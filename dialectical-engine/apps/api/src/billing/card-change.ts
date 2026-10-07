@@ -103,8 +103,10 @@ export async function startCardChange(deps: CardDeps, input: CardChangeInput): P
   const email = await deps.accountEmail.read(input.userId);
   const { firstName, lastName, street, city, postalCode } = input.details;
   // SR-30: the corrections reach NETOPIA and the next page; the tax location (country, region) never moves.
+  // The locale stored at checkout stays (as N12's upgrade); the card page's locale only when no profile is stored yet.
+  const profileLocale = stored.profile?.locale ?? input.locale;
   const profile: BillingProfile = Object.freeze({
-    email, locale: input.locale, name: `${firstName} ${lastName}`, firstName, lastName, phone, paymentIp: input.ip,
+    email, locale: profileLocale, name: `${firstName} ${lastName}`, firstName, lastName, phone, paymentIp: input.ip,
     country: stored.location.country, region: stored.quoteLocation.region, postalCode, city, street,
     company: stored.profile?.company ?? null
   });
@@ -140,7 +142,7 @@ export async function startCardChange(deps: CardDeps, input: CardChangeInput): P
     });
     const sealed = sealBillingProfile(deps.recordsKey, stored.customerId, profile);
     await deps.billing.appendProfile(client, {
-      customerId: stored.customerId, at: input.now, locale: input.locale, profileCiphertext: sealed.ciphertext, keyId: sealed.keyId
+      customerId: stored.customerId, at: input.now, locale: profileLocale, profileCiphertext: sealed.ciphertext, keyId: sealed.keyId
     });
   });
   deps.audit("billing.card.change.started", { status: before.status });

@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { foldSubscription, paymentError, type PaymentState } from "@debateai/billing-core";
 import { BillingCardChangeResponseSchema, BillingCardDetailsResponseSchema } from "@debateai/contract";
@@ -13,7 +13,7 @@ import {
 import { netopiaVerifyHandler, verifyJob } from "../support/netopia-verify.js";
 import { StubCardPayments, stubPaymentReport } from "../support/stub-card-payments.js";
 import { chargeStatusOf } from "../../apps/api/src/billing/charge-status.js";
-import { openBillingProfile, sealCardToken } from "../../apps/api/src/billing/records.js";
+import { openBillingProfile, sealBillingProfile, sealCardToken, sealIpEvidence } from "../../apps/api/src/billing/records.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 
 let database: TestDatabase;
@@ -62,7 +62,7 @@ async function start(label: string) {
     payments.scriptStatus(chargeRef, stubPaymentReport(chargeRef, state, { amountMicros: 0, ...extra }));
     return verify.handle(verifyJob(chargeRef, clock.now), clock.now);
   };
-  return { identity, clock, payments, audit, seeded, api, details, change, started, check };
+  return { identity, clock, payments, audit, seeded, api, details, change, started, check, verify };
 }
 type Run = Awaited<ReturnType<typeof start>>;
 
@@ -77,6 +77,18 @@ async function storeToken(run: Run, chargeRef: string): Promise<string> {
     last4: "0004", cardCountry: "RO", createdAt: run.clock.now
   }));
   return tokenId;
+}
+
+/** NETOPIA's verified message for the check, as N9 stores it (N10's `storeNotice`); no saved card in it. */
+async function storeNotice(run: Run, chargeRef: string, status: number): Promise<{ noticeId: string; receivedAt: Date }> {
+  const sealed = sealIpEvidence(TEST_RECORDS_KEY, chargeRef, null);
+  const stored = await repository.withTransaction((client) => repository.insertPaymentNotice(client, {
+    noticeId: randomUUID(), paymentProvider: "netopia", paymentEnvironment: "sandbox", receivedAt: run.clock.now,
+    bodySha256: randomBytes(32).toString("hex"), orderId: chargeRef, providerPaymentId: `ntp-${chargeRef.slice(0, 12)}`,
+    providerStatus: status, amountText: "0.00", currency: "USD", cardCountry: "RO", keyFingerprint: "e".repeat(64),
+    jwtIat: null, allowedCiphertext: sealed.ciphertext, keyId: sealed.keyId
+  }));
+  return { noticeId: stored.noticeId, receivedAt: run.clock.now };
 }
 
 const trail = async (chargeRef: string) =>
@@ -140,6 +152,25 @@ describe("N13 the card page's details and NETOPIA's 0 check (spec §2.11)", () =
     expect(BillingCardDetailsResponseSchema.parse((await run.details()).json())).toMatchObject({ first_name: "Ana", country: "RO" });
     expect((await stateOf(run)).cardTokenId).toBe(run.seeded.cardTokenId);
     expect(run.audit.events.map((entry) => entry.event)).toContain("billing.card.change.started");
+    await run.api.close();
+  });
+
+  it("keeps the locale stored at checkout on the new profile, whatever the card page's language", async () => {
+    const run = await start("n13-locale");
+    const customerId = run.seeded.customerId;
+    const seededProfile = (await repository.latestProfile(customerId))!;
+    const opened = openBillingProfile(TEST_RECORDS_KEY, customerId, seededProfile.profileCiphertext);
+    const resealed = sealBillingProfile(TEST_RECORDS_KEY, customerId, { ...opened, locale: "ro" });
+    await repository.withTransaction((client) => repository.appendProfile(client, {
+      customerId, at: new Date(run.clock.now.getTime() - MINUTE), locale: "ro", profileCiphertext: resealed.ciphertext,
+      keyId: resealed.keyId
+    }));
+    const response = await run.change({ locale: "en", ...CORRECTED });
+    expect(response.statusCode, response.body).toBe(200);
+    const latest = (await repository.latestProfile(customerId))!;
+    expect(latest.locale).toBe("ro");
+    expect(openBillingProfile(TEST_RECORDS_KEY, customerId, latest.profileCiphertext))
+      .toMatchObject({ locale: "ro", firstName: "Ana", paymentIp: IP });
     await run.api.close();
   });
 
@@ -234,6 +265,27 @@ describe("N13 VERIFY_PAYMENT on a 0 card check (spec §2.11)", () => {
     expect(await run.check(answer.charge_ref, "PAID")).toEqual({ kind: "DONE" });
     expect((await trail(answer.charge_ref)).map(([kind]) => kind)).not.toContain("SUCCEEDED");
     expect((await stateOf(run)).cardTokenId).toBe(run.seeded.cardTokenId);
+    await run.api.close();
+  });
+
+  it("decided from the stored notice with no PAID/AUTHORIZED read, waits 15 minutes from the notice's arrival", async () => {
+    const run = await start("n13-from-notice");
+    const answer = await run.started();
+    const notice = await storeNotice(run, answer.charge_ref, 2);
+    // NETOPIA's status stays unreadable (an empty queue would answer NO_SUCH_ORDER, the other branch).
+    run.payments.scriptStatus(answer.charge_ref, paymentError("PAYMENT_PROVIDER_UNAVAILABLE"));
+    const waiting = await run.verify.handle(verifyJob(answer.charge_ref, run.clock.now, 7), run.clock.now);
+    expect(waiting).toEqual({ kind: "RETRY", code: "CARD_NOT_SAVED_YET", retryAt: new Date(notice.receivedAt.getTime() + 15 * MINUTE) });
+    expect((await trail(answer.charge_ref)).map(([kind]) => kind)).not.toContain("FAILED");
+    run.clock.now = new Date(run.clock.now.getTime() + 16 * MINUTE);
+    run.payments.scriptStatus(answer.charge_ref, paymentError("PAYMENT_PROVIDER_UNAVAILABLE"));
+    expect(await run.verify.handle(verifyJob(answer.charge_ref, run.clock.now, 8), run.clock.now)).toEqual({ kind: "DONE" });
+    expect((await trail(answer.charge_ref)).at(-1)).toEqual(["FAILED", "CARD_NOT_SAVED"]);
+    expect((await stateOf(run)).cardTokenId).toBe(run.seeded.cardTokenId);
+    const outcomes = (await database.pool.query<{ outcome: string }>(
+      "SELECT outcome FROM billing.payment_notice_outcome WHERE notice_id = $1 ORDER BY at", [notice.noticeId]
+    )).rows.map((row) => row.outcome);
+    expect(outcomes).toContain("DECIDED_BY_NOTICE");
     await run.api.close();
   });
 

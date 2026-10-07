@@ -1291,8 +1291,9 @@ export class VerifyPaymentHandler {
 
   /**
    * N13 (spec §2.11, SR-12): a card check succeeds only once its saved card has arrived. Without a stored token of this
-   * charge it waits 15 minutes from NETOPIA's first PAID/AUTHORIZED read (the message may come after the status), then
-   * FAILED(CARD_NOT_SAVED). A check closed CARD_NOT_SAVED stays closed: a later token is never adopted (N17 revokes
+   * charge it waits 15 minutes (the message may come after the status), then FAILED(CARD_NOT_SAVED). The wait runs from
+   * NETOPIA's first PAID/AUTHORIZED read or, when the job decides from the stored notice with no such read, from that
+   * notice's arrival. A check closed CARD_NOT_SAVED stays closed: a later token is never adopted (N17 revokes
    * it). Null: not a card check waiting for its card; decide as usual.
    */
   private async cardCheckGate(
@@ -1304,7 +1305,8 @@ export class VerifyPaymentHandler {
     const tokens = await repository.withTransaction((client) => repository.cardTokensFromCharge(client, charge.chargeId));
     if (tokens.length > 0) return null;
     const first = await repository.withTransaction((client) => repository.firstStatusReadAt(client, charge.chargeId, ["PAID", "AUTHORIZED"]));
-    const deadline = (first ?? now).getTime() + cardSaveWaitMs();
+    const start = first ?? (fromNotice ? (await this.newestNotice(charge.chargeId))?.receivedAt ?? now : now);
+    const deadline = start.getTime() + cardSaveWaitMs();
     if (now.getTime() >= deadline) return this.cardNotSaved(charge, now);
     const scheduled = fromNotice ? null : notFinalRetryAt(job.attempts, now);
     const retryAt = new Date(Math.min(scheduled?.getTime() ?? deadline, deadline));
