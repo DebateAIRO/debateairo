@@ -9,5 +9,6 @@ export function previewPlanRoster<T extends Readonly<{ free: readonly string[]; 
   if (!Array.isArray(decoded) || decoded.length !== 1 || decoded[0] !== "zai-org/GLM-5.3-Flash") {
     throw new TypeError("PREVIEW_FREE_MODEL_ROSTER_BUILD_FLAG_INVALID");
   }
-  return Object.freeze({ free: Object.freeze(["zai-org/GLM-5.3-Flash"]), premium: defaults.premium });
+  // Step 1 (owner, 2026-10-08): Premium runs on the same single GLM on the private preview.
+  return Object.freeze({ free: Object.freeze(["zai-org/GLM-5.3-Flash"]), premium: Object.freeze(["zai-org/GLM-5.3-Flash"]) });
 }
