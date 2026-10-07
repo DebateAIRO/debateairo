@@ -16,7 +16,7 @@ describe('production preview spending guard optional JSON mode', () => {
   it('runs the v2 team daily pot, concurrency, halt and custody behaviors offline', () => {
     const result = runPython('tests/unit/preview_budget_authority_v2_test.py', 30000);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 51 tests');
+    expect(result.stderr).toContain('Ran 79 tests');
     expect(result.stderr).toContain('OK');
   });
 });

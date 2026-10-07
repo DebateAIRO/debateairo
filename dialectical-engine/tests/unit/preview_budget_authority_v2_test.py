@@ -964,8 +964,8 @@ class ConcurrencyTests(GateTest):
         try:
             for _ in range(4):
                 self.assertTrue(entered.acquire(timeout=3), 'four dispatches must be in flight at once')
-            with bridge.TeamStore(gate.private, lock_timeout=0.5):
-                pass  # The exclusive ledger lock is free while all four upstream calls are running.
+            with bridge.TeamStore(gate.private, lock_timeout=0):
+                pass  # One non-blocking try: the exclusive ledger lock is free while four upstream calls run.
             self.assertEqual(gate.status()['in_flight'], 4)
             fifth = []
             started = time.monotonic()
@@ -980,6 +980,37 @@ class ConcurrencyTests(GateTest):
         self.assertEqual({k: v['status'] for k, v in results.items()}, {'op-%d' % n: 200 for n in range(4)})
         status = gate.status()
         self.assertEqual((status['in_flight'], status['today_posts'], status['today_spend_usd']), (0, 4, '0.04'))
+
+    def test_racing_calls_at_the_budget_edge_reserve_exactly_what_fits(self):
+        for fits, budget in ((1, '0.10'), (2, '0.17')):
+            with self.subTest(fits=fits):
+                self.assertTrue(fits * RESERVED <= Decimal(budget) < (fits + 1) * RESERVED)
+                gate = self.gate(daily_budget_usd=budget, max_concurrent_calls=8).ready()
+                start, release, results = threading.Barrier(8), threading.Event(), {}
+
+                def held(_body, _key):
+                    release.wait(5)  # Holds stay pending until every racer has been answered.
+                    return 200, provider_response('0.01')
+
+                def race(operation_id):
+                    start.wait(5)
+                    try:
+                        results[operation_id] = gate.call(operation_id, dispatch=held, slot_wait=5)
+                    except BaseException as error:  # noqa: BLE001 - recorded for assertions
+                        results[operation_id] = error
+                threads = [threading.Thread(target=race, args=('op-%d' % n,)) for n in range(8)]
+                for thread in threads:
+                    thread.start()
+                deadline = time.monotonic() + 10
+                while len(results) < 8 - fits and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                release.set()
+                for thread in threads:
+                    thread.join(10)
+                outcomes = sorted('ok' if isinstance(v, dict) else str(v) for v in results.values())
+                self.assertEqual(outcomes, ['TEAM_DAILY_BUDGET_REACHED'] * (8 - fits) + ['ok'] * fits)
+                status = gate.status()
+                self.assertEqual((status['today_posts'], status['in_flight'], status['state']), (fits, 0, 'active'))
 
     def test_waiting_call_proceeds_when_a_slot_frees_within_the_wait(self):
         gate = self.gate(max_concurrent_calls=1).ready()
