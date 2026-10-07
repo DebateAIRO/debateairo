@@ -119,6 +119,25 @@ describe('executing identity is wired before protected operations',()=>{
    if(file==='run-stage.mjs')expect(code).toContain("['preview-auth-dev-stage-operation-v2','preview-auth-dev-stage-operation-v3'].includes(operation.schema)");
   }
  });
+ it('binds stage execution before its private creator read and both connections',async()=>{
+  const code=await readFile(resolve('deploy/preview-auth-dev/v1/run-stage.mjs'),'utf8'),binding=code.indexOf("entryUrl:import.meta.url,entryName:'run-stage.mjs'");
+  const credentialRead=code.indexOf("withPrivateBytes(join(root,'admin-connection.json')"),probe=code.indexOf('const probe=new pg.Client('),creator=code.indexOf('creator=new pg.Client(');
+  expect(credentialRead).toBeGreaterThan(binding);expect(probe).toBeGreaterThan(credentialRead);expect(creator).toBeGreaterThan(credentialRead);
+ });
+});
+
+describe('stage-only direct creator envelope',()=>{
+ const envelope=()=>({schema:'preview-auth-dev-synthetic-stage-connection-v1',url:`postgresql://debateai_prod_migrator:${'a'.repeat(64)}@localhost/debateai_preview_auth_dev_stage?host=/run/debateai-preview-auth-dev-stage/postgresql&port=55434`});
+ it('accepts only the established bounded creator envelope',async()=>{
+  const stage=await import('../../deploy/'+'preview-auth-dev/v1/run-stage.mjs');
+  expect(stage.parseStageCreatorConnection(envelope())).toBe(envelope().url);
+ });
+ it.each(['schema','extra','principal','database','socket','port','hostname','tcp-port','options','duplicate','fragment','password','protocol'])('refuses %s redirection before connecting',async kind=>{
+  const stage=await import('../../deploy/'+'preview-auth-dev/v1/run-stage.mjs'),value:any=envelope(),url=new URL(value.url);
+  if(kind==='schema')value.schema='another-schema';if(kind==='extra')value.other=true;
+  if(kind==='principal')url.username='postgres';if(kind==='database')url.pathname='/debateai';if(kind==='socket')url.searchParams.set('host','/run/debateai-v3-preview/postgresql');if(kind==='port')url.searchParams.set('port','5434');if(kind==='hostname')url.hostname='127.0.0.1';if(kind==='tcp-port')url.port='55434';if(kind==='options')url.searchParams.set('options','-c role=postgres');if(kind==='duplicate')url.searchParams.append('host','/run/other');if(kind==='fragment')url.hash='other';if(kind==='password')url.password='short';if(kind==='protocol')url.protocol='http:';
+  value.url=kind==='protocol'?url.toString().replace('postgresql:','http:'):url.toString();expect(()=>stage.parseStageCreatorConnection(value)).toThrow('PREVIEW_STAGE_CREATOR_REFUSED');
+ });
 });
 
 describe('exact separately generated contract binding',()=>{
