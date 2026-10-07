@@ -71,13 +71,14 @@ const iso = (value: Date | null): string | null => value === null ? null : value
 
 /**
  * An upgrade is offered only while it can be charged at a prorated price: ACTIVE, below Max, no postponed renewal
- * running, outside the renewal's lead (P12c refuses it there with UPGRADE_NOT_AVAILABLE_NOW), and the plan paid in
- * a payment system this API serves (spec §2.5.4; P2-W3 (a): the upgrade refuses another one's NOT_SUBSCRIBED).
+ * running, outside the renewal's lead (P12c refuses it there with UPGRADE_NOT_AVAILABLE_NOW), and a NETOPIA plan of
+ * the environment this API serves (spec §2.5.4, §2.10; P2-W3 (a): the upgrade refuses any other plan NOT_SUBSCRIBED).
+ * Since N12 the upgrade route serves NETOPIA plans only (`servedByNetopia`'s rule), so an xMoney plan is never offered it.
  */
 function upgradeOffered(input: WindowInput): boolean {
   const { state, now } = input;
   return state.status === "ACTIVE" && state.planId !== "MAX" && state.renewalPostponedUntil === null
-    && served(input)
+    && state.paymentProvider === "netopia" && served(input)
     && state.currentPeriodEnd !== null && now.getTime() < state.currentPeriodEnd.getTime() - renewalLeadMs();
 }
 

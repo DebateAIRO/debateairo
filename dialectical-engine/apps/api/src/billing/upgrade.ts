@@ -298,6 +298,10 @@ async function prepareUpgrade(
   }
   // A renewal since the quote moved the period: the prorated price no longer holds.
   if (quote.createdAt.getTime() < state.currentPeriodStart.getTime()) refuse(409, "QUOTE_EXPIRED");
+  // Another upgrade applied since the quote changed the plan it was priced from: its price no longer holds.
+  if (locked.events.some((event) => event.kind === "UPGRADED" && event.at.getTime() >= quote.createdAt.getTime())) {
+    refuse(409, "QUOTE_EXPIRED");
+  }
   if (planById(deps.plans, input.planId).netPriceMicros <= planById(deps.plans, state.planId).netPriceMicros) {
     refuse(422, "UPGRADE_NOT_HIGHER");
   }
@@ -427,7 +431,9 @@ const CLOSED_GOES_BACK: SettlementResult = Object.freeze({ kind: "REFUND" as con
  * it is). A declined upgrade changes nothing (spec §2.5.6). Every read runs on the settlement's own connection.
  * N12 (spec §2.10): a late payment for an upgrade we CLOSED (FAILED other than a decline) buys only what it was priced
  * for (the same period, no plan change since its quote), else it goes back as `UPGRADE_CLOSED`; on NETOPIA, UPGRADED
- * carries N10's adopted card.
+ * carries N10's adopted card. Any upgrade quoted before another one was applied (an UPGRADED at or after its quote's
+ * creation) goes back in full, closed or not (`UPGRADE_CLOSED` when we closed it, `SUBSCRIPTION_ENDED` otherwise): it
+ * was priced from a plan the subscription no longer has, so two upgrades never both apply.
  */
 export function createUpgradeSettlement(deps: Readonly<{
   repository: Pick<BillingRepository,
@@ -447,9 +453,9 @@ export function createUpgradeSettlement(deps: Readonly<{
       const read = await deps.repository.charge(charge.chargeId, client);
       const closed = read?.events.some((event) => event.kind === "FAILED" && event.errorCode !== "PAYMENT_DECLINED") ?? false;
       const goesBack = closed ? CLOSED_GOES_BACK : PAYMENT_GOES_BACK;
-      // The plan it was priced from changed since its quote (another upgrade was applied): a closed one buys nothing.
-      if (closed && context.events.some((event) => event.kind === "UPGRADED" && event.at.getTime() >= quote.createdAt.getTime())) {
-        return CLOSED_GOES_BACK;
+      // The plan it was priced from changed since its quote (another upgrade was applied): it buys nothing.
+      if (context.events.some((event) => event.kind === "UPGRADED" && event.at.getTime() >= quote.createdAt.getTime())) {
+        return goesBack;
       }
       if (subscription.status !== "ACTIVE" || subscription.currentPeriodStart === null
         || planById(deps.plans, quote.planId).netPriceMicros <= planById(deps.plans, subscription.planId).netPriceMicros
