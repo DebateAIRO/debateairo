@@ -95,6 +95,9 @@ importers:
       '@debateai/obs-capture':
         specifier: workspace:*
         version: link:packages/obs-capture
+      '@debateai/payments-netopia':
+        specifier: workspace:*
+        version: link:packages/payments-netopia
       '@debateai/payments-xmoney':
         specifier: workspace:*
         version: link:packages/payments-xmoney
@@ -725,6 +728,15 @@ importers:
       pg:
         specifier: 8.22.0
         version: 8.22.0
+
+  packages/payments-netopia:
+    dependencies:
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../billing-core
+      '@debateai/kernel':
+        specifier: workspace:*
+        version: link:../kernel
 
   packages/payments-xmoney:
     dependencies:

@@ -38,6 +38,9 @@ const rows: readonly Row[] = [
   ["billing-core", "packages/billing-core", ["kernel"]],
   // Paid plans (A26(a)): xMoney order signing, notice decryption and (P3b) the HTTP client.
   ["payments-xmoney", "packages/payments-xmoney", ["kernel"]],
+  // NETOPIA (spec 2026-10-05 §2.4): the card processor's package over plain fetch and node:crypto; billing-core for the
+  // payment port's types and error vocabulary (billing-core depends on kernel alone, so no cycle).
+  ["payments-netopia", "packages/payments-netopia", ["kernel", "billing-core"]],
   // Paid plans (A26(a)): the Quaderno tax connector over plain fetch (P4).
   ["tax-quaderno", "packages/tax-quaderno", ["kernel", "billing-core"]],
   // Paid plans (A26(a)): the SmartBill invoice connector over plain fetch (P5).

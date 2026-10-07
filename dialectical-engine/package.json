@@ -98,6 +98,7 @@
     "@debateai/mail-templates": "workspace:*",
     "@debateai/memory": "workspace:*",
     "@debateai/obs-capture": "workspace:*",
+    "@debateai/payments-netopia": "workspace:*",
     "@debateai/payments-xmoney": "workspace:*",
     "@debateai/propagation": "workspace:*",
     "@debateai/providers": "workspace:*",

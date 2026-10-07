@@ -786,6 +786,17 @@ packages/obs-capture/src/zone/classifier.ts
 packages/obs-capture/src/zone/counter.ts
 packages/obs-capture/src/zone/index.ts
 packages/obs-capture/src/zone/manifest.ts
+packages/payments-netopia/src/answers.ts
+packages/payments-netopia/src/countries.ts
+packages/payments-netopia/src/facts.ts
+packages/payments-netopia/src/hosts.ts
+packages/payments-netopia/src/index.ts
+packages/payments-netopia/src/json.ts
+packages/payments-netopia/src/money.ts
+packages/payments-netopia/src/requests.ts
+packages/payments-netopia/src/secret-token.ts
+packages/payments-netopia/src/status.ts
+packages/payments-netopia/src/time.ts
 packages/payments-xmoney/src/client.ts
 packages/payments-xmoney/src/index.ts
 packages/payments-xmoney/src/json.ts
