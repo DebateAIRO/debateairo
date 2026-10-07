@@ -28,6 +28,7 @@
   "mail.M5.subject": "Emme saaneet veloitettua {plan}-tilauksesi maksua",
   "mail.M5.notTaken": "Emme saaneet veloitettua tämän kuun maksua {plan}-tilauksestasi. Tilauksesi pysyy voimassa, kun yritämme uudelleen.",
   "mail.M5.bankRefused": "Pankkisi hylkäsi maksun.",
+  "mail.M5.confirmCard": "Pankkisi pyysi sinua vahvistamaan tämän maksun. Vahvista korttisi kohdassa Asetukset, niin yritämme uudelleen.",
   "mail.M5.retry": "Yritämme uudelleen {retryDate}. Jos haluat käyttää toista korttia, avaa: {cardPageUrl}",
   "mail.M5.secondTry": "Toinenkaan yrityksemme ei onnistunut. Yritämme uudelleen {retryDate}. Jos haluat käyttää toista korttia, avaa: {cardPageUrl}",
   "mail.M5.lastTry": "Teemme viimeisen yrityksen {retryDate}. Jos se epäonnistuu, tilisi siirtyy Maksuton-tilaukseen, ja keskustelusi säilyvät. Jos haluat käyttää toista korttia, avaa: {cardPageUrl}",

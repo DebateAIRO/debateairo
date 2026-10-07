@@ -28,6 +28,7 @@
   "mail.M5.subject": "No pudimos cobrar el pago de su plan {plan}",
   "mail.M5.notTaken": "No pudimos cobrar el pago de este mes de su plan {plan}. Conserva su plan mientras lo intentamos de nuevo.",
   "mail.M5.bankRefused": "Su banco rechazó el pago.",
+  "mail.M5.confirmCard": "Su banco le pidió que confirmara este pago. Confirme su tarjeta en Configuración y lo intentaremos de nuevo.",
   "mail.M5.retry": "Lo intentaremos de nuevo el {retryDate}. Para usar otra tarjeta, abra: {cardPageUrl}",
   "mail.M5.secondTry": "Nuestro segundo intento tampoco funcionó. Lo intentaremos de nuevo el {retryDate}. Para usar otra tarjeta, abra: {cardPageUrl}",
   "mail.M5.lastTry": "Haremos un último intento el {retryDate}. Si falla, su cuenta pasará al plan Gratuito y sus debates se conservarán. Para usar otra tarjeta, abra: {cardPageUrl}",

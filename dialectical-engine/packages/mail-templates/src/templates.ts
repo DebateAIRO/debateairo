@@ -84,12 +84,19 @@ const define = (template: MailTemplateDefinition): MailTemplateDefinition => Obj
  * W10 (P2-I21): `bankDeclined` is "true" only for a charge the bank declined (PAYMENT_DECLINED); every other failed
  * attempt (an outage past Q-1's 72 hours, our refused key, an unknown outcome, xMoney's own refusal, a tax service
  * that stayed down, a retry whose total changed) asked no bank, so its email never says one refused.
+ * N11 (spec §2.9.2): the optional flag `confirmCard` is "true" for AUTHENTICATION_REQUIRED (the bank asked for its
+ * security check on a renewal nobody was present to finish): its sentence replaces the bank's refusal. An M5 queued
+ * without it reads as before.
  */
 const retry = Object.freeze({ plan: "plan", retryDate: "date", cardPageUrl: "url", bankDeclined: "flag" } as const);
-/** W10 (P2-I21): the first M5 sentence is true in every case; the bank's refusal follows only when there was one. */
+const retryOptional = Object.freeze({ confirmCard: "flag" } as const);
+/** W10 (P2-I21): the first M5 sentence is true in every case; then the bank's check or its refusal, when there was one. */
 const notTaken: ReadonlyArray<MailParagraph> = Object.freeze([
   "mail.M5.notTaken",
-  { ifParam: "bankDeclined", test: "true", then: "mail.M5.bankRefused", otherwise: null }
+  {
+    ifParam: "confirmCard", test: "true", then: "mail.M5.confirmCard",
+    otherwise: { ifParam: "bankDeclined", test: "true", then: "mail.M5.bankRefused", otherwise: null }
+  }
 ]);
 const charged = Object.freeze({ plan: "plan", totalAmount: "amount", chargeDate: "date" } as const);
 
@@ -132,9 +139,15 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     paragraphs: ["mail.M4.reminder", "mail.M4.cancel"],
     params: { plan: "plan", totalAmount: "amount", renewDate: "date", cancelPageUrl: "url" }
   }),
-  M5A: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.retry"], params: retry }),
-  M5B: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.secondTry"], params: retry }),
-  M5C: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.lastTry"], params: retry }),
+  M5A: define({
+    catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.retry"], params: retry, optional: retryOptional
+  }),
+  M5B: define({
+    catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.secondTry"], params: retry, optional: retryOptional
+  }),
+  M5C: define({
+    catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.lastTry"], params: retry, optional: retryOptional
+  }),
   M6: define({
     catalogue: "mail", subject: "mail.M6.subject",
     paragraphs: ["mail.M6.moved", "mail.M6.again"],

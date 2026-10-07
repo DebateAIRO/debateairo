@@ -28,6 +28,7 @@
   "mail.M5.subject": "Nismo uspjeli naplatiti plaćanje za vaš plan {plan}",
   "mail.M5.notTaken": "Nismo uspjeli naplatiti ovomjesečno plaćanje za vaš plan {plan}. Zadržavate svoj plan dok pokušavamo ponovno.",
   "mail.M5.bankRefused": "Vaša banka odbila je plaćanje.",
+  "mail.M5.confirmCard": "Vaša banka zatražila je da potvrdite ovo plaćanje. Molimo potvrdite svoju karticu u Postavkama i pokušat ćemo ponovno.",
   "mail.M5.retry": "Pokušat ćemo ponovno {retryDate}. Za korištenje druge kartice otvorite: {cardPageUrl}",
   "mail.M5.secondTry": "Ni naš drugi pokušaj nije uspio. Pokušat ćemo ponovno {retryDate}. Za korištenje druge kartice otvorite: {cardPageUrl}",
   "mail.M5.lastTry": "Posljednji pokušaj napravit ćemo {retryDate}. Ako ne uspije, vaš račun prelazi na plan Besplatno, a vaše rasprave ostaju sačuvane. Za korištenje druge kartice otvorite: {cardPageUrl}",

@@ -28,6 +28,7 @@
   "mail.M5.subject": "Vi kunne ikke trække betalingen for dit {plan}-abonnement",
   "mail.M5.notTaken": "Vi kunne ikke trække denne måneds betaling for dit {plan}-abonnement. Du beholder dit abonnement, mens vi prøver igen.",
   "mail.M5.bankRefused": "Din bank afviste betalingen.",
+  "mail.M5.confirmCard": "Din bank bad dig bekræfte denne betaling. Bekræft dit kort under Indstillinger, så prøver vi igen.",
   "mail.M5.retry": "Vi prøver igen den {retryDate}. Åbn denne side for at bruge et andet kort: {cardPageUrl}",
   "mail.M5.secondTry": "Vores andet forsøg lykkedes heller ikke. Vi prøver igen den {retryDate}. Åbn denne side for at bruge et andet kort: {cardPageUrl}",
   "mail.M5.lastTry": "Vi gør et sidste forsøg den {retryDate}. Hvis det mislykkes, flyttes din konto til Gratis-abonnementet, og dine debatter bevares. Åbn denne side for at bruge et andet kort: {cardPageUrl}",

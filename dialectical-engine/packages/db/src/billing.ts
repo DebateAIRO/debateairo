@@ -843,6 +843,19 @@ export class BillingRepository {
     `, [subscriptionId])).rows.map(toCharge);
   }
 
+  /**
+   * N11/N16 (spec §2.14): the latest status read of a charge (`billing.status_read`, one content-free row per read):
+   * when, and what it said (a PaymentState, NO_SUCH_ORDER, or the error code). Null: never read.
+   */
+  async lastStatusRead(
+    chargeId: string, executor: BillingReadExecutor = this.pool
+  ): Promise<Readonly<{ at: Date; outcome: string }> | null> {
+    const row = (await executor.query<{ at: Date; outcome: string }>(
+      "SELECT at, outcome FROM billing.status_read WHERE charge_id = $1 ORDER BY at DESC LIMIT 1", [chargeId]
+    )).rows[0];
+    return row === undefined ? null : Object.freeze({ at: row.at, outcome: row.outcome });
+  }
+
   async insertLocationEvidence(c: PoolClient, e: LocationEvidenceRow): Promise<void> {
     await c.query(`
       INSERT INTO billing.location_evidence (charge_id, ip_country, declared_country, card_country, verdict,

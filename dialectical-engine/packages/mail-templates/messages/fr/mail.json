@@ -28,6 +28,7 @@
   "mail.M5.subject": "Nous n’avons pas pu encaisser le paiement de votre formule {plan}",
   "mail.M5.notTaken": "Nous n’avons pas pu encaisser le paiement de ce mois pour votre formule {plan}. Vous conservez votre formule pendant que nous réessayons.",
   "mail.M5.bankRefused": "Votre banque a refusé le paiement.",
+  "mail.M5.confirmCard": "Votre banque vous a demandé de confirmer ce paiement. Veuillez confirmer votre carte dans les Paramètres, et nous réessaierons.",
   "mail.M5.retry": "Nous réessaierons le {retryDate}. Pour utiliser une autre carte, ouvrez : {cardPageUrl}",
   "mail.M5.secondTry": "Notre deuxième tentative n’a pas abouti non plus. Nous réessaierons le {retryDate}. Pour utiliser une autre carte, ouvrez : {cardPageUrl}",
   "mail.M5.lastTry": "Nous ferons une dernière tentative le {retryDate}. Si elle échoue, votre compte passera à la formule Gratuite, et vos débats seront conservés. Pour utiliser une autre carte, ouvrez : {cardPageUrl}",

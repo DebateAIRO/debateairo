@@ -39,6 +39,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   notRequested: "true",
   otherSystem: "true",
   bankDeclined: "true",
+  confirmCard: "true",
   paymentAlert: "true",
   endedPlan: "PRO",
   invoiceNumber: "DBAI 0042",
@@ -197,11 +198,13 @@ describe("P17 renderMail", () => {
     for (const id of ["M5A", "M5B", "M5C"] as const) {
       // An outage past Q-1's 72 hours, our own refused key, an unknown outcome or a tax service that stayed down: no
       // bank was asked, so no sentence blames one.
-      const ours = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "false" }).text;
+      // N11: `confirmCard` (AUTHENTICATION_REQUIRED) is left "false" here; its own sentence is pinned in
+      // tests/unit/billing-netopia-renewal-rules.test.ts.
+      const ours = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "false", confirmCard: "false" }).text;
       expect(ours, id).toContain(`Hello,\n\n${first}\n\n`);
       expect(ours, id).not.toMatch(/bank/iu);
       // PAYMENT_DECLINED: the same first sentence, then the bank's refusal.
-      const declined = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "true" }).text;
+      const declined = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "true", confirmCard: "false" }).text;
       expect(declined, id).toContain(`Hello,\n\n${first}\n\nYour bank refused the payment.\n\n`);
       expect(MAIL_TEMPLATES[id].params.bankDeclined, id).toBe("flag");
       const { bankDeclined: _flag, ...withoutFlag } = paramsFor(id);

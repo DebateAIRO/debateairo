@@ -28,6 +28,7 @@
   "mail.M5.subject": "Chúng tôi không thể thu khoản thanh toán cho gói {plan} của quý vị",
   "mail.M5.notTaken": "Chúng tôi không thể thu khoản thanh toán tháng này cho gói {plan} của quý vị. Quý vị vẫn giữ gói của mình trong khi chúng tôi thử lại.",
   "mail.M5.bankRefused": "Ngân hàng của quý vị đã từ chối khoản thanh toán.",
+  "mail.M5.confirmCard": "Ngân hàng của quý vị đã yêu cầu xác nhận khoản thanh toán này. Vui lòng xác nhận thẻ của quý vị trong Cài đặt, và chúng tôi sẽ thử lại.",
   "mail.M5.retry": "Chúng tôi sẽ thử lại vào {retryDate}. Để dùng thẻ khác, hãy mở: {cardPageUrl}",
   "mail.M5.secondTry": "Lần thử thứ hai của chúng tôi cũng không thành công. Chúng tôi sẽ thử lại vào {retryDate}. Để dùng thẻ khác, hãy mở: {cardPageUrl}",
   "mail.M5.lastTry": "Chúng tôi sẽ thử lần cuối vào {retryDate}. Nếu không thành công, tài khoản của quý vị sẽ chuyển sang gói Miễn phí, và các cuộc tranh luận của quý vị được giữ lại. Để dùng thẻ khác, hãy mở: {cardPageUrl}",

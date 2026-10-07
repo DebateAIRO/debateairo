@@ -28,6 +28,7 @@
   "mail.M5.subject": "Nie udało się pobrać płatności za Państwa plan {plan}",
   "mail.M5.notTaken": "Nie udało się pobrać płatności za ten miesiąc za Państwa plan {plan}. Zachowują Państwo swój plan, gdy próbujemy ponownie.",
   "mail.M5.bankRefused": "Państwa bank odrzucił płatność.",
+  "mail.M5.confirmCard": "Państwa bank poprosił o potwierdzenie tej płatności. Prosimy potwierdzić kartę w Ustawieniach, a spróbujemy ponownie.",
   "mail.M5.retry": "Spróbujemy ponownie {retryDate}. Aby użyć innej karty, prosimy otworzyć: {cardPageUrl}",
   "mail.M5.secondTry": "Nasza druga próba również się nie powiodła. Spróbujemy ponownie {retryDate}. Aby użyć innej karty, prosimy otworzyć: {cardPageUrl}",
   "mail.M5.lastTry": "Podejmiemy ostatnią próbę {retryDate}. Jeśli się nie powiedzie, Państwa konto przejdzie na plan Bezpłatny, a Państwa debaty zostaną zachowane. Aby użyć innej karty, prosimy otworzyć: {cardPageUrl}",

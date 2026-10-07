@@ -28,6 +28,7 @@
   "mail.M5.subject": "Mēs nevarējām iekasēt maksājumu par jūsu plānu {plan}",
   "mail.M5.notTaken": "Mēs nevarējām iekasēt šī mēneša maksājumu par jūsu plānu {plan}. Jūs saglabājat savu plānu, kamēr mēģinām vēlreiz.",
   "mail.M5.bankRefused": "Jūsu banka atteica maksājumu.",
+  "mail.M5.confirmCard": "Jūsu banka lūdza apstiprināt šo maksājumu. Lūdzu, apstipriniet savu karti sadaļā Iestatījumi, un mēs mēģināsim vēlreiz.",
   "mail.M5.retry": "Mēs mēģināsim vēlreiz {retryDate}. Lai izmantotu citu karti, atveriet: {cardPageUrl}",
   "mail.M5.secondTry": "Arī mūsu otrais mēģinājums neizdevās. Mēs mēģināsim vēlreiz {retryDate}. Lai izmantotu citu karti, atveriet: {cardPageUrl}",
   "mail.M5.lastTry": "Mēs veiksim pēdējo mēģinājumu {retryDate}. Ja tas neizdosies, jūsu konts pāries uz plānu Bezmaksas, un jūsu debates tiks saglabātas. Lai izmantotu citu karti, atveriet: {cardPageUrl}",

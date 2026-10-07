@@ -72,6 +72,17 @@ export type BillingAuditEvent =
   | "billing.renewal.history_invalid"
   /** P11a: a subscription whose recurring net price was never recorded; it is not charged at a guessed price. */
   | "billing.renewal.price_missing"
+  /** N11 (spec §2.9.3, §2.9.4): a NETOPIA renewal's outcome is still open past its window; O3 was queued. The attempt. */
+  | "billing.renewal.outcome_open"
+  /** N11 (spec §2.9.3 step 5): a dunning retry was not made this pass; the code (EARLIER_ATTEMPT_PAID or _UNREADABLE). */
+  | "billing.renewal.retry_held"
+  /** N11: an earlier attempt of the period read PAID before a retry; its check was queued. The attempt. */
+  | "billing.renewal.recovered_earlier"
+  /**
+   * N11 (spec §2.4.3, ruling PR-11): NETOPIA answered a renewal's FIRST send with 56 (the orderID was already used), an
+   * anomaly; O3 ORDER_REUSED was queued. Our own order id (the charge id) only.
+   */
+  | "billing.payment.order_reused"
   /** N10/N11 (spec §2.19's rename of billing.xmoney.credentials_refused): NETOPIA refused our API key. The operation. */
   | "billing.payment.credentials_refused"
   /** N10 (§2.4.4): NETOPIA reported a status whose meaning it has not confirmed (UNCLEAR). The status number only. */

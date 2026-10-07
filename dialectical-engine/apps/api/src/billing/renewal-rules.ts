@@ -169,3 +169,20 @@ export function anniversaryDue(activatedAt: Date, now: Date, windowDays: number)
 export function renewalLeadMs(): number {
   return 5 * 60_000;
 }
+
+/** The two payment systems this API serves: its xMoney system (until N23) and its NETOPIA environment (null: none). */
+export type PaymentSystems = Readonly<{ xmoneyEnvironment: "stage" | "live"; paymentEnvironment: "sandbox" | "live" | null }>;
+
+/**
+ * Spec §2.5.4: whether a subscription or a charge belongs to a payment system this API serves. Provider AND environment
+ * together: "live" exists in both providers, so a NETOPIA live row is never read as the xMoney live system. Every guard
+ * that used to compare `xmoneyEnvironment` alone reads this one rule; a row of another system stays "other system".
+ */
+export function servedHere(
+  row: Readonly<{ paymentProvider: "xmoney" | "netopia"; paymentEnvironment: "stage" | "sandbox" | "live" }>,
+  systems: PaymentSystems
+): boolean {
+  return row.paymentProvider === "xmoney"
+    ? row.paymentEnvironment === systems.xmoneyEnvironment
+    : systems.paymentEnvironment !== null && row.paymentEnvironment === systems.paymentEnvironment;
+}

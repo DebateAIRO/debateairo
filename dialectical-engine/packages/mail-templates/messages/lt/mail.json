@@ -28,6 +28,7 @@
   "mail.M5.subject": "Nepavyko nuskaičiuoti mokėjimo už jūsų planą {plan}",
   "mail.M5.notTaken": "Nepavyko nuskaičiuoti šio mėnesio mokėjimo už jūsų planą {plan}. Planą išsaugote, kol bandome dar kartą.",
   "mail.M5.bankRefused": "Jūsų bankas atmetė mokėjimą.",
+  "mail.M5.confirmCard": "Jūsų bankas paprašė patvirtinti šį mokėjimą. Patvirtinkite savo kortelę skiltyje Nustatymai ir bandysime dar kartą.",
   "mail.M5.retry": "Bandysime dar kartą {retryDate}. Norėdami naudoti kitą kortelę, atidarykite: {cardPageUrl}",
   "mail.M5.secondTry": "Antrasis mūsų bandymas taip pat nepavyko. Bandysime dar kartą {retryDate}. Norėdami naudoti kitą kortelę, atidarykite: {cardPageUrl}",
   "mail.M5.lastTry": "Paskutinį kartą bandysime {retryDate}. Jei nepavyks, jūsų paskyra pereis į planą Nemokamas, o jūsų debatai bus išsaugoti. Norėdami naudoti kitą kortelę, atidarykite: {cardPageUrl}",

@@ -28,6 +28,7 @@
   "mail.M5.subject": "Nu am putut încasa plata pentru abonamentul dumneavoastră {plan}",
   "mail.M5.notTaken": "Nu am putut încasa plata din această lună pentru abonamentul dumneavoastră {plan}. Vă păstrați abonamentul cât timp încercăm din nou.",
   "mail.M5.bankRefused": "Banca dumneavoastră a refuzat plata.",
+  "mail.M5.confirmCard": "Banca dumneavoastră a cerut să confirmați această plată. Vă rugăm să vă confirmați cardul în Setări, iar noi vom încerca din nou.",
   "mail.M5.retry": "Vom încerca din nou pe {retryDate}. Pentru a folosi alt card, deschideți: {cardPageUrl}",
   "mail.M5.secondTry": "Nici a doua încercare nu a reușit. Vom încerca din nou pe {retryDate}. Pentru a folosi alt card, deschideți: {cardPageUrl}",
   "mail.M5.lastTry": "Vom face o ultimă încercare pe {retryDate}. Dacă nu reușește, contul dumneavoastră trece la abonamentul Gratuit, iar dezbaterile dumneavoastră se păstrează. Pentru a folosi alt card, deschideți: {cardPageUrl}",

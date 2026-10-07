@@ -28,6 +28,7 @@
   "mail.M5.subject": "Kami tidak dapat menerima pembayaran untuk paket {plan} Anda",
   "mail.M5.notTaken": "Kami tidak dapat menerima pembayaran bulan ini untuk paket {plan} Anda. Anda tetap memiliki paket Anda selama kami mencoba lagi.",
   "mail.M5.bankRefused": "Bank Anda menolak pembayaran tersebut.",
+  "mail.M5.confirmCard": "Bank Anda meminta Anda mengonfirmasi pembayaran ini. Silakan konfirmasi kartu Anda di Pengaturan, dan kami akan mencoba lagi.",
   "mail.M5.retry": "Kami akan mencoba lagi pada {retryDate}. Untuk menggunakan kartu lain, buka: {cardPageUrl}",
   "mail.M5.secondTry": "Percobaan kedua kami juga tidak berhasil. Kami akan mencoba lagi pada {retryDate}. Untuk menggunakan kartu lain, buka: {cardPageUrl}",
   "mail.M5.lastTry": "Kami akan melakukan satu percobaan terakhir pada {retryDate}. Jika gagal, akun Anda pindah ke paket Gratis, dan debat Anda tetap disimpan. Untuk menggunakan kartu lain, buka: {cardPageUrl}",

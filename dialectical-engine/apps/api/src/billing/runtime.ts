@@ -152,19 +152,30 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P11a: `drain` is declared below; the kick only runs once a tick does. P15 (R-34): `erasurePending` over
   // `billing.owner_erasure_pending`, which answers true for a pending or finished erasure and for an `age_frozen`
   // owner (R3-2); P11b's maintenance reuses this `renewal` and its `erasureBlocks`.
+  // W8 (P2-I12, the owner's ruling of 2 October 2026): every billing email, the cancel link's M9 and every invoice go
+  // to the account's CURRENT address at the time of sending; the billing profile's only after the account is erased.
+  // N11: the NETOPIA renewal's payer email is the same current address (spec §2.5.3).
+  const recipients = new DekBillingRecipientReader(deps.pool, deps.dekStore);
   const renewal = new RenewalService({
     repository, jobs, entitlements, xmoney: deps.connectors.xmoney, tax: deps.connectors.tax, settlement: renewalSettlement,
     policy: deps.policy, plans: deps.plans, recordsKey: deps.connectors.recordsKey,
     publicAppUrl: deps.connectors.publicAppUrl, audit: deps.audit, clock: deps.clock, kick: () => drain(),
     erasurePending: erasurePendingOf(repository),
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment,
+    // N11 (spec §2.9): the saved-card renewals, their probes and the pending deadline; the payer's current address (W8).
+    netopia: {
+      payments: deps.connectors.payments, paymentEnvironment: deps.connectors.paymentEnvironment, recipients,
+      orderText: catalogueOrderText
+    }
   });
   const maintenance = new BillingMaintenance({
     repository, jobs, entitlements, renewal, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit, clock: deps.clock
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment, paymentEnvironment: deps.connectors.paymentEnvironment,
+    audit: deps.audit, clock: deps.clock
   });
   outbox.register("RENEWAL_NOTICE", createRenewalNoticeHandler({
-    repository, jobs, renewal, policy: deps.policy, xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit
+    repository, jobs, renewal, policy: deps.policy, xmoneyEnvironment: deps.connectors.xmoneyEnvironment,
+    paymentEnvironment: deps.connectors.paymentEnvironment, audit: deps.audit
   }));
   let lastMaintenance = Number.NEGATIVE_INFINITY;
   const renewTick = createSingleFlightErasureReconciler(
@@ -182,9 +193,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P10a: the legal documents of a non-Romanian charge (spec §2.5.9). P17 (D6a F29): the invoice line in the buyer's
   // locale, from the catalogue, as for the checkout below.
   // P2-I4 (D5 5h): no document is issued for a charge paid in the other xMoney system.
-  // W8 (P2-I12, the owner's ruling of 2 October 2026): every billing email, the cancel link's M9 and every invoice go
-  // to the account's CURRENT address at the time of sending; the billing profile's only after the account is erased.
-  const recipients = new DekBillingRecipientReader(deps.pool, deps.dekStore);
+  // W8: `recipients` (declared above, before the renewal) is every billing email's and every invoice's address.
   const invoiceDeps = {
     repository, recordsKey: deps.connectors.recordsKey, recipients, policy: deps.policy,
     publicAppUrl: deps.connectors.publicAppUrl,

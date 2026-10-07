@@ -28,6 +28,7 @@
   "mail.M5.subject": "Ma stajniex niġbru l-ħlas għall-pjan {plan} tiegħek",
   "mail.M5.notTaken": "Ma stajniex niġbru l-ħlas ta’ dan ix-xahar għall-pjan {plan} tiegħek. Iżżomm il-pjan tiegħek waqt li nerġgħu nippruvaw.",
   "mail.M5.bankRefused": "Il-bank tiegħek irrifjuta l-ħlas.",
+  "mail.M5.confirmCard": "Il-bank tiegħek talbek tikkonferma dan il-ħlas. Jekk jogħġbok ikkonferma l-karta tiegħek fl-Issettjar, u se nerġgħu nippruvaw.",
   "mail.M5.retry": "Se nerġgħu nippruvaw fl-{retryDate}. Biex tuża karta oħra, iftaħ: {cardPageUrl}",
   "mail.M5.secondTry": "Lanqas it-tieni tentattiv tagħna ma rnexxa. Se nerġgħu nippruvaw fl-{retryDate}. Biex tuża karta oħra, iftaħ: {cardPageUrl}",
   "mail.M5.lastTry": "Se nagħmlu tentattiv wieħed finali fl-{retryDate}. Jekk ma jirnexxix, il-kont tiegħek jgħaddi għall-pjan B’xejn, u d-dibattiti tiegħek jinżammu. Biex tuża karta oħra, iftaħ: {cardPageUrl}",

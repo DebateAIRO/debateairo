@@ -28,6 +28,7 @@
   "mail.M5.subject": "Platbu za váš program {plan} sa nepodarilo strhnúť",
   "mail.M5.notTaken": "Platbu za tento mesiac za váš program {plan} sa nepodarilo strhnúť. Svoj program si ponechávate, kým to skúšame znova.",
   "mail.M5.bankRefused": "Vaša banka platbu odmietla.",
+  "mail.M5.confirmCard": "Vaša banka požiadala o potvrdenie tejto platby. Potvrďte, prosím, svoju kartu v Nastaveniach a skúsime to znova.",
   "mail.M5.retry": "Skúsime to znova {retryDate}. Ak chcete použiť inú kartu, otvorte: {cardPageUrl}",
   "mail.M5.secondTry": "Ani náš druhý pokus nevyšiel. Skúsime to znova {retryDate}. Ak chcete použiť inú kartu, otvorte: {cardPageUrl}",
   "mail.M5.lastTry": "Posledný pokus urobíme {retryDate}. Ak sa nepodarí, váš účet prejde na program Bezplatný a vaše debaty zostanú zachované. Ak chcete použiť inú kartu, otvorte: {cardPageUrl}",

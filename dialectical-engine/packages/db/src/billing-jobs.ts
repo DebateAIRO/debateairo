@@ -1,5 +1,7 @@
 import type { Pool, PoolClient } from "pg";
-import type { CustomerXMoneyEnvironment, OutboxJob, OutboxKind, OutboxPayload } from "./billing.js";
+import type {
+  ChargeKind, CustomerXMoneyEnvironment, OutboxJob, OutboxKind, OutboxPayload, PaymentEnvironmentName, PaymentProviderName
+} from "./billing.js";
 
 const SUBSCRIPTION_LEASE_NAMESPACE = "debateai.billing.subscription:";
 
@@ -301,6 +303,60 @@ export class BillingJobQueries {
     );
     return result.rows.map((row) => Object.freeze({
       chargeId: row.charge_id, subscriptionId: row.subscription_id, periodStart: row.period_start, createdAt: row.created_at
+    }));
+  }
+
+  /**
+   * N11 (spec §2.9.3): the charges of these kinds, in ONE payment system (provider and environment), made since
+   * `createdFrom`, that hold no SUBMITTED, SUCCEEDED or FAILED yet: a call marker, a not-sent request or an unknown
+   * outcome. Unlike `openCharges` (xMoney's A2), the number of unknowns is no limit: probing and resending the same
+   * orderID is safe (NETOPIA's error 56). One keyset page on (created_at, charge_id), oldest first.
+   */
+  async openPaymentCharges(input: Readonly<{
+    provider: PaymentProviderName; environment: PaymentEnvironmentName; kinds: ReadonlyArray<ChargeKind>;
+    createdFrom: Date; after: Readonly<{ createdAt: Date; chargeId: string }> | null; limit: number;
+  }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; createdAt: Date }>>> {
+    const result = await this.pool.query<{ charge_id: string; subscription_id: string; created_at: Date }>(
+      `SELECT c.charge_id, c.subscription_id, c.created_at FROM billing.charge c
+        WHERE c.payment_provider = $1 AND c.payment_environment = $2 AND c.kind = ANY($3::text[]) AND c.created_at >= $4
+          AND ($5::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($5::timestamptz, $6::text))
+          AND NOT EXISTS (SELECT 1 FROM billing.charge_event e
+                           WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUCCEEDED', 'FAILED'))
+        ORDER BY c.created_at, c.charge_id LIMIT $7`,
+      [input.provider, input.environment, [...input.kinds], input.createdFrom, input.after?.createdAt ?? null,
+        input.after?.chargeId ?? null, input.limit]
+    );
+    return result.rows.map((row) => Object.freeze({
+      chargeId: row.charge_id, subscriptionId: row.subscription_id, createdAt: row.created_at
+    }));
+  }
+
+  /**
+   * N11 (spec §2.9.4): the RENEWAL charges of one payment system, any attempt, made since `createdFrom`, SUBMITTED at or
+   * before `submittedBefore`, with no SUCCEEDED and no FAILED: renewals NETOPIA answered and still holds pending. One
+   * keyset page on (created_at, charge_id), oldest first.
+   */
+  async submittedPaymentRenewals(input: Readonly<{
+    provider: PaymentProviderName; environment: PaymentEnvironmentName; createdFrom: Date; submittedBefore: Date;
+    after: Readonly<{ createdAt: Date; chargeId: string }> | null; limit: number;
+  }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; periodStart: Date; attempt: number; createdAt: Date }>>> {
+    const result = await this.pool.query<{
+      charge_id: string; subscription_id: string; period_start: Date; attempt: number; created_at: Date;
+    }>(
+      `SELECT c.charge_id, c.subscription_id, c.period_start, c.attempt, c.created_at FROM billing.charge c
+        WHERE c.payment_provider = $1 AND c.payment_environment = $2 AND c.kind = 'RENEWAL' AND c.created_at >= $3
+          AND ($5::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($5::timestamptz, $6::text))
+          AND EXISTS (SELECT 1 FROM billing.charge_event s
+                       WHERE s.charge_id = c.charge_id AND s.kind = 'SUBMITTED' AND s.at <= $4)
+          AND NOT EXISTS (SELECT 1 FROM billing.charge_event e
+                           WHERE e.charge_id = c.charge_id AND e.kind IN ('SUCCEEDED', 'FAILED'))
+        ORDER BY c.created_at, c.charge_id LIMIT $7`,
+      [input.provider, input.environment, input.createdFrom, input.submittedBefore, input.after?.createdAt ?? null,
+        input.after?.chargeId ?? null, input.limit]
+    );
+    return result.rows.map((row) => Object.freeze({
+      chargeId: row.charge_id, subscriptionId: row.subscription_id, periodStart: row.period_start,
+      attempt: row.attempt, createdAt: row.created_at
     }));
   }
 

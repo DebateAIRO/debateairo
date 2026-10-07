@@ -28,6 +28,7 @@
   "mail.M5.subject": "我们未能收取您的 {plan} 方案费用",
   "mail.M5.notTaken": "我们未能收取您 {plan} 方案本月的费用。在我们重试期间，您的方案将保持不变。",
   "mail.M5.bankRefused": "您的银行拒绝了这笔付款。",
+  "mail.M5.confirmCard": "您的银行要求您确认这笔付款。请在设置中确认您的银行卡，我们将再次尝试。",
   "mail.M5.retry": "我们将于 {retryDate} 重试。如需使用其他银行卡，请打开：{cardPageUrl}",
   "mail.M5.secondTry": "我们的第二次尝试也未成功。我们将于 {retryDate} 重试。如需使用其他银行卡，请打开：{cardPageUrl}",
   "mail.M5.lastTry": "我们将于 {retryDate} 进行最后一次尝试。如果失败，您的账户将转为免费方案，您的辩论将被保留。如需使用其他银行卡，请打开：{cardPageUrl}",

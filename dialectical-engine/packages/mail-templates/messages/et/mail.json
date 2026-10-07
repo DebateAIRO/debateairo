@@ -28,6 +28,7 @@
   "mail.M5.subject": "Me ei saanud teie paketi {plan} eest makset võtta",
   "mail.M5.notTaken": "Me ei saanud teie paketi {plan} selle kuu makset võtta. Teie pakett jääb alles, kuni me uuesti proovime.",
   "mail.M5.bankRefused": "Teie pank keeldus maksest.",
+  "mail.M5.confirmCard": "Teie pank palus teil see makse kinnitada. Palun kinnitage oma kaart jaotises Seaded ja me proovime uuesti.",
   "mail.M5.retry": "Proovime uuesti {retryDate}. Teise kaardi kasutamiseks avage: {cardPageUrl}",
   "mail.M5.secondTry": "Ka meie teine katse ebaõnnestus. Proovime uuesti {retryDate}. Teise kaardi kasutamiseks avage: {cardPageUrl}",
   "mail.M5.lastTry": "Teeme {retryDate} viimase katse. Kui see ebaõnnestub, läheb teie konto üle paketile Tasuta ja teie debatid säilivad. Teise kaardi kasutamiseks avage: {cardPageUrl}",

@@ -28,6 +28,7 @@
   "mail.M5.subject": "We couldn't take the payment for your {plan} plan",
   "mail.M5.notTaken": "We couldn't take this month's payment for your {plan} plan. You keep your plan while we try again.",
   "mail.M5.bankRefused": "Your bank refused the payment.",
+  "mail.M5.confirmCard": "Your bank asked you to confirm this payment. Please confirm your card in Settings, and we'll try again.",
   "mail.M5.retry": "We will try again on {retryDate}. To use a different card, open: {cardPageUrl}",
   "mail.M5.secondTry": "Our second try did not work either. We will try again on {retryDate}. To use a different card, open: {cardPageUrl}",
   "mail.M5.lastTry": "We will make one last try on {retryDate}. If it fails, your account moves to the Free plan, and your debates are kept. To use a different card, open: {cardPageUrl}",

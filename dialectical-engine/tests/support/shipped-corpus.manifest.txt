@@ -37,6 +37,7 @@ apps/api/src/billing/invoice-smartbill.ts
 apps/api/src/billing/location-verdict.ts
 apps/api/src/billing/maintenance.ts
 apps/api/src/billing/netopia-intake.ts
+apps/api/src/billing/netopia-payer.ts
 apps/api/src/billing/notice-intake.ts
 apps/api/src/billing/operator-connection.ts
 apps/api/src/billing/order-text-catalogue.ts

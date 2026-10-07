@@ -30,10 +30,13 @@ export type DunningAttempt = Readonly<{
    */
   reason: string | null;
   /**
-   * W10 (P2-I21): the failed charge's code (`PAYMENT_DECLINED`, `VOIDED`, `REBILL_REFUSED` or `NO_TRANSACTION`); null
-   * for a charge-less attempt. Only `PAYMENT_DECLINED` means a bank refused, so only it puts the bank's refusal in M5.
+   * W10 (P2-I21): the failed charge's code (`PAYMENT_DECLINED`, `VOIDED`, `REBILL_REFUSED`, `NO_TRANSACTION`, and on
+   * NETOPIA `CARD_NOT_SAVED`, `AUTHENTICATION_REQUIRED`, `PAYMENT_FAILED`, `PAYMENT_EXPIRED`); null for a charge-less
+   * attempt. `AUTHENTICATION_REQUIRED` puts M5's "confirm your card" sentence in place of any bank sentence.
    */
   chargeErrorCode: string | null;
+  /** Whether a bank refused this attempt's charge (W10; on NETOPIA, the report's `bankDeclined`). Only then M5 says so. */
+  bankDeclined: boolean;
   periodStart: Date;
   firstFailedAt: Date;
   now: Date;
@@ -42,10 +45,10 @@ export type DunningAttempt = Readonly<{
 /**
  * THE failed-attempt writer (spec §2.5.5, A8a, Q-1), in the caller's transaction under the owner lock: PAST_DUE with
  * the next retry at `first failure + dunning_retry_days[attempt - 1]`, on attempt 1 the PAST_DUE_GRACE (paid through
- * the first failure plus the last retry day plus 1), and M5A/M5B/M5C (whose bank sentence only a PAYMENT_DECLINED
- * charge gets, W10); past the last retry day ENDED(DUNNING), Free
- * and M6. A charge-less attempt names its `reason` where a charged one names its `charge_id`, and its M5 is
- * deduplicated on the subscription, the period and the attempt. The settlement's `failed` (a charge) and P11a's
+ * the first failure plus the last retry day plus 1), and M5A/M5B/M5C (whose bank sentence only a charge the bank declined
+ * gets, W10, and whose "confirm your card" sentence only an AUTHENTICATION_REQUIRED one, N11); past the last retry day
+ * ENDED(DUNNING), Free and M6. A charge-less attempt names its `reason` where a charged one names its `charge_id`, and
+ * its M5 is deduplicated on the subscription, the period and the attempt. The settlement's `failed` (a charge) and P11a's
  * `failUnpricedAttempt` (no charge) both write through here, so the two can never drift apart.
  */
 export async function writeDunningAttempt(
@@ -76,7 +79,8 @@ export async function writeDunningAttempt(
       dedupeRef: input.chargeId ?? `${subscription.subscriptionId}:${input.periodStart.toISOString()}:${input.attempt}`,
       params: {
         plan: subscription.planId, retryDate: nextRetryAt.toISOString(), cardPageUrl: page("/settings/card"),
-        bankDeclined: String(input.chargeId !== null && input.chargeErrorCode === "PAYMENT_DECLINED")
+        bankDeclined: String(input.chargeId !== null && input.bankDeclined),
+        ...(input.chargeId !== null && input.chargeErrorCode === "AUTHENTICATION_REQUIRED" ? { confirmCard: "true" } : {})
       },
       notBefore: now
     });
@@ -166,9 +170,13 @@ export function createRenewalSettlement(deps: RenewalSettlementDeps): ChargeSett
       // Every retry is timed from the first failure. Read from the history folded under this lock (the attempt-1
       // failure may have had no charge, Q-1), never from charge rows through a second connection.
       const firstFailedAt = charge.attempt === 1 ? now : dunningProgress(context.events, subscription)?.firstFailedAt ?? now;
+      // W10: an xMoney PAYMENT_DECLINED was always the bank's; a NETOPIA decline names the bank only when NETOPIA says so
+      // (spec §2.4.5: not for antifraud, risk or a failed 3-D Secure), and a caller that did not say is never read as one.
+      const bankDeclined = context.bankDeclined
+        ?? (context.charge.paymentProvider === "xmoney" && context.errorCode === "PAYMENT_DECLINED");
       await writeDunningAttempt(deps, client, {
         subscription, customerId: context.customerId, attempt: charge.attempt, chargeId: charge.chargeId, reason: null,
-        chargeErrorCode: context.errorCode, periodStart: charge.periodStart, firstFailedAt, now
+        chargeErrorCode: context.errorCode, bankDeclined, periodStart: charge.periodStart, firstFailedAt, now
       });
     }
   });

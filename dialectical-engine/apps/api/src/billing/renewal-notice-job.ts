@@ -2,8 +2,9 @@ import { addBusinessDays, foldSubscription, type SubscriptionState } from "@deba
 import type { BillingJobQueries, BillingRepository, CustomerXMoneyEnvironment } from "@debateai/db";
 import type { BillingPolicy } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
-import { DONE, otherXMoneySystem, type OutboxHandler } from "./outbox.js";
+import { DONE, otherPaymentSystem, otherXMoneySystem, type OutboxHandler } from "./outbox.js";
 import type { RenewalService } from "./renewal.js";
+import { servedHere } from "./renewal-rules.js";
 
 const stillDue = (state: SubscriptionState, periodEnd: string): boolean =>
   state.status === "ACTIVE" && !state.cancelRequested && state.currentPeriodEnd?.toISOString() === periodEnd;
@@ -23,6 +24,8 @@ export function createRenewalNoticeHandler(deps: Readonly<{
   policy: BillingPolicy;
   /** P6a's connectors.xmoneyEnvironment: the xMoney system this API talks to. */
   xmoneyEnvironment: CustomerXMoneyEnvironment;
+  /** N8's connectors.paymentEnvironment; absent in the xMoney harnesses (no NETOPIA plan is then served). */
+  paymentEnvironment?: "sandbox" | "live";
   audit: BillingAudit;
 }>): OutboxHandler {
   return async (job, now) => {
@@ -31,7 +34,11 @@ export function createRenewalNoticeHandler(deps: Readonly<{
     const periodEnd = job.ref.slice(split + 1);
     const state = foldSubscription(await deps.repository.subscriptionEvents(subscriptionId));
     if (!stillDue(state, periodEnd)) return DONE;
-    if (state.paymentProvider !== "xmoney" || state.paymentEnvironment !== deps.xmoneyEnvironment) return otherXMoneySystem(deps.audit, job.kind);
+    // Spec §2.5.4 (`servedHere`): a plan of another payment system is never priced here. Its DEAD code names the system
+    // the plan belongs to (ruling PR-8's `otherPaymentSystem` for NETOPIA; xMoney's own code until N23).
+    if (!servedHere(state, { xmoneyEnvironment: deps.xmoneyEnvironment, paymentEnvironment: deps.paymentEnvironment ?? null })) {
+      return state.paymentProvider === "netopia" ? otherPaymentSystem(deps.audit, job.kind) : otherXMoneySystem(deps.audit, job.kind);
+    }
     const priced = await deps.renewal.freshQuote(state, now);
     if (priced.tax.totalMicros === state.announcedTotalMicros) return DONE;
     const noticeEnds = addBusinessDays(now, deps.policy.renewalNoticeBusinessDays);

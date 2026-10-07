@@ -28,6 +28,7 @@
   "mail.M5.subject": "Wij konden de betaling voor uw {plan}-abonnement niet innen",
   "mail.M5.notTaken": "Wij konden de betaling van deze maand voor uw {plan}-abonnement niet innen. U behoudt uw abonnement terwijl wij het opnieuw proberen.",
   "mail.M5.bankRefused": "Uw bank heeft de betaling geweigerd.",
+  "mail.M5.confirmCard": "Uw bank heeft u gevraagd deze betaling te bevestigen. Bevestig uw kaart in Instellingen, dan proberen wij het opnieuw.",
   "mail.M5.retry": "Wij proberen het opnieuw op {retryDate}. Om een andere kaart te gebruiken, opent u: {cardPageUrl}",
   "mail.M5.secondTry": "Ook onze tweede poging is mislukt. Wij proberen het opnieuw op {retryDate}. Om een andere kaart te gebruiken, opent u: {cardPageUrl}",
   "mail.M5.lastTry": "Wij doen op {retryDate} een laatste poging. Als die mislukt, gaat uw account over naar het Gratis-abonnement en blijven uw debatten bewaard. Om een andere kaart te gebruiken, opent u: {cardPageUrl}",
