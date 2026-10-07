@@ -91,6 +91,15 @@ def emit(value):
         sys.stdout.flush()
 
 
+def log_event(value):
+    """Best effort: the ledger is the record, so a broken log stream never costs a settled reply.
+    If the reply cannot be delivered either, the IPC handler halts."""
+    try:
+        emit(value)
+    except Exception:  # noqa: BLE001 - logging only
+        pass
+
+
 def iso(moment):
     return moment.astimezone(timezone.utc).isoformat()
 
@@ -482,7 +491,7 @@ class CallSlots:
 
 
 def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, key_loader=None, host=None,
-                    platform=None, now=None, slot_wait=SLOT_WAIT_SECONDS, cancelled=None):
+                    platform=None, now=None, slot_wait=SLOT_WAIT_SECONDS, cancelled=None, on_reserved=None):
     accepted = time.monotonic()
     now = now or helper.utc_now
     go, go_sha = load_go(go_path)
@@ -503,6 +512,8 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         if slots.tripped:
             raise SafetyError('AUTHORITY_STOPPED')
         entry_id, day = reserve_call(private, go, go_sha, input, reserved, host, peer_uid, now)
+        if on_reserved is not None:
+            on_reserved(entry_id)
         budget, started = Decimal(go['daily_budget_usd']), time.monotonic()
         event = {'event': 'preview_provider_paid_post', 'operation_id': input['operationId'], 'day': day}
         try:
@@ -513,7 +524,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                 'state': 'uncertain', 'held_usd': str(reserved), 'reason': 'transport_failure',
                 'error_class': type(error).__name__, 'elapsed_seconds': round(time.monotonic() - started, 6)},
                 'uncertain_charge', budget, now, slots)
-            emit({**event, 'status': 'uncertain', **outcome})
+            log_event({**event, 'status': 'uncertain', **outcome})
             raise SafetyError('NEW_CHARGE_UNCERTAIN') from None
         elapsed = round(time.monotonic() - started, 6)
         try:
@@ -524,7 +535,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                                                     'reason': 'accounting_failure', 'elapsed_seconds': elapsed},
                                                    'uncertain_charge', None, None)
         outcome = settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots)
-        emit({**event, 'status': changes['state'], 'halt_reason': halt_reason, 'guard_charge_usd': charge,
+        log_event({**event, 'status': changes['state'], 'halt_reason': halt_reason, 'guard_charge_usd': charge,
               'elapsed_seconds': elapsed, **outcome})
         if charge is None:
             raise SafetyError('NEW_CHARGE_UNCERTAIN')
@@ -553,7 +564,8 @@ def assess_reply(status, response, reserved, elapsed):
         halt_reason = 'provider_error_or_model_identity'
     else:
         halt_reason = None
-    return changes, halt_reason, charge, {'status': status, 'body': json.dumps(response, ensure_ascii=False, default=str)}
+    # ASCII escapes keep any lone surrogate in a provider reply encodable all the way to the caller.
+    return changes, halt_reason, charge, {'status': status, 'body': json.dumps(response, ensure_ascii=True, default=str)}
 
 
 def recover_interrupted(private, now=None):
@@ -634,7 +646,7 @@ def refusal_body(error):
     return json.dumps({'error': code}).encode()
 
 
-def make_handler(private, allowed_uids, execute, peer_uid_of=linux_peer_uid, now=None):
+def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_uid, now=None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_args):
             pass
@@ -646,7 +658,16 @@ def make_handler(private, allowed_uids, execute, peer_uid_of=linux_peer_uid, now
             self.end_headers()
             self.wfile.write(payload)
 
+        def stop_gate(self, entry_id):
+            # A paid reply may be lost: keep the charge and stop. If even the halt cannot be
+            # written, this server reserves nothing more until it is restarted.
+            try:
+                halt(private, 'ipc_or_delivery_failure', now=now, entry_id=entry_id)
+            except BaseException:
+                slots.trip()
+
         def do_POST(self):
+            reserved = []
             try:
                 uid = peer_uid_of(self.connection)
                 length = int(self.headers.get('content-length', '0'))
@@ -654,8 +675,12 @@ def make_handler(private, allowed_uids, execute, peer_uid_of=linux_peer_uid, now
                     raise SafetyError('IPC_REQUEST_REFUSED')
                 self.connection.settimeout(5)
                 data = json.loads(self.rfile.read(length))
-                encoded = json.dumps(execute(data, uid, lambda: caller_canceled(self.connection)), ensure_ascii=False).encode()
+                result = execute(data, uid, lambda: caller_canceled(self.connection), reserved.append)
+                encoded = json.dumps(result, ensure_ascii=True).encode('ascii')
             except BaseException as error:
+                if reserved:
+                    # Once a hold exists, any failure may lose a paid reply: halt, as for a lost reply.
+                    self.stop_gate(reserved[0])
                 try:
                     self.reply(409, refusal_body(error))
                 except BaseException:
@@ -664,11 +689,7 @@ def make_handler(private, allowed_uids, execute, peer_uid_of=linux_peer_uid, now
             try:
                 self.reply(200, encoded)
             except BaseException:
-                # A lost reply follows a paid settled call; preserve the charge and stop.
-                try:
-                    halt(private, 'ipc_or_delivery_failure', now=now)
-                except BaseException:
-                    pass
+                self.stop_gate(reserved[0] if reserved else None)
     return Handler
 
 
@@ -696,9 +717,10 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None):
         recovered = recover_interrupted(private)
         slots = CallSlots(go['max_concurrent_calls'])
 
-        def execute(data, uid, cancelled):
-            return execute_request(private, go_path, data, peer_uid=uid, slots=slots, cancelled=cancelled)
-        server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute))
+        def execute(data, uid, cancelled, on_reserved):
+            return execute_request(private, go_path, data, peer_uid=uid, slots=slots, cancelled=cancelled,
+                                   on_reserved=on_reserved)
+        server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots))
         os.chmod(socket_path, 0o666)
         emit({'status': 'serving', 'socket': str(socket_path), 'max_concurrent_calls': slots.limit,
               'interrupted_calls_found': recovered['interrupted'],

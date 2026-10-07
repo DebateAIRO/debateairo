@@ -903,7 +903,7 @@ class ConcurrencyTests(GateTest):
 
 
 class IpcTests(GateTest):
-    def exchange(self, gate, dispatch, path='/complete', uid=PEER, payload=None, after_send=None):
+    def exchange(self, gate, dispatch, path='/complete', uid=PEER, payload=None, after_send=None, after_execute=None):
         server_side, client_side = socket.socketpair()
         data = json.dumps(payload if payload is not None else envelope(body(), 'op-1')).encode()
         client_side.sendall(b'POST ' + path.encode() + b' HTTP/1.0\r\nContent-Type: application/json\r\n'
@@ -911,11 +911,15 @@ class IpcTests(GateTest):
         if after_send:
             after_send(client_side)
 
-        def execute(request, peer_uid, cancelled):
-            return bridge.execute_request(gate.private, gate.go_path, request, peer_uid=peer_uid, slots=gate.slots,
-                                          dispatch=dispatch(client_side), key_loader=lambda _: KEY, host=HOST,
-                                          platform='linux', now=gate.clock, cancelled=cancelled)
-        handler = bridge.make_handler(gate.private, [PEER], execute, peer_uid_of=lambda _connection: uid,
+        def execute(request, peer_uid, cancelled, on_reserved):
+            result = bridge.execute_request(gate.private, gate.go_path, request, peer_uid=peer_uid, slots=gate.slots,
+                                            dispatch=dispatch(client_side), key_loader=lambda _: KEY, host=HOST,
+                                            platform='linux', now=gate.clock, cancelled=cancelled,
+                                            on_reserved=on_reserved)
+            if after_execute:
+                after_execute()
+            return result
+        handler = bridge.make_handler(gate.private, [PEER], execute, gate.slots, peer_uid_of=lambda _connection: uid,
                                       now=gate.clock)
         thread = threading.Thread(target=handler, args=(server_side, '', types.SimpleNamespace()))
         thread.start()
@@ -988,6 +992,65 @@ class IpcTests(GateTest):
         self.assertEqual((status['state'], status['reason']), ('halted', 'ipc_or_delivery_failure'))
         entry = gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-1']
         self.assertEqual((entry['state'], entry['held_usd']), ('settled', '0.01'))
+
+    def test_any_failure_after_the_reservation_halts_even_when_a_refusal_is_delivered(self):
+        gate = self.gate().ready()
+
+        def fail_after_settlement():
+            raise BrokenPipeError('synthetic failure after the paid call settled')
+        line, payload = self.exchange(gate, self.ok, after_execute=fail_after_settlement)
+        self.assertIn(b' 409 ', line)
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason']), ('halted', 'ipc_or_delivery_failure'))
+        entry = gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-1']
+        self.assertEqual((entry['state'], entry['held_usd']), ('settled', '0.01'))
+
+    def test_broken_log_stream_does_not_lose_a_settled_reply(self):
+        gate = self.gate().ready()
+
+        class Broken(io.StringIO):
+            def write(self, _text):
+                raise BrokenPipeError('synthetic closed stdout')
+        with contextlib.redirect_stdout(Broken()):
+            line, payload = self.exchange(gate, self.ok)
+        self.assertIn(b' 200 ', line)
+        self.assertEqual(json.loads(payload)['status'], 200)
+        self.assertEqual(gate.status()['state'], 'active')
+
+    def test_reply_holding_a_lone_surrogate_is_delivered_escaped(self):
+        gate = self.gate().ready()
+        lone = 'half \ud83d'  # A JSON reply may escape half of a surrogate pair; Python decodes it alone.
+
+        def reply(_client):
+            return lambda _body, _key: (200, provider_response('0.01', content=lone))
+        line, payload = self.exchange(gate, reply)
+        self.assertIn(b' 200 ', line)
+        self.assertTrue(payload.isascii())
+        result = json.loads(payload)
+        self.assertEqual(json.loads(result['body'])['choices'][0]['message']['content'], lone)
+        self.assertEqual(gate.status()['state'], 'active')
+
+    def test_lost_reply_whose_halt_cannot_be_written_trips_the_server(self):
+        gate = self.gate().ready()
+
+        def vanish(client):
+            def dispatch(_body, _key):
+                client.close()
+                return 200, provider_response('0.01')
+            return dispatch
+        real_halt = bridge.halt
+
+        def halt_fails(*args, **kwargs):
+            if args[1] == 'ipc_or_delivery_failure':
+                raise OSError('synthetic disk full')
+            return real_halt(*args, **kwargs)
+        with patch.object(bridge, 'halt', halt_fails):
+            self.exchange(gate, vanish)
+        self.assertEqual(gate.status()['state'], 'active')
+        dispatched = []
+        with self.refused('AUTHORITY_STOPPED'):
+            gate.call('op-2', dispatch=lambda *args: dispatched.append(args))
+        self.assertEqual(dispatched, [])
 
 
 if __name__ == '__main__':
