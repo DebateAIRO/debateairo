@@ -162,7 +162,7 @@ export async function revokeCancelForOwner(deps: SubscriptionRouteDeps, ownerRef
     if (state.status !== "ACTIVE" && state.status !== "PAST_DUE") return "NOT_SUBSCRIBED" as const;
     // D5 5h (P2-I4): a plan of the other xMoney system is never renewed here, so its cancel stands (a sandbox plan
     // revoked on live would stay ACTIVE for ever and refuse the next live start, BILLING_STAGE_RECORDS_OPEN).
-    if (state.xmoneyEnvironment !== deps.xmoneyEnvironment) return "NOT_SUBSCRIBED" as const;
+    if (state.paymentProvider !== "xmoney" || state.paymentEnvironment !== deps.xmoneyEnvironment) return "NOT_SUBSCRIBED" as const;
     if (!state.cancelRequested) return "NOTHING" as const;
     if (state.currentPeriodEnd !== null && now.getTime() >= state.currentPeriodEnd.getTime()) {
       return "NOT_SUBSCRIBED" as const;

@@ -47,8 +47,8 @@ describe("P8b the quote", () => {
       taxCountry: "RO", taxRateBasisPoints: 2_100, taxStatus: "TAXABLE", expiresAt: new Date(NOW.getTime() + 1_800_000)
     });
     expect(openQuoteLocation(KEY, result.quote.quoteId, stored!.locationCiphertext)).toEqual({
-      name: "Ana Pop", country: "RO", region: "Bucuresti", postalCode: "010101", city: "Sector 1", street: null,
-      ip: "198.51.100.7", ipCountry: "RO", company: null
+      name: "Ana Pop", firstName: null, lastName: null, phone: null, country: "RO", region: "Bucuresti",
+      postalCode: "010101", city: "Sector 1", street: null, ip: "198.51.100.7", ipCountry: "RO", company: null
     });
     expect(await repository.quote(result.quote.quoteId, randomUUID())).toBeNull();
   });

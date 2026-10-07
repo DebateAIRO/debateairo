@@ -225,7 +225,7 @@ export class CheckoutService implements CheckoutServicePort {
       const subscriptionId = randomUUID();
       await this.deps.repository.appendSubscriptionEvent(client, {
         eventId: randomUUID(), subscriptionId, ownerRef: input.ownerRef, kind: "CREATED", at: input.now,
-        planId: quote.planId, periodAnchorAt: null, xmoneyOrderId: null, xmoneyCustomerId, cardRef: null,
+        planId: quote.planId, periodAnchorAt: null, xmoneyOrderId: null, xmoneyCustomerId, cardRef: null, cardTokenId: null,
         data: {
           country_confirmed: place.kind === "CONFIRM_COUNTRY", ip_country: place.ipCountry, quote_id: quote.quoteId,
           // D5 5h: the xMoney system this subscription's order, customer and card ids belong to (P1a CHECK, P2 fold).

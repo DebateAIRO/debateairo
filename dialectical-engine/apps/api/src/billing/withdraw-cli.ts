@@ -172,7 +172,7 @@ export async function settleOwnerWithdrawal(
     const events = await stores.billing.subscriptionEvents(waiting.subscriptionId, client);
     const folded = foldSubscription(events);
     // D5 5h (P2-I4): its payments live in the other xMoney system, where the API's outbox cannot refund them.
-    if (folded.xmoneyEnvironment !== stores.xmoneyEnvironment) refuse(409, "NOT_SUBSCRIBED");
+    if (folded.paymentProvider !== "xmoney" || folded.paymentEnvironment !== stores.xmoneyEnvironment) refuse(409, "NOT_SUBSCRIBED");
     const activatedAt = folded.activatedAt;
     const withdrawn = events.find((event) => event.kind === "WITHDRAWN");
     if (activatedAt === null || withdrawn === undefined) throw new TypeError("BILLING_WITHDRAW_NOT_AWAITING_OWNER");

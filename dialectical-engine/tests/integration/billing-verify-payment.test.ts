@@ -383,7 +383,7 @@ describe("P9b VERIFY_PAYMENT", () => {
     const states = await h.repository.subscriptionsForOwner(ownerRef);
     expect(states.filter((state) => state.status === "ACTIVE").map((state) => state.subscriptionId)).toEqual([older.subscriptionId]);
     const end = foldSubscription(await h.repository.subscriptionEvents(older.subscriptionId)).currentPeriodEnd!;
-    const due = (await h.repository.dueRenewals(new Date(end.getTime() + 60_000), 5 * 60_000, 50, { environment: "stage" }))
+    const due = (await h.repository.dueRenewals(new Date(end.getTime() + 60_000), 5 * 60_000, 50, { provider: "xmoney", environment: "stage" }))
       .filter((state) => state.ownerRef === ownerRef).map((state) => state.subscriptionId);
     expect(due).toEqual([older.subscriptionId]);
   });

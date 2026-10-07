@@ -271,7 +271,7 @@ async function prepareUpgrade(
   if (state.status !== "ACTIVE" || state.xmoneyOrderId === null || state.xmoneyCustomerId === null
     || state.currentPeriodStart === null || state.currentPeriodEnd === null
     // D5 5h: the order lives in the system the subscription was created in; the rebill goes to the connectors'.
-    || state.xmoneyEnvironment !== deps.xmoneyEnvironment) {
+    || state.paymentProvider !== "xmoney" || state.paymentEnvironment !== deps.xmoneyEnvironment) {
     refuse(409, "NOT_SUBSCRIBED");
   }
   // A renewal since the quote moved the period: the prorated price no longer holds.

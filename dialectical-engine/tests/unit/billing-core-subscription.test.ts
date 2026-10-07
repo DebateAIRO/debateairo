@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   entitlementPlanOf,
   foldSubscription,
+  SUBSCRIPTION_EVENT_KINDS,
   type SubscriptionEvent,
   type SubscriptionEventKind
 } from "@debateai/billing-core";
@@ -27,6 +28,7 @@ function event(
     xmoneyOrderId: null,
     xmoneyCustomerId: null,
     cardRef: null,
+    cardTokenId: null,
     data: {},
     ...overrides
   };
@@ -50,7 +52,7 @@ describe("P2 — subscription fold: the legal paths", () => {
     expect(state).toMatchObject({
       status: "ACTIVE", planId: "PLUS", xmoneyOrderId: "4711", xmoneyCustomerId: "55", cardRef: "77",
       announcedTotalMicros: 24_200_000, activatedAt: anchor, cancelRequested: false, retryIndex: 0,
-      xmoneyEnvironment: "stage"
+      paymentProvider: "xmoney", paymentEnvironment: "stage", cardTokenId: null
     });
     expect(state.currentPeriodStart?.toISOString()).toBe("2026-01-31T10:00:00.000Z");
     expect(state.currentPeriodEnd?.toISOString()).toBe("2026-02-28T10:00:00.000Z");
@@ -218,9 +220,9 @@ describe("P2 — subscription fold: the legal paths", () => {
     expect(late).toMatchObject({ status: "ACTIVE", endedCause: null });
   });
 
-  it("keeps the xMoney system the subscription was created in, for life", () => {
+  it("keeps the payment system the subscription was created in, for life (an old row reads as xMoney)", () => {
     const live = fold(event("CREATED", { data: { xmoney_environment: "live" } }), activated(), event("RENEWED"));
-    expect(live.xmoneyEnvironment).toBe("live");
+    expect(live).toMatchObject({ paymentProvider: "xmoney", paymentEnvironment: "live" });
   });
 
   it("leaves PAST_DUE by every exit D6a/D6b write, and SUSPENDED by erasure (spec §2.8: every transition)", () => {
@@ -297,6 +299,86 @@ describe("P2 — subscription fold: illegal histories are refused", () => {
     ["RENEWED while SUSPENDED", () => fold(created(), activated(), event("SUSPENDED"), event("RENEWED"))],
     ["a CREATED that names no xMoney environment", () => fold(event("CREATED"))],
     ["a CREATED that names an unknown xMoney environment", () => fold(event("CREATED", { data: { xmoney_environment: "sandbox" } }))]
+  ])("%s", (_label, run) => {
+    expect(run).toThrow(illegal);
+  });
+});
+
+describe("N7 — NETOPIA subscriptions (spec 2026-10-05 §2.5.5, §2.15.2)", () => {
+  const TOKEN_A = ["0b4e2a9c", "6f1d", "4c3e", "9a7b", "2d5f8e1c0a01"].join("-");
+  const TOKEN_B = ["0b4e2a9c", "6f1d", "4c3e", "9a7b", "2d5f8e1c0a02"].join("-");
+  const TOKEN_C = ["0b4e2a9c", "6f1d", "4c3e", "9a7b", "2d5f8e1c0a03"].join("-");
+  const TOKEN_D = ["0b4e2a9c", "6f1d", "4c3e", "9a7b", "2d5f8e1c0a04"].join("-");
+  const netopiaCreated = (environment: "sandbox" | "live" = "sandbox"): SubscriptionEvent =>
+    event("CREATED", { data: { payment_provider: "netopia", payment_environment: environment } });
+  const netopiaActivated = (cardTokenId: string | null = null): SubscriptionEvent => event("ACTIVATED", {
+    at: anchor, periodAnchorAt: anchor, cardTokenId, data: { announced_total_micros: 24_200_000 }
+  });
+  const cardChange = { charge_id: "f".repeat(32), retry_now: false } as const;
+
+  it("takes the provider and the environment from CREATED, and reads an old row as xMoney", () => {
+    expect(fold(netopiaCreated("live"))).toMatchObject({ paymentProvider: "netopia", paymentEnvironment: "live", cardTokenId: null });
+    expect(fold(netopiaCreated())).toMatchObject({ paymentProvider: "netopia", paymentEnvironment: "sandbox" });
+    expect(fold(created())).toMatchObject({ paymentProvider: "xmoney", paymentEnvironment: "stage", cardTokenId: null });
+    expect(SUBSCRIPTION_EVENT_KINDS).toContain("CARD_SAVED");
+  });
+
+  it("starts a NETOPIA plan without a card, or with the card its first payment saved", () => {
+    expect(fold(netopiaCreated(), netopiaActivated())).toMatchObject({
+      status: "ACTIVE", cardTokenId: null, xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null,
+      currentPeriodEnd: new Date("2026-02-28T10:00:00.000Z")
+    });
+    expect(fold(netopiaCreated(), netopiaActivated(TOKEN_A))).toMatchObject({ status: "ACTIVE", cardTokenId: TOKEN_A });
+  });
+
+  it("keeps the newest adopting event's card: RENEWED, UPGRADED, CARD_CHANGED and CARD_SAVED", () => {
+    const start = (): SubscriptionEvent[] => [netopiaCreated(), netopiaActivated(TOKEN_A)];
+    expect(fold(...start(), event("RENEWED", { cardTokenId: TOKEN_B })).cardTokenId).toBe(TOKEN_B);
+    // An adopting event without a card keeps the current one.
+    expect(fold(...start(), event("RENEWED")).cardTokenId).toBe(TOKEN_A);
+    expect(fold(...start(), event("UPGRADED", {
+      planId: "PRO", cardTokenId: TOKEN_C, data: { announced_total_micros: 60_500_000 }
+    })).cardTokenId).toBe(TOKEN_C);
+    expect(fold(...start(), event("CARD_CHANGED", { cardTokenId: TOKEN_D, data: cardChange })))
+      .toMatchObject({ cardTokenId: TOKEN_D, status: "ACTIVE", xmoneyOrderId: null });
+    expect(fold(...start(), event("PAST_DUE"), event("CARD_CHANGED", { cardTokenId: TOKEN_D, data: { ...cardChange, retry_now: true } })))
+      .toMatchObject({ cardTokenId: TOKEN_D, status: "PAST_DUE" });
+  });
+
+  it("CARD_SAVED changes the card and nothing else, while ACTIVE, PAST_DUE or SUSPENDED", () => {
+    const active = fold(netopiaCreated(), netopiaActivated());
+    const saved = fold(netopiaCreated(), netopiaActivated(), event("CARD_SAVED", { cardTokenId: TOKEN_B }));
+    expect(saved).toEqual({ ...active, cardTokenId: TOKEN_B });
+    expect(fold(netopiaCreated(), netopiaActivated(), event("PAST_DUE"), event("CARD_SAVED", { cardTokenId: TOKEN_B })))
+      .toMatchObject({ status: "PAST_DUE", cardTokenId: TOKEN_B });
+    expect(fold(netopiaCreated(), netopiaActivated(), event("SUSPENDED"), event("CARD_SAVED", { cardTokenId: TOKEN_B })))
+      .toMatchObject({ status: "SUSPENDED", cardTokenId: TOKEN_B });
+  });
+
+  it.each([
+    ["a CARD_SAVED without a card", () => fold(netopiaCreated(), netopiaActivated(), event("CARD_SAVED"))],
+    ["a CARD_SAVED before the plan starts", () => fold(netopiaCreated(), event("CARD_SAVED", { cardTokenId: TOKEN_A }))],
+    ["a CARD_SAVED after the plan ended", () => fold(netopiaCreated(), netopiaActivated(), event("CANCEL_REQUESTED"),
+      ended("CANCEL"), event("CARD_SAVED", { cardTokenId: TOKEN_A }))],
+    ["a CARD_SAVED that changes the plan", () => fold(netopiaCreated(), netopiaActivated(),
+      event("CARD_SAVED", { planId: "PRO", cardTokenId: TOKEN_A }))],
+    ["a NETOPIA CARD_CHANGED without the new card", () => fold(netopiaCreated(), netopiaActivated(),
+      event("CARD_CHANGED", { data: cardChange }))],
+    ["a card on an event that cannot adopt one", () => fold(netopiaCreated(), netopiaActivated(),
+      event("PAST_DUE", { cardTokenId: TOKEN_A }))],
+    ["a card on CREATED", () => fold(event("CREATED", {
+      cardTokenId: TOKEN_A, data: { payment_provider: "netopia", payment_environment: "sandbox" }
+    }))],
+    ["a card on an xMoney plan", () => fold(created(), activated(), event("CARD_SAVED", { cardTokenId: TOKEN_A }))],
+    ["an xMoney id on a NETOPIA plan", () => fold(netopiaCreated(), event("ACTIVATED", {
+      at: anchor, periodAnchorAt: anchor, xmoneyOrderId: "4711", data: { announced_total_micros: 1 }
+    }))],
+    ["a NETOPIA CREATED naming xMoney's stage", () => fold(event("CREATED", {
+      data: { payment_provider: "netopia", payment_environment: "stage" }
+    }))],
+    ["a CREATED naming the xMoney provider by the new keys", () => fold(event("CREATED", {
+      data: { payment_provider: "xmoney", payment_environment: "stage" }
+    }))]
   ])("%s", (_label, run) => {
     expect(run).toThrow(illegal);
   });

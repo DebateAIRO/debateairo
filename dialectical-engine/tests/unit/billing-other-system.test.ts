@@ -142,7 +142,8 @@ function state(overrides: Partial<SubscriptionState> = {}): SubscriptionState {
     status: "ACTIVE", periodAnchorAt: ACTIVATED, currentPeriodStart: ACTIVATED, currentPeriodEnd: new Date("2026-11-08T09:00:00.000Z"),
     cancelRequested: true, scheduledDowngradePlanId: null, xmoneyOrderId: "901", xmoneyCustomerId: "77", cardRef: "4242",
     activatedAt: ACTIVATED, endedCause: null, pastDueSince: null, retryIndex: 0, renewalPostponedUntil: null,
-    announcedTotalMicros: 24_200_000, lastNoticeAt: null, xmoneyEnvironment: "stage",
+    announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "xmoney", paymentEnvironment: "stage",
+    cardTokenId: null,
     ...overrides
   });
 }

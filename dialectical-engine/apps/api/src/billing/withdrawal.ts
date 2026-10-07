@@ -95,7 +95,7 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
     || before.currentPeriodEnd === null || before.activatedAt === null
     || withdrewAt.getTime() < before.currentPeriodStart.getTime()
     // D5 5h (P2-I4): its payments live in the other xMoney system, where this API cannot refund them.
-    || before.xmoneyEnvironment !== deps.xmoneyEnvironment) {
+    || before.paymentProvider !== "xmoney" || before.paymentEnvironment !== deps.xmoneyEnvironment) {
     refuse(409, "NOT_SUBSCRIBED");
   }
   const taxCountry = await initialTaxCountry(deps.billing, before);

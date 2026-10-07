@@ -16,6 +16,7 @@ import { openRecord, sealRecord } from "@debateai/crypto";
 import type { SubscriptionEvent } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
+import { seedNetopiaSubscription } from "../support/billingSubscriptionFixtures.js";
 
 let database: TestDatabase;
 let billing: BillingRepository;
@@ -36,7 +37,7 @@ function subscriptionEvent(
 ): SubscriptionEvent {
   return {
     eventId: randomUUID(), subscriptionId, ownerRef, kind, at: anchor, planId: "PLUS", periodAnchorAt: null,
-    xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null,
+    xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null, cardTokenId: null,
     data: kind === "CREATED" ? { xmoney_environment: "stage" } : {}, ...overrides
   };
 }
@@ -158,9 +159,9 @@ describe("P1b — quotes, subscriptions and charges", () => {
     const ownerRef = randomUUID();
     const subscriptionId = await activeSubscription(ownerRef);
     const state = await billing.subscriptionForOwner(ownerRef);
-    expect(state).toMatchObject({ subscriptionId, status: "ACTIVE", planId: "PLUS", xmoneyEnvironment: "stage" });
+    expect(state).toMatchObject({ subscriptionId, status: "ACTIVE", planId: "PLUS", paymentProvider: "xmoney", paymentEnvironment: "stage" });
     const periodEnd = state!.currentPeriodEnd!;
-    const stage = { environment: "stage" } as const;
+    const stage = { provider: "xmoney", environment: "stage" } as const;
     const beforeHorizon = await billing.dueRenewals(new Date(periodEnd.getTime() - 3_600_000), 300_000, 500, stage);
     expect(beforeHorizon.some((due) => due.subscriptionId === subscriptionId)).toBe(false);
     const due = await billing.dueRenewals(new Date(periodEnd.getTime() - 60_000), 300_000, 500, stage);
@@ -319,12 +320,12 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     const edge = new Date(periodEnd.getTime() - 60_000);
     const invalid: string[] = [];
     const due = await billing.dueRenewals(edge, 300_000, 500, {
-      environment: "stage", onInvalid: (subscriptionId) => invalid.push(subscriptionId)
+      provider: "xmoney", environment: "stage", onInvalid: (subscriptionId) => invalid.push(subscriptionId)
     });
     expect(due.some((state) => state.subscriptionId === healthy)).toBe(true);
     expect(invalid.filter((subscriptionId) => subscriptionId === poisoned)).toHaveLength(1);
     // The broken one takes no limit slot.
-    expect((await billing.dueRenewals(edge, 300_000, due.length, { environment: "stage" })).map((state) => state.subscriptionId)).toEqual(due.map((state) => state.subscriptionId));
+    expect((await billing.dueRenewals(edge, 300_000, due.length, { provider: "xmoney", environment: "stage" })).map((state) => state.subscriptionId)).toEqual(due.map((state) => state.subscriptionId));
     // A read for that one owner still fails closed.
     await expect(billing.subscriptionForOwner(poisonedOwner)).rejects.toMatchObject({ code: "BILLING_SUBSCRIPTION_EVENTS_INVALID" });
   });
@@ -362,7 +363,7 @@ describe("P1b — one broken history never stops the renewals of everyone else",
   it("pages the due renewals by (period end, subscription), so a stuck head can never starve the rest", async () => {
     for (let index = 0; index < 3; index += 1) await activeSubscription(randomUUID(), new Date(anchor.getTime() - index * 60_000));
     const now = new Date(anchor.getTime() + 40 * 86_400_000);
-    const stage = { environment: "stage" } as const;
+    const stage = { provider: "xmoney", environment: "stage" } as const;
     const all = await billing.dueRenewals(now, 0, 10_000, stage);
     expect(all.length).toBeGreaterThanOrEqual(3);
     const paged: string[] = [];
@@ -382,10 +383,10 @@ describe("P1b — one broken history never stops the renewals of everyone else",
     const ownerRef = randomUUID();
     const live = await activeSubscription(ownerRef, anchor, "live");
     const now = new Date(anchor.getTime() + 40 * 86_400_000);
-    const liveDue = await billing.dueRenewals(now, 0, 10_000, { environment: "live" });
+    const liveDue = await billing.dueRenewals(now, 0, 10_000, { provider: "xmoney", environment: "live" });
     expect(liveDue.map((state) => state.subscriptionId)).toContain(live);
-    expect(liveDue.every((state) => state.xmoneyEnvironment === "live")).toBe(true);
-    expect((await billing.dueRenewals(now, 0, 10_000, { environment: "stage" })).map((state) => state.subscriptionId))
+    expect(liveDue.every((state) => state.paymentProvider === "xmoney" && state.paymentEnvironment === "live")).toBe(true);
+    expect((await billing.dueRenewals(now, 0, 10_000, { provider: "xmoney", environment: "stage" })).map((state) => state.subscriptionId))
       .not.toContain(live);
     expect(await billing.openRecordCounts("live")).toEqual({ ...before, subscriptions: before.subscriptions + 1 });
     const charge = await quoteAndCharge(ownerRef, live, "INITIAL", anchor, "live");
@@ -927,5 +928,60 @@ describe("N6 — NETOPIA's rows through the repository (spec §2.5.1, §2.5.2)",
     expect(await inTx((c) => jobs.bringForward(c, "VERIFY_PAYMENT", ref, new Date(now.getTime() + 7_200_000)))).toBe(true);
     expect(await notBefore()).toBe(now.getTime());
     expect(await inTx((c) => jobs.bringForward(c, "VERIFY_PAYMENT", chargeIdOf(), now))).toBe(false);
+  });
+});
+
+describe("N7 — a NETOPIA subscription through the repository (spec 2026-10-05 §2.5.5)", () => {
+  it("folds the seeded NETOPIA plan with its card, and renews it only in its own system", async () => {
+    const ownerRef = randomUUID();
+    const seeded = await seedNetopiaSubscription(database.pool, {
+      ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 40 * 86_400_000), taxCountry: "RO"
+    });
+    expect(await billing.subscriptionForOwner(ownerRef)).toMatchObject({
+      subscriptionId: seeded.subscriptionId, status: "ACTIVE", paymentProvider: "netopia", paymentEnvironment: "sandbox",
+      cardTokenId: seeded.cardTokenId, xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null,
+      currentPeriodEnd: seeded.periodEnd
+    });
+    expect(await billing.cardTokenById(database.pool, seeded.cardTokenId)).toMatchObject({
+      sourceChargeId: seeded.initialChargeId, customerId: seeded.customerId, paymentEnvironment: "sandbox", revokedAt: null
+    });
+    const charge = await billing.charge(seeded.initialChargeId);
+    expect(charge).toMatchObject({ kind: "INITIAL", paymentProvider: "netopia", paymentEnvironment: "sandbox" });
+    expect(charge?.events.map((event) => [event.kind, event.providerPaymentId]))
+      .toEqual([["REQUESTED", null], ["SUCCEEDED", seeded.providerPaymentId]]);
+    const now = new Date(seeded.periodEnd.getTime() + 60_000);
+    const dueIn = async (provider: "xmoney" | "netopia", environment: "stage" | "sandbox" | "live") =>
+      (await billing.dueRenewals(now, 0, 10_000, { provider, environment })).map((state) => state.subscriptionId);
+    expect(await dueIn("netopia", "sandbox")).toContain(seeded.subscriptionId);
+    expect(await dueIn("netopia", "live")).not.toContain(seeded.subscriptionId);
+    expect(await dueIn("xmoney", "stage")).not.toContain(seeded.subscriptionId);
+    expect(await dueIn("xmoney", "live")).not.toContain(seeded.subscriptionId);
+    // An xMoney plan stays on the xMoney pass only.
+    const xmoneyOwner = randomUUID();
+    const xmoneyPlan = await activeSubscription(xmoneyOwner, new Date(now.getTime() - 40 * 86_400_000));
+    expect(await dueIn("xmoney", "stage")).toContain(xmoneyPlan);
+    expect(await dueIn("netopia", "sandbox")).not.toContain(xmoneyPlan);
+  });
+
+  it("adopts a later card with CARD_SAVED, stores it in card_token_id, and refuses a card on any other kind", async () => {
+    const ownerRef = randomUUID();
+    const seeded = await seedNetopiaSubscription(database.pool, {
+      ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 5 * 86_400_000), taxCountry: "DE"
+    });
+    const newer = randomUUID();
+    await billing.withTransaction((c) => billing.appendSubscriptionEvent(c,
+      subscriptionEvent(seeded.subscriptionId, ownerRef, "CARD_SAVED", { cardTokenId: newer })));
+    expect((await billing.subscriptionForOwner(ownerRef))?.cardTokenId).toBe(newer);
+    const stored = await database.pool.query<{ kind: string; card_token_id: string | null }>(
+      "SELECT kind, card_token_id FROM billing.subscription_event WHERE subscription_id = $1 ORDER BY seq", [seeded.subscriptionId]);
+    expect(stored.rows).toEqual([
+      { kind: "CREATED", card_token_id: null }, { kind: "ACTIVATED", card_token_id: seeded.cardTokenId },
+      { kind: "CARD_SAVED", card_token_id: newer }
+    ]);
+    await expect(billing.withTransaction((c) => billing.appendSubscriptionEvent(c,
+      subscriptionEvent(seeded.subscriptionId, ownerRef, "CANCEL_REQUESTED", { cardTokenId: randomUUID() }))))
+      .rejects.toMatchObject({ code: "BILLING_SUBSCRIPTION_EVENTS_INVALID" });
+    expect((await billing.subscriptionEvents(seeded.subscriptionId)).map((event) => event.kind))
+      .toEqual(["CREATED", "ACTIVATED", "CARD_SAVED"]);
   });
 });

@@ -78,9 +78,14 @@ const PAGE = 50;
 const MAX_PAGES = 20;
 const DAY_MS = 86_400_000;
 
+/**
+ * Spec 2026-10-05 §2.5.5: an xMoney plan renews only on its order and customer (the rebill needs both); a NETOPIA plan
+ * needs no payment handle — with no usable card it renews into a CARD_NOT_SAVED attempt (§2.9.2), never into silence.
+ */
 function renewable(state: SubscriptionState, now: Date): boolean {
   return state.status === "ACTIVE" && !state.cancelRequested && state.currentPeriodEnd !== null
-    && state.periodAnchorAt !== null && state.xmoneyOrderId !== null && state.xmoneyCustomerId !== null
+    && state.periodAnchorAt !== null
+    && (state.paymentProvider !== "xmoney" || (state.xmoneyOrderId !== null && state.xmoneyCustomerId !== null))
     && (state.renewalPostponedUntil === null || state.renewalPostponedUntil.getTime() <= now.getTime());
 }
 
@@ -190,7 +195,8 @@ export class RenewalService {
     try {
       for (let page = 0; page < MAX_PAGES; page += 1) {
         const due = await this.deps.repository.dueRenewals(now, renewalLeadMs(), PAGE, {
-          environment: this.deps.xmoneyEnvironment, after, onInvalid: (subscriptionId) => { invalid.add(subscriptionId); }
+          provider: "xmoney", environment: this.deps.xmoneyEnvironment, after,
+          onInvalid: (subscriptionId) => { invalid.add(subscriptionId); }
         });
         for (const state of due) {
           if (!renewable(state, now)) {
@@ -544,7 +550,8 @@ export class RenewalService {
     return this.deps.repository.withTransaction(async (client): Promise<LockedCharge | null> => {
       await this.deps.jobs.lockOwner(client, state.ownerRef);
       const fresh = foldSubscription(await this.deps.repository.subscriptionEvents(state.subscriptionId, client));
-      if (fresh.status !== "PAST_DUE" || fresh.cancelRequested || fresh.xmoneyOrderId === null || fresh.xmoneyCustomerId === null
+      if (fresh.status !== "PAST_DUE" || fresh.cancelRequested
+        || (fresh.paymentProvider === "xmoney" && (fresh.xmoneyOrderId === null || fresh.xmoneyCustomerId === null))
         || fresh.currentPeriodEnd?.getTime() !== periodStart.getTime()) return null;
       const existing = await this.deps.repository.chargesForSubscription(state.subscriptionId, client);
       if (existing.some((row) => row.kind === "RENEWAL" && row.periodStart.getTime() === periodStart.getTime()

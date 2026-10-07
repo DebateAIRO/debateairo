@@ -47,14 +47,18 @@ export function transactionRoute(transactionType: string | null): TransactionRou
 type SubscriptionIdentity = Pick<SubscriptionState,
   "subscriptionId" | "ownerRef" | "planId" | "periodAnchorAt" | "xmoneyOrderId" | "xmoneyCustomerId" | "cardRef">;
 
-/** The next event of an existing subscription: identity carried over, `changes` overriding what moves. */
+/**
+ * The next event of an existing subscription: identity carried over, `changes` overriding what moves. The card is
+ * never carried over (spec 2026-10-05 §2.15.2: only an adopting event names one, and only when it adopts it).
+ */
 export function subscriptionEvent(
   state: SubscriptionIdentity, kind: SubscriptionEventKind, at: Date, data: SubscriptionEvent["data"],
-  changes: Partial<Pick<SubscriptionEvent, "planId" | "periodAnchorAt" | "xmoneyOrderId" | "xmoneyCustomerId" | "cardRef">> = {}
+  changes: Partial<Pick<SubscriptionEvent, "planId" | "periodAnchorAt" | "xmoneyOrderId" | "xmoneyCustomerId" | "cardRef" | "cardTokenId">> = {}
 ): SubscriptionEvent {
   return Object.freeze({
     eventId: randomUUID(), subscriptionId: state.subscriptionId, ownerRef: state.ownerRef, kind, at,
     planId: state.planId, periodAnchorAt: state.periodAnchorAt, xmoneyOrderId: state.xmoneyOrderId,
-    xmoneyCustomerId: state.xmoneyCustomerId, cardRef: state.cardRef, ...changes, data: Object.freeze({ ...data })
+    xmoneyCustomerId: state.xmoneyCustomerId, cardRef: state.cardRef, cardTokenId: null, ...changes,
+    data: Object.freeze({ ...data })
   });
 }

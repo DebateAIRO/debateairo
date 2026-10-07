@@ -107,7 +107,8 @@ describe("P8b POST /v1/billing/quote", () => {
 
 describe("P2-M29 a US or Canadian buyer gives the postal code (spec §1.3)", () => {
   const at = (country: string, region: string | null, postalCode: string | null) => addressRequired({
-    name: null, country, region, postalCode, city: null, street: null, ip: null, ipCountry: country, company: null
+    name: null, firstName: null, lastName: null, phone: null, country, region, postalCode, city: null, street: null,
+    ip: null, ipCountry: country, company: null
   }, country, testBillingPolicy);
 
   it.each(["US", "CA"])("asks %s for the postal code even when a state is given, since Quaderno is sent no region", (country) => {

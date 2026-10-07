@@ -1,11 +1,11 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import {
   AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, type CustomerXMoneyEnvironment
 } from "@debateai/db";
-import { computeWindows, foldSubscription } from "@debateai/billing-core";
+import { computeWindows, foldSubscription, type SecretToken } from "@debateai/billing-core";
 import { hashToken } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import type { XMoneyClient } from "@debateai/payments-xmoney";
@@ -13,7 +13,7 @@ import { planById, type PlanId } from "@debateai/register";
 import type { BillingAudit, BillingAuditEvent, BillingAuditField } from "../../apps/api/src/billing/audit.js";
 import type { BillingAdmissionScope } from "../../apps/api/src/billing/index.js";
 import { CheckoutService } from "../../apps/api/src/billing/checkout.js";
-import { sealBillingProfile, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
+import { sealBillingProfile, sealCardToken, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { chargeEvent, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { installSubscriptionRoutes } from "../../apps/api/src/billing/subscription-routes.js";
@@ -119,13 +119,13 @@ export async function seedActiveSubscription(pool: Pool, input: Readonly<{
     const base = { subscriptionId, ownerRef: input.ownerRef, planId: input.planId, xmoneyCustomerId } as const;
     await billing.appendSubscriptionEvent(client, {
       ...base, eventId: randomUUID(), kind: "CREATED", at: checkoutAt,
-      periodAnchorAt: null, xmoneyOrderId: null, cardRef: null,
+      periodAnchorAt: null, xmoneyOrderId: null, cardRef: null, cardTokenId: null,
       // 0085 `subscription_event_created_names_environment`: every CREATED names its xMoney system (D5 5h).
       data: { country_confirmed: false, ip_country: input.taxCountry, quote_id: initialQuoteId, xmoney_environment: environment }
     });
     await billing.appendSubscriptionEvent(client, {
       ...base, eventId: randomUUID(), kind: "ACTIVATED", at: periodStart, periodAnchorAt: periodStart,
-      xmoneyOrderId, cardRef,
+      xmoneyOrderId, cardRef, cardTokenId: null,
       // As P9b writes it: the SUBSCRIBE quote's net is the price this subscriber keeps (Terms §12, P11a's
       // `recurringNetOf`); a history without it is never renewed (BILLING_RECURRING_PRICE_MISSING).
       data: { charge_id: initialChargeId, announced_total_micros: totalMicros, recurring_net_micros: netMicros, reactivated: false }
@@ -139,6 +139,123 @@ export async function seedActiveSubscription(pool: Pool, input: Readonly<{
   return Object.freeze({
     ownerRef: input.ownerRef, subscriptionId, customerId, initialQuoteId, initialChargeId, initialTransactionId,
     xmoneyOrderId, xmoneyCustomerId, cardRef, periodStart, periodEnd, totalMicros, xmoneyEnvironment: environment
+  });
+}
+
+export type SeededNetopiaSubscription = Readonly<{
+  ownerRef: string; subscriptionId: string; customerId: string;
+  initialQuoteId: string; initialChargeId: string;
+  /** NETOPIA's ntpID of the first payment. */
+  providerPaymentId: string;
+  /** The saved card ACTIVATED adopted: a sealed made-up token, its source the INITIAL charge, expiring in December three years on. */
+  cardTokenId: string;
+  periodStart: Date; periodEnd: Date; totalMicros: number;
+  paymentEnvironment: "sandbox";
+}>;
+
+/** A SecretToken over a made-up value (tests never hold a real token): it prints `[token]` everywhere. */
+export function testCardToken(plaintext: string): SecretToken {
+  const token = {
+    reveal: (): string => plaintext,
+    fingerprint: createHash("sha256").update(plaintext, "utf8").digest("hex").slice(0, 16),
+    toString: (): string => "[token]",
+    toJSON: (): string => "[token]",
+    [Symbol.for("nodejs.util.inspect.custom")]: (): string => "[token]"
+  };
+  return token;
+}
+
+/**
+ * One ACTIVE NETOPIA subscription as the switched flows leave it (skeleton §2.5; until N18 a new checkout still makes
+ * an xMoney one): customer, sealed profile with the payer's fields, SUBSCRIBE quote with its sealed location (ip
+ * 192.0.2.10), INITIAL charge in NETOPIA's sandbox (REQUESTED, SUCCEEDED with an ntpID) that spent the quote, the
+ * card that payment saved, CREATED naming `payment_provider`/`payment_environment`, ACTIVATED adopting the card,
+ * SUBSCRIBED entitlement paid through the period end.
+ */
+export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
+  ownerRef: string; planId: Exclude<PlanId, "FREE">; activatedAt: Date; taxCountry: string;
+  taxRateBasisPoints?: number; email?: string; netMicros?: number;
+}>): Promise<SeededNetopiaSubscription> {
+  const billing = new BillingRepository(pool);
+  const entitlements = new EntitlementRepository(pool);
+  const rate = input.taxRateBasisPoints ?? 2_100;
+  const netMicros = input.netMicros ?? planById(testBillingPlans, input.planId).netPriceMicros;
+  const taxMicros = Math.floor(netMicros * rate / 10_000 / 10_000) * 10_000;
+  const totalMicros = netMicros + taxMicros;
+  const subscriptionId = randomUUID();
+  const initialQuoteId = randomUUID();
+  const initialChargeId = randomUUID().replaceAll("-", "");
+  const providerPaymentId = digits(1_000_000, 8_000_000);
+  const cardTokenId = randomUUID();
+  const periodStart = input.activatedAt;
+  const periodEnd = computeWindows(periodStart, periodStart).month.end;
+  const checkoutAt = new Date(periodStart.getTime() - 60_000);
+  const payer = { firstName: "Test", lastName: "Subscriber", phone: "+40712345678" } as const;
+  const location = sealQuoteLocation(TEST_RECORDS_KEY, initialQuoteId, {
+    name: "Test Subscriber", ...payer, country: input.taxCountry, region: null, postalCode: "010101", city: "Bucuresti",
+    street: "Strada Exemplu 1", ip: "192.0.2.10", ipCountry: input.taxCountry, company: null
+  });
+  const customerId = await billing.withTransaction(async (client) => {
+    // No xMoney link is made: a NETOPIA customer needs none (the lookup's system is irrelevant here).
+    const customer = await billing.ensureCustomer(client, { ownerRef: input.ownerRef, locale: "en", now: checkoutAt, environment: "stage" });
+    const profile = sealBillingProfile(TEST_RECORDS_KEY, customer.customerId, {
+      email: input.email ?? `${input.ownerRef}@example.test`, locale: "en", name: "Test Subscriber", ...payer,
+      paymentIp: "192.0.2.10", country: input.taxCountry, region: null, postalCode: "010101", city: "Bucuresti",
+      street: "Strada Exemplu 1", company: null
+    });
+    await billing.appendProfile(client, {
+      customerId: customer.customerId, at: checkoutAt, locale: "en", profileCiphertext: profile.ciphertext, keyId: profile.keyId
+    });
+    await billing.insertQuote(client, {
+      quoteId: initialQuoteId, ownerRef: input.ownerRef, planId: input.planId, kind: "SUBSCRIBE",
+      netMicros, taxMicros, totalMicros, taxCountry: input.taxCountry, taxRegion: null,
+      taxRateBasisPoints: rate, taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null,
+      createdAt: new Date(periodStart.getTime() - 120_000), expiresAt: new Date(periodStart.getTime() + 1_800_000),
+      locationCiphertext: location.ciphertext, keyId: location.keyId, recurringTotalMicros: null
+    });
+    await billing.insertCharge(client, {
+      chargeId: initialChargeId, ownerRef: input.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1,
+      periodStart, periodEnd, quoteId: initialQuoteId, netMicros, taxMicros, totalMicros, currency: "USD",
+      createdAt: checkoutAt, paymentProvider: "netopia", paymentEnvironment: "sandbox"
+    });
+    await billing.useQuote(client, { quoteId: initialQuoteId, usedAt: checkoutAt, chargeId: initialChargeId });
+    await billing.appendChargeEvent(client, chargeEvent(initialChargeId, "REQUESTED", checkoutAt, {
+      providerPaymentId: null, amountMicros: totalMicros, errorCode: null
+    }));
+    await billing.appendChargeEvent(client, chargeEvent(initialChargeId, "SUCCEEDED", periodStart, {
+      providerPaymentId, amountMicros: totalMicros, errorCode: null, providerCreatedAt: periodStart
+    }));
+    const sealedCard = sealCardToken(TEST_RECORDS_KEY, cardTokenId, testCardToken(["test", "card", cardTokenId.slice(0, 8)].join("-")));
+    await billing.insertCardToken(client, {
+      tokenId: cardTokenId, customerId: customer.customerId, paymentProvider: "netopia", paymentEnvironment: "sandbox",
+      sourceChargeId: initialChargeId, sourceToolOrder: null, sourceNoticeId: null, sourcePaidAt: periodStart,
+      tokenCiphertext: sealedCard.ciphertext, keyId: sealedCard.keyId, expMonth: 12,
+      expYear: periodStart.getUTCFullYear() + 3, last4: "1111", cardCountry: input.taxCountry, createdAt: periodStart
+    });
+    const base = {
+      subscriptionId, ownerRef: input.ownerRef, planId: input.planId, xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null
+    } as const;
+    await billing.appendSubscriptionEvent(client, {
+      ...base, eventId: randomUUID(), kind: "CREATED", at: checkoutAt, periodAnchorAt: null, cardTokenId: null,
+      // 0096 `subscription_event_created_names_payment_system`: a NETOPIA CREATED names both keys (spec §2.5.1).
+      data: {
+        country_confirmed: false, ip_country: input.taxCountry, quote_id: initialQuoteId,
+        payment_provider: "netopia", payment_environment: "sandbox"
+      }
+    });
+    await billing.appendSubscriptionEvent(client, {
+      ...base, eventId: randomUUID(), kind: "ACTIVATED", at: periodStart, periodAnchorAt: periodStart, cardTokenId,
+      data: { charge_id: initialChargeId, announced_total_micros: totalMicros, recurring_net_micros: netMicros, reactivated: false }
+    });
+    await entitlements.append(client, {
+      ownerRef: input.ownerRef, planId: input.planId, periodAnchorAt: periodStart, cause: "SUBSCRIBED",
+      effectiveAt: periodStart, subscriptionId, paidThrough: periodEnd, monthCreditOverrideMicros: null
+    });
+    return customer.customerId;
+  });
+  return Object.freeze({
+    ownerRef: input.ownerRef, subscriptionId, customerId, initialQuoteId, initialChargeId, providerPaymentId, cardTokenId,
+    periodStart, periodEnd, totalMicros, paymentEnvironment: "sandbox"
   });
 }
 

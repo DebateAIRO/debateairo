@@ -13,7 +13,8 @@ const created = (subscriptionId: string): SubscriptionState => ({
   subscriptionId, ownerRef: "o", planId: "PLUS", status: "CREATED", periodAnchorAt: null, currentPeriodStart: null,
   currentPeriodEnd: new Date(NOW.getTime() - 1_000), cancelRequested: false, scheduledDowngradePlanId: null,
   xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null, activatedAt: null, endedCause: null, pastDueSince: null,
-  retryIndex: 0, renewalPostponedUntil: null, announcedTotalMicros: null, lastNoticeAt: null, xmoneyEnvironment: "stage"
+  retryIndex: 0, renewalPostponedUntil: null, announcedTotalMicros: null, lastNoticeAt: null, paymentProvider: "xmoney",
+  paymentEnvironment: "stage", cardTokenId: null
 } as SubscriptionState);
 
 function tick(dueRenewals: BillingRepository["dueRenewals"]) {
@@ -44,10 +45,10 @@ describe("P11a the renewal tick (D5 5d)", () => {
     const report = await service.runOnce();
     expect(report.skipped).toBe(51);
     expect(dueRenewals).toHaveBeenCalledTimes(2);
-    const options = (dueRenewals.mock.calls as unknown as Array<[Date, number, number, { environment: string; after: DueRenewalCursor | null }]>);
-    expect(options[0]![3]).toMatchObject({ environment: "stage", after: null });
+    const options = (dueRenewals.mock.calls as unknown as Array<[Date, number, number, { provider: string; environment: string; after: DueRenewalCursor | null }]>);
+    expect(options[0]![3]).toMatchObject({ provider: "xmoney", environment: "stage", after: null });
     expect(options[1]![3]).toMatchObject({
-      environment: "stage", after: { periodEnd: new Date(NOW.getTime() - 1_000), subscriptionId: "s-49" }
+      provider: "xmoney", environment: "stage", after: { periodEnd: new Date(NOW.getTime() - 1_000), subscriptionId: "s-49" }
     });
   });
 
@@ -121,5 +122,19 @@ describe("P11a the renewal tick (D5 5d)", () => {
     const { service, audit } = tick((async () => []) as unknown as BillingRepository["dueRenewals"]);
     await service.runOnce();
     expect(audit.mock.calls.map(([event]) => event)).not.toContain("billing.renewal.report");
+  });
+
+  it("renews a NETOPIA plan that holds no xMoney ids, and still skips an xMoney plan without its order (spec §2.5.5)", async () => {
+    const lapsedAnchor = new Date(NOW.getTime() - 31 * 86_400_000);
+    const netopia = {
+      ...created("s-netopia"), status: "ACTIVE", periodAnchorAt: lapsedAnchor, paymentProvider: "netopia",
+      paymentEnvironment: "sandbox"
+    } as SubscriptionState;
+    const xmoney = { ...created("s-xmoney"), status: "ACTIVE", periodAnchorAt: lapsedAnchor } as SubscriptionState;
+    const { service } = tick((async () => [netopia, xmoney]) as unknown as BillingRepository["dueRenewals"]);
+    const renew = vi.spyOn(service, "renew").mockResolvedValue("charged");
+    const report = await service.runOnce();
+    expect(renew.mock.calls).toEqual([["s-netopia"]]);
+    expect([report.charged, report.skipped]).toEqual([1, 1]);
   });
 });

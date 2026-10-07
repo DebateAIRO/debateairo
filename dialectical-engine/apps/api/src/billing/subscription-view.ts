@@ -40,7 +40,7 @@ type WindowInput = Readonly<{
 function openWithdrawal(input: WindowInput): WithdrawalDeadline | null {
   const { state, taxCountry, policy, now } = input;
   if (state.status !== "ACTIVE" || state.activatedAt === null || taxCountry === null) return null;
-  if (state.xmoneyEnvironment !== input.xmoneyEnvironment) return null;
+  if (state.paymentProvider !== "xmoney" || state.paymentEnvironment !== input.xmoneyEnvironment) return null;
   if (!policy.withdrawalCountries.includes(taxCountry)) return null;
   const deadline = withdrawalDeadline({ activatedAt: state.activatedAt, taxCountry, withdrawalDays: policy.withdrawalDays });
   return now.getTime() < deadline.closesAt.getTime() ? deadline : null;
@@ -70,7 +70,7 @@ const iso = (value: Date | null): string | null => value === null ? null : value
 function upgradeOffered(input: WindowInput): boolean {
   const { state, now } = input;
   return state.status === "ACTIVE" && state.planId !== "MAX" && state.renewalPostponedUntil === null
-    && state.xmoneyEnvironment === input.xmoneyEnvironment
+    && state.paymentProvider === "xmoney" && state.paymentEnvironment === input.xmoneyEnvironment
     && state.currentPeriodEnd !== null && now.getTime() < state.currentPeriodEnd.getTime() - renewalLeadMs();
 }
 
@@ -80,7 +80,8 @@ function upgradeOffered(input: WindowInput): boolean {
  */
 function cardChangeOffered(input: WindowInput): boolean {
   const { state } = input;
-  return (state.status === "ACTIVE" || state.status === "PAST_DUE") && state.xmoneyEnvironment === input.xmoneyEnvironment;
+  return (state.status === "ACTIVE" || state.status === "PAST_DUE")
+    && state.paymentProvider === "xmoney" && state.paymentEnvironment === input.xmoneyEnvironment;
 }
 
 /**
@@ -91,7 +92,8 @@ function cardChangeOffered(input: WindowInput): boolean {
  */
 function revokeCancelOffered(input: WindowInput): boolean {
   const { state, now } = input;
-  return state.status === "ACTIVE" && state.cancelRequested && state.xmoneyEnvironment === input.xmoneyEnvironment
+  return state.status === "ACTIVE" && state.cancelRequested
+    && state.paymentProvider === "xmoney" && state.paymentEnvironment === input.xmoneyEnvironment
     && (state.currentPeriodEnd === null || now.getTime() < state.currentPeriodEnd.getTime());
 }
 

@@ -82,7 +82,7 @@ export function unusedAskApplication(): AskApplication {
  */
 export function activeSubscriptionEvents(ownerRef: string, at: Date, planId: "PLUS" | "PRO" | "MAX" = "PLUS"): SubscriptionEvent[] {
   const subscriptionId = randomUUID();
-  const base = { subscriptionId, ownerRef, planId, xmoneyCustomerId: "9001", cardRef: null } as const;
+  const base = { subscriptionId, ownerRef, planId, xmoneyCustomerId: "9001", cardRef: null, cardTokenId: null } as const;
   const netMicros = testBillingPlans.plans.find((plan) => plan.planId === planId)!.netPriceMicros;
   return [
     { ...base, eventId: randomUUID(), kind: "CREATED", at, periodAnchorAt: null, xmoneyOrderId: null,

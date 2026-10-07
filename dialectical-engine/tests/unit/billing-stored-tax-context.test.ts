@@ -20,13 +20,14 @@ const COMPANY = Object.freeze({ name: "Later GmbH", vatId: "DE-VALID-1", address
 
 function location(company: QuoteLocation["company"]): QuoteLocation {
   return {
-    name: "Test Person", country: "DE", region: null, postalCode: "10115", city: "Berlin", street: null,
-    ip: "198.51.100.7", ipCountry: "DE", company
+    name: "Test Person", firstName: null, lastName: null, phone: null, country: "DE", region: null, postalCode: "10115",
+    city: "Berlin", street: null, ip: "198.51.100.7", ipCountry: "DE", company
   };
 }
 
 const LATER_PROFILE: BillingProfile = Object.freeze({
-  email: "later@example.test", locale: "de", name: "Test Person", country: "DE", region: null,
+  email: "later@example.test", locale: "de", name: "Test Person", firstName: null, lastName: null, phone: null,
+  paymentIp: null, country: "DE", region: null,
   postalCode: "10115", city: "Berlin", street: null, company: COMPANY
 });
 

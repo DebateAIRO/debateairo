@@ -56,7 +56,7 @@ export async function startCardChange(
   if (await deps.legal.requiresReacceptance(input.ownerRef)) refuse(403, "LEGAL_REACCEPTANCE_REQUIRED");
   const before = await deps.billing.subscriptionForOwner(input.ownerRef);
   if (before === null || (before.status !== "ACTIVE" && before.status !== "PAST_DUE")
-    || before.xmoneyEnvironment !== deps.xmoneyEnvironment) {
+    || before.paymentProvider !== "xmoney" || before.paymentEnvironment !== deps.xmoneyEnvironment) {
     refuse(409, "NOT_SUBSCRIBED");
   }
   const stored = await storedTaxContext({ billing: deps.billing, recordsKey: deps.recordsKey }, before);

@@ -169,7 +169,7 @@ function subscriptionEventAt(
 ): SubscriptionEvent {
   return Object.freeze({
     eventId: `${subscriptionId}-${kind}`, subscriptionId, ownerRef: `owner-${subscriptionId}`, kind, at, planId: "PLUS",
-    periodAnchorAt: null, xmoneyOrderId, xmoneyCustomerId: null, cardRef: null,
+    periodAnchorAt: null, xmoneyOrderId, xmoneyCustomerId: null, cardRef: null, cardTokenId: null,
     data: Object.freeze({ xmoney_environment: "stage" })
   }) as SubscriptionEvent;
 }

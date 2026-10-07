@@ -13,7 +13,8 @@ const state = (overrides: Partial<SubscriptionState> = {}): SubscriptionState =>
   periodAnchorAt: START, currentPeriodStart: START, currentPeriodEnd: END,
   cancelRequested: false, scheduledDowngradePlanId: null, xmoneyOrderId: "901", xmoneyCustomerId: "77",
   cardRef: "4242", activatedAt: START, endedCause: null, pastDueSince: null, retryIndex: 0,
-  renewalPostponedUntil: null, announcedTotalMicros: 24_200_000, lastNoticeAt: null, xmoneyEnvironment: "stage",
+  renewalPostponedUntil: null, announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "xmoney",
+  paymentEnvironment: "stage", cardTokenId: null,
   ...overrides
 });
 

@@ -155,7 +155,7 @@ export class BillingMaintenance {
       const state = foldSubscription(events);
       if (state.status !== "PAST_DUE" || state.cancelRequested || state.currentPeriodEnd === null) return false;
       // D5 5h: the other xMoney system's plan is never charged from here, nor dunned without a charge.
-      if (state.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return false;
+      if (state.paymentProvider !== "xmoney" || state.paymentEnvironment !== this.deps.xmoneyEnvironment) return false;
       const progress = dunningProgress(events, state);
       if (progress === null) return false;
       const periodStart = state.currentPeriodEnd;
@@ -239,7 +239,7 @@ export class BillingMaintenance {
   private async remind(state: SubscriptionState, now: Date, report: MaintenanceReport): Promise<void> {
     if (state.activatedAt === null || state.cancelRequested || state.currentPeriodEnd === null) return;
     // D5 5h (P2-W3 (b)'s sibling): the other xMoney system's plan is never renewed here, so it is never reminded either.
-    if (state.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return;
+    if (state.paymentProvider !== "xmoney" || state.paymentEnvironment !== this.deps.xmoneyEnvironment) return;
     const years = anniversaryDue(state.activatedAt, now, 7);
     if (years === null) return;
     const customer = await this.deps.repository.customerByOwner(state.ownerRef);
@@ -261,7 +261,7 @@ export class BillingMaintenance {
     const end = state.currentPeriodEnd;
     if (state.cancelRequested || end === null || end.getTime() <= now.getTime()) return;
     // D5 5h: P11a's renewal never renews the other xMoney system's plan (`dueRenewals`), so nothing is announced for it.
-    if (state.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return;
+    if (state.paymentProvider !== "xmoney" || state.paymentEnvironment !== this.deps.xmoneyEnvironment) return;
     if (addBusinessDays(now, this.deps.policy.lookAheadBusinessDays).getTime() < end.getTime()) return;
     const queued = await this.deps.repository.withTransaction((client) => enqueueOnce(this.deps, client, {
       kind: "RENEWAL_NOTICE", ref: `${state.subscriptionId}:${end.toISOString()}`, notBefore: now, payload: {}

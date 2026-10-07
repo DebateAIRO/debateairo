@@ -62,7 +62,7 @@ export function createInitialSettlement(deps: Readonly<{
       await deps.repository.appendSubscriptionEvent(client, {
         eventId: randomUUID(), subscriptionId: subscription.subscriptionId, ownerRef: context.ownerRef, kind: "ACTIVATED",
         at: now, planId: quote.planId, periodAnchorAt: anchor, xmoneyOrderId: transaction.orderId,
-        xmoneyCustomerId: transaction.customerId, cardRef: transaction.cardId,
+        xmoneyCustomerId: transaction.customerId, cardRef: transaction.cardId, cardTokenId: null,
         data: {
           charge_id: context.charge.chargeId, announced_total_micros: context.charge.totalMicros,
           // Terms §12: this subscriber's recurring net price. Every renewal charges it plus a fresh tax (P11a), never

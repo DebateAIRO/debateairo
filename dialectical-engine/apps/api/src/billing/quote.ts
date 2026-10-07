@@ -133,7 +133,8 @@ export class QuoteService implements QuoteServicePort {
       company = Object.freeze({ ...input.company, vatValidated: true });
     }
     const validated: QuoteLocation = Object.freeze({
-      name: input.name, country: place.declaredCountry, region: input.region, postalCode: input.postalCode,
+      name: input.name, firstName: null, lastName: null, phone: null,
+      country: place.declaredCountry, region: input.region, postalCode: input.postalCode,
       city: input.city, street: null, ip: input.ip === "unknown" ? null : input.ip, ipCountry: place.ipCountry, company
     });
     const taxQuote = await this.taxCall(this.deps.tax.quote({

@@ -31,7 +31,7 @@ export function createRenewalNoticeHandler(deps: Readonly<{
     const periodEnd = job.ref.slice(split + 1);
     const state = foldSubscription(await deps.repository.subscriptionEvents(subscriptionId));
     if (!stillDue(state, periodEnd)) return DONE;
-    if (state.xmoneyEnvironment !== deps.xmoneyEnvironment) return otherXMoneySystem(deps.audit, job.kind);
+    if (state.paymentProvider !== "xmoney" || state.paymentEnvironment !== deps.xmoneyEnvironment) return otherXMoneySystem(deps.audit, job.kind);
     const priced = await deps.renewal.freshQuote(state, now);
     if (priced.tax.totalMicros === state.announcedTotalMicros) return DONE;
     const noticeEnds = addBusinessDays(now, deps.policy.renewalNoticeBusinessDays);

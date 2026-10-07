@@ -11,7 +11,7 @@ const NOW = new Date("2026-11-02T10:00:00.000Z");
 function events(...rows: Array<[SubscriptionEvent["kind"], SubscriptionEvent["planId"], SubscriptionEvent["data"]]>): SubscriptionEvent[] {
   return rows.map(([kind, planId, data]) => ({
     eventId: randomUUID(), subscriptionId: "s", ownerRef: "o", kind, at: NOW, planId, periodAnchorAt: NOW,
-    xmoneyOrderId: "1", xmoneyCustomerId: "2", cardRef: null, data
+    xmoneyOrderId: "1", xmoneyCustomerId: "2", cardRef: null, cardTokenId: null, data
   }));
 }
 

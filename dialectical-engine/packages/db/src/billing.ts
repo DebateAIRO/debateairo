@@ -126,8 +126,12 @@ export type TaxSummaryRow = Readonly<{
 /** Where the previous page of due renewals ended: the order is (currentPeriodEnd, subscriptionId). */
 export type DueRenewalCursor = Readonly<{ periodEnd: Date; subscriptionId: string }>;
 export type DueRenewalsOptions = Readonly<{
-  /** REQUIRED: stage and live are two xMoney systems; a renewal pass only ever rebills its own system's orders. */
-  environment: CustomerXMoneyEnvironment;
+  /**
+   * REQUIRED (spec 2026-10-05 §2.5.4): a renewal pass serves one payment system, a provider and one of its
+   * environments; a subscription of any other system is never renewed by it.
+   */
+  provider: PaymentProviderName;
+  environment: PaymentEnvironmentName;
   after?: DueRenewalCursor | null;
   /** Called once per subscription whose history does not fold (the id only); it is left out, the rest go on. */
   onInvalid?: (subscriptionId: string) => void;
@@ -202,7 +206,7 @@ function refundRefusal(error: unknown): boolean {
 type SubscriptionEventRaw = {
   event_id: string; seq: string; subscription_id: string; owner_ref: string; kind: SubscriptionEventKind; at: Date;
   plan_id: PlanId; period_anchor_at: Date | null; xmoney_order_id: string | null; xmoney_customer_id: string | null;
-  card_ref: string | null; data: Record<string, string | number | boolean | null>;
+  card_ref: string | null; card_token_id: string | null; data: Record<string, string | number | boolean | null>;
 };
 type ChargeRaw = {
   charge_id: string; owner_ref: string; subscription_id: string; kind: ChargeKind; attempt: number;
@@ -232,7 +236,7 @@ type InvoiceRaw = {
 
 const SUBSCRIPTION_EVENT_COLUMNS = `event.event_id, event.seq, event.subscription_id, event.owner_ref, event.kind,
   event.at, event.plan_id, event.period_anchor_at, event.xmoney_order_id, event.xmoney_customer_id, event.card_ref,
-  event.data`;
+  event.card_token_id, event.data`;
 const CHARGE_COLUMNS = `charge.charge_id, charge.owner_ref, charge.subscription_id, charge.kind, charge.attempt,
   charge.period_start, charge.period_end, charge.quote_id, charge.net_micros, charge.tax_micros, charge.total_micros,
   charge.currency, charge.created_at, charge.payment_provider, charge.payment_environment`;
@@ -241,7 +245,8 @@ function toSubscriptionEvent(row: SubscriptionEventRaw): SubscriptionEvent {
   return Object.freeze({
     eventId: row.event_id, subscriptionId: row.subscription_id, ownerRef: row.owner_ref, kind: row.kind, at: row.at,
     planId: row.plan_id, periodAnchorAt: row.period_anchor_at, xmoneyOrderId: row.xmoney_order_id,
-    xmoneyCustomerId: row.xmoney_customer_id, cardRef: row.card_ref, data: Object.freeze({ ...row.data })
+    xmoneyCustomerId: row.xmoney_customer_id, cardRef: row.card_ref, cardTokenId: row.card_token_id,
+    data: Object.freeze({ ...row.data })
   });
 }
 function toCharge(row: ChargeRaw): ChargeRow {
@@ -602,10 +607,10 @@ export class BillingRepository {
     foldSubscription([...stored, e]);
     await c.query(`
       INSERT INTO billing.subscription_event (event_id, subscription_id, owner_ref, kind, at, plan_id,
-        period_anchor_at, xmoney_order_id, xmoney_customer_id, card_ref, data)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb)
+        period_anchor_at, xmoney_order_id, xmoney_customer_id, card_ref, card_token_id, data)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
     `, [e.eventId, e.subscriptionId, e.ownerRef, e.kind, e.at, e.planId, e.periodAnchorAt, e.xmoneyOrderId,
-      e.xmoneyCustomerId, e.cardRef, JSON.stringify(e.data)]);
+      e.xmoneyCustomerId, e.cardRef, e.cardTokenId, JSON.stringify(e.data)]);
   }
 
   async subscriptionEvents(subscriptionId: string, executor: BillingReadExecutor = this.pool): Promise<SubscriptionEvent[]> {
@@ -655,14 +660,16 @@ export class BillingRepository {
       )
       AND event.subscription_id IN (
         SELECT created.subscription_id FROM billing.subscription_event AS created
-        WHERE created.kind = 'CREATED' AND created.data ->> 'xmoney_environment' = $2
+        WHERE created.kind = 'CREATED'
+          AND COALESCE(created.data ->> 'payment_provider', 'xmoney') = $2
+          AND COALESCE(created.data ->> 'payment_environment', created.data ->> 'xmoney_environment') = $3
       )
       ORDER BY event.subscription_id, event.seq
-    `, [[...TERMINAL_KINDS], options.environment])).rows;
+    `, [[...TERMINAL_KINDS], options.provider, options.environment])).rows;
     const edge = now.getTime() + horizonMs;
     const after = options.after ?? null;
     const candidates = foldEach(rows, (subscriptionId) => options.onInvalid?.(subscriptionId)).filter((state) => {
-      if (state.xmoneyEnvironment !== options.environment) return false;
+      if (state.paymentProvider !== options.provider || state.paymentEnvironment !== options.environment) return false;
       if (state.status !== "ACTIVE" || state.cancelRequested || state.currentPeriodEnd === null) return false;
       const dueAt = Math.max(state.currentPeriodEnd.getTime(), state.renewalPostponedUntil?.getTime() ?? 0);
       return dueAt <= edge;

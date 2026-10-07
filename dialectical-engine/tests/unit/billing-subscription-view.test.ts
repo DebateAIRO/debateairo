@@ -16,7 +16,8 @@ function state(overrides: Partial<SubscriptionState> = {}): SubscriptionState {
     cancelRequested: false, scheduledDowngradePlanId: null,
     xmoneyOrderId: "901", xmoneyCustomerId: "77", cardRef: "4242",
     activatedAt: ACTIVATED, endedCause: null, pastDueSince: null, retryIndex: 0,
-    renewalPostponedUntil: null, announcedTotalMicros: 24_200_000, lastNoticeAt: null, xmoneyEnvironment: "stage",
+    renewalPostponedUntil: null, announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "xmoney",
+    paymentEnvironment: "stage", cardTokenId: null,
     ...overrides
   });
 }
@@ -122,7 +123,7 @@ describe("P12b the subscription as the person sees it", () => {
     // Control: the plan's own system offers both, and a live plan on the live API too.
     expect(read("stage")).toMatchObject({ can_upgrade: true, can_change_card: true });
     expect(read("stage", { status: "PAST_DUE" })).toMatchObject({ can_upgrade: false, can_change_card: true });
-    expect(read("live", { xmoneyEnvironment: "live" })).toMatchObject({ can_upgrade: true, can_change_card: true });
+    expect(read("live", { paymentEnvironment: "live" })).toMatchObject({ can_upgrade: true, can_change_card: true });
   });
 
   it("offers Undo only where the revoke route accepts it: ACTIVE, this API's xMoney system, a cancel pending, before the period end (C-15)", () => {
@@ -133,7 +134,7 @@ describe("P12b the subscription as the person sees it", () => {
     expect(read("live", { cancelRequested: true }).can_revoke_cancel).toBe(false);
     // Control: the plan's own system offers it, and a live plan on the live API too.
     expect(read("stage", { cancelRequested: true }).can_revoke_cancel).toBe(true);
-    expect(read("live", { cancelRequested: true, xmoneyEnvironment: "live" }).can_revoke_cancel).toBe(true);
+    expect(read("live", { cancelRequested: true, paymentEnvironment: "live" }).can_revoke_cancel).toBe(true);
     // Nothing to undo; the period is over (the route refuses it there); a plan paused by a dispute (refused while paused).
     expect(read("stage").can_revoke_cancel).toBe(false);
     expect(read("stage", { cancelRequested: true }, new Date(PERIOD_END.getTime() - 1)).can_revoke_cancel).toBe(true);
