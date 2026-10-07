@@ -110,6 +110,7 @@
   "newDebate.legalGate.signOut": "Disconnetti",
   "newDebate.legalGate.signOutFailed": "La disconnessione non è stata completata. Riprova.",
   "newDebate.room.locationBlocked": "Non è possibile avviare nuovi dibattiti dalla tua posizione attuale. I tuoi dibattiti restano disponibili per la lettura.",
+  "newDebate.room.previewTeamOnly": "I dibattiti in questa versione di anteprima sono riservati al team.",
   "newDebate.room.siteFull": "Il limite di oggi è stato raggiunto. Puoi comunque fare la tua domanda: il dibattito partirà da solo quando il limite si azzera.",
   "newDebate.room.siteClose": "Sei vicino al limite di oggi. Questo dibattito si svolgerà comunque per intero; i successivi potrebbero attendere fino all’azzeramento.",
   "newDebate.room.alreadyWaiting": "Può restare in attesa una sola domanda alla volta. La tua partirà alle {time}; fai questa domanda dopo.",

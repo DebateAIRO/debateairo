@@ -110,6 +110,7 @@
   "newDebate.legalGate.signOut": "Odhlásiť sa",
   "newDebate.legalGate.signOutFailed": "Odhlásenie sa nedokončilo. Skúste to znova.",
   "newDebate.room.locationBlocked": "Z vašej aktuálnej polohy nie je možné začať nové debaty. Vaše debaty zostávajú dostupné na čítanie.",
+  "newDebate.room.previewTeamOnly": "Debaty v tejto ukážkovej verzii sú prístupné iba tímu.",
   "newDebate.room.siteFull": "Dnešný limit je vyčerpaný. Otázku môžete položiť aj tak — vaša debata sa spustí sama, keď sa limit obnoví.",
   "newDebate.room.siteClose": "Blížite sa k dnešnému limitu. Táto debata aj tak prebehne celá; ďalšie môžu počkať do obnovenia.",
   "newDebate.room.alreadyWaiting": "Naraz môže čakať iba jedna otázka. Vaša sa začne v čase {time}; túto položte až potom.",

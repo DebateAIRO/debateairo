@@ -110,6 +110,7 @@
   "newDebate.legalGate.signOut": "Keluar",
   "newDebate.legalGate.signOutFailed": "Proses keluar tidak selesai. Silakan coba lagi.",
   "newDebate.room.locationBlocked": "Debat baru tidak dapat dimulai dari lokasi Anda saat ini. Debat Anda tetap dapat dibaca.",
+  "newDebate.room.previewTeamOnly": "Debat di versi pratinjau ini hanya terbuka untuk tim.",
   "newDebate.room.siteFull": "Batas hari ini telah tercapai. Anda tetap dapat bertanya — debat Anda akan dimulai dengan sendirinya saat batas diatur ulang.",
   "newDebate.room.siteClose": "Anda hampir mencapai batas hari ini. Debat ini tetap berjalan penuh; debat berikutnya mungkin menunggu hingga batas diatur ulang.",
   "newDebate.room.alreadyWaiting": "Hanya satu pertanyaan yang dapat menunggu dalam satu waktu. Pertanyaan Anda akan dimulai pada {time}; ajukan pertanyaan ini setelah itu.",
