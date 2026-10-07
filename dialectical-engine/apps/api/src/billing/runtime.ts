@@ -126,9 +126,12 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P2-I4 (D5 5h): a refund of a charge paid in the other xMoney system ends DEAD before any call.
   const refunds = new RefundDesk({
     repository, jobs, xmoney: deps.connectors.xmoney, policy: deps.policy, audit: deps.audit, clock: deps.clock,
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment,
+    // N14 (spec §2.12): NETOPIA refunds go to the owner (the port has no `refund` until N-10).
+    netopia: { payments: deps.connectors.payments, paymentEnvironment: deps.connectors.paymentEnvironment, jobs }
   });
   outbox.register("XMONEY_REFUND", refunds.handle);
+  outbox.register("PAYMENT_REFUND", refunds.handle);
   const verify = new VerifyPaymentHandler({
     repository, jobs, xmoney: deps.connectors.xmoney, refunds, entitlements, countryPolicy: deps.countryPolicy,
     policy: deps.policy, recordsKey: deps.connectors.recordsKey, audit: deps.audit,
@@ -311,7 +314,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P16c: the owner's quarterly tax summary (spec §2.5.9), queued once per quarter and sent as email O1.
   const ownerJobs = new OwnerJobs({
     billing: repository, jobs, taxAuthorities: required(deps.taxAuthorities, "taxAuthorities"),
-    audit: deps.audit, clock: deps.clock
+    audit: deps.audit, clock: deps.clock, refunds
   });
   outbox.register("OWNER_TAX_SUMMARY", ownerJobs.taxSummary);
   const scheduleOwnerJobs = createCoalescingSingleFlight(

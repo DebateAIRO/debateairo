@@ -436,6 +436,14 @@
           "condition": "package script billing:withdraw"
         },
         {
+          "component": "apps/api:billing-refund-done-cli",
+          "sourceFile": "apps/api/src/billing/refund-done-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_REFUND_DONE_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:refund-done"
+        },
+        {
           "component": "apps/api:billing-tax-summary-cli",
           "sourceFile": "apps/api/src/billing/tax-summary-cli.ts",
           "environmentKey": "DATABASE_URL",

@@ -427,6 +427,10 @@ describe("P3-01 production database-principal manifest", () => {
         // billing.outbox, and billing.withdrawal_owner_settlement, on which 0088 grants
         // SELECT, INSERT; since 0093 each to debateai_billing_runtime); no privilege is added.
         { component: "apps/api:billing-withdraw-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_WITHDRAW_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:withdraw" },
+        // N14 (spec §2.12.2): the owner's refund-done command (`pnpm billing:refund-done`) runs as the API, with the
+        // API's own EnvironmentFile, under systemd-run, and writes only billing rows that principal already writes
+        // (billing.charge_event and billing.outbox, since 0093 granted to debateai_billing_runtime); no privilege is added.
+        { component: "apps/api:billing-refund-done-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_REFUND_DONE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:refund-done" },
         // Paid plans, Task P16b: the owner's tax summary (`pnpm billing:tax-summary`)
         // runs as the API under systemd-run on a READ-ONLY one-connection pool
         // (billing rows and the register's taxAuthorities row); it writes nothing.

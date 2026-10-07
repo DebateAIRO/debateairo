@@ -2,11 +2,13 @@
  * R-8's sixteen ids, ruling Q-5's owner template O2 (a refund that could not be completed), W9's (P2-I11)
  * M8_RECEIVED (a withdrawal's acknowledgement of receipt) and O2_WITHDRAWAL (a withdrawal the owner settles by hand),
  * W12's (P2-I16) O3 (a legal document or an email that was never sent), and N9's O4 (NETOPIA's message about an open
- * charge could not be verified).
+ * charge could not be verified), and N14's O2_REFUND_DUE and O2_REFUND_REMINDER (a NETOPIA refund for the owner to make
+ * in NETOPIA's admin, and the daily list of the open ones).
  */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL", "O3", "O4"
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL",
+  "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -261,6 +263,34 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
       "owner.O2_WITHDRAWAL.next"
     ],
     params: { ownerRef: "text", reasonCode: "text", withdrawalDate: "date", refundDeadline: "date" }
+  }),
+  // N14 (spec §2.12.2, ruling C-3): while NETOPIA's refund call is unconfirmed, RefundDesk hands each NETOPIA refund to
+  // the owner at once: our charge id, NETOPIA's payment number, the exact amount and currency, whether it is the whole
+  // payment, the reason, a withdrawal's legal deadline, and the exact command that records it. Never a customer's name,
+  // email or card.
+  O2_REFUND_DUE: define({
+    catalogue: "owner", subject: "owner.O2_REFUND_DUE.subject",
+    paragraphs: [
+      "owner.O2_REFUND_DUE.intro", "owner.O2.charge", "owner.O2_REFUND_DUE.payment", "owner.O2_REFUND_DUE.amount",
+      { ifParam: "whole", test: "true", then: "owner.O2_REFUND_DUE.whole", otherwise: "owner.O2_REFUND_DUE.part" },
+      "owner.O2.refundReason",
+      { ifParam: "refundDeadline", test: "present", then: "owner.O2_REFUND_DUE.deadline", otherwise: null },
+      "owner.O2_REFUND_DUE.next",
+      { ifParam: "whole", test: "true", then: "owner.O2_REFUND_DUE.recordedBySite", otherwise: "owner.O2_REFUND_DUE.command" },
+      "owner.O2_REFUND_DUE.reminded"
+    ],
+    params: {
+      chargeRef: "text", paymentRef: "text", refundAmount: "amount", currency: "text", refundReason: "text", whole: "flag",
+      doneCommand: "text"
+    },
+    optional: { refundDeadline: "date" }
+  }),
+  // N14 (spec §2.12.2 item 3): the daily list of the open owner refunds, each with its exact command (`refundList`,
+  // preformatted English lines built by RefundDesk). Our ids only.
+  O2_REFUND_REMINDER: define({
+    catalogue: "owner", subject: "owner.O2_REFUND_REMINDER.subject",
+    paragraphs: ["owner.O2_REFUND_REMINDER.intro", { block: "refundList" }, "owner.O2_REFUND_REMINDER.seen"],
+    params: { refundCount: "count", refundList: "block" }
   }),
   // W12 (P2-I16, the controller's ruling): the outbox worker's dead-letter hook sends this to the owner at once when an
   // invoice or credit-note job, or an email, dies (never for a dead O3 itself). The job kind, our own reference (a

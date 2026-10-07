@@ -42,12 +42,12 @@ function served(input: WindowInput): boolean {
 
 /**
  * The withdrawal deadline while the right is still open (ACTIVE, a withdrawal country, before it closes, and the plan
- * paid in this API's xMoney system: its refund could not be sent to the other one); else null.
+ * paid in a payment system this API serves (spec §2.5.4): its refund could not be sent to another one); else null.
  */
 function openWithdrawal(input: WindowInput): WithdrawalDeadline | null {
   const { state, taxCountry, policy, now } = input;
   if (state.status !== "ACTIVE" || state.activatedAt === null || taxCountry === null) return null;
-  if (state.paymentProvider !== "xmoney" || state.paymentEnvironment !== input.xmoneyEnvironment) return null;
+  if (!served(input)) return null;
   if (!policy.withdrawalCountries.includes(taxCountry)) return null;
   const deadline = withdrawalDeadline({ activatedAt: state.activatedAt, taxCountry, withdrawalDays: policy.withdrawalDays });
   return now.getTime() < deadline.closesAt.getTime() ? deadline : null;

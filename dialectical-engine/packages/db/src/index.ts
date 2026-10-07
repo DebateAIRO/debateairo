@@ -97,6 +97,7 @@ export {
   type NoticeQuarantineReason,
   type NoticeQuarantineRow,
   type NoticeRow,
+  type OpenOwnerRefundRow,
   type OutboxClaimFence,
   type OutboxJob,
   type OutboxKind,

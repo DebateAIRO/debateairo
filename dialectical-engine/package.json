@@ -57,6 +57,7 @@
     "billing:efactura-status": "tsx apps/api/src/billing/efactura-status-cli.ts",
     "billing:invoice": "tsx apps/api/src/billing/invoice-cli.ts",
     "billing:withdraw": "tsx apps/api/src/billing/withdraw-cli.ts",
+    "billing:refund-done": "tsx apps/api/src/billing/refund-done-cli.ts",
     "compose:env": "tsx packages/register/src/compose-env.ts",
     "job:replay-self-test": "tsx apps/scheduler/src/cli.ts replay-self-test",
     "job:liveness-sweep": "tsx apps/scheduler/src/cli.ts liveness-sweep",

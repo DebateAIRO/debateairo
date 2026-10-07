@@ -47,7 +47,7 @@ afterAll(async () => {
 const DAY = 86_400_000;
 /** The command's stores; the API's xMoney system is stage, `seedActiveSubscription`'s default (P2-I4). */
 const stores = (audit = recordingAudit(), xmoneyEnvironment: "stage" | "live" = "stage") => withdrawStoresFor(operator, {
-  policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => new Date(), xmoneyEnvironment
+  policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => new Date(), xmoneyEnvironment, paymentEnvironment: null
 });
 const rows = () => new BillingRepository(database.pool);
 
@@ -144,7 +144,7 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     });
     const audit = recordingAudit();
     const clocked = withdrawStoresFor(operator, {
-      policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => at, xmoneyEnvironment: "stage"
+      policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => at, xmoneyEnvironment: "stage", paymentEnvironment: null
     });
     expect(await runWithdrawCommand(clocked, parseWithdrawArguments(["--owner", seeded.ownerRef])))
       .toMatchObject({ kind: "REFUNDING" });

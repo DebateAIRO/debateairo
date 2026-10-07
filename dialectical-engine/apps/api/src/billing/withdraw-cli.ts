@@ -38,6 +38,7 @@ import { enqueueEmail } from "./email-job.js";
 import { openBillingOperatorPool } from "./operator-connection.js";
 import { allocateRefund, paidTransactions, RefundDesk } from "./refunds.js";
 import { BillingRefusal } from "./refusal.js";
+import { servedHere } from "./renewal-rules.js";
 import { refuse } from "./subscription-core.js";
 import { recordWithdrawal, type WithdrawalDeps } from "./withdrawal.js";
 
@@ -114,12 +115,14 @@ const NO_XMONEY_HERE: Pick<XMoneyClient, "refund" | "getTransaction" | "listTran
 
 /**
  * The command's stores over its operator pool: the same classes the API composes, so the shipped setup is tested.
- * `xmoneyEnvironment` is the API's xMoney system, from the same EnvironmentFile (D5 5h, P2-I4): a plan of the other
- * system is refused, since the API's outbox could never refund it.
+ * `xmoneyEnvironment` and `paymentEnvironment` are the API's payment systems, from the same EnvironmentFile (D5 5h,
+ * P2-I4): a plan of another system is refused, since the API's outbox could never refund it.
  */
 export function withdrawStoresFor(pool: Pool, input: Readonly<{
   policy: BillingPolicy; plans: BillingPlans; audit: BillingAudit; clock: () => Date;
   xmoneyEnvironment: CustomerXMoneyEnvironment;
+  /** N14: the API's NETOPIA environment (spec §2.5.4); null until N23 reads NETOPIA_API_BASE_URL here (PR-5). */
+  paymentEnvironment: "sandbox" | "live" | null;
 }>): WithdrawStores {
   const billing = new BillingRepository(pool);
   const jobs = new BillingJobQueries(pool);
@@ -130,8 +133,8 @@ export function withdrawStoresFor(pool: Pool, input: Readonly<{
       repository: billing, jobs, xmoney: NO_XMONEY_HERE, policy: input.policy, audit: input.audit, clock: input.clock,
       xmoneyEnvironment: input.xmoneyEnvironment
     }),
-    audit: input.audit, clock: input.clock, xmoneyEnvironment: input.xmoneyEnvironment,
-    // No outbox runs in this process: the API's worker takes the XMONEY_REFUND jobs at its next tick.
+    audit: input.audit, clock: input.clock, xmoneyEnvironment: input.xmoneyEnvironment, paymentEnvironment: input.paymentEnvironment,
+    // No outbox runs in this process: the API's worker takes the refund jobs (XMONEY_REFUND, PAYMENT_REFUND) at its next tick.
     kick: () => undefined
   });
 }
@@ -171,8 +174,10 @@ export async function settleOwnerWithdrawal(
     if (waiting === undefined) throw new TypeError("BILLING_WITHDRAW_NOT_AWAITING_OWNER");
     const events = await stores.billing.subscriptionEvents(waiting.subscriptionId, client);
     const folded = foldSubscription(events);
-    // D5 5h (P2-I4): its payments live in the other xMoney system, where the API's outbox cannot refund them.
-    if (folded.paymentProvider !== "xmoney" || folded.paymentEnvironment !== stores.xmoneyEnvironment) refuse(409, "NOT_SUBSCRIBED");
+    // D5 5h (P2-I4), spec §2.5.4: its payments live in another payment system, where the API's outbox cannot refund them.
+    if (!servedHere(folded, { xmoneyEnvironment: stores.xmoneyEnvironment, paymentEnvironment: stores.paymentEnvironment })) {
+      refuse(409, "NOT_SUBSCRIBED");
+    }
     const activatedAt = folded.activatedAt;
     const withdrawn = events.find((event) => event.kind === "WITHDRAWN");
     if (activatedAt === null || withdrawn === undefined) throw new TypeError("BILLING_WITHDRAW_NOT_AWAITING_OWNER");
@@ -297,7 +302,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       if (policy === null || plans === null) throw new TypeError("BILLING_WITHDRAW_REGISTER_UNRESOLVED");
       const stores = withdrawStoresFor(pool, {
         policy, plans, audit: consoleBillingAudit, clock: () => new Date(),
-        xmoneyEnvironment: xmoneyEnvironmentOf(environment.XMONEY_API_BASE_URL)
+        xmoneyEnvironment: xmoneyEnvironmentOf(environment.XMONEY_API_BASE_URL), paymentEnvironment: null
       });
       return Object.freeze({ run: (input: WithdrawArguments) => runWithdrawCommand(stores, input), close: () => pool.end() });
     } catch (error) {

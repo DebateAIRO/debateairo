@@ -82,6 +82,13 @@ export type LocationEvidenceRow = Readonly<{
   chargeId: string; ipCountry: string; declaredCountry: string; cardCountry: string | null;
   verdict: LocationVerdict; ipCiphertext: Buffer; keyId: string; at: Date;
 }>;
+/** N14 (spec §2.12.2): one open owner refund: our request on a NETOPIA payment that its REFUNDED parts do not cover. */
+export type OpenOwnerRefundRow = Readonly<{
+  chargeId: string; ownerRef: string; currency: string; providerPaymentId: string; reason: string;
+  requestedMicros: number; refundedMicros: number; requestedAt: Date;
+  /** The request gives back the whole payment it names (its SUCCEEDED or DUPLICATE_PAYMENT amount). */
+  whole: boolean;
+}>;
 export type InvoiceIntentRow = Readonly<{ chargeId: string; kind: InvoiceKind; issuer: InvoiceIssuerName; requestedAt: Date }>;
 export type InvoiceRow = Readonly<{
   invoiceId: string; chargeId: string; issuer: InvoiceIssuerName; kind: InvoiceKind; externalRef: string;
@@ -792,6 +799,9 @@ export class BillingRepository {
    * DUPLICATE for any unique conflict: a replay of (system, transaction, kind), a second SUCCEEDED of the charge, or
    * a transaction that already paid. After a DUPLICATE to a SUCCEEDED, `succeededTransaction` says which payment is
    * the recorded one. The event's provider and environment are the charge's.
+   * Ruling PR-20/PR-31: a NETOPIA REFUNDED is never a unique conflict (one payment may hold several refund parts), so a
+   * repeated one is INSERTED (or refused REFUND_EXCEEDS_CHARGE by the sum guard), never answered DUPLICATE. A NETOPIA
+   * refund part is idempotent only through its caller's own re-read under the owner lock (`recordNetopiaRefund`).
    */
   async appendChargeEvent(c: PoolClient, e: ChargeEventInput): Promise<"INSERTED" | "DUPLICATE"> {
     const charge = (await c.query<{ payment_provider: PaymentProviderName; payment_environment: PaymentEnvironmentName }>(
@@ -841,6 +851,41 @@ export class BillingRepository {
       SELECT ${CHARGE_COLUMNS} FROM billing.charge AS charge
       WHERE charge.subscription_id = $1 ORDER BY charge.created_at, charge.charge_id
     `, [subscriptionId])).rows.map(toCharge);
+  }
+
+  /**
+   * N14 (spec §2.12.2): every open owner refund of one NETOPIA environment — a REFUND_REQUESTED of more than 0.00 with
+   * one of `reasons` (ours, never a provider refund's) whose REFUNDED parts sum to less. Oldest first.
+   */
+  async openOwnerRefunds(
+    paymentEnvironment: PaymentEnvironmentName, reasons: ReadonlyArray<string>, executor: BillingReadExecutor = this.pool
+  ): Promise<ReadonlyArray<OpenOwnerRefundRow>> {
+    const result = await executor.query<{
+      charge_id: string; owner_ref: string; currency: string; provider_payment_id: string; error_code: string;
+      requested_micros: string; refunded_micros: string; requested_at: Date; whole: boolean;
+    }>(`
+      SELECT requested.charge_id, charge.owner_ref, charge.currency, requested.provider_payment_id, requested.error_code,
+        requested.amount_micros::text AS requested_micros, requested.at AS requested_at,
+        COALESCE((SELECT sum(refunded.amount_micros) FROM billing.charge_event AS refunded
+          WHERE refunded.charge_id = requested.charge_id AND refunded.kind = 'REFUNDED'
+            AND COALESCE(refunded.refunds_transaction_id, refunded.provider_payment_id) = requested.provider_payment_id), 0)::text
+          AS refunded_micros,
+        EXISTS (SELECT 1 FROM billing.charge_event AS paid
+          WHERE paid.charge_id = requested.charge_id AND paid.kind IN ('SUCCEEDED','DUPLICATE_PAYMENT')
+            AND paid.provider_payment_id = requested.provider_payment_id AND paid.amount_micros = requested.amount_micros) AS whole
+      FROM billing.charge_event AS requested
+      JOIN billing.charge AS charge ON charge.charge_id = requested.charge_id
+      WHERE requested.kind = 'REFUND_REQUESTED' AND requested.payment_provider = 'netopia'
+        AND requested.payment_environment = $1 AND requested.amount_micros > 0 AND requested.error_code = ANY($2::text[])
+      ORDER BY requested.at, requested.charge_id
+    `, [paymentEnvironment, [...reasons]]);
+    return result.rows
+      .map((row) => Object.freeze({
+        chargeId: row.charge_id, ownerRef: row.owner_ref, currency: row.currency, providerPaymentId: row.provider_payment_id,
+        reason: row.error_code, requestedMicros: Number(row.requested_micros), refundedMicros: Number(row.refunded_micros),
+        requestedAt: row.requested_at, whole: row.whole
+      }))
+      .filter((row) => row.refundedMicros < row.requestedMicros);
   }
 
   /**

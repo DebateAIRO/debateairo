@@ -50,6 +50,7 @@ apps/api/src/billing/place.ts
 apps/api/src/billing/quote.ts
 apps/api/src/billing/reconcile.ts
 apps/api/src/billing/records.ts
+apps/api/src/billing/refund-done-cli.ts
 apps/api/src/billing/refunds.ts
 apps/api/src/billing/refusal.ts
 apps/api/src/billing/renewal-notice-job.ts

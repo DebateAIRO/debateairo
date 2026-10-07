@@ -217,14 +217,21 @@ export type SaleRefund =
 export function saleRefundOf(
   charge: Readonly<{ events: readonly ChargeEventRow[] }>, paid: ChargeEventRow, transactionId: string
 ): SaleRefund {
-  const refunded = transactionId === paid.providerPaymentId
-    ? charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === transactionId)
-    : undefined;
+  const rows = transactionId === paid.providerPaymentId
+    ? charge.events.filter((event) => event.kind === "REFUNDED" && refundTarget(event) === transactionId)
+    : [];
+  const refunded = rows[0];
   if (refunded === undefined || refunded.amountMicros === null || refunded.amountMicros <= 0) {
     return Object.freeze({ kind: "MISSING" as const });
   }
   if (refunded.errorCode === "PROVIDER_REFUND" && refunded.refundsTransactionId === null) {
     return Object.freeze({ kind: "AMOUNT_UNKNOWN" as const, refunded, upToMicros: refunded.amountMicros });
+  }
+  // N14 (spec §2.12.2 item 4): the owner may record a NETOPIA refund in parts, several REFUNDED rows of one request;
+  // the credit note credits their sum, dated by the last part (the one that closed the request).
+  if (paid.paymentProvider === "netopia" && rows.length > 1) {
+    const last = rows[rows.length - 1]!;
+    return Object.freeze({ kind: "BACKED" as const, refunded: last, amountMicros: rows.reduce((total, row) => total + (row.amountMicros ?? 0), 0) });
   }
   return Object.freeze({ kind: "BACKED" as const, refunded, amountMicros: refunded.amountMicros });
 }
@@ -247,8 +254,10 @@ export async function creditNoteContext(
   if (paid === null) return Object.freeze({ kind: "DEAD" as const, code: "INVOICE_CHARGE_NOT_PAID" });
   const issued = await invoicesOfCharge(deps.repository, paid);
   if (issued.some((invoice) => invoice.kind === "CREDIT_NOTE")) {
-    // Refunds of the sale itself only: a DUPLICATE_PAYMENT's refund (D5 5f) was never a sale and has no document.
-    const saleRefunds = paid.charge.events.filter((event) => event.kind === "REFUNDED"
+    // Refunds of the sale itself only: a DUPLICATE_PAYMENT's refund (D5 5f) was never a sale and has no document. N14:
+    // a NETOPIA refund recorded in parts is one request, so its requests are counted, not its REFUNDED rows.
+    const counted = paid.paid.paymentProvider === "netopia" ? "REFUND_REQUESTED" : "REFUNDED";
+    const saleRefunds = paid.charge.events.filter((event) => event.kind === counted
       && refundTarget(event) === paid.paid.providerPaymentId).length;
     if (saleRefunds <= 1) return DONE;
     deps.audit("billing.invoice.unknown", { issuer, kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" });

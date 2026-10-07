@@ -99,6 +99,12 @@ export type BillingAuditEvent =
   | "billing.xmoney.row_rejected"
   /** P9c: a second refund made at xMoney on a transaction that already holds one; the owner records it by hand. */
   | "billing.refund.unrecorded"
+  /** N14 (spec §2.12.2): a NETOPIA refund was handed to the owner (O2_REFUND_DUE). The reason. */
+  | "billing.refund.owner_due"
+  /** N14 (spec §2.12.4): NETOPIA reports a refund on a PARTIAL request; nothing recorded until the owner's command. */
+  | "billing.refund.seen_partial"
+  /** N14 (spec §2.12.2 item 4): the owner recorded a refund with `pnpm billing:refund-done`. The reason. */
+  | "billing.refund.recorded_by_owner"
   | "billing.invoice.unknown"
   /** P12b: a cancel request was written; the field is its source (SETTINGS or EMAIL_LINK). */
   | "billing.cancel"

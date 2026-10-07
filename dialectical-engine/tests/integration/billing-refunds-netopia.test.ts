@@ -1,0 +1,350 @@
+import { randomUUID } from "node:crypto";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { computeWindows, foldSubscription, type CardPayments, type PaymentReport } from "@debateai/billing-core";
+import {
+  AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type OutboxJob
+} from "@debateai/db";
+import { TypedDomainError } from "@debateai/kernel";
+import type { XMoneyClient } from "@debateai/payments-xmoney";
+import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { testBillingPlans, testBillingPolicy, testCountryPolicy } from "../support/billingFixtures.js";
+import {
+  recordingAudit, seedNetopiaSubscription, subscriptionDeps, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
+} from "../support/billingSubscriptionFixtures.js";
+import { OwnerJobs } from "../../apps/api/src/billing/owner-jobs.js";
+import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
+import { chargeEvent, newChargeId, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
+import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
+import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
+import { readSubscriptionView } from "../../apps/api/src/billing/subscription-view.js";
+import { recordOwnerWithdrawal, settleOwnerWithdrawal, withdrawStoresFor } from "../../apps/api/src/billing/withdraw-cli.js";
+import { recordWithdrawal } from "../../apps/api/src/billing/withdrawal.js";
+
+let database: TestDatabase;
+let repository: BillingRepository;
+let jobs: BillingJobQueries;
+beforeAll(async () => {
+  database = await startTestDatabase();
+  await migrate(database.pool);
+  repository = new BillingRepository(database.pool);
+  jobs = new BillingJobQueries(database.pool);
+}, 120_000);
+afterAll(async () => database?.stop());
+
+const DAY = 86_400_000;
+const unused = async (): Promise<never> => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "no xMoney in this suite"); };
+const NO_XMONEY = Object.freeze({ getTransaction: unused, getOrder: unused, getCard: unused, refund: unused, listTransactions: unused }) as
+  unknown as Pick<XMoneyClient, "getTransaction" | "getOrder" | "getCard" | "refund" | "listTransactions">;
+
+/** The port: scripted status reads, and (API mode only) a refund call that records what it was asked. */
+class RefundPort implements Pick<CardPayments, "status" | "refund"> {
+  readonly refunds: Array<Readonly<{ orderId: string; providerPaymentId: string; amountMicros: number }>> = [];
+  readonly statuses = new Map<string, PaymentReport>();
+  refund?: NonNullable<CardPayments["refund"]>;
+  constructor(apiMode: boolean) {
+    if (apiMode) this.refund = async (input) => { this.refunds.push(input); return this.statuses.get(input.orderId)!; };
+  }
+  async status(input: Readonly<{ orderId: string; providerPaymentId: string | null }>): Promise<PaymentReport | "NO_SUCH_ORDER"> {
+    return this.statuses.get(input.orderId) ?? "NO_SUCH_ORDER";
+  }
+}
+
+const report = (orderId: string, providerPaymentId: string, state: PaymentReport["state"], amountMicros: number): PaymentReport => Object.freeze({
+  orderId, providerPaymentId, state, providerStatus: state === "REFUNDED" ? "8" : "3", amountMicros, currency: "USD",
+  cardCountry: "DE", savedCard: null, declineCode: null, declineSide: null, bankDeclined: false, occurredAt: null, clientId: null
+});
+
+function deskFor(port: RefundPort, clock: { now: Date }) {
+  const audit = recordingAudit();
+  const refunds = new RefundDesk({
+    repository, jobs, xmoney: NO_XMONEY, policy: testBillingPolicy, audit, clock: () => clock.now, xmoneyEnvironment: "stage",
+    netopia: { payments: port, paymentEnvironment: "sandbox", jobs }
+  });
+  const entitlements = new EntitlementRepository(database.pool);
+  const verify = new VerifyPaymentHandler({
+    repository, jobs, xmoney: NO_XMONEY, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
+    recordsKey: TEST_RECORDS_KEY, audit, xmoneyEnvironment: "stage", netopia: { payments: port, paymentEnvironment: "sandbox", jobs }
+  });
+  verify.registerSettlement("INITIAL", createInitialSettlement({
+    repository, entitlements, acceptances: new AcceptanceRepository(database.pool), policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL
+  }));
+  return { refunds, verify, audit };
+}
+
+async function paidPlan(_label: string) {
+  return seedNetopiaSubscription(database.pool, {
+    ownerRef: randomUUID() /* billing owner_ref is a uuid (0085) */, planId: "PLUS", activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "DE"
+  });
+}
+
+/** Claims the one open job of this kind and ref, exactly as P1b's `claim` does, and hands it over as the worker would. */
+async function claim(kind: string, ref: string, now: Date): Promise<OutboxJob> {
+  const row = (await database.pool.query<{ job_id: string; payload: Record<string, unknown>; created_at: Date; not_before: Date; attempts: number }>(`
+    UPDATE billing.outbox SET claimed_by = 'n14', claimed_at = $3, attempts = attempts + 1
+    WHERE kind = $1 AND ref = $2 AND done_at IS NULL AND dead_at IS NULL
+    RETURNING job_id, payload, created_at, not_before, attempts
+  `, [kind, ref, now])).rows[0]!;
+  return {
+    jobId: row.job_id, kind, ref, payload: row.payload, createdAt: row.created_at, notBefore: row.not_before,
+    attempts: row.attempts, claimedBy: "n14", claimedAt: now
+  } as unknown as OutboxJob;
+}
+const stageOf = async (jobId: string) => jobs.jobStage(jobId);
+const emails = async (template: string, needle: string) => (await database.pool.query<{ payload: Record<string, string> }>(
+  "SELECT payload FROM billing.outbox WHERE kind = 'EMAIL' AND payload->>'template' = $1", [template]
+)).rows.map((row) => row.payload).filter((payload) => JSON.stringify(payload).includes(needle));
+const refundedRows = async (chargeId: string) => (await repository.charge(chargeId))!.events
+  .filter((event) => event.kind === "REFUNDED").map((event) => event.amountMicros);
+
+async function requestWhole(seeded: Awaited<ReturnType<typeof paidPlan>>, desk: RefundDesk, reason: "SUBSCRIPTION_ENDED" | "WITHDRAWAL", amountMicros: number) {
+  await repository.withTransaction(async (client) => {
+    await jobs.lockOwner(client, seeded.ownerRef);
+    await desk.request(client, {
+      chargeId: seeded.initialChargeId, transactionId: seeded.providerPaymentId, amountMicros,
+      whole: amountMicros === seeded.totalMicros, ownerRef: seeded.ownerRef, reason
+    }, new Date());
+  });
+}
+
+describe("N14 refunds on NETOPIA: the owner mode", () => {
+  it("queues PAYMENT_REFUND, emails the owner O2_REFUND_DUE with the whole amount and the command, and moves no money", async () => {
+    const seeded = await paidPlan("due");
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds, audit } = deskFor(port, clock);
+    await requestWhole(seeded, refunds, "SUBSCRIPTION_ENDED", seeded.totalMicros);
+    const ref = `${seeded.initialChargeId}:${seeded.providerPaymentId}`;
+    expect((await database.pool.query("SELECT 1 FROM billing.outbox WHERE kind = 'XMONEY_REFUND' AND ref = $1", [ref])).rowCount).toBe(0);
+    const job = await claim("PAYMENT_REFUND", ref, clock.now);
+    expect(await refunds.handle(job, clock.now)).toEqual({ kind: "DONE" });
+    expect(await stageOf(job.jobId)).toBe("OWNER_REFUND_DUE");
+    expect(await refundedRows(seeded.initialChargeId)).toEqual([]);
+    const [due] = await emails("O2_REFUND_DUE", seeded.initialChargeId);
+    expect(due).toMatchObject({
+      "param.chargeRef": seeded.initialChargeId, "param.paymentRef": seeded.providerPaymentId, "param.whole": "true",
+      "param.currency": "USD", "param.refundReason": "SUBSCRIPTION_ENDED",
+      "param.doneCommand": `pnpm billing:refund-done --charge ${seeded.initialChargeId} --amount ${(seeded.totalMicros / 1_000_000).toFixed(2)} --confirm`
+    });
+    expect(due!["param.refundDeadline"]).toBeUndefined();
+    expect(audit.events).toContainEqual({ event: "billing.refund.owner_due", fields: { reason: "SUBSCRIPTION_ENDED" } });
+  });
+
+  it("records a WHOLE refund as soon as NETOPIA reports it, with the customer's email (spec §2.12.4)", async () => {
+    const seeded = await paidPlan("whole-seen");
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds, verify } = deskFor(port, clock);
+    await requestWhole(seeded, refunds, "SUBSCRIPTION_ENDED", seeded.totalMicros);
+    port.statuses.set(seeded.initialChargeId, report(seeded.initialChargeId, seeded.providerPaymentId, "REFUNDED", seeded.totalMicros));
+    const job = { jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: seeded.initialChargeId, payload: {}, attempts: 1, notBefore: clock.now,
+      createdAt: clock.now, claimedBy: "n14", claimedAt: clock.now } as unknown as OutboxJob;
+    expect(await verify.handle(job, clock.now)).toEqual({ kind: "DONE" });
+    expect(await refundedRows(seeded.initialChargeId)).toEqual([seeded.totalMicros]);
+    expect(await emails("M11_DUPLICATE", seeded.customerId)).toHaveLength(1);
+    // Seen again: nothing more.
+    expect(await verify.handle(job, clock.now)).toEqual({ kind: "DONE" });
+    expect(await refundedRows(seeded.initialChargeId)).toEqual([seeded.totalMicros]);
+  });
+
+  it("records nothing for a PARTIAL request NETOPIA reports refunded, and the reminder asks for the command", async () => {
+    const seeded = await paidPlan("partial-seen");
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds, verify } = deskFor(port, clock);
+    await requestWhole(seeded, refunds, "WITHDRAWAL", 12_100_000);
+    port.statuses.set(seeded.initialChargeId, report(seeded.initialChargeId, seeded.providerPaymentId, "REFUNDED", seeded.totalMicros));
+    const job = { jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: seeded.initialChargeId, payload: {}, attempts: 1, notBefore: clock.now,
+      createdAt: clock.now, claimedBy: "n14", claimedAt: clock.now } as unknown as OutboxJob;
+    await verify.handle(job, clock.now);
+    expect(await refundedRows(seeded.initialChargeId)).toEqual([]);
+    expect(await refunds.remindOwnerRefunds(clock.now)).toBeGreaterThan(0);
+    const [reminder] = await emails("O2_REFUND_REMINDER", seeded.initialChargeId);
+    expect(reminder!["param.refundList"]).toContain(`- charge ${seeded.initialChargeId}, NETOPIA payment ${seeded.providerPaymentId}: refund 12.10 USD (part of the payment), reason WITHDRAWAL`);
+    expect(reminder!["param.refundList"]).toContain("NETOPIA shows a refund: only the command is missing");
+    // At most one reminder a day (its ref is the UTC day).
+    await refunds.remindOwnerRefunds(clock.now);
+    const today = (await database.pool.query("SELECT 1 FROM billing.outbox WHERE kind = 'EMAIL' AND ref = $1",
+      [`O2_REFUND_REMINDER:${clock.now.toISOString().slice(0, 10)}`])).rowCount;
+    expect(today).toBe(1);
+  });
+
+  it("records an owner's refund in parts: the rest stays open, and M8 and the credit note follow the last part", async () => {
+    const seeded = await paidPlan("parts");
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds } = deskFor(port, clock);
+    const withdrewAt = new Date(Date.now() - DAY);
+    await repository.withTransaction(async (client) => {
+      await jobs.lockOwner(client, seeded.ownerRef);
+      const state = foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId, client));
+      await repository.appendSubscriptionEvent(client, subscriptionEvent(state, "WITHDRAWN", withdrewAt, { withdrew_at: withdrewAt.toISOString() }));
+      await refunds.requestAll(client, {
+        ownerRef: seeded.ownerRef, reason: "WITHDRAWAL", at: withdrewAt,
+        allocations: [{ chargeId: seeded.initialChargeId, transactionId: seeded.providerPaymentId, amountMicros: 12_100_000 }]
+      });
+    });
+    const ref = `${seeded.initialChargeId}:${seeded.providerPaymentId}`;
+    await refunds.handle(await claim("PAYMENT_REFUND", ref, clock.now), clock.now);
+    const [due] = await emails("O2_REFUND_DUE", seeded.initialChargeId);
+    expect(due).toMatchObject({ "param.whole": "false", "param.refundDeadline": new Date(withdrewAt.getTime() + 14 * DAY).toISOString() });
+
+    const first = await refunds.planOwnerRefund(seeded.initialChargeId, 5_000_000);
+    expect(first).toMatchObject({ openMicros: 12_100_000, restMicros: 7_100_000, mail: null, reason: "WITHDRAWAL" });
+    expect(await refunds.recordOwnerRefund(first, clock.now)).toBe("PART_RECORDED");
+    expect(await refundedRows(seeded.initialChargeId)).toEqual([5_000_000]);
+    expect(await emails("M8", seeded.customerId)).toHaveLength(0);
+    await expect(refunds.planOwnerRefund(seeded.initialChargeId, 7_200_000)).rejects.toThrow("BILLING_REFUND_DONE_EXCEEDS_REQUEST");
+
+    const last = await refunds.planOwnerRefund(seeded.initialChargeId, 7_100_000);
+    expect(last.mail).toMatchObject({ template: "M8" });
+    expect(last.mail!.text).toContain("12.10");
+    expect(await refunds.recordOwnerRefund(last, clock.now)).toBe("RECORDED");
+    expect(await refundedRows(seeded.initialChargeId)).toEqual([5_000_000, 7_100_000]);
+    expect(await emails("M8", seeded.customerId)).toHaveLength(1);
+    const notes = (await database.pool.query<{ payload: Record<string, unknown> }>(
+      "SELECT payload FROM billing.outbox WHERE kind = 'QUADERNO_RECORD_REFUND' AND ref = $1", [ref]
+    )).rows;
+    expect(notes).toHaveLength(1);
+    await expect(refunds.planOwnerRefund(seeded.initialChargeId, 1_000_000)).rejects.toThrow("BILLING_REFUND_DONE_NO_OPEN_REQUEST");
+  });
+
+  it("refuses the command on another system's charge", async () => {
+    const seeded = await paidPlan("other-system");
+    const clock = { now: new Date() };
+    const audit = recordingAudit();
+    const live = new RefundDesk({
+      repository, jobs, xmoney: NO_XMONEY, policy: testBillingPolicy, audit, clock: () => clock.now, xmoneyEnvironment: "stage",
+      netopia: { payments: new RefundPort(false), paymentEnvironment: "live", jobs }
+    });
+    await expect(live.planOwnerRefund(seeded.initialChargeId, 1_000_000)).rejects.toThrow("BILLING_REFUND_DONE_OTHER_PAYMENT_SYSTEM");
+  });
+
+  it("records a 0.00 card-check release with no call and no email to the owner, ahead of the owner mode", async () => {
+    const seeded = await paidPlan("release");
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds } = deskFor(port, clock);
+    const chargeId = newChargeId();
+    const paymentId = `ntp-cc-${chargeId.slice(0, 8)}`;
+    await repository.withTransaction(async (client) => {
+      await repository.insertCharge(client, {
+        chargeId, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "CARD_CHECK", attempt: 1,
+        periodStart: seeded.periodStart, periodEnd: seeded.periodEnd, quoteId: null, netMicros: 0, taxMicros: 0, totalMicros: 0,
+        currency: "USD", createdAt: clock.now, paymentProvider: "netopia", paymentEnvironment: "sandbox"
+      });
+      await repository.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", clock.now, { providerPaymentId: null, amountMicros: 0, errorCode: null }));
+      await repository.appendChargeEvent(client, chargeEvent(chargeId, "SUCCEEDED", clock.now, { providerPaymentId: paymentId, amountMicros: 0, errorCode: null }));
+      await jobs.lockOwner(client, seeded.ownerRef);
+      await refunds.request(client, { chargeId, transactionId: paymentId, amountMicros: 0, whole: true, ownerRef: seeded.ownerRef, reason: "CARD_CHECK_RELEASE" }, clock.now);
+    });
+    expect(await refunds.handle(await claim("PAYMENT_REFUND", `${chargeId}:${paymentId}`, clock.now), clock.now)).toEqual({ kind: "DONE" });
+    expect(await refundedRows(chargeId)).toEqual([0]);
+    expect(await emails("O2_REFUND_DUE", chargeId)).toHaveLength(0);
+  });
+
+  it("records a refund made in NETOPIA's admin with no request of ours as A9's PROVIDER_REFUND", async () => {
+    const seeded = await paidPlan("by-hand");
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { verify, audit } = deskFor(port, clock);
+    port.statuses.set(seeded.initialChargeId, report(seeded.initialChargeId, seeded.providerPaymentId, "REFUNDED", seeded.totalMicros));
+    await verify.handle({ jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: seeded.initialChargeId, payload: {}, attempts: 1,
+      notBefore: clock.now, createdAt: clock.now, claimedBy: "n14", claimedAt: clock.now } as unknown as OutboxJob, clock.now);
+    const rows = (await repository.charge(seeded.initialChargeId))!.events.filter((event) => event.kind === "REFUNDED");
+    expect(rows.map((event) => [event.errorCode, event.amountMicros])).toEqual([["PROVIDER_REFUND", seeded.totalMicros]]);
+    expect(audit.events).toContainEqual({ event: "billing.invoice.unknown", fields: { issuer: "QUADERNO", kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" } });
+  });
+});
+
+describe("N14 refunds on NETOPIA: the API mode (dormant until N-10)", () => {
+  it("calls NETOPIA's refund once, and records a payment already REFUNDED instead of refunding again", async () => {
+    const seeded = await paidPlan("api");
+    const port = new RefundPort(true);
+    const clock = { now: new Date() };
+    const { refunds } = deskFor(port, clock);
+    await requestWhole(seeded, refunds, "SUBSCRIPTION_ENDED", seeded.totalMicros);
+    port.statuses.set(seeded.initialChargeId, report(seeded.initialChargeId, seeded.providerPaymentId, "REFUNDED", seeded.totalMicros));
+    const ref = `${seeded.initialChargeId}:${seeded.providerPaymentId}`;
+    expect(await refunds.handle(await claim("PAYMENT_REFUND", ref, clock.now), clock.now)).toEqual({ kind: "DONE" });
+    expect(port.refunds).toEqual([{ orderId: seeded.initialChargeId, providerPaymentId: seeded.providerPaymentId, amountMicros: seeded.totalMicros }]);
+    expect(await refundedRows(seeded.initialChargeId)).toEqual([seeded.totalMicros]);
+
+    const again = await paidPlan("api-again");
+    await requestWhole(again, refunds, "SUBSCRIPTION_ENDED", again.totalMicros);
+    port.statuses.set(again.initialChargeId, report(again.initialChargeId, again.providerPaymentId, "REFUNDED", again.totalMicros));
+    const job = await claim("PAYMENT_REFUND", `${again.initialChargeId}:${again.providerPaymentId}`, clock.now);
+    expect(await refunds.handle({ ...job, attempts: 2 } as OutboxJob, clock.now)).toEqual({ kind: "DONE" });
+    expect(port.refunds.filter((call) => call.orderId === again.initialChargeId)).toEqual([]);
+    expect(await refundedRows(again.initialChargeId)).toEqual([again.totalMicros]);
+  });
+});
+
+describe("N14 the owner's daily job and the withdrawal on a NETOPIA plan", () => {
+  it("runs the refund reminders in the daily owner job", async () => {
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds } = deskFor(port, clock);
+    const calls: Date[] = [];
+    const owner = new OwnerJobs({
+      billing: repository, jobs, taxAuthorities: [] as never, audit: recordingAudit(), clock: () => clock.now,
+      refunds: { remindOwnerRefunds: async (now: Date) => { calls.push(now); return refunds.remindOwnerRefunds(now); } }
+    });
+    await owner.schedule();
+    expect(calls).toEqual([clock.now]);
+  });
+
+  it("lets a NETOPIA plan withdraw: the refund goes to the owner mode (N11's guard note)", async () => {
+    const seeded = await paidPlan("withdraw");
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds } = deskFor(port, clock);
+    const deps = subscriptionDeps(database.pool, { refunds, paymentEnvironment: "sandbox", clock: () => clock.now });
+    const outcome = await recordWithdrawal(deps, {
+      ownerRef: seeded.ownerRef, withdrewAt: clock.now, source: "OWNER", authorize: async () => undefined
+    });
+    expect(outcome.refundMicros).toBeGreaterThan(0);
+    const queued = (await database.pool.query<{ kind: string }>(
+      "SELECT kind FROM billing.outbox WHERE ref = $1", [`${seeded.initialChargeId}:${seeded.providerPaymentId}`]
+    )).rows.map((row) => row.kind);
+    expect(queued).toEqual(["PAYMENT_REFUND"]);
+  });
+
+  it("shows a NETOPIA plan's withdrawal window in its own environment only (spec §2.5.4, §2.5.6)", async () => {
+    const seeded = await paidPlan("view"); // DE, activated two days ago: inside the 14 days
+    const now = new Date();
+    const here = await readSubscriptionView(subscriptionDeps(database.pool, { paymentEnvironment: "sandbox" }), seeded.ownerRef, now);
+    expect(here?.withdrawal_open_until).not.toBeNull();
+    expect(here?.withdrawal_last_day).not.toBeNull();
+    const elsewhere = await readSubscriptionView(subscriptionDeps(database.pool, { paymentEnvironment: "live" }), seeded.ownerRef, now);
+    expect(elsewhere?.withdrawal_open_until).toBeNull();
+  });
+
+  it("lets the owner's withdraw command take a NETOPIA plan of its own environment only (ruling PR-32, G2)", async () => {
+    const seeded = await paidPlan("command");
+    const now = new Date();
+    const storesFor = (paymentEnvironment: "sandbox" | "live" | null) => withdrawStoresFor(database.pool, {
+      policy: testBillingPolicy, plans: testBillingPlans, audit: recordingAudit(), clock: () => new Date(),
+      xmoneyEnvironment: "stage", paymentEnvironment
+    });
+    // A refund made in NETOPIA's admin on the payment (A9's PROVIDER_REFUND): the withdrawal is the owner's to settle.
+    await repository.withTransaction(async (client) => {
+      for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
+        await repository.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, kind, new Date(now.getTime() - DAY), {
+          providerPaymentId: seeded.providerPaymentId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
+        }));
+      }
+    });
+    const receivedAt = new Date(now.getTime() - 60_000);
+    await expect(recordOwnerWithdrawal(storesFor("live"), { ownerRef: seeded.ownerRef, receivedAt }))
+      .rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
+    await expect(recordOwnerWithdrawal(storesFor(null), { ownerRef: seeded.ownerRef, receivedAt }))
+      .rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
+    expect(await recordOwnerWithdrawal(storesFor("sandbox"), { ownerRef: seeded.ownerRef, receivedAt })).toEqual({ kind: "OWNER_REVIEW" });
+    // The settlement: refused from another environment, taken in its own.
+    await expect(settleOwnerWithdrawal(storesFor("live"), { ownerRef: seeded.ownerRef, refundMicros: 0, dashboardMicros: 2_000_000 }))
+      .rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
+    expect(await repository.withdrawalOwnerSettlement(seeded.subscriptionId)).toBeNull();
+    expect(await settleOwnerWithdrawal(storesFor("sandbox"), { ownerRef: seeded.ownerRef, refundMicros: 0, dashboardMicros: 2_000_000 }))
+      .toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 2_000_000 });
+  });
+});

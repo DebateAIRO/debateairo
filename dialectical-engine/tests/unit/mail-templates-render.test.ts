@@ -54,6 +54,12 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   jobKind: "SMARTBILL_INVOICE",
   reference: "charge 0123456789abcdef0123456789abcdef",
   receivedAt: "2026-10-06T18:00:00.000Z",
+  paymentRef: "ntp-1234567890",
+  currency: "USD",
+  whole: "true",
+  doneCommand: "pnpm billing:refund-done --charge 0123456789abcdef0123456789abcdef --amount 12.10 --confirm",
+  refundCount: "2",
+  refundList: "- charge 0123456789abcdef0123456789abcdef, NETOPIA payment ntp-1: refund 12.10 USD (part of the payment)\n  pnpm billing:refund-done --charge 0123456789abcdef0123456789abcdef --amount 12.10 --confirm",
   nextSteps: "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with pnpm billing:invoice"
     + " --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>"
 });

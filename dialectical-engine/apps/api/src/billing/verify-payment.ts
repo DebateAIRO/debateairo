@@ -22,7 +22,9 @@ import {
 } from "./outbox.js";
 import { queuePaymentAlert } from "./payment-alert.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
-import { covers, pendingRefund, refundedAlready, refundedMicros, refundIntentOf, type RefundDesk } from "./refunds.js";
+import {
+  covers, openOwnRequest, pendingRefund, refundedAlready, refundedMicros, refundIntentOf, type RefundDesk
+} from "./refunds.js";
 import { chargeEvent, refundTarget, subscriptionEvent, transactionRoute } from "./rows.js";
 import {
   enqueueCreditNote, enqueueInvoice, type ChargeSettlement, type SettledPayment, type SettlementContext, type SettlementPrepared
@@ -70,7 +72,7 @@ export type VerifyDeps = Readonly<{
   repository: BillingRepository;
   jobs: Pick<BillingJobQueries, "lockOwner" | "chargeIdForTransaction">;
   xmoney: Pick<XMoneyClient, "getTransaction" | "getOrder" | "getCard">;
-  refunds: Pick<RefundDesk, "request" | "recordRefunded">;
+  refunds: Pick<RefundDesk, "request" | "recordRefunded" | "recordNetopiaRefund">;
   entitlements: Pick<EntitlementRepository, "append">;
   countryPolicy: CountryPolicy;
   policy: BillingPolicy;
@@ -1028,7 +1030,7 @@ export class VerifyPaymentHandler {
     return read;
   }
 
-  /** Spec §2.8 step 3 by state. `fromNotice`: no retry here. REFUNDED (N14) and CHARGEBACK_* (N15) go to the owner for now. */
+  /** Spec §2.8 step 3 by state. `fromNotice`: no retry here. REFUNDED is N14's (§2.12.4); CHARGEBACK_* (N15) go to the owner for now. */
   private async decideNetopia(
     job: OutboxJob, charge: ChargeWithEvents, report: PaymentReport, now: Date, fromNotice: boolean
   ): Promise<OutboxOutcome> {
@@ -1062,7 +1064,7 @@ export class VerifyPaymentHandler {
           ? this.netopiaProviderRefund(charge, report, now, "PROVIDER_VOID")
           : this.netopiaFailed(charge, report, now, "VOIDED");
       case "REFUNDED":
-        return this.netopiaOwnerReview(charge, report, now, false);
+        return this.netopiaRefunded(charge, report, now);
       case "CHARGEBACK_OPENED":
       case "CHARGEBACK_LOST":
       case "CHARGEBACK_REPRESENTED":
@@ -1261,6 +1263,27 @@ export class VerifyPaymentHandler {
       });
     }
     this.deps.audit("billing.refund", { reason, chargeKind: charge.kind });
+    return DONE;
+  }
+
+  /**
+   * Spec §2.12.4: our open request for the WHOLE payment is recorded, follow-ups included; a partial one records nothing
+   * (N-8: NETOPIA may report both alike; the reminder asks for the command); no request of ours is A9's PROVIDER_REFUND.
+   */
+  private async netopiaRefunded(charge: ChargeWithEvents, report: PaymentReport, now: Date): Promise<OutboxOutcome> {
+    const paymentId = charge.events.find((event) => event.kind === "SUCCEEDED")?.providerPaymentId ?? report.providerPaymentId;
+    const requested = charge.events.some((event) => event.kind === "REFUND_REQUESTED" && event.providerPaymentId === paymentId);
+    if (!requested) return this.netopiaProviderRefund(charge, report, now, "PROVIDER_REFUND");
+    const open = openOwnRequest(charge, paymentId);
+    if (open === null || open.openMicros === 0) return DONE;
+    const paid = charge.events.find((event) => (event.kind === "SUCCEEDED" || event.kind === "DUPLICATE_PAYMENT")
+      && event.providerPaymentId === paymentId);
+    const whole = paid !== undefined && paid.amountMicros === open.intent.amountMicros && open.openMicros === open.intent.amountMicros;
+    if (!whole) {
+      this.deps.audit("billing.refund.seen_partial", { reason: open.intent.reason });
+      return DONE;
+    }
+    await this.deps.refunds.recordNetopiaRefund(open.intent, open.openMicros, now);
     return DONE;
   }
 

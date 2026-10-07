@@ -9,6 +9,7 @@ import { planById } from "@debateai/register";
 import type { AuthenticatedSession } from "../sessions.js";
 import { enqueueEmail } from "./email-job.js";
 import { allocateRefund, paidTransactions, type PaidTransaction, type RefundAllocation } from "./refunds.js";
+import { servedHere } from "./renewal-rules.js";
 import { appendChecked, lockedSubscription, refuse } from "./subscription-core.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 import { initialTaxCountry, withdrawalOpenUntil } from "./subscription-view.js";
@@ -16,7 +17,7 @@ import { initialTaxCountry, withdrawalOpenUntil } from "./subscription-view.js";
 /** What a withdrawal needs: the route's composition, or the owner's command (P14c) over its operator pool. */
 export type WithdrawalDeps = Pick<SubscriptionRouteDeps,
   | "billing" | "jobs" | "entitlements" | "plans" | "policy" | "ownerSpend" | "refunds" | "audit" | "clock" | "kick"
-  | "xmoneyEnvironment">;
+  | "xmoneyEnvironment" | "paymentEnvironment">;
 
 export type WithdrawalRequest = Readonly<{
   ownerRef: string;
@@ -94,13 +95,14 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
   if (before === null || before.status !== "ACTIVE" || before.currentPeriodStart === null
     || before.currentPeriodEnd === null || before.activatedAt === null
     || withdrewAt.getTime() < before.currentPeriodStart.getTime()
-    // D5 5h (P2-I4): its payments live in the other xMoney system, where this API cannot refund them.
-    || before.paymentProvider !== "xmoney" || before.paymentEnvironment !== deps.xmoneyEnvironment) {
+    // D5 5h (P2-I4), skeleton §1 rule 2: its payments live in another payment system, where this API cannot refund them.
+    || !servedHere(before, { xmoneyEnvironment: deps.xmoneyEnvironment, paymentEnvironment: deps.paymentEnvironment })) {
     refuse(409, "NOT_SUBSCRIBED");
   }
   const taxCountry = await initialTaxCountry(deps.billing, before);
   if (withdrawalOpenUntil({
-    state: before, taxCountry, policy: deps.policy, now: withdrewAt, xmoneyEnvironment: deps.xmoneyEnvironment
+    state: before, taxCountry, policy: deps.policy, now: withdrewAt, xmoneyEnvironment: deps.xmoneyEnvironment,
+    paymentEnvironment: deps.paymentEnvironment
   }) === null) {
     refuse(409, "WITHDRAWAL_WINDOW_CLOSED");
   }

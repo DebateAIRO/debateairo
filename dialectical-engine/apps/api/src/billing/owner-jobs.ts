@@ -3,6 +3,7 @@ import type { TaxAuthorities } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
 import { emailJob } from "./email-job.js";
 import { DONE, enqueueOnce, type OutboxHandler } from "./outbox.js";
+import type { RefundDesk } from "./refunds.js";
 import {
   buildTaxSummary,
   deadEmailsFrom,
@@ -45,14 +46,43 @@ export type OwnerJobsDeps = Readonly<{
   taxAuthorities: TaxAuthorities;
   audit: BillingAudit;
   clock: () => Date;
+  /** N14 (spec §2.12.2 item 3): the owner's refund reminders, run by the daily tick. Absent: none (billing off, tests). */
+  refunds?: Pick<RefundDesk, "remindOwnerRefunds">;
 }>;
 
 export class OwnerJobs {
   constructor(private readonly deps: OwnerJobsDeps) {}
 
-  /** The daily tick: the quarter's job exists once, whatever state an earlier copy is in. */
+  /**
+   * The daily owner job: the quarter's tax summary queued once (whatever state an earlier copy is in), then each later
+   * daily step (N14's refund reminders, N17's card custody). Each step is isolated: one failing never skips the others;
+   * the first failure is thrown at the end, so the single-flight reports BILLING_OWNER_JOBS_PENDING.
+   */
   async schedule(): Promise<number> {
-    const summary = taxSummaryJobFor(this.deps.clock());
+    const now = this.deps.clock();
+    let done = 0;
+    let failure: unknown = undefined;
+    for (const step of this.dailySteps(now)) {
+      try {
+        done += await step();
+      } catch (error) {
+        failure ??= error;
+      }
+    }
+    if (failure !== undefined) throw failure;
+    return done;
+  }
+
+  private dailySteps(now: Date): ReadonlyArray<() => Promise<number>> {
+    const refunds = this.deps.refunds;
+    return [
+      () => this.queueTaxSummary(now),
+      ...(refunds === undefined ? [] : [() => refunds.remindOwnerRefunds(now)])
+    ];
+  }
+
+  private async queueTaxSummary(now: Date): Promise<number> {
+    const summary = taxSummaryJobFor(now);
     const written = await this.deps.billing.withTransaction((client) => enqueueOnce(
       { repository: this.deps.billing, jobs: this.deps.jobs }, client,
       { kind: summary.kind, ref: summary.ref, notBefore: summary.notBefore, payload: { quarter: summary.quarter.label } }

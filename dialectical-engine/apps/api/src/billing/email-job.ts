@@ -14,15 +14,19 @@ import { openBillingProfile, type BillingProfile } from "./records.js";
  * settles by hand), both queued by `recordWithdrawal`, plus W12's (P2-I16) `O3` (a legal document or an email that
  * was never sent, English only, params `jobKind`, `reference`, `reasonCode` and `nextSteps`), which the outbox
  * worker's dead-letter hook queues (`createDeadJobAlert`), plus N9's `O4` (NETOPIA's message about an open charge could
- * not be verified, English only, params `chargeRef`, `receivedAt`, `reasonCode`), which the NETOPIA intake queues.
+ * not be verified, English only, params `chargeRef`, `receivedAt`, `reasonCode`), which the NETOPIA intake queues,
+ * plus N14's `O2_REFUND_DUE` (a NETOPIA refund for the owner to make in NETOPIA's admin) and `O2_REFUND_REMINDER` (the
+ * daily list of the open ones), both queued by RefundDesk, English only.
  */
 export type BillingMailTemplateId =
   | "M1" | "M2_INVOICE_LINK" | "M2_INVOICE_ATTACHED" | "M3" | "M4" | "M5A" | "M5B" | "M5C"
-  | "M6" | "M7" | "M8" | "M8_RECEIVED" | "M9" | "M10" | "M11" | "M11_DUPLICATE" | "O1" | "O2" | "O2_WITHDRAWAL" | "O3" | "O4";
+  | "M6" | "M7" | "M8" | "M8_RECEIVED" | "M9" | "M10" | "M11" | "M11_DUPLICATE" | "O1" | "O2" | "O2_WITHDRAWAL"
+  | "O2_REFUND_DUE" | "O2_REFUND_REMINDER" | "O3" | "O4";
 
 const TEMPLATE_IDS: ReadonlySet<string> = new Set<BillingMailTemplateId>([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL", "O3", "O4"
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL",
+  "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4"
 ]);
 
 /** Structurally P17's `MailAttachment` (apps/api/src/mail-mime.ts). */
