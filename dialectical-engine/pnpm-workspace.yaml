@@ -70,6 +70,8 @@ overrides:
   'brace-expansion@>=2.0.0 <2.1.7': '2.1.7'
   'undici@>=8.1.0 <8.10.2': '8.10.2'
   'qs@<6.16.0': '6.16.0'
+  # GHSA-68fv-2mgg-jv7q: exact 1.2.2 security patch; one-time early use explicitly user-approved.
+  'source-map-js@>=1.0.0 <1.2.2': '1.2.2'
   'postcss@<8.5.23': '8.5.23'
   # 2026-10-07: GHSA-wq5f-xc86-pv6w fixed in0.35.5, published2026-09-27T13:46:24.509Z; cooldown satisfied.
   'sharp@<0.35.5': '0.35.5'
