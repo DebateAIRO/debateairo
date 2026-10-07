@@ -71,7 +71,9 @@ export function quadernoRecordingSale(transactionId: string): SaleRecord {
     },
     lines: [{ description: "DebateAI Plus, October 2026", netMicros: 20_000_000, taxMicros: 3_800_000, taxRateBasisPoints: 1900 }],
     taxCode: "saas",
-    evidence: { billingCountry: "DE", ipAddress: "203.0.113.10", bankCountry: "DE" }
+    evidence: { billingCountry: "DE", ipAddress: "203.0.113.10", bankCountry: "DE" },
+    // Spec §2.8 step 5: this recording is what asks Quaderno whether it accepts "netopia" (else the value is "other").
+    processor: "netopia"
   };
 }
 
@@ -81,7 +83,8 @@ export function quadernoRecordingRefund(
   return {
     chargeId: RECORDING_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-05T10:00:00.000Z"),
     refundTotalMicros: 11_900_000, original: { documentId: original.documentId, number: original.number },
-    description: "Teilerstattung DebateAI Plus"
+    description: "Teilerstattung DebateAI Plus",
+    processor: "netopia"
   };
 }
 
@@ -99,7 +102,8 @@ export function quadernoRecordingCompanySale(transactionId: string, vatCountry: 
     },
     lines: [{ description: "DebateAI Plus, October 2026", netMicros: 20_000_000, taxMicros: 0, taxRateBasisPoints: 0 }],
     taxCode: "saas",
-    evidence: { billingCountry: vatCountry, ipAddress: "203.0.113.10", bankCountry: vatCountry }
+    evidence: { billingCountry: vatCountry, ipAddress: "203.0.113.10", bankCountry: vatCountry },
+    processor: "netopia"
   };
 }
 
@@ -110,7 +114,8 @@ export function quadernoRecordingCompanyRefund(
   return {
     chargeId: RECORDING_COMPANY_CHARGE_ID, transactionId, issuedOn: new Date("2026-10-05T10:00:00.000Z"),
     refundTotalMicros: 10_000_000, original: { documentId: original.documentId, number: original.number },
-    description: "Partial refund, DebateAI Plus"
+    description: "Partial refund, DebateAI Plus",
+    processor: "netopia"
   };
 }
 
