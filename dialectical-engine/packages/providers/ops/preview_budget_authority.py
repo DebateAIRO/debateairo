@@ -50,6 +50,8 @@ SLOT_WAIT_SECONDS = 60
 CALL_DEADLINE_SECONDS = 600
 REPLY_TIMEOUT_SECONDS = 630
 MAX_IPC_BYTES = 1024 * 1024
+IPC_READ_TIMEOUT_SECONDS = 10  # Each header or body read on the 0666 socket.
+MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a thread.
 STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
 PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED'})
 GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'model', 'requested_effort',
@@ -651,6 +653,8 @@ def refusal_body(error):
 
 def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_uid, now=None):
     class Handler(BaseHTTPRequestHandler):
+        timeout = IPC_READ_TIMEOUT_SECONDS  # An idle or slow client cannot hold a thread forever.
+
         def log_message(self, *_args):
             pass
 
@@ -676,7 +680,6 @@ def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_u
                 length = int(self.headers.get('content-length', '0'))
                 if self.path != '/complete' or uid not in allowed_uids or not 1 <= length <= MAX_IPC_BYTES:
                     raise SafetyError('IPC_REQUEST_REFUSED')
-                self.connection.settimeout(5)
                 data = json.loads(self.rfile.read(length))
                 result = execute(data, uid, lambda: caller_canceled(self.connection), reserved.append)
                 encoded = json.dumps(result, ensure_ascii=True).encode('ascii')
@@ -697,8 +700,31 @@ def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_u
 
 
 class UnixThreadingServer(ThreadingMixIn, HTTPServer):
+    """One thread per connection, at most max_connections at once. Every read has a timeout and
+    every call a deadline, so server_close (which lets in-flight calls finish and settle) is bounded."""
     address_family = socket.AF_UNIX
     daemon_threads = False
+    max_connections = MAX_IPC_CONNECTIONS
+
+    def __init__(self, *args, **kwargs):
+        self.connection_slots = threading.BoundedSemaphore(self.max_connections)
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request, client_address):
+        if not self.connection_slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self.connection_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.connection_slots.release()
 
     def server_bind(self):
         self.socket.bind(self.server_address)

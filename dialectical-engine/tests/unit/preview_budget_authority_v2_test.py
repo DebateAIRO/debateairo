@@ -1086,5 +1086,68 @@ class IpcTests(GateTest):
         self.assertEqual(dispatched, [])
 
 
+class SocketServerTests(GateTest):
+    def serve_on(self, gate):
+        path = gate.root / 's.sock'
+
+        def execute(*_args):
+            raise AssertionError('no request reaches execution in these tests')
+        handler = bridge.make_handler(gate.private, [PEER], execute, gate.slots, peer_uid_of=lambda _c: PEER,
+                                      now=gate.clock)
+        server = bridge.UnixThreadingServer(str(path), handler)
+        thread = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': 0.05})
+        thread.start()
+        return path, server, thread
+
+    def connect(self, path):
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(client.close)
+        client.connect(str(path))
+        client.settimeout(3)
+        return client
+
+    def close_hangs(self, server, thread):
+        server.shutdown()
+        thread.join(5)
+        closer = threading.Thread(target=server.server_close)
+        closer.start()
+        closer.join(5)
+        return closer.is_alive()
+
+    def test_idle_connection_is_dropped_after_the_read_timeout_so_server_close_cannot_hang(self):
+        gate = self.gate().ready()
+        with patch.object(bridge, 'IPC_READ_TIMEOUT_SECONDS', 0.2):
+            path, server, thread = self.serve_on(gate)
+        idle = self.connect(path)
+        try:
+            self.assertEqual(idle.recv(1), b'')  # The server gave up waiting for request headers.
+        finally:
+            idle.close()
+            self.assertFalse(self.close_hangs(server, thread))
+
+    def test_connections_beyond_the_cap_are_closed_without_a_thread(self):
+        gate = self.gate().ready()
+        with patch.object(bridge, 'IPC_READ_TIMEOUT_SECONDS', 5), \
+                patch.object(bridge.UnixThreadingServer, 'max_connections', 2):
+            path, server, thread = self.serve_on(gate)
+        held = [self.connect(path) for _ in range(2)]
+        extra = self.connect(path)
+        try:
+            self.assertEqual(extra.recv(1), b'')
+            for client in held:
+                client.setblocking(False)
+                with self.assertRaises(BlockingIOError):
+                    client.recv(1)  # Still open: their threads wait for request headers.
+        finally:
+            for client in held + [extra]:
+                client.close()
+            self.assertFalse(self.close_hangs(server, thread))
+
+    def test_production_read_timeout_and_connection_cap(self):
+        self.assertEqual((bridge.IPC_READ_TIMEOUT_SECONDS, bridge.UnixThreadingServer.max_connections), (10, 32))
+        handler = bridge.make_handler(Path('/nonexistent'), [PEER], None, bridge.CallSlots(1))
+        self.assertEqual(handler.timeout, 10)
+
+
 if __name__ == '__main__':
     unittest.main()
