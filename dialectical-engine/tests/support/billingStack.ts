@@ -40,6 +40,8 @@ import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "./discoveredPa
 import { startFakeXMoney } from "./fake-xmoney.js";
 import { FakeInvoiceIssuer } from "./fake-invoice-issuer.js";
 import { FakeTaxEngine } from "./fake-tax-engine.js";
+import { testNetopiaKeys } from "./netopia-notice.js";
+import { StubCardPayments } from "./stub-card-payments.js";
 import { TEST_APP_ORIGIN, testSessionHeaders, type TestHttpIdentity } from "./httpSession.js";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
 
@@ -313,6 +315,10 @@ export async function startBillingStack(): Promise<BillingStack> {
   };
 
   const connectors: BillingConnectors = Object.freeze({
+    // N8: the NETOPIA members. The flows switch one by one (N9–N18); N24 drives the stack through the NETOPIA fake.
+    payments: new StubCardPayments(),
+    noticeTrust: testNetopiaKeys().trust(["STCK", "0000", "1111", "2222", "3333"].join("-")),
+    paymentEnvironment: "sandbox",
     // As main.ts does under a stage offset: the runtime's own times, translated at xMoney's door.
     xmoney: new StageShiftedXMoneyClient(
       new XMoneyClient({ baseUrl: xmoney.baseUrl, privateKey: xmoney.privateKey, siteId: xmoney.siteId, timeoutMs: 5_000 }),

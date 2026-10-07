@@ -79,8 +79,10 @@ describe("P6b — development billing fakes", () => {
       const connectors = loadBillingConnectors({
         environment: developmentBillingEnvironmentGroup(first.receipt),
         company: companyAnswering(first.receipt.smartbill.companyCif),
-        recordsKey: randomBytes(32), hold: () => undefined
+        recordsKey: randomBytes(32), hold: () => undefined,
+        trustedKeyOwners: { ownerUid: process.getuid!(), apiUid: -1 }, allowLoopbackBase: true
       });
+      expect(connectors.paymentEnvironment).toBe("sandbox");
       const { customerId } = await connectors.xmoney.createCustomer({ identifier: "dev-check", email: "person@example.test", country: "RO" });
       expect(customerId).toMatch(/^[0-9]+$/u);
       const quote = await connectors.tax.quote({

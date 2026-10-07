@@ -30,6 +30,7 @@ import {
   readBillingPlans,
   readBillingPolicy,
   readBillingEnvironmentGroup,
+  readNetopiaEnvironmentGroup,
   type BillingPolicy,
   loadApiEnvironment,
   createSupportConfigurationPort,
@@ -94,9 +95,11 @@ import {
   assertStageInvoicersAreSandboxes,
   billingClock
 } from "./billing/stage-clock.js";
+import { TimeShiftedCardPayments } from "./billing/time-shifted-payments.js";
 import { createRetentionPurge } from "./retention-purge.js";
 import {
-  assertNoRecordsDatedAhead, assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
+  assertNoRecordsDatedAhead, assertOtherSystemRecordsClosed, billingCustodyPaths, billingModeOf, incompleteNetopiaKey,
+  loadBillingConnectors, loadNetopiaConnectors, type BillingConnectors, type BillingMode, type NetopiaConnectors
 } from "./billing/connectors.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
@@ -617,7 +620,16 @@ if (billingPolicy?.enabled === true) {
     });
   });
 }
-const billingConnectors: BillingConnectors | null = billingPolicy?.enabled === true
+/**
+ * NETOPIA (spec 2026-10-05 §2.7.3, ruling C-9): which billing exists. ON is the whole of it; PROVIDER_ONLY (hosted,
+ * billing off, NETOPIA's four settings all set) builds the NETOPIA connector alone, over which N9 serves NETOPIA's
+ * message for the owner's test tool's orders; OFF builds nothing. A NETOPIA group set only in part, with billing off,
+ * is one content-free line naming the first missing key, never its value.
+ */
+const billingMode: BillingMode = billingModeOf({
+  hosted: environment.DEPLOYMENT_MODE === "hosted", billingEnabled: billingPolicy?.enabled === true, environment
+});
+const billingConnectors: BillingConnectors | null = billingMode === "ON"
   ? boot.runSync("billing-connectors", () => loadBillingConnectors({
       environment: readBillingEnvironmentGroup(environment),
       // RULINGS-R3 R3-4: SmartBill's CIF is built from the legal notice's facts (COMPANY, mirrored), never a setting.
@@ -626,13 +638,24 @@ const billingConnectors: BillingConnectors | null = billingPolicy?.enabled === t
       hold: (resource) => boot.hold(resource)
     }))
   : null;
-// Stage and live are two xMoney systems: going live with sandbox subscriptions still open would leave them ACTIVE
-// for ever (the live renewal pass never rebills a stage order). The runbook's switch-on step closes them first.
-if (billingConnectors?.xmoneyEnvironment === "live") {
-  await boot.run("billing-stage-records", async () => {
-    assertStageRecordsClosed(await new BillingRepository(pool).openRecordCounts("stage"));
+const providerOnlyConnectors: NetopiaConnectors | null = billingMode === "PROVIDER_ONLY"
+  ? boot.runSync("billing-netopia-connectors", () => loadNetopiaConnectors({
+      environment: readNetopiaEnvironmentGroup(environment), recordsKey
+    }))
+  : null;
+if (environment.DEPLOYMENT_MODE === "hosted" && billingMode === "OFF") {
+  const missing = incompleteNetopiaKey(environment);
+  if (missing !== null) console.error(JSON.stringify({ event: "billing.provider_only.incomplete", missing }));
+}
+// Going live (spec §2.5.4): anything of another payment system still open (xMoney-era rows, or NETOPIA sandbox rows
+// after the same-host switch) would never be renewed or settled by the live passes. The runbook's step closes it first.
+if (billingConnectors?.paymentEnvironment === "live") {
+  await boot.run("billing-other-system-records", async () => {
+    assertOtherSystemRecordsClosed(await new BillingRepository(pool).openOtherSystemRecordCounts({
+      paymentProvider: "netopia", paymentEnvironment: "live"
+    }));
   });
-  // W14 (P2-I19): nor while billing rows or open jobs are dated more than a day ahead (a moved stage clock's leftovers).
+  // W14 (P2-I19): nor while billing rows or open jobs are dated more than a day ahead (a moved sandbox clock's leftovers).
   await boot.run("billing-records-dated-ahead", async () => {
     assertNoRecordsDatedAhead(await new BillingRepository(pool).recordsDatedAhead(new Date()));
   });
@@ -1130,27 +1153,33 @@ const billingRuntime = billingConnectors === null
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingCancelLink admission scope");
     }
-    // A stage payment never reaches a live invoicing service (SmartBill has no sandbox), offset or not.
+    // A sandbox payment never reaches a live invoicing service (SmartBill has no sandbox), offset or not.
     assertStageInvoicersAreSandboxes({
+      paymentEnvironment: billingConnectors.paymentEnvironment,
       xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
       quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
       smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
     });
     // ... and a live payment never meets a sandbox invoicer (exactly one legal invoice per charge).
     assertLiveInvoicersAreLive({
+      paymentEnvironment: billingConnectors.paymentEnvironment,
       xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
       quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
       smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
     });
+    const stageOffsetDays = environment.BILLING_STAGE_CLOCK_OFFSET_DAYS ?? null;
     const stageClock = billingClock({
-      apiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
-      offsetDays: environment.BILLING_STAGE_CLOCK_OFFSET_DAYS ?? null
+      paymentEnvironment: billingConnectors.paymentEnvironment,
+      xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
+      offsetDays: stageOffsetDays
     });
-    // One moved clock for everything the runtime records and decides; real time wherever it talks to xMoney.
-    const runtimeConnectors = stageClock.offsetMs === 0
+    // One moved clock for everything the runtime records and decides; real time wherever it talks to NETOPIA (and,
+    // until N23, to xMoney).
+    const runtimeConnectors = stageClock.offsetMs === 0 || stageOffsetDays === null
       ? billingConnectors
       : Object.freeze({
         ...billingConnectors,
+        payments: new TimeShiftedCardPayments(billingConnectors.payments, stageOffsetDays),
         xmoney: new StageShiftedXMoneyClient(billingConnectors.xmoney, () => stageClock.offsetMs)
       });
     return createBillingRuntime({

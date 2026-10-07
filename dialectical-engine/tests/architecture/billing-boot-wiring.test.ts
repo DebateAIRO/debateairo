@@ -2,22 +2,24 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
-describe("P6a — the API boot wires billing only when hosted and switched on", () => {
-  it("reads the policy in hosted mode, asks B4a's readiness question, then builds the connectors under the boot ledger", async () => {
+describe("N8 — the API boot wires billing only when hosted, switched on or provider-only", () => {
+  it("reads the policy in hosted mode, asks B4a's readiness question, decides the mode, then builds the connectors", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
     const policy = main.indexOf('boot.run("billing-policy", () => readBillingPolicy(pool, environment.REGISTER_VERSION))');
     const readiness = main.indexOf('boot.run("billing-readiness"');
+    const mode = main.indexOf("const billingMode: BillingMode = billingModeOf({");
     const connectors = main.indexOf('boot.runSync("billing-connectors"');
     expect(policy).toBeGreaterThan(0);
     expect(readiness).toBeGreaterThan(policy);
-    expect(connectors).toBeGreaterThan(readiness);
+    expect(mode).toBeGreaterThan(readiness);
+    expect(connectors).toBeGreaterThan(mode);
     expect(main.slice(policy - 120, policy)).toContain('environment.DEPLOYMENT_MODE === "hosted"');
     expect(main.slice(readiness, connectors)).toContain("assertBillingReady({");
     expect(main).toContain("billingPolicy?.enabled === true");
+    expect(main.slice(mode, connectors)).toContain('hosted: environment.DEPLOYMENT_MODE === "hosted"');
+    expect(main.slice(mode, connectors + 80)).toContain('billingMode === "ON"');
     expect(main).toContain("readBillingEnvironmentGroup(environment)");
-    // RULINGS-R3 R3-4: SmartBill's CIF comes from the legal notice's facts, never from api.env.
     expect(main.slice(connectors, connectors + 400)).toContain("company: SELLER_COMPANY");
-    // SELLER_COMPANY has its own import line; B6b's billing-core line stays byte for byte (B6b's test pins it).
     expect(main).toContain('import { SELLER_COMPANY } from "@debateai/billing-core";');
     expect(main).toContain('import { BillingPersonAllowanceSource } from "@debateai/billing-core";');
     expect(main).not.toContain("SMARTBILL_COMPANY_CIF");
@@ -25,39 +27,55 @@ describe("P6a — the API boot wires billing only when hosted and switched on", 
     expect(main).toContain("...billingCustodyPaths(environment)");
     expect(main).toContain("billingConnectors.xmoneyPrivateKey.fill(0)");
     expect(main).not.toContain("PUBLIC_SITE_ORIGIN");
+    // No development knob reaches the production boot.
+    expect(main).not.toContain("trustedKeyOwners");
+    expect(main).not.toContain("allowLoopbackBase");
   });
 
-  it("refuses a live boot while stage records are open, after the connectors know the xMoney system", async () => {
+  it("builds the NETOPIA connector alone in the provider-only mode, and names a group set in part", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    const providerOnly = main.indexOf('boot.runSync("billing-netopia-connectors"');
+    expect(providerOnly).toBeGreaterThan(0);
+    expect(main.slice(providerOnly - 200, providerOnly)).toContain('billingMode === "PROVIDER_ONLY"');
+    expect(main.slice(providerOnly, providerOnly + 300)).toContain("readNetopiaEnvironmentGroup(environment)");
+    expect(main).toContain("const providerOnlyConnectors: NetopiaConnectors | null");
+    expect(main).toContain("incompleteNetopiaKey(environment)");
+    expect(main).toContain('event: "billing.provider_only.incomplete"');
+  });
+
+  it("refuses a live boot while another payment system's records are open, after the connectors know the system", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
     const connectors = main.indexOf('boot.runSync("billing-connectors"');
-    const stage = main.indexOf('boot.run("billing-stage-records"');
-    expect(stage).toBeGreaterThan(connectors);
-    expect(main.slice(connectors, stage)).toContain('billingConnectors?.xmoneyEnvironment === "live"');
-    expect(main.slice(stage, stage + 240)).toContain('assertStageRecordsClosed(await new BillingRepository(pool).openRecordCounts("stage"))');
+    const other = main.indexOf('boot.run("billing-other-system-records"');
+    expect(other).toBeGreaterThan(connectors);
+    expect(main.slice(connectors, other)).toContain('billingConnectors?.paymentEnvironment === "live"');
+    expect(main.slice(other, other + 300)).toContain(
+      'assertOtherSystemRecordsClosed(await new BillingRepository(pool).openOtherSystemRecordCounts({'
+    );
+    expect(main.slice(other, other + 300)).toContain('paymentProvider: "netopia", paymentEnvironment: "live"');
+    expect(main).not.toContain("assertStageRecordsClosed");
+    expect(main).not.toContain("xmoneyEnvironment === \"live\"");
   });
 
   it("refuses a live boot while billing rows or open jobs are dated more than a day ahead (W14, P2-I19)", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
-    const stage = main.indexOf('boot.run("billing-stage-records"');
+    const other = main.indexOf('boot.run("billing-other-system-records"');
     const ahead = main.indexOf('boot.run("billing-records-dated-ahead"');
-    const live = main.lastIndexOf('if (billingConnectors?.xmoneyEnvironment === "live") {', stage);
-    expect(ahead).toBeGreaterThan(stage);
+    const live = main.lastIndexOf('if (billingConnectors?.paymentEnvironment === "live") {', other);
+    expect(ahead).toBeGreaterThan(other);
     expect(live).toBeGreaterThan(0);
-    // Inside the same live-only block as the stage check: a stage boot runs on its moved clock by design.
     expect(main.slice(live, ahead)).not.toContain("\n}\n");
     expect(main.slice(ahead, ahead + 240)).toContain("assertNoRecordsDatedAhead(await new BillingRepository(pool).recordsDatedAhead(new Date()))");
   });
 
   it("asks the retention purge once right after the API listens, then daily, in every mode (A15, P2-M42)", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
-    // A service restarted more often than daily (every deploy) must still reach a check: the first is at start.
     const daily = main.indexOf("setInterval(triggerRetentionPurge,86_400_000)");
     const listen = main.indexOf('await startup.run("listen"');
     const first = main.indexOf("\ntriggerRetentionPurge();\n");
     expect(daily).toBeGreaterThan(0);
     expect(listen).toBeGreaterThan(daily);
     expect(first).toBeGreaterThan(listen);
-    // At the top level, beside the erasure reconciliation's first call: never behind a billing or mode switch.
     expect(main.slice(listen, first)).toContain("\ntriggerErasureReconciliation();\n");
     expect(main.slice(listen, first)).not.toContain("billingPolicy");
   });

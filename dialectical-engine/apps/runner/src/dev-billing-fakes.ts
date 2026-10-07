@@ -6,6 +6,7 @@ import type { BillingEnvironmentGroup } from "@debateai/register";
 import { startFakeQuaderno } from "../../../acceptance/billing-fakes/fake-quaderno.js";
 import { startFakeSmartBill } from "../../../acceptance/billing-fakes/fake-smartbill.js";
 import { startFakeXMoney } from "../../../acceptance/billing-fakes/fake-xmoney.js";
+import { startFakeNetopia } from "../../../acceptance/billing-fakes/fake-netopia.js";
 import { ensureDevCustodyDirectory, resolveDevCustodyRoot } from "../../../deploy/dev-auth/custody-root.mjs";
 import { DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE, type DevelopmentAuthStackProfile } from "./dev-auth-stack-profile.js";
 
@@ -23,6 +24,8 @@ export const DEVELOPMENT_BILLING_SECRET_FILES = Object.freeze([
 
 export type DevelopmentBillingFakesReceipt = Readonly<{
   xmoney: Readonly<{ baseUrl: string; publicKey: string; siteId: string; privateKeyPath: string }>;
+  /** N8: the NETOPIA fake. Its API key and trusted key are new at every start, so their files are rewritten each time. */
+  netopia: Readonly<{ baseUrl: string; posSignature: string; apiKeyPath: string; ipnKeysPath: string }>;
   quaderno: Readonly<{ baseUrl: string; apiKeyPath: string }>;
   smartbill: Readonly<{ baseUrl: string; credentialsPath: string; companyCif: string; series: string }>;
   ownerReportEmailPath: string;
@@ -100,6 +103,24 @@ async function publishReceipt(path: string, receipt: DevelopmentBillingFakesRece
   }
 }
 
+/** A file the fakes own, rewritten whole at every start (temporary file, then one rename). */
+async function publishFile(path: string, text: string, mode: number): Promise<void> {
+  const temporary = join(dirname(path), `.${randomUUID()}.tmp`);
+  try {
+    const handle = await open(temporary, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, mode);
+    try {
+      await handle.writeFile(text, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    await rename(temporary, path);
+  } catch (error) {
+    await unlink(temporary).catch(() => undefined);
+    throw new TypeError("DEV_BILLING_FAKES_PUBLISH_FAILED", { cause: error });
+  }
+}
+
 export async function startDevelopmentBillingFakes(input: Readonly<{
   repositoryRoot: string;
   commandEnvironment: Readonly<Record<string, string | undefined>>;
@@ -139,8 +160,18 @@ export async function startDevelopmentBillingFakes(input: Readonly<{
       series: "DEV", port: profile.billingFakePorts[2]
     });
     started.push(smartbill);
+    // N8: NETOPIA's fake on an ephemeral port (the receipt records it; the local API never reads billing settings).
+    const netopia = await startFakeNetopia();
+    started.push({ stop: () => netopia.close() });
+    const netopiaKeyFile = join(directory, "netopia-api-key");
+    const netopiaPemFile = join(directory, "netopia-ipn-keys.pem");
+    await publishFile(netopiaKeyFile, `${netopia.apiKey}\n`, PRIVATE_FILE_MODE);
+    await publishFile(netopiaPemFile, netopia.trustedKeysPem, 0o644);
     const receipt: DevelopmentBillingFakesReceipt = Object.freeze({
       xmoney: Object.freeze({ baseUrl: xmoney.baseUrl, publicKey: xmoney.publicKey, siteId: xmoney.siteId, privateKeyPath: xmoneyFile }),
+      netopia: Object.freeze({
+        baseUrl: netopia.baseUrl, posSignature: netopia.posSignature, apiKeyPath: netopiaKeyFile, ipnKeysPath: netopiaPemFile
+      }),
       quaderno: Object.freeze({ baseUrl: quaderno.baseUrl, apiKeyPath: quadernoFile }),
       smartbill: Object.freeze({ baseUrl: smartbill.baseUrl, credentialsPath: smartbillFile, companyCif: smartbill.companyCif, series: smartbill.series }),
       ownerReportEmailPath: ownerFile,
@@ -164,23 +195,31 @@ export async function startDevelopmentBillingFakes(input: Readonly<{
 }
 
 /**
- * The receipt as the group loadBillingConnectors takes (loopback http: the hosted validation is not applied). The
- * group has no CIF (RULINGS-R3 R3-4). The caller passes `company` filled as the owner fills COMPANY: `cui` is the
- * digits of `receipt.smartbill.companyCif`, and in SMARTBILL_CIF_FORM's "ro" form `vat` is
+ * The receipt as the group loadBillingConnectors takes (loopback http: the caller passes `allowLoopbackBase: true` and
+ * `trustedKeyOwners` naming its own uid; the hosted validation is not applied). The group has no CIF (RULINGS-R3
+ * R3-4). The caller passes `company` filled as the owner fills COMPANY: `cui` is the digits of
+ * `receipt.smartbill.companyCif`, and in SMARTBILL_CIF_FORM's "ro" form `vat` is
  * `{kind: "registered", number: companyCif}`. The fake's RO value never goes in as a CUI.
  */
 export function developmentBillingEnvironmentGroup(receipt: DevelopmentBillingFakesReceipt): BillingEnvironmentGroup {
   return Object.freeze({
-    xmoneyPrivateKeyPath: receipt.xmoney.privateKeyPath,
-    xmoneyPublicKey: receipt.xmoney.publicKey,
-    xmoneySiteId: receipt.xmoney.siteId,
-    xmoneyApiBaseUrl: receipt.xmoney.baseUrl,
+    netopiaApiBaseUrl: receipt.netopia.baseUrl,
+    netopiaPosSignature: receipt.netopia.posSignature,
+    netopiaApiKeyPath: receipt.netopia.apiKeyPath,
+    netopiaIpnKeysPath: receipt.netopia.ipnKeysPath,
     quadernoApiKeyPath: receipt.quaderno.apiKeyPath,
     quadernoApiBaseUrl: receipt.quaderno.baseUrl,
     smartbillCredentialsPath: receipt.smartbill.credentialsPath,
     smartbillApiBaseUrl: receipt.smartbill.baseUrl,
     smartbillSeries: receipt.smartbill.series,
     ownerReportEmailPath: receipt.ownerReportEmailPath,
-    publicAppUrl: receipt.publicAppUrl
+    publicAppUrl: receipt.publicAppUrl,
+    // Until N23/N24: the xMoney fake keeps serving the flows not yet switched.
+    xmoney: Object.freeze({
+      xmoneyPrivateKeyPath: receipt.xmoney.privateKeyPath,
+      xmoneyPublicKey: receipt.xmoney.publicKey,
+      xmoneySiteId: receipt.xmoney.siteId,
+      xmoneyApiBaseUrl: receipt.xmoney.baseUrl
+    })
   });
 }

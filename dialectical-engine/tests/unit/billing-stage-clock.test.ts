@@ -23,19 +23,22 @@ let fake: FakeXMoney;
 beforeAll(async () => { fake = await startFakeXMoney(); });
 afterAll(async () => { await fake?.stop(); });
 
-describe("P23 the stage clock (spec §2.8: renew by advancing the clock)", () => {
-  it("is the real clock, with no offset, when none is set, on stage and on live", () => {
-    for (const apiBaseUrl of [STAGE, "https://api.xmoney.com", null]) {
-      const stage = billingClock({ apiBaseUrl, offsetDays: null, now: () => FIXED });
+describe("N8 the sandbox clock (spec 2026-10-05 §2.3: renew by advancing the clock)", () => {
+  it("is the real clock, with no offset, when none is set, on sandbox and on live", () => {
+    for (const paymentEnvironment of ["sandbox", "live", null] as const) {
+      const stage = billingClock({ paymentEnvironment, xmoneyApiBaseUrl: null, offsetDays: null, now: () => FIXED });
       expect(stage.clock()).toEqual(FIXED);
       expect(stage.offsetMs).toBe(0);
     }
   });
 
-  it("moves the billing clock forward by whole days against xMoney's stage API only, and says by how much", () => {
-    const stage = billingClock({ apiBaseUrl: STAGE, offsetDays: 31, now: () => FIXED });
+  it("moves the billing clock forward by whole days against NETOPIA's sandbox only, and says by how much", () => {
+    const stage = billingClock({ paymentEnvironment: "sandbox", xmoneyApiBaseUrl: null, offsetDays: 31, now: () => FIXED });
     expect(stage.clock().toISOString()).toBe("2026-11-01T00:00:00.000Z");
     expect(stage.offsetMs).toBe(31 * DAY);
+    // Until N23: an xMoney setting still present must be xMoney's stage API too.
+    expect(billingClock({ paymentEnvironment: "sandbox", xmoneyApiBaseUrl: STAGE, offsetDays: 2, now: () => FIXED }).offsetMs)
+      .toBe(2 * DAY);
   });
 
   it("talks to xMoney in real time under a moved clock: a transaction made now is found from the moved side", async () => {
@@ -91,9 +94,9 @@ describe("P23 the stage clock (spec §2.8: renew by advancing the clock)", () =>
     }
   });
 
-  it("never lets a stage payment reach a live invoicing service, whatever the clock", () => {
+  it("never lets a sandbox payment reach a live invoicing service, whatever the clock", () => {
     const sandboxes = {
-      xmoneyApiBaseUrl: STAGE,
+      paymentEnvironment: "sandbox" as const, xmoneyApiBaseUrl: null,
       quadernoApiBaseUrl: "https://debateai.sandbox-quadernoapp.com/api",
       smartbillApiBaseUrl: "https://smartbill.invalid"
     };
@@ -104,23 +107,24 @@ describe("P23 the stage clock (spec §2.8: renew by advancing the clock)", () =>
       .toBe("BILLING_STAGE_LIVE_INVOICER_REFUSED");
     expect(codeOf(() => assertStageInvoicersAreSandboxes({ ...sandboxes, quadernoApiBaseUrl: null })))
       .toBe("BILLING_STAGE_LIVE_INVOICER_REFUSED");
-    // Fail closed: only a `.invalid` SmartBill passes on stage. A trailing-dot spelling of the live host, a bare IP
-    // address and an unset address are all refused.
     for (const smartbillApiBaseUrl of ["https://ws.smartbill.ro./SBORO/api", "https://203.0.113.5/SBORO/api", null]) {
       expect(codeOf(() => assertStageInvoicersAreSandboxes({ ...sandboxes, smartbillApiBaseUrl })), String(smartbillApiBaseUrl))
         .toBe("BILLING_STAGE_LIVE_INVOICER_REFUSED");
     }
-    // Live payments with live invoicing is the ordinary production setting.
+    // Until N23: xMoney's stage API left beside a live NETOPIA base is a sandbox payment system too.
+    expect(codeOf(() => assertStageInvoicersAreSandboxes({
+      paymentEnvironment: "live", xmoneyApiBaseUrl: STAGE,
+      quadernoApiBaseUrl: "https://debateai.quadernoapp.com/api", smartbillApiBaseUrl: "https://ws.smartbill.ro/SBORO/api"
+    }))).toBe("BILLING_STAGE_LIVE_INVOICER_REFUSED");
     expect(() => assertStageInvoicersAreSandboxes({
-      xmoneyApiBaseUrl: "https://api.xmoney.com",
-      quadernoApiBaseUrl: "https://debateai.quadernoapp.com/api",
-      smartbillApiBaseUrl: "https://ws.smartbill.ro/SBORO/api"
+      paymentEnvironment: "live", xmoneyApiBaseUrl: null,
+      quadernoApiBaseUrl: "https://debateai.quadernoapp.com/api", smartbillApiBaseUrl: "https://ws.smartbill.ro/SBORO/api"
     })).not.toThrow();
   });
 
   it("never lets a live payment meet a sandbox invoicer (exactly one legal invoice per charge)", () => {
     const live = {
-      xmoneyApiBaseUrl: "https://api.xmoney.com",
+      paymentEnvironment: "live" as const, xmoneyApiBaseUrl: null,
       quadernoApiBaseUrl: "https://debateai.quadernoapp.com/api",
       smartbillApiBaseUrl: "https://ws.smartbill.ro/SBORO/api"
     };
@@ -129,15 +133,19 @@ describe("P23 the stage clock (spec §2.8: renew by advancing the clock)", () =>
       .toBe("BILLING_LIVE_SANDBOX_INVOICER_REFUSED");
     expect(codeOf(() => assertLiveInvoicersAreLive({ ...live, smartbillApiBaseUrl: "https://smartbill.invalid" })))
       .toBe("BILLING_LIVE_SANDBOX_INVOICER_REFUSED");
-    // The stage sandboxes of §14.9 are the stage API's own business, not this rule's.
+    // Until N23: xMoney's live API left beside a sandbox NETOPIA base takes live payments too.
+    expect(codeOf(() => assertLiveInvoicersAreLive({
+      paymentEnvironment: "sandbox", xmoneyApiBaseUrl: "https://api.xmoney.com",
+      quadernoApiBaseUrl: "https://debateai.sandbox-quadernoapp.com/api", smartbillApiBaseUrl: "https://smartbill.invalid"
+    }))).toBe("BILLING_LIVE_SANDBOX_INVOICER_REFUSED");
+    // The sandbox's own pairing is the other guard's business.
     expect(() => assertLiveInvoicersAreLive({
-      xmoneyApiBaseUrl: STAGE,
-      quadernoApiBaseUrl: "https://debateai.sandbox-quadernoapp.com/api",
-      smartbillApiBaseUrl: "https://smartbill.invalid"
+      paymentEnvironment: "sandbox", xmoneyApiBaseUrl: null,
+      quadernoApiBaseUrl: "https://debateai.sandbox-quadernoapp.com/api", smartbillApiBaseUrl: "https://smartbill.invalid"
     })).not.toThrow();
   });
 
-  it("main.ts checks both invoicer rules and hands the runtime the stage clock and the translated connectors", () => {
+  it("main.ts checks both invoicer rules on the payment environment and hands the runtime the clock and the shifted port", () => {
     const main = readFileSync(resolve("apps/api/src/main.ts"), "utf8");
     const start = main.indexOf('boot.runSync("billing-runtime"');
     const create = main.indexOf("createBillingRuntime({", start);
@@ -148,7 +156,9 @@ describe("P23 the stage clock (spec §2.8: renew by advancing the clock)", () =>
     const step = main.slice(start, end);
     expect(step).toContain("assertStageInvoicersAreSandboxes({");
     expect(step).toContain("assertLiveInvoicersAreLive({");
+    expect(step).toContain("paymentEnvironment: billingConnectors.paymentEnvironment,");
     expect(step).toContain("billingClock({");
+    expect(step).toContain("payments: new TimeShiftedCardPayments(billingConnectors.payments, stageOffsetDays)");
     expect(step).toContain("connectors: runtimeConnectors");
     expect(step).toContain("clock: stageClock.clock");
     const runtime = main.slice(create, end);
@@ -157,11 +167,17 @@ describe("P23 the stage clock (spec §2.8: renew by advancing the clock)", () =>
   });
 
   it("refuses to move the clock against live money, or by a senseless amount", () => {
-    expect(codeOf(() => billingClock({ apiBaseUrl: "https://api.xmoney.com", offsetDays: 31 }))).toBe("BILLING_STAGE_CLOCK_LIVE_REFUSED");
-    expect(codeOf(() => billingClock({ apiBaseUrl: null, offsetDays: 1 }))).toBe("BILLING_STAGE_CLOCK_LIVE_REFUSED");
-    expect(codeOf(() => billingClock({ apiBaseUrl: "https://api-stage.xmoney.com.evil.test", offsetDays: 1 }))).toBe("BILLING_STAGE_CLOCK_LIVE_REFUSED");
+    expect(codeOf(() => billingClock({ paymentEnvironment: "live", xmoneyApiBaseUrl: null, offsetDays: 31 })))
+      .toBe("BILLING_STAGE_CLOCK_LIVE_REFUSED");
+    expect(codeOf(() => billingClock({ paymentEnvironment: null, xmoneyApiBaseUrl: null, offsetDays: 1 })))
+      .toBe("BILLING_STAGE_CLOCK_LIVE_REFUSED");
+    // Until N23: a NETOPIA sandbox beside xMoney's live API, or beside a look-alike of its stage host, is refused.
+    for (const xmoneyApiBaseUrl of ["https://api.xmoney.com", "https://api-stage.xmoney.com.evil.test"]) {
+      expect(codeOf(() => billingClock({ paymentEnvironment: "sandbox", xmoneyApiBaseUrl, offsetDays: 1 })), xmoneyApiBaseUrl)
+        .toBe("BILLING_STAGE_CLOCK_LIVE_REFUSED");
+    }
     for (const offsetDays of [0, -1, 401, 1.5]) {
-      expect(codeOf(() => billingClock({ apiBaseUrl: "https://api-stage.xmoney.com", offsetDays })), String(offsetDays))
+      expect(codeOf(() => billingClock({ paymentEnvironment: "sandbox", xmoneyApiBaseUrl: null, offsetDays })), String(offsetDays))
         .toBe("BILLING_STAGE_CLOCK_OFFSET_INVALID");
     }
   });

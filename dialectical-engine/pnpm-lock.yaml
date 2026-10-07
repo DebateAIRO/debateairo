@@ -215,6 +215,9 @@ importers:
       '@debateai/obs-capture':
         specifier: workspace:*
         version: link:../../packages/obs-capture
+      '@debateai/payments-netopia':
+        specifier: workspace:*
+        version: link:../../packages/payments-netopia
       '@debateai/payments-xmoney':
         specifier: workspace:*
         version: link:../../packages/payments-xmoney

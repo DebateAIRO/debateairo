@@ -1026,11 +1026,19 @@ export {
   parseRunnerEnvironment,
   parseServeDisclosureReportEnvironment,
   parseSettlementEnvironment,
-  // P6a (paid plans): the billing group of the API environment, validated late (A22).
+  // P6a (paid plans): the billing group of the API environment, validated late (A22); N8: NETOPIA's group.
   BILLING_ENVIRONMENT_KEYS,
+  NETOPIA_ENVIRONMENT_KEYS,
+  XMONEY_ENVIRONMENT_KEYS,
   readBillingEnvironmentGroup,
+  readNetopiaEnvironmentGroup,
+  readXMoneyEnvironmentGroup,
   type BillingEnvironmentGroup,
-  type BillingEnvironmentKey
+  type BillingEnvironmentKey,
+  type NetopiaEnvironmentGroup,
+  type NetopiaEnvironmentKey,
+  type XMoneyEnvironmentGroup,
+  type XMoneyEnvironmentKey
 } from "./runtime-environment.js";
 
 export {
