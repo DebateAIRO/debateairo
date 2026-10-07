@@ -51,7 +51,7 @@ describe("P21 the previous versions the Privacy Policy promises, and one page pe
     }
     // The policy itself links there, as its own text promises (privacy-policy.md:26).
     mocks.locale = "en";
-    expect((await page(PrivacyPage)).querySelector('.legalMain a[href="/privacy/versions"]')?.textContent).toBe("All versions of this policy");
+    expect((await page(() => PrivacyPage({}))).querySelector('.legalMain a[href="/privacy/versions"]')?.textContent).toBe("All versions of this policy");
   });
 
   it("opens one text exactly as it was published, inside the legal layout, and reads it from apps/ui too (the service's working directory)", async () => {

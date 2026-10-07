@@ -25,7 +25,8 @@ function compare(left: string, right: string): number {
 // esbuild GHSA-67mh-4wv8-2f99 (<=0.24.2) and GHSA-g7r4-m6w7-qqqr (>=0.27.3 <0.28.1).
 const VULNERABLE: Record<string, (version: string) => boolean> = {
   postcss: (v) => compare(v, "8.5.23") < 0,
-  sharp: (v) => compare(v, "0.35.4") < 0,
+  // GHSA-wq5f-xc86-pv6w:0.35.5 published2026-09-27 and meets the unchanged seven-day cooldown.
+  sharp: (v) => compare(v, "0.35.5") < 0,
   nanoid: (v) => v.startsWith("3.") && compare(v, "3.3.18") < 0,
   esbuild: (v) => compare(v, "0.24.3") < 0 || (compare(v, "0.27.3") >= 0 && compare(v, "0.28.1") < 0),
   // DL6-F1 (delta audit 2026-09-18): the advisory database moved under the merged tree and
