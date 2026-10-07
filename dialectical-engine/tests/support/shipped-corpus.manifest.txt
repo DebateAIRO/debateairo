@@ -787,6 +787,7 @@ packages/obs-capture/src/zone/counter.ts
 packages/obs-capture/src/zone/index.ts
 packages/obs-capture/src/zone/manifest.ts
 packages/payments-netopia/src/answers.ts
+packages/payments-netopia/src/client.ts
 packages/payments-netopia/src/countries.ts
 packages/payments-netopia/src/facts.ts
 packages/payments-netopia/src/hosts.ts

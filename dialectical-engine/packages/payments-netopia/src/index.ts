@@ -9,3 +9,5 @@ export { microsToNetopiaAmount, netopiaAmountToMicros } from "./money.js";
 export { parseOccurredAt } from "./time.js";
 export { createSecretToken } from "./secret-token.js";
 export { parseJsonKeepingNumberText } from "./json.js";
+// N3: the client (spec §2.3 errors, §2.4.1–2.4.3). createNetopiaPaymentsForRecording and the timeouts stay internal.
+export { answeredOrderReused, createNetopiaPayments, type NetopiaConfig, type NetopiaDeps } from "./client.js";
