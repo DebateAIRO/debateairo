@@ -99,7 +99,7 @@ function harness(input: Readonly<{
   return { api, counters };
 }
 
-async function ask(api: ReturnType<typeof buildApi>, identity: TestHttpIdentity, question = ASK.question_line) {
+async function ask(api: ReturnType<typeof buildApi>, identity: TestHttpIdentity, question: string = ASK.question_line) {
   return api.inject({
     method: "POST", url: "/v1/asks", headers: testSessionHeaders(identity, true),
     payload: { ...ASK, question_line: question }
