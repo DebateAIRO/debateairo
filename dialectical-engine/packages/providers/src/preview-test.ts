@@ -122,6 +122,19 @@ export function createPreviewGuardedFetch(port: PreviewBudgetPort): typeof fetch
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
   };
 }
+/**
+ * Step 1 (owner, 2026-10-08): the v2 gate refuses with 409 and {"error": CODE}. The team's day
+ * being used up is the product's daily code (a run-level spend stop lifted by the next day);
+ * every other refusal, and any body that is not exactly that shape, keeps the per-run money code.
+ */
+const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_REACHED", "DAILY_CALL_LIMIT_REACHED"]);
+function previewAuthorityRefusal(status: number | undefined, row: unknown): TypedDomainError {
+  const code = status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
+    ? (row as Record<string, unknown>).error : undefined;
+  return typeof code === "string" && PREVIEW_DAILY_REFUSALS.has(code)
+    ? new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "Private preview team budget for today is used up")
+    : new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");
+}
 /** Local IPC only: application principals never receive the provider credential or ledger write access. */
 export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig): PreviewBudgetPort {
   return Object.freeze({ execute(input: PreviewBudgetExecution, signal?: AbortSignal) {
@@ -136,7 +149,7 @@ export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig): P
           let result: unknown; try { result = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response invalid")); return; }
           const row = result as Record<string, unknown>;
           if (response.statusCode !== 200 || typeof row !== "object" || row === null || !Number.isInteger(row.status) || typeof row.body !== "string") {
-            reject(new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request")); return;
+            reject(previewAuthorityRefusal(response.statusCode, row)); return;
           }
           resolve({ status: Number(row.status), body: row.body });
         });
