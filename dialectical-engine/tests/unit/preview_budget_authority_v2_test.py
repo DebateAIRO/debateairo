@@ -22,7 +22,7 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from preview_budget_authority_fixture import (  # noqa: E402
-    HELPER_SOURCE, HOST, KEY, PEER, REMOVE, RESERVED, SCOPE, SOURCE, Gate, body, envelope,
+    HELPER_SOURCE, HOST, KEY, MODEL, PEER, REMOVE, RESERVED, SCOPE, SOURCE, Gate, body, envelope,
     file_sha, go_document, load_bridge, provider_response)
 
 bridge = load_bridge()
@@ -458,6 +458,29 @@ class HaltTests(GateTest):
             gate.call('op-1', charge=None)
         entry = self.assert_halted(gate, 'uncertain_charge', 'uncertain')
         self.assertEqual(Decimal(entry['held_usd']), RESERVED)
+
+    def test_reported_cost_without_valid_token_counts_is_uncertain_and_halts(self):
+        for usage in ({'estimated_cost': 0}, {'estimated_cost': '0.01'},
+                      {'prompt_tokens': 'many', 'completion_tokens': 1, 'estimated_cost': '0.01'},
+                      {'prompt_tokens': 3, 'estimated_cost': '0.01'},
+                      {'prompt_tokens': 3, 'completion_tokens': 4, 'total_tokens': 99, 'estimated_cost': '0.01'}):
+            with self.subTest(usage=usage):
+                gate = self.gate().ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    gate.call('op-1', dispatch=lambda _b, _k, u=usage: (200, {'model': MODEL, 'usage': u}))
+                entry = self.assert_halted(gate, 'uncertain_charge', 'uncertain')
+                self.assertEqual(Decimal(entry['held_usd']), RESERVED)
+
+    def test_charge_is_the_larger_of_token_price_and_reported_cost(self):
+        for usage, held in (({'prompt_tokens': 100000, 'completion_tokens': 0, 'estimated_cost': '0.01'}, '0.015'),
+                            ({'prompt_tokens': 0, 'completion_tokens': 2000, 'estimated_cost': '0.02'}, '0.02'),
+                            ({'prompt_tokens': 100000, 'completion_tokens': 2000}, '0.016')):
+            with self.subTest(usage=usage):
+                gate = self.gate().ready()
+                self.assertEqual(gate.call('op-1', dispatch=lambda _b, _k, u=usage: (200, {'model': MODEL, 'usage': u}))['status'], 200)
+                entry = gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-1']
+                self.assertEqual((entry['state'], Decimal(entry['held_usd'])), ('settled', Decimal(held)))
+                self.assertEqual(gate.status()['state'], 'active')
 
     def test_unexpected_failure_after_a_paid_reply_holds_full_reservation_and_halts(self):
         gate = self.gate().ready()

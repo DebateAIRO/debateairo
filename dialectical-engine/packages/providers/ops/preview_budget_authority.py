@@ -501,7 +501,9 @@ def assess_reply(status, response, reserved, elapsed):
     accounting = bounded_accounting(helper.account_response(response))
     charge = accounting.get('guard_charge_usd')
     changes = {'accounting': accounting, 'elapsed_seconds': elapsed, 'http_status': status if type(status) is int else None}
-    if charge is None:
+    if charge is None or accounting.get('usage_valid') is not True:
+        # A reported cost alone is not usage: without valid token counts the charge is uncertain.
+        # With both, the guard charge is the larger of the token list price and the reported cost.
         changes.update(state='uncertain', held_usd=str(reserved), reason='usage_or_cost_unreported')
         return changes, 'uncertain_charge', None, None
     amount = Decimal(charge)
