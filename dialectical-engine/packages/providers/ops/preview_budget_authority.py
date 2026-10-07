@@ -38,7 +38,8 @@ TEAM_DAY_ZONE = 'Europe/Bucharest'
 CONTROL_NAME = 'team-control.json'
 LOCK_NAME = 'team.lock'
 SERVE_LOCK_NAME = 'team-serve.lock'
-CONTROL_BYTES = 64 * 1024
+CONTROL_BYTES = 1024 * 1024
+MAX_HALT_EVENTS = 2048  # About 0.6 MiB at most, so a halt always fits the control file.
 DAY_LEDGER_BYTES = 16 * 1024 * 1024
 DAY_LEDGER_RESERVE_BYTES = 15 * 1024 * 1024  # Headroom so in-flight settlements always fit.
 LOCK_TIMEOUT_SECONDS = 10
@@ -240,10 +241,16 @@ class TeamStore:
         helper.write_bytes(self.dir_fd, day_ledger_name(ledger['day']), data)
 
 
-def _halt(control, reason, moment):
-    # The first reason stands while halted; each entry keeps its own outcome.
+def _halt(control, reason, moment, entry_id=None):
+    # The first reason stands while halted; every halt is also appended to the history, which
+    # re-activation keeps. Past the bound only a count grows, so a halt never fails for room.
     if control['state'] != 'halted':
         control.update(state='halted', reason=reason, halted_at=iso(moment))
+    halts = control.setdefault('halts', [])
+    if len(halts) < MAX_HALT_EVENTS:
+        halts.append({'reason': reason, 'at': iso(moment), **({} if entry_id is None else {'entry_id': entry_id})})
+    else:
+        control['halts_dropped'] = control.get('halts_dropped', 0) + 1
 
 
 def day_summary(control, ledger, moment):
@@ -254,7 +261,9 @@ def day_summary(control, ledger, moment):
             'today': ledger['day'], 'daily_budget_usd': control['limits']['daily_budget_usd'],
             'today_spend_usd': str(spend), 'remaining_today_usd': str(max(Decimal(0), budget - spend)),
             'today_posts': len(ledger['entries']), 'max_paid_posts_per_day': control['limits']['max_paid_posts_per_day'],
-            'in_flight': len(control['in_flight'])}
+            'in_flight': len(control['in_flight']),
+            'today_uncertain': sum(1 for entry in ledger['entries'].values() if entry['state'] == 'uncertain'),
+            'halts': control.get('halts', []), 'halts_dropped': control.get('halts_dropped', 0)}
 
 
 def init_state(private, go_path, now=None):
@@ -267,7 +276,8 @@ def init_state(private, go_path, now=None):
                    'state': 'initialized', 'reason': None, 'go_sha256': go_sha, 'limits': limits_of(go),
                    'predecessor_ledger_sha256': go.get('predecessor_ledger_sha256'),
                    'initialized_at': iso(current(now)), 'activated_at': None, 'active_host': None,
-                   'open_until_utc': None, 'halted_at': None, 'activations': 0, 'in_flight': {}}
+                   'open_until_utc': None, 'halted_at': None, 'activations': 0, 'in_flight': {},
+                   'halts': [], 'halts_dropped': 0}
         store.save_control(control)
     return {'state': 'initialized', 'scope_id': go['scope_id'], 'target_host': go['target_host'],
             'go_sha256': go_sha, 'predecessor_ledger_sha256': control['predecessor_ledger_sha256']}
@@ -292,11 +302,11 @@ def activate(private, go_path, host=None, platform=None, now=None):
         return day_summary(control, store.ledger(bucharest_day(moment)), moment)
 
 
-def halt(private, reason, now=None):
+def halt(private, reason, now=None, entry_id=None):
     now = now or helper.utc_now
     with TeamStore(private) as store:
         control = store.control()
-        _halt(control, reason, current(now))
+        _halt(control, reason, current(now), entry_id)
         store.save_control(control)
         return {'state': control['state'], 'reason': control['reason'], 'halted_at': control['halted_at']}
 
@@ -409,7 +419,7 @@ def record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
         ledger = store.ledger(day)
         entry = ledger['entries'].get(entry_id)
         if entry is None or entry['state'] != 'pending':
-            _halt(control, 'settlement_state_invalid', moment)
+            _halt(control, 'settlement_state_invalid', moment, entry_id)
             store.save_control(control)
             raise SafetyError('SETTLEMENT_STATE_INVALID')
         entry.update(changes, reconciled_at=iso(moment))
@@ -418,7 +428,7 @@ def record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
         store.save_ledger(ledger)
         control['in_flight'].pop(entry_id, None)
         if halt_reason is not None:
-            _halt(control, halt_reason, moment)
+            _halt(control, halt_reason, moment, entry_id)
         store.save_control(control)
         return {'authority': control['state'], 'day_held_usd': str(day_spend(ledger))}
 
@@ -429,7 +439,7 @@ def settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now):
     except BaseException:
         # The pending hold stays in the ledger and in flight; serve start turns it uncertain.
         try:
-            halt(private, 'settlement_failure', now=now)
+            halt(private, 'settlement_failure', now=now, entry_id=entry_id)
         except BaseException:
             pass
         raise SafetyError('SETTLEMENT_FAILED') from None

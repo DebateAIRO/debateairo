@@ -218,7 +218,8 @@ class PhaseTests(GateTest):
         self.assertEqual(result, {
             'state': 'active', 'reason': None, 'open_until_utc': '2026-10-15T09:00:00+00:00', 'window_open': True,
             'today': '2026-10-08', 'daily_budget_usd': '5.00', 'today_spend_usd': '0.05',
-            'remaining_today_usd': '4.95', 'today_posts': 1, 'max_paid_posts_per_day': 500, 'in_flight': 0})
+            'remaining_today_usd': '4.95', 'today_posts': 1, 'max_paid_posts_per_day': 500, 'in_flight': 0,
+            'today_uncertain': 0, 'halts': [], 'halts_dropped': 0})
 
     def test_status_of_uninitialized_directory_refuses_without_creating_files(self):
         gate = self.gate()
@@ -599,6 +600,38 @@ class HaltTests(GateTest):
                     gate.call('op-1', charge='0.02', **kwargs)
                 entry = self.assert_halted(gate, 'provider_error_or_model_identity', 'settled')
                 self.assertEqual(entry['held_usd'], '0.02')
+
+    def test_every_halt_is_kept_and_status_shows_the_first_reason_all_events_and_uncertain_count(self):
+        gate = self.gate().ready()
+
+        def broken(_body, _key):
+            raise OSError('synthetic')
+        with self.refused('NEW_CHARGE_UNCERTAIN'):
+            gate.call('op-1', dispatch=broken)
+        gate.clock.set('2026-10-08T09:05:00+00:00')
+        bridge.stop_authority(gate.private, now=gate.clock)
+        status = gate.status()
+        first = {'reason': 'uncertain_charge', 'at': '2026-10-08T09:00:00+00:00', 'entry_id': 'preview-test:' + SCOPE + ':op-1'}
+        self.assertEqual((status['state'], status['reason'], status['today_uncertain']), ('halted', 'uncertain_charge', 1))
+        self.assertEqual(status['halts'], [first, {'reason': 'operator_stop', 'at': '2026-10-08T09:05:00+00:00'}])
+        gate.activate()
+        gate.clock.set('2026-10-08T09:10:00+00:00')
+        bridge.stop_authority(gate.private, now=gate.clock)
+        status = gate.status()
+        self.assertEqual((status['reason'], len(status['halts']), status['halts'][0]), ('operator_stop', 3, first))
+
+    def test_halt_history_is_bounded_but_a_halt_is_never_refused_for_room(self):
+        gate = self.gate().ready()
+        with patch.object(bridge, 'MAX_HALT_EVENTS', 2):
+            for minute in range(4):
+                gate.clock.set('2026-10-08T09:0%d:00+00:00' % minute)
+                bridge.stop_authority(gate.private, now=gate.clock)
+                gate.activate()
+            bridge.stop_authority(gate.private, now=gate.clock)
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason'], len(status['halts']), status['halts_dropped']),
+                         ('halted', 'operator_stop', 2, 3))
+        self.assertEqual(status['halts'][0]['at'], '2026-10-08T09:00:00+00:00')
 
     def test_reactivation_after_halt_keeps_history_and_uncertain_amount_counts_on_its_own_day(self):
         gate = self.gate(daily_budget_usd='0.10').ready()
