@@ -43,6 +43,33 @@ export function validatePreviewProviderTestConfig(value: unknown): PreviewProvid
  if(source===undefined)return refused();
  return parsePreviewProviderTestConfig(source);
 }
+/**
+ * Step 1 (owner, 2026-10-08): the identity user ids that may start debates on the private
+ * preview. Malformed refuses to boot; a value (even an empty one) without the preview
+ * configuration refuses to boot, so it never silently applies to the real site; missing or
+ * empty on the preview is an empty team and every ask is refused at request time.
+ */
+export const PREVIEW_TEAM_MAX_MEMBERS = 20 as const;
+const PREVIEW_TEAM_USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+export function parsePreviewTeamUserIds(source: string | undefined, previewConfigured: boolean): readonly string[] | undefined {
+  if (source !== undefined && !previewConfigured) throw new TypeError("PREVIEW_TEAM_USER_IDS_WITHOUT_PREVIEW");
+  if (!previewConfigured) return undefined;
+  if (source === undefined || source.trim() === "") return Object.freeze([]);
+  let value: unknown; try { value = JSON.parse(source); } catch { throw new TypeError("PREVIEW_TEAM_USER_IDS_INVALID"); }
+  if (!Array.isArray(value) || value.length > PREVIEW_TEAM_MAX_MEMBERS
+    || value.some(id => typeof id !== "string" || !PREVIEW_TEAM_USER_ID.test(id))
+    || new Set(value).size !== value.length) throw new TypeError("PREVIEW_TEAM_USER_IDS_INVALID");
+  return Object.freeze([...value as string[]]);
+}
+/** The refusal a person outside the preview's team gets, at the route (403) and in submit. */
+export const PREVIEW_TEAM_ONLY = "PREVIEW_TEAM_ONLY" as const;
+/** Off the preview there is no team rule; on it, only a listed identity user id may start a debate. */
+export function previewTeamAdmits(
+  config: PreviewProviderTestConfig | undefined, teamUserIds: readonly string[] | undefined, userId: string | undefined
+): boolean {
+  if (config === undefined) return true;
+  return userId !== undefined && teamUserIds !== undefined && teamUserIds.includes(userId);
+}
 export function previewPlanTierRosters<T extends Readonly<{ free: readonly string[]; premium: readonly string[] }>>(
   config: PreviewProviderTestConfig | undefined, defaults: T
 ): Readonly<{ free: readonly string[]; premium: readonly string[] }> {

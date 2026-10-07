@@ -1,4 +1,4 @@
-import { validatePreviewProviderTestConfig, previewPlanTierRosters, type PreviewProviderTestConfig } from "@debateai/providers";
+import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
@@ -1586,6 +1586,11 @@ const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Obje
 
 export interface ApiOptions {
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
+  /**
+   * Step 1 (owner, 2026-10-08): the identity user ids that may start debates on the private
+   * preview. Read only with `previewProviderTestConfig`; absent there, nobody may.
+   */
+  readonly previewTeamUserIds?: readonly string[];
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
   /** Mandatory for signup and resend; absent configuration fails closed. */
@@ -1737,8 +1742,10 @@ export interface EvaluatorDevMenuApplication {
  * resets — so a caller waits the right amount of time instead of hammering the
  * surface or giving up on a debate it could still have.
  */
-export function askRefusalStatus(code: string): 401 | 422 | 429 {
+export function askRefusalStatus(code: string): 401 | 403 | 422 | 429 {
   if (code === ASK_SIGN_IN_REQUIRED) return 401;
+  // Step 1: the same 403 the route answers when it refuses a person outside the preview's team.
+  if (code === PREVIEW_TEAM_ONLY) return 403;
   return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
 }
 
@@ -3214,6 +3221,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         });
       }
     }
+    // Step 1 (owner, 2026-10-08): the private preview spends the company's money on every
+    // model call, so only its team starts debates there. Third, after the crisis and consent
+    // checks; before the quota, the country rule, admission and its paid discovery probe, so a
+    // refusal here spends nothing. Off the preview there is no team rule.
+    if (!previewTeamAdmits(previewConfig, options.previewTeamUserIds, request.authenticatedSession?.userId)) {
+      return reply.status(403).send({ error: PREVIEW_TEAM_ONLY });
+    }
     if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
       request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
     // Paid plans G3a: no new debate from an always-blocked country. Reading is never gated.
@@ -3692,6 +3706,8 @@ export class HatchetDispatcher implements Dispatcher {
 
 export interface RunCreationSettings {
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
+  /** Step 1: the preview's team; `submit` refuses everyone else (the route refuses them first). */
+  readonly previewTeamUserIds?: readonly string[];
   readonly strangerSampleRate: number;
   readonly registerVersion: number;
   readonly batteryVersion: string;
@@ -4268,6 +4284,12 @@ export class PostgresAskApplication implements AskApplication {
       }
     } else if (session.ownership_provenance === "server_session" || session.asker_id !== principal.legacyAskerId) {
       throw new TypedDomainError("RUN_PRINCIPAL_SESSION_MISMATCH", "Legacy scope is valid only for an exact legacy session");
+    }
+    // Step 1, defense in depth: the route refuses a person outside the preview's team first;
+    // any other caller of submit is refused here, before billing, admission or any probe.
+    if (!previewTeamAdmits(validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig),
+      this.settings.previewTeamUserIds, principal.kind === "server" ? principal.userId : undefined)) {
+      markAskRefusal(new TypedDomainError(PREVIEW_TEAM_ONLY, PREVIEW_TEAM_ONLY));
     }
     // Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; ruling R-28).
     // With billing on, the SERVER decides the ask. Every later step reads `ask`
