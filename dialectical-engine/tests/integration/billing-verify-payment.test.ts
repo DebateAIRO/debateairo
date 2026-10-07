@@ -267,7 +267,7 @@ describe("P9b VERIFY_PAYMENT", () => {
     expect(await subscriptionKinds(bought.subscriptionId)).not.toContain("ACTIVATED");
     expect(await status(bought.chargeId, bought.ownerRef)).toEqual({ state: "FAILED", reasonCode: "CHARGEBACK" });
     const quarter = { from: new Date(h.clock.now.getTime() - 86_400_000), to: new Date(h.clock.now.getTime() + 86_400_000) };
-    expect((await h.repository.quarterSummaryRows(quarter.from, quarter.to, "stage"))
+    expect((await h.repository.quarterSummaryRows(quarter.from, quarter.to, { provider: "xmoney", environment: "stage" }))
       .filter((row) => row.chargeId === bought.chargeId).map((row) => `${row.type} ${String(row.saleRecorded)}`))
       .toEqual(["CHARGEBACK false"]);
   });

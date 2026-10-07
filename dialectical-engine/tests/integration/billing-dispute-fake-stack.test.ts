@@ -71,7 +71,7 @@ async function summaryChargebacks(ownerRef: string): Promise<string[]> {
   const to = new Date(stack.now().getTime() + DAY_MS);
   const from = new Date(to.getTime() - 400 * DAY_MS);
   const summary = buildTaxSummary({
-    quarter: { ...parseTaxQuarter("2026-Q4"), from, to }, rows: await billing.quarterSummaryRows(from, to, "stage"),
+    quarter: { ...parseTaxQuarter("2026-Q4"), from, to }, rows: await billing.quarterSummaryRows(from, to, { provider: "xmoney", environment: "stage" }),
     invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: [],
     authorities: taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.sourceRef)
   });

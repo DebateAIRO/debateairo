@@ -36,8 +36,8 @@ export function createInitialSettlement(deps: Readonly<{
       });
     },
     async succeeded(context): Promise<SettlementResult> {
-      const { subscription, transaction, client, now, quote } = context;
-      if (transaction === null || quote === null) throw new TypeError("BILLING_INITIAL_WITHOUT_TRANSACTION_OR_QUOTE");
+      const { subscription, transaction, payment, client, now, quote } = context;
+      if ((transaction === null && payment === null) || quote === null) throw new TypeError("BILLING_INITIAL_WITHOUT_TRANSACTION_OR_QUOTE");
       // P15: the one choke point for a payment that arrives during an erasure's grace (a checkout opened before it
       // was scheduled, while the hook failed): nothing is activated and the money goes back in full (RefundDesk).
       if (await deps.repository.ownerErasurePending(context.ownerRef, client)) {
@@ -57,12 +57,15 @@ export function createInitialSettlement(deps: Readonly<{
       for (const other of others.filter((candidate) => candidate.status === "CREATED")) {
         await deps.repository.appendSubscriptionEvent(client, subscriptionEvent(other, "ENDED", now, { cause: "ABANDONED", reason: "SUPERSEDED" }));
       }
-      const anchor = transaction.createdAt ?? now;
+      // The month is anchored at the payment: NETOPIA's `occurredAt` (§2.4.3), xMoney's creationDate, else now.
+      const anchor = payment !== null ? (payment.occurredAt ?? now) : (transaction?.createdAt ?? now);
       const periodEnd = computeWindows(anchor, anchor).month.end;
       await deps.repository.appendSubscriptionEvent(client, {
         eventId: randomUUID(), subscriptionId: subscription.subscriptionId, ownerRef: context.ownerRef, kind: "ACTIVATED",
-        at: now, planId: quote.planId, periodAnchorAt: anchor, xmoneyOrderId: transaction.orderId,
-        xmoneyCustomerId: transaction.customerId, cardRef: transaction.cardId, cardTokenId: null,
+        at: now, planId: quote.planId, periodAnchorAt: anchor,
+        // N10: a NETOPIA plan holds no xMoney ids; its card is the token adopted at this decision (spec §2.15.2).
+        xmoneyOrderId: transaction?.orderId ?? null, xmoneyCustomerId: transaction?.customerId ?? null,
+        cardRef: transaction?.cardId ?? null, cardTokenId: payment?.cardTokenId ?? null,
         data: {
           charge_id: context.charge.chargeId, announced_total_micros: context.charge.totalMicros,
           // Terms §12: this subscriber's recurring net price. Every renewal charges it plus a fresh tax (P11a), never

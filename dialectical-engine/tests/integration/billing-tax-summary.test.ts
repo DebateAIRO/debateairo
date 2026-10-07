@@ -44,7 +44,7 @@ describe("P16b the summary reads our own rows", () => {
       });
     });
     // The seeded subscriptions live in xMoney's sandbox system ("stage"), so they are read as such here.
-    const rows = await billing.quarterSummaryRows(quarter.from, quarter.to, "stage");
+    const rows = await billing.quarterSummaryRows(quarter.from, quarter.to, { provider: "xmoney", environment: "stage" });
     const mine = rows.filter((row) => row.chargeId === ro.initialChargeId || row.chargeId === de.initialChargeId);
     expect(mine).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: "SALE", chargeId: ro.initialChargeId, taxCountry: "RO", taxStatus: "TAXABLE",
@@ -57,7 +57,7 @@ describe("P16b the summary reads our own rows", () => {
     ]));
     expect(mine).toHaveLength(4);
     // A sandbox payment is never a sale: the live summary, the one the command and O1 read, sees none of them.
-    expect((await billing.quarterSummaryRows(quarter.from, quarter.to, "live"))
+    expect((await billing.quarterSummaryRows(quarter.from, quarter.to, { provider: "xmoney", environment: "live" }))
       .filter((row) => row.chargeId === ro.initialChargeId || row.chargeId === de.initialChargeId)).toEqual([]);
   });
 
@@ -151,7 +151,7 @@ describe("P16b the summary reads our own rows", () => {
         refundsTransactionId: ownTransaction.initialTransactionId
       }));
     });
-    const refunds = (await billing.quarterSummaryRows(quarter.from, quarter.to, "stage")).filter((row) => row.type === "REFUND"
+    const refunds = (await billing.quarterSummaryRows(quarter.from, quarter.to, { provider: "xmoney", environment: "stage" })).filter((row) => row.type === "REFUND"
       && (row.chargeId === onPayment.initialChargeId || row.chargeId === ownTransaction.initialChargeId));
     expect(refunds).toEqual(expect.arrayContaining([
       expect.objectContaining({ chargeId: onPayment.initialChargeId, amountMicros: onPayment.totalMicros, amountKnown: false }),

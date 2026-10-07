@@ -130,9 +130,19 @@ export function createRenewalSettlement(deps: RenewalSettlementDeps): ChargeSett
       if (downgrading && subscription.status === "ACTIVE") {
         await deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "DOWNGRADED", now, { charge_id: charge.chargeId }, { planId: quote.planId }));
       }
+      const recovering = subscription.status === "PAST_DUE";
+      // N10 (spec §2.15.2): NETOPIA issues a new token with each token payment; a RENEWED carries it. A RECOVERED may
+      // not (spec §2.5.5), so a recovered retry's card is adopted by a CARD_SAVED right after it.
+      const cardTokenId = context.payment?.cardTokenId ?? null;
       await deps.repository.appendSubscriptionEvent(client, subscriptionEvent(
-        subscription, subscription.status === "PAST_DUE" ? "RECOVERED" : "RENEWED", now, data, { planId: quote.planId }
+        subscription, recovering ? "RECOVERED" : "RENEWED", now, data,
+        { planId: quote.planId, ...(cardTokenId !== null && !recovering ? { cardTokenId } : {}) }
       ));
+      if (cardTokenId !== null && recovering) {
+        await deps.repository.appendSubscriptionEvent(client, subscriptionEvent(
+          subscription, "CARD_SAVED", now, { charge_id: charge.chargeId }, { planId: quote.planId, cardTokenId }
+        ));
+      }
       await deps.entitlements.append(client, {
         ownerRef: context.ownerRef, planId: quote.planId, periodAnchorAt: subscription.periodAnchorAt,
         cause: downgrading ? "DOWNGRADED" : "RENEWED", effectiveAt: now, subscriptionId: subscription.subscriptionId,

@@ -59,7 +59,7 @@ async function settle(run: Awaited<ReturnType<typeof start>>, chargeRef: string,
   return billing.withTransaction(async (client) => {
     const events = await billing.subscriptionEvents(run.seeded.subscriptionId);
     return settlement.succeeded({
-      client, now: new Date(), charge, transaction: authorized(chargeRef, run.seeded.xmoneyCustomerId),
+      client, now: new Date(), charge, transaction: authorized(chargeRef, run.seeded.xmoneyCustomerId), payment: null,
       subscription: foldSubscription(events), events, quote: null, ownerRef: run.identity.authenticated.ownerRef,
       customerId: run.seeded.customerId, cardCountry
     });

@@ -661,7 +661,7 @@ export class RenewalService {
       if (inserted === "DUPLICATE") return;
       const events = await this.deps.repository.subscriptionEvents(charge.subscriptionId, client);
       await this.deps.settlement.failed({
-        client, now, charge, transaction: null, subscription: foldSubscription(events), events, quote,
+        client, now, charge, transaction: null, payment: null, subscription: foldSubscription(events), events, quote,
         ownerRef: charge.ownerRef, customerId: customer.customerId, cardCountry: null, errorCode
       });
     });

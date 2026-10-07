@@ -18,6 +18,7 @@ apps/api/src/ask-room.ts
 apps/api/src/billing/account-email.ts
 apps/api/src/billing/audit.ts
 apps/api/src/billing/cancel-link.ts
+apps/api/src/billing/card-adoption.ts
 apps/api/src/billing/card-change.ts
 apps/api/src/billing/charge-status.ts
 apps/api/src/billing/checkout.ts
@@ -42,6 +43,7 @@ apps/api/src/billing/order-text-catalogue.ts
 apps/api/src/billing/order-text.ts
 apps/api/src/billing/outbox.ts
 apps/api/src/billing/owner-jobs.ts
+apps/api/src/billing/payment-alert.ts
 apps/api/src/billing/place.ts
 apps/api/src/billing/quote.ts
 apps/api/src/billing/reconcile.ts

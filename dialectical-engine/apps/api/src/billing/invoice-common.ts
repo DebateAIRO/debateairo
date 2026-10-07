@@ -7,7 +7,7 @@ import type { BillingPolicy, PlanId } from "@debateai/register";
 import type { BillingRecipientReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
 import { englishOrderText, invoiceDate, planName, type BillingOrderText } from "./order-text.js";
-import { DONE, failureRetryAt, otherXMoneySystem, type OutboxOutcome } from "./outbox.js";
+import { DONE, failureRetryAt, otherPaymentSystem, otherXMoneySystem, type OutboxOutcome } from "./outbox.js";
 import { openBillingProfile, openQuoteLocation, type BillingProfile, type QuoteLocation } from "./records.js";
 import { refundTarget } from "./rows.js";
 
@@ -31,19 +31,27 @@ export type InvoiceJobDeps = Readonly<{
    * for a charge paid in this system: a sandbox payment never becomes a live fiscal invoice or OSS record.
    */
   xmoneyEnvironment: CustomerXMoneyEnvironment;
+  /** N10: the connectors' NETOPIA environment (N8); absent or null: this API issues no document for a NETOPIA charge. */
+  paymentEnvironment?: "sandbox" | "live" | null;
 }>;
 
 /**
- * P2-I4 (D5 5h): the outcome of a job whose charge was paid in the other xMoney system (DEAD, one audit line), read
+ * P2-I4 (D5 5h): the outcome of a job whose charge was paid in another payment system (DEAD, one audit line), read
  * before anything else the job does; null when the charge is this system's, or missing (the job's own check answers).
+ * N10: a NETOPIA charge is this system's only in the connectors' NETOPIA environment (OTHER_PAYMENT_SYSTEM otherwise);
+ * an xMoney charge keeps P2-I4's rule (OTHER_XMONEY_SYSTEM).
  */
 export async function otherSystemOutcome(
-  deps: Pick<InvoiceJobDeps, "repository" | "xmoneyEnvironment"> & Readonly<{ audit: BillingAudit }>, job: OutboxJob,
-  chargeId: string
+  deps: Pick<InvoiceJobDeps, "repository" | "xmoneyEnvironment" | "paymentEnvironment"> & Readonly<{ audit: BillingAudit }>,
+  job: OutboxJob, chargeId: string
 ): Promise<OutboxOutcome | null> {
   const charge = await deps.repository.charge(chargeId);
-  return charge !== null && (charge.paymentProvider !== "xmoney" || charge.paymentEnvironment !== deps.xmoneyEnvironment)
-    ? otherXMoneySystem(deps.audit, job.kind) : null;
+  if (charge === null) return null;
+  // Skeleton §1 rule 2: a NETOPIA charge is this system's only in the connectors' NETOPIA environment.
+  if (charge.paymentProvider === "netopia") {
+    return charge.paymentEnvironment === (deps.paymentEnvironment ?? null) ? null : otherPaymentSystem(deps.audit, job.kind);
+  }
+  return charge.paymentEnvironment !== deps.xmoneyEnvironment ? otherXMoneySystem(deps.audit, job.kind) : null;
 }
 
 export type PaidCharge = Readonly<{
@@ -173,7 +181,9 @@ export function saleRecordOf(
     evidence: Object.freeze({
       billingCountry: paid.location.country, ipAddress: paid.location.ip,
       bankCountry: typeof payload.card_country === "string" ? payload.card_country : null
-    })
+    }),
+    // Spec §2.8 step 5: Quaderno's sale names who took the payment (`processor_id` is `transactionId`, the ntpID).
+    processor: paid.charge.paymentProvider
   });
 }
 
@@ -268,7 +278,9 @@ export async function creditNoteContext(
       refundTotalMicros: sale.amountMicros, original: { documentId: original.externalRef, number: original.number },
       // RefundRecord.description (D5 Open question 4): the credited line in the buyer's language, the same sentence
       // the invoice carried for the period it credits (SmartBill's P5 still names its negative line itself).
-      description: invoiceLine(deps.orderText ?? englishOrderText, paid.profile.locale, paid.quote.planId, paid.period)
+      description: invoiceLine(deps.orderText ?? englishOrderText, paid.profile.locale, paid.quote.planId, paid.period),
+      // Spec §2.8 step 5: the credit note names the processor of the payment it refunds.
+      processor: paid.charge.paymentProvider
     })
   });
 }

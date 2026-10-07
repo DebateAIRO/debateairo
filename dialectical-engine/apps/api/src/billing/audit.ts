@@ -72,6 +72,14 @@ export type BillingAuditEvent =
   | "billing.renewal.history_invalid"
   /** P11a: a subscription whose recurring net price was never recorded; it is not charged at a guessed price. */
   | "billing.renewal.price_missing"
+  /** N10/N11 (spec §2.19's rename of billing.xmoney.credentials_refused): NETOPIA refused our API key. The operation. */
+  | "billing.payment.credentials_refused"
+  /** N10 (§2.4.4): NETOPIA reported a status whose meaning it has not confirmed (UNCLEAR). The status number only. */
+  | "billing.payment.status_unexpected"
+  /** N10 (§2.8, ruling C-7): a payment was handed to the owner with nothing recorded. The PaymentState. */
+  | "billing.payment.owner_review"
+  /** N10 (§2.15.2): a saved card that arrived after the decision was adopted (CARD_SAVED). The charge kind. */
+  | "billing.card.saved"
   /** P11b: one line per maintenance pass whose visits failed; the count and the failures' distinct codes only. */
   | "billing.maintenance.report"
   /** D5 5i: xMoney refused our credentials (401/403). An operator alarm: nothing was charged, failed or emailed. */

@@ -88,13 +88,13 @@ const quarterOf = (date: Date): TaxQuarter =>
 const quarterAfter = (quarter: TaxQuarter): TaxQuarter => quarterOf(quarter.to);
 /** When the quarter's rows date a charge's sale (the money moved), read over all time. */
 async function saleDateOf(chargeId: string): Promise<Date> {
-  const rows = await h.repository.quarterSummaryRows(new Date(0), new Date(Date.UTC(9999, 0, 1)), "stage");
+  const rows = await h.repository.quarterSummaryRows(new Date(0), new Date(Date.UTC(9999, 0, 1)), { provider: "xmoney", environment: "stage" });
   return rows.find((row) => row.type === "SALE" && row.chargeId === chargeId)!.at;
 }
 /** The quarter's summary as the command builds it, from this harness's xMoney system ("stage"). */
 async function summaryFor(quarter: TaxQuarter) {
   const summary = buildTaxSummary({
-    quarter, rows: await h.repository.quarterSummaryRows(quarter.from, quarter.to, "stage"),
+    quarter, rows: await h.repository.quarterSummaryRows(quarter.from, quarter.to, { provider: "xmoney", environment: "stage" }),
     invoiceUnknown: await h.repository.invoiceUnknownItems(), efactura: [], paymentsToCheck: [], deadEmails: [],
     authorities: taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, "test")
   });
@@ -313,7 +313,7 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     await h.settle(paid.transaction.transactionId);
     expect(await listed(paid.chargeId)).toEqual([expect.objectContaining({ jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })]);
     const quarter = parseTaxQuarter(`${h.clock.now.getUTCFullYear()}-Q${Math.floor(h.clock.now.getUTCMonth() / 3) + 1}`);
-    const quarterRefunds = async () => (await h.repository.quarterSummaryRows(quarter.from, quarter.to, "stage"))
+    const quarterRefunds = async () => (await h.repository.quarterSummaryRows(quarter.from, quarter.to, { provider: "xmoney", environment: "stage" }))
       .filter((row) => row.type === "REFUND" && row.chargeId === paid.chargeId);
     expect(await quarterRefunds()).toEqual([expect.objectContaining({ amountMicros: 24_200_000, amountKnown: false })]);
     const kinds = async () => (await invoices(paid.chargeId)).map((row) => row.kind);

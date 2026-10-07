@@ -155,6 +155,21 @@ describe("P4 — Quaderno client against the fake", () => {
     expect(recorded).toHaveLength(1);
     expect(recorded[0]).toMatchObject({ items: [{ description: "Rückerstattung zu Rechnung Q-1", quantity: 1, amount: 11.9 }] });
   });
+
+  it("N10: names NETOPIA as the processor and its payment id, and finds the document again by that id", async () => {
+    const netopiaSale: SaleRecord = { ...sale("ntp-7301"), processor: "netopia" };
+    const first = await engine.recordSale(netopiaSale);
+    expect(await engine.recordSale(netopiaSale)).toEqual(first);
+    const bodies = fake.sales.filter((recorded) => recorded.processor_id === "ntp-7301");
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]).toMatchObject({ processor: "netopia", payment: { processor: "netopia", processor_id: "ntp-7301" } });
+    await engine.recordRefund({
+      chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId: "ntp-7301", issuedOn: new Date("2026-10-05T10:00:00Z"),
+      refundTotalMicros: 11_900_000, original: { documentId: first.documentId, number: first.number },
+      description: "Credit", processor: "netopia"
+    });
+    expect(fake.refunds.find((recorded) => recorded.processor_id === "ntp-7301")).toMatchObject({ processor: "netopia" });
+  });
 });
 
 describe("P4 — a lookup that does not answer a list never leads to a second document (R-24)", () => {

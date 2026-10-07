@@ -1,22 +1,32 @@
-import { decimalToMicros, foldSubscription, invoiceIssuerFor, type SubscriptionEvent } from "@debateai/billing-core";
+import {
+  decimalToMicros, foldSubscription, invoiceIssuerFor, paymentErrorCode, type CardPayments, type PaymentEnvironment,
+  type PaymentReport, type SubscriptionEvent
+} from "@debateai/billing-core";
 import type {
   BillingJobQueries, BillingReadExecutor, BillingRepository, ChargeEventRow, ChargeKind, ChargeRow, CustomerXMoneyEnvironment,
-  EntitlementRepository, LocationEvidenceRow, OutboxJob, QuoteRow
+  EntitlementRepository, LocationEvidenceRow, NoticeOutcome as PaymentNoticeOutcome, OutboxJob, PaymentNoticeRow, QuoteRow
 } from "@debateai/db";
 import { decideCardCountry } from "@debateai/geo";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
+import { netopiaAmountToMicros, statusToState } from "@debateai/payments-netopia";
 import type { XMoneyClient, XMoneyTransaction } from "@debateai/payments-xmoney";
 import type { BillingPolicy, CountryPolicy } from "@debateai/register";
 import type { PoolClient } from "pg";
 import { credentialsRefused, type BillingAudit } from "./audit.js";
+import { adoptingKindOf, chooseAdoptableToken, writeCardSaved, type AdoptingKind } from "./card-adoption.js";
 import type { NoticeOutcome, RequestedRefundReason } from "./codes.js";
 import { enqueueEmail } from "./email-job.js";
 import { locationVerdict } from "./location-verdict.js";
-import { DONE, notFinalRetryAt, otherXMoneySystem, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
+import {
+  DONE, notFinalRetryAt, otherPaymentSystem, otherXMoneySystem, type OutboxHandler, type OutboxOutcome
+} from "./outbox.js";
+import { queuePaymentAlert } from "./payment-alert.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
 import { covers, pendingRefund, refundedAlready, refundedMicros, refundIntentOf, type RefundDesk } from "./refunds.js";
 import { chargeEvent, refundTarget, subscriptionEvent, transactionRoute } from "./rows.js";
-import { enqueueCreditNote, enqueueInvoice, type ChargeSettlement, type SettlementContext, type SettlementPrepared } from "./settlement.js";
+import {
+  enqueueCreditNote, enqueueInvoice, type ChargeSettlement, type SettledPayment, type SettlementContext, type SettlementPrepared
+} from "./settlement.js";
 
 type ChargeWithEvents = ChargeRow & { events: ChargeEventRow[] };
 type Owner = Readonly<{ ownerRef: string; quote: QuoteRow | null; customerId: string; events: ReadonlyArray<SubscriptionEvent> }>;
@@ -47,6 +57,15 @@ const REBILL_SOURCES: ReadonlySet<string> = new Set(["re-bill", "re-bill-micro"]
 const NOT_REBILL_SOURCES: ReadonlySet<string> = new Set(["service-call", "card-change"]);
 const NOT_FINAL_STATUSES: ReadonlySet<string> = new Set(["start", "in-progress", "3d-pending"]);
 
+/** Skeleton §1 rule 2: what the NETOPIA path needs. Absent: this API serves no NETOPIA charge (they end OTHER_PAYMENT_SYSTEM). */
+export type NetopiaVerifyDeps = Readonly<{
+  payments: Pick<CardPayments, "status">;
+  /** N8's `BillingConnectors.paymentEnvironment`: a NETOPIA charge of another environment is another system's. */
+  paymentEnvironment: PaymentEnvironment;
+  /** `queuePaymentAlert`'s once-only check. */
+  jobs: Pick<BillingJobQueries, "outboxJobExists">;
+}>;
+
 export type VerifyDeps = Readonly<{
   repository: BillingRepository;
   jobs: Pick<BillingJobQueries, "lockOwner" | "chargeIdForTransaction">;
@@ -59,6 +78,8 @@ export type VerifyDeps = Readonly<{
   audit: BillingAudit;
   /** D5 5h: the xMoney system this API talks to; a transaction id is matched only among its rows. */
   xmoneyEnvironment: CustomerXMoneyEnvironment;
+  /** N10: the NETOPIA path's deps (optional so the xMoney harnesses compile unchanged until N23). */
+  netopia?: NetopiaVerifyDeps;
 }>;
 
 function amountMatches(decimal: string, micros: number): boolean {
@@ -77,6 +98,31 @@ const sameOrderPayment = (charge: ChargeRow): SecondPayment => Object.freeze({
   amountMicros: charge.totalMicros, reason: charge.kind === "CARD_CHECK" ? "CARD_CHECK_RELEASE" as const : "DUPLICATE_PAYMENT" as const
 });
 
+/** A NETOPIA job's ref: our charge id, which is NETOPIA's orderID (spec §2.8). xMoney refs are digits. */
+const CHARGE_REF = /^[0-9a-f]{32}$/u;
+/** The plan states that keep a card (spec §2.15.4). */
+const CARD_HOLDING: ReadonlySet<string> = new Set(["ACTIVE", "PAST_DUE", "SUSPENDED"]);
+
+/** Spec §2.8 step 2: a report from the newest stored (signed) notice; it carries no decline code, so never "bank refused". */
+function reportFromNotice(orderId: string, notice: PaymentNoticeRow): PaymentReport | null {
+  if (notice.providerStatus === null || notice.providerPaymentId === null) return null;
+  let amountMicros: number | null = null;
+  try {
+    amountMicros = notice.amountText === null ? null : netopiaAmountToMicros(notice.amountText);
+  } catch {
+    amountMicros = null;
+  }
+  const state = statusToState(notice.providerStatus);
+  return Object.freeze({
+    orderId, providerPaymentId: notice.providerPaymentId, state, providerStatus: String(notice.providerStatus),
+    amountMicros, currency: notice.currency, cardCountry: notice.cardCountry, savedCard: null, declineCode: null,
+    declineSide: state === "DECLINED" ? "CARD" as const : null, bankDeclined: false, occurredAt: null, clientId: null
+  });
+}
+
+/** Spec §2.6.4: the client id NETOPIA echoes is our customer id as 32 lower-case hex (the same rule as N11's `clientIdOf`). */
+const clientIdMatches = (echoed: string, customerId: string): boolean => echoed === customerId.replaceAll("-", "").toLowerCase();
+
 /**
  * Spec §2.5.4 VERIFY_PAYMENT: the only place a payment changes state. It reads xMoney server to server; the
  * browser and the notice are only triggers.
@@ -94,6 +140,8 @@ export class VerifyPaymentHandler {
   /** A credentials refusal (D5 5i) raises the operator alarm; the worker's failure schedule retries the check. */
   readonly handle: OutboxHandler = async (job, now) => {
     try {
+      // Skeleton §1 rule 2: a NETOPIA job (ref = our charge id) takes the NETOPIA path; every other ref keeps xMoney's.
+      if (CHARGE_REF.test(job.ref)) return await this.netopiaJob(job, now);
       if (await this.namesOtherSystemCharge(job)) return otherXMoneySystem(this.deps.audit, job.kind);
       return await this.run(job, now);
     } catch (error) {
@@ -449,11 +497,11 @@ export class VerifyPaymentHandler {
    */
   private async context(
     client: PoolClient, charge: ChargeRow, transaction: XMoneyTransaction | null, owner: Owner, now: Date,
-    cardCountry: string | null = null, prepared: SettlementPrepared = {}
+    cardCountry: string | null = null, prepared: SettlementPrepared = {}, payment: SettledPayment | null = null
   ): Promise<SettlementContext> {
     const events = await this.deps.repository.subscriptionEvents(charge.subscriptionId, client);
     return Object.freeze({
-      client, now, charge, transaction, subscription: foldSubscription(events), events,
+      client, now, charge, transaction, payment, subscription: foldSubscription(events), events,
       quote: owner.quote, ownerRef: owner.ownerRef, customerId: owner.customerId, cardCountry, prepared
     });
   }
@@ -913,5 +961,326 @@ export class VerifyPaymentHandler {
         && !charge.events.some((event) => event.kind === "CHARGEBACK_REPRESENTED"))
       .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
     return withEvents[0] ?? null;
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // N10 — the NETOPIA path (spec §2.8). N23 deletes everything above that serves xMoney.
+  // ---------------------------------------------------------------------------------------------------------------
+
+  /** The dispatch: this API's NETOPIA charge, another system's (DEAD before any read), or none yet (wait for it). */
+  private async netopiaJob(job: OutboxJob, now: Date): Promise<OutboxOutcome> {
+    const charge = await this.deps.repository.charge(job.ref);
+    if (charge === null) return notFinal(job, now, "CHARGE_NOT_FOUND");
+    const netopia = this.deps.netopia;
+    if (netopia === undefined || charge.paymentProvider !== "netopia" || charge.paymentEnvironment !== netopia.paymentEnvironment) {
+      return otherPaymentSystem(this.deps.audit, job.kind);
+    }
+    const read = await this.readNetopiaStatus(charge, now);
+    if (read !== "UNREADABLE" && read !== "NO_SUCH_ORDER") return this.decideNetopia(job, charge, read, now, false);
+    const code = read === "NO_SUCH_ORDER" ? "PAYMENT_NOT_FOUND" : "PAYMENT_STATUS_UNREADABLE";
+    const retryAt = notFinalRetryAt(job.attempts, now);
+    if (retryAt !== null) return Object.freeze({ kind: "RETRY" as const, code, retryAt });
+    // Spec §2.8 step 2: the schedule is spent; NETOPIA's own signed message decides when we hold one.
+    if (read === "UNREADABLE") {
+      const notice = await this.newestNotice(charge.chargeId);
+      const fromNotice = notice === null ? null : reportFromNotice(charge.chargeId, notice);
+      if (notice !== null && fromNotice !== null) {
+        await this.noticeOutcome(notice.noticeId, now, "DECIDED_BY_NOTICE");
+        return this.decideNetopia(job, charge, fromNotice, now, true);
+      }
+    }
+    return this.leftToChecks(charge, code);
+  }
+
+  /** Spec §2.8 step 2: one status read with the best ntpID (N-16), its `status_read` row; a payment error is UNREADABLE. */
+  private async readNetopiaStatus(charge: ChargeWithEvents, now: Date): Promise<PaymentReport | "NO_SUCH_ORDER" | "UNREADABLE"> {
+    const payments = this.deps.netopia!.payments;
+    const submitted = [...charge.events].reverse()
+      .find((event) => event.kind === "SUBMITTED" && event.providerPaymentId !== null)?.providerPaymentId ?? null;
+    const notice = submitted !== null ? null : await this.newestNotice(charge.chargeId);
+    let read: PaymentReport | "NO_SUCH_ORDER" | "UNREADABLE";
+    let outcome: string;
+    try {
+      const answer = await payments.status({ orderId: charge.chargeId, providerPaymentId: submitted ?? notice?.providerPaymentId ?? null });
+      // An answer for another order is no answer for this one.
+      if (answer !== "NO_SUCH_ORDER" && answer.orderId !== charge.chargeId) {
+        read = "UNREADABLE";
+        outcome = "PAYMENT_RESPONSE_INVALID";
+      } else {
+        read = answer;
+        outcome = answer === "NO_SUCH_ORDER" ? answer : answer.state;
+      }
+    } catch (error) {
+      const code = paymentErrorCode(error);
+      if (code === null) throw error;
+      if (code === "PAYMENT_CREDENTIALS_REFUSED") this.deps.audit("billing.payment.credentials_refused", { operation: "verify" });
+      read = "UNREADABLE";
+      outcome = code;
+    }
+    await this.deps.repository.withTransaction((client) => this.deps.repository.insertStatusRead(client, {
+      chargeId: charge.chargeId, at: now, outcome
+    }));
+    return read;
+  }
+
+  /** Spec §2.8 step 3 by state. `fromNotice`: no retry here. REFUNDED (N14) and CHARGEBACK_* (N15) go to the owner for now. */
+  private async decideNetopia(
+    job: OutboxJob, charge: ChargeWithEvents, report: PaymentReport, now: Date, fromNotice: boolean
+  ): Promise<OutboxOutcome> {
+    switch (report.state) {
+      case "PENDING":
+      case "AUTHORIZED":
+      case "ACTION_REQUIRED": {
+        // §2.9.2: nobody is present to finish the bank's check of a renewal (mail.M5.confirmCard follows, N11).
+        if (report.state === "ACTION_REQUIRED" && charge.kind === "RENEWAL") {
+          return this.netopiaFailed(charge, report, now, "AUTHENTICATION_REQUIRED");
+        }
+        // §2.11: a 0.00 card check is authorised, never captured; that is its success.
+        if (report.state === "AUTHORIZED" && charge.kind === "CARD_CHECK" && charge.totalMicros === 0) {
+          return this.netopiaSucceeded(charge, report, now);
+        }
+        const retryAt = fromNotice ? null : notFinalRetryAt(job.attempts, now);
+        return retryAt === null ? this.leftToChecks(charge, "PAYMENT_NOT_FINAL")
+          : Object.freeze({ kind: "RETRY" as const, code: "PAYMENT_NOT_FINAL", retryAt });
+      }
+      case "PAID":
+        return this.netopiaSucceeded(charge, report, now);
+      case "DECLINED":
+        return this.netopiaFailed(charge, report, now, "PAYMENT_DECLINED");
+      case "FAILED":
+        return this.netopiaFailed(charge, report, now, "PAYMENT_FAILED");
+      case "EXPIRED":
+        return this.netopiaFailed(charge, report, now, "PAYMENT_EXPIRED");
+      case "VOIDED":
+        // A9's void-ok rule, kept: before success a closed order; after it a full refund made at NETOPIA.
+        return charge.events.some((event) => event.kind === "SUCCEEDED")
+          ? this.netopiaProviderRefund(charge, report, now, "PROVIDER_VOID")
+          : this.netopiaFailed(charge, report, now, "VOIDED");
+      case "REFUNDED":
+        return this.netopiaOwnerReview(charge, report, now, false);
+      case "CHARGEBACK_OPENED":
+      case "CHARGEBACK_LOST":
+      case "CHARGEBACK_REPRESENTED":
+        return this.netopiaOwnerReview(charge, report, now, false);
+      case "UNCLEAR":
+        return this.netopiaOwnerReview(charge, report, now, true);
+      default:
+        return exhaustive(report.state);
+    }
+  }
+
+  /** The schedule is spent: a renewal's job ends DONE (§2.9.4 takes over); any other is left to the checks (§2.14). */
+  private leftToChecks(charge: ChargeRow, code: string): OutboxOutcome {
+    return charge.kind === "RENEWAL" ? DONE : Object.freeze({ kind: "RETRY" as const, code, retryAt: null });
+  }
+
+  /** Spec §2.8 PAID: the payment must be the charge's own: the exact amount, the currency, and our customer. */
+  private netopiaMismatch(
+    charge: ChargeRow, report: PaymentReport, customerId: string
+  ): "PAYMENT_AMOUNT_MISMATCH" | "PAYMENT_CUSTOMER_MISMATCH" | null {
+    if (report.amountMicros === null || report.amountMicros !== charge.totalMicros || report.currency !== charge.currency) {
+      return "PAYMENT_AMOUNT_MISMATCH";
+    }
+    if (report.clientId !== null && !clientIdMatches(report.clientId, customerId)) return "PAYMENT_CUSTOMER_MISMATCH";
+    return null;
+  }
+
+  /**
+   * Spec §2.8 PAID, one transaction (A3 (f)): SUCCEEDED (one per charge, A3 (d)), evidence with NETOPIA's card country,
+   * the settlement carrying the card adopted now, invoice job and emails. Already SUCCEEDED: only a late card (CARD_SAVED).
+   */
+  private async netopiaSucceeded(charge: ChargeWithEvents, report: PaymentReport, now: Date): Promise<OutboxOutcome> {
+    if (charge.events.some((event) => event.kind === "SUCCEEDED")) return this.adoptLateCard(charge, now);
+    const owner = await this.owner(charge);
+    const mismatch = this.netopiaMismatch(charge, report, owner.customerId);
+    if (mismatch !== null) {
+      this.deps.audit("billing.payment.mismatch", { code: mismatch });
+      await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia!.jobs }, {
+        code: mismatch, reference: `charge ${charge.chargeId}`, dedupeRef: `${charge.chargeId}:${mismatch}`, now,
+        nextSteps: `NETOPIA reports a paid order whose ${mismatch === "PAYMENT_AMOUNT_MISMATCH" ? "amount or currency" : "customer"}`
+          + " our charge does not hold. Nothing was recorded and no plan changed. Look at this order in NETOPIA's admin;"
+          + " if the money was taken, refund it there in full."
+      });
+      return Object.freeze({ kind: "DEAD" as const, code: mismatch });
+    }
+    const settlement = this.settlementFor(charge.kind);
+    const location = owner.quote === null ? null
+      : openQuoteLocation(this.deps.recordsKey, owner.quote.quoteId, owner.quote.locationCiphertext);
+    const cardCountry = report.cardCountry;
+    const countryConfirmed = owner.events.find((event) => event.kind === "CREATED")?.data.country_confirmed === true;
+    const verdict = location === null ? null : locationVerdict({
+      declaredCountry: location.country, ipCountry: location.ipCountry, cardCountry, countryConfirmed,
+      card: decideCardCountry(this.deps.countryPolicy, { declaredCountry: location.country, cardCountry })
+    });
+    const ipEvidence = location === null ? null : sealIpEvidence(this.deps.recordsKey, charge.chargeId, location.ip);
+    const prepared = verdict === "BLOCKED" || settlement.prepare === undefined ? {} : await settlement.prepare(charge);
+    const result = await this.deps.repository.withTransaction(async (client): Promise<"APPLIED" | "REFUND" | "DUPLICATE"> => {
+      await this.deps.jobs.lockOwner(client, owner.ownerRef);
+      // `at` is the verification instant; `providerCreatedAt` is when NETOPIA says the money moved (the quarter rows).
+      const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "SUCCEEDED", now, {
+        providerPaymentId: report.providerPaymentId, amountMicros: charge.totalMicros, errorCode: null,
+        providerCreatedAt: report.occurredAt
+      }));
+      if (inserted === "DUPLICATE") return "DUPLICATE";
+      if (location !== null && verdict !== null && ipEvidence !== null) {
+        await this.deps.repository.insertLocationEvidence(client, Object.freeze({
+          chargeId: charge.chargeId, ipCountry: location.ipCountry, declaredCountry: location.country, cardCountry, verdict,
+          ipCiphertext: ipEvidence.ciphertext, keyId: ipEvidence.keyId, at: now
+        }) satisfies LocationEvidenceRow);
+      }
+      const cardTokenId = verdict === "BLOCKED" ? null : await this.adoptableAtDecision(client, charge.chargeId, adoptingKindOf(charge.kind));
+      const payment: SettledPayment = Object.freeze({
+        provider: "netopia" as const, providerPaymentId: report.providerPaymentId, occurredAt: report.occurredAt, cardCountry, cardTokenId
+      });
+      const context = await this.context(client, charge, null, owner, now, cardCountry, prepared, payment);
+      const settled = verdict === "BLOCKED"
+        ? Object.freeze({ kind: "REFUND" as const, reason: "CARD_COUNTRY_BLOCKED" as const })
+        : await settlement.succeeded(context);
+      if (settled.kind === "REFUND") {
+        await this.endRefusedPayment(context, settled.reason);
+        // R-32: the whole payment goes back through the one refund executor (N14: the owner mode on NETOPIA).
+        await this.deps.refunds.request(client, {
+          chargeId: charge.chargeId, transactionId: report.providerPaymentId, amountMicros: charge.totalMicros,
+          whole: true, ownerRef: owner.ownerRef, reason: settled.reason
+        }, now);
+        return "REFUND";
+      }
+      if (charge.kind !== "CARD_CHECK" && owner.quote !== null && location !== null) {
+        await enqueueInvoice(this.deps.repository, client, {
+          charge, quote: owner.quote, policy: this.deps.policy, cardCountry, ipCountry: location.ipCountry, now
+        });
+      }
+      return "APPLIED";
+    });
+    if (result === "APPLIED") {
+      this.deps.audit("billing.payment.verified", { chargeKind: charge.kind, planId: owner.quote?.planId ?? null, verdict: verdict ?? "NONE" });
+    }
+    return DONE;
+  }
+
+  /** Spec §2.15.2 "at the decision": the newest eligible token stored for the charge being decided, under the lock. */
+  private async adoptableAtDecision(client: PoolClient, chargeId: string, adopting: AdoptingKind): Promise<string | null> {
+    const decided = await this.deps.repository.charge(chargeId, client);
+    if (decided === null) return null;
+    const events = await this.deps.repository.subscriptionEvents(decided.subscriptionId, client);
+    const state = foldSubscription(events);
+    const tokens = await this.deps.repository.cardTokensFromCharge(client, chargeId);
+    const current = state.cardTokenId === null ? null : await this.deps.repository.cardTokenById(client, state.cardTokenId);
+    return chooseAdoptableToken({ state, events, charge: decided, tokens, current, adopting, deciding: true })?.tokenId ?? null;
+  }
+
+  /** Spec §2.15.2 "after it": a late token of this SUCCEEDED charge is adopted with CARD_SAVED, once; never a CARD_CHECK's. */
+  private async adoptLateCard(charge: ChargeWithEvents, now: Date): Promise<OutboxOutcome> {
+    if (charge.kind === "CARD_CHECK") return DONE;
+    const saved = await this.deps.repository.withTransaction(async (client): Promise<boolean> => {
+      await this.deps.jobs.lockOwner(client, charge.ownerRef);
+      const events = await this.deps.repository.subscriptionEvents(charge.subscriptionId, client);
+      const state = foldSubscription(events);
+      if (!CARD_HOLDING.has(state.status)) return false;
+      const decided = await this.deps.repository.charge(charge.chargeId, client);
+      if (decided === null) return false;
+      const tokens = await this.deps.repository.cardTokensFromCharge(client, charge.chargeId);
+      const current = state.cardTokenId === null ? null : await this.deps.repository.cardTokenById(client, state.cardTokenId);
+      const token = chooseAdoptableToken({ state, events, charge: decided, tokens, current, adopting: "CARD_SAVED", deciding: false });
+      return token !== null && await writeCardSaved({ repository: this.deps.repository }, client, { state, token, at: now });
+    });
+    if (saved) this.deps.audit("billing.card.saved", { chargeKind: charge.kind });
+    return DONE;
+  }
+
+  /** Spec §2.8 FAILED states: FAILED with the code, then the kind's `failed`; the bank is named only when NETOPIA says so. */
+  private async netopiaFailed(charge: ChargeWithEvents, report: PaymentReport, now: Date, errorCode: string): Promise<OutboxOutcome> {
+    if (charge.events.some((event) => event.kind === "SUCCEEDED")) return DONE;
+    if (charge.events.some((event) => event.kind === "FAILED" && event.providerPaymentId === report.providerPaymentId)) return DONE;
+    const settlement = this.settlementFor(charge.kind);
+    const owner = await this.owner(charge);
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.jobs.lockOwner(client, owner.ownerRef);
+      const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "FAILED", now, {
+        providerPaymentId: report.providerPaymentId, amountMicros: charge.totalMicros, errorCode
+      }));
+      if (inserted === "DUPLICATE") return;
+      await settlement.failed({
+        ...(await this.context(client, charge, null, owner, now)), errorCode,
+        ...(errorCode === "PAYMENT_DECLINED" ? { bankDeclined: report.bankDeclined } : {})
+      });
+    });
+    this.deps.audit("billing.payment.failed", { chargeKind: charge.kind, code: errorCode });
+    return DONE;
+  }
+
+  /**
+   * A9 on NETOPIA: a void after success (PROVIDER_VOID) is a full refund with its credit note; an admin refund
+   * (PROVIDER_REFUND, N14) is recorded at the remaining amount, its credit note the owner's; never seen paid: paid and refunded.
+   */
+  private async netopiaProviderRefund(
+    charge: ChargeWithEvents, report: PaymentReport, now: Date, reason: "PROVIDER_REFUND" | "PROVIDER_VOID"
+  ): Promise<OutboxOutcome> {
+    const paymentId = report.providerPaymentId;
+    if (refundedAlready(charge, paymentId)) return DONE;
+    const owner = await this.owner(charge);
+    const paidRow = charge.events.find((event) => event.kind === "SUCCEEDED");
+    const succeeded = paidRow !== undefined;
+    const paidMicros = paidRow?.amountMicros ?? charge.totalMicros;
+    const amountMicros = paidMicros - refundedMicros(charge, paidRow?.providerPaymentId ?? paymentId);
+    const target = paidRow?.providerPaymentId ?? paymentId;
+    await this.deps.repository.withTransaction(async (client) => {
+      await this.deps.jobs.lockOwner(client, owner.ownerRef);
+      if (!succeeded) {
+        const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "SUCCEEDED", now, {
+          providerPaymentId: paymentId, amountMicros: charge.totalMicros, errorCode: null, providerCreatedAt: report.occurredAt
+        }));
+        if (inserted === "DUPLICATE") return;
+        if (charge.kind === "INITIAL") {
+          const subscription = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId, client));
+          if (subscription.status === "CREATED") {
+            await this.deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "ENDED", now, { cause: "ABANDONED", reason }));
+          }
+        }
+      }
+      if (amountMicros > 0) {
+        const fields = { providerPaymentId: target, amountMicros, errorCode: reason };
+        await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "REFUND_REQUESTED", now, fields));
+        await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "REFUNDED", now, fields));
+        if (succeeded && owner.quote !== null && reason === "PROVIDER_VOID") {
+          await enqueueCreditNote(this.deps.repository, client, {
+            charge, quote: owner.quote, policy: this.deps.policy, transactionId: target, refundMicros: amountMicros, now
+          });
+        }
+      }
+    });
+    if (reason === "PROVIDER_REFUND" && succeeded && owner.quote !== null && amountMicros > 0) {
+      this.deps.audit("billing.invoice.unknown", {
+        issuer: invoiceIssuerFor(owner.quote.taxCountry, this.deps.policy.invoiceIssuerRules), kind: "CREDIT_NOTE",
+        code: "CREDIT_NOTE_MANUAL"
+      });
+    }
+    this.deps.audit("billing.refund", { reason, chargeKind: charge.kind });
+    return DONE;
+  }
+
+  /** Ruling C-7: nothing recorded; the notice's outcome OWNER_REVIEW, audit lines, and one O3 per charge and status. */
+  private async netopiaOwnerReview(charge: ChargeRow, report: PaymentReport, now: Date, unexpected: boolean): Promise<OutboxOutcome> {
+    const notice = await this.newestNotice(charge.chargeId);
+    if (notice !== null) await this.noticeOutcome(notice.noticeId, now, "OWNER_REVIEW");
+    if (unexpected) this.deps.audit("billing.payment.status_unexpected", { status: report.providerStatus });
+    this.deps.audit("billing.payment.owner_review", { state: report.state });
+    await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia!.jobs }, {
+      code: "OWNER_REVIEW", reference: `charge ${charge.chargeId}`, dedupeRef: `${charge.chargeId}:OWNER_REVIEW:${report.providerStatus}`, now,
+      nextSteps: `NETOPIA reports status ${report.providerStatus} for this order (NETOPIA payment ${report.providerPaymentId}).`
+        + " Nothing was recorded on the charge and no plan changed. Look at the order in NETOPIA's admin, then record what"
+        + " happened with the owner commands the runbook names."
+    });
+    return DONE;
+  }
+
+  /** The newest stored notice for our order (`billing.payment_notice`), read on its own connection. */
+  private async newestNotice(chargeId: string): Promise<PaymentNoticeRow | null> {
+    return this.deps.repository.withTransaction((client) => this.deps.repository.newestNoticeForOrder(client, chargeId));
+  }
+
+  /** A21's pattern on NETOPIA's notices: what processing made of one is a following row. */
+  private async noticeOutcome(noticeId: string, now: Date, outcome: PaymentNoticeOutcome): Promise<void> {
+    await this.deps.repository.withTransaction((client) => this.deps.repository.insertPaymentNoticeOutcome(client, { noticeId, at: now, outcome }));
   }
 }

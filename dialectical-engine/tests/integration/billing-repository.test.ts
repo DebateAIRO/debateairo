@@ -559,7 +559,7 @@ describe("P1b — invoices, notices and the tax summary", () => {
     const renewal = await quoteAndCharge(ownerRef, subscriptionId, "RENEWAL", new Date(anchor.getTime() + 30 * 86_400_000));
     await billing.withTransaction((c) => billing.appendChargeEvent(c, { chargeId: renewal.chargeId, kind: "SUCCEEDED",
       at: nextQuarter, providerPaymentId: "31002", amountMicros: 24_200_000, errorCode: null }));
-    const rows = await billing.quarterSummaryRows(new Date("2031-01-01T00:00:00Z"), new Date("2031-04-01T00:00:00Z"), "stage");
+    const rows = await billing.quarterSummaryRows(new Date("2031-01-01T00:00:00Z"), new Date("2031-04-01T00:00:00Z"), { provider: "xmoney", environment: "stage" });
     expect(rows).toEqual([
       { type: "SALE", chargeId: charge.chargeId, at: paidAt, taxCountry: "RO", taxRegion: null, taxStatus: "TAXABLE",
         chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000, amountMicros: 24_200_000,
@@ -568,7 +568,7 @@ describe("P1b — invoices, notices and the tax summary", () => {
         chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000, amountMicros: 4_200_000,
         amountKnown: true, saleRecorded: true, locationVerdict: "AGREED" }
     ]);
-    const next = await billing.quarterSummaryRows(new Date("2031-04-01T00:00:00Z"), new Date("2031-07-01T00:00:00Z"), "stage");
+    const next = await billing.quarterSummaryRows(new Date("2031-04-01T00:00:00Z"), new Date("2031-07-01T00:00:00Z"), { provider: "xmoney", environment: "stage" });
     expect(next).toEqual([expect.objectContaining({ type: "SALE", chargeId: renewal.chargeId, locationVerdict: null })]);
   });
 
@@ -600,7 +600,7 @@ describe("P1b — invoices, notices and the tax summary", () => {
       await billing.appendChargeEvent(c, event(won.chargeId, "CHARGEBACK_RESOLVED", new Date("2032-03-01T12:00:00.000Z"), "32002", null));
       await billing.appendChargeEvent(c, event(unsold.chargeId, "CHARGEBACK", disputedAt, "32004", null));
     });
-    const rows = (await billing.quarterSummaryRows(new Date("2032-01-01T00:00:00Z"), new Date("2032-04-01T00:00:00Z"), "stage"))
+    const rows = (await billing.quarterSummaryRows(new Date("2032-01-01T00:00:00Z"), new Date("2032-04-01T00:00:00Z"), { provider: "xmoney", environment: "stage" }))
       .filter((row) => row.chargeId === open.chargeId || row.chargeId === won.chargeId);
     expect(rows).toHaveLength(3);
     expect(rows.filter((row) => row.type === "SALE").map((row) => row.chargeId).sort()).toEqual([open.chargeId, won.chargeId].sort());
@@ -610,7 +610,7 @@ describe("P1b — invoices, notices and the tax summary", () => {
         amountMicros: 24_200_000, amountKnown: true, saleRecorded: true, locationVerdict: null }
     ]);
     // C-19: the never-verified charge's charge-back says no sale was recorded for it (and it gives no SALE row).
-    const unsoldRows = (await billing.quarterSummaryRows(new Date("2032-01-01T00:00:00Z"), new Date("2032-04-01T00:00:00Z"), "stage"))
+    const unsoldRows = (await billing.quarterSummaryRows(new Date("2032-01-01T00:00:00Z"), new Date("2032-04-01T00:00:00Z"), { provider: "xmoney", environment: "stage" }))
       .filter((row) => row.chargeId === unsold.chargeId);
     expect(unsoldRows.map((row) => `${row.type} saleRecorded=${String(row.saleRecorded)}`)).toEqual(["CHARGEBACK saleRecorded=false"]);
   });
@@ -625,10 +625,10 @@ describe("P1b — invoices, notices and the tax summary", () => {
       chargeId: charge.chargeId, kind: "SUCCEEDED", at: verifiedAt, providerCreatedAt: takenAt,
       providerPaymentId: "33001", amountMicros: 24_200_000, errorCode: null
     }));
-    const first = await billing.quarterSummaryRows(new Date("2033-01-01T00:00:00Z"), new Date("2033-04-01T00:00:00Z"), "stage");
+    const first = await billing.quarterSummaryRows(new Date("2033-01-01T00:00:00Z"), new Date("2033-04-01T00:00:00Z"), { provider: "xmoney", environment: "stage" });
     expect(first.filter((row) => row.chargeId === charge.chargeId))
       .toEqual([expect.objectContaining({ type: "SALE", at: takenAt, amountMicros: 24_200_000 })]);
-    const second = await billing.quarterSummaryRows(new Date("2033-04-01T00:00:00Z"), new Date("2033-07-01T00:00:00Z"), "stage");
+    const second = await billing.quarterSummaryRows(new Date("2033-04-01T00:00:00Z"), new Date("2033-07-01T00:00:00Z"), { provider: "xmoney", environment: "stage" });
     expect(second.some((row) => row.chargeId === charge.chargeId)).toBe(false);
     // A row that names no transaction cannot carry xMoney's time (P1a's constraint), whatever the caller passes.
     await expect(billing.withTransaction((c) => billing.appendChargeEvent(c, {
@@ -659,10 +659,10 @@ describe("P1b — invoices, notices and the tax summary", () => {
       providerPaymentId: "35001", amountMicros: 24_200_000, errorCode: null
     }));
     const ours = (rows: readonly TaxSummaryRow[]) => rows.filter((row) => row.chargeId === charge.chargeId);
-    expect(ours(await billing.quarterSummaryRows(new Date("2035-01-01T00:00:00Z"), new Date("2035-04-01T00:00:00Z"), "stage")))
+    expect(ours(await billing.quarterSummaryRows(new Date("2035-01-01T00:00:00Z"), new Date("2035-04-01T00:00:00Z"), { provider: "xmoney", environment: "stage" })))
       .toEqual([expect.objectContaining({ type: "SALE", at: takenAt, amountMicros: 24_200_000 })]);
     // No error code on that row: its amount is still known (the column is never NULL).
-    expect(ours(await billing.quarterSummaryRows(new Date("2035-04-01T00:00:00Z"), new Date("2035-07-01T00:00:00Z"), "stage")))
+    expect(ours(await billing.quarterSummaryRows(new Date("2035-04-01T00:00:00Z"), new Date("2035-07-01T00:00:00Z"), { provider: "xmoney", environment: "stage" })))
       .toEqual([expect.objectContaining({ type: "REFUND", at: refundedAt, amountMicros: 24_200_000, amountKnown: true })]);
   });
 
@@ -690,7 +690,7 @@ describe("P1b — invoices, notices and the tax summary", () => {
       await billing.appendChargeEvent(c, { chargeId: ownTransaction.chargeId, kind: "REFUNDED", at: refundedAt,
         providerPaymentId: "36003", refundsTransactionId: "36002", amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND" });
     });
-    const rows = (await billing.quarterSummaryRows(new Date("2036-01-01T00:00:00Z"), new Date("2036-04-01T00:00:00Z"), "stage"))
+    const rows = (await billing.quarterSummaryRows(new Date("2036-01-01T00:00:00Z"), new Date("2036-04-01T00:00:00Z"), { provider: "xmoney", environment: "stage" }))
       .filter((row) => row.chargeId === onPayment.chargeId || row.chargeId === ownTransaction.chargeId);
     expect(rows.filter((row) => row.type === "SALE").map((row) => row.amountKnown)).toEqual([true, true]);
     const refunds = rows.filter((row) => row.type === "REFUND");
@@ -721,9 +721,9 @@ describe("P1b — invoices, notices and the tax summary", () => {
     const to = new Date("2034-04-01T00:00:00Z");
     const ours = (rows: readonly TaxSummaryRow[]) =>
       rows.filter((row) => row.chargeId === stageCharge.chargeId || row.chargeId === liveCharge.chargeId);
-    expect(ours(await billing.quarterSummaryRows(from, to, "live")))
+    expect(ours(await billing.quarterSummaryRows(from, to, { provider: "xmoney", environment: "live" })))
       .toEqual([expect.objectContaining({ type: "SALE", chargeId: liveCharge.chargeId, at: paidAt })]);
-    expect(ours(await billing.quarterSummaryRows(from, to, "stage")))
+    expect(ours(await billing.quarterSummaryRows(from, to, { provider: "xmoney", environment: "stage" })))
       .toEqual([expect.objectContaining({ type: "SALE", chargeId: stageCharge.chargeId, at: paidAt })]);
   });
 });

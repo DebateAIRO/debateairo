@@ -446,10 +446,10 @@ describe("P16b the summary", () => {
 });
 
 describe("P16b the rows it reads", () => {
-  it("reads only the live xMoney system's rows: a sandbox payment is never a sale (D5's third argument)", async () => {
+  it("reads only the live NETOPIA system's rows: a sandbox payment is never a sale (ruling PR-21)", async () => {
     const quarterSummaryRows = vi.fn(async () => [row({})]);
     expect(await liveQuarterSummaryRows({ quarterSummaryRows }, Q4.from, Q4.to)).toHaveLength(1);
-    expect(quarterSummaryRows).toHaveBeenCalledWith(Q4.from, Q4.to, "live");
+    expect(quarterSummaryRows).toHaveBeenCalledWith(Q4.from, Q4.to, { provider: "netopia", environment: "live" });
   });
 
   it("names each e-Factura document P10b lists by its printed series and number", async () => {

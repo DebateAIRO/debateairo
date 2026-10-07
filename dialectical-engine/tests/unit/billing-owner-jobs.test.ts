@@ -73,7 +73,7 @@ describe("P16c the owner's tax-summary job", () => {
     expect(await owner.taxSummary(job("OWNER_TAX_SUMMARY", "tax-summary:2026-Q4"), new Date("2027-01-05T06:00:00.000Z")))
       .toEqual({ kind: "DONE" });
     // The live xMoney system only (a sandbox payment is never a sale), and P10b's e-Factura read of the same quarter.
-    expect(billing.quarterSummaryRows).toHaveBeenCalledWith(new Date("2026-10-01T00:00:00.000Z"), new Date("2027-01-01T00:00:00.000Z"), "live");
+    expect(billing.quarterSummaryRows).toHaveBeenCalledWith(new Date("2026-10-01T00:00:00.000Z"), new Date("2027-01-01T00:00:00.000Z"), { provider: "netopia", environment: "live" });
     expect(jobs.smartBillDocumentsNotAccepted).toHaveBeenCalledWith(new Date("2027-01-01T00:00:00.000Z"));
     const o1 = enqueued.find((entry) => entry.kind === "EMAIL");
     expect(o1).toMatchObject({ ref: "O1:2026-Q4", payload: { template: "O1", recipient: "OWNER", "param.quarter": "2026-Q4" } });

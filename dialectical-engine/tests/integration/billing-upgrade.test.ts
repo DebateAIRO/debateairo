@@ -335,7 +335,7 @@ describe("P12c upgrade on real PostgreSQL", () => {
     const result = await billing.withTransaction(async (client) => {
       const events = await billing.subscriptionEvents(run.seeded.subscriptionId);
       return settlement.succeeded({
-        client, now: at, charge, transaction, subscription: foldSubscription(events), events, quote,
+        client, now: at, charge, transaction, payment: null, subscription: foldSubscription(events), events, quote,
         ownerRef: run.identity.authenticated.ownerRef, customerId: run.seeded.customerId, cardCountry: "RO"
       });
     });
@@ -354,7 +354,7 @@ describe("P12c upgrade on real PostgreSQL", () => {
     const again = await billing.withTransaction(async (client) => {
       const events = await billing.subscriptionEvents(run.seeded.subscriptionId);
       return settlement.succeeded({
-        client, now: at, charge, transaction, subscription: foldSubscription(events), events, quote,
+        client, now: at, charge, transaction, payment: null, subscription: foldSubscription(events), events, quote,
         ownerRef: run.identity.authenticated.ownerRef, customerId: run.seeded.customerId, cardCountry: "RO"
       });
     });
@@ -387,7 +387,7 @@ describe("P12c upgrade on real PostgreSQL", () => {
     const result = await billing.withTransaction(async (client) => {
       const events = await billing.subscriptionEvents(run.seeded.subscriptionId);
       return settlement.succeeded({
-        client, now: new Date(run.seeded.periodEnd.getTime() + 60_000), charge, transaction,
+        client, now: new Date(run.seeded.periodEnd.getTime() + 60_000), charge, transaction, payment: null,
         subscription: foldSubscription(events), events, quote,
         ownerRef: run.identity.authenticated.ownerRef, customerId: run.seeded.customerId, cardCountry: "RO"
       });

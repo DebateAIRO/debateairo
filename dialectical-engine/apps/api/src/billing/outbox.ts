@@ -35,6 +35,14 @@ export function otherXMoneySystem(
   return Object.freeze({ kind: "DEAD" as const, code: "OTHER_XMONEY_SYSTEM" as const });
 }
 
+/** Spec §2.5.4: a job of another payment system ends DEAD before any vendor call (one content-free audit line). */
+export function otherPaymentSystem(
+  audit: BillingAudit, kind: OutboxKind
+): Readonly<{ kind: "DEAD"; code: "OTHER_PAYMENT_SYSTEM" }> {
+  audit("billing.outbox.other_system", { kind, code: "OTHER_PAYMENT_SYSTEM" });
+  return Object.freeze({ kind: "DEAD" as const, code: "OTHER_PAYMENT_SYSTEM" as const });
+}
+
 /**
  * P2-M6: a handler whose job was claimed again by another worker (its claim's lease ran out while it ran) learns it
  * from `markJobStage`, which only the current claim holder can move, or (C-14, SmartBill) from `holdsClaim` in the

@@ -170,6 +170,7 @@ export class QuadernoTaxEngine implements TaxEngine {
   }
 
   async recordSale(i: SaleRecord): Promise<{ documentId: string; number: string; url: string | null }> {
+    const processor = i.processor ?? "xmoney";
     const found = await this.#send("GET", `/invoices?${new URLSearchParams({ processor_id: i.transactionId }).toString()}`, null, "READ");
     const mine = findDocument(found, i.transactionId, i.chargeId);
     if (mine !== undefined) return documentOf(mine);
@@ -201,13 +202,13 @@ export class QuadernoTaxEngine implements TaxEngine {
           tax_code: i.taxCode
         }
       })),
-      payment: { method: "credit_card", processor: "xmoney", processor_id: i.transactionId },
+      payment: { method: "credit_card", processor, processor_id: i.transactionId },
       evidence: {
         billing_country: i.evidence.billingCountry,
         ip_address: i.evidence.ipAddress,
         bank_country: i.evidence.bankCountry
       },
-      processor: "xmoney",
+      processor,
       processor_id: i.transactionId,
       custom_metadata: { charge_id: i.chargeId }
     }, "RATE_LIMIT_ONLY");
@@ -215,6 +216,7 @@ export class QuadernoTaxEngine implements TaxEngine {
   }
 
   async recordRefund(i: RefundRecord): Promise<{ documentId: string; number: string }> {
+    const processor = i.processor ?? "xmoney";
     const found = await this.#send("GET", `/credits?${new URLSearchParams({ processor_id: i.transactionId }).toString()}`, null, "READ");
     const mine = findDocument(found, i.transactionId, i.chargeId);
     if (mine !== undefined) {
@@ -227,8 +229,8 @@ export class QuadernoTaxEngine implements TaxEngine {
       date: isoDate(i.issuedOn),
       // The line's text is the caller's, in the customer's language (P10a, from the catalogue) — never ours.
       items: [{ description: i.description, quantity: 1, amount: Number(microsToDecimal(i.refundTotalMicros)) }],
-      payment: { method: "credit_card", processor: "xmoney", processor_id: i.transactionId },
-      processor: "xmoney",
+      payment: { method: "credit_card", processor, processor_id: i.transactionId },
+      processor,
       processor_id: i.transactionId,
       custom_metadata: { charge_id: i.chargeId, original_document_id: i.original.documentId }
     }, "RATE_LIMIT_ONLY");

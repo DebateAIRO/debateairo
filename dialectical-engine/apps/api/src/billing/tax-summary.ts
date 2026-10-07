@@ -157,14 +157,15 @@ export function dueDatesFor(rule: TaxDueRule, quarter: TaxQuarter): readonly Dat
 }
 
 /**
- * The quarter's tax rows of the LIVE xMoney system only. D5's `quarterSummaryRows` takes the system because stage and
- * live share one database across the switch, and a sandbox payment is never a sale. The command and O1 both read
- * the rows through here, so neither can count a sandbox payment (a host still on the sandbox prints no sales).
+ * The quarter's tax rows of the LIVE NETOPIA system only (ruling PR-21). `quarterSummaryRows` takes the payment system
+ * because the sandbox and live share one database across the switch, and a sandbox payment is never a sale. The
+ * command and O1 both read the rows through here, so neither can count a sandbox payment (a host still on the sandbox
+ * prints no sales).
  */
 export function liveQuarterSummaryRows(
   billing: Pick<BillingRepository, "quarterSummaryRows">, from: Date, to: Date
 ): Promise<TaxSummaryRow[]> {
-  return billing.quarterSummaryRows(from, to, "live");
+  return billing.quarterSummaryRows(from, to, { provider: "netopia", environment: "live" });
 }
 
 /**

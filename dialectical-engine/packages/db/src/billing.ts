@@ -101,7 +101,7 @@ export type OutboxJob = Readonly<{
  * P16b's row (R-31): one SALE per SUCCEEDED event of an INITIAL, RENEWAL or UPGRADE charge (`amountMicros` = the
  * charge total), one REFUND per REFUNDED event (`amountMicros` = the refunded amount), one CHARGEBACK per CHARGEBACK
  * event whose own transaction has no CHARGEBACK_RESOLVED (`amountMicros` = the event's amount, else the charge total). Only
- * charges of the xMoney system `quarterSummaryRows` is asked for: a sandbox payment is never a sale. `at` is when
+ * charges of the payment system `quarterSummaryRows` is asked for: a sandbox payment is never a sale. `at` is when
  * xMoney says the money moved (the event's `provider_created_at`, present only on a SUCCEEDED or on a REFUNDED that is
  * its own refund transaction), else when it was recorded — so a refund or charge-back of the payment itself is dated
  * when it was recorded, never by the payment's date. Tax fields come from the charge's quote, money fields from the
@@ -1050,10 +1050,13 @@ export class BillingRepository {
   }
 
   /**
-   * The quarter's tax rows of ONE xMoney system. The environment is required: stage and live share this database
-   * across the switch, and a sandbox payment is never a sale.
+   * The quarter's tax rows of ONE payment system (ruling PR-21: a provider and one of its environments). The system is
+   * required: a provider's test and live environments share this database across the switch, and a sandbox payment is
+   * never a sale.
    */
-  async quarterSummaryRows(from: Date, to: Date, environment: CustomerXMoneyEnvironment): Promise<TaxSummaryRow[]> {
+  async quarterSummaryRows(
+    from: Date, to: Date, system: Readonly<{ provider: PaymentProviderName; environment: PaymentEnvironmentName }>
+  ): Promise<TaxSummaryRow[]> {
     const rows = (await this.pool.query<{
       type: "SALE" | "REFUND" | "CHARGEBACK"; charge_id: string; at: Date; tax_country: string; tax_region: string | null;
       tax_status: TaxStatus; net_micros: string; tax_micros: string; total_micros: string; amount_micros: string;
@@ -1093,8 +1096,8 @@ export class BillingRepository {
           AND dated.refunds_transaction_id IS NULL
           AND dashboard_note.charge_id = dated.charge_id AND dashboard_note.kind = 'CREDIT_NOTE'
       WHERE dated.money_at >= $1 AND dated.money_at < $2
-        -- Only that xMoney system's charges; the event inherits the charge's system through its foreign key.
-        AND charge.payment_provider = 'xmoney' AND charge.payment_environment = $3
+        -- Only that payment system's charges; the event inherits the charge's system through its foreign key.
+        AND charge.payment_provider = $3 AND charge.payment_environment = $4
         AND charge.kind IN ('INITIAL','RENEWAL','UPGRADE')
         -- A refund or a charge-back of a second payment (DUPLICATE_PAYMENT) moves money that was never a sale: no
         -- tax row for it.
@@ -1113,7 +1116,7 @@ export class BillingRepository {
             AND resolved.provider_payment_id = dated.provider_payment_id
         )
       ORDER BY dated.money_at, charge.charge_id, dated.seq
-    `, [from, to, environment])).rows;
+    `, [from, to, system.provider, system.environment])).rows;
     return rows.map((row) => Object.freeze({
       type: row.type, chargeId: row.charge_id, at: row.at, taxCountry: row.tax_country, taxRegion: row.tax_region,
       taxStatus: row.tax_status, chargeNetMicros: micros(row.net_micros), chargeTaxMicros: micros(row.tax_micros),

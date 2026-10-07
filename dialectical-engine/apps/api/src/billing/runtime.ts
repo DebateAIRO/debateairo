@@ -132,7 +132,9 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   const verify = new VerifyPaymentHandler({
     repository, jobs, xmoney: deps.connectors.xmoney, refunds, entitlements, countryPolicy: deps.countryPolicy,
     policy: deps.policy, recordsKey: deps.connectors.recordsKey, audit: deps.audit,
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment,
+    // N10 (skeleton §1 rule 2): NETOPIA charges are verified from NETOPIA's status (N8's connector).
+    netopia: { payments: deps.connectors.payments, paymentEnvironment: deps.connectors.paymentEnvironment, jobs }
   });
   verify.registerSettlement("INITIAL", createInitialSettlement({
     repository, entitlements, acceptances, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl
@@ -188,7 +190,8 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     publicAppUrl: deps.connectors.publicAppUrl,
     audit: deps.audit,
     orderText: catalogueOrderText,
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+    xmoneyEnvironment: deps.connectors.xmoneyEnvironment,
+    paymentEnvironment: deps.connectors.paymentEnvironment
   };
   outbox.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
   outbox.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
