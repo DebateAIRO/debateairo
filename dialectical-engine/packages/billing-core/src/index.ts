@@ -42,6 +42,27 @@ export type {
   TaxStatus
 } from "./ports.js";
 
+// N1 (spec 2026-10-05 §2.3): the card payment port, its types and its error vocabulary.
+export {
+  paymentError,
+  paymentErrorCode,
+  paymentNothingSent,
+  type CardPayments,
+  type DeclineSide,
+  type HostedPaymentStart,
+  type HostedPaymentStarted,
+  type Payer,
+  type PaymentEnvironment,
+  type PaymentErrorCode,
+  type PaymentProvider,
+  type PaymentReport,
+  type PaymentState,
+  type PriceCurrency,
+  type SavedCard,
+  type SavedCardCharge,
+  type SecretToken
+} from "./payments.js";
+
 // P6a (paid plans, RULINGS-R3 R3-4): the mirror of the legal notice's company facts for the API and the mail.
 export { SELLER_COMPANY, isUnverifiedCompanyFact, type SellerCompany, type SellerVatStatus } from "./company.js";
 

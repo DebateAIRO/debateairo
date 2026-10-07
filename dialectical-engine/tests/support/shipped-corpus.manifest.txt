@@ -65,6 +65,7 @@ apps/api/src/billing/subscription-routes.ts
 apps/api/src/billing/subscription-view.ts
 apps/api/src/billing/tax-summary-cli.ts
 apps/api/src/billing/tax-summary.ts
+apps/api/src/billing/time-shifted-payments.ts
 apps/api/src/billing/upgrade.ts
 apps/api/src/billing/usage.ts
 apps/api/src/billing/verify-payment.ts
@@ -646,6 +647,7 @@ packages/billing-core/src/calendar.ts
 packages/billing-core/src/company.ts
 packages/billing-core/src/index.ts
 packages/billing-core/src/money.ts
+packages/billing-core/src/payments.ts
 packages/billing-core/src/plan-lookup.ts
 packages/billing-core/src/ports.ts
 packages/billing-core/src/subscription.ts
