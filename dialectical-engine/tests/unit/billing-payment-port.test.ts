@@ -96,6 +96,7 @@ function recordingInner(o: Readonly<{
       ...base,
       async refund(i) {
         calls.refund.push(i);
+        if (o.fail !== undefined) throw o.fail;
         return report({ orderId: i.orderId, state: "REFUNDED", providerStatus: "8", occurredAt });
       }
     },
@@ -224,10 +225,11 @@ describe("N1 — TimeShiftedCardPayments, the sandbox clock over the port (spec 
     expect(await missing.status({ orderId: ORDER, providerPaymentId: null })).toBe("NO_SUCH_ORDER");
 
     const failure = paymentError("PAYMENT_OUTCOME_UNKNOWN");
-    const failing = new TimeShiftedCardPayments(recordingInner({ fail: failure }).inner, 31);
+    const failing = new TimeShiftedCardPayments(recordingInner({ fail: failure, withRefund: true }).inner, 31);
     await expect(failing.chargeSavedCard(SAVED_CARD_CHARGE)).rejects.toBe(failure);
     await expect(failing.startHostedPayment(HOSTED_START)).rejects.toBe(failure);
     await expect(failing.status({ orderId: ORDER, providerPaymentId: null })).rejects.toBe(failure);
+    await expect(failing.refund!({ orderId: ORDER, providerPaymentId: "1234567", amountMicros: 24_200_000 })).rejects.toBe(failure);
   });
 
   it("has refund exactly when the inner port has one (RefundDesk's owner mode needs it absent)", () => {
