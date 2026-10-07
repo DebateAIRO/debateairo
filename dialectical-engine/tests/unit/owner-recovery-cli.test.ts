@@ -10,6 +10,7 @@ import { syntheticOwnerCustody } from '../support/ownerRecoveryCustody.js';
 import { describe, expect, it } from 'vitest';
 
 const tsx=resolve('node_modules/tsx/dist/cli.mjs');
+const python=realpathSync('/usr/bin/python3');
 describe('Owner CLI refuses authority without explicit independent operator inputs',()=>{
  for(const name of ['owner-bootstrap-cli','owner-recovery-cli']){
   it(`${name} fails closed and emits only its bounded refusal without inputs`,()=>{
@@ -27,7 +28,7 @@ describe('Owner CLI refuses authority without explicit independent operator inpu
 });
 
 describe('POSIX inherited descriptor lock on actual Mac process boundaries',()=>{
- const helper=realpathSync(resolve('apps/runner/src/owner-recovery-lock.py')),python='/usr/bin/python3';
+ const helper=realpathSync(resolve('apps/runner/src/owner-recovery-lock.py'));
  it('retains the exclusive lock on the Node descriptor after helper exit and refuses an independent contender',async()=>{
   const root=await realpath(await mkdtemp(join(tmpdir(),'task6-flock-'))),path=join(root,'lock');let first=-1,second=-1;
   try {
@@ -53,8 +54,13 @@ describe('POSIX inherited descriptor lock on actual Mac process boundaries',()=>
 });
 
 describe('root-private offline generation material',()=>{
+ it('accepts the installed canonical interpreter and still refuses an owned symlink alias under otherwise valid custody',async()=>{
+  const root=await realpath(await mkdtemp(join(tmpdir(),'task5-python-alias-'))),custody=syntheticOwnerCustody(root),alias=join(root,'python-alias');
+  try{await custody.executable(python);await symlink(python,alias);expect((await lstat(alias)).isSymbolicLink()).toBe(true);await expect(custody.executable(alias)).rejects.toThrow('OWNER_ROOT_CUSTODY_REQUIRED');}
+  finally{await rm(root,{recursive:true,force:true});}
+ });
  it('writes only bounded private material and verifier files and returns a secret-free material receipt identifier',async()=>{
-  const root=await realpath(await mkdtemp(join(tmpdir(),'task6-material-'))),custody=syntheticOwnerCustody(root),lock=new PosixOwnerRecoveryLock(custody,{pythonPath:'/usr/bin/python3',helperPath:realpathSync(resolve('apps/runner/src/owner-recovery-lock.py'))});
+  const root=await realpath(await mkdtemp(join(tmpdir(),'task6-material-'))),custody=syntheticOwnerCustody(root),lock=new PosixOwnerRecoveryLock(custody,{pythonPath:python,helperPath:realpathSync(resolve('apps/runner/src/owner-recovery-lock.py'))});
   try{const output={materialFile:join(root,'material'),verifierFile:join(root,'verifier'),lockFile:join(root,'lock'),custody,lock},result=await createOwnerRecoveryMaterial(output),material=JSON.parse(await readFile(output.materialFile,'utf8')),verifier=JSON.parse(await readFile(output.verifierFile,'utf8'));
    expect((await lstat(output.materialFile)).mode&0o777).toBe(0o600);expect((await lstat(output.verifierFile)).mode&0o777).toBe(0o600);expect(Buffer.from(material.proof,'base64url')).toHaveLength(32);expect(material.binding).toBeNull();expect(result).toEqual({receiptId:material.receiptId,verifier:verifier.verifier});
    expect(verifier.verifier).toBe(`sha256:${createHash('sha256').update(Buffer.concat([Buffer.from('debateai:owner-recovery-proof:v1\0'+material.generation+'\0'),Buffer.from(material.proof,'base64url')])).digest('hex')}`);
@@ -64,13 +70,13 @@ describe('root-private offline generation material',()=>{
  it('refuses symlink/insecure files, writable ancestors, path collision, and actual non-root production custody',async()=>{
   const root=await realpath(await mkdtemp(join(tmpdir(),'task6-custody-'))),custody=syntheticOwnerCustody(root),path=join(root,'private');
   try{await writeFile(path,'synthetic',{mode:0o600});await symlink(path,join(root,'link'));await expect(custody.read(join(root,'link'))).rejects.toThrow('OWNER_ROOT_CUSTODY_REQUIRED');await chmod(path,0o644);await expect(custody.read(path)).rejects.toThrow('OWNER_ROOT_CUSTODY_REQUIRED');await chmod(path,0o600);await chmod(root,0o777);await expect(custody.read(path)).rejects.toThrow('OWNER_ROOT_CUSTODY_REQUIRED');await chmod(root,0o700);await expect(new OwnerRecoveryCustody().read(path)).rejects.toThrow('OWNER_ROOT_CUSTODY_REQUIRED');
-   const lock=new PosixOwnerRecoveryLock(custody,{pythonPath:'/usr/bin/python3',helperPath:realpathSync(resolve('apps/runner/src/owner-recovery-lock.py'))});await expect(createOwnerRecoveryMaterial({materialFile:path,verifierFile:path,lockFile:join(root,'lock'),custody,lock})).rejects.toThrow('OWNER_PRIVATE_PATH_INVALID');
+   const lock=new PosixOwnerRecoveryLock(custody,{pythonPath:python,helperPath:realpathSync(resolve('apps/runner/src/owner-recovery-lock.py'))});await expect(createOwnerRecoveryMaterial({materialFile:path,verifierFile:path,lockFile:join(root,'lock'),custody,lock})).rejects.toThrow('OWNER_PRIVATE_PATH_INVALID');
   }finally{await chmod(root,0o700);await rm(root,{recursive:true,force:true});}
  });
  it('pins helper code, retains lock inode, and refuses a concurrent real adapter invocation',async()=>{
-  const root=await realpath(await mkdtemp(join(tmpdir(),'task6-adapter-'))),custody=syntheticOwnerCustody(root),path=join(root,'lock'),lock=new PosixOwnerRecoveryLock(custody,{pythonPath:'/usr/bin/python3',helperPath:realpathSync(resolve('apps/runner/src/owner-recovery-lock.py'))});
+  const root=await realpath(await mkdtemp(join(tmpdir(),'task6-adapter-'))),custody=syntheticOwnerCustody(root),path=join(root,'lock'),lock=new PosixOwnerRecoveryLock(custody,{pythonPath:python,helperPath:realpathSync(resolve('apps/runner/src/owner-recovery-lock.py'))});
   try{let release:()=>void=()=>{},entered:()=>void=()=>{};const wait=new Promise<void>(r=>release=r),started=new Promise<void>(r=>entered=r);const holder=lock.withLock(path,async()=>{entered();await wait;});await started;const before=(await lstat(path)).ino;await expect(lock.withLock(path,async()=>undefined)).rejects.toThrow('OWNER_RECOVERY_LOCK_BUSY');release();await holder;await lock.withLock(path,async()=>undefined);expect((await lstat(path)).ino).toBe(before);
-   const fake=join(root,'helper.py');await writeFile(fake,'synthetic-unreviewed-helper',{mode:0o600});await expect(new PosixOwnerRecoveryLock(custody,{pythonPath:'/usr/bin/python3',helperPath:fake}).withLock(path,async()=>undefined)).rejects.toThrow('OWNER_LOCK_ADAPTER_UNAVAILABLE');
+   const fake=join(root,'helper.py');await writeFile(fake,'synthetic-unreviewed-helper',{mode:0o600});await expect(new PosixOwnerRecoveryLock(custody,{pythonPath:python,helperPath:fake}).withLock(path,async()=>undefined)).rejects.toThrow('OWNER_LOCK_ADAPTER_UNAVAILABLE');
   }finally{await rm(root,{recursive:true,force:true});}
  });
  it('bounds lock-helper process lifetime and kills the owned fixture process before returning refusal',async()=>{

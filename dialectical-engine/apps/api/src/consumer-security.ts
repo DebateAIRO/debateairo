@@ -77,7 +77,7 @@ export class ConsumerSecurityService implements ConsumerSecurityApplication {
         const authorization = StepUpAuthorizationRequestSchema.parse(committed.authorization);
         return { sessionToken, response: { status: 'step_up_complete', csrf_token: csrfToken, step_up_grant: { ...authorization, token: grantToken, expires_at: new Date(committed.expiresAt).toISOString() } } };
     }
-    async removeAuthMethod(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<void> { const p = parseConsumerSecurityInput(RemoveAuthMethodRequestSchema, input); await this.repository.removeAuthMethod(consumerSecuritySession(session), p.factor_id, hashToken('step-up-grant', p.step_up_grant), await this.passwordPath(session), source); }
+    async removeAuthMethod(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<void> { const p = parseConsumerSecurityInput(RemoveAuthMethodRequestSchema, input); await this.sessions.admit('AUTH_METHOD_REMOVE', session.userId, source); await this.repository.removeAuthMethod(consumerSecuritySession(session), p.factor_id, hashToken('step-up-grant', p.step_up_grant), await this.passwordPath(session), source); }
     async regenerateRecoveryCodes(input: unknown, session: AuthenticatedSession, source: AuthSourceContext): Promise<{
         codes: readonly string[];
     }> {

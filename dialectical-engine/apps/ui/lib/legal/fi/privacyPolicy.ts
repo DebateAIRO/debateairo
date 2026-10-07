@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Väittelyt ovat yksityisiä, kunnes julkaiset ne. Julkaiseminen on tietoinen, erikseen vahvistettava toimi. Julkaistu väittely näyttää nimimerkkisi, kysymyksesi kirjoittamassasi muodossa, argumenttipuun, pisteet, ratkaisun ja luottamusvälin, ja siinä on näkyvä merkintä tekoälyn tuottamasta sisällöstä. Se ei koskaan näytä sähköpostiosoitettasi, istuntotietojasi tai tilihistoriaasi. [Published debates are / are not] hakukoneiden indeksoimia [unless you choose]." },
-      { kind: "p", text: "Julkaisun peruuttaminen poistaa väittelyn DebateAI-palvelusta ja tuhoaa julkisen kopiomme avaimen. Lukijoiden, hakukoneiden tai arkistojen jo tekemät kopiot eivät ole hallinnassamme, emmekä voi kutsua niitä takaisin." },
+      { kind: "p", text: "Julkaisun peruuttaminen poistaa väittelyn Dialectical Engine-palvelusta ja tuhoaa julkisen kopiomme avaimen. Lukijoiden, hakukoneiden tai arkistojen jo tekemät kopiot eivät ole hallinnassamme, emmekä voi kutsua niitä takaisin." },
       { kind: "p", text: "Kun poistat tilisi, poistamme kaikki julkaisemasi väittelyt julkisesta käytöstä ilman aiheetonta viivytystä ja viimeistään 30 päivän kuluessa, ellei laki velvoita meitä säilyttämään tiettyä kohdetta. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Väittelyissä nimetyt henkilöt, jotka eivät ole käyttäjiämme",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Jos joku esittää DebateAI-palvelussa sinut nimeävän kysymyksen, hallussamme voi olla sinua koskevia henkilötietoja, vaikka et olisi koskaan käyttänyt palvelua. Ehdot kieltävät käyttäjiä tekemästä näin, ja minimoimme tekoälypalveluntarjoajille lähettämämme tiedot, mutta näin tapahtuu." },
+      { kind: "p", text: "Jos joku esittää Dialectical Engine-palvelussa sinut nimeävän kysymyksen, hallussamme voi olla sinua koskevia henkilötietoja, vaikka et olisi koskaan käyttänyt palvelua. Ehdot kieltävät käyttäjiä tekemästä näin, ja minimoimme tekoälypalveluntarjoajille lähettämämme tiedot, mutta näin tapahtuu." },
       { kind: "p", text: "Tämä osio on GDPR:n 14 artiklan nojalla sinulle annettava ilmoitus. Tiedot ovat sitä, mitä käyttäjä kirjoitti ja mitä järjestelmä tuotti vastaukseksi; lähde on kyseinen käyttäjä; tarkoitukset ja oikeusperusteet ovat osiossa 4; vastaanottajat ovat Rekisterissä luetellut tekoälypalveluntarjoajat; säilytykseen sovelletaan osiota 7. Sinulla on kaikki osiossa 10 tarkoitetut oikeudet, ja voit erityisesti pyytää meitä poistamaan tietojasi sisältävän julkaistun tai yksityisen väittelyn sekä kertomaan, mitä tietoja meillä on. Et tarvitse siihen tiliä. Kirjoita osoitteeseen privacy@dezbatere.ro tai käytä minkä tahansa julkaistun väittelyn Ilmoita-toimintoa, niin käsittelemme perustellut pyynnöt ilman aiheetonta viivytystä. Emme voi ilmoittaa sinulle erikseen, kun näin tapahtuu, koska emme tiedä, kuka olet tai miten tavoittaisimme sinut; tämän sijasta toteutamme toimenpiteinä tämän julkisen ilmoituksen ja poistamisreitin." },
       { kind: "p", text: "Sama koskee sinua koskevia arkaluonteisia tietoja — politiikkaa, terveyttä ja uskontoa — jotka esiintyvät jonkun muun kysymyksessä. Mikään oikeudellinen edellytys ei anna meille lupaa jatkaa niiden käsittelyä sen jälkeen, kun vastustat sitä, emmekä jatka käsittelyä." }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Lapset",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI on tarkoitettu aikuisille. Vahvistat rekisteröityessäsi olevasi vähintään 18-vuotias, emmekä tietoisesti käsittele alle 18-vuotiaiden tietoja. Jos saamme tietää tilin kuuluvan alle 18-vuotiaalle, suljemme sen ja poistamme tiedot osiossa 7 kuvatulla tavalla. Joissakin maissa pelkkää vahvistusta ei pidetä riittävänä tai niissä vaaditaan enemmän; liitteessä B kerrotaan alueellisesti sovellettavat säännöt, ja Ehdoissa selitetään, mitä teemme asian suhteen." }
+      { kind: "p", text: "Dialectical Engine on tarkoitettu aikuisille. Vahvistat rekisteröityessäsi olevasi vähintään 18-vuotias, emmekä tietoisesti käsittele alle 18-vuotiaiden tietoja. Jos saamme tietää tilin kuuluvan alle 18-vuotiaalle, suljemme sen ja poistamme tiedot osiossa 7 kuvatulla tavalla. Joissakin maissa pelkkää vahvistusta ei pidetä riittävänä tai niissä vaaditaan enemmän; liitteessä B kerrotaan alueellisesti sovellettavat säännöt, ja Ehdoissa selitetään, mitä teemme asian suhteen." }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Evästeet",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI käyttää kahdeksaa kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain DebateAI: neljä evästettä ja neljä merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa [dezbatere.ro/cookies] oleva Evästekäytäntö luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään." },
+      { kind: "p", text: "Dialectical Engine käyttää 18 kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain Dialectical Engine: 13 evästettä ja 5 merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa [dezbatere.ro/cookies] oleva Evästekäytäntö luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään." },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Eväste — Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. — 14 päivää",
         "__Host-debateai-age-refusal — Eväste (HttpOnly) — Kun ikätarkistus on hylätty, estää tätä selainta yrittämästä uudelleen 30 päivän ajan. Se sisältää vain sanan ”hylätty”, ei henkilötietoja. — 30 päivää",
         "debateai.locale — Eväste — Muistaa valitsemasi käyttöliittymän kielen. — 1 vuosi",
+        "__Host-debateai-staff — Eväste (HttpOnly) — Erillinen henkilöstön käyttöoikeus — Enintään 8 tuntia; 15 minuuttia käyttämättömyyttä",
+        "__Host-debateai-staff-csrf — Eväste — Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. — Enintään 8 tuntia; 15 minuuttia käyttämättömyyttä",
+        "__Host-debateai-password-reset — Eväste (HttpOnly) — Vain salasanan palautus — Enintään 30 minuuttia",
+        "__Host-debateai-password-reset-csrf — Eväste — Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. — Enintään 30 minuuttia",
+        "__Host-debateai-mfa-recovery — Eväste (HttpOnly) — Vain todentimen palautus — Enintään 299 sekuntia",
+        "__Host-debateai-mfa-recovery-csrf — Eväste — Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. — Enintään 299 sekuntia",
+        "__Host-debateai-social-flow — Eväste (HttpOnly) — Lyhyt palveluntarjoajakirjautuminen tai tilin liittäminen — Enintään 5 minuuttia",
+        "__Host-debateai-social-apple — Eväste (HttpOnly) — Lyhyt palveluntarjoajakirjautuminen tai tilin liittäminen — Enintään 5 minuuttia",
+        "__Host-debateai-social-browser — Eväste (HttpOnly) — Lyhyt palveluntarjoajakirjautuminen tai tilin liittäminen — Enintään 5 minuuttia",
         "debateai.consent — Paikallinen tallennustila — Muistaa, että olet nähnyt evästeilmoituksen, joten se näytetään vain kerran. — Kunnes tyhjennät sen",
         "debateai.mode — Paikallinen tallennustila — Käytätkö vaaleaa vai tummaa tilaa. — Kunnes tyhjennät sen",
         "debateai.languageOffer.dismissed — Istunnon tallennustila — Muistaa tämän välilehden osalta, että kieltäydyit tarjouksesta näyttää väittely toisella kielellä. — Kunnes suljet välilehden",
-        "debateai.support.conversation.v2 — Istunnon tallennustila — Pitää ohjekeskustelusi näytöllä niin kauan kuin välilehti on auki. Se poistetaan, kun joku kirjautuu sisään tai ulos tässä välilehdessä. — Kunnes suljet välilehden"
+        "debateai.support.conversation.v2 — Istunnon tallennustila — Pitää ohjekeskustelusi näytöllä niin kauan kuin välilehti on auki. Se poistetaan, kun joku kirjautuu sisään tai ulos tässä välilehdessä. — Kunnes suljet välilehden",
+        "debateai.phone-completion-draft.v1 — Istunnon tallennustila — Keskeneräinen kysymys puhelinvaiheen aikana; poistetaan istunnon vaihtuessa, uloskirjautuessa tai omistajan vaihtuessa — 15 minuuttia tai aiempaan poistamiseen asti"
         ]
       },
-      { kind: "p", text: "Mikään muu osapuoli ei kerää DebateAI:n kautta tietoja verkkotoiminnastasi ajan mittaan eikä eri verkkosivustoilla." },
-      { kind: "p", text: "Selaimet voivat lähettää ”Do Not Track” -signaalin tai muun vastaavan signaalin. DebateAI ei seuraa sinua, joten tällaisella signaalilla ei ole mitään kytkettävää pois päältä: palvelu toimii samalla tavalla signaalin kanssa tai ilman sitä." },
+      { kind: "p", text: "Mikään muu osapuoli ei kerää Dialectical Engine:n kautta tietoja verkkotoiminnastasi ajan mittaan eikä eri verkkosivustoilla." },
+      { kind: "p", text: "Selaimet voivat lähettää ”Do Not Track” -signaalin tai muun vastaavan signaalin. Dialectical Engine ei seuraa sinua, joten tällaisella signaalilla ei ole mitään kytkettävää pois päältä: palvelu toimii samalla tavalla signaalin kanssa tai ilman sitä." },
       { kind: "p", text: "Voit kieltäytyä näistä kohteista estämällä tai poistamalla tämän sivuston evästeet ja sivustotiedot selaimesi asetuksista. Mikä silloin lakkaa toimimasta: sisäänkirjautuminen sekä kieli- ja näyttövalintojesi muistaminen; myös evästeilmoitus näytetään uudelleen." }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraina (vain jos lueteltu)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Sovelletaan Ukrainan lakia ”Henkilötietojen suojasta”. Emme tarjoa DebateAI-palvelua niillä Ukrainan alueilla, jotka eivät ole sen hallituksen hallinnassa. Tietosi siirretään EU-maihin ja Yhdysvaltoihin (ks. Rekisteri). Voit tehdä valituksen Ukrainan parlamentin ihmisoikeusvaltuutetulle." }
+      { kind: "p", text: "Sovelletaan Ukrainan lakia ”Henkilötietojen suojasta”. Emme tarjoa Dialectical Engine-palvelua niillä Ukrainan alueilla, jotka eivät ole sen hallituksen hallinnassa. Tietosi siirretään EU-maihin ja Yhdysvaltoihin (ks. Rekisteri). Voit tehdä valituksen Ukrainan parlamentin ihmisoikeusvaltuutetulle." }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "fd3802e5805c0ee21cc79d7bf8ab1dff7f0321553933c9ea67666ecb01c3bf7e",
-  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.0 · VOIMASSA [DATE]",
+  version: "3.1",
+  sha256: "4558d8bb1fe3400973c42e0b905c536bdd7675439e8e65e1838b971389452eed",
+  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.1 · VOIMASSA [DATE]",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",
-  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tietosuojakäytännön teksti",
   sectionIdPrefix: "policy-section-",

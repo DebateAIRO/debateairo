@@ -191,7 +191,7 @@ function tierBranchLines(): string[] {
         if (branchSelectsRoster && selectsTierCase) hits.push(location(match.index));
       }
 
-      const tierTernary = /\b(?:plan_tier|planTier)\b[^;?]*\?[^;]*;/gs;
+      const tierTernary = tierTernaries();
       for (const match of source.matchAll(tierTernary)) {
         if (selectsRoster(match[0], selectors)) hits.push(location(match.index));
       }
@@ -199,8 +199,20 @@ function tierBranchLines(): string[] {
     })
   ).sort();
 }
+function tierTernaries(): RegExp {
+  // An optional parameter's ?: is type syntax, not a model-selection branch.
+  return /\b(?:plan_tier|planTier)\b[^;?]*\?(?!\s*:)[^;]*;/gs;
+}
 
 describe("S02 tier roster architecture", () => {
+  it("distinguishes optional preview parameters from real tier selection", () => {
+    expect("function room(input:{plan_tier:PlanTier}, previewConfig?: Config) { return PLAN_TIER_ROSTERS[input.plan_tier]; }"
+      .match(tierTernaries())).toBeNull();
+    expect("const roster = planTier === 'free' ? PLAN_TIER_ROSTERS.free : PLAN_TIER_ROSTERS.premium;"
+      .match(tierTernaries())).toHaveLength(1);
+    expect("function room(previewConfig?: Config) { return plan_tier === 'free' ? PLAN_TIER_ROSTERS.free : PLAN_TIER_ROSTERS.premium; }"
+      .match(tierTernaries())).toHaveLength(1);
+  });
   it("keeps the exact ordered model roster for each plan tier", () => {
     expect(PLAN_TIER_ROSTERS.free).toEqual([
       "gpt-5.6-luna",

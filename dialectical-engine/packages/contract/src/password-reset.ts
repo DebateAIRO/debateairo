@@ -42,7 +42,9 @@ export function createPasswordResetClient(fetcher: typeof fetch = fetch, base = 
   if (!base.startsWith("/") || base.startsWith("//") || /[\\?#]/.test(base) || base.split("/").some(part => {
     try { const decoded = decodeURIComponent(part); return decoded === ".." || decoded === "." || /[\\/]/.test(decoded); } catch { return true; }
   })) throw new TypeError("PASSWORD_RESET_API_BASE_INVALID");
-  base = base.replace(/\/+$/, "");
+  let baseEnd = base.length;
+  while (baseEnd > 0 && base[baseEnd - 1] === "/") baseEnd--;
+  base = base.slice(0, baseEnd);
   async function request<T>(path: string, schema: z.ZodType<T>, body?: unknown, scoped = true, expectedStatus = 200): Promise<T> {
     const headers = new Headers({ accept: "application/json" });
     if (body !== undefined) headers.set("content-type", "application/json");

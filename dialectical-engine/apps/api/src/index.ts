@@ -3449,6 +3449,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
 
   api.get<{ Params: { id: string } }>("/v1/runs/:id/events", routePolicy("GET /v1/runs/{id}/events"), async (request, reply) => {
+    if (!admitOrRefuse(reply, "publicReads", "GET /v1/runs/{id}/events", sourceFor(request).ip)) return reply;
     const runId = ResourceIdSchema.safeParse(request.params.id);
     const ownership = ownershipFor(request);
     if (!runId.success || await options.application.readRun(runId.data, request.session, ownership) === null) {

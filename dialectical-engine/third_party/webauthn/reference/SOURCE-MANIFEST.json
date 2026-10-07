@@ -11,7 +11,7 @@
       "commit": "545d566cfd521b11287d67a03ea9592dc6e3acec",
       "source_url": "https://codeload.github.com/MasterKale/SimpleWebAuthn/tar.gz/545d566cfd521b11287d67a03ea9592dc6e3acec",
       "source_final_url": "https://codeload.github.com/MasterKale/SimpleWebAuthn/tar.gz/545d566cfd521b11287d67a03ea9592dc6e3acec",
-      "source_archive": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/owned-webauthn-source-acquisition/archives/simplewebauthn-server-545d566cfd521b11287d67a03ea9592dc6e3acec.tar.gz",
+      "source_archive": "docs/operations/admin-implementation-2026-10-02/owned-webauthn-source-acquisition/archives/simplewebauthn-server-545d566cfd521b11287d67a03ea9592dc6e3acec.tar.gz",
       "source_archive_sha256": "b158be004c09b8726457ae4a36124162228a73fb4df43b9183ce6568622a141f",
       "source_bytes": 1059708,
       "selected_files": 79,
@@ -22,7 +22,7 @@
       "published_archive_sha256": "9c3911699eebe8c3309790aa746b6c3c7e2fb3b5626f9f7ba1d5a94da9506ebb",
       "published_integrity": "sha512-g+m/xv9/8FRWsDY22CwsTYRzt3WwS9fJrR3P7eY3Ti01FXH5FQ36Xn55v6D+5tb6VajlqOj4hywP/Vxsb6a3Sg==",
       "published_integrity_verified": true,
-      "metadata_file": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/dependency-preparation-candidate14/registry/simplewebauthn__server-14.0.2-version.json",
+      "metadata_file": "docs/operations/admin-implementation-2026-10-02/dependency-preparation-candidate14/registry/simplewebauthn__server-14.0.2-version.json",
       "metadata_sha256": "b60850b5a50cc6a1196f2800259cd6cbaab34e31b92d7357b0a413684c92380c"
     },
     {
@@ -32,7 +32,7 @@
       "commit": "83f87addc67b652ff5b84e681669451648216ef6",
       "source_url": "https://codeload.github.com/MasterKale/SimpleWebAuthn/tar.gz/83f87addc67b652ff5b84e681669451648216ef6",
       "source_final_url": "https://codeload.github.com/MasterKale/SimpleWebAuthn/tar.gz/83f87addc67b652ff5b84e681669451648216ef6",
-      "source_archive": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/owned-webauthn-source-acquisition/archives/simplewebauthn-browser-83f87addc67b652ff5b84e681669451648216ef6.tar.gz",
+      "source_archive": "docs/operations/admin-implementation-2026-10-02/owned-webauthn-source-acquisition/archives/simplewebauthn-browser-83f87addc67b652ff5b84e681669451648216ef6.tar.gz",
       "source_archive_sha256": "a40ec1cc2ec47a678d1108252e2ea7a63bbc43f89e3f8907497f4ac7432a7b52",
       "source_bytes": 1050347,
       "selected_files": 27,
@@ -43,7 +43,7 @@
       "published_archive_sha256": "4b811631f0a377ca7fd9363e65e5e8b747657108a47cffcf881dcfc1c06cd9c4",
       "published_integrity": "sha512-1odWVqeEBTl7lJ9zMKLEsmTlnyrDO5iRcTvfMKKk1WThUnp/i8JJdffdj2icP+tty159s4PgwE3BiMoEW9NFow==",
       "published_integrity_verified": true,
-      "metadata_file": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/dependency-preparation-candidate14/registry/simplewebauthn__browser-14.0.0-version.json",
+      "metadata_file": "docs/operations/admin-implementation-2026-10-02/dependency-preparation-candidate14/registry/simplewebauthn__browser-14.0.0-version.json",
       "metadata_sha256": "7d1f13d595ca1a8a0b3d34f902f5a0d4ec5f0a5e1d4862ff7b6729fdc0c75186"
     },
     {
@@ -53,7 +53,7 @@
       "commit": "3dfd6c890abf450966fc0349dd2ebb94a30144bb",
       "source_url": "https://codeload.github.com/levischuck/tiny-cbor/tar.gz/3dfd6c890abf450966fc0349dd2ebb94a30144bb",
       "source_final_url": "https://codeload.github.com/levischuck/tiny-cbor/tar.gz/3dfd6c890abf450966fc0349dd2ebb94a30144bb",
-      "source_archive": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/owned-webauthn-source-acquisition/archives/tiny-cbor-3dfd6c890abf450966fc0349dd2ebb94a30144bb.tar.gz",
+      "source_archive": "docs/operations/admin-implementation-2026-10-02/owned-webauthn-source-acquisition/archives/tiny-cbor-3dfd6c890abf450966fc0349dd2ebb94a30144bb.tar.gz",
       "source_archive_sha256": "f1ad007b6cdc3a543110f3ac55812775fd7b32eb9f5dc0c7a9854c2fa60f86f0",
       "source_bytes": 23143,
       "selected_files": 11,
@@ -64,7 +64,7 @@
       "published_archive_sha256": "03a92256a3fc14f7b5b8203933224d7777c962f6922b2780248fd72aff8369e6",
       "published_integrity": "sha512-llBRm4dT4Z89aRsm6u2oEZ8tfwL/2l6BwpZ7JcyieouniDECM5AqNgr/y08zalEIvW3RSK4upYyybDcmjXqAow==",
       "published_integrity_verified": true,
-      "metadata_file": "/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/dependency-preparation-candidate14/registry/levischuck__tiny-cbor-0.2.11-version.json",
+      "metadata_file": "docs/operations/admin-implementation-2026-10-02/dependency-preparation-candidate14/registry/levischuck__tiny-cbor-0.2.11-version.json",
       "metadata_sha256": "cd5930cbf37136b5c568de9649798561dfd7ebeff1bb489c2430ad2093f291f6"
     }
   ],

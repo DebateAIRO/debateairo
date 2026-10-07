@@ -483,7 +483,11 @@ describe("the report in the question's own script (R-fonts)", () => {
       ? { answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY") }
       : storyScriptSample(locale);
     const first = drawnLines(await renderReportPdf({ answer, story, generatedAt: GENERATED, catalogs: reportCatalogs }))[0]!;
-    const eyebrow = first.findIndex((line) => line.includes("DEBATEAI"));
+    const eyebrowText = reportCatalogs.publicCatalog["public.report.eyebrow"]!.toLocaleUpperCase(locale);
+    const [brand, scriptTitle] = eyebrowText.split(" · ");
+    // The Latin brand stays LTR within the RTL Hebrew label.
+    const printedEyebrow = locale === "he" ? [...scriptTitle!].reverse().join("")+" · "+brand : eyebrowText;
+    const eyebrow = first.findIndex((line) => line === printedEyebrow);
     expect(eyebrow).toBeGreaterThan(0);
     // Everything above the eyebrow is the notice, and nothing else. A right-to-left line is drawn from the
     // right, so each of its lines reads back reversed; the line breaks drop the spaces they fall on.

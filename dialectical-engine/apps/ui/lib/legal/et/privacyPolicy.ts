@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Väitlused on privaatsed, kuni te need avaldate. Avaldamine on teadlik ja eraldi kinnitatav toiming. Avaldatud väitluses kuvatakse teie pseudonüüm, küsimus sellisel kujul, nagu selle kirjutasite, argumentide puu, hinded, otsus ja kindlusaste ning nähtav märgis, et sisu on loonud tehisintellekt. Seal ei kuvata kunagi teie e-posti aadressi, seansikirjeid ega konto ajalugu. [Published debates are / are not] otsingumootorites indekseeritud [unless you choose]." },
-      { kind: "p", text: "Avaldamise tühistamisel eemaldatakse väitlus DebateAI-st ja hävitatakse meie avaliku koopia võti. Lugejate, otsingumootorite või arhiivide juba tehtud koopiad ei ole meie kontrolli all ning me ei saa neid tagasi võtta." },
+      { kind: "p", text: "Avaldamise tühistamisel eemaldatakse väitlus Dialectical Engine-st ja hävitatakse meie avaliku koopia võti. Lugejate, otsingumootorite või arhiivide juba tehtud koopiad ei ole meie kontrolli all ning me ei saa neid tagasi võtta." },
       { kind: "p", text: "Kui kustutate konto, eemaldame kõik teie avaldatud väitlused avalikust vaatest põhjendamatu viivituseta ja hiljemalt 30 päeva jooksul, välja arvatud juhul, kui seadus nõuab konkreetse üksuse säilitamist. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Väitlustes nimetatud inimesed, kes ei ole meie kasutajad",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Kui keegi esitab DebateAI-le küsimuse, milles teid nimetatakse, võime säilitada teie isikuandmeid, kuigi te pole teenust kunagi kasutanud. Tingimused keelavad kasutajatel seda teha ja me minimeerime tehisintellekti pakkujatele saadetavaid andmeid, kuid seda juhtub." },
+      { kind: "p", text: "Kui keegi esitab Dialectical Engine-le küsimuse, milles teid nimetatakse, võime säilitada teie isikuandmeid, kuigi te pole teenust kunagi kasutanud. Tingimused keelavad kasutajatel seda teha ja me minimeerime tehisintellekti pakkujatele saadetavaid andmeid, kuid seda juhtub." },
       { kind: "p", text: "See jaotis on teade, mille peame teile GDPR-i artikli 14 kohaselt esitama. Andmed on kasutaja sisestatud teave ja mootori loodud vastus; allikas on see kasutaja; eesmärgid ja õiguslikud alused on esitatud jaotises 4; vastuvõtjad on registris olevad tehisintellekti pakkujad; säilitamine toimub jaotise 7 kohaselt. Teil on kõik jaotises 10 nimetatud õigused ning eelkõige võite paluda meil eemaldada teie andmeid sisaldav avaldatud või privaatne väitlus ja selgitada, milliseid andmeid säilitame. Selleks ei ole kontot vaja. Kirjutage aadressil privacy@dezbatere.ro või kasutage avaldatud väitluse juures juhtelementi Teatage ning täidame põhjendatud taotlused põhjendamatu viivituseta. Me ei saa teid sellise juhtumi korral isiklikult teavitada, sest me ei tea, kes te olete või kuidas teiega ühendust saada; selle asemel võtame meetmetena kasutusele käesoleva avaliku teate ja eemaldamisvõimaluse." },
       { kind: "p", text: "Sama kehtib tundliku teabe kohta — poliitika, tervis, religioon — mis esineb kellegi teise küsimuses. Ükski õiguslik tingimus ei luba meil pärast teie vastuväidet selle töötlemist jätkata ja me ei tee seda." }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Lapsed",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI on mõeldud täiskasvanutele. Registreerumisel kinnitate, et olete vähemalt 18-aastane, ning me ei töötle teadlikult alla 18-aastaste andmeid. Kui saame teada, et konto kuulub alla 18-aastasele, sulgeme selle ja kustutame andmed jaotises 7 kirjeldatud viisil. Mõni riik peab kinnitust ebapiisavaks või nõuab enamat; lisas B on märgitud, mida kus kohaldatakse, ja Tingimustes selgitatakse, mida me selle suhtes teeme." }
+      { kind: "p", text: "Dialectical Engine on mõeldud täiskasvanutele. Registreerumisel kinnitate, et olete vähemalt 18-aastane, ning me ei töötle teadlikult alla 18-aastaste andmeid. Kui saame teada, et konto kuulub alla 18-aastasele, sulgeme selle ja kustutame andmed jaotises 7 kirjeldatud viisil. Mõni riik peab kinnitust ebapiisavaks või nõuab enamat; lisas B on märgitud, mida kus kohaldatakse, ja Tingimustes selgitatakse, mida me selle suhtes teeme." }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Küpsised",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI kasutab kaheksat üksust, mis kõik on teie tellitud teenuse jaoks rangelt vajalikud ja mida kõiki paigaldab ainult DebateAI: neli küpsist ja neli kirjet teie brauseri salvestusruumis. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. Küpsisepoliitikas aadressil [dezbatere.ro/cookies] on need loetletud koos sellega, mida igaüks teeb ja kes selle saab, ning seda muudetakse enne, kui midagi muud lisatakse." },
+      { kind: "p", text: "Dialectical Engine kasutab 18 üksust, mis kõik on teie tellitud teenuse jaoks rangelt vajalikud ja mida kõiki paigaldab ainult Dialectical Engine: 13 küpsist ja 5 kirjet teie brauseri salvestusruumis. Me ei paigalda analüüsi-, reklaami- ega jälgimisküpsiseid. Küpsisepoliitikas aadressil [dezbatere.ro/cookies] on need loetletud koos sellega, mida igaüks teeb ja kes selle saab, ning seda muudetakse enne, kui midagi muud lisatakse." },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Küpsis — Takistab teistel veebisaitidel teie nimel vorme esitamast. — 14 päeva",
         "__Host-debateai-age-refusal — Küpsis (HttpOnly) — Pärast tagasilükatud vanusekontrolli takistab see sellel brauseril 30 päeva jooksul uuesti proovimast. See sisaldab ainult sõna „tagasi lükatud“, mitte isikuandmeid. — 30 päeva",
         "debateai.locale — Küpsis — Jätab meelde teie valitud liidese keele. — 1 aasta",
+        "__Host-debateai-staff — Küpsis (HttpOnly) — Eraldi töötajate juurdepääs — Kuni 8 tundi; 15 minutit tegevusetust",
+        "__Host-debateai-staff-csrf — Küpsis — Takistab teistel veebisaitidel teie nimel vorme esitamast. — Kuni 8 tundi; 15 minutit tegevusetust",
+        "__Host-debateai-password-reset — Küpsis (HttpOnly) — Ainult parooli lähtestamine — Kuni 30 minutit",
+        "__Host-debateai-password-reset-csrf — Küpsis — Takistab teistel veebisaitidel teie nimel vorme esitamast. — Kuni 30 minutit",
+        "__Host-debateai-mfa-recovery — Küpsis (HttpOnly) — Ainult autentija taastamine — Kuni 299 sekundit",
+        "__Host-debateai-mfa-recovery-csrf — Küpsis — Takistab teistel veebisaitidel teie nimel vorme esitamast. — Kuni 299 sekundit",
+        "__Host-debateai-social-flow — Küpsis (HttpOnly) — Lühike teenusepakkuja sisselogimine või konto sidumine — Kuni 5 minutit",
+        "__Host-debateai-social-apple — Küpsis (HttpOnly) — Lühike teenusepakkuja sisselogimine või konto sidumine — Kuni 5 minutit",
+        "__Host-debateai-social-browser — Küpsis (HttpOnly) — Lühike teenusepakkuja sisselogimine või konto sidumine — Kuni 5 minutit",
         "debateai.consent — Kohalik salvestusruum — Jätab meelde, et olete küpsiseteate näinud, nii et seda näidatakse vaid korra. — Kuni te selle kustutate",
         "debateai.mode — Kohalik salvestusruum — Kas kasutate heledat või tumedat kuvarežiimi. — Kuni te selle kustutate",
         "debateai.languageOffer.dismissed — Seansi salvestusruum — Jätab selle vahekaardi jaoks meelde, et loobusite pakkumisest näidata väitlust teises keeles. — Kuni te vahekaardi sulgete",
-        "debateai.support.conversation.v2 — Seansi salvestusruum — Hoiab teie abivestluse ekraanil, kuni vahekaart on avatud. See kustutatakse, kui keegi selles vahekaardis sisse või välja logib. — Kuni te vahekaardi sulgete"
+        "debateai.support.conversation.v2 — Seansi salvestusruum — Hoiab teie abivestluse ekraanil, kuni vahekaart on avatud. See kustutatakse, kui keegi selles vahekaardis sisse või välja logib. — Kuni te vahekaardi sulgete",
+        "debateai.phone-completion-draft.v1 — Seansi salvestusruum — Lõpetamata küsimus telefonisammu ajal; kustutatakse seansi vahetusel, väljalogimisel või omaniku vahetusel — 15 minutit või varasema kustutamiseni"
         ]
       },
-      { kind: "p", text: "Ükski teine osapool ei kogu DebateAI kaudu teavet teie võrgutegevuse kohta aja jooksul ja eri veebisaitidel." },
-      { kind: "p", text: "Brauserid võivad saata signaali „Do Not Track“ või muu sarnase signaali. DebateAI ei jälgi teid, seega pole sellisel signaalil midagi välja lülitada: teenus töötab samamoodi nii signaaliga kui ka ilma." },
+      { kind: "p", text: "Ükski teine osapool ei kogu Dialectical Engine kaudu teavet teie võrgutegevuse kohta aja jooksul ja eri veebisaitidel." },
+      { kind: "p", text: "Brauserid võivad saata signaali „Do Not Track“ või muu sarnase signaali. Dialectical Engine ei jälgi teid, seega pole sellisel signaalil midagi välja lülitada: teenus töötab samamoodi nii signaaliga kui ka ilma." },
       { kind: "p", text: "Nende üksuste keelamiseks blokeerige või kustutage selle saidi küpsised ja saidiandmed oma brauseri seadetes. Mis siis enam ei tööta: sisselogimine ning teie keele- ja kuvavaliku meelespidamine; ka küpsiseteade kuvatakse uuesti." }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraina (ainult kui loetletud)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Kohaldatakse Ukraina seadust „Isikuandmete kaitse kohta“. Me ei paku DebateAI-d Ukraina aladel, mis ei ole selle valitsuse kontrolli all. Teie andmed edastatakse ELi riikidesse ja Ameerika Ühendriikidesse (vt registrit). Võite esitada kaebuse Ukraina Ülemraada inimõiguste volinikule." }
+      { kind: "p", text: "Kohaldatakse Ukraina seadust „Isikuandmete kaitse kohta“. Me ei paku Dialectical Engine-d Ukraina aladel, mis ei ole selle valitsuse kontrolli all. Teie andmed edastatakse ELi riikidesse ja Ameerika Ühendriikidesse (vt registrit). Võite esitada kaebuse Ukraina Ülemraada inimõiguste volinikule." }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "d08ff594b122b00f48af46d2b303d73af101c5906f467696073e165afcc9e9e6",
-  eyebrow: "PRIVAATSUSPOLIITIKA · v3.0 · KEHTIB ALATES [DATE]",
+  version: "3.1",
+  sha256: "e2a055431353bf71fb30e3bbeb4fabcaae710aa194a4bcc638aeae6cd543887f",
+  eyebrow: "PRIVAATSUSPOLIITIKA · v3.1 · KEHTIB ALATES [DATE]",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",
-  endMarker: "POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privaatsuspoliitika tekst",
   sectionIdPrefix: "policy-section-",

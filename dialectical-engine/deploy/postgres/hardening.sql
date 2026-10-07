@@ -27,7 +27,7 @@ GRANT CONNECT ON DATABASE debateai TO
 -- support-config operator. Without this line the API boots and then refuses every support
 -- request, because its support pool cannot connect.
 GRANT CONNECT ON DATABASE debateai TO
-  debateai_support, debateai_support_config_operator;
+  debateai_support, debateai_support_config_operator, debateai_staff_recovery;
 GRANT CONNECT ON DATABASE debateai TO
   debateai_obs_writer, debateai_obs_listener, debateai_obs_watchdog, debateai_obs_human;
 -- Migrations 0057 and 0071 already grant these inside the migrations; restated so this file alone

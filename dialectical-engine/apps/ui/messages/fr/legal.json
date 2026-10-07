@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "obtenir la liste de tous les tiers qui les ont reçues ;",
   "legal.health.s05.item3": "retirer votre consentement et en obtenir la suppression.",
   "legal.health.s06.title": "Comment les exercer",
-  "legal.health.s06.body": "Depuis les Paramètres, ou en écrivant à privacy@dezbatere.ro. Nous répondons dans un délai de 45 jours. Si nous rejetons une demande, vous pouvez former un recours en répondant à notre décision."
+  "legal.health.s06.body": "Depuis les Paramètres, ou en écrivant à privacy@dezbatere.ro. Nous répondons dans un délai de 45 jours. Si nous rejetons une demande, vous pouvez former un recours en répondant à notre décision.",
+  "legal.cookies.staff.purpose": "Accès du personnel séparé",
+  "legal.cookies.passwordReset.purpose": "Réinitialisation du mot de passe uniquement",
+  "legal.cookies.mfaRecovery.purpose": "Récupération de l’authentificateur uniquement",
+  "legal.cookies.social.purpose": "Courte connexion par fournisseur ou association de compte",
+  "legal.cookies.phoneDraft.purpose": "Question inachevée pendant l’étape du téléphone ; effacée lors d’un changement de session, d’une déconnexion ou d’un changement de propriétaire",
+  "legal.cookies.staff.life": "Jusqu’à 8 heures ; 15 minutes d’inactivité",
+  "legal.cookies.passwordReset.life": "Jusqu’à 30 minutes",
+  "legal.cookies.mfaRecovery.life": "Jusqu’à 299 secondes",
+  "legal.cookies.social.life": "Jusqu’à 5 minutes",
+  "legal.cookies.phoneDraft.life": "15 minutes ou jusqu’à l’effacement"
 }

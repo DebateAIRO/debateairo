@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Debaty sú súkromné, kým ich nezverejníte. Zverejnenie je úmyselný krok, ktorý sa potvrdzuje samostatne. Zverejnená debata zobrazuje váš pseudonym, otázku v znení, v akom ste ju napísali, strom argumentov, hodnotenia, verdikt a pásmo spoľahlivosti a obsahuje viditeľné označenie, že obsah vytvorila umelá inteligencia. Nikdy nezobrazuje vašu e-mailovú adresu, záznamy relácií ani históriu účtu. [Published debates are / are not] indexované vyhľadávačmi [unless you choose]." },
-      { kind: "p", text: "Zrušením zverejnenia sa debata odstráni zo služby DebateAI a zničí sa kľúč k našej verejnej kópii. Kópie, ktoré už vytvorili čitatelia, vyhľadávače alebo archívy, sú mimo našej kontroly a nemôžeme ich stiahnuť späť." },
+      { kind: "p", text: "Zrušením zverejnenia sa debata odstráni zo služby Dialectical Engine a zničí sa kľúč k našej verejnej kópii. Kópie, ktoré už vytvorili čitatelia, vyhľadávače alebo archívy, sú mimo našej kontroly a nemôžeme ich stiahnuť späť." },
       { kind: "p", text: "Keď odstránite účet, bez zbytočného odkladu a najneskôr do 30 dní odstránime z verejného prístupu každú debatu, ktorú ste zverejnili, pokiaľ nám zákon neukladá uchovať konkrétnu položku. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Osoby uvedené v debatách, ktoré nie sú našimi používateľmi",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Ak niekto položí službe DebateAI otázku, v ktorej vás uvedie, môžeme uchovávať vaše osobné údaje, hoci ste službu nikdy nepoužili. Podmienky používateľom takéto konanie zakazujú a minimalizujeme údaje odosielané poskytovateľom umelej inteligencie, napriek tomu k tomu dochádza." },
+      { kind: "p", text: "Ak niekto položí službe Dialectical Engine otázku, v ktorej vás uvedie, môžeme uchovávať vaše osobné údaje, hoci ste službu nikdy nepoužili. Podmienky používateľom takéto konanie zakazujú a minimalizujeme údaje odosielané poskytovateľom umelej inteligencie, napriek tomu k tomu dochádza." },
       { kind: "p", text: "Táto časť predstavuje oznámenie, ktoré vám musíme poskytnúť podľa článku 14 GDPR. Údaje zahŕňajú všetko, čo používateľ napísal, a všetko, čo systém vytvoril v odpovedi; zdrojom je daný používateľ; účely a právny základ sú uvedené v časti 4; príjemcami sú poskytovatelia umelej inteligencie v registri; doba uchovávania sa riadi časťou 7. Máte všetky práva uvedené v časti 10 a predovšetkým nás môžete požiadať o odstránenie zverejnenej alebo súkromnej debaty, ktorá obsahuje vaše údaje, a o oznámenie údajov, ktoré uchovávame. Nepotrebujete na to účet. Napíšte na privacy@dezbatere.ro alebo použite ovládací prvok Nahlásiť pri ktorejkoľvek zverejnenej debate a odôvodnené žiadosti vybavíme bez zbytočného odkladu. Keď k tomu dôjde, nemôžeme vás informovať individuálne, pretože nevieme, kto ste ani ako vás kontaktovať; namiesto toho zverejňujeme toto oznámenie a ponúkame možnosť odstránenia." },
       { kind: "p", text: "To isté platí pre citlivé informácie o vás — politické názory, zdravie, náboženstvo — uvedené v otázke inej osoby. Po vznesení námietky nám žiadna právna podmienka neumožňuje pokračovať v ich spracúvaní a nebudeme v ňom pokračovať." }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Deti",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI je určená dospelým. Pri registrácii potvrdzujete, že máte aspoň 18 rokov, a vedome nespracúvame údaje žiadnej osoby mladšej ako 18 rokov. Ak zistíme, že účet patrí osobe mladšej ako 18 rokov, odstránime ho a údaje vymažeme spôsobom opísaným v časti 7. Niektoré krajiny považujú potvrdenie za nedostatočné alebo vyžadujú viac; príloha B uvádza pravidlá platné v daných krajinách a podmienky vysvetľujú náš postup." }
+      { kind: "p", text: "Dialectical Engine je určená dospelým. Pri registrácii potvrdzujete, že máte aspoň 18 rokov, a vedome nespracúvame údaje žiadnej osoby mladšej ako 18 rokov. Ak zistíme, že účet patrí osobe mladšej ako 18 rokov, odstránime ho a údaje vymažeme spôsobom opísaným v časti 7. Niektoré krajiny považujú potvrdenie za nedostatočné alebo vyžadujú viac; príloha B uvádza pravidlá platné v daných krajinách a podmienky vysvetľujú náš postup." }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Súbory cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI používa osem položiek, pričom všetky sú nevyhnutne potrebné pre službu, o ktorú ste požiadali, a všetky nastavuje výlučne DebateAI: štyri súbory cookie a štyri záznamy v úložisku vášho prehliadača. Nenastavujeme analytické, reklamné ani sledovacie súbory cookie. Zásady používania súborov cookie na [dezbatere.ro/cookies] ich uvádzajú spolu s tým, na čo každá položka slúži a kto ju dostáva, a zmenia sa skôr, než sa pridá čokoľvek ďalšie." },
+      { kind: "p", text: "Dialectical Engine používa 18 položiek, pričom všetky sú nevyhnutne potrebné pre službu, o ktorú ste požiadali, a všetky nastavuje výlučne Dialectical Engine: 13 súborov cookie a 5 záznamov v úložisku vášho prehliadača. Nenastavujeme analytické, reklamné ani sledovacie súbory cookie. Zásady používania súborov cookie na [dezbatere.ro/cookies] ich uvádzajú spolu s tým, na čo každá položka slúži a kto ju dostáva, a zmenia sa skôr, než sa pridá čokoľvek ďalšie." },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Súbor cookie — Bráni iným webom odosielať formuláre vo vašom mene. — 14 dní",
         "__Host-debateai-age-refusal — Súbor cookie (HttpOnly) — Po zamietnutej kontrole veku zabráni tomuto prehliadaču skúsiť to znova počas 30 dní. Obsahuje iba slovo „zamietnuté“, žiadne osobné údaje. — 30 dní",
         "debateai.locale — Súbor cookie — Pamätá si, aký jazyk rozhrania ste si zvolili. — 1 rok",
+        "__Host-debateai-staff — Súbor cookie (HttpOnly) — Oddelený prístup pracovníkov — Najviac 8 hodín; 15 minút nečinnosti",
+        "__Host-debateai-staff-csrf — Súbor cookie — Bráni iným webom odosielať formuláre vo vašom mene. — Najviac 8 hodín; 15 minút nečinnosti",
+        "__Host-debateai-password-reset — Súbor cookie (HttpOnly) — Iba obnovenie hesla — Najviac 30 minút",
+        "__Host-debateai-password-reset-csrf — Súbor cookie — Bráni iným webom odosielať formuláre vo vašom mene. — Najviac 30 minút",
+        "__Host-debateai-mfa-recovery — Súbor cookie (HttpOnly) — Iba obnova autentifikátora — Najviac 299 sekúnd",
+        "__Host-debateai-mfa-recovery-csrf — Súbor cookie — Bráni iným webom odosielať formuláre vo vašom mene. — Najviac 299 sekúnd",
+        "__Host-debateai-social-flow — Súbor cookie (HttpOnly) — Krátke prihlásenie cez poskytovateľa alebo prepojenie účtu — Najviac 5 minút",
+        "__Host-debateai-social-apple — Súbor cookie (HttpOnly) — Krátke prihlásenie cez poskytovateľa alebo prepojenie účtu — Najviac 5 minút",
+        "__Host-debateai-social-browser — Súbor cookie (HttpOnly) — Krátke prihlásenie cez poskytovateľa alebo prepojenie účtu — Najviac 5 minút",
         "debateai.consent — Lokálne úložisko — Pamätá si, že ste oznámenie o súboroch cookie už videli, takže sa zobrazí iba raz. — Do vymazania",
         "debateai.mode — Lokálne úložisko — Či používate svetlý, alebo tmavý režim zobrazenia. — Do vymazania",
         "debateai.languageOffer.dismissed — Úložisko relácie — Pamätá si pre túto kartu, že ste odmietli ponuku zobraziť debatu v inom jazyku. — Do zatvorenia karty",
-        "debateai.support.conversation.v2 — Úložisko relácie — Drží vašu konverzáciu s chatom pomoci na obrazovke, kým je karta otvorená. Vymaže sa, keď sa na tejto karte ktokoľvek prihlási alebo odhlási. — Do zatvorenia karty"
+        "debateai.support.conversation.v2 — Úložisko relácie — Drží vašu konverzáciu s chatom pomoci na obrazovke, kým je karta otvorená. Vymaže sa, keď sa na tejto karte ktokoľvek prihlási alebo odhlási. — Do zatvorenia karty",
+        "debateai.phone-completion-draft.v1 — Úložisko relácie — Nedokončená otázka počas telefonického kroku; odstránená pri zmene relácie, odhlásení alebo zmene vlastníka — 15 minút alebo do skoršieho vymazania"
         ]
       },
-      { kind: "p", text: "Žiadna iná strana prostredníctvom DebateAI nezhromažďuje informácie o vašich online aktivitách v priebehu času a naprieč webovými stránkami." },
-      { kind: "p", text: "Prehliadače môžu odosielať signál „Do Not Track“ alebo podobný signál. DebateAI vás nesleduje, takže takýto signál nemá čo vypnúť: služba funguje rovnako s ním aj bez neho." },
+      { kind: "p", text: "Žiadna iná strana prostredníctvom Dialectical Engine nezhromažďuje informácie o vašich online aktivitách v priebehu času a naprieč webovými stránkami." },
+      { kind: "p", text: "Prehliadače môžu odosielať signál „Do Not Track“ alebo podobný signál. Dialectical Engine vás nesleduje, takže takýto signál nemá čo vypnúť: služba funguje rovnako s ním aj bez neho." },
       { kind: "p", text: "Ak chcete tieto položky odmietnuť, zablokujte alebo vymažte súbory cookie a údaje stránky pre túto stránku v nastaveniach prehliadača. Čo potom prestane fungovať: prihlásenie a zapamätanie vašej voľby jazyka a režimu zobrazenia; oznámenie o súboroch cookie sa tiež znova zobrazí." }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukrajina (iba ak je uvedená)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Uplatňuje sa zákon Ukrajiny „O ochrane osobných údajov“. DebateAI neponúkame v oblastiach Ukrajiny, ktoré nekontroluje jej vláda. Vaše údaje smerujú do krajín EÚ a do Spojených štátov (pozri register). Sťažnosť môžete podať Komisárovi Najvyššej rady Ukrajiny pre ľudské práva." }
+      { kind: "p", text: "Uplatňuje sa zákon Ukrajiny „O ochrane osobných údajov“. Dialectical Engine neponúkame v oblastiach Ukrajiny, ktoré nekontroluje jej vláda. Vaše údaje smerujú do krajín EÚ a do Spojených štátov (pozri register). Sťažnosť môžete podať Komisárovi Najvyššej rady Ukrajiny pre ľudské práva." }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "c1b72ce43cb60511162cbf5be38641b511164d694a9fc427893de2ba199523fe",
-  eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.0 · ÚČINNÉ OD [DATE]",
+  version: "3.1",
+  sha256: "e9d3a6aa14d87a9b37cf7bc1e5f0f2a3bcbe53de345805f9387729be95c0fb1f",
+  eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.1 · ÚČINNÉ OD [DATE]",
   title: "Čo uchovávame a prečo",
   lede: "Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.",
-  endMarker: "KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Text zásad ochrany osobných údajov",
   sectionIdPrefix: "policy-section-",

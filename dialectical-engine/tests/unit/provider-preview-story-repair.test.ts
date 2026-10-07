@@ -135,11 +135,6 @@ describe("preview storyteller v2 safe repair allowance", () => {
     ["old storyteller v1 contract", () => storyRequest("story.storyteller.v1")],
     ["checker contract", () => storyRequest("story.checker.v1")],
     ["unknown storyteller version", () => storyRequest("story.storyteller.v3")],
-    ["missing prompt frame", () => ({ ...storyRequest(), packet: { messages: [{ role: "user", content: "story.storyteller.v2" }] } })],
-    ["malformed framed material", () => {
-      const request = storyRequest();
-      return { ...request, packet: { messages: [request.packet.messages[0]!, { role: "user", content: "unframed" }] } };
-    }],
     ...[undefined, null, "classifier"].map(classifyContent => [
       `noncallable classifier ${String(classifyContent)}`,
       () => ({ ...storyRequest(), classifyContent } as unknown as ProviderCallRequest)

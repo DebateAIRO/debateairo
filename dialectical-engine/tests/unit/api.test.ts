@@ -806,47 +806,46 @@ describe("Fastify sole facade / FX-WIRE-03", () => {
     await api.close();
   });
 
-  it("aborts a stale SSE connection without killing subsequent API requests", async () => {
+  it("cleanly closes a stale SSE connection without payload or harming subsequent API requests", async () => {
     const application = fixtureApplication();
-    application.readRun = async (runId) => ({
-      run_ref: runId,
-      question_line: "Stale run",
-      state: "QUEUED",
-      terminal_reason: null,
-      hold_until: null
-    });
-    application.events = async function* (runId) {
+    application.readRun = async (runId) => ({ run_ref: runId, question_line: "Stale run", state: "QUEUED", terminal_reason: null, hold_until: null });
+    let entered = 0;
+    let staleSignal: AbortSignal | undefined;
+    application.events = async function* (runId, session, _ownership, signal) {
+      entered += 1;
       expect(runId).toBe(MISSING_RUN_ID);
+      expect(session).toMatchObject({ caller_scope: "ASKER" });
+      staleSignal = signal;
       throw new TypedDomainError("RUN_NOT_FOUND", "No run exists for this stale EventSource");
     };
     const api = buildApi({ application });
-    await api.listen({ host: "127.0.0.1", port: 0 });
-    const address = api.server.address();
-    if (address === null || typeof address === "string") throw new Error("Expected a TCP test listener");
-
     const abort = new AbortController();
-    const streamOutcome = await Promise.race([
-      fetch(`http://127.0.0.1:${address.port}/v1/runs/${MISSING_RUN_ID}/events`, {
-        headers: USER_HEADERS,
-        signal: abort.signal
-      }).then(async (stream) => {
-        expect(stream.status).toBe(200);
-        await stream.text();
-        return "ended_by_server" as const;
-      }).then(
-        (outcome) => outcome,
-        () => "aborted_by_server" as const
-      ),
-      new Promise<"timed_out">((resolve) => setTimeout(() => resolve("timed_out"), 1_000))
-    ]);
-    if (streamOutcome === "timed_out") abort.abort();
-    expect(streamOutcome).toBe("aborted_by_server");
-
-    const survivor = await fetch(`http://127.0.0.1:${address.port}/v1/session`, {
-      headers: USER_HEADERS
-    });
-    expect(survivor.status).toBe(200);
-    await expect(survivor.json()).resolves.toMatchObject({ caller_scope: "ASKER" });
-    await api.close();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await api.listen({ host: "127.0.0.1", port: 0 });
+      const address = api.server.address();
+      if (address === null || typeof address === "string") throw new Error("Expected a TCP test listener");
+      const streamOutcome = await Promise.race([
+        fetch(`http://127.0.0.1:${address.port}/v1/runs/${MISSING_RUN_ID}/events`, { headers: USER_HEADERS, signal: abort.signal })
+          .then(async (stream) => {
+            expect(stream.status).toBe(200);
+            expect(stream.headers.get("content-type")).toBe("text/event-stream");
+            expect(await stream.text()).toBe("");
+            return "ended_by_server" as const;
+          }),
+        new Promise<"timed_out">((resolve) => { timer = setTimeout(() => resolve("timed_out"), 1_000); })
+      ]);
+      expect(streamOutcome).toBe("ended_by_server");
+      expect(entered).toBe(1);
+      expect(staleSignal).toBeInstanceOf(AbortSignal);
+      expect(staleSignal?.aborted).toBe(true);
+      const survivor = await fetch(`http://127.0.0.1:${address.port}/v1/session`, { headers: USER_HEADERS });
+      expect(survivor.status).toBe(200);
+      await expect(survivor.json()).resolves.toMatchObject({ caller_scope: "ASKER" });
+    } finally {
+      abort.abort();
+      if (timer !== undefined) clearTimeout(timer);
+      await api.close();
+    }
   });
 });

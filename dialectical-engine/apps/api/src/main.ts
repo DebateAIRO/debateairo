@@ -474,10 +474,12 @@ const declaredProviderTargets = boot.runSync("provider-targets", () => {
 // V-9(2): the ask-time health probe needs the same credential the runner uses, so
 // it resolves each vendor's file through the same custody-checked seam.
 if (previewConfig !== undefined) {
-  assertPreviewProviderTargets(previewConfig, declaredProviderTargets);
-  if ((await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID") {
-    throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT", "Preview roster cannot override a valid scorecard");
-  }
+  await boot.run("preview-scorecard-conflict", async () => {
+    assertPreviewProviderTargets(previewConfig, declaredProviderTargets);
+    if ((await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID") {
+      throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT", "Preview roster cannot override a valid scorecard");
+    }
+  });
 }
 const previewFetch = previewConfig === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPort(previewConfig));
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>

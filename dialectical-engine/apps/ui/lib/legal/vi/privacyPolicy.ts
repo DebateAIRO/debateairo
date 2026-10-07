@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Các cuộc tranh luận là riêng tư cho đến khi bạn công khai chúng. Việc công khai là một hành động có chủ ý và được xác nhận riêng. Một cuộc tranh luận đã công khai hiển thị bí danh của bạn, câu hỏi đúng như bạn đã viết, cây lập luận, điểm số, phán quyết và dải độ tin cậy, đồng thời mang nhãn hiển thị rõ ràng rằng nội dung do AI tạo ra. Cuộc tranh luận không bao giờ hiển thị địa chỉ email, hồ sơ phiên hoặc lịch sử tài khoản của bạn. [Published debates are / are not] được các công cụ tìm kiếm lập chỉ mục [unless you choose]." },
-      { kind: "p", text: "Việc hủy công khai sẽ gỡ cuộc tranh luận khỏi DebateAI và hủy khóa của bản sao công khai do chúng tôi nắm giữ. Các bản sao mà độc giả, công cụ tìm kiếm hoặc kho lưu trữ đã tạo nằm ngoài tầm kiểm soát của chúng tôi và chúng tôi không thể thu hồi chúng." },
+      { kind: "p", text: "Việc hủy công khai sẽ gỡ cuộc tranh luận khỏi Dialectical Engine và hủy khóa của bản sao công khai do chúng tôi nắm giữ. Các bản sao mà độc giả, công cụ tìm kiếm hoặc kho lưu trữ đã tạo nằm ngoài tầm kiểm soát của chúng tôi và chúng tôi không thể thu hồi chúng." },
       { kind: "p", text: "Khi bạn xóa tài khoản, chúng tôi gỡ mọi cuộc tranh luận bạn đã công khai khỏi quyền truy cập công cộng mà không chậm trễ quá mức và chậm nhất trong vòng 30 ngày, trừ khi pháp luật yêu cầu chúng tôi lưu giữ một mục cụ thể. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Người được nêu tên trong các cuộc tranh luận nhưng không phải người dùng của chúng tôi",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Nếu ai đó đặt cho DebateAI một câu hỏi có nêu tên bạn, chúng tôi có thể lưu giữ dữ liệu cá nhân về bạn mặc dù bạn chưa từng sử dụng dịch vụ. Điều khoản cấm người dùng làm việc này và chúng tôi giảm thiểu dữ liệu gửi đến các nhà cung cấp AI, nhưng việc đó vẫn xảy ra." },
+      { kind: "p", text: "Nếu ai đó đặt cho Dialectical Engine một câu hỏi có nêu tên bạn, chúng tôi có thể lưu giữ dữ liệu cá nhân về bạn mặc dù bạn chưa từng sử dụng dịch vụ. Điều khoản cấm người dùng làm việc này và chúng tôi giảm thiểu dữ liệu gửi đến các nhà cung cấp AI, nhưng việc đó vẫn xảy ra." },
       { kind: "p", text: "Mục này là thông báo mà chúng tôi phải cung cấp cho bạn theo Điều 14 GDPR. Dữ liệu là bất kỳ nội dung nào người dùng đã nhập và công cụ tạo ra để trả lời; nguồn là người dùng đó; mục đích và cơ sở pháp lý được nêu tại mục 4; bên nhận là các nhà cung cấp AI trong Sổ đăng ký; thời hạn lưu giữ tuân theo mục 7. Bạn có mọi quyền trong mục 10 và đặc biệt có thể yêu cầu chúng tôi gỡ một cuộc tranh luận đã công khai hoặc riêng tư có chứa dữ liệu của bạn và cho bạn biết chúng tôi lưu giữ những gì. Bạn không cần tài khoản để thực hiện. Hãy viết đến privacy@dezbatere.ro hoặc sử dụng chức năng Báo cáo trên bất kỳ cuộc tranh luận đã công khai nào, và chúng tôi sẽ xử lý yêu cầu có căn cứ mà không chậm trễ quá mức. Chúng tôi không thể thông báo riêng cho bạn khi việc này xảy ra vì không biết bạn là ai hoặc cách liên hệ; thay vào đó, chúng tôi áp dụng thông báo công khai này và phương thức yêu cầu gỡ bỏ." },
       { kind: "p", text: "Điều tương tự áp dụng đối với thông tin nhạy cảm về bạn — chính trị, sức khỏe, tôn giáo — xuất hiện trong câu hỏi của người khác. Không có điều kiện pháp lý nào cho phép chúng tôi tiếp tục xử lý sau khi bạn phản đối, và chúng tôi sẽ không tiếp tục." }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Trẻ em",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI dành cho người trưởng thành. Khi đăng ký, bạn xác nhận mình từ 18 tuổi trở lên và chúng tôi không cố ý xử lý dữ liệu của bất kỳ ai dưới 18 tuổi. Nếu biết một tài khoản thuộc về người dưới 18 tuổi, chúng tôi đóng tài khoản và xóa dữ liệu như mô tả tại mục 7. Một số quốc gia coi việc xác nhận là chưa đủ hoặc yêu cầu thêm; Phụ lục B nêu quy định áp dụng tại từng nơi và Điều khoản giải thích cách chúng tôi xử lý." }
+      { kind: "p", text: "Dialectical Engine dành cho người trưởng thành. Khi đăng ký, bạn xác nhận mình từ 18 tuổi trở lên và chúng tôi không cố ý xử lý dữ liệu của bất kỳ ai dưới 18 tuổi. Nếu biết một tài khoản thuộc về người dưới 18 tuổi, chúng tôi đóng tài khoản và xóa dữ liệu như mô tả tại mục 7. Một số quốc gia coi việc xác nhận là chưa đủ hoặc yêu cầu thêm; Phụ lục B nêu quy định áp dụng tại từng nơi và Điều khoản giải thích cách chúng tôi xử lý." }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI sử dụng tám mục, tất cả đều thực sự cần thiết cho dịch vụ bạn đã yêu cầu và tất cả chỉ do DebateAI đặt: bốn cookie và bốn mục nhập trong bộ nhớ trình duyệt của bạn. Chúng tôi không đặt cookie phân tích, quảng cáo hoặc theo dõi. Chính sách Cookie tại [dezbatere.ro/cookies] liệt kê chúng cùng với chức năng của từng mục và bên nhận mục đó, và sẽ được thay đổi trước khi bất kỳ thứ gì khác được thêm vào." },
+      { kind: "p", text: "Dialectical Engine sử dụng 18 mục, tất cả đều thực sự cần thiết cho dịch vụ bạn đã yêu cầu và tất cả chỉ do Dialectical Engine đặt: 13 cookie và 5 mục nhập trong bộ nhớ trình duyệt của bạn. Chúng tôi không đặt cookie phân tích, quảng cáo hoặc theo dõi. Chính sách Cookie tại [dezbatere.ro/cookies] liệt kê chúng cùng với chức năng của từng mục và bên nhận mục đó, và sẽ được thay đổi trước khi bất kỳ thứ gì khác được thêm vào." },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — 14 ngày",
         "__Host-debateai-age-refusal — Tệp cookie (HttpOnly) — Sau khi một lần kiểm tra độ tuổi bị từ chối, ngăn trình duyệt này thử lại trong 30 ngày. Nó chỉ chứa từ “bị từ chối”, không có dữ liệu cá nhân. — 30 ngày",
         "debateai.locale — Tệp cookie — Ghi nhớ ngôn ngữ giao diện bạn đã chọn. — 1 năm",
+        "__Host-debateai-staff — Tệp cookie (HttpOnly) — Quyền truy cập nhân viên riêng — Tối đa 8 giờ; 15 phút không hoạt động",
+        "__Host-debateai-staff-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — Tối đa 8 giờ; 15 phút không hoạt động",
+        "__Host-debateai-password-reset — Tệp cookie (HttpOnly) — Chỉ đặt lại mật khẩu — Tối đa 30 phút",
+        "__Host-debateai-password-reset-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — Tối đa 30 phút",
+        "__Host-debateai-mfa-recovery — Tệp cookie (HttpOnly) — Chỉ khôi phục trình xác thực — Tối đa 299 giây",
+        "__Host-debateai-mfa-recovery-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — Tối đa 299 giây",
+        "__Host-debateai-social-flow — Tệp cookie (HttpOnly) — Quy trình ngắn đăng nhập qua nhà cung cấp hoặc liên kết tài khoản — Tối đa 5 phút",
+        "__Host-debateai-social-apple — Tệp cookie (HttpOnly) — Quy trình ngắn đăng nhập qua nhà cung cấp hoặc liên kết tài khoản — Tối đa 5 phút",
+        "__Host-debateai-social-browser — Tệp cookie (HttpOnly) — Quy trình ngắn đăng nhập qua nhà cung cấp hoặc liên kết tài khoản — Tối đa 5 phút",
         "debateai.consent — Bộ nhớ cục bộ — Ghi nhớ rằng bạn đã xem thông báo về cookie, để thông báo chỉ hiện một lần. — Cho đến khi bạn xóa",
         "debateai.mode — Bộ nhớ cục bộ — Ghi nhớ bạn dùng chế độ hiển thị sáng hay tối. — Cho đến khi bạn xóa",
         "debateai.languageOffer.dismissed — Bộ nhớ phiên — Ghi nhớ, cho thẻ này, rằng bạn đã từ chối đề nghị hiển thị một cuộc tranh luận bằng ngôn ngữ khác. — Cho đến khi bạn đóng thẻ",
-        "debateai.support.conversation.v2 — Bộ nhớ phiên — Giữ cuộc trò chuyện trợ giúp của bạn trên màn hình khi thẻ vẫn mở. Cuộc trò chuyện bị xóa khi có người đăng nhập hoặc đăng xuất trong thẻ này. — Cho đến khi bạn đóng thẻ"
+        "debateai.support.conversation.v2 — Bộ nhớ phiên — Giữ cuộc trò chuyện trợ giúp của bạn trên màn hình khi thẻ vẫn mở. Cuộc trò chuyện bị xóa khi có người đăng nhập hoặc đăng xuất trong thẻ này. — Cho đến khi bạn đóng thẻ",
+        "debateai.phone-completion-draft.v1 — Bộ nhớ phiên — Câu hỏi chưa hoàn tất ở bước điện thoại; xóa khi đổi phiên, đăng xuất hoặc đổi chủ sở hữu — 15 phút hoặc đến khi bị xóa sớm hơn"
         ]
       },
-      { kind: "p", text: "Không có bên nào khác thu thập, thông qua DebateAI, thông tin về các hoạt động trực tuyến của bạn theo thời gian và trên nhiều trang web khác nhau." },
-      { kind: "p", text: "Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín hiệu tương tự. DebateAI không theo dõi bạn, vì vậy không có gì để tín hiệu đó tắt đi: dịch vụ hoạt động như nhau dù có hay không có tín hiệu đó." },
+      { kind: "p", text: "Không có bên nào khác thu thập, thông qua Dialectical Engine, thông tin về các hoạt động trực tuyến của bạn theo thời gian và trên nhiều trang web khác nhau." },
+      { kind: "p", text: "Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín hiệu tương tự. Dialectical Engine không theo dõi bạn, vì vậy không có gì để tín hiệu đó tắt đi: dịch vụ hoạt động như nhau dù có hay không có tín hiệu đó." },
       { kind: "p", text: "Để từ chối các mục này, hãy chặn hoặc xóa cookie và dữ liệu trang web của trang này trong phần cài đặt trình duyệt. Khi đó, những gì ngừng hoạt động: việc đăng nhập và việc ghi nhớ lựa chọn ngôn ngữ và chế độ hiển thị của bạn; thông báo cookie cũng sẽ hiển thị lại." }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraine (chỉ khi được liệt kê)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Luật của Ukraine \"Về bảo vệ dữ liệu cá nhân\" được áp dụng. Chúng tôi không cung cấp DebateAI tại các khu vực của Ukraine không do chính phủ nước này kiểm soát. Dữ liệu của bạn được chuyển đến các quốc gia EU và Hoa Kỳ (xem Sổ đăng ký). Bạn có thể khiếu nại đến Ủy viên Quốc hội Ukraine về Nhân quyền." }
+      { kind: "p", text: "Luật của Ukraine \"Về bảo vệ dữ liệu cá nhân\" được áp dụng. Chúng tôi không cung cấp Dialectical Engine tại các khu vực của Ukraine không do chính phủ nước này kiểm soát. Dữ liệu của bạn được chuyển đến các quốc gia EU và Hoa Kỳ (xem Sổ đăng ký). Bạn có thể khiếu nại đến Ủy viên Quốc hội Ukraine về Nhân quyền." }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "6dbd1367a00481704b799d912a7e0d8eb64aaea8575a212b13623a3a4bd19829",
-  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.0 · CÓ HIỆU LỰC [DATE]",
+  version: "3.1",
+  sha256: "02d0641211998910b5646631b757fbc7c014757bd3ab0bb355eca5948c92e591",
+  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.1 · CÓ HIỆU LỰC [DATE]",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",
-  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Nội dung Chính sách quyền riêng tư",
   sectionIdPrefix: "policy-section-",

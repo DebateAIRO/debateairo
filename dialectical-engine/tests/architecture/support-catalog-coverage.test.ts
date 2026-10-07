@@ -55,6 +55,8 @@ describe("Support catalog route coverage", () => {
       "/providers",
       "/public/debate/[id]",
       "/recover",
+      "/recover-authenticator",
+      "/reset-password",
       "/settings",
       "/settings/security",
       "/settings/card",
@@ -62,6 +64,7 @@ describe("Support catalog route coverage", () => {
       "/terms",
       "/terms/versions",
       "/terms/versions/[sha256]",
+      "/verify-backup-email",
       "/verify-email",
       "/verify-recovery-email",
       "/withdraw",
@@ -74,6 +77,10 @@ describe("Support catalog route coverage", () => {
 
     expect(disposition.get("/verify-email")).toBe("excluded");
     expect(disposition.get("/enroll-mfa")).toBe("excluded");
+    for (const route of ["/reset-password", "/recover-authenticator", "/verify-backup-email"]) {
+      expect(SUPPORT_PAGE_ROUTES).toContain(route);
+      expect(SUPPORT_CAPABILITIES.find(capability => capability.route === route)).toBeUndefined();
+    }
     expect(disposition.get("/admin/workers")).toBe("excluded");
     expect(disposition.get("/debate/[id]")).toBe("trusted-context-only");
     expect(disposition.get("/public/debate/[id]")).toBe("trusted-context-only");

@@ -3,6 +3,20 @@ import { createMfaRecoveryClient, createBackupEmailClient } from "../../packages
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 const expires_at = "2030-01-01T00:00:00Z";
 describe("approved current-password and verified-email clients", () => {
+  it.each([["/api", "/api"], ["/api/", "/api"], ["/api///", "/api"], ["/", ""], ["/a//b///", "/a//b"]])(
+    "preserves validated base %s and trims only its trailing slashes", async (base,prefix) => {
+      let url="",body="";
+      const client=createMfaRecoveryClient(async (input,init)=>{url=String(input);body=String(init?.body);return json({status:"factor_required",expires_at});},base);
+      await client.exchange("A".repeat(43),"fixture password");
+      expect(url).toBe(prefix+"/v1/auth/mfa-recovery/exchange");
+      expect(body).toBe(JSON.stringify({token:"A".repeat(43),password:"fixture password"}));
+    });
+  it("preserves a long allowed nontrailing slash run without transport at construction", async () => {
+    const base="/a"+"/".repeat(32000)+"b";let calls=0,url="";
+    const client=createMfaRecoveryClient(async input=>{calls++;url=String(input);return json({status:"factor_required",expires_at});},base);
+    expect(calls).toBe(0);await client.exchange("A".repeat(43),"fixture password");
+    expect(url).toBe(base+"/v1/auth/mfa-recovery/exchange");expect(calls).toBe(1);
+  });
   it("pairs current password with the mailed token once in an unscoped exchange body", async () => {
     let request: { url: string; init: RequestInit };
     const client = createMfaRecoveryClient(async (url, init) => { request = { url: String(url), init: init! }; return json({ status: "factor_required", expires_at }); }, "/api", () => "B".repeat(43));

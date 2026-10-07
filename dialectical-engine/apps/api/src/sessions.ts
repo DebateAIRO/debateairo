@@ -69,7 +69,7 @@ export interface ConsumerSessionMaterial {
   readonly sessionBindingContext:Readonly<{user_agent_hash:string}>; readonly occurredAt:Date;
   readonly idleExpiresAt:Date; readonly absoluteExpiresAt:Date;
 }
-export type ConsumerCeremonyOperation = 'ENROLLMENT_BEGIN' | 'ENROLLMENT_COMPLETE' | 'LOGIN_BEGIN' | 'LOGIN_COMPLETE' | 'STEP_UP_BEGIN' | 'STEP_UP_COMPLETE' | 'SECURITY_CODES' | 'RECOVERY_PROVE' | 'RECOVERY_BEGIN' | 'RECOVERY_COMPLETE' | 'ONBOARDING_STATUS' | 'ONBOARDING_COMPLETE' | 'SOCIAL_BEGIN' | 'SOCIAL_CALLBACK' | 'SOCIAL_SIGNUP';
+export type ConsumerCeremonyOperation = 'ENROLLMENT_BEGIN' | 'ENROLLMENT_COMPLETE' | 'LOGIN_BEGIN' | 'LOGIN_COMPLETE' | 'STEP_UP_BEGIN' | 'STEP_UP_COMPLETE' | 'SECURITY_CODES' | 'AUTH_METHOD_REMOVE' | 'RECOVERY_PROVE' | 'RECOVERY_BEGIN' | 'RECOVERY_COMPLETE' | 'ONBOARDING_STATUS' | 'ONBOARDING_COMPLETE' | 'SOCIAL_BEGIN' | 'SOCIAL_CALLBACK' | 'SOCIAL_SIGNUP';
 export interface ConsumerCeremonyAdmission {
   readonly retentionKey:string;
   readonly challengeCapacity:number;

@@ -319,6 +319,9 @@ describe("V-22 a stored Argon2id envelope may not exceed twice its own policy", 
     // still has to carry its own structural guard below.
     expect(sites.map((site) => `${site.path}:${site.callee}`)).toEqual([
       "apps/api/src/consumer-recovery.ts:verifyRecoveryCode",
+      "apps/api/src/email-mfa-recovery.ts:verifyPassword",
+      "apps/api/src/email-mfa-recovery.ts:verifyPassword",
+      "apps/api/src/email-mfa-recovery.ts:verifyRecoveryCode",
       "apps/api/src/mfa.ts:verifyRecoveryCode",
       "apps/api/src/sessions.ts:verifyPassword",
       "apps/api/src/sessions.ts:verifyRecoveryCode",

@@ -16,7 +16,7 @@ describe('explicit protected operator activation inputs',()=>{
  });
 });
 
-import { chmod, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
@@ -26,7 +26,7 @@ const validModule=`export function createStaffAlertOperatorAdapters(){return {sc
 const sha=(s:string)=>createHash('sha256').update(s).digest('hex');
 describe('trusted exact-byte operator loader',()=>{
  it('loads only the reviewed file bytes, validates exact ABI, and refuses production non-root custody',async()=>{
-  const root=await mkdtemp(join(tmpdir(),'task9-module-')),path=join(root,'adapter.mjs');
+  const root=await realpath(await mkdtemp(join(tmpdir(),'task9-module-'))),path=join(root,'adapter.mjs');
   try{
    await writeFile(path,validModule,{mode:0o600});const input={path,sha256:sha(validModule),files:syntheticAlertFiles(root)};
    expect((await loadStaffAlertOperator(input)).dispatch).toEqual({batchSize:1,intervalMs:100});
@@ -37,8 +37,8 @@ describe('trusted exact-byte operator loader',()=>{
   }finally{await rm(root,{recursive:true,force:true});}
  });
  it('refuses changed exports, unknown ABI fields, empty ACK registry and unbounded dispatch',async()=>{
-  const root=await mkdtemp(join(tmpdir(),'task9-abi-')),path=join(root,'adapter.mjs');
-  try{for(const source of [validModule+'\nexport const unknown=true;',validModule.replace("schema:'staff-alert-operator-v1'","unknown:true,schema:'staff-alert-operator-v1'"),validModule.replace("new Map([['capture',{evidence:async()=>null,acknowledge:async()=>null}]])",'new Map()'),validModule.replace('batchSize:1','batchSize:101'),validModule.replace('intervalMs:100','intervalMs:0')]){
+  const root=await realpath(await mkdtemp(join(tmpdir(),'task9-abi-'))),path=join(root,'adapter.mjs');
+  try{await writeFile(path,validModule,{mode:0o600});expect((await loadStaffAlertOperator({path,sha256:sha(validModule),files:syntheticAlertFiles(root)})).dispatch).toEqual({batchSize:1,intervalMs:100});for(const source of [validModule+'\nexport const unknown=true;',validModule.replace("schema:'staff-alert-operator-v1'","unknown:true,schema:'staff-alert-operator-v1'"),validModule.replace("new Map([['capture',{evidence:async()=>null,acknowledge:async()=>null}]])",'new Map()'),validModule.replace('batchSize:1','batchSize:101'),validModule.replace('intervalMs:100','intervalMs:0')]){
    await writeFile(path,source,{mode:0o600});await expect(loadStaffAlertOperator({path,sha256:sha(source),files:syntheticAlertFiles(root)})).rejects.toThrow('STAFF_ACTIVATION_UNAVAILABLE');
   }}finally{await rm(root,{recursive:true,force:true});}
  });

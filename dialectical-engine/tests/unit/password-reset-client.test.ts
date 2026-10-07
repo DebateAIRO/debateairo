@@ -5,6 +5,20 @@ const state = { status: "password_required", expires_at: "2030-01-01T00:00:00Z",
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
 
 describe("password-only reset typed client", () => {
+  it.each([["/api", "/api"], ["/api/", "/api"], ["/api///", "/api"], ["/", ""], ["/a//b///", "/a//b"]])(
+    "preserves validated base %s and trims only its trailing slashes", async (base, prefix) => {
+      let url="",body="";
+      const client=createPasswordResetClient(async (input,init)=>{url=String(input);body=String(init?.body);return json(state);},base);
+      await client.exchange("A".repeat(43));
+      expect(url).toBe(prefix+"/v1/auth/password-reset/exchange");
+      expect(body).toBe(JSON.stringify({token:"A".repeat(43)}));
+    });
+  it("preserves a long allowed nontrailing slash run without transport at construction", async () => {
+    const base="/a"+"/".repeat(32000)+"b";let calls=0,url="";
+    const client=createPasswordResetClient(async input=>{calls++;url=String(input);return json(state);},base);
+    expect(calls).toBe(0);await client.exchange("A".repeat(43));
+    expect(url).toBe(base+"/v1/auth/password-reset/exchange");expect(calls).toBe(1);
+  });
   it("exchanges the secret only in a same-origin POST body without ordinary or recovery CSRF", async () => {
     let url = "", init: RequestInit = {};
     const client = createPasswordResetClient(async (input, options) => { url = String(input); init = options!; return json(state); }, "/api", () => "B".repeat(43));

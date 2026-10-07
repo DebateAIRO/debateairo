@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "토론은 귀하가 공개할 때까지 비공개입니다. 공개는 별도로 확인되는 의도적인 행위입니다. 공개된 토론에는 귀하의 가명, 입력한 그대로의 질문, 논증 트리, 점수, 평결 및 신뢰 구간이 표시되고 콘텐츠가 AI 생성임을 알리는 라벨이 명시됩니다. 귀하의 이메일 주소, 세션 기록 또는 계정 기록은 절대 표시되지 않습니다. [Published debates are / are not] 검색 엔진에 색인됩니다 [unless you choose]." },
-      { kind: "p", text: "공개를 취소하면 토론이 DebateAI에서 제거되고 당사의 공개용 사본에 대한 키가 파기됩니다. 독자, 검색 엔진 또는 보관소가 이미 만든 사본은 당사가 통제할 수 없으며 회수할 수 없습니다." },
+      { kind: "p", text: "공개를 취소하면 토론이 Dialectical Engine에서 제거되고 당사의 공개용 사본에 대한 키가 파기됩니다. 독자, 검색 엔진 또는 보관소가 이미 만든 사본은 당사가 통제할 수 없으며 회수할 수 없습니다." },
       { kind: "p", text: "귀하가 계정을 삭제하면 법률상 특정 항목을 보관해야 하는 경우를 제외하고 귀하가 공개한 모든 토론을 부당한 지체 없이 늦어도 30일 이내에 공개 접근에서 제거합니다. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "토론에서 이름 등이 언급된 당사 비사용자",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "누군가 DebateAI에 귀하를 지목하는 질문을 하면 귀하가 서비스를 이용한 적이 없어도 당사가 귀하의 개인 데이터를 보유할 수 있습니다. 이용약관은 사용자의 이러한 행위를 금지하고 당사는 AI 제공업체로 보내는 정보를 최소화하지만, 이런 일이 발생할 수 있습니다." },
+      { kind: "p", text: "누군가 Dialectical Engine에 귀하를 지목하는 질문을 하면 귀하가 서비스를 이용한 적이 없어도 당사가 귀하의 개인 데이터를 보유할 수 있습니다. 이용약관은 사용자의 이러한 행위를 금지하고 당사는 AI 제공업체로 보내는 정보를 최소화하지만, 이런 일이 발생할 수 있습니다." },
       { kind: "p", text: "본 조항은 GDPR 제14조에 따라 당사가 귀하에게 제공해야 하는 고지입니다. 데이터는 사용자가 입력한 내용과 엔진이 답변으로 생성한 내용이고, 출처는 해당 사용자이며, 목적과 법적 근거는 제4조에 기재된 것, 수령자는 등록부의 AI 제공업체, 보유 기간은 제7조를 따릅니다. 귀하는 제10조의 모든 권리를 가지며, 특히 귀하의 데이터를 포함한 공개 또는 비공개 토론의 삭제와 당사가 보유한 정보의 고지를 요청할 수 있습니다. 이를 위해 계정이 필요하지 않습니다. privacy@dezbatere.ro로 문의하거나 공개 토론의 신고 기능을 사용하면 당사는 근거 있는 요청에 부당한 지체 없이 조치합니다. 이러한 일이 발생하더라도 당사는 귀하가 누구인지 또는 어떻게 연락할지 알지 못하므로 개별적으로 통지할 수 없습니다. 대신 이 공개 고지와 삭제 경로를 조치로 제공합니다." },
       { kind: "p", text: "다른 사람의 질문에 나타나는 귀하에 관한 정치, 건강, 종교 등의 민감정보에도 동일하게 적용됩니다. 귀하가 이의를 제기한 이후에도 당사가 계속 처리할 수 있는 법적 요건은 없으며, 당사는 계속 처리하지 않습니다." }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "아동",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI는 성인용입니다. 가입할 때 만 18세 이상임을 확인하며, 당사는 만 18세 미만인 사람의 데이터를 알면서 처리하지 않습니다. 계정이 만 18세 미만인 사람의 것임을 알게 되면 계정을 폐쇄하고 제7조에 설명된 대로 데이터를 삭제합니다. 일부 국가는 확인만으로 불충분하다고 보거나 추가 조치를 요구합니다. 지역별 적용 사항은 부속서 B에, 이에 대한 당사의 조치는 이용약관에 설명되어 있습니다." }
+      { kind: "p", text: "Dialectical Engine는 성인용입니다. 가입할 때 만 18세 이상임을 확인하며, 당사는 만 18세 미만인 사람의 데이터를 알면서 처리하지 않습니다. 계정이 만 18세 미만인 사람의 것임을 알게 되면 계정을 폐쇄하고 제7조에 설명된 대로 데이터를 삭제합니다. 일부 국가는 확인만으로 불충분하다고 보거나 추가 조치를 요구합니다. 지역별 적용 사항은 부속서 B에, 이에 대한 당사의 조치는 이용약관에 설명되어 있습니다." }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "쿠키",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI는 8개 항목을 사용하며, 모두 귀하가 요청한 서비스에 엄격히 필요하고 모두 DebateAI만 설정합니다. 쿠키 4개와 귀하의 브라우저 저장소에 있는 항목 4개입니다. 분석, 광고 또는 추적용 쿠키는 설정하지 않습니다. [dezbatere.ro/cookies]의 쿠키 정책에는 이 항목들이 각각의 역할 및 수신자와 함께 기재되어 있으며, 다른 무엇이든 추가하기 전에 변경됩니다." },
+      { kind: "p", text: "Dialectical Engine는 18개 항목을 사용하며, 모두 귀하가 요청한 서비스에 엄격히 필요하고 모두 Dialectical Engine만 설정합니다. 쿠키 13개와 귀하의 브라우저 저장소에 있는 항목 5개입니다. 분석, 광고 또는 추적용 쿠키는 설정하지 않습니다. [dezbatere.ro/cookies]의 쿠키 정책에는 이 항목들이 각각의 역할 및 수신자와 함께 기재되어 있으며, 다른 무엇이든 추가하기 전에 변경됩니다." },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — 쿠키 — 다른 웹사이트가 귀하의 이름으로 양식을 제출하지 못하도록 막습니다. — 14일",
         "__Host-debateai-age-refusal — 쿠키 (HttpOnly) — 연령 확인이 거부된 후 이 브라우저가 30일 동안 다시 시도하지 못하게 합니다. ‘거부됨’이라는 단어만 담고 있으며 개인정보는 없습니다. — 30일",
         "debateai.locale — 쿠키 — 귀하가 선택한 인터페이스 언어를 기억합니다. — 1년",
+        "__Host-debateai-staff — 쿠키 (HttpOnly) — 별도의 직원 접근 — 최대 8시간; 15분 비활동",
+        "__Host-debateai-staff-csrf — 쿠키 — 다른 웹사이트가 귀하의 이름으로 양식을 제출하지 못하도록 막습니다. — 최대 8시간; 15분 비활동",
+        "__Host-debateai-password-reset — 쿠키 (HttpOnly) — 비밀번호 재설정만 — 최대 30분",
+        "__Host-debateai-password-reset-csrf — 쿠키 — 다른 웹사이트가 귀하의 이름으로 양식을 제출하지 못하도록 막습니다. — 최대 30분",
+        "__Host-debateai-mfa-recovery — 쿠키 (HttpOnly) — 인증기 복구만 — 최대 299초",
+        "__Host-debateai-mfa-recovery-csrf — 쿠키 — 다른 웹사이트가 귀하의 이름으로 양식을 제출하지 못하도록 막습니다. — 최대 299초",
+        "__Host-debateai-social-flow — 쿠키 (HttpOnly) — 짧은 제공자 로그인 또는 계정 연결 흐름 — 최대 5분",
+        "__Host-debateai-social-apple — 쿠키 (HttpOnly) — 짧은 제공자 로그인 또는 계정 연결 흐름 — 최대 5분",
+        "__Host-debateai-social-browser — 쿠키 (HttpOnly) — 짧은 제공자 로그인 또는 계정 연결 흐름 — 최대 5분",
         "debateai.consent — 로컬 스토리지 — 쿠키 안내를 이미 보셨다는 사실을 기억하여 안내가 한 번만 표시되도록 합니다. — 직접 삭제할 때까지",
         "debateai.mode — 로컬 스토리지 — 라이트 모드와 다크 모드 중 어느 쪽을 사용하는지 기억합니다. — 직접 삭제할 때까지",
         "debateai.languageOffer.dismissed — 세션 스토리지 — 이 탭에서 토론을 다른 언어로 보여 주겠다는 제안을 거절하셨다는 사실을 기억합니다. — 탭을 닫을 때까지",
-        "debateai.support.conversation.v2 — 세션 스토리지 — 탭이 열려 있는 동안 도움말 채팅 대화를 화면에 유지합니다. 이 탭에서 누군가 로그인하거나 로그아웃하면 삭제됩니다. — 탭을 닫을 때까지"
+        "debateai.support.conversation.v2 — 세션 스토리지 — 탭이 열려 있는 동안 도움말 채팅 대화를 화면에 유지합니다. 이 탭에서 누군가 로그인하거나 로그아웃하면 삭제됩니다. — 탭을 닫을 때까지",
+        "debateai.phone-completion-draft.v1 — 세션 스토리지 — 전화 단계의 미완료 질문; 세션 변경, 로그아웃 또는 소유자 변경 시 삭제 — 15분 또는 그전에 삭제할 때까지"
         ]
       },
-      { kind: "p", text: "DebateAI를 통해 다른 어떤 당사자도 시간 경과에 따라 여러 웹사이트에 걸쳐 귀하의 온라인 활동에 관한 정보를 수집하지 않습니다." },
-      { kind: "p", text: "브라우저는 “Do Not Track” 신호 또는 이와 유사한 신호를 보낼 수 있습니다. DebateAI는 귀하를 추적하지 않으므로 이러한 신호로 끌 대상이 없습니다. 서비스는 신호가 있든 없든 똑같이 작동합니다." },
+      { kind: "p", text: "Dialectical Engine를 통해 다른 어떤 당사자도 시간 경과에 따라 여러 웹사이트에 걸쳐 귀하의 온라인 활동에 관한 정보를 수집하지 않습니다." },
+      { kind: "p", text: "브라우저는 “Do Not Track” 신호 또는 이와 유사한 신호를 보낼 수 있습니다. Dialectical Engine는 귀하를 추적하지 않으므로 이러한 신호로 끌 대상이 없습니다. 서비스는 신호가 있든 없든 똑같이 작동합니다." },
       { kind: "p", text: "이 항목들을 거부하려면 브라우저 설정에서 이 사이트의 쿠키와 사이트 데이터를 차단하거나 삭제하세요. 그러면 작동하지 않게 되는 것: 로그인, 그리고 언어 및 화면 표시 선택의 기억입니다. 쿠키 안내도 다시 표시됩니다." }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "우크라이나 (기재된 경우에만)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "우크라이나 「개인 데이터 보호에 관한 법률」이 적용됩니다. 당사는 우크라이나 정부가 통제하지 않는 우크라이나 지역에서는 DebateAI를 제공하지 않습니다. 귀하의 데이터는 EU 국가와 미국으로 이전됩니다(등록부 참조). 귀하는 우크라이나 의회 인권위원에게 민원을 제기할 수 있습니다." }
+      { kind: "p", text: "우크라이나 「개인 데이터 보호에 관한 법률」이 적용됩니다. 당사는 우크라이나 정부가 통제하지 않는 우크라이나 지역에서는 Dialectical Engine를 제공하지 않습니다. 귀하의 데이터는 EU 국가와 미국으로 이전됩니다(등록부 참조). 귀하는 우크라이나 의회 인권위원에게 민원을 제기할 수 있습니다." }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "0893119cae7b91823cfdeee82bbd7f0348943f5a573b8fe1ca883b2255035d15",
-  eyebrow: "개인정보 처리방침 · v3.0 · 시행일 [DATE]",
+  version: "3.1",
+  sha256: "2a7061fe36ca4a1358eb77ca74f476160944dd914a8f21a8f712ee6a31ddcb14",
+  eyebrow: "개인정보 처리방침 · v3.1 · 시행일 [DATE]",
   title: "당사가 저장하는 정보와 그 이유",
   lede: "GDPR (EU) 2016/679에 따른 귀하의 권리와 당사의 의무를 알기 쉽게 설명합니다. 총 14개 조항과 부속서 B — 끝까지 스크롤하십시오.",
-  endMarker: "방침 끝 · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "방침 끝 · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "개인정보 처리방침 본문",
   sectionIdPrefix: "policy-section-",

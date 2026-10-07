@@ -115,6 +115,24 @@ function harness(policy: AdmissionPolicy = POLICY) {
 const REFUSAL = Object.freeze({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" });
 
 describe("B10 admission limits (F-07, L1-F1, L1-F2)", () => {
+  it("charges authenticated SSE openings against the same real public-read window before query or stream effects", async () => {
+    let now=new Date(T0),entered=0;
+    const readRun=vi.fn(async()=>({run_ref:RUN_ID,question_line:'Synthetic streamed run',state:'QUEUED' as const,terminal_reason:null,hold_until:null}));
+    const application={...fixtureApplication(),readRun,events:async function*(){entered++;yield {event_id:'event:test',event_type:'run.accepted',run_ref:RUN_ID,at_sequence:1,payload:{}};}};
+    const limiter=new AdmissionLimiter(POLICY);
+    const api=buildApi({application,sessions:testSessionApplication([OWNER_A]),allowedOrigin:TEST_APP_ORIGIN,admission:limiter,admissionClock:()=>now});
+    const log=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    try{
+      for(let i=0;i<POLICY.publicReads.limit;i++)expect(limiter.decide('publicReads',SOURCE_A,now).allowed).toBe(true);
+      const refused=await api.inject({method:'GET',url:`/v1/runs/${RUN_ID}/events`,remoteAddress:SOURCE_A,headers:testSessionHeaders(OWNER_A)});
+      expect(refused.statusCode).toBe(429);expect(refused.json()).toEqual(REFUSAL);expect(refused.headers['retry-after']).toBe(String(POLICY.publicReads.windowMs/1000));
+      expect(refused.headers['content-type']).not.toContain('text/event-stream');expect(readRun).not.toHaveBeenCalled();expect(entered).toBe(0);
+      now=new Date(now.getTime()+POLICY.publicReads.windowMs);
+      const allowed=await api.inject({method:'GET',url:`/v1/runs/${RUN_ID}/events`,remoteAddress:SOURCE_A,headers:testSessionHeaders(OWNER_A)});
+      expect(allowed.statusCode).toBe(200);expect(allowed.headers['content-type']).toBe('text/event-stream');expect(allowed.body).toContain('event: run.accepted');expect(readRun).toHaveBeenCalledTimes(1);expect(entered).toBe(1);
+      expect(log).toHaveBeenCalledWith(JSON.stringify({event:'api.admission.refused',route:'GET /v1/runs/{id}/events',reason:'LIMIT',windowMs:POLICY.publicReads.windowMs}));
+    }finally{log.mockRestore();await api.close();}
+  });
   it("admits 20 asks per owner per hour, refuses the 21st with 429 + retry-after, and leaves other owners alone", async () => {
     const h = harness();
     try {

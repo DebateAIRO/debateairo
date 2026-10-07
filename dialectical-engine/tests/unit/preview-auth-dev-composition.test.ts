@@ -4,6 +4,7 @@ import { parseApiEnvironment,parseRunnerEnvironment,API_ENVIRONMENT_KEYS,RUNNER_
 import { validApiEnvironmentFixture,validRunnerEnvironmentFixture } from '../support/apiEnvironmentFixture.js';
 import { parsePreviewProviderTestConfig } from '../../packages/providers/src/preview-test.js';
 import ts from 'typescript-classic';
+import { installBootCustody } from '../../apps/api/src/boot-custody.js';
 const config={deployment:'v3-preview',free_model_ids:['zai-org/GLM-5.3-Flash'],requested_thinking_level:'high',budget_socket:'/run/debateai-v3-preview/glm.sock',scope_id:'fixture'};
 const loaders=[['api',parseApiEnvironment,validApiEnvironmentFixture,API_ENVIRONMENT_KEYS],['runner',parseRunnerEnvironment,validRunnerEnvironmentFixture,RUNNER_ENVIRONMENT_KEYS]] as const;
 describe('actual entrypoint opt-in preview composition',()=>{
@@ -20,10 +21,11 @@ describe('actual entrypoint opt-in preview composition',()=>{
    if(!guard)return;
    const code=guard.getText(ast);let targetChecks=0,reads=0;
    const AsyncFunction=Object.getPrototypeOf(async()=>{}).constructor;
-   const run=new AsyncFunction('previewConfig','declaredProviderTargets','assertPreviewProviderTargets','readModelScorecard','pool','environment','readEngineVersion','TypedDomainError',ts.transpileModule(code,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
+   const run=new AsyncFunction('previewConfig','declaredProviderTargets','assertPreviewProviderTargets','readModelScorecard','pool','environment','readEngineVersion','TypedDomainError','boot',ts.transpileModule(code,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
    class Domain extends Error{constructor(code:string){super(code);}}
-   await expect(run(config,[],()=>{targetChecks++;},async()=>{reads++;return{state:'VALID'};},{},{REGISTER_VERSION:12},async()=>'current',Domain)).rejects.toThrow('PREVIEW_SCORECARD_CONFLICT');expect({targetChecks,reads}).toEqual({targetChecks:1,reads:1});
-   targetChecks=0;reads=0;await run(undefined,[],()=>{targetChecks++;},async()=>{reads++;return{state:'VALID'};},{},{REGISTER_VERSION:12},async()=>'current',Domain);expect({targetChecks,reads}).toEqual({targetChecks:0,reads:0});
+   let closed=0;const pool={end:async()=>{closed++;}},boot=installBootCustody({logger:{error:()=>undefined}});if(service==='api')boot.hold(pool);
+   await expect(run(config,[],()=>{targetChecks++;},async()=>{reads++;return{state:'VALID'};},pool,{REGISTER_VERSION:12},async()=>'current',Domain,boot)).rejects.toThrow('PREVIEW_SCORECARD_CONFLICT');expect({targetChecks,reads}).toEqual({targetChecks:1,reads:1});expect(closed).toBe(service==='api'?1:0);
+   const absentBoot=installBootCustody({logger:{error:()=>undefined}});targetChecks=0;reads=0;await run(undefined,[],()=>{targetChecks++;},async()=>{reads++;return{state:'VALID'};},pool,{REGISTER_VERSION:12},async()=>'current',Domain,absentBoot);expect({targetChecks,reads}).toEqual({targetChecks:0,reads:0});absentBoot.release();
    expect(source.indexOf(code)).toBeLessThan(source.indexOf(service==='api'?'const providerDiscoveryTargets =':'const providerTargets ='));
   });
  }

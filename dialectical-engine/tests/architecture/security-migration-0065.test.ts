@@ -3,6 +3,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
 import type { PoolClient } from "pg";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
+import { auditMigrationReplaySafety } from "../../tools/orphan-audit/src/index.js";
 
 // DB1 of the 2026-09-01 security-hardening mission pins
 // migrations/0065_security_delta_guards.sql on real PostgreSQL.
@@ -28,7 +30,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 // escaping every rule below.
 const APPLICATION_SCHEMAS = [
   "billing", "core", "evaluator", "evidence", "identity", "ledger", "legal", "memory",
-  "obs", "observation", "register", "scorecard", "serve", "support"
+  "obs", "observation", "register", "scorecard", "serve", "staff", "support"
 ] as const;
 
 // The exhaustive set of application base tables that legitimately carry NO
@@ -70,8 +72,110 @@ const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   "identity.account_erasure_notification_outbox": "outbox rows are sent then cleared",
   "identity.private_erasure_audit_binding": "erasure binding is cleared by the sweep",
   "identity.publication_event_binding": "binding is cleared on unpublish",
-  "identity.run_execution_binding": "binding is cleared by erasure"
+  "identity.run_execution_binding": "binding is cleared by erasure",
+  "identity.account_security_hold": "0085/0104-0106: held/security_epoch state updated by exact private security owners",
+  "identity.staff_webauthn_metadata": "0086: inserted with factor; erased by account/factor cascade; private selected-column reader",
+  "identity.password_reset_control": "0104: request state advances and closes",
+  "identity.password_reset_notice_binding": "0104: private request/account-cascade binding",
+  "identity.password_reset_notice": "0104: delivery lease/sent/dead/retry state changes",
+  "identity.password_reset_source_window": "0104: source window increments and is pruned",
+  "identity.backup_email_control": "0105: verification state advances/expires",
+  "identity.backup_email_notice_binding": "0105: private challenge/account-cascade binding",
+  "identity.backup_email_notice": "0105: delivery lease/sent/dead state changes",
+  "identity.backup_email_source_window": "0105: source window increments and is pruned",
+  "identity.backup_email_proof_window": "0105: per-session proof window increments; session cascade erases",
+  "identity.mfa_recovery_control": "0106: staged request completes/cancels/expires",
+  "identity.mfa_recovery_staged_code": "0106: staged codes are replaced then copied on completion",
+  "identity.mfa_recovery_notice_binding": "0106: private request/account-cascade binding",
+  "identity.mfa_recovery_notice": "0106: delivery lease/sent/dead state changes",
+  "identity.mfa_recovery_source_window": "0106: source window increments and is pruned",
+  "staff.subject": "0085/0089: capabilities/state/epoch and erased user binding change",
+  "staff.privilege_session": "0087: idle renewal/revocation and account/session cascade",
+  "staff.action_proof": "0085/0086: proof consumed; parent/session cascade",
+  "staff.invitation_proof": "0085/0086: proof consumed; parent/session cascade",
+  "staff.prerequisite_receipt": "0085/0086: prerequisite consumed and registration handle bound",
+  "staff.webauthn_challenge": "0086: challenge bound/consumed; failed attempts change",
+  "staff.owner_possession_receipt": "0085/0089: receipt consumed; account/session/command cascade",
+  "staff.invitation": "0085: invitation consumed/revoked; account cascade",
+  "staff.owner_command": "0089: command committed/cancelled and erased previous user binding",
+  "staff.owner_designation": "0089: active designation rotates false",
+  "staff.owner_lineage": "0089: current singleton lineage changes in owner recovery transaction",
+  "staff.owner_recovery_generation": "0089: current offline generation/verifier rotates",
+  "staff.password_totp_rotation_receipt": "0085: account/session/factor ON DELETE CASCADE erases receipt",
+  "staff.alert_dispatch_state": "0088: claim/retry/terminal delivery state changes",
+  "staff.alert_operation_readiness": "0088: current per-operation readiness expires/replaces",
+  "staff.independent_alert_readiness": "0088: current readiness singleton published/revoked",
+  "staff.funding_policy_selection": "0092: current selected policy changes through exact capability"
 };
+
+const STAFF_OWNER = "debateai_staff_security_owner";
+const RECOVERY_READERS = ["debateai_password_recovery_owner", "debateai_password_reset_owner", "debateai_backup_email_owner", "debateai_mfa_recovery_owner"];
+const PRIVATE_READERS = [STAFF_OWNER, ...RECOVERY_READERS];
+const PRIVATE_TABLE_OWNERS: Readonly<Record<string, string>> = Object.fromEntries([
+  ...["action_proof", "alert_delivery_receipt", "alert_dispatch_state", "alert_operation_readiness", "alert_outbox", "audit_event", "bootstrap_marker", "funding_policy_selection", "grant_event", "independent_alert_readiness", "invitation", "invitation_proof", "owner_command", "owner_designation", "owner_lineage", "owner_possession_receipt", "owner_recovery_generation", "owner_recovery_operation", "password_totp_rotation_receipt", "prerequisite_receipt", "privilege_session", "subject", "webauthn_challenge"].map((name) => [`staff.${name}`, STAFF_OWNER]),
+  ...["internal_grant", "internal_grant_event", "internal_provider_admission"].map((name) => [`billing.${name}`, STAFF_OWNER]),
+  ...["password_reset_control", "password_reset_notice_binding", "password_reset_notice", "password_reset_source_window"].map((name) => [`identity.${name}`, "debateai_password_reset_owner"]),
+  ...["backup_email_control", "backup_email_notice_binding", "backup_email_notice", "backup_email_source_window", "backup_email_proof_window"].map((name) => [`identity.${name}`, "debateai_backup_email_owner"]),
+  ...["mfa_recovery_control", "mfa_recovery_staged_code", "mfa_recovery_notice_binding", "mfa_recovery_notice", "mfa_recovery_source_window", "mfa_recovery_legacy_cohort"].map((name) => [`identity.${name}`, "debateai_mfa_recovery_owner"]),
+  ...["password_recovery_control", "password_recovery_feed", "password_recovery_notice", "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code"].map((name) => [`identity.${name}`, "debateai_password_recovery_owner"])
+]);
+
+/** Finite metadata-only oracle; private ownership is never inferred from NOLOGIN alone. */
+async function privateBoundaryProblems(client: Pick<PoolClient, "query">, expectedOwners = PRIVATE_TABLE_OWNERS): Promise<string[]> {
+  const problems: string[] = [];
+  const owners = await client.query<{ role: string; safe: boolean }>(`
+    SELECT rolname AS role, NOT rolcanlogin AND NOT rolsuper AND NOT rolinherit AND NOT rolbypassrls
+      AND NOT rolcreaterole AND NOT rolcreatedb AND NOT rolreplication
+      AND NOT EXISTS(SELECT 1 FROM pg_auth_members m WHERE m.roleid=pg_roles.oid) AS safe
+    FROM pg_roles WHERE rolname=ANY($1::text[]) ORDER BY rolname`, [PRIVATE_READERS]);
+  if (owners.rows.length !== PRIVATE_READERS.length || owners.rows.some((row) => !row.safe)) problems.push("PRIVATE_OWNER_ROLE_OR_MEMBERSHIP");
+  const tables = await client.query<{ relation: string; owner: string }>(`
+    SELECT n.nspname||'.'||c.relname AS relation,pg_get_userbyid(c.relowner) AS owner
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE c.relkind IN('r','p') AND n.nspname=ANY($1::text[])
+      AND pg_get_userbyid(c.relowner)=ANY($2::text[]) ORDER BY 1`, [[...APPLICATION_SCHEMAS], PRIVATE_READERS]);
+  const actual = Object.fromEntries(tables.rows.map((row) => [row.relation, row.owner]));
+  if (JSON.stringify(Object.entries(actual).sort()) !== JSON.stringify(Object.entries(expectedOwners).sort())) problems.push("PRIVATE_TABLE_OWNER_INVENTORY");
+  const creator = await client.query<{ safe: boolean; oid: number }>(`
+    SELECT c.relowner AS oid, c.relowner=(SELECT oid FROM pg_roles WHERE rolname=current_user)
+      AND c.relowner=(SELECT datdba FROM pg_database WHERE datname=current_database())
+      AND c.relowner=(SELECT nspowner FROM pg_namespace WHERE nspname='billing') AS safe
+    FROM pg_class c WHERE c.oid='public.debateai_schema_migration'::regclass`);
+  if (creator.rows.length !== 1 || creator.rows[0]?.safe !== true) return [...problems, "ORIGINAL_CREATOR_ANCHOR"];
+  const newRelations = Object.keys(MUTABLE_UNGUARDED_RELATIONS).filter((name) => name.startsWith("staff.") || /identity\.(?:account_security_hold|staff_webauthn_metadata|password_reset_|backup_email_|mfa_recovery_)/.test(name));
+  const identityOwners = await client.query<{ ok: boolean }>(`SELECT count(*)=2 AND bool_and(relowner=$1::oid) AS ok FROM pg_class WHERE oid IN('identity.account_security_hold'::regclass,'identity.staff_webauthn_metadata'::regclass)`, [creator.rows[0]!.oid]);
+  if (identityOwners.rows[0]?.ok !== true) problems.push("IDENTITY_CREATOR_OWNER");
+  const effective = await client.query<{ relation: string; role: string }>(`
+    SELECT n.nspname||'.'||c.relname AS relation,r.rolname AS role
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN pg_roles r
+    WHERE n.nspname||'.'||c.relname=ANY($1::text[]) AND r.oid<>c.relowner AND r.oid<>$2::oid
+      AND r.rolname LIKE 'debateai\\_%' AND NOT(r.rolname=ANY($3::text[]))
+      AND (has_table_privilege(r.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+        OR has_any_column_privilege(r.oid,c.oid,'SELECT,INSERT,UPDATE,REFERENCES'))`, [newRelations, creator.rows[0]!.oid, PRIVATE_READERS]);
+  for (const row of effective.rows) problems.push(`REACHABLE_RUNTIME_RAW:${row.relation}:${row.role}`);
+  const access = await client.query<{ relation: string; role: string; privilege: string; column_name: string | null }>(`
+    WITH grants AS (
+      SELECT c.oid,c.relowner,n.nspname||'.'||c.relname AS relation,a.grantee,a.privilege_type AS privilege,NULL::text AS column_name
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace,
+        LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
+      UNION ALL
+      SELECT c.oid,c.relowner,n.nspname||'.'||c.relname,a.grantee,a.privilege_type,attribute.attname
+      FROM pg_attribute attribute JOIN pg_class c ON c.oid=attribute.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace,
+        LATERAL aclexplode(attribute.attacl) a WHERE attribute.attnum>0 AND NOT attribute.attisdropped
+    ) SELECT relation,coalesce(r.rolname,'PUBLIC') AS role,privilege,column_name
+    FROM grants g LEFT JOIN pg_roles r ON r.oid=g.grantee
+    WHERE relation=ANY($1::text[]) AND g.grantee<>g.relowner AND g.grantee<>$2::oid
+    ORDER BY relation,role,privilege,column_name`, [newRelations, creator.rows[0]!.oid]);
+  for (const row of access.rows) {
+    const allowed = row.relation === "identity.account_security_hold" && PRIVATE_READERS.includes(row.role)
+      && row.column_name === null && ["SELECT", "INSERT", "UPDATE"].includes(row.privilege)
+      || row.relation === "identity.staff_webauthn_metadata" && row.role === STAFF_OWNER && row.privilege === "SELECT"
+        && row.column_name !== null && ["mfa_factor_id", "user_id", "transports"].includes(row.column_name)
+      || row.relation === "staff.subject" && RECOVERY_READERS.includes(row.role) && row.privilege === "SELECT" && row.column_name === null;
+    if (!allowed) problems.push(`PRIVATE_RAW_GRANT:${row.relation}:${row.role}:${row.privilege}:${row.column_name ?? "table"}`);
+  }
+  return problems;
+}
 
 // DL5-F4: the three definer entry points plus the CHECK helper 0055 made
 // surplus. Each row is (signature, roles that must still hold EXECUTE).
@@ -186,8 +290,9 @@ describe("0065 TRUNCATE and mutation guards discovered from the catalog (DL5-F2)
   });
 
   it("grants TRUNCATE to no application role in any application schema", async () => {
-    const result = await database.pool.query<{ relation: string; grantee: string }>(`
-      SELECT namespace.nspname || '.' || relation.relname AS relation, grantee.rolname AS grantee
+    expect(await privateBoundaryProblems(database.pool)).toEqual([]);
+    const result = await database.pool.query<{ relation: string; grantee: string; is_owner: boolean }>(`
+      SELECT namespace.nspname || '.' || relation.relname AS relation, grantee.rolname AS grantee,acl.grantee=relation.relowner AS is_owner
       FROM pg_catalog.pg_class AS relation
       JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace,
         LATERAL pg_catalog.aclexplode(COALESCE(
@@ -200,7 +305,40 @@ describe("0065 TRUNCATE and mutation guards discovered from the catalog (DL5-F2)
         AND (acl.grantee = 0 OR grantee.rolname LIKE 'debateai\\_%')
       ORDER BY 1, 2
     `, [[...APPLICATION_SCHEMAS]]);
-    expect(result.rows).toEqual([]);
+    expect(result.rows.filter((row) => !row.is_owner || PRIVATE_TABLE_OWNERS[row.relation] !== row.grantee)).toEqual([]);
+  });
+
+  it("keeps all six legacy103 owner tables guarded instead of treating them as mutable", async () => {
+    const names=Object.entries(PRIVATE_TABLE_OWNERS).filter(([,owner])=>owner==='debateai_password_recovery_owner').map(([name])=>name);
+    expect(names).toHaveLength(6);for(const name of names)expect(MUTABLE_UNGUARDED_RELATIONS[name]).toBeUndefined();
+    const guards=await database.pool.query<{ok:boolean}>(`SELECT count(*)=6 AND bool_and(EXISTS(SELECT 1 FROM pg_trigger t WHERE t.tgrelid=c.oid AND NOT t.tgisinternal AND (t.tgtype&32)<>0 AND (t.tgtype&2)<>0 AND t.tgenabled IN('O','A'))) AS ok FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname||'.'||c.relname=ANY($1::text[])`,[names]);
+    expect(guards.rows[0]?.ok).toBe(true);
+  });
+
+  it("refuses unsafe private owners, raw grants and unknown or missing table maps in rolled-back synthetic catalog states", async () => {
+    expect(await privateBoundaryProblems(database.pool)).toEqual([]);
+    const absent = { ...PRIVATE_TABLE_OWNERS }; delete absent["identity.backup_email_control"];
+    expect(await privateBoundaryProblems(database.pool, absent)).toContain("PRIVATE_TABLE_OWNER_INVENTORY");
+    expect(await privateBoundaryProblems(database.pool, { ...PRIVATE_TABLE_OWNERS, "staff.synthetic_missing": STAFF_OWNER })).toContain("PRIVATE_TABLE_OWNER_INVENTORY");
+    for (const sql of [
+      "ALTER TABLE identity.backup_email_control OWNER TO debateai_mfa_recovery_owner",
+      "ALTER ROLE debateai_staff_security_owner LOGIN",
+      "ALTER ROLE debateai_staff_security_owner SUPERUSER",
+      "ALTER ROLE debateai_staff_security_owner BYPASSRLS",
+      "GRANT debateai_staff_security_owner TO debateai_runtime",
+      "CREATE ROLE debateai_task5_inherited NOLOGIN; GRANT debateai_backup_email_owner TO debateai_task5_inherited; GRANT debateai_task5_inherited TO debateai_runtime",
+      "CREATE TABLE staff.synthetic_unclassified(value text); ALTER TABLE staff.synthetic_unclassified OWNER TO debateai_staff_security_owner",
+      "GRANT SELECT ON identity.backup_email_control TO debateai_runtime",
+      "GRANT SELECT(challenge_id) ON identity.backup_email_control TO debateai_runtime",
+      "GRANT TRUNCATE ON identity.backup_email_control TO debateai_authorization_runtime",
+      "CREATE ROLE debateai_task5_untrusted_nologin NOLOGIN; GRANT TRUNCATE ON identity.backup_email_control TO debateai_task5_untrusted_nologin",
+      "GRANT SELECT ON identity.backup_email_control TO PUBLIC"
+    ]) await withRolledBackTransaction(async (client) => {
+      await client.query(sql);
+      expect(await privateBoundaryProblems(client), sql).not.toEqual([]);
+    });
+    // NOLOGIN capability remains untrusted: it cannot inherit a private owner or hold raw TRUNCATE.
+    expect(await privateBoundaryProblems(database.pool)).toEqual([]);
   });
 
   it("refuses TRUNCATE and the closed mutations from the database owner", async () => {
@@ -342,6 +480,12 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
 
   // Pre-0065 duplicated numeric prefixes, recorded for the B28 checksum work.
   const DUPLICATED_PREFIXES = ["0025", "0050", "0051", "0052", "0053", "0054", "0055", "0057"] as const;
+  const NATIVE_TABLE_SITES: Readonly<Record<string, readonly string[]>> = {
+    "0104_password_only_reset.sql": ["identity.password_reset_control", "identity.password_reset_notice_binding", "identity.password_reset_notice", "identity.password_reset_source_window"],
+    "0105_backup_email_verification.sql": ["identity.backup_email_control", "identity.backup_email_notice_binding", "identity.backup_email_notice", "identity.backup_email_source_window", "identity.backup_email_proof_window"],
+    "0106_known_password_mfa_recovery.sql": ["identity.mfa_recovery_control", "identity.mfa_recovery_staged_code", "identity.mfa_recovery_notice_binding", "identity.mfa_recovery_notice", "identity.mfa_recovery_source_window"],
+    "0107_auth_dev_integration.sql": ["identity.mfa_recovery_legacy_cohort"]
+  };
 
   async function migrationFiles(): Promise<string[]> {
     return (await readdir(MIGRATIONS)).filter((name) => /^\d+.*\.sql$/u.test(name)).sort();
@@ -349,159 +493,55 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
 
   it("guards every CREATE TABLE and CREATE INDEX outside the two ledgered files", async () => {
     const files = await migrationFiles();
+    const plan = await loadMigrationPlan();
+    const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
     const unguardedTables: string[] = [];
     const unguardedIndexes: string[] = [];
+    const classifiedTables: string[] = [];
     for (const name of files) {
       const source = await readFile(new URL(name, MIGRATIONS), "utf8");
       for (const line of source.split("\n")) {
         if (/^\s*CREATE\s+TABLE\s+/iu.test(line) && !/IF\s+NOT\s+EXISTS/iu.test(line)) {
-          unguardedTables.push(name);
+          const relation = /^\s*CREATE\s+TABLE\s+([^\s(]+)/iu.exec(line)?.[1];
+          if (relation !== undefined && NATIVE_TABLE_SITES[name]?.includes(relation)) {
+            // Exact15 table sites, including one pre107 cohort; no standalone replay or reseed.
+            expect(auditMigrationReplaySafety(`migrations/${name}`, source, { plan, migrateSource })).toEqual([]);
+            classifiedTables.push(`${name}:${relation}`);
+          } else unguardedTables.push(name);
         }
         if (/^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+/iu.test(line) && !/IF\s+NOT\s+EXISTS/iu.test(line)) {
-          unguardedIndexes.push(name);
+          if (name === "0105_backup_email_verification.sql" && line === "CREATE UNIQUE INDEX backup_email_one_pending ON identity.backup_email_control(user_id) WHERE stage='EMAIL_REQUIRED';") {
+            expect(auditMigrationReplaySafety(`migrations/${name}`, source, { plan, migrateSource })).toEqual([]);
+          } else unguardedIndexes.push(name);
         }
       }
     }
     expect([...new Set(unguardedTables)]).toEqual([...UNGUARDED_CREATE_TABLE]);
     expect(unguardedIndexes).toEqual([]);
+    expect(classifiedTables.sort()).toEqual(Object.entries(NATIVE_TABLE_SITES).flatMap(([name, relations]) => relations.map((relation) => `${name}:${relation}`)).sort());
   });
 
-  it("allocates a unique numeric prefix from 0065 onward", async () => {
+  it("binds every full migration name and intentional collision to the closed native order", async () => {
     const files = await migrationFiles();
-    const byPrefix = new Map<string, string[]>();
-    for (const name of files) {
-      const prefix = name.slice(0, 4);
-      byPrefix.set(prefix, [...(byPrefix.get(prefix) ?? []), name]);
+    const plan = await loadMigrationPlan();
+    const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
+    expect(plan.manifest.order).toHaveLength(128);
+    expect(files).toEqual([...plan.manifest.order, plan.forward108.name].sort());
+    for (const name of ["0104_password_only_reset.sql", "0105_backup_email_verification.sql", "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"]) {
+      expect(auditMigrationReplaySafety(`migrations/${name}`, plan.sources.get(name)!.sql, { plan, migrateSource })).toEqual([]);
     }
-    const duplicated = [...byPrefix.entries()]
-      .filter(([, names]) => names.length > 1)
-      .map(([prefix]) => prefix)
-      .sort();
-    expect(duplicated).toEqual([...DUPLICATED_PREFIXES]);
-    expect(duplicated.filter((prefix) => Number(prefix) >= 65)).toEqual([]);
-    // migrate() sorts by file name (packages/db/src/index.ts:769), so inside a
-    // duplicated pair the applied order is a lexical accident of the suffix.
-    // Nothing may depend on it; a new file must not add another pair.
-    expect(files.filter((name) => Number(name.slice(0, 4)) >= 65))
-      .toEqual([
-        "0065_security_delta_guards.sql",
-        // V-28 (task 11): the persisted model-spend ledger the per-run and daily
-        // cost envelopes read. A new prefix, no pair.
-        "0066_model_spend_ledger.sql",
-        // SYNC3 / R2 (coordinator ruling): dev's plan-tier column, which dev had
-        // numbered 0061 beside 0061_algorithm_publication_profiles.sql. Renamed to
-        // the next free prefix instead of adding "0061" to DUPLICATED_PREFIXES. It
-        // is idempotent statement by statement, so a database that applied it
-        // under the old name re-applies it harmlessly under this one (the runner
-        // tracks migrations by full file name).
-        "0067_plan_tier_on_run.sql",
-        // V-29 (owner ruling 2026-09-22): the observation agent's statistics window
-        // replaces its pg_monitor membership. A new prefix, no pair.
-        "0068_observation_stats_window.sql",
-        // V-6 (owner ruling 2026-09-22, scope ruled 2026-09-25): the remaining
-        // debate-text carriers take 0063's mechanism. A new prefix, no pair.
-        "0069_remaining_content_carriers.sql",
-        // DL7-F9 (Task 14): the threshold operator principal; the daemon loses INSERT on the
-        // policy that rules it. 0069 and 0070 are reserved for V-6. A new prefix, no pair.
-        "0071_observation_threshold_operator.sql",
-        // Turn 12 localization: the debate's argument language (redefines
-        // core.create_encrypted_run from 0067) and the support interface locale.
-        // New prefixes after 0071, no pair.
-        "0072_argument_language.sql",
-        "0073_support_interface_locale.sql",
-        // Verdict story (spec 2026-09-26 §7): serve.answer_story and the STORY spend
-        // source. Written as 0072 on the feature branch; renamed to the next free
-        // prefix after dev's 0072/0073 when origin/dev merged in. No pair.
-        "0074_answer_story.sql",
-        // Engine money rule, Task M1 (spec 2026-09-26 §14.4.1, risk R12): the
-        // spend phase (BODY | SERVE) on ledger.model_spend's RUN charges. The
-        // next free prefix, no pair.
-        "0075_model_spend_phase.sql",
-        // Engine money rule, Task M3 (spec 2026-09-26 §14.4.5): serve.serve_disclosure,
-        // the owner-side, content-free record beside each served answer. The next
-        // free prefix, no pair.
-        "0076_serve_disclosure.sql",
-        // Age gate (Turn 8 implementation prompt): identity.age_check, the result-only
-        // age record, and the 'age_frozen' account state. The next free prefix, no pair.
-        "0077_age_gate.sql",
-        // Sensitive-data consent (V's ruling of 2026-09-29): identity.sensitive_data_consent,
-        // the one-time Article 9 consent before the first debate. The next free prefix, no pair.
-        "0078_sensitive_data_consent.sql",
-        // Turn 14 change email: identity.email_change_request, the CHANGE_EMAIL
-        // step-up grant and its six definer capabilities. The next free prefix, no pair.
-        "0079_email_change.sql",
-        // Paid plans L3a (spec 2026-09-29 §2.3.2 and §2.16, amendments R1 A14/A15, RULINGS-R3 R3-1):
-        // legal.acceptance, the retention purge, the sign-up consent wrapper (with the age record)
-        // and the G3a country-gate audit capability. 0078 and 0079 are the colleague's consent and
-        // change-email files, so R3-1 moves this to 0080; no pair.
-        "0080_legal_acceptance.sql",
-        // Hate-speech S02 R10: append-only, content-free publication check record.
-        // Written as 0078 on the slice branch; renamed to the next free prefix after
-        // dev's 0078/0079/0080 when origin/dev merged in (INTEG-HS-dev). Idempotent
-        // statement by statement, so a database that applied it as 0078 re-applies it
-        // harmlessly under this name (the runner tracks migrations by full file name). No pair.
-        "0081_publication_check_record.sql",
-        // Hate-speech S02 FIX p1 (sd-N1, sd-N2): identifier grammar, call count and distinct members on the record.
-        // Written as 0079; renamed with its table's file (DROP CONSTRAINT IF EXISTS before each ADD). No pair.
-        "0082_publication_check_record_identifiers.sql",
-        // Budget spec 2026-09-28 (B3): the holds, the waiting line, the owner record of
-        // cheaper models, and the ALLOWANCE stop kind on serve.serve_disclosure. The
-        // spec named it 0077; dev's age gate took 0077, the sensitive-data consent holds
-        // 0078, the change-email turn 0079, legal acceptance is 0080 and dev's publication check
-        // record holds 0081 and 0082 (RULINGS-R3 R3-1). A new prefix, no pair.
-        "0083_budget_holds_waiting_line.sql",
-        // Paid plans, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3): the entitlement,
-        // the run's charge scope and the runner's windows view. The next free
-        // prefix after dev's 0077 (age gate), the colleague's 0078
-        // (sensitive-data consent) and 0079 (change email), L3a's 0080, dev's 0081 and 0082
-        // (publication check record) and B3's 0083. No pair.
-        "0084_billing_entitlement.sql",
-        // Paid plans, Part 2 (spec 2026-09-29 §2.5.2; R1 A3, A15, A17, A19, A21): customers, quotes and the
-        // subscription log; charges, invoices and notices; the outbox and the cancel tokens. No pair.
-        "0085_billing_customers_subscriptions.sql",
-        "0086_billing_charges_invoices.sql",
-        "0087_billing_outbox_cancel.sql",
-        // Paid plans P12a (amendments R1 A18, ruling R-31; number by R3-1): the
-        // WITHDRAW_SUBSCRIPTION step-up purpose and its one-shot consume function.
-        // The next free prefix after the billing tables, no pair.
-        "0088_billing_withdrawal_step_up.sql",
-        // Paid plans P15 (ruling R-31; number by R3-1): billing learns that an owner's
-        // account is being erased, or was frozen by the age gate (R3-2), as three
-        // content-free lookups. The next free prefix, no pair.
-        "0089_billing_erasure_hook.sql",
-        // Model scorecard (spec 2026-09-26, ruling R8): the per-call record columns, the
-        // encrypted prompt carrier and the pinned role assignment. Written as 0072 on its
-        // branch; renamed to 0090, the next free prefix after the billing migrations
-        // 0084-0089, when it merged (paid plans S1a, rulings R-31 and R3-1). No pair.
-        "0090_model_scorecard.sql",
-        // Paid plans Part 2b W7 (P2-I10): billing tells a committed erasure from a pending one (the plan now ends
-        // at the commit). 0090 is Part 3's scorecard; the next free prefix, no pair.
-        "0091_billing_erasure_commit.sql",
-        // Paid plans Part 4 P4-M (P2-M43, the owner's ruling of 3 October 2026): indexes for the recurring billing
-        // queries. The next free prefix, no pair.
-        "0092_billing_query_indexes.sql",
-        // Go-live row 41 (Part 2's final review P2-I5, part 3): billing's privileges move from debateai_runtime
-        // to debateai_billing_runtime, which only api-runtime holds. The next free prefix, no pair.
-        "0093_billing_runtime_role.sql",
-        // The 2026-10-04 review of 0080: the legal schema, legal.acceptance and the three SECURITY DEFINER functions
-        // (the retention purge, sign-up with consent, the country-gate audit) move from debateai_runtime to
-        // debateai_billing_runtime, which only api-runtime holds. The next free prefix, no pair.
-        "0094_legal_runtime_api_only.sql",
-        // Region picker S01: identity.registration_region and its definer writer. Next free prefix after dev's 0094; no pair.
-        "0095_registration_region.sql",
-        // Account-flow plan: exact new source and checksum-preserved external103.
-        // Historical85–94 inventory debt remains visible, not absorbed by a count.
-        "0095_phone_profile_optional_recovery.sql",
-        "0096_verification_delivery_budget.sql",
-        "0097_recovery_email_verification.sql",
-        "0098_consumer_passkeys.sql",
-        "0099_direct_secure_sessions.sql",
-        "0100_consumer_security_recovery.sql",
-        "0101_social_identities.sql",
-        "0102_consumer_auth_method_availability.sql",
-        "0103_password_recovery_t2.sql",
-        "0104_account_flow_recovery_bridge.sql",
-        "0105_account_authentication_corrections.sql"
-      ]);
+    const byPrefix = new Map<string, string[]>();
+    for (const name of files) byPrefix.set(name.slice(0, 4), [...(byPrefix.get(name.slice(0, 4)) ?? []), name]);
+    const duplicated = [...byPrefix].filter(([, names]) => names.length > 1).map(([prefix]) => prefix).sort();
+    expect(duplicated.filter((prefix) => Number(prefix) < 65)).toEqual([...DUPLICATED_PREFIXES]);
+    expect(duplicated.filter((prefix) => Number(prefix) >= 65)).toEqual([
+      "0085", "0086", "0087", "0088", "0089", "0090", "0091", "0092", "0093", "0094", "0095", "0104", "0105"
+    ]);
+    // Runtime follows the checked recipe, including its nonlexical auth/Dev joins.
+    const ordered = plan.manifest.order;
+    expect(ordered.indexOf("0095_registration_region.sql")).toBeLessThan(ordered.indexOf("0092_internal_funded_allowance.sql"));
+    expect(ordered.indexOf("0106_known_password_mfa_recovery.sql")).toBeLessThan(ordered.indexOf("0104_account_flow_recovery_bridge.sql"));
+    expect(ordered.at(-1)).toBe("0107_auth_dev_integration.sql");
+    expect(plan.forward108.name).toBe("0108_preview_recovery_verified_bindings.sql");
   });
 });

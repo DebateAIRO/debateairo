@@ -30,8 +30,18 @@ const EN_KIND = [
   "Cookie",
   "Cookie (HttpOnly)",
   "Cookie",
+  "Cookie (HttpOnly)",
+  "Cookie",
+  "Cookie (HttpOnly)",
+  "Cookie",
+  "Cookie (HttpOnly)",
+  "Cookie",
+  "Cookie (HttpOnly)",
+  "Cookie (HttpOnly)",
+  "Cookie (HttpOnly)",
   "Local storage",
   "Local storage",
+  "Session storage",
   "Session storage",
   "Session storage"
 ];
@@ -40,10 +50,20 @@ const EN_LIFE = [
   "14 days",
   "30 days",
   "1 year",
+  "Up to 8 hours; 15-minute idle expiry",
+  "Up to 8 hours; 15-minute idle expiry",
+  "Up to 30 minutes",
+  "Up to 30 minutes",
+  "Up to 299 seconds",
+  "Up to 299 seconds",
+  "Up to 5 minutes",
+  "Up to 5 minutes",
+  "Up to 5 minutes",
   "Until you clear it",
   "Until you clear it",
   "Until you close the tab",
-  "Until you close the tab"
+  "Until you close the tab",
+  "15 minutes or until earlier clearing"
 ];
 const ACK = JSON.stringify({ v: 2, acknowledgedAt: "2026-09-29T00:00:00.000Z" });
 const consent = consentEnglish as MessageCatalog;
@@ -185,7 +205,7 @@ describe("S01 one card, four doors (SPEC-v2 R07, R02, R04, R08)", () => {
       const dialogs = document.querySelectorAll('[role="dialog"]');
       expect(dialogs.length, "one dialog").toBe(1);
       const rows = [...dialogs[0]!.querySelectorAll<HTMLElement>(".consentCatRow")];
-      expect(rows.length, "eight rows").toBe(8);
+      expect(rows.length, "eight rows").toBe(18);
       expect(rows.map((row) => row.querySelector(".consentTag-kind")?.textContent), "kinds").toEqual(EN_KIND);
       expect(rows.map((row) => row.querySelector(".consentCatDetail")?.textContent), "lifetimes").toEqual(EN_LIFE);
 

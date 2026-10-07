@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "dobite seznam vseh tretjih oseb, ki so jih prejele;",
   "legal.health.s05.item3": "prekličete privolitev in zahtevate njihov izbris.",
   "legal.health.s06.title": "Kako jih uveljaviti",
-  "legal.health.s06.body": "V Nastavitvah ali tako, da pišete na privacy@dezbatere.ro. Odgovorimo v 45 dneh. Če zahtevo zavrnemo, se lahko pritožite tako, da odgovorite na naše sporočilo."
+  "legal.health.s06.body": "V Nastavitvah ali tako, da pišete na privacy@dezbatere.ro. Odgovorimo v 45 dneh. Če zahtevo zavrnemo, se lahko pritožite tako, da odgovorite na naše sporočilo.",
+  "legal.cookies.staff.purpose": "Ločen dostop osebja",
+  "legal.cookies.passwordReset.purpose": "Samo ponastavitev gesla",
+  "legal.cookies.mfaRecovery.purpose": "Samo obnovitev overitelja",
+  "legal.cookies.social.purpose": "Kratka prijava prek ponudnika ali povezava računa",
+  "legal.cookies.phoneDraft.purpose": "Nedokončano vprašanje med telefonskim korakom; izbriše se ob spremembi seje, odjavi ali spremembi lastnika",
+  "legal.cookies.staff.life": "Do 8 ur; 15 minut nedejavnosti",
+  "legal.cookies.passwordReset.life": "Do 30 minut",
+  "legal.cookies.mfaRecovery.life": "Do 299 sekund",
+  "legal.cookies.social.life": "Do 5 minut",
+  "legal.cookies.phoneDraft.life": "15 minut ali do predhodnega brisanja"
 }

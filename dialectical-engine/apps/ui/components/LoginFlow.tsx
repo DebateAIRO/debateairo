@@ -244,8 +244,12 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 finish(result);
         }
         catch (failure) {
-            if (!(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
-            if (owner === sequence.current) setError(failure instanceof ContractHttpError && failure.status === 429 ? t(catalog, "auth.login.tooManyAttempts") : method === 'recovery_code' ? t(catalog, "auth.login.recoveryCodeRejected") : t(catalog, "auth.login.authenticationCodeRejected"));
+            const credentialRefused = failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500;
+            if (!credentialRefused) clearStoredSupportConversation();
+            if (owner === sequence.current) setError(failure instanceof ContractHttpError && failure.status === 429
+                ? t(catalog, "auth.login.tooManyAttempts")
+                : !credentialRefused ? t(catalog, "auth.login.verificationFailed")
+                : method === 'recovery_code' ? t(catalog, "auth.login.recoveryCodeRejected") : t(catalog, "auth.login.authenticationCodeRejected"));
         }
         finally {
             if (owner === sequence.current) {

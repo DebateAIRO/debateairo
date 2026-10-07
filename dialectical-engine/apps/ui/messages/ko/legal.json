@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "해당 데이터를 받은 모든 제3자의 목록을 받을 권리",
   "legal.health.s05.item3": "동의를 철회하고 해당 데이터의 삭제를 요청할 권리",
   "legal.health.s06.title": "권리 행사 방법",
-  "legal.health.s06.body": "‘설정’에서 직접 행사하거나 privacy@dezbatere.ro로 이메일을 보내 요청할 수 있습니다. 당사는 45일 이내에 답변합니다. 당사가 요청을 거부하는 경우 해당 답변에 회신하여 이의를 제기할 수 있습니다."
+  "legal.health.s06.body": "‘설정’에서 직접 행사하거나 privacy@dezbatere.ro로 이메일을 보내 요청할 수 있습니다. 당사는 45일 이내에 답변합니다. 당사가 요청을 거부하는 경우 해당 답변에 회신하여 이의를 제기할 수 있습니다.",
+  "legal.cookies.staff.purpose": "별도의 직원 접근",
+  "legal.cookies.passwordReset.purpose": "비밀번호 재설정만",
+  "legal.cookies.mfaRecovery.purpose": "인증기 복구만",
+  "legal.cookies.social.purpose": "짧은 제공자 로그인 또는 계정 연결 흐름",
+  "legal.cookies.phoneDraft.purpose": "전화 단계의 미완료 질문; 세션 변경, 로그아웃 또는 소유자 변경 시 삭제",
+  "legal.cookies.staff.life": "최대 8시간; 15분 비활동",
+  "legal.cookies.passwordReset.life": "최대 30분",
+  "legal.cookies.mfaRecovery.life": "최대 299초",
+  "legal.cookies.social.life": "최대 5분",
+  "legal.cookies.phoneDraft.life": "15분 또는 그전에 삭제할 때까지"
 }

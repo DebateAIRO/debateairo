@@ -1,5 +1,5 @@
 import { createPreviewRecoveryApiFixture } from "../support/previewRecoveryPrincipal.js";
-import { canonicalRegisterJson, PASSWORD_RESET_POLICY_REGISTER_ROW as resetFacet, BACKUP_EMAIL_POLICY_REGISTER_ROW as backupFacet, MFA_RECOVERY_POLICY_REGISTER_ROW as mfaFacet } from "@debateai/register";
+import { canonicalRegisterJson, registerVersionToSafeLegacyNumber, PASSWORD_RESET_POLICY_REGISTER_ROW as resetFacet, BACKUP_EMAIL_POLICY_REGISTER_ROW as backupFacet, MFA_RECOVERY_POLICY_REGISTER_ROW as mfaFacet } from "@debateai/register";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -67,7 +67,7 @@ beforeAll(async () => {
   expect(await readPasswordResetPolicy(db.pool, bootstrap.registerVersion)).toBeNull();
   const rows = [...await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, TEST_DEVELOPMENT_PROVIDER_PANEL),...[resetFacet,backupFacet,mfaFacet].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
   const publication = await createPostgresRegisterPublicationPort(db.pool).publishGeneral({ publicationId: randomUUID(), baseRegisterVersion: parseRegisterVersionText(String(bootstrap.registerVersion)), rows, sourceRef: "password-only reset native General fixture", deployment: "local" });
-  expect(await readPasswordResetPolicy(db.pool, Number(publication.registerVersion))).toMatchObject({ maximumElapsedMs: 1800000 });
+  expect(await readPasswordResetPolicy(db.pool, registerVersionToSafeLegacyNumber(publication.registerVersion))).toMatchObject({ maximumElapsedMs: 1800000 });
   await provisionDevelopmentDatabasePrincipals({ adminPool: db.pool, adminDatabaseUrl: db.connectionString, credentialFilePath: join(root, "database-principals.env") });
   const credentials = new Map((await readFile(join(root, "database-principals.env"), "utf8")).split(/\r?\n/).filter(line => line && !line.startsWith("#")).map(line => {
     const i = line.indexOf("=");
@@ -79,7 +79,7 @@ credentials.set("DATABASE_URL",await createPreviewRecoveryApiFixture(db.pool,cre
   argon = new Argon2WorkerPool();
   await argon.ready();
   audit = new AuditContextHasher(argon, Buffer.alloc(32, 61), auth.auditSourceIpKdf);
-  repo = new PostgresPasswordResetRepository(apiPool, audit, Number(publication.registerVersion));
+  repo = new PostgresPasswordResetRepository(apiPool, audit, registerVersionToSafeLegacyNumber(publication.registerVersion));
   await repo.assertRole();
   service = new PasswordResetService({ repository: repo, users, argon2: argon, authPolicy: auth, mfaPolicy: mfa, passwordResetPolicy: policy, blindIndexKey: blind, reportDiagnostic: () => {
     } });

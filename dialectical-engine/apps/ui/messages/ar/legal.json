@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "الحصول على قائمة بكل طرف ثالث تلقاها؛",
   "legal.health.s05.item3": "سحب موافقتك وطلب حذفها.",
   "legal.health.s06.title": "كيفية ممارستها",
-  "legal.health.s06.body": "من الإعدادات، أو بمراسلة privacy@dezbatere.ro. ونرد خلال 45 يومًا. وإذا رفضنا طلبًا، يمكنك استئناف الرفض بالرد على جوابنا."
+  "legal.health.s06.body": "من الإعدادات، أو بمراسلة privacy@dezbatere.ro. ونرد خلال 45 يومًا. وإذا رفضنا طلبًا، يمكنك استئناف الرفض بالرد على جوابنا.",
+  "legal.cookies.staff.purpose": "وصول منفصل للموظفين",
+  "legal.cookies.passwordReset.purpose": "إعادة تعيين كلمة المرور فقط",
+  "legal.cookies.mfaRecovery.purpose": "استعادة تطبيق المصادقة فقط",
+  "legal.cookies.social.purpose": "تسجيل دخول قصير عبر مزود أو ربط الحساب",
+  "legal.cookies.phoneDraft.purpose": "سؤال غير مكتمل أثناء خطوة الهاتف؛ يُحذف عند تغيير الجلسة أو تسجيل الخروج أو تغيير المالك",
+  "legal.cookies.staff.life": "حتى 8 ساعات؛ 15 دقيقة دون نشاط",
+  "legal.cookies.passwordReset.life": "حتى 30 دقيقة",
+  "legal.cookies.mfaRecovery.life": "حتى 299 ثانية",
+  "legal.cookies.social.life": "حتى 5 دقائق",
+  "legal.cookies.phoneDraft.life": "15 دقيقة أو حتى الحذف المبكر"
 }

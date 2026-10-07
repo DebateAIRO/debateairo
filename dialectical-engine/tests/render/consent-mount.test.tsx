@@ -359,7 +359,7 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     act(() => opener!.click());
 
     expect(card(), "the same card opens").not.toBeNull();
-    expect(card()!.querySelectorAll(".consentCatRow").length, "the eight items").toBe(8);
+    expect(card()!.querySelectorAll(".consentCatRow").length, "the eight items").toBe(18);
     expect(raw(), "opening the card writes nothing").toBe(before);
 
     // One panel, mounted once, in the page the SPEC names.

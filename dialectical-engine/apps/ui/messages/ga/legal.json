@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "liosta a fháil de gach tríú páirtí a fuair iad;",
   "legal.health.s05.item3": "do thoiliú a tharraingt siar agus a iarraidh go scriosfar iad.",
   "legal.health.s06.title": "Conas iad a fheidhmiú",
-  "legal.health.s06.body": "Ó na Socruithe, nó trí scríobh chuig privacy@dezbatere.ro. Freagraímid laistigh de 45 lá. Má dhiúltaímid d’iarratas, is féidir leat achomharc a dhéanamh trí fhreagra a thabhairt ar ár dteachtaireacht."
+  "legal.health.s06.body": "Ó na Socruithe, nó trí scríobh chuig privacy@dezbatere.ro. Freagraímid laistigh de 45 lá. Má dhiúltaímid d’iarratas, is féidir leat achomharc a dhéanamh trí fhreagra a thabhairt ar ár dteachtaireacht.",
+  "legal.cookies.staff.purpose": "Rochtain ar leith don fhoireann",
+  "legal.cookies.passwordReset.purpose": "Athshocrú focail faire amháin",
+  "legal.cookies.mfaRecovery.purpose": "Aisghabháil fíordheimhnitheora amháin",
+  "legal.cookies.social.purpose": "Sreabhadh gearr sínithe isteach trí sholáthraí nó nascadh cuntais",
+  "legal.cookies.phoneDraft.purpose": "Ceist neamhchríochnaithe le linn chéim an ghutháin; glantar í ag athrú seisiúin, síniú amach nó athrú úinéara",
+  "legal.cookies.staff.life": "Suas le 8 n-uaire; 15 nóiméad díomhaointis",
+  "legal.cookies.passwordReset.life": "Suas le 30 nóiméad",
+  "legal.cookies.mfaRecovery.life": "Suas le 299 soicind",
+  "legal.cookies.social.life": "Suas le 5 nóiméad",
+  "legal.cookies.phoneDraft.life": "15 nóiméad nó go dtí glanadh níos luaithe"
 }

@@ -113,7 +113,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Debat bersifat privat sampai Anda memublikasikannya. Publikasi adalah tindakan yang disengaja dan dikonfirmasi secara terpisah. Debat yang dipublikasikan menampilkan nama samaran Anda, pertanyaan Anda sebagaimana ditulis, pohon argumen, skor, putusan, dan rentang keyakinan, serta memuat label yang terlihat bahwa konten dihasilkan AI. Debat tersebut tidak pernah menampilkan alamat email, catatan sesi, atau riwayat akun Anda. [Published debates are / are not] diindeks oleh mesin pencari [unless you choose]." },
-      { kind: "p", text: "Membatalkan publikasi menghapus debat dari DebateAI dan memusnahkan kunci salinan publik kami. Salinan yang telah dibuat oleh pembaca, mesin pencari, atau arsip berada di luar kendali kami, dan kami tidak dapat menariknya kembali." },
+      { kind: "p", text: "Membatalkan publikasi menghapus debat dari Dialectical Engine dan memusnahkan kunci salinan publik kami. Salinan yang telah dibuat oleh pembaca, mesin pencari, atau arsip berada di luar kendali kami, dan kami tidak dapat menariknya kembali." },
       { kind: "p", text: "Ketika Anda menghapus akun, kami menghapus setiap debat yang Anda publikasikan dari akses publik tanpa penundaan yang tidak semestinya dan paling lambat dalam 30 hari, kecuali hukum mewajibkan kami menyimpan item tertentu. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -188,7 +188,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Orang yang disebut dalam debat dan bukan pengguna kami",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Jika seseorang mengajukan pertanyaan kepada DebateAI yang menyebut Anda, kami mungkin menyimpan data pribadi tentang Anda meskipun Anda belum pernah menggunakan layanan ini. Ketentuan melarang pengguna melakukan hal ini, dan kami meminimalkan apa yang dikirim kepada penyedia AI, tetapi hal ini dapat terjadi." },
+      { kind: "p", text: "Jika seseorang mengajukan pertanyaan kepada Dialectical Engine yang menyebut Anda, kami mungkin menyimpan data pribadi tentang Anda meskipun Anda belum pernah menggunakan layanan ini. Ketentuan melarang pengguna melakukan hal ini, dan kami meminimalkan apa yang dikirim kepada penyedia AI, tetapi hal ini dapat terjadi." },
       { kind: "p", text: "Bagian ini adalah pemberitahuan yang wajib kami berikan kepada Anda berdasarkan Pasal 14 GDPR. Datanya adalah apa pun yang diketik pengguna dan yang dihasilkan mesin sebagai jawaban; sumbernya adalah pengguna tersebut; tujuan dan dasar hukumnya terdapat dalam bagian 4; penerimanya adalah penyedia AI dalam Daftar; retensi mengikuti bagian 7. Anda memiliki setiap hak dalam bagian 10, dan khususnya dapat meminta kami menghapus debat terpublikasi atau privat yang memuat data Anda, serta memberi tahu apa yang kami simpan. Anda tidak memerlukan akun untuk melakukannya. Hubungi privacy@dezbatere.ro atau gunakan kendali Laporkan pada debat terpublikasi, dan kami menindaklanjuti permintaan yang terbukti tanpa penundaan yang tidak semestinya. Kami tidak dapat memberi tahu Anda secara individual ketika hal ini terjadi karena kami tidak mengetahui siapa Anda atau cara menghubungi Anda; pemberitahuan publik ini dan jalur penghapusan merupakan langkah yang kami ambil sebagai gantinya." },
       { kind: "p", text: "Hal yang sama berlaku untuk informasi sensitif tentang Anda — politik, kesehatan, agama — yang muncul dalam pertanyaan orang lain. Tidak ada ketentuan hukum yang mengizinkan kami terus memprosesnya setelah Anda mengajukan keberatan, dan kami tidak akan melakukannya." }
     ]
@@ -198,7 +198,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Anak-anak",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI ditujukan untuk orang dewasa. Anda mengonfirmasi bahwa Anda berusia 18 tahun atau lebih saat mendaftar, dan kami tidak dengan sengaja memproses data siapa pun yang berusia di bawah 18 tahun. Jika kami mengetahui bahwa suatu akun dimiliki oleh orang berusia di bawah 18 tahun, kami menutupnya dan menghapus data sebagaimana dijelaskan bagian 7. Beberapa negara menganggap konfirmasi tidak memadai atau mensyaratkan lebih banyak; Lampiran B menyatakan apa yang berlaku dan di mana, dan Ketentuan menjelaskan tindakan kami mengenainya." }
+      { kind: "p", text: "Dialectical Engine ditujukan untuk orang dewasa. Anda mengonfirmasi bahwa Anda berusia 18 tahun atau lebih saat mendaftar, dan kami tidak dengan sengaja memproses data siapa pun yang berusia di bawah 18 tahun. Jika kami mengetahui bahwa suatu akun dimiliki oleh orang berusia di bawah 18 tahun, kami menutupnya dan menghapus data sebagaimana dijelaskan bagian 7. Beberapa negara menganggap konfirmasi tidak memadai atau mensyaratkan lebih banyak; Lampiran B menyatakan apa yang berlaku dan di mana, dan Ketentuan menjelaskan tindakan kami mengenainya." }
     ]
   },
   {
@@ -206,7 +206,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kuki",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI menggunakan delapan item, semuanya mutlak diperlukan untuk layanan yang Anda minta dan semuanya hanya dipasang oleh DebateAI: empat kuki dan empat entri di penyimpanan browser Anda. Kami tidak memasang kuki analitik, iklan, atau pelacakan. Kebijakan Kuki di [dezbatere.ro/cookies] mencantumkannya beserta fungsi masing-masing dan pihak yang menerimanya, dan akan berubah sebelum apa pun ditambahkan." },
+      { kind: "p", text: "Dialectical Engine menggunakan 18 item, semuanya mutlak diperlukan untuk layanan yang Anda minta dan semuanya hanya dipasang oleh Dialectical Engine: 13 kuki dan 5 entri di penyimpanan browser Anda. Kami tidak memasang kuki analitik, iklan, atau pelacakan. Kebijakan Kuki di [dezbatere.ro/cookies] mencantumkannya beserta fungsi masing-masing dan pihak yang menerimanya, dan akan berubah sebelum apa pun ditambahkan." },
       {
         kind: "list",
         items: [
@@ -214,14 +214,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Kuki — Mencegah situs web lain mengirimkan formulir atas nama Anda. — 14 hari",
         "__Host-debateai-age-refusal — Kuki (HttpOnly) — Setelah pemeriksaan usia ditolak, mencegah peramban ini mencoba lagi selama 30 hari. Isinya hanya kata “ditolak”, tanpa data pribadi. — 30 hari",
         "debateai.locale — Kuki — Mengingat bahasa antarmuka yang Anda pilih. — 1 tahun",
+        "__Host-debateai-staff — Kuki (HttpOnly) — Akses staf terpisah — Hingga 8 jam; 15 menit tidak aktif",
+        "__Host-debateai-staff-csrf — Kuki — Mencegah situs web lain mengirimkan formulir atas nama Anda. — Hingga 8 jam; 15 menit tidak aktif",
+        "__Host-debateai-password-reset — Kuki (HttpOnly) — Hanya pengaturan ulang kata sandi — Hingga 30 menit",
+        "__Host-debateai-password-reset-csrf — Kuki — Mencegah situs web lain mengirimkan formulir atas nama Anda. — Hingga 30 menit",
+        "__Host-debateai-mfa-recovery — Kuki (HttpOnly) — Hanya pemulihan autentikator — Hingga 299 detik",
+        "__Host-debateai-mfa-recovery-csrf — Kuki — Mencegah situs web lain mengirimkan formulir atas nama Anda. — Hingga 299 detik",
+        "__Host-debateai-social-flow — Kuki (HttpOnly) — Alur singkat masuk melalui penyedia atau penautan akun — Hingga 5 menit",
+        "__Host-debateai-social-apple — Kuki (HttpOnly) — Alur singkat masuk melalui penyedia atau penautan akun — Hingga 5 menit",
+        "__Host-debateai-social-browser — Kuki (HttpOnly) — Alur singkat masuk melalui penyedia atau penautan akun — Hingga 5 menit",
         "debateai.consent — Penyimpanan lokal — Mengingat bahwa Anda sudah melihat pemberitahuan kuki, sehingga pemberitahuan itu hanya muncul sekali. — Sampai Anda menghapusnya",
         "debateai.mode — Penyimpanan lokal — Apakah Anda menggunakan mode terang atau mode gelap. — Sampai Anda menghapusnya",
         "debateai.languageOffer.dismissed — Penyimpanan sesi — Mengingat, untuk tab ini, bahwa Anda menolak tawaran untuk menampilkan debat dalam bahasa lain. — Sampai Anda menutup tab",
-        "debateai.support.conversation.v2 — Penyimpanan sesi — Menjaga percakapan obrolan bantuan Anda tetap di layar selama tab masih terbuka. Percakapan dihapus saat seseorang masuk atau keluar di tab ini. — Sampai Anda menutup tab"
+        "debateai.support.conversation.v2 — Penyimpanan sesi — Menjaga percakapan obrolan bantuan Anda tetap di layar selama tab masih terbuka. Percakapan dihapus saat seseorang masuk atau keluar di tab ini. — Sampai Anda menutup tab",
+        "debateai.phone-completion-draft.v1 — Penyimpanan sesi — Pertanyaan belum selesai pada langkah telepon; dihapus saat sesi berubah, keluar, atau pemilik berubah — 15 menit atau sampai lebih awal dihapus"
         ]
       },
-      { kind: "p", text: "Tidak ada pihak lain yang mengumpulkan informasi tentang aktivitas online Anda dari waktu ke waktu dan di berbagai situs web melalui DebateAI." },
-      { kind: "p", text: "Browser dapat mengirim sinyal “Do Not Track” atau sinyal serupa. DebateAI tidak melacak Anda, sehingga tidak ada yang perlu dimatikan oleh sinyal tersebut: layanan berfungsi sama dengan atau tanpa sinyal itu." },
+      { kind: "p", text: "Tidak ada pihak lain yang mengumpulkan informasi tentang aktivitas online Anda dari waktu ke waktu dan di berbagai situs web melalui Dialectical Engine." },
+      { kind: "p", text: "Browser dapat mengirim sinyal “Do Not Track” atau sinyal serupa. Dialectical Engine tidak melacak Anda, sehingga tidak ada yang perlu dimatikan oleh sinyal tersebut: layanan berfungsi sama dengan atau tanpa sinyal itu." },
       { kind: "p", text: "Untuk menolak item ini, blokir atau hapus kuki dan data situs untuk situs ini di pengaturan browser Anda. Yang kemudian berhenti berfungsi: masuk ke akun, dan pengingatan pilihan bahasa serta tampilan Anda; pemberitahuan kuki juga akan muncul lagi." }
     ]
   },
@@ -304,7 +314,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraina (hanya jika tercantum)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Undang-Undang Ukraina \"Tentang Perlindungan Data Pribadi\" berlaku. Kami tidak menawarkan DebateAI di wilayah Ukraina yang tidak dikendalikan oleh pemerintahnya. Data Anda dikirim ke negara-negara UE dan Amerika Serikat (lihat Daftar). Anda dapat mengadu kepada Komisioner Parlemen Ukraina untuk Hak Asasi Manusia." }
+      { kind: "p", text: "Undang-Undang Ukraina \"Tentang Perlindungan Data Pribadi\" berlaku. Kami tidak menawarkan Dialectical Engine di wilayah Ukraina yang tidak dikendalikan oleh pemerintahnya. Data Anda dikirim ke negara-negara UE dan Amerika Serikat (lihat Daftar). Anda dapat mengadu kepada Komisioner Parlemen Ukraina untuk Hak Asasi Manusia." }
     ]
   },
   {
@@ -335,12 +345,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "70611e7e006ce686cb59ab2dfceda69e43513913652c3e7e6889e638fa0c3d09",
-  eyebrow: "KEBIJAKAN PRIVASI · v3.0 · BERLAKU [DATE]",
+  version: "3.1",
+  sha256: "a49e3564a813999eab7014af89f450770abce653dda8e724377b0f0498f96f5d",
+  eyebrow: "KEBIJAKAN PRIVASI · v3.1 · BERLAKU [DATE]",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",
-  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Teks Kebijakan Privasi",
   sectionIdPrefix: "policy-section-",
