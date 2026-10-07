@@ -11,3 +11,18 @@ export { createSecretToken } from "./secret-token.js";
 export { parseJsonKeepingNumberText } from "./json.js";
 // N3: the client (spec §2.3 errors, §2.4.1–2.4.3). createNetopiaPaymentsForRecording and the timeouts stay internal.
 export { answeredOrderReused, createNetopiaPayments, type NetopiaConfig, type NetopiaDeps } from "./client.js";
+// N4: verifying NETOPIA's message (spec §2.4.6), the quarantine test, the tolerant parse and the answers (§2.7.2).
+export {
+  loadTrustedKeys,
+  netopiaNoticeAnswer,
+  parseNetopiaNotice,
+  publishedIpnKeyFingerprint,
+  quarantinable,
+  verifyNetopiaNotice,
+  type NoticeRejection,
+  type NoticeRejectionReason,
+  type NoticeTrust,
+  type ParsedNotice,
+  type TrustedKey,
+  type VerifiedNotice
+} from "./notice.js";

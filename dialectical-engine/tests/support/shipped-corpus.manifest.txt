@@ -794,6 +794,7 @@ packages/payments-netopia/src/hosts.ts
 packages/payments-netopia/src/index.ts
 packages/payments-netopia/src/json.ts
 packages/payments-netopia/src/money.ts
+packages/payments-netopia/src/notice.ts
 packages/payments-netopia/src/requests.ts
 packages/payments-netopia/src/secret-token.ts
 packages/payments-netopia/src/status.ts
