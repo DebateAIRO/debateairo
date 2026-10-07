@@ -8,6 +8,27 @@ import { readPublicArtifact } from './launch-plan.mjs';
 import { verifySourceManifest } from './source-manifest.mjs';
 import { verifyUiBuildManifest } from './ui-build.mjs';
 import { exerciseStageRuntime } from './stage-runtime.mjs';
+import { assertNativeConnection } from './native-peer.mjs';
+/** The existing stage-owned credential has one exact direct-creator envelope and endpoint. */
+export function parseStageCreatorConnection(connection){
+ try{
+  exactKeys(connection,['schema','url'],'PREVIEW_STAGE_CREATOR_REFUSED');
+  const url=new URL(connection.url);
+  if(connection.schema!=='preview-auth-dev-synthetic-stage-connection-v1'||url.protocol!=='postgresql:'||url.username!=='debateai_prod_migrator'||!/^[a-f0-9]{64}$/.test(url.password)
+   ||url.hostname!=='localhost'||url.port!==''||url.hash!==''||url.pathname!==`/${STAGE.database}`||url.searchParams.size!==2
+   ||url.searchParams.get('host')!==STAGE.socket||url.searchParams.get('port')!==String(STAGE.port))refuse('PREVIEW_STAGE_CREATOR_REFUSED');
+  return connection.url;
+ }catch{refuse('PREVIEW_STAGE_CREATOR_REFUSED');}
+}
+/** Client-only identity gate; synthetic PG18 tests supply their isolated measured target. */
+export async function assertStageDatabaseConnections(probe,creator,target=STAGE){
+ const identity=await probe.query(`SELECT session_user::text session,current_user::text role,current_database() database,current_setting('port')::int port,current_setting('cluster_name') cluster,(current_setting('server_version_num')::int/10000) major`),row=identity.rows[0];
+ if(identity.rows.length!==1||!row||row.session!=='preview_recovery_fixture_api'||row.role!==row.session||row.database!==target.database||row.port!==target.port||row.cluster!==target.cluster||row.major!==18)refuse('PREVIEW_STAGE_DATABASE_REFUSED');
+ const native=await assertNativeConnection(creator,{...target,session:'debateai_prod_migrator',role:'debateai_prod_migrator'},[]);
+ const owner=(await creator.query(`SELECT (SELECT datdba::int FROM pg_database WHERE datname=current_database()) database_owner,r.rolreplication,r.rolconfig FROM pg_roles r WHERE r.rolname=current_user`)).rows;
+ if(owner.length!==1||owner[0].database_owner!==native.roleOid||owner[0].rolreplication!==false||owner[0].rolconfig!==null)refuse('PREVIEW_STAGE_CREATOR_REFUSED');
+ return true;
+}
 /** The executable has one fixed stage namespace and never accepts a target URL argument. */
 export async function runStage(){
  if(process.platform!=='linux'||process.version!=='v26.8.2'||process.argv.length!==2||process.getuid?.()===0)refuse('PREVIEW_LINUX_STAGE_ACTOR_REQUIRED');
@@ -35,10 +56,12 @@ export async function runStage(){
  for(const [key,value]of Object.entries(fixture.environment))if(key==='DATABASE_URL'||key.endsWith('_DATABASE_URL')){
   const url=new URL(value);if(url.pathname!==`/${STAGE.database}`||url.searchParams.get('host')!==STAGE.socket||String(url.searchParams.get('port')??url.port)!==String(STAGE.port))refuse('PREVIEW_STAGE_DATABASE_REFUSED');
  }
- const probe=new pg.Client({connectionString:fixture.environment.DATABASE_URL,connectionTimeoutMillis:5000});
- try{await probe.connect();const row=(await probe.query(`SELECT current_database() database,current_setting('port')::int port,current_setting('cluster_name') cluster,current_setting('data_directory') directory,(current_setting('server_version_num')::int/10000) major`)).rows[0];
-  if(!row||row.database!==STAGE.database||row.port!==STAGE.port||row.cluster!==STAGE.cluster||row.directory!==STAGE.dataDirectory||row.major!==18)refuse('PREVIEW_STAGE_DATABASE_REFUSED');
- }finally{await probe.end();}
+ const connection=await withPrivateBytes(join(root,'admin-connection.json'),{root,uid:operation.stageUid,mode:0o600,parentMode:0o700,maxBytes:2048},raw=>strictJson(raw));
+ const creatorUrl=parseStageCreatorConnection(connection);
+ const probe=new pg.Client({connectionString:fixture.environment.DATABASE_URL,connectionTimeoutMillis:5000}),creator=new pg.Client({connectionString:creatorUrl,connectionTimeoutMillis:5000});
+ connection.url='';
+ try{await probe.connect();await creator.connect();await assertStageDatabaseConnections(probe,creator);}
+ finally{await Promise.all([probe.end(),creator.end()]);}
  const receipts={};
  for(const artifact of ['candidate','fallback']){
   const {api,ui}=prepared[artifact];
