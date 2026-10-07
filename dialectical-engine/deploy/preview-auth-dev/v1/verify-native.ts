@@ -15,7 +15,8 @@ export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevisi
  if(installed.length!==1)fail();
  await migrate(pool); // Authoritative current source: complete table/column/membership/owner/provenance checks.
  const plan=await loadMigrationPlan();
- const client=await pool.connect();let transaction=false;
+ const client=await pool.connect();let transaction=false,released=false;
+ const release=()=>{if(!released){released=true;client.release();}};
  try{
   await client.query('BEGIN READ ONLY');transaction=true;
   const identity=(await client.query(`SELECT current_user role,r.oid::int oid,(current_setting('server_version_num')::int/10000) major,
@@ -34,7 +35,7 @@ export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevisi
     AND n.nspname IN ('identity','billing') AND has_function_privilege(r.oid,p.oid,'EXECUTE') GROUP BY r.rolname ORDER BY r.rolname`)).rows;
   const defaultOwnerCount=(await client.query(`SELECT count(*)::int n FROM pg_proc WHERE oid=ANY(ARRAY['billing.purge_expired_records(timestamptz)'::regprocedure,'billing.consume_withdrawal_grant(uuid,uuid,uuid,text)'::regprocedure,'billing.owner_erasure_pending(uuid)'::regprocedure,'billing.pending_erasure_owner_refs(uuid,integer)'::regprocedure,'billing.owner_age_frozen(uuid)'::regprocedure,'billing.owner_erasure_committed(uuid)'::regprocedure]) AND proowner=$1`,[identity.oid])).rows[0]?.n;
   if(defaultOwnerCount!==6)fail();
-  await client.query('COMMIT');transaction=false;
+  await client.query('COMMIT');transaction=false;release();
   await assertPublicationIdentity(pool,binding.publication);
   const snapshot=await readSealedSnapshot(pool,binding.publication.registerVersion);
   if(snapshot.snapshotSha256!==binding.publication.snapshotSha256||snapshot.rows.length!==binding.publication.rowCount||forward.length!==1||plan.forward108===undefined)fail();
@@ -42,7 +43,7 @@ export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevisi
    ledgerOwnerOid:identity.ledger_owner,billingOwnerOid:identity.billing_owner,defaultOwnerCount,ledgerCount:ledger.length,resolutionCount:resolutions.length,forwardCount:forward.length,
    catalogSha256:hash(catalog),ledgerSha256:hash(ledger),resolutionSha256:hash(resolutions),forwardSha256:hash(forward),cohortCount:cohort,
    capabilityCounts:Object.fromEntries(capabilities.map(row=>[row.rolname,row.count])),currentContractVerified:true};
- }catch(error){if(transaction)await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}
+ }catch(error){if(transaction)await client.query('ROLLBACK').catch(()=>{});throw error;}finally{release();}
 }
 
 async function assertPublicationIdentity(pool:Pool,publication:RegisterPublicationReceipt):Promise<void> {

@@ -45,7 +45,19 @@ describe('isolated PG18 native preview publication (source evidence, not Linux s
     const receipt=await publishPreviewRegister(pool,input);
     expect(receipt.registerVersion).toBe('5');expect(receipt.rowCount).toBe(68);expect(receipt.publicationKind).toBe('GENERAL');expect(receipt.requestSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(await publishPreviewRegister(pool,input)).toEqual(receipt);
-    await expect(verifyNativeState(pool,{sourceRevision:observation.sourceRevision,sourceTree:observation.sourceTree,nativeSourceSha256:'d'.repeat(64),publication:{...receipt,requestSha256:'0'.repeat(64)}})).rejects.toThrow('PREVIEW_NATIVE_VERIFICATION_REFUSED');
+    const singleConnection=new pg.Pool({connectionString:db.connectionString,options:'-c role=debateai_prod_migrator',max:1,connectionTimeoutMillis:5000});
+    await native.withGuardedPool(singleConnection,async(c:any)=>{acquisitions++;await native.assertNativeConnection(c,target,plan.manifest.cohorts.auth106);},async(verifierPool:any)=>{
+     const binding={sourceRevision:observation.sourceRevision,sourceTree:observation.sourceTree,nativeSourceSha256:'d'.repeat(64),publication:receipt};
+     const verified=await verifyNativeState(verifierPool,binding);
+     expect(verified.currentContractVerified).toBe(true);expect(verified.defaultOwnerCount).toBe(6);
+     expect(verified.executorOid).toBe(verified.ledgerOwnerOid);expect(verified.executorOid).toBe(verified.billingOwnerOid);
+     expect(verified.publication).toEqual(receipt);
+     expect(singleConnection.totalCount).toBe(1);expect(singleConnection.idleCount).toBe(1);expect(singleConnection.waitingCount).toBe(0);
+     await expect(verifyNativeState(verifierPool,{...binding,publication:{...receipt,requestSha256:'0'.repeat(64)}})).rejects.toThrow('PREVIEW_NATIVE_VERIFICATION_REFUSED');
+     expect(singleConnection.idleCount).toBe(1);expect(singleConnection.waitingCount).toBe(0);
+     expect((await verifyNativeState(verifierPool,binding)).currentContractVerified).toBe(true);
+     expect(singleConnection.idleCount).toBe(1);expect(singleConnection.waitingCount).toBe(0);
+    });
     expect(await readSealedSnapshot(pool,'4')).toEqual(sealedBefore);
     await expect(publishPreviewRegister(pool,{...input,publicationId:randomUUID(),approval:{...approval,deltaSha256:'0'.repeat(64)}})).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
     const row=(await pool.query("SELECT r.oid::int oid,(SELECT proowner::int FROM pg_proc WHERE oid='billing.owner_age_frozen(uuid)'::regprocedure) owner FROM pg_roles r WHERE r.rolname=current_user")).rows[0];expect(row.owner).toBe(row.oid);
