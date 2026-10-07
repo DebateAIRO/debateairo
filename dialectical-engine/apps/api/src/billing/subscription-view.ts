@@ -3,7 +3,7 @@ import { microsToDecimal, withdrawalDeadline, type SubscriptionState, type Withd
 import type { BillingInvoicesResponse, BillingSubscriptionResponse } from "@debateai/contract";
 import type { BillingRepository, CustomerXMoneyEnvironment } from "@debateai/db";
 import type { BillingPolicy, PlanId } from "@debateai/register";
-import { renewalLeadMs } from "./renewal-rules.js";
+import { renewalLeadMs, servedHere } from "./renewal-rules.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 
 export type SubscriptionView = NonNullable<BillingSubscriptionResponse["subscription"]>;
@@ -31,7 +31,14 @@ type WindowInput = Readonly<{
   state: SubscriptionState; taxCountry: string | null; policy: BillingPolicy; now: Date;
   /** P2-I4 (D5 5h): the connectors' xMoney system; a plan created in the other one is never offered a withdrawal. */
   xmoneyEnvironment: CustomerXMoneyEnvironment;
+  /** N12: the connectors' NETOPIA environment; absent or null, no NETOPIA plan is served here (spec §2.5.4). */
+  paymentEnvironment?: "sandbox" | "live" | null;
 }>;
+
+/** Spec §2.5.4: the plan belongs to a payment system this API serves (provider and environment together). */
+function served(input: WindowInput): boolean {
+  return servedHere(input.state, { xmoneyEnvironment: input.xmoneyEnvironment, paymentEnvironment: input.paymentEnvironment ?? null });
+}
 
 /**
  * The withdrawal deadline while the right is still open (ACTIVE, a withdrawal country, before it closes, and the plan
@@ -65,12 +72,12 @@ const iso = (value: Date | null): string | null => value === null ? null : value
 /**
  * An upgrade is offered only while it can be charged at a prorated price: ACTIVE, below Max, no postponed renewal
  * running, outside the renewal's lead (P12c refuses it there with UPGRADE_NOT_AVAILABLE_NOW), and the plan paid in
- * this API's xMoney system (P2-W3 (a): P12c refuses the other one's NOT_SUBSCRIBED).
+ * a payment system this API serves (spec §2.5.4; P2-W3 (a): the upgrade refuses another one's NOT_SUBSCRIBED).
  */
 function upgradeOffered(input: WindowInput): boolean {
   const { state, now } = input;
   return state.status === "ACTIVE" && state.planId !== "MAX" && state.renewalPostponedUntil === null
-    && state.paymentProvider === "xmoney" && state.paymentEnvironment === input.xmoneyEnvironment
+    && served(input)
     && state.currentPeriodEnd !== null && now.getTime() < state.currentPeriodEnd.getTime() - renewalLeadMs();
 }
 
@@ -86,14 +93,14 @@ function cardChangeOffered(input: WindowInput): boolean {
 
 /**
  * C-15: an undo of a pending cancel is offered only where the revoke route (`revokeCancelForOwner`) accepts it: ACTIVE,
- * the plan paid in this API's xMoney system (D5 5h: the other one's cancel stands, NOT_SUBSCRIBED), a cancel pending,
- * and before the period end. A SUSPENDED plan's undo is refused while paused (P2-W10); a PAST_DUE plan's cancel ends it
- * at once, so it never carries one.
+ * the plan paid in a payment system this API serves (spec §2.5.4; D5 5h: another one's cancel stands, NOT_SUBSCRIBED),
+ * a cancel pending, and before the period end. A SUSPENDED plan's undo is refused while paused (P2-W10); a PAST_DUE
+ * plan's cancel ends it at once, so it never carries one.
  */
 function revokeCancelOffered(input: WindowInput): boolean {
   const { state, now } = input;
   return state.status === "ACTIVE" && state.cancelRequested
-    && state.paymentProvider === "xmoney" && state.paymentEnvironment === input.xmoneyEnvironment
+    && served(input)
     && (state.currentPeriodEnd === null || now.getTime() < state.currentPeriodEnd.getTime());
 }
 
@@ -121,13 +128,13 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
 }
 
 export async function readSubscriptionView(
-  deps: Pick<SubscriptionRouteDeps, "billing" | "policy" | "xmoneyEnvironment">, ownerRef: string, now: Date
+  deps: Pick<SubscriptionRouteDeps, "billing" | "policy" | "xmoneyEnvironment" | "paymentEnvironment">, ownerRef: string, now: Date
 ): Promise<SubscriptionView | null> {
   const state = await deps.billing.subscriptionForOwner(ownerRef);
   if (state === null) return null;
   return subscriptionView({
     state, taxCountry: await initialTaxCountry(deps.billing, state), policy: deps.policy, now,
-    xmoneyEnvironment: deps.xmoneyEnvironment
+    xmoneyEnvironment: deps.xmoneyEnvironment, paymentEnvironment: deps.paymentEnvironment
   });
 }
 

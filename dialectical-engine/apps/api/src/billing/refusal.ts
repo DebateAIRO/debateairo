@@ -38,6 +38,8 @@ export type BillingRefusalCode =
   | "UPGRADE_NOT_HIGHER"
   /** P12c: an earlier upgrade has no outcome yet, or another process holds the subscription's lease (409). */
   | "UPGRADE_IN_PROGRESS"
+  /** N12 (spec §2.10): an upgrade is paid or on its way at NETOPIA (or unreadable); `chargeRef` names it (409). */
+  | "UPGRADE_PENDING"
   /** P12c: the renewal of this period is due, postponed or already charging; upgrade in the new period (409). */
   | "UPGRADE_NOT_AVAILABLE_NOW"
   /**
@@ -64,7 +66,7 @@ export type BillingRefusalCode =
 export type BillingRefusalStatus = 403 | 404 | 409 | 422 | 503;
 
 export class BillingRefusal extends Error {
-  /** `chargeRef`: our own charge id (32 hex), sent back only with CHECKOUT_PENDING. */
+  /** `chargeRef`: our own charge id (32 hex), sent back only with CHECKOUT_PENDING and UPGRADE_PENDING. */
   constructor(readonly status: BillingRefusalStatus, readonly code: BillingRefusalCode, readonly chargeRef: string | null = null) {
     super(code);
     this.name = "BillingRefusal";

@@ -45,7 +45,7 @@ type FollowUp = (client: PoolClient, at: Date) => Promise<void>;
 
 const REQUESTED_REASONS: ReadonlySet<string> = new Set<RequestedRefundReason>([
   "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "WITHDRAWAL", "CARD_CHECK_RELEASE",
-  "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE", "DUPLICATE_PAYMENT"
+  "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE", "DUPLICATE_PAYMENT", "UPGRADE_CLOSED"
 ]);
 const PROVIDER_REASONS: ReadonlySet<string> = new Set(["PROVIDER_REFUND", "PROVIDER_VOID"]);
 /** The releases of a card change's hold (P12e, P20): the only refunds whose amount may be 0 (P2-M4). */
@@ -177,6 +177,7 @@ function refundsWholePayment(reason: RequestedRefundReason): boolean {
     case "CARD_COUNTRY_BLOCKED":
     case "ALREADY_SUBSCRIBED":
     case "SUBSCRIPTION_ENDED":
+    case "UPGRADE_CLOSED":
     case "DUPLICATE_PAYMENT":
     case "CARD_CHECK_RELEASE":
     case "CARD_CHECK_REFUSED":
@@ -518,6 +519,8 @@ export class RefundDesk {
         return this.mail(intent, "M11", intent.chargeId, await this.planEndedByRefusal(intent));
       case "ALREADY_SUBSCRIBED":
       case "SUBSCRIPTION_ENDED":
+      // N12: a closed upgrade's late payment: M11's "a payment arrived that we could not apply … refunded in full".
+      case "UPGRADE_CLOSED":
         return this.mail(intent, "M11_DUPLICATE", intent.chargeId);
       case "DUPLICATE_PAYMENT":
         // One charge can take more than one duplicate: each refunded transaction gets its own email.

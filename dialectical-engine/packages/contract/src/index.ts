@@ -475,14 +475,28 @@ export const BillingUpgradeQuoteResponseSchema = z.object({
   expires_at: z.iso.datetime()
 }).strict();
 export type BillingUpgradeQuoteResponse = z.infer<typeof BillingUpgradeQuoteResponseSchema>;
-export const BillingUpgradeRequestSchema = z.object({ plan_id: z.enum(["PRO", "MAX"]), quote_ref: z.uuid() }).strict();
-/** P12c: the upgrade charge's state; the plan changes only once VERIFY_PAYMENT confirms the payment. */
+/** N12 (spec §2.10, §2.18): the quote, and the card-saving agreement the page showed (recorded, surface UPGRADE). */
+export const BillingUpgradeRequestSchema = z.object({
+  plan_id: z.enum(["PRO", "MAX"]),
+  quote_ref: z.uuid(),
+  locale: z.string().regex(/^[a-z]{2}$/),
+  renewal_terms: BillingDocumentPairSchema
+}).strict();
+export type BillingUpgradeRequest = z.infer<typeof BillingUpgradeRequestSchema>;
+/** N12: NETOPIA's page for the prorated total; the plan changes only once NETOPIA confirms the payment (VERIFY_PAYMENT). */
 export const BillingUpgradeResponseSchema = z.object({
-  charge_ref: z.string().regex(/^[0-9a-f]{32}$/u),
-  state: z.enum(["PENDING", "SUCCEEDED", "FAILED"]),
-  reason_code: z.enum(["PAYMENT_DECLINED", "VOIDED", "REBILL_REFUSED", "NO_TRANSACTION"]).nullable()
+  redirect_url: z.url({ protocol: /^https?$/u }).max(2_048),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/u)
 }).strict();
 export type BillingUpgradeResponse = z.infer<typeof BillingUpgradeResponseSchema>;
+/** N12: the 409 body while an upgrade of this subscription is paid or on its way; the page waits on `charge_ref`. */
+export const BillingUpgradePendingErrorSchema = z.object({
+  error: z.literal("UPGRADE_PENDING"),
+  message: z.literal("UPGRADE_PENDING"),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/u)
+}).strict();
+/** What `upgradeSubscription` resolves to for that 409, beside NETOPIA's page. */
+export type BillingUpgradePendingResponse = Readonly<{ state: "PENDING"; charge_ref: string }>;
 /** P12d: the step-up grant for WITHDRAW_SUBSCRIPTION (the same 43-character token every step-up grant is). */
 export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
 /**
@@ -1387,7 +1401,7 @@ export const contractInventory = Object.freeze({
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,
     BillingUpgradeQuoteRequestSchema, BillingUpgradeQuoteResponseSchema, BillingUpgradeRequestSchema,
-    BillingUpgradeResponseSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema,
+    BillingUpgradeResponseSchema, BillingUpgradePendingErrorSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema,
     BillingCardChangeResponseSchema, BillingCancelLinkRequestSchema, BillingCancelLinkAcceptedSchema,
     BillingCancelByTokenRequestSchema
   })

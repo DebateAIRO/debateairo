@@ -106,8 +106,12 @@ export type BillingAuditEvent =
   | "billing.cancel.revoked"
   /** P12b: a downgrade to a lower plan was scheduled for the next renewal; the field is the plan id. */
   | "billing.downgrade.scheduled"
-  /** P12c: an upgrade charge was written and its rebill is about to be sent; the field is the plan id. */
+  /** P12c/N12: an upgrade charge was written and NETOPIA's page is about to be opened for it; the field is the plan id. */
   | "billing.upgrade.requested"
+  /** N12 (spec §2.6.2 step 8): NETOPIA's page could not be opened; the fields are the operation and the payment code. */
+  | "billing.payment.start_failed"
+  /** N12/N16: an unpaid hosted charge was closed FAILED(NO_TRANSACTION); the field is the charge kind. */
+  | "billing.charge.closed"
   /** P12d: a withdrawal was recorded; the fields are the number of refund intents written and its source. */
   | "billing.withdrawal"
   /**

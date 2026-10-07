@@ -1,8 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { decimalToMicros, foldSubscription } from "@debateai/billing-core";
 import { startBillingHarness, type BillingHarness } from "../support/billingHarness.js";
 import { testBillingPlans } from "../support/billingFixtures.js";
-import { subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
+import { subscriptionDeps, testAgreement } from "../support/billingSubscriptionFixtures.js";
 import { renewalLeadMs } from "../../apps/api/src/billing/renewal-rules.js";
 import { chargeEvent } from "../../apps/api/src/billing/rows.js";
 import { createUpgradeSettlement, quoteUpgrade, startUpgrade } from "../../apps/api/src/billing/upgrade.js";
@@ -22,6 +23,14 @@ const IP = "198.51.100.7";
 const deps = () => subscriptionDeps(h.database.pool, {
   recordsKey: h.recordsKey, tax: h.tax, xmoney: h.xmoney, geo: h.geo, clock: h.clock.read
 });
+/**
+ * N12's upgrade input (the card-saving agreement and the request's source). This suite still runs xMoney's
+ * `h.activate()`, so its upgrades answer NOT_SUBSCRIBED until N24 moves it to NETOPIA (the red ledger).
+ */
+const upgradeInput = (ownerRef: string, planId: "PRO" | "MAX", quoteRef: string) => ({
+  ownerRef, userId: randomUUID(), planId, quoteRef, ip: IP, userAgent: "p12c-renewal", locale: "en",
+  agreement: testAgreement("en")!
+});
 const renewalCharges = async (subscriptionId: string) =>
   (await h.repository.chargesForSubscription(subscriptionId)).filter((charge) => charge.kind === "RENEWAL");
 
@@ -31,7 +40,7 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     const end = await h.periodEndOf(paid.subscriptionId);
     h.clock.now = new Date(end.getTime() - 10 * MINUTE);
     const quoted = await quoteUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", ip: IP, now: h.clock.now });
-    expect(await startUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", quoteRef: quoted.quote_ref }))
+    expect(await startUpgrade(deps(), upgradeInput(paid.ownerRef, "MAX", quoted.quote_ref)))
       .toMatchObject({ state: "PENDING" });
     h.clock.now = new Date(end.getTime() - MINUTE);
     await h.renewal.runOnce();
@@ -55,7 +64,7 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     const quoted = await quoteUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", ip: IP, now: h.clock.now });
     // The rebill reached xMoney but its answer was lost: SUBMIT_UNKNOWN, which only an adoption can settle.
     h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN", true);
-    expect(await startUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", quoteRef: quoted.quote_ref }))
+    expect(await startUpgrade(deps(), upgradeInput(paid.ownerRef, "MAX", quoted.quote_ref)))
       .toMatchObject({ state: "PENDING" });
     // Inside the lead the renewal waits for the upgrade, and the hold is written before the period end.
     h.clock.now = new Date(end.getTime() - 2 * MINUTE);
@@ -107,7 +116,7 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     expect(await renewalCharges(paid.subscriptionId)).toHaveLength(1);
     // A second API process whose clock is ten minutes behind: the renewal charge itself is the refusal.
     h.clock.now = new Date(end.getTime() - 10 * MINUTE);
-    await expect(startUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "PRO", quoteRef: quoted.quote_ref }))
+    await expect(startUpgrade(deps(), upgradeInput(paid.ownerRef, "PRO", quoted.quote_ref)))
       .rejects.toMatchObject({ code: "UPGRADE_NOT_AVAILABLE_NOW" });
     await expect(quoteUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "PRO", ip: IP, now: h.clock.now }))
       .rejects.toMatchObject({ code: "UPGRADE_NOT_AVAILABLE_NOW" });
@@ -120,7 +129,7 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     const plusTotal = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).announcedTotalMicros;
     h.clock.now = new Date(end.getTime() - 2 * DAY);
     const quoted = await quoteUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", ip: IP, now: h.clock.now });
-    expect(await startUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", quoteRef: quoted.quote_ref }))
+    expect(await startUpgrade(deps(), upgradeInput(paid.ownerRef, "MAX", quoted.quote_ref)))
       .toMatchObject({ state: "PENDING" });
     // The upgrade stays SUBMITTED (no drain). A day later it no longer holds the renewal, priced at the old plan.
     h.clock.now = new Date(end.getTime() - MINUTE);

@@ -192,3 +192,20 @@ export function taxLocationOf(location: QuoteLocation): TaxLocation {
     city: location.city, street: location.street, ip: location.ip
   });
 }
+
+const paymentUrlAad = (chargeId: string): RecordAad =>
+  ({ table: "billing.hosted_payment", column: "redirect_ciphertext", rowId: chargeId });
+
+/** Spec §2.5.2: NETOPIA's payment URL lets anyone pay our order, so it is sealed under the records key. */
+export function sealPaymentUrl(key: Buffer, chargeId: string, url: string): { ciphertext: Buffer; keyId: string } {
+  return sealRecord(key, paymentUrlAad(chargeId), Buffer.from(url, "utf8"));
+}
+
+export function openPaymentUrl(key: Buffer, chargeId: string, ciphertext: Buffer): string {
+  const plaintext = openRecord(key, paymentUrlAad(chargeId), ciphertext);
+  try {
+    return plaintext.toString("utf8");
+  } finally {
+    plaintext.fill(0);
+  }
+}

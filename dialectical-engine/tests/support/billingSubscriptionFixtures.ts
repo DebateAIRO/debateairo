@@ -13,6 +13,8 @@ import { planById, type PlanId } from "@debateai/register";
 import type { BillingAudit, BillingAuditEvent, BillingAuditField } from "../../apps/api/src/billing/audit.js";
 import type { BillingAdmissionScope } from "../../apps/api/src/billing/index.js";
 import { CheckoutService } from "../../apps/api/src/billing/checkout.js";
+import type { ConsentKind } from "../../apps/api/src/billing/checkout.js";
+import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
 import { sealBillingProfile, sealCardToken, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { chargeEvent, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
@@ -20,6 +22,7 @@ import { installSubscriptionRoutes } from "../../apps/api/src/billing/subscripti
 import type { SubscriptionRouteDeps } from "../../apps/api/src/billing/subscription-deps.js";
 import { AdjustableTaxEngine, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy } from "./billingFixtures.js";
 import type { TestHttpIdentity } from "./httpSession.js";
+import { StubCardPayments } from "./stub-card-payments.js";
 
 /** A generated records key: tests never hold a real one. */
 export const TEST_RECORDS_KEY = Buffer.alloc(32, 7);
@@ -27,6 +30,15 @@ export const TEST_RECORDS_KEY = Buffer.alloc(32, 7);
 export const TEST_PUBLIC_APP_URL = "https://dezbatere.test";
 /** A generated xMoney private key (A23: bytes); tests never hold a real one. */
 export const TEST_XMONEY_PRIVATE_KEY = Buffer.alloc(32, 9);
+
+const TEST_AGREEMENT_SHA256 = createHash("sha256").update("renewal agreement (test)", "utf8").digest("hex");
+/** 0080's `acceptance_document_version_shape`: a consent sentence's version is `sha256-` + its hash's first 12 hex. */
+const TEST_AGREEMENT = Object.freeze({ version: `sha256-${TEST_AGREEMENT_SHA256.slice(0, 12)}`, sha256: TEST_AGREEMENT_SHA256 });
+
+/** N12/N13: the card-saving agreement a test page shows in `locale` (spec §2.18); null where none is published. */
+export function testAgreement(locale: string): Readonly<{ version: string; sha256: string }> | null {
+  return locale === "en" ? TEST_AGREEMENT : null;
+}
 
 export type RecordingAudit = BillingAudit & {
   readonly events: Array<Readonly<{ event: BillingAuditEvent; fields: Readonly<Record<string, BillingAuditField>> }>>;
@@ -416,6 +428,11 @@ export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRout
     xmoney: UNCONFIGURED_XMONEY,
     // The connectors' xMoney system in these tests, as P6a's fakes and `seedActiveSubscription`'s default.
     xmoneyEnvironment: "stage",
+    payments: new StubCardPayments(),
+    paymentEnvironment: "sandbox",
+    acceptances: new AcceptanceRepository(pool),
+    consentDocuments: (kind: ConsentKind, locale: string) => kind === "CONSENT_RENEWAL" ? testAgreement(locale) : null,
+    orderText: englishOrderText,
     countryPolicy: testCountryPolicy,
     geo: new StubGeo(),
     kick: () => undefined,

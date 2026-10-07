@@ -40,6 +40,8 @@ import {
   BillingInvoicesResponseSchema,
   BillingSubscriptionResponseSchema,
   BillingUpgradeQuoteResponseSchema,
+  BillingUpgradePendingErrorSchema,
+  BillingUpgradeRequestSchema,
   BillingUpgradeResponseSchema,
   BillingUsageResponseSchema,
   BillingWithdrawResponseSchema,
@@ -78,6 +80,7 @@ import {
   type BillingCheckoutRequest,
   type BillingCheckoutResponse,
   type BillingChargeStatusResponse,
+  type BillingUpgradePendingResponse,
   type BillingInvoicesResponse,
   type BillingSubscriptionResponse,
   type BillingUpgradeQuoteResponse,
@@ -431,7 +434,11 @@ export interface ContractClient {
   revokeSubscriptionCancel(): Promise<void>;
   /** P12c: the prorated upgrade price with tax and the new plan's recurring total; spend it with `upgradeSubscription`. */
   quoteSubscriptionUpgrade(planId: "PRO" | "MAX"): Promise<BillingUpgradeQuoteResponse>;
-  upgradeSubscription(planId: "PRO" | "MAX", quoteRef: string): Promise<BillingUpgradeResponse>;
+  /** N12: NETOPIA's page for the prorated total; one paid or on its way resolves `{state: "PENDING", charge_ref}` (409). */
+  upgradeSubscription(
+    planId: "PRO" | "MAX", quoteRef: string,
+    agreement: Readonly<{ locale: string; renewal_terms: Readonly<{ version: string; sha256: string }> }>
+  ): Promise<BillingUpgradeResponse | BillingUpgradePendingResponse>;
   /** P12d: withdraw within the 14 days with a WITHDRAW_SUBSCRIPTION step-up grant; `refund` null = the owner settles it. */
   withdrawSubscription(stepUpGrant: string): Promise<BillingWithdrawResponse>;
   /** P12e: the card form's signed 1.00 USD authorization order, released once the new card is seen. */
@@ -765,9 +772,22 @@ export function createContractClient(
       "/v1/billing/subscription/upgrade-quote", BillingUpgradeQuoteResponseSchema,
       { method: "POST", body: JSON.stringify({ plan_id: planId }) }
     ),
-    upgradeSubscription: (planId: "PRO" | "MAX", quoteRef: string) => request(
-      "/v1/billing/subscription/upgrade", BillingUpgradeResponseSchema,
-      { method: "POST", body: JSON.stringify({ plan_id: planId, quote_ref: quoteRef }) }
+    upgradeSubscription: (
+      planId: "PRO" | "MAX", quoteRef: string,
+      agreement: Readonly<{ locale: string; renewal_terms: Readonly<{ version: string; sha256: string }> }>
+    ) => requestJson<BillingUpgradeResponse | BillingUpgradePendingResponse>(
+      root.href, fetchImplementation, "/v1/billing/subscription/upgrade", BillingUpgradeResponseSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(BillingUpgradeRequestSchema.parse({
+          plan_id: planId, quote_ref: quoteRef, locale: agreement.locale, renewal_terms: agreement.renewal_terms
+        }))
+      }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const pending = BillingUpgradePendingErrorSchema.safeParse(body);
+        return pending.success ? Object.freeze({ state: "PENDING" as const, charge_ref: pending.data.charge_ref }) : null;
+      }
     ),
     withdrawSubscription: (stepUpGrant: string) => request(
       "/v1/billing/subscription/withdraw", BillingWithdrawResponseSchema,

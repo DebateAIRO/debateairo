@@ -30,6 +30,8 @@ export type BillingRefundReason =
    * bought nothing: refunded in full, M11_DUPLICATE, never a credit note (it was never a sale).
    */
   | "DUPLICATE_PAYMENT"
+  /** N12 (spec §2.10): a late payment for a closed upgrade that can no longer buy what it was priced for; whole, M11_DUPLICATE. */
+  | "UPGRADE_CLOSED"
   /** P9c (A9): refunded in the xMoney dashboard, not by us. Recorded, never requested. */
   | "PROVIDER_REFUND"
   /** P9c (A9): voided or cancelled at xMoney after it had succeeded. Recorded, never requested. */
@@ -44,7 +46,7 @@ export type RequestedRefundReason = Exclude<BillingRefundReason, "PROVIDER_REFUN
  */
 export const REFUND_REASONS_REFUSING_THE_PAYMENT: ReadonlySet<BillingRefundReason> = new Set<BillingRefundReason>([
   "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED",
-  "CARD_CHECK_NOT_LIVE"
+  "CARD_CHECK_NOT_LIVE", "UPGRADE_CLOSED"
 ]);
 
 export type ChargeFailureCode = "PAYMENT_DECLINED" | "VOIDED" | "REBILL_REFUSED" | "NO_TRANSACTION";

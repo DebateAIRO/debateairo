@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import type { EntitlementRepository } from "@debateai/db";
 import { planById } from "@debateai/register";
 import { enqueueEmail } from "./email-job.js";
+import { servedHere } from "./renewal-rules.js";
 import { quoteTax, storedTaxContext } from "./stored-tax-context.js";
 import { appendChecked, lockedAfter, lockedSubscription, refuse, type LockedSubscription } from "./subscription-core.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
@@ -160,9 +161,11 @@ export async function revokeCancelForOwner(deps: SubscriptionRouteDeps, ownerRef
     if (locked === null) return "NOT_SUBSCRIBED" as const;
     const { state } = locked;
     if (state.status !== "ACTIVE" && state.status !== "PAST_DUE") return "NOT_SUBSCRIBED" as const;
-    // D5 5h (P2-I4): a plan of the other xMoney system is never renewed here, so its cancel stands (a sandbox plan
-    // revoked on live would stay ACTIVE for ever and refuse the next live start, BILLING_STAGE_RECORDS_OPEN).
-    if (state.paymentProvider !== "xmoney" || state.paymentEnvironment !== deps.xmoneyEnvironment) return "NOT_SUBSCRIBED" as const;
+    // D5 5h (P2-I4), spec §2.5.4: a plan of another payment system is never renewed here, so its cancel stands (a
+    // sandbox plan revoked on live would stay ACTIVE for ever and refuse the next live start).
+    if (!servedHere(state, { xmoneyEnvironment: deps.xmoneyEnvironment, paymentEnvironment: deps.paymentEnvironment })) {
+      return "NOT_SUBSCRIBED" as const;
+    }
     if (!state.cancelRequested) return "NOTHING" as const;
     if (state.currentPeriodEnd !== null && now.getTime() >= state.currentPeriodEnd.getTime()) {
       return "NOT_SUBSCRIBED" as const;

@@ -256,6 +256,9 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     // declared below; the kick only runs once an upgrade is submitted).
     xmoney: deps.connectors.xmoney,
     xmoneyEnvironment: deps.connectors.xmoneyEnvironment,
+    // N12/N13 (spec §2.10, §2.11, §2.18): NETOPIA's page and status read, its environment, the agreement, the order line.
+    payments: deps.connectors.payments, paymentEnvironment: deps.connectors.paymentEnvironment, acceptances,
+    consentDocuments: (kind, locale) => currentDocument(kind, locale), orderText: catalogueOrderText,
     countryPolicy: deps.countryPolicy,
     geo: deps.geo,
     kick: () => drain(),

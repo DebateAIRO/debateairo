@@ -124,14 +124,18 @@ export function installSubscriptionRoutes(
       ownerRef, planId: parsed.data.plan_id, ip: source(request).ip, now: deps.clock()
     }))));
   });
+  // N12 (spec §2.10): the card-saving agreement and the quote; the answer is NETOPIA's page for the prorated total.
   api.post("/v1/billing/subscription/upgrade", policy("POST /v1/billing/subscription/upgrade"), async (request, reply) => {
     if (deps === undefined) return notFound(reply);
-    const ownerRef = ownerOf(request);
-    if (ownerRef === null) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+    const authenticated = request.authenticatedSession;
+    if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
     const parsed = BillingUpgradeRequestSchema.safeParse(request.body);
     if (!parsed.success) return malformed(reply);
+    const from = source(request);
     return answer(reply, async () => reply.send(BillingUpgradeResponseSchema.parse(await startUpgrade(deps, {
-      ownerRef, planId: parsed.data.plan_id, quoteRef: parsed.data.quote_ref
+      ownerRef: authenticated.ownerRef, userId: authenticated.userId, planId: parsed.data.plan_id,
+      quoteRef: parsed.data.quote_ref, ip: from.ip, userAgent: from.userAgent, locale: parsed.data.locale,
+      agreement: parsed.data.renewal_terms
     }))));
   });
   // P12d: the step-up grant (WITHDRAW_SUBSCRIPTION) rides in the body and is spent under the owner lock.

@@ -43,6 +43,8 @@ export type NextEvent = Readonly<{
   xmoneyOrderId?: string;
   xmoneyCustomerId?: string;
   cardRef?: string | null;
+  /** N12/N13 (spec §2.15.2): the saved card an adopting event (UPGRADED, CARD_CHANGED) makes the subscription's. */
+  cardTokenId?: string | null;
   data?: Readonly<Record<string, string | number | boolean | null>>;
 }>;
 
@@ -62,7 +64,8 @@ export async function appendChecked(
     ...(next.planId === undefined ? {} : { planId: next.planId }),
     ...(next.xmoneyOrderId === undefined ? {} : { xmoneyOrderId: next.xmoneyOrderId }),
     ...(next.xmoneyCustomerId === undefined ? {} : { xmoneyCustomerId: next.xmoneyCustomerId }),
-    ...(next.cardRef === undefined ? {} : { cardRef: next.cardRef })
+    ...(next.cardRef === undefined ? {} : { cardRef: next.cardRef }),
+    ...(next.cardTokenId === undefined ? {} : { cardTokenId: next.cardTokenId })
   });
   foldSubscription([...locked.events, event]);
   await billing.appendSubscriptionEvent(client, event);
