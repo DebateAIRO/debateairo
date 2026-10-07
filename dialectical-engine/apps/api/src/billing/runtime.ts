@@ -296,10 +296,12 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     subscription
   });
   const drain = createCoalescingSingleFlight(() => outbox.drain(10), () => deps.reportPending("BILLING_OUTBOX_PENDING"));
-  // P14a: the money check against xMoney (A10's daily listings, A2's adoption) in this connectors' xMoney system.
+  // P14a / N16: the money check (xMoney's listings and adoption for xMoney rows; NETOPIA's status reads).
   const reconciler = new BillingReconciler({
     billing: repository, jobs, xmoney: deps.connectors.xmoney, environment: deps.connectors.xmoneyEnvironment,
-    audit: deps.audit, clock: deps.clock, kick: drain
+    audit: deps.audit, clock: deps.clock, kick: drain,
+    // N16 (spec §2.14): NETOPIA's status reads, in this API's NETOPIA environment, on the same 10-minute tick.
+    netopia: { payments: deps.connectors.payments, paymentEnvironment: deps.connectors.paymentEnvironment, jobs, pool: deps.pool }
   });
   // P15: the erasure stop sweep runs in front of the money check, isolated from it (`reconcileWork`): a failed sweep
   // reports BILLING_ERASURE_SWEEP_PENDING and the reconciler runs anyway; BILLING_RECONCILIATION_PENDING means only

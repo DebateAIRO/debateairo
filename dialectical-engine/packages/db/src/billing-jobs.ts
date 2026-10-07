@@ -3,6 +3,21 @@ import type {
   ChargeKind, CustomerXMoneyEnvironment, OutboxJob, OutboxKind, OutboxPayload, PaymentEnvironmentName, PaymentProviderName
 } from "./billing.js";
 
+/** Spec 2026-10-05 §2.14: which read schedule a NETOPIA charge is on. */
+export type StatusReadSchedule = "OPEN" | "CLOSED" | "PAID" | "REFUND";
+/** Where the frequent pass stopped: the last row it read (the list runs newest due first). */
+export type StatusReadCursor = Readonly<{ dueAt: Date; chargeId: string }>;
+/** One NETOPIA charge whose next status read is due, with what the reconciler needs to read and decide it. */
+export type DueStatusRead = Readonly<{
+  chargeId: string; ownerRef: string; subscriptionId: string; kind: ChargeKind; quoteId: string | null; createdAt: Date;
+  totalMicros: number; schedule: StatusReadSchedule; dueAt: Date;
+  /** The best ntpID we hold (N-16): the charge's newest SUBMITTED one, else the hosted page's. */
+  providerPaymentId: string | null;
+}>;
+
+/** How far back a charge can still be due: a payment made up to 30 days after its charge, read until 120 days later. */
+const STATUS_READ_HORIZON_MS = 151 * 86_400_000;
+
 const SUBSCRIPTION_LEASE_NAMESPACE = "debateai.billing.subscription:";
 
 /**
@@ -358,6 +373,99 @@ export class BillingJobQueries {
       chargeId: row.charge_id, subscriptionId: row.subscription_id, periodStart: row.period_start,
       attempt: row.attempt, createdAt: row.created_at
     }));
+  }
+
+  /**
+   * Spec §2.14 (SR-21): the NETOPIA charges of one environment whose next status read is due at `now`, newest due first,
+   * after `cursor` (exclusive), at most `limit`. Each charge's schedule and next read come from our rows and its newest
+   * `billing.status_read` row (every read writes one):
+   * - REFUND: requested refund amounts above the refunded ones (§2.12.2's owner refunds): now, then daily;
+   * - PAID: SUCCEEDED (never a 0 card check): the latest of 1, 7, 30, 60, 90, 120 days after the payment not read since;
+   * - OPEN: a hosted page started (SUBMITTED or SUBMIT_UNKNOWN) or a SUBMITTED renewal, not final: 10 min, 30 min, 1 h,
+   *   3 h after the submit, then daily after the last read, up to 30 days; never a renewal N11's probes own;
+   * - CLOSED: a hosted INITIAL or UPGRADE with no SUCCEEDED that is FAILED or whose plan ENDED: daily for 30 days.
+   * `next` is the last row of a full page, else null (the cursor wraps, so no due charge is starved). Every step is
+   * written in hours: a `timestamptz + interval 'N days'` follows the session's time zone across a daylight-saving
+   * change, and a read must not move by an hour with it.
+   */
+  async dueStatusReads(
+    executor: Pick<Pool, "query"> | PoolClient, now: Date, cursor: StatusReadCursor | null, limit: number,
+    environment: PaymentEnvironmentName
+  ): Promise<Readonly<{ rows: ReadonlyArray<DueStatusRead>; next: StatusReadCursor | null }>> {
+    const result = await executor.query<{
+      charge_id: string; owner_ref: string; subscription_id: string; kind: ChargeKind; quote_id: string | null;
+      created_at: Date; total_micros: string; schedule: StatusReadSchedule; due_at: Date; provider_payment_id: string | null;
+    }>(`
+      WITH facts AS (
+        SELECT c.charge_id, c.owner_ref::text AS owner_ref, c.subscription_id::text AS subscription_id, c.kind,
+          c.quote_id::text AS quote_id, c.created_at, c.total_micros,
+          h.provider_payment_id AS hosted_payment_id,
+          (SELECT e.provider_payment_id FROM billing.charge_event e
+            WHERE e.charge_id = c.charge_id AND e.kind = 'SUBMITTED' AND e.provider_payment_id IS NOT NULL
+            ORDER BY e.at DESC LIMIT 1) AS submitted_payment_id,
+          COALESCE((SELECT min(e.at) FROM billing.charge_event e
+            WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUBMIT_UNKNOWN')), h.started_at, c.created_at) AS anchor_at,
+          (SELECT min(e.at) FROM billing.charge_event e WHERE e.charge_id = c.charge_id AND e.kind = 'SUCCEEDED') AS paid_at,
+          EXISTS (SELECT 1 FROM billing.charge_event e WHERE e.charge_id = c.charge_id AND e.kind = 'SUBMITTED') AS submitted,
+          EXISTS (SELECT 1 FROM billing.charge_event e
+            WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUBMIT_UNKNOWN')) AS sent,
+          EXISTS (SELECT 1 FROM billing.charge_event e WHERE e.charge_id = c.charge_id AND e.kind = 'FAILED') AS failed,
+          EXISTS (SELECT 1 FROM billing.subscription_event s
+            WHERE s.subscription_id = c.subscription_id AND s.kind = 'ENDED') AS ended,
+          COALESCE((SELECT sum(e.amount_micros) FROM billing.charge_event e
+            WHERE e.charge_id = c.charge_id AND e.kind = 'REFUND_REQUESTED'), 0)
+            > COALESCE((SELECT sum(e.amount_micros) FROM billing.charge_event e
+            WHERE e.charge_id = c.charge_id AND e.kind = 'REFUNDED'), 0) AS refund_open,
+          (SELECT max(r.at) FROM billing.status_read r WHERE r.charge_id = c.charge_id) AS last_read_at
+        FROM billing.charge c
+        LEFT JOIN billing.hosted_payment h ON h.charge_id = c.charge_id
+        WHERE c.payment_provider = 'netopia' AND c.payment_environment = $1 AND c.created_at >= $2 AND c.created_at <= $3
+      ),
+      classed AS (
+        SELECT f.*, CASE
+          WHEN f.refund_open THEN 'REFUND'
+          WHEN f.paid_at IS NOT NULL THEN CASE WHEN f.kind = 'CARD_CHECK' AND f.total_micros = 0 THEN NULL ELSE 'PAID' END
+          WHEN f.kind = 'RENEWAL' THEN CASE WHEN f.submitted AND NOT f.failed THEN 'OPEN' END
+          WHEN f.hosted_payment_id IS NULL AND NOT f.sent THEN NULL
+          WHEN f.failed OR f.ended THEN CASE WHEN f.hosted_payment_id IS NOT NULL AND f.kind <> 'CARD_CHECK' THEN 'CLOSED' END
+          ELSE 'OPEN' END AS schedule
+        FROM facts f
+      ),
+      due AS (
+        SELECT k.*, CASE k.schedule
+          WHEN 'REFUND' THEN COALESCE(k.last_read_at + interval '24 hours', $3::timestamptz)
+          WHEN 'PAID' THEN (SELECT max(k.paid_at + m.step)
+            FROM unnest(ARRAY[interval '24 hours', interval '168 hours', interval '720 hours', interval '1440 hours',
+              interval '2160 hours', interval '2880 hours']) AS m(step)
+            WHERE k.paid_at + m.step <= $3::timestamptz AND (k.last_read_at IS NULL OR k.last_read_at < k.paid_at + m.step))
+          WHEN 'CLOSED' THEN (SELECT n.at FROM (SELECT COALESCE(k.last_read_at, k.anchor_at) + interval '24 hours' AS at) AS n
+            WHERE n.at <= k.anchor_at + interval '720 hours')
+          WHEN 'OPEN' THEN (SELECT n.at FROM (SELECT COALESCE(
+              (SELECT min(p.at) FROM (VALUES (k.anchor_at + interval '10 minutes'), (k.anchor_at + interval '30 minutes'),
+                (k.anchor_at + interval '1 hour'), (k.anchor_at + interval '3 hours')) AS p(at)
+                WHERE k.last_read_at IS NULL OR p.at > k.last_read_at),
+              k.last_read_at + interval '24 hours') AS at) AS n
+            WHERE n.at <= k.anchor_at + interval '720 hours')
+        END AS due_at
+        FROM classed k WHERE k.schedule IS NOT NULL
+      )
+      SELECT charge_id, owner_ref, subscription_id, kind, quote_id, created_at, total_micros::text AS total_micros, schedule,
+        due_at, COALESCE(submitted_payment_id, hosted_payment_id) AS provider_payment_id
+      FROM due
+      WHERE due_at IS NOT NULL AND due_at <= $3::timestamptz
+        AND ($4::timestamptz IS NULL OR (due_at, charge_id) < ($4::timestamptz, $5::text))
+      ORDER BY due_at DESC, charge_id DESC
+      LIMIT $6
+    `, [environment, new Date(now.getTime() - STATUS_READ_HORIZON_MS), now, cursor?.dueAt ?? null, cursor?.chargeId ?? null, limit]);
+    const rows = result.rows.map((row) => Object.freeze({
+      chargeId: row.charge_id, ownerRef: row.owner_ref, subscriptionId: row.subscription_id, kind: row.kind,
+      quoteId: row.quote_id, createdAt: row.created_at, totalMicros: Number(row.total_micros), schedule: row.schedule,
+      dueAt: row.due_at, providerPaymentId: row.provider_payment_id
+    }));
+    const last = rows.at(-1);
+    return Object.freeze({
+      rows, next: rows.length < limit || last === undefined ? null : Object.freeze({ dueAt: last.dueAt, chargeId: last.chargeId })
+    });
   }
 
   /** Subscriptions whose latest event is not terminal, in id order, one page after `after`. */

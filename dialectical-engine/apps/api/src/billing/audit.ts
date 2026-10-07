@@ -156,10 +156,12 @@ export type BillingAuditEvent =
   | "billing.reconcile.listing_failed"
   /**
    * P14a: charges one reconcile loop could not handle (a history that does not fold, an owner lock that timed out),
-   * skipped so the pass goes on for every other charge. The pass (FREQUENT, DAILY or CHECKOUT), the count and the
-   * distinct codes only.
+   * skipped so the pass goes on for every other charge. The pass (FREQUENT, DAILY, CHECKOUT or N16's STATUS), the
+   * count and the distinct codes only.
    */
   | "billing.reconcile.errors"
+  /** N16 (spec §2.14): one NETOPIA status read failed; the pass went on. The field is the payment code only. */
+  | "billing.reconcile.status_failed"
   /**
    * P14a: dead XMONEY_REFUND jobs with no REFUNDED since, whatever their code (`deadRefunds()`). Not every one is
    * owed: the owner summary reads each code. REFUND_NOT_REQUESTED, REFUND_CHARGE_MISSING and OTHER_XMONEY_SYSTEM owe
