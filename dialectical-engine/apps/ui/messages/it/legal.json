@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Prezzo e pagamento",
   "legal.notice.s04.body": "{product} è gratuito. I piani a pagamento non sono ancora disponibili. Prima dell’avvio di qualsiasi piano a pagamento, questa sezione indicherà il prezzo (tasse incluse), come e quando paghi, quando inizia il servizio, come funziona il rinnovo e come disdire.",
   "legal.notice.s04.bodyPaid": "I piani a pagamento e i loro prezzi mensili sono nella pagina dei prezzi. I prezzi indicati lì sono al netto delle imposte; prima che tu paghi, la pagina di pagamento mostra il prezzo completo con l’imposta del tuo paese. Paghi con carta, ogni mese in anticipo. Un piano inizia non appena la tua banca conferma il pagamento e si rinnova ogni mese finché non lo disdici. Puoi disdirlo in qualsiasi momento nelle Impostazioni, oppure nella pagina di disdetta senza accedere.",
-  "legal.notice.s04.payments": "I pagamenti con carta sono elaborati da xMoney. Non vediamo né conserviamo mai il numero della tua carta.",
+  "legal.notice.s04.payments": "I pagamenti con carta sono elaborati da NETOPIA Payments. Non vediamo né conserviamo mai il numero della tua carta.",
   "legal.notice.s04.pricingLink": "Vedi i piani e i prezzi",
   "legal.notice.s04.cancelLink": "Disdici un piano",
   "legal.notice.s05.title": "Recesso e rimborsi",

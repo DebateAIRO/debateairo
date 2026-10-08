@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Price and payment",
   "legal.notice.s04.body": "{product} is free. Paid plans are not available yet. Before any paid plan starts, this section will list the price (tax included), how and when you pay, when the service starts, how renewal works, and how to cancel.",
   "legal.notice.s04.bodyPaid": "The paid plans and their monthly prices are on the pricing page. The prices there are before tax; before you pay, the checkout shows the full price with your country's tax. You pay by card, every month in advance. A plan starts as soon as your bank confirms the payment and renews every month until you cancel. You can cancel at any time in Settings, or on the cancel page without signing in.",
-  "legal.notice.s04.payments": "Card payments are processed by xMoney. We never see or store your card number.",
+  "legal.notice.s04.payments": "Card payments are processed by NETOPIA Payments. We never see or store your card number.",
   "legal.notice.s04.pricingLink": "See the plans and prices",
   "legal.notice.s04.cancelLink": "Cancel a plan",
   "legal.notice.s05.title": "Withdrawal and refunds",

@@ -79,7 +79,7 @@ describe("P19 XMoneyCardForm", () => {
         nonce={NONCE} locale="en" catalog={billingEnglish} submitLabel="Subscribe and pay" summary="x"
         onSubmitted={() => undefined} loadSdk={loadSdk} />);
     });
-    expect(container.textContent).toContain("The card form couldn't be loaded. Please reload the page.");
+    expect(container.textContent).toContain("The payment page could not be opened. Please try again in a minute.");
     expect(loadSdk).not.toHaveBeenCalled();
     expect(sdkOriginMatchesEnvironment(null, "stage")).toBe(false);
     expect(sdkOriginMatchesEnvironment("https://secure.xmoney.com", "live")).toBe(true);

@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Cijena i plaćanje",
   "legal.notice.s04.body": "Usluga {product} besplatna je. Plaćeni planovi još nisu dostupni. Prije uvođenja bilo kojeg plaćenog plana u ovom ćemo odjeljku navesti cijenu (s uključenim porezom), način i rok plaćanja, početak pružanja usluge, način obnove i način otkazivanja.",
   "legal.notice.s04.bodyPaid": "Plaćeni planovi i njihove mjesečne cijene nalaze se na stranici s cijenama. Ondje su cijene navedene bez poreza; prije plaćanja na naplati se prikazuje puna cijena s porezom vaše zemlje. Plaćate karticom, svaki mjesec unaprijed. Plan počinje čim vaša banka potvrdi plaćanje i obnavlja se svaki mjesec dok ga ne otkažete. Možete ga otkazati u bilo kojem trenutku u Postavkama ili na stranici za otkazivanje, bez prijave.",
-  "legal.notice.s04.payments": "Plaćanja karticom obrađuje xMoney. Mi nikada ne vidimo niti pohranjujemo broj vaše kartice.",
+  "legal.notice.s04.payments": "Plaćanja karticom obrađuje NETOPIA Payments. Mi nikada ne vidimo niti pohranjujemo broj vaše kartice.",
   "legal.notice.s04.pricingLink": "Pogledajte planove i cijene",
   "legal.notice.s04.cancelLink": "Otkazivanje plana",
   "legal.notice.s05.title": "Odustanak od ugovora i povrat novca",

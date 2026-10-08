@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Cena i płatność",
   "legal.notice.s04.body": "Serwis {product} jest bezpłatny. Płatne plany nie są jeszcze dostępne. Zanim uruchomimy jakikolwiek płatny plan, podamy w tej sekcji cenę (wraz z podatkiem), sposób i termin płatności, datę rozpoczęcia świadczenia usługi, zasady odnawiania oraz sposób anulowania.",
   "legal.notice.s04.bodyPaid": "Płatne plany i ich miesięczne ceny znajdziesz na stronie z cennikiem. Podane tam ceny nie zawierają podatku; zanim zapłacisz, strona płatności pokaże pełną cenę z podatkiem Twojego kraju. Płacisz kartą, co miesiąc z góry. Plan zaczyna się, gdy tylko Twój bank potwierdzi płatność, i odnawia się co miesiąc, dopóki z niego nie zrezygnujesz. Możesz zrezygnować w dowolnym momencie w Ustawieniach albo na stronie rezygnacji bez logowania.",
-  "legal.notice.s04.payments": "Płatności kartą obsługuje xMoney. Nigdy nie widzimy ani nie przechowujemy numeru Twojej karty.",
+  "legal.notice.s04.payments": "Płatności kartą obsługuje NETOPIA Payments. Nigdy nie widzimy ani nie przechowujemy numeru Twojej karty.",
   "legal.notice.s04.pricingLink": "Zobacz plany i ceny",
   "legal.notice.s04.cancelLink": "Rezygnacja z planu",
   "legal.notice.s05.title": "Odstąpienie od umowy i zwroty",

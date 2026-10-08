@@ -136,7 +136,7 @@ const REQUIRED = [
   "billing.subscription.withdrawWindowClosed", "billing.subscription.stillConfirming",
   "billing.subscription.actionFailed", "billing.subscription.invoices", "billing.subscription.noInvoices",
   "billing.subscription.invoiceRow", "billing.subscription.creditNote", "billing.subscription.openInvoice",
-  "billing.card.title", "billing.card.intro", "billing.card.holdNote", "billing.card.noHoldNote", "billing.card.save",
+  "billing.card.title", "billing.card.intro", "billing.card.noHoldNote", "billing.card.save",
   "billing.card.saved", "billing.card.failed", "billing.card.countryRefused", "billing.card.tryAgainShortly",
   "billing.card.notSubscribed", "billing.card.back",
   "billing.cancelPage.title", "billing.cancelPage.lede", "billing.cancelPage.email", "billing.cancelPage.send",
@@ -161,7 +161,7 @@ test("the spec's sentences G2, G3, B1–B5 read exactly as approved in English (
   assert.equal(english["billing.checkout.countryUnavailable"], "Paid plans aren't available in your country yet. You can keep using the Free plan.");
   assert.equal(english["billing.checkout.confirmCountry"], "Your connection looks like it's from {ipCountry}. Do you live in {declaredCountry}?");
   assert.equal(english["billing.checkout.total"], "{plan} — {net} + {taxLabel} = {total} per month. Renews on the {day} of each month until you cancel.");
-  assert.equal(english["billing.consent.renewal"], "I agree that my subscription renews automatically every month at the price shown, until I cancel. I can cancel at any time in Settings or at dezbatere.ro/cancel.");
+  assert.equal(english["billing.consent.renewal"], "I agree that NETOPIA Payments keeps my card and that {total} is charged to it every month until I cancel. I can cancel at any time in Settings or at dezbatere.ro/cancel.");
   assert.equal(english["billing.consent.immediateStart"], "Start my plan now. I understand that if I withdraw within 14 days, I pay for the part already used: the larger of the days used or the credit used.");
   assert.equal(english["billing.checkout.subscribeAndPay"], "Subscribe and pay");
   assert.equal(english["billing.checkout.waitingForBank"], "Waiting for your bank to confirm…");
@@ -183,7 +183,7 @@ test("each sentence shown before a paid click names the money it moves (A7: the 
   assert.match(english["billing.subscription.downgradeConfirm"], /\{price\}.*\+ tax.*\{date\}/u);
   // Spec §1.3: "$20.00 + $4.20 VAT (21%, Romania)" — the tax amount, not only its rate.
   assert.match(english["billing.checkout.taxLabel"], /\{tax\}/);
-  assert.match(english["billing.card.holdNote"], /\{amount\}/);
+  assert.match(english["billing.consent.renewal"], /\{total\}/);
 });
 
 test("each refusal D6b's routes answer is worded as the server means it, in English exactly", () => {
@@ -303,6 +303,29 @@ test("/pricing's plan lines say what is true: Free's low-cost models, and the pa
     for (const strength of ["Best", "Balanced", "Economy"]) {
       const label = newDebate[`newDebate.modelStrength${strength}`];
       assert.ok(billing["billing.pricing.paidFeatures"].includes(label), `${code}: the paid line names ${strength} as /new does (${label})`);
+    }
+  }
+});
+
+// N20 (spec 2026-10-05 §2.18, §2.22): the card processor is NETOPIA Payments in every locale, and the card-saving
+// agreement names it with the monthly total; nothing a customer reads names xMoney or a hold.
+test("every locale names NETOPIA Payments where it names the card processor, and never xMoney", () => {
+  const english = catalogue("en");
+  assert.equal(english["billing.checkout.cardNote"], "You pay on NETOPIA Payments' secure page. Your card number never reaches our servers.");
+  assert.equal(english["billing.checkout.continueToCard"], "Continue to payment");
+  assert.equal(english["billing.checkout.formUnavailable"], "The payment page could not be opened. Please try again in a minute.");
+  assert.equal(catalogue("ro")["billing.checkout.continueToCard"], "Comandă cu obligație de plată");
+  for (const { code } of LOCALES) {
+    const billing = catalogue(code);
+    const legal = JSON.parse(source(`messages/${code}/legal.json`));
+    for (const key of ["billing.checkout.cardNote", "billing.consent.renewal"]) {
+      assert.ok(billing[key].includes("NETOPIA Payments"), `${code}: ${key} names NETOPIA Payments`);
+    }
+    assert.ok(legal["legal.notice.s04.payments"].includes("NETOPIA Payments"), `${code}: legal.notice.s04.payments`);
+    assert.ok(billing["billing.consent.renewal"].includes("dezbatere.ro/cancel"), `${code}: the cancel address`);
+    assert.equal(Object.hasOwn(billing, "billing.card.holdNote"), false, `${code}: no hold sentence`);
+    for (const [key, value] of [...Object.entries(billing), ...Object.entries(legal)]) {
+      assert.doesNotMatch(value, /xmoney/iu, `${code}: ${key}`);
     }
   }
 });

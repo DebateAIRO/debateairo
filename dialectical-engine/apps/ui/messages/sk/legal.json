@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Cena a platba",
   "legal.notice.s04.body": "Služba {product} je bezplatná. Platené programy zatiaľ nie sú k dispozícii. Skôr než spustíme akýkoľvek platený program, uvedieme v tejto časti cenu (vrátane dane), ako a kedy sa platí, kedy sa služba začne poskytovať, ako funguje obnovenie a ako predplatné zrušiť.",
   "legal.notice.s04.bodyPaid": "Platené programy a ich mesačné ceny nájdete na stránke s cenníkom. Ceny sú tam uvedené bez dane; pred zaplatením vám pokladňa ukáže plnú cenu vrátane dane vašej krajiny. Platíte kartou, každý mesiac vopred. Program začína, hneď ako vaša banka potvrdí platbu, a obnovuje sa každý mesiac, kým ho nezrušíte. Zrušiť ho môžete kedykoľvek v Nastaveniach alebo na stránke na zrušenie, a to bez prihlásenia.",
-  "legal.notice.s04.payments": "Platby kartou spracúva xMoney. Číslo vašej karty nikdy nevidíme ani neukladáme.",
+  "legal.notice.s04.payments": "Platby kartou spracúva NETOPIA Payments. Číslo vašej karty nikdy nevidíme ani neukladáme.",
   "legal.notice.s04.pricingLink": "Zobraziť programy a ceny",
   "legal.notice.s04.cancelLink": "Zrušenie programu",
   "legal.notice.s05.title": "Odstúpenie od zmluvy a vrátenie peňazí",

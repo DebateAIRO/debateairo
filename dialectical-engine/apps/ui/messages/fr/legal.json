@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Prix et paiement",
   "legal.notice.s04.body": "{product} est gratuit. Aucune formule payante n’est encore proposée. Avant le lancement de toute formule payante, cette section indiquera le prix (toutes taxes comprises), comment et quand vous payez, quand le service commence, comment fonctionne le renouvellement et comment résilier.",
   "legal.notice.s04.bodyPaid": "Les formules payantes et leurs prix mensuels figurent sur la page des tarifs. Les prix y sont indiqués hors taxes ; avant que vous payiez, la page de paiement affiche le prix total avec la taxe de votre pays. Vous payez par carte, chaque mois à l’avance. Une formule commence dès que votre banque confirme le paiement et se renouvelle chaque mois jusqu’à ce que vous la résiliiez. Vous pouvez la résilier à tout moment dans les Paramètres, ou sur la page de résiliation sans vous connecter.",
-  "legal.notice.s04.payments": "Les paiements par carte sont traités par xMoney. Nous ne voyons ni ne conservons jamais votre numéro de carte.",
+  "legal.notice.s04.payments": "Les paiements par carte sont traités par NETOPIA Payments. Nous ne voyons ni ne conservons jamais votre numéro de carte.",
   "legal.notice.s04.pricingLink": "Voir les formules et les prix",
   "legal.notice.s04.cancelLink": "Résilier une formule",
   "legal.notice.s05.title": "Rétractation et remboursements",
