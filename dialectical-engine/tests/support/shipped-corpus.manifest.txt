@@ -22,6 +22,7 @@ apps/api/src/billing/card-adoption.ts
 apps/api/src/billing/card-change.ts
 apps/api/src/billing/card-custody.ts
 apps/api/src/billing/charge-status.ts
+apps/api/src/billing/check-cli.ts
 apps/api/src/billing/checkout.ts
 apps/api/src/billing/codes.ts
 apps/api/src/billing/connectors.ts

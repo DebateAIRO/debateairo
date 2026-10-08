@@ -800,6 +800,28 @@ export function readBillingEnvironmentGroup(environment: GroupSource): BillingEn
 }
 
 /**
+ * NETOPIA spec 2026-10-05 §2.17.3: `pnpm billing:check` reads the API's billing settings AS THEY ARE (it runs under
+ * systemd-run with the API's EnvironmentFile), so it can say which one is missing or malformed instead of stopping at
+ * the first. It judges each one itself and prints no value. Exactly the listed keys that are set come back.
+ */
+export const BILLING_CHECK_ENVIRONMENT_KEYS = Object.freeze([...BILLING_ENVIRONMENT_KEYS, "PUBLIC_APP_URL"] as const);
+export type BillingCheckEnvironmentKey = typeof BILLING_CHECK_ENVIRONMENT_KEYS[number];
+export type BillingCheckEnvironment = Readonly<Partial<Record<BillingCheckEnvironmentKey, string>>>;
+
+export function readBillingCheckEnvironment(source: EnvironmentSource): BillingCheckEnvironment {
+  const values: Partial<Record<BillingCheckEnvironmentKey, string>> = {};
+  for (const key of BILLING_CHECK_ENVIRONMENT_KEYS) {
+    const value = source[key];
+    if (value !== undefined) values[key] = value;
+  }
+  return Object.freeze(values);
+}
+
+export function loadBillingCheckEnvironment(): BillingCheckEnvironment {
+  return readBillingCheckEnvironment(process.env);
+}
+
+/**
  * V-3. What `apps/runner/src/rotate-kek-cli.ts` needs. Each `*_KEK_PREVIOUS_PATH`
  * is OPTIONAL because its absence is the steady state: an operator sets it only
  * for the length of a changeover and removes it once a verification pass is

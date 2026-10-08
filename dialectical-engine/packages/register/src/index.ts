@@ -1040,7 +1040,13 @@ export {
   type NetopiaEnvironmentGroup,
   type NetopiaEnvironmentKey,
   type XMoneyEnvironmentGroup,
-  type XMoneyEnvironmentKey
+  type XMoneyEnvironmentKey,
+  // N21: the check command's reading of the same settings.
+  BILLING_CHECK_ENVIRONMENT_KEYS,
+  loadBillingCheckEnvironment,
+  readBillingCheckEnvironment,
+  type BillingCheckEnvironment,
+  type BillingCheckEnvironmentKey
 } from "./runtime-environment.js";
 
 export {

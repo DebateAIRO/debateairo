@@ -447,6 +447,9 @@ describe("P3-01 production database-principal manifest", () => {
         // SELECT, INSERT, and billing.outbox, on which 0087 grants SELECT, INSERT;
         // since 0093 both to debateai_billing_runtime); no privilege is added.
         { component: "apps/api:billing-invoice-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_INVOICE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:invoice" },
+        // NETOPIA spec 2026-10-05 §2.17.3 (N21): the owner's check command (`pnpm billing:check`) runs as the API under
+        // systemd-run on a READ-ONLY one-connection pool and reads only the register's billing rows; it writes nothing.
+        { component: "apps/api:billing-check-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:check" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "SERVER_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },

@@ -466,6 +466,14 @@
           "purpose": "BILLING_INVOICE_OPERATOR_COMMAND",
           "binding": "WIRED",
           "condition": "package script billing:invoice"
+        },
+        {
+          "component": "apps/api:billing-check-cli",
+          "sourceFile": "apps/api/src/billing/check-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_CHECK_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:check"
         }
       ]
     },
