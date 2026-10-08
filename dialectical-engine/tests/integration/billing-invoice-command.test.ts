@@ -242,6 +242,9 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     expect(recorded.out).toContain(`A credit note of this charge was waiting for this invoice: re-queue it with pnpm`
       + ` billing:invoice --charge ${paid.chargeId} --kind CREDIT_NOTE --requeue --confirm-not-issued (once you have checked`
       + " SmartBill).");
+    // P4-K control: a refund our records price (a void, PROVIDER_VOID) is credited at its REFUNDED row by the job, never at a typed amount.
+    expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0902", "--amount", "4.00"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_NO_DASHBOARD_REFUND\n" });
     expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--requeue", "--confirm-not-issued"))
       .toMatchObject({ code: 0, err: "" });
     await documents.drain(5);
@@ -336,6 +339,23 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
       issuer: "QUADERNO", external_ref: "qd_dash01", total_micros: String(Math.round(Number(bought.totalDecimal) * 1_000_000))
     });
     expect(await listed(bought.chargeId)).toEqual([]);
+  });
+
+  it("takes --amount only for a dashboard refund's line, after the charge's invoice (P4-K control)", async () => {
+    const plain = await h.activate();
+    await documents.drain(5);
+    expect(await invoiceCommand("--charge", plain.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0981", "--amount", "4.00"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_NO_DASHBOARD_REFUND\n" });
+    // A refund made in NETOPIA's admin (status 8, no request of ours) of a sale whose invoice is not recorded: the invoice
+    // comes first, as for every credit note.
+    const unknown = await romanianSaleThat("UNKNOWN");
+    h.payments.setState(unknown.chargeId, "REFUNDED");
+    await h.settle(unknown.chargeId);
+    expect(await invoiceCommand("--charge", unknown.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0982", "--amount", "4.00"))
+      .toMatchObject({ code: 1, err: "BILLING_INVOICE_ORIGINAL_MISSING\n" });
+    for (const chargeId of [plain.chargeId, unknown.chargeId]) {
+      expect((await invoices(chargeId)).map((row) => row.kind), chargeId).not.toContain("CREDIT_NOTE");
+    }
   });
 
   it("records a Quaderno invoice by its document id, with the settings-link receipt (fix I-2)", async () => {

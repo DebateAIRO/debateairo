@@ -60,4 +60,13 @@ describe("N24 the billing harness pays through NETOPIA's port", () => {
     const renewal = (await h.repository.chargesForSubscription(paid.subscriptionId)).find((charge) => charge.kind === "RENEWAL")!;
     expect(await h.eventKinds(renewal.chargeId)).toEqual(expect.arrayContaining(["SUBMIT_UNKNOWN", "SUCCEEDED"]));
   });
+
+  it("knows a started page as untouched (status 1) until it is paid, so the same purchase again gets the same page (spec §2.6.3)", async () => {
+    const first = await h.buy();
+    expect(await h.payments.status({ orderId: first.chargeId, providerPaymentId: null }))
+      .toMatchObject({ orderId: first.chargeId, state: "PENDING", providerStatus: "1" });
+    const again = await h.buy({ ownerRef: first.ownerRef });
+    expect([again.chargeId, again.reused]).toEqual([first.chargeId, true]);
+    expect(h.payments.hosted.filter((start) => start.orderId === first.chargeId)).toHaveLength(1);
+  });
 });

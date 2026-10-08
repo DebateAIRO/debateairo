@@ -453,6 +453,36 @@ describe("P11a monthly renewal", () => {
     }
   });
 
+  it("never resends an unknown renewal charge once the plan was suspended, cancelled or already renewed, and resends a live one on the same orderID (A2, A9; spec §2.9.3)", async () => {
+    for (const change of ["SUSPENDED", "CANCEL_REQUESTED", "RENEWED", null] as const) {
+      const { paid, end } = await dueNow();
+      h.payments.failNextCharge(paid.subscriptionId, "UNKNOWN_NOTHING_MADE");
+      await h.renewal.runOnce();
+      const [charge] = await renewalCharges(paid.subscriptionId);
+      const anchor = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).periodAnchorAt!;
+      if (change !== null) {
+        await append(paid.subscriptionId, change, change === "SUSPENDED" ? { charge_id: paid.chargeId }
+          : change === "RENEWED" ? {
+            charge_id: "f".repeat(32), period_start: end.toISOString(), period_end: computeWindows(anchor, end).month.end.toISOString()
+          } : {});
+      }
+      h.clock.advance(31 * MINUTE);
+      await h.renewal.runOnce();
+      if (change === null) {
+        // Control: a live plan is resent once, on the same orderID.
+        expect(rebills(paid)).toBe(2);
+        expect(h.payments.charges.filter((sent) => sent.orderId === charge!.chargeId)).toHaveLength(2);
+        expect(await requestedCodes(charge!.chargeId)).toEqual([null, "RESEND_STARTED"]);
+        continue;
+      }
+      h.clock.advance(61 * MINUTE);
+      await h.renewal.runOnce();
+      expect(rebills(paid), change).toBe(1);
+      // Still open: a payment that did reach NETOPIA is still adopted by the next read.
+      expect(await h.eventKinds(charge!.chargeId), change).toEqual(kindsOf("REQUESTED", "SUBMIT_UNKNOWN"));
+    }
+  });
+
   it("still adopts a lost renewal charge on a suspended plan, and hands its refund to the owner", async () => {
     const { paid } = await dueNow();
     h.payments.failNextCharge(paid.subscriptionId, "PAID_ANSWER_LOST");

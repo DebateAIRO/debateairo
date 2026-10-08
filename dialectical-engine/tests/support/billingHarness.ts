@@ -80,8 +80,9 @@ export type HarnessChargeOutcome =
 /**
  * NETOPIA's port in memory (the NETOPIA counterpart of the harness's former xMoney stub; the protocol itself runs
  * against N5's fake in the fake stack). Our charge id is NETOPIA's orderID, so every report is keyed by charge. A status
- * read answers the order's current report, or NO_SUCH_ORDER. There is no `refund`: RefundDesk runs in the owner mode
- * (spec §2.12.2), as in production until N-10.
+ * read answers the order's current report: a started page is untouched (status 1) until it is paid; an order never
+ * started is NO_SUCH_ORDER. There is no `refund`: RefundDesk runs in the owner mode (spec §2.12.2), as in production
+ * until N-10.
  */
 export class HarnessPayments implements CardPayments {
   readonly provider = "netopia" as const;
@@ -142,6 +143,10 @@ export class HarnessPayments implements CardPayments {
 
   async startHostedPayment(input: HostedPaymentStart): Promise<HostedPaymentStarted> {
     this.hosted.push(input);
+    // NETOPIA knows a started order at once: untouched (status 1) until the person pays (N5's fake; spec §2.6.3).
+    this.reports.set(input.orderId, stubPaymentReport(input.orderId, "PENDING", {
+      amountMicros: input.amountMicros, currency: input.currency, cardCountry: null, occurredAt: null
+    }));
     return Object.freeze({
       providerPaymentId: `ntp-${input.orderId.slice(0, 12)}`,
       redirectUrl: `https://secure-sandbox.netopia-payments.com/ui/card?p=${input.orderId}`
