@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Acesso (Art. 15) — Uma cópia dos dados pessoais que detemos a seu respeito e estas informações. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Acesso (Art. 15) — Uma cópia dos dados pessoais que detemos a seu respeito e estas informações. Em Definições, escolha Exportar dados: preparamos um ficheiro ZIP com ficheiros JSON e uma página que pode abrir em qualquer navegador, e enviamos-lhe por email uma ligação de transferência válida durante 24 horas e apenas enquanto tiver sessão iniciada na sua conta.",
         "Retificação (Art. 16) — Corrija o seu endereço de correio eletrónico ou o endereço de recuperação nas Definições. O seu pseudónimo não pode ser alterado, pelas razões indicadas nos Termos; pode encerrar a conta e abrir uma nova",
         "Apagamento (Art. 17) — Elimine um debate privado a qualquer momento a partir da página do debate. Encerre a sua conta nas Definições; a secção 7 explica exatamente o que isso faz. Peça-nos que removamos um debate publicado que contenha os seus dados, seja ou não o seu autor",
         "Limitação (Art. 18) — Peça-nos que suspendamos o tratamento de determinados dados enquanto é resolvido um litígio relativo a esses dados",
         "Oposição (Art. 21) — Oponha-se ao tratamento baseado em interesses legítimos — o tratamento de segurança e auditoria da secção 4 — e cessaremos esse tratamento, salvo se demonstrarmos motivos imperiosos. Oponha-se ao marketing a qualquer momento, e cessá-lo-emos",
-        "Portabilidade (Art. 20) — Os seus debates e dados da conta num formato de uso corrente e de leitura automática. [Pending: same export as Access.] O conteúdo não pessoal que criou, como as suas perguntas, é-lhe devolvido mediante pedido quando o contrato terminar",
+        "Portabilidade (Art. 20) — Os seus debates e dados da conta num formato de uso corrente e de leitura automática. Utilize Exportar dados em Definições: o ZIP contém os seus dados em ficheiros JSON de leitura automática e uma página legível; a ligação enviada por email é válida durante 24 horas e apenas enquanto tiver sessão iniciada na sua conta. O conteúdo não pessoal que criou, como as suas perguntas, é-lhe devolvido mediante pedido quando o contrato terminar",
         "Retirada do consentimento (Art. 7(3)) — Retire o consentimento para marketing a partir de qualquer mensagem de correio eletrónico ou das Definições; retire o consentimento para dados sensíveis escrevendo para privacy@dezbatere.ro (também pode omitir esses dados ou eliminar um debate que os contenha). A retirada não afeta o tratamento que já ocorreu",
         "Reclamação — À autoridade de controlo romena, a ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucareste, anspdcp@dataprotection.ro, ou à autoridade do país onde reside. Preferimos que nos contacte primeiro"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "2e2607c1dc9a2ef5cfe863b558abb16b52b6579ee3d92296c8cd476ab13ad4fb",
+  sha256: "884d3747ccdfc7d8f174a8a574c940c9e76a6271637081d691d56d30ba4d6c09",
   eyebrow: "POLÍTICA DE PRIVACIDADE · v3.2 · EM VIGOR DESDE [DATE]",
   title: "O que armazenamos e porquê",
   lede: "Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.",

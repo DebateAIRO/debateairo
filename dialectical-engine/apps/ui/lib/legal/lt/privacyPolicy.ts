@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Teisė susipažinti (Art. 15) — Mūsų turimų jūsų asmens duomenų kopija ir ši informacija. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Teisė susipažinti (Art. 15) — Mūsų turimų jūsų asmens duomenų kopija ir ši informacija. Nustatymuose pasirinkite Eksportuoti duomenis: parengiame ZIP failą su JSON failais ir vienu bet kurioje naršyklėje atveriamu puslapiu, o el. paštu atsiunčiame atsisiuntimo nuorodą, kuri galioja 24 valandas ir veikia tik prisijungus prie savo paskyros.",
         "Teisė ištaisyti duomenis (Art. 16) — Nustatymuose ištaisykite savo el. pašto ar atkūrimo el. pašto adresą. Dėl Sąlygose nurodytų priežasčių jūsų slapyvardžio pakeisti negalima; galite uždaryti paskyrą ir atidaryti naują",
         "Teisė reikalauti ištrinti duomenis (Art. 17) — Bet kada debatų puslapyje ištrinkite privačius debatus. Uždarykite paskyrą Nustatymuose; 7 skyriuje tiksliai paaiškinta, ką tai reiškia. Paprašykite pašalinti paskelbtus debatus, kuriuose yra jūsų duomenų, nepriklausomai nuo to, ar esate jų autorius",
         "Teisė apriboti duomenų tvarkymą (Art. 18) — Paprašykite sustabdyti konkrečių duomenų tvarkymą, kol bus išspręstas dėl jų kilęs ginčas",
         "Teisė nesutikti (Art. 21) — Nesutikite, kad duomenys būtų tvarkomi remiantis teisėtais interesais — 4 skyriuje aprašytas saugumo ir audito duomenų tvarkymas — ir mes sustabdysime tvarkymą, nebent galėsime įrodyti įtikinamas priežastis. Bet kada nesutikite su rinkodara, ir ją nutrauksime",
-        "Teisė į duomenų perkeliamumą (Art. 20) — Jūsų debatai ir paskyros duomenys įprastai naudojamu, kompiuterio skaitomu formatu. [Pending: same export as Access.] Jūsų sukurtas neasmeninis turinys, pavyzdžiui, jūsų klausimai, pasibaigus sutarčiai jūsų prašymu grąžinamas jums",
+        "Teisė į duomenų perkeliamumą (Art. 20) — Jūsų debatai ir paskyros duomenys įprastai naudojamu, kompiuterio skaitomu formatu. Naudokite Nustatymų funkciją Eksportuoti duomenis: ZIP faile yra jūsų duomenys kompiuterio skaitomuose JSON failuose ir vienas skaitomas puslapis; el. paštu atsiųsta nuoroda galioja 24 valandas ir veikia tik prisijungus prie savo paskyros. Jūsų sukurtas neasmeninis turinys, pavyzdžiui, jūsų klausimai, pasibaigus sutarčiai jūsų prašymu grąžinamas jums",
         "Sutikimo atšaukimas (Art. 7(3)) — Atšaukite rinkodaros sutikimą bet kuriame el. laiške arba Nustatymuose; atšaukite sutikimą tvarkyti neskelbtinus duomenis parašydami adresu privacy@dezbatere.ro (tokių duomenų galite ir neįtraukti arba ištrinti debatus, kuriuose jie yra). Atšaukimas neturi įtakos jau atliktam tvarkymui",
         "Skundo pateikimas — Rumunijos priežiūros institucijai ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukareštas, anspdcp@dataprotection.ro, arba šalies, kurioje gyvenate, institucijai. Norėtume, kad pirmiausia kreiptumėtės į mus"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "c2dd64e7dffde72d5cdba7eadd413060c3d41c43a55b9b02b77332625ee9d4ca",
+  sha256: "f891a0909f6535e0753f2c861a2f8d532ef36deb3938eefa4589e639196d1f54",
   eyebrow: "PRIVATUMO POLITIKA · v3.2 · ĮSIGALIOJA [DATE]",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",

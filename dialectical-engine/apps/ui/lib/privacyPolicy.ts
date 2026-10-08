@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Access (Art. 15) — A copy of the personal data we hold about you, and this information. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Access (Art. 15) — A copy of the personal data we hold about you, and this information. In Settings, choose Export data: we prepare a ZIP file of JSON files plus one page you can open in any browser, and email you a download link that works for 24 hours and only while you are signed in to your account.",
         "Rectification (Art. 16) — Correct your email or recovery email from Settings. Your pseudonym cannot be changed, for the reasons in the Terms; you can close the account and open a new one",
         "Erasure (Art. 17) — Delete a private debate at any time from the debate page. Close your account from Settings; section 7 explains exactly what that does. Ask us to remove a published debate that contains your data whether or not you are the author",
         "Restriction (Art. 18) — Ask us to stop processing particular data while a dispute about it is resolved",
         "Objection (Art. 21) — Object to processing based on legitimate interests — the security and audit processing in section 4 — and we stop unless we can show compelling grounds. Object to marketing at any time, and we stop",
-        "Portability (Art. 20) — Your debates and account data in a commonly used, machine-readable format. [Pending: same export as Access.] Non-personal content you created, such as your questions, is returned to you on request when the contract ends",
+        "Portability (Art. 20) — Your debates and account data in a commonly used, machine-readable format. Use Export data in Settings: the ZIP holds your data as machine-readable JSON files plus one readable page, sent as an emailed link that works for 24 hours and only while you are signed in. Non-personal content you created, such as your questions, is returned to you on request when the contract ends",
         "Withdraw consent (Art. 7(3)) — Withdraw marketing consent from any email or from Settings; withdraw the sensitive-data consent by writing to privacy@dezbatere.ro (you can also leave such data out or delete a debate). Withdrawal does not affect processing that already happened",
         "Complain — To the Romanian supervisory authority, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, anspdcp@dataprotection.ro, or to the authority in the country where you live. We would rather hear from you first"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "64deca8c44238c7b9f033d215475208a2b91d5581918c964941b5a79cc27a73d",
+  sha256: "566eea050a376ac282717c994ad5bf67a079b8622fe6c6b51f800ec9889120ab",
   eyebrow: "PRIVACY POLICY · v3.2 · EFFECTIVE [DATE]",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",

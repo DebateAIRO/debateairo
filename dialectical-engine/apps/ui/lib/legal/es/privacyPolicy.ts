@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Acceso (Art. 15) — Una copia de los datos personales que conservamos sobre usted y esta información. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Acceso (Art. 15) — Una copia de los datos personales que conservamos sobre usted y esta información. En Configuración, elija Exportar datos: preparamos un archivo ZIP con archivos JSON y una página que puede abrir en cualquier navegador, y le enviamos por correo electrónico un enlace de descarga que funciona durante 24 horas y solo mientras haya iniciado sesión en su cuenta.",
         "Rectificación (Art. 16) — Corrija su correo electrónico o el de recuperación desde Configuración. Su seudónimo no puede modificarse por los motivos indicados en los Términos; puede cerrar la cuenta y abrir otra",
         "Supresión (Art. 17) — Elimine un debate privado en cualquier momento desde la página del debate. Cierre su cuenta desde Configuración; la sección 7 explica exactamente qué efecto tiene. Pídanos que retiremos un debate publicado que contenga sus datos, sea usted o no su autor",
         "Limitación (Art. 18) — Pídanos que dejemos de tratar determinados datos mientras se resuelve una controversia al respecto",
         "Oposición (Art. 21) — Opóngase al tratamiento basado en intereses legítimos —el tratamiento de seguridad y auditoría de la sección 4— y lo detendremos, salvo que podamos demostrar motivos imperiosos. Puede oponerse a la mercadotecnia en cualquier momento y la detendremos",
-        "Portabilidad (Art. 20) — Sus debates y los datos de su cuenta en un formato de uso común y lectura mecánica. [Pending: same export as Access.] El contenido no personal que haya creado, como sus preguntas, se le devuelve previa solicitud cuando finaliza el contrato",
+        "Portabilidad (Art. 20) — Sus debates y los datos de su cuenta en un formato de uso común y lectura mecánica. Use Exportar datos en Configuración: el ZIP contiene sus datos en archivos JSON legibles por máquina y una página legible; el enlace enviado por correo electrónico funciona durante 24 horas y solo mientras haya iniciado sesión en su cuenta. El contenido no personal que haya creado, como sus preguntas, se le devuelve previa solicitud cuando finaliza el contrato",
         "Retirada del consentimiento (Art. 7(3)) — Retire el consentimiento para la mercadotecnia desde cualquier correo electrónico o desde Configuración; retire el consentimiento relativo a datos sensibles escribiendo a privacy@dezbatere.ro (también puede omitirlos o eliminar un debate que los contenga). La retirada no afecta al tratamiento ya realizado",
         "Reclamación — Ante la autoridad de control rumana, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucarest, anspdcp@dataprotection.ro, o ante la autoridad del país donde vive. Preferimos que se dirija primero a nosotros"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "5e26d6ad2c4dc5fc89d870919d00e0869c2850d9fb40420e030e85d29aea1358",
+  sha256: "1a25b1059da026b0d1910e200a0c07ce00b3a899688ad8087131022130674105",
   eyebrow: "POLÍTICA DE PRIVACIDAD · v3.2 · EN VIGOR DESDE [DATE]",
   title: "Qué almacenamos y por qué",
   lede: "Sus derechos y nuestras obligaciones conforme al RGPD – GDPR (EU) 2016/679, en lenguaje claro. Catorce secciones y el anexo B — desplácese hasta el final.",

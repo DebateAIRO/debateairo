@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Juurdepääs (Art. 15) — Koopia teie isikuandmetest, mida säilitame, ja käesolev teave. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Juurdepääs (Art. 15) — Koopia teie isikuandmetest, mida säilitame, ja käesolev teave. Valige Seaded ja seejärel Ekspordi andmed: valmistame ette ZIP-faili JSON-failide ja ühe lehega, mida saab avada igas brauseris, ning saadame teile e-postiga allalaadimislingi, mis kehtib 24 tundi ja töötab ainult siis, kui olete oma kontole sisse logitud.",
         "Parandamine (Art. 16) — Parandage seadetes oma e-posti aadress või taastamise e-posti aadress. Teie pseudonüümi ei saa Tingimustes esitatud põhjustel muuta; võite konto sulgeda ja uue avada",
         "Kustutamine (Art. 17) — Kustutage privaatne väitlus igal ajal väitluse lehel. Sulgege konto seadetes; jaotis 7 selgitab täpselt selle tagajärgi. Paluge meil eemaldada teie andmeid sisaldav avaldatud väitlus olenemata sellest, kas olete selle autor",
         "Piiramine (Art. 18) — Paluge meil peatada konkreetsete andmete töötlemine, kuni neid puudutav vaidlus lahendatakse",
         "Vastuväide (Art. 21) — Esitage vastuväide õigustatud huvidel põhinevale töötlemisele — jaotises 4 kirjeldatud turbe- ja audititöötlusele — ning lõpetame selle, kui me ei suuda tõendada ülekaalukaid põhjuseid. Esitage igal ajal vastuväide turundusele ja lõpetame selle",
-        "Andmete ülekantavus (Art. 20) — Teie väitlused ja kontoandmed üldkasutatavas masinloetavas vormingus. [Pending: same export as Access.] Teie loodud mitteisiklik sisu, näiteks küsimused, tagastatakse teile taotluse korral lepingu lõppemisel",
+        "Andmete ülekantavus (Art. 20) — Teie väitlused ja kontoandmed üldkasutatavas masinloetavas vormingus. Kasutage Seadetes valikut Ekspordi andmed: ZIP-fail sisaldab teie andmeid masinloetavate JSON-failidena ja üht loetavat lehte; e-postiga saadetud link kehtib 24 tundi ja töötab ainult siis, kui olete oma kontole sisse logitud. Teie loodud mitteisiklik sisu, näiteks küsimused, tagastatakse teile taotluse korral lepingu lõppemisel",
         "Nõusoleku tagasivõtmine (Art. 7(3)) — Võtke turundusnõusolek tagasi mis tahes e-kirja kaudu või seadetes; võtke tundlike andmete nõusolek tagasi, kirjutades aadressile privacy@dezbatere.ro (võite need andmed ka välja jätta või kustutada neid sisaldava väitluse). Tagasivõtmine ei mõjuta juba toimunud töötlemist",
         "Kaebuse esitamine — Rumeenia järelevalveasutusele ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, või teie elukohariigi asutusele. Eelistaksime siiski, et pöörduksite esmalt meie poole"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "cf966f9b61f9d2a02fd2ca0b0c21d57895ef748e06132d98b17a97ab487ba760",
+  sha256: "e4387872c4fd46e204f9eb3c3f53f2d35f41d5d293314f4914f0565f404757c4",
   eyebrow: "PRIVAATSUSPOLIITIKA · v3.2 · KEHTIB ALATES [DATE]",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",

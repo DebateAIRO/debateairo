@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Erişim (Art. 15) — Hakkınızda tuttuğumuz kişisel verilerin ve bu bilgilerin bir kopyası. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Erişim (Art. 15) — Hakkınızda tuttuğumuz kişisel verilerin ve bu bilgilerin bir kopyası. Ayarlar bölümünde Verileri dışa aktar seçeneğini seçin: JSON dosyaları ve herhangi bir tarayıcıda açabileceğiniz tek bir sayfa içeren ZIP dosyası hazırlarız ve size e-postayla, 24 saat boyunca yalnızca hesabınızda oturum açıkken çalışan bir indirme bağlantısı göndeririz.",
         "Düzeltme (Art. 16) — E-posta veya kurtarma e-posta adresinizi Ayarlar'dan düzeltin. Koşullarda belirtilen nedenlerle takma adınız değiştirilemez; hesabı kapatıp yeni bir hesap açabilirsiniz",
         "Silme (Art. 17) — Gizli bir tartışmayı tartışma sayfasından istediğiniz zaman silin. Hesabınızı Ayarlar'dan kapatın; bunun tam olarak ne yaptığını bölüm 7 açıklar. Yazarı olup olmadığınıza bakılmaksızın verilerinizi içeren yayımlanmış bir tartışmayı kaldırmamızı isteyin",
         "Kısıtlama (Art. 18) — Bir uyuşmazlık çözümlenene kadar belirli verileri işlemeyi durdurmamızı isteyin",
         "İtiraz (Art. 21) — Meşru menfaatlere dayalı işlemeye — bölüm 4'teki güvenlik ve denetim işlemesine — itiraz edin; zorlayıcı gerekçeler gösterebilmediğimiz sürece işlemeyi durdururuz. Pazarlamaya istediğiniz zaman itiraz edin; durdururuz",
-        "Taşınabilirlik (Art. 20) — Tartışmalarınız ve hesap verileriniz yaygın kullanılan, makinece okunabilir bir biçimde sağlanır. [Pending: same export as Access.] Sorularınız gibi oluşturduğunuz kişisel olmayan içerik, sözleşme sona erdiğinde talebiniz üzerine size iade edilir",
+        "Taşınabilirlik (Art. 20) — Tartışmalarınız ve hesap verileriniz yaygın kullanılan, makinece okunabilir bir biçimde sağlanır. Ayarlar bölümündeki Verileri dışa aktar seçeneğini kullanın: ZIP dosyası verilerinizi makinece okunabilir JSON dosyalarında ve okunabilir tek bir sayfada içerir; e-postayla gönderilen bağlantı 24 saat boyunca yalnızca hesabınızda oturum açıkken çalışır. Sorularınız gibi oluşturduğunuz kişisel olmayan içerik, sözleşme sona erdiğinde talebiniz üzerine size iade edilir",
         "Rızayı geri çekme (Art. 7(3)) — Pazarlama rızasını herhangi bir e-postadan veya Ayarlar'dan geri çekin; hassas veri rızasını privacy@dezbatere.ro adresine yazarak geri çekin (bu tür verilere yer vermeyebilir veya bunları içeren bir tartışmayı silebilirsiniz). Geri çekme, daha önce gerçekleşmiş işlemeyi etkilemez",
         "Şikâyet — Romanya denetim makamı ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bükreş, anspdcp@dataprotection.ro adresine veya yaşadığınız ülkedeki makama. Önce bizden haber almayı tercih ederiz"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "87924f644fa57f255c1430a82832fb5c7fe40d336a64f6004299e634c97f3b27",
+  sha256: "470f61a57085984e3393d0c67d8dabfff247af414c5eda4e4c3112bc6ae265c6",
   eyebrow: "GİZLİLİK POLİTİKASI · v3.2 · YÜRÜRLÜK TARİHİ [DATE]",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",

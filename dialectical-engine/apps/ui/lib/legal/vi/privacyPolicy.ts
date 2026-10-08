@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Truy cập (Art. 15) — Một bản sao dữ liệu cá nhân chúng tôi lưu giữ về bạn và thông tin này. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Truy cập (Art. 15) — Một bản sao dữ liệu cá nhân chúng tôi lưu giữ về bạn và thông tin này. Trong Cài đặt, chọn Xuất dữ liệu: chúng tôi chuẩn bị tệp ZIP gồm các tệp JSON và một trang có thể mở bằng bất kỳ trình duyệt nào, rồi gửi cho bạn qua email liên kết tải xuống có hiệu lực trong 24 giờ và chỉ dùng được khi bạn đã đăng nhập vào tài khoản của mình.",
         "Chỉnh sửa (Art. 16) — Sửa email hoặc email khôi phục của bạn trong phần Cài đặt. Bí danh của bạn không thể thay đổi vì các lý do nêu trong Điều khoản; bạn có thể đóng tài khoản và mở tài khoản mới",
         "Xóa (Art. 17) — Xóa một cuộc tranh luận riêng tư bất cứ lúc nào từ trang tranh luận. Đóng tài khoản của bạn trong phần Cài đặt; mục 7 giải thích chính xác tác dụng của việc đó. Yêu cầu chúng tôi gỡ một cuộc tranh luận đã công khai có chứa dữ liệu của bạn dù bạn có phải tác giả hay không",
         "Hạn chế (Art. 18) — Yêu cầu chúng tôi ngừng xử lý dữ liệu cụ thể trong khi tranh chấp liên quan đến dữ liệu đó được giải quyết",
         "Phản đối (Art. 21) — Phản đối việc xử lý dựa trên lợi ích hợp pháp — hoạt động xử lý bảo mật và kiểm toán tại mục 4 — và chúng tôi sẽ dừng trừ khi có thể chứng minh lý do thuyết phục. Phản đối tiếp thị bất cứ lúc nào và chúng tôi sẽ dừng",
-        "Khả năng di chuyển dữ liệu (Art. 20) — Các cuộc tranh luận và dữ liệu tài khoản của bạn ở định dạng thông dụng, máy có thể đọc được. [Pending: same export as Access.] Nội dung không phải dữ liệu cá nhân do bạn tạo, chẳng hạn câu hỏi của bạn, sẽ được trả lại theo yêu cầu khi hợp đồng chấm dứt",
+        "Khả năng di chuyển dữ liệu (Art. 20) — Các cuộc tranh luận và dữ liệu tài khoản của bạn ở định dạng thông dụng, máy có thể đọc được. Dùng mục Xuất dữ liệu trong Cài đặt: tệp ZIP chứa dữ liệu của bạn dưới dạng tệp JSON mà máy có thể đọc được cùng một trang dễ đọc; liên kết gửi qua email có hiệu lực trong 24 giờ và chỉ dùng được khi bạn đã đăng nhập vào tài khoản của mình. Nội dung không phải dữ liệu cá nhân do bạn tạo, chẳng hạn câu hỏi của bạn, sẽ được trả lại theo yêu cầu khi hợp đồng chấm dứt",
         "Rút lại sự đồng ý (Art. 7(3)) — Rút lại sự đồng ý tiếp thị từ bất kỳ email nào hoặc trong phần Cài đặt; rút lại sự đồng ý về dữ liệu nhạy cảm bằng cách viết tới privacy@dezbatere.ro (bạn cũng có thể không đưa dữ liệu đó vào hoặc xóa cuộc tranh luận chứa dữ liệu đó). Việc rút lại không ảnh hưởng đến hoạt động xử lý đã diễn ra",
         "Khiếu nại — Gửi đến cơ quan giám sát Romania, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, anspdcp@dataprotection.ro, hoặc đến cơ quan tại quốc gia nơi bạn sinh sống. Chúng tôi mong bạn liên hệ với chúng tôi trước"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "57515fb8d62befd64175977fecf833e33b1d47487c5dd77141b89e8d9ab806c9",
+  sha256: "356a706f9bc207189e72451df0af84ba7598f9cb73a2979c64979633be5c6a8d",
   eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.2 · CÓ HIỆU LỰC [DATE]",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",

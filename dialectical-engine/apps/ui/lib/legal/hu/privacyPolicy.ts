@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Hozzáférés (Art. 15; a GDPR 15. cikke) — Az Önről tárolt személyes adatok és ezen információk másolata. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Hozzáférés (Art. 15; a GDPR 15. cikke) — Az Önről tárolt személyes adatok és ezen információk másolata. A Beállításokban válassza az Adatok exportálása lehetőséget: ZIP-fájlt készítünk JSON-fájlokkal és egy bármely böngészőben megnyitható oldallal, majd e-mailben letöltési hivatkozást küldünk, amely 24 órán át és csak a fiókjába bejelentkezve működik.",
         "Helyesbítés (Art. 16; a GDPR 16. cikke) — E-mail- vagy helyreállítási e-mail-címének helyesbítése a Beállításokban. Álneve a Feltételekben ismertetett okokból nem módosítható; megszüntetheti a fiókot, és újat nyithat",
         "Törlés (Art. 17; a GDPR 17. cikke) — Magánjellegű vita bármikori törlése a vita oldaláról. Fiókja megszüntetése a Beállításokból; a 7. szakasz pontosan ismerteti ennek hatását. Kérheti tőlünk az Ön adatait tartalmazó közzétett vita eltávolítását, függetlenül attól, hogy Ön-e a szerző",
         "Az adatkezelés korlátozása (Art. 18; a GDPR 18. cikke) — Kérheti, hogy állítsuk le meghatározott adatok kezelését, amíg az azokkal kapcsolatos vita rendeződik",
         "Tiltakozás (Art. 21; a GDPR 21. cikke) — Tiltakozhat a jogos érdeken alapuló adatkezelés — a 4. szakasz szerinti biztonsági és auditcélú adatkezelés — ellen, és azt leállítjuk, kivéve, ha kényszerítő erejű okokat tudunk igazolni. A marketing ellen bármikor tiltakozhat, és azt leállítjuk",
-        "Adathordozhatóság (Art. 20; a GDPR 20. cikke) — Vitái és fiókadatai széles körben használt, géppel olvasható formátumban. [Pending: same export as Access.] Az Ön által létrehozott nem személyes tartalmat, például kérdéseit, a szerződés megszűnésekor kérésére visszaadjuk Önnek",
+        "Adathordozhatóság (Art. 20; a GDPR 20. cikke) — Vitái és fiókadatai széles körben használt, géppel olvasható formátumban. Használja a Beállítások Adatok exportálása lehetőségét: a ZIP az adatait géppel olvasható JSON-fájlokban és egy olvasható oldalon tartalmazza; az e-mailben küldött hivatkozás 24 órán át és csak a fiókjába bejelentkezve működik. Az Ön által létrehozott nem személyes tartalmat, például kérdéseit, a szerződés megszűnésekor kérésére visszaadjuk Önnek",
         "Hozzájárulás visszavonása (Art. 7(3); a GDPR 7. cikkének (3) bekezdése) — A marketing-hozzájárulás visszavonása bármely e-mailből vagy a Beállításokban; a különleges adatokra vonatkozó hozzájárulás visszavonása a privacy@dezbatere.ro címre írva (az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát). A visszavonás nem érinti a már megtörtént adatkezelést",
         "Panasztétel — A román felügyeleti hatóságnál, az ANSPDCP-nél, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, vagy a lakóhelye szerinti ország hatóságánál. Örömmel vennénk, ha először bennünket keresne meg"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "22d4f4b916051b46cd985fa88d498426ca101c08891ef0da4a97b6d839f2c18c",
+  sha256: "429147add5f04ddc452cde1f31760bd34f3523bf1fa974a38df8f562bed32901",
   eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.2 · HATÁLYOS [DATE]",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",

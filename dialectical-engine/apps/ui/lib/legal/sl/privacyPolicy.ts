@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Dostop (Art. 15) — Kopija osebnih podatkov, ki jih hranimo o vas, in te informacije. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Dostop (Art. 15) — Kopija osebnih podatkov, ki jih hranimo o vas, in te informacije. V Nastavitvah izberite Izvozi podatke: pripravimo datoteko ZIP z datotekami JSON in eno stranjo, ki jo lahko odprete v katerem koli brskalniku, ter vam po e-pošti pošljemo povezavo za prenos, ki velja 24 ur in deluje le, ko ste prijavljeni v svoj račun.",
         "Popravek (Art. 16) — V Nastavitvah popravite svoj e-poštni naslov ali e-poštni naslov za obnovitev. Psevdonima zaradi razlogov, navedenih v Pogojih, ni mogoče spremeniti; račun lahko zaprete in odprete novega",
         "Izbris (Art. 17) — Zasebno razpravo lahko kadar koli izbrišete na strani razprave. Račun zaprete v Nastavitvah; razdelek 7 natančno pojasnjuje posledice. Prosite nas lahko, naj odstranimo objavljeno razpravo, ki vsebuje vaše podatke, ne glede na to, ali ste njen avtor",
         "Omejitev (Art. 18) — Prosite nas lahko, naj prenehamo obdelovati določene podatke, dokler se spor o njih ne razreši",
         "Ugovor (Art. 21) — Ugovarjate lahko obdelavi na podlagi zakonitih interesov — varnostni in revizijski obdelavi iz razdelka 4 — in prenehali bomo, razen če lahko dokažemo nujne razloge. Trženju lahko ugovarjate kadar koli in prenehali bomo",
-        "Prenosljivost (Art. 20) — Vaše razprave in podatki računa v splošno uporabljani, strojno berljivi obliki. [Pending: same export as Access.] Neosebna vsebina, ki ste jo ustvarili, na primer vaša vprašanja, vam bo na zahtevo vrnjena ob prenehanju pogodbe",
+        "Prenosljivost (Art. 20) — Vaše razprave in podatki računa v splošno uporabljani, strojno berljivi obliki. Uporabite Izvozi podatke v Nastavitvah: ZIP vsebuje vaše podatke v strojno berljivih datotekah JSON in eno berljivo stran; povezava, poslana po e-pošti, velja 24 ur in deluje le, ko ste prijavljeni v svoj račun. Neosebna vsebina, ki ste jo ustvarili, na primer vaša vprašanja, vam bo na zahtevo vrnjena ob prenehanju pogodbe",
         "Preklic privolitve (Art. 7(3)) — Privolitev za trženje prekličete v katerem koli e-poštnem sporočilu ali Nastavitvah; privolitev za občutljive podatke prekličete s pisanjem na privacy@dezbatere.ro (take podatke lahko tudi izpustite ali izbrišete razpravo, ki jih vsebuje). Preklic ne vpliva na obdelavo, ki je že bila izvedena",
         "Pritožba — Romunskemu nadzornemu organu ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarešta, anspdcp@dataprotection.ro, ali organu v državi, v kateri živite. Raje bi videli, da se najprej obrnete na nas"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "212dd537a6ab1784f7c60fc390960573ed20c57bb915bc425a211e6632429bc5",
+  sha256: "90d5f8f9e476d688a57d9992397bd518ea933b508e0fed479fa85b976cf2ceb1",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.2 · VELJA OD [DATE]",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",
