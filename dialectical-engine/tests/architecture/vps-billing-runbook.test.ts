@@ -858,4 +858,18 @@ describe("P22 the Billing runbook", () => {
     expect(new Set(refundDone).size).toBeGreaterThanOrEqual(7);
     for (const code of new Set(refundDone)) expect(flat, code).toContain(`\`${code}\``);
   });
+
+  it("N25 fix round 1: every owner email §14 quotes as (O…, \"…\") is quoted by its template's English subject", () => {
+    // The subject is the template's own (packages/mail-templates); a {param} part is written "…" in the runbook, so the
+    // next change to a subject turns this red instead of leaving the runbook quoting an email nobody receives.
+    const owner = JSON.parse(read("packages/mail-templates/messages/en/owner.json")) as Record<string, string>;
+    const quotes = [...billing.replace(/\s+/gu, " ").matchAll(/\((O[0-9][A-Z0-9_]*), "([^"]*)"/gu)]
+      .map((match) => ({ code: match[1]!, quote: match[2]! }));
+    expect(quotes.map(({ code }) => code)).toEqual(expect.arrayContaining(["O2_WITHDRAWAL", "O2_REFUND_DUE", "O3"]));
+    for (const { code, quote } of quotes) {
+      const subject = owner[`owner.${code}.subject`];
+      expect(subject, `owner.${code}.subject`).toBeTypeOf("string");
+      expect(quote, code).toBe(subject!.replace(/\{[A-Za-z]+\}/gu, "…"));
+    }
+  });
 });

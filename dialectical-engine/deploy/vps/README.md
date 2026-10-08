@@ -2582,7 +2582,7 @@ A withdrawal is settled once. Running the command a second time for the same wit
 
 **A refund handed to you.** NETOPIA has not yet confirmed its refund call for our account, so every refund the site
 owes (a withdrawal, a card from a blocked country, a second payment, an upgrade that can no longer be given) is made by
-you in NETOPIA's admin. The site emails you at once (O2_REFUND_DUE, "A refund is due: make it in NETOPIA's admin") with
+you in NETOPIA's admin. The site emails you at once (O2_REFUND_DUE, "A refund to make in NETOPIA's admin") with
 the reason, our charge reference, NETOPIA's payment number, the exact amount and currency, whether it is the whole
 payment, for a withdrawal the date the law requires it by (14 days after the person withdrew), and the one command that
 records it (needed for a part of a payment). Look at that payment in NETOPIA's admin first. If it already shows a
@@ -2754,8 +2754,8 @@ It prints one line naming the document it recorded. A document the site never is
 (`EFACTURA_DOCUMENT_UNKNOWN`) and nothing is written.
 
 **An invoice, a credit note or an email that was never sent.** When a job that issues an invoice or a credit note,
-or that sends an email, stops after its last try, the site emails you at once (O3, "A legal document or a required
-email was not sent and needs your attention"), and the owner summary lists it until it is settled: invoices and
+or that sends an email, stops after its last try, the site emails you at once (O3, "Billing needs your attention (…)",
+the brackets holding the code the job stopped with), and the owner summary lists it until it is settled: invoices and
 credit notes under "Invoices and credit notes to check by hand", emails under "Emails that never went out". Below
 each list the summary says what to do for each kind of line, and the email says it for its job. Typical causes: a wrong or revoked Quaderno key (`TAX_SERVICE_REFUSED`), Quaderno or
 SmartBill not answering for more than about 15 hours (`TAX_SERVICE_UNAVAILABLE`, `INVOICE_SERVICE_UNAVAILABLE`), or
