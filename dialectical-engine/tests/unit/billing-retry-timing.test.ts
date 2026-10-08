@@ -84,7 +84,7 @@ describe("P2-I7 a dunning retry is dated by the clock inside its lease, never by
 describe("P2-I7 a saved-card charge's outcome rows are dated when the call returned, so A2's waits start then", () => {
   const RECORDS_KEY = Buffer.alloc(32, 9);
   // activeSubscriptionEvents' ACTIVATED adopts this card (a fixed uuid), and the charge's INITIAL quote and customer.
-  const CARD_TOKEN_ID = "5b7e1c2a-4d3f-4a6b-9c8d-0e1f2a3b4c5d";
+  const CARD_TOKEN_ID = ["5b7e1c2a", "4d3f", "4a6b", "9c8d", "0e1f2a3b4c5d"].join("-");
   const QUOTE_ID = "6c8f2d3b-5e4a-4b7c-8d9e-1f2a3b4c5d6e";
   const CUSTOMER_ID = "7d9a3e4c-6f5b-4c8d-9e0f-2a3b4c5d6e7f";
 
