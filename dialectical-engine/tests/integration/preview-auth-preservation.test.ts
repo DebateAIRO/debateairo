@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 import { randomUUID,randomBytes,createHash } from 'node:crypto';
 import { beforeAll,afterAll } from 'vitest';
 import { migrate,createPool,type Pool } from '@debateai/db';
+import { loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
 import { encrypt,hashToken } from '@debateai/crypto';
 import { MFA_RECOVERY_POLICY_REGISTER_ROW,RECOVERY_POLICY_REGISTER_ROW,PASSWORD_RESET_POLICY_REGISTER_ROW } from '@debateai/register';
 import { seedInstalledAuth106 } from '../support/auth106.js';
@@ -253,7 +254,11 @@ describe('closed original107 append and native atomicity',()=>{
    await Promise.all([migrate(db.pool),migrate(second)]);
    expect((await db.pool.query("SELECT count(*)::int n FROM public.debateai_schema_migration WHERE name='0108_preview_recovery_verified_bindings.sql'")).rows[0].n).toBe(1);
    expect((await db.pool.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n).toBe(1);
-   expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name<>'0108_preview_recovery_verified_bindings.sql' ORDER BY name")).rows).toEqual(before);
+   // PR-54: migrate() also appends the forward chain after 0108 (0109 today); each step exactly once, with one step receipt each.
+   const chain=(await loadMigrationPlan()).forwardChain.map(step=>step.name);expect(chain.length).toBeGreaterThan(0);
+   expect((await db.pool.query('SELECT name,count(*)::int n FROM public.debateai_schema_migration WHERE name=ANY($1) GROUP BY name ORDER BY name',[chain])).rows).toEqual([...chain].sort().map(name=>({name,n:1})));
+   expect((await db.pool.query('SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name')).rows).toEqual([...chain].sort().map(source_name=>({source_name})));
+   expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name<>'0108_preview_recovery_verified_bindings.sql' AND NOT name=ANY($1) ORDER BY name",[chain])).rows).toEqual(before);
   }finally{await second.end();await db.stop();}
  },120000);
  it('a late108 refusal rolls the function replacement/ledger/receipt back atomically',async()=>{
