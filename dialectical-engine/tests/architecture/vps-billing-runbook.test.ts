@@ -240,7 +240,7 @@ describe("P22 the Billing runbook", () => {
       "billing.renewal.report", "billing.outbox.dead", "billing.outbox.alert_failed",
       "billing.outbox.settle_failed", "billing.payment.credentials_refused", "billing.quote.refused",
       "billing.invoice.unknown", "billing.payment.mismatch",
-      // P4-H fix round 1 (finding 4): a renewal REBILL_REFUSED on more than one renewal is reported at once.
+      // P4-H fix round 1 (finding 4): the same failure code on many renewals at once is reported at once.
       "billing.payment.failed",
       // N23: a setting of the previous card processor left in api.env, and an answer of NETOPIA's the site cannot read.
       "billing.setting.retired", "billing.payment.answer_rejected",
@@ -296,12 +296,20 @@ describe("P22 the Billing runbook", () => {
       expect(failedDo, needle).toContain(needle);
     }
     expect(failedMeans).not.toContain("CHARGE_REFUSED`:");
-    // The codes the renewal can close a charge with, as the code maps NETOPIA's states (renewal.ts).
+    // The codes the renewal can close a charge with, read from the code (renewal.ts): every code renewalFailureOf maps
+    // NETOPIA's states to (its own body, so a sixth one is seen), and every literal code a renewal is refused with.
+    // The RenewalFailureCode union is not read: it still lists a code nothing writes.
     const renewal = read("apps/api/src/billing/renewal.ts");
-    const stateFailures = new Set([...renewal.matchAll(/return "([A-Z_]+)";/gu)].map((match) => match[1]!)
-      .filter((code) => ["PAYMENT_DECLINED", "AUTHENTICATION_REQUIRED", "PAYMENT_FAILED", "PAYMENT_EXPIRED", "VOIDED"].includes(code)));
-    expect(stateFailures.size, "renewalFailureOf's codes").toBe(5);
-    for (const code of stateFailures) expect(failedMeans, code).toContain(`\`${code}\``);
+    const failureOfStart = renewal.indexOf("export function renewalFailureOf(");
+    expect(failureOfStart, "renewalFailureOf").toBeGreaterThanOrEqual(0);
+    const failureOfEnd = renewal.indexOf("\n}\n", failureOfStart);
+    expect(failureOfEnd, "renewalFailureOf's closing brace").toBeGreaterThan(failureOfStart);
+    const failureOf = renewal.slice(failureOfStart, failureOfEnd + 3);
+    const stateFailures = new Set([...failureOf.matchAll(/return "([A-Z_]+)";/gu)].map((match) => match[1]!));
+    expect(stateFailures.size, "renewalFailureOf's codes").toBeGreaterThanOrEqual(5);
+    const refusedCodes = new Set([...renewal.matchAll(/this\.refused\(charge, "([A-Z_]+)"/gu)].map((match) => match[1]!));
+    expect([...refusedCodes], "the literal codes of this.refused").toEqual(expect.arrayContaining(["CARD_NOT_SAVED", "NO_TRANSACTION"]));
+    for (const code of [...stateFailures, ...refusedCodes]) expect(failedMeans, code).toContain(`\`${code}\``);
     // N25: a renewal whose answer was lost names every code the renewal writes for it (renewal.ts's markers).
     const [, unknownMeans = ""] = rowOf("billing.renewal.unknown");
     for (const code of ["CHARGE_NOT_SENT", "CHARGE_CREDENTIALS_REFUSED", "CHARGE_CONFIGURATION_REFUSED", "CHARGE_OUTCOME_UNKNOWN",
