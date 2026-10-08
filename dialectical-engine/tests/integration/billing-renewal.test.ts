@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { addBusinessDays, computeWindows, foldSubscription } from "@debateai/billing-core";
+import { addBusinessDays, computeWindows, decimalToMicros, foldSubscription } from "@debateai/billing-core";
 import { createPool } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { BillingPlans } from "@debateai/register";
@@ -28,21 +28,15 @@ const emailParam = async (jobRef: string, name: string) =>
   (await h.outboxRows(jobRef)).find((row) => row.kind === "EMAIL" && row.ref === jobRef)?.payload[`param.${name}`];
 const subscriptionKinds = async (subscriptionId: string) =>
   (await h.repository.subscriptionEvents(subscriptionId)).map((event) => event.kind);
-/** Rebills of this subscription's own order: earlier tests' subscriptions may fall due on the same clock. */
-const rebills = (paid: Readonly<{ transaction: Readonly<{ orderId: string }> }>) => h.xmoney.rebillsFor(paid.transaction.orderId);
-/** Transactions a rebill actually created on this order (a rebill that never reached xMoney creates none). */
-const rebillTransactions = (paid: Readonly<{ transaction: Readonly<{ orderId: string }> }>) =>
-  [...h.xmoney.transactions.values()].filter((transaction) =>
-    transaction.orderId === paid.transaction.orderId && transaction.transactionSource === "re-bill");
+/** Saved-card charge calls for this subscription: earlier tests' subscriptions may fall due on the same clock. */
+const rebills = (paid: Readonly<{ subscriptionId: string }>) => h.payments.chargesFor(paid.subscriptionId);
+/** Saved-card charges NETOPIA actually made for this subscription (a charge that never reached NETOPIA makes none). */
+const madeRebills = (paid: Readonly<{ subscriptionId: string }>) => h.payments.madeFor(paid.subscriptionId);
 const unknownCodes = async (chargeId: string) => ((await h.repository.charge(chargeId))?.events ?? [])
   .filter((event) => event.kind === "SUBMIT_UNKNOWN").map((event) => event.errorCode);
 /** The call markers and not-sent outcomes: every REQUESTED row's code, the first (null) being the request itself. */
 const requestedCodes = async (chargeId: string) => ((await h.repository.charge(chargeId))?.events ?? [])
   .filter((event) => event.kind === "REQUESTED").map((event) => event.errorCode);
-const openChargeIds = async () => (await h.jobs.openCharges({
-  environment: "stage", kinds: ["RENEWAL"], after: null, closeBefore: new Date(h.clock.now.getTime() - DAY),
-  renewalCloseBefore: new Date(h.clock.now.getTime() - 72 * HOUR), limit: 1_000
-})).map((open) => open.chargeId);
 /** A billingPlans version published later with Plus at 25.00 (Terms §12's case). */
 const plusAt25: BillingPlans = Object.freeze({
   ...testBillingPlans, sourceRef: "test:billing-plans:plus-25",
@@ -66,7 +60,7 @@ describe("P11a monthly renewal", () => {
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(1);
     const [charge] = await renewalCharges(paid.subscriptionId);
-    expect(charge).toMatchObject({ attempt: 1, periodStart: end, periodEnd: computeWindows(paid.transaction.createdAt!, end).month.end, totalMicros: 24_200_000 });
+    expect(charge).toMatchObject({ attempt: 1, periodStart: end, periodEnd: computeWindows(paid.payment.occurredAt!, end).month.end, totalMicros: 24_200_000 });
     expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMITTED"));
     await h.worker.drain(10);
     expect((await subscriptionKinds(paid.subscriptionId)).at(-1)).toBe("RENEWED");
@@ -164,7 +158,7 @@ describe("P11a monthly renewal", () => {
     expect(await h.renewal.renew(paid.subscriptionId)).toBe("skipped");
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(0);
-    expect(rebillTransactions(paid)).toHaveLength(0);
+    expect(madeRebills(paid)).toBe(0);
     expect(await renewalCharges(paid.subscriptionId)).toHaveLength(0);
     // The line names the stop, never its cause: a frozen account is no erasure, and the line carries no field.
     expect(stopped()).toBeGreaterThan(before);
@@ -172,166 +166,16 @@ describe("P11a monthly renewal", () => {
     h.frozen.delete(paid.ownerRef);
   });
 
-  it("adopts a rebill whose answer was lost instead of charging again, at xMoney's whole-second precision", async () => {
-    const { paid } = await dueNow();
-    // Off the whole second: the charge row reads .400, xMoney's transaction .000 of the same second.
-    h.clock.advance(400);
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN", true);
-    await h.renewal.runOnce();
-    const [charge] = await renewalCharges(paid.subscriptionId);
-    expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMIT_UNKNOWN"));
-    h.clock.advance(MINUTE);
-    await h.renewal.runOnce();
-    expect(rebills(paid)).toBe(1);
-    expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMIT_UNKNOWN", "SUBMITTED"));
-    await h.worker.drain(10);
-    expect((await subscriptionKinds(paid.subscriptionId)).at(-1)).toBe("RENEWED");
-    h.clock.advance(31 * MINUTE);
-    await h.renewal.runOnce();
-    expect(rebills(paid)).toBe(1);
-  });
-
-  it("lists from the clock-skew floor, so a lost rebill xMoney stamped seconds before the charge is still adopted", async () => {
-    const { paid } = await dueNow();
-    h.clock.advance(400);
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN", true);
-    await h.renewal.runOnce();
-    const [charge] = await renewalCharges(paid.subscriptionId);
-    expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMIT_UNKNOWN"));
-    // xMoney's clock runs behind ours: its transaction reads 2 s before the charge row's own whole second.
-    const [lost] = rebillTransactions(paid);
-    h.xmoney.transactions.set(lost!.transactionId, Object.freeze({
-      ...lost!, createdAt: new Date(Math.floor(charge!.createdAt.getTime() / 1_000) * 1_000 - 2_000)
-    }));
-    h.clock.advance(MINUTE);
-    await h.renewal.runOnce();
-    expect(rebills(paid)).toBe(1);
-    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "SUBMITTED"))
-      .toMatchObject({ providerPaymentId: lost!.transactionId });
-    h.clock.advance(31 * MINUTE);
-    await h.renewal.runOnce();
-    expect(rebills(paid)).toBe(1);
-  });
-
-  it("resubmits an unknown rebill only once, keeps the plan for 72 hours, then starts the normal dunning (A2, Q-1)", async () => {
-    const { paid, end } = await dueNow();
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN");
-    await h.renewal.runOnce();
-    // Q-1: the outcome is unknown, so the plan stays: paid access runs on to 72 hours past the period end.
-    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({
-      planId: "PLUS", cause: "RENEWAL_PENDING", paidThrough: new Date(end.getTime() + 72 * HOUR)
-    });
-    expect(h.auditLines).toContainEqual({ event: "billing.renewal.pending", code: "REBILL_OUTCOME_UNKNOWN" });
-    h.clock.advance(5 * MINUTE);
-    await h.renewal.runOnce();
-    expect(rebills(paid)).toBe(1);
-    h.clock.advance(26 * MINUTE);
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN");
-    await h.renewal.runOnce();
-    expect(rebills(paid)).toBe(2);
-    h.clock.advance(31 * MINUTE);
-    await h.renewal.runOnce();
-    expect(rebills(paid)).toBe(2);
-    const [charge] = await renewalCharges(paid.subscriptionId);
-    // Two blind unknowns, each after its own committed call marker.
-    expect(await unknownCodes(charge!.chargeId)).toEqual(["REBILL_OUTCOME_UNKNOWN", "REBILL_OUTCOME_UNKNOWN"]);
-    expect(await requestedCodes(charge!.chargeId)).toEqual([null, "RESUBMIT_STARTED"]);
-    expect(h.auditLines.filter((line) => line.event === "billing.renewal.unknown").length).toBeGreaterThanOrEqual(2);
-    // A2's one extra submission is spent: the charge leaves the tick (only adoption is left, P14a's daily pass) until
-    // its close is due (D6b's request, so stuck charges never crowd out fresh ones).
-    expect(await openChargeIds()).not.toContain(charge!.chargeId);
-    // A day on the plan is still in force and nothing was emailed: the 72 hours are not over.
-    h.clock.advance(DAY);
-    expect(await openChargeIds()).not.toContain(charge!.chargeId);
-    expect(await h.entitlements.current(paid.ownerRef, h.clock.now)).toMatchObject({ planId: "PLUS", cause: "RENEWAL_PENDING", lapsed: false });
-    expect(await m5Refs(charge!.chargeId)).toEqual([]);
-    // The end state: 72 hours past the period end, closed for the owner, never a third blind rebill, and the normal
-    // dunning path starts (Q-1): PAST_DUE with its 8-day grace, and M5A.
-    h.clock.now = new Date(end.getTime() + 72 * HOUR + MINUTE);
-    expect(await openChargeIds()).toContain(charge!.chargeId);
-    await h.renewal.runOnce();
-    expect(rebills(paid)).toBe(2);
-    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED"))
-      .toMatchObject({ errorCode: "NO_TRANSACTION" });
-    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 1 } });
-    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({
-      cause: "PAST_DUE_GRACE", paidThrough: new Date(h.clock.now.getTime() + 8 * DAY)
-    });
-    expect(await m5Refs(charge!.chargeId)).toEqual([`M5A:${charge!.chargeId}`]);
-    // W10 (P2-I21): an outcome that stayed unknown asked no bank we know of, so M5A never says a bank refused.
-    expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("false");
-    expect(h.auditLines).toContainEqual({ event: "billing.renewal.stuck", attempt: 1, code: "REBILL_OUTCOME_UNKNOWN" });
-  });
-
-  /** Two blind unknowns on the renewal's rebill (A2's one resubmission spent), from now on, as the test above makes them. */
-  async function twoLostAnswers(paid: Readonly<{ transaction: Readonly<{ orderId: string }> }>) {
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN");
-    await h.renewal.runOnce();
-    h.clock.advance(5 * MINUTE);
-    await h.renewal.runOnce();
-    h.clock.advance(26 * MINUTE);
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN");
-    await h.renewal.runOnce();
-    h.clock.advance(31 * MINUTE);
-    await h.renewal.runOnce();
-    expect(rebills(paid)).toBe(2);
-  }
-
-  it("lists a renewal charged late with two lost answers from 72 hours past its due instant, not its making (P2-M11)", async () => {
-    const { paid, end } = await dueNow();
-    // The tax service is down at the due instant (Q-1): no charge yet, and the plan is held to 72 hours past the end.
-    h.tax.failNext("TAX_SERVICE_UNAVAILABLE");
-    await expect(h.renewal.renew(paid.subscriptionId)).rejects.toMatchObject({ code: "TAX_SERVICE_UNAVAILABLE" });
-    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({
-      cause: "RENEWAL_PENDING", paidThrough: new Date(end.getTime() + 72 * HOUR)
-    });
-    // It is charged 50 hours late, and both answers are lost.
-    h.clock.now = new Date(end.getTime() + 50 * HOUR);
-    await twoLostAnswers(paid);
-    const [charge] = await renewalCharges(paid.subscriptionId);
-    expect(await unknownCodes(charge!.chargeId)).toEqual(["REBILL_OUTCOME_UNKNOWN", "REBILL_OUTCOME_UNKNOWN"]);
-    expect(await openChargeIds()).not.toContain(charge!.chargeId);
-    // The hold lapses 72 hours past the due instant, so the close is due then, not 72 hours after the charge was made.
-    h.clock.now = new Date(end.getTime() + 72 * HOUR + MINUTE);
-    expect(await openChargeIds()).toContain(charge!.chargeId);
-    await h.renewal.runOnce();
-    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED"))
-      .toMatchObject({ errorCode: "NO_TRANSACTION" });
-    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 1 } });
-    expect(await m5Refs(charge!.chargeId)).toEqual([`M5A:${charge!.chargeId}`]);
-  });
-
-  it("lists a postponed renewal with two lost answers only from 72 hours past the postponement's end (P2-M11)", async () => {
-    const { paid, end } = await dueNow();
-    h.tax.rateOverride.set("RO", 1_900);
-    await h.renewal.runOnce();
-    const until = addBusinessDays(h.clock.now, 7);
-    await h.mail.drain();
-    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "RENEWAL_NOTICE_SENT" });
-    h.clock.now = new Date(until.getTime() + MINUTE);
-    await twoLostAnswers(paid);
-    const [charge] = await renewalCharges(paid.subscriptionId);
-    expect(charge).toMatchObject({ periodStart: end, totalMicros: 23_800_000 });
-    // Well past the period start's 72 hours, but the window runs from the postponement's end: no listing every tick.
-    expect(h.clock.now.getTime()).toBeGreaterThan(end.getTime() + 72 * HOUR);
-    expect(await openChargeIds()).not.toContain(charge!.chargeId);
-    h.clock.now = new Date(until.getTime() + 72 * HOUR + MINUTE);
-    expect(await openChargeIds()).toContain(charge!.chargeId);
-    await h.renewal.runOnce();
-    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED"))
-      .toMatchObject({ errorCode: "NO_TRANSACTION" });
-  });
-
-  it("keeps the plan through an xMoney outage for 72 hours past the period end, then starts the normal dunning (Q-1)", async () => {
+  it("keeps the plan through a NETOPIA outage for 72 hours past the period end, then starts the normal dunning (Q-1)", async () => {
     const { paid, end } = await dueNow();
     const pendingUntil = new Date(end.getTime() + 72 * HOUR);
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_UNAVAILABLE");
+    h.payments.failNextCharge(paid.subscriptionId, "UNAVAILABLE");
     await h.renewal.runOnce();
     const [charge] = await renewalCharges(paid.subscriptionId);
     expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ planId: "PLUS", cause: "RENEWAL_PENDING", paidThrough: pendingUntil });
     // Still down two days on: retried quietly, never failed, never emailed, and still one RENEWAL_PENDING.
     h.clock.now = new Date(end.getTime() + 48 * HOUR);
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_UNAVAILABLE");
+    h.payments.failNextCharge(paid.subscriptionId, "UNAVAILABLE");
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(2);
     expect(await h.eventKinds(charge!.chargeId)).not.toContain("FAILED");
@@ -352,30 +196,30 @@ describe("P11a monthly renewal", () => {
     expect(await m5Refs(charge!.chargeId)).toEqual([`M5A:${charge!.chargeId}`]);
     // W10 (P2-I21): 72 hours of our own outage reached no bank, so M5A never says a bank refused.
     expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("false");
-    expect(h.auditLines).toContainEqual({ event: "billing.renewal.stuck", attempt: 1, code: "REBILL_NOT_SENT" });
+    expect(h.auditLines).toContainEqual({ event: "billing.renewal.stuck", attempt: 1, code: "CHARGE_NOT_SENT" });
   });
 
-  it("retries a rebill that never reached xMoney on later ticks, never as a failure, and charges once (Review Focus 5)", async () => {
+  it("retries a charge that never reached NETOPIA on later ticks, never as a failure, and charges once (Review Focus 5)", async () => {
     const { paid } = await dueNow();
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_UNAVAILABLE");
+    h.payments.failNextCharge(paid.subscriptionId, "UNAVAILABLE");
     await h.renewal.runOnce();
     const [charge] = await renewalCharges(paid.subscriptionId);
-    // D5 5i: nothing reached xMoney, so the charge stays REQUESTED and spends no SUBMIT_UNKNOWN.
-    expect(await requestedCodes(charge!.chargeId)).toEqual([null, "REBILL_NOT_SENT"]);
+    // D5 5i: nothing reached NETOPIA, so the charge stays REQUESTED and spends no SUBMIT_UNKNOWN.
+    expect(await requestedCodes(charge!.chargeId)).toEqual([null, "CHARGE_NOT_SENT"]);
     expect(await unknownCodes(charge!.chargeId)).toEqual([]);
     // Q-1: the plan stays while the renewal is retried quietly.
     expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ cause: "RENEWAL_PENDING", paidThrough: new Date(charge!.periodStart.getTime() + 72 * HOUR) });
     h.clock.advance(MINUTE + 1_000);
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_UNAVAILABLE");
+    h.payments.failNextCharge(paid.subscriptionId, "UNAVAILABLE");
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(2);
-    expect(await requestedCodes(charge!.chargeId)).toEqual([null, "REBILL_NOT_SENT", "RESUBMIT_STARTED", "REBILL_NOT_SENT"]);
+    expect(await requestedCodes(charge!.chargeId)).toEqual([null, "CHARGE_NOT_SENT", "RESEND_STARTED", "CHARGE_NOT_SENT"]);
     expect(await unknownCodes(charge!.chargeId)).toEqual([]);
-    // xMoney is back, 35 minutes on: the next eligible tick charges it.
+    // NETOPIA is back, 35 minutes on: the next eligible tick charges it.
     h.clock.advance(35 * MINUTE);
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(3);
-    expect(rebillTransactions(paid)).toHaveLength(1);
+    expect(madeRebills(paid)).toBe(1);
     await h.worker.drain(10);
     const kinds = await subscriptionKinds(paid.subscriptionId);
     expect(kinds.at(-1)).toBe("RENEWED");
@@ -388,21 +232,21 @@ describe("P11a monthly renewal", () => {
 
   it("keeps the plan through a 429 and then a refused key: no FAILED, no PAST_DUE, no M5, and the alarm (D5 5i)", async () => {
     const { paid } = await dueNow();
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_UNAVAILABLE");
+    h.payments.failNextCharge(paid.subscriptionId, "UNAVAILABLE");
     await h.renewal.runOnce();
     h.clock.advance(MINUTE + 1_000);
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_CREDENTIALS_REFUSED");
+    h.payments.failNextCharge(paid.subscriptionId, "CREDENTIALS");
     await h.renewal.runOnce();
     expect(rebills(paid)).toBe(2);
     const [charge] = await renewalCharges(paid.subscriptionId);
     expect(await requestedCodes(charge!.chargeId))
-      .toEqual([null, "REBILL_NOT_SENT", "RESUBMIT_STARTED", "REBILL_CREDENTIALS_REFUSED"]);
+      .toEqual([null, "CHARGE_NOT_SENT", "RESEND_STARTED", "CHARGE_CREDENTIALS_REFUSED"]);
     expect(await h.eventKinds(charge!.chargeId)).not.toContain("FAILED");
     expect(await h.eventKinds(charge!.chargeId)).not.toContain("SUBMIT_UNKNOWN");
     expect(await subscriptionKinds(paid.subscriptionId)).not.toContain("PAST_DUE");
     expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).status).toBe("ACTIVE");
     expect((await h.outboxRows(charge!.chargeId)).map((row) => row.ref).filter((ref) => ref.startsWith("M5"))).toEqual([]);
-    expect(h.auditLines).toContainEqual({ event: "billing.xmoney.credentials_refused", operation: "rebill" });
+    expect(h.auditLines).toContainEqual(expect.objectContaining({ event: "billing.payment.credentials_refused" }));
     // The key is fixed: the next eligible tick charges it, once.
     h.clock.advance(6 * MINUTE);
     await h.renewal.runOnce();
@@ -491,7 +335,7 @@ describe("P11a monthly renewal", () => {
     expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).status).toBe("ACTIVE");
     expect(await h.entitlements.current(paid.ownerRef, h.clock.now)).toMatchObject({ planId: "PLUS", cause: "RENEWAL_PENDING", lapsed: false });
     expect((await h.entitlementRows(paid.ownerRef)).filter((row) => row.cause === "RENEWAL_PENDING")).toHaveLength(1);
-    // 72 hours and a minute, still down: the normal dunning starts, with no charge row and no rebill (Q-1).
+    // 72 hours and a minute, still down: the normal dunning starts, with no charge row and no saved-card charge (Q-1).
     h.clock.now = new Date(pendingUntil.getTime() + MINUTE);
     const failedAt = h.clock.now;
     h.tax.failNext("TAX_SERVICE_UNAVAILABLE");
@@ -534,7 +378,7 @@ describe("P11a monthly renewal", () => {
     const lines = h.auditLines.slice(linesBefore);
     expect(lines).toContainEqual({ event: "billing.renewal.tax_refused", code: "TAX_SERVICE_REFUSED", reason: "QUADERNO_HTTP_401" });
     expect(lines.filter((line) => line.code === "TAX_SERVICE_UNAVAILABLE")).toEqual([]);
-    // The default hold, the precedent of xMoney's refused key, labelled with the real code.
+    // The default hold, the precedent of a refused payment key, labelled with the real code.
     expect(lines).toContainEqual({ event: "billing.renewal.pending", code: "TAX_SERVICE_REFUSED" });
     expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({
       cause: "RENEWAL_PENDING", paidThrough: new Date(end.getTime() + 72 * HOUR)
@@ -553,14 +397,13 @@ describe("P11a monthly renewal", () => {
   it("keeps the plan while a sent renewal waits for its check past the period end, then renews it (Q-1)", async () => {
     const paid = await h.activate();
     const end = await h.periodEndOf(paid.subscriptionId);
-    // Charged two minutes before the end (inside the due list's 5-minute horizon); the rebill answered.
+    // Charged two minutes before the end (inside the due list's 5-minute horizon); NETOPIA answered the charge.
     h.clock.now = new Date(end.getTime() - 2 * MINUTE);
     await h.renewal.runOnce();
     const [charge] = await renewalCharges(paid.subscriptionId);
     expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMITTED"));
-    const transactionId = (await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "SUBMITTED")!.providerPaymentId!;
-    // VERIFY_PAYMENT cannot read the transaction: xMoney is down. The worker retries it a minute later.
-    h.xmoney.failNextLookup(transactionId);
+    // VERIFY_PAYMENT cannot read NETOPIA's status: NETOPIA is down. The worker retries it a minute later.
+    h.payments.failNextStatus(charge!.chargeId);
     await h.worker.drain(10);
     expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMITTED"));
     // Past the period end the person, already charged, keeps the plan: one RENEWAL_PENDING, 72 hours past the end.
@@ -575,7 +418,7 @@ describe("P11a monthly renewal", () => {
     expect(await m5Refs(charge!.chargeId)).toEqual([]);
     expect(await h.eventKinds(charge!.chargeId)).not.toContain("FAILED");
     expect(rebills(paid)).toBe(1);
-    // xMoney answers again: the check's retry verifies it, and the plan renews for the next period.
+    // NETOPIA answers again: the check's retry verifies it, and the plan renews for the next period.
     await h.worker.drain(10);
     expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMITTED", "SUCCEEDED"));
     expect((await subscriptionKinds(paid.subscriptionId)).at(-1)).toBe("RENEWED");
@@ -610,74 +453,29 @@ describe("P11a monthly renewal", () => {
     }
   });
 
-  it("never resubmits an unknown rebill once the plan was suspended, cancelled or already renewed (A2, A9)", async () => {
-    for (const change of ["SUSPENDED", "CANCEL_REQUESTED", "RENEWED"] as const) {
-      const { paid, end } = await dueNow();
-      h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN");
-      await h.renewal.runOnce();
-      const [charge] = await renewalCharges(paid.subscriptionId);
-      const anchor = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).periodAnchorAt!;
-      await append(paid.subscriptionId, change, change === "SUSPENDED" ? { charge_id: paid.chargeId }
-        : change === "RENEWED" ? {
-          charge_id: "f".repeat(32), period_start: end.toISOString(), period_end: computeWindows(anchor, end).month.end.toISOString()
-        } : {});
-      h.clock.advance(31 * MINUTE);
-      await h.renewal.runOnce();
-      expect(rebills(paid)).toBe(1);
-      // Still open: a transaction that did go through is still adopted.
-      expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMIT_UNKNOWN"));
-    }
-  });
-
-  it("still adopts a lost rebill on a suspended plan, and refunds it", async () => {
+  it("still adopts a lost renewal charge on a suspended plan, and hands its refund to the owner", async () => {
     const { paid } = await dueNow();
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN", true);
+    h.payments.failNextCharge(paid.subscriptionId, "PAID_ANSWER_LOST");
     await h.renewal.runOnce();
     await append(paid.subscriptionId, "SUSPENDED", { charge_id: paid.chargeId });
-    h.clock.advance(MINUTE);
+    // Past the 30 quiet minutes the probe reads NETOPIA's status: PAID.
+    h.clock.advance(61 * MINUTE);
     await h.renewal.runOnce();
     await h.worker.drain(10);
     const [charge] = await renewalCharges(paid.subscriptionId);
-    expect(rebills(paid)).toBe(1);
-    expect(await h.eventKinds(charge!.chargeId))
-      .toEqual(kindsOf("REQUESTED", "SUBMIT_UNKNOWN", "SUBMITTED", "SUCCEEDED", "REFUND_REQUESTED", "REFUNDED"));
+    expect(madeRebills(paid)).toBe(1);
+    expect(await h.eventKinds(charge!.chargeId)).toEqual(expect.arrayContaining(["SUBMIT_UNKNOWN", "SUCCEEDED", "REFUND_REQUESTED"]));
     expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "REFUND_REQUESTED"))
       .toMatchObject({ errorCode: "SUBSCRIPTION_ENDED" });
-  });
-
-  it("adopts a lost rebill from the old order after a card change, and never charges the new card again (A2, A12)", async () => {
-    const { paid } = await dueNow();
-    // The rebill reaches xMoney on the order in force and its answer is lost.
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN", true);
-    await h.renewal.runOnce();
-    const [charge] = await renewalCharges(paid.subscriptionId);
-    const [lost] = rebillTransactions(paid);
-    expect(await h.eventKinds(charge!.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMIT_UNKNOWN"));
-    // Before the next look (a minute on), a card change settles: the subscription's order is now the new card's, while
-    // the lost payment sits on the old one (D6b's P12e defers such a change; this is the root fix under it).
-    h.clock.advance(10_000);
-    const card = h.xmoney.pay({ externalOrderId: randomUUID(), amountDecimal: "1.00", cardCountry: "RO" });
-    const state = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId));
-    await h.repository.withTransaction((client) => h.repository.appendSubscriptionEvent(client, subscriptionEvent(
-      state, "CARD_CHANGED", h.clock.now, { charge_id: "c".repeat(32), retry_now: false },
-      { xmoneyOrderId: card.orderId, xmoneyCustomerId: card.customerId, cardRef: card.cardId }
-    )));
-    // Past A2's 30 quiet minutes the resubmission is due, unless a payment is found on an order that could hold it.
-    h.clock.advance(31 * MINUTE);
-    await h.renewal.runOnce();
-    expect(h.xmoney.rebillsFor(card.orderId)).toBe(0);
-    expect(rebills(paid)).toBe(1);
-    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "SUBMITTED"))
-      .toMatchObject({ providerPaymentId: lost!.transactionId });
-    await h.worker.drain(10);
-    expect((await subscriptionKinds(paid.subscriptionId)).at(-1)).toBe("RENEWED");
-    // The card change stands: the next renewal charges the new card.
-    expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).xmoneyOrderId).toBe(card.orderId);
+    // Spec §2.12.2, the owner mode: the whole payment is handed to the owner.
+    expect(await h.ownerRefundsDue(charge!.chargeId)).toEqual([
+      expect.objectContaining({ refundAmount: "24.20", refundReason: "SUBSCRIPTION_ENDED" })
+    ]);
   });
 
   it("keeps the plan during a declined renewal: PAST_DUE, paid through 8 days more, and M5A", async () => {
     const { paid } = await dueNow();
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_PAYMENT_FAILED");
+    h.payments.failNextCharge(paid.subscriptionId, "DECLINED");
     await h.renewal.runOnce();
     const [charge] = await renewalCharges(paid.subscriptionId);
     expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED")).toMatchObject({ errorCode: "PAYMENT_DECLINED" });
@@ -691,23 +489,36 @@ describe("P11a monthly renewal", () => {
     expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("true");
   });
 
-  it("never says a bank refused when xMoney refused the rebill request itself (REBILL_REFUSED, W10 P2-I21)", async () => {
+  it("holds the plan when NETOPIA refuses the charge for our own setup: no FAILED, no M5, one O3 (ruling C-8)", async () => {
     const { paid } = await dueNow();
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_REFUSED");
+    h.payments.failNextCharge(paid.subscriptionId, "CONFIGURATION");
     await h.renewal.runOnce();
     const [charge] = await renewalCharges(paid.subscriptionId);
-    expect((await h.repository.charge(charge!.chargeId))!.events.find((event) => event.kind === "FAILED")).toMatchObject({ errorCode: "REBILL_REFUSED" });
-    expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 1 } });
-    expect(await emailParam(`M5A:${charge!.chargeId}`, "bankDeclined")).toBe("false");
+    expect(await requestedCodes(charge!.chargeId)).toEqual([null, "CHARGE_CONFIGURATION_REFUSED"]);
+    expect(await h.eventKinds(charge!.chargeId)).not.toContain("FAILED");
+    expect(await subscriptionKinds(paid.subscriptionId)).not.toContain("PAST_DUE");
+    expect(await m5Refs(charge!.chargeId)).toEqual([]);
+    expect((await h.entitlementRows(paid.ownerRef)).at(-1)).toMatchObject({ planId: "PLUS", cause: "RENEWAL_PENDING" });
+    // O3 is keyed once per code and hour (payment-alert.ts); its reference names this charge.
+    const alerts = await h.database.pool.query(
+      `SELECT 1 FROM billing.outbox WHERE kind = 'EMAIL' AND ref LIKE 'O3:%' AND payload->>'param.reasonCode' = $1
+         AND payload->>'param.reference' = $2`, ["CHARGE_CONFIGURATION_REFUSED", `charge ${charge!.chargeId}`]
+    );
+    expect(alerts.rows).toHaveLength(1);
   });
 
   it("says in M11 that the plan ended when a renewal is refused for the card's country (W10, P2-M9)", async () => {
     const { paid } = await dueNow();
     // The saved card's country moved onto the always-blocked list after activation (P2-M9's narrowing).
-    h.xmoney.cards.set(paid.transaction.cardId!, "RU");
+    h.payments.cardCountryFor(paid.subscriptionId, "RU");
     await h.renewal.runOnce();
     await h.worker.drain(10);
     const [charge] = await renewalCharges(paid.subscriptionId);
+    // Spec §2.12.2, the owner mode: the whole renewal is handed to the owner, who refunds it in NETOPIA's admin; NETOPIA's
+    // status then says REFUNDED, and VERIFY_PAYMENT records it (§2.12.4).
+    expect(await h.ownerRefundsDue(charge!.chargeId)).toEqual([expect.objectContaining({ refundAmount: "24.20", whole: "true" })]);
+    h.payments.setState(charge!.chargeId, "REFUNDED");
+    await h.settle(charge!.chargeId);
     expect(await h.eventKinds(charge!.chargeId)).toEqual(expect.arrayContaining(["SUCCEEDED", "REFUND_REQUESTED", "REFUNDED"]));
     expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1))
       .toMatchObject({ kind: "ENDED", data: { cause: "CANCEL", reason: "CARD_COUNTRY_BLOCKED" } });
@@ -740,14 +551,15 @@ describe("P11a monthly renewal", () => {
       // validated VAT id, and it wrote the latest billing profile. The older one is then paid late and revived.
       const older = await h.buy({ ownerRef, planId: "PLUS", country: "DE" });
       await h.buy({ ownerRef, planId: "PRO", country: "DE", company: { name: "Later GmbH", vatId: "DE123VALID", address: "Teststr. 1, 10115 Berlin" } });
-      const olderPaid = h.xmoney.pay({ externalOrderId: older.chargeId, amountDecimal: older.totalDecimal, cardCountry: "DE" });
-      await h.settle(olderPaid.transactionId);
+      await h.storeCardToken(older.chargeId, { cardCountry: "DE" });
+      h.payments.pay(older.chargeId, { amountMicros: decimalToMicros(older.totalDecimal), cardCountry: "DE" });
+      await h.settle(older.chargeId);
       expect((await h.repository.subscriptionEvents(older.subscriptionId)).at(-1))
         .toMatchObject({ kind: "ACTIVATED", data: { reactivated: true } });
       h.clock.now = new Date((await h.periodEndOf(older.subscriptionId)).getTime() + MINUTE);
       await h.renewal.runOnce();
-      // Priced as the person it was bought by: German VAT, the same total, so no notice and one rebill.
-      expect(rebills({ transaction: olderPaid })).toBe(1);
+      // Priced as the person it was bought by: German VAT, the same total, so no notice and one saved-card charge.
+      expect(rebills(older)).toBe(1);
       const [charge] = await renewalCharges(older.subscriptionId);
       expect(charge).toMatchObject({ totalMicros: 23_800_000 });
       expect(await h.repository.quote(charge!.quoteId!, ownerRef))

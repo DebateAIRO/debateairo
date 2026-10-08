@@ -76,7 +76,7 @@ beforeAll(async () => {
   const deps = () => ({
     repository: h.repository, jobs: h.jobs, issuer: smartbill.port(), recordsKey: h.recordsKey,
     recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy,
-    publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const
+    publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const, paymentEnvironment: "sandbox" as const
   });
   invoiceDeps = deps;
   invoiceHandler = () => createSmartBillInvoiceHandler(deps());
@@ -347,11 +347,11 @@ describe("P10b SmartBill invoices for Romania", () => {
     const charge = (await h.repository.charge(paid.chargeId))!;
     const quote = (await h.repository.quote(charge.quoteId!, paid.ownerRef))!;
     await h.repository.withTransaction(async (client) => {
-      const fields = { providerPaymentId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
+      const fields = { providerPaymentId: paid.payment.providerPaymentId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
       await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUND_REQUESTED", h.clock.now, fields));
       await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUNDED", h.clock.now, fields));
       await enqueueCreditNote(h.repository, client, {
-        charge, quote, policy: testBillingPolicy, transactionId: paid.transaction.transactionId, refundMicros: 12_100_000, now: h.clock.now
+        charge, quote, policy: testBillingPolicy, transactionId: paid.payment.providerPaymentId, refundMicros: 12_100_000, now: h.clock.now
       });
     });
     await h.worker.drain(10);
@@ -359,14 +359,15 @@ describe("P10b SmartBill invoices for Romania", () => {
       .toMatchObject({ name: "SC Test SRL", street: "Str. Test 1, Bucuresti" });
     const person = await h.activate();
     await h.worker.drain(10);
-    expect(smartbill.issued.find((sale) => sale.chargeId === person.chargeId)?.customer.street).toBeNull();
+    // A person's street is the one they typed for NETOPIA's cardholder (spec 2026-10-05 §2.6.1, the harness's buyer).
+    expect(smartbill.issued.find((sale) => sale.chargeId === person.chargeId)?.customer.street).toBe("Strada Test 1");
   });
 
   it("credits an old charge to that charge's own buyer, not to the details of a later checkout (P2-M30)", async () => {
     const paid = await h.activate();
     await h.worker.drain(10);
     expect(smartbill.issued.find((sale) => sale.chargeId === paid.chargeId)?.customer)
-      .toMatchObject({ name: "Test Buyer", city: "Sector 1", region: "Bucuresti", street: null, taxId: null });
+      .toMatchObject({ name: "Test Buyer", city: "Sector 1", region: "Bucuresti", street: "Strada Test 1", taxId: null });
     // The person later checks out under other details (a company in Cluj): that writes the newest billing profile.
     const customer = (await h.repository.customerByOwner(paid.ownerRef))!;
     const later = sealBillingProfile(h.recordsKey, customer.customerId, {
@@ -381,19 +382,19 @@ describe("P10b SmartBill invoices for Romania", () => {
     const charge = (await h.repository.charge(paid.chargeId))!;
     const quote = (await h.repository.quote(charge.quoteId!, paid.ownerRef))!;
     await h.repository.withTransaction(async (client) => {
-      const fields = { providerPaymentId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
+      const fields = { providerPaymentId: paid.payment.providerPaymentId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
       await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUND_REQUESTED", h.clock.now, fields));
       await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUNDED", h.clock.now, fields));
       await enqueueCreditNote(h.repository, client, {
-        charge, quote, policy: testBillingPolicy, transactionId: paid.transaction.transactionId, refundMicros: 12_100_000, now: h.clock.now
+        charge, quote, policy: testBillingPolicy, transactionId: paid.payment.providerPaymentId, refundMicros: 12_100_000, now: h.clock.now
       });
     });
     await h.worker.drain(10);
     // The buyer is the one the charge's own quote sealed; only the address it is sent to and its language follow the
     // newest profile (W8: the account's current address, here the profile's own).
     expect(smartbill.credits.find((refund) => refund.chargeId === paid.chargeId)?.customer).toEqual({
-      name: "Test Buyer", email: "later-buyer@example.test", country: "RO", region: "Bucuresti", postalCode: null,
-      city: "Sector 1", street: null, taxId: null, locale: "ro"
+      name: "Test Buyer", email: "later-buyer@example.test", country: "RO", region: "Bucuresti", postalCode: "010011",
+      city: "Sector 1", street: "Strada Test 1", taxId: null, locale: "ro"
     });
   });
 
@@ -401,8 +402,8 @@ describe("P10b SmartBill invoices for Romania", () => {
     const full = await h.activate();
     await h.worker.drain(10);
     // A void after success is a refund in full (A9); a dashboard refund's amount is unknown and gets no document (P9c).
-    h.xmoney.setStatus(full.transaction.transactionId, "void-ok");
-    await h.settle(full.transaction.transactionId);
+    h.payments.setState(full.chargeId, "VOIDED");
+    await h.settle(full.chargeId);
     await h.worker.drain(10);
     expect(smartbill.stornos.map((refund) => refund.chargeId)).toContain(full.chargeId);
 
@@ -413,11 +414,11 @@ describe("P10b SmartBill invoices for Romania", () => {
       const charge = (await h.repository.charge(paid.chargeId))!;
       const quote = (await h.repository.quote(charge.quoteId!, paid.ownerRef))!;
       await h.repository.withTransaction(async (client) => {
-        const fields = { providerPaymentId: paid.transaction.transactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
+        const fields = { providerPaymentId: paid.payment.providerPaymentId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL" };
         await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUND_REQUESTED", h.clock.now, fields));
         await h.repository.appendChargeEvent(client, chargeEvent(paid.chargeId, "REFUNDED", h.clock.now, fields));
         await enqueueCreditNote(h.repository, client, {
-          charge, quote, policy: testBillingPolicy, transactionId: paid.transaction.transactionId, refundMicros: 12_100_000, now: h.clock.now
+          charge, quote, policy: testBillingPolicy, transactionId: paid.payment.providerPaymentId, refundMicros: 12_100_000, now: h.clock.now
         });
       });
       await h.worker.drain(10);

@@ -171,7 +171,7 @@ describe("P2-I4 a plan of the other xMoney system offers no withdrawal and canno
 
 /** A sandbox plan (activeSubscriptionEvents names "stage"), activated at `at`, folded by the handlers below. */
 function stageSubscription(at: Date): Readonly<{ events: SubscriptionEvent[]; subscriptionId: string; ownerRef: string }> {
-  const events = activeSubscriptionEvents("0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", at);
+  const events = activeSubscriptionEvents("0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", at, "PLUS", { provider: "xmoney", environment: "stage" });
   return { events, subscriptionId: events[0]!.subscriptionId, ownerRef: events[0]!.ownerRef };
 }
 

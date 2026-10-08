@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { foldSubscription } from "@debateai/billing-core";
+import { decimalToMicros, foldSubscription } from "@debateai/billing-core";
 import type { Pool } from "@debateai/db";
 import { startBillingHarness, testConsentDocuments, type BillingHarness } from "../support/billingHarness.js";
 import { StubGeo, testBillingPlans } from "../support/billingFixtures.js";
@@ -65,7 +65,7 @@ describe("P15 no new money while an account erasure is pending", () => {
     const identity = testHttpIdentity("p15-guard-routes");
     const paid = await h.activate({ ownerRef: identity.authenticated.ownerRef });
     const deps = subscriptionDeps(h.database.pool, {
-      recordsKey: h.recordsKey, tax: h.tax, xmoney: h.xmoney, geo: h.geo, clock: h.clock.read,
+      recordsKey: h.recordsKey, tax: h.tax, payments: h.payments, geo: h.geo, clock: h.clock.read,
       accountEmail: { read: async () => "erasing@example.test" }
     });
     const api = await mountSubscriptionRoutes(deps, identity);
@@ -98,8 +98,8 @@ describe("P15 no new money while an account erasure is pending", () => {
     const bought = await h.buy({ ownerRef });
     // The checkout was open when the erasure was scheduled, and the hook failed: nothing ended the CREATED plan.
     await scheduleErasure(h.database.pool, ownerRef);
-    const payment = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RO" });
-    await h.settle(payment.transactionId);
+    h.payments.pay(bought.chargeId, { amountMicros: decimalToMicros(bought.totalDecimal), cardCountry: "RO" });
+    await h.settle(bought.chargeId);
     const kinds = (await h.repository.charge(bought.chargeId))!.events.map((event) => [event.kind, event.errorCode]);
     expect(kinds).toEqual(expect.arrayContaining([["SUCCEEDED", null], ["REFUND_REQUESTED", "SUBSCRIPTION_ENDED"]]));
     const events = await h.repository.subscriptionEvents(bought.subscriptionId);

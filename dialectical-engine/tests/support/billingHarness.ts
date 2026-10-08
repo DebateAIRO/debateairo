@@ -1,18 +1,21 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { decimalToMicros, foldSubscription, microsToDecimal } from "@debateai/billing-core";
+import {
+  foldSubscription, microsToDecimal, paymentError, type CardPayments, type HostedPaymentStart, type HostedPaymentStarted,
+  type PaymentReport, type PaymentState, type SavedCardCharge
+} from "@debateai/billing-core";
 import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
-import type { XMoneyNotice, XMoneyStatus, XMoneyTransaction } from "@debateai/payments-xmoney";
 import type { BillingPlans } from "@debateai/register";
+import type { BillingRecipientReader } from "../../apps/api/src/billing/account-email.js";
 import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
 import { CheckoutService, type CheckoutDeps, type ConsentKind } from "../../apps/api/src/billing/checkout.js";
 import {
   createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMail
 } from "../../apps/api/src/billing/email-job.js";
 import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
-import { NoticeIntake } from "../../apps/api/src/billing/notice-intake.js";
+import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
 import { BillingOutboxWorker } from "../../apps/api/src/billing/outbox.js";
 import { QuoteService } from "../../apps/api/src/billing/quote.js";
+import { sealCardToken } from "../../apps/api/src/billing/records.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { RenewalService, type RenewalDeps } from "../../apps/api/src/billing/renewal.js";
 import { createRenewalNoticeHandler } from "../../apps/api/src/billing/renewal-notice-job.js";
@@ -20,8 +23,9 @@ import { createInitialSettlement } from "../../apps/api/src/billing/settlement-i
 import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-renewal.js";
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 import { consentDocument } from "../../apps/ui/scripts/legal-consent-manifest.mjs";
+import { testCardToken } from "./billingSubscriptionFixtures.js";
+import { stubPaymentReport } from "./stub-card-payments.js";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
-import { StubCardPayments } from "./stub-card-payments.js";
 import {
   AdjustableTaxEngine, PROFILE_ADDRESS_ONLY, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy
 } from "./billingFixtures.js";
@@ -62,243 +66,149 @@ export async function endPoolWithin(pool: Pool, ms = 2_000): Promise<void> {
   await Promise.race([pool.end(), new Promise<void>((resolve) => { setTimeout(resolve, ms).unref(); })]);
 }
 
-/** xMoney stamps `creationDate` to the whole second (xmoney-openapi.yaml: "2020-05-18T00:00:00+00:00"). */
-const wholeSecond = (value: Date): Date => new Date(Math.floor(value.getTime() / 1_000) * 1_000);
+/**
+ * What a saved-card charge does at NETOPIA, scripted per subscription (spec 2026-10-05 §2.9): `PAID` at once (the
+ * default, a frictionless merchant-initiated payment), `PENDING`, `DECLINED` (code 20, a card decline the bank gave),
+ * `ACTION_REQUIRED` (3-D Secure asked, code 100), `PAID_ANSWER_LOST` (the charge is made, the answer is lost: a later
+ * status read finds it PAID), `UNKNOWN_NOTHING_MADE` (the answer is lost and nothing was made: the order is unknown),
+ * and the three errors that prove nothing reached NETOPIA or was refused before any charge.
+ */
+export type HarnessChargeOutcome =
+  | "PAID" | "PENDING" | "DECLINED" | "ACTION_REQUIRED" | "PAID_ANSWER_LOST" | "UNKNOWN_NOTHING_MADE"
+  | "UNAVAILABLE" | "CREDENTIALS" | "CONFIGURATION";
 
 /**
- * The xMoney surface billing calls, in memory: payments made "in the browser" (`pay`), rebills, refunds, cards.
- * It stands in for P3's client wherever a test shapes a transaction's status by hand; the notice decryption
- * itself runs against P3's fake server (`tests/support/fake-xmoney.ts`) in P9a. Where the real service's behaviour is
- * known it is copied, so the stub cannot hide a case: `createdAt` has whole-second precision, an embedded payment is
- * `service-call` and a rebill `re-bill` (the OpenAPI `transactionSource` enum), and the refund model is P3b's careful
- * one (D5): every refund is its own `transactionType: "refund"` transaction (`complete-ok`, its own amount,
- * `relatedTransactionIds: [payment]`); a PARTIAL refund leaves the payment `complete-ok`, and only the refund that
- * leaves nothing turns it `refund-ok`. `refundRowsHidden` models the other reading X0 may record: no refund row.
- * A1 (P2-I6): our charge id lives on the ORDER only. Every transaction carries `externalOrderId: null`, as P3b's
- * protocol fake and the OpenAPI copy have it, so a match goes through `getOrder` exactly as it must against xMoney.
- * A payment is made by the customer its signed order names (`signed`, which the harness's checkout calls): the
- * xMoney customer `createCustomer` made for that identifier.
+ * NETOPIA's port in memory (the NETOPIA counterpart of the harness's former xMoney stub; the protocol itself runs
+ * against N5's fake in the fake stack). Our charge id is NETOPIA's orderID, so every report is keyed by charge. A status
+ * read answers the order's current report, or NO_SUCH_ORDER. There is no `refund`: RefundDesk runs in the owner mode
+ * (spec §2.12.2), as in production until N-10.
  */
-export class StubXMoney {
-  readonly transactions = new Map<string, XMoneyTransaction>();
-  readonly orders = new Map<string, Readonly<{ orderId: string; externalOrderId: string | null }>>();
-  readonly cards = new Map<string, string | null>();
-  readonly orderCards = new Map<string, string>();
-  readonly refunds: Array<Readonly<{ transactionId: string; amountDecimal: string | null; reason: string }>> = [];
-  rebillCalls = 0;
-  customers = 0;
-  /** The next refund calls fail BEFORE anything moves, reported as an unknown outcome (a timeout that moved nothing). */
-  refundFailures = 0;
-  /** The next refund calls fail before any byte is sent, reported as such (P3b's XMONEY_UNAVAILABLE). */
-  refundNotSent = 0;
-  /** The next refund calls move the money and then lose the answer (XMONEY_OUTCOME_UNKNOWN after the refund). */
-  refundLostResponses = 0;
-  /** X0's other possible reading: a refund moves money but is listed as no transaction of its own. */
-  refundRowsHidden = false;
-  /** Rebills per xMoney order: a test counts its own subscription's charges, whatever else is due. */
-  private readonly rebillsByOrder = new Map<string, number>();
-  private readonly rebillFailures = new Map<string, Readonly<{ code: string; afterCreate: boolean }>>();
-  /** Micros refunded so far per paid transaction. */
-  private readonly refundedMicros = new Map<string, number>();
-  /** Reads of one transaction that fail before any byte is sent (P3b's XMONEY_UNAVAILABLE), per transaction id. */
-  private readonly lookupFailures = new Map<string, number>();
-  /** xMoney's customer per our identifier (`createCustomer`), and the identifier each signed order names. */
-  private readonly customersByIdentifier = new Map<string, string>();
-  private readonly signedOrders = new Map<string, string>();
-  /** Ids `createCustomer` answers next, reserved by a test that pays before its checkout exists. */
-  private readonly reservedCustomers: string[] = [];
-  /** `getOrder` calls so far (the checkout's look asks once per order). */
-  getOrderCalls = 0;
-  private sequence = 1_000;
+export class HarnessPayments implements CardPayments {
+  readonly provider = "netopia" as const;
+  readonly environment = "sandbox" as const;
+  readonly reports = new Map<string, PaymentReport>();
+  readonly hosted: HostedPaymentStart[] = [];
+  readonly charges: SavedCardCharge[] = [];
+  readonly #outcomes = new Map<string, HarnessChargeOutcome[]>();
+  readonly #countries = new Map<string, string>();
+  readonly #statusFailures = new Map<string, number>();
+  readonly #calls = new Map<string, number>();
+  readonly #made = new Map<string, number>();
 
-  constructor(private readonly clock: () => Date) {}
+  /** `subscriptionOf`: the subscription a charge belongs to (the harness reads its own database). */
+  constructor(private readonly clock: () => Date, private readonly subscriptionOf: (chargeId: string) => Promise<string>) {}
 
-  private next(): string { this.sequence += 1; return String(this.sequence); }
-
-  /**
-   * The next `times` reads of this one transaction (`getTransaction`) fail as an outage that sent nothing. Keyed by
-   * transaction, so a test's outage never lands on another test's job that the same drain happens to run.
-   */
-  failNextLookup(transactionId: string, times = 1): void {
-    this.lookupFailures.set(transactionId, (this.lookupFailures.get(transactionId) ?? 0) + times);
+  /** The next saved-card charge of this subscription ends as `outcome`; several calls queue in order. */
+  failNextCharge(subscriptionId: string, outcome: HarnessChargeOutcome): void {
+    this.#outcomes.set(subscriptionId, [...(this.#outcomes.get(subscriptionId) ?? []), outcome]);
   }
 
-  private add(fields: Pick<XMoneyTransaction, "orderId" | "externalOrderId" | "customerId" | "cardId" | "status" | "amountDecimal">
-    & Partial<Pick<XMoneyTransaction, "transactionType" | "transactionSource" | "createdAt" | "relatedTransactionIds">>): XMoneyTransaction {
-    const transaction = Object.freeze({
-      transactionId: this.next(), currency: "USD", ip: "198.51.100.7", transactionSource: "service-call",
-      transactionType: "deposit", createdAt: wholeSecond(this.clock()), relatedTransactionIds: Object.freeze([]), ...fields
-    }) as XMoneyTransaction;
-    this.transactions.set(transaction.transactionId, transaction);
-    return transaction;
+  /** The next `times` status reads of this charge fail before anything is sent (PAYMENT_PROVIDER_UNAVAILABLE). */
+  failNextStatus(chargeId: string, times = 1): void {
+    this.#statusFailures.set(chargeId, (this.#statusFailures.get(chargeId) ?? 0) + times);
   }
 
-  /** The refund transactions xMoney lists for one payment (D5's model). */
-  refundTransactionsOf(paymentId: string): XMoneyTransaction[] {
-    return [...this.transactions.values()].filter((transaction) =>
-      transaction.transactionType === "refund" && transaction.relatedTransactionIds.includes(paymentId));
+  /** The issuer country NETOPIA reports on this subscription's next saved-card charges (default: Romania). */
+  cardCountryFor(subscriptionId: string, iso2: string): void {
+    this.#countries.set(subscriptionId, iso2);
   }
 
-  async createCustomer(input?: Readonly<{ identifier: string }>): Promise<{ customerId: string }> {
-    this.customers += 1;
-    const customerId = this.reservedCustomers.shift() ?? this.next();
-    if (input !== undefined) this.customersByIdentifier.set(input.identifier, customerId);
-    return { customerId };
-  }
+  /** Saved-card charge calls made for this subscription, whatever their outcome. */
+  chargesFor(subscriptionId: string): number { return this.#calls.get(subscriptionId) ?? 0; }
 
-  /** The id the next `createCustomer` answers: a payment made before its checkout's customer exists names it. */
-  reserveCustomer(): string {
-    const customerId = this.next();
-    this.reservedCustomers.push(customerId);
-    return customerId;
-  }
+  /** Saved-card charges NETOPIA actually made for this subscription (PAID, or PAID with the answer lost). */
+  madeFor(subscriptionId: string): number { return this.#made.get(subscriptionId) ?? 0; }
 
-  /** An embedded order was signed for this merchant id and customer identifier (the harness's checkout reports it). */
-  signed(externalOrderId: string, customerIdentifier: string): void {
-    this.signedOrders.set(externalOrderId, customerIdentifier);
-  }
-
-  /** The xMoney customer whose signed order has this merchant id, when the stub created that customer. */
-  private customerOfOrder(externalOrderId: string): string | null {
-    const identifier = this.signedOrders.get(externalOrderId);
-    return identifier === undefined ? null : this.customersByIdentifier.get(identifier) ?? null;
-  }
-
-  async getTransaction(transactionId: string): Promise<XMoneyTransaction> {
-    const failing = this.lookupFailures.get(transactionId) ?? 0;
-    if (failing > 0) {
-      this.lookupFailures.set(transactionId, failing - 1);
-      throw new TypedDomainError("XMONEY_UNAVAILABLE", "connection refused");
-    }
-    const found = this.transactions.get(transactionId);
-    if (found === undefined) throw new TypedDomainError("XMONEY_REFUSED", "unknown transaction");
-    return found;
-  }
-
-  async getOrder(orderId: string): Promise<{ orderId: string; externalOrderId: string | null }> {
-    this.getOrderCalls += 1;
-    const found = this.orders.get(orderId);
-    if (found === undefined) throw new TypedDomainError("XMONEY_REFUSED", "unknown order");
-    return found;
-  }
-
-  async getCard(cardId: string, _customerId: string): Promise<{ cardId: string; countryCode: string | null }> {
-    return { cardId, countryCode: this.cards.get(cardId) ?? null };
-  }
-
-  async rebill(input: { orderId: string; customerId: string; amountDecimal: string }): Promise<{ transactionId: string; orderId: string }> {
-    this.rebillCalls += 1;
-    this.rebillsByOrder.set(input.orderId, this.rebillsFor(input.orderId) + 1);
-    const failure = this.rebillFailures.get(input.orderId) ?? null;
-    this.rebillFailures.delete(input.orderId);
-    if (failure !== null && !failure.afterCreate) throw new TypedDomainError(failure.code, failure.code);
-    const transaction = this.add({
-      orderId: input.orderId, externalOrderId: null, customerId: input.customerId, cardId: this.orderCards.get(input.orderId) ?? null, status: "complete-ok",
-      amountDecimal: input.amountDecimal, transactionSource: "re-bill"
+  /** A person paying a hosted payment (a checkout, an upgrade or a card check) on NETOPIA's page. */
+  pay(chargeId: string, input: Readonly<{ amountMicros: number; cardCountry: string | null }>): PaymentReport {
+    const report = stubPaymentReport(chargeId, input.amountMicros === 0 ? "AUTHORIZED" : "PAID", {
+      amountMicros: input.amountMicros, currency: "USD", cardCountry: input.cardCountry, occurredAt: this.clock()
     });
-    if (failure !== null) throw new TypedDomainError(failure.code, failure.code);
-    return { transactionId: transaction.transactionId, orderId: input.orderId };
+    this.reports.set(chargeId, report);
+    return report;
   }
 
-  async refund(input: { transactionId: string; amountDecimal: string | null; reason: string; message: string }): Promise<void> {
-    if (this.refundNotSent > 0) {
-      this.refundNotSent -= 1;
-      throw new TypedDomainError("XMONEY_UNAVAILABLE", "connection refused");
-    }
-    if (this.refundFailures > 0) {
-      this.refundFailures -= 1;
-      throw new TypedDomainError("XMONEY_OUTCOME_UNKNOWN", "timeout");
-    }
-    this.refunds.push({ transactionId: input.transactionId, amountDecimal: input.amountDecimal, reason: input.reason });
-    const found = this.transactions.get(input.transactionId);
-    if (found !== undefined) {
-      const paid = decimalToMicros(found.amountDecimal);
-      const before = this.refundedMicros.get(found.transactionId) ?? 0;
-      const amount = input.amountDecimal === null ? paid - before : decimalToMicros(input.amountDecimal);
-      this.refundedMicros.set(found.transactionId, before + amount);
-      if (!this.refundRowsHidden) {
-        this.add({
-          orderId: found.orderId, externalOrderId: null, customerId: found.customerId, cardId: found.cardId,
-          status: "complete-ok", amountDecimal: microsToDecimal(amount), transactionType: "refund", transactionSource: null,
-          relatedTransactionIds: Object.freeze([found.transactionId])
-        });
+  /** NETOPIA's status of a charge changes (a void, an admin refund, a charge-back): the amount and card are kept. */
+  setState(chargeId: string, state: PaymentState, overrides: Partial<PaymentReport> = {}): PaymentReport {
+    const current = this.reports.get(chargeId);
+    if (current === undefined) throw new Error("HARNESS_PAYMENT_UNKNOWN");
+    const report = stubPaymentReport(chargeId, state, {
+      providerPaymentId: current.providerPaymentId, amountMicros: current.amountMicros, currency: current.currency,
+      cardCountry: current.cardCountry, occurredAt: this.clock(), ...overrides
+    });
+    this.reports.set(chargeId, report);
+    return report;
+  }
+
+  async startHostedPayment(input: HostedPaymentStart): Promise<HostedPaymentStarted> {
+    this.hosted.push(input);
+    return Object.freeze({
+      providerPaymentId: `ntp-${input.orderId.slice(0, 12)}`,
+      redirectUrl: `https://secure-sandbox.netopia-payments.com/ui/card?p=${input.orderId}`
+    });
+  }
+
+  async chargeSavedCard(input: SavedCardCharge): Promise<PaymentReport> {
+    this.charges.push(input);
+    const subscriptionId = await this.subscriptionOf(input.orderId);
+    this.#calls.set(subscriptionId, this.chargesFor(subscriptionId) + 1);
+    const outcome = this.#outcomes.get(subscriptionId)?.shift() ?? "PAID";
+    const base = {
+      amountMicros: input.amountMicros, currency: input.currency, cardCountry: this.#countries.get(subscriptionId) ?? "RO",
+      occurredAt: this.clock()
+    };
+    const made = (): PaymentReport => {
+      this.#made.set(subscriptionId, this.madeFor(subscriptionId) + 1);
+      const report = stubPaymentReport(input.orderId, "PAID", base);
+      this.reports.set(input.orderId, report);
+      return report;
+    };
+    switch (outcome) {
+      case "PAID":
+        return made();
+      case "PAID_ANSWER_LOST":
+        made();
+        throw paymentError("PAYMENT_OUTCOME_UNKNOWN", "UND_ERR_SOCKET");
+      case "UNKNOWN_NOTHING_MADE":
+        throw paymentError("PAYMENT_OUTCOME_UNKNOWN", "UND_ERR_SOCKET");
+      case "UNAVAILABLE":
+        throw paymentError("PAYMENT_PROVIDER_UNAVAILABLE", "429");
+      case "CREDENTIALS":
+        throw paymentError("PAYMENT_CREDENTIALS_REFUSED", "401");
+      case "CONFIGURATION":
+        throw paymentError("PAYMENT_CONFIGURATION_REFUSED", "32");
+      case "PENDING":
+      case "DECLINED":
+      case "ACTION_REQUIRED": {
+        const report = stubPaymentReport(input.orderId, outcome, outcome === "DECLINED"
+          ? { ...base, declineCode: "20", declineSide: "CARD", bankDeclined: true }
+          : outcome === "ACTION_REQUIRED" ? { ...base, declineCode: "100" } : base);
+        this.reports.set(input.orderId, report);
+        return report;
       }
-      if (before + amount >= paid) this.setStatus(found.transactionId, "refund-ok");
-    }
-    if (this.refundLostResponses > 0) {
-      this.refundLostResponses -= 1;
-      throw new TypedDomainError("XMONEY_OUTCOME_UNKNOWN", "the refund was made, the answer was lost");
+      default:
+        return exhaustive(outcome);
     }
   }
 
-  /** A2/A10's listing: by order and by creation time, both at xMoney's whole-second precision. */
-  async listTransactions(input: Readonly<{
-    orderId?: string; from?: Date; to?: Date; dateType?: string; onRejected?: (transactionId: string | null) => void;
-  }>): Promise<ReadonlyArray<XMoneyTransaction>> {
-    const from = input.from === undefined ? null : wholeSecond(input.from).getTime();
-    const to = input.to === undefined ? null : wholeSecond(input.to).getTime() + 999;
-    return [...this.transactions.values()].filter((transaction) => {
-      if (input.orderId !== undefined && transaction.orderId !== input.orderId) return false;
-      const created = transaction.createdAt?.getTime() ?? null;
-      if (created === null) return true;
-      return (from === null || created >= from) && (to === null || created <= to);
-    });
-  }
-
-  /**
-   * A person paying in the embedded form for the order whose merchant id is `externalOrderId`. The transaction carries
-   * no merchant id (A1); its customer is `customerId`, else the one the signed order names, else a stranger.
-   */
-  pay(input: Readonly<{
-    externalOrderId: string; amountDecimal: string; cardCountry: string | null; status?: XMoneyStatus;
-    customerId?: string; transactionType?: string;
-  }>): XMoneyTransaction {
-    let order = [...this.orders.values()].find((candidate) => candidate.externalOrderId === input.externalOrderId);
-    if (order === undefined) {
-      order = Object.freeze({ orderId: this.next(), externalOrderId: input.externalOrderId });
-      this.orders.set(order.orderId, order);
+  async status(input: Readonly<{ orderId: string; providerPaymentId: string | null }>): Promise<PaymentReport | "NO_SUCH_ORDER"> {
+    const failing = this.#statusFailures.get(input.orderId) ?? 0;
+    if (failing > 0) {
+      this.#statusFailures.set(input.orderId, failing - 1);
+      throw paymentError("PAYMENT_PROVIDER_UNAVAILABLE", "429");
     }
-    const cardId = this.orderCards.get(order.orderId) ?? this.next();
-    this.cards.set(cardId, input.cardCountry);
-    this.orderCards.set(order.orderId, cardId);
-    return this.add({
-      orderId: order.orderId, externalOrderId: null,
-      customerId: input.customerId ?? this.customerOfOrder(input.externalOrderId) ?? "9999",
-      cardId, status: input.status ?? "complete-ok", amountDecimal: input.amountDecimal,
-      ...(input.transactionType === undefined ? {} : { transactionType: input.transactionType })
-    });
-  }
-
-  /**
-   * A dispute xMoney reports as its own `chargeback` transaction naming the payment (P3b's fake's model, P2-I2), on
-   * the payment's order, customer and card, for its amount. Only the new transaction: the payment's own status is
-   * left as it is (`setStatus` it to `charge-back` for the case where xMoney reports both).
-   */
-  dispute(paymentId: string, status: XMoneyStatus = "charge-back", transactionType = "chargeback"): XMoneyTransaction {
-    const payment = this.transactions.get(paymentId);
-    if (payment === undefined) throw new Error("STUB_TRANSACTION_UNKNOWN");
-    return this.add({
-      orderId: payment.orderId, externalOrderId: null, customerId: payment.customerId, cardId: payment.cardId, status,
-      amountDecimal: payment.amountDecimal, transactionType, relatedTransactionIds: Object.freeze([paymentId])
-    });
-  }
-
-  setStatus(transactionId: string, status: XMoneyStatus): void {
-    const found = this.transactions.get(transactionId);
-    if (found === undefined) throw new Error("STUB_TRANSACTION_UNKNOWN");
-    this.transactions.set(transactionId, Object.freeze({ ...found, status }));
-  }
-
-  rebillsFor(orderId: string): number { return this.rebillsByOrder.get(orderId) ?? 0; }
-
-  /**
-   * The next rebill of this xMoney order fails with `code`. `afterCreate`: the transaction IS created, but the
-   * caller sees the error (a lost response).
-   */
-  failNextRebill(orderId: string, code: string, afterCreate = false): void {
-    this.rebillFailures.set(orderId, Object.freeze({ code, afterCreate }));
+    return this.reports.get(input.orderId) ?? "NO_SUCH_ORDER";
   }
 }
+
+function exhaustive(value: never): never {
+  throw new Error(`HARNESS_UNEXPECTED_OUTCOME:${String(value)}`);
+}
+
+/** The payer's current address (W8), as DekBillingRecipientReader answers for an account still standing. */
+const HARNESS_PAYERS: BillingRecipientReader = Object.freeze({
+  currentAddress: async (customerId: string) => `payer-${customerId.slice(0, 8)}@example.test`
+});
 
 export type Purchase = Readonly<{
   ownerRef: string; userId: string; quoteId: string; chargeId: string; subscriptionId: string;
@@ -308,9 +218,8 @@ export type Purchase = Readonly<{
 export type BillingHarness = Readonly<{
   database: TestDatabase;
   recordsKey: Buffer;
-  xmoneyPrivateKey: Buffer;
   clock: MutableClock;
-  xmoney: StubXMoney;
+  payments: HarnessPayments;
   tax: AdjustableTaxEngine;
   geo: StubGeo;
   repository: BillingRepository;
@@ -331,15 +240,14 @@ export type BillingHarness = Readonly<{
   refunds: RefundDesk;
   verify: VerifyPaymentHandler;
   worker: BillingOutboxWorker;
-  notices: NoticeIntake;
-  /**
-   * An opaque "opensslResult" that the harness's notice intake decrypts to this transaction's notice. Like xMoney's,
-   * the notice names the order's merchant id; `overrides` forge fields (a notice is not authenticated, spec §2.1).
-   */
-  noticeFor(transaction: XMoneyTransaction, overrides?: Partial<XMoneyNotice>): string;
-  /** Enqueues VERIFY_PAYMENT for a transaction, as a notice or a rebill would, and drains the worker. */
-  settle(transactionId: string, payload?: Readonly<Record<string, string | null>>): Promise<void>;
-  activate(input?: Parameters<BillingHarness["buy"]>[0] & Readonly<{ cardCountry?: string }>): Promise<Purchase & Readonly<{ transaction: XMoneyTransaction }>>;
+  /** Enqueues VERIFY_PAYMENT as NETOPIA's message or a charge's answer would (ref = our charge id), and drains the worker. */
+  settle(chargeId: string, payload?: Readonly<Record<string, string | null>>): Promise<void>;
+  /** Stores the card a payment of this charge saved, as N9's intake stores a message's token. Returns its id. */
+  storeCardToken(chargeId: string, input?: Readonly<{ cardCountry?: string; expYear?: number; paidAt?: Date }>): Promise<string>;
+  /** `buy`, the card the first payment saved, NETOPIA's PAID status, then VERIFY_PAYMENT. */
+  activate(input?: Parameters<BillingHarness["buy"]>[0] & Readonly<{ cardCountry?: string }>): Promise<Purchase & Readonly<{ payment: PaymentReport; cardTokenId: string }>>;
+  /** The refunds handed to the owner for this charge (O2_REFUND_DUE, spec §2.12.2), oldest first. */
+  ownerRefundsDue(chargeId: string): Promise<Array<Readonly<{ refundAmount: string; refundReason: string; whole: string }>>>;
   outboxRows(ref: string): Promise<Array<Readonly<{ kind: string; ref: string; done: boolean; dead: boolean; lastErrorCode: string | null; notBefore: Date; payload: Readonly<Record<string, unknown>> }>>>;
   entitlementRows(ownerRef: string): Promise<Array<Readonly<{ planId: string; cause: string; paidThrough: Date | null }>>>;
   /** The charge's event kinds as a sorted multiset: events written in one transaction share one instant. */
@@ -372,22 +280,31 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   const database = await startTestDatabase();
   await migrate(database.pool);
   const recordsKey = randomBytes(32);
-  const xmoneyPrivateKey = randomBytes(32);
   const clock = new MutableClock(start);
-  const xmoney = new StubXMoney(clock.read);
   const tax = new AdjustableTaxEngine();
   const geo = new StubGeo();
   const repository = new BillingRepository(database.pool);
   const jobs = new BillingJobQueries(database.pool);
   const entitlements = new EntitlementRepository(database.pool);
   const acceptances = new AcceptanceRepository(database.pool);
+  const payments = new HarnessPayments(clock.read, async (chargeId) => {
+    const charge = await repository.charge(chargeId);
+    if (charge === null) throw new Error("HARNESS_CHARGE_MISSING");
+    return charge.subscriptionId;
+  });
+  /** N10, N11, N14 (skeleton §1 rule 2): what the NETOPIA paths of VERIFY_PAYMENT, the renewal and RefundDesk need. */
+  const netopiaPort = Object.freeze({ payments, paymentEnvironment: "sandbox" as const, jobs });
+  /** Until N23: the xMoney deps member the not-yet-cleaned services still type; every call fails before any byte. */
+  const noXMoney = async (): Promise<never> => { throw new Error("HARNESS_HAS_NO_XMONEY"); };
+  const NO_XMONEY = Object.freeze({
+    getTransaction: noXMoney, getOrder: noXMoney, getCard: noXMoney, refund: noXMoney, listTransactions: noXMoney,
+    rebill: noXMoney, createCustomer: noXMoney
+  });
   const auditLines: Array<Readonly<Record<string, unknown>>> = [];
   const audit: BillingAudit = (event, fields) => { auditLines.push(Object.freeze({ event, ...fields })); };
   const quotes = new QuoteService({
     repository, tax, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy, plans: testBillingPlans, recordsKey, audit
   });
-  // N18: the checkout starts NETOPIA's page; N24 moves the rest of this harness onto NETOPIA.
-  const payments = new StubCardPayments();
   const checkoutDeps: CheckoutDeps = {
     repository, jobs, acceptances, payments, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
     accountEmail: { read: async (userId: string) => `buyer-${userId.slice(0, 8)}@example.test` },
@@ -397,11 +314,12 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     new CheckoutService({ ...checkoutDeps, ...overrides } as CheckoutDeps);
   const checkout = checkoutWith({});
   const refunds = new RefundDesk({
-    repository, jobs, xmoney, policy: testBillingPolicy, audit, clock: clock.read, xmoneyEnvironment: "stage"
+    repository, jobs, xmoney: NO_XMONEY as never, policy: testBillingPolicy, audit, clock: clock.read, xmoneyEnvironment: "stage",
+    netopia: netopiaPort
   });
   const verify = new VerifyPaymentHandler({
-    repository, jobs, xmoney, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy, recordsKey, audit,
-    xmoneyEnvironment: "stage"
+    repository, jobs, xmoney: NO_XMONEY as never, refunds, entitlements, countryPolicy: testCountryPolicy,
+    policy: testBillingPolicy, recordsKey, audit, xmoneyEnvironment: "stage", netopia: netopiaPort
   });
   verify.registerSettlement("INITIAL", createInitialSettlement({
     repository, entitlements, acceptances, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL
@@ -416,8 +334,9 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     repository: pool === null ? repository : new BillingRepository(pool),
     jobs: pool === null ? jobs : new BillingJobQueries(pool),
     entitlements: pool === null ? entitlements : new EntitlementRepository(pool),
-    xmoney, tax, settlement: renewalSettlement, policy: testBillingPolicy, plans: testBillingPlans, recordsKey,
-    publicAppUrl: TEST_PUBLIC_APP_URL, audit, clock: clock.read, kick: () => undefined, xmoneyEnvironment: "stage",
+    xmoney: NO_XMONEY as never, tax, settlement: renewalSettlement, policy: testBillingPolicy, plans: testBillingPlans,
+    recordsKey, publicAppUrl: TEST_PUBLIC_APP_URL, audit, clock: clock.read, kick: () => undefined, xmoneyEnvironment: "stage",
+    netopia: { payments, paymentEnvironment: "sandbox", recipients: HARNESS_PAYERS, orderText: englishOrderText },
     erasurePending: async (ownerRef) => erasures.has(ownerRef) || frozen.has(ownerRef)
   });
   const renewalOn = (pool: Pool | null): RenewalService => new RenewalService(renewalDeps(pool));
@@ -425,12 +344,13 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   const worker = new BillingOutboxWorker({ repository, workerId: "harness", clock: clock.read, audit, batchSize: 20 });
   worker.register("VERIFY_PAYMENT", verify.handle);
   worker.register("XMONEY_REFUND", refunds.handle);
+  worker.register("PAYMENT_REFUND", refunds.handle);
   const maintenance = new BillingMaintenance({
     repository, jobs, entitlements, renewal, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL,
-    xmoneyEnvironment: "stage", audit, clock: clock.read
+    xmoneyEnvironment: "stage", paymentEnvironment: "sandbox", audit, clock: clock.read
   });
   worker.register("RENEWAL_NOTICE", createRenewalNoticeHandler({
-    repository, jobs, renewal, policy: testBillingPolicy, xmoneyEnvironment: "stage", audit
+    repository, jobs, renewal, policy: testBillingPolicy, xmoneyEnvironment: "stage", paymentEnvironment: "sandbox", audit
   }));
   const sentMail: BillingMail[] = [];
   const mailWorker = new BillingOutboxWorker({ repository, workerId: "harness-mail", clock: clock.read, audit, batchSize: 20 });
@@ -444,21 +364,12 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     sent: (job, now) => renewal.noticeMailSent(job, now)
   }));
   const mail = Object.freeze({ sent: sentMail, drain: () => mailWorker.drain(10) });
-  const noticeTokens = new Map<string, XMoneyNotice>();
-  const notices = new NoticeIntake({
-    repository, audit, clock: clock.read, kick: () => undefined, xmoneyEnvironment: "stage",
-    decrypt: (token) => {
-      const notice = noticeTokens.get(token);
-      if (notice === undefined) throw new Error("UNDECRYPTABLE");
-      return notice;
-    }
-  });
   /** A quote service under another `billingPlans` version (a price published later; P11a's price test). */
   const quotesWith = (plans: BillingPlans): QuoteService => new QuoteService({
     repository, tax, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy, plans, recordsKey, audit
   });
   return Object.freeze({
-    database, recordsKey, xmoneyPrivateKey, clock, xmoney, tax, geo, repository, jobs, entitlements, acceptances,
+    database, recordsKey, clock, payments, tax, geo, repository, jobs, entitlements, acceptances,
     audit, auditLines, quotes, quotesWith, checkoutWith,
     async buy(input = {}) {
       const ownerRef = input.ownerRef ?? randomUUID();
@@ -490,7 +401,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
         totalDecimal: microsToDecimal(charge.totalMicros), redirectUrl: started.redirectUrl, reused: started.reused
       });
     },
-    refunds, verify, worker, notices, mail,
+    refunds, verify, worker, mail,
     renewal, maintenance, erasures, frozen,
     renewalFor: (pool) => renewalOn(pool),
     renewalWith: (overrides) => new RenewalService({ ...renewalDeps(null), ...overrides }),
@@ -499,27 +410,49 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       if (end === null) throw new Error("HARNESS_NO_PERIOD");
       return end;
     },
-    noticeFor(transaction, overrides = {}) {
-      const token = `notice-${randomUUID()}`;
-      noticeTokens.set(token, Object.freeze({
-        transactionStatus: transaction.status, orderId: transaction.orderId,
-        externalOrderId: xmoney.orders.get(transaction.orderId)?.externalOrderId ?? null,
-        transactionId: transaction.transactionId, customerId: transaction.customerId, amountDecimal: transaction.amountDecimal,
-        currency: transaction.currency, cardId: transaction.cardId, timestamp: null, ...overrides
-      }));
-      return token;
-    },
-    async settle(transactionId, payload = {}) {
+    async settle(chargeId, payload = {}) {
       await repository.withTransaction((client) => repository.enqueue(client, {
-        kind: "VERIFY_PAYMENT", ref: transactionId, notBefore: clock.now, payload
+        kind: "VERIFY_PAYMENT", ref: chargeId, notBefore: clock.now, payload: { charge_id: chargeId, ...payload }
       }));
       await worker.drain(10);
     },
+    async storeCardToken(chargeId, input = {}) {
+      const charge = await repository.charge(chargeId);
+      if (charge === null) throw new Error("HARNESS_CHARGE_MISSING");
+      const customer = await repository.customerByOwner(charge.ownerRef);
+      if (customer === null) throw new Error("HARNESS_CUSTOMER_MISSING");
+      const tokenId = randomUUID();
+      const paidAt = input.paidAt ?? clock.now;
+      // Built from pieces: never a key-like literal (spec §2.2 rule 2).
+      const sealed = sealCardToken(recordsKey, tokenId, testCardToken(["harness", "tok", tokenId.slice(0, 8)].join("-")));
+      await repository.withTransaction((client) => repository.insertCardToken(client, {
+        tokenId, customerId: customer.customerId, paymentProvider: "netopia", paymentEnvironment: "sandbox",
+        sourceChargeId: chargeId, sourceToolOrder: null, sourceNoticeId: null, sourcePaidAt: paidAt,
+        tokenCiphertext: sealed.ciphertext, keyId: sealed.keyId, expMonth: 12,
+        expYear: input.expYear ?? paidAt.getUTCFullYear() + 3, last4: "4242", cardCountry: input.cardCountry ?? "RO",
+        createdAt: paidAt
+      }));
+      return tokenId;
+    },
     async activate(input = {}) {
       const bought = await this.buy(input);
-      const transaction = xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: input.cardCountry ?? "RO" });
-      await this.settle(transaction.transactionId);
-      return Object.freeze({ ...bought, transaction });
+      const charge = await repository.charge(bought.chargeId);
+      if (charge === null) throw new Error("HARNESS_CHARGE_MISSING");
+      const cardCountry = input.cardCountry ?? "RO";
+      const cardTokenId = await this.storeCardToken(bought.chargeId, { cardCountry });
+      const payment = payments.pay(bought.chargeId, { amountMicros: charge.totalMicros, cardCountry });
+      await this.settle(bought.chargeId);
+      return Object.freeze({ ...bought, payment, cardTokenId });
+    },
+    async ownerRefundsDue(chargeId) {
+      const found = await database.pool.query<{ amount: string; reason: string; whole: string }>(`
+        SELECT payload->>'param.refundAmount' AS amount, payload->>'param.refundReason' AS reason,
+          payload->>'param.whole' AS whole
+        FROM billing.outbox WHERE kind = 'EMAIL' AND payload->>'template' = 'O2_REFUND_DUE'
+          AND payload->>'param.chargeRef' = $1
+        ORDER BY created_at
+      `, [chargeId]);
+      return found.rows.map((row) => Object.freeze({ refundAmount: row.amount, refundReason: row.reason, whole: row.whole }));
     },
     async outboxRows(ref) {
       const result = await database.pool.query<{ kind: string; ref: string; done_at: Date | null; dead_at: Date | null; last_error_code: string | null; not_before: Date; payload: Record<string, unknown> }>(

@@ -26,7 +26,7 @@ export type FakeNetopiaOptions = Readonly<{
 }>;
 export type FakeNetopiaOrder = Readonly<{
   orderId: string; ntpId: string; amountText: string; currency: string; clientId: string | null; tokenPayment: boolean;
-  status: number; notifyUrl: string; returnUrl: string; token: string | null; refundedMicros: number; updatedAt: Date;
+  status: number; notifyUrl: string; returnUrl: string; token: string | null; refundedMicros: number; cardCountry: number; updatedAt: Date;
 }>;
 export type FakeNetopiaRequest = Readonly<{ route: FakeNetopiaRoute | "UNKNOWN"; path: string; authorization: string | null; bodyText: string }>;
 export type FakeNetopiaDelivery = Readonly<{ orderId: string; status: number; httpStatus: number; responseText: string; lost: boolean }>;
@@ -35,7 +35,8 @@ export type FakeNetopia = Readonly<{
   readonly orders: ReadonlyMap<string, FakeNetopiaOrder>;
   readonly lastRequests: ReadonlyArray<FakeNetopiaRequest>;
   pendingNotices(): number;
-  pay(orderId: string, outcome: FakeNetopiaOutcome, code?: string): void;
+  /** `cardCountry`: NETOPIA's numeric issuer country this payment was made with (default: the fake's `cardCountry`). */
+  pay(orderId: string, outcome: FakeNetopiaOutcome, code?: string, cardCountry?: number): void;
   nextCharge(outcome: FakeNetopiaChargeOutcome, code?: string): void;
   deliverNotices(notifyUrl?: string): Promise<ReadonlyArray<FakeNetopiaDelivery>>;
   resendLastNotice(orderId: string, notifyUrl?: string): Promise<FakeNetopiaDelivery>;
@@ -50,7 +51,7 @@ export type FakeNetopia = Readonly<{
 
 type Order = {
   orderId: string; ntpId: string; amountText: string; currency: string; clientId: string | null; tokenPayment: boolean;
-  status: number; notifyUrl: string; returnUrl: string; token: string | null; refundedMicros: number; updatedAt: Date;
+  status: number; notifyUrl: string; returnUrl: string; token: string | null; refundedMicros: number; cardCountry: number; updatedAt: Date;
 };
 type Notice = Readonly<{ orderId: string; status: number; bodyText: string }>;
 type Result = Readonly<{ status: number; text: string }>;
@@ -163,8 +164,8 @@ export async function startFakeNetopia(options: FakeNetopiaOptions = {}): Promis
   const operationDate = (order: Order): string => (order.status === 1 ? "0001-01-01T00:00:00" : order.updatedAt.toISOString());
 
   /** The card members of a payment: the token where `tokenAt` puts it, the card's expiry, its masked number and country. */
-  const cardMembers = (token: string | null): Record<string, unknown> => {
-    const instrument = { panMasked: "9****5098", country: cardCountry };
+  const cardMembers = (country: number, token: string | null): Record<string, unknown> => {
+    const instrument = { panMasked: "9****5098", country };
     const expiry = { expireMonth: 12, expireYear: 2030 };
     if (token === null) return { instrument };
     if (tokenAt === "binding") return { binding: { token, ...expiry }, instrument };
@@ -176,7 +177,7 @@ export async function startFakeNetopia(options: FakeNetopiaOptions = {}): Promis
 
   const queueNotice = (order: Order, token: string | null, code: string, message: string): void => {
     const body = {
-      payment: { ...paymentMembers(order), ...cardMembers(token), code, message, operationDate: operationDate(order) },
+      payment: { ...paymentMembers(order), ...cardMembers(order.cardCountry, token), code, message, operationDate: operationDate(order) },
       order: { orderID: order.orderId }
     };
     queue.push(Object.freeze({ orderId: order.orderId, status: order.status, bodyText: withAmount(body, order.amountText) }));
@@ -215,7 +216,7 @@ export async function startFakeNetopia(options: FakeNetopiaOptions = {}): Promis
     const created: Order = {
       orderId: String(order.orderID), ntpId: nextNtpId(), amountText: String(order.amount), currency: String(order.currency),
       clientId: tokenPayment ? null : clientId, tokenPayment, status: 1, notifyUrl: String(config.notifyUrl),
-      returnUrl: String(config.redirectUrl), token: null, refundedMicros: 0, updatedAt: clock()
+      returnUrl: String(config.redirectUrl), token: null, refundedMicros: 0, cardCountry, updatedAt: clock()
     };
     orders.set(created.orderId, created);
     return created;
@@ -264,7 +265,7 @@ export async function startFakeNetopia(options: FakeNetopiaOptions = {}): Promis
     queueNotice(created, created.token, "00", APPROVED_MESSAGE);
     return { status: 200, text: withAmount({
       error: { code: "00", message: "Approved" },
-      payment: { ...paymentMembers(created), ...cardMembers(created.token), operationDate: operationDate(created) },
+      payment: { ...paymentMembers(created), ...cardMembers(created.cardCountry, created.token), operationDate: operationDate(created) },
       order: { orderID: created.orderId }
     }, created.amountText) };
   };
@@ -280,7 +281,7 @@ export async function startFakeNetopia(options: FakeNetopiaOptions = {}): Promis
       merchant: { posID: 1, posName: "fake" }, card: {}, error: { code: "00", message: "OK" },
       payment: { ...paymentMembers(order), operationDate: operationDate(order),
         binding: { expireMonth: order.token === null ? 0 : 12, expireYear: order.token === null ? 0 : 2030 },
-        instrument: { panMasked: touched ? "9****5098" : "", country: touched ? cardCountry : 0 } },
+        instrument: { panMasked: touched ? "9****5098" : "", country: touched ? order.cardCountry : 0 } },
       order: { orderID: order.orderId, ...(order.clientId === null ? {} : { clientID: order.clientId }) }
     }, order.amountText) };
   };
@@ -348,9 +349,13 @@ export async function startFakeNetopia(options: FakeNetopiaOptions = {}): Promis
       return Object.freeze([...requests]);
     },
     pendingNotices: () => queue.length,
-    pay(orderId: string, outcome: FakeNetopiaOutcome, code?: string) {
+    pay(orderId: string, outcome: FakeNetopiaOutcome, code?: string, country?: number) {
       const order = orderOf(orderId);
       if (order.tokenPayment) throw new TypeError("FAKE_NETOPIA_NOT_A_PAGE_ORDER");
+      if (country !== undefined) {
+        if (!Number.isInteger(country) || country < 1 || country > 999) throw new TypeError("FAKE_NETOPIA_COUNTRY_INVALID");
+        order.cardCountry = country;
+      }
       order.updatedAt = clock();
       if (outcome === "DECLINE") {
         order.status = 12;

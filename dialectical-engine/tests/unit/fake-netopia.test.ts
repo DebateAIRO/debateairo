@@ -163,6 +163,23 @@ describe("N5 — the fake's hosted payments, through the real client (spec §2.2
     expect((await post({ config: {}, payment: {}, order: {} })).status).toBe(400);
     expect((await post({}, "/nowhere")).status).toBe(404);
   });
+
+  it("N24: names the issuer country the page payment was made with, in the message and in the status read", async () => {
+    const { fake, sink, payments, startOf } = await setup();
+    const orderId = hex();
+    const started = await payments.startHostedPayment(startOf(orderId));
+    fake.pay(orderId, "APPROVE", undefined, 643);
+    await fake.deliverNotices();
+    expect(JSON.parse(sink.received[0]!.rawBody.toString("utf8")).payment.instrument.country).toBe(643);
+    expect(await payments.status({ orderId, providerPaymentId: started.providerPaymentId })).toMatchObject({ state: "PAID", cardCountry: "RU" });
+    // An order paid without a country keeps the fake's own (Romania, 642).
+    const other = hex();
+    await payments.startHostedPayment(startOf(other));
+    fake.pay(other, "APPROVE");
+    await fake.deliverNotices();
+    expect(JSON.parse(sink.received[1]!.rawBody.toString("utf8")).payment.instrument.country).toBe(642);
+    expect(() => fake.pay(other, "APPROVE", undefined, 0)).toThrow("FAKE_NETOPIA_COUNTRY_INVALID");
+  });
 });
 
 describe("N5 — saved-card charges (spec §2.4.2, §2.9)", () => {

@@ -5,7 +5,6 @@ import { startBillingHarness, type BillingHarness } from "../support/billingHarn
 import { testBillingPlans } from "../support/billingFixtures.js";
 import { subscriptionDeps, testAgreement } from "../support/billingSubscriptionFixtures.js";
 import { renewalLeadMs } from "../../apps/api/src/billing/renewal-rules.js";
-import { chargeEvent } from "../../apps/api/src/billing/rows.js";
 import { createUpgradeSettlement, quoteUpgrade, startUpgrade } from "../../apps/api/src/billing/upgrade.js";
 
 let h: BillingHarness;
@@ -21,18 +20,21 @@ const MINUTE = 60_000;
 const DAY = 86_400_000;
 const IP = "198.51.100.7";
 const deps = () => subscriptionDeps(h.database.pool, {
-  recordsKey: h.recordsKey, tax: h.tax, xmoney: h.xmoney, geo: h.geo, clock: h.clock.read
+  recordsKey: h.recordsKey, tax: h.tax, payments: h.payments, geo: h.geo, clock: h.clock.read
 });
-/**
- * N12's upgrade input (the card-saving agreement and the request's source). This suite still runs xMoney's
- * `h.activate()`, so its upgrades answer NOT_SUBSCRIBED until N24 moves it to NETOPIA (the red ledger).
- */
+/** N12's upgrade input (the card-saving agreement and the request's source): NETOPIA's page for the prorated total. */
 const upgradeInput = (ownerRef: string, planId: "PRO" | "MAX", quoteRef: string) => ({
   ownerRef, userId: randomUUID(), planId, quoteRef, ip: IP, userAgent: "p12c-renewal", locale: "en",
   agreement: testAgreement("en")!
 });
 const renewalCharges = async (subscriptionId: string) =>
   (await h.repository.chargesForSubscription(subscriptionId)).filter((charge) => charge.kind === "RENEWAL");
+/** The person pays the upgrade on NETOPIA's page: the card it saved, and NETOPIA's PAID status (no VERIFY_PAYMENT yet). */
+async function payUpgradePage(chargeId: string) {
+  const charge = (await h.repository.charge(chargeId))!;
+  await h.storeCardToken(chargeId);
+  return h.payments.pay(chargeId, { amountMicros: charge.totalMicros, cardCountry: "RO" });
+}
 
 describe("P12c an upgrade and a renewal are never open together", () => {
   it("holds the renewal back while an upgrade waits for its payment, then renews at the upgraded plan without M3", async () => {
@@ -40,12 +42,14 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     const end = await h.periodEndOf(paid.subscriptionId);
     h.clock.now = new Date(end.getTime() - 10 * MINUTE);
     const quoted = await quoteUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", ip: IP, now: h.clock.now });
-    expect(await startUpgrade(deps(), upgradeInput(paid.ownerRef, "MAX", quoted.quote_ref)))
-      .toMatchObject({ state: "PENDING" });
+    const started = await startUpgrade(deps(), upgradeInput(paid.ownerRef, "MAX", quoted.quote_ref));
+    expect(started.redirect_url).toMatch(/^https:\/\/secure-sandbox\.netopia-payments\.com\//u);
     h.clock.now = new Date(end.getTime() - MINUTE);
     await h.renewal.runOnce();
     expect(await renewalCharges(paid.subscriptionId)).toEqual([]);
-    await h.worker.drain(10);
+    // The person pays on NETOPIA's page; its message brings VERIFY_PAYMENT.
+    await payUpgradePage(started.charge_ref);
+    await h.settle(started.charge_ref);
     expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).planId).toBe("MAX");
     await h.renewal.runOnce();
     const renewals = await renewalCharges(paid.subscriptionId);
@@ -62,10 +66,9 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     const end = await h.periodEndOf(paid.subscriptionId);
     h.clock.now = new Date(end.getTime() - 10 * MINUTE);
     const quoted = await quoteUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", ip: IP, now: h.clock.now });
-    // The rebill reached xMoney but its answer was lost: SUBMIT_UNKNOWN, which only an adoption can settle.
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN", true);
-    expect(await startUpgrade(deps(), upgradeInput(paid.ownerRef, "MAX", quoted.quote_ref)))
-      .toMatchObject({ state: "PENDING" });
+    // The person pays on NETOPIA's page, but NETOPIA's message is lost: only a status read can settle it.
+    const started = await startUpgrade(deps(), upgradeInput(paid.ownerRef, "MAX", quoted.quote_ref));
+    await payUpgradePage(started.charge_ref);
     // Inside the lead the renewal waits for the upgrade, and the hold is written before the period end.
     h.clock.now = new Date(end.getTime() - 2 * MINUTE);
     await h.renewal.runOnce();
@@ -77,20 +80,14 @@ describe("P12c an upgrade and a renewal are never open together", () => {
       planId: "PLUS", cause: "RENEWAL_PENDING", lapsed: false
     });
     expect((await h.entitlementRows(paid.ownerRef)).filter((row) => row.cause === "RENEWAL_PENDING")).toHaveLength(1);
-    // P14a's adoption (built later) links the lost payment and hands it to VERIFY_PAYMENT; done here the same way.
+    // N16's status read (the reconciler's, which this harness does not run) finds the upgrade PAID and hands it to
+    // VERIFY_PAYMENT; done here the same way, keyed by the upgrade charge's own report.
     h.clock.now = new Date(end.getTime() + 40 * MINUTE);
     const upgrade = (await h.repository.chargesForSubscription(paid.subscriptionId)).find((row) => row.kind === "UPGRADE")!;
-    const lost = (await h.xmoney.listTransactions({ orderId: paid.transaction.orderId, from: upgrade.createdAt }))
-      .find((transaction) => transaction.transactionSource === "re-bill")!;
-    await h.repository.withTransaction(async (client) => {
-      await h.repository.appendChargeEvent(client, chargeEvent(upgrade.chargeId, "SUBMITTED", h.clock.now, {
-        providerPaymentId: lost.transactionId, amountMicros: upgrade.totalMicros, errorCode: null
-      }));
-      await h.repository.enqueue(client, {
-        kind: "VERIFY_PAYMENT", ref: lost.transactionId, notBefore: h.clock.now, payload: { charge_id: upgrade.chargeId }
-      });
-    });
-    await h.worker.drain(10);
+    const lost = h.payments.reports.get(upgrade.chargeId)!;
+    expect((await h.repository.charge(upgrade.chargeId))!.events.find((event) => event.kind === "SUBMITTED"))
+      .toMatchObject({ providerPaymentId: lost.providerPaymentId });
+    await h.settle(upgrade.chargeId);
     expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).planId).toBe("MAX");
     // Without `upgradedPaidThrough` this reads FREE: the UPGRADED row would be paid only through the period end.
     expect(await h.entitlements.current(paid.ownerRef, h.clock.now)).toMatchObject({ planId: "MAX", lapsed: false });
@@ -129,9 +126,10 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     const plusTotal = foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).announcedTotalMicros;
     h.clock.now = new Date(end.getTime() - 2 * DAY);
     const quoted = await quoteUpgrade(deps(), { ownerRef: paid.ownerRef, planId: "MAX", ip: IP, now: h.clock.now });
-    expect(await startUpgrade(deps(), upgradeInput(paid.ownerRef, "MAX", quoted.quote_ref)))
-      .toMatchObject({ state: "PENDING" });
-    // The upgrade stays SUBMITTED (no drain). A day later it no longer holds the renewal, priced at the old plan.
+    const started = await startUpgrade(deps(), upgradeInput(paid.ownerRef, "MAX", quoted.quote_ref));
+    // The person pays on NETOPIA's page, but no VERIFY_PAYMENT runs yet. A day later the upgrade no longer holds the
+    // renewal, which is priced at the old plan.
+    await payUpgradePage(started.charge_ref);
     h.clock.now = new Date(end.getTime() - MINUTE);
     await h.renewal.runOnce();
     const renewals = await renewalCharges(paid.subscriptionId);
@@ -140,7 +138,11 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     // The upgrade's payment verified now, before RENEWED moved the period: as P9b's VERIFY_PAYMENT calls it.
     const upgrade = (await h.repository.chargesForSubscription(paid.subscriptionId)).find((row) => row.kind === "UPGRADE")!;
     const read = (await h.repository.charge(upgrade.chargeId))!;
-    const transaction = h.xmoney.transactions.get(read.events.find((event) => event.kind === "SUBMITTED")!.providerPaymentId!)!;
+    const report = h.payments.reports.get(read.chargeId)!;
+    const payment = Object.freeze({
+      provider: "netopia" as const, providerPaymentId: report.providerPaymentId, occurredAt: report.occurredAt,
+      cardCountry: report.cardCountry, cardTokenId: null
+    });
     const quote = (await h.repository.quote(upgrade.quoteId!, paid.ownerRef))!;
     const customer = (await h.repository.customerByOwner(paid.ownerRef))!;
     const rowsBefore = (await h.entitlementRows(paid.ownerRef)).length;
@@ -148,7 +150,7 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     const result = await h.repository.withTransaction(async (client) => {
       const events = await h.repository.subscriptionEvents(paid.subscriptionId, client);
       return settlement.succeeded({
-        client, now: h.clock.now, charge: upgrade, transaction, payment: null, subscription: foldSubscription(events), events, quote,
+        client, now: h.clock.now, charge: upgrade, transaction: null, payment, subscription: foldSubscription(events), events, quote,
         ownerRef: paid.ownerRef, customerId: customer.customerId, cardCountry: "RO"
       });
     });
@@ -156,7 +158,7 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     expect((await h.repository.subscriptionEvents(paid.subscriptionId)).some((event) => event.kind === "UPGRADED")).toBe(false);
     expect(await h.entitlementRows(paid.ownerRef)).toHaveLength(rowsBefore);
     // The real VERIFY_PAYMENT jobs: the renewal settles at PLUS, the upgrade goes back in full through RefundDesk.
-    await h.worker.drain(10);
+    await h.settle(upgrade.chargeId);
     const after = await h.repository.subscriptionEvents(paid.subscriptionId);
     expect(after.at(-1)?.kind).toBe("RENEWED");
     expect(foldSubscription(after).planId).toBe("PLUS");

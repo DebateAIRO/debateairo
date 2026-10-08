@@ -71,7 +71,7 @@ describe("P6b — development billing fakes", () => {
     const first = await startDevelopmentBillingFakes({ repositoryRoot, commandEnvironment: {}, profile });
     let key: string;
     try {
-      const keyPath = first.receipt.xmoney.privateKeyPath;
+      const keyPath = first.receipt.netopia.apiKeyPath;
       expect((await stat(keyPath)).mode & 0o777).toBe(0o600);
       expect((await stat(dirname(keyPath))).mode & 0o777).toBe(0o700);
       expect((await stat(first.receiptPath)).mode & 0o777).toBe(0o600);
@@ -82,9 +82,21 @@ describe("P6b — development billing fakes", () => {
         recordsKey: randomBytes(32), hold: () => undefined,
         trustedKeyOwners: { ownerUid: process.getuid!(), apiUid: -1 }, allowLoopbackBase: true
       });
+      // The API's NETOPIA client talks to the fake with the custody key: a hosted start answers the fake's page.
       expect(connectors.paymentEnvironment).toBe("sandbox");
-      const { customerId } = await connectors.xmoney.createCustomer({ identifier: "dev-check", email: "person@example.test", country: "RO" });
-      expect(customerId).toMatch(/^[0-9]+$/u);
+      const started = await connectors.payments.startHostedPayment({
+        orderId: "d".repeat(32), amountMicros: 1_000_000, currency: "USD", description: "DebateAI Plus",
+        payer: {
+          firstName: "Test", lastName: "Person", email: "person@example.test", phone: "+40712345678", country: "RO",
+          region: "Cluj", city: "Cluj-Napoca", postalCode: "400001", street: "Str. Exemplu 1"
+        },
+        clientId: "c".repeat(32), returnUrl: `${first.receipt.publicAppUrl}/checkout/return?charge=${"d".repeat(32)}`,
+        notifyUrl: `${first.receipt.publicAppUrl}/api/v1/billing/netopia/notify`, language: "ro"
+      });
+      expect(started.redirectUrl.startsWith(`${first.receipt.netopia.baseUrl}/ui/card?p=`)).toBe(true);
+      // The trusted key the API loaded is the fake's own, read from the published file.
+      expect(connectors.noticeTrust.keys).toHaveLength(1);
+      expect((await stat(first.receipt.netopia.ipnKeysPath)).mode & 0o777).toBe(0o644);
       const quote = await connectors.tax.quote({
         netMicros: 20_000_000, currency: "USD", taxId: null, taxCode: "saas", date: new Date(),
         location: { country: "RO", region: null, postalCode: null, city: null, street: null, ip: null }
@@ -109,7 +121,7 @@ describe("P6b — development billing fakes", () => {
     }
     const second = await startDevelopmentBillingFakes({ repositoryRoot, commandEnvironment: {}, profile });
     try {
-      expect(await readFile(second.receipt.xmoney.privateKeyPath, "latin1")).toBe(key);
+      expect(await readFile(second.receipt.netopia.apiKeyPath, "latin1")).toBe(key);
     } finally {
       await second.stop();
     }

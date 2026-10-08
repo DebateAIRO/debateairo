@@ -303,8 +303,8 @@ describe("P2-W10 a plan cancelled while a card dispute pauses it, on the fake st
   /** A paid plan whose payment the bank took back: SUSPENDED, paid features paused. */
   async function pausedByDispute() {
     const paid = await h.activate();
-    h.xmoney.setStatus(paid.transaction.transactionId, "charge-back");
-    await h.settle(paid.transaction.transactionId);
+    h.payments.setState(paid.chargeId, "CHARGEBACK_OPENED");
+    await h.settle(paid.chargeId);
     expect(await folded(paid.subscriptionId)).toMatchObject({ status: "SUSPENDED", cancelRequested: false });
     return paid;
   }
@@ -330,7 +330,7 @@ describe("P2-W10 a plan cancelled while a card dispute pauses it, on the fake st
     h.clock.advance(10 * MINUTE);
     await h.renewal.runOnce();
     expect(await renewalCharges(paid.subscriptionId)).toEqual([]);
-    expect(h.xmoney.rebillsFor(paid.transaction.orderId)).toBe(0);
+    expect(h.payments.chargesFor(paid.subscriptionId)).toBe(0);
   }, 30_000);
 
   it("lost: a plan cancelled while paused ends as a dispute", async () => {
@@ -356,7 +356,7 @@ describe("P2-W10 a plan cancelled while a card dispute pauses it, on the fake st
     expect(await recordDisputeOutcome(harnessStores(), { chargeRef: paid.chargeId, outcome: "won" })).toBe("RESUMED");
     await pastPeriodEnd(paid.subscriptionId);
     expect(await renewalCharges(paid.subscriptionId)).toHaveLength(1);
-    expect(h.xmoney.rebillsFor(paid.transaction.orderId)).toBe(1);
+    expect(h.payments.chargesFor(paid.subscriptionId)).toBe(1);
     expect((await folded(paid.subscriptionId)).status).not.toBe("ENDED");
   }, 30_000);
 });

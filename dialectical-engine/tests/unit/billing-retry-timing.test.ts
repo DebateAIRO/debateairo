@@ -20,7 +20,7 @@ function movingClock(start: Date) {
 
 /** A plan whose renewal (attempt 1) failed a minute after its period end: PAST_DUE, first retry due a day later. */
 function pastDueHistory(): { events: SubscriptionEvent[]; periodStart: Date; failedAt: Date } {
-  const active = activeSubscriptionEvents("o-timing", ACTIVATED);
+  const active = activeSubscriptionEvents("o-timing", ACTIVATED, "PLUS", { provider: "xmoney", environment: "stage" });
   const periodStart = foldSubscription(active).currentPeriodEnd!;
   const failedAt = new Date(periodStart.getTime() + MINUTE);
   const pastDue = subscriptionEvent(foldSubscription(active), "PAST_DUE", failedAt, {
