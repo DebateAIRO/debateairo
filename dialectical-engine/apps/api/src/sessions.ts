@@ -3,6 +3,7 @@ import type {
   AuthSourceContext,
   LoginChallengeRecord,
   LoginIdentityRecord,
+  StaffPrerequisiteProducer,
   PostgresAuthenticationRiskSignalRepository,
   PostgresSessionRepository
 } from "@debateai/db";
@@ -27,8 +28,10 @@ import {
   type ReadableUserDekStore,
   type TokenKind
 } from "@debateai/crypto";
-import { AuthFlowError, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
+import { AuthFlowError, consumerPasswordUsable, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
 import { MfaVerificationLimiter } from "./mfa.js";
+
+import { staffTokenHash } from "./staff/access.js";
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
@@ -59,7 +62,37 @@ export type LoginResult = Readonly<{
   replacementRecoveryCode?: string;
 }>;
 
+/** Internal producer for verified consumer methods. Raw bearers never cross the HTTP projection. */
+export interface ConsumerSessionMaterial {
+  readonly sessionId:string; readonly sessionToken:string; readonly sessionTokenHash:string;
+  readonly csrfToken:string; readonly csrfTokenHash:string; readonly bindingHash:string;
+  readonly sessionBindingContext:Readonly<{user_agent_hash:string}>; readonly occurredAt:Date;
+  readonly idleExpiresAt:Date; readonly absoluteExpiresAt:Date;
+}
+export type ConsumerCeremonyOperation = 'ENROLLMENT_BEGIN' | 'ENROLLMENT_COMPLETE' | 'LOGIN_BEGIN' | 'LOGIN_COMPLETE' | 'STEP_UP_BEGIN' | 'STEP_UP_COMPLETE' | 'SECURITY_CODES' | 'AUTH_METHOD_REMOVE' | 'RECOVERY_PROVE' | 'RECOVERY_BEGIN' | 'RECOVERY_COMPLETE' | 'ONBOARDING_STATUS' | 'ONBOARDING_COMPLETE' | 'SOCIAL_BEGIN' | 'SOCIAL_CALLBACK' | 'SOCIAL_SIGNUP';
+export interface ConsumerCeremonyAdmission {
+  readonly retentionKey:string;
+  readonly challengeCapacity:number;
+  readonly challengesPerScope:number;
+}
+export interface ConsumerSessionProducer {
+  admit(operation:ConsumerCeremonyOperation,scope:string,source:AuthSourceContext):Promise<ConsumerCeremonyAdmission>;
+  bindingHash(source:AuthSourceContext):string;
+  socialBindings?():Promise<readonly string[]>;
+  passwordUsable?(hash:string|null):boolean;
+  prepare(source:AuthSourceContext):ConsumerSessionMaterial;
+  committed(material:ConsumerSessionMaterial, identity:Readonly<{userId:string;ownerRef:string}>, source:AuthSourceContext):Promise<LoginResult>;
+}
+
+export type StaffPrerequisiteRequest = Readonly<{session: AuthenticatedSession; password: string; code: string}> & (
+  Readonly<{purpose: "KEY_PREREGISTRATION"}> | Readonly<{purpose: "OWNER_POSSESSION"; commandId: string; commandNonce: string}>
+);
+export type StaffPrerequisiteResult = Readonly<{sessionToken: string; csrfToken: string; prerequisiteHandle: string; expiresAt: Date}>;
+
 export interface SessionApplication {
+  stepUpStaffPrerequisite?(input: StaffPrerequisiteRequest, source: AuthSourceContext, signal?: AbortSignal): Promise<StaffPrerequisiteResult>;
+  /** Non-refreshing current generation/expiry/hold check. Missing implementations deny streaming. */
+  assertCurrent?(session:AuthenticatedSession,signal?:AbortSignal):Promise<void>;
   authenticate(sessionToken: string, source: AuthSourceContext): Promise<AuthenticatedSession | null>;
   authenticateErasureStatus?(sessionToken:string,source:AuthSourceContext):
     Promise<AuthenticatedSession|null>;
@@ -67,6 +100,7 @@ export interface SessionApplication {
   beginLogin(input: Readonly<{ email: string; password: string }>, source: AuthSourceContext): Promise<Readonly<{
     status: "mfa_required";
     challengeToken: string;
+    availableMethods?: readonly ("passkey"|"totp"|"recovery_code")[];
   }>>;
   completeLogin(input: Readonly<{ challengeToken: string; code: string }>, source: AuthSourceContext): Promise<LoginResult>;
   logout(session: AuthenticatedSession, source: AuthSourceContext): Promise<boolean>;
@@ -103,7 +137,9 @@ export interface SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" }>
+      | Readonly<{action:"REMOVE_AUTH_METHOD";targetFactorId:string}>
+      | Readonly<{action:"LINK_PROVIDER"|"UNLINK_PROVIDER";targetProvider:"google"|"apple"|"facebook"|"x"}>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
@@ -112,7 +148,7 @@ export interface SessionApplication {
   }>>;
 }
 
-type SessionRepository = Pick<PostgresSessionRepository,
+type SessionRepository = Partial<Pick<PostgresSessionRepository,"assertSessionCurrent">> & Pick<PostgresSessionRepository,
   | "authenticateSession"
   | "authenticateAccountErasureStatusSession"
   | "confirmAccountAge"
@@ -190,6 +226,7 @@ export class SessionService implements SessionApplication {
 
   private constructor(private readonly dependencies: Readonly<{
     repository: SessionRepository;
+    staffPrerequisites?: StaffPrerequisiteProducer;
     riskSignals:SessionRiskSignals;
     onRiskSignalFailure:(error:unknown)=>void;
     dekStore: ReadableUserDekStore;
@@ -198,6 +235,7 @@ export class SessionService implements SessionApplication {
     mfaPolicy: MfaPolicy;
     sessionPolicy: SessionPolicy;
     blindIndexKey: Uint8Array;
+    socialProviderBindings?: () => Promise<readonly string[]>;
     sessionBindingKey: Buffer;
     loginRateKey: Buffer;
     dummyPasswordHash: string;
@@ -208,6 +246,7 @@ export class SessionService implements SessionApplication {
 
   static async create(dependencies: Readonly<{
     repository: SessionRepository;
+    staffPrerequisites?: StaffPrerequisiteProducer;
     riskSignals:SessionRiskSignals;
     onRiskSignalFailure:(error:unknown)=>void;
     dekStore: ReadableUserDekStore;
@@ -216,6 +255,7 @@ export class SessionService implements SessionApplication {
     mfaPolicy: MfaPolicy;
     sessionPolicy: SessionPolicy;
     blindIndexKey: Uint8Array;
+    socialProviderBindings?: () => Promise<readonly string[]>;
     bindingKey?: Uint8Array;
     dummyPasswordHash?: string;
     clock?: () => Date;
@@ -281,6 +321,15 @@ export class SessionService implements SessionApplication {
     throw new AuthFlowError("MFA_RATE_LIMITED");
   }
 
+  async assertCurrent(session:AuthenticatedSession,signal?:AbortSignal):Promise<void> {
+    try {
+      if(session.authKind!=="cookie" || this.dependencies.repository.assertSessionCurrent===undefined
+        || !await this.dependencies.repository.assertSessionCurrent({userId:session.userId,sessionId:session.session.session_id,tokenHash:session.tokenHash},signal)) {
+        throw new Error("SESSION_REQUIRED");
+      }
+    } catch {throw new Error("SESSION_REQUIRED");}
+  }
+
   async authenticate(sessionToken: string, source: AuthSourceContext): Promise<AuthenticatedSession | null> {
     const tokenHash = safeTokenHash("session", sessionToken);
     if (tokenHash === null) return null;
@@ -289,7 +338,7 @@ export class SessionService implements SessionApplication {
       tokenHash,
       bindingHash: this.bindingHash(source),
       occurredAt: now,
-      idleExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.idleTtlMs)
+      idleExpiresAt: new Date(now.getTime() + Math.min(this.dependencies.sessionPolicy.idleTtlMs,1209600000))
     });
     return record === null ? null : Object.freeze({
       session: sessionFor(record.ownerRef, record.sessionId),
@@ -324,7 +373,7 @@ export class SessionService implements SessionApplication {
   async beginLogin(
     input: Readonly<{ email: string; password: string }>,
     source: AuthSourceContext
-  ): Promise<Readonly<{ status: "mfa_required"; challengeToken: string }>> {
+  ): Promise<Readonly<{ status: "mfa_required"; challengeToken: string; availableMethods:readonly ("passkey"|"totp"|"recovery_code")[] }>> {
     const now = this.now();
     let normalizedEmail = "";
     try {
@@ -352,7 +401,7 @@ export class SessionService implements SessionApplication {
         envelopeAdmitted ? passwordHash : this.dependencies.dummyPasswordHash,
         input.password
       ) && envelopeAdmitted;
-      if (!verified || identity === null) {
+      if (!verified || identity === null || identity.passwordHash === null) {
         await this.dependencies.repository.recordLoginFailure({
           ...(identity === null ? {} : { actorToken: identity.auditToken }),
           occurredAt: now, source, reason: "AUTH_CREDENTIALS_INVALID"
@@ -371,7 +420,7 @@ export class SessionService implements SessionApplication {
         source
       });
       if (!created) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
-      return Object.freeze({ status: "mfa_required" as const, challengeToken });
+      return Object.freeze({ status: "mfa_required" as const, challengeToken, availableMethods:identity.availableMethods??["totp" as const] });
     } catch (error) {
       throw asAuthFailure(error);
     }
@@ -394,12 +443,43 @@ export class SessionService implements SessionApplication {
       sessionTokenHash: hashToken("session", sessionToken),
       csrfToken,
       csrfTokenHash: hashToken("csrf", csrfToken),
-      idleExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.idleTtlMs),
-      absoluteExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.absoluteTtlMs)
+      idleExpiresAt: new Date(now.getTime() + Math.min(this.dependencies.sessionPolicy.idleTtlMs,1209600000)),
+      absoluteExpiresAt: new Date(now.getTime() + Math.min(this.dependencies.sessionPolicy.absoluteTtlMs,2592000000))
+    });
+  }
+
+  /** Construct only from the fully initialized service so every method shares token/KDF policy. */
+  consumerProducer():ConsumerSessionProducer {
+    return Object.freeze({
+      admit:async(operation:ConsumerCeremonyOperation,scope:string,source:AuthSourceContext)=>{
+        await this.requireRateBudget(this.challengeRateKey(`consumer:${operation}:${scope==='discoverable'?`${scope}:${this.sourceIp(source)}`:scope}`),source,this.now());
+        return Object.freeze({retentionKey:`sha256:${this.challengeRateKey(`consumer:retention:${this.sourceIp(source)}`)}`,
+          challengeCapacity:this.dependencies.mfaPolicy.verificationLimits.capacity,
+          challengesPerScope:this.dependencies.mfaPolicy.verificationLimits.perEnrollment});
+      },
+      bindingHash:(source:AuthSourceContext)=>this.bindingHash(source),
+      passwordUsable:(hash:string|null)=>consumerPasswordUsable(hash,this.dependencies.authPolicy),
+      socialBindings:()=>this.dependencies.socialProviderBindings?.() ?? Promise.resolve([]),
+      prepare:(source:AuthSourceContext)=>{
+        const now=this.now(), bindingHash=this.bindingHash(source);
+        const material=this.sessionMaterial(now);
+        // Preserve shorter selected lifetimes within the consumer maximums.
+        const absoluteExpiresAt=new Date(Math.min(material.absoluteExpiresAt.getTime(),now.getTime()+2592000000));
+        const idleExpiresAt=new Date(Math.min(material.idleExpiresAt.getTime(),now.getTime()+1209600000,absoluteExpiresAt.getTime()));
+        return Object.freeze({...material,absoluteExpiresAt,idleExpiresAt,bindingHash,sessionBindingContext:Object.freeze({user_agent_hash:bindingHash}),occurredAt:now});
+      },
+      committed:async (material:ConsumerSessionMaterial,identity:Readonly<{userId:string;ownerRef:string}>,source:AuthSourceContext)=>{
+        try {
+          const recorded=await this.dependencies.riskSignals.recordForSession({tokenHash:material.sessionTokenHash,bindingHash:material.bindingHash,kind:"LOGIN_SUCCESS",source});
+          if(recorded!=="recorded") throw new TypeError("LOGIN_RISK_SIGNAL_SCOPE_UNRESOLVED");
+        } catch(error){this.dependencies.onRiskSignalFailure(error);}
+        return Object.freeze({status:"authenticated" as const,sessionToken:material.sessionToken,csrfToken:material.csrfToken,session:sessionFor(identity.ownerRef,material.sessionId)});
+      }
     });
   }
 
   private async totpStep(challenge: LoginChallengeRecord, code: string, now: Date): Promise<number | null> {
+    if(challenge.factorId===null || challenge.secretCiphertext===null) return null;
     let dek: Buffer | undefined;
     let secret: Buffer | undefined;
     try {
@@ -442,6 +522,9 @@ export class SessionService implements SessionApplication {
         });
         throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       }
+      const admittedProviders=challenge.firstStep==='PROVIDER'?await this.dependencies.socialProviderBindings?.()??[]:[];
+      if(challenge.firstStep==='PROVIDER' && (!challenge.socialConfiguration || !admittedProviders.includes(challenge.socialConfiguration) || !source.socialBrowserHash || challenge.socialCookieHash!==source.socialBrowserHash)) throw new AuthFlowError('AUTH_CREDENTIALS_INVALID');
+      const socialAuthority={admittedProviders,...(source.socialBrowserHash===undefined?{}:{browserHash:source.socialBrowserHash})};
       const material = this.sessionMaterial(now);
       const context = Object.freeze({ user_agent_hash: bindingHash });
       let replacementRecoveryCode: string | undefined;
@@ -449,7 +532,7 @@ export class SessionService implements SessionApplication {
       if (/^\d{6}$/.test(input.code)) {
         const acceptedStep = await this.totpStep(challenge, input.code, now);
         completed = acceptedStep !== null && await this.dependencies.repository.completeTotpLogin({
-          challenge,
+          ...socialAuthority,challenge,
           acceptedStep,
           bindingHash,
           sessionId: material.sessionId,
@@ -481,7 +564,7 @@ export class SessionService implements SessionApplication {
             this.dependencies.mfaPolicy.recoveryCodes.argon2id
           );
           completed = await this.dependencies.repository.completeRecoveryLogin({
-            challenge,
+            ...socialAuthority,recoveryCodeHash:record.codeHash,challenge,
             recoveryCodeId: record.recoveryCodeId,
             replacementHash,
             bindingHash,
@@ -502,20 +585,9 @@ export class SessionService implements SessionApplication {
         });
         throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       }
-      try{
-        const recorded=await this.dependencies.riskSignals.recordForSession({
-          tokenHash:material.sessionTokenHash,bindingHash,kind:"LOGIN_SUCCESS",source
-        });
-        if(recorded!=="recorded") throw new TypeError("LOGIN_RISK_SIGNAL_SCOPE_UNRESOLVED");
-      }catch(error){this.dependencies.onRiskSignalFailure(error);}
       this.limiter.clearEnrollment(rateKey);
-      return Object.freeze({
-        status: "authenticated" as const,
-        sessionToken: material.sessionToken,
-        csrfToken: material.csrfToken,
-        session: sessionFor(challenge.ownerRef, material.sessionId),
-        ...(replacementRecoveryCode === undefined ? {} : { replacementRecoveryCode })
-      });
+      const result=await this.consumerProducer().committed({...material,bindingHash,sessionBindingContext:context,occurredAt:now},challenge,source);
+      return Object.freeze({...result,...(replacementRecoveryCode===undefined?{}:{replacementRecoveryCode})});
     } catch (error) {
       throw asAuthFailure(error);
     }
@@ -602,13 +674,28 @@ export class SessionService implements SessionApplication {
         action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" }>;
+      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" }>
+      | Readonly<{action:"REMOVE_AUTH_METHOD";targetFactorId:string}>
+      | Readonly<{action:"LINK_PROVIDER"|"UNLINK_PROVIDER";targetProvider:"google"|"apple"|"facebook"|"x"}>;
   }>, source: AuthSourceContext): Promise<Readonly<{
     sessionToken: string;
     csrfToken: string;
     grantToken?: string;
     grantExpiresAt?: Date;
   }>> {
+    return this.freshStepUp(input, source);
+  }
+
+  async stepUpStaffPrerequisite(input: StaffPrerequisiteRequest, source: AuthSourceContext, signal?: AbortSignal): Promise<StaffPrerequisiteResult> {
+    if (this.dependencies.staffPrerequisites === undefined) throw new Error("STAFF_UNAVAILABLE");
+    const result = await this.freshStepUp(input, source, input, signal);
+    if (result.prerequisiteHandle === undefined || result.expiresAt === undefined) throw new Error("STAFF_UNAVAILABLE");
+    return {sessionToken: result.sessionToken, csrfToken: result.csrfToken,
+      prerequisiteHandle: result.prerequisiteHandle, expiresAt: result.expiresAt};
+  }
+
+  private async freshStepUp(input: Parameters<SessionApplication["stepUp"]>[0], source: AuthSourceContext,
+    prerequisite?: StaffPrerequisiteRequest, signal?: AbortSignal): Promise<Awaited<ReturnType<SessionApplication["stepUp"]>> & Partial<StaffPrerequisiteResult>> {
     const now = this.now();
     let identity: LoginIdentityRecord | null = null;
     let rotationAttempted = false;
@@ -652,6 +739,7 @@ export class SessionService implements SessionApplication {
       });
       const acceptedStep = await this.totpStep(challenge, input.code, now);
       if (acceptedStep === null) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
+      if (signal?.aborted) throw new Error("STAFF_UNAVAILABLE");
       const replacementToken = generateVerificationToken();
       const replacementCsrf = generateVerificationToken();
       const grantToken = input.authorization === undefined
@@ -660,7 +748,19 @@ export class SessionService implements SessionApplication {
         ? undefined
         : new Date(now.getTime() + this.dependencies.sessionPolicy.stepUpFreshnessMs);
       rotationAttempted = true;
-      const rotated = await this.dependencies.repository.rotateAfterStepUp({
+      const prerequisiteHandle = prerequisite === undefined ? undefined : generateVerificationToken();
+      const prerequisiteResult = prerequisite === undefined || prerequisiteHandle === undefined ? undefined
+        : await this.dependencies.staffPrerequisites!.complete({
+          identity: {userId: identity.userId, ownerRef: identity.ownerRef, passwordHash: identity.passwordHash, factorId: identity.factorId},
+          currentSessionId: input.session.session.session_id, currentTokenHash: input.session.tokenHash, acceptedStep,
+          replacementTokenHash: hashToken("session", replacementToken), replacementCsrfHash: hashToken("csrf", replacementCsrf),
+          bindingContext: Object.freeze({user_agent_hash: this.bindingHash(source)}), source,
+          handleHash: staffTokenHash(prerequisiteHandle)!,
+          ...(prerequisite.purpose === "KEY_PREREGISTRATION" ? {purpose: "KEY_PREREGISTRATION" as const}
+            : {purpose: "OWNER_POSSESSION" as const, commandId: prerequisite.commandId, nonceHash: staffTokenHash(prerequisite.commandNonce)!})
+        }, signal);
+      if (signal?.aborted) throw new Error("STAFF_UNAVAILABLE");
+      const rotated = prerequisite === undefined ? await this.dependencies.repository.rotateAfterStepUp({
         identity,
         currentSessionId: input.session.session.session_id,
         currentTokenHash: input.session.tokenHash,
@@ -669,7 +769,7 @@ export class SessionService implements SessionApplication {
         replacementCsrfHash: hashToken("csrf", replacementCsrf),
         bindingContext: Object.freeze({ user_agent_hash: this.bindingHash(source) }),
         occurredAt: now,
-        idleExpiresAt: new Date(now.getTime() + this.dependencies.sessionPolicy.idleTtlMs),
+        idleExpiresAt: new Date(now.getTime() + Math.min(this.dependencies.sessionPolicy.idleTtlMs,1209600000)),
         source,
         ...(input.authorization === undefined || grantToken === undefined || grantExpiresAt === undefined
           ? {}
@@ -678,6 +778,8 @@ export class SessionService implements SessionApplication {
                   grantId: randomUUID(),
                   grantTokenHash: hashToken("step-up-grant", grantToken),
                   action: input.authorization.action,
+                  ...("targetFactorId" in input.authorization ? {targetFactorId:input.authorization.targetFactorId} : {}),
+                  ...("targetProvider" in input.authorization ? {targetProvider:input.authorization.targetProvider} : {}),
                   expiresAt: grantExpiresAt
                 }
               : {
@@ -687,12 +789,13 @@ export class SessionService implements SessionApplication {
                   targetRunId: input.authorization.targetRunId,
                   expiresAt: grantExpiresAt
                 } })
-      });
+      }) : true;
       if (!rotated) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       this.limiter.clearEnrollment(rateKey);
       return Object.freeze({
         sessionToken: replacementToken,
         csrfToken: replacementCsrf,
+        ...(prerequisiteHandle === undefined || prerequisiteResult === undefined ? {} : {prerequisiteHandle, expiresAt: prerequisiteResult.expiresAt}),
         ...(grantToken === undefined || grantExpiresAt === undefined
           ? {}
           : { grantToken, grantExpiresAt })

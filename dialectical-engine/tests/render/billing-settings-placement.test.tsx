@@ -20,7 +20,7 @@ import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type:
 describe("P20 Settings placement (spec §2.10)", () => {
   it("puts the subscription card and the usage bars right after the identity panel, before sessions and deletion", () => {
     const html = renderToStaticMarkup(<SettingsPageClient billingCatalog={{ ...billingEnglish, "billing.subscription.title": "ABONAMENT" }} />);
-    const order = ["setPanel", 'data-marker="subscription"', 'data-marker="usage"', 'data-marker="sessions"', 'data-marker="erasure"']
+    const order = ['class="setTitle"', 'href="/settings/security"', 'data-marker="subscription"', 'data-marker="usage"', 'data-marker="sessions"', 'data-marker="erasure"']
       .map((needle) => html.indexOf(needle));
     expect(order.every((position) => position >= 0)).toBe(true);
     expect([...order].sort((left, right) => left - right)).toEqual(order);

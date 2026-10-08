@@ -20,10 +20,11 @@ import { createSupportModelReferenceFactory } from "../../apps/api/src/support/m
 // base (SV's content check) means: check out the base tree, run with the variable, diff the temp file with the golden.
 // D-ORCH-S05-2 (N2): the same 26 queries in ENGLISH are routed for every one of the 33 locales too (keys `…|en<n>`):
 // a 33-locale visitor who types English is scored against the en catalogue names, which a localized name must not move.
-// Paid plans (P24, merge with #62): the nine paid-plan pages add 18 English capability queries (`…|en66` to `…|en83`) to
-// every locale and sign-in state. The golden was re-measured with them on the merged catalogue: every one of S05's 6,072
-// rows is byte-identical, and the 1,188 new rows are the routes the nine pages' own names and search words reach.
+// Paid plans (P24, merge with #62) added 18 English capability queries (`…|en66` to `…|en83`). The original 7,260-row
+// golden remains historical. Auth + Dev integration changes 592 explicit rows in a separate reviewed overlay: 526 source
+// ranking changes and 66 approved action additions; recovery-source and source-policy fields remain byte-identical.
 const GOLDEN = resolve(process.cwd(), "tests/support/fixtures/support-routing-33.json");
+const INTEGRATION = resolve(process.cwd(), "tests/support/fixtures/support-routing-auth-dev-overlay.json");
 const QUERY_KEYS = [
   "chrome:chrome.aiTransparency", "chrome:chrome.legal.notice", "chrome:chrome.legal.terms", "chrome:chrome.legal.versions",
   "chrome:chrome.legal.privacy", "chrome:chrome.legal.health", "chrome:chrome.legal.cookies", "chrome:chrome.legal.providers",
@@ -79,7 +80,19 @@ describe("S05 33-locale routing pin (SPEC-v5 R10, R13)", () => {
       throw new Error(`S05_WRITE_ROUTING_GOLDEN=1 wrote ${written}; the committed golden is never regenerated here (D-ORCH-S05-3)`);
     }
     const golden = JSON.parse(readFileSync(GOLDEN, "utf8")) as Record<string, string>;
+    const overlay = JSON.parse(readFileSync(INTEGRATION, "utf8")) as Record<string, string>;
     expect(Object.keys(golden)).toHaveLength(33 * 2 * (2 * (6 + QUERY_KEYS.length) + 2 * 29));
-    expect(now).toEqual(golden);
+    expect(Object.keys(overlay)).toHaveLength(592);
+    for (const [key,value] of Object.entries(overlay)) {
+      expect(golden).toHaveProperty(key);
+      const prior=golden[key]!.split("|");
+      const current=value.split("|");
+      expect(current.slice(2),key).toEqual(prior.slice(2));
+      if (prior[1] !== current[1]) expect([
+        "sign-in|sign-in,forgot-password",
+        "privacy-preferences,delete-account|security,privacy-preferences,delete-account"
+      ]).toContain(`${prior[1]}|${current[1]}`);
+    }
+    expect(now).toEqual({...golden,...overlay});
   });
 });

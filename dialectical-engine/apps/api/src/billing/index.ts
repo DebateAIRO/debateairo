@@ -44,9 +44,10 @@ export type BillingRoutePolicy = (route: BillingRoutePath) => Readonly<{
 
 export interface BillingUsageReader {
   read(ownerRef: string, now: Date): Promise<Readonly<{
-    planId: PlanId;
+    planId: PlanId | null;
+    funding?: Readonly<{kind:"INTERNAL";expiresAt:Date}>;
     windows: ReadonlyArray<Readonly<{
-      scope: "PERSON_DAY" | "PERSON_WEEK" | "PERSON_MONTH";
+      scope: "PERSON_DAY" | "PERSON_WEEK" | "PERSON_MONTH" | "PERSON_GRANT";
       percent: number;
       resetsAt: Date;
     }>>;
@@ -180,6 +181,7 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     const usage = await deps.usage.read(ownerRef, clock());
     return reply.send(BillingUsageResponseSchema.parse({
       plan_id: usage.planId,
+      ...(usage.funding === undefined ? {} : {funding:{kind:"INTERNAL",expires_at:usage.funding.expiresAt.toISOString()}}),
       windows: usage.windows.map((window) => ({
         scope: window.scope, percent: window.percent, resets_at: window.resetsAt.toISOString()
       }))

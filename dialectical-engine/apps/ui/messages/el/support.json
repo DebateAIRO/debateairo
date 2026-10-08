@@ -81,5 +81,7 @@
   "support.answerRating": "Αξιολόγηση απάντησης",
   "support.privacyPreferences": "Απόρρητο",
   "support.aiBanner": "Οι απαντήσεις δημιουργούνται από ΤΝ, επισημαίνονται με μηχανικώς αναγνώσιμο τρόπο και μπορεί να είναι λανθασμένες. Ζητήστε άνθρωπο οποιαδήποτε στιγμή.",
-  "support.cookiePreferences": "Τα cookies που αποθηκεύουμε"
+  "support.cookiePreferences": "Τα cookies που αποθηκεύουμε",
+  "support.recoverAccount": "Ανάκτηση λογαριασμού",
+  "support.countryUnavailable": "Το Dialectical Engine δεν είναι ακόμη διαθέσιμο στη χώρα σας."
 }

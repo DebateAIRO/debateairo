@@ -1,0 +1,18 @@
+import { describe, it, expect } from 'vitest';
+import { renderAccountEmail, serializeAccountMail, type AccountMailInput } from '../../apps/api/src/account-mail-template.mjs';
+const expiresAt = new Date('2026-10-05T12:00:00Z'), recipient = 'primary@example.test';
+describe('consumer recovery and security mail purposes', () => {
+    it('renders a separate15minute recovery proof purpose and never calls email alone recovery', () => {
+        const input = { template: 'consumer-recovery-v1', recipient, expiresAt, url: new URL('https://preview.dezbatere.ro/recover#token=' + 'a'.repeat(43)) } as AccountMailInput;
+        const mail = renderAccountEmail(input);
+        expect(mail.text).toContain('15 minutes');
+        expect(mail.text).toContain('saved recovery code');
+        expect(mail.text).not.toContain('Confirm recovery email');
+        expect(serializeAccountMail(input, 'noreply@dezbatere.ro')).toContain('X-Account-Template: consumer-recovery-v1');
+    });
+    it('marks actual English prose as English and only localized date fragments with their own language', () => {
+        const mail = renderAccountEmail({ template: 'verification-v1', recipient, expiresAt, url: new URL('https://preview.dezbatere.ro/verify-email#token=' + 'a'.repeat(43)), display: { locale: 'ro', timeZone: 'Europe/Bucharest' } });
+        expect(mail.html).toContain('<html lang="en">');
+        expect(mail.html).toContain('<span lang="ro">');
+    });
+});

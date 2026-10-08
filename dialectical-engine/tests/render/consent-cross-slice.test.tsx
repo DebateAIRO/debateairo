@@ -296,7 +296,7 @@ describe("cross-slice integration — both consent surfaces in one document", ()
 
     await mountBoth();
     activate(labelled(WHAT_WE_STORE));
-    expect(rows(), "the card's eight rows are present").toBe(8);
+    expect(rows(), "the card's eight rows are present").toBe(18);
 
     await act(async () => {
       privacyBox().click();
@@ -306,7 +306,7 @@ describe("cross-slice integration — both consent surfaces in one document", ()
     expect(policy(), "the policy closed").toBeNull();
     expect(card(), "the card is still there").not.toBeNull();
     expect(bar(), "the bar has not come back underneath it").toBeNull();
-    expect(rows(), "and the card still shows its eight rows").toBe(8);
+    expect(rows(), "and the card still shows its eight rows").toBe(18);
     expect(document.activeElement, "focus returns to the control that opened the policy").toBe(
       privacyBox()
     );

@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Cuntas — Seoladh ríomhphoist agus seoladh ríomhphoist athshlánaithe (stóráilte agus criptithe, le hinnéacs eochraithe ionas gur féidir linn an cuntas a aimsiú gan an seoladh a léamh); pasfhocal (stóráilte mar hais, agus ní i ngnáth-théacs riamh); do rún fíordheimhnithe dhá fhachtóir (criptithe); deich gcód athshlánaithe (stóráilte mar hais); d'ainm cleite; an t-am a dheimhnigh tú go raibh tú 18 mbliana d'aois nó os a chionn — Tusa, tráth clárúcháin",
+        "Cuntas — Seoladh ríomhphoist agus seoladh ríomhphoist athshlánaithe (stóráilte agus criptithe, le hinnéacs eochraithe ionas gur féidir linn an cuntas a aimsiú gan an seoladh a léamh); pasfhocal (stóráilte mar hais, agus ní i ngnáth-théacs riamh); do rún fíordheimhnithe dhá fhachtóir (criptithe); deich gcód athshlánaithe (stóráilte mar hais); d'ainm cleite; toradh do sheiceála aoise — Tusa, tráth clárúcháin",
+        "Seiceáil thír an tseolta IP — Tráth clárúcháin aimsímid tír an tseolta IP go háitiúil le DB-IP Lite agus seiceálaimid liosta de sheoltaí imeachta Tor. Ag tús gach díospóireachta nua aimsímid tír an tseolta IP arís go háitiúil agus féadfaimid an díospóireacht a dhiúltú má tá an tír toirmiscthe go buan. Má dhiúltaítear d’iarratas, déanaimid na taifid iniúchóireachta a chomhiomlánú de réir bealaigh, cóid, tíre agus tréimhse ama; ní choinnítear an seoladh IP ann ach mar achoimre aontreo eochraithe. Tá an cód diúltaithe, an tír agus comhartha gur fianaise a bhí sa seoladh IP sa taifead diúltaithe; ní choinnítear an seoladh IP ná an teaghrán gníomhaire úsáideora ach mar hais aontreo eochraithe. — Do bhrabhsálaí tráth clárúcháin agus ag tús díospóireachta nua",
+        "Seiceáil aoise — Cuireann tú do dháta breithe isteach don tseiceáil amháin; ní stórálaimid é. Coinnímid an toradh, an aois íosta, tír an tseolta IP má tá sí ar fáil, leagan na rialach, an comhthéacs agus am na seiceála. Ní stóráiltear ach toradh «pasáilte» i gcás clárú rathúil; d’fhéadfadh «pasáilte» nó «diúltaithe» a bheith ag cuntas atá ann cheana — Tusa agus do bhrabhsálaí",
+        "Áit chónaithe dhearbhaithe — An tír ina ndeir tú go bhfuil cónaí ort agus an stát má tá cónaí ort sna Stáit Aontaithe — Tusa tráth clárúcháin",
         "Seisiúin agus slándáil — Comhartha seisiúin haisithe; hais eochraithe de theaghrán gníomhaire úsáideora do bhrabhsálaí, a úsáidtear chun a thabhairt faoi deara nuair a aistrítear seisiún go brabhsálaí eile; stampaí ama an chruthaithe, na húsáide deireanaí agus an éaga. Ní stórálaimid do sheoladh IP, ainm do ghléis ná sonraí do bhrabhsálaí le seisiún, agus ní thaispeántar ach stampaí ama sa liosta seisiún a fheiceann tú sna Socruithe — Do bhrabhsálaí",
         "Rian iniúchóireachta slándála — Loga nach féidir ach cur leis d'imeachtaí a bhaineann le slándáil — clárú, fíorú, iarrachtaí sínithe isteach, athshlánú, foilsiú, scriosadh. Ní stóráiltear seoladh IP agus gníomhaire úsáideora aon imeachta ach mar achoimrí eochraithe aontreo (Argon2id), ionas nach féidir iad a léamh ar ais ach gur féidir iad a mheaitseáil laistigh de thréimhse. Stóráiltear comharthaí riosca sínithe isteach agus athshlánaithe criptithe ar feadh 90 lá — Do bhrabhsálaí, tráth gach imeachta",
         "Ábhar díospóireachta — An cheist a chlóscríobhann tú; na nótaí stiúrtha a shocraíonn tú; na maímh, na cáintí, na tagairtí fianaise, na scóir agus na breithiúnais a ghineann an t-inneall; taifead focal ar fhocal den mhéid a thug gach soláthraí IS ar ais; iarratais aisghabhála agus tagairtí foinse. Stóráiltear é seo ar fad criptithe faoi eochair a bhaineann go sonrach le do chuntas — Tusa, agus na samhlacha IS a oibríonn ar do cheist",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Daoine nach úsáideoirí dár gcuid iad — Sonraí pearsanta faoi dhaoine eile a chuireann tú i do cheist, nó a ghineann an t-inneall agus é ag freagairt na ceiste. Iarraimid ort gan é seo a dhéanamh; mínítear i rannán 11 cad a dhéanaimid nuair a tharlaíonn sé mar sin féin — Tusa, go hindíreach"
         ]
       },
+      { kind: "p", text: "Tráth clárúcháin seiceálaimid tír do sheolta IP go háitiúil agus diúltaímid do chlárú ó thíortha nach bhfreastalaímid orthu, ó sheoltaí imeachta Tor agus ó sheoltaí nach eol a dtír. Ní sheolaimid an seoladh IP chuig tríú páirtí don tseiceáil seo. Úsáidimid do dháta breithe chun d’aois a sheiceáil gan é a stóráil; dearbhaíonn tú freisin do thír chónaithe agus, más sna Stáit Aontaithe atá tú, do stát. Ag tús gach díospóireachta nua seiceálaimid tír an tseolta IP go háitiúil freisin agus féadfaimid í a dhiúltú má tá an tír toirmiscthe go buan; is le clárú amháin a bhaineann diúltú mar gheall ar Tor nó tír anaithnid." },
       { kind: "p", text: "Ní bhailímid anailísíocht ná teiliméadracht faoin gcaoi a n-úsáideann tú an táirge, agus ní shocraímid aon fhianán chun na críche sin. Má athraíonn sé sin, athróidh an beartas seo agus an Beartas Fianán ar dtús, agus iarrfar ort rogha a dhéanamh." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Spreagann inneall díospóireachta ceisteanna faoi pholaitíocht, reiligiún, sláinte, gnéasacht agus creideamh. Is catagóirí speisialta sonraí iad sin faoi Airteagal 9 GDPR, agus d'fhéadfaidís a bheith i do cheisteanna cibé acu atá sé ar intinn againn iad a bhailiú nó nach bhfuil." },
-      { kind: "p", text: "Fút féin. Roimh do chéad díospóireacht, tugann tú toiliú sainráite, ar scáileán ar leith, dúinn faisnéis íogair a roghnaíonn tú a chur i do cheisteanna féin a phróiseáil chun do dhíospóireachtaí a reáchtáil. Taifeadaimid an leagan den fhoclaíocht lenar aontaigh tú, do theanga agus an t-am. Gan an toiliú seo, ní féidir leat díospóireacht a thosú. Is féidir leat é a tharraingt siar am ar bith trí gan an fhaisnéis sin a chur isteach, nó trí dhíospóireacht a scriosadh. Is sonraí atá roghnaithe agat a chur ar fáil go poiblí iad na sonraí a fhoilsíonn tú fút féin." },
+      { kind: "p", text: "Fút féin. Roimh do chéad díospóireacht, tugann tú toiliú sainráite, ar scáileán ar leith, dúinn faisnéis íogair a roghnaíonn tú a chur i do cheisteanna féin a phróiseáil chun do dhíospóireachtaí a reáchtáil. Taifeadaimid an leagan den fhoclaíocht lenar aontaigh tú, do theanga agus an t-am. Gan an toiliú seo, ní féidir leat díospóireacht a thosú. Is féidir leat an toiliú seo a tharraingt siar am ar bith trí scríobh chuig privacy@dezbatere.ro. Is féidir leat freisin an fhaisnéis sin a fhágáil ar lár nó díospóireacht ina bhfuil sí a scriosadh. Is sonraí atá roghnaithe agat a chur ar fáil go poiblí iad na sonraí a fhoilsíonn tú fút féin." },
       { kind: "p", text: "Faoi dhaoine eile. Ní cheadaíonn aon choinníoll dlíthiúil dúinn sonraí íogaire a phróiseáil faoi thríú páirtí a ainmníonn tú i do cheist, agus níl coinníoll den sórt sin ag aon duine dár soláthraithe IS ach oiread. Sin é an fáth a gcuireann na Téarmaí cosc air, a n-íoslaghdaímid an méid a sheolaimid, agus a mbainimid ábhar den sórt sin go tapa arna iarraidh sin — rannán 11." },
       { kind: "p", text: "Faisnéis sláinte. Déileálann roinnt tíortha le sonraí a bhaineann le sláinte, tátail san áireamh, faoi dhlíthe ar leith. Má tá cónaí ort in [the State of Washington], tá feidhm ag [Consumer Health Data Privacy Notice] ar leith." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "An fáth a n-úsáidimid do shonraí, agus an bunús atá leis",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Tá bunús dlíthiúil amháin ag gach cuspóir faoi Airteagal 6(1) GDPR, agus ní athúsáidimid sonraí a bailíodh chun críche amháin chun críche eile." },
+      { kind: "p", text: "Luaimid na bunúis dlí is infheidhme maidir le gach cuspóir faoi Airteagal 6(1) GDPR, agus ní athúsáidimid sonraí a bailíodh chun críche amháin chun críche eile." },
       {
         kind: "list",
         items: [
         "Do chuntas a chruthú agus a reáchtáil, tú a fhíordheimhniú, do dhíospóireachtaí a reáchtáil agus a stóráil ionas gur féidir leat iad a athoscailt agus a athsheinm — Cuntas, seisiúin, ábhar díospóireachta — Conradh — Art. 6(1)(b)",
+        "Incháilitheacht clárúcháin agus thús díospóireachta nua a mheas de réir thír an tseolta IP agus srianta críochacha — Tír an tseolta IP agus taifead diúltaithe — Leasanna dlisteanacha — Art. 6(1)(f) chun an tseirbhís a chosaint agus a oibriú nuair a cheadaítear é, agus oibleagáid dhlíthiúil — Art. 6(1)(c) nuair a chuireann smachtbhannaí srian ar sholáthar na seirbhíse",
+        "An aois íosta a sheiceáil — Sonraí seiceála aoise — Conradh — Art. 6(1)(b), agus leasanna dlisteanacha — Art. 6(1)(f)",
+        "Rialacha tomhaltóirí, príobháideachais agus cánach a chur i bhfeidhm de réir cónaithe — Tír chónaithe dhearbhaithe agus stát SAM más ann — Conradh — Art. 6(1)(b), agus oibleagáid dhlíthiúil — Art. 6(1)(c)",
         "Do cheist agus ráitis an innill a sheoladh chuig soláthraithe IS chun díospóireacht a ghiniúint — Ábhar díospóireachta — Conradh — Art. 6(1)(b)",
         "An tseirbhís a choinneáil slán, mí-úsáid a bhrath, ligean duit síniú isteach nach ndearna tú a aithint, rian iniúchóireachta a choinneáil — Seisiúin, rian iniúchóireachta slándála, haiseanna mí-úsáide tacaíochta — Leasanna dlisteanacha — Art. 6(1)(f): ár leas agus do leas i seirbhís shlán. Féadfaidh tú agóid a dhéanamh; rannán 10",
         "A chruthú gur ghlac tú leis na Téarmaí agus gur thug tú toiliú nó gur tharraing tú siar é — Taifid ghlactha agus toilithe — Oibleagáid dhlíthiúil — Art. 6(1)(c), ár ndualgas toiliú a léiriú faoi Art. 7(1) — agus leasanna dlisteanacha chun an conradh a chruthú",
@@ -112,8 +119,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Foilsiú agus infheictheacht",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Bíonn díospóireachtaí príobháideach go dtí go bhfoilsíonn tú iad. Is gníomh d'aon ghnó é foilsiú agus deimhnítear ar leithligh é. Taispeánann díospóireacht fhoilsithe d'ainm cleite, do cheist mar a scríobh tú í, crann na n-argóintí, na scóir, an breithiúnas agus an banda muiníne, agus bíonn lipéad infheicthe uirthi a deir gur ghin IS an t-ábhar. Ní thaispeánann sí do sheoladh ríomhphoist, do thaifid sheisiúin ná stair do chuntais riamh. Tá díospóireachtaí foilsithe [Published debates are / are not] innéacsaithe ag innill chuardaigh [unless you choose]." },
-      { kind: "p", text: "Má dhífhoilsítear an díospóireacht, baintear ó DebateAI í agus scriostar an eochair dár leagan poiblí. Tá cóipeanna atá déanta cheana ag léitheoirí, innill chuardaigh nó cartlanna lasmuigh dár smacht, agus ní féidir linn iad a aisghairm." },
+      { kind: "p", text: "Bíonn díospóireachtaí príobháideach go dtí go bhfoilsíonn tú iad. Is gníomh d'aon ghnó é foilsiú agus deimhnítear ar leithligh é. Taispeánann díospóireacht fhoilsithe d'ainm cleite, do cheist mar a scríobh tú í, crann na n-argóintí, na scóir, an breithiúnas agus an banda muiníne, agus bíonn lipéad infheicthe uirthi a deir gur ghin IS an t-ábhar. Ní thaispeánann sí do sheoladh ríomhphoist, do thaifid sheisiúin ná stair do chuntais riamh. Féadfaidh innill chuardaigh díospóireachtaí foilsithe a innéacsú." },
+      { kind: "p", text: "Má dhífhoilsítear an díospóireacht, baintear ó Dialectical Engine í agus scriostar an eochair dár leagan poiblí. Tá cóipeanna atá déanta cheana ag léitheoirí, innill chuardaigh nó cartlanna lasmuigh dár smacht, agus ní féidir linn iad a aisghairm." },
       { kind: "p", text: "Nuair a scriosann tú do chuntas, bainimid gach díospóireacht a d'fhoilsigh tú ó rochtain phoiblí gan moill mhíchuí agus laistigh de 30 lá ar a mhéad, mura gceanglaíonn an dlí orainn mír ar leith a choinneáil. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -126,6 +133,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Cuntas — Fad atá an cuntas ann, móide tréimhse chairde 7 lá tar éis duit iarraidh é a dhúnadh — Scriostar eochracha; scriostar an taifead",
+        "Seoladh IP don chuardach áitiúil ar an tír — Le linn próiseáil an chlárúcháin nó thús díospóireachta nua amháin — Ní choinnítear an seoladh IP i bhfoirm inléite tar éis na seiceála; má dhiúltaítear don iarratas, ní choinníonn an loga iniúchóireachta ach hais aontreo eochraithe den seoladh IP agus den teaghrán gníomhaire úsáideora, mar a mhínítear thíos",
+        "Taifead diúltaithe do sheiceáil thír an tseolta IP — Ar feadh shaolré na seirbhíse — Tá cód diúltaithe, an tír, comhartha gur fianaise a bhí sa seoladh IP, agus hais aontreo eochraithe den seoladh IP agus den teaghrán gníomhaire úsáideora sa taifead; ní féidir ach taifid a chur leis an loga iniúchóireachta",
+        "Toradh agus sonraí na seiceála aoise — Fad atá an cuntas ann — Scriostar iad leis an gcuntas",
+        "Tír chónaithe dhearbhaithe agus stát SAM — Fad atá an cuntas ann — Scriostar iad leis an gcuntas",
         "Taifid sheisiúin — 14 lá tar éis na húsáide deireanaí, nó 90 lá tar éis an chruthaithe, cibé acu is túisce — Scriostar iad",
         "Naisc fhíoraithe ríomhphoist — 24 uair an chloig — Scriostar iad",
         "Comharthaí riosca sínithe isteach agus athshlánaithe — 90 lá, arna fhorfheidhmiú ag an mbunachar sonraí — Glantar iad",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Srianadh (Art. 18) — Iarr orainn stopadh de shonraí ar leith a phróiseáil fad atá díospóid fúthu á réiteach",
         "Agóid (Art. 21) — Déan agóid i gcoinne próiseála atá bunaithe ar leasanna dlisteanacha — an phróiseáil slándála agus iniúchóireachta i rannán 4 — agus stopaimid mura féidir linn forais sháraitheacha a léiriú. Déan agóid i gcoinne margaíochta am ar bith, agus stopaimid",
         "Iniomparthacht (Art. 20) — Do dhíospóireachtaí agus sonraí do chuntais i bhformáid a úsáidtear go coitianta agus atá inléite ag meaisín. [Pending: same export as Access.] Tugtar ábhar neamhphearsanta a chruthaigh tú, amhail do cheisteanna, ar ais duit má iarrann tú é nuair a thagann deireadh leis an gconradh",
-        "Toiliú a tharraingt siar (Art. 7(3)) — Tarraing toiliú margaíochta siar ó aon ríomhphost nó ó na Socruithe; tarraing an toiliú le haghaidh sonraí íogaire siar trí gan na sonraí sin a chur isteach, nó trí dhíospóireacht a scriosadh. Ní dhéanann tarraingt siar difear don phróiseáil a tharla cheana",
+        "Toiliú a tharraingt siar (Art. 7(3)) — Tarraing toiliú margaíochta siar ó aon ríomhphost nó ó na Socruithe; tarraing an toiliú le haghaidh sonraí íogaire siar trí scríobh chuig privacy@dezbatere.ro (is féidir leat na sonraí a fhágáil ar lár nó díospóireacht ina bhfuil siad a scriosadh freisin). Ní dhéanann tarraingt siar difear don phróiseáil a tharla cheana",
         "Gearán — Le húdarás maoirseachta na Rómáine, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Búcairist, anspdcp@dataprotection.ro, nó leis an údarás sa tír ina bhfuil cónaí ort. B'fhearr linn cloisteáil uait ar dtús"
         ]
       },
@@ -188,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Daoine a ainmnítear i ndíospóireachtaí nach úsáideoirí dár gcuid iad",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Má chuireann duine ceist ar DebateAI ina n-ainmnítear thú, d'fhéadfaimis sonraí pearsanta fút a choinneáil cé nár úsáid tú an tseirbhís riamh. Cuireann na Téarmaí cosc ar úsáideoirí é seo a dhéanamh, agus íoslaghdaímid an méid a sheolaimid chuig soláthraithe IS, ach tarlaíonn sé." },
+      { kind: "p", text: "Má chuireann duine ceist ar Dialectical Engine ina n-ainmnítear thú, d'fhéadfaimis sonraí pearsanta fút a choinneáil cé nár úsáid tú an tseirbhís riamh. Cuireann na Téarmaí cosc ar úsáideoirí é seo a dhéanamh, agus íoslaghdaímid an méid a sheolaimid chuig soláthraithe IS, ach tarlaíonn sé." },
       { kind: "p", text: "Is é an rannán seo an fógra atá dlite duit faoi Airteagal 14 GDPR. Is iad na sonraí cibé rud a chlóscríobh an t-úsáideoir agus cibé rud a ghin an t-inneall mar fhreagra; is é an t-úsáideoir sin an fhoinse; is iad na cuspóirí agus an bunús dlíthiúil na cinn i rannán 4; is iad na soláthraithe IS sa Chlár na faighteoirí; leanann an choinneáil rannán 7. Tá gach ceart i rannán 10 agat, agus go háirithe is féidir leat iarraidh orainn díospóireacht fhoilsithe nó díospóireacht phríobháideach ina bhfuil do shonraí a bhaint, agus a insint duit cad atá againn. Ní gá cuntas a bheith agat chun é sin a dhéanamh. Scríobh chuig privacy@dezbatere.ro nó úsáid an rialtán Tuairiscigh ar aon díospóireacht fhoilsithe, agus gníomhaímid maidir le hiarrataí a bhfuil bunús leo gan moill mhíchuí. Ní féidir linn fógra aonair a thabhairt duit nuair a tharlaíonn sé seo, mar níl a fhios againn cé thú ná conas teagmháil a dhéanamh leat; is iad an fógra poiblí seo agus an bealach bainte na bearta a dhéanaimid ina ionad." },
       { kind: "p", text: "Baineann an rud céanna le faisnéis íogair fút — polaitíocht, sláinte, reiligiún — a thagann chun cinn i gceist a chuir duine eile. Ní cheadaíonn aon choinníoll dlíthiúil dúinn leanúint dá próiseáil tar éis duit agóid a dhéanamh, agus ní leanfaimid di." }
     ]
@@ -198,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Leanaí",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Is do dhaoine fásta é DebateAI. Deimhníonn tú go bhfuil tú 18 mbliana d'aois nó os a chionn nuair a chláraíonn tú, agus ní phróiseálaimid go feasach sonraí aon duine faoi 18 mbliana d'aois. Má fhaighimid amach go bhfuil cuntas ag duine faoi 18 mbliana d'aois, dúnfaimid é agus scriosfaimid na sonraí mar a thuairiscítear i rannán 7. Measann roinnt tíortha nach leor deimhniú nó éilíonn siad níos mó; deir Iarscríbhinn B cad atá i bhfeidhm agus cén áit, agus mínítear sna Téarmaí an méid a dhéanaimid faoi." }
+      { kind: "p", text: "Is do dhaoine fásta é Dialectical Engine. Deimhníonn tú go bhfuil tú 18 mbliana d'aois nó os a chionn nuair a chláraíonn tú, agus ní phróiseálaimid go feasach sonraí aon duine faoi 18 mbliana d'aois. Má fhaighimid amach go bhfuil cuntas ag duine faoi 18 mbliana d'aois, dúnfaimid é agus scriosfaimid na sonraí mar a thuairiscítear i rannán 7. Measann roinnt tíortha nach leor deimhniú nó éilíonn siad níos mó; deir Iarscríbhinn B cad atá i bhfeidhm agus cén áit, agus mínítear sna Téarmaí an méid a dhéanaimid faoi." }
     ]
   },
   {
@@ -206,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Fianáin",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Úsáideann DebateAI ocht mír, agus tá géarghá le gach ceann acu don tseirbhís a d'iarr tú agus ní shocraíonn ach DebateAI iad: ceithre fhianán agus ceithre iontráil i stóras do bhrabhsálaí. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad sa Bheartas Fianán ag [dezbatere.ro/cookies], mar aon leis an méid a dhéanann gach ceann acu agus cé a fhaigheann é, agus athrófar é sula gcuirfear aon rud eile leis." },
+      { kind: "p", text: "Úsáideann Dialectical Engine 18 mír, agus tá géarghá le gach ceann acu don tseirbhís a d'iarr tú agus ní shocraíonn ach Dialectical Engine iad: 13 fhianán agus 5 iontráil i stóras do bhrabhsálaí. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad sa Bheartas Fianán ag [dezbatere.ro/cookies], mar aon leis an méid a dhéanann gach ceann acu agus cé a fhaigheann é, agus athrófar é sula gcuirfear aon rud eile leis." },
       {
         kind: "list",
         items: [
@@ -214,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Fianán — Cuireann sé cosc ar shuíomhanna eile foirmeacha a chur isteach i d’ainm. — 14 lá",
         "__Host-debateai-age-refusal — Fianán (HttpOnly) — Tar éis seiceáil aoise a dhiúltú, cuireann sé cosc ar an mbrabhsálaí seo triail eile a bhaint as ar feadh 30 lá. Níl ann ach an focal “diúltaithe”, gan aon sonraí pearsanta. — 30 lá",
         "debateai.locale — Fianán — Meabhraíonn sé teanga an chomhéadain a roghnaigh tú. — 1 bhliain",
+        "__Host-debateai-staff — Fianán (HttpOnly) — Rochtain ar leith don fhoireann — Suas le 8 n-uaire; 15 nóiméad díomhaointis",
+        "__Host-debateai-staff-csrf — Fianán — Cuireann sé cosc ar shuíomhanna eile foirmeacha a chur isteach i d’ainm. — Suas le 8 n-uaire; 15 nóiméad díomhaointis",
+        "__Host-debateai-password-reset — Fianán (HttpOnly) — Athshocrú focail faire amháin — Suas le 30 nóiméad",
+        "__Host-debateai-password-reset-csrf — Fianán — Cuireann sé cosc ar shuíomhanna eile foirmeacha a chur isteach i d’ainm. — Suas le 30 nóiméad",
+        "__Host-debateai-mfa-recovery — Fianán (HttpOnly) — Aisghabháil fíordheimhnitheora amháin — Suas le 299 soicind",
+        "__Host-debateai-mfa-recovery-csrf — Fianán — Cuireann sé cosc ar shuíomhanna eile foirmeacha a chur isteach i d’ainm. — Suas le 299 soicind",
+        "__Host-debateai-social-flow — Fianán (HttpOnly) — Sreabhadh gearr sínithe isteach trí sholáthraí nó nascadh cuntais — Suas le 5 nóiméad",
+        "__Host-debateai-social-apple — Fianán (HttpOnly) — Sreabhadh gearr sínithe isteach trí sholáthraí nó nascadh cuntais — Suas le 5 nóiméad",
+        "__Host-debateai-social-browser — Fianán (HttpOnly) — Sreabhadh gearr sínithe isteach trí sholáthraí nó nascadh cuntais — Suas le 5 nóiméad",
         "debateai.consent — Stóras áitiúil — Cuimhníonn sé go bhfaca tú an fógra fianán, ionas nach dtaispeántar é ach uair amháin. — Go dtí go nglanann tú é",
         "debateai.mode — Stóras áitiúil — Cé acu an mód geal nó an mód dorcha a úsáideann tú. — Go dtí go nglanann tú é",
         "debateai.languageOffer.dismissed — Stóras seisiúin — Cuimhníonn sé, don chluaisín seo, gur dhiúltaigh tú don tairiscint díospóireacht a thaispeáint i dteanga eile. — Go dtí go ndúnann tú an cluaisín",
-        "debateai.support.conversation.v2 — Stóras seisiúin — Coinníonn sé do chomhrá leis an gcabhair ar an scáileán fad a fhanann an cluaisín oscailte. Scriostar é nuair a shíníonn duine ar bith isteach nó amach sa chluaisín seo. — Go dtí go ndúnann tú an cluaisín"
+        "debateai.support.conversation.v2 — Stóras seisiúin — Coinníonn sé do chomhrá leis an gcabhair ar an scáileán fad a fhanann an cluaisín oscailte. Scriostar é nuair a shíníonn duine ar bith isteach nó amach sa chluaisín seo. — Go dtí go ndúnann tú an cluaisín",
+        "debateai.phone-completion-draft.v1 — Stóras seisiúin — Ceist neamhchríochnaithe le linn chéim an ghutháin; glantar í ag athrú seisiúin, síniú amach nó athrú úinéara — 15 nóiméad nó go dtí glanadh níos luaithe"
         ]
       },
-      { kind: "p", text: "Ní bhailíonn aon pháirtí eile faisnéis faoi do ghníomhaíochtaí ar líne le himeacht ama agus thar shuímh ghréasáin éagsúla trí DebateAI." },
-      { kind: "p", text: "Is féidir le brabhsálaithe comhartha “Do Not Track” nó comhartha cosúil leis a sheoladh. Ní rianaíonn DebateAI thú, mar sin níl aon rud ann le múchadh ag comhartha den sórt sin: oibríonn an tseirbhís ar an mbealach céanna leis nó gan é." },
+      { kind: "p", text: "Ní bhailíonn aon pháirtí eile faisnéis faoi do ghníomhaíochtaí ar líne le himeacht ama agus thar shuímh ghréasáin éagsúla trí Dialectical Engine." },
+      { kind: "p", text: "Is féidir le brabhsálaithe comhartha “Do Not Track” nó comhartha cosúil leis a sheoladh. Ní rianaíonn Dialectical Engine thú, mar sin níl aon rud ann le múchadh ag comhartha den sórt sin: oibríonn an tseirbhís ar an mbealach céanna leis nó gan é." },
       { kind: "p", text: "Chun na míreanna seo a dhiúltú, cuir bac ar fhianáin agus ar shonraí suímh an tsuímh seo, nó scrios iad, i socruithe do bhrabhsálaí. Cad a stopann ag obair ansin: síniú isteach, agus cuimhneamh ar do roghanna teanga agus taispeána; taispeánfar an fógra fianán arís freisin." }
     ]
   },
@@ -231,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag [dezbatere.ro/privacy/versions]. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú." },
-      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar [date]. Tháinig Leagan 3.0 in ionad leagan 2.1, ina ndearnadh cur síos ar shonraí seisiúin, tréimhsí coinneála, anailísíocht, easpórtáil agus éifeacht an scriosta ar dhíospóireachtaí foilsithe ar bhealaí nár léirigh an tseirbhís a thuilleadh." }
+      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar [date]. Tháinig Leagan 3.2 in ionad leagan 2.1, ina ndearnadh cur síos ar shonraí seisiúin, tréimhsí coinneála, anailísíocht, easpórtáil agus éifeacht an scriosta ar dhíospóireachtaí foilsithe ar bhealaí nár léirigh an tseirbhís a thuilleadh." }
     ]
   },
   {
@@ -263,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Stáit Aontaithe Mheiriceá (ach amháin má tá siad liostaithe)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Fógra tráth bailithe. Liostaítear sa tábla i rannán 2 gach catagóir faisnéise pearsanta a bhailímid, a cuspóir, agus cá fhad a choinnímid í (rannán 7). Ní bhailímid na catagóirí seo d'fhaisnéis phearsanta íogair ach amháin nuair a chuireann tú isteach i do cheisteanna fút féin iad: sláinte, creidimh reiligiúnacha nó fealsúnacha, saol gnéasach nó claonadh gnéasach, tuairimí polaitiúla, ballraíocht i gceardchumann, agus bunadh ciníoch nó eitneach. Ní úsáidimid iad ach chun do dhíospóireachtaí a reáchtáil, agus ní dhéanaimid amhlaidh ach tar éis an toilithe ar leith i rannán 3. Ní dhíolaimid ná ní roinnimid faisnéis phearsanta, agus ní dhearnamar é sin le linn an dá mhí dhéag roimhe seo. Ní úsáidimid faisnéis phearsanta le haghaidh fógraíochta spriocdhírithe, agus ní úsáidimid faisnéis phearsanta íogair chun aon chríche seachas an tseirbhís a iarrann tú a sholáthar. Comharthaí rogha an diúltaithe: ós rud é nach ndíolaimid ná nach roinnimid faisnéis phearsanta agus nach n-úsáidimid í le haghaidh fógraíochta spriocdhírithe, níl aon ní ann le diúltú dó, agus ní athraíonn comhartha Global Privacy Control aon ní. Do chearta: eolas a fháil, scriosadh a iarraidh, ceartú a iarraidh, diúltú, úsáid faisnéise pearsanta íogaire a theorannú, agus gan idirdhealú a fhulaingt mar gheall ar iad a fheidhmiú; déan iarratas ag privacy@dezbatere.ro. Dreasachtaí airgeadais: ní thairgimid aon cheann; is ionann ár gcuspóirí agus ár gcosaintí ar na pleananna saor in aisce agus íoctha. Tá an choinneáil i rannán 7. Sáruithe: tugaimid fógra do chónaitheoirí agus d'údaráis stáit mar a éilíonn dlí sáraithe gach stáit. Nuashonraítear an fógra seo gach dhá mhí dhéag ar a laghad; nuashonraíodh é an uair dheireanach ar [date]." },
+      { kind: "p", text: "Fógra tráth bailithe. Liostaítear sa tábla i rannán 2 na catagóirí faisnéise pearsanta a bhailímid agus a bhfoinsí. Tá críocha agus bunúis dlí na próiseála i rannán 4, agus tá na tréimhsí coinneála i rannán 7. Ní bhailímid na catagóirí seo d'fhaisnéis phearsanta íogair ach amháin nuair a chuireann tú isteach i do cheisteanna fút féin iad: sláinte, creidimh reiligiúnacha nó fealsúnacha, saol gnéasach nó claonadh gnéasach, tuairimí polaitiúla, ballraíocht i gceardchumann, agus bunadh ciníoch nó eitneach. Ní úsáidimid iad ach chun do dhíospóireachtaí a reáchtáil, agus ní dhéanaimid amhlaidh ach tar éis an toilithe ar leith i rannán 3. Ní dhíolaimid ná ní roinnimid faisnéis phearsanta, agus ní dhearnamar é sin le linn an dá mhí dhéag roimhe seo. Ní úsáidimid faisnéis phearsanta le haghaidh fógraíochta spriocdhírithe, agus ní úsáidimid faisnéis phearsanta íogair chun aon chríche seachas an tseirbhís a iarrann tú a sholáthar. Comharthaí rogha an diúltaithe: Faoi láthair níl aon ní le diúltú dó, mar ní dhíolaimid ná ní roinnimid faisnéis phearsanta. Má thosaímid á díol nó á roinnt amach anseo, urramóimid comharthaí Global Privacy Control mar dhiúltú. Do chearta: eolas a fháil, scriosadh a iarraidh, ceartú a iarraidh, diúltú, úsáid faisnéise pearsanta íogaire a theorannú, agus gan idirdhealú a fhulaingt mar gheall ar iad a fheidhmiú; déan iarratas ag privacy@dezbatere.ro. Dreasachtaí airgeadais: ní thairgimid aon cheann; is ionann ár gcuspóirí agus ár gcosaintí ar na pleananna saor in aisce agus íoctha. Tá an choinneáil i rannán 7. Sáruithe: tugaimid fógra do chónaitheoirí agus d'údaráis stáit mar a éilíonn dlí sáraithe gach stáit. Nuashonraítear an fógra seo gach dhá mhí dhéag ar a laghad; nuashonraíodh é an uair dheireanach ar [date]." },
       { kind: "p", text: "Connecticut: ní phróiseálaimid sonraí íogaire ach amháin le do thoiliú sainráite (roghnú isteach), a thugann tú ar an scáileán ar leith roimh do chéad díospóireacht (rannán 3); ní úsáidimid do shonraí pearsanta chun samhlacha IS a oiliúint. Washington: is doiciméad ar leith é ár bhFógra Príobháideachais Sonraí Sláinte Tomhaltóirí ag [URL] a bhfuil feidhm aige maidir le haon fhaisnéis a bhaineann le sláinte, tátail san áireamh. Texas agus Nebraska: ní dhíolaimid sonraí pearsanta íogaire. Colorado, Connecticut, Virginia agus stáit eile a bhfuil dlíthe cuimsitheacha príobháideachais acu: baineann na cearta thuas leat sa chás ina mbaineann an dlí linne. Má dhiúltaímid d'iarratas, is féidir leat achomharc a dhéanamh trí fhreagra a thabhairt ar ár bhfreagra ag privacy@dezbatere.ro; má dhiúltaímid don achomharc, is féidir leat teagmháil a dhéanamh le hArd-Aighne do stáit." }
     ]
   },
@@ -304,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "An Úcráin (ach amháin má tá sí liostaithe)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tá feidhm ag Dlí na hÚcráine \"Maidir le Cosaint Sonraí Pearsanta\". Ní chuirimid DebateAI ar fáil sna ceantair den Úcráin nach bhfuil faoi smacht a rialtais. Téann do shonraí chuig tíortha an Aontais Eorpaigh agus chuig na Stáit Aontaithe (féach an Clár). Is féidir leat gearán a dhéanamh leis an Ukrainian Parliament Commissioner for Human Rights." }
+      { kind: "p", text: "Tá feidhm ag Dlí na hÚcráine \"Maidir le Cosaint Sonraí Pearsanta\". Ní chuirimid Dialectical Engine ar fáil sna ceantair den Úcráin nach bhfuil faoi smacht a rialtais. Téann do shonraí chuig tíortha an Aontais Eorpaigh agus chuig na Stáit Aontaithe (féach an Clár). Is féidir leat gearán a dhéanamh leis an Ukrainian Parliament Commissioner for Human Rights." }
     ]
   },
   {
@@ -335,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "a9297204e3138d504264bd7b60984f814f805ef6a8c8c4e0021158e10edb972a",
-  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.0 · I bhFEIDHM [DATE]",
+  version: "3.2",
+  sha256: "152805f461e3b27c84ba7ab1cba0d8d1e4a23b13262187e1fcf9d4c9e5a7e46c",
+  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.2 · I bhFEIDHM [DATE]",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Téacs an Bheartais Príobháideachais",
   sectionIdPrefix: "policy-section-",

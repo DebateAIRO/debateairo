@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Where we offer DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "We offer DebateAI to people who live in [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
+      { kind: "p", text: "We offer DebateAI to people who live in [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
     ]
   },
   {
@@ -70,7 +70,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "You accept these Terms by ticking the box marked \"I have read and agree to the Terms of Service\" and clicking Create account. That creates a contract between you and DebateAIRO S.R.L. The Terms include the acceptable-use rules in section 7, the publication rules in section 9, the liability provisions in section 15, the governing-law and dispute provisions in section 18 and, if you live in the United States, the arbitration agreement in Annex A.3. We keep a record of the version you accepted and when, as our Privacy Policy explains." },
       { kind: "p", text: "Our Privacy Policy at [dezbatere.ro/privacy] explains how we handle personal data. It is information we owe you, not a contract you agree to, and nothing in these Terms turns it into consent for processing. Our Cookie Policy at [dezbatere.ro/cookies] and our AI Provider Register at [dezbatere.ro/providers] are part of these Terms by reference." },
-      { kind: "p", text: "Before you conclude any contract with us electronically, the interface shows you the steps involved, lets you review and correct what you have entered before you submit it, and tells you the languages in which the contract can be concluded. These Terms are available in a form you can save and print, we send you the version you accepted by email, and you can request a copy at any time. Nothing in these Terms limits rights you have under Romanian or EU consumer law, or the law of the country where you live, that cannot be limited by contract." }
+      { kind: "p", text: "Before you conclude any contract with us electronically, the interface shows you the steps involved, lets you review and correct what you have entered before you submit it, and tells you the languages in which the contract can be concluded. These Terms are available in a form you can save and print; when you buy a paid plan, we email you the version you accepted; and you can request a copy at any time. Nothing in these Terms limits rights you have under Romanian or EU consumer law, or the law of the country where you live, that cannot be limited by contract." }
     ]
   },
   {
@@ -100,7 +100,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Your account",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "You register with an email address, a password, a recovery email address and two-factor authentication, which is mandatory. You choose a pseudonym, which is the name shown on anything you publish; pseudonyms cannot be changed once set. Keep your password, your authentication app and your recovery codes safe. You are responsible for activity under your account, except where it results from our failure." },
+      { kind: "p", text: "You register with an email address, a password, a recovery email address and two-factor authentication, which is mandatory. We give you a random pseudonym, which is the name shown on anything you publish. It cannot be changed. Keep your password, your authentication app and your recovery codes safe. You are responsible for activity under your account, except where it results from our failure." },
       { kind: "p", text: "You may hold one account unless we agree otherwise. Do not share, sell or transfer it." },
       { kind: "p", text: "If you lose access, account recovery follows the process published in the product, which includes waiting periods designed to make account takeover harder. We may refuse a recovery request where we cannot reasonably establish that it comes from you." },
       { kind: "p", text: "You can close your account at any time from Settings → Account. Closure takes effect after a 7-day grace period during which you can cancel it, and we notify you on each of your registered channels. Section 11 explains what closure deletes and what it does not." }
@@ -116,7 +116,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Your own sensitive information. Questions you ask may touch on your own health, beliefs, politics or other sensitive matters. You consent to that on a separate screen before your first debate. If you live somewhere with specific rules on health data, Annex A may point you to a separate notice." },
       { kind: "p", text: "Do not submit or publish unlawful content, including content that is defamatory, incites violence or hatred, harasses or threatens, is intimate imagery shared without consent, infringes intellectual property or confidentiality, discloses trade secrets, constitutes child sexual abuse material, or breaches sanctions or export controls." },
       { kind: "p", text: "Do not use DebateAI to deceive. Do not present generated output as human-written where that would mislead, strip the AI-generated label from it, or use it to manufacture apparent consensus, fake evidence or impersonation." },
-      { kind: "p", text: "Do not attack the service. No automated access, scraping, crawling or bulk extraction of published debates beyond what our robots file permits; no circumvention of rate limits, authentication or publication controls; no attempts to extract prompts or system instructions; no prompt injection aimed at making the engine ignore its constraints; no probing or load testing without our written permission." },
+      { kind: "p", text: "Do not attack the service. Except for ordinary indexing by search engines, do not access the service automatically, scrape, crawl or bulk-extract published debates without our written permission; do not circumvent rate limits, authentication or publication controls; do not try to extract prompts or system instructions; do not use prompt injection to make the engine ignore its constraints; and do not probe or load-test the service without our written permission." },
       { kind: "p", text: "Do not resell or rebrand the service, or use it to build a competing engine, including by using outputs as training data, without our written agreement." },
       { kind: "p", text: "Do not use DebateAI for decisions about a person's health, safety, legal rights, employment, credit, housing or immigration status. It is not built for that and its outputs are not a safe basis for it." },
       { kind: "p", text: "Local law where you publish. You are responsible for making sure that anything you publish complies with the law of the country you are in. We may restrict publication of certain topics in certain regions." },
@@ -143,7 +143,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Debates are private by default. Nothing you create is visible to anyone else unless you publish it." },
-      { kind: "p", text: "What publishing does. Publishing is a deliberate, separately confirmed action. When you publish, we take a frozen snapshot of the debate and make it readable by anyone, without an account. [Search engines may index it. / Published debates are not indexed by search engines unless you choose to allow it.] The snapshot shows your pseudonym, your question as you wrote it, the argument tree, the scores, the verdict and the confidence band, and carries a visible label that the content is AI-generated. It does not show your email address, your session records or your account history." },
+      { kind: "p", text: "What publishing does. Publishing is a deliberate, separately confirmed action. When you publish, we take a frozen snapshot of the debate and make it readable by anyone, without an account. Search engines may index it. The snapshot shows your pseudonym, your question as you wrote it, the argument tree, the scores, the verdict and the confidence band, and carries a visible label that the content is AI-generated. It does not show your email address, your session records or your account history." },
       { kind: "p", text: "Publishing is effectively irreversible in practice. Once a debate is public, other people can read, quote, screenshot, archive and cache it. Unpublishing removes it from DebateAI and destroys the key to our copy, but cannot reach copies that already exist elsewhere. Do not publish anything you would be unwilling to have permanently associated with your pseudonym." },
       { kind: "p", text: "Published debates when you close your account. When your account is closed, we remove every debate you published from public access without undue delay and in any event within 30 days, unless the law requires us to act faster or to retain a specific item. Copies that others made before removal are outside our control. If you want a debate to stay available after you leave, download it first. [This is Option B from the earlier drafts, as recommended in the second-opinion review. It is a product change to implement, not a description of the current system, which keeps published snapshots readable after erasure.]" },
       { kind: "p", text: "We can always take published content down. We may remove or restrict access to a published debate where the law requires it, where a court or competent authority orders it, or where it breaches these Terms or is illegal. Nothing in this section prevents us from acting on a valid notice under section 10, and nothing in it is a promise that a published debate will remain available." },
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "United States (only if listed in section 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. We do not offer DebateAI to people who live in Tennessee." },
       { kind: "p", text: "Arbitration agreement and class-action waiver. If you live in the United States, you and DebateAIRO agree to resolve any dispute arising out of these Terms or the service by binding individual arbitration administered by [the American Arbitration Association / JAMS] under its consumer rules, rather than in court, except that either of us may bring an individual claim in small-claims court. You may opt out by emailing [address] within 30 days of first accepting these Terms. This agreement is governed by the Federal Arbitration Act. We pay the arbitration filing fees. Class, collective and representative actions are waived to the extent the law allows. This section applies prospectively only and does not apply to claims that arose before you accepted it." },
       { kind: "p", text: "Notices and takedowns. Non-consensual intimate imagery may be reported at [URL] without an account and is removed within 48 hours of a valid request. Copyright complaints go to our designated agent named in section 16." },
       { kind: "p", text: "State-specific. California: the automatic-renewal terms in section 12 apply; you may cancel online at any time; we retain your consent to renewal terms for at least three years. New York: you may cancel within 14 days of any charge at an increased price and receive a pro-rata refund. Texas and Nebraska: we do not sell sensitive personal data. Washington: our Consumer Health Data Privacy Notice at [URL] applies to health-related information. Colorado: nothing in the service makes consequential decisions about you. Our Privacy Policy, Annex B.3, covers your data and your state privacy rights." }
@@ -380,12 +381,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.0",
-  sha256: "204c7fc22db03df274d0995b89f5fcdccd9b94e5906f4f7a631e8446f33d24a2",
-  eyebrow: "TERMS OF SERVICE · v2.0 · EFFECTIVE [DATE]",
+  version: "2.1",
+  sha256: "fe032570217ea191d28a698bef19a89ed43de9425c468256ac4cf8c321eb036c",
+  eyebrow: "TERMS OF SERVICE · v2.1 · EFFECTIVE [DATE]",
   title: "What you agree to",
   lede: "The contract between you and DebateAIRO S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",
-  endMarker: "END OF TERMS · v2.0",
+  endMarker: "END OF TERMS · v2.1",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Terms of Service text",
   sectionIdPrefix: "terms-section-",

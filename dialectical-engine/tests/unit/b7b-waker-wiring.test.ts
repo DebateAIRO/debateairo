@@ -40,6 +40,6 @@ describe("B7b the API root wakes the line", () => {
   it("hands the room to the application as both the decision and the line, with the plans a waking run is checked against", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
     expect(main).toContain("? { room: askRoom, waitingLine: askRoom }");
-    expect(main).toContain("        entitlements,\n        billingPlans,\n        dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,");
+    expect(main).toMatch(/entitlements,\s*billingPlans,\s*\.\.\.\(fundedAllowance === undefined \? \{\} : \{\s*funding:\s*fundedAllowance\s*\}\),\s*dailyCeilingMicros:\s*costEnvelopeRows\.runPolicy\.dailyCeilingMicros,/u);
   });
 });

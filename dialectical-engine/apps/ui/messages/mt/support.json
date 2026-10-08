@@ -81,5 +81,7 @@
   "support.answerRating": "Valutazzjoni tat-tweġiba",
   "support.privacyPreferences": "Privatezza",
   "support.aiBanner": "It-tweġibiet huma ġġenerati mill-IA, immarkati b’mod li jista’ jinqara minn magna, u jistgħu jkunu żbaljati. Tista’ titlob persuna fi kwalunkwe ħin.",
-  "support.cookiePreferences": "Il-cookies li naħżnu"
+  "support.cookiePreferences": "Il-cookies li naħżnu",
+  "support.recoverAccount": "Irkupra l-kont tiegħek",
+  "support.countryUnavailable": "Dialectical Engine għadu mhux disponibbli f’pajjiżek."
 }

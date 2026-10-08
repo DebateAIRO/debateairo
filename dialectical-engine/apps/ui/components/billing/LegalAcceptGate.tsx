@@ -6,7 +6,7 @@ import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { PrivacyPolicyModal } from "@/components/consent/PrivacyPolicyModal";
 import { TermsOfServiceModal } from "@/components/consent/TermsOfServiceModal";
 import { useLegalDocument } from "@/components/consent/useLegalDocument";
-import { clearStoredSupportConversation } from "@/components/support/conversation";
+import { endSession } from "@/lib/endSession";
 import { contractClient } from "@/lib/api";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -118,9 +118,8 @@ export function LegalAcceptGate({
     setBusy(true);
     setError(null);
     try {
-      await client.logout();
+      await endSession(client, { redirectTo: null });
       // DL3-F3, the same clear SessionControls runs: the support transcript never outlives the session.
-      clearStoredSupportConversation();
       onSignedOut();
     } catch {
       setError("signOutFailed");

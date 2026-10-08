@@ -21,7 +21,7 @@ describe("T7 audit-chain capacity contract", () => {
     expect(createStart).toBeGreaterThan(-1);
     expect(deliveryStart).toBeGreaterThan(createStart);
     expect(repository.slice(createStart, deliveryStart)).toContain("return this.transaction(async (client)");
-    expect(repository.slice(createStart, deliveryStart)).toContain("identity.create_pending_account_with_audit(");
+    expect(repository.slice(createStart, deliveryStart)).toContain("identity.create_pending_account_reserved_with_audit(");
     expect(repository.slice(deliveryStart)).toContain("await this.transaction(async (client)");
     expect(repository.slice(deliveryStart)).toContain("identity.record_verification_delivery_with_audit(");
 

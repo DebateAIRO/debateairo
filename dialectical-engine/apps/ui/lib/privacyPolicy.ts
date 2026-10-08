@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Account — Email address and recovery email address (stored encrypted, with a keyed index so we can find the account without reading the address); password (stored as a hash, never in clear); your two-factor authentication secret (encrypted); ten recovery codes (stored as hashes); your pseudonym; the time you confirmed you are 18 or over — You, at registration",
+        "Account — Email address and recovery email address (stored encrypted, with a keyed index so we can find the account without reading the address); password (stored as a hash, never in clear); your two-factor authentication secret (encrypted); ten recovery codes (stored as hashes); your pseudonym — You, at registration",
+        "IP country checks — At sign-up and when you start a new debate, we use your IP address to look up its country locally with DB-IP Lite; at sign-up we also check a locally held Tor exit list. If we refuse access, an aggregated audit entry records the refusal code, country and that the IP was the evidence; the audit trail holds one-way keyed digests of the IP address and user-agent, not readable addresses — Your connection at sign-up or when you start a debate",
+        "Age check — The result (passed or refused), the minimum age applied, the IP country if available, the rule version, whether the check was at registration or for an existing account, and the time. We do not store your date of birth — You, when you enter your date of birth",
+        "Declared location — The country where you say you live and, if that is the United States, your state — You, at registration",
         "Sessions and security — A hashed session token; a keyed hash of your browser's user-agent string, used to notice when a session moves to a different browser; timestamps of creation, last use and expiry. We do not store your IP address, device name or browser details with a session, and the session list you see in Settings shows only timestamps — Your browser",
         "Security audit trail — An append-only log of security-relevant events — registration, verification, login attempts, recovery, publication, deletion. The IP address and user-agent of each event are stored only as one-way keyed digests (Argon2id), so they cannot be read back but can be matched within a period. Login and recovery risk signals are stored encrypted for 90 days — Your browser, at the time of each event",
         "Debate content — The question you type; the steering annotations you set; the claims, critiques, evidence references, scores and verdicts the engine generates; a verbatim record of what each AI provider returned; retrieval queries and source references. All of this is stored encrypted under a key specific to your account — You, and the AI models working on your question",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "People who are not our users — Personal data about other people that you include in a question or that the engine generates in answering it. We ask you not to do this; section 11 explains what we do when it happens anyway — You, indirectly"
         ]
       },
+      { kind: "p", text: "At sign-up, we refuse access from countries we do not serve, Tor exit addresses and IP addresses whose country we cannot determine. When you start a new debate, we check the IP country again and may refuse the request from a blocked country. These checks run locally; we do not send your IP address to DB-IP or another third party for them. We aggregate refusal audit entries by route, code, country and time window. You enter your date of birth so we can check your age, but we do not keep the date. A successful registration stores a passed age-check result; for an existing account, the check may record passed or refused. You also choose your country of residence and, if it is the United States, your state." },
       { kind: "p", text: "We do not collect analytics or telemetry about how you use the product, and we set no cookies for that purpose. If that changes, this policy and the Cookie Policy change first, and you will be asked." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "A debate engine invites questions about politics, religion, health, sexuality and belief. Those are special categories of data under Article 9 GDPR, and they can arrive in your questions whether or not we intend to collect them." },
-      { kind: "p", text: "About you. Before your first debate you give explicit consent, on a separate screen, to our processing sensitive information you choose to include in your own questions, for the purpose of running your debates. We record the version of the wording you agreed to, your language and the time. Without this consent you cannot start a debate. You can withdraw it at any time by not including such information, or by deleting a debate. What you publish about yourself is data you have chosen to make public." },
+      { kind: "p", text: "About you. Before your first debate you give explicit consent, on a separate screen, to our processing sensitive information you choose to include in your own questions, for the purpose of running your debates. We record the version of the wording you agreed to, your language and the time. Without this consent you cannot start a debate. You can withdraw it at any time by writing to privacy@dezbatere.ro. You can also leave such information out, or delete a debate that contains it. What you publish about yourself is data you have chosen to make public." },
       { kind: "p", text: "About other people. No legal condition allows us to process sensitive data about a third party you name in a question, and none of our AI providers has one either. That is why the Terms prohibit it, why we minimise what we send, and why we remove such content quickly on request — section 11." },
       { kind: "p", text: "Health information. Some countries treat health-related data, including inferences, under specific laws. If you live in [the State of Washington], a separate [Consumer Health Data Privacy Notice] applies." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Why we use your data, and on what basis",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Each purpose has one legal basis under Article 6(1) GDPR, and we do not reuse data collected for one purpose for another." },
+      { kind: "p", text: "The table sets out the purposes and legal bases under Article 6(1) GDPR. We do not reuse data collected for one purpose for another." },
       {
         kind: "list",
         items: [
         "Creating and running your account, authenticating you, running and storing your debates so you can reopen and replay them — Account, sessions, debate content — Contract — Art. 6(1)(b)",
+        "Checking the IP country at sign-up and at the start of a new debate, checking Tor status at sign-up, refusing access where we cannot serve or lawfully provide the service, and recording aggregated refusals — IP address for the local check; country, refusal code and one-way keyed IP and user-agent digests in the audit trail — Legitimate interests — Art. 6(1)(f), in protecting and operating the service where we can comply; legal obligation — Art. 6(1)(c), where sanctions restrict service",
+        "Checking whether you meet the minimum age to use the service and protecting minors from access — Date of birth for the check only; stored age-check result and rule details for accounts — Contract — Art. 6(1)(b), checking eligibility to create and use an account; legitimate interests — Art. 6(1)(f), protecting minors",
+        "Applying the consumer, privacy and tax rules for where you live — Declared country and, for US residents, state — Contract — Art. 6(1)(b), applying the rules for your account; legal obligation — Art. 6(1)(c), meeting applicable consumer, privacy and tax duties",
         "Sending your question and the engine's statements to AI providers to generate a debate — Debate content — Contract — Art. 6(1)(b)",
         "Keeping the service secure, detecting abuse, letting you spot a login you did not make, keeping an audit trail — Sessions, security audit trail, support abuse hashes — Legitimate interests — Art. 6(1)(f): ours and yours in a secure service. You may object; section 10",
         "Proving that you accepted the Terms and gave or withdrew a consent — Acceptance and consent records — Legal obligation — Art. 6(1)(c), our duty to demonstrate consent under Art. 7(1) — and legitimate interests in evidencing the contract",
@@ -112,8 +119,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Publishing and visibility",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Debates are private until you publish them. Publishing is a deliberate, separately confirmed action. A published debate shows your pseudonym, your question as you wrote it, the argument tree, the scores, the verdict and the confidence band, and carries a visible label that the content is AI-generated. It never shows your email address, your session records or your account history. [Published debates are / are not] indexed by search engines [unless you choose]." },
-      { kind: "p", text: "Unpublishing removes the debate from DebateAI and destroys the key to our public copy. Copies already made by readers, search engines or archives are outside our control, and we cannot recall them." },
+      { kind: "p", text: "Debates are private until you publish them. Publishing is a deliberate, separately confirmed action. A published debate shows your pseudonym, your question as you wrote it, the argument tree, the scores, the verdict and the confidence band, and carries a visible label that the content is AI-generated. It never shows your email address, your session records or your account history. Search engines may index published debates." },
+      { kind: "p", text: "Unpublishing removes the debate from Dialectical Engine and destroys the key to our public copy. Copies already made by readers, search engines or archives are outside our control, and we cannot recall them." },
       { kind: "p", text: "When you delete your account, we remove every debate you published from public access without undue delay and within 30 days at most, unless the law requires us to keep a specific item. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -126,6 +133,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Account — While the account exists, plus a 7-day grace period after you ask to close it — Keys destroyed; record deleted",
+        "IP country lookup at sign-up and the start of a new debate; Tor check at sign-up — For each decision only; not retained as a standalone lookup record — The country may also appear in the age-check record and an aggregated refusal audit entry",
+        "Aggregated country-check refusal entries — For the life of the service, as part of the append-only security audit trail — The entry retains the refusal code, country, IP evidence label and one-way keyed IP and user-agent digests",
+        "Age-check result and rule details — Until the account is deleted after the closure grace period — Deleted with the account; date of birth is never stored",
+        "Declared country of residence and US state — Until the account is deleted after the closure grace period — Deleted with the account",
         "Session records — 14 days after last use, or 90 days after creation, whichever is first — Deleted",
         "Email verification links — 24 hours — Deleted",
         "Login and recovery risk signals — 90 days, enforced by the database — Purged",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Restriction (Art. 18) — Ask us to stop processing particular data while a dispute about it is resolved",
         "Objection (Art. 21) — Object to processing based on legitimate interests — the security and audit processing in section 4 — and we stop unless we can show compelling grounds. Object to marketing at any time, and we stop",
         "Portability (Art. 20) — Your debates and account data in a commonly used, machine-readable format. [Pending: same export as Access.] Non-personal content you created, such as your questions, is returned to you on request when the contract ends",
-        "Withdraw consent (Art. 7(3)) — Withdraw marketing consent from any email or from Settings; withdraw the sensitive-data consent by not including such data, or by deleting a debate. Withdrawal does not affect processing that already happened",
+        "Withdraw consent (Art. 7(3)) — Withdraw marketing consent from any email or from Settings; withdraw the sensitive-data consent by writing to privacy@dezbatere.ro (you can also leave such data out or delete a debate). Withdrawal does not affect processing that already happened",
         "Complain — To the Romanian supervisory authority, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, anspdcp@dataprotection.ro, or to the authority in the country where you live. We would rather hear from you first"
         ]
       },
@@ -188,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "People named in debates who are not our users",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "If someone asks DebateAI a question that names you, we may hold personal data about you although you have never used the service. The Terms prohibit users from doing this, and we minimise what we send to AI providers, but it happens." },
+      { kind: "p", text: "If someone asks Dialectical Engine a question that names you, we may hold personal data about you although you have never used the service. The Terms prohibit users from doing this, and we minimise what we send to AI providers, but it happens." },
       { kind: "p", text: "This section is the notice we owe you under Article 14 GDPR. The data is whatever the user typed and whatever the engine generated in answer; the source is that user; the purposes and legal basis are those in section 4; the recipients are the AI providers in the Register; retention follows section 7. You have every right in section 10, and in particular you can ask us to remove a published debate or a private one that contains your data, and to tell you what we hold. You do not need an account to do so. Write to privacy@dezbatere.ro or use the Report control on any published debate, and we act on substantiated requests without undue delay. We cannot notify you individually when this happens, because we do not know who you are or how to reach you; this public notice, and the removal route, are the measures we take instead." },
       { kind: "p", text: "The same applies to sensitive information about you — politics, health, religion — that appears in someone else's question. No legal condition allows us to keep processing it once you object, and we will not." }
     ]
@@ -198,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Children",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI is for adults. You confirm that you are 18 or over when you register, and we do not knowingly process the data of anyone under 18. If we learn that an account belongs to someone under 18, we close it and delete the data as section 7 describes. Some countries treat a confirmation as insufficient or require more; Annex B says what applies where, and the Terms explain what we do about it." }
+      { kind: "p", text: "Dialectical Engine is for adults. You confirm that you are 18 or over when you register, and we do not knowingly process the data of anyone under 18. If we learn that an account belongs to someone under 18, we close it and delete the data as section 7 describes. Some countries treat a confirmation as insufficient or require more; Annex B says what applies where, and the Terms explain what we do about it." }
     ]
   },
   {
@@ -206,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI uses eight items, all strictly necessary for the service you asked for and all set only by DebateAI: four cookies and four entries in your browser's storage. We set no analytics, advertising or tracking cookies. The Cookie Policy at [dezbatere.ro/cookies] lists them with what each one does and who receives it, and will change before anything else is added." },
+      { kind: "p", text: "Dialectical Engine uses 18 items, all strictly necessary for the service you asked for and all set only by Dialectical Engine: 13 cookies and 5 entries in your browser's storage. We set no analytics, advertising or tracking cookies. The Cookie Policy at [dezbatere.ro/cookies] lists them with what each one does and who receives it, and will change before anything else is added." },
       {
         kind: "list",
         items: [
@@ -214,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Cookie — Stops other websites from submitting forms in your name. — 14 days",
         "__Host-debateai-age-refusal — Cookie (HttpOnly) — After an age check is refused, stops this browser from trying again for 30 days. It holds only the word “refused”, no personal data. — 30 days",
         "debateai.locale — Cookie — Remembers the interface language you picked. — 1 year",
+        "__Host-debateai-staff — Cookie (HttpOnly) — Separate staff access — Up to 8 hours; 15-minute idle expiry",
+        "__Host-debateai-staff-csrf — Cookie — Stops other websites from submitting forms in your name. — Up to 8 hours; 15-minute idle expiry",
+        "__Host-debateai-password-reset — Cookie (HttpOnly) — Password reset only — Up to 30 minutes",
+        "__Host-debateai-password-reset-csrf — Cookie — Stops other websites from submitting forms in your name. — Up to 30 minutes",
+        "__Host-debateai-mfa-recovery — Cookie (HttpOnly) — Authenticator recovery only — Up to 299 seconds",
+        "__Host-debateai-mfa-recovery-csrf — Cookie — Stops other websites from submitting forms in your name. — Up to 299 seconds",
+        "__Host-debateai-social-flow — Cookie (HttpOnly) — Short provider sign-in or account-linking flow — Up to 5 minutes",
+        "__Host-debateai-social-apple — Cookie (HttpOnly) — Short provider sign-in or account-linking flow — Up to 5 minutes",
+        "__Host-debateai-social-browser — Cookie (HttpOnly) — Short provider sign-in or account-linking flow — Up to 5 minutes",
         "debateai.consent — Local storage — Remembers that you have seen the cookie notice, so it is shown once. — Until you clear it",
         "debateai.mode — Local storage — Whether you use the light or the dark display. — Until you clear it",
         "debateai.languageOffer.dismissed — Session storage — Remembers, for this tab, that you declined the offer to show a debate in another language. — Until you close the tab",
-        "debateai.support.conversation.v2 — Session storage — Keeps your help-chat conversation on screen while the tab stays open. It is erased when someone signs in or signs out in this tab. — Until you close the tab"
+        "debateai.support.conversation.v2 — Session storage — Keeps your help-chat conversation on screen while the tab stays open. It is erased when someone signs in or signs out in this tab. — Until you close the tab",
+        "debateai.phone-completion-draft.v1 — Session storage — Unfinished question during phone completion; cleared on session, sign-out or owner changes — 15 minutes or until earlier clearing"
         ]
       },
-      { kind: "p", text: "No other party collects information about your online activities over time and across websites through DebateAI." },
-      { kind: "p", text: "Browsers can send a “Do Not Track” signal or a similar signal. DebateAI does not track you, so there is nothing for such a signal to switch off: the service works the same with or without it." },
+      { kind: "p", text: "No other party collects information about your online activities over time and across websites through Dialectical Engine." },
+      { kind: "p", text: "Browsers can send a “Do Not Track” signal or a similar signal. Dialectical Engine does not track you, so there is nothing for such a signal to switch off: the service works the same with or without it." },
       { kind: "p", text: "To refuse these items, block or delete cookies and site data for this site in your browser settings. What then stops working: signing in, and the remembering of your language and display choices; the cookie notice will also show again." }
     ]
   },
@@ -231,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at [dezbatere.ro/privacy/versions]. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version." },
-      { kind: "p", text: "This policy was last updated on [date]. Version 3.0 replaced version 2.1, which described session data, retention periods, analytics, export and the effect of deletion on published debates in ways that no longer reflected the service." }
+      { kind: "p", text: "This policy was last updated on [date]. Version 3.2 replaced version 2.1, which described session data, retention periods, analytics, export and the effect of deletion on published debates in ways that no longer reflected the service." }
     ]
   },
   {
@@ -263,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "United States (only if listed)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Notice at collection. The table in section 2 lists each category of personal information we collect, its purpose, and how long we keep it (section 7). We collect these categories of sensitive personal information only where you include them in your own questions about yourself: health, religious or philosophical beliefs, sex life or sexual orientation, political views, union membership, and racial or ethnic origin. We use them only to run your debates, and only after the separate consent in section 3. We do not sell or share personal information, and have not done so in the preceding twelve months. We do not use personal information for targeted advertising, and we do not use sensitive personal information for any purpose beyond providing the service you request. Opt-out preference signals: because we do not sell or share personal information or use it for targeted advertising, there is nothing to opt out of, and a Global Privacy Control signal changes nothing. Your rights: to know, to delete, to correct, to opt out, to limit use of sensitive personal information, and not to be discriminated against for exercising them; make a request at privacy@dezbatere.ro. Financial incentives: we offer none; our purposes and protections are the same on the free and paid plans. Retention is in section 7. Breaches: we notify residents and state authorities as each state's breach law requires. This notice is updated at least every twelve months; last updated [date]." },
+      { kind: "p", text: "Notice at collection. The table in section 2 lists the categories of personal information we collect, what they contain and where they come from. Section 4 explains the purposes and legal bases; section 7 says how long we keep the data. We collect these categories of sensitive personal information only where you include them in your own questions about yourself: health, religious or philosophical beliefs, sex life or sexual orientation, political views, union membership, and racial or ethnic origin. We use them only to run your debates, and only after the separate consent in section 3. We do not sell or share personal information, and have not done so in the preceding twelve months. We do not use personal information for targeted advertising, and we do not use sensitive personal information for any purpose beyond providing the service you request. Opt-out preference signals: because we do not sell or share personal information or use it for targeted advertising, there is nothing to opt out of. If we ever start selling or sharing, we will honour Global Privacy Control signals as an opt-out. Your rights: to know, to delete, to correct, to opt out, to limit use of sensitive personal information, and not to be discriminated against for exercising them; make a request at privacy@dezbatere.ro. Financial incentives: we offer none; our purposes and protections are the same on the free and paid plans. Retention is in section 7. Breaches: we notify residents and state authorities as each state's breach law requires. This notice is updated at least every twelve months; last updated [date]." },
       { kind: "p", text: "Connecticut: we process sensitive data only with your opt-in consent, given on the separate screen before your first debate (section 3); we do not use your personal data to train AI models. Washington: our Consumer Health Data Privacy Notice at [URL] is a separate document that applies to any health-related information, including inferences. Texas and Nebraska: we do not sell sensitive personal data. Colorado, Connecticut, Virginia and other states with comprehensive privacy laws: the rights above apply to you where the law applies to us. If we refuse a request, you can appeal by replying to our answer at privacy@dezbatere.ro; if we refuse the appeal, you can contact the Attorney General of your state." }
     ]
   },
@@ -304,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraine (only if listed)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "The Law of Ukraine \"On Personal Data Protection\" applies. We do not offer DebateAI in the areas of Ukraine not controlled by its government. Your data goes to EU countries and the United States (see the Register). You can complain to the Ukrainian Parliament Commissioner for Human Rights." }
+      { kind: "p", text: "The Law of Ukraine \"On Personal Data Protection\" applies. We do not offer Dialectical Engine in the areas of Ukraine not controlled by its government. Your data goes to EU countries and the United States (see the Register). You can complain to the Ukrainian Parliament Commissioner for Human Rights." }
     ]
   },
   {
@@ -335,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "8e5ad8287f4ebc0d08fe1f55dfea5f36cc4a78d9d9aea32753c1e126beeaab2f",
-  eyebrow: "PRIVACY POLICY · v3.0 · EFFECTIVE [DATE]",
+  version: "3.2",
+  sha256: "64deca8c44238c7b9f033d215475208a2b91d5581918c964941b5a79cc27a73d",
+  eyebrow: "PRIVACY POLICY · v3.2 · EFFECTIVE [DATE]",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",
-  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privacy Policy text",
   sectionIdPrefix: "policy-section-",

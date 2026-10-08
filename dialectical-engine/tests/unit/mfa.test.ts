@@ -1,3 +1,5 @@
+import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows } from '@debateai/register';
+import { consumerPasswordUsable } from '../../apps/api/src/consumer-security.js';
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -10,11 +12,12 @@ import {
   generateTotpSecret,
   generateVerificationToken,
   hashPassword,
+  hashRecoveryCode,
   matchTotpStep,
   totpCodeAtStep,
   totpProvisioningUri
 } from "../../packages/crypto/src/index.js";
-import { MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue } from "../../packages/register/src/mfa-policy.js";
+import { MFA_POLICY_REGISTER_ROW, MFA_POLICY_DEPLOYMENT_REGISTER_ROW, mfaPolicyFromValue } from "../../packages/register/src/mfa-policy.js";
 import { MfaEnrollmentService, MfaVerificationLimiter } from "../../apps/api/src/mfa.js";
 import { totpQrMatrix } from "../../apps/ui/lib/totpQr.js";
 
@@ -146,7 +149,7 @@ describe("S4 MFA enrolment service", () => {
     expect(spray.consume("enrollment-overflow", "203.0.113.4", new Date(0))).toBe(false);
   });
 
-  it("keeps the seed encrypted, requires TOTP then a recovery-code type-back, and replaces a used code", async () => {
+  it("keeps the seed encrypted and authenticates immediately after verified TOTP", async () => {
     const policy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value);
     const userId = "11111111-1111-4111-8111-111111111111";
     const pseudonym = "amber-raven-010203";
@@ -227,15 +230,28 @@ describe("S4 MFA enrolment service", () => {
         return true;
       }
     };
+    const argon2=fakeArgon2();
+    const fixtureAuthPolicy=authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS),fixturePassword=await hashPassword(argon2,"Fixture password 123!",fixtureAuthPolicy.password.argon2id);
+    let committed=0;
     const service = new MfaEnrollmentService({
       repository: repository as never,
+      consumerRepository: {
+        prepareTotpEnrollment: async()=>({userId,pseudonym,expiresAt:new Date(now.getTime()+300000).toISOString()}),
+        beginTotpEnrollment: async(input)=>{await repository.beginTotpEnrollment(input);return {expiresAt:new Date(now.getTime()+300000).toISOString()};},
+        readTotpEnrollment: async()=>factor?.state!=="pending"?null:{passwordHash:fixturePassword,userId,pseudonym,factorId:factor.factorId,secretCiphertext:factor.secretCiphertext,lastAcceptedStep:factor.lastAcceptedStep,purpose:"INITIAL_ENROLLMENT",expiresAt:new Date(now.getTime()+300000).toISOString()},
+        completeTotpEnrollment: async(input)=>{factor!.state="active";factor!.lastAcceptedStep=input.acceptedStep;accountState="active";return {userId,ownerRef:userId,sessionId:input.material!.sessionId};}
+      },
+      sessions:{ passwordUsable:(value)=>consumerPasswordUsable(value,fixtureAuthPolicy),admit:async()=>({retentionKey:"sha256:"+"a".repeat(64),challengeCapacity:8192,challengesPerScope:5}),bindingHash:()=>"sha256:"+"b".repeat(64),
+        prepare:()=>({sessionId:userId,sessionToken:"s".repeat(43),csrfToken:"c".repeat(43),sessionTokenHash:"sha256:"+"a".repeat(64),csrfTokenHash:"sha256:"+"c".repeat(64),bindingHash:"sha256:"+"b".repeat(64),sessionBindingContext:{user_agent_hash:"sha256:"+"b".repeat(64)},occurredAt:now,idleExpiresAt:new Date(now.getTime()+1209600000),absoluteExpiresAt:new Date(now.getTime()+2592000000)}),
+        committed:async(material)=>{expect(accountState).toBe("active");committed++;return {status:"authenticated",sessionToken:material.sessionToken,csrfToken:material.csrfToken,session:{asker_id:`owner:${userId}`,session_id:userId,caller_scope:"ASKER",ownership_provenance:"server_session",provisional_identity_model:false}};}
+      },
       dekStore: {
         async store() { throw new Error("unused"); },
         async destroy() { return "ALREADY_ABSENT"; },
         async exists() { return true; },
         async load() { return Buffer.from(dek); }
       },
-      argon2: fakeArgon2(),
+      argon2,
       policy,
       clock: () => now
     });
@@ -247,25 +263,15 @@ describe("S4 MFA enrolment service", () => {
     const currentStep = Math.floor(now.getTime() / 30_000);
     const code = totpCodeAtStep(decodeBase32(begun.secret), currentStep);
     await expect(service.verifyTotp({ enrollmentToken: token, code }, source))
-      .resolves.toEqual({ status: "recovery_codes_required" });
+      .resolves.toMatchObject({ status: "authenticated", sessionToken: expect.any(String), csrfToken: expect.any(String) });
 
-    const unseen = await service.generateRecoveryCodes({ enrollmentToken: token }, source);
-    const generated = await service.generateRecoveryCodes({ enrollmentToken: token }, source);
-    expect(generated.recoveryCodes).toHaveLength(10);
-    expect(generated.recoveryCodes).not.toEqual(unseen.recoveryCodes);
-    for (const plaintext of generated.recoveryCodes) {
-      expect([...recovery.values()].every((stored) => !stored.hash.includes(plaintext))).toBe(true);
-    }
-    await expect(service.confirmRecoveryCode({
-      enrollmentToken: token,
-      recoveryCode: unseen.recoveryCodes[0]!
-    }, source)).rejects.toMatchObject({ code: "MFA_RECOVERY_CONFIRMATION_INVALID" });
-    await expect(service.confirmRecoveryCode({
-      enrollmentToken: token,
-      recoveryCode: generated.recoveryCodes[0]!
-    }, source)).resolves.toEqual({ status: "active" });
     expect(accountState).toBe("active");
-
+    expect(committed).toBe(1);
+    expect(recovery.size).toBe(0);
+    await expect(service.verifyTotp({enrollmentToken:token,code},source)).rejects.toMatchObject({code:"MFA_ENROLLMENT_STATE_INVALID"});
+    // Existing saved-code custody remains independent of whether initial enrollment generated codes.
+    const generated={recoveryCodes:generateRecoveryCodes()};
+    for(const [i,value] of generated.recoveryCodes.entries()) recovery.set(i+1,{id:`recovery-${++nextRecoveryId}`,hash:await hashRecoveryCode(argon2,value,policy.recoveryCodes.argon2id),consumed:false});
     const first = await service.consumeRecoveryCode({
       userId, recoveryCode: generated.recoveryCodes[1]!
     }, source);
@@ -273,7 +279,7 @@ describe("S4 MFA enrolment service", () => {
     await expect(service.consumeRecoveryCode({
       userId, recoveryCode: generated.recoveryCodes[1]!
     }, source)).resolves.toEqual({ consumed: false });
-    expect(failures).toEqual(["MFA_RECOVERY_CONFIRMATION_INVALID"]);
+    expect(failures).toEqual([]);
   });
 
   it("bounds recovery hashing so a registration credential job coexists within two workers", async () => {
@@ -351,4 +357,14 @@ describe("S4 MFA enrolment service", () => {
     expect(stored).toHaveLength(10);
     expect(registrationHash).toMatch(/^\$argon2id\$/);
   });
+});
+
+it("keeps sealed historical issuer bytes and publishes only the current display issuer separately",()=>{
+  expect(MFA_POLICY_REGISTER_ROW.value.issuer).toBe("DebateAIRO");
+  expect(MFA_POLICY_DEPLOYMENT_REGISTER_ROW.value).toEqual({...MFA_POLICY_REGISTER_ROW.value,issuer:"Dialectical Engine"});
+  expect(MFA_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef).toContain(MFA_POLICY_REGISTER_ROW.sourceRef);
+  for(const row of [MFA_POLICY_REGISTER_ROW,MFA_POLICY_DEPLOYMENT_REGISTER_ROW]) {
+    const policy=mfaPolicyFromValue(row.value),uri=new URL(totpProvisioningUri(Buffer.alloc(20,7),{issuer:policy.issuer,accountLabel:"synthetic account"}));
+    expect(uri.searchParams.get('issuer')).toBe(row.value.issuer);expect(uri.searchParams.get('digits')).toBe('6');expect(uri.searchParams.get('period')).toBe('30');
+  }
 });

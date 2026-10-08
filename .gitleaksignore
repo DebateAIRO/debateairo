@@ -22,3 +22,40 @@ ede2d62e142e0a0f4f5881b0c9f2af55f8e1bc0e:dialectical-engine/tests/unit/hosted-re
 # A made-up value, not a key. Owner's ruling on PR #71. The test now builds the value from pieces, so later edits do
 # not raise the same match.
 aa15f4e9e63d2fab63b6c8d103802b42051b41d3:dialectical-engine/tests/unit/billing-connector-recording.test.ts:generic-api-key:98
+
+# non-secret immutable migration SHA256 guard; Current hashes map entry for 0103_password_recovery_t2.sql equals SHA256 of current tracked SQL bytes; seedInstalledAuth106 computes SHA256 and refuses source drift. No credential consumer.
+01c65bdcf0936adddf3d0c0c81c8eb1b30674a29:dialectical-engine/tests/support/auth106.ts:generic-api-key:5
+# non-secret immutable migration SHA256 guard; Current hashes map entry for 0104_password_only_reset.sql equals SHA256 of current tracked SQL bytes; seedInstalledAuth106 computes SHA256 and refuses source drift. No credential consumer.
+01c65bdcf0936adddf3d0c0c81c8eb1b30674a29:dialectical-engine/tests/support/auth106.ts:generic-api-key:6
+# non-secret immutable migration SHA256 guard; Current hashes map entry for 0106_known_password_mfa_recovery.sql equals SHA256 of current tracked SQL bytes; seedInstalledAuth106 computes SHA256 and refuses source drift. No credential consumer.
+01c65bdcf0936adddf3d0c0c81c8eb1b30674a29:dialectical-engine/tests/support/auth106.ts:generic-api-key:8
+# non-secret session-duration prose; Redacted finding context is optional recovery, passkey-or-TOTP,[REDACTED] sessions, Turnstile. Current line54 is prose describing14-day idle/30-day absolute session lifetimes; no credential literal or assignment.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/final-report.md:generic-api-key:54
+# non-secret source-file SHA256 inventory; Current sourceFiles map key packages/contract/src/consumer-auth.ts has a64-hex digest. It differs from current file bytes; this diagnosis does not treat the historical profile as current. Timing/cause of the difference was not established; no historical blob was read.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:5
+# non-secret source-file SHA256 inventory; Current sourceFiles map key packages/contract/generated/openapi.json has a64-hex digest. It differs from current file bytes; this diagnosis does not treat the historical profile as current. Timing/cause of the difference was not established; no historical blob was read.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:8
+# non-secret source-file SHA256 inventory; Current sourceFiles map key apps/api/src/consumer-webauthn.ts has a64-hex digest. Digest equals current tracked/source-generated file bytes.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:15
+# non-secret source-file SHA256 inventory; Current sourceFiles map key apps/api/src/social-auth.ts has a64-hex digest. It differs from current file bytes; this diagnosis does not treat the historical profile as current. Timing/cause of the difference was not established; no historical blob was read.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:18
+# non-secret source-file SHA256 inventory; Current sourceFiles map key migrations/0033_verification_token_credentials.sql has a64-hex digest. Digest equals current tracked/source-generated file bytes.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:67
+# non-secret source-file SHA256 inventory; Current sourceFiles map key migrations/0041_dev_token_retirement.sql has a64-hex digest. Digest equals current tracked/source-generated file bytes.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:75
+# non-secret source-file SHA256 inventory; Current sourceFiles map key migrations/0047_passkey_credential_storage.sql has a64-hex digest. Digest equals current tracked/source-generated file bytes.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:81
+# non-secret source-file SHA256 inventory; Current sourceFiles map key migrations/0054_support_keys_audit.sql has a64-hex digest. Digest equals current tracked/source-generated file bytes.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:92
+# non-secret source-file SHA256 inventory; Current sourceFiles map key migrations/0085_staff_access_foundation.sql has a64-hex digest. Digest equals current tracked/source-generated file bytes.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:125
+# non-secret source-file SHA256 inventory; Current sourceFiles map key migrations/0086_staff_webauthn.sql has a64-hex digest. Digest equals current tracked/source-generated file bytes.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:126
+# non-secret source-file SHA256 inventory; Current sourceFiles map key migrations/0094_owner_one_verified_key.sql has a64-hex digest. Digest equals current tracked/source-generated file bytes.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:134
+# non-secret source-file SHA256 inventory; Current sourceFiles map key migrations/0098_consumer_passkeys.sql has a64-hex digest. Digest equals current tracked/source-generated file bytes.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:138
+# non-secret source-file SHA256 inventory; Current sourceFiles map key migrations/0103_password_recovery_t2.sql has a64-hex digest. Digest equals current tracked/source-generated file bytes.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:143
+# non-secret TypeScript variable assignment; Redacted finding context is let previousToken=firstToken,[REDACTED] mfa.beginTotp({enro... . Current line4259 assigns runtime fixture variables and awaits mfa.beginTotp; it has no string literal or embedded credential. Reported historical line4262 is not the current line.
+39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/tests/integration/registration-database.test.ts:generic-api-key:4262

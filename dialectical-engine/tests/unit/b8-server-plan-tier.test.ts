@@ -80,7 +80,8 @@ const member = (modelId: string, index: number) => Object.freeze({
 function settingsWith(
   billing: AskBilling | undefined,
   room?: AskRoomPort,
-  panel: readonly string[] = [...PLAN_TIER_ROSTERS.free, ...PLAN_TIER_ROSTERS.premium]
+  panel: readonly string[] = [...PLAN_TIER_ROSTERS.free, ...PLAN_TIER_ROSTERS.premium],
+  profile?: {hasPhone(ownerRef:string):Promise<boolean>}
 ): RunCreationSettings {
   return {
     strangerSampleRate: 0,
@@ -93,6 +94,7 @@ function settingsWith(
       effectiveRiskTier: askerRiskTier, tierSource: tierSource as never, tierProvenanceRef
     }),
     ...(billing === undefined ? {} : { billing }),
+    ...(profile === undefined ? {} : {accountProfile:profile}),
     ...(room === undefined ? {} : { room })
   };
 }
@@ -154,7 +156,7 @@ function billingFor(planId: PlanId, day: Readonly<{ spent: number; limit: number
   return { billing, current, estimateMicros };
 }
 
-function arrange(billing: AskBilling | undefined, room?: AskRoomPort, panel?: readonly string[]) {
+function arrange(billing: AskBilling | undefined, room?: AskRoomPort, panel?: readonly string[], profile?: {hasPhone(ownerRef:string):Promise<boolean>}) {
   const started: Array<Parameters<RunRepository["startRun"]>[0]> = [];
   vi.spyOn(LivenessRepository.prototype, "recordQuery").mockResolvedValue(1);
   vi.spyOn(RunRepository.prototype, "startRun").mockImplementation(async (input) => {
@@ -170,7 +172,7 @@ function arrange(billing: AskBilling | undefined, room?: AskRoomPort, panel?: re
   const setupFailures = vi.spyOn(WorkItemRepository.prototype, "recordSetupFailure").mockResolvedValue(true);
   const substitutions = vi.spyOn(RunCostSubstitutionRepository.prototype, "record").mockResolvedValue("substitution:b8");
   const application = new PostgresAskApplication(
-    stubPool(), { dispatch: vi.fn(async () => undefined) }, settingsWith(billing, room, panel),
+    stubPool(), { dispatch: vi.fn(async () => undefined) }, settingsWith(billing, room, panel, profile),
     { read: async () => [] }, stubPool(), { server: stubPool(), legacy: stubPool() }
   );
   return { application, started, substitutions, memory, enqueued, enqueuedOnRoom, setupFailures };
@@ -595,4 +597,35 @@ describe("the colleague's consent gate comes before the plan and the room (R3-6)
     expect(submit).not.toHaveBeenCalled();
     expect(current).not.toHaveBeenCalled();
   });
+});
+
+describe("manual phone completion at the resolved funding seam",()=>{
+ it("refuses a resolved Free ask before room quota, hold or run creation",async()=>{
+  const {billing}=billingFor("FREE"), {room,questions}=recordingRoom();
+  const {application,started}=arrange(billing,room,undefined,{hasPhone:async()=>false});
+  await expect(application.submit(ask(),serverSession,serverPrincipal)).rejects.toMatchObject({code:"ACCOUNT_PHONE_REQUIRED"});
+  expect(questions).toEqual([]);expect(started).toEqual([]);
+ });
+ it("allows paid asks without phone even when the room uses Free models",async()=>{
+  const {billing}=billingFor("PLUS",{spent:900000,limit:1000000},300000);
+  const {application,started}=arrange(billing,undefined,undefined,{hasPhone:async()=>false});
+  const result=await application.submit(ask(),serverSession,serverPrincipal);
+  expect(result.status).toBe("QUEUED");expect(started).toHaveLength(1);
+ });
+ it("allows a resolved Free ask once the manual phone is present",async()=>{
+  const {billing}=billingFor("FREE"), {room}=recordingRoom();
+  const {application,started}=arrange(billing,room,undefined,{hasPhone:async()=>true});
+  expect((await application.submit(ask(),serverSession,serverPrincipal)).status).toBe("QUEUED");expect(started).toHaveLength(1);
+ });
+});
+
+it("offers crisis support first for an owner missing phone without room, quota or run work",async()=>{
+ const identity=testHttpIdentity("task3-phone-crisis"),{billing}=billingFor("FREE"),{room,questions}=recordingRoom();
+ let phoneReads=0;const {application,started}=arrange(billing,room,undefined,{hasPhone:async()=>{phoneReads++;return false;}});
+ const api=buildApi({application,sessions:testSessionApplication([identity]),allowedOrigin:TEST_APP_ORIGIN});
+ try{const response=await api.inject({method:"POST",url:"/v1/asks",headers:testSessionHeaders(identity,true),payload:ask({question_line:"I want to kill myself"})});
+ expect(response.statusCode).toBe(422);expect(response.json()).toMatchObject({error:"CRISIS_SUPPORT_OFFERED"});expect(phoneReads).toBe(0);expect(questions).toEqual([]);expect(started).toEqual([]);
+ const ordinary=await api.inject({method:"POST",url:"/v1/asks",headers:testSessionHeaders(identity,true),payload:ask()});
+ expect(ordinary.statusCode).toBe(422);expect(ordinary.json()).toMatchObject({error:"ACCOUNT_PHONE_REQUIRED"});expect(phoneReads).toBe(1);expect(questions).toEqual([]);expect(started).toEqual([]);
+ }finally{await api.close();}
 });

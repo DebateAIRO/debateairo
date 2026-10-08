@@ -1,7 +1,7 @@
 {
   "newDebate.eyebrow": "UUSI KYSYMYS",
   "newDebate.title": "Mistä väittelemme?",
-  "newDebate.aiNotice": "Kaikki tämän väittelyn tuottama — argumentit, arviot, pisteet ja ratkaisu — on tekoälymallien tuottamaa, koneellisesti luettavasti merkittyä ja mahdollisesti virheellistä.",
+  "newDebate.aiNotice": "Kaikki tämän väittelyn tuottama — argumentit, arviot, pisteet ja ratkaisu — on tekoälymallien tuottamaa, koneellisesti luettavasti merkittyä ja mahdollisesti virheellistä. Se ei ole lääketieteellistä, psykologista, oikeudellista, taloudellista tai muuta ammatillista neuvontaa.",
   "newDebate.planTier": "Tilaustaso",
   "newDebate.free": "Maksuton",
   "newDebate.freePromise": "Kaikki säätimet ovat kiinteitä. Kysymys on sinun.",

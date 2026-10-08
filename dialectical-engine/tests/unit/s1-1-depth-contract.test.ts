@@ -1798,14 +1798,37 @@ describe("S1-1 · the depth bound has a single source", () => {
     ? "const view = <div>\n" + source + "\n" + loginBody + "\n))}</div>;"
     : source;
 
-  it("models the actual shipped LoginFlow candidate as six JSX cells and OTHER", () => {
-    const path = "apps/ui/components/LoginFlow.tsx";
-    const source = readFileSync(join(REPOSITORY_ROOT, path), "utf8");
+  it("models the former six-cell LoginFlow layout as JSX and OTHER", () => {
+    const path = "login-layout-control.tsx";
+    const source = completeLoginLayout("{[0, 1, 2, 3, 4, 5].map((slot) => (");
     const candidate = evaluateOne(path, source);
     expect(source.slice(candidate.start, candidate.end)).toBe("[0, 1, 2, 3, 4, 5]");
     expect(candidate.value).toEqual({ kind: "EXACT", coll: "array", cells: Array.from({ length: 6 }, () => ({ t: "jsx" })) });
     expect(candidate.verdict).toBe("OTHER");
     expect(domainSites(path, source)).toEqual([]);
+  });
+
+  it("characterizes the shipped LoginFlow single code input and detects a planted depth domain", () => {
+    const path = "apps/ui/components/LoginFlow.tsx";
+    const source = readFileSync(join(REPOSITORY_ROOT, path), "utf8");
+    expect(parseModule(path, source).ok).toBe(true);
+    const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const controls: ts.JsxSelfClosingElement[] = [];
+    const visit = (node: ts.Node): void => {
+      if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(file) === "input"
+        && node.attributes.properties.some(property => ts.isJsxAttribute(property)
+          && property.name.getText(file) === "id" && property.initializer?.getText(file) === '"login-code"')) controls.push(node);
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+    expect(controls).toHaveLength(1);
+    const attributes = Object.fromEntries(controls[0]!.attributes.properties.filter(ts.isJsxAttribute)
+      .map(attribute => [attribute.name.getText(file), attribute.initializer?.getText(file)]));
+    expect(attributes).toMatchObject({ value: "{code}", autoComplete: '"one-time-code"',
+      inputMode: "{method === 'totp' ? 'numeric' : 'text'}", maxLength: "{method === 'totp' ? 6 : 128}" });
+    expect(domainSites(path, source)).toEqual([]);
+    const planted = source + "\nconst plantedDepthChoices = [1,2,3,4,5];\n";
+    expect(domainSites(path, planted)).toEqual([{ kind: "DOMAIN_ENUMERATION", line: source.split("\n").length + 1, text: "const plantedDepthChoices = [1,2,3,4,5];" }]);
   });
 
   it.each([

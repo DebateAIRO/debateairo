@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "да получите списък на всички трети лица, които са ги получили;",
   "legal.health.s05.item3": "да оттеглите съгласието си и да поискате изтриването им.",
   "legal.health.s06.title": "Как да ги упражните",
-  "legal.health.s06.body": "От „Настройки“ или като пишете на privacy@dezbatere.ro. Отговаряме в срок от 45 дни. Ако откажем да изпълним искането Ви, можете да го обжалвате, като отговорите на писмото ни."
+  "legal.health.s06.body": "От „Настройки“ или като пишете на privacy@dezbatere.ro. Отговаряме в срок от 45 дни. Ако откажем да изпълним искането Ви, можете да го обжалвате, като отговорите на писмото ни.",
+  "legal.cookies.staff.purpose": "Отделен достъп за персонала",
+  "legal.cookies.passwordReset.purpose": "Само нулиране на парола",
+  "legal.cookies.mfaRecovery.purpose": "Само възстановяване на удостоверителя",
+  "legal.cookies.social.purpose": "Кратко влизане чрез доставчик или свързване на акаунт",
+  "legal.cookies.phoneDraft.purpose": "Недовършен въпрос при стъпката с телефона; изтрива се при промяна на сесията, излизане или смяна на притежателя",
+  "legal.cookies.staff.life": "До 8 часа; 15 минути бездействие",
+  "legal.cookies.passwordReset.life": "До 30 минути",
+  "legal.cookies.mfaRecovery.life": "До 299 секунди",
+  "legal.cookies.social.life": "До 5 минути",
+  "legal.cookies.phoneDraft.life": "15 минути или до по-ранно изтриване"
 }

@@ -3,6 +3,7 @@
 export { allowanceVsPlus, computeWindows, personWindowsFor, type TimeWindow } from "./windows.js";
 export { BillingPersonAllowanceSource, type EntitlementPort, type EntitlementWindowBasis } from "./allowance-source.js";
 
+export { FundingAwarePersonAllowanceSource, type FundingEntitlementPort, type FundingAllowancePort } from "./internal-allowance-source.js";
 // P2 (paid plans): money rules, calendar, the subscription fold and the connector ports.
 export type { BillingPlan, BillingPlans, BillingPolicy, PlanId } from "@debateai/register";
 export {

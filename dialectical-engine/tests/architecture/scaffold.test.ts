@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { LEDGER_OUTCOMES } from "@debateai/kernel";
+import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import {
   auditArchitecture,
   auditEdgeManifest,
@@ -10,10 +11,53 @@ import {
   auditSurfaceAttachmentLiterals,
   auditSurfaceReachability,
   auditSourceRules,
+  auditProductionFixtureImports,
   surfaceReachabilityTarget
 } from "../../tools/orphan-audit/src/index.js";
 
 describe("P1 / FX-ORPH-01 / FX-HR-H1 / FX-HR-H3 — structural law", () => {
+  it("classifies only the four checksum-bound native once-per-ledger sources", async () => {
+    const plan = await loadMigrationPlan();
+    const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
+    for (const name of ["0104_password_only_reset.sql", "0105_backup_email_verification.sql", "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"]) {
+      const sql = plan.sources.get(name)!.sql;
+      expect(auditMigrationReplaySafety(`migrations/${name}`, sql).length).toBeGreaterThan(0);
+      expect(auditMigrationReplaySafety(`migrations/${name}`, sql, { plan, migrateSource })).toEqual([]);
+    }
+  });
+
+  it("refuses native classification on changed bytes, recipe, order or ledger ownership", async () => {
+    const plan = await loadMigrationPlan();
+    const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
+    const name = "0104_password_only_reset.sql";
+    const sql = plan.sources.get(name)!.sql;
+    for (const [caseIndex, broken] of [
+      { plan: { ...plan, recipeSha256: "0".repeat(64) }, migrateSource },
+      { plan: { ...plan, manifest: { ...plan.manifest, order: [...plan.manifest.order].reverse() } }, migrateSource },
+      { plan: { ...plan, sources: new Map([...plan.sources].map(([key, value]) => [key, key === name ? { ...value, sha256: "0".repeat(64) } : value])) }, migrateSource },
+      ...["if (appliedSet.has(name) || resolvedSet.has(name)) continue;", "INSERT INTO public.debateai_schema_migration (name, applied_at)", 'await client.query("ROLLBACK")', "client.release()"].map((fragment) => {
+        const at = migrateSource.indexOf(fragment, migrateSource.indexOf("export async function migrate("));
+        expect(at).toBeGreaterThan(0);
+        return { plan, migrateSource: migrateSource.slice(0, at) + "REMOVED_NATIVE_CONTROL" + migrateSource.slice(at + fragment.length) };
+      })
+    ].entries()) expect(() => auditMigrationReplaySafety(`migrations/${name}`, sql, broken), `native control case ${caseIndex}`).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+    expect(() => auditMigrationReplaySafety(`migrations/${name}`, sql + "\nCREATE FUNCTION unsafe() RETURNS void AS '';", { plan, migrateSource })).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+    expect(() => auditMigrationReplaySafety(`migrations/${name}`, sql + "\nCREATE TABLE identity.unclassified(value text);", { plan, migrateSource })).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+    expect(auditMigrationReplaySafety("migrations/new-unclassified.sql", "CREATE FUNCTION unsafe() RETURNS void AS ''; CREATE INDEX unsafe ON core.test(id);", { plan, migrateSource })).toHaveLength(2);
+    const integration = plan.sources.get("0107_auth_dev_integration.sql")!.sql;
+    expect(() => auditMigrationReplaySafety("migrations/0107_auth_dev_integration.sql", integration.replace("DROP CONSTRAINT step_up_grant_action_check", "DROP CONSTRAINT wrong_constraint"), { plan, migrateSource })).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+  });
+
+  it.each(["comment", "string", "dead-code"])("cannot substitute a %s for the executable native ledger guard", async (kind) => {
+    const plan=await loadMigrationPlan();
+    const migrateSource=await readFile(new URL("../../packages/db/src/index.ts",import.meta.url),"utf8");
+    const guard="if (appliedSet.has(name) || resolvedSet.has(name)) continue;";
+    expect(migrateSource.split(guard)).toHaveLength(2);
+    const replacement=kind==="comment" ? `// ${guard}` : kind==="string" ? `void ${JSON.stringify(guard)};` : `if (false) { ${guard} }`;
+    const altered=migrateSource.replace(guard,replacement);
+    expect(()=>auditMigrationReplaySafety("migrations/0104_password_only_reset.sql",plan.sources.get("0104_password_only_reset.sql")!.sql,{plan,migrateSource:altered})).toThrow("MIGRATION_NATIVE_AUDIT_BINDING_REFUSED");
+  });
+
   it("BUG-01 T14 keeps the ruled ledger outcome vocabulary unchanged", () => {
     expect(LEDGER_OUTCOMES).toEqual([
       "OK", "FAILED", "BLOCKED", "TIMED_OUT", "REFUSED", "SKIPPED_BY_BUDGET"
@@ -338,4 +382,10 @@ describe("S00 composition roots", () => {
     expect(runnerMain).toContain("loadRunnerEnvironment");
     expect(runnerMain).toContain("new WalkingSkeletonRunner");
   });
+});
+
+describe('exact frozen preview runtime import boundary',()=>{
+ it.each(['packages/providers/src/index.ts','packages/providers/src/provider-probe.ts'])('admits only the exact reviewed runtime import from %s',where=>{expect(auditProductionFixtureImports(where,'import { x } from "./preview-test.js";')).toEqual([]);});
+ it.each([['apps/api/src/index.ts','./preview-test.js'],['packages/providers/src/index.ts','../src/preview-test.js'],['packages/providers/src/index.ts','./other-test.js'],['packages/providers/src/index.ts','../../../tests/unit/fake.js'],['packages/providers/src/index.ts','./fixtures/fake.js']])('retains fixture denial for %s importing %s',(where,specifier)=>{expect(auditProductionFixtureImports(where,`import { x } from "${specifier}";`)).toEqual([`${where} imports a test/fixture module from production code`]);});
+ it('an allowed runtime import cannot hide a following fixture import',()=>{expect(auditProductionFixtureImports('packages/providers/src/index.ts','import { x } from "./preview-test.js"; import { fixture } from "../../../tests/unit/fake.js";')).toEqual(['packages/providers/src/index.ts imports a test/fixture module from production code']);});
 });

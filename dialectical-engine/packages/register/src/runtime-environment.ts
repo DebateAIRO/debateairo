@@ -1,3 +1,7 @@
+import { parsePreviewProviderTestConfig } from "@debateai/providers";
+import { isAbsolute } from "node:path";
+import { internalAllowancePolicyFromValue } from "./internal-allowance-policy.js";
+import type { StaffAccessEnvironment } from "@debateai/kernel";
 import { z } from "zod";
 import {
   parseRegisterVersionText,
@@ -390,6 +394,7 @@ const hatchetShape = {
 } as const;
 
 const apiEnvironmentShape = {
+    PREVIEW_PROVIDER_TEST_CONFIG_JSON: z.string().min(1).max(8192).optional(),
     KEK_PATH: kekPath,
     SUPPORT_KEK_PATH: kekPath,
     /**
@@ -451,6 +456,10 @@ const apiEnvironmentShape = {
     MAIL_SENDMAIL_PATH: z.string().min(1),
     MAIL_FROM: z.string().regex(/^noreply@[A-Za-z0-9.-]+$/),
     PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://")),
+    // Public Unix relay address only; the API has no Turnstile credential.
+    SOCIAL_SOCKET_PATH: z.string().max(103).optional(),
+    SOCIAL_PROVIDERS_JSON: z.string().max(8192).optional(),
+    TURNSTILE_SOCKET_PATH: z.string().max(103).regex(/^\/(?!.*(?:^|\/)\.\.?(?:\/|$))[^\0]*\.sock$/u).optional(),
     DATABASE_URL: z.string().url(),
     SUPPORT_DATABASE_URL: z.string().url(),
     API_HOST: z.string().min(1), API_PORT: positiveInteger,
@@ -650,7 +659,9 @@ function validateApiEnvironment(
 export function parseApiEnvironment(
   source: Readonly<Record<string, string | undefined>>
 ) {
-  return validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
+  const staffAccess = parseStaffAccessEnvironment(source);
+  return { ...validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source)), STAFF_ACCESS: staffAccess,
+    PREVIEW_PROVIDER_TEST_CONFIG: parsePreviewProviderTestConfig(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON) };
 }
 
 /** NETOPIA (spec 2026-10-05 §2.17.1): the payment system's four settings, in the order a missing one is reported. */
@@ -850,7 +861,7 @@ export function loadKeyRotationEnvironment() {
 }
 
 export function loadApiEnvironment() {
-  return validateApiEnvironment(parseEnvironment(apiEnvironmentShape));
+  return parseApiEnvironment(process.env);
 }
 
 export function loadRunnerEnvironment() {
@@ -858,6 +869,7 @@ export function loadRunnerEnvironment() {
 }
 
 const runnerEnvironmentShape = {
+    PREVIEW_PROVIDER_TEST_CONFIG_JSON: z.string().min(1).max(8192).optional(),
     KEK_PATH: kekPath,
     /**
      * V-3, fix wave A-C2. The runner's half of a changeover. It holds ONE
@@ -934,6 +946,7 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
   assertProductionFloors(environment);
   return {
     ...environment,
+    PREVIEW_PROVIDER_TEST_CONFIG: parsePreviewProviderTestConfig(environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON),
     DEPLOYMENT_MODE: resolveDeploymentMode(
       environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV
     )
@@ -997,3 +1010,53 @@ export const API_ENVIRONMENT_KEYS = environmentKeyInventory(apiEnvironmentShape)
 export const RUNNER_ENVIRONMENT_KEYS = environmentKeyInventory(runnerEnvironmentShape);
 export const OBSERVATION_AGENT_ENVIRONMENT_KEYS =
   environmentKeyInventory(observationAgentEnvironmentShape);
+
+/** Configuration shape only: custody, implementation and independent alert readiness are later activation gates. */
+export function parseStaffAccessEnvironment(source: EnvironmentSource): StaffAccessEnvironment {
+  const version = source.STAFF_ACCESS_POLICY_VERSION;
+  const fundingKeys = ["INTERNAL_ALLOWANCE_POLICY_VERSION", "INTERNAL_ALLOWANCE_CURRENCY", "INTERNAL_ALLOWANCE_MAXIMUM_GRANT_MICROS",
+    "INTERNAL_ALLOWANCE_MAXIMUM_DAY_MICROS", "INTERNAL_ALLOWANCE_MAXIMUM_WEEK_MICROS", "INTERNAL_ALLOWANCE_MAXIMUM_LIFETIME_MS",
+    "INTERNAL_ALLOWANCE_FINISH_ALLOWANCE_BP", "INTERNAL_ALLOWANCE_POLICY_SOURCE_REF"];
+  const hasFunding = fundingKeys.some(key => source[key] !== undefined);
+  if ((version === undefined || version === "1") && hasFunding) throw new TypeError("INTERNAL_ALLOWANCE_STAFF_V2_REQUIRED");
+  if (version === undefined || version === "1") return Object.freeze({ policyVersion: 1 });
+  if (version !== "2") throw new TypeError("STAFF_ACCESS_POLICY_VERSION_INVALID");
+  const publicUrl = source.PUBLIC_APP_URL;
+  const origin = source.STAFF_WEBAUTHN_ORIGIN;
+  const rpId = source.STAFF_WEBAUTHN_RP_ID;
+  const configPath = source.STAFF_INDEPENDENT_ALERT_CONFIG_PATH;
+  const operatorModulePath = source.STAFF_ALERT_OPERATOR_MODULE_PATH, operatorModuleSha256 = source.STAFF_ALERT_OPERATOR_MODULE_SHA256;
+  if (!publicUrl || !origin || !rpId || !configPath || !operatorModulePath || !operatorModuleSha256) throw new TypeError("STAFF_ACCESS_CONFIGURATION_REQUIRED");
+  let app: URL;
+  let ceremony: URL;
+  try { app = new URL(publicUrl); ceremony = new URL(origin); }
+  catch { throw new TypeError("STAFF_ACCESS_ORIGIN_INVALID"); }
+  if (app.protocol !== "https:" || app.username || app.password || app.pathname !== "/" || app.search || app.hash
+    || ceremony.protocol !== "https:" || origin !== ceremony.origin || origin !== app.origin
+    || rpId !== app.hostname || rpId !== ceremony.hostname) {
+    throw new TypeError("STAFF_ACCESS_ORIGIN_RP_MISMATCH");
+  }
+  if (configPath !== configPath.trim() || !isAbsolute(configPath) || /[\u0000-\u001f\u007f]/u.test(configPath)) {
+    throw new TypeError("STAFF_INDEPENDENT_ALERT_CONFIG_PATH_INVALID");
+  }
+  if (operatorModulePath !== operatorModulePath.trim() || !isAbsolute(operatorModulePath) || /[\u0000-\u001f\u007f]/u.test(operatorModulePath) || operatorModulePath.split('/').some(part => part === '..' || part === '.')) throw new TypeError("STAFF_ALERT_OPERATOR_MODULE_PATH_INVALID");
+  if (!/^[0-9a-f]{64}$/u.test(operatorModuleSha256)) throw new TypeError("STAFF_ALERT_OPERATOR_MODULE_SHA256_INVALID");
+  if (!hasFunding) return Object.freeze({ policyVersion: 2, origin, rpId, independentAlertConfigPath: configPath, operatorModulePath, operatorModuleSha256 });
+  if (source.INTERNAL_ALLOWANCE_POLICY_VERSION !== "1" || fundingKeys.some(key => source[key] === undefined)) throw new TypeError("INTERNAL_ALLOWANCE_CONFIGURATION_REQUIRED");
+  const integer = (key: string) => {
+    const text = source[key];
+    if (text === undefined || !/^[1-9][0-9]*$/u.test(text)) throw new TypeError("INTERNAL_ALLOWANCE_CONFIGURATION_INVALID");
+    return Number(text);
+  };
+  const policy = internalAllowancePolicyFromValue({ enabled: true, funding_policy_version: 1, currency: source.INTERNAL_ALLOWANCE_CURRENCY,
+    maximum_grant_micros: integer("INTERNAL_ALLOWANCE_MAXIMUM_GRANT_MICROS"), maximum_day_micros: integer("INTERNAL_ALLOWANCE_MAXIMUM_DAY_MICROS"),
+    maximum_week_micros: integer("INTERNAL_ALLOWANCE_MAXIMUM_WEEK_MICROS"), maximum_lifetime_ms: integer("INTERNAL_ALLOWANCE_MAXIMUM_LIFETIME_MS"),
+    finish_allowance_bp: integer("INTERNAL_ALLOWANCE_FINISH_ALLOWANCE_BP") }, source.INTERNAL_ALLOWANCE_POLICY_SOURCE_REF!);
+  if (!policy.enabled) throw new TypeError("INTERNAL_ALLOWANCE_CONFIGURATION_INVALID");
+  return Object.freeze({ policyVersion: 2, origin, rpId, independentAlertConfigPath: configPath, operatorModulePath, operatorModuleSha256, internalAllowancePolicy: policy });
+}
+
+/** Owner CLI must inspect the full snapshot for forbidden secrets, including unexpected names. */
+export function loadOwnerOperatorEnvironment(): Readonly<NodeJS.ProcessEnv> {
+  return Object.freeze({ ...process.env });
+}

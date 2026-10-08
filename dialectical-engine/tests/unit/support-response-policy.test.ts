@@ -227,8 +227,8 @@ describe("CP1 support model response policy", () => {
     expect(bindSupportDraftAuthority({
       ...valid,
       sourceIds: ["account-access"],
-      actionIds: ["forgot-password"],
-    },["account-access"],["forgot-password"],"ja")).toBeNull();
+      actionIds: ["home"],
+    },["account-access"],["home"],"ja")).toBeNull();
   });
 
   it.each(["en","ro"] as const)(

@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "id-dibattiti",
   "INCIDENT_SURFACE_PUBLISHING": "il-pubblikazzjoni",
   "INCIDENT_SURFACE_SIGN_IN": "id-dħul",
-  "INCIDENT_SURFACE_WHOLE_SITE": "is-sit kollu"
+  "INCIDENT_SURFACE_WHOLE_SITE": "is-sit kollu",
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine għadu mhux disponibbli f’pajjiżek."
 }

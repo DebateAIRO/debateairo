@@ -592,7 +592,10 @@ is on the always-blocked list.
 - The quote and checkout routes check payment (§2.5.3).
 - Payment confirmation checks the card country (§2.5.4).
 - `POST /v1/asks` checks `decideAsk`.
-- Sign-in is never gated.
+- Sign-in and the support assistant check sign-up's rule (owner's request of 8 October 2026, superseding "sign-in is
+  never gated"): every route that ends in a new session (password, passkey, social, recovery, password reset, MFA
+  recovery) and every support write answer 403 `COUNTRY_SERVICE_UNAVAILABLE`; a session already held, reads and the
+  cancel links are not gated. These refusals are not audited yet (the 0080 capability names only register and asks).
 - Refusals are 403 with the code only.
 - Each decision writes an audit event (content-free: the code, the country, and whether it came from the IP), using
   the existing audit-event writer.

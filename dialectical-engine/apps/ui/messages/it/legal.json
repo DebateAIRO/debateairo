@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "ottenere l’elenco di tutti i terzi che li hanno ricevuti;",
   "legal.health.s05.item3": "revocare il consenso e ottenerne la cancellazione.",
   "legal.health.s06.title": "Come esercitarli",
-  "legal.health.s06.body": "Dalle Impostazioni o scrivendo a privacy@dezbatere.ro. Rispondiamo entro 45 giorni. Se respingiamo una richiesta, puoi presentare ricorso rispondendo alla nostra comunicazione."
+  "legal.health.s06.body": "Dalle Impostazioni o scrivendo a privacy@dezbatere.ro. Rispondiamo entro 45 giorni. Se respingiamo una richiesta, puoi presentare ricorso rispondendo alla nostra comunicazione.",
+  "legal.cookies.staff.purpose": "Accesso del personale separato",
+  "legal.cookies.passwordReset.purpose": "Solo ripristino della password",
+  "legal.cookies.mfaRecovery.purpose": "Solo recupero dell’autenticatore",
+  "legal.cookies.social.purpose": "Breve accesso tramite fornitore o collegamento del conto",
+  "legal.cookies.phoneDraft.purpose": "Domanda incompleta durante il passaggio telefonico; eliminata al cambio di sessione, alla disconnessione o al cambio di titolare",
+  "legal.cookies.staff.life": "Fino a 8 ore; 15 minuti di inattività",
+  "legal.cookies.passwordReset.life": "Fino a 30 minuti",
+  "legal.cookies.mfaRecovery.life": "Fino a 299 secondi",
+  "legal.cookies.social.life": "Fino a 5 minuti",
+  "legal.cookies.phoneDraft.life": "15 minuti o fino all’eliminazione"
 }

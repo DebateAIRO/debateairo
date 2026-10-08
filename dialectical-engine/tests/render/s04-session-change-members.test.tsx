@@ -148,14 +148,14 @@ function expectSilence(): void {
 
 describe("S2.1 sign-in (LoginFlow, PLAN §2 row completeLogin)", () => {
   async function signInWith(completeLogin: ReturnType<typeof vi.fn>, onAuthenticated = vi.fn()): Promise<void> {
-    const beginLogin = vi.fn().mockResolvedValue({ status: "mfa_required" as const, challenge_token: "challenge" });
+    const beginLogin = vi.fn().mockResolvedValue({ status: "mfa_required" as const, challenge_token: "challenge", available_methods: ["totp"] });
     await act(async () => root!.render(
       <LoginFlow client={{ beginLogin, completeLogin }} onAuthenticated={onAuthenticated} />
     ));
     field("email").value = "person@example.test";
     field("password").value = "password";
     await submitForm();
-    field("code").value = "123456";
+    await typeValue("code", "123456");
     await submitForm();
     expect(completeLogin).toHaveBeenCalledWith("challenge", "123456");
     await quiet();

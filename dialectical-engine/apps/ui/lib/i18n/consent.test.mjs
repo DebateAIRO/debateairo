@@ -132,7 +132,7 @@ test("protected consent identifiers stay outside translatable messages", () => {
 // painted English until the locale chunk arrived) with a catalogue served by
 // the root layout. loadNamespace(locale, "consent") covers all 35 locales in
 // lib/i18n/server.ts; this row pins the serving path and the English-only rule.
-test("the selected consent catalog is served with the server render, English only for en", () => {
+test("the selected consent catalog is served with the server render, with English catalog aliases", () => {
   const hookSource = sources.get("components/consent/useConsentCatalog.ts");
   const layoutSource = source("app/layout.tsx");
   assert.match(layoutSource, /loadNamespace\(locale, "consent"\)/);
@@ -142,7 +142,8 @@ test("the selected consent catalog is served with the server render, English onl
   assert.match(layoutSource, /<ConsentCatalogProvider catalog=\{consent\}>[\s\S]*<CookieConsent \/>[\s\S]*<\/ConsentCatalogProvider>/);
   assert.doesNotMatch(hookSource, /import\(/, "no client-side catalogue chunk load");
   assert.doesNotMatch(hookSource, /\?\? consentEnglish/, "English is never a stand-in for another locale");
-  assert.match(hookSource, /if \(locale === "en"\) return consentEnglish;/);
+  // English fallback behavior (including regional aliases) is exercised by
+  // tests/render/legal-document-locale-render.test.tsx, without pinning source spelling.
   const serverSource = source("lib/i18n/server.ts");
   for (const { code } of LOCALES) {
     assert.match(serverSource, new RegExp(`consent: \\(\\) => import\\("\\.\\.\\/\\.\\.\\/messages\\/${code}\\/consent\\.json"\\)`), `${code} consent is loadable on the server`);

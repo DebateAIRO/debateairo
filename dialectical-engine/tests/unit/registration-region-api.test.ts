@@ -1,5 +1,6 @@
+import { canonicalSignup, passedTurnstile } from "../support/turnstileFixtures.js";
 import { describe, expect, it, vi } from "vitest";
-import { REGION_COUNTRY_CODES } from "@debateai/kernel";
+import { REGION_COUNTRY_CODES, US_STATE_CODES } from "@debateai/kernel";
 import { COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW, countryPolicyFromValue } from "@debateai/register";
 import { AGE_REFUSAL_COOKIE_NAME } from "@debateai/contract";
 import type { GeoLookup } from "@debateai/geo";
@@ -16,12 +17,13 @@ const gate = () => {
   const audit = { recordCountryGateRefusal: vi.fn(async (_input: unknown) => undefined) };
   return { gate: new CountryGate({ policy, lookup, audit }), audit };
 };
-const REGISTER_BODY = { email: "alice@example.test", password: "correct horse battery staple", recovery_email: "alice.recovery@example.test", date_of_birth: "1990-01-01" };
+const { country: _defaultCountry, ...REGISTER_BODY } = canonicalSignup;
 const invalid = { error: "AUTH_INPUT_INVALID", message: "AUTH_INPUT_INVALID" };
 function api(countryGate?: CountryGate) {
   const register = vi.fn(async (_input: unknown, _source: unknown) => ({ message: "If this address can be registered, verification instructions will arrive. Check your spam folder." }));
   const instance = buildApi({
     application: { submit: vi.fn() } as unknown as AskApplication,
+    turnstile: passedTurnstile,
     registration: { register, verifyEmail: vi.fn(), resendVerification: vi.fn() } as never,
     sessions: testSessionApplication([testHttpIdentity("region-api")]), allowedOrigin: TEST_APP_ORIGIN,
     ...(countryGate === undefined ? {} : { countryGate })
@@ -80,9 +82,24 @@ describe("registration region API", () => {
     expect(country.audit.recordCountryGateRefusal).not.toHaveBeenCalled();
     await instance.close();
   });
+  it("C10b refuses a declared Tennessee residence with the state code, without an IP audit", async () => {
+    const country = gate(); const { instance, register } = api(country.gate);
+    const response = await post(instance, { ...REGISTER_BODY, country: "US", us_state: "TN" });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "STATE_SIGNUP_UNAVAILABLE" });
+    expect(register).not.toHaveBeenCalled();
+    expect(country.audit.recordCountryGateRefusal).not.toHaveBeenCalled();
+    expect((await post(instance, { ...REGISTER_BODY, country: "US", us_state: "TX" })).statusCode).toBe(202);
+    await instance.close();
+  });
+  it("C10c closes Tennessee and no other state", () => {
+    const refused = US_STATE_CODES.filter((state) => gate().gate.declaredSignupRefusal({ country: "US", usState: state }) !== null);
+    expect(refused).toEqual(["TN"]);
+  });
   it("C11 refuses exactly the closed drawn countries", () => {
     const closed = "DZ EG ET GH KE MA NG RW SN ZA TN UG CN IN ID MY PK PH TH VN RS UA GB BH JO KW LB OM QA SA TR AE CR MX PA AR BR CL CO EC PE UY FJ".split(" ");
-    const refused = REGION_COUNTRY_CODES.filter((code) => gate().gate.declaredSignupRefusal(code) !== null);
+    const refused = REGION_COUNTRY_CODES.filter((code) =>
+      gate().gate.declaredSignupRefusal({ country: code, usState: code === "US" ? "TX" : null }) !== null);
     expect(refused.sort()).toEqual(closed.sort());
   });
   it("C12 answers IP gate, region, declared gate, then age in order", async () => {

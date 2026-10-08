@@ -5,7 +5,10 @@ import { describe, expect, it } from "vitest";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const migration = "migrations/0095_registration_region.sql";
+const forwardContract = "migrations/0107_auth_dev_integration.sql";
+const verifier = "migrations/lineage/verify-effective-capabilities.sql";
 const writer = "packages/db/src/identity.ts";
+const socialWriter = "packages/db/src/social-identity.ts";
 
 function productionFiles(): string[] {
   return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "--", "migrations", "apps", "packages"], {
@@ -19,13 +22,23 @@ function source(path: string): string {
 }
 
 describe("registration region scope", () => {
-  it("S1 keeps the region relation in its migration and account creation writer only", () => {
+  it("S1 keeps region writes in the two bounded account-creation paths and reads in the verifier", () => {
     const references = productionFiles().filter((path) => source(path).includes("registration_region"));
-    expect(references.sort()).toEqual([migration, writer]);
+    expect(references.sort()).toEqual([migration, forwardContract, verifier, writer, socialWriter]);
+
+    const contractSource = source(forwardContract);
+    expect(source(verifier)).toContain("identity.record_registration_region(uuid,text,text)");
+    const socialHelper = /CREATE OR REPLACE FUNCTION identity\.record_social_registration_region\([\s\S]*?END \$\$;/i.exec(contractSource)?.[0];
+    expect(socialHelper).toContain('INSERT INTO identity.registration_region(user_id,country_code,us_state)');
+    expect(contractSource.replace(socialHelper!, '')).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
 
     const writerSource = source(writer);
     expect(writerSource).toContain("SELECT identity.record_registration_region($1,$2,$3)");
     expect(writerSource).not.toMatch(/\b(?:FROM|JOIN)\s+identity\.registration_region\b/i);
+    const socialSource=source(socialWriter);
+    expect(socialSource).toContain('SELECT identity.record_social_registration_region($1::uuid,$2::text,$3::text,$4::text,$5::text)');
+    expect(socialSource).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO)\s+identity\.registration_region\b/i);
+    expect(source(verifier)).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);
   });
 
   it("S2 does not backfill region rows during migration", () => {

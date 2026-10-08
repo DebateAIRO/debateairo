@@ -1,3 +1,6 @@
+import {createHash} from "node:crypto";
+import {migrate} from "@debateai/db";
+import {startTestDatabase} from "../support/testDatabase.js";
 import { execFile } from "node:child_process";
 import { readFile, readdir } from "node:fs/promises";
 import { extname } from "node:path";
@@ -30,6 +33,27 @@ import {
 const migrationPath = "migrations/0055_register_support_publication.sql";
 const productionRunbookPath =
   "docs/missions/2026-08-17-accounts-privacy-security/P3-02-production-database-principal-provisioning.md";
+
+const HISTORICAL_READER_FILE="migrations/0103_password_recovery_t2.sql";
+const HISTORICAL_READER_SHA="d90e9eaef8ffd4e21f86e99f2f9c669e0cb61897f89da4a8f15f1f1c857e082f";
+const HISTORICAL_READER_SITES=Object.freeze([
+  {signature:"identity.password_recovery_rules(bigint)",line:71},
+  {signature:"identity.password_recovery_start(bytea,uuid,uuid[],jsonb,text,text,jsonb,jsonb,bigint)",line:161}
+]);
+function latestRegisterSites(file:string,text:string) {
+  const matches=[...text.matchAll(/(?:max\s*\(\s*(?:[a-z_]+[.])?register_version\s*\)|ORDER\s+BY\s+(?:[a-z_]+[.])?register_version\s+DESC\s+LIMIT\s+1)/giu)];
+  return matches.map(match=>{
+    const before=text.slice(0,match.index),definitions=[...before.matchAll(/^CREATE OR REPLACE FUNCTION ([a-z_.]+)\(([^)]*)\) RETURNS/gmi)],definition=definitions.at(-1);
+    const signature=definition?definition[1]+'('+definition[2]!.split(',').map(arg=>arg.trim().split(/\s+/)[1]).join(',')+')':null;
+    return {file,line:before.split('\n').length,signature};
+  });
+}
+function readerClassification(site:ReturnType<typeof latestRegisterSites>[number],source:string,evidence:{ownerLogin:boolean;ownerMemberships:number;ordinaryCallable:boolean}) {
+  return site.file===HISTORICAL_READER_FILE && createHash('sha256').update(source).digest('hex')===HISTORICAL_READER_SHA
+    && HISTORICAL_READER_SITES.some(expected=>expected.signature===site.signature && expected.line===site.line)
+    && !evidence.ownerLogin && evidence.ownerMemberships===0 && !evidence.ordinaryCallable
+    ? 'RETIRED_HISTORICAL_READER' : 'LIVE_OR_UNVERIFIED_LATEST_READER';
+}
 
 async function migrationSource(): Promise<string> {
   return readFile(migrationPath, "utf8").catch(() => "");
@@ -435,20 +459,22 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     // `historicalRows` stays 14 and the legacy hash is untouched. MEASURED: the port emits 62 with no duplicate keys,
     // and 61 with the key removed.
     const storyKeys: readonly string[] = STORY_ROW_KEYS;
-    expect(developmentRows).toHaveLength(62);
-    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(56);
-    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(61);
-    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(61);
-    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(61);
-    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(60);
-    expect(developmentRows.filter((row) => row.rowKey !== "taxAuthorities")).toHaveLength(61);
-    expect(developmentRows.filter((row) => row.rowKey !== "publicationCheckPolicy")).toHaveLength(61);
+    expect(developmentRows).toHaveLength(63);
+    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(57);
+    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(62);
+    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(62);
+    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(62);
+    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(61);
+    expect(developmentRows.filter((row) => row.rowKey !== "taxAuthorities")).toHaveLength(62);
+    expect(developmentRows.filter((row) => row.rowKey !== "publicationCheckPolicy")).toHaveLength(62);
     // A19 x MODEL SCORECARD: it adds no row to these counts, deliberately (paid plans S1a: +0). `modelScorecard` is NOT a
     // code-owned deployment row: local mode reads the bundled public file
     // (scorecards/current.json), and the hosted scorecard is an ADDITIVE operator
     // row published with `--scorecard`. A code-owned default would seal the
     // one-version-behind public scorecard wherever an operator forgot the flag.
     expect(developmentRows.map((row) => row.rowKey)).not.toContain(MODEL_SCORECARD_ROW_KEY);
+    expect(developmentRows.filter(row=>row.rowKey!=="consumerRecoveryPolicy")).toHaveLength(62);
+    expect(developmentRows.filter(row=>row.rowKey==="consumerRecoveryPolicy")).toHaveLength(1);
     expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);
 
@@ -580,13 +606,32 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     }).map(({ file, kind }) => `${kind}:${file}`);
     expect([...new Set(unclassified)]).toEqual([]);
 
-    const latestReads = census.sql.filter(({ file, text }) =>
-      /(?:max\s*\(\s*register_version\s*\)|ORDER\s+BY\s+register_version\s+DESC\s+LIMIT\s+1)/iu.test(text)
-      && file !== migrationPath
-      && file !== "tests/architecture/register-support-publication.test.ts"
-      && file !== "tests/integration/register-support-publication.test.ts"
-    ).map(({ file }) => file);
-    expect([...new Set(latestReads)]).toEqual([]);
+    const candidateSources=census.sql.filter(({file})=>![migrationPath,"tests/architecture/register-support-publication.test.ts","tests/integration/register-support-publication.test.ts"].includes(file));
+    const sites=candidateSources.flatMap(({file,text})=>latestRegisterSites(file,text));
+    // This is an adjudicated immutable-history category, not permission for a live latest reader.
+    // A disposable actual catalog proves both definitions unreachable by ordinary callers.
+    const db=await startTestDatabase();
+    try {
+      await migrate(db.pool);
+      const state=async()=> (await db.pool.query(`SELECT r.rolcanlogin AS "ownerLogin",(SELECT count(*)::int FROM pg_auth_members WHERE roleid=r.oid) AS "ownerMemberships",EXISTS(SELECT 1 FROM pg_roles caller CROSS JOIN pg_proc f WHERE NOT caller.rolsuper AND caller.oid<>r.oid AND caller.rolname<>'debateai_mfa_recovery_owner' AND f.oid=ANY($1::regprocedure[]) AND has_function_privilege(caller.oid,f.oid,'EXECUTE')) AS "ordinaryCallable" FROM pg_roles r WHERE r.rolname='debateai_password_recovery_owner'`,[HISTORICAL_READER_SITES.map(x=>x.signature)])).rows[0];
+      const evidence=await state(),historical=await readFile(HISTORICAL_READER_FILE,'utf8');
+      expect(evidence).toEqual({ownerLogin:false,ownerMemberships:0,ordinaryCallable:false});
+      expect((await db.pool.query("SELECT has_function_privilege('debateai_mfa_recovery_owner','identity.password_recovery_rules(bigint)','EXECUTE') policy,has_function_privilege('debateai_mfa_recovery_owner','identity.password_recovery_start(bytea,uuid,uuid[],jsonb,text,text,jsonb,jsonb,bigint)','EXECUTE') mutator")).rows[0]).toEqual({policy:true,mutator:false});
+      const retired=sites.filter(site=>readerClassification(site,census.sources.get(site.file)??'',evidence)==='RETIRED_HISTORICAL_READER');
+      expect(retired).toEqual(HISTORICAL_READER_SITES.map(site=>({file:HISTORICAL_READER_FILE,...site})));
+      expect(sites.filter(site=>!retired.includes(site))).toEqual([]);
+      for(const site of retired)expect(readerClassification(site,historical+'\n',evidence)).toBe('LIVE_OR_UNVERIFIED_LATEST_READER');
+      for(const qualifier of ['', 'r.']) {
+        const planted=latestRegisterSites('packages/db/src/unapproved.ts',`SELECT * FROM register.register_version r ORDER BY ${qualifier}register_version DESC LIMIT 1`);
+        expect(planted).toHaveLength(1);expect(readerClassification(planted[0]!,historical,evidence)).toBe('LIVE_OR_UNVERIFIED_LATEST_READER');
+      }
+      await db.pool.query('CREATE ROLE task13_reader_live NOLOGIN; GRANT USAGE ON SCHEMA identity TO task13_reader_live; GRANT EXECUTE ON FUNCTION identity.password_recovery_rules(bigint) TO task13_reader_live');
+      expect((await state()).ordinaryCallable).toBe(true);
+      const caller=await db.pool.connect();try{await caller.query('BEGIN');await caller.query('SET LOCAL ROLE task13_reader_live');await expect(caller.query('SELECT identity.password_recovery_rules(1)')).rejects.toThrow('RECOVERY_POLICY_UNRESOLVED');}finally{await caller.query('ROLLBACK');caller.release();}
+      for(const site of retired)expect(readerClassification(site,historical,await state())).toBe('LIVE_OR_UNVERIFIED_LATEST_READER');
+      await db.pool.query('REVOKE ALL ON FUNCTION identity.password_recovery_rules(bigint) FROM task13_reader_live');
+      expect(await state()).toEqual(evidence);
+    } finally {await db.stop();}
 
     const sequenceUsers = census.sql.filter(({ file, text }) =>
       /register_version_id_seq|nextval\s*\(/iu.test(text)

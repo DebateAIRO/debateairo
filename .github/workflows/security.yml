@@ -21,15 +21,15 @@ jobs:
         with: { version: 11.20.0 }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with: { node-version: 26.8.2, cache: pnpm, cache-dependency-path: dialectical-engine/pnpm-lock.yaml }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run generate:contract
-      - run: pnpm run typecheck
+      - run: node tools/source-map-hotfix.mjs install # pnpm install --frozen-lockfile
+      - run: node tools/source-map-hotfix.mjs generate # pnpm run generate:contract
+      - run: node tools/source-map-hotfix.mjs typecheck # pnpm run typecheck
       # B31: the recorded known-red gate (tools/ci-known-red.mjs + tests/ci-known-red.txt).
       # It runs tests/unit, tests/architecture and tests/render (V, 2026-09-28) under vitest but
       # fails only on failures that are not on the recorded list; a listed test that passes three
       # runs in a row fails the gate until its entry is deleted (V-4).
-      - run: pnpm run test:ci-gate
-      - run: pnpm audit --audit-level=moderate
+      - run: node tools/source-map-hotfix.mjs tests # pnpm run test:ci-gate
+      - run: node tools/source-map-hotfix.mjs audit # pnpm audit --audit-level=moderate
   secrets:
     runs-on: ubuntu-latest
     env:

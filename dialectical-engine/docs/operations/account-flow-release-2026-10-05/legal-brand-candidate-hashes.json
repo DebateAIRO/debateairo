@@ -1,0 +1,352 @@
+[
+  {
+    "path": "apps/ui/legal/ar/privacy-policy.md",
+    "currentSha256": "40bc71f1269cd6a4a03eb69f95ccfdcbd0dc63c9f85288dace454ee18bff4358",
+    "brandCandidateSha256": "137826d40f1f2ae79c693b77c37785a5e4355bcca81debb55d5b711e2eb31c63"
+  },
+  {
+    "path": "apps/ui/legal/ar/terms-of-service.md",
+    "currentSha256": "6e6190f74e986624274e9c9cf2d66fb3ddf1859a785933d2deb8dddb8c87cb57",
+    "brandCandidateSha256": "6c2b62bfba0d805260a6c460048ee9da8ebd32c92946a0ec1d9ddf9b1aeb6cad"
+  },
+  {
+    "path": "apps/ui/legal/bg/privacy-policy.md",
+    "currentSha256": "4f39519705c20a44638283b70c6a223b4b241791956fefc0255559708c759c33",
+    "brandCandidateSha256": "d4e80534efe6cd413ea51e1777afc3ceeb42e2a852fc183730afe8fa647e0b14"
+  },
+  {
+    "path": "apps/ui/legal/bg/terms-of-service.md",
+    "currentSha256": "d7301dfef81723ef3c7f66659764113b291d728ceb1077900022277a24115b24",
+    "brandCandidateSha256": "801c4174643b37ed8973f95a09f5eb2a331a8b65f4970566f54d972b3e396102"
+  },
+  {
+    "path": "apps/ui/legal/cs/privacy-policy.md",
+    "currentSha256": "09a2d653475a68875ed1b2139ea8e79879df62551f1e08a249a01aa059246b05",
+    "brandCandidateSha256": "aa99560a302b1f90cf389878d70bd873e04452db8870cc33868353b09b9a187d"
+  },
+  {
+    "path": "apps/ui/legal/cs/terms-of-service.md",
+    "currentSha256": "cb0f44393828f47cecdf3930b689201197ab5c6e3c7b664fa1788dda1887b766",
+    "brandCandidateSha256": "f4fb2681137bca027571e7fb63ceee66f2aacfc611d36ca7110b7abb39d91aa2"
+  },
+  {
+    "path": "apps/ui/legal/da/privacy-policy.md",
+    "currentSha256": "5788df2f80ea9707505ad1da6de5f5f56c6547161552d75d72977f5d2a9c75b9",
+    "brandCandidateSha256": "ac7b51800da651652ddafd829d8aabff95ddefac375d1fdac150a8066875a1d9"
+  },
+  {
+    "path": "apps/ui/legal/da/terms-of-service.md",
+    "currentSha256": "9110cc31f873cc251d6e14bd3cab439a9fe22b6bbe7c56537f790c716ef8b3cd",
+    "brandCandidateSha256": "c629e39d8b56c9cbb27441dabb89a24534dcc337b1d776775bfa63cf2c8a7d52"
+  },
+  {
+    "path": "apps/ui/legal/de/privacy-policy.md",
+    "currentSha256": "ebc8671f087f812e585e5142cf7b9047ba9992e78fe877f1b425e8ac9985c262",
+    "brandCandidateSha256": "c75dd882a04cdb321bf400d5469189bcfdaa4970486c33ff832fe44aa94cef3a"
+  },
+  {
+    "path": "apps/ui/legal/de/terms-of-service.md",
+    "currentSha256": "aa88561a8ce9597a86184c51cf3de2e19b70a6240dd5c24427c70004f448601a",
+    "brandCandidateSha256": "eae280328cb4d41c8a759308e3193e2507046233c0c705ea937ab4a84e8b2237"
+  },
+  {
+    "path": "apps/ui/legal/el/privacy-policy.md",
+    "currentSha256": "4c3a6de1b3eb46e8d869061535e291f728fd99f6ce24210bab13a6f3af945999",
+    "brandCandidateSha256": "ec592963477e9ba4f522feda11d306ef110c96448078fd6a65e2da09978afc49"
+  },
+  {
+    "path": "apps/ui/legal/el/terms-of-service.md",
+    "currentSha256": "d4b7a3b6cdfc7bc8dada6b840fa8d105a08e7532b1e6464a0477c1e26ac248b3",
+    "brandCandidateSha256": "8dc30793b8e46054eaee022204ab3ab4554dd226501d4b4abf21821f17d6b404"
+  },
+  {
+    "path": "apps/ui/legal/en/privacy-policy.md",
+    "currentSha256": "e20adfede07688bbbc37252fdc65adc19c237f25c5179ae1ed583e2b20a3c5e6",
+    "brandCandidateSha256": "c5b722ceda8ee30f06b80dd5f669888f91df3c8cc5ba2c799a33e13b97396d33"
+  },
+  {
+    "path": "apps/ui/legal/en/terms-of-service.md",
+    "currentSha256": "790b10380cbd979e4eebc5f172282765a267edce1d16b6ac7b0f4b1f3225d9a9",
+    "brandCandidateSha256": "f8f34a61e2f90d8fb1fc8f2fff686398f1dd5855f869a895c060c7a829384e2e"
+  },
+  {
+    "path": "apps/ui/legal/es/privacy-policy.md",
+    "currentSha256": "e243c9af2422da0ef684455eeb77e3144c002f1ceb3f739a130e854ed0423cc1",
+    "brandCandidateSha256": "37cff989054de21085ef706ed2e8bd4126eac378a261ad47d338d723630826b0"
+  },
+  {
+    "path": "apps/ui/legal/es/terms-of-service.md",
+    "currentSha256": "9302760f4df0b9e8d0a84a76124623c563c3ea4b34a026499d74ffdec0d3dd11",
+    "brandCandidateSha256": "f915d1745e27ffea2398907e61809c4974ab2b629f9b88debeeab1d49d94a906"
+  },
+  {
+    "path": "apps/ui/legal/et/privacy-policy.md",
+    "currentSha256": "f7bf451a7ce18ff247f657f4505015c0fcec7a6c436a9d929caeeba5b77ffad3",
+    "brandCandidateSha256": "0c752a1bd341ecd03cc2b65393ae7f8e60b80bc6b3bc5ca40fc014816f9cbc89"
+  },
+  {
+    "path": "apps/ui/legal/et/terms-of-service.md",
+    "currentSha256": "8618e67065768038f743b8385806976fb65112e40c8eec4652749bf725993a9c",
+    "brandCandidateSha256": "50a5283b179a61fcd58336b959f27fbcdb4526c409b4731a5a91432afe604500"
+  },
+  {
+    "path": "apps/ui/legal/fi/privacy-policy.md",
+    "currentSha256": "5dcda2043a002837daca22cfc5ecdb8f457b6c2354854da378990770a50ec6d2",
+    "brandCandidateSha256": "fa44d44c0b9792ad1380959853197886621bb62bbf98a4e8afa1b5f19d778c23"
+  },
+  {
+    "path": "apps/ui/legal/fi/terms-of-service.md",
+    "currentSha256": "8ea2b9a9680d218d6dcbc512b801768a5aea80cf7d97313c2b64ba90740743c3",
+    "brandCandidateSha256": "e1a047fa33fb0f668913fe621cb31b68d4267af65281a84145aaa7199a6e5bef"
+  },
+  {
+    "path": "apps/ui/legal/fr/privacy-policy.md",
+    "currentSha256": "4f0c3bab5c2259f3fbc6e32db72e75b064474ee0dd6a0a7d6e944d3525654981",
+    "brandCandidateSha256": "0548e48ad3d333a32a527422d5f210bfb1a3e66b22b843698cca8bb6d1c5559e"
+  },
+  {
+    "path": "apps/ui/legal/fr/terms-of-service.md",
+    "currentSha256": "5c7fcc44f423c4d72cab2c17f9b1e4e9e70462e117827b548dfa223c5c8e331f",
+    "brandCandidateSha256": "d478295ca125c11f3793ee388bef1803e7643f626dbdb0cfc29c29198f19a2d3"
+  },
+  {
+    "path": "apps/ui/legal/ga/privacy-policy.md",
+    "currentSha256": "9a68b2ee176328e4739e7868c57903b7e161f10b88f80de0a836f42cb25f55d2",
+    "brandCandidateSha256": "4a62954db5033f042b60c51899980b1acf7695e2406de165feed0f18522289cd"
+  },
+  {
+    "path": "apps/ui/legal/ga/terms-of-service.md",
+    "currentSha256": "140d2d7ea3d3ff8531d33f513c99503fef636514551b840af5e50b0899b1fa20",
+    "brandCandidateSha256": "d002600b286d600c98f3480097132dbe0f4d509b1a9bd6f18ece904f1ab8c598"
+  },
+  {
+    "path": "apps/ui/legal/he/privacy-policy.md",
+    "currentSha256": "1cb7e4db83c28810789f189428e89bea71f76b8af744685846b96d1237f3e912",
+    "brandCandidateSha256": "76724b7ec944c2f98e813e6183cb3266196e1d09ac40260d55f3cc10854cbcda"
+  },
+  {
+    "path": "apps/ui/legal/he/terms-of-service.md",
+    "currentSha256": "531056181d8ada0b4f51f72736ceecb4bce4db3d52ff4f0ba693b2e3ec7ce715",
+    "brandCandidateSha256": "56634ad4e2b1e850cb0332a86e0a12035ef071df7ca044b199265dec10f5da34"
+  },
+  {
+    "path": "apps/ui/legal/hi/privacy-policy.md",
+    "currentSha256": "a77cd9684fd1afb48262910477a497f42319b6a68cb8b623c6f7f6cf462f3e90",
+    "brandCandidateSha256": "2fdea6156febbc72f4da2d7b51e0ed0e2f61d7d8bd9e6f20db131bee8740f5c9"
+  },
+  {
+    "path": "apps/ui/legal/hi/terms-of-service.md",
+    "currentSha256": "36796ff8c2c68c104631aabdfcc4f3f7d2617b117caa04fd10e96f695ca5a655",
+    "brandCandidateSha256": "e7e2c19d4af568835ad684fcac11ba26223d83c73e5ee1312ce1cf40340a6db9"
+  },
+  {
+    "path": "apps/ui/legal/hr/privacy-policy.md",
+    "currentSha256": "23234b61d7ad3cbedaa3a9bdf61cba5cdb2bc1f135ddce92872f7103e0821cab",
+    "brandCandidateSha256": "76149e1d6ecd067ddda21e3acf09e7ec4826c3f5219986ba30ab331ee98a88ed"
+  },
+  {
+    "path": "apps/ui/legal/hr/terms-of-service.md",
+    "currentSha256": "563c0a014311709efb46e3667e32e3f64e6ec1e6523dabd2ee7ace35b1246fdc",
+    "brandCandidateSha256": "a2b40127adcd8ff903ed677bf60dc56522c0a68eb2119768fd51a6ec7e1f0508"
+  },
+  {
+    "path": "apps/ui/legal/hu/privacy-policy.md",
+    "currentSha256": "01da9efa75018445c839f9c78faa42cc30b7de28d01acd6af9c3f4e5840b3969",
+    "brandCandidateSha256": "9e348339652c801fc93cb57937a02ae3a21c7389f014fef30c6e52712f717bb0"
+  },
+  {
+    "path": "apps/ui/legal/hu/terms-of-service.md",
+    "currentSha256": "8ac73cf231d83ec25a741b715a010a2f3c9aa7eb0bfa5d23e33b10853746f45f",
+    "brandCandidateSha256": "7d44f914a74f18f3054491d7d9592f9f1b7610bd4af15472438e28ca33e2a9d2"
+  },
+  {
+    "path": "apps/ui/legal/id/privacy-policy.md",
+    "currentSha256": "953b9001fdb0811e1232fb9a3de65e6b6a1262dc0c98d382af5ae9e0e22e656e",
+    "brandCandidateSha256": "5bb22f2a1e9ca6fc137f7c9849acfaef4dca9d4133a1f3283fd9b898b2ecf188"
+  },
+  {
+    "path": "apps/ui/legal/id/terms-of-service.md",
+    "currentSha256": "b328390f33a7d03397928d9fef2dcef98ea583adc7c16ef058d10c7b7078763c",
+    "brandCandidateSha256": "5ea1ec52fc0d829d9a36a0a5b1b2cf3c9a0316633bf23f13fdc0923334d7169f"
+  },
+  {
+    "path": "apps/ui/legal/it/privacy-policy.md",
+    "currentSha256": "684c056ef8514c797386c5d23ddb037c62047fc040a9212f740f5f2142aa80e8",
+    "brandCandidateSha256": "5493bc13f4a1a7d89ea0714242875d7396c868b7777d4236275fe957d907d729"
+  },
+  {
+    "path": "apps/ui/legal/it/terms-of-service.md",
+    "currentSha256": "d9a583d3b9aee07a3041b3f31f2add7ab6f7dd7e16dcbdfa24927ef0ad9cdfc2",
+    "brandCandidateSha256": "788e814b1f3e802dd90796ce33fd62f5252fe7e49b723136308cb54034d18e31"
+  },
+  {
+    "path": "apps/ui/legal/ja/privacy-policy.md",
+    "currentSha256": "527145458dc2992c64b181c4e8f5d83b75ddc6418669d9c9b08afb879a9337ce",
+    "brandCandidateSha256": "a6ed2be541e41be0afdc5af41c2930dcfbc149c01d716a79188036ec59dfe213"
+  },
+  {
+    "path": "apps/ui/legal/ja/terms-of-service.md",
+    "currentSha256": "60ec85a05b7477ccd5db40322d01ee11c7d3ed6f783a0b96593f16bfe62acca2",
+    "brandCandidateSha256": "9be3bcdf50e72ea0c033456c49d680b17bf048bd7fdc397a1f17db81a1436bce"
+  },
+  {
+    "path": "apps/ui/legal/ko/privacy-policy.md",
+    "currentSha256": "5e82a99984907e257f0e20c7b7819ba20c8a7d7ebaa1efce1840a922b1ad3538",
+    "brandCandidateSha256": "d3de5028e288d4b7597f06ce722c06b1344bd22e09c080e15e1e455d43c1934c"
+  },
+  {
+    "path": "apps/ui/legal/ko/terms-of-service.md",
+    "currentSha256": "6be52843d694090984b1f213fd65e9d991e48becf5dcf9fe1c9e1578d6cf3aa4",
+    "brandCandidateSha256": "ce61a50ead1c90371ce6c3c3cd4e4acf1b260be431b593354ed17fb8ba988bbe"
+  },
+  {
+    "path": "apps/ui/legal/lt/privacy-policy.md",
+    "currentSha256": "b89478b97149945481659b6f43dbf17b6090f9321446aaf6a48ac7efac88fbd1",
+    "brandCandidateSha256": "bd8025650e0a1421740f5f6e42bb7a45888052287fcc742f599dd8f94ff7cd19"
+  },
+  {
+    "path": "apps/ui/legal/lt/terms-of-service.md",
+    "currentSha256": "2b3f802f40be87b19c7d3987fd0897471e28016e5bd608f0ba1db04347189c5c",
+    "brandCandidateSha256": "80ac9120f03faec430430e7b14e1d8ffa3e9c473e1c1cf8e23d48dbf95175ccf"
+  },
+  {
+    "path": "apps/ui/legal/lv/privacy-policy.md",
+    "currentSha256": "4d2169e7b672ce938af8dcf6dd5dfd0c1ad4c3d5d00565e7f80b5862d975fa76",
+    "brandCandidateSha256": "ab7c2adb0d45dddffb5fae8a2531cc79fc4b8cc245972a0ddfecb98f5e4807cd"
+  },
+  {
+    "path": "apps/ui/legal/lv/terms-of-service.md",
+    "currentSha256": "e69026a84f96908865066c5028e2fb11a310517d5de6d17c8dba1cdd5d653e4e",
+    "brandCandidateSha256": "c462d78bfab40b4d47fd7b7657a0b5683242a5eef40725591866d1683eb8ecf0"
+  },
+  {
+    "path": "apps/ui/legal/mt/privacy-policy.md",
+    "currentSha256": "5fb50ec1d788da32f90aa19903d94ff1d2ac6bd12f5ac0df2e4ecb7edef7e6ea",
+    "brandCandidateSha256": "dddd555275183b292aa5f6c9bba7b75e55ec30d8ecdb3d3eb380d51dbac4ad48"
+  },
+  {
+    "path": "apps/ui/legal/mt/terms-of-service.md",
+    "currentSha256": "04d7aa8cbdf70959638211e39dc47c0212ec1f269e3a02dfcf88878ccea9bf75",
+    "brandCandidateSha256": "1337a7c21a2f6ef055767244bb2f969606a82111a59b34f2b64131bf002339e1"
+  },
+  {
+    "path": "apps/ui/legal/nl/privacy-policy.md",
+    "currentSha256": "f5be62cb9215636f2294576a29450bfd39847e7d2d8ff89ce9dc28dfe6c8c3ff",
+    "brandCandidateSha256": "b7725b7f4c475e57c6d430d8863e524b6ce90b3c4e9d8d74bea37a794e714108"
+  },
+  {
+    "path": "apps/ui/legal/nl/terms-of-service.md",
+    "currentSha256": "d009085e560ca793d3a2fa8c068aa8da8dc7ba54f3b2f06f1b9ca04094ded646",
+    "brandCandidateSha256": "63168f6fb7e753894fa6a9bb5784ab987a8f95cffd9299b89891f571d0dfc422"
+  },
+  {
+    "path": "apps/ui/legal/pl/privacy-policy.md",
+    "currentSha256": "0882bfe996ada6ced7b5f425bf636aaf62e7e77bd858979218709fa671083ba3",
+    "brandCandidateSha256": "d793c3d232814ff1c24b15c8c892ce56db57acea0933f2a63fd8830ff39eace9"
+  },
+  {
+    "path": "apps/ui/legal/pl/terms-of-service.md",
+    "currentSha256": "69874d08ec29203501d7698c711209e3cce6a64ed0b6c6557528ec8f6a9aae37",
+    "brandCandidateSha256": "aedec209d063c8eec951cc8dfee32de2b6e880910b5252240f901deb8d7045c0"
+  },
+  {
+    "path": "apps/ui/legal/pt/privacy-policy.md",
+    "currentSha256": "fd45b54b4a176ef952fec6427a1bbac421ceebdc5dcafe9a2d7bc34588bc634a",
+    "brandCandidateSha256": "a5087ea010f04e6f711e48177218bc2214db1248ed7754e06cd8631b0a6845c2"
+  },
+  {
+    "path": "apps/ui/legal/pt/terms-of-service.md",
+    "currentSha256": "dad7ac82ac3b1587d64cfe0dddbd389eb5aec04cd481629a5aa209492fbb99f3",
+    "brandCandidateSha256": "450723eec832d2176097e48e5dad0ccb60712d055c2fb42d1fb2397f2b039ec2"
+  },
+  {
+    "path": "apps/ui/legal/ro/privacy-policy.md",
+    "currentSha256": "b743c59bbb41b123f112699ddd75cf117d3177a4bd98abdfe31708065eb3b543",
+    "brandCandidateSha256": "a40158aa07c42e1fec09939c04b1f3d232e7b3b42c9201c6ecdeeecb4429ee85"
+  },
+  {
+    "path": "apps/ui/legal/ro/terms-of-service.md",
+    "currentSha256": "804928a6c70252c237b73421d39d23be49da21fde73c29bce1e0500390435624",
+    "brandCandidateSha256": "adadf0b4fe4e0d174b75817a418a8a1af803758d0a46c0aeecffcd1e0ad90070"
+  },
+  {
+    "path": "apps/ui/legal/ru/privacy-policy.md",
+    "currentSha256": "813de4e8c6e80f36abe094eddef5238dcef36ee80601fb770051d2c2ff12fe89",
+    "brandCandidateSha256": "0bc19a9e006d8427c4fce45f7304746099927e02ad9abb59310aba1ca37a44cf"
+  },
+  {
+    "path": "apps/ui/legal/ru/terms-of-service.md",
+    "currentSha256": "6e3582a18c06e8cad614f856e4e00de2c7d35e9e5e13461d74e13e00c62a3fe9",
+    "brandCandidateSha256": "bbc96b155386eabc9ac25ead584ce0ed4cf6dbfd06c1c90158b85c2e54a81eb5"
+  },
+  {
+    "path": "apps/ui/legal/sk/privacy-policy.md",
+    "currentSha256": "969bd77b8548a98313aee5ffe2bda6ecc4fde6a1d444f79a5c0a2201569d354d",
+    "brandCandidateSha256": "7f0739b5a564beeba44256c63c984767e8a7e214b05ee3d30444f5504239d6f6"
+  },
+  {
+    "path": "apps/ui/legal/sk/terms-of-service.md",
+    "currentSha256": "e228342ce1c9d02b622dce58770a8b16c8abbd437ef449ce69fe1429dcfeada8",
+    "brandCandidateSha256": "a88fbebf1544df41c0bbca632555b451665e3dd14543a35ce8c89f05e9be9ef9"
+  },
+  {
+    "path": "apps/ui/legal/sl/privacy-policy.md",
+    "currentSha256": "3d53aa04ab517e5cdd7000e4345f282ddfa3c548170f3506337b639427ec87f4",
+    "brandCandidateSha256": "6ad80db3a90ddd1c23e45c60042193de031b38e817783c1b105fab3db3d47c84"
+  },
+  {
+    "path": "apps/ui/legal/sl/terms-of-service.md",
+    "currentSha256": "f1cc4e668081cd52b36ef05d845df0a96bbfadafecf908d2331a77d922440b04",
+    "brandCandidateSha256": "445aecc2fc887f6cf985ae51e3efcfa56d505b89d7401c233e8f6067a1203be9"
+  },
+  {
+    "path": "apps/ui/legal/sv/privacy-policy.md",
+    "currentSha256": "6a212699d9543ff9a7d67495cfa3d7dbdb2e83b3d9005a4fabc955745ca8529a",
+    "brandCandidateSha256": "425aaaf6164ad38bba4aca8172decae80e795a7de518fb27c3477d213c746848"
+  },
+  {
+    "path": "apps/ui/legal/sv/terms-of-service.md",
+    "currentSha256": "fe24ca15c9ce9c1671a1fee28c726ef453614db66e0ac26780a9625483a5d187",
+    "brandCandidateSha256": "e497b67717ba64246f884911300610a342d7b6edec8b0b029e01ed309ee78f81"
+  },
+  {
+    "path": "apps/ui/legal/tr/privacy-policy.md",
+    "currentSha256": "66f4061ded6718d32be4a2375ef81b8e2742d799b4c17cccb5612b223da46eca",
+    "brandCandidateSha256": "f9ef77e06c00b3a534f4d5dadf7504121de89dc33aca83c2575c3bc87ae3be89"
+  },
+  {
+    "path": "apps/ui/legal/tr/terms-of-service.md",
+    "currentSha256": "00105a4b6f1920dcbb0e297a2c6c213a6fad7aa554171cbfc13cdd027955296f",
+    "brandCandidateSha256": "26cea5af306240fbb518b14d90f18f5f17cf92212e236cad1e1109b29ebc3a2c"
+  },
+  {
+    "path": "apps/ui/legal/uk/privacy-policy.md",
+    "currentSha256": "f9e536d77e35f37084e41051347420142c54e6f24d9fe523a5489dd3076505b8",
+    "brandCandidateSha256": "38ddb6bf67dce4d128883db94e8dadfb6e0bd85661877ebc2a601abc75e2e1ca"
+  },
+  {
+    "path": "apps/ui/legal/uk/terms-of-service.md",
+    "currentSha256": "19646e762d03cf763a2eade223cd84559a93c4abfd441e20a4c3f1c4693262d8",
+    "brandCandidateSha256": "1995bc3a539fe4605118e194a9b181264aeaf96842193b501a1285f4501a5476"
+  },
+  {
+    "path": "apps/ui/legal/vi/privacy-policy.md",
+    "currentSha256": "456c86917e166db0486852f458683c71ec5f427dcf3454bfc579aa78043a9ca7",
+    "brandCandidateSha256": "dbe4f9abacd6ab2c5e7004a20c3c076035dc7efe35c84c86f4a39072d4717e2d"
+  },
+  {
+    "path": "apps/ui/legal/vi/terms-of-service.md",
+    "currentSha256": "097654fe565ef87cfd80646057057ecc3c50ce70a959024c60e4ca58abc090de",
+    "brandCandidateSha256": "a3a86427112cd67dc39cef4ddf31724b20133db3e985d533fd22c580f8852838"
+  },
+  {
+    "path": "apps/ui/legal/zh/privacy-policy.md",
+    "currentSha256": "bef71d9f6bd152e27bfb51c50038d3e763cbe67d1169679f12170cf6172d6666",
+    "brandCandidateSha256": "cbd52487f6811465ae44ced1a0fb9f1797b8001498456a8c22f6de795f3aedc8"
+  },
+  {
+    "path": "apps/ui/legal/zh/terms-of-service.md",
+    "currentSha256": "4a9595f6483cb47ad16b74a4e0f9a0841660501a68b886d8945301ad18cb94c4",
+    "brandCandidateSha256": "015840c5577fbba7d87a752d55d6e93e3c56ecd3207b7e812a1031d8925e995c"
+  }
+]

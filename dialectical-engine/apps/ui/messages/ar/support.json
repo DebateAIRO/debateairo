@@ -81,5 +81,7 @@
   "support.answerRating": "تقييم الإجابة",
   "support.privacyPreferences": "الخصوصية",
   "support.aiBanner": "الردود مولّدة بالذكاء الاصطناعي وموسومة بما يمكن للآلة قراءته، وقد تكون خاطئة. اطلب التحدث إلى إنسان في أي وقت.",
-  "support.cookiePreferences": "ملفات تعريف الارتباط التي نخزّنها"
+  "support.cookiePreferences": "ملفات تعريف الارتباط التي نخزّنها",
+  "support.recoverAccount": "استرداد حسابك",
+  "support.countryUnavailable": "Dialectical Engine غير متاح في بلدك بعد."
 }

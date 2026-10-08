@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "बहसों",
   "INCIDENT_SURFACE_PUBLISHING": "प्रकाशन",
   "INCIDENT_SURFACE_SIGN_IN": "साइन-इन",
-  "INCIDENT_SURFACE_WHOLE_SITE": "पूरी साइट"
+  "INCIDENT_SURFACE_WHOLE_SITE": "पूरी साइट",
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine अभी आपके देश में उपलब्ध नहीं है।"
 }

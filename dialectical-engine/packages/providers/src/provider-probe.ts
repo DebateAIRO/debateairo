@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { THINKING_LEVEL_TOKEN } from "./index.js";
+import { PREVIEW_GLM_OUTPUT_RESERVATION } from "./preview-test.js";
 import type { ProviderDiscoveryTarget } from "./index.js";
 
 /**
@@ -59,6 +61,8 @@ const MAX_PROBE_RESPONSE_BYTES = 64 * 1024;
 export async function observeProviderTarget(input: Readonly<{
   target: ProviderDiscoveryTarget;
   timeoutMs: number;
+  thinkingLevel?: string;
+  tokenCeiling?: number;
   fetchImplementation: typeof fetch;
   clock: () => Date;
   // MOVED: was `ProviderProbeRecord` (@debateai/db), now the structural twin.
@@ -67,6 +71,8 @@ export async function observeProviderTarget(input: Readonly<{
   const probedAt = input.clock();
   let state: ProviderProbeObservation;
   try {
+    if(input.tokenCeiling!==undefined&&(!Number.isSafeInteger(input.tokenCeiling)||input.tokenCeiling<1||input.tokenCeiling>PREVIEW_GLM_OUTPUT_RESERVATION))throw new TypeError("PROVIDER_PROBE_TOKEN_CEILING_INVALID");
+    if(input.thinkingLevel!==undefined&&(!THINKING_LEVEL_TOKEN.test(input.thinkingLevel)||input.target.thinkingParameter===undefined||!input.target.thinkingLevels?.includes(input.thinkingLevel)))throw new TypeError("PROVIDER_PROBE_THINKING_INVALID");
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (input.target.authorizationHeader !== undefined) {
       headers.authorization = input.target.authorizationHeader;
@@ -79,7 +85,8 @@ export async function observeProviderTarget(input: Readonly<{
         signal: AbortSignal.timeout(input.timeoutMs),
         body: JSON.stringify({
           model: input.target.model,
-          max_tokens: 8,
+          max_tokens: input.tokenCeiling ?? 8,
+          ...(input.thinkingLevel===undefined?{}:{[input.target.thinkingParameter!]:input.thinkingLevel}),
           messages: [{
             role: "user",
             content: "DR-181 discovery health probe. Reply exactly: OK"
@@ -135,6 +142,8 @@ export async function probeTarget(input: Readonly<{
   target: ProviderDiscoveryTarget;
   probes: ProviderProbeRecorder;
   timeoutMs: number;
+  thinkingLevel?: string;
+  tokenCeiling?: number;
   fetchImplementation: typeof fetch;
   clock: () => Date;
 }>): Promise<ProviderProbeObservation> {

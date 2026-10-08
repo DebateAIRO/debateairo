@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Fiók — E-mail-cím és helyreállítási e-mail-cím (titkosítva tárolva, kulcsolt indexszel, hogy a címet annak elolvasása nélkül is megtalálhassuk); jelszó (kivonatként tárolva, soha nem egyszerű szövegként); a kétfaktoros hitelesítés titka (titkosítva); tíz helyreállítási kód (kivonatként tárolva); az Ön álneve; annak időpontja, amikor megerősítette, hogy betöltötte a 18. életévét — Öntől, a regisztráció során",
+        "Fiók — E-mail-cím és helyreállítási e-mail-cím (titkosítva tárolva, kulcsolt indexszel, hogy a címet annak elolvasása nélkül is megtalálhassuk); jelszó (kivonatként tárolva, soha nem egyszerű szövegként); a kétfaktoros hitelesítés titka (titkosítva); tíz helyreállítási kód (kivonatként tárolva); az Ön álneve — Öntől és a szolgáltatástól, a regisztráció során",
+        "IP-cím országának ellenőrzése regisztrációnál és új vitánál — Regisztrációnál az IP-cím országát és a Tor-kilépőpontokat helyben ellenőrizzük a DB-IP Lite és a Tor-lista alapján. Minden új vita előtt helyben ismét ellenőrizzük az IP-cím országát, és elutasítjuk a vitát, ha az ország a mindig tiltott országok listáján szerepel. Elutasítjuk a nem támogatott országokból, Tor-kilépőcímekről és olyan IP-címekről érkező regisztrációkat, amelyek országát nem tudjuk meghatározni; az IP-címet nem küldjük harmadik félnek. Az elutasításokat útvonal, kód, ország és időablak szerint összesítve rögzítjük; az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel. A bizonyíték típusa „IP-cím”. — Az Ön kapcsolata",
+        "Életkor-ellenőrzés — Megadja születési dátumát, de azt nem tároljuk. Sikeres regisztrációnál a sikeres ellenőrzést rögzítjük; meglévő fióknál az eredmény sikeres vagy elutasított lehet. A bejegyzés tartalmazza az alsó korhatárt, az IP-cím országát, ha ismert, a szabály verzióját, az ellenőrzés körülményeit és időpontját — Ön és a regisztrációs rendszer",
+        "Bejelentett lakóhely — A regisztrációnál kiválasztott lakóhely szerinti ország és az amerikai állam, ha az Egyesült Államokban él — Ön",
         "Munkamenetek és biztonság — Kivonatolt munkamenet-token; a böngésző user-agent karakterláncának kulcsolt kivonata, amellyel észlelhető, ha egy munkamenet másik böngészőbe kerül; a létrehozás, az utolsó használat és a lejárat időbélyege. A munkamenethez nem tároljuk az Ön IP-címét, eszköznevét vagy böngészőadatait, a Beállításokban látható munkamenetlista pedig kizárólag időbélyegeket mutat — Az Ön böngészőjéből",
         "Biztonsági auditnapló — A biztonsági szempontból releváns események — regisztráció, ellenőrzés, bejelentkezési kísérletek, helyreállítás, közzététel, törlés — csak hozzáfűzhető naplója. Az egyes események IP-címét és user-agent adatát csak egyirányú, kulcsolt kivonatként (Argon2id) tároljuk, így azok nem olvashatók vissza, de egy adott időszakon belül egyeztethetők. A bejelentkezési és helyreállítási kockázati jelzéseket 90 napig, titkosítva tároljuk — Az Ön böngészőjéből, az egyes események időpontjában",
         "A vita tartalma — Az Ön által beírt kérdés; az Ön által megadott irányító megjegyzések; a motor által létrehozott állítások, kritikák, bizonyítékhivatkozások, pontszámok és döntések; az egyes MI-szolgáltatók válaszainak szó szerinti nyilvántartása; visszakeresési lekérdezések és forráshivatkozások. Mindezt az Ön fiókjához tartozó egyedi kulccsal titkosítva tároljuk — Öntől és a kérdésén dolgozó MI-modellektől",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Személyek, akik nem felhasználóink — Más személyek személyes adatai, amelyeket Ön egy kérdésben megad, vagy amelyeket a motor a válaszadás során létrehoz. Kérjük, hogy ne tegyen ilyet; a 11. szakasz ismerteti, mit teszünk, ha ez mégis megtörténik — Közvetve Öntől"
         ]
       },
+      { kind: "p", text: "Regisztrációnál ellenőrizzük az IP-cím országát és az életkort. A születési dátumot kizárólag ellenőrzésre küldi el; nem tároljuk. Az IP-ellenőrzés helyben történik, harmadik félhez nem kerül a cím. Minden új vita előtt is helyben ellenőrizzük az IP-cím országát; a mindig tiltott országokból induló vitát elutasítjuk." },
       { kind: "p", text: "Nem gyűjtünk analitikai vagy telemetriai adatokat arról, hogyan használja a terméket, és ilyen célból sütiket sem helyezünk el. Ha ez megváltozik, előbb ezt a szabályzatot és a Sütiszabályzatot módosítjuk, és az Ön döntését kérjük." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Egy vitamotor politikával, vallással, egészséggel, szexualitással és meggyőződéssel kapcsolatos kérdésekre ösztönöz. Ezek a GDPR 9. cikke szerinti különleges adatkategóriák, és attól függetlenül megjelenhetnek a kérdéseiben, hogy szándékunkban áll-e gyűjteni őket." },
-      { kind: "p", text: "Önről. Első vitája előtt, külön képernyőn adja meg kifejezett hozzájárulását ahhoz, hogy a saját kérdéseiben önként megadott különleges adatokat vitái futtatása céljából kezeljük. Rögzítjük a szöveg Ön által elfogadott verzióját, az Ön nyelvét és az időpontot. E hozzájárulás nélkül nem indíthat vitát. Ezt bármikor visszavonhatja azzal, hogy nem ad meg ilyen adatokat, vagy töröl egy vitát. Amit saját magáról közzétesz, olyan adat, amelyet Ön döntött úgy, hogy nyilvánosságra hoz." },
+      { kind: "p", text: "Önről. Első vitája előtt, külön képernyőn adja meg kifejezett hozzájárulását ahhoz, hogy a saját kérdéseiben önként megadott különleges adatokat vitái futtatása céljából kezeljük. Rögzítjük a szöveg Ön által elfogadott verzióját, az Ön nyelvét és az időpontot. E hozzájárulás nélkül nem indíthat vitát. Ezt bármikor visszavonhatja a privacy@dezbatere.ro címre írva. Az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát. Amit saját magáról közzétesz, olyan adat, amelyet Ön döntött úgy, hogy nyilvánosságra hoz." },
       { kind: "p", text: "Más személyekről. Semmilyen jogi feltétel nem teszi lehetővé számunkra, hogy az Ön által egy kérdésben megnevezett harmadik személy különleges adatait kezeljük, és MI-szolgáltatóink egyike sem rendelkezik ilyen feltétellel. Ezért tiltják ezt a Feltételek, ezért minimalizáljuk az általunk továbbított adatokat, és ezért távolítjuk el kérésre gyorsan az ilyen tartalmat — lásd a 11. szakaszt." },
       { kind: "p", text: "Egészségügyi adatok. Egyes országok külön jogszabályok alapján kezelik az egészséggel kapcsolatos adatokat, beleértve a következtetéseket is. Ha Ön [the State of Washington] területén él, külön [Consumer Health Data Privacy Notice] alkalmazandó." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Miért és milyen jogalapon használjuk az Ön adatait",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Minden célnak egy jogalapja van a GDPR 6. cikkének (1) bekezdése szerint, és az egyik célból gyűjtött adatokat nem használjuk fel másik célra." },
+      { kind: "p", text: "Az alábbiakban minden célhoz megadjuk a GDPR 6. cikkének (1) bekezdése szerinti alkalmazandó jogalapokat. Az egyik célból gyűjtött adatokat nem használjuk fel másik célra." },
       {
         kind: "list",
         items: [
         "Fiókjának létrehozása és működtetése, az Ön hitelesítése, vitáinak futtatása és tárolása, hogy azokat újra megnyithassa és lejátszhassa — Fiók, munkamenetek, vitatartalom — Szerződés — Art. 6(1)(b) (a GDPR 6. cikke (1) bekezdésének b) pontja)",
+        "Az IP-cím országának és Tor-státuszának ellenőrzése regisztrációnál a a nem támogatott országokból vagy ismeretlen országú IP-címekről érkező kérelmek elutasítására, valamint az IP országának ellenőrzése minden új vita előtt a mindig tiltott országok kizárására — IP-ellenőrzés és az elutasítás auditadatai — Jogos érdek — Art. 6(1)(f), biztonságos és jogszerű szolgáltatás; jogi kötelezettség — Art. 6(1)(c), ahol korlátozás érvényes",
+        "Életkor ellenőrzése regisztrációnál és meglévő fióknál — Életkor-ellenőrzés eredménye; születési dátum csak az ellenőrzés idejére — Szerződés — Art. 6(1)(b); jogos érdek — Art. 6(1)(f), kiskorúak védelme",
+        "Lakóhely szerinti fogyasztóvédelmi, adatvédelmi és adószabályok alkalmazása — Bejelentett ország és amerikai állam — Szerződés — Art. 6(1)(b); jogi kötelezettség — Art. 6(1)(c)",
         "Kérdésének és a motor állításainak továbbítása MI-szolgáltatókhoz vita létrehozása céljából — Vitatartalom — Szerződés — Art. 6(1)(b) (a GDPR 6. cikke (1) bekezdésének b) pontja)",
         "A szolgáltatás biztonságának fenntartása, visszaélések észlelése, annak lehetővé tétele, hogy észrevegye az Ön által nem kezdeményezett bejelentkezést, auditnapló vezetése — Munkamenetek, biztonsági auditnapló, támogatási visszaélési kivonatok — Jogos érdekek — Art. 6(1)(f) (a GDPR 6. cikke (1) bekezdésének f) pontja): a mi és az Ön érdeke a biztonságos szolgáltatáshoz. Ön tiltakozhat; lásd a 10. szakaszt",
         "Annak igazolása, hogy elfogadta a Feltételeket, és hozzájárulást adott vagy vont vissza — Elfogadási és hozzájárulási nyilvántartások — Jogi kötelezettség — Art. 6(1)(c) (a GDPR 6. cikke (1) bekezdésének c) pontja), a hozzájárulás Art. 7(1) (a GDPR 7. cikkének (1) bekezdése) szerinti igazolására vonatkozó kötelezettségünk — továbbá a szerződés igazolásához fűződő jogos érdekek",
@@ -112,8 +119,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Közzététel és láthatóság",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. A közzététel szándékos, külön megerősítést igénylő művelet. Egy közzétett vita megjeleníti az Ön álnevét, az Ön által megfogalmazott kérdést, az érvelési fát, a pontszámokat, a döntést és a megbízhatósági sávot, továbbá látható címkével jelzi, hogy a tartalmat MI hozta létre. Soha nem jeleníti meg e-mail-címét, munkamenet-nyilvántartásait vagy fiókelőzményeit. [Published debates are / are not] szerepelnek / nem szerepelnek a keresőmotorok indexében [unless you choose]." },
-      { kind: "p", text: "A közzététel visszavonása eltávolítja a vitát a DebateAI felületéről, és megsemmisíti a nyilvános példányunk kulcsát. Az olvasók, keresőmotorok vagy archívumok által már elkészített másolatok nem állnak ellenőrzésünk alatt, és nem tudjuk azokat visszahívni." },
+      { kind: "p", text: "A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. A közzététel szándékos, külön megerősítést igénylő művelet. Egy közzétett vita megjeleníti az Ön álnevét, az Ön által megfogalmazott kérdést, az érvelési fát, a pontszámokat, a döntést és a megbízhatósági sávot, továbbá látható címkével jelzi, hogy a tartalmat MI hozta létre. Soha nem jeleníti meg e-mail-címét, munkamenet-nyilvántartásait vagy fiókelőzményeit. A keresőmotorok indexelhetik a közzétett vitákat." },
+      { kind: "p", text: "A közzététel visszavonása eltávolítja a vitát a Dialectical Engine felületéről, és megsemmisíti a nyilvános példányunk kulcsát. Az olvasók, keresőmotorok vagy archívumok által már elkészített másolatok nem állnak ellenőrzésünk alatt, és nem tudjuk azokat visszahívni." },
       { kind: "p", text: "Fiókja törlésekor az Ön által közzétett minden vitát indokolatlan késedelem nélkül, de legfeljebb 30 napon belül eltávolítunk a nyilvános hozzáférésből, kivéve, ha a jogszabály egy konkrét elem megőrzésére kötelez bennünket. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -126,10 +133,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Fiók — A fiók fennállásáig, majd a megszüntetési kérelem után 7 napos türelmi időn át — A kulcsokat megsemmisítjük; a rekordot töröljük",
+        "Életkor-ellenőrzés eredménye és körülményei — A fiók fennállásáig — A fiókkal együtt törlődik",
+        "Bejelentett lakóhely szerinti ország és amerikai állam — A fiók fennállásáig — A fiókkal együtt törlődik",
         "Munkamenet-nyilvántartások — Az utolsó használattól számított 14 napig vagy a létrehozástól számított 90 napig, amelyik hamarabb bekövetkezik — Töröljük",
         "E-mail-ellenőrző hivatkozások — 24 óráig — Töröljük",
         "Bejelentkezési és helyreállítási kockázati jelzések — 90 napig, az adatbázis által kikényszerítve — Véglegesen eltávolítjuk",
         "Biztonsági auditnapló — A szolgáltatás teljes élettartamáig — Csak hozzáfűzhető; az IP-cím és a user-agent egyirányú kivonat, és nem olvasható vissza",
+        "IP-cím országa szerinti elutasítás auditbejegyzése — A szolgáltatás teljes élettartama alatt — Csak hozzáfűzhető; rögzíti az útvonalat, az elutasítás kódját, az országot, az időablakot és az „IP-cím” bizonyítéktípust; az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel",
+        "Nyers IP-cím a regisztrációs vagy új vita előtti országellenőrzéshez — Csak az adott kérés ideje alatt — Az ellenőrzés nem tárol olvasható IP-címet; az elutasítás auditjában az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel, az IP országa pedig az életkor-ellenőrzésben szerepelhet",
         "Vitatartalom (magánjellegű) — A fiók fennállásáig — Megszüntetéskor megsemmisítjük a kulcsokat, így a tartalom olvashatatlanná válik",
         "Vitatartalom (közzétett) — A közzététel és a fiók fennállásáig — A közzététel visszavonásakor vagy megszüntetéskor eltávolítjuk a nyilvános hozzáférésből; a kulcsokat megsemmisítjük",
         "Szolgáltatói válasznyilvántartások és visszakeresési hivatkozások — Ugyanaddig, mint a vita, amelyhez tartoznak — Ugyanaz",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Az adatkezelés korlátozása (Art. 18; a GDPR 18. cikke) — Kérheti, hogy állítsuk le meghatározott adatok kezelését, amíg az azokkal kapcsolatos vita rendeződik",
         "Tiltakozás (Art. 21; a GDPR 21. cikke) — Tiltakozhat a jogos érdeken alapuló adatkezelés — a 4. szakasz szerinti biztonsági és auditcélú adatkezelés — ellen, és azt leállítjuk, kivéve, ha kényszerítő erejű okokat tudunk igazolni. A marketing ellen bármikor tiltakozhat, és azt leállítjuk",
         "Adathordozhatóság (Art. 20; a GDPR 20. cikke) — Vitái és fiókadatai széles körben használt, géppel olvasható formátumban. [Pending: same export as Access.] Az Ön által létrehozott nem személyes tartalmat, például kérdéseit, a szerződés megszűnésekor kérésére visszaadjuk Önnek",
-        "Hozzájárulás visszavonása (Art. 7(3); a GDPR 7. cikkének (3) bekezdése) — A marketing-hozzájárulás visszavonása bármely e-mailből vagy a Beállításokban; a különleges adatokra vonatkozó hozzájárulás visszavonása azzal, hogy nem ad meg ilyen adatokat, vagy töröl egy vitát. A visszavonás nem érinti a már megtörtént adatkezelést",
+        "Hozzájárulás visszavonása (Art. 7(3); a GDPR 7. cikkének (3) bekezdése) — A marketing-hozzájárulás visszavonása bármely e-mailből vagy a Beállításokban; a különleges adatokra vonatkozó hozzájárulás visszavonása a privacy@dezbatere.ro címre írva (az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát). A visszavonás nem érinti a már megtörtént adatkezelést",
         "Panasztétel — A román felügyeleti hatóságnál, az ANSPDCP-nél, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, vagy a lakóhelye szerinti ország hatóságánál. Örömmel vennénk, ha először bennünket keresne meg"
         ]
       },
@@ -188,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Vitákban megnevezett személyek, akik nem felhasználóink",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Ha valaki olyan kérdést tesz fel a DebateAI-nak, amelyben Önt megnevezi, akkor is kezelhetünk Önről személyes adatokat, ha Ön soha nem használta a szolgáltatást. A Feltételek tiltják, hogy a felhasználók ezt tegyék, és minimalizáljuk az MI-szolgáltatóknak továbbított adatokat, de ez megtörténhet." },
+      { kind: "p", text: "Ha valaki olyan kérdést tesz fel a Dialectical Engine-nak, amelyben Önt megnevezi, akkor is kezelhetünk Önről személyes adatokat, ha Ön soha nem használta a szolgáltatást. A Feltételek tiltják, hogy a felhasználók ezt tegyék, és minimalizáljuk az MI-szolgáltatóknak továbbított adatokat, de ez megtörténhet." },
       { kind: "p", text: "Ez a szakasz a GDPR 14. cikke alapján Önnek nyújtandó tájékoztatás. Az adat mindaz, amit a felhasználó beírt, és amit a motor válaszként létrehozott; a forrás ez a felhasználó; a célok és a jogalap a 4. szakaszban szerepelnek; a címzettek a Nyilvántartásban feltüntetett MI-szolgáltatók; a megőrzés a 7. szakaszt követi. A 10. szakaszban szereplő valamennyi jog megilleti Önt, és különösen kérheti, hogy távolítsunk el egy közzétett vagy az Ön adatait tartalmazó magánjellegű vitát, és közöljük, milyen adatokat tárolunk. Ehhez nincs szüksége fiókra. Írjon a privacy@dezbatere.ro címre, vagy használja bármely közzétett vitán a Jelentés vezérlőt; a megalapozott kérelmekre indokolatlan késedelem nélkül intézkedünk. Ilyen esetben nem tudjuk Önt egyénileg értesíteni, mert nem tudjuk, ki Ön, és hogyan érhetjük el; ehelyett ezt a nyilvános tájékoztatást és az eltávolítási lehetőséget biztosítjuk." },
       { kind: "p", text: "Ugyanez vonatkozik az Önre vonatkozó különleges adatokra — politikai véleményre, egészségre, vallásra —, amelyek más személy kérdésében jelennek meg. Semmilyen jogi feltétel nem teszi lehetővé, hogy tiltakozása után tovább kezeljük őket, és ezt nem is tesszük." }
     ]
@@ -198,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Gyermekek",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "A DebateAI felnőtteknek készült. Regisztrációkor megerősíti, hogy betöltötte a 18. életévét, és tudatosan nem kezeljük 18 éven aluli személyek adatait. Ha tudomást szerzünk arról, hogy egy fiók 18 éven aluli személyhez tartozik, megszüntetjük azt, és a 7. szakaszban leírtak szerint töröljük az adatokat. Egyes országok a megerősítést elégtelennek tekintik, vagy többet követelnek; a B. melléklet közli, hol mi alkalmazandó, a Feltételek pedig ismertetik, mit teszünk ezzel kapcsolatban." }
+      { kind: "p", text: "A Dialectical Engine felnőtteknek készült. Regisztrációkor megerősíti, hogy betöltötte a 18. életévét, és tudatosan nem kezeljük 18 éven aluli személyek adatait. Ha tudomást szerzünk arról, hogy egy fiók 18 éven aluli személyhez tartozik, megszüntetjük azt, és a 7. szakaszban leírtak szerint töröljük az adatokat. Egyes országok a megerősítést elégtelennek tekintik, vagy többet követelnek; a B. melléklet közli, hol mi alkalmazandó, a Feltételek pedig ismertetik, mit teszünk ezzel kapcsolatban." }
     ]
   },
   {
@@ -206,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Sütik",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "A DebateAI nyolc elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a DebateAI helyezi el: négy sütit és négy bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A [dezbatere.ro/cookies] címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
+      { kind: "p", text: "A Dialectical Engine 18 elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a Dialectical Engine helyezi el: 13 sütit és 5 bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A [dezbatere.ro/cookies] címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
       {
         kind: "list",
         items: [
@@ -214,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — 14 nap",
         "__Host-debateai-age-refusal — Süti (HttpOnly) — Elutasított életkor-ellenőrzés után 30 napig megakadályozza, hogy ez a böngésző újra próbálkozzon. Csak az „elutasítva” szót tartalmazza, személyes adatot nem. — 30 nap",
         "debateai.locale — Süti — Megjegyzi, milyen nyelvű felületet választott. — 1 év",
+        "__Host-debateai-staff — Süti (HttpOnly) — Külön munkatársi hozzáférés — Legfeljebb 8 óra; 15 perc inaktivitás",
+        "__Host-debateai-staff-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — Legfeljebb 8 óra; 15 perc inaktivitás",
+        "__Host-debateai-password-reset — Süti (HttpOnly) — Csak jelszó-visszaállítás — Legfeljebb 30 perc",
+        "__Host-debateai-password-reset-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — Legfeljebb 30 perc",
+        "__Host-debateai-mfa-recovery — Süti (HttpOnly) — Csak hitelesítő-helyreállítás — Legfeljebb 299 másodperc",
+        "__Host-debateai-mfa-recovery-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — Legfeljebb 299 másodperc",
+        "__Host-debateai-social-flow — Süti (HttpOnly) — Rövid szolgáltatói bejelentkezés vagy fiók-összekapcsolás — Legfeljebb 5 perc",
+        "__Host-debateai-social-apple — Süti (HttpOnly) — Rövid szolgáltatói bejelentkezés vagy fiók-összekapcsolás — Legfeljebb 5 perc",
+        "__Host-debateai-social-browser — Süti (HttpOnly) — Rövid szolgáltatói bejelentkezés vagy fiók-összekapcsolás — Legfeljebb 5 perc",
         "debateai.consent — Helyi tárhely — Megjegyzi, hogy Ön már látta a sütikről szóló értesítést, így az csak egyszer jelenik meg. — Amíg Ön nem törli",
         "debateai.mode — Helyi tárhely — Megjegyzi, hogy a világos vagy a sötét módot használja. — Amíg Ön nem törli",
         "debateai.languageOffer.dismissed — Munkamenet-tárhely — Megjegyzi ennél a lapnál, hogy Ön elutasította az ajánlatot, hogy egy vitát más nyelven mutassunk meg. — Amíg be nem zárja a lapot",
-        "debateai.support.conversation.v2 — Munkamenet-tárhely — A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. — Amíg be nem zárja a lapot"
+        "debateai.support.conversation.v2 — Munkamenet-tárhely — A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. — Amíg be nem zárja a lapot",
+        "debateai.phone-completion-draft.v1 — Munkamenet-tárhely — Befejezetlen kérdés a telefonos lépés alatt; munkamenetváltáskor, kijelentkezéskor vagy tulajdonosváltáskor törlődik — 15 perc vagy a korábbi törlésig"
         ]
       },
-      { kind: "p", text: "Semmilyen más fél nem gyűjt a DebateAI-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően." },
-      { kind: "p", text: "A böngészők küldhetnek „Do Not Track” jelzést vagy hasonló jelzést. A DebateAI nem követi Önt, így egy ilyen jelzésnek nincs mit kikapcsolnia: a szolgáltatás a jelzéssel és anélkül is ugyanúgy működik." },
+      { kind: "p", text: "Semmilyen más fél nem gyűjt a Dialectical Engine-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően." },
+      { kind: "p", text: "A böngészők küldhetnek „Do Not Track” jelzést vagy hasonló jelzést. A Dialectical Engine nem követi Önt, így egy ilyen jelzésnek nincs mit kikapcsolnia: a szolgáltatás a jelzéssel és anélkül is ugyanúgy működik." },
       { kind: "p", text: "Ha el szeretné utasítani ezeket az elemeket, böngészője beállításaiban tiltsa le vagy törölje ennek az oldalnak a sütijeit és webhelyadatait. Ami ezután nem működik: a bejelentkezés, valamint a nyelv- és megjelenítési választásának megjegyzése; a sütikről szóló tájékoztatás is ismét megjelenik." }
     ]
   },
@@ -231,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a [dezbatere.ro/privacy/versions] címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot." },
-      { kind: "p", text: "Ezt a szabályzatot legutóbb [date] napján frissítettük. A 3.0-s verzió a 2.1-es verzió helyébe lépett, amely a munkamenetadatokat, a megőrzési időket, az analitikát, az exportálást és a törlés közzétett vitákra gyakorolt hatását már nem a szolgáltatásnak megfelelő módon írta le." }
+      { kind: "p", text: "Ezt a szabályzatot legutóbb [date] napján frissítettük. A 3.2-s verzió a 2.1-es verzió helyébe lépett, amely a munkamenetadatokat, a megőrzési időket, az analitikát, az exportálást és a törlés közzétett vitákra gyakorolt hatását már nem a szolgáltatásnak megfelelő módon írta le." }
     ]
   },
   {
@@ -263,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Egyesült Államok (csak ha fel van sorolva)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Tájékoztatás az adatgyűjtéskor. A 2. szakasz táblázata felsorolja az általunk gyűjtött személyes adatok minden kategóriáját, annak célját és megőrzési idejét (7. szakasz). A különleges személyes adatok következő kategóriáit csak akkor gyűjtjük, ha Ön a saját magára vonatkozó kérdéseiben megadja őket: egészségi állapot, vallási vagy világnézeti meggyőződés, szexuális élet vagy szexuális irányultság, politikai vélemény, szakszervezeti tagság, valamint faji vagy etnikai származás. Ezeket kizárólag vitái futtatására használjuk fel, és csak a 3. szakaszban leírt külön hozzájárulás után. Nem értékesítünk és nem osztunk meg személyes adatokat, és az előző tizenkét hónapban sem tettünk ilyet. Személyes adatokat nem használunk célzott hirdetésre, különleges személyes adatokat pedig nem használunk az Ön által kért szolgáltatás nyújtásán túli célra. Leiratkozási preferenciajelzések: mivel személyes adatokat nem értékesítünk, nem osztunk meg és nem használunk célzott hirdetésre, nincs miről leiratkozni, és a Global Privacy Control jelzés semmin nem változtat. Az Ön jogai: a megismeréshez, törléshez, helyesbítéshez, leiratkozáshoz, a különleges személyes adatok felhasználásának korlátozásához való jog, valamint az, hogy e jogok gyakorlása miatt ne érje hátrányos megkülönböztetés; kérelmet a privacy@dezbatere.ro címen nyújthat be. Pénzügyi ösztönzők: nem kínálunk ilyeneket; adatkezelési céljaink és garanciáink az ingyenes és a fizetős csomagokban azonosak. A megőrzés szabályait a 7. szakasz tartalmazza. Incidensek: az egyes államok adatvédelmi incidensekre vonatkozó jogszabályai szerint értesítjük az érintett lakosokat és az állami hatóságokat. E tájékoztatást legalább tizenkét havonta frissítjük; utoljára frissítve: [date]." },
+      { kind: "p", text: "Tájékoztatás az adatgyűjtéskor. A 2. szakasz táblázata az általunk gyűjtött személyes adatok kategóriáit és forrásait sorolja fel; az adatkezelés céljait a 4., a megőrzési időket a 7. szakasz tartalmazza. A különleges személyes adatok következő kategóriáit csak akkor gyűjtjük, ha Ön a saját magára vonatkozó kérdéseiben megadja őket: egészségi állapot, vallási vagy világnézeti meggyőződés, szexuális élet vagy szexuális irányultság, politikai vélemény, szakszervezeti tagság, valamint faji vagy etnikai származás. Ezeket kizárólag vitái futtatására használjuk fel, és csak a 3. szakaszban leírt külön hozzájárulás után. Nem értékesítünk és nem osztunk meg személyes adatokat, és az előző tizenkét hónapban sem tettünk ilyet. Személyes adatokat nem használunk célzott hirdetésre, különleges személyes adatokat pedig nem használunk az Ön által kért szolgáltatás nyújtásán túli célra. Leiratkozási preferenciajelzések: Mivel jelenleg nem értékesítünk és nem osztunk meg személyes adatokat, továbbá nem használjuk őket célzott hirdetésre, nincs miről leiratkozni. Ha valaha értékesíteni vagy megosztani kezdjük őket, a Global Privacy Control jelzéseit leiratkozási kérelemként fogjuk tiszteletben tartani. Az Ön jogai: a megismeréshez, törléshez, helyesbítéshez, leiratkozáshoz, a különleges személyes adatok felhasználásának korlátozásához való jog, valamint az, hogy e jogok gyakorlása miatt ne érje hátrányos megkülönböztetés; kérelmet a privacy@dezbatere.ro címen nyújthat be. Pénzügyi ösztönzők: nem kínálunk ilyeneket; adatkezelési céljaink és garanciáink az ingyenes és a fizetős csomagokban azonosak. A megőrzés szabályait a 7. szakasz tartalmazza. Incidensek: az egyes államok adatvédelmi incidensekre vonatkozó jogszabályai szerint értesítjük az érintett lakosokat és az állami hatóságokat. E tájékoztatást legalább tizenkét havonta frissítjük; utoljára frissítve: [date]." },
       { kind: "p", text: "Connecticut: különleges adatokat csak az Ön kifejezett, előzetes (opt-in) hozzájárulásával kezelünk, amelyet első vitája előtt a külön képernyőn ad meg (3. szakasz); személyes adatait nem használjuk MI-modellek betanítására. Washington: a [URL] címen található Fogyasztói egészségügyi adatokra vonatkozó adatvédelmi tájékoztatónk külön dokumentum, amely minden egészséggel kapcsolatos információra, beleértve a következtetéseket is, alkalmazandó. Texas és Nebraska: nem értékesítünk különleges személyes adatokat. Colorado, Connecticut, Virginia és más, átfogó adatvédelmi jogszabályokkal rendelkező államok: a fenti jogok megilletik Önt, ahol a jogszabály ránk alkalmazandó. Ha egy kérelmet elutasítunk, válaszunkra a privacy@dezbatere.ro címen válaszolva fellebbezhet; ha a fellebbezést is elutasítjuk, államának főügyészéhez (Attorney General) fordulhat." }
     ]
   },
@@ -304,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukrajna (csak ha fel van sorolva)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Ukrajna „A személyes adatok védelméről” szóló törvénye alkalmazandó. A DebateAI szolgáltatást nem kínáljuk Ukrajna azon területein, amelyek nem állnak a kormánya ellenőrzése alatt. Adatai uniós országokba és az Egyesült Államokba kerülnek (lásd a Nyilvántartást). Panaszt az Ukrainian Parliament Commissioner for Human Rights hivatalánál tehet." }
+      { kind: "p", text: "Ukrajna „A személyes adatok védelméről” szóló törvénye alkalmazandó. A Dialectical Engine szolgáltatást nem kínáljuk Ukrajna azon területein, amelyek nem állnak a kormánya ellenőrzése alatt. Adatai uniós országokba és az Egyesült Államokba kerülnek (lásd a Nyilvántartást). Panaszt az Ukrainian Parliament Commissioner for Human Rights hivatalánál tehet." }
     ]
   },
   {
@@ -335,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "80d4c7c6421f2aa5024f8b8846c30139798a3f8c9ee580a4c32fe460cef58e81",
-  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.0 · HATÁLYOS [DATE]",
+  version: "3.2",
+  sha256: "22d4f4b916051b46cd985fa88d498426ca101c08891ef0da4a97b6d839f2c18c",
+  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.2 · HATÁLYOS [DATE]",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",
-  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Az Adatvédelmi szabályzat szövege",
   sectionIdPrefix: "policy-section-",

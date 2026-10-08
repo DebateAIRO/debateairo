@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import type { LocaleCode } from "@/lib/i18n/locales";
+import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
 import type { MessageCatalog } from "@/lib/i18n/translate";
 import authEnglish from "@/messages/en/auth.json";
 
@@ -22,9 +22,8 @@ export function AuthCatalogProvider({ catalog, children }: { catalog: MessageCat
 export function useSelectedAuthCatalog(locale: LocaleCode): MessageCatalog {
   const served = useContext(AuthCatalogContext);
   if (served !== null) return served;
-  // English is the English path only: an "en" reader outside the provider
-  // (isolated component renders) reads it directly.
-  if (locale === "en") return authEnglish;
+  // English catalog aliases can render isolated components without a served provider.
+  if (catalogLocale(locale) === "en") return authEnglish;
   throw new Error(
     `useSelectedAuthCatalog: no auth catalogue was served for "${locale}"; mount AuthCatalogProvider with the locale's auth namespace`
   );
@@ -35,19 +34,21 @@ export function useSelectedAuthCatalog(locale: LocaleCode): MessageCatalog {
    block, and a shell-around-core bezel panel that carries the form. */
 export function AuthShell({
   eyebrow,
+  lang,
   title,
   description,
   children,
   footer
 }: Readonly<{
   eyebrow: string;
+  lang?: string;
   title: string;
   description: string;
   children: ReactNode;
   footer: ReactNode;
 }>) {
   return (
-    <main className="authScreen scroll" aria-labelledby="auth-title">
+    <main lang={lang} className="authScreen scroll" aria-labelledby="auth-title">
       <div className="authCard">
         <div className="authCardInner">
           <div className="authBrand">

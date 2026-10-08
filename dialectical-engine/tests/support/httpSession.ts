@@ -48,6 +48,11 @@ export function testSessionApplication(
   identities: readonly TestHttpIdentity[]
 ): SessionApplication {
   const application:SessionApplication={
+    assertCurrent: async (session) => {
+      if (!identities.some(identity => identity.authenticated.userId === session.userId
+        && identity.authenticated.session.session_id === session.session.session_id
+        && identity.authenticated.tokenHash === session.tokenHash)) throw new Error("SESSION_REQUIRED");
+    },
     authenticate: async (presented) => identities.find(
       (identity) => identity.rawSessionToken === presented
     )?.authenticated ?? null,

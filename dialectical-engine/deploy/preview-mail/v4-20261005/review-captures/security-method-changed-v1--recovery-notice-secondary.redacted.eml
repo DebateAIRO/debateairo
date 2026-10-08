@@ -1,0 +1,39 @@
+From: dezbatere.ro <noreply@dezbatere.ro>
+To: recovery-notice-secondary@fixture.invalid
+Message-ID: <11111111-1111-4111-8111-111111111111@debateai.local>
+Subject: Your Dialectical Engine sign-in methods changed
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="dialectical-account-v1"
+X-Account-Template: security-method-changed-v1
+X-Account-Expires: 1791186060000
+X-Account-Locale: en
+X-Account-Time-Zone: UTC
+X-Account-Runtime: node=26.8.2;icu=78.3;tz=2026a;cldr=48.0;unicode=17.0
+
+--dialectical-account-v1
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: base64
+
+RGlhbGVjdGljYWwgRW5naW5lDQoNCkEgc2lnbi1pbiBtZXRob2QgY2hhbmdlIHdhcyByZWNvcmRl
+ZCBhdCA1IE9jdG9iZXIgMjAyNiBhdCAwNzo0MSBHTVQrMCAoVVRDKS4NCg0KSWYgeW91IGRpZCBu
+b3QgbWFrZSB0aGlzIGNoYW5nZSwgY29udGFjdCB0aGUgc2l0ZSBvcGVyYXRvciBpbW1lZGlhdGVs
+eS4NCg==
+--dialectical-account-v1
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: base64
+
+PCFkb2N0eXBlIGh0bWw+PGh0bWwgbGFuZz0iZW4iPjxoZWFkPjxtZXRhIGNoYXJzZXQ9IlVURi04
+Ij48dGl0bGU+WW91ciBEaWFsZWN0aWNhbCBFbmdpbmUgc2lnbi1pbiBtZXRob2RzIGNoYW5nZWQ8
+L3RpdGxlPjwvaGVhZD48Ym9keSBzdHlsZT0ibWFyZ2luOjA7YmFja2dyb3VuZDojZjdmM2U4O2Nv
+bG9yOiMyNDI0MjQ7Zm9udC1mYW1pbHk6QXJpYWwsc2Fucy1zZXJpZiI+PG1haW4gc3R5bGU9Im1h
+eC13aWR0aDo2MDBweDttYXJnaW46MzJweCBhdXRvO3BhZGRpbmc6MzJweDtib3JkZXItdG9wOjRw
+eCBzb2xpZCAjYjg5YjVlIj48cCBzdHlsZT0iZm9udC1zaXplOjIycHg7Zm9udC13ZWlnaHQ6Ym9s
+ZCI+RGlhbGVjdGljYWwgRW5naW5lPC9wPjxoMSBzdHlsZT0iZm9udC1zaXplOjI0cHgiPllvdXIg
+RGlhbGVjdGljYWwgRW5naW5lIHNpZ24taW4gbWV0aG9kcyBjaGFuZ2VkPC9oMT48cCBzdHlsZT0i
+bGluZS1oZWlnaHQ6MS42Ij5BIHNpZ24taW4gbWV0aG9kIGNoYW5nZSB3YXMgcmVjb3JkZWQgYXQg
+PHNwYW4gbGFuZz0iZW4iPjUgT2N0b2JlciAyMDI2IGF0IDA3OjQxIEdNVCswIChVVEMpPC9zcGFu
+Pi48L3A+PHAgc3R5bGU9ImxpbmUtaGVpZ2h0OjEuNiI+SWYgeW91IGRpZCBub3QgbWFrZSB0aGlz
+IGNoYW5nZSwgY29udGFjdCB0aGUgc2l0ZSBvcGVyYXRvciBpbW1lZGlhdGVseS48L3A+PHAgc3R5
+bGU9ImZvbnQtc2l6ZToxMnB4Ij5kZXpiYXRlcmUucm88L3A+PC9tYWluPjwvYm9keT48L2h0bWw+
+DQo=
+--dialectical-account-v1--

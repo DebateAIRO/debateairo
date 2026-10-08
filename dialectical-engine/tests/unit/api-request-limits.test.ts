@@ -1,3 +1,4 @@
+import { canonicalSignup, passedTurnstile } from "../support/turnstileFixtures.js";
 import { describe, expect, it, vi } from "vitest";
 import {
   API_BODY_LIMIT_BYTES,
@@ -95,9 +96,9 @@ function harness() {
   } satisfies RecoveryApplication;
   const mfa = {
     beginTotp: vi.fn(async () => ({
-      status: "verification_required" as const, secret: "secret", otpauthUri: "otpauth://totp/test"
+      status: "verification_required" as const, enrollment_token:"e".repeat(43), expires_at:"2026-10-05T00:00:00.000Z", secret: "secret", otpauthUri: "otpauth://totp/test"
     })),
-    verifyTotp: vi.fn(async () => ({ status: "recovery_codes_required" as const })),
+    verifyTotp: vi.fn(async () => ({ status: "enrolled" as const })),
     generateRecoveryCodes: vi.fn(async () => ({ status: "confirmation_required" as const, recoveryCodes: [] })),
     confirmRecoveryCode: vi.fn(async () => ({ status: "active" as const }))
   } satisfies MfaApplication;
@@ -108,6 +109,7 @@ function harness() {
     stepUp: vi.fn(baseSessions.stepUp)
   } satisfies SessionApplication;
   const api = buildApi({
+    turnstile: passedTurnstile,
     application: fixtureApplication(),
     registration,
     recovery,
@@ -177,7 +179,7 @@ describe("API request limits (F-07, L1-F4)", () => {
       const response = await api.inject({
         method: "POST", url: "/v1/auth/register", headers: JSON_HEADERS,
         // Register reaches the service only past the age gate, so the body carries an adult date.
-        payload: jsonBodyOfBytes(AUTH_BODY_LIMIT_BYTES, '"date_of_birth":"1990-01-01","country":"RO",')
+        payload: JSON.stringify(canonicalSignup) + " ".repeat(AUTH_BODY_LIMIT_BYTES - Buffer.byteLength(JSON.stringify(canonicalSignup)))
       });
       expect(response.statusCode).toBe(202);
       expect(registration.register).toHaveBeenCalledTimes(1);
@@ -252,7 +254,7 @@ describe("API request limits (F-07, L1-F4)", () => {
       const overByLength = "p".repeat(AUTH_PASSWORD_MAX_BYTES + 1);
       const atLimit = "p".repeat(AUTH_PASSWORD_MAX_BYTES);
       const registerBody = (password: string) => ({
-        email: "alice@example.test", password, recovery_email: "", date_of_birth: "1990-01-01", country: "RO"
+        ...canonicalSignup, email: "alice@example.test", password, date_of_birth: "1990-01-01"
       });
 
       for (const password of [overByBytes, overByLength]) {

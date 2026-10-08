@@ -81,5 +81,7 @@
   "support.answerRating": "Оценка ответа",
   "support.privacyPreferences": "Конфиденциальность",
   "support.aiBanner": "Ответы создаются ИИ, имеют машиночитаемую маркировку и могут быть ошибочными. В любой момент можно попросить подключить человека.",
-  "support.cookiePreferences": "Файлы cookie, которые мы храним"
+  "support.cookiePreferences": "Файлы cookie, которые мы храним",
+  "support.recoverAccount": "Восстановить аккаунт",
+  "support.countryUnavailable": "Dialectical Engine пока недоступен в вашей стране."
 }

@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "debatus",
   "INCIDENT_SURFACE_PUBLISHING": "publikavimą",
   "INCIDENT_SURFACE_SIGN_IN": "prisijungimą",
-  "INCIDENT_SURFACE_WHOLE_SITE": "visą svetainę"
+  "INCIDENT_SURFACE_WHOLE_SITE": "visą svetainę",
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine jūsų šalyje dar nepasiekiama."
 }

@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Cont — Adresa de e-mail și adresa de e-mail pentru recuperare (stocate criptat, cu un index bazat pe cheie pentru a putea găsi contul fără a citi adresa); parola (stocată sub formă de hash, niciodată în clar); secretul pentru autentificarea cu doi factori (criptat); zece coduri de recuperare (stocate sub formă de hash); pseudonimul dumneavoastră; momentul în care ați confirmat că aveți cel puțin 18 ani — Dumneavoastră, la înregistrare",
+        "Cont — Adresa de e-mail și adresa de e-mail pentru recuperare (stocate criptat, cu un index bazat pe cheie pentru a putea găsi contul fără a citi adresa); parola (stocată sub formă de hash, niciodată în clar); secretul pentru autentificarea cu doi factori (criptat); zece coduri de recuperare (stocate sub formă de hash); pseudonimul dumneavoastră; rezultatul verificării vârstei, dar nu data nașterii — Dumneavoastră, la înregistrare",
+        "Verificarea țării adresei IP — La înregistrare, stabilim local țara adresei IP cu DB-IP Lite și verificăm separat lista adreselor de ieșire Tor. La începutul fiecărei dezbateri noi, verificăm tot local țara adresei IP și putem refuza dezbaterea dacă țara se află pe lista celor blocate întotdeauna. Pentru refuzuri, consemnăm agregat ruta, codul, țara, intervalul de timp și faptul că proba a fost adresa IP; În jurnalul de audit, adresa IP și identificatorul browserului (user-agent) sunt păstrate numai ca amprente unidirecționale bazate pe cheie. — Adresa IP folosită la înregistrare și la începutul unei dezbateri noi",
+        "Verificarea vârstei — Rezultatul (admis la înregistrare; admis sau respins pentru un cont existent), vârsta minimă aplicată, țara adresei IP dacă este cunoscută, versiunea regulii, contextul și momentul verificării. Nu păstrăm data nașterii — Data nașterii introdusă pentru verificare; țara dedusă din IP",
+        "Regiunea declarată — Țara de reședință aleasă la înregistrare și, pentru SUA, statul — Dumneavoastră, la înregistrare",
         "Sesiuni și securitate — Un token de sesiune stocat sub formă de hash; un hash bazat pe cheie al șirului user-agent al browserului, folosit pentru a observa când o sesiune trece la alt browser; marcajele temporale ale creării, ultimei utilizări și expirării. Nu stocăm împreună cu o sesiune adresa IP, numele dispozitivului sau detaliile browserului, iar lista de sesiuni afișată în Setări conține numai marcaje temporale — Browserul dumneavoastră",
         "Jurnal de audit al securității — Un jurnal exclusiv cu adăugare al evenimentelor relevante pentru securitate — înregistrare, verificare, încercări de autentificare, recuperare, publicare, ștergere. Adresa IP și user-agent-ul fiecărui eveniment sunt stocate numai ca amprente ireversibile bazate pe cheie (Argon2id), astfel încât nu pot fi citite, dar pot fi corelate într-o anumită perioadă. Semnalele de risc privind autentificarea și recuperarea sunt stocate criptat timp de 90 de zile — Browserul dumneavoastră, la momentul fiecărui eveniment",
         "Conținutul dezbaterii — Întrebarea introdusă; indicațiile de orientare stabilite; susținerile, criticile, trimiterile la dovezi, punctajele și verdictele generate de motor; o înregistrare textuală exactă a răspunsului fiecărui furnizor de IA; interogările de regăsire și referințele la surse. Toate acestea sunt stocate criptat cu o cheie specifică contului dumneavoastră — Dumneavoastră și modelele de IA care lucrează la întrebarea dumneavoastră",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Persoane care nu sunt utilizatorii noștri — Date cu caracter personal despre alte persoane pe care le includeți într-o întrebare sau pe care motorul le generează atunci când răspunde. Vă solicităm să nu faceți acest lucru; secțiunea 11 explică ce facem dacă totuși se întâmplă — Dumneavoastră, indirect"
         ]
       },
+      { kind: "p", text: "La înregistrare, stabilim local țara adresei IP cu DB-IP Lite și verificăm separat lista adreselor de ieșire Tor, fără a trimite adresa unui terț. Refuzăm înregistrarea din țările în care serviciul nu este disponibil, de la adresele de ieșire Tor și de la adresele a căror țară nu este cunoscută. La începutul fiecărei dezbateri noi, verificăm tot local țara adresei IP și putem refuza dezbaterea dacă țara se află pe lista celor blocate întotdeauna. Introduceți data nașterii numai pentru verificarea vârstei; nu o stocăm. Pentru înregistrările reușite, rezultatul păstrat este „admis”; pentru conturile deja existente, poate fi „admis” sau „respins”. Declarați și țara în care locuiți, precum și statul dacă locuiți în SUA, pentru a aplica normele privind consumatorii, confidențialitatea și taxele." },
       { kind: "p", text: "Nu colectăm date analitice sau de telemetrie despre modul în care utilizați produsul și nu setăm module cookie în acest scop. Dacă acest lucru se schimbă, prezenta politică și Politica privind modulele cookie vor fi modificate mai întâi, iar dumneavoastră veți fi întrebat." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Un motor de dezbatere invită la întrebări despre politică, religie, sănătate, sexualitate și convingeri. Acestea sunt categorii speciale de date potrivit articolului 9 din GDPR și pot apărea în întrebările dumneavoastră indiferent dacă intenționăm sau nu să le colectăm." },
-      { kind: "p", text: "Despre dumneavoastră. Înainte de prima dumneavoastră dezbatere acordați, pe un ecran separat, consimțământul explicit pentru prelucrarea de către noi a informațiilor sensibile pe care alegeți să le includeți în propriile întrebări, în scopul desfășurării dezbaterilor. Consemnăm versiunea formulării pe care ați acceptat-o, limba dumneavoastră și momentul acordării. Fără acest consimțământ nu puteți începe o dezbatere. Îl puteți retrage oricând prin neincluderea unor asemenea informații sau prin ștergerea unei dezbateri. Ceea ce publicați despre dumneavoastră reprezintă date pe care ați ales să le faceți publice." },
+      { kind: "p", text: "Despre dumneavoastră. Înainte de prima dumneavoastră dezbatere acordați, pe un ecran separat, consimțământul explicit pentru prelucrarea de către noi a informațiilor sensibile pe care alegeți să le includeți în propriile întrebări, în scopul desfășurării dezbaterilor. Consemnăm versiunea formulării pe care ați acceptat-o, limba dumneavoastră și momentul acordării. Fără acest consimțământ nu puteți începe o dezbatere. Îl puteți retrage oricând scriindu-ne la privacy@dezbatere.ro. De asemenea, puteți omite asemenea informații sau șterge o dezbatere care le conține. Ceea ce publicați despre dumneavoastră reprezintă date pe care ați ales să le faceți publice." },
       { kind: "p", text: "Despre alte persoane. Nicio condiție juridică nu ne permite să prelucrăm date sensibile despre un terț pe care îl menționați într-o întrebare și niciunul dintre furnizorii noștri de IA nu dispune de un asemenea temei. De aceea Termenii interzic acest lucru, reducem la minimum ceea ce transmitem și eliminăm rapid un asemenea conținut la cerere — secțiunea 11." },
       { kind: "p", text: "Informații privind sănătatea. Unele țări supun datele legate de sănătate, inclusiv deducțiile, unor legi speciale. Dacă locuiți în [the State of Washington], se aplică o [Consumer Health Data Privacy Notice] separată." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "De ce folosim datele și în baza cărui temei",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Fiecare scop are un singur temei juridic potrivit articolului 6 alineatul (1) din GDPR și nu reutilizăm într-un alt scop datele colectate pentru un anumit scop." },
+      { kind: "p", text: "Pentru fiecare scop indicăm temeiul sau temeiurile juridice potrivit articolului 6 alineatul (1) din GDPR. Nu reutilizăm într-un alt scop datele colectate pentru un anumit scop." },
       {
         kind: "list",
         items: [
         "Crearea și administrarea contului, autentificarea dumneavoastră, desfășurarea și stocarea dezbaterilor pentru a le putea redeschide și reda — Cont, sesiuni, conținutul dezbaterilor — Contract — Art. 6(1)(b)",
+        "Verificarea disponibilității înregistrării după țara IP, Tor și adrese necunoscute, precum și a dezbaterilor noi după lista țărilor blocate întotdeauna; documentarea refuzurilor — Verificarea țării adresei IP — Interese legitime — Art. 6(1)(f), furnizarea sigură a serviciului; și obligație legală — Art. 6(1)(c), respectarea sancțiunilor și a normelor din țările deservite",
+        "Verificarea vârstei minime necesare pentru folosirea serviciului — Verificarea vârstei — Contract — Art. 6(1)(b), încheierea contractului; și interese legitime — Art. 6(1)(f), protejarea minorilor",
+        "Aplicarea normelor relevante privind consumatorii, confidențialitatea și taxele — Regiunea declarată — Contract — Art. 6(1)(b); și obligație legală — Art. 6(1)(c)",
         "Trimiterea întrebării și a afirmațiilor motorului către furnizorii de IA pentru generarea unei dezbateri — Conținutul dezbaterii — Contract — Art. 6(1)(b)",
         "Menținerea securității serviciului, detectarea abuzurilor, posibilitatea de a identifica o autentificare pe care nu ați efectuat-o, păstrarea unui jurnal de audit — Sesiuni, jurnal de audit al securității, hash-uri ale mesajelor abuzive transmise serviciului de asistență — Interese legitime — Art. 6(1)(f): ale noastre și ale dumneavoastră într-un serviciu sigur. Vă puteți opune; secțiunea 10",
         "Dovedirea faptului că ați acceptat Termenii și ați acordat sau retras un consimțământ — Evidențe privind acceptarea și consimțământul — Obligație legală — Art. 6(1)(c), obligația noastră de a demonstra consimțământul potrivit Art. 7(1) — și interese legitime pentru dovedirea contractului",
@@ -112,8 +119,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Publicare și vizibilitate",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Dezbaterile sunt private până când le publicați. Publicarea este o acțiune deliberată, confirmată separat. O dezbatere publicată afișează pseudonimul dumneavoastră, întrebarea exact așa cum ați formulat-o, arborele argumentelor, punctajele, verdictul și intervalul de încredere și poartă o etichetă vizibilă care arată că materialul este generat de IA. Nu afișează niciodată adresa de e-mail, evidențele sesiunilor sau istoricul contului. [Published debates are / are not] indexate de motoarele de căutare [unless you choose]." },
-      { kind: "p", text: "Retragerea publicării elimină dezbaterea din DebateAI și distruge cheia copiei noastre publice. Copiile deja realizate de cititori, motoare de căutare sau arhive nu se află sub controlul nostru și nu le putem retrage." },
+      { kind: "p", text: "Dezbaterile sunt private până când le publicați. Publicarea este o acțiune deliberată, confirmată separat. O dezbatere publicată afișează pseudonimul dumneavoastră, întrebarea exact așa cum ați formulat-o, arborele argumentelor, punctajele, verdictul și intervalul de încredere și poartă o etichetă vizibilă care arată că materialul este generat de IA. Nu afișează niciodată adresa de e-mail, evidențele sesiunilor sau istoricul contului. Motoarele de căutare pot indexa dezbaterile publicate." },
+      { kind: "p", text: "Retragerea publicării elimină dezbaterea din Dialectical Engine și distruge cheia copiei noastre publice. Copiile deja realizate de cititori, motoare de căutare sau arhive nu se află sub controlul nostru și nu le putem retrage." },
       { kind: "p", text: "Când vă ștergeți contul, eliminăm din accesul public fiecare dezbatere publicată, fără întârzieri nejustificate și în cel mult 30 de zile, cu excepția cazului în care legea ne obligă să păstrăm un anumit element. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -126,10 +133,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Cont — Cât timp există contul, plus o perioadă de grație de 7 zile după ce solicitați închiderea — Cheile sunt distruse; înregistrarea este ștearsă",
+        "Rezultatul verificării vârstei și detaliile regulii — Cât timp există contul — Șterse odată cu contul; data nașterii nu este stocată",
+        "Țara de reședință și statul american declarate — Cât timp există contul — Șterse odată cu contul",
         "Evidențele sesiunilor — 14 zile de la ultima utilizare sau 90 de zile de la creare, oricare termen survine primul — Șterse",
         "Linkuri de verificare a e-mailului — 24 de ore — Șterse",
         "Semnale de risc privind autentificarea și recuperarea — 90 de zile, perioadă impusă de baza de date — Eliminate definitiv",
         "Jurnal de audit al securității — Pe durata de viață a serviciului — Exclusiv cu adăugare; IP-ul și user-agent-ul sunt amprente ireversibile și nu pot fi citite",
+        "Adresa IP folosită pentru stabilirea locală a țării la înregistrare și la începutul unei dezbateri noi — Numai pe durata prelucrării cererii — Nu este păstrată în clar pentru această verificare; refuzul este înregistrat doar agregat și prin amprenta descrisă mai jos",
+        "Înregistrări agregate ale auditului refuzurilor pe baza țării IP — Pe durata de viață a serviciului — Înregistrarea păstrează codul refuzului, țara, mențiunea că adresa IP a fost proba și amprentele unidirecționale bazate pe cheie ale adresei IP și ale identificatorului browserului (user-agent); jurnalul permite doar adăugări.",
         "Conținutul dezbaterii (privat) — Cât timp există contul — Cheile sunt distruse la închidere, făcând conținutul ilizibil",
         "Conținutul dezbaterii (publicat) — Cât timp este publicat și există contul — Eliminat din accesul public la retragerea publicării sau la închidere; cheile sunt distruse",
         "Evidențele răspunsurilor furnizorilor și referințele de regăsire — La fel ca dezbaterea căreia îi aparțin — La fel",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Restricționare (Art. 18) — Solicitați-ne să oprim prelucrarea anumitor date până la soluționarea unei contestații privind aceste date",
         "Opoziție (Art. 21) — Opuneți-vă prelucrării întemeiate pe interese legitime — prelucrarea pentru securitate și audit din secțiunea 4 — iar noi o oprim dacă nu putem demonstra motive imperioase. Vă puteți opune oricând marketingului, iar noi îl oprim",
         "Portabilitate (Art. 20) — Dezbaterile și datele contului într-un format utilizat în mod curent și care poate fi citit automat. [Pending: same export as Access.] Conținutul fără caracter personal pe care l-ați creat, precum întrebările, vă este restituit la cerere la încetarea contractului",
-        "Retragerea consimțământului (Art. 7(3)) — Retrageți consimțământul pentru marketing din orice e-mail sau din Setări; retrageți consimțământul privind datele sensibile prin neincluderea unor asemenea date sau prin ștergerea unei dezbateri. Retragerea nu afectează prelucrarea care a avut deja loc",
+        "Retragerea consimțământului (Art. 7(3)) — Retrageți consimțământul pentru marketing din orice e-mail sau din Setări; retrageți consimțământul privind datele sensibile scriindu-ne la privacy@dezbatere.ro (puteți și omite asemenea date sau șterge o dezbatere care le conține). Retragerea nu afectează prelucrarea care a avut deja loc",
         "Depunerea unei plângeri — La autoritatea română de supraveghere, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, București, anspdcp@dataprotection.ro, sau la autoritatea din țara în care locuiți. Am prefera să ne contactați mai întâi"
         ]
       },
@@ -188,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Persoane menționate în dezbateri care nu sunt utilizatorii noștri",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Dacă cineva adresează DebateAI o întrebare în care vă menționează, este posibil să deținem date cu caracter personal despre dumneavoastră, chiar dacă nu ați utilizat niciodată serviciul. Termenii le interzic utilizatorilor acest lucru și reducem la minimum ceea ce trimitem furnizorilor de IA, însă se poate întâmpla." },
+      { kind: "p", text: "Dacă cineva adresează Dialectical Engine o întrebare în care vă menționează, este posibil să deținem date cu caracter personal despre dumneavoastră, chiar dacă nu ați utilizat niciodată serviciul. Termenii le interzic utilizatorilor acest lucru și reducem la minimum ceea ce trimitem furnizorilor de IA, însă se poate întâmpla." },
       { kind: "p", text: "Această secțiune reprezintă informarea pe care trebuie să v-o furnizăm potrivit articolului 14 din GDPR. Datele sunt cele introduse de utilizator și cele generate de motor ca răspuns; sursa este utilizatorul respectiv; scopurile și temeiul juridic sunt cele din secțiunea 4; destinatarii sunt furnizorii de IA din Registru; păstrarea urmează secțiunea 7. Beneficiați de toate drepturile din secțiunea 10 și, în special, ne puteți solicita să eliminăm o dezbatere publicată sau una privată care conține datele dumneavoastră și să vă comunicăm ce date deținem. Nu aveți nevoie de cont pentru aceasta. Scrieți la privacy@dezbatere.ro sau folosiți comanda Raportare din orice dezbatere publicată, iar noi soluționăm solicitările justificate fără întârzieri nejustificate. Nu vă putem notifica individual când se întâmplă acest lucru deoarece nu știm cine sunteți sau cum vă putem contacta; această informare publică și calea de eliminare sunt măsurile pe care le luăm în schimb." },
       { kind: "p", text: "Același lucru este valabil pentru informațiile sensibile despre dumneavoastră — politică, sănătate, religie — care apar în întrebarea altei persoane. Nicio condiție juridică nu ne permite să continuăm prelucrarea lor după ce vă opuneți, iar noi nu o vom face." }
     ]
@@ -198,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Copii",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI este destinat adulților. La înregistrare confirmați că aveți cel puțin 18 ani și nu prelucrăm cu bună știință datele niciunei persoane sub 18 ani. Dacă aflăm că un cont aparține unei persoane sub 18 ani, îl închidem și ștergem datele conform secțiunii 7. Unele țări consideră că o confirmare nu este suficientă sau impun cerințe suplimentare; Anexa B precizează normele aplicabile, iar Termenii explică măsurile noastre." }
+      { kind: "p", text: "Dialectical Engine este destinat adulților. La înregistrare confirmați că aveți cel puțin 18 ani și nu prelucrăm cu bună știință datele niciunei persoane sub 18 ani. Dacă aflăm că un cont aparține unei persoane sub 18 ani, îl închidem și ștergem datele conform secțiunii 7. Unele țări consideră că o confirmare nu este suficientă sau impun cerințe suplimentare; Anexa B precizează normele aplicabile, iar Termenii explică măsurile noastre." }
     ]
   },
   {
@@ -206,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Module cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI folosește opt elemente, toate strict necesare pentru serviciul pe care l-ați solicitat și toate setate numai de DebateAI: patru module cookie și patru intrări în spațiul de stocare al browserului dumneavoastră. Nu setăm module cookie analitice, publicitare sau de urmărire. Politica privind modulele cookie de la [dezbatere.ro/cookies] le enumeră, arătând ce face fiecare și cine îl primește, și va fi modificată înainte de adăugarea oricărui alt element." },
+      { kind: "p", text: "Dialectical Engine folosește 18 elemente, toate strict necesare pentru serviciul pe care l-ați solicitat și toate setate numai de Dialectical Engine: 13 module cookie și 5 intrări în spațiul de stocare al browserului dumneavoastră. Nu setăm module cookie analitice, publicitare sau de urmărire. Politica privind modulele cookie de la [dezbatere.ro/cookies] le enumeră, arătând ce face fiecare și cine îl primește, și va fi modificată înainte de adăugarea oricărui alt element." },
       {
         kind: "list",
         items: [
@@ -214,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Modul cookie — Împiedică alte site-uri să trimită formulare în numele dumneavoastră. — 14 zile",
         "__Host-debateai-age-refusal — Modul cookie (HttpOnly) — După ce o verificare a vârstei este refuzată, împiedică acest browser să încerce din nou timp de 30 de zile. Conține doar cuvântul „refuzat”, fără date personale. — 30 de zile",
         "debateai.locale — Modul cookie — Reține limba interfeței pe care ați ales-o. — 1 an",
+        "__Host-debateai-staff — Modul cookie (HttpOnly) — Acces separat pentru personal — Cel mult 8 ore; expiră după 15 minute de inactivitate",
+        "__Host-debateai-staff-csrf — Modul cookie — Împiedică alte site-uri să trimită formulare în numele dumneavoastră. — Cel mult 8 ore; expiră după 15 minute de inactivitate",
+        "__Host-debateai-password-reset — Modul cookie (HttpOnly) — Doar resetarea parolei — Cel mult 30 de minute",
+        "__Host-debateai-password-reset-csrf — Modul cookie — Împiedică alte site-uri să trimită formulare în numele dumneavoastră. — Cel mult 30 de minute",
+        "__Host-debateai-mfa-recovery — Modul cookie (HttpOnly) — Doar recuperarea autentificatorului — Cel mult 299 de secunde",
+        "__Host-debateai-mfa-recovery-csrf — Modul cookie — Împiedică alte site-uri să trimită formulare în numele dumneavoastră. — Cel mult 299 de secunde",
+        "__Host-debateai-social-flow — Modul cookie (HttpOnly) — Flux scurt de autentificare prin furnizor sau asociere a contului — Cel mult 5 minute",
+        "__Host-debateai-social-apple — Modul cookie (HttpOnly) — Flux scurt de autentificare prin furnizor sau asociere a contului — Cel mult 5 minute",
+        "__Host-debateai-social-browser — Modul cookie (HttpOnly) — Flux scurt de autentificare prin furnizor sau asociere a contului — Cel mult 5 minute",
         "debateai.consent — Stocare locală — Reține că ați văzut deja notificarea despre cookie-uri, ca să fie afișată o singură dată. — Până când îl ștergeți",
         "debateai.mode — Stocare locală — Dacă folosiți modul luminos sau modul întunecat. — Până când îl ștergeți",
         "debateai.languageOffer.dismissed — Stocare de sesiune — Reține, pentru această filă, că ați refuzat propunerea de a afișa o dezbatere în altă limbă. — Până când închideți fila",
-        "debateai.support.conversation.v2 — Stocare de sesiune — Păstrează pe ecran conversația dvs. din chatul de ajutor cât timp fila rămâne deschisă. Se șterge când cineva se autentifică sau se deconectează în această filă. — Până când închideți fila"
+        "debateai.support.conversation.v2 — Stocare de sesiune — Păstrează pe ecran conversația dvs. din chatul de ajutor cât timp fila rămâne deschisă. Se șterge când cineva se autentifică sau se deconectează în această filă. — Până când închideți fila",
+        "debateai.phone-completion-draft.v1 — Stocare de sesiune — Întrebare neterminată în timpul completării telefonului; se șterge la schimbarea sesiunii, deconectare sau schimbarea titularului — 15 minute sau până la ștergere"
         ]
       },
-      { kind: "p", text: "Nicio altă parte nu colectează, prin intermediul DebateAI, informații despre activitățile dumneavoastră online de-a lungul timpului și pe diferite site-uri web." },
-      { kind: "p", text: "Browserele pot trimite un semnal „Do Not Track” sau un semnal similar. DebateAI nu vă urmărește, așa că un astfel de semnal nu are nimic de oprit: serviciul funcționează la fel cu sau fără el." },
+      { kind: "p", text: "Nicio altă parte nu colectează, prin intermediul Dialectical Engine, informații despre activitățile dumneavoastră online de-a lungul timpului și pe diferite site-uri web." },
+      { kind: "p", text: "Browserele pot trimite un semnal „Do Not Track” sau un semnal similar. Dialectical Engine nu vă urmărește, așa că un astfel de semnal nu are nimic de oprit: serviciul funcționează la fel cu sau fără el." },
       { kind: "p", text: "Pentru a refuza aceste elemente, blocați sau ștergeți modulele cookie și datele site-ului pentru acest site din setările browserului dumneavoastră. Ce nu mai funcționează atunci: autentificarea și reținerea alegerilor dumneavoastră privind limba și modul de afișare; notificarea privind modulele cookie va fi, de asemenea, afișată din nou." }
     ]
   },
@@ -231,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la [dezbatere.ro/privacy/versions]. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune." },
-      { kind: "p", text: "Această politică a fost actualizată ultima dată la [date]. Versiunea 3.0 a înlocuit versiunea 2.1, care descria datele de sesiune, perioadele de păstrare, analiza utilizării, exportul și efectul ștergerii asupra dezbaterilor publicate în moduri care nu mai reflectau serviciul." }
+      { kind: "p", text: "Această politică a fost actualizată ultima dată la [date]. Versiunea 3.2 a înlocuit versiunea 2.1, care descria datele de sesiune, perioadele de păstrare, analiza utilizării, exportul și efectul ștergerii asupra dezbaterilor publicate în moduri care nu mai reflectau serviciul." }
     ]
   },
   {
@@ -263,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Statele Unite (numai dacă sunt enumerate)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Informare la colectare. Tabelul din secțiunea 2 enumeră fiecare categorie de informații cu caracter personal pe care o colectăm, scopul și durata păstrării acesteia (secțiunea 7). Colectăm următoarele categorii de informații cu caracter personal sensibile numai atunci când le includeți în propriile întrebări despre dumneavoastră: sănătate, convingeri religioase sau filozofice, viață sexuală sau orientare sexuală, opinii politice, apartenență sindicală și origine rasială sau etnică. Le folosim exclusiv pentru desfășurarea dezbaterilor și numai după consimțământul separat din secțiunea 3. Nu vindem și nu partajăm informații cu caracter personal și nu am făcut acest lucru în precedentele douăsprezece luni. Nu folosim informații cu caracter personal pentru publicitate direcționată și nu folosim informațiile cu caracter personal sensibile în niciun scop în afara furnizării serviciului solicitat. Semnale privind preferința de renunțare: deoarece nu vindem și nu partajăm informații cu caracter personal și nu le folosim pentru publicitate direcționată, nu există nimic la care să puteți renunța, iar un semnal Global Privacy Control nu schimbă nimic. Drepturile dumneavoastră: de a cunoaște, a șterge, a corecta, a renunța, a limita utilizarea informațiilor cu caracter personal sensibile și de a nu fi discriminat pentru exercitarea lor; formulați o solicitare la privacy@dezbatere.ro. Stimulente financiare: nu oferim asemenea stimulente; scopurile și măsurile noastre de protecție sunt aceleași pentru planurile gratuite și pentru cele plătite. Păstrarea este descrisă în secțiunea 7. Încălcări ale securității datelor: notificăm rezidenții și autoritățile statale conform legii privind încălcările securității datelor din fiecare stat. Prezenta informare este actualizată cel puțin o dată la douăsprezece luni; ultima actualizare [date]." },
+      { kind: "p", text: "Informare la colectare. Tabelul din secțiunea 2 prezintă categoriile de date cu caracter personal pe care le colectăm și sursele acestora. Scopurile și temeiurile juridice sunt în secțiunea 4, iar perioadele de păstrare în secțiunea 7. Colectăm următoarele categorii de informații cu caracter personal sensibile numai atunci când le includeți în propriile întrebări despre dumneavoastră: sănătate, convingeri religioase sau filozofice, viață sexuală sau orientare sexuală, opinii politice, apartenență sindicală și origine rasială sau etnică. Le folosim exclusiv pentru desfășurarea dezbaterilor și numai după consimțământul separat din secțiunea 3. Nu vindem și nu partajăm informații cu caracter personal și nu am făcut acest lucru în precedentele douăsprezece luni. Nu folosim informații cu caracter personal pentru publicitate direcționată și nu folosim informațiile cu caracter personal sensibile în niciun scop în afara furnizării serviciului solicitat. Semnale privind preferința de renunțare: deoarece nu vindem și nu partajăm informații cu caracter personal și nu le folosim pentru publicitate direcționată, nu există nimic la care să puteți renunța. Dacă vom începe vreodată să vindem sau să partajăm astfel de informații, vom respecta semnalele Global Privacy Control ca opțiune de renunțare. Drepturile dumneavoastră: de a cunoaște, a șterge, a corecta, a renunța, a limita utilizarea informațiilor cu caracter personal sensibile și de a nu fi discriminat pentru exercitarea lor; formulați o solicitare la privacy@dezbatere.ro. Stimulente financiare: nu oferim asemenea stimulente; scopurile și măsurile noastre de protecție sunt aceleași pentru planurile gratuite și pentru cele plătite. Păstrarea este descrisă în secțiunea 7. Încălcări ale securității datelor: notificăm rezidenții și autoritățile statale conform legii privind încălcările securității datelor din fiecare stat. Prezenta informare este actualizată cel puțin o dată la douăsprezece luni; ultima actualizare [date]." },
       { kind: "p", text: "Connecticut: prelucrăm date sensibile numai cu consimțământul dumneavoastră expres, acordat pe ecranul separat dinaintea primei dezbateri (secțiunea 3); nu folosim datele dumneavoastră cu caracter personal pentru a antrena modele de IA. Washington: Informarea privind confidențialitatea datelor de sănătate ale consumatorilor de la [URL] este un document separat care se aplică oricăror informații legate de sănătate, inclusiv deducțiilor. Texas și Nebraska: nu vindem date cu caracter personal sensibile. Colorado, Connecticut, Virginia și alte state cu legi cuprinzătoare privind confidențialitatea: drepturile de mai sus vi se aplică dacă ni se aplică legea. Dacă refuzăm o solicitare, puteți contesta refuzul răspunzând la mesajul nostru, la privacy@dezbatere.ro; dacă respingem contestația, vă puteți adresa procurorului general (Attorney General) al statului dumneavoastră." }
     ]
   },
@@ -304,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ucraina (numai dacă este enumerată)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Se aplică Legea Ucrainei „Privind protecția datelor cu caracter personal”. Nu oferim DebateAI în zonele Ucrainei care nu sunt controlate de guvernul acesteia. Datele dumneavoastră ajung în țări din UE și în Statele Unite (a se vedea Registrul). Puteți depune o plângere la Comisarul pentru drepturile omului al Radei Supreme a Ucrainei." }
+      { kind: "p", text: "Se aplică Legea Ucrainei „Privind protecția datelor cu caracter personal”. Nu oferim Dialectical Engine în zonele Ucrainei care nu sunt controlate de guvernul acesteia. Datele dumneavoastră ajung în țări din UE și în Statele Unite (a se vedea Registrul). Puteți depune o plângere la Comisarul pentru drepturile omului al Radei Supreme a Ucrainei." }
     ]
   },
   {
@@ -335,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "96380d9b9d68f0c521fe28ab8c32baf4a791ac9d3dccd17ffd97c6b00481d3a8",
-  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.0 · ÎN VIGOARE DE LA [DATE]",
+  version: "3.2",
+  sha256: "416a6489ad36f2531f0353a0eadcd9ea9ac0011b543a26b2b1cdf48c7728ff62",
+  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.2 · ÎN VIGOARE DE LA [DATE]",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",
-  endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Textul Politicii de confidențialitate",
   sectionIdPrefix: "policy-section-",

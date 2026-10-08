@@ -1,0 +1,37 @@
+From: dezbatere.ro <noreply@dezbatere.ro>
+To: verification-forward-secondary@fixture.invalid
+Subject: Dialectical Engine email change
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="dialectical-account-v1"
+X-Account-Template: email-change-unavailable-v1
+X-Account-Expires: none
+X-Account-Locale: en
+X-Account-Time-Zone: UTC
+X-Account-Runtime: node=26.8.2;icu=78.3;tz=2026a;cldr=48.0;unicode=17.0
+
+--dialectical-account-v1
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: base64
+
+RGlhbGVjdGljYWwgRW5naW5lDQoNClNvbWVvbmUgYXNrZWQgdG8gdXNlIHRoaXMgYWRkcmVzcyBm
+b3IgYSBEaWFsZWN0aWNhbCBFbmdpbmUgYWNjb3VudCwgYnV0IGl0IGFscmVhZHkgYmVsb25ncyB0
+byBvbmUuDQoNCk5vdGhpbmcgd2FzIGNoYW5nZWQuIElmIHRoaXMgd2FzIHlvdSwgc2lnbiBpbiB3
+aXRoIHRoaXMgYWRkcmVzcyBpbnN0ZWFkLg0K
+--dialectical-account-v1
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: base64
+
+PCFkb2N0eXBlIGh0bWw+PGh0bWwgbGFuZz0iZW4iPjxoZWFkPjxtZXRhIGNoYXJzZXQ9IlVURi04
+Ij48dGl0bGU+RGlhbGVjdGljYWwgRW5naW5lIGVtYWlsIGNoYW5nZTwvdGl0bGU+PC9oZWFkPjxi
+b2R5IHN0eWxlPSJtYXJnaW46MDtiYWNrZ3JvdW5kOiNmN2YzZTg7Y29sb3I6IzI0MjQyNDtmb250
+LWZhbWlseTpBcmlhbCxzYW5zLXNlcmlmIj48bWFpbiBzdHlsZT0ibWF4LXdpZHRoOjYwMHB4O21h
+cmdpbjozMnB4IGF1dG87cGFkZGluZzozMnB4O2JvcmRlci10b3A6NHB4IHNvbGlkICNiODliNWUi
+PjxwIHN0eWxlPSJmb250LXNpemU6MjJweDtmb250LXdlaWdodDpib2xkIj5EaWFsZWN0aWNhbCBF
+bmdpbmU8L3A+PGgxIHN0eWxlPSJmb250LXNpemU6MjRweCI+RGlhbGVjdGljYWwgRW5naW5lIGVt
+YWlsIGNoYW5nZTwvaDE+PHAgc3R5bGU9ImxpbmUtaGVpZ2h0OjEuNiI+U29tZW9uZSBhc2tlZCB0
+byB1c2UgdGhpcyBhZGRyZXNzIGZvciBhIERpYWxlY3RpY2FsIEVuZ2luZSBhY2NvdW50LCBidXQg
+aXQgYWxyZWFkeSBiZWxvbmdzIHRvIG9uZS48L3A+PHAgc3R5bGU9ImxpbmUtaGVpZ2h0OjEuNiI+
+Tm90aGluZyB3YXMgY2hhbmdlZC4gSWYgdGhpcyB3YXMgeW91LCBzaWduIGluIHdpdGggdGhpcyBh
+ZGRyZXNzIGluc3RlYWQuPC9wPjxwIHN0eWxlPSJmb250LXNpemU6MTJweCI+ZGV6YmF0ZXJlLnJv
+PC9wPjwvbWFpbj48L2JvZHk+PC9odG1sPg0K
+--dialectical-account-v1--

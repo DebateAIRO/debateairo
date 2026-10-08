@@ -94,6 +94,21 @@ function scanWritten(sources: ReadonlyMap<string, string>): WrittenScan {
         const value = constants.get(match[1]!);
         if (value) written.add(value);
       }
+      // Resolve this file's concrete local cookie names (including `${n}-csrf`).
+      const local = new Map(constants);
+      for (const match of text.matchAll(/\b([a-z][A-Za-z0-9_]*)\s*=\s*["'](__Host-[^"']+)["']/g)) local.set(match[1]!,match[2]!);
+      for (const match of text.matchAll(/\b([a-z][A-Za-z0-9_]*)\s*=\s*`\$\{([a-z][A-Za-z0-9_]*)\}(-[A-Za-z0-9_-]+)`/g)) {
+        const parent=local.get(match[2]!);if(parent)local.set(match[1]!,parent+match[3]!);
+      }
+      for (const match of text.matchAll(/\$\{([a-z][A-Za-z0-9_]*)\}=/g)) {
+        const name=local.get(match[1]!);if(name)written.add(name);
+      }
+      // Only arguments of the actual bounded social-cookie producer count.
+      if (/\bsocialCookie\s*=\s*\([^)]*\)\s*=>\s*`\$\{name\}=/s.test(text)) {
+        for(const match of text.matchAll(/\bsocialCookie\(\s*([^,]+),/g)) {
+          for(const token of match[1]!.matchAll(/\b[A-Z][A-Z0-9_]*\b/g)){const name=constants.get(token[0]);if(name)written.add(name);}
+        }
+      }
     }
     for (const match of text.matchAll(/([A-Za-z_][\w.]*(?:\(\))?\??)\.setItem\(\s*([^,)]+)/g)) {
       const value = resolve(match[2]!);
@@ -122,6 +137,11 @@ describe("the storage inventory of record equals what the product writes (SPEC-v
 
   it("every write site's key resolves to a string", () => {
     expect(scan.unresolved).toEqual([]);
+  });
+  it("counts concrete MFA CSRF and both social flow producers without unrelated identifiers", () => {
+    const sources=new Map([["apps/api/a.ts", 'const SOCIAL_FLOW_COOKIE="__Host-flow", UNUSED="__Host-unused"; const SOCIAL_APPLE_FLOW_COOKIE="__Host-apple";const n="__Host-mfa",csrfName=`${n}-csrf`;const socialCookie=(name:string,value:string)=>`${name}=${value}`;reply.header("set-cookie",[`${n}=v`,`${csrfName}=c`,socialCookie(provider===\'apple\'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,value)]);']]);
+    expect([...scanWritten(sources).written].sort()).toEqual(["__Host-apple","__Host-flow","__Host-mfa","__Host-mfa-csrf"]);
+    expect([...scanWritten(new Map([["apps/api/a.ts",'const SOCIAL_FLOW_COOKIE="__Host-flow";const socialCookie=(name:string)=>name;/* set-cookie */ socialCookie(SOCIAL_FLOW_COOKIE);']])).written]).toEqual([]);
   });
 
   it("the scan keeps the scanned-file rule of SPEC-v2 R17", () => {

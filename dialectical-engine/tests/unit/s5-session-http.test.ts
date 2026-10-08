@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import {
   buildApi,
@@ -55,8 +56,8 @@ function authenticated(): AuthenticatedSession {
     }),
     userId: "11111111-1111-4111-8111-111111111111",
     ownerRef,
-    tokenHash: "sha256:session",
-    csrfTokenHash: "sha256:csrf",
+    tokenHash: "sha256:" + createHash("sha256").update(SESSION_TOKEN).digest("hex"),
+    csrfTokenHash: "sha256:" + createHash("sha256").update(CSRF_TOKEN).digest("hex"),
     authKind: "cookie" as const
   });
 }
@@ -64,6 +65,9 @@ function authenticated(): AuthenticatedSession {
 function sessions(): SessionApplication {
   const auth = authenticated();
   return {
+    assertCurrent: async (session) => {
+      if (session.userId !== auth.userId || session.session.session_id !== auth.session.session_id || session.tokenHash !== auth.tokenHash) throw new Error("SESSION_REQUIRED");
+    },
     authenticate: async (token) => token === SESSION_TOKEN ? auth : null,
     verifyCsrf: (resolved, supplied) => resolved === auth && supplied === CSRF_TOKEN,
     beginLogin: async () => ({ status: "mfa_required", challengeToken: "m".repeat(43) }),
@@ -326,6 +330,29 @@ describe("S5 HTTP session boundary", () => {
     await api.close();
   });
 
+  it.each(["malformed", "", CSRF_TOKEN])("client and server reject a valid CSRF cookie plus duplicate %s", async duplicate => {
+    const raw = `${CSRF_COOKIE_NAME}=${CSRF_TOKEN}; ${CSRF_COOKIE_NAME}=${duplicate}`;
+    const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN });
+    const sent: Headers[] = [];
+    vi.stubGlobal("document", { cookie: raw });
+    try {
+      const client = createContractClient(ORIGIN, (async (_url, init) => {
+        const headers = new Headers(init?.headers); sent.push(headers);
+        const response = await api.inject({ method: "POST", url: "/v1/auth/logout", headers: {
+          cookie: `${SESSION_COOKIE_NAME}=${SESSION_TOKEN}; ${raw}`, origin: ORIGIN,
+          ...(headers.has("x-csrf-token") ? { "x-csrf-token": headers.get("x-csrf-token")! } : {})
+        } });
+        return new Response(response.body, { status: response.statusCode, headers: { "content-type": "application/json" } });
+      }) as typeof fetch);
+      await expect(client.logout()).rejects.toMatchObject({ status: 403 });
+      expect(sent[0]!.get("x-csrf-token")).toBeNull();
+      const response = await api.inject({ method: "POST", url: "/v1/auth/logout", headers: {
+        cookie: `${SESSION_COOKIE_NAME}=${SESSION_TOKEN}; ${raw}`, origin: ORIGIN, "x-csrf-token": CSRF_TOKEN
+      } });
+      expect(response.statusCode).toBe(403);
+    } finally { vi.unstubAllGlobals(); await api.close(); }
+  });
+
   it("maps malformed revoke ids to foreign-safe 404 without reaching the repository", async () => {
     const revokeSession = vi.fn().mockResolvedValue(true);
     const api = buildApi({
@@ -438,4 +465,162 @@ describe("S5 HTTP session boundary", () => {
       expect(call.headers.get("cookie")).toContain(`${SESSION_COOKIE_NAME}=${SESSION_TOKEN}`);
     }
   });
+});
+
+// Exercise hook barriers under exact canonical policies; v1 fixture leaves these mounts to each test.
+describe('prepared staff HTTP authority', () => {
+    it('denies missing separate staff cookie instead of admitting ordinary MFA', async () => {
+        const staff = await import('../../apps/api/src/staff/access.js');
+        expect(staff).not.toBeNull();
+        const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN });
+        api.get('/v1/admin/team', staff.staffRoutePolicy('TEAM_READ'), async () => ({ secret: 'private' }));
+        expect((await api.inject({ url: '/v1/admin/team', headers: { cookie } })).statusCode).toBe(401);
+        await api.close();
+    });
+});
+async function staffHttpFixture() {
+    const staff = await import('../../apps/api/src/staff/access.js');
+    const ordinary = sessions(), base = (await ordinary.authenticate(SESSION_TOKEN, { ip: '192.0.2.1', userAgent: 'test', requestId: 'test' }))!;
+    const token = Buffer.alloc(32, 3).toString('base64url'), csrf = Buffer.alloc(32, 4).toString('base64url');
+    const hash = (value: string) => 'sha256:' + createHash('sha256').update(value).digest('hex');
+    const context = { staffId: '77777777-7777-4777-8777-777777777777', userId: base.userId, ordinarySessionId: base.session.session_id, privilegeSessionId: '88888888-8888-4888-8888-888888888888', designation: 'DELEGATED' as const, securityEpoch: 0, accountSecurityEpoch: 0, grantRevision: 0, capabilities: ['TEAM_READ' as const] };
+    let current = true, unavailable = false;
+    const record = () => {
+        if (unavailable)
+            throw new Error('SECRET_DB_DETAIL');
+        return current ? { context, csrfTokenHash: hash(csrf), expiresAt: new Date(Date.now() + 60000) } : null;
+    };
+    const repo = { readAuthentication: async (input: any) => input.staffTokenHash === hash(token) && input.ordinaryTokenHash === base.tokenHash ? record() : null, readCurrentContext: async () => record(), authorize: async (input: any) => input.capability === 'TEAM_READ' && current, readActionProof: async () => null, readInvitationContext: async () => null, readOwnerPossessionContext: async () => null };
+    const service = new staff.StaffAccessService(repo, ordinary);
+    const api = buildApi({ application: application(), sessions: ordinary, staffAccess: service, allowedOrigin: ORIGIN });
+    const bothCookies = cookie + '; ' + staff.STAFF_COOKIE_NAME + '=' + token + '; ' + staff.STAFF_CSRF_COOKIE_NAME + '=' + csrf;
+    const headers = { cookie: bothCookies, origin: ORIGIN, 'x-csrf-token': CSRF_TOKEN, 'x-staff-csrf-token': csrf };
+    return { api, staff, token, csrf, headers, bothCookies, revoke: () => { current = false; }, outage: () => { unavailable = true; } };
+}
+describe('Task4 exact staff transport and response boundary', () => {
+    it.each([
+        ['missing staff csrf', { 'x-staff-csrf-token': undefined }],
+        ['wrong staff csrf', { 'x-staff-csrf-token': Buffer.alloc(32, 5).toString('base64url') }],
+        ['joined duplicate staff csrf', { 'x-staff-csrf-token': 'bad,bad' }],
+        ['missing ordinary csrf', { 'x-csrf-token': undefined }],
+        ['missing Origin', { origin: undefined }],
+        ['foreign Origin', { origin: 'https://foreign.test' }],
+        ['nonexact Origin', { origin: ORIGIN + '/' }],
+    ])('rejects %s before a staff mutation handler', async (_label, change) => {
+        const f = await staffHttpFixture();
+        let reached = false;
+        f.api.post('/v1/admin/webauthn/action/options', {config: {auth: 'staff'}}, async () => { reached = true; return { secret: 'private' }; });
+        const headers = Object.fromEntries(Object.entries({ ...f.headers, ...change }).filter(([, value]) => value !== undefined)) as Record<string, string>;
+        const response = await f.api.inject({ method: 'POST', url: '/v1/admin/webauthn/action/options', headers });
+        expect(response.statusCode).toBe(403);
+        expect(reached).toBe(false);
+        await f.api.close();
+    });
+    it('requires separate cookies, rejects duplicates/retired channels, and preserves safe GET Origin semantics', async () => {
+        const f = await staffHttpFixture();
+        f.api.get('/v1/admin/team', f.staff.staffRoutePolicy('TEAM_READ'), async () => ({ own: true }));
+        for (const headers of [{ cookie }, { cookie: f.bothCookies + '; ' + f.staff.STAFF_COOKIE_NAME + '=' + f.token }, { cookie: f.bothCookies, authorization: 'Bearer ' + f.token }, { cookie: f.bothCookies, [RETIRED_DEV_HEADER]: 'legacy' }])
+            expect((await f.api.inject({ url: '/v1/admin/team', headers })).statusCode).toBe(401);
+        const read = await f.api.inject({ url: '/v1/admin/team', headers: { cookie: f.bothCookies } });
+        expect(read.statusCode).toBe(200);
+        expect(read.json()).toEqual({ own: true });
+        await f.api.close();
+    });
+    it('requires persistent capability, keeps Session ASKER and sends secrets only in trusted Set-Cookie', async () => {
+        const f = await staffHttpFixture();
+        f.api.get('/v1/admin/team', f.staff.staffRoutePolicy('TEAM_READ'), async (request, reply) => { expect(request.session.caller_scope).toBe('ASKER'); reply.header('set-cookie', f.staff.staffCookies({ staffToken: f.token, staffCsrfToken: f.csrf, expiresAt: new Date(Date.now() + 60000) })); return { own: true }; });
+        f.api.get('/v1/admin/audit', f.staff.staffRoutePolicy('AUDIT_READ'), async () => ({ secret: 'audit' }));
+        expect((await f.api.inject({ url: '/v1/admin/audit', headers: f.headers })).statusCode).toBe(403);
+        const response = await f.api.inject({ url: '/v1/admin/team', headers: f.headers });
+        expect(response.statusCode).toBe(200);
+        expect(response.body).not.toContain(f.token);
+        expect(response.body).not.toContain(f.csrf);
+        const cookies = response.headers['set-cookie'] as string[];
+        expect(cookies).toHaveLength(2);
+        expect(cookies[0]).toContain('; HttpOnly; Secure; SameSite=Strict');
+        expect(cookies[1]).not.toContain('HttpOnly');
+        for (const cookie of [...cookies, ...f.staff.clearStaffCookies()]) {
+            expect(cookie).toContain('Path=/');
+            expect(cookie).toContain('Secure; SameSite=Strict');
+            expect(cookie).not.toContain('Domain=');
+        }
+        await f.api.close();
+    });
+    it.each(['disable', 'outage'])('suppresses privileged content at the pre-serialization %s barrier', async (mode) => {
+        const f = await staffHttpFixture();
+        let started: () => void = () => { }, release: () => void = () => { };
+        const waiting = new Promise<void>(r => { started = r; }), barrier = new Promise<void>(r => { release = r; });
+        f.api.get('/v1/admin/team', f.staff.staffRoutePolicy('TEAM_READ'), async () => { started(); await barrier; return { secret: 'must never emit' }; });
+        const pending = f.api.inject({ url: '/v1/admin/team', headers: f.headers });
+        await waiting;
+        if (mode === 'disable')
+            f.revoke();
+        else
+            f.outage();
+        release();
+        const response = await pending;
+        expect(response.statusCode).toBe(401);
+        expect(response.json()).toEqual({ error: 'STAFF_AUTHORITY_INVALID' });
+        expect(response.body).not.toContain('must never emit');
+        expect(response.body).not.toContain('SECRET_DB_DETAIL');
+        await f.api.close();
+    });
+    it('rechecks ordinary base immediately before an existing private SSE event', async () => {
+        const ordinary = sessions(), app = application();
+        let revoked = false, started: () => void = () => { }, release: () => void = () => { };
+        const waiting = new Promise<void>(r => { started = r; }), barrier = new Promise<void>(r => { release = r; });
+        ordinary.assertCurrent = async () => {
+            if (revoked)
+                throw new Error('HELD');
+        };
+        app.events = async function* () { started(); await barrier; yield { event_id: 'event:private', event_type: 'run.accepted', run_ref: RUN_ID, at_sequence: 1, payload: { secret: 'never' } }; };
+        const api = buildApi({ application: app, sessions: ordinary, allowedOrigin: ORIGIN }), pending = api.inject({ url: '/v1/runs/' + RUN_ID + '/events', headers: { cookie } });
+        await waiting;
+        revoked = true;
+        release();
+        const response = await pending;
+        expect(response.body).not.toContain('event:private');
+        expect(response.body).not.toContain('never');
+        await api.close();
+    });
+});
+it('rechecks a prepared staff string response at final onSend after its handler revokes authority', async () => {
+    const f = await staffHttpFixture();
+    f.api.get('/v1/admin/team', f.staff.staffRoutePolicy('TEAM_READ'), async () => { f.revoke(); return 'SECRET_STRING_MUST_NOT_ESCAPE'; });
+    const response = await f.api.inject({ url: '/v1/admin/team', headers: f.headers });
+    expect(response.statusCode).toBe(401);
+    expect(response.body).not.toContain('SECRET_STRING_MUST_NOT_ESCAPE');
+    await f.api.close();
+});
+
+
+describe("direct TOTP session completion", () => {
+  it("sets the shared host-only session cookies and projects no bearer into JSON", async () => {
+    const auth = authenticated();
+    const api = buildApi({ application: application(), sessions: sessions(), allowedOrigin: ORIGIN,
+      mfa: { verifyTotp: async () => ({ status: "authenticated", sessionToken: SESSION_TOKEN, csrfToken: CSRF_TOKEN, session: auth.session }) } as never });
+    try {
+      const response = await api.inject({ method: "POST", url: "/v1/auth/mfa/totp/verify", headers: { origin: ORIGIN }, payload: { enrollment_token: "e".repeat(43), code: "123456" } });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ status: "authenticated", csrf_token: CSRF_TOKEN, session: auth.session });
+      const cookies = response.headers["set-cookie"] as string[];
+      expect(cookies).toHaveLength(2);
+      expect(cookies[0]).toContain("HttpOnly");
+      for (const cookie of cookies) { expect(cookie).toContain("Secure"); expect(cookie).toContain("SameSite=Lax"); expect(cookie).toContain("Max-Age=1209600"); expect(cookie).not.toContain("Domain="); }
+    } finally { await api.close(); }
+  });
+});
+
+it('requires ordinary cookie CSRF when adding TOTP and exposes only enrolled on completion',async()=>{
+  const begin=vi.fn(async()=>({status:'verification_required',secret:'A'.repeat(32),otpauthUri:'otpauth://totp/fixture',enrollment_token:'e'.repeat(43),expires_at:'2026-10-05T12:00:00.000Z'}));
+  const complete=vi.fn(async(..._args:unknown[])=>({status:'enrolled'}));
+  const api=buildApi({application:application(),sessions:sessions(),allowedOrigin:ORIGIN,mfa:{beginTotp:begin,verifyTotp:complete} as never});
+  try {
+    const cookie=`${SESSION_COOKIE_NAME}=${SESSION_TOKEN}; ${CSRF_COOKIE_NAME}=${CSRF_TOKEN}`;
+    const missing=await api.inject({method:'POST',url:'/v1/auth/mfa/totp/begin',headers:{cookie,origin:ORIGIN},payload:{step_up_grant:'g'.repeat(43)}});
+    expect(missing.statusCode).toBe(403);expect(begin).not.toHaveBeenCalled();
+    const success=await api.inject({method:'POST',url:'/v1/auth/mfa/totp/verify',headers:{cookie,origin:ORIGIN,'x-csrf-token':CSRF_TOKEN},payload:{enrollment_token:'e'.repeat(43),code:'123456'}});
+    expect(success.statusCode).toBe(200);expect(success.json()).toEqual({status:'enrolled'});
+    expect(complete.mock.calls[0]?.[2]).toMatchObject({userId:authenticated().userId});
+  } finally {await api.close();}
 });

@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "nhận danh sách tất cả các bên thứ ba đã nhận dữ liệu đó;",
   "legal.health.s05.item3": "rút lại sự đồng ý và yêu cầu xóa dữ liệu đó.",
   "legal.health.s06.title": "Cách thực hiện các quyền này",
-  "legal.health.s06.body": "Bạn có thể thực hiện trong phần Cài đặt hoặc viết thư đến privacy@dezbatere.ro. Chúng tôi phản hồi trong vòng 45 ngày. Nếu chúng tôi từ chối một yêu cầu, bạn có thể khiếu nại bằng cách trả lời thư phản hồi của chúng tôi."
+  "legal.health.s06.body": "Bạn có thể thực hiện trong phần Cài đặt hoặc viết thư đến privacy@dezbatere.ro. Chúng tôi phản hồi trong vòng 45 ngày. Nếu chúng tôi từ chối một yêu cầu, bạn có thể khiếu nại bằng cách trả lời thư phản hồi của chúng tôi.",
+  "legal.cookies.staff.purpose": "Quyền truy cập nhân viên riêng",
+  "legal.cookies.passwordReset.purpose": "Chỉ đặt lại mật khẩu",
+  "legal.cookies.mfaRecovery.purpose": "Chỉ khôi phục trình xác thực",
+  "legal.cookies.social.purpose": "Quy trình ngắn đăng nhập qua nhà cung cấp hoặc liên kết tài khoản",
+  "legal.cookies.phoneDraft.purpose": "Câu hỏi chưa hoàn tất ở bước điện thoại; xóa khi đổi phiên, đăng xuất hoặc đổi chủ sở hữu",
+  "legal.cookies.staff.life": "Tối đa 8 giờ; 15 phút không hoạt động",
+  "legal.cookies.passwordReset.life": "Tối đa 30 phút",
+  "legal.cookies.mfaRecovery.life": "Tối đa 299 giây",
+  "legal.cookies.social.life": "Tối đa 5 phút",
+  "legal.cookies.phoneDraft.life": "15 phút hoặc đến khi bị xóa sớm hơn"
 }

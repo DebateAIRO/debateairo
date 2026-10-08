@@ -1,6 +1,7 @@
-import { readFile, readdir } from "node:fs/promises";
+import { applyForward108, base108Lineage } from "./migration-forward108.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
+import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
 import type { Pool, PoolClient } from "pg";
 import pg from "pg";
 import type {
@@ -12,6 +13,8 @@ import type {
 import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
+export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
+import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";
 
 export {
   PostgresSessionRepository,
@@ -413,16 +416,25 @@ export interface RunContentLease {
  */
 export async function acquireRunContentLease(
   pool: Pool,
-  requestedRunIds: readonly string[]
+  requestedRunIds: readonly string[],
+  signal?: AbortSignal
 ): Promise<RunContentLease> {
   const runIds = Object.freeze([...new Set(requestedRunIds)].sort());
   if (runIds.length === 0) throw new TypeError("CONTENT_LEASE_RUN_REQUIRED");
   for (;;) {
-    const client = await pool.connect();
+    const client = await abortablePrivateWork(() => pool.connect(), signal, late => late.release(true));
     const acquired: string[] = [];
     let released = false;
     let invalidated: Error | undefined;
+    let previousLockTimeout: string | undefined;
+    const abort = () => {
+      invalidated ??= new Error("PRIVATE_STREAM_CLOSED");
+      if (!released) { released = true; void cancelAndDestroyPrivateClient(pool, client).catch(() => {}); }
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
     const unlock = async (): Promise<void> => {
+      signal?.removeEventListener("abort", abort);
       if (released) return;
       released = true;
       let failure: unknown = invalidated;
@@ -440,17 +452,26 @@ export async function acquireRunContentLease(
           failure ??= error;
         }
       }
+      if (failure === undefined && previousLockTimeout !== undefined) {
+        try { await client.query("SELECT set_config('lock_timeout',$1,false)", [previousLockTimeout]); }
+        catch (error) { failure = error; }
+      }
       if (failure === undefined) client.release();
       else client.release(failure instanceof Error ? failure : new Error("CONTENT_LEASE_UNLOCK_FAILED"));
       if (failure !== undefined) throw failure;
     };
     try {
+      if (signal !== undefined) {
+        const prior = await abortablePrivateWork(() => client.query<{lock_timeout:string}>("SHOW lock_timeout"), signal);
+        previousLockTimeout = prior.rows[0]?.lock_timeout ?? '0';
+        await abortablePrivateWork(() => client.query("SET lock_timeout='700ms'"), signal);
+      }
       let contended = false;
       for (const runId of runIds) {
-        const result = await client.query<{ acquired: boolean }>(
+        const result = await abortablePrivateWork(() => client.query<{ acquired: boolean }>(
           "SELECT pg_try_advisory_lock_shared(hashtextextended($1,0)) AS acquired",
           [`${CONTENT_LEASE_NAMESPACE}${runId}`]
-        );
+        ), signal);
         if (result.rows[0]?.acquired !== true) {
           contended = true;
           break;
@@ -459,7 +480,7 @@ export async function acquireRunContentLease(
       }
       if (contended) {
         await unlock();
-        await new Promise<void>((resolve) => setTimeout(resolve,10));
+        await abortablePrivateWork(() => new Promise<void>((resolve) => setTimeout(resolve,10)), signal);
         continue;
       }
       return Object.freeze({
@@ -469,7 +490,7 @@ export async function acquireRunContentLease(
           invalidated ??= error;
         },
         assertLive: async () => {
-          const result = await client.query<{ run_id: string; live: boolean }>(
+          const result = await abortablePrivateWork(() => client.query<{ run_id: string; live: boolean }>(
             `SELECT run.run_id,
                     CASE WHEN run.content_encryption_version=1
                       THEN core.run_private_content_is_live(run.run_id)
@@ -478,7 +499,7 @@ export async function acquireRunContentLease(
              WHERE run.run_id=ANY($1::uuid[])
              ORDER BY run.run_id`,
             [runIds]
-          );
+          ), signal);
           if (result.rows.length !== runIds.length
             || result.rows.some((row) => row.live !== true)) {
             throw new TypedDomainError(
@@ -552,7 +573,8 @@ export interface LeasedPreparedRunContentCipher {
 
 export async function prepareLeasedContentEncryptionForRuns(
   pool: Pool,
-  requestedRunIds: readonly string[]
+  requestedRunIds: readonly string[],
+  signal?: AbortSignal
 ): Promise<ReadonlyMap<string, LeasedPreparedRunContentCipher>> {
   const requested = [...new Set(requestedRunIds)].sort();
   const current = contentLeaseScope.getStore();
@@ -564,13 +586,13 @@ export async function prepareLeasedContentEncryptionForRuns(
     );
   }
   const borrowed = current?.pool === pool;
-  const lease = borrowed ? current.lease : await acquireRunContentLease(pool, requested);
+  const lease = borrowed ? current.lease : await acquireRunContentLease(pool, requested, signal);
   const preparedByRun = new Map<string, PreparedRunContentCipher | null>();
   try {
     await lease.assertLive();
     const cipher = contentCipherFor(pool);
     for (const runId of requested) {
-      const enabled = await runUsesContentEncryption(lease.client, runId);
+      const enabled = await abortablePrivateWork(() => runUsesContentEncryption(lease.client, runId), signal);
       if (!enabled) {
         preparedByRun.set(runId, null);
         continue;
@@ -581,7 +603,7 @@ export async function prepareLeasedContentEncryptionForRuns(
           "Encrypted content cannot be read without the external key store"
         );
       }
-      preparedByRun.set(runId, await cipher.prepareRun(runId));
+      preparedByRun.set(runId, await abortablePrivateWork(() => cipher.prepareRun(runId), signal, late => late.close()));
     }
     await lease.assertLive();
     let closed = false;
@@ -610,9 +632,10 @@ export async function prepareLeasedContentEncryptionForRuns(
 
 export async function prepareLeasedContentEncryptionForRun(
   pool: Pool,
-  runId: string
+  runId: string,
+  signal?: AbortSignal
 ): Promise<LeasedPreparedRunContentCipher> {
-  const leased = await prepareLeasedContentEncryptionForRuns(pool, [runId]);
+  const leased = await prepareLeasedContentEncryptionForRuns(pool, [runId], signal);
   return leased.get(runId)!;
 }
 
@@ -938,11 +961,14 @@ export function createSupportControlPlanePool(connectionString: string): Pool {
 }
 
 export async function migrate(pool: Pool): Promise<void> {
-  const directory = new URL("../../../migrations/", import.meta.url);
-  const migrations = (await readdir(directory)).filter((name) => /^\d+.*\.sql$/.test(name)).sort();
+  const plan = await loadMigrationPlan();
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const isolation = await client.query<{ transaction_isolation: string }>("SHOW transaction_isolation");
+    if (isolation.rows[0]?.transaction_isolation !== "read committed") {
+      throw new Error("MIGRATION_ISOLATION_REQUIRES_READ_COMMITTED");
+    }
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('debateai:schema-migrations', 0))");
     await client.query(`
       CREATE TABLE IF NOT EXISTS public.debateai_schema_migration (
@@ -950,15 +976,127 @@ export async function migrate(pool: Pool): Promise<void> {
         applied_at timestamptz NOT NULL
       )
     `);
-    for (const name of migrations) {
-      const applied = await client.query("SELECT 1 FROM public.debateai_schema_migration WHERE name=$1", [name]);
-      if (applied.rowCount !== 0) continue;
-      await client.query(await readFile(new URL(name, directory), "utf8"));
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS public.debateai_schema_migration_resolution (
+        logical_name text PRIMARY KEY,
+        original_source_sha256 text NOT NULL CHECK(original_source_sha256 ~ '^[0-9a-f]{64}$'),
+        resolution_id text NOT NULL,
+        recipe_sha256 text NOT NULL CHECK(recipe_sha256 ~ '^[0-9a-f]{64}$'),
+        executable_path text NOT NULL,
+        executable_sha256 text NOT NULL CHECK(executable_sha256 ~ '^[0-9a-f]{64}$'),
+        precondition_evidence_digest text NOT NULL CHECK(precondition_evidence_digest ~ '^[0-9a-f]{64}$'),
+        postcondition_evidence_digest text NOT NULL CHECK(postcondition_evidence_digest ~ '^[0-9a-f]{64}$'),
+        executed_at timestamptz NOT NULL
+      )
+    `);
+    await client.query("REVOKE ALL ON public.debateai_schema_migration_resolution FROM PUBLIC");
+    const resolutionAcl = await client.query<{ valid: boolean }>(`
+      SELECT pg_get_userbyid(c.relowner)=current_user
+        AND NOT EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
+          WHERE a.grantee<>c.relowner)
+        AND NOT EXISTS(SELECT 1 FROM pg_roles service WHERE service.rolname LIKE 'debateai\\_%'
+          AND service.oid<>c.relowner AND pg_has_role(service.oid,c.relowner,'MEMBER')) AS valid
+      FROM pg_class c WHERE c.oid='public.debateai_schema_migration_resolution'::regclass
+    `);
+    if (resolutionAcl.rows[0]?.valid !== true) throw new Error("MIGRATION_RESOLUTION_ACL_DRIFT");
+    const applied = (await client.query<{ name: string }>("SELECT name FROM public.debateai_schema_migration ORDER BY name")).rows.map(({ name }) => name);
+    const resolutions = (await client.query<{
+      logical_name: string; original_source_sha256: string; resolution_id: string; recipe_sha256: string;
+      executable_path: string; executable_sha256: string; precondition_evidence_digest: string;
+      postcondition_evidence_digest: string;
+    }>("SELECT * FROM public.debateai_schema_migration_resolution ORDER BY logical_name")).rows;
+    const lineage = identifyLineage(plan, applied, resolutions.map(({ logical_name }) => logical_name));
+    const baseLineage=base108Lineage(lineage);
+    const authLineage = lineage === "auth94" || lineage === "auth103" || lineage === "auth106";
+    if (baseLineage === "auth106" || baseLineage === "integrated-original" || baseLineage === "integrated-compatibility" || baseLineage === "integrated-fresh-resolutions") await assertAuth106Catalog(client);
+    if (lineage === "dev95") {
+      // Retained active, expired and consumed withdrawal grants all block the
+      // immutable Auth CHECK replacements. The lock keeps the predicate stable.
+      await client.query("LOCK TABLE identity.step_up_grant IN SHARE ROW EXCLUSIVE MODE");
+      const retained = await client.query<{ retained: boolean }>(
+        "SELECT EXISTS(SELECT 1 FROM identity.step_up_grant WHERE action='WITHDRAW_SUBSCRIPTION') retained"
+      );
+      if (retained.rows[0]?.retained) throw new Error("MIGRATION_WITHDRAWAL_ROWS_RETAINED");
+    }
+    const compat = plan.manifest.compatibility;
+    if (baseLineage === "integrated-fresh-resolutions") {
+      for (const body of plan.manifest.transactionBodies) {
+        const receipt = resolutions.find(({ logical_name }) => logical_name === body.logicalName);
+        if (receipt?.original_source_sha256 !== plan.sources.get(body.logicalName)!.sha256
+          || receipt.resolution_id !== body.resolutionId || receipt.recipe_sha256 !== plan.recipeSha256
+          || receipt.executable_path !== body.executablePath || receipt.executable_sha256 !== body.executableSha256
+          || receipt.precondition_evidence_digest !== transactionBodyPreconditionDigest(plan, body.logicalName)
+          || receipt.postcondition_evidence_digest !== await transactionBodyPostconditionEvidence(client, body.logicalName)) {
+          throw new Error("MIGRATION_RESOLUTION_BINDING_DRIFT");
+        }
+      }
+    }
+    if (baseLineage === "integrated-compatibility") {
+      const receipt = resolutions[0];
+      const source = plan.sources.get(compat.logicalName)!;
+      if (receipt?.original_source_sha256 !== source.sha256 || receipt.resolution_id !== compat.resolutionId
+        || receipt.recipe_sha256 !== plan.recipeSha256 || receipt.executable_path !== compat.executablePath
+        || receipt.executable_sha256 !== compat.executableSha256
+        || !(["auth94", "auth103", "auth106"] as const)
+          .some((cohort) => receipt.precondition_evidence_digest === compatibilityPreconditionDigest(plan, cohort))
+        || receipt.postcondition_evidence_digest !== await lineageEvidence(client)) {
+        throw new Error("MIGRATION_RESOLUTION_BINDING_DRIFT");
+      }
+    }
+    const appliedSet = new Set(applied);
+    const resolvedSet = new Set(resolutions.map(({ logical_name }) => logical_name));
+    for (const name of plan.manifest.order) {
+      if (appliedSet.has(name) || resolvedSet.has(name)) continue;
+      const body = lineage === "fresh" ? plan.manifest.transactionBodies.find(({ logicalName }) => logicalName === name) : undefined;
+      if (body !== undefined) {
+        const terminal = [...appliedSet,...resolvedSet].sort();
+        const preceding = plan.manifest.order.slice(0,plan.manifest.order.indexOf(name)).sort();
+        if (terminal.length !== preceding.length || terminal.some((entry,index) => entry !== preceding[index])) {
+          throw new Error("MIGRATION_TRANSACTION_BODY_ORDER_DRIFT");
+        }
+        await client.query(plan.transactionBodySql.get(name)!);
+        const postconditionEvidence = await transactionBodyPostconditionEvidence(client,name);
+        await client.query(`
+          INSERT INTO public.debateai_schema_migration_resolution
+          (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
+           precondition_evidence_digest,postcondition_evidence_digest,executed_at)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
+        `,[name,plan.sources.get(name)!.sha256,body.resolutionId,plan.recipeSha256,body.executablePath,
+          body.executableSha256,transactionBodyPreconditionDigest(plan,name),postconditionEvidence]);
+        resolvedSet.add(name);
+        continue;
+      }
+      if (name === compat.logicalName && authLineage) {
+        const source = plan.sources.get(name)!;
+        const preconditionEvidence = compatibilityPreconditionDigest(plan, lineage);
+        if (preconditionEvidence !== sha256(JSON.stringify({ lineage, applied: [...appliedSet].sort(), source: source.sha256 }))) {
+          throw new Error("MIGRATION_COMPATIBILITY_ORDER_DRIFT");
+        }
+        await client.query(plan.compatibilitySql);
+        const postconditionEvidence = await lineageEvidence(client);
+        await client.query(`
+          INSERT INTO public.debateai_schema_migration_resolution
+          (logical_name,original_source_sha256,resolution_id,recipe_sha256,executable_path,executable_sha256,
+           precondition_evidence_digest,postcondition_evidence_digest,executed_at)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())
+        `,[name,source.sha256,compat.resolutionId,plan.recipeSha256,compat.executablePath,
+          compat.executableSha256,preconditionEvidence,postconditionEvidence]);
+        resolvedSet.add(name);
+        continue;
+      }
+      await client.query(plan.sources.get(name)!.sql);
       await client.query(
         "INSERT INTO public.debateai_schema_migration (name, applied_at) VALUES ($1, statement_timestamp())",
         [name]
       );
+      appliedSet.add(name);
     }
+    if (authLineage) {
+      const final = await lineageEvidence(client);
+      await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[final,compat.logicalName]);
+    }
+    await client.query(plan.effectiveCapabilityVerifierSql);
+    await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -2207,6 +2345,8 @@ export {
   identitySession,
   identityUser,
   mfaFactor,
+  staffWebAuthnMetadata,
+  STAFF_WEBAUTHN_SCHEMA_MANIFEST,
   recoveryCode
 } from "./schema.js";
 
@@ -2243,3 +2383,25 @@ export {
   type AuthenticationRiskSummary,
   type DecryptedAuthenticationRiskSignal
 } from "./auth-risk.js";
+
+export { PostgresStaffIndependentReadinessPublisher, type StaffIndependentReadinessPublisher, PostgresStaffAlertRepository, type StaffClaimKeyState, type StaffAlertClaim, type StaffAlertFailureCode, type StaffAlertKeyMapping, type StaffAlertKeyMappings, type StaffAlertReadinessBinding, type StaffAlertRepository, type StaffAlertPurpose, PostgresStaffRepository, type StaffRepository, type StaffAlertIntent, type StaffInvitationDeliveryIntent, type StaffMutation, type InvitationAcceptCommand, type StaffWebAuthnRepository, type StaffOrdinarySession, type StaffEnrollmentIntent, type StaffEnrollmentIntentBinding, type StaffEnrollmentIntentFactory, type StaffCeremonyRead, type StaffCeremonyScope, type StaffCeremonyContext, type StaffCeremonyPurpose, type StaffCeremonyChallenge, type StaffCredentialTransport, type StaffOwnedCredential, type StaffAssertionCompletion, type StaffCeremonyBegin } from "./staff-access.js";
+
+export { PostgresOwnerCommandRepository, OwnerCommandAlertKeyMappings, type OwnerCommandRepository, type OwnerCommandInput, type OwnerCommandPurpose, type OwnerPredecessor, type OwnerRecoveryProofBinding, type OwnerRecoveryRotation, type PreparedOwnerCommand, type StoredOwnerPossessionReceipt, type OwnerCommitInput, type OwnerAlertMetadata } from './owner-recovery.js';
+
+export { PostgresStaffPrerequisiteProducer, type StaffPrerequisiteProducer, type StaffPrerequisiteInput, type StaffManagementRepository, type StaffProjectionRead, type StaffEnrollmentRecord, type StaffTeamPageRecord, type StaffAuditPageRecord, type StaffTargetInvitationChannels, type StaffTargetInvitationChannelInput } from "./staff-access.js";
+
+export { PostgresInternalAllowanceRepository, type InternalAllowancePort, type InternalAllowanceCommandState, type InternalAllowanceConfigureCommand, type InternalAllowanceRevokeCommand, type SelectedInternalAllowancePolicy } from "./internal-allowance.js";
+
+export {PostgresAccountProfileRepository, type ProfileSession, type PhoneProfileRecord} from "./account-profile.js";
+export {PostgresRecoveryEmailRepository, type RecoveryEmailRecord} from "./recovery-email.js";
+export * from './consumer-auth.js';
+
+export type { TotpEnrollmentAuthority, SecureTotpEnrollment, TotpEnrollmentLookup } from "./consumer-auth.js";
+
+export * from "./consumer-security.js";
+
+export * from "./consumer-recovery.js";
+export * from "./onboarding-evidence.js";
+
+export {PostgresConsumerSecurityNoticeRepository,type ConsumerSecurityNotice,type ConsumerSecurityNoticeClaim} from "./consumer-security-mail.js";
+export * from './social-identity.js';

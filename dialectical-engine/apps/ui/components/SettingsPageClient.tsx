@@ -12,7 +12,6 @@ import {
   type EmailChangeLink
 } from "@/components/EmailSettings";
 import { EvaluatorDevMenu, type SettingsI18nProps } from "@/components/EvaluatorDevMenu";
-import { LegacyRunClaimControls } from "@/components/LegacyRunClaimControls";
 import { SessionControls } from "@/components/SessionControls";
 import { SubscriptionControls } from "@/components/billing/SubscriptionControls";
 import { UsageBars } from "@/components/billing/UsageBars";
@@ -67,26 +66,6 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent
 }) {
   const [changingFrom, setChangingFrom] = useState<string | null>(null);
   const [emailNotice, setEmailNotice] = useState<string | null>(null);
-  const identityRows = [
-    {
-      key: "asker",
-      label: t(catalog, "settings.identity.asker"),
-      value: t(catalog, "settings.identity.askerUnavailable"),
-      absent: true
-    },
-    {
-      key: "scope",
-      label: t(catalog, "settings.identity.scope"),
-      value: t(catalog, "settings.identity.personal"),
-      absent: false
-    },
-    {
-      key: "model",
-      label: t(catalog, "settings.identity.model"),
-      value: t(catalog, "settings.identity.modelValue"),
-      absent: false
-    }
-  ] as const;
 
   if (changingFrom !== null) {
     return (
@@ -106,22 +85,8 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent
     <div className="screen scroll setScreen">
       <div className="setBody">
         <div className="setInner">
-          <p className="setEyebrow">{t(catalog, "settings.identity.eyebrow")}</p>
-          <h1 className="setTitle">{t(catalog, "settings.identity.title")}</h1>
-          <p className="setLede">{t(catalog, "settings.identity.lede")}</p>
-
-          <div className="setPanel">
-            <div className="setPanelCore">
-              {identityRows.map((row) => (
-                <div className="setIdentityRow" key={row.key}>
-                  <span className="setIdentityKey">{row.label}</span>
-                  <span className="setIdentityValue" data-absent={row.absent ? "true" : undefined}>
-                    {row.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <h1 className="setTitle">{t(catalog, "settings.account.title")}</h1>
+          <a className="setBtn" href="/settings/security">{t(catalog, "settings.security.title")}</a>
           <SubscriptionControls catalog={billingCatalog} locale={locale} renewalConsent={renewalConsent} />
           <UsageBars catalog={billingCatalog} locale={locale} />
 
@@ -135,7 +100,6 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent
           />
           <SessionControls catalog={catalog} locale={locale} />
           <ConsentSettingsPanel />
-          <LegacyRunClaimControls catalog={catalog} locale={locale} />
           <AccountErasureControls catalog={catalog} locale={locale} />
         </div>
       </div>

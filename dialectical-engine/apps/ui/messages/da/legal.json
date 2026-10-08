@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "få en liste over alle tredjeparter, der har modtaget dem;",
   "legal.health.s05.item3": "trække dit samtykke tilbage og få dem slettet.",
   "legal.health.s06.title": "Sådan udøver du dem",
-  "legal.health.s06.body": "Under Indstillinger eller ved at skrive til privacy@dezbatere.ro. Vi svarer inden for 45 dage. Hvis vi afslår en anmodning, kan du klage over afgørelsen ved at svare på vores svar."
+  "legal.health.s06.body": "Under Indstillinger eller ved at skrive til privacy@dezbatere.ro. Vi svarer inden for 45 dage. Hvis vi afslår en anmodning, kan du klage over afgørelsen ved at svare på vores svar.",
+  "legal.cookies.staff.purpose": "Separat medarbejderadgang",
+  "legal.cookies.passwordReset.purpose": "Kun nulstilling af adgangskode",
+  "legal.cookies.mfaRecovery.purpose": "Kun gendannelse af autentifikatoren",
+  "legal.cookies.social.purpose": "Kort udbyderlogin eller kontotilknytning",
+  "legal.cookies.phoneDraft.purpose": "Ufærdigt spørgsmål under telefontrinnet; slettes ved sessionsskift, logout eller ejerskift",
+  "legal.cookies.staff.life": "Op til 8 timer; 15 minutters inaktivitet",
+  "legal.cookies.passwordReset.life": "Op til 30 minutter",
+  "legal.cookies.mfaRecovery.life": "Op til 299 sekunder",
+  "legal.cookies.social.life": "Op til 5 minutter",
+  "legal.cookies.phoneDraft.life": "15 minutter eller indtil tidligere sletning"
 }

@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "bu verileri alan tüm üçüncü tarafların listesini almak;",
   "legal.health.s05.item3": "rızanızı geri çekmek ve verilerinizin silinmesini sağlamak.",
   "legal.health.s06.title": "Haklarınızı nasıl kullanırsınız",
-  "legal.health.s06.body": "Ayarlar'dan veya privacy@dezbatere.ro adresine yazarak. 45 gün içinde yanıt veririz. Bir talebi reddedersek, yanıtımıza cevap vererek itiraz edebilirsiniz."
+  "legal.health.s06.body": "Ayarlar'dan veya privacy@dezbatere.ro adresine yazarak. 45 gün içinde yanıt veririz. Bir talebi reddedersek, yanıtımıza cevap vererek itiraz edebilirsiniz.",
+  "legal.cookies.staff.purpose": "Ayrı personel erişimi",
+  "legal.cookies.passwordReset.purpose": "Yalnızca parola sıfırlama",
+  "legal.cookies.mfaRecovery.purpose": "Yalnızca kimlik doğrulayıcı kurtarma",
+  "legal.cookies.social.purpose": "Kısa sağlayıcı oturumu veya hesap bağlama akışı",
+  "legal.cookies.phoneDraft.purpose": "Telefon adımında tamamlanmamış soru; oturum değişikliği, çıkış veya sahip değişikliğiyle silinir",
+  "legal.cookies.staff.life": "En fazla 8 saat; 15 dakika hareketsizlik",
+  "legal.cookies.passwordReset.life": "En fazla 30 dakika",
+  "legal.cookies.mfaRecovery.life": "En fazla 299 saniye",
+  "legal.cookies.social.life": "En fazla 5 dakika",
+  "legal.cookies.phoneDraft.life": "15 dakika veya daha erken silinene kadar"
 }

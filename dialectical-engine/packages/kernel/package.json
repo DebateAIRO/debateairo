@@ -1,1 +1,13 @@
-{"name":"@debateai/kernel","version":"0.1.0","private":true,"type":"module","exports":"./src/index.ts"}
+{
+  "name": "@debateai/kernel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./manualPhone": "./src/manualPhone.ts"
+  },
+  "dependencies": {
+    "libphonenumber-js": "1.13.7"
+  }
+}

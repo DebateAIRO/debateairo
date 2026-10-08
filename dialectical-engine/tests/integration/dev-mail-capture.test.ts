@@ -1,3 +1,4 @@
+import { mailAlternatives } from "../support/accountMail.js";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
@@ -85,7 +86,8 @@ describe("DEV-06 local sendmail-compatible capture", { concurrent: false }, () =
 
       const message = readFileSync(join(spool, files[0]!), "utf8");
       expect(message).toContain("To: developer@example.test\r\n");
-      expect(message).toContain(`https://localhost:3000/verify-email#token=${token}`);
+      expect(mailAlternatives(message).text).toContain(`https://localhost:3000/verify-email#token=${token}`);
+      expect(mailAlternatives(message).html).toContain(`https://localhost:3000/verify-email#token=${token}`);
       expect(message).not.toContain("?token=");
       expect(message).not.toContain("attempt-not-persisted-by-the-sink");
     } finally {

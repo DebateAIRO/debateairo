@@ -1,7 +1,7 @@
 {
   "newDebate.eyebrow": "UUS KÜSIMUS",
   "newDebate.title": "Mille üle peaksime väitlema?",
-  "newDebate.aiNotice": "Kõik selles väitluses loodav — argumendid, hinnangud, hinded ja otsus — on loodud tehisintellektimudelitega, masinloetavalt märgistatud ning võib olla ebatäpne.",
+  "newDebate.aiNotice": "Kõik selles väitluses loodav — argumendid, hinnangud, hinded ja otsus — on loodud tehisintellektimudelitega, masinloetavalt märgistatud ning võib olla ebatäpne. See ei ole meditsiini-, psühholoogia-, õigus-, finants- ega muu kutsealane nõuanne.",
   "newDebate.planTier": "Paketitase",
   "newDebate.free": "Tasuta",
   "newDebate.freePromise": "Kõik seaded on fikseeritud. Küsimus on teie.",

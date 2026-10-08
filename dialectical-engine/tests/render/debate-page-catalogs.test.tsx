@@ -96,10 +96,24 @@ function synthesisStrings(locale: string): string[] {
 /** The English page as fc3cb865a rendered it (see the byte-identical row), plus the
  * deliberate later changes, each a hand edit of one element in both files: b68f82dae
  * dropped the language-switcher flag span; PR #56 (eb7269e1) added the
- * publicationControl class to the publication card. fc3cb865a is not in this
+ * publicationControl class to the publication card; the not-advice mission appended
+ * "It is not medical, psychological, legal or financial advice, or any other
+ * professional advice." to the AI notice text. fc3cb865a is not in this
  * repository, so a later deliberate change is applied the same way and listed here. */
 function headFixture(name: "queued" | "lens"): string {
   return readFileSync(resolve(process.cwd(), `tests/render/fixtures/debate-page-en.fc3cb865a.${name}.html`), "utf8");
+}
+
+const RETIRED_SETTINGS_ANCHOR = '<a class="iconBtn debateOverflowAction" aria-label="Settings" href="/settings">⚙</a>';
+function currentExpectedActions(historical: string): string {
+  // The accepted account menu owns Settings now; preserve all other historical bytes.
+  expect(historical.split(RETIRED_SETTINGS_ANCHOR)).toHaveLength(3);
+  const first = historical.indexOf(RETIRED_SETTINGS_ANCHOR);
+  const second = historical.indexOf(RETIRED_SETTINGS_ANCHOR, first + RETIRED_SETTINGS_ANCHOR.length);
+  for (const at of [first, second]) expect(historical.slice(0, at)).toMatch(/aria-label="How it works">\?<\/button>$/);
+  expect(historical.slice(first + RETIRED_SETTINGS_ANCHOR.length)).toMatch(/^<\/div><details class="debateUtilityOverflow">/);
+  expect(historical.slice(second + RETIRED_SETTINGS_ANCHOR.length)).toMatch(/^<\/div><\/details><\/div><\/header>/);
+  return historical.split(RETIRED_SETTINGS_ANCHOR).join("");
 }
 
 function escapeHtml(value: string): string {
@@ -157,11 +171,22 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
     });
     const queued = liftReviewMarks(html);
     expect(queued.marks).toBe(0);
-    expect(reactIds(queued.rest)).toBe(reactIds(headFixture("queued")));
+    expect(reactIds(queued.rest)).toBe(reactIds(currentExpectedActions(headFixture("queued"))));
     mocks.getDebateServer.mockResolvedValue({ ok: true, debate: debateWithLensBranch(), answer: null });
     const lens = liftReviewMarks(await renderPage("en"));
     expect(lens.marks).toBe(1);
-    expect(reactIds(lens.rest)).toBe(reactIds(headFixture("lens")));
+    expect(reactIds(lens.rest)).toBe(reactIds(currentExpectedActions(headFixture("lens"))));
+  });
+
+  it("retains the historical fixture and rejects unrelated content or an unexpected Settings-anchor count", () => {
+    const historical = headFixture("queued");
+    const expected = currentExpectedActions(historical);
+    expect(currentExpectedActions(historical.replace("Messi or Ronaldo?", "Unrelated changed claim"))).not.toBe(expected);
+    expect(() => currentExpectedActions(historical.replace(RETIRED_SETTINGS_ANCHOR, ""))).toThrow();
+    expect(() => currentExpectedActions(historical + RETIRED_SETTINGS_ANCHOR)).toThrow();
+    expect(() => currentExpectedActions(historical.replace('aria-label="How it works">?</button>', 'aria-label="Other action">?</button>'))).toThrow();
+    const currentPage = readFileSync(resolve(process.cwd(), "apps/ui/app/debate/[id]/DebatePageClient.tsx"), "utf8");
+    expect(currentPage).toContain('<AccountMenu catalog={chromeCatalog} />');
   });
 
   // Follow-up 4, review F1: the workspace's AI notice reads home.* keys, which the

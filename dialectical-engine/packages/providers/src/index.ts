@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { networkInterfaces } from "node:os";
 import { z } from "zod";
-import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole } from "@debateai/kernel";
+import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
 
@@ -117,6 +117,7 @@ export interface ProviderCallRequest {
   readonly contractHash: string;
   readonly providerRef: string;
   readonly packet: PromptPacket;
+  readonly preferredResponseFormat?: "json_object";
   readonly classifyContent?: (content: string) => ContentClassification;
   readonly buildRepairPacket?: (rejected: RejectedProviderContent) => PromptPacket;
   /**
@@ -276,14 +277,19 @@ export function providerTargetPrice(target: ProviderDiscoveryTarget): Readonly<{
 export type ProviderTargetGatewayControls = Readonly<{
   thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
   contextWindowTokens?: number;
+  supportsJsonObjectResponse?: boolean;
 }>;
 
+function isJsonObjectResponseTarget(endpoint:string,model:string):boolean {
+  return endpoint === "https://api.deepinfra.com/v1/openai" && model === "zai-org/GLM-5.3-Flash";
+}
 export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): ProviderTargetGatewayControls {
   return Object.freeze({
     ...(target.thinkingParameter === undefined || target.thinkingLevels === undefined ? {} : {
       thinking: Object.freeze({ parameter: target.thinkingParameter, levels: target.thinkingLevels })
     }),
-    ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens })
+    ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens }),
+    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{})
   });
 }
 
@@ -356,7 +362,7 @@ function normalizedProviderBaseUrl(value: unknown): string {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
   }
   parsed.pathname = parsed.pathname.replace(/\/+$/u, "");
-  if (!parsed.pathname.endsWith("/v1")) {
+  if (!parsed.pathname.endsWith("/v1") && parsed.toString() !== "https://api.deepinfra.com/v1/openai") {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
   }
   return parsed.toString().replace(/\/$/u, "");
@@ -957,8 +963,9 @@ export interface ProviderAdapterRegistration {
   readonly maker: string;
 }
 
+export const OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND = "openai-compatible-http" as const;
 export const BUILT_IN_PROVIDER_ADAPTERS = Object.freeze([
-  Object.freeze({ adapterKind: "openai-compatible-http", implementation: "OpenAICompatibleProviderGateway" }),
+  Object.freeze({ adapterKind: OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, implementation: "OpenAICompatibleProviderGateway" }),
   Object.freeze({ adapterKind: "vllm-openai-compatible-http", implementation: "VllmOpenAICompatibleProviderGateway" })
 ] as const);
 
@@ -1054,7 +1061,7 @@ export interface ProviderCostEnvelopeSeam {
     requestBytes: number;
     /** This attempt's `max_tokens`, which a length retry raises (W10/2). */
     completionTokenCeiling: number;
-  }>) => void | Promise<void>;
+  }>) => void | ProviderCallAdmission | Promise<void | ProviderCallAdmission>;
   /**
    * CHARGE what the vendor billed. Called for every attempt that produced a
    * response body, whatever the engine then decides about it, and it NEVER
@@ -1063,6 +1070,7 @@ export interface ProviderCostEnvelopeSeam {
    */
   readonly recordCall: (observed: Readonly<{
     providerRef: string;
+    admission?: ProviderCallAdmission;
     /**
      * The vendor's usage block EXACTLY as it arrived — not the strict parse.
      * A malformed count does not make a billed call free (Important 1), so the
@@ -1093,6 +1101,7 @@ export interface ProviderCostEnvelopeSeam {
 }
 
 export interface OpenAICompatibleGatewayOptions {
+  readonly supportsJsonObjectResponse?: boolean;
   readonly endpoint: string;
   readonly model: string;
   readonly maker: string;
@@ -1135,6 +1144,8 @@ export const PROVIDER_COST_ENVELOPE_REFUSAL_CODES = Object.freeze([
   // HERE, inside the attempt loop, and a retry would be a second billed call
   // for the same unrepresentable number.
   "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+  "INTERNAL_PROVIDER_FRAME_INVALID",
+  "INTERNAL_PROVIDER_SETTLEMENT_UNCERTAIN",
   // B9 (budget spec §2.9): the seam's shared wall raises the day mid-run under
   // the new settings, before sending; retrying a day that is spent would be as
   // pointless as retrying a run that is.
@@ -1446,6 +1457,12 @@ function assertBoundedProviderResponse(decoded: unknown): void {
   }
 }
 
+function assertJsonObjectResponseCapability(options:OpenAICompatibleGatewayOptions):void {
+ if ((options.supportsJsonObjectResponse !== undefined && typeof options.supportsJsonObjectResponse !== "boolean")
+  || (options.supportsJsonObjectResponse === true && !isJsonObjectResponseTarget(options.endpoint,options.model)))
+  throw new TypedDomainError("PROVIDER_RESPONSE_FORMAT_CAPABILITY_INVALID","Invalid JSON object response capability");
+}
+
 export class OpenAICompatibleProviderGateway implements ProviderGateway {
   readonly #options: OpenAICompatibleGatewayOptions;
 
@@ -1460,11 +1477,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     if (options.contextWindowTokens !== undefined && !isContextWindowTokens(options.contextWindowTokens)) {
       throw new TypeError("PROVIDER_GATEWAY_CONTEXT_WINDOW_INVALID");
     }
+    assertJsonObjectResponseCapability(options);
     this.#options = options;
   }
 
   async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
     this.#options.assertNoOpenWriteTransaction();
+    assertJsonObjectResponseCapability(this.#options);
+    if(request.preferredResponseFormat!==undefined&&request.preferredResponseFormat!=="json_object") throw new TypedDomainError("PROVIDER_RESPONSE_FORMAT_INVALID","Unsupported preferred response format");
+    const responseFormat=request.lane==="story"&&request.preferredResponseFormat==="json_object"&&this.#options.supportsJsonObjectResponse===true?{type:"json_object"} as const:undefined;
     if (!Number.isInteger(request.bound.maxAttempts) || request.bound.maxAttempts < 1) {
       throw new TypeError("CallBound.maxAttempts must be a positive integer");
     }
@@ -1545,7 +1566,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         model: this.#options.model,
         max_tokens: attemptTokenCeiling,
         ...thinking.wire,
-        messages: attemptPacket.messages
+        messages: attemptPacket.messages,
+        ...(responseFormat===undefined?{}:{response_format:responseFormat})
       });
       /**
        * V-28 (DL4-F2) — THE MONEY DECISION, TAKEN BEFORE THE CALL.
@@ -1558,12 +1580,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
        * no ledger row and burns nothing of the attempt ceiling, exactly as
        * `assertAttemptAllowed` above does.
        */
-      await request.costEnvelope?.assertCallAllowed({
+      const costAdmission = await request.costEnvelope?.assertCallAllowed({
         requestBytes: Buffer.byteLength(body, "utf8"),
         completionTokenCeiling: attemptTokenCeiling
       });
       attemptsMade = attempt;
-      const inputHash = digest(JSON.stringify(attemptPacket));
+      const inputHash = digest(JSON.stringify(responseFormat===undefined?attemptPacket:{...attemptPacket,response_format:responseFormat}));
       const attemptId = randomUUID();
       const startedAt = new Date();
       let rawArtifactRef: string | null = null;
@@ -1747,6 +1769,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         await request.costEnvelope?.recordCall({
           providerRef: request.providerRef,
           usage: rawUsage,
+          ...(costAdmission === undefined ? {} : {admission:costAdmission}),
           // The SAME two facts `assertCallAllowed` decided against above, so a
           // charge that falls back to the projection can never exceed what the
           // per-run gate already admitted for this attempt.
@@ -2119,3 +2142,5 @@ export {
   type ProviderProbeObservation,
   type ProviderProbeRecorder
 } from "./provider-probe.js";
+
+export * from "./preview-test.js";

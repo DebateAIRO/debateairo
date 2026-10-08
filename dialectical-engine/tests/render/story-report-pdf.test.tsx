@@ -468,13 +468,13 @@ describe("the report in the question's own script (R-fonts)", () => {
     expect(pages[0]!.filter((line) => line.endsWith(printed(fate))).length).toBe(2);
     // The footer: page numbers on the left, the footer's words on the right.
     const footer = pages[0]!.at(-1)!;
-    expect(footer.indexOf("1")).toBeLessThan(footer.indexOf("DebateAI"));
+    expect(footer.indexOf("1")).toBeLessThan(footer.indexOf("Dialectical Engine"));
     // A left-to-right report keeps its footer the other way round (control).
     const romanian = drawnLines(await renderReportPdf({
       answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY"), generatedAt: new Date("2026-09-26T12:00:00.000Z"), catalogs: ROMANIAN
     }));
     const romanianFooter = romanian[0]!.at(-1)!;
-    expect(romanianFooter.indexOf("DebateAI")).toBeLessThan(romanianFooter.indexOf("1"));
+    expect(romanianFooter.indexOf("Dialectical Engine")).toBeLessThan(romanianFooter.indexOf("1"));
   }, 120_000);
 
   it.each(["en", "he"] as const)("starts page 1 of the %s report with the not-professional-advice line, before the eyebrow", async (locale) => {
@@ -483,14 +483,18 @@ describe("the report in the question's own script (R-fonts)", () => {
       ? { answer: STORY_FIXTURE_ANSWER, story: storyFixture("READY") }
       : storyScriptSample(locale);
     const first = drawnLines(await renderReportPdf({ answer, story, generatedAt: GENERATED, catalogs: reportCatalogs }))[0]!;
-    const eyebrow = first.findIndex((line) => line.includes("DEBATEAI"));
+    const eyebrowText = reportCatalogs.publicCatalog["public.report.eyebrow"]!.toLocaleUpperCase(locale);
+    const [brand, scriptTitle] = eyebrowText.split(" · ");
+    // The Latin brand stays LTR within the RTL Hebrew label.
+    const printedEyebrow = locale === "he" ? [...scriptTitle!].reverse().join("")+" · "+brand : eyebrowText;
+    const eyebrow = first.findIndex((line) => line === printedEyebrow);
     expect(eyebrow).toBeGreaterThan(0);
     // Everything above the eyebrow is the notice, and nothing else. A right-to-left line is drawn from the
     // right, so each of its lines reads back reversed; the line breaks drop the spaces they fall on.
     const bare = (text: string) => text.replace(/\s/gu, "");
     const above = first.slice(0, eyebrow).map((line) => (locale === "he" ? [...line].reverse().join("") : line)).join("");
     expect(bare(above)).toBe(bare(reportCatalogs.publicCatalog["public.report.notAdvice"]!));
-    if (locale === "en") expect(above).toContain("It is not medical, legal, financial or other professional advice.");
+    if (locale === "en") expect(above).toContain("It is not medical, psychological, legal or financial advice, or any other professional advice.");
   }, 120_000);
 
   it.each(["hi", "he"] as const)("hands react-pdf every face of the %s report through the glyph fix (reportGlyphs.ts), never the bare font", async (locale) => {

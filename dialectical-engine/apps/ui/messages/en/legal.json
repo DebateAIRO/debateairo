@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "get the list of every third party that received it;",
   "legal.health.s05.item3": "withdraw your consent and have it deleted.",
   "legal.health.s06.title": "How to use them",
-  "legal.health.s06.body": "From Settings, or by writing to privacy@dezbatere.ro. We reply within 45 days. If we refuse a request, you can appeal by replying to our answer."
+  "legal.health.s06.body": "From Settings, or by writing to privacy@dezbatere.ro. We reply within 45 days. If we refuse a request, you can appeal by replying to our answer.",
+  "legal.cookies.staff.purpose": "Separate staff access",
+  "legal.cookies.passwordReset.purpose": "Password reset only",
+  "legal.cookies.mfaRecovery.purpose": "Authenticator recovery only",
+  "legal.cookies.social.purpose": "Short provider sign-in or account-linking flow",
+  "legal.cookies.phoneDraft.purpose": "Unfinished question during phone completion; cleared on session, sign-out or owner changes",
+  "legal.cookies.staff.life": "Up to 8 hours; 15-minute idle expiry",
+  "legal.cookies.passwordReset.life": "Up to 30 minutes",
+  "legal.cookies.mfaRecovery.life": "Up to 299 seconds",
+  "legal.cookies.social.life": "Up to 5 minutes",
+  "legal.cookies.phoneDraft.life": "15 minutes or until earlier clearing"
 }

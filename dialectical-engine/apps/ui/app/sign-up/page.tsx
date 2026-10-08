@@ -1,4 +1,5 @@
-import Link from "next/link";
+import { publicTurnstileConfig } from "@/lib/turnstile";
+import { NONCE_REQUEST_HEADER } from "../../content-security-policy.mjs";
 import { cookies, headers } from "next/headers";
 import { AGE_REFUSAL_COOKIE_NAME, AGE_REFUSAL_COOKIE_VALUE } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
@@ -11,7 +12,7 @@ import { createServerContractClient, readTrustedClientIp } from "@/lib/serverApi
 
 /**
  * Paid plans G3b (sentence G1). The visitor's address is checked server-side through
- * GET /v1/geo/availability, which answers two booleans and never the country. A failed check shows the
+ * GET /v1/geo/availability, which answers booleans and never the country. A failed check shows the
  * form: POST /v1/auth/register applies the same gate (before the age gate judges the date) and refuses
  * with the same sentence.
  */
@@ -27,6 +28,9 @@ async function signupOpenFor(requestHeaders: Headers): Promise<boolean> {
 }
 
 export default async function SignUpPage() {
+  const requestHeaders = await headers();
+  // Public config only. Task11 consumes this through the reusable managed widget.
+  const turnstile = publicTurnstileConfig(process.env.TURNSTILE_SITE_KEY, requestHeaders.get(NONCE_REQUEST_HEADER) ?? undefined, process.env.NODE_ENV === "production");
   const cookieStore = await cookies();
   const requestedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
@@ -45,11 +49,10 @@ export default async function SignUpPage() {
         description={t(catalog, "auth.signUp.countryUnavailable")}
         footer={null}
       >
-        <p className="authPanelFooter">
-          {t(catalog, "auth.signUp.alreadyHaveOne")} <Link href="/login">{t(catalog, "auth.signUp.logIn")}</Link>
-        </p>
+        {/* Sign-in is closed at the same addresses (paid plans G3a), so no link leads on. */}
+        {null}
       </AuthShell>
     );
   }
-  return <SignUpFlow catalog={catalog} dobLocale={dobLocale} refused={refused} />;
+  return <SignUpFlow catalog={catalog} dobLocale={dobLocale} refused={refused} turnstile={turnstile} />;
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, US_STATE_CODES, type DeclaredRegion } from "@debateai/kernel";
 import type { Pool } from "pg";
 
 /**
@@ -9,6 +9,9 @@ import type { Pool } from "pg";
  * is off: the Terms (NOT_OFFERED, TERMS_EXCLUDED), tax registration not yet done (TAX_NOT_READY),
  * sanctions (SANCTIONS) or an AI provider's own country list (PROVIDER_UNSUPPORTED). `blocked`
  * marks the always-blocked countries: no new debate is started from there either.
+ *
+ * `us_states` (optional) narrows the United States by the state a person DECLARES at sign-up: the
+ * address lookup knows countries only, so a state rule is never IP evidence and is never `blocked`.
  *
  * A sealed register row like every policy value: changing a country is publishing a NEW version,
  * never an edit. The row is OPTIONAL: a register version that never published it has no country
@@ -21,6 +24,7 @@ export type CountryRule = Readonly<{ signup: boolean; pay: boolean; reason: Coun
 export type CountryPolicy = Readonly<{
   defaultRule: CountryRule;
   countries: Readonly<Record<string, CountryRule>>;
+  usStates: Readonly<Record<string, CountryRule>>;
   unknownIp: "REFUSE";
   tor: "REFUSE";
   sourceRef: string;
@@ -35,17 +39,24 @@ const ruleSchema = z.object({
 }).strict();
 /** ISO 3166-1 alpha-2, upper case; "XX" is the lookup's own "no country" and never a key. */
 const isoCountrySchema = z.string().regex(/^[A-Z]{2}$/u).refine((code) => code !== "XX");
+/** A state of the region picker's closed list (kernel region.ts). */
+const usStateSchema = z.string().refine((code) => US_STATE_CODES.includes(code));
 
 const countryPolicyValueSchema = z.object({
   kind: z.literal("COUNTRY_POLICY"),
   default_rule: ruleSchema,
   countries: z.record(isoCountrySchema, ruleSchema),
+  us_states: z.record(usStateSchema, ruleSchema).optional(),
   unknown_ip: z.literal("REFUSE"),
   tor: z.literal("REFUSE")
 }).strict().superRefine((value, context) => {
   const rules: ReadonlyArray<readonly [string, z.infer<typeof ruleSchema>]> = [
-    ["default_rule", value.default_rule], ...Object.entries(value.countries)
+    ["default_rule", value.default_rule], ...Object.entries(value.countries),
+    ...Object.entries(value.us_states ?? {}).map(([state, rule]) => [`US-${state}`, rule] as const)
   ];
+  for (const [state, rule] of Object.entries(value.us_states ?? {})) {
+    if (rule.blocked === true) context.addIssue({ code: "custom", message: `US-${state}: a state is never blocked` });
+  }
   for (const [where, rule] of rules) {
     if (rule.pay && !rule.signup) {
       context.addIssue({ code: "custom", message: `${where}: pay without sign-up` });
@@ -85,7 +96,13 @@ const PROVIDERS_REFUSE: RuleValue = Object.freeze({ signup: false, pay: false, r
  * Macau, Iran, Cuba, Syria, Venezuela and Vietnam as the AI providers' and the Terms' commercial
  * scope — Cuba and Iran deliberately NOT worded as compliance with US sanctions (the EU Blocking
  * Statute, spec §2.12 item 7). Every country not listed takes `default_rule`: closed.
+ * Since the owner's amendment of 8 October 2026, Tennessee is kept out by the Terms (section 2,
+ * Annex A.3): its HB 1891 may require an age check of every account wherever account holders
+ * publish (docs/legal-research, US state by state compliance). Every other state takes the US rule.
  */
+const US_STATE_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = Object.freeze([
+  [["TN"], EXCLUDED]
+]);
 const COUNTRY_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = Object.freeze([
   [["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT",
     "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "NO", "IS"], OFFERED],
@@ -100,13 +117,16 @@ const COUNTRY_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = O
 
 export const COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: COUNTRY_POLICY_ROW_KEY,
-  sourceRef: "Paid plans spec 2026-09-29 §1.5 country switches (owner decisions 29 September 2026, amended 1 and 2 October 2026):"
+  sourceRef: "Paid plans spec 2026-09-29 §1.5 country switches (owner decisions 29 September 2026, amended 1, 2 and 8 October 2026):"
     + " the Terms Annex A, sanctions and the AI providers' country lists",
   value: Object.freeze({
     kind: "COUNTRY_POLICY" as const,
     default_rule: NOT_YET,
     countries: Object.freeze(Object.fromEntries(
       COUNTRY_GROUPS.flatMap(([codes, rule]) => codes.map((code) => [code, rule] as const))
+    )),
+    us_states: Object.freeze(Object.fromEntries(
+      US_STATE_GROUPS.flatMap(([codes, rule]) => codes.map((code) => [code, rule] as const))
     )),
     unknown_ip: "REFUSE" as const,
     tor: "REFUSE" as const
@@ -127,6 +147,9 @@ export function countryPolicyFromValue(value: unknown, sourceRef: string): Count
     countries: Object.freeze(Object.fromEntries(
       Object.entries(parsed.data.countries).map(([code, rule]) => [code, ruleOf(rule)])
     )),
+    usStates: Object.freeze(Object.fromEntries(
+      Object.entries(parsed.data.us_states ?? {}).map(([code, rule]) => [code, ruleOf(rule)])
+    )),
     unknownIp: parsed.data.unknown_ip,
     tor: parsed.data.tor,
     sourceRef
@@ -137,6 +160,12 @@ export function countryPolicyFromValue(value: unknown, sourceRef: string): Count
 export function countryRule(policy: CountryPolicy, iso2: string): CountryRule {
   const code = typeof iso2 === "string" ? iso2.toUpperCase() : "";
   return Object.hasOwn(policy.countries, code) ? policy.countries[code]! : policy.defaultRule;
+}
+
+/** The rule for a declared region: a listed US state's own rule, else the country's. */
+export function declaredRegionRule(policy: CountryPolicy, region: DeclaredRegion): CountryRule {
+  const state = region.country.toUpperCase() === "US" ? region.usState : null;
+  return state !== null && Object.hasOwn(policy.usStates, state) ? policy.usStates[state]! : countryRule(policy, region.country);
 }
 
 /** The row IN FORCE at a register version, or null when that version never published one. */

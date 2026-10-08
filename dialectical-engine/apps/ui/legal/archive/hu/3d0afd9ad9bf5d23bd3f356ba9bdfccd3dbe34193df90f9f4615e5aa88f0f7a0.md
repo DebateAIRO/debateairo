@@ -1,0 +1,247 @@
+# DebateAI — Adatvédelmi szabályzat
+
+<!-- legal-chrome
+summaryTitle: Röviden
+eyebrow: ADATVÉDELMI SZABÁLYZAT · v3.0 · HATÁLYOS [DATE]
+title: Mit tárolunk és miért
+lede: Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.
+endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.0
+bodyLabel: Az Adatvédelmi szabályzat szövege
+annexTitle: B. melléklet — Regionális adatvédelmi feltételek
+jumps:
+01 ADATKEZELŐ
+02 MILYEN ADATOKAT GYŰJTÜNK
+04 JOGALAP
+05 MODELLEK ÉS ADATTOVÁBBÍTÁSOK
+06 KÖZZÉTÉTEL
+07 MEGŐRZÉS
+10 AZ ÖN GDPR-JOGAI
+13 SÜTIK
+-->
+
+**Version 3.0 · Effective \[date\] · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DebateAIRO S.R.L., Bukarest**
+
+**In short.** A fiók működéséhez szükséges és az Ön által megadni választott adatokat gyűjtjük. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk; azokat nem használják modellek betanítására. A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti az adataihoz tartozó kulcsokat, és eltávolítja közzétett vitáit. A privacy@dezbatere.ro címen érhet el bennünket, és a vitában megnevezett személyek fiók nélkül is kérhetik az eltávolítást.
+
+## 1. Ki felelős az Ön adataiért
+
+Az Ön személyes adatainak adatkezelője a **DebateAIRO S.R.L.**, \[address\], Bukarest, Románia, cégjegyzékszám: \[J40/…\], CUI: \[…\]. A szabályzattal kapcsolatos bármely ügyben írjon a **privacy@dezbatere.ro** címre; egy hónapon belül válaszolunk. Nem neveztünk ki adatvédelmi tisztviselőt, mert erre a jogszabály nem kötelez bennünket; ezt a címet \[role\] felügyeli. Ha egy adott országban képviselőt vagy adatvédelmi tisztviselőt neveztünk ki, a B. melléklet megnevezi őket.
+
+## 2. Milyen adatokat gyűjtünk, és honnan származnak
+
+Csak a fiók működéséhez szükséges, az Ön által önként megadott, valamint a jogszabály alapján megőrzendő adatokat gyűjtjük.
+
+| Kategória | Pontosan milyen adat | Forrás |
+| --- | --- | --- |
+| **Fiók** | E-mail-cím és helyreállítási e-mail-cím (titkosítva tárolva, kulcsolt indexszel, hogy a címet annak elolvasása nélkül is megtalálhassuk); jelszó (kivonatként tárolva, soha nem egyszerű szövegként); a kétfaktoros hitelesítés titka (titkosítva); tíz helyreállítási kód (kivonatként tárolva); az Ön álneve | Öntől és a szolgáltatástól, a regisztráció során |
+| **IP-cím országának ellenőrzése regisztrációnál és új vitánál** | Regisztrációnál az IP-cím országát és a Tor-kilépőpontokat helyben ellenőrizzük a DB-IP Lite és a Tor-lista alapján. Minden új vita előtt helyben ismét ellenőrizzük az IP-cím országát, és elutasítjuk a vitát, ha az ország a mindig tiltott országok listáján szerepel. Elutasítjuk a nem támogatott országokból, Tor-kilépőcímekről és olyan IP-címekről érkező regisztrációkat, amelyek országát nem tudjuk meghatározni; az IP-címet nem küldjük harmadik félnek. Az elutasításokat útvonal, kód, ország és időablak szerint összesítve rögzítjük; az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel. A bizonyíték típusa „IP-cím”. | Az Ön kapcsolata |
+| **Életkor-ellenőrzés** | Megadja születési dátumát, de azt nem tároljuk. Sikeres regisztrációnál a sikeres ellenőrzést rögzítjük; meglévő fióknál az eredmény sikeres vagy elutasított lehet. A bejegyzés tartalmazza az alsó korhatárt, az IP-cím országát, ha ismert, a szabály verzióját, az ellenőrzés körülményeit és időpontját | Ön és a regisztrációs rendszer |
+| **Bejelentett lakóhely** | A regisztrációnál kiválasztott lakóhely szerinti ország és az amerikai állam, ha az Egyesült Államokban él | Ön |
+| **Munkamenetek és biztonság** | Kivonatolt munkamenet-token; a böngésző user-agent karakterláncának kulcsolt kivonata, amellyel észlelhető, ha egy munkamenet másik böngészőbe kerül; a létrehozás, az utolsó használat és a lejárat időbélyege. A munkamenethez **nem** tároljuk az Ön IP-címét, eszköznevét vagy böngészőadatait, a Beállításokban látható munkamenetlista pedig kizárólag időbélyegeket mutat | Az Ön böngészőjéből |
+| **Biztonsági auditnapló** | A biztonsági szempontból releváns események — regisztráció, ellenőrzés, bejelentkezési kísérletek, helyreállítás, közzététel, törlés — csak hozzáfűzhető naplója. Az egyes események IP-címét és user-agent adatát csak egyirányú, kulcsolt kivonatként (Argon2id) tároljuk, így azok nem olvashatók vissza, de egy adott időszakon belül egyeztethetők. A bejelentkezési és helyreállítási kockázati jelzéseket 90 napig, titkosítva tároljuk | Az Ön böngészőjéből, az egyes események időpontjában |
+| **A vita tartalma** | Az Ön által beírt kérdés; az Ön által megadott irányító megjegyzések; a motor által létrehozott állítások, kritikák, bizonyítékhivatkozások, pontszámok és döntések; az egyes MI-szolgáltatók válaszainak szó szerinti nyilvántartása; visszakeresési lekérdezések és forráshivatkozások. Mindezt az Ön fiókjához tartozó egyedi kulccsal titkosítva tároljuk | Öntől és a kérdésén dolgozó MI-modellektől |
+| **Támogatás** | A támogatási asszisztenssel vagy egy személlyel váltott üzenetei, titkosítva tárolva; a használt nyelv; engedélyezte-e az asszisztensnek, hogy lássa vitái állapotát (a tartalmukat soha); az Ön értékelései. Ha egy üzenet visszaélés elleni ellenőrzést vált ki, megőrizzük az üzenet kivonatát és annak az IP-címnek a kivonatát, amelyről az érkezett | Öntől |
+| **Elfogadási és hozzájárulási nyilvántartások** | Az Ön által elfogadott Feltételek verziója és tartalmi kivonata, valamint az Önnek megjelenített szabályzat; az időpont; a használt képernyő és mechanizmus; az Ön nyelve; az adott pillanatbeli IP-címe és user-agent adata; minden megadott vagy visszavont hozzájárulás és annak időpontja | Az Ön böngészőjéből, a regisztrációkor és valahányszor megváltoztat egy választást |
+| **Fizetések** \[pending — once a paid plan exists\] | Csomag, ár, számlázási időszak, tranzakciós hivatkozások, adóügyi helyszín igazolása. A kártyaadatokat fizetési szolgáltatónk kezeli, mi soha | Öntől és a fizetési szolgáltatótól |
+| **Személyek, akik nem felhasználóink** | Más személyek személyes adatai, amelyeket Ön egy kérdésben megad, vagy amelyeket a motor a válaszadás során létrehoz. Kérjük, hogy ne tegyen ilyet; a 11. szakasz ismerteti, mit teszünk, ha ez mégis megtörténik | Közvetve Öntől |
+
+Regisztrációnál ellenőrizzük az IP-cím országát és az életkort. A születési dátumot kizárólag ellenőrzésre küldi el; nem tároljuk. Az IP-ellenőrzés helyben történik, harmadik félhez nem kerül a cím. Minden új vita előtt is helyben ellenőrizzük az IP-cím országát; a mindig tiltott országokból induló vitát elutasítjuk.
+
+**Nem** gyűjtünk analitikai vagy telemetriai adatokat arról, hogyan használja a terméket, és ilyen célból sütiket sem helyezünk el. Ha ez megváltozik, előbb ezt a szabályzatot és a Sütiszabályzatot módosítjuk, és az Ön döntését kérjük.
+
+## 3. Különleges adatok
+
+Egy vitamotor politikával, vallással, egészséggel, szexualitással és meggyőződéssel kapcsolatos kérdésekre ösztönöz. Ezek a GDPR 9. cikke szerinti különleges adatkategóriák, és attól függetlenül megjelenhetnek a kérdéseiben, hogy szándékunkban áll-e gyűjteni őket.
+
+**Önről.** Első vitája előtt, külön képernyőn adja meg kifejezett hozzájárulását ahhoz, hogy a saját kérdéseiben önként megadott különleges adatokat vitái futtatása céljából kezeljük. Rögzítjük a szöveg Ön által elfogadott verzióját, az Ön nyelvét és az időpontot. E hozzájárulás nélkül nem indíthat vitát. Ezt bármikor visszavonhatja a fiókja megszüntetésével. Az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát. Amit saját magáról közzétesz, olyan adat, amelyet Ön döntött úgy, hogy nyilvánosságra hoz.
+
+**Más személyekről.** Semmilyen jogi feltétel nem teszi lehetővé számunkra, hogy az Ön által egy kérdésben megnevezett harmadik személy különleges adatait kezeljük, és MI-szolgáltatóink egyike sem rendelkezik ilyen feltétellel. Ezért tiltják ezt a Feltételek, ezért minimalizáljuk az általunk továbbított adatokat, és ezért távolítjuk el kérésre gyorsan az ilyen tartalmat — lásd a 11. szakaszt.
+
+**Egészségügyi adatok.** Egyes országok külön jogszabályok alapján kezelik az egészséggel kapcsolatos adatokat, beleértve a következtetéseket is. Ha Ön \[the State of Washington\] területén él, külön \[Consumer Health Data Privacy Notice\] alkalmazandó.
+
+## 4. Miért és milyen jogalapon használjuk az Ön adatait
+
+Az alábbiakban minden célhoz megadjuk a GDPR 6. cikkének (1) bekezdése szerinti alkalmazandó jogalapokat. Az egyik célból gyűjtött adatokat nem használjuk fel másik célra.
+
+| Cél | Adat | Jogalap |
+| --- | --- | --- |
+| Fiókjának létrehozása és működtetése, az Ön hitelesítése, vitáinak futtatása és tárolása, hogy azokat újra megnyithassa és lejátszhassa | Fiók, munkamenetek, vitatartalom | **Szerződés** — Art. 6(1)(b) (a GDPR 6. cikke (1) bekezdésének b) pontja) |
+| Az IP-cím országának és Tor-státuszának ellenőrzése regisztrációnál a a nem támogatott országokból vagy ismeretlen országú IP-címekről érkező kérelmek elutasítására, valamint az IP országának ellenőrzése minden új vita előtt a mindig tiltott országok kizárására | IP-ellenőrzés és az elutasítás auditadatai | **Jogos érdek** — Art. 6(1)(f), biztonságos és jogszerű szolgáltatás; **jogi kötelezettség** — Art. 6(1)(c), ahol korlátozás érvényes |
+| Életkor ellenőrzése regisztrációnál és meglévő fióknál | Életkor-ellenőrzés eredménye; születési dátum csak az ellenőrzés idejére | **Szerződés** — Art. 6(1)(b); **jogos érdek** — Art. 6(1)(f), kiskorúak védelme |
+| Lakóhely szerinti fogyasztóvédelmi, adatvédelmi és adószabályok alkalmazása | Bejelentett ország és amerikai állam | **Szerződés** — Art. 6(1)(b); **jogi kötelezettség** — Art. 6(1)(c) |
+| Kérdésének és a motor állításainak továbbítása MI-szolgáltatókhoz vita létrehozása céljából | Vitatartalom | **Szerződés** — Art. 6(1)(b) (a GDPR 6. cikke (1) bekezdésének b) pontja) |
+| A szolgáltatás biztonságának fenntartása, visszaélések észlelése, annak lehetővé tétele, hogy észrevegye az Ön által nem kezdeményezett bejelentkezést, auditnapló vezetése | Munkamenetek, biztonsági auditnapló, támogatási visszaélési kivonatok | **Jogos érdekek** — Art. 6(1)(f) (a GDPR 6. cikke (1) bekezdésének f) pontja): a mi és az Ön érdeke a biztonságos szolgáltatáshoz. Ön tiltakozhat; lásd a 10. szakaszt |
+| Annak igazolása, hogy elfogadta a Feltételeket, és hozzájárulást adott vagy vont vissza | Elfogadási és hozzájárulási nyilvántartások | **Jogi kötelezettség** — Art. 6(1)(c) (a GDPR 6. cikke (1) bekezdésének c) pontja), a hozzájárulás Art. 7(1) (a GDPR 7. cikkének (1) bekezdése) szerinti igazolására vonatkozó kötelezettségünk — továbbá a szerződés igazolásához fűződő jogos érdekek |
+| Támogatási kérelmek megválaszolása | Támogatás | **Szerződés** — Art. 6(1)(b) (a GDPR 6. cikke (1) bekezdésének b) pontja) |
+| Az Ön által saját magáról megadott különleges adatok kezelése | Vitatartalom | **Kifejezett hozzájárulás** — Art. 9(2)(a) (a GDPR 9. cikke (2) bekezdésének a) pontja), első vitája előtt, külön képernyőn megadva |
+| Az Ön által közzétenni választott vita közzététele | Vitatartalom, álnév | **Szerződés** — Art. 6(1)(b) (a GDPR 6. cikke (1) bekezdésének b) pontja), az Ön utasítására; az Önre vonatkozó különleges adatok esetében Art. 9(2)(e) (a GDPR 9. cikke (2) bekezdésének e) pontja) — olyan adatok, amelyeket Ön egyértelműen nyilvánosságra hozott |
+| Termékhírek küldése Önnek | E-mail-cím | **Hozzájárulás** — Art. 6(1)(a) (a GDPR 6. cikke (1) bekezdésének a) pontja), alapértelmezetten üres jelölőnégyzet; bármely e-mailből vagy a Beállításokban bármikor visszavonható |
+| Adózási, számviteli és jogi kötelezettségek teljesítése \[pending paid plans\] | Fizetések, elfogadási nyilvántartások | **Jogi kötelezettség** — Art. 6(1)(c) (a GDPR 6. cikke (1) bekezdésének c) pontja) |
+| Jogi megkeresések, jogellenes tartalomról szóló bejelentések és tárhelyszolgáltatói kötelezettségeink kezelése | A megkeresés szempontjából releváns adatok | **Jogi kötelezettség** — Art. 6(1)(c) (a GDPR 6. cikke (1) bekezdésének c) pontja) — és jogos érdekek |
+
+Nem alkotunk profilt Önről, nem használjuk adatait reklámozásra, és nem értékesítjük azokat. Tartalmát nem használjuk modellek betanítására, és ezt szolgáltatóinknak sem engedélyezzük — lásd az 5. szakaszt.
+
+## 5. MI-szolgáltatók és nemzetközi adattovábbítások
+
+**Mit továbbítunk.** Egy vita futtatásához szöveget küldünk egy vagy több külső MI-szolgáltatónak: az Ön kérdését, az Ön által megadott irányító megjegyzéseket és a motor által a vita alakulása során összeállított állításokat. A szolgáltató tehát az Ön által beírt szövegből származó és aköré épített szöveget lát. Ha Ön az ügyfélszolgálati csevegést használja, az ott beírt szöveget az ügyfélszolgálati csevegés modellje kapja meg. A szolgáltató soha nem kapja meg az Ön e-mail-címét, fiók- vagy munkamenet-azonosítóit, IP-címét vagy fizetési adatait.
+
+**Mely szolgáltatók.** Ezeket a szabályzat részét képező **MI-szolgáltatói Nyilvántartásunk** sorolja fel itt: \[dezbatere.ro/providers\]. A Nyilvántartás minden felhasználóra vonatkozik, bárhol éljen is. Minden szolgáltatónál feltünteti annak jogi személyét és letelepedési országát; hogy mit és milyen célból kap meg — a vita érveinek megírása, azok elbírálása és ellenőrzése, az ítélet történetének megírása vagy az Önnek adott válasz az ügyfélszolgálati csevegésben; az adatkezelés országait vagy régióit; megőrzési feltételeit, továbbá azt, hogy aktív-e a zéró adatmegőrzés az általunk használt végpont és funkciók esetében; hogy szerződésünk alapján használhat-e bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; azt, hogy az adatait érintő ügyekben hogyan veheti fel vele a kapcsolatot; valamint az egyes bejegyzések utolsó ellenőrzésének dátumát. A szolgáltatók változhatnak; a Nyilvántartás verziózott, és a változást ott jelezzük.
+
+**A betanítás és a megőrzés különböző dolgok.** A szolgáltatókkal kötött szerződéseink kizárják, hogy az Ön tartalmát modelljeik betanítására vagy fejlesztésére használják. \[Publish only once verified per route.\] Egyes szolgáltatók biztonsági, visszaélés-megelőzési vagy saját jogi kötelezettségeik miatt korlátozott ideig megőrzik a promptokat és válaszokat; a Nyilvántartás közli, hogy meddig és miért. Ahol zéró adatmegőrzés aktív, a Nyilvántartás ezt és az érintett funkciókat is feltünteti. A tartalmat nem minősítjük meg nem őrzöttnek, ha ez nem igaz.
+
+**Az EGT-n kívüli adattovábbítások.** Az Egyesült Államokban letelepedett szolgáltatók a GDPR V. fejezetében meghatározott mechanizmusok egyike alapján kapnak adatokat: az EU–USA adatvédelmi keret alapján, ha a konkrét szerződő jogalany erre az adatra tanúsítással rendelkezik, vagy az Európai Bizottság általános szerződési feltételei (második modul, adatkezelőtől adatfeldolgozóhoz) alapján, adattovábbítási kockázatértékeléssel és kiegészítő intézkedésekkel alátámasztva. A Nyilvántartás minden szolgáltató esetében megnevezi a mechanizmust. Az általunk alkalmazott kikötések másolatát a privacy@dezbatere.ro címre írva kérheti. Ha egy általunk alkalmazott mechanizmust érvénytelenítenek, az adattovábbítás folytatása előtt másikra váltunk, és erről tájékoztatjuk Önt.
+
+**További címzettek.** Tárhelyszolgáltatónk \[Hetzner, Germany — region …\]; tartalomkézbesítési és átviteli szolgáltatónk \[Cloudflare\]; e-mail-továbbítónk \[…\]; \[our payment provider, once a paid plan exists\]. Mindegyik dokumentált utasításaink alapján jár el, a 28. cikkben előírt garanciákat tartalmazó adatfeldolgozási megállapodás szerint, és mindegyik szerepel a Nyilvántartásban a helyével és adattovábbítási mechanizmusával együtt. Egyetlen adatfeldolgozónak sem engedjük, hogy az Ön adatait saját céljaira használja. Ha egy szolgáltató ezt tenné, önálló adatkezelő lenne, és nem küldjük el neki az Ön adatait.
+
+**Hatóságok.** Személyes adatokat bíróságokkal, szabályozó vagy bűnüldöző hatóságokkal akkor közlünk, ha ezt a jog előírja, és erről tájékoztatjuk Önt, kivéve, ha ezt a jog tiltja.
+
+## 6. Közzététel és láthatóság
+
+A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. A közzététel szándékos, külön megerősítést igénylő művelet. Egy közzétett vita megjeleníti az Ön **álnevét**, az Ön által megfogalmazott kérdést, az érvelési fát, a pontszámokat, a döntést és a megbízhatósági sávot, továbbá látható címkével jelzi, hogy a tartalmat MI hozta létre. Soha nem jeleníti meg e-mail-címét, munkamenet-nyilvántartásait vagy fiókelőzményeit. A keresőmotorok indexelhetik a közzétett vitákat.
+
+A közzététel visszavonása eltávolítja a vitát a DebateAI felületéről, és megsemmisíti a nyilvános példányunk kulcsát. Az olvasók, keresőmotorok vagy archívumok által már elkészített másolatok nem állnak ellenőrzésünk alatt, és nem tudjuk azokat visszahívni.
+
+Fiókja törlésekor az Ön által közzétett minden vitát indokolatlan késedelem nélkül, de legfeljebb 30 napon belül eltávolítunk a nyilvános hozzáférésből, kivéve, ha a jogszabály egy konkrét elem megőrzésére kötelez bennünket. \[Option B — a product change; see the Terms, section 9.\]
+
+## 7. Mennyi ideig őrizzük meg az adatokat
+
+| Adat | Megőrzési idő | Ezt követően |
+| --- | --- | --- |
+| Fiók | A fiók fennállásáig, majd a megszüntetési kérelem után 7 napos türelmi időn át | A kulcsokat megsemmisítjük; a rekordot töröljük |
+| Életkor-ellenőrzés eredménye és körülményei | A fiók fennállásáig | A fiókkal együtt törlődik |
+| Bejelentett lakóhely szerinti ország és amerikai állam | A fiók fennállásáig | A fiókkal együtt törlődik |
+| Munkamenet-nyilvántartások | Az utolsó használattól számított 14 napig vagy a létrehozástól számított 90 napig, amelyik hamarabb bekövetkezik | Töröljük |
+| E-mail-ellenőrző hivatkozások | 24 óráig | Töröljük |
+| Bejelentkezési és helyreállítási kockázati jelzések | 90 napig, az adatbázis által kikényszerítve | Véglegesen eltávolítjuk |
+| Biztonsági auditnapló | A szolgáltatás teljes élettartamáig | Csak hozzáfűzhető; az IP-cím és a user-agent egyirányú kivonat, és nem olvasható vissza |
+| IP-cím országa szerinti elutasítás auditbejegyzése | A szolgáltatás teljes élettartama alatt | Csak hozzáfűzhető; rögzíti az útvonalat, az elutasítás kódját, az országot, az időablakot és az „IP-cím” bizonyítéktípust; az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel |
+| Nyers IP-cím a regisztrációs vagy új vita előtti országellenőrzéshez | Csak az adott kérés ideje alatt | Az ellenőrzés nem tárol olvasható IP-címet; az elutasítás auditjában az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel, az IP országa pedig az életkor-ellenőrzésben szerepelhet |
+| Vitatartalom (magánjellegű) | A fiók fennállásáig | Megszüntetéskor megsemmisítjük a kulcsokat, így a tartalom olvashatatlanná válik |
+| Vitatartalom (közzétett) | A közzététel és a fiók fennállásáig | A közzététel visszavonásakor vagy megszüntetéskor eltávolítjuk a nyilvános hozzáférésből; a kulcsokat megsemmisítjük |
+| Szolgáltatói válasznyilvántartások és visszakeresési hivatkozások | Ugyanaddig, mint a vita, amelyhez tartoznak | Ugyanaz |
+| Támogatási beszélgetések és ügyek | \[Until closed plus 12 months\] | A kulcsokat megsemmisítjük |
+| Elfogadási és hozzájárulási nyilvántartások | A fiók élettartama plusz 6 év — a ránk alkalmazandó leghosszabb elévülési idő | Töröljük |
+| Fizetési nyilvántartások \[pending\] | 10 évig, a román számviteli jogszabályok előírása szerint | Töröljük |
+| Biztonsági mentések \[pending\] | \[… days\] az élő példány törlése után | Felülírjuk |
+
+**Mit tesz valójában a törlés.** Vitáit és fiókadatait a fiókjára és minden egyes vitára jellemző kulcsokkal titkosítjuk. Fiókja törlése megsemmisíti ezeket a kulcsokat, ami után a titkosított rekordokat sem mi, sem más nem tudja elolvasni, továbbá töröljük fiókrekordját. Ezt azért nevezzük törlésnek, mert ez a hatása, és ezt dokumentált értékeléssel támasztjuk alá; ha többet szeretne tudni, kérdezzen bennünket. Három dolgot fontos tudni: a biztonsági auditnapló csak hozzáfűzhető és nem törlődik, de nem tartalmaz Önről olvasható azonosítókat; néhány régebbi vita a jelenlegi titkosítási rendszerünk előtti időből származik, és ha ez az Ön fiókjára vonatkozik, közöljük, hogy a megszüntetés mit eredményez náluk; továbbá a már MI-szolgáltatónak küldött adatmásolatokra az adott szolgáltató Nyilvántartásban szereplő megőrzési feltételei vonatkoznak, nem a mi törlésünk.
+
+&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
+
+## 8. Automatizált döntések és profilalkotás
+
+A vitában szereplő pontszámok, feltételjelölések és döntések **érvek, nem személyek** automatizált értékelései. Nem járnak Önre nézve joghatással, és hasonlóan jelentős hatást sem gyakorolnak Önre. Nem hozunk Önről kizárólag automatizált adatkezelésen alapuló, joghatással vagy hasonlóan jelentős hatással járó döntést, és nem alkotunk profilt Önről.
+
+Ha valaha automatizálunk egy, az Ön fiókjára vonatkozó döntést — annak felfüggesztését vagy egy vita közzétételének megtagadását —, az ilyen döntést egy személy annak hatálybalépése előtt vagy az Ön kérésére felülvizsgálja, Ön kifejtheti álláspontját, és megtámadhatja a döntést. A Feltételek ismertetik ennek módját.
+
+## 9. Biztonság, és mi történik, ha valami baj történik
+
+A jelszavakat Argon2id használatával kivonatoljuk. A kétfaktoros hitelesítés kötelező. E-mail-címét, vitáit, támogatási beszélgetéseit és hitelesítési titkait nyugalmi állapotban, a fiókjára jellemző kulcsokkal titkosítjuk, a közzétett viták kulcsait pedig a magánjellegű viták kulcsaitól elkülönítve tároljuk. Az üzemi adatokhoz való hozzáférést naplózzuk. Biztonsági naplónkban az IP-címeket és a böngészőadatokat csak egyirányú kivonatként tároljuk.
+
+Ha személyesadat-sértés történik, a román felügyeleti hatóságot 72 órán belül értesítjük, amikor ezt a jogszabály előírja, Önt pedig közvetlenül, indokolatlan késedelem nélkül tájékoztatjuk, ha a jogsértés valószínűsíthetően magas kockázattal jár jogaira és szabadságaira nézve. A B. melléklet felsorolja az általunk kiszolgált más régiókban alkalmazandó értesítési szabályokat.
+
+## 10. Az Ön jogai és gyakorlásuk módja
+
+E jogok bármelyikét díjmentesen gyakorolhatja, ha a **privacy@dezbatere.ro** címre ír, vagy a **Beállítások → Adatvédelem** menüpontban, ahol rendelkezésre áll ilyen vezérlő. Egy hónapon belül válaszolunk; összetett kérelem esetén további legfeljebb két hónapra lehet szükségünk, aminek okáról tájékoztatjuk Önt. Megkérhetjük arra, hogy fiókján keresztül erősítse meg személyazonosságát.
+
+| Jog | Mit jelent itt |
+| --- | --- |
+| **Hozzáférés** (Art. 15; a GDPR 15. cikke) | Az Önről tárolt személyes adatok és ezen információk másolata. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Helyesbítés** (Art. 16; a GDPR 16. cikke) | E-mail- vagy helyreállítási e-mail-címének helyesbítése a Beállításokban. Álneve a Feltételekben ismertetett okokból nem módosítható; megszüntetheti a fiókot, és újat nyithat |
+| **Törlés** (Art. 17; a GDPR 17. cikke) | Magánjellegű vita bármikori törlése a vita oldaláról. Fiókja megszüntetése a Beállításokból; a 7. szakasz pontosan ismerteti ennek hatását. Kérheti tőlünk az Ön adatait tartalmazó közzétett vita eltávolítását, függetlenül attól, hogy Ön-e a szerző |
+| **Az adatkezelés korlátozása** (Art. 18; a GDPR 18. cikke) | Kérheti, hogy állítsuk le meghatározott adatok kezelését, amíg az azokkal kapcsolatos vita rendeződik |
+| **Tiltakozás** (Art. 21; a GDPR 21. cikke) | Tiltakozhat a jogos érdeken alapuló adatkezelés — a 4. szakasz szerinti biztonsági és auditcélú adatkezelés — ellen, és azt leállítjuk, kivéve, ha kényszerítő erejű okokat tudunk igazolni. A marketing ellen bármikor tiltakozhat, és azt leállítjuk |
+| **Adathordozhatóság** (Art. 20; a GDPR 20. cikke) | Vitái és fiókadatai széles körben használt, géppel olvasható formátumban. \[Pending: same export as Access.\] Az Ön által létrehozott nem személyes tartalmat, például kérdéseit, a szerződés megszűnésekor kérésére visszaadjuk Önnek |
+| **Hozzájárulás visszavonása** (Art. 7(3); a GDPR 7. cikkének (3) bekezdése) | A marketing-hozzájárulás visszavonása bármely e-mailből vagy a Beállításokban; a különleges adatokra vonatkozó hozzájárulás visszavonása a fiók megszüntetésével (az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát). A visszavonás nem érinti a már megtörtént adatkezelést |
+| **Panasztétel** | A román felügyeleti hatóságnál, az **ANSPDCP**-nél, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, <anspdcp@dataprotection.ro>, vagy a lakóhelye szerinti ország hatóságánál. Örömmel vennénk, ha először bennünket keresne meg |
+
+Soha nem számítunk fel díjat egy kérelemért, és nem részesítjük Önt kedvezőtlenebb bánásmódban azért, mert kérelmet nyújtott be.
+
+## 11. Vitákban megnevezett személyek, akik nem felhasználóink
+
+Ha valaki olyan kérdést tesz fel a DebateAI-nak, amelyben Önt megnevezi, akkor is kezelhetünk Önről személyes adatokat, ha Ön soha nem használta a szolgáltatást. A Feltételek tiltják, hogy a felhasználók ezt tegyék, és minimalizáljuk az MI-szolgáltatóknak továbbított adatokat, de ez megtörténhet.
+
+Ez a szakasz a GDPR 14. cikke alapján Önnek nyújtandó tájékoztatás. Az adat mindaz, amit a felhasználó beírt, és amit a motor válaszként létrehozott; a forrás ez a felhasználó; a célok és a jogalap a 4. szakaszban szerepelnek; a címzettek a Nyilvántartásban feltüntetett MI-szolgáltatók; a megőrzés a 7. szakaszt követi. A 10. szakaszban szereplő valamennyi jog megilleti Önt, és különösen kérheti, hogy távolítsunk el egy közzétett vagy az Ön adatait tartalmazó magánjellegű vitát, és közöljük, milyen adatokat tárolunk. Ehhez nincs szüksége fiókra. Írjon a **privacy@dezbatere.ro** címre, vagy használja bármely közzétett vitán a **Jelentés** vezérlőt; a megalapozott kérelmekre indokolatlan késedelem nélkül intézkedünk. Ilyen esetben nem tudjuk Önt egyénileg értesíteni, mert nem tudjuk, ki Ön, és hogyan érhetjük el; ehelyett ezt a nyilvános tájékoztatást és az eltávolítási lehetőséget biztosítjuk.
+
+Ugyanez vonatkozik az Önre vonatkozó különleges adatokra — politikai véleményre, egészségre, vallásra —, amelyek más személy kérdésében jelennek meg. Semmilyen jogi feltétel nem teszi lehetővé, hogy tiltakozása után tovább kezeljük őket, és ezt nem is tesszük.
+
+## 12. Gyermekek
+
+A DebateAI felnőtteknek készült. Regisztrációkor megerősíti, hogy betöltötte a 18. életévét, és tudatosan nem kezeljük 18 éven aluli személyek adatait. Ha tudomást szerzünk arról, hogy egy fiók 18 éven aluli személyhez tartozik, megszüntetjük azt, és a 7. szakaszban leírtak szerint töröljük az adatokat. Egyes országok a megerősítést elégtelennek tekintik, vagy többet követelnek; a B. melléklet közli, hol mi alkalmazandó, a Feltételek pedig ismertetik, mit teszünk ezzel kapcsolatban.
+
+## 13. Sütik
+
+A DebateAI nyolc elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a DebateAI helyezi el: négy sütit és négy bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A \[dezbatere.ro/cookies\] címen található **Sütiszabályzat** felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog.
+
+| Név | Típus | Cél | Élettartam |
+|---|---|---|---|
+| `__Host-debateai-session` | Süti (HttpOnly) | Bejelentkezve tartja Önt. A szolgáltatás használata közben folyamatosan megújul. | 14 nap |
+| `__Host-debateai-csrf` | Süti | Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. | 14 nap |
+| `__Host-debateai-age-refusal` | Süti (HttpOnly) | Elutasított életkor-ellenőrzés után 30 napig megakadályozza, hogy ez a böngésző újra próbálkozzon. Csak az „elutasítva” szót tartalmazza, személyes adatot nem. | 30 nap |
+| `debateai.locale` | Süti | Megjegyzi, milyen nyelvű felületet választott. | 1 év |
+| `debateai.consent` | Helyi tárhely | Megjegyzi, hogy Ön már látta a sütikről szóló értesítést, így az csak egyszer jelenik meg. | Amíg Ön nem törli |
+| `debateai.mode` | Helyi tárhely | Megjegyzi, hogy a világos vagy a sötét módot használja. | Amíg Ön nem törli |
+| `debateai.languageOffer.dismissed` | Munkamenet-tárhely | Megjegyzi ennél a lapnál, hogy Ön elutasította az ajánlatot, hogy egy vitát más nyelven mutassunk meg. | Amíg be nem zárja a lapot |
+| `debateai.support.conversation.v2` | Munkamenet-tárhely | A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. | Amíg be nem zárja a lapot |
+
+Semmilyen más fél nem gyűjt a DebateAI-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően.
+
+A böngészők küldhetnek „Do Not Track” jelzést vagy hasonló jelzést. A DebateAI nem követi Önt, így egy ilyen jelzésnek nincs mit kikapcsolnia: a szolgáltatás a jelzéssel és anélkül is ugyanúgy működik.
+
+Ha el szeretné utasítani ezeket az elemeket, böngészője beállításaiban tiltsa le vagy törölje ennek az oldalnak a sütijeit és webhelyadatait. Ami ezután nem működik: a bejelentkezés, valamint a nyelv- és megjelenítési választásának megjegyzése; a sütikről szóló tájékoztatás is ismét megjelenik.
+
+## 14. A szabályzat módosításai
+
+Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a \[dezbatere.ro/privacy/versions\] címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot.
+
+Ezt a szabályzatot legutóbb \[date\] napján frissítettük. A 3.0-s verzió a 2.1-es verzió helyébe lépett, amely a munkamenetadatokat, a megőrzési időket, az analitikát, az exportálást és a törlés közzétett vitákra gyakorolt hatását már nem a szolgáltatásnak megfelelő módon írta le.
+
+## Annex B — Regionális adatvédelmi feltételek
+
+Minden bejegyzés csak akkor alkalmazandó, ha régiója szerepel a Feltételek 2. szakaszában, és kizárólag azt közli, ami eltér e szabályzat törzsszövegétől.
+
+### B.1 Európai Unió és Európai Gazdasági Térség
+
+E szabályzat törzsszövege Önnek szól. Felügyeleti hatóságunk a román **ANSPDCP**; Ön a lakóhelye szerinti ország hatóságánál is panaszt tehet. Román felhasználók: ez a szabályzat románul is elérhető itt: \[URL\].
+
+### B.2 Egyesült Királyság *(csak ha fel van sorolva)*
+
+Az Egyesült Királyságban az UK GDPR 27. cikke szerinti képviselőnk **\[name, address, email\]**; a szabályzattal kapcsolatos bármely ügyben kapcsolatba léphet vele. A felügyeleti hatóság az **Information Commissioner's Office**, [ico.org.uk](https://ico.org.uk). Ha panaszt kíván tenni nálunk, írjon a privacy@dezbatere.ro címre; panaszát 30 napon belül visszaigazoljuk. Adatainak az Egyesült Királyságból az Egyesült Államokbeli MI-szolgáltatókhoz továbbítása, ha a szolgáltató tanúsítvánnyal rendelkezik, az EU–USA adatvédelmi keretrendszer egyesült királysági kiterjesztésén (UK Extension to the EU–US Data Privacy Framework), egyébként az uniós általános adatvédelmi kikötésekhez fűzött egyesült királysági nemzetközi adattovábbítási kiegészítésen (UK International Data Transfer Addendum) alapul, adattovábbítási kockázatértékeléssel alátámasztva; a Nyilvántartás szolgáltatónként megnevezi az alkalmazott eszközt. A személyesadat-sértést, ha a jogszabály előírja, 72 órán belül bejelentjük az ICO-nak, és ha az Önre nézve magas kockázattal jár, indokolatlan késedelem nélkül tájékoztatjuk Önt. Ha valaha analitikai sütiket helyeznénk el, az Egyesült Királyságban azok hozzájárulás helyett leiratkozás tárgyát képeznék; jelenleg egyet sem helyezünk el. Ha 18 éven aluli, és életkori szabályunk ellenére hozzáfér a szolgáltatáshoz, az ICO Gyermekekre vonatkozó Kódexének normái alkalmazandók arra, hogyan kezeljük adatait.
+
+### B.3 Egyesült Államok *(csak ha fel van sorolva)*
+
+**Tájékoztatás az adatgyűjtéskor.** A 2. szakasz táblázata az általunk gyűjtött személyes adatok kategóriáit és forrásait sorolja fel; az adatkezelés céljait a 4., a megőrzési időket a 7. szakasz tartalmazza. A *különleges* személyes adatok következő kategóriáit csak akkor gyűjtjük, ha Ön a saját magára vonatkozó kérdéseiben megadja őket: egészségi állapot, vallási vagy világnézeti meggyőződés, szexuális élet vagy szexuális irányultság, politikai vélemény, szakszervezeti tagság, valamint faji vagy etnikai származás. Ezeket kizárólag vitái futtatására használjuk fel, és csak a 3. szakaszban leírt külön hozzájárulás után. **Nem értékesítünk és nem osztunk meg személyes adatokat, és az előző tizenkét hónapban sem tettünk ilyet.** Személyes adatokat nem használunk célzott hirdetésre, különleges személyes adatokat pedig nem használunk az Ön által kért szolgáltatás nyújtásán túli célra. **Leiratkozási preferenciajelzések:** Mivel jelenleg nem értékesítünk és nem osztunk meg személyes adatokat, továbbá nem használjuk őket célzott hirdetésre, nincs miről leiratkozni. Ha valaha értékesíteni vagy megosztani kezdjük őket, a Global Privacy Control jelzéseit leiratkozási kérelemként fogjuk tiszteletben tartani. **Az Ön jogai:** a megismeréshez, törléshez, helyesbítéshez, leiratkozáshoz, a különleges személyes adatok felhasználásának korlátozásához való jog, valamint az, hogy e jogok gyakorlása miatt ne érje hátrányos megkülönböztetés; kérelmet a privacy@dezbatere.ro címen nyújthat be. **Pénzügyi ösztönzők:** nem kínálunk ilyeneket; adatkezelési céljaink és garanciáink az ingyenes és a fizetős csomagokban azonosak. A **megőrzés** szabályait a 7. szakasz tartalmazza. **Incidensek:** az egyes államok adatvédelmi incidensekre vonatkozó jogszabályai szerint értesítjük az érintett lakosokat és az állami hatóságokat. E tájékoztatást legalább tizenkét havonta frissítjük; utoljára frissítve: \[date\].
+
+*Connecticut:* különleges adatokat csak az Ön kifejezett, előzetes (opt-in) hozzájárulásával kezelünk, amelyet első vitája előtt a külön képernyőn ad meg (3. szakasz); személyes adatait nem használjuk MI-modellek betanítására. *Washington:* a \[URL\] címen található **Fogyasztói egészségügyi adatokra vonatkozó adatvédelmi tájékoztatónk** külön dokumentum, amely minden egészséggel kapcsolatos információra, beleértve a következtetéseket is, alkalmazandó. *Texas és Nebraska:* nem értékesítünk különleges személyes adatokat. *Colorado, Connecticut, Virginia és más, átfogó adatvédelmi jogszabályokkal rendelkező államok:* a fenti jogok megilletik Önt, ahol a jogszabály ránk alkalmazandó. Ha egy kérelmet elutasítunk, válaszunkra a privacy@dezbatere.ro címen válaszolva fellebbezhet; ha a fellebbezést is elutasítjuk, államának főügyészéhez (Attorney General) fordulhat.
+
+### B.4 Kanada és Québec *(csak ha fel van sorolva)*
+
+Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: **\[name\]**, privacy@dezbatere.ro. A kérelmekre 30 napon belül válaszolunk. Továbbra is felelősek maradunk a Kanadán kívüli MI-szolgáltatóknak továbbított személyes adatokért, és szerződésekben követelünk meg összehasonlítható védelmet; ezekre a szolgáltatókra a működési országuk jogszabályai vonatkozhatnak, beleértve a hatóságok jogszerű hozzáférését. Marketing e-mailt kizárólag az Ön CASL szerinti kifejezett hozzájárulásával küldünk. A biztonsági intézkedések olyan megsértését, amely valós kockázatát jelenti annak, hogy Önt jelentős kár éri, bejelentjük az **Office of the Privacy Commissioner of Canada** hivatalnak és Önnek, és minden ilyen esetről 24 hónapig nyilvántartást vezetünk. **Québec:** személyes adatok Québecen kívüli közlése előtt adatvédelmi hatásvizsgálatot végzünk; a súlyos kár kockázatával járó titoktartási incidenst bejelentjük a **Commission d'accès à l'information** szervnek és Önnek, és az incidensekről nyilvántartást vezetünk; a vitáit magánjellegűként megőrző beállítások alapértelmezés szerint be vannak kapcsolva; kérheti, hogy szüntessük meg az Önre vonatkozó személyes adatok indexelését vagy terjesztését; adatait strukturált, széles körben használt formátumban kérheti; a 8. szakasz ismerteti automatizált adatkezelésünket.
+
+### B.5 Ausztrália és Új-Zéland *(csak ha fel van sorolva)*
+
+**Ausztrália.** Személyes adatainak tengerentúli címzettjei a Nyilvántartásban felsorolt MI-szolgáltatók és adatfeldolgozók, amelyek \[the United States and the European Union\] területén találhatók; észszerű lépéseket teszünk annak biztosítására, hogy azokat az ausztrál adatvédelmi alapelvekkel összhangban kezeljék. **Automatizált döntések:** 2026. december 10-től ez a szabályzat azonosítja a számítógépes programok által hozott, az Ön jogait vagy érdekeit jelentősen érintő döntések típusait — ilyenek nincsenek; a pontszámok és döntések az érvekre, nem Önre vonatkoznak —, valamint az ezekhez felhasznált személyes adatokat. Panasz az **Office of the Australian Information Commissioner** hivatalánál tehető. **Új-Zéland.** Adatvédelmi tisztviselőnk \[name\]. Ha Önről közvetve gyűjtünk személyes adatokat — mert egy másik felhasználó belefoglalta azokat egy kérdésbe —, ez a szabályzat és a 11. szakasz az általunk nyújtott tájékoztatás. A Nyilvántartásban szereplő MI-szolgáltatóknak ügynökeinkként, összehasonlítható garanciákat előíró szerződések alapján továbbítunk adatokat. Panasz az **Office of the Privacy Commissioner** hivatalánál tehető.
+
+### B.6 Svájc *(csak ha fel van sorolva)*
+
+A svájci szövetségi adatvédelmi törvény (FADP) alkalmazandó. A felügyeleti hatóság a **Federal Data Protection and Information Commissioner** (FDPIC), [edoeb.admin.ch](https://www.edoeb.admin.ch). Adatai a Nyilvántartásban megnevezett országokba kerülnek: uniós országokba és az Egyesült Államokba. Az Egyesült Államok esetében, ha a szolgáltató tanúsítvánnyal rendelkezik, a svájci–amerikai adatvédelmi keretrendszerre (Swiss–US Data Privacy Framework), egyébként az FDPIC által elismert általános adatvédelmi kikötésekre támaszkodunk. Az olyan adatvédelmi incidenst, amely valószínűleg magas kockázattal jár Önre nézve, a lehető leghamarabb bejelentjük az FDPIC-nek. Felmérésünk szerint nincs szükségünk svájci képviselőre (Art. 14 FADP). Ezt évente felülvizsgáljuk.
+
+### B.7 Moldova *(csak ha fel van sorolva)*
+
+Moldova személyes adatok védelméről szóló 195/2024. számú törvénye alkalmazandó. A törvény a GDPR-t követi, és e szabályzat törzsszövege ismerteti az abból eredő jogait. A felügyeleti hatóság a **National Center for Personal Data Protection** (CNPDCP). Nincs szükségünk moldovai képviselőre, mivel az Európai Gazdasági Térségben letelepedett vállalkozás vagyunk (195/2024. számú törvény, Art. 27(2)(c)). Ezt évente felülvizsgáljuk. Adatainak az Egyesült Államokba történő továbbítása a Nyilvántartásban az egyes szolgáltatóknál megnevezett mechanizmus alapján történik. A személyesadat-sértést, ha a jogszabály előírja, 72 órán belül bejelentjük a CNPDCP-nek.
+
+### B.8 Ukrajna *(csak ha fel van sorolva)*
+
+Ukrajna „A személyes adatok védelméről” szóló törvénye alkalmazandó. A DebateAI szolgáltatást nem kínáljuk Ukrajna azon területein, amelyek nem állnak a kormánya ellenőrzése alatt. Adatai uniós országokba és az Egyesült Államokba kerülnek (lásd a Nyilvántartást). Panaszt az **Ukrainian Parliament Commissioner for Human Rights** hivatalánál tehet.
+
+### B.9 Izrael *(csak ha fel van sorolva)*
+
+Izrael magánszféra védelméről szóló törvénye (Protection of Privacy Law) alkalmazandó. Az adatkezelő a DebateAIRO S.R.L.; elérhetőségeinket az 1. szakasz tartalmazza. Önt nem terheli jogi kötelezettség arra, hogy adatait megadja nekünk; a fiókadatok nélkül azonban nem tudunk fiókot nyitni Önnek. Adatait a 4. szakaszban foglalt célokra használjuk, és az 5. szakaszban felsorolt címzetteknek adjuk át. Kérheti, hogy megtekinthesse és helyesbíthesse őket (10. szakasz). A felügyeleti hatóság a **Privacy Protection Authority**.
+
+### B.10 Ázsia és a csendes-óceáni térség *(csak a felsorolt régiók sorai)*
+
+*Szingapúr:* adatvédelmi tisztviselőnk **\[name, email\]**; az adattovábbítások a PDPA-val összehasonlítható védelmet biztosító szerződéses kötelezettségeken alapulnak; a bejelentendő incidensekről 3 napon belül értesítjük a PDPC-t. *Japán:* személyes adatait a 4. szakaszban foglalt célokra használjuk, másra nem. Azokat a Nyilvántartásban szereplő, az Egyesült Államokban és uniós országokban található MI-szolgáltatóknak és tárhelyszolgáltatóknak adjuk át olyan szerződések alapján, amelyek előírják számukra, hogy az adatokat a japán személyesinformáció-védelmi törvény (Act on the Protection of Personal Information) szintjén védjék; kérésre tájékoztatjuk arról, mit tesznek az adatok védelmében, és országuk adatvédelmi rendszeréről. Meggyőződése, ideértve vallási és politikai meggyőződését, valamint egészségi állapota különös gondosságot igénylő személyes információnak minősül; ezeket csak az Ön előzetes hozzájárulásával gyűjtjük (3. szakasz). Nevünk és címünk: DebateAIRO S.R.L., \[address\], Románia; képviselőnk \[name\], ügyvezető; a kérelem benyújtásának módját a 10. szakasz, biztonsági intézkedéseinket a 9. szakasz ismerteti, panaszát pedig a privacy@dezbatere.ro címre küldheti. Az incidenseket a törvény előírásai szerint jelentjük a Personal Information Protection Commissionnek. *Dél-Korea:* adatvédelmi tisztviselőnk **\[name\]**, ügyvezető, privacy@dezbatere.ro. Személyes adatokat azért továbbítunk külföldre, mert vitái futtatása az Önnel kötött szerződésünk alapján ezt megköveteli: minden vita futtatásakor az Ön kérdését és a vita állításait, a támogatási csevegésben pedig üzeneteit titkosított kapcsolaton keresztül elküldjük a Nyilvántartásban szereplő MI-szolgáltatóknak és tárhelyszolgáltatóknak; a Nyilvántartás minden címzettnél megnevezi annak országát, elérhetőségét, az adatkezelés célját és az adatok megőrzési idejét. Az adattovábbítást megtagadhatja, ha nem indít vitát, vagy ha törli fiókját; ebben az esetben nem tudunk vitát futtatni Önnek. A politikai vélemény, a meggyőződés és az egészségi állapot különleges információ; ezeket csak az Ön külön hozzájárulásával kezeljük (3. szakasz). Önről nem hozunk kizárólag automatizált döntést (8. szakasz). A kérelmekre \[10\] napon belül válaszolunk, az incidenseket pedig a Personal Information Protection Act előírásai szerint jelentjük a Personal Information Protection Commissionnek és Önnek. *Tajvan:* Tajvan személyes adatok védelméről szóló törvénye (Personal Data Protection Act) alkalmazandó. Adatait a 7. szakaszban meghatározott ideig őrizzük meg; azokat Romániában, más uniós országokban és az Egyesült Államokban használjuk (lásd a Nyilvántartást); a címzetteket az 5. szakasz sorolja fel; rendszereink és MI-modelljeink vitái futtatása érdekében automatikusan kezelik őket. Megkérdezheti, milyen adatokat tárolunk Önről, megtekintheti őket, másolatot kaphat róluk, helyesbítheti őket, kérheti, hogy ne használjuk tovább őket, és kérheti a törlésüket (10. szakasz). A fiókadatok megadása az Ön döntése, de nélkülük nem tudunk fiókot nyitni Önnek. Az adatainak megtekintésére vagy azokról másolat kiadására irányuló kérelmekre 15 napon belül válaszolunk; ha több időre van szükségünk, ezt a határidőt egy alkalommal legfeljebb 15 nappal meghosszabbíthatjuk, és ennek okáról írásban tájékoztatjuk Önt. *Fülöp-szigetek:* DPO-nk \[name\]; panasz a National Privacy Commissionnél tehető; a 8. szakasz ismerteti automatizált adatkezelésünket. *Thaiföld:* képviselőnk \[name\] \[if appointed\].
+
+### B.11 Fenntartva
+
+Törökország, Brazília és Indonézia egyaránt helyi nyelvű tájékoztatást, képviselőt vagy nyilvántartásba vételt és bejelentéseket követel meg, és itt nincsenek kidolgozva. Kínát, Vietnamot és Oroszországot nem szolgáljuk ki.

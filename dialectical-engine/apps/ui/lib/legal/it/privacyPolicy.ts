@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Account — Indirizzo email e indirizzo email di recupero (conservati in forma cifrata, con un indice dotato di chiave che ci consente di trovare l'account senza leggere l'indirizzo); password (conservata come hash, mai in chiaro); il segreto per l'autenticazione a due fattori (cifrato); dieci codici di recupero (conservati come hash); il tuo pseudonimo; il momento in cui hai confermato di avere almeno 18 anni — Tu, al momento della registrazione",
+        "Account — Indirizzo email e indirizzo email di recupero (conservati in forma cifrata, con un indice dotato di chiave che ci consente di trovare l'account senza leggere l'indirizzo); password (conservata come hash, mai in chiaro); il segreto per l'autenticazione a due fattori (cifrato); dieci codici di recupero (conservati come hash); il tuo pseudonimo — Tu e il servizio, al momento della registrazione",
+        "Verifica del Paese dell’IP alla registrazione e prima di un nuovo dibattito — Alla registrazione verifichiamo localmente il Paese dell’indirizzo IP e le uscite Tor con DB-IP Lite e l’elenco Tor. Prima di ogni nuovo dibattito verifichiamo di nuovo localmente il Paese dell’IP e rifiutiamo il dibattito se il Paese è nell’elenco di quelli sempre bloccati. Rifiutiamo le registrazioni da Paesi non serviti, da Tor e da indirizzi IP di cui non possiamo determinare il Paese; l’IP non viene inviato a terzi. I rifiuti sono aggregati per percorso, codice, Paese e intervallo di tempo; l’indirizzo IP e lo user-agent figurano solo come digest unidirezionali con chiave. Il tipo di prova è indicato come «indirizzo IP». — La tua connessione",
+        "Verifica dell’età — Inserisci la data di nascita, ma non la conserviamo. Per una registrazione riuscita registriamo l’esito positivo; per gli account esistenti l’esito può essere positivo o negativo. Il record comprende l’età minima richiesta, il Paese dell’IP se disponibile, la versione della regola, il contesto e l’ora della verifica — Tu e il sistema di registrazione",
+        "Residenza dichiarata — Il Paese di residenza scelto alla registrazione e, se negli Stati Uniti, lo Stato federato — Tu",
         "Sessioni e sicurezza — Un token di sessione sottoposto a hash; un hash con chiave della stringa user-agent del tuo browser, utilizzato per rilevare quando una sessione passa a un browser diverso; data e ora di creazione, ultimo utilizzo e scadenza. Non conserviamo con una sessione il tuo indirizzo IP, il nome del dispositivo o i dettagli del browser; l'elenco delle sessioni visualizzato nelle Impostazioni mostra soltanto data e ora — Il tuo browser",
         "Registro di controllo della sicurezza — Un registro di sola aggiunta degli eventi rilevanti per la sicurezza — registrazione, verifica, tentativi di accesso, recupero, pubblicazione, cancellazione. L'indirizzo IP e lo user-agent di ciascun evento sono conservati esclusivamente come digest unidirezionali con chiave (Argon2id), pertanto non possono essere letti ma possono essere confrontati entro un determinato periodo. I segnali di rischio relativi all'accesso e al recupero sono conservati in forma cifrata per 90 giorni — Il tuo browser, al momento di ciascun evento",
         "Contenuto dei dibattiti — La domanda che digiti; le annotazioni di orientamento che imposti; le affermazioni, le critiche, i riferimenti probatori, i punteggi e i verdetti generati dal motore; una registrazione letterale di quanto restituito da ciascun fornitore di IA; le query di ricerca e i riferimenti alle fonti. Tutto ciò è conservato in forma cifrata con una chiave specifica per il tuo account — Tu e i modelli di IA che elaborano la tua domanda",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Persone che non sono nostri utenti — Dati personali relativi ad altre persone che includi in una domanda o che il motore genera nel rispondere. Ti chiediamo di non farlo; la sezione 11 spiega cosa facciamo quando accade comunque — Tu, indirettamente"
         ]
       },
+      { kind: "p", text: "Alla registrazione verifichiamo il Paese dell’IP e l’età. La data di nascita viene inviata soltanto per la verifica e non viene conservata. La verifica dell’IP avviene localmente, senza inviare l’indirizzo a terzi. Prima di ogni nuovo dibattito verifichiamo localmente anche il Paese dell’IP; il dibattito viene rifiutato se il Paese è sempre bloccato." },
       { kind: "p", text: "Non raccogliamo dati analitici o di telemetria sul modo in cui utilizzi il prodotto e non impostiamo cookie a tale scopo. Se ciò dovesse cambiare, modificheremo prima la presente informativa e l'Informativa sui cookie e ti verrà chiesto il consenso." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Un motore di dibattito invita a porre domande su politica, religione, salute, sessualità e convinzioni personali. Si tratta di categorie particolari di dati ai sensi dell'Articolo 9 GDPR e possono comparire nelle tue domande indipendentemente dal fatto che intendiamo raccoglierle o meno." },
-      { kind: "p", text: "Informazioni che ti riguardano. Prima del tuo primo dibattito presti il consenso esplicito, in una schermata separata, al trattamento da parte nostra delle informazioni sensibili che scegli di includere nelle tue domande, allo scopo di svolgere i tuoi dibattiti. Registriamo la versione del testo che hai accettato, la tua lingua e il momento dell'accettazione. Senza questo consenso non puoi avviare un dibattito. Puoi revocarlo in qualsiasi momento non includendo tali informazioni o cancellando un dibattito. Ciò che pubblichi su di te costituisce un insieme di dati che hai scelto di rendere pubblico." },
+      { kind: "p", text: "Informazioni che ti riguardano. Prima del tuo primo dibattito presti il consenso esplicito, in una schermata separata, al trattamento da parte nostra delle informazioni sensibili che scegli di includere nelle tue domande, allo scopo di svolgere i tuoi dibattiti. Registriamo la versione del testo che hai accettato, la tua lingua e il momento dell'accettazione. Senza questo consenso non puoi avviare un dibattito. Puoi revocarlo in qualsiasi momento scrivendo a privacy@dezbatere.ro. Puoi anche omettere tali informazioni o cancellare un dibattito che le contiene. Ciò che pubblichi su di te costituisce un insieme di dati che hai scelto di rendere pubblico." },
       { kind: "p", text: "Informazioni che riguardano altre persone. Nessuna condizione giuridica ci consente di trattare dati sensibili relativi a una terza persona che nomini in una domanda e nessuno dei nostri fornitori di IA dispone di una tale condizione. Per questo motivo le Condizioni lo vietano, riduciamo al minimo ciò che inviamo e rimuoviamo rapidamente tali contenuti su richiesta — sezione 11." },
       { kind: "p", text: "Informazioni sulla salute. Alcuni Paesi disciplinano i dati relativi alla salute, comprese le inferenze, mediante leggi specifiche. Se vivi nello [the State of Washington], si applica una distinta [Consumer Health Data Privacy Notice]." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Perché utilizziamo i tuoi dati e su quale base",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Ciascuna finalità ha una base giuridica ai sensi dell'Articolo 6(1) GDPR e non riutilizziamo per una finalità diversa dati raccolti per una determinata finalità." },
+      { kind: "p", text: "Indichiamo qui sotto le basi giuridiche applicabili a ciascuna finalità ai sensi dell’articolo 6(1) GDPR. Non riutilizziamo per una finalità diversa i dati raccolti per una determinata finalità." },
       {
         kind: "list",
         items: [
         "Creare e gestire il tuo account, autenticarti, svolgere e conservare i tuoi dibattiti affinché tu possa riaprirli e riprodurli — Account, sessioni, contenuto dei dibattiti — Contratto — Art. 6(1)(b)",
+        "Verificare il Paese dell’IP e Tor alla registrazione per rifiutare indirizzi IP di Paesi non serviti o di cui non possiamo determinare il Paese, e verificare il Paese dell’IP prima di ogni nuovo dibattito per bloccare i Paesi sempre esclusi — Verifica IP e audit dei rifiuti — Legittimo interesse — Art. 6(1)(f), un servizio sicuro e conforme; obbligo legale — Art. 6(1)(c), ove si applichino restrizioni",
+        "Verificare l’età alla registrazione o per un account esistente — Esito della verifica; data di nascita solo durante la verifica — Contratto — Art. 6(1)(b); legittimo interesse — Art. 6(1)(f), tutela dei minori",
+        "Applicare le norme su consumatori, privacy e imposte in base alla residenza — Paese dichiarato e Stato federato USA — Contratto — Art. 6(1)(b); obbligo legale — Art. 6(1)(c)",
         "Inviare la tua domanda e le affermazioni del motore ai fornitori di IA per generare un dibattito — Contenuto dei dibattiti — Contratto — Art. 6(1)(b)",
         "Mantenere sicuro il servizio, rilevare gli abusi, consentirti di individuare un accesso che non hai effettuato, conservare un registro di controllo — Sessioni, registro di controllo della sicurezza, hash relativi agli abusi segnalati all'assistenza — Legittimi interessi — Art. 6(1)(f): i nostri e i tuoi a disporre di un servizio sicuro. Puoi opporti; sezione 10",
         "Dimostrare che hai accettato le Condizioni e prestato o revocato un consenso — Registri di accettazione e consenso — Obbligo legale — Art. 6(1)(c), il nostro dovere di dimostrare il consenso ai sensi dell'Art. 7(1) — e legittimi interessi a comprovare il contratto",
@@ -112,8 +119,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Pubblicazione e visibilità",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "I dibattiti sono privati fino a quando non li pubblichi. La pubblicazione è un'azione intenzionale e confermata separatamente. Un dibattito pubblicato mostra il tuo pseudonimo, la domanda così come l'hai formulata, l'albero argomentativo, i punteggi, il verdetto e la fascia di affidabilità e reca un'etichetta visibile che indica che il contenuto è generato dall'IA. Non mostra mai il tuo indirizzo email, i registri delle sessioni o la cronologia dell'account. [Published debates are / are not] indicizzati dai motori di ricerca [unless you choose]." },
-      { kind: "p", text: "La revoca della pubblicazione rimuove il dibattito da DebateAI e distrugge la chiave della nostra copia pubblica. Le copie già effettuate da lettori, motori di ricerca o archivi sfuggono al nostro controllo e non possiamo richiamarle." },
+      { kind: "p", text: "I dibattiti sono privati fino a quando non li pubblichi. La pubblicazione è un'azione intenzionale e confermata separatamente. Un dibattito pubblicato mostra il tuo pseudonimo, la domanda così come l'hai formulata, l'albero argomentativo, i punteggi, il verdetto e la fascia di affidabilità e reca un'etichetta visibile che indica che il contenuto è generato dall'IA. Non mostra mai il tuo indirizzo email, i registri delle sessioni o la cronologia dell'account. I motori di ricerca possono indicizzare i dibattiti pubblicati." },
+      { kind: "p", text: "La revoca della pubblicazione rimuove il dibattito da Dialectical Engine e distrugge la chiave della nostra copia pubblica. Le copie già effettuate da lettori, motori di ricerca o archivi sfuggono al nostro controllo e non possiamo richiamarle." },
       { kind: "p", text: "Quando cancelli il tuo account, rimuoviamo dall'accesso pubblico ogni dibattito da te pubblicato senza ingiustificato ritardo e al più tardi entro 30 giorni, salvo che la legge ci imponga di conservare uno specifico elemento. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -126,10 +133,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Account — Finché l'account esiste, più un periodo di tolleranza di 7 giorni dopo la richiesta di chiusura — Chiavi distrutte; record cancellato",
+        "Esito e contesto della verifica dell’età — Finché esiste l’account — Il record viene eliminato con l’account",
+        "Paese di residenza e Stato federato USA dichiarati — Finché esiste l’account — I dati vengono eliminati con l’account",
         "Registri delle sessioni — 14 giorni dall'ultimo utilizzo o 90 giorni dalla creazione, se precedente — Cancellati",
         "Link per la verifica dell'email — 24 ore — Cancellati",
         "Segnali di rischio relativi ad accesso e recupero — 90 giorni, applicati dal database — Eliminati definitivamente",
         "Registro di controllo della sicurezza — Per tutta la durata del servizio — Di sola aggiunta; IP e user-agent sono digest unidirezionali e non possono essere riletti",
+        "Audit dei rifiuti per Paese dell’IP — Per tutta la vita del servizio — Di sola aggiunta; registra percorso, codice del rifiuto, Paese, intervallo di tempo e tipo di prova «indirizzo IP»; indirizzo IP e user-agent figurano solo come digest unidirezionali con chiave",
+        "Indirizzo IP in chiaro per verificare il Paese alla registrazione o prima di un nuovo dibattito — Solo durante la relativa richiesta — Questa verifica non conserva l’IP leggibile; nell’audit del rifiuto l’indirizzo IP e lo user-agent figurano solo come digest unidirezionali con chiave e il Paese dell’IP può figurare nel record della verifica dell’età",
         "Contenuto dei dibattiti (privato) — Finché l'account esiste — Chiavi distrutte alla chiusura, rendendo il contenuto illeggibile",
         "Contenuto dei dibattiti (pubblicato) — Finché è pubblicato e finché l'account esiste — Rimosso dall'accesso pubblico alla revoca della pubblicazione o alla chiusura; chiavi distrutte",
         "Registrazioni delle risposte dei fornitori e riferimenti di ricerca — Come il dibattito cui appartengono — Come per il dibattito cui appartengono",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Limitazione (Art. 18) — Chiederci di interrompere il trattamento di determinati dati mentre viene risolta una controversia che li riguarda",
         "Opposizione (Art. 21) — Opporti al trattamento basato su legittimi interessi — i trattamenti di sicurezza e controllo di cui alla sezione 4 — nel qual caso interrompiamo il trattamento, salvo che possiamo dimostrare motivi cogenti. Puoi opporti al marketing in qualsiasi momento e lo interromperemo",
         "Portabilità (Art. 20) — I tuoi dibattiti e i dati del tuo account in un formato di uso comune e leggibile da dispositivo automatico. [Pending: same export as Access.] I contenuti non personali da te creati, come le tue domande, ti vengono restituiti su richiesta alla cessazione del contratto",
-        "Revoca del consenso (Art. 7(3)) — Revocare il consenso al marketing tramite qualsiasi email o dalle Impostazioni; revocare il consenso relativo ai dati sensibili non includendo tali dati o cancellando un dibattito. La revoca non pregiudica il trattamento già effettuato",
+        "Revoca del consenso (Art. 7(3)) — Revocare il consenso al marketing tramite qualsiasi email o dalle Impostazioni; revocare il consenso relativo ai dati sensibili scrivendo a privacy@dezbatere.ro (puoi anche omettere tali dati o cancellare un dibattito che li contiene). La revoca non pregiudica il trattamento già effettuato",
         "Reclamo — All'autorità di controllo rumena, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucarest, anspdcp@dataprotection.ro, oppure all'autorità del Paese in cui vivi. Preferiremmo che ti rivolgessi prima a noi"
         ]
       },
@@ -188,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Persone nominate nei dibattiti che non sono nostri utenti",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Se qualcuno pone a DebateAI una domanda in cui ti nomina, potremmo detenere dati personali che ti riguardano anche se non hai mai utilizzato il servizio. Le Condizioni vietano agli utenti di farlo e riduciamo al minimo ciò che inviamo ai fornitori di IA, ma può accadere." },
+      { kind: "p", text: "Se qualcuno pone a Dialectical Engine una domanda in cui ti nomina, potremmo detenere dati personali che ti riguardano anche se non hai mai utilizzato il servizio. Le Condizioni vietano agli utenti di farlo e riduciamo al minimo ciò che inviamo ai fornitori di IA, ma può accadere." },
       { kind: "p", text: "La presente sezione costituisce l'informativa che siamo tenuti a fornirti ai sensi dell'Articolo 14 GDPR. I dati sono costituiti da ciò che l'utente ha digitato e da quanto generato dal motore in risposta; la fonte è tale utente; le finalità e la base giuridica sono quelle indicate nella sezione 4; i destinatari sono i fornitori di IA elencati nel Registro; la conservazione segue la sezione 7. Ti spettano tutti i diritti indicati nella sezione 10 e, in particolare, puoi chiederci di rimuovere un dibattito pubblicato o privato che contenga i tuoi dati e di comunicarti quali dati deteniamo. Non devi disporre di un account per farlo. Scrivi a privacy@dezbatere.ro o utilizza il controllo Segnala presente su qualsiasi dibattito pubblicato; daremo seguito alle richieste motivate senza ingiustificato ritardo. Non possiamo informarti individualmente quando ciò accade, perché non sappiamo chi sei né come contattarti; la presente informativa pubblica e il percorso di rimozione sono le misure che adottiamo in alternativa." },
       { kind: "p", text: "Lo stesso vale per le informazioni sensibili che ti riguardano — politica, salute, religione — contenute nella domanda di un'altra persona. Nessuna condizione giuridica ci consente di continuare a trattarle dopo la tua opposizione e non lo faremo." }
     ]
@@ -198,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Minori",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI è destinato agli adulti. Al momento della registrazione confermi di avere almeno 18 anni e non trattiamo consapevolmente i dati di persone di età inferiore ai 18 anni. Se veniamo a sapere che un account appartiene a una persona minore di 18 anni, lo chiudiamo e cancelliamo i dati come descritto nella sezione 7. Alcuni Paesi considerano insufficiente una conferma o richiedono ulteriori misure; l'Allegato B indica quanto applicabile nei vari casi e le Condizioni spiegano come procediamo." }
+      { kind: "p", text: "Dialectical Engine è destinato agli adulti. Al momento della registrazione confermi di avere almeno 18 anni e non trattiamo consapevolmente i dati di persone di età inferiore ai 18 anni. Se veniamo a sapere che un account appartiene a una persona minore di 18 anni, lo chiudiamo e cancelliamo i dati come descritto nella sezione 7. Alcuni Paesi considerano insufficiente una conferma o richiedono ulteriori misure; l'Allegato B indica quanto applicabile nei vari casi e le Condizioni spiegano come procediamo." }
     ]
   },
   {
@@ -206,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI utilizza otto elementi, tutti strettamente necessari per il servizio che hai richiesto e tutti impostati esclusivamente da DebateAI: quattro cookie e quattro voci nella memoria del tuo browser. Non impostiamo cookie analitici, pubblicitari o di tracciamento. L'Informativa sui cookie disponibile su [dezbatere.ro/cookies] li elenca indicando a cosa serve ciascuno e chi lo riceve, e sarà modificata prima di qualsiasi altra aggiunta." },
+      { kind: "p", text: "Dialectical Engine utilizza 18 elementi, tutti strettamente necessari per il servizio che hai richiesto e tutti impostati esclusivamente da Dialectical Engine: 13 cookie e 5 voci nella memoria del tuo browser. Non impostiamo cookie analitici, pubblicitari o di tracciamento. L'Informativa sui cookie disponibile su [dezbatere.ro/cookies] li elenca indicando a cosa serve ciascuno e chi lo riceve, e sarà modificata prima di qualsiasi altra aggiunta." },
       {
         kind: "list",
         items: [
@@ -214,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — File cookie — Impedisce ad altri siti web di inviare moduli a tuo nome. — 14 giorni",
         "__Host-debateai-age-refusal — File cookie (HttpOnly) — Dopo una verifica dell’età rifiutata, impedisce a questo browser di riprovare per 30 giorni. Contiene solo la parola «rifiutato», nessun dato personale. — 30 giorni",
         "debateai.locale — File cookie — Ricorda la lingua dell’interfaccia che hai scelto. — 1 anno",
+        "__Host-debateai-staff — File cookie (HttpOnly) — Accesso del personale separato — Fino a 8 ore; 15 minuti di inattività",
+        "__Host-debateai-staff-csrf — File cookie — Impedisce ad altri siti web di inviare moduli a tuo nome. — Fino a 8 ore; 15 minuti di inattività",
+        "__Host-debateai-password-reset — File cookie (HttpOnly) — Solo ripristino della password — Fino a 30 minuti",
+        "__Host-debateai-password-reset-csrf — File cookie — Impedisce ad altri siti web di inviare moduli a tuo nome. — Fino a 30 minuti",
+        "__Host-debateai-mfa-recovery — File cookie (HttpOnly) — Solo recupero dell’autenticatore — Fino a 299 secondi",
+        "__Host-debateai-mfa-recovery-csrf — File cookie — Impedisce ad altri siti web di inviare moduli a tuo nome. — Fino a 299 secondi",
+        "__Host-debateai-social-flow — File cookie (HttpOnly) — Breve accesso tramite fornitore o collegamento del conto — Fino a 5 minuti",
+        "__Host-debateai-social-apple — File cookie (HttpOnly) — Breve accesso tramite fornitore o collegamento del conto — Fino a 5 minuti",
+        "__Host-debateai-social-browser — File cookie (HttpOnly) — Breve accesso tramite fornitore o collegamento del conto — Fino a 5 minuti",
         "debateai.consent — Archiviazione locale — Ricorda che hai già visto l’avviso sui cookie, così viene mostrato una sola volta. — Finché non lo cancelli",
         "debateai.mode — Archiviazione locale — Se usi la visualizzazione chiara o quella scura. — Finché non lo cancelli",
         "debateai.languageOffer.dismissed — Archiviazione di sessione — Ricorda, per questa scheda, che hai rifiutato la proposta di mostrare un dibattito in un’altra lingua. — Finché non chiudi la scheda",
-        "debateai.support.conversation.v2 — Archiviazione di sessione — Mantiene sullo schermo la tua conversazione con la chat di assistenza finché la scheda resta aperta. Viene cancellata quando qualcuno accede o esce in questa scheda. — Finché non chiudi la scheda"
+        "debateai.support.conversation.v2 — Archiviazione di sessione — Mantiene sullo schermo la tua conversazione con la chat di assistenza finché la scheda resta aperta. Viene cancellata quando qualcuno accede o esce in questa scheda. — Finché non chiudi la scheda",
+        "debateai.phone-completion-draft.v1 — Archiviazione di sessione — Domanda incompleta durante il passaggio telefonico; eliminata al cambio di sessione, alla disconnessione o al cambio di titolare — 15 minuti o fino all’eliminazione"
         ]
       },
-      { kind: "p", text: "Nessun'altra parte raccoglie, tramite DebateAI, informazioni sulle tue attività online nel tempo e su siti web diversi." },
-      { kind: "p", text: "I browser possono inviare un segnale «Do Not Track» o un segnale simile. DebateAI non ti traccia, quindi un tale segnale non ha nulla da disattivare: il servizio funziona allo stesso modo con o senza di esso." },
+      { kind: "p", text: "Nessun'altra parte raccoglie, tramite Dialectical Engine, informazioni sulle tue attività online nel tempo e su siti web diversi." },
+      { kind: "p", text: "I browser possono inviare un segnale «Do Not Track» o un segnale simile. Dialectical Engine non ti traccia, quindi un tale segnale non ha nulla da disattivare: il servizio funziona allo stesso modo con o senza di esso." },
       { kind: "p", text: "Per rifiutare questi elementi, blocca o elimina i cookie e i dati di questo sito nelle impostazioni del tuo browser. Cosa smette allora di funzionare: l'accesso e la memorizzazione delle tue scelte di lingua e di visualizzazione; anche l'avviso sui cookie verrà mostrato di nuovo." }
     ]
   },
@@ -231,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Quando modifichiamo la presente informativa, pubblichiamo la nuova versione insieme a una sintesi delle modifiche e a una nuova data di entrata in vigore e conserviamo le versioni precedenti su [dezbatere.ro/privacy/versions]. Per una modifica che aggiunga una nuova finalità o un nuovo destinatario, ti informiamo per email e all'interno del prodotto prima dell'inizio del nuovo trattamento e ti concediamo il tempo necessario per opporti. Laddove una nuova finalità dipenda dal tuo consenso — ad esempio, se in futuro volessimo utilizzare i contenuti per migliorare i modelli — chiediamo tale consenso separatamente e in modo specifico; non consideriamo mai l'accettazione di Condizioni aggiornate come consenso a un nuovo trattamento. Per chiarimenti che non modificano in alcun modo le nostre attività, ci limitiamo a pubblicare la nuova versione." },
-      { kind: "p", text: "La presente informativa è stata aggiornata da ultimo il [date]. La versione 3.0 ha sostituito la versione 2.1, che descriveva i dati di sessione, i periodi di conservazione, l'analisi, l'esportazione e l'effetto della cancellazione sui dibattiti pubblicati in modi che non riflettevano più il servizio." }
+      { kind: "p", text: "La presente informativa è stata aggiornata da ultimo il [date]. La versione 3.2 ha sostituito la versione 2.1, che descriveva i dati di sessione, i periodi di conservazione, l'analisi, l'esportazione e l'effetto della cancellazione sui dibattiti pubblicati in modi che non riflettevano più il servizio." }
     ]
   },
   {
@@ -263,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Stati Uniti (solo se elencati)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Informativa al momento della raccolta. La tabella nella sezione 2 elenca ciascuna categoria di informazioni personali che raccogliamo, la relativa finalità e il periodo di conservazione (sezione 7). Raccogliamo le seguenti categorie di informazioni personali sensibili solo quando le includi nelle domande che poni su di te: salute, convinzioni religiose o filosofiche, vita sessuale od orientamento sessuale, opinioni politiche, appartenenza sindacale e origine razziale o etnica. Le utilizziamo esclusivamente per svolgere i tuoi dibattiti, e solo dopo il consenso separato di cui alla sezione 3. Non vendiamo né condividiamo informazioni personali e non lo abbiamo fatto nei dodici mesi precedenti. Non utilizziamo informazioni personali per pubblicità mirata e non utilizziamo informazioni personali sensibili per finalità diverse dalla fornitura del servizio da te richiesto. Segnali di preferenza di opt-out: poiché non vendiamo né condividiamo informazioni personali né le utilizziamo per pubblicità mirata, non c'è nulla a cui rinunciare, e un segnale Global Privacy Control non cambia nulla. I tuoi diritti: conoscere, cancellare, correggere, esercitare l'opt-out, limitare l'uso delle informazioni personali sensibili e non subire discriminazioni per averli esercitati; presenta una richiesta a privacy@dezbatere.ro. Incentivi finanziari: non ne offriamo; le nostre finalità e tutele sono le stesse nei piani gratuiti e a pagamento. La conservazione è descritta nella sezione 7. Violazioni: informiamo i residenti e le autorità statali come richiesto dalla legge sulle violazioni dei dati di ciascuno Stato. La presente informativa è aggiornata almeno ogni dodici mesi; ultimo aggiornamento [date]." },
+      { kind: "p", text: "Informativa al momento della raccolta. La tabella nella sezione 2 elenca le categorie di informazioni personali che raccogliamo e le relative fonti; le finalità del trattamento sono nella sezione 4 e i periodi di conservazione nella sezione 7. Raccogliamo le seguenti categorie di informazioni personali sensibili solo quando le includi nelle domande che poni su di te: salute, convinzioni religiose o filosofiche, vita sessuale od orientamento sessuale, opinioni politiche, appartenenza sindacale e origine razziale o etnica. Le utilizziamo esclusivamente per svolgere i tuoi dibattiti, e solo dopo il consenso separato di cui alla sezione 3. Non vendiamo né condividiamo informazioni personali e non lo abbiamo fatto nei dodici mesi precedenti. Non utilizziamo informazioni personali per pubblicità mirata e non utilizziamo informazioni personali sensibili per finalità diverse dalla fornitura del servizio da te richiesto. Segnali di preferenza di opt-out: Poiché attualmente non vendiamo né condividiamo informazioni personali e non le utilizziamo per pubblicità mirata, non vi è nulla rispetto a cui esercitare l’opt-out. Se in futuro iniziassimo a venderle o condividerle, rispetteremo i segnali Global Privacy Control come richiesta di opt-out. I tuoi diritti: conoscere, cancellare, correggere, esercitare l'opt-out, limitare l'uso delle informazioni personali sensibili e non subire discriminazioni per averli esercitati; presenta una richiesta a privacy@dezbatere.ro. Incentivi finanziari: non ne offriamo; le nostre finalità e tutele sono le stesse nei piani gratuiti e a pagamento. La conservazione è descritta nella sezione 7. Violazioni: informiamo i residenti e le autorità statali come richiesto dalla legge sulle violazioni dei dati di ciascuno Stato. La presente informativa è aggiornata almeno ogni dodici mesi; ultimo aggiornamento [date]." },
       { kind: "p", text: "Connecticut: trattiamo dati sensibili solo con il tuo consenso esplicito (opt-in), prestato nella schermata separata prima del tuo primo dibattito (sezione 3); non utilizziamo i tuoi dati personali per addestrare modelli di IA. Washington: la nostra Informativa sulla privacy dei dati sanitari dei consumatori disponibile su [URL] è un documento distinto applicabile a tutte le informazioni relative alla salute, comprese le inferenze. Texas e Nebraska: non vendiamo dati personali sensibili. Colorado, Connecticut, Virginia e altri Stati dotati di leggi organiche sulla privacy: i diritti sopra indicati ti spettano laddove la legge si applichi a noi. Se rigettiamo una richiesta, puoi presentare ricorso rispondendo alla nostra risposta all'indirizzo privacy@dezbatere.ro; se rigettiamo il ricorso, puoi rivolgerti all'Attorney General del tuo Stato." }
     ]
   },
@@ -304,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ucraina (solo se elencata)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Si applica la Legge dell'Ucraina \"Sulla protezione dei dati personali\". Non offriamo DebateAI nelle aree dell'Ucraina non controllate dal suo governo. I tuoi dati sono trasferiti verso Paesi dell'UE e gli Stati Uniti (vedi il Registro). Puoi presentare reclamo al Commissario per i diritti umani del Parlamento ucraino." }
+      { kind: "p", text: "Si applica la Legge dell'Ucraina \"Sulla protezione dei dati personali\". Non offriamo Dialectical Engine nelle aree dell'Ucraina non controllate dal suo governo. I tuoi dati sono trasferiti verso Paesi dell'UE e gli Stati Uniti (vedi il Registro). Puoi presentare reclamo al Commissario per i diritti umani del Parlamento ucraino." }
     ]
   },
   {
@@ -335,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "26375ad28aba67befe057fb0953d57eb6e7f08617ce63a7ea5d9e5226206385e",
-  eyebrow: "INFORMATIVA SULLA PRIVACY · v3.0 · IN VIGORE DAL [DATE]",
+  version: "3.2",
+  sha256: "083bffcb7234eae469ce5a2bd4e382f3af919c5eee1d9d0f062307ae69e2d9c8",
+  eyebrow: "INFORMATIVA SULLA PRIVACY · v3.2 · IN VIGORE DAL [DATE]",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",
-  endMarker: "FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Testo dell'Informativa sulla privacy",
   sectionIdPrefix: "policy-section-",

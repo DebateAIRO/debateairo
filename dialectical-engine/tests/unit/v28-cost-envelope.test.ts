@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+import { observeProviderTarget } from "../../packages/providers/src/provider-probe.js";
 import {
   COST_ENVELOPE_CHARGE_UNREPRESENTABLE,
   COST_ENVELOPE_CURRENCY,
@@ -479,7 +480,20 @@ describe("C-I8 the daily ceiling claims only what it counts", () => {
 
   it("agrees with the probe, which makes a real completion and charges nothing", async () => {
     const probe = await source("../../packages/providers/src/provider-probe.ts");
-    expect(probe).toContain("max_tokens: 8");
     expect(probe).not.toMatch(/costEnvelope|recordCall|chargeMicrosForUsage/u);
+    const bodies: Readonly<Record<string, unknown>>[] = [];
+    const target = { providerRef: "api:probe-fixture", maker: "fixture", baseUrl: "https://provider.example.test/v1", model: "fixture-model" };
+    const capture: typeof fetch = async (_url, request) => {
+      bodies.push(JSON.parse(String(request?.body)));
+      return new Response(JSON.stringify({ model: target.model, choices: [{ message: { content: "OK" } }] }), {
+        headers: { "content-type": "application/json" }
+      });
+    };
+    for (const ceiling of [undefined, 32]) {
+      const result = await observeProviderTarget({ target, timeoutMs: 1000, fetchImplementation: capture,
+        clock: () => new Date("2026-10-06T00:00:00.000Z"), ...(ceiling === undefined ? {} : { tokenCeiling: ceiling }) });
+      expect(result.state).toBe("HEALTHY");
+    }
+    expect(bodies.map(body => body.max_tokens)).toEqual([8, 32]);
   });
 });

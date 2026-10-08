@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "otrzymać listę wszystkich podmiotów trzecich, które je otrzymały;",
   "legal.health.s05.item3": "wycofać zgodę i zażądać ich usunięcia.",
   "legal.health.s06.title": "Jak z nich skorzystać",
-  "legal.health.s06.body": "W Ustawieniach lub pisząc na adres privacy@dezbatere.ro. Odpowiadamy w ciągu 45 dni. Jeśli odmówimy spełnienia żądania, możesz się od tej decyzji odwołać, odpowiadając na naszą wiadomość."
+  "legal.health.s06.body": "W Ustawieniach lub pisząc na adres privacy@dezbatere.ro. Odpowiadamy w ciągu 45 dni. Jeśli odmówimy spełnienia żądania, możesz się od tej decyzji odwołać, odpowiadając na naszą wiadomość.",
+  "legal.cookies.staff.purpose": "Oddzielny dostęp personelu",
+  "legal.cookies.passwordReset.purpose": "Tylko resetowanie hasła",
+  "legal.cookies.mfaRecovery.purpose": "Tylko odzyskiwanie uwierzytelniacza",
+  "legal.cookies.social.purpose": "Krótkie logowanie przez dostawcę lub łączenie konta",
+  "legal.cookies.phoneDraft.purpose": "Niedokończone pytanie podczas kroku z telefonem; usuwane przy zmianie sesji, wylogowaniu lub zmianie właściciela",
+  "legal.cookies.staff.life": "Do 8 godzin; 15 minut bezczynności",
+  "legal.cookies.passwordReset.life": "Do 30 minut",
+  "legal.cookies.mfaRecovery.life": "Do 299 sekund",
+  "legal.cookies.social.life": "Do 5 minut",
+  "legal.cookies.phoneDraft.life": "15 minut lub do wcześniejszego usunięcia"
 }

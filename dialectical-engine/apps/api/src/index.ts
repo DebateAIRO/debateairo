@@ -1,3 +1,23 @@
+import { validatePreviewProviderTestConfig, previewPlanTierRosters, type PreviewProviderTestConfig } from "@debateai/providers";
+import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
+import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
+import type { PasswordResetApplication } from "./password-reset.js";
+import type { BackupEmailApplication, MfaRecoveryApplication } from "./email-mfa-recovery.js";
+import type { SocialStepUpApplication } from './social-step-up.js';
+import { SocialAuthError, SOCIAL_BROWSER_COOKIE, SOCIAL_FLOW_COOKIE, SOCIAL_APPLE_FLOW_COOKIE, type SocialAuthApplication } from './social-auth.js';
+import { socialBrowserHash } from './social-providers/hashes.js';
+import { SocialProviderSchema, CompleteSocialSignupRequestSchema } from '@debateai/contract';
+import type {ConsumerRecoveryApplication} from "./consumer-recovery.js";
+import type {OnboardingEvidenceApplication} from "./onboarding-evidence.js";
+import type { ConsumerSecurityApplication } from "./consumer-security.js";
+import type { ConsumerWebAuthnApplication } from "./consumer-webauthn.js";
+import type { AuthSourceAdmission } from "./registration.js";
+import { requireTurnstileProof, TurnstileGateError, type TurnstileVerifier } from "./turnstile.js";
+import { AccountProfileError, type AccountProfileService } from "./account-profile.js";
+import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
+import type { ProfileSession } from "@debateai/db";
+import { normalizeManualPhone } from "./phone-profile.js";
+import type { FundingBasis } from "@debateai/kernel";
 import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -40,7 +60,10 @@ import {
   RunEventSchema,
   RunProjectionSchema,
   SessionSchema,
+  AccountPhoneProfileSchema, PhoneProfileRevealRequestSchema, PhoneProfileRevealSchema, PhoneProfileUpdateRequestSchema,
+  RecoveryEmailSettingsSchema, RecoveryEmailRequestSchema, RecoveryEmailRemoveRequestSchema,
   StepUpAuthorizationRequestSchema,
+  AuthenticationResponseSchema, PasskeyEnrollmentResponseSchema, BeginTotpEnrollmentRequestSchema, CompleteTotpEnrollmentRequestSchema, TotpEnrollmentOptionsResponseSchema, TotpEnrollmentResponseSchema, LoginContinuationResponseSchema,
   UnpublishDebateRequestSchema,
   type Answer,
   type AnswerIndex,
@@ -70,6 +93,8 @@ import {
   DateOfBirthSchema,
   PUBLICATION_CONTENT_REFUSED_MESSAGE,
   RegisterLegalDocumentsSchema,
+  RegisterRequestSchema,
+  ResendVerificationRequestSchema,
   type RegisterLegalDocuments,
   LegalAcceptRequestSchema,
   LegalStatusResponseSchema,
@@ -77,7 +102,7 @@ import {
   AskRoomQuerySchema,
   AskRoomResponseSchema
 } from "@debateai/contract";
-import type { Pool, PoolClient } from "pg";
+import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
 import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
@@ -87,6 +112,7 @@ import {
   decryptLeasedContentForRun,
   insertRunRoleAssignment,
   prepareLeasedContentEncryptionForRun,
+  queryPrivateStream,
   withOwnerAskAdmissionLease,
   withRunContentLease,
   type CryptoEnvelope,
@@ -192,7 +218,11 @@ import {
 } from "./ask-billing.js";
 import type { MfaApplication } from "./mfa.js";
 import type { AuthSourceContext } from "@debateai/db";
-import type { AuthenticatedSession, SessionApplication } from "./sessions.js";
+import type { AuthenticatedSession, SessionApplication, LoginResult } from "./sessions.js";
+import type { StaffCapability } from "@debateai/kernel";
+import { registerStaffRoutes, staffAuthorizationPolicyInventory, type StaffHttpApplication } from "./staff/routes.js";
+import { exactStaffCookie, exactStaffCsrfPair, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER, streamAuthorizedEvents, type StaffAccessApplication, type StaffAuthentication } from "./staff/access.js";
+export { staffRoutePolicy, staffCookies, clearStaffCookies, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, STAFF_CSRF_HEADER } from "./staff/access.js";
 import type { PublicationApplication } from "./publications.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 import type { AnswerStoryApplication } from "./stories.js";
@@ -224,7 +254,7 @@ import {
 } from "./billing/index.js";
 import type { BillingErasureHook } from "./billing/erasure-hook.js";
 
-type RouteAuthPolicy = "public" | "user" | "operator";
+type RouteAuthPolicy = "public" | "user" | "operator" | "staff";
 type RouteOriginPolicy = "trusted";
 type RouteSessionPolicy = "optional";
 
@@ -1220,21 +1250,53 @@ export function apiOperationalErrorDiagnostic(error: unknown): string {
 }
 
 export const authorizationPolicyInventory = Object.freeze([
+  ...passwordResetPolicyInventory,
+  ...emailMfaPolicyInventory,
+  {route:'POST /v1/account/social/{provider}/step-up/begin',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
+  {route:'POST /v1/account/social/step-up/status',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
+  {route:'POST /v1/account/social/step-up/passkey-options',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
+  {route:'POST /v1/account/social/step-up/complete',auth:'user',origin:'trusted',resource:'identity',action:'social-step-up'},
+  {route:'GET /v1/auth/providers',auth:'public',resource:'identity',action:'social-providers'},
+  {route:'POST /v1/auth/social/{provider}/begin',auth:'public',origin:'trusted',resource:'identity',action:'social-begin'},
+  {route:'GET /v1/auth/social/{provider}/callback',auth:'public',resource:'identity',action:'social-callback'},
+  {route:'POST /v1/auth/social/apple/callback',auth:'public',resource:'identity',action:'social-callback'},
+  {route:'POST /v1/auth/social/login/status',auth:'public',origin:'trusted',resource:'identity',action:'social-signup'},
+  {route:'POST /v1/auth/social/signup/status',auth:'public',origin:'trusted',resource:'identity',action:'social-signup'},
+  {route:'POST /v1/auth/social/signup/complete',auth:'public',origin:'trusted',resource:'identity',action:'social-signup'},
+  {route:'GET /v1/account/social-providers',auth:'user',resource:'identity',action:'social-links'},
+  {route:'POST /v1/account/social/{provider}/link',auth:'user',origin:'trusted',resource:'identity',action:'social-link'},
+  {route:'POST /v1/account/social/unlink',auth:'user',origin:'trusted',resource:'identity',action:'social-unlink'},
   // Age gate (Turn 8): the browser-only pre-register check, like login held to the exact Origin.
   { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
   { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
+  { route:"POST /v1/auth/recovery/prove",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/recovery/enrollment/options",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/recovery/enrollment/complete",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/recovery/enrollment/status",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/recovery/enrollment/complete-evidence",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/onboarding/status",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
+  { route:"POST /v1/auth/onboarding/complete",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route: "POST /v1/auth/recovery/start", auth: "public", resource: "identity", action: "start-recovery" },
-  { route: "POST /v1/auth/mfa/totp/begin", auth: "public", resource: "identity", action: "begin-totp" },
-  { route: "POST /v1/auth/mfa/totp/verify", auth: "public", resource: "identity", action: "verify-totp" },
+  { route: "POST /v1/auth/mfa/totp/begin", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "begin-totp" },
+  { route: "POST /v1/auth/mfa/totp/verify", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "verify-totp" },
   { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },
   { route: "POST /v1/auth/mfa/recovery-codes/confirm", auth: "public", resource: "identity", action: "confirm-recovery-code" },
+  { route: "POST /v1/auth/passkeys/enrollment/options", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "passkey-enrollment-options" },
+  { route: "POST /v1/auth/passkeys/enrollment/complete", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "passkey-enrollment-complete" },
+  { route: "POST /v1/auth/passkeys/login/options", auth: "public", origin: "trusted", resource: "identity", action: "passkey-login-options" },
+  { route: "POST /v1/auth/passkeys/login/complete", auth: "public", origin: "trusted", resource: "identity", action: "passkey-login-complete" },
   { route: "POST /v1/auth/login", auth: "public", origin: "trusted", resource: "identity", action: "login" },
   { route: "POST /v1/auth/logout", auth: "user", resource: "session-self", action: "logout" },
   { route: "GET /v1/auth/sessions", auth: "user", resource: "session-owner", action: "list" },
   { route: "DELETE /v1/auth/sessions/{id}", auth: "user", resource: "session-owner", action: "revoke" },
   { route: "DELETE /v1/auth/sessions", auth: "user", resource: "session-owner", action: "revoke-all" },
+  { route: "GET /v1/account/auth-methods", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/account/auth-methods/remove", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/account/recovery-codes/regenerate", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/auth/passkeys/step-up/options", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/auth/passkeys/step-up/complete", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
   { route: "GET /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "read-age-confirmation" },
   { route: "POST /v1/auth/age-confirmation", auth: "user", resource: "session-self", action: "confirm-age" },
@@ -1249,6 +1311,13 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   // Turn 14 — change email. The owner routes ride the cookie session and CSRF;
   // the two link routes need only the first-party Origin and the mailed bearer.
+  { route: "GET /v1/account/profile", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/profile/reveal", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/profile", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "GET /v1/account/recovery-email", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/recovery-email", auth: "user", resource: "identity", action: "profile-self" },
+  { route: "POST /v1/account/recovery-email/confirm", auth: "public", origin:"trusted", resource: "identity", action: "confirm-recovery-email" },
+  { route: "DELETE /v1/account/recovery-email", auth: "user", resource: "identity", action: "profile-self" },
   { route: "GET /v1/account/email", auth: "user", resource: "identity", action: "read-email" },
   { route: "POST /v1/account/email/change", auth: "user", resource: "identity", action: "request-email-change" },
   { route: "POST /v1/account/email/change/resend", auth: "user", resource: "identity", action: "resend-email-change" },
@@ -1319,15 +1388,17 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
   // P13: cancel without signing in (Terms §12). First-party Origin only; never a session.
   { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },
-  { route: "POST /v1/billing/cancel-by-token", auth: "public", origin: "trusted", resource: "billing", action: "cancel-by-token" }
+  { route: "POST /v1/billing/cancel-by-token", auth: "public", origin: "trusted", resource: "billing", action: "cancel-by-token" },
+  ...staffAuthorizationPolicyInventory
 ] as const satisfies readonly Readonly<{
   route: string;
   auth: RouteAuthPolicy;
   origin?: RouteOriginPolicy;
   session?: RouteSessionPolicy;
+  staffCapability?: StaffCapability;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status" | "geo" | "billing";
+    "support-status" | "geo" | "billing" | "staff-self" | "staff-team" | "staff-invitation" | "owner-possession" | "staff-audit";
   action: string;
 }>[]);
 
@@ -1336,8 +1407,14 @@ const authorizationPolicies = new Map<string, typeof authorizationPolicyInventor
   authorizationPolicyInventory.map((policy) => [policy.route, policy])
 );
 
+type RoutePolicyConfig = {readonly config: {readonly auth: RouteAuthPolicy; readonly staffCapability?: StaffCapability;
+  readonly origin?: RouteOriginPolicy; readonly session?: RouteSessionPolicy}};
+function routePolicy(route: Exclude<AuthorizationRoute, typeof staffAuthorizationPolicyInventory[number]["route"]>):
+  {readonly config: {readonly auth: Exclude<RouteAuthPolicy, "staff">; readonly origin?: RouteOriginPolicy; readonly session?: RouteSessionPolicy}};
+function routePolicy(route: AuthorizationRoute): RoutePolicyConfig;
 function routePolicy(route: AuthorizationRoute): { readonly config: {
   readonly auth: RouteAuthPolicy;
+  readonly staffCapability?: StaffCapability;
   readonly origin?: RouteOriginPolicy;
   readonly session?: RouteSessionPolicy;
 } } {
@@ -1345,7 +1422,8 @@ function routePolicy(route: AuthorizationRoute): { readonly config: {
   if (policy === undefined) throw new TypeError(`AUTHORIZATION_POLICY_UNDECLARED:${route}`);
   return Object.freeze({
     config: Object.freeze({
-      auth: policy.auth,
+      auth: policy.auth as RouteAuthPolicy,
+      ...("staffCapability" in policy ? { staffCapability: policy.staffCapability } : {}),
       ...("origin" in policy ? { origin: policy.origin } : {}),
       ...("session" in policy ? { session: policy.session } : {})
     })
@@ -1451,6 +1529,7 @@ function passwordWithinRequestBound(body: Readonly<Record<string, unknown>>): bo
 declare module "fastify" {
   interface FastifyContextConfig {
     auth?: RouteAuthPolicy;
+    staffCapability?: StaffCapability;
     origin?: RouteOriginPolicy;
     session?: RouteSessionPolicy;
   }
@@ -1458,6 +1537,7 @@ declare module "fastify" {
   interface FastifyRequest {
     session: Session;
     authenticatedSession?: AuthenticatedSession;
+    staffAuthentication?: StaffAuthentication;
     cookieRefresh?: Readonly<{ sessionToken: string; csrfToken: string | null }>;
   }
 }
@@ -1475,7 +1555,7 @@ export interface AskApplication {
   recordInvestigation(answerId: string, gapRef: string, userInput: string | null, session: Session, ownership: RunOwnershipAccess): Promise<InvestigationAccepted | null>;
   unlinkMemoryLink(answerId: string, session: Session, ownership: RunOwnershipAccess): Promise<{ readonly memory_link_id: string; readonly state: "UNLINKED" } | null>;
   readDeployment(session: Session): Promise<Deployment>;
-  events(runId: string, session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown>;
+  events(runId: string, session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): AsyncIterable<unknown>;
 }
 
 export type AskPrincipal =
@@ -1507,11 +1587,26 @@ const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Obje
 });
 
 export interface ApiOptions {
+  readonly previewProviderTestConfig?: PreviewProviderTestConfig;
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
+  /** Mandatory for signup and resend; absent configuration fails closed. */
+  readonly turnstile?: TurnstileVerifier;
   readonly recovery?: RecoveryApplication;
+  readonly passwordReset?: PasswordResetApplication;
+  readonly backupEmail?: BackupEmailApplication;
+  readonly mfaRecovery?: MfaRecoveryApplication;
   readonly mfa?: MfaApplication;
   readonly sessions?: SessionApplication;
+  readonly consumerWebAuthn?: ConsumerWebAuthnApplication;
+  readonly consumerSecurity?:ConsumerSecurityApplication;
+  readonly socialAuth?:SocialAuthApplication;
+  readonly socialStepUp?:SocialStepUpApplication;
+  readonly consumerRecovery?:ConsumerRecoveryApplication;
+  readonly onboardingEvidence?:OnboardingEvidenceApplication;
+  readonly staffAccess?: StaffAccessApplication;
+  readonly staffPolicyVersion?: 1 | 2;
+  readonly staff?: StaffHttpApplication;
   readonly publications?: PublicationApplication;
   /**
    * hate-speech S02 (SPEC-v2 R1, D-S02-22): the pre-publish content check,
@@ -1540,6 +1635,8 @@ export interface ApiOptions {
   readonly legal?: LegalAcceptanceApplication;
   /** Turn 14 — change email; the routes answer a closed 503 when it is absent. */
   readonly emailChange?: EmailChangeApplication;
+  readonly accountProfile?: Pick<AccountProfileService,"phoneProfile"|"revealPhoneProfile"|"updatePhoneProfile">;
+  readonly recoveryEmail?: Pick<RecoveryEmailService,"recoveryEmail"|"requestRecoveryEmail"|"confirmRecoveryEmail"|"removeRecoveryEmail">;
   readonly allowedOrigin?: string;
   readonly evaluatorDevMenu?: EvaluatorDevMenuApplication;
   readonly evaluatorDevMenuRegisterVersion?: number;
@@ -1765,6 +1862,14 @@ function csrfCookie(value: string, maxAgeSeconds: number): string {
   return `${CSRF_COOKIE_NAME}=${value}; Path=/; Max-Age=${maxAgeSeconds}; Secure; SameSite=Lax`;
 }
 
+/** All verified consumer methods share this sole public bearer/cookie projection. */
+function completeAuthenticatedResponse(reply:FastifyReply,result:LoginResult):FastifyReply {
+  const response=AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session,
+    ...(result.replacementRecoveryCode===undefined?{}:{replacement_recovery_code:result.replacementRecoveryCode})});
+  reply.header("set-cookie",[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS),...(exactCookie(reply.request.headers.cookie,SOCIAL_BROWSER_COOKIE)===null?[]:[`${SOCIAL_BROWSER_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`])]);
+  return reply.send(response);
+}
+
 function expiredCookies(): readonly string[] {
   const expired = "Thu, 01 Jan 1970 00:00:00 GMT";
   return Object.freeze([
@@ -1835,7 +1940,42 @@ function refreshedCookies(input: Readonly<{
   ]);
 }
 
+/** Paid plans G3a: the code sign-in and support answer where the service is not offered. */
+const COUNTRY_SERVICE_UNAVAILABLE = "COUNTRY_SERVICE_UNAVAILABLE";
+/** Every POST that can end in a new session. Cancel links ("this wasn't me") stay open everywhere. */
+const SIGN_IN_ROUTES: ReadonlySet<string> = new Set([
+  "/v1/auth/login",
+  "/v1/auth/passkeys/login/options",
+  "/v1/auth/passkeys/login/complete",
+  "/v1/auth/social/:provider/begin",
+  "/v1/auth/social/apple/callback",
+  "/v1/auth/social/login/status",
+  "/v1/auth/recovery/start",
+  "/v1/auth/recovery/prove",
+  "/v1/auth/recovery/enrollment/options",
+  "/v1/auth/recovery/enrollment/complete",
+  "/v1/auth/password-reset/start",
+  "/v1/auth/password-reset/exchange",
+  "/v1/auth/password-reset/complete",
+  "/v1/auth/mfa-recovery/start",
+  "/v1/auth/mfa-recovery/exchange"
+]);
+/**
+ * The onboarding steps after sign-up and recovery: without a session already held they end in a new
+ * one (an enrollment token, not a cookie, carries the caller), so they are sign-in doors too. With a
+ * session held they add a factor to it and stay open.
+ */
+const ONBOARDING_SIGN_IN_ROUTES: ReadonlySet<string> = new Set([
+  "/v1/auth/mfa/totp/begin",
+  "/v1/auth/mfa/totp/verify",
+  "/v1/auth/mfa/recovery-codes/generate",
+  "/v1/auth/mfa/recovery-codes/confirm",
+  "/v1/auth/passkeys/enrollment/options",
+  "/v1/auth/passkeys/enrollment/complete"
+]);
+
 export function buildApi(options: ApiOptions): FastifyInstance {
+  const previewConfig=validatePreviewProviderTestConfig(options.previewProviderTestConfig);
   // Crisis check: compile its patterns now, not on the first question (about a second, once).
   warmCrisisCheck();
   const allowedOrigin = options.allowedOrigin === undefined
@@ -1866,6 +2006,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const policy = authorizationPolicies.get(key);
       if (policy === undefined
         || route.config?.auth !== policy.auth
+        || route.config?.staffCapability !== ("staffCapability" in policy ? policy.staffCapability : undefined)
         || route.config?.origin !== ("origin" in policy ? policy.origin : undefined)
         || route.config?.session !== ("session" in policy ? policy.session : undefined)) {
         throw new TypeError(`AUTHORIZATION_POLICY_UNDECLARED:${key}`);
@@ -1874,6 +2015,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   api.decorateRequest("session");
   api.decorateRequest("authenticatedSession");
+  api.decorateRequest("staffAuthentication");
   api.decorateRequest("cookieRefresh");
   /**
    * Paid plans L3b: the Terms and Privacy pairs a register request carried, keyed by the request object
@@ -1881,6 +2023,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * request and no request decoration is added.
    */
   const registerLegalDocuments = new WeakMap<object, RegisterLegalDocuments>();
+  const registerPublicBodies = new WeakMap<object, Record<string, unknown>>();
+  const sourceAdmissions = new WeakMap<object, AuthSourceAdmission>();
+  api.addHook("onResponse", async request => { sourceAdmissions.get(request)?.release(); sourceAdmissions.delete(request); });
+  const mailDisplays = new WeakMap<object, Readonly<{ locale: string; timeZone: string | null }>>();
   // Region picker S01: parsed region for the current register request only.
   const registerDeclaredRegions = new WeakMap<object, DeclaredRegion>();
   const sourceFor = (request: {
@@ -1906,10 +2052,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ? request.headers["user-agent"] as string
         : "unknown",
       requestId: request.id,
+      ...(socialBrowserHash(exactCookie(request.headers.cookie as string | undefined,SOCIAL_BROWSER_COOKIE)) === undefined ? {} : { socialBrowserHash: socialBrowserHash(exactCookie(request.headers.cookie as string | undefined,SOCIAL_BROWSER_COOKIE))! }),
       // Age gate (R3-3): the country computed above (the edge's, else the country gate's lookup),
       // left out when neither gives one.
       ...(countryCode === null ? {} : { countryCode }),
       ...(legal === undefined ? {} : { legal }),
+      ...(mailDisplays.get(request) === undefined ? {} : { mailDisplay: mailDisplays.get(request)! }),
       ...(region === undefined ? {} : { region })
     });
   };
@@ -1992,13 +2140,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }
       return;
     }
-    if (authPolicy !== "user" && authPolicy !== "operator") {
+    if (authPolicy !== "user" && authPolicy !== "operator" && authPolicy !== "staff") {
       return reply.status(401).send({ error: "SESSION_REQUIRED" });
     }
     const rawCookie = request.headers.cookie;
     const cookieWasPresented = typeof rawCookie === "string"
       && rawCookie.split(";").some((member) => member.trimStart().startsWith(`${SESSION_COOKIE_NAME}=`));
-    if (typeof request.headers[RETIRED_DEV_HEADER] === "string") {
+    if (request.headers[RETIRED_DEV_HEADER] !== undefined || (authPolicy === "staff" && request.headers.authorization !== undefined)) {
       return reply.status(401).send({ error: "SESSION_REQUIRED" });
     }
     if (cookieWasPresented) {
@@ -2028,6 +2176,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         }
       }
       request.cookieRefresh = Object.freeze({ sessionToken: sessionToken!, csrfToken: csrfCookieToken });
+      if (authPolicy === "staff") {
+        const staffToken = exactStaffCookie(rawCookie, STAFF_COOKIE_NAME);
+        if (staffToken === null || options.staffAccess === undefined) {
+          return reply.status(401).send({ error: "STAFF_AUTHORITY_INVALID" });
+        }
+        const staffAuth = await options.staffAccess.authenticate(authenticated, staffToken);
+        if (staffAuth === null) return reply.status(401).send({ error: "STAFF_AUTHORITY_INVALID" });
+        try {
+          await options.staffAccess.assertCurrent(staffAuth);
+          if (request.routeOptions.config.staffCapability !== undefined) await options.staffAccess.requireCapability(staffAuth, request.routeOptions.config.staffCapability);
+        }
+        catch { return reply.status(403).send({ error: "STAFF_AUTHORITY_INVALID" }); }
+        if (MUTATING_METHODS.has(request.method)) {
+          const csrf = exactStaffCsrfPair(request.headers[STAFF_CSRF_HEADER], exactStaffCookie(rawCookie, STAFF_CSRF_COOKIE_NAME));
+          if (csrf === null || !await options.staffAccess.verifyCsrf(staffAuth, csrf)) return reply.status(403).send({ error: "CSRF_VALIDATION_FAILED" });
+        }
+        request.staffAuthentication = staffAuth;
+      }
       if (authPolicy === "operator") {
         return reply.status(403).send({ error: "OPERATOR_REQUIRED" });
       }
@@ -2035,26 +2201,75 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(401).send({ error: "SESSION_REQUIRED" });
   });
+  api.addHook("preSerialization", async (request, reply, payload) => {
+    if (reply.statusCode >= 400) return payload;
+    if (request.routeOptions.url?.startsWith("/v1/admin/") && request.authenticatedSession !== undefined) {
+      try {
+        if (options.sessions?.assertCurrent === undefined) throw new Error("SESSION_REQUIRED");
+        await options.sessions.assertCurrent(request.authenticatedSession);
+      } catch { reply.code(401); return typeof payload === "string" ? JSON.stringify({error: "SESSION_REQUIRED"}) : {error: "SESSION_REQUIRED"}; }
+    }
+    if (request.staffAuthentication === undefined) return payload;
+    try { await options.staffAccess!.assertCurrent(request.staffAuthentication); }
+    catch { reply.code(401); return { error: "STAFF_AUTHORITY_INVALID" }; }
+    return payload;
+  });
+  // Fastify skips preSerialization for string/Buffer/stream payloads. Final emission always checks.
+  api.addHook("onSend", async (request, reply, payload) => {
+    if (reply.statusCode >= 400) return payload;
+    if (request.routeOptions.url?.startsWith("/v1/admin/") && request.authenticatedSession !== undefined) {
+      try {
+        if (options.sessions?.assertCurrent === undefined) throw new Error("SESSION_REQUIRED");
+        await options.sessions.assertCurrent(request.authenticatedSession);
+      } catch { reply.code(401); return typeof payload === "string" ? JSON.stringify({error: "SESSION_REQUIRED"}) : {error: "SESSION_REQUIRED"}; }
+    }
+    if (request.staffAuthentication === undefined) return payload;
+    try {
+      if (payload !== null && typeof payload === "object" && !Buffer.isBuffer(payload)) throw new Error("STAFF_AUTHORITY_INVALID");
+      await options.staffAccess!.assertCurrent(request.staffAuthentication);
+      return payload;
+    } catch {
+      reply.code(401); reply.header("content-type","application/json; charset=utf-8");
+      return JSON.stringify({error:"STAFF_AUTHORITY_INVALID"});
+    }
+  });
   /**
    * Paid plans G3a (spec §2.3.3): the country gate in front of register. The registration mount region
    * is frozen (S04), so — like the age gate below — the refusal is decided in a hook, before the date of
    * birth is judged and before any account work. The answer is the code only.
    */
   api.addHook("preHandler", async (request, reply) => {
-    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    if (request.method !== "POST" || !["/v1/auth/register","/v1/auth/social/signup/complete"].includes(request.routeOptions.url ?? "")) return;
     const countryRefusal = options.countryGate?.signup(sourceFor(request)) ?? null;
     if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
   });
+  /**
+   * Paid plans G3a, sign-in: no new sign-in where the service is not offered (sign-up's rule — the
+   * address's switch, Tor, unknown). Every door that ends in a new session is closed there: password,
+   * passkey, social, account recovery, password reset, MFA recovery and onboarding without a session.
+   * A session already held, every
+   * read, and the "this wasn't me" cancel links are never gated. The answer is the code only.
+   */
+  api.addHook("preHandler", async (request, reply) => {
+    if (options.countryGate === undefined) return;
+    const route = request.routeOptions.url ?? "";
+    const isSignIn = request.method === "POST"
+      ? SIGN_IN_ROUTES.has(route) || (request.authenticatedSession === undefined && ONBOARDING_SIGN_IN_ROUTES.has(route))
+      : request.method === "GET" && route === "/v1/auth/social/:provider/callback";
+    if (!isSignIn || options.countryGate.service(sourceFor(request)) === null) return;
+    // A social callback is a browser navigation: the login page says why, in the visitor's language.
+    if (request.method === "GET" || route === "/v1/auth/social/apple/callback") return reply.redirect("/login", 303);
+    return reply.status(403).send({ error: COUNTRY_SERVICE_UNAVAILABLE });
+  });
   /** Region picker S01 (SPEC R17, R18): parse the declared region after the IP gate and before age. */
   api.addHook("preHandler", async (request, reply) => {
-    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    if (request.method !== "POST" || !["/v1/auth/register", "/v1/auth/social/signup/complete"].includes(request.routeOptions.url ?? "")) return;
     const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
       ? request.body as Record<string, unknown> : null;
     const region = body === null ? null : parseDeclaredRegion(body);
     if (region === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
-    if (options.countryGate?.declaredSignupRefusal(region.country) === "COUNTRY_SIGNUP_UNAVAILABLE") {
-      return reply.status(403).send({ error: "COUNTRY_SIGNUP_UNAVAILABLE" });
-    }
+    const declaredRefusal = options.countryGate?.declaredSignupRefusal(region) ?? null;
+    if (declaredRefusal !== null) return reply.status(403).send({ error: declaredRefusal });
     registerDeclaredRegions.set(request, region);
   });
   /**
@@ -2065,7 +2280,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
    * and it overwrites anything the client claimed. The date itself goes no further.
    */
   api.addHook("preHandler", async (request, reply) => {
-    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    if (request.method !== "POST" || !["/v1/auth/register","/v1/auth/social/signup/complete"].includes(request.routeOptions.url ?? "")) return;
     if (ageRefusalCookiePresent(request.headers.cookie)) return ageRefused(reply);
     const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
       ? request.body as Record<string, unknown>
@@ -2073,17 +2288,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const dateOfBirth = body === null ? null : dateOfBirthValue(body.date_of_birth);
     if (body === null || dateOfBirth === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
     if (!meetsMinimumAge(dateOfBirth)) return ageRefused(reply);
+    // Keep the original submitted facts separate from the server age decision.
+    registerPublicBodies.set(request, { ...body });
     body.adult_affirmed = true;
   });
   /**
    * Paid plans L3b (spec §2.3.2): the pairs of the documents the sign-up page displayed. The registration
    * mount region is frozen (S04), so — as the age gate does for the date — they are read here and travel to
-   * the service on the source (sourceFor), never in the region's four input members. A missing or malformed
-   * triple travels as absent, which the service refuses as LEGAL_DOCUMENT_STALE when the records key is
-   * composed. Runs after the age gate's hook, so a refused date never gets this far.
+   * the service on the source (sourceFor), separately from account profile input. The canonical hook
+   * below rejects a missing or malformed triple; the service pre-proof admission port resolves
+   * well-formed pairs against the current manifest before any budget or proof. Runs after age refusal.
    */
   api.addHook("preHandler", async (request) => {
-    if (request.method !== "POST" || request.routeOptions.url !== "/v1/auth/register") return;
+    if (request.method !== "POST" || !["/v1/auth/register","/v1/auth/social/signup/complete"].includes(request.routeOptions.url ?? "")) return;
     const body = typeof request.body === "object" && request.body !== null && !Array.isArray(request.body)
       ? request.body as Record<string, unknown>
       : null;
@@ -2092,6 +2309,38 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       terms: body.terms, privacy: body.privacy, locale: body.locale
     });
     if (legal.success) registerLegalDocuments.set(request, legal.data);
+  });
+  // Parse submitted facts, never the body carrying the server's injected age decision.
+  api.addHook("preHandler", async (request, reply) => {
+    const path = request.routeOptions.url;
+    if (request.method !== "POST" || (path !== "/v1/auth/register" && path !== "/v1/auth/resend-verification" && path !== "/v1/auth/social/signup/complete")) return;
+    const socialSignup = path === "/v1/auth/social/signup/complete";
+    const signup = path === "/v1/auth/register" || socialSignup;
+    const submitted = signup ? registerPublicBodies.get(request) : request.body;
+    if (submitted && typeof submitted === "object" && !passwordWithinRequestBound(submitted as Record<string, unknown>)) {
+      return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    const parsed = socialSignup ? CompleteSocialSignupRequestSchema.safeParse(registerPublicBodies.get(request)) : path === "/v1/auth/register"
+      ? RegisterRequestSchema.safeParse(registerPublicBodies.get(request))
+      : ResendVerificationRequestSchema.safeParse(request.body);
+    if (!parsed.success || !passwordWithinRequestBound(parsed.data)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    if (signup) {
+      const body = request.body as Record<string, unknown>;
+      try { body.phone = normalizeManualPhone(body.phone); } catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+    }
+    mailDisplays.set(request, Object.freeze({ locale: parsed.data.ui_locale, timeZone: parsed.data.time_zone }));
+    const body = request.body as Record<string, unknown>;
+    const admission = await options.registration?.admitSource?.(socialSignup
+      ? {route:"social",source:sourceFor(request),input:{email:parsed.data.email,phone:typeof body.phone === "string" ? body.phone : "",adultAffirmed:body.adult_affirmed===true}}
+      : path === "/v1/auth/register"
+      ? { route: "register", source: sourceFor(request), input: {
+          email: typeof body.email === "string" ? body.email : "", password: typeof body.password === "string" ? body.password : "",
+          phone: typeof body.phone === "string" ? body.phone : "", recoveryEmail: null, adultAffirmed: body.adult_affirmed === true
+        } }
+      : { route: "resend", source: sourceFor(request), input: { email: parsed.data.email } });
+    if (admission !== undefined) sourceAdmissions.set(request, admission);
+    try { await requireTurnstileProof(options.turnstile, { token: parsed.data.turnstile_token, action: signup ? "signup" : "resend-verification" }); }
+    catch (error) { admission?.release(); sourceAdmissions.delete(request); throw error; }
   });
   /**
    * L1-F6: unknown routes, and HEAD/OPTIONS on known ones (`exposeHeadRoutes`
@@ -2102,6 +2351,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   api.setNotFoundHandler((_request, reply) =>
     reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" }));
   api.setErrorHandler((error, request, reply) => {
+    if (error instanceof SocialAuthError) return reply.status(error.statusCode).send({error:error.code,message:error.code});
+    if (error instanceof TurnstileGateError) {
+      return reply.status(error.statusCode).send({ error: error.code, message: error.code });
+    }
     if (reply.sent || reply.raw.headersSent) {
       // A streaming response has no lawful error envelope left to send. Abort
       // the one connection instead of fabricating a terminal SSE event (DR-115)
@@ -2120,7 +2373,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }
       return;
     }
-    const knownError = error instanceof Error ? error : new Error(String(error));
+    const rawError = error instanceof Error ? error : new Error(String(error));
+    const consumerRefusal = new Set(['SOCIAL_FLOW_INVALID','SOCIAL_PARENT_INVALID','SOCIAL_LAST_PATH','CONSUMER_PASSWORD_PATH_UNAVAILABLE','STEP_UP_GRANT_GENERATION_INVALID','CONSUMER_SECURITY_INVALID','CONSUMER_RECOVERY_INVALID','CONSUMER_LAST_METHOD','CONSUMER_WEBAUTHN_INVALID','ONBOARDING_AUTHORITY_INVALID','ONBOARDING_EVIDENCE_CHANGED','ONBOARDING_EVIDENCE_REQUIRED','ONBOARDING_AGE_REQUIRED','ONBOARDING_AGE_NOT_REQUIRED']);
+    const knownError = rawError.message==='CONSUMER_PASSWORD_PATH_UNAVAILABLE'||rawError.message==='CONSUMER_LAST_METHOD' ? new AuthFlowError('MFA_ENROLLMENT_STATE_INVALID') : consumerRefusal.has(rawError.message) ? new AuthFlowError('AUTH_CREDENTIALS_INVALID') : rawError;
     const frameworkCode = (knownError as Error & Readonly<{ code?: unknown }>).code;
     const transportFault = typeof frameworkCode === "string"
       ? TRANSPORT_FAULT_ENVELOPES.get(frameworkCode) : undefined;
@@ -2195,6 +2450,104 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     });
   });
 
+  const socialCookie = (name:string,value:string,expiresAt:string,sameSite:'Lax'|'None'='Lax') => `${name}=${value}; Path=/; Max-Age=${Math.max(0,Math.min(300,Math.floor((new Date(expiresAt).getTime()-Date.now())/1000)))}; HttpOnly; Secure; SameSite=${sameSite}`;
+  const clearedSocialCookie = (name:string,sameSite:'Lax'|'None'='Lax') => `${name}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=${sameSite}`;
+  api.get('/v1/auth/providers',routePolicy('GET /v1/auth/providers'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/auth/providers',sourceFor(request).ip))return reply;return reply.send(await options.socialAuth?.authProviders() ?? {providers:[]});});
+  api.post<{Params:{provider:string}}>('/v1/auth/social/:provider/begin',credentialRoutePolicy('POST /v1/auth/social/{provider}/begin'),async(request,reply)=>{
+    const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success)throw new SocialAuthError('SOCIAL_PROOF_INVALID');if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
+    const result=await options.socialAuth.begin(provider.data,request.body??{},sourceFor(request));
+    reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));
+    return reply.send({authorization_url:result.authorization_url});
+  });
+  const socialCallback = async(provider:'google'|'apple'|'facebook'|'x',input:unknown,request:FastifyRequest,reply:FastifyReply)=>{
+    const cookieName=provider==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE;
+    reply.header('set-cookie',clearedSocialCookie(cookieName,provider==='apple'?'None':'Lax'));
+    if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
+    const result=await options.socialAuth.callback(provider,input,exactCookie(request.headers.cookie,cookieName),sourceFor(request));
+    if(result.status==='linked')return reply.redirect(result.next,303);
+    reply.header('set-cookie',[clearedSocialCookie(cookieName,provider==='apple'?'None':'Lax'),socialCookie(SOCIAL_BROWSER_COOKIE,result.browserCookie,result.expiresAt)]);
+    return reply.redirect('/social/complete#'+new URLSearchParams({kind:result.status==='mfa_required'?'login':result.status==='provider_step_up_required'?'stepup':'signup',token:result.token,next:result.next}),303);
+  };
+  api.get<{Params:{provider:string}}>('/v1/auth/social/:provider/callback',routePolicy('GET /v1/auth/social/{provider}/callback'),async(request,reply)=>{
+    const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success||provider.data==='apple')throw new SocialAuthError('SOCIAL_PROOF_INVALID');return socialCallback(provider.data,request.query,request,reply);
+  });
+  void api.register(async apple=>{
+    // Replace the inherited billing-only parser in this callback's encapsulated scope.
+    // The parent still refuses form bodies on all routes except the xMoney notification.
+    if (apple.hasContentTypeParser('application/x-www-form-urlencoded')) apple.removeContentTypeParser('application/x-www-form-urlencoded');
+    apple.addContentTypeParser('application/x-www-form-urlencoded',{parseAs:'string',bodyLimit:8192},(_request,body,done)=>{
+      try {const form=new URLSearchParams(body as string);const value:Record<string,string>={};for(const [key,member] of form){if(Object.hasOwn(value,key)||!['state','code','error','error_description','user'].includes(key))throw new SocialAuthError('SOCIAL_PROOF_INVALID');value[key]=member;}done(null,value);}catch{done(new SocialAuthError('SOCIAL_PROOF_INVALID'));}
+    });
+    apple.post('/v1/auth/social/apple/callback',{...routePolicy('POST /v1/auth/social/apple/callback'),bodyLimit:8192},async(request,reply)=>{
+      if(request.headers['content-type']?.split(';')[0]?.trim()!=='application/x-www-form-urlencoded')throw new SocialAuthError('SOCIAL_PROOF_INVALID');return socialCallback('apple',request.body,request,reply);
+    });
+  });
+  api.post('/v1/auth/social/login/status',credentialRoutePolicy('POST /v1/auth/social/login/status'),async(request,reply)=>{if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialAuth.loginStatus(request.body,sourceFor(request)));});
+  api.post('/v1/auth/social/signup/status',credentialRoutePolicy('POST /v1/auth/social/signup/status'),async(request,reply)=>{if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialAuth.signupStatus(request.body,sourceFor(request)));});
+  api.post('/v1/auth/social/signup/complete',credentialRoutePolicy('POST /v1/auth/social/signup/complete'),async(request,reply)=>{
+    if(!options.socialAuth||!sourceAdmissions.get(request))throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
+    const result=await options.socialAuth.completeSignup(registerPublicBodies.get(request),sourceFor(request),sourceAdmissions.get(request)!);
+    if('status' in result)return reply.send(result);
+    reply.header('set-cookie',clearedSocialCookie(SOCIAL_BROWSER_COOKIE));return reply.status(202).send({...result,retry_after_seconds:60});
+  });
+  api.get('/v1/account/social-providers',routePolicy('GET /v1/account/social-providers'),async(request,reply)=>{if(!options.socialAuth)return reply.send({providers:[]});return reply.send(await options.socialAuth.linked(request.authenticatedSession!));});
+  api.post<{Params:{provider:string}}>('/v1/account/social/:provider/link',credentialRoutePolicy('POST /v1/account/social/{provider}/link'),async(request,reply)=>{
+    const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success)throw new SocialAuthError('SOCIAL_PROOF_INVALID');if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
+    const result=await options.socialAuth.begin(provider.data,request.body,sourceFor(request),request.authenticatedSession!);reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));return reply.send({authorization_url:result.authorization_url});
+  });
+  api.post<{Params:{provider:string}}>('/v1/account/social/:provider/step-up/begin',credentialRoutePolicy('POST /v1/account/social/{provider}/step-up/begin'),async(request,reply)=>{
+    const provider=SocialProviderSchema.safeParse(request.params.provider);if(!provider.success)throw new SocialAuthError('SOCIAL_PROOF_INVALID');if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');
+    const result=await options.socialAuth.beginStepUp(provider.data,request.body,sourceFor(request),request.authenticatedSession!);reply.header('set-cookie',socialCookie(provider.data==='apple'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,result.flowCookie,result.expiresAt,provider.data==='apple'?'None':'Lax'));return reply.send({authorization_url:result.authorization_url});
+  });
+  api.post('/v1/account/social/step-up/status',credentialRoutePolicy('POST /v1/account/social/step-up/status'),async(request,reply)=>{if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialStepUp.status(request.body,request.authenticatedSession!,sourceFor(request)));});
+  api.post('/v1/account/social/step-up/passkey-options',credentialRoutePolicy('POST /v1/account/social/step-up/passkey-options'),async(request,reply)=>{if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');return reply.send(await options.socialStepUp.beginPasskey(request.body,request.authenticatedSession!,sourceFor(request)));});
+  api.post('/v1/account/social/step-up/complete',{...credentialRoutePolicy('POST /v1/account/social/step-up/complete'),bodyLimit:32768},async(request,reply)=>{
+    if(!options.socialStepUp)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');const r=await options.socialStepUp.complete(request.body,request.authenticatedSession!,sourceFor(request));reply.header('set-cookie',[sessionCookie(r.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(r.response.csrf_token,SESSION_IDLE_MAX_AGE_SECONDS),clearedSocialCookie(SOCIAL_BROWSER_COOKIE)]);return reply.send(r.response);
+  });
+  api.post('/v1/account/social/unlink',credentialRoutePolicy('POST /v1/account/social/unlink'),async(request,reply)=>{if(!options.socialAuth)throw new SocialAuthError('SOCIAL_PROVIDER_UNAVAILABLE');await options.socialAuth.unlink(request.body,request.authenticatedSession!,sourceFor(request));return reply.status(204).send();});
+
+  if(options.consumerRecovery!==undefined){
+    const recovery=options.consumerRecovery;
+    api.post('/v1/auth/recovery/prove',credentialRoutePolicy('POST /v1/auth/recovery/prove'),async(request,reply)=>reply.send(await recovery.prove(request.body,sourceFor(request))));
+    api.post('/v1/auth/recovery/enrollment/options',credentialRoutePolicy('POST /v1/auth/recovery/enrollment/options'),async(request,reply)=>reply.send(await recovery.beginEnrollment(request.body,sourceFor(request))));
+    api.post('/v1/auth/recovery/enrollment/complete',{...credentialRoutePolicy('POST /v1/auth/recovery/enrollment/complete'),bodyLimit:32768},async(request,reply)=>completeAuthenticatedResponse(reply,await recovery.completeEnrollment(request.body,sourceFor(request))));
+  }
+  if(options.onboardingEvidence!==undefined){
+    const evidence=options.onboardingEvidence;
+    api.post('/v1/auth/onboarding/status',credentialRoutePolicy('POST /v1/auth/onboarding/status'),async(request,reply)=>reply.send(await evidence.status('PENDING',request.body,sourceFor(request))));
+    api.post('/v1/auth/onboarding/complete',credentialRoutePolicy('POST /v1/auth/onboarding/complete'),async(request,reply)=>{await evidence.complete('PENDING',request.body,sourceFor(request));return reply.status(204).send();});
+    api.post('/v1/auth/recovery/enrollment/status',credentialRoutePolicy('POST /v1/auth/recovery/enrollment/status'),async(request,reply)=>reply.send(await evidence.status('RECOVERY',request.body,sourceFor(request))));
+    api.post('/v1/auth/recovery/enrollment/complete-evidence',credentialRoutePolicy('POST /v1/auth/recovery/enrollment/complete-evidence'),async(request,reply)=>{await evidence.complete('RECOVERY',request.body,sourceFor(request));return reply.status(204).send();});
+  }
+  if(options.consumerSecurity!==undefined){
+    const security=options.consumerSecurity;
+    api.get('/v1/account/auth-methods',routePolicy('GET /v1/account/auth-methods'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/auth-methods',sourceFor(request).ip))return reply;return reply.send(await security.authMethods(request.authenticatedSession!));});
+    api.post('/v1/account/auth-methods/remove',credentialRoutePolicy('POST /v1/account/auth-methods/remove'),async(request,reply)=>{await security.removeAuthMethod(request.body,request.authenticatedSession!,sourceFor(request));return reply.status(204).send();});
+    api.post('/v1/account/recovery-codes/regenerate',credentialRoutePolicy('POST /v1/account/recovery-codes/regenerate'),async(request,reply)=>reply.send(await security.regenerateRecoveryCodes(request.body,request.authenticatedSession!,sourceFor(request))));
+    api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request))));
+    api.post('/v1/auth/passkeys/step-up/complete',{...credentialRoutePolicy('POST /v1/auth/passkeys/step-up/complete'),bodyLimit:32768},async(request,reply)=>{
+      const result=await security.completePasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request));
+      reply.header('set-cookie',[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.response.csrf_token,SESSION_IDLE_MAX_AGE_SECONDS)]);
+      return reply.send(result.response);
+    });
+  }
+  if(options.consumerWebAuthn!==undefined){
+    const consumer=options.consumerWebAuthn;
+    api.post("/v1/auth/passkeys/enrollment/options",{...routePolicy("POST /v1/auth/passkeys/enrollment/options"),bodyLimit:32768},async(request,reply)=>
+      reply.send(await consumer.beginPasskeyEnrollment(request.body,sourceFor(request),request.authenticatedSession)));
+    api.post("/v1/auth/passkeys/enrollment/complete",{...routePolicy("POST /v1/auth/passkeys/enrollment/complete"),bodyLimit:32768},async(request,reply)=>{
+      const result=await consumer.completePasskeyEnrollment(request.body,sourceFor(request),request.authenticatedSession);
+      if(result.status==='enrolled')return reply.send(PasskeyEnrollmentResponseSchema.parse(result));
+      return completeAuthenticatedResponse(reply,result);
+    });
+    api.post("/v1/auth/passkeys/login/options",{...routePolicy("POST /v1/auth/passkeys/login/options"),bodyLimit:32768},async(request,reply)=>
+      reply.send(await consumer.beginPasskeyLogin(request.body??{},sourceFor(request))));
+    api.post("/v1/auth/passkeys/login/complete",{...routePolicy("POST /v1/auth/passkeys/login/complete"),bodyLimit:32768},async(request,reply)=>{
+      const result=await consumer.completePasskeyLogin(request.body,sourceFor(request));
+      return completeAuthenticatedResponse(reply,result);
+    });
+  }
+
   if (options.sessions !== undefined) {
     api.post("/v1/auth/login", credentialRoutePolicy("POST /v1/auth/login"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
@@ -2207,23 +2560,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           challengeToken: body.challenge_token,
           code: typeof body.code === "string" ? body.code : ""
         }, sourceFor(request));
-        reply.header("set-cookie", [
-          sessionCookie(result.sessionToken, SESSION_IDLE_MAX_AGE_SECONDS),
-          csrfCookie(result.csrfToken, SESSION_IDLE_MAX_AGE_SECONDS)
-        ]);
-        return reply.send({
-          status: result.status,
-          csrf_token: result.csrfToken,
-          session: result.session,
-          ...(result.replacementRecoveryCode === undefined
-            ? {} : { replacement_recovery_code: result.replacementRecoveryCode })
-        });
+        return completeAuthenticatedResponse(reply,result);
       }
       const result = await options.sessions!.beginLogin({
         email: typeof body.email === "string" ? body.email : "",
         password: typeof body.password === "string" ? body.password : ""
       }, sourceFor(request));
-      return reply.status(202).send({ status: result.status, challenge_token: result.challengeToken });
+      return reply.status(202).send(LoginContinuationResponseSchema.parse({ status: result.status, challenge_token: result.challengeToken, available_methods:result.availableMethods??["totp"] }));
     });
     api.post("/v1/auth/logout", credentialRoutePolicy("POST /v1/auth/logout"), async (request, reply) => {
       const authenticated = request.authenticatedSession;
@@ -2323,9 +2666,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         password: typeof body.password === "string" ? body.password : "",
         code: typeof body.code === "string" ? body.code : "",
         ...(authorization === undefined ? {} : { authorization:
-          !("target_run_id" in authorization)
-            ? { action: authorization.action }
-            : { action: authorization.action, targetRunId: authorization.target_run_id }
+          "target_run_id" in authorization ? {action:authorization.action,targetRunId:authorization.target_run_id}
+            : "target_factor_id" in authorization ? {action:authorization.action,targetFactorId:authorization.target_factor_id}
+            : "target_provider" in authorization ? {action:authorization.action,targetProvider:authorization.target_provider}
+            : {action:authorization.action}
         })
       }, sourceFor(request));
       reply.header("set-cookie", [
@@ -2339,18 +2683,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           || rotated.grantToken === undefined
           || rotated.grantExpiresAt === undefined
           ? {}
-          : { step_up_grant: !("target_run_id" in authorization)
-              ? {
-                  token: rotated.grantToken,
-                  action: authorization.action,
-                  expires_at: rotated.grantExpiresAt.toISOString()
-                }
-              : {
-                  token: rotated.grantToken,
-                  action: authorization.action,
-                  target_run_id: authorization.target_run_id,
-                  expires_at: rotated.grantExpiresAt.toISOString()
-                } })
+          : {step_up_grant:{...authorization,token:rotated.grantToken,expires_at:rotated.grantExpiresAt.toISOString()}})
+
       });
     });
   }
@@ -2443,7 +2777,112 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       }));
     }
   );
-  // Turn 14 — change email (design doc 14A/14B/14C).
+  // Purpose-bound account phone profile and optional recovery email.
+  const profileSession = (authenticated: AuthenticatedSession): ProfileSession => ({
+    userId: authenticated.userId, sessionId: authenticated.session.session_id, tokenHash: authenticated.tokenHash
+  });
+  const profileRefusal = (reply: FastifyReply, error: unknown) => {
+    if (error instanceof AccountProfileError || error instanceof RecoveryEmailError)
+      return reply.status(error.code === "STEP_UP_REQUIRED" ? 403 : error.code === "LINK_EXPIRED" ? 410 : 400).send({
+        error: error.code
+      });
+    throw error;
+  };
+  api.get("/v1/account/profile", routePolicy("GET /v1/account/profile"), async (request, reply) => {
+    if (options.accountProfile === undefined)
+      return reply.status(503).send({
+        error: "ACCOUNT_PROFILE_UNAVAILABLE"
+      });
+    const result = await options.accountProfile.phoneProfile(profileSession(request.authenticatedSession!),sourceFor(request));
+    return result === null ? reply.status(401).send({
+      error: "SESSION_REQUIRED"
+    }) : reply.send(AccountPhoneProfileSchema.parse(result));
+  });
+  api.post("/v1/account/profile/reveal", credentialRoutePolicy("POST /v1/account/profile/reveal"), async (request, reply) => {
+    if (options.accountProfile === undefined)
+      return reply.status(503).send({
+        error: "ACCOUNT_PROFILE_UNAVAILABLE"
+      });
+    const input = parseRequest(PhoneProfileRevealRequestSchema, request.body);
+    try {
+      return reply.send(PhoneProfileRevealSchema.parse(await options.accountProfile.revealPhoneProfile(profileSession(request.authenticatedSession!), input.step_up_grant, sourceFor(request))));
+    }
+    catch (error) {
+      return profileRefusal(reply, error);
+    }
+  });
+  api.post("/v1/account/profile", credentialRoutePolicy("POST /v1/account/profile"), async (request, reply) => {
+    if (options.accountProfile === undefined)
+      return reply.status(503).send({
+        error: "ACCOUNT_PROFILE_UNAVAILABLE"
+      });
+    const input = parseRequest(PhoneProfileUpdateRequestSchema, request.body);
+    try {
+      return reply.send(AccountPhoneProfileSchema.parse(await options.accountProfile.updatePhoneProfile(profileSession(request.authenticatedSession!), {
+        phone: input.phone, grantToken: input.step_up_grant
+      }, sourceFor(request))));
+    }
+    catch (error) {
+      return profileRefusal(reply, error);
+    }
+  });
+  api.get("/v1/account/recovery-email", routePolicy("GET /v1/account/recovery-email"), async (request, reply) => {
+    if (options.recoveryEmail === undefined)
+      return reply.status(503).send({
+        error: "RECOVERY_EMAIL_UNAVAILABLE"
+      });
+    const result = await options.recoveryEmail.recoveryEmail(profileSession(request.authenticatedSession!));
+    return result === null ? reply.status(401).send({
+      error: "SESSION_REQUIRED"
+    }) : reply.send(RecoveryEmailSettingsSchema.parse(result));
+  });
+  api.post("/v1/account/recovery-email", credentialRoutePolicy("POST /v1/account/recovery-email"), async (request, reply) => {
+    if (options.recoveryEmail === undefined)
+      return reply.status(503).send({
+        error: "RECOVERY_EMAIL_UNAVAILABLE"
+      });
+    const input = parseRequest(RecoveryEmailRequestSchema, request.body);
+    try {
+      return reply.status(202).send(RecoveryEmailSettingsSchema.parse(await options.recoveryEmail.requestRecoveryEmail(profileSession(request.authenticatedSession!), {
+        email: input.email, grantToken: input.step_up_grant
+      }, sourceFor(request))));
+    }
+    catch (error) {
+      return profileRefusal(reply, error);
+    }
+  });
+  api.delete("/v1/account/recovery-email", credentialRoutePolicy("DELETE /v1/account/recovery-email"), async (request, reply) => {
+    if (options.recoveryEmail === undefined)
+      return reply.status(503).send({
+        error: "RECOVERY_EMAIL_UNAVAILABLE"
+      });
+    const input = parseRequest(RecoveryEmailRemoveRequestSchema, request.body);
+    try {
+      await options.recoveryEmail.removeRecoveryEmail(profileSession(request.authenticatedSession!), {
+        grantToken: input.step_up_grant
+      }, sourceFor(request));
+      return reply.status(204).send();
+    }
+    catch (error) {
+      return profileRefusal(reply, error);
+    }
+  });
+  api.post("/v1/account/recovery-email/confirm", credentialRoutePolicy("POST /v1/account/recovery-email/confirm"), async (request, reply) => {
+    if (options.recoveryEmail === undefined)
+      return reply.status(503).send({
+        error: "RECOVERY_EMAIL_UNAVAILABLE"
+      });
+    const input = parseRequest(EmailChangeLinkRequestSchema, request.body);
+    try {
+      await options.recoveryEmail.confirmRecoveryEmail(input, sourceFor(request));
+      return reply.send(EmailChangeConfirmedSchema.parse({
+        status: "CONFIRMED"
+      }));
+    }
+    catch (error) {
+      return profileRefusal(reply, error);
+    }
+  });
   const emailChangeSession = (authenticated: AuthenticatedSession): EmailChangeSession =>
     Object.freeze({ userId: authenticated.userId, sessionId: authenticated.session.session_id });
   const pendingBody = (pending: EmailChangePending) => EmailChangePendingSchema.parse({
@@ -2606,10 +3045,11 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const response = await options.registration!.register({
         email: typeof body.email === "string" ? body.email : "",
         password: typeof body.password === "string" ? body.password : "",
-        recoveryEmail: typeof body.recovery_email === "string" ? body.recovery_email : "",
+        recoveryEmail: null,
+        phone: typeof body.phone === "string" ? body.phone : "",
         adultAffirmed: body.adult_affirmed === true
-      }, sourceFor(request));
-      return reply.status(202).send(response);
+      }, sourceFor(request), sourceAdmissions.get(request));
+      return reply.status(202).send({ message: response.message, retry_after_seconds: 60 });
     });
     api.post("/v1/auth/verify-email", credentialRoutePolicy("POST /v1/auth/verify-email"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
@@ -2626,8 +3066,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         : {};
       const response = await options.registration!.resendVerification({
         email: typeof body.email === "string" ? body.email : ""
-      }, sourceFor(request));
-      return reply.status(202).send(response);
+      }, sourceFor(request), sourceAdmissions.get(request));
+      return reply.status(202).send({ message: response.message, retry_after_seconds: 60 });
     });
   }
   // Age gate (8d → 8j). Stateless: the date is checked and dropped. The UI calls this before
@@ -2692,10 +3132,12 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // No gate composed (local mode, or hosted without countryPolicy): sign-up is open and payment is
     // not offered through this answer.
     return reply.send(GeoAvailabilityResponseSchema.parse(
-      options.countryGate?.availability(source.ip) ?? { signup: true, pay: false }
+      options.countryGate?.availability(source.ip) ?? { signup: true, pay: false, service: true }
     ));
   });
 
+  if (options.passwordReset) registerPasswordResetRoutes(api,{service:options.passwordReset,policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/password-reset/start",sourceFor(request).ip)});
+  registerEmailMfaRoutes(api,{...(options.backupEmail?{backup:options.backupEmail}:{}),...(options.mfaRecovery?{mfa:options.mfaRecovery}:{}),policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/mfa-recovery/start",sourceFor(request).ip)});
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
       // L1-F3: this route had no per-source admission control at all — only a
@@ -2719,21 +3161,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
 
   if (options.mfa !== undefined) {
     api.post("/v1/auth/mfa/totp/begin", credentialRoutePolicy("POST /v1/auth/mfa/totp/begin"), async (request, reply) => {
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Record<string, unknown>
-        : {};
-      return reply.send(await options.mfa!.beginTotp({
-        enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : ""
-      }, sourceFor(request)));
+      const body=parseRequest(BeginTotpEnrollmentRequestSchema,request.body);
+      const result=await options.mfa!.beginTotp("enrollment_token" in body?{enrollmentToken:body.enrollment_token}:{stepUpGrant:body.step_up_grant},sourceFor(request),request.authenticatedSession);
+      return reply.send(TotpEnrollmentOptionsResponseSchema.parse(result));
     });
     api.post("/v1/auth/mfa/totp/verify", credentialRoutePolicy("POST /v1/auth/mfa/totp/verify"), async (request, reply) => {
-      const body = typeof request.body === "object" && request.body !== null
-        ? request.body as Record<string, unknown>
-        : {};
-      return reply.send(await options.mfa!.verifyTotp({
-        enrollmentToken: typeof body.enrollment_token === "string" ? body.enrollment_token : "",
-        code: typeof body.code === "string" ? body.code : ""
-      }, sourceFor(request)));
+      const body=parseRequest(CompleteTotpEnrollmentRequestSchema,request.body);
+      const result=await options.mfa!.verifyTotp({enrollmentToken:body.enrollment_token,code:body.code},sourceFor(request),request.authenticatedSession);
+      return result.status==="authenticated"?completeAuthenticatedResponse(reply,result):reply.send(TotpEnrollmentResponseSchema.parse(result));
     });
     api.post("/v1/auth/mfa/recovery-codes/generate", credentialRoutePolicy("POST /v1/auth/mfa/recovery-codes/generate"), async (request, reply) => {
       const body = typeof request.body === "object" && request.body !== null
@@ -2871,7 +3306,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
             plan_tier: query.data.plan_tier,
             composition_budget_tier: query.data.composition_budget_tier,
             depth_params: { depth: query.data.depth }
-          }, access.ownerRef, options.askBilling))
+          }, access.ownerRef, options.askBilling),previewConfig)
         });
     return reply.send(AskRoomResponseSchema.parse({
       room: answer.room,
@@ -2879,6 +3314,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       resets_at: answer.resetsAt?.toISOString() ?? null,
       waiting_run_ref: answer.waitingRunRef,
       plan_id: answer.planId,
+      ...(answer.funding === undefined ? {} : {funding:{kind:"INTERNAL",expires_at:answer.funding.expiresAt.toISOString()}}),
       ...(answer.waitsFor === undefined ? {} : { waits_for: answer.waitsFor })
     }));
   });
@@ -3066,6 +3502,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
 
   api.get<{ Params: { id: string } }>("/v1/runs/:id/events", routePolicy("GET /v1/runs/{id}/events"), async (request, reply) => {
+    if (!admitOrRefuse(reply, "publicReads", "GET /v1/runs/{id}/events", sourceFor(request).ip)) return reply;
     const runId = ResourceIdSchema.safeParse(request.params.id);
     const ownership = ownershipFor(request);
     if (!runId.success || await options.application.readRun(runId.data, request.session, ownership) === null) {
@@ -3079,11 +3516,18 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
       connection: "keep-alive"
     });
-    for await (const candidate of options.application.events(runId.data, request.session, ownership)) {
-      const event = RunEventSchema.parse(candidate);
-      reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
-    }
-    reply.raw.end();
+    await streamAuthorizedEvents({
+      events: signal => options.application.events(runId.data, request.session, ownership, signal),
+      check: async signal => {
+        if (request.authenticatedSession === undefined || options.sessions?.assertCurrent === undefined) throw new Error("SESSION_REQUIRED");
+        await options.sessions.assertCurrent(request.authenticatedSession, signal);
+      },
+      write: candidate => {
+        const event = RunEventSchema.parse(candidate);
+        reply.raw.write(`id: ${event.event_id}\nevent: ${event.event_type}\ndata: ${JSON.stringify(event)}\n\n`);
+      },
+      close: () => { if (!reply.raw.destroyed) reply.raw.end(); }, peer: reply.raw
+    });
   });
   api.get<{ Params: { id: string } }>("/v1/runs/:id", routePolicy("GET /v1/runs/{id}"), async (request, reply) => {
     const runId = ResourceIdSchema.safeParse(request.params.id);
@@ -3245,7 +3689,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       || chargeAdmission(scope, route, key).allowed
   });
   installSupportRoutes(
-    api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
+    api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport,
+    // Paid plans G3a: no support assistant where the service is not offered (sign-up's rule).
+    (request) => (options.countryGate?.service(sourceFor(request)) ?? null) !== null
   );
   // Paid plans (R-3): the one billing routes module, always installed.
   const admitBilling: BillingAdmission = Object.freeze({
@@ -3268,6 +3714,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     },
     ...(billingAgeConfirmation === undefined ? {} : { ageConfirmation: billingAgeConfirmation })
   });
+  if (options.staffPolicyVersion === 2) registerStaffRoutes(api, options.staff,
+    route => routePolicy(route as AuthorizationRoute), {sourceFor, refreshedCookies});
   return api;
 }
 
@@ -3298,6 +3746,7 @@ export class HatchetDispatcher implements Dispatcher {
 }
 
 export interface RunCreationSettings {
+  readonly previewProviderTestConfig?: PreviewProviderTestConfig;
   readonly strangerSampleRate: number;
   readonly registerVersion: number;
   readonly batteryVersion: string;
@@ -3331,6 +3780,7 @@ export interface RunCreationSettings {
    * signed-in owner (ASK_SIGN_IN_REQUIRED). Absent means today's ask exactly.
    */
   readonly billing?: AskBilling;
+  readonly accountProfile?: Pick<AccountProfileService,"hasPhone">;
   /** Budget spec §2.7 (B7b): the line the waker drains. main.ts supplies the room itself. */
   readonly waitingLine?: AskWaitingLinePort;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
@@ -3638,6 +4088,9 @@ export async function evaluateAskAdmission(
   ask: AskRequest,
   personRoom: PersonRoomInput | null = null
 ): Promise<AskAdmission> {
+  const previewConfig=validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
+  if(previewConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")
+    markAskRefusal(new TypedDomainError("PREVIEW_SCORECARD_CONFLICT","Preview roster cannot override a valid scorecard"));
   /**
    * V-28(2) — FIRST, before anything is discovered or probed.
    *
@@ -3675,7 +4128,7 @@ export async function evaluateAskAdmission(
     assertHostedPickerCeiling(modelPicker);
   }
   const discoveredPanel = await settings.resolveDiscoveredPanel();
-  const roster = PLAN_TIER_ROSTERS[planTier as keyof typeof PLAN_TIER_ROSTERS];
+  const roster = previewPlanTierRosters(previewConfig,PLAN_TIER_ROSTERS)[planTier as keyof typeof PLAN_TIER_ROSTERS];
   if (modelPicker !== undefined && modelPicker.scorecard.state === "VALID") {
     return admitWithScorecard({
       settings, ask, risk, discoveredPanel, rosterModelIds: roster,
@@ -3808,6 +4261,13 @@ export type WaitingLineTick = Readonly<{
  */
 const STALLED_START_SECONDS = 300;
 
+/** Private SSE snapshot reads have only a local peer/revocation cancellation seam.
+ * Destroy the dedicated client on abort, including a blocked PostgreSQL query;
+ * do not change pool/global settings or impose the authority-check deadline on content reads. */
+async function queryPrivateSnapshot<T extends QueryResultRow>(pool:Pool,sql:string,values:readonly unknown[],signal?:AbortSignal):Promise<QueryResult<T>> {
+  return queryPrivateStream<T>(pool,sql,values,signal);
+}
+
 export class PostgresAskApplication implements AskApplication {
   readonly #runs: RunRepository;
   readonly #work: WorkItemRepository;
@@ -3830,6 +4290,8 @@ export class PostgresAskApplication implements AskApplication {
     runProvisionPool:Pool,
     askAdmissionPools:Readonly<{ server:Pool;legacy:Pool }>
   ) {
+    validatePreviewProviderTestConfig(settings.previewProviderTestConfig);
+    if(settings.previewProviderTestConfig!==undefined&&settings.modelPicker?.scorecard.state==="VALID")throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT","Preview roster cannot override a valid scorecard");
     if (askAdmissionPools.server===pool || askAdmissionPools.legacy===pool
       || askAdmissionPools.server===runProvisionPool
       || askAdmissionPools.legacy===runProvisionPool
@@ -3872,6 +4334,7 @@ export class PostgresAskApplication implements AskApplication {
     let plannedAsk: AskRequest = requestedAsk;
     let applied: AskApplied | null = null;
     let substitutedAt: Date | null = null;
+    let fundingBasis: FundingBasis | undefined;
     const billing = this.settings.billing;
     if (billing !== undefined) {
       if (principal.kind !== "server") {
@@ -3879,6 +4342,13 @@ export class PostgresAskApplication implements AskApplication {
       }
       const now = billing.clock();
       const resolved = await resolveBillingAsk(requestedAsk, principal.ownerRef, billing, now);
+      // The resolved plan governs completion. Paid/internal questions remain
+      // usable even when coarse fit later chooses the Free provider roster.
+      if (resolved.planId === "FREE" && this.settings.accountProfile !== undefined
+        && !await this.settings.accountProfile.hasPhone(principal.ownerRef)) {
+        markAskRefusal(new TypedDomainError("ACCOUNT_PHONE_REQUIRED", "Complete your phone profile before asking a free question"));
+      }
+      fundingBasis = resolved.fundingBasis;
       ask = resolved.ask;
       plannedAsk = resolved.ask;
       applied = appliedAskOf(resolved.ask);
@@ -3902,7 +4372,7 @@ export class PostgresAskApplication implements AskApplication {
     // the reply carries what the server applied (QUEUED or WAITING).
     if (this.settings.room !== undefined) {
       const accepted = await this.#submitWithRoom(
-        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt
+        ask, plannedAsk, session, principal, ownership, this.settings.room, substitutedAt, fundingBasis
       );
       return Object.freeze({ ...accepted, ...appliedField });
     }
@@ -4030,7 +4500,7 @@ export class PostgresAskApplication implements AskApplication {
    * most likely the same outage — the run keeps reading QUEUED, so the one
    * line that names it goes to the operator's log (ids and codes only).
    */
-  async #recordRunSetupFailure(runId: string, step: RunSetupStep): Promise<void> {
+  async #recordRunSetupFailure(runId: string, step: RunSetupStep | "FUNDING_ENDED"): Promise<void> {
     const reason = `RUN_SETUP_FAILED:${step}`;
     try {
       await this.#work.recordSetupFailure({ runId, ...firstRunJob(runId), reason });
@@ -4109,12 +4579,13 @@ export class PostgresAskApplication implements AskApplication {
     principal: AskPrincipal,
     ownership: RunOwnershipAccess,
     room: AskRoomPort,
-    substitutedAt: Date | null
+    substitutedAt: Date | null,
+    fundingBasis?: FundingBasis
   ): Promise<AskAccepted> {
     if (!Object.hasOwn(PLAN_TIER_ROSTERS, ask.plan_tier as string)) {
       throw new AskRefusal(new TypedDomainError("ASK_PLAN_TIER_INVALID", "The plan tier must be free or premium"));
     }
-    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask) });
+    const question = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(ask,this.settings.previewProviderTestConfig), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
     const admissionPool = principal.kind === "server"
       ? this.#serverAskAdmissionPool : this.#legacyAskAdmissionPool;
@@ -4152,7 +4623,7 @@ export class PostgresAskApplication implements AskApplication {
           startAsk = plannedAsk;
           swappedAt = null;
           swappedEvaluation = plannedEvaluation;
-          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk) });
+          decisionQuestion = Object.freeze({ access: ownership, settingsClass: runSettingsClassOfAsk(plannedAsk,this.settings.previewProviderTestConfig), ...(fundingBasis === undefined ? {} : {fundingBasis}) });
           await room.precheck(decisionQuestion);
         }
         if (swappedEvaluation instanceof AskRefusal) throw swappedEvaluation;
@@ -4353,6 +4824,9 @@ export class PostgresAskApplication implements AskApplication {
           stopped = true;
           break;
         }
+        if (outcome.kind === "FUNDING_FAILED") {
+          failed+=1;await this.#recordRunSetupFailure(run.runId,"FUNDING_ENDED");continue;
+        }
         if (outcome.kind === "PLAN_CHANGED") {
           failed += 1;
           await this.#recordRunSetupFailure(run.runId, "PLAN_CHANGED");
@@ -4538,50 +5012,51 @@ export class PostgresAskApplication implements AskApplication {
     });
   }
 
-  async *events(runId: string, _session: Session, ownership: RunOwnershipAccess): AsyncIterable<unknown> {
+  async *events(runId: string, _session: Session, ownership: RunOwnershipAccess, signal?: AbortSignal): AsyncIterable<unknown> {
+    if (signal?.aborted) return;
     const access = ownership;
-    const [result, failedWork] = await Promise.all([this.pool.query<{
+    const [result, failedWork] = await Promise.all([queryPrivateSnapshot<{
       event_id: string;
       kind: string;
       at_seq: string;
       value_json: unknown;
       content_ciphertext: CryptoEnvelope | null;
-    }>(
+    }>(this.pool,
       `SELECT event.event_id, event.kind, event.at_seq, event.value_json, event.content_ciphertext
        FROM core.run_progress_event AS event
        JOIN core.run AS run ON run.run_id = event.run_id
       WHERE event.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3) ORDER BY event.at_seq`,
-      [runId, access.ownerRef, access.legacyAskerId]
-    ), this.pool.query<{
+      [runId, access.ownerRef, access.legacyAskerId],signal
+    ), queryPrivateSnapshot<{
       work_item_id: string;
       created_at_seq: string;
       terminal_reason: string;
-    }>(
+    }>(this.pool,
       `SELECT work.work_item_id, work.created_at_seq, work.terminal_reason
        FROM core.work_item AS work
        JOIN core.run AS run ON run.run_id = work.run_id
        WHERE work.run_id = $1 AND core.run_is_owned_by(run.run_id,$2,$3) AND work.state = 'FAILED'
        ORDER BY work.created_at_seq`,
-      [runId, access.ownerRef, access.legacyAskerId]
+      [runId, access.ownerRef, access.legacyAskerId],signal
     )]);
-    if (result.rows.length === 0 && failedWork.rows.length === 0) return;
-    const projected = await this.#splitLifecycle.read(runId);
+    if (signal?.aborted || (result.rows.length === 0 && failedWork.rows.length === 0)) return;
+    const projected = await this.#splitLifecycle.read(runId, signal);
     // Lifecycle projection performs additional ungated reads. Revalidate after
     // every source snapshot and before yielding any bytes so a claim committed
     // between the stored-event query and projection cannot disclose data to the
     // superseded owner.
-    const stillOwned = await this.pool.query<{ owned: boolean }>(
+    const stillOwned = await queryPrivateSnapshot<{ owned: boolean }>(this.pool,
       `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
-      [runId, access.ownerRef, access.legacyAskerId]
+      [runId, access.ownerRef, access.legacyAskerId],signal
     );
-    if (stillOwned.rows[0]?.owned !== true) return;
+    if (signal?.aborted || stillOwned.rows[0]?.owned !== true) return;
     // V-6 (0069): only an encrypted run's investigation-gap rows carry an
     // envelope; every other row is read as stored, with no key work at all.
     // Fix round 1 / 4: the run's key is prepared ONCE per read (one lease, one
     // key load), however many gap rows the stream holds.
     let decryptedRows = result.rows;
     if (result.rows.some((row) => (row.content_ciphertext ?? null) !== null)) {
-      const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId);
+      const leased = await prepareLeasedContentEncryptionForRun(this.pool, runId, signal);
       try {
         decryptedRows = result.rows.map((row) => (row.content_ciphertext ?? null) === null
           ? row
@@ -4636,6 +5111,6 @@ export class PostgresAskApplication implements AskApplication {
         payload: event.payload
       }))
     ].sort((left, right) => left.at_sequence - right.at_sequence);
-    for (const event of events) yield event;
+    for (const event of events) { if (signal?.aborted) return; yield event; }
   }
 }

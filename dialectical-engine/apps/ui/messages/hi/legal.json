@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "उन सभी तृतीय पक्षों की सूची प्राप्त कर सकते हैं जिन्हें यह डेटा मिला है;",
   "legal.health.s05.item3": "अपनी सहमति वापस लेकर इसे हटवा सकते हैं।",
   "legal.health.s06.title": "इन अधिकारों का उपयोग कैसे करें",
-  "legal.health.s06.body": "सेटिंग्स से, या privacy@dezbatere.ro पर लिखकर। हम 45 दिनों के भीतर उत्तर देते हैं। यदि हम कोई अनुरोध अस्वीकार करते हैं, तो आप हमारे उत्तर का जवाब देकर अपील कर सकते हैं।"
+  "legal.health.s06.body": "सेटिंग्स से, या privacy@dezbatere.ro पर लिखकर। हम 45 दिनों के भीतर उत्तर देते हैं। यदि हम कोई अनुरोध अस्वीकार करते हैं, तो आप हमारे उत्तर का जवाब देकर अपील कर सकते हैं।",
+  "legal.cookies.staff.purpose": "कर्मचारियों की अलग पहुँच",
+  "legal.cookies.passwordReset.purpose": "केवल पासवर्ड रीसेट",
+  "legal.cookies.mfaRecovery.purpose": "केवल प्रमाणक पुनर्प्राप्ति",
+  "legal.cookies.social.purpose": "छोटा प्रदाता साइन-इन या खाता जोड़ने का प्रवाह",
+  "legal.cookies.phoneDraft.purpose": "फ़ोन चरण में अधूरा प्रश्न; सत्र बदलने, साइन-आउट या स्वामी बदलने पर मिटता है",
+  "legal.cookies.staff.life": "अधिकतम 8 घंटे; 15 मिनट निष्क्रियता",
+  "legal.cookies.passwordReset.life": "अधिकतम 30 मिनट",
+  "legal.cookies.mfaRecovery.life": "अधिकतम 299 सेकंड",
+  "legal.cookies.social.life": "अधिकतम 5 मिनट",
+  "legal.cookies.phoneDraft.life": "15 मिनट या पहले मिटाए जाने तक"
 }

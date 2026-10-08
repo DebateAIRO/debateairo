@@ -44,7 +44,7 @@ export type Wall = "WITHIN" | "WOULD_CROSS";
 const WHOLE_BASIS_POINTS = 10_000n;
 /** Which scope names a tie: the person's longest window first, the site's day last. */
 const SCOPE_PRECEDENCE: readonly SpendScope[] = Object.freeze([
-  "PERSON_MONTH", "PERSON_WEEK", "PERSON_DAY", "SITE_DAY"
+  "PERSON_GRANT", "PERSON_MONTH", "PERSON_WEEK", "PERSON_DAY", "SITE_DAY"
 ]);
 
 function wholeMicros(value: unknown, code: string): bigint {

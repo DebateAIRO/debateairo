@@ -8,6 +8,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "بدء مناظرة",
     "sign-in": "تسجيل الدخول",
     "sign-up": "إنشاء حساب",
+    "forgot-password": "الدخول عبر الاسترداد",
     "help": "المساعدة",
     "support-status": "حالة الخدمة",
     "method": "المنهج",
@@ -15,7 +16,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "الإعدادات",
     "active-sessions": "الجلسات النشطة",
     "privacy-preferences": "الخصوصية",
-    "claim-legacy": "المطالبة بالمناظرات القديمة",
+    "security": "الأمان",
     "delete-account": "حذف الحساب",
     "public-catalog": "المناظرات العامة",
     "your-debates": "مناظراتك",
@@ -27,6 +28,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Започнете дебат",
     "sign-in": "Влезте",
     "sign-up": "Създайте профил",
+    "forgot-password": "Достъп за възстановяване",
     "help": "Помощ",
     "support-status": "Състояние на услугата",
     "method": "Метод",
@@ -34,7 +36,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Настройки",
     "active-sessions": "Активни сесии",
     "privacy-preferences": "Поверителност",
-    "claim-legacy": "Заявяване на наследени дебати",
+    "security": "Сигурност",
     "delete-account": "Изтриване на профила",
     "public-catalog": "Публични дебати",
     "your-debates": "Вашите дебати",
@@ -46,6 +48,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Začněte debatu",
     "sign-in": "Přihlásit se",
     "sign-up": "Vytvořit účet",
+    "forgot-password": "Obnovení přístupu",
     "help": "Nápověda",
     "support-status": "Stav služby",
     "method": "Metoda",
@@ -53,7 +56,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Nastavení",
     "active-sessions": "Aktivní relace",
     "privacy-preferences": "Ochrana soukromí",
-    "claim-legacy": "Převzít starší debaty",
+    "security": "Zabezpečení",
     "delete-account": "Smazat účet",
     "public-catalog": "Veřejné debaty",
     "your-debates": "Vaše debaty",
@@ -65,6 +68,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Start en debat",
     "sign-in": "Log ind",
     "sign-up": "Opret konto",
+    "forgot-password": "Gendannelsesadgang",
     "help": "Hjælp",
     "support-status": "Tjenestestatus",
     "method": "Metode",
@@ -72,7 +76,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Indstillinger",
     "active-sessions": "Aktive sessioner",
     "privacy-preferences": "Privatliv",
-    "claim-legacy": "Gør krav på ældre debatter",
+    "security": "Sikkerhed",
     "delete-account": "Slet konto",
     "public-catalog": "Offentlige debatter",
     "your-debates": "Dine debatter",
@@ -84,6 +88,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Debatte beginnen",
     "sign-in": "Anmelden",
     "sign-up": "Konto erstellen",
+    "forgot-password": "Wiederherstellungszugang",
     "help": "Hilfe",
     "support-status": "Dienststatus",
     "method": "Methode",
@@ -91,7 +96,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Einstellungen",
     "active-sessions": "Aktive Sitzungen",
     "privacy-preferences": "Datenschutz",
-    "claim-legacy": "Ältere Debatten übernehmen",
+    "security": "Sicherheit",
     "delete-account": "Konto löschen",
     "public-catalog": "Öffentliche Debatten",
     "your-debates": "Ihre Debatten",
@@ -103,6 +108,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Έναρξη αντιπαράθεσης",
     "sign-in": "Σύνδεση",
     "sign-up": "Δημιουργία λογαριασμού",
+    "forgot-password": "Πρόσβαση ανάκτησης",
     "help": "Βοήθεια",
     "support-status": "Κατάσταση υπηρεσίας",
     "method": "Μέθοδος",
@@ -110,7 +116,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Ρυθμίσεις",
     "active-sessions": "Ενεργές συνεδρίες",
     "privacy-preferences": "Απόρρητο",
-    "claim-legacy": "Διεκδίκηση παλαιότερων αντιπαραθέσεων",
+    "security": "Ασφάλεια",
     "delete-account": "Διαγραφή λογαριασμού",
     "public-catalog": "Δημόσιες αντιπαραθέσεις",
     "your-debates": "Οι αντιπαραθέσεις σας",
@@ -122,6 +128,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Start a debate",
     "sign-in": "Log in",
     "sign-up": "Create account",
+    "forgot-password": "Recovery access",
     "help": "Help",
     "support-status": "Service status",
     "method": "Method",
@@ -129,7 +136,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Settings",
     "active-sessions": "Active sessions",
     "privacy-preferences": "Privacy",
-    "claim-legacy": "Claim legacy debates",
+    "security": "Security",
     "delete-account": "Delete account",
     "public-catalog": "Public debates",
     "your-debates": "Your debates",
@@ -141,6 +148,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Iniciar un debate",
     "sign-in": "Iniciar sesión",
     "sign-up": "Crear cuenta",
+    "forgot-password": "Acceso de recuperación",
     "help": "Ayuda",
     "support-status": "Estado del servicio",
     "method": "Método",
@@ -148,7 +156,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Configuración",
     "active-sessions": "Sesiones activas",
     "privacy-preferences": "Privacidad",
-    "claim-legacy": "Reclamar debates heredados",
+    "security": "Seguridad",
     "delete-account": "Eliminar cuenta",
     "public-catalog": "Debates públicos",
     "your-debates": "Sus debates",
@@ -160,6 +168,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Alustage väitlust",
     "sign-in": "Logige sisse",
     "sign-up": "Looge konto",
+    "forgot-password": "Juurdepääsu taastamine",
     "help": "Abi",
     "support-status": "Teenuse olek",
     "method": "Meetod",
@@ -167,7 +176,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Seaded",
     "active-sessions": "Aktiivsed seansid",
     "privacy-preferences": "Privaatsus",
-    "claim-legacy": "Omandage pärandväitlused",
+    "security": "Turvalisus",
     "delete-account": "Konto kustutamine",
     "public-catalog": "Avalikud väitlused",
     "your-debates": "Teie väitlused",
@@ -179,6 +188,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Aloita väittely",
     "sign-in": "Kirjaudu sisään",
     "sign-up": "Luo tili",
+    "forgot-password": "Palautuspääsy",
     "help": "Ohje",
     "support-status": "Palvelun tila",
     "method": "Menetelmä",
@@ -186,7 +196,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Asetukset",
     "active-sessions": "Aktiiviset istunnot",
     "privacy-preferences": "Tietosuoja",
-    "claim-legacy": "Liitä vanhat väittelyt tiliin",
+    "security": "Turvallisuus",
     "delete-account": "Poista tili",
     "public-catalog": "Julkiset väittelyt",
     "your-debates": "Omat väittelysi",
@@ -198,6 +208,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Lancer un débat",
     "sign-in": "Se connecter",
     "sign-up": "Créer un compte",
+    "forgot-password": "Accès de récupération",
     "help": "Aide",
     "support-status": "État du service",
     "method": "Méthode",
@@ -205,7 +216,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Paramètres",
     "active-sessions": "Sessions actives",
     "privacy-preferences": "Confidentialité",
-    "claim-legacy": "Rattacher des débats anciens",
+    "security": "Sécurité",
     "delete-account": "Supprimer le compte",
     "public-catalog": "Débats publics",
     "your-debates": "Vos débats",
@@ -217,6 +228,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Tosaigh díospóireacht",
     "sign-in": "Sínigh isteach",
     "sign-up": "Cruthaigh cuntas",
+    "forgot-password": "Rochtain athshlánaithe",
     "help": "Cabhair",
     "support-status": "Stádas seirbhíse",
     "method": "Modh",
@@ -224,7 +236,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Socruithe",
     "active-sessions": "Seisiúin ghníomhacha",
     "privacy-preferences": "Príobháideachas",
-    "claim-legacy": "Éiligh díospóireachtaí oidhreachta",
+    "security": "Slándáil",
     "delete-account": "Scrios an cuntas",
     "public-catalog": "Díospóireachtaí poiblí",
     "your-debates": "Do chuid díospóireachtaí",
@@ -236,6 +248,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "התחלת דיון",
     "sign-in": "התחברות",
     "sign-up": "יצירת חשבון",
+    "forgot-password": "גישה באמצעות שחזור",
     "help": "עזרה",
     "support-status": "מצב השירות",
     "method": "שיטה",
@@ -243,7 +256,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "הגדרות",
     "active-sessions": "הפעלות פעילות",
     "privacy-preferences": "פרטיות",
-    "claim-legacy": "שיוך דיונים ישנים",
+    "security": "אבטחה",
     "delete-account": "מחיקת החשבון",
     "public-catalog": "דיונים ציבוריים",
     "your-debates": "הדיונים שלכם",
@@ -255,6 +268,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "वाद-विवाद शुरू करें",
     "sign-in": "लॉग इन करें",
     "sign-up": "खाता बनाएँ",
+    "forgot-password": "पुनर्प्राप्ति पहुँच",
     "help": "सहायता",
     "support-status": "सेवा की स्थिति",
     "method": "विधि",
@@ -262,7 +276,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "सेटिंग्स",
     "active-sessions": "सक्रिय सत्र",
     "privacy-preferences": "गोपनीयता",
-    "claim-legacy": "पुराने वाद-विवाद अपने खाते से जोड़ें",
+    "security": "सुरक्षा",
     "delete-account": "खाता मिटाएँ",
     "public-catalog": "सार्वजनिक वाद-विवाद",
     "your-debates": "आपके वाद-विवाद",
@@ -274,6 +288,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Započnite raspravu",
     "sign-in": "Prijavite se",
     "sign-up": "Izradite račun",
+    "forgot-password": "Pristup za oporavak",
     "help": "Pomoć",
     "support-status": "Stanje usluge",
     "method": "Metoda",
@@ -281,7 +296,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Postavke",
     "active-sessions": "Aktivne sesije",
     "privacy-preferences": "Privatnost",
-    "claim-legacy": "Pridružite naslijeđene rasprave",
+    "security": "Sigurnost",
     "delete-account": "Izbrišite račun",
     "public-catalog": "Javne rasprave",
     "your-debates": "Vaše rasprave",
@@ -293,6 +308,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Vita indítása",
     "sign-in": "Bejelentkezés",
     "sign-up": "Fiók létrehozása",
+    "forgot-password": "Helyreállítási hozzáférés",
     "help": "Súgó",
     "support-status": "Szolgáltatás állapota",
     "method": "Módszer",
@@ -300,7 +316,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Beállítások",
     "active-sessions": "Aktív munkamenetek",
     "privacy-preferences": "Adatvédelem",
-    "claim-legacy": "Régi viták átvétele",
+    "security": "Biztonság",
     "delete-account": "Fiók törlése",
     "public-catalog": "Nyilvános viták",
     "your-debates": "Saját viták",
@@ -312,6 +328,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Mulai debat",
     "sign-in": "Masuk",
     "sign-up": "Buat akun",
+    "forgot-password": "Akses pemulihan",
     "help": "Bantuan",
     "support-status": "Status layanan",
     "method": "Metode",
@@ -319,7 +336,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Pengaturan",
     "active-sessions": "Sesi aktif",
     "privacy-preferences": "Privasi",
-    "claim-legacy": "Klaim debat lama",
+    "security": "Keamanan",
     "delete-account": "Hapus akun",
     "public-catalog": "Debat publik",
     "your-debates": "Debat Anda",
@@ -331,6 +348,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Avvia un dibattito",
     "sign-in": "Accedi",
     "sign-up": "Crea account",
+    "forgot-password": "Accesso di recupero",
     "help": "Aiuto",
     "support-status": "Stato del servizio",
     "method": "Metodo",
@@ -338,7 +356,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Impostazioni",
     "active-sessions": "Sessioni attive",
     "privacy-preferences": "Privacy",
-    "claim-legacy": "Rivendica i dibattiti preesistenti",
+    "security": "Sicurezza",
     "delete-account": "Elimina account",
     "public-catalog": "Dibattiti pubblici",
     "your-debates": "I tuoi dibattiti",
@@ -350,6 +368,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "ディベートを開始",
     "sign-in": "ログイン",
     "sign-up": "アカウントを作成",
+    "forgot-password": "リカバリーアクセス",
     "help": "ヘルプ",
     "support-status": "サービス状況",
     "method": "方式",
@@ -357,7 +376,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "設定",
     "active-sessions": "有効なセッション",
     "privacy-preferences": "プライバシー",
-    "claim-legacy": "以前のディベートを紐付ける",
+    "security": "セキュリティ",
     "delete-account": "アカウントを削除",
     "public-catalog": "公開ディベート",
     "your-debates": "自分のディベート",
@@ -369,6 +388,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "토론 시작",
     "sign-in": "로그인",
     "sign-up": "계정 만들기",
+    "forgot-password": "복구 액세스",
     "help": "도움말",
     "support-status": "서비스 상태",
     "method": "방식",
@@ -376,7 +396,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "설정",
     "active-sessions": "활성 세션",
     "privacy-preferences": "개인정보",
-    "claim-legacy": "기존 토론 소유권 확인",
+    "security": "보안",
     "delete-account": "계정 삭제",
     "public-catalog": "공개 토론",
     "your-debates": "내 토론",
@@ -388,6 +408,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Pradėti debatus",
     "sign-in": "Prisijungti",
     "sign-up": "Sukurti paskyrą",
+    "forgot-password": "Prieigos atkūrimas",
     "help": "Pagalba",
     "support-status": "Paslaugos būsena",
     "method": "Metodas",
@@ -395,7 +416,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Nustatymai",
     "active-sessions": "Aktyvūs seansai",
     "privacy-preferences": "Privatumas",
-    "claim-legacy": "Perimti senus debatus",
+    "security": "Saugumas",
     "delete-account": "Ištrinti paskyrą",
     "public-catalog": "Vieši debatai",
     "your-debates": "Jūsų debatai",
@@ -407,6 +428,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Sākt debates",
     "sign-in": "Pierakstīties",
     "sign-up": "Izveidot kontu",
+    "forgot-password": "Piekļuves atkopšana",
     "help": "Palīdzība",
     "support-status": "Pakalpojuma statuss",
     "method": "Metode",
@@ -414,7 +436,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Iestatījumi",
     "active-sessions": "Aktīvās sesijas",
     "privacy-preferences": "Privātums",
-    "claim-legacy": "Pieprasīt mantotās debates",
+    "security": "Drošība",
     "delete-account": "Dzēst kontu",
     "public-catalog": "Publiskās debates",
     "your-debates": "Jūsu debates",
@@ -426,6 +448,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Ibda dibattitu",
     "sign-in": "Idħol fil-kont",
     "sign-up": "Oħloq kont",
+    "forgot-password": "Aċċess għall-irkupru",
     "help": "Għajnuna",
     "support-status": "Stat tas-servizz",
     "method": "Metodu",
@@ -433,7 +456,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Issettjar",
     "active-sessions": "Sessjonijiet attivi",
     "privacy-preferences": "Privatezza",
-    "claim-legacy": "Itlob id-dibattiti storiċi",
+    "security": "Sigurtà",
     "delete-account": "Ħassar il-kont",
     "public-catalog": "Dibattiti pubbliċi",
     "your-debates": "Id-dibattiti tiegħek",
@@ -445,6 +468,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Een debat starten",
     "sign-in": "Aanmelden",
     "sign-up": "Account aanmaken",
+    "forgot-password": "Toegang herstellen",
     "help": "Hulp",
     "support-status": "Servicestatus",
     "method": "Methode",
@@ -452,7 +476,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Instellingen",
     "active-sessions": "Actieve sessies",
     "privacy-preferences": "Privacy",
-    "claim-legacy": "Eerdere debatten koppelen",
+    "security": "Beveiliging",
     "delete-account": "Account verwijderen",
     "public-catalog": "Openbare debatten",
     "your-debates": "Uw debatten",
@@ -464,6 +488,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Rozpocznij debatę",
     "sign-in": "Zaloguj się",
     "sign-up": "Utwórz konto",
+    "forgot-password": "Dostęp awaryjny",
     "help": "Pomoc",
     "support-status": "Stan usługi",
     "method": "Metoda",
@@ -471,7 +496,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Ustawienia",
     "active-sessions": "Aktywne sesje",
     "privacy-preferences": "Prywatność",
-    "claim-legacy": "Przejmij starsze debaty",
+    "security": "Bezpieczeństwo",
     "delete-account": "Usuń konto",
     "public-catalog": "Debaty publiczne",
     "your-debates": "Twoje debaty",
@@ -483,6 +508,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Iniciar um debate",
     "sign-in": "Iniciar sessão",
     "sign-up": "Criar conta",
+    "forgot-password": "Acesso de recuperação",
     "help": "Ajuda",
     "support-status": "Estado do serviço",
     "method": "Método",
@@ -490,7 +516,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Definições",
     "active-sessions": "Sessões ativas",
     "privacy-preferences": "Privacidade",
-    "claim-legacy": "Reivindicar debates antigos",
+    "security": "Segurança",
     "delete-account": "Eliminar conta",
     "public-catalog": "Debates públicos",
     "your-debates": "Os seus debates",
@@ -502,6 +528,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Începeți o dezbatere",
     "sign-in": "Autentificați-vă",
     "sign-up": "Creați un cont",
+    "forgot-password": "Acces de recuperare",
     "help": "Ajutor",
     "support-status": "Starea serviciului",
     "method": "Metodă",
@@ -509,7 +536,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Setări",
     "active-sessions": "Sesiuni active",
     "privacy-preferences": "Confidențialitate",
-    "claim-legacy": "Revendicați dezbaterile vechi",
+    "security": "Securitate",
     "delete-account": "Ștergeți contul",
     "public-catalog": "Dezbateri publice",
     "your-debates": "Dezbaterile dvs.",
@@ -521,6 +548,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Начать дебаты",
     "sign-in": "Войти",
     "sign-up": "Создать учётную запись",
+    "forgot-password": "Восстановление доступа",
     "help": "Помощь",
     "support-status": "Состояние сервиса",
     "method": "Метод",
@@ -528,7 +556,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Настройки",
     "active-sessions": "Активные сеансы",
     "privacy-preferences": "Конфиденциальность",
-    "claim-legacy": "Привязать прежние дебаты",
+    "security": "Безопасность",
     "delete-account": "Удалить учётную запись",
     "public-catalog": "Публичные дебаты",
     "your-debates": "Ваши дебаты",
@@ -540,6 +568,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Začať debatu",
     "sign-in": "Prihlásiť sa",
     "sign-up": "Vytvoriť účet",
+    "forgot-password": "Obnovenie prístupu",
     "help": "Pomoc",
     "support-status": "Stav služby",
     "method": "Metóda",
@@ -547,7 +576,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Nastavenia",
     "active-sessions": "Aktívne relácie",
     "privacy-preferences": "Súkromie",
-    "claim-legacy": "Prevziať staršie debaty",
+    "security": "Zabezpečenie",
     "delete-account": "Odstrániť účet",
     "public-catalog": "Verejné debaty",
     "your-debates": "Vaše debaty",
@@ -559,6 +588,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Začni razpravo",
     "sign-in": "Prijava",
     "sign-up": "Ustvari račun",
+    "forgot-password": "Obnovitev dostopa",
     "help": "Pomoč",
     "support-status": "Stanje storitve",
     "method": "Metoda",
@@ -566,7 +596,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Nastavitve",
     "active-sessions": "Aktivne seje",
     "privacy-preferences": "Zasebnost",
-    "claim-legacy": "Prevzem podedovanih razprav",
+    "security": "Varnost",
     "delete-account": "Izbris računa",
     "public-catalog": "Javne razprave",
     "your-debates": "Vaše razprave",
@@ -578,6 +608,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Starta en debatt",
     "sign-in": "Logga in",
     "sign-up": "Skapa konto",
+    "forgot-password": "Återställningsåtkomst",
     "help": "Hjälp",
     "support-status": "Tjänstestatus",
     "method": "Metod",
@@ -585,7 +616,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Inställningar",
     "active-sessions": "Aktiva sessioner",
     "privacy-preferences": "Integritet",
-    "claim-legacy": "Ta över äldre debatter",
+    "security": "Säkerhet",
     "delete-account": "Radera konto",
     "public-catalog": "Offentliga debatter",
     "your-debates": "Dina debatter",
@@ -597,6 +628,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Tartışma başlat",
     "sign-in": "Oturum aç",
     "sign-up": "Hesap oluştur",
+    "forgot-password": "Kurtarma erişimi",
     "help": "Yardım",
     "support-status": "Hizmet durumu",
     "method": "Yöntem",
@@ -604,7 +636,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Ayarlar",
     "active-sessions": "Etkin oturumlar",
     "privacy-preferences": "Gizlilik",
-    "claim-legacy": "Eski tartışmaları sahiplen",
+    "security": "Güvenlik",
     "delete-account": "Hesabı sil",
     "public-catalog": "Herkese açık tartışmalar",
     "your-debates": "Tartışmalarınız",
@@ -616,6 +648,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Почати дебати",
     "sign-in": "Увійти",
     "sign-up": "Створити обліковий запис",
+    "forgot-password": "Доступ для відновлення",
     "help": "Довідка",
     "support-status": "Стан сервісу",
     "method": "Метод",
@@ -623,7 +656,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Налаштування",
     "active-sessions": "Активні сеанси",
     "privacy-preferences": "Конфіденційність",
-    "claim-legacy": "Заявити права на попередні дебати",
+    "security": "Безпека",
     "delete-account": "Видалити обліковий запис",
     "public-catalog": "Оприлюднені дебати",
     "your-debates": "Ваші дебати",
@@ -635,6 +668,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "Bắt đầu một cuộc tranh luận",
     "sign-in": "Đăng nhập",
     "sign-up": "Tạo tài khoản",
+    "forgot-password": "Truy cập khôi phục",
     "help": "Trợ giúp",
     "support-status": "Trạng thái dịch vụ",
     "method": "Phương pháp",
@@ -642,7 +676,7 @@ export const SUPPORT_UI_LABELS = {
     "settings": "Cài đặt",
     "active-sessions": "Phiên đang hoạt động",
     "privacy-preferences": "Quyền riêng tư",
-    "claim-legacy": "Nhận quyền sở hữu cuộc tranh luận cũ",
+    "security": "Bảo mật",
     "delete-account": "Xóa tài khoản",
     "public-catalog": "Các cuộc tranh luận công khai",
     "your-debates": "Các cuộc tranh luận của bạn",
@@ -654,6 +688,7 @@ export const SUPPORT_UI_LABELS = {
     "start-debate": "开始辩论",
     "sign-in": "登录",
     "sign-up": "创建账户",
+    "forgot-password": "恢复访问权限",
     "help": "帮助",
     "support-status": "服务状态",
     "method": "方法",
@@ -661,14 +696,14 @@ export const SUPPORT_UI_LABELS = {
     "settings": "设置",
     "active-sessions": "活跃会话",
     "privacy-preferences": "隐私",
-    "claim-legacy": "认领旧版辩论",
+    "security": "安全",
     "delete-account": "删除账户",
     "public-catalog": "公开辩论",
     "your-debates": "您的辩论",
     "owner-debate": "打开您的辩论",
     "public-debate": "打开公开辩论"
   }
-} as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<Exclude<SupportActionId, "forgot-password">, string>>>>;
+} as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<SupportActionId, string>>>>;
 
 export const SUPPORT_UI_LABEL_ALIASES = {
   "ar": {
@@ -685,6 +720,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     ],
     "sign-up": [
       "أنشئ حسابًا"
+    ],
+    "forgot-password": [
+      "الدخول عبر الاسترداد"
     ],
     "help": [
       "المساعدة"
@@ -708,8 +746,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "الخصوصية"
     ],
-    "claim-legacy": [
-      "المطالبة بالمناظرات القديمة"
+    "security": [
+      "الأمان"
     ],
     "delete-account": [
       "حذف الحساب"
@@ -742,6 +780,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Създайте профил"
     ],
+    "forgot-password": [
+      "Достъп за възстановяване"
+    ],
     "help": [
       "Помощ"
     ],
@@ -764,8 +805,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Поверителност"
     ],
-    "claim-legacy": [
-      "Заявяване на наследени дебати"
+    "security": [
+      "Сигурност"
     ],
     "delete-account": [
       "Изтриване на профила"
@@ -798,6 +839,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Vytvořit účet"
     ],
+    "forgot-password": [
+      "Obnovení přístupu"
+    ],
     "help": [
       "Nápověda"
     ],
@@ -820,8 +864,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Ochrana soukromí"
     ],
-    "claim-legacy": [
-      "Převzít starší debaty"
+    "security": [
+      "Zabezpečení"
     ],
     "delete-account": [
       "Smazat účet"
@@ -854,6 +898,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Opret en"
     ],
+    "forgot-password": [
+      "Gendannelsesadgang"
+    ],
     "help": [
       "Hjælp"
     ],
@@ -876,8 +923,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privatliv"
     ],
-    "claim-legacy": [
-      "Gør krav på ældre debatter"
+    "security": [
+      "Sikkerhed"
     ],
     "delete-account": [
       "Slet konto"
@@ -910,6 +957,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Konto erstellen"
     ],
+    "forgot-password": [
+      "Wiederherstellungszugang"
+    ],
     "help": [
       "Hilfe"
     ],
@@ -932,8 +982,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Datenschutz"
     ],
-    "claim-legacy": [
-      "Ältere Debatten übernehmen"
+    "security": [
+      "Sicherheit"
     ],
     "delete-account": [
       "Konto löschen"
@@ -966,6 +1016,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Δημιουργήστε έναν"
     ],
+    "forgot-password": [
+      "Πρόσβαση ανάκτησης"
+    ],
     "help": [
       "Βοήθεια"
     ],
@@ -988,8 +1041,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Απόρρητο"
     ],
-    "claim-legacy": [
-      "Διεκδίκηση παλαιότερων αντιπαραθέσεων"
+    "security": [
+      "Ασφάλεια"
     ],
     "delete-account": [
       "Διαγραφή λογαριασμού"
@@ -1022,6 +1075,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Create one"
     ],
+    "forgot-password": [
+      "Recovery access"
+    ],
     "help": [
       "Help"
     ],
@@ -1044,8 +1100,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privacy"
     ],
-    "claim-legacy": [
-      "Claim legacy debates"
+    "security": [
+      "Security"
     ],
     "delete-account": [
       "Delete account"
@@ -1078,6 +1134,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Crear una"
     ],
+    "forgot-password": [
+      "Acceso de recuperación"
+    ],
     "help": [
       "Ayuda"
     ],
@@ -1100,8 +1159,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privacidad"
     ],
-    "claim-legacy": [
-      "Reclamar debates heredados"
+    "security": [
+      "Seguridad"
     ],
     "delete-account": [
       "Eliminar cuenta"
@@ -1134,6 +1193,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Looge konto"
     ],
+    "forgot-password": [
+      "Juurdepääsu taastamine"
+    ],
     "help": [
       "Abi"
     ],
@@ -1156,8 +1218,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privaatsus"
     ],
-    "claim-legacy": [
-      "Omandage pärandväitlused"
+    "security": [
+      "Turvalisus"
     ],
     "delete-account": [
       "Konto kustutamine"
@@ -1190,6 +1252,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Luo tili"
     ],
+    "forgot-password": [
+      "Palautuspääsy"
+    ],
     "help": [
       "Ohje"
     ],
@@ -1212,8 +1277,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Tietosuoja"
     ],
-    "claim-legacy": [
-      "Liitä vanhat väittelyt tiliin"
+    "security": [
+      "Turvallisuus"
     ],
     "delete-account": [
       "Poista tili"
@@ -1246,6 +1311,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Créer un compte"
     ],
+    "forgot-password": [
+      "Accès de récupération"
+    ],
     "help": [
       "Aide"
     ],
@@ -1268,8 +1336,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Confidentialité"
     ],
-    "claim-legacy": [
-      "Rattacher des débats anciens"
+    "security": [
+      "Sécurité"
     ],
     "delete-account": [
       "Supprimer le compte"
@@ -1302,6 +1370,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Cruthaigh ceann"
     ],
+    "forgot-password": [
+      "Rochtain athshlánaithe"
+    ],
     "help": [
       "Cabhair"
     ],
@@ -1324,8 +1395,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Príobháideachas"
     ],
-    "claim-legacy": [
-      "Éiligh díospóireachtaí oidhreachta"
+    "security": [
+      "Slándáil"
     ],
     "delete-account": [
       "Scrios an cuntas"
@@ -1358,6 +1429,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "יצירת חשבון"
     ],
+    "forgot-password": [
+      "גישה באמצעות שחזור"
+    ],
     "help": [
       "עזרה"
     ],
@@ -1380,8 +1454,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "פרטיות"
     ],
-    "claim-legacy": [
-      "שיוך דיונים ישנים"
+    "security": [
+      "אבטחה"
     ],
     "delete-account": [
       "מחיקת החשבון"
@@ -1414,6 +1488,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "खाता बनाएँ"
     ],
+    "forgot-password": [
+      "पुनर्प्राप्ति पहुँच"
+    ],
     "help": [
       "सहायता"
     ],
@@ -1436,8 +1513,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "गोपनीयता"
     ],
-    "claim-legacy": [
-      "पुराने वाद-विवाद अपने खाते से जोड़ें"
+    "security": [
+      "सुरक्षा"
     ],
     "delete-account": [
       "खाता मिटाएँ"
@@ -1470,6 +1547,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Izradite ga"
     ],
+    "forgot-password": [
+      "Pristup za oporavak"
+    ],
     "help": [
       "Pomoć"
     ],
@@ -1492,8 +1572,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privatnost"
     ],
-    "claim-legacy": [
-      "Pridružite naslijeđene rasprave"
+    "security": [
+      "Sigurnost"
     ],
     "delete-account": [
       "Izbrišite račun"
@@ -1526,6 +1606,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Hozzon létre egyet"
     ],
+    "forgot-password": [
+      "Helyreállítási hozzáférés"
+    ],
     "help": [
       "Súgó"
     ],
@@ -1548,8 +1631,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Adatvédelem"
     ],
-    "claim-legacy": [
-      "Régi viták átvétele"
+    "security": [
+      "Biztonság"
     ],
     "delete-account": [
       "Fiók törlése"
@@ -1582,6 +1665,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Buat akun"
     ],
+    "forgot-password": [
+      "Akses pemulihan"
+    ],
     "help": [
       "Bantuan"
     ],
@@ -1604,8 +1690,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privasi"
     ],
-    "claim-legacy": [
-      "Klaim debat lama"
+    "security": [
+      "Keamanan"
     ],
     "delete-account": [
       "Hapus akun"
@@ -1638,6 +1724,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Creane uno"
     ],
+    "forgot-password": [
+      "Accesso di recupero"
+    ],
     "help": [
       "Aiuto"
     ],
@@ -1660,8 +1749,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privacy"
     ],
-    "claim-legacy": [
-      "Rivendica i dibattiti preesistenti"
+    "security": [
+      "Sicurezza"
     ],
     "delete-account": [
       "Elimina account"
@@ -1694,6 +1783,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "アカウントを作成"
     ],
+    "forgot-password": [
+      "リカバリーアクセス"
+    ],
     "help": [
       "ヘルプ"
     ],
@@ -1716,8 +1808,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "プライバシー"
     ],
-    "claim-legacy": [
-      "以前のディベートを紐付ける"
+    "security": [
+      "セキュリティ"
     ],
     "delete-account": [
       "アカウントを削除"
@@ -1750,6 +1842,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "계정 만들기"
     ],
+    "forgot-password": [
+      "복구 액세스"
+    ],
     "help": [
       "도움말"
     ],
@@ -1772,8 +1867,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "개인정보"
     ],
-    "claim-legacy": [
-      "기존 토론 소유권 확인"
+    "security": [
+      "보안"
     ],
     "delete-account": [
       "계정 삭제"
@@ -1806,6 +1901,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Sukurti paskyrą"
     ],
+    "forgot-password": [
+      "Prieigos atkūrimas"
+    ],
     "help": [
       "Pagalba"
     ],
@@ -1828,8 +1926,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privatumas"
     ],
-    "claim-legacy": [
-      "Perimti senus debatus"
+    "security": [
+      "Saugumas"
     ],
     "delete-account": [
       "Ištrinti paskyrą"
@@ -1862,6 +1960,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Izveidot kontu"
     ],
+    "forgot-password": [
+      "Piekļuves atkopšana"
+    ],
     "help": [
       "Palīdzība"
     ],
@@ -1884,8 +1985,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privātums"
     ],
-    "claim-legacy": [
-      "Pieprasīt mantotās debates"
+    "security": [
+      "Drošība"
     ],
     "delete-account": [
       "Dzēst kontu"
@@ -1918,6 +2019,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Oħloq wieħed"
     ],
+    "forgot-password": [
+      "Aċċess għall-irkupru"
+    ],
     "help": [
       "Għajnuna"
     ],
@@ -1940,8 +2044,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privatezza"
     ],
-    "claim-legacy": [
-      "Itlob id-dibattiti storiċi"
+    "security": [
+      "Sigurtà"
     ],
     "delete-account": [
       "Ħassar il-kont"
@@ -1974,6 +2078,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Account aanmaken"
     ],
+    "forgot-password": [
+      "Toegang herstellen"
+    ],
     "help": [
       "Hulp"
     ],
@@ -1996,8 +2103,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privacy"
     ],
-    "claim-legacy": [
-      "Eerdere debatten koppelen"
+    "security": [
+      "Beveiliging"
     ],
     "delete-account": [
       "Account verwijderen"
@@ -2030,6 +2137,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Utwórz konto"
     ],
+    "forgot-password": [
+      "Dostęp awaryjny"
+    ],
     "help": [
       "Pomoc"
     ],
@@ -2052,8 +2162,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Prywatność"
     ],
-    "claim-legacy": [
-      "Przejmij starsze debaty"
+    "security": [
+      "Bezpieczeństwo"
     ],
     "delete-account": [
       "Usuń konto"
@@ -2086,6 +2196,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Criar uma"
     ],
+    "forgot-password": [
+      "Acesso de recuperação"
+    ],
     "help": [
       "Ajuda"
     ],
@@ -2108,8 +2221,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Privacidade"
     ],
-    "claim-legacy": [
-      "Reivindicar debates antigos"
+    "security": [
+      "Segurança"
     ],
     "delete-account": [
       "Eliminar conta"
@@ -2142,6 +2255,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Creați unul"
     ],
+    "forgot-password": [
+      "Acces de recuperare"
+    ],
     "help": [
       "Ajutor"
     ],
@@ -2164,8 +2280,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Confidențialitate"
     ],
-    "claim-legacy": [
-      "Revendicați dezbaterile vechi"
+    "security": [
+      "Securitate"
     ],
     "delete-account": [
       "Ștergeți contul"
@@ -2198,6 +2314,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Создать"
     ],
+    "forgot-password": [
+      "Восстановление доступа"
+    ],
     "help": [
       "Помощь"
     ],
@@ -2220,8 +2339,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Конфиденциальность"
     ],
-    "claim-legacy": [
-      "Привязать прежние дебаты"
+    "security": [
+      "Безопасность"
     ],
     "delete-account": [
       "Удалить учётную запись"
@@ -2254,6 +2373,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Vytvorte si ho"
     ],
+    "forgot-password": [
+      "Obnovenie prístupu"
+    ],
     "help": [
       "Pomoc"
     ],
@@ -2276,8 +2398,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Súkromie"
     ],
-    "claim-legacy": [
-      "Prevziať staršie debaty"
+    "security": [
+      "Zabezpečenie"
     ],
     "delete-account": [
       "Odstrániť účet"
@@ -2310,6 +2432,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Ustvari ga"
     ],
+    "forgot-password": [
+      "Obnovitev dostopa"
+    ],
     "help": [
       "Pomoč"
     ],
@@ -2332,8 +2457,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Zasebnost"
     ],
-    "claim-legacy": [
-      "Prevzem podedovanih razprav"
+    "security": [
+      "Varnost"
     ],
     "delete-account": [
       "Izbris računa"
@@ -2366,6 +2491,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Skapa ett"
     ],
+    "forgot-password": [
+      "Återställningsåtkomst"
+    ],
     "help": [
       "Hjälp"
     ],
@@ -2388,8 +2516,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Integritet"
     ],
-    "claim-legacy": [
-      "Ta över äldre debatter"
+    "security": [
+      "Säkerhet"
     ],
     "delete-account": [
       "Radera konto"
@@ -2422,6 +2550,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Hesap oluşturun"
     ],
+    "forgot-password": [
+      "Kurtarma erişimi"
+    ],
     "help": [
       "Yardım"
     ],
@@ -2444,8 +2575,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Gizlilik"
     ],
-    "claim-legacy": [
-      "Eski tartışmaları sahiplen"
+    "security": [
+      "Güvenlik"
     ],
     "delete-account": [
       "Hesabı sil"
@@ -2478,6 +2609,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Створити"
     ],
+    "forgot-password": [
+      "Доступ для відновлення"
+    ],
     "help": [
       "Довідка"
     ],
@@ -2500,8 +2634,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Конфіденційність"
     ],
-    "claim-legacy": [
-      "Заявити права на попередні дебати"
+    "security": [
+      "Безпека"
     ],
     "delete-account": [
       "Видалити обліковий запис"
@@ -2534,6 +2668,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "Tạo tài khoản"
     ],
+    "forgot-password": [
+      "Truy cập khôi phục"
+    ],
     "help": [
       "Trợ giúp"
     ],
@@ -2556,8 +2693,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "Quyền riêng tư"
     ],
-    "claim-legacy": [
-      "Nhận quyền sở hữu cuộc tranh luận cũ"
+    "security": [
+      "Bảo mật"
     ],
     "delete-account": [
       "Xóa tài khoản"
@@ -2590,6 +2727,9 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "sign-up": [
       "创建账户"
     ],
+    "forgot-password": [
+      "恢复访问权限"
+    ],
     "help": [
       "帮助"
     ],
@@ -2612,8 +2752,8 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "privacy-preferences": [
       "隐私"
     ],
-    "claim-legacy": [
-      "认领旧版辩论"
+    "security": [
+      "安全"
     ],
     "delete-account": [
       "删除账户"
@@ -2631,7 +2771,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
       "打开公开辩论"
     ]
   }
-} as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<Exclude<SupportActionId, "forgot-password">, readonly string[]>>>>;
+} as const satisfies Readonly<Record<SupportLanguage, Readonly<Record<SupportActionId, readonly string[]>>>>;
 
 export const SUPPORT_TOPIC_PROMPTS = {
   "ar": [
@@ -4148,10 +4288,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "كيف نوسم محتوى الذكاء الاصطناعي"
     ],
     [
-      "Claim legacy debates",
-      "المطالبة بالمناظرات القديمة"
-    ],
-    [
       "Escalate to a human",
       "التصعيد إلى شخص"
     ],
@@ -4360,10 +4496,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Как обозначаваме съдържанието от ИИ"
-    ],
-    [
-      "Claim legacy debates",
-      "Заявяване на наследени дебати"
     ],
     [
       "Escalate to a human",
@@ -4576,10 +4708,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Jak označujeme obsah AI"
     ],
     [
-      "Claim legacy debates",
-      "Převzít starší debaty"
-    ],
-    [
       "Escalate to a human",
       "Předat člověku"
     ],
@@ -4786,10 +4914,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Sådan mærker vi AI-indhold"
     ],
     [
-      "Claim legacy debates",
-      "Gør krav på ældre debatter"
-    ],
-    [
       "Escalate to a human",
       "Eskaler til et menneske"
     ],
@@ -4992,10 +5116,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "So kennzeichnen wir KI-Inhalte"
     ],
     [
-      "Claim legacy debates",
-      "Ältere Debatten übernehmen"
-    ],
-    [
       "Escalate to a human",
       "An einen Menschen weiterleiten"
     ],
@@ -5196,10 +5316,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Πώς επισημαίνουμε το περιεχόμενο ΤΝ"
-    ],
-    [
-      "Claim legacy debates",
-      "Διεκδίκηση παλαιότερων αντιπαραθέσεων"
     ],
     [
       "Escalate to a human",
@@ -5409,10 +5525,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Cómo etiquetamos el contenido generado por IA"
     ],
     [
-      "Claim legacy debates",
-      "Reclamar debates heredados"
-    ],
-    [
       "Escalate to a human",
       "Derivar a una persona"
     ],
@@ -5617,10 +5729,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Kuidas märgistame tehisintellekti loodud sisu"
-    ],
-    [
-      "Claim legacy debates",
-      "Omandage pärandväitlused"
     ],
     [
       "Escalate to a human",
@@ -5829,10 +5937,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Näin merkitsemme tekoälyn tuottaman sisällön"
     ],
     [
-      "Claim legacy debates",
-      "Liitä vanhat väittelyt tiliin"
-    ],
-    [
       "Escalate to a human",
       "Siirrä henkilölle"
     ],
@@ -6039,10 +6143,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Comment nous signalons le contenu généré par l’IA"
     ],
     [
-      "Claim legacy debates",
-      "Rattacher des débats anciens"
-    ],
-    [
       "Escalate to a human",
       "Transmettre à une personne"
     ],
@@ -6243,10 +6343,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "An chaoi a lipéadaímid ábhar IS"
-    ],
-    [
-      "Claim legacy debates",
-      "Éiligh díospóireachtaí oidhreachta"
     ],
     [
       "Escalate to a human",
@@ -6459,10 +6555,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "כיצד אנו מסמנים תוכן שנוצר בידי בינה מלאכותית"
     ],
     [
-      "Claim legacy debates",
-      "שיוך דיונים ישנים"
-    ],
-    [
       "Escalate to a human",
       "העברה לנציג אנושי"
     ],
@@ -6671,10 +6763,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "हम AI सामग्री को कैसे चिह्नित करते हैं"
-    ],
-    [
-      "Claim legacy debates",
-      "पुराने वाद-विवाद अपने खाते से जोड़ें"
     ],
     [
       "Escalate to a human",
@@ -6887,10 +6975,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Kako označavamo sadržaj umjetne inteligencije"
     ],
     [
-      "Claim legacy debates",
-      "Pridružite naslijeđene rasprave"
-    ],
-    [
       "Escalate to a human",
       "Proslijedite osobi"
     ],
@@ -7095,10 +7179,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Hogyan jelöljük az MI-tartalmat"
-    ],
-    [
-      "Claim legacy debates",
-      "Régi viták átvétele"
     ],
     [
       "Escalate to a human",
@@ -7311,10 +7391,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Cara kami memberi label pada konten AI"
     ],
     [
-      "Claim legacy debates",
-      "Klaim debat lama"
-    ],
-    [
       "Escalate to a human",
       "Teruskan ke petugas"
     ],
@@ -7521,10 +7597,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Come etichettiamo i contenuti generati dall’IA"
     ],
     [
-      "Claim legacy debates",
-      "Rivendica i dibattiti preesistenti"
-    ],
-    [
       "Escalate to a human",
       "Richiedi l’intervento di una persona"
     ],
@@ -7717,10 +7789,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "AI生成コンテンツの表示方法"
-    ],
-    [
-      "Claim legacy debates",
-      "以前のディベートを紐付ける"
     ],
     [
       "Escalate to a human",
@@ -7933,10 +8001,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "AI 콘텐츠 표시 방식"
     ],
     [
-      "Claim legacy debates",
-      "기존 토론 소유권 확인"
-    ],
-    [
       "Escalate to a human",
       "상담원에게 전달"
     ],
@@ -8147,10 +8211,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Kaip žymime DI sukurtą turinį"
     ],
     [
-      "Claim legacy debates",
-      "Perimti senus debatus"
-    ],
-    [
       "Escalate to a human",
       "Perduoti pokalbį žmogui"
     ],
@@ -8355,10 +8415,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Kā mēs marķējam MI saturu"
-    ],
-    [
-      "Claim legacy debates",
-      "Pieprasīt mantotās debates"
     ],
     [
       "Escalate to a human",
@@ -8567,10 +8623,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Kif nimmarkaw il-kontenut tal-IA"
     ],
     [
-      "Claim legacy debates",
-      "Itlob id-dibattiti storiċi"
-    ],
-    [
       "Escalate to a human",
       "Għaddi l-każ lil persuna"
     ],
@@ -8773,10 +8825,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Hoe wij AI-inhoud aanduiden"
     ],
     [
-      "Claim legacy debates",
-      "Eerdere debatten koppelen"
-    ],
-    [
       "Escalate to a human",
       "Doorzetten naar een medewerker"
     ],
@@ -8973,10 +9021,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Jak oznaczamy treści AI"
-    ],
-    [
-      "Claim legacy debates",
-      "Przejmij starsze debaty"
     ],
     [
       "Escalate to a human",
@@ -9185,10 +9229,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Como identificamos o conteúdo de IA"
     ],
     [
-      "Claim legacy debates",
-      "Reivindicar debates antigos"
-    ],
-    [
       "Escalate to a human",
       "Encaminhar para uma pessoa"
     ],
@@ -9394,10 +9434,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Как мы маркируем контент ИИ"
-    ],
-    [
-      "Claim legacy debates",
-      "Привязать прежние дебаты"
     ],
     [
       "Escalate to a human",
@@ -9610,10 +9646,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Ako označujeme obsah vytvorený AI"
     ],
     [
-      "Claim legacy debates",
-      "Prevziať staršie debaty"
-    ],
-    [
       "Escalate to a human",
       "Postúpiť človeku"
     ],
@@ -9814,10 +9846,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Kako označujemo vsebino UI"
-    ],
-    [
-      "Claim legacy debates",
-      "Prevzem podedovanih razprav"
     ],
     [
       "Escalate to a human",
@@ -10026,10 +10054,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Så märker vi AI-innehåll"
     ],
     [
-      "Claim legacy debates",
-      "Ta över äldre debatter"
-    ],
-    [
       "Escalate to a human",
       "Eskalera till en person"
     ],
@@ -10230,10 +10254,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Yapay zekâ içeriğini nasıl etiketliyoruz"
-    ],
-    [
-      "Claim legacy debates",
-      "Eski tartışmaları sahiplen"
     ],
     [
       "Escalate to a human",
@@ -10440,10 +10460,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "Як ми позначаємо вміст ШІ"
-    ],
-    [
-      "Claim legacy debates",
-      "Заявити права на попередні дебати"
     ],
     [
       "Escalate to a human",
@@ -10656,10 +10672,6 @@ export const SUPPORT_CONTROL_NAMES = {
       "Cách chúng tôi gắn nhãn nội dung AI"
     ],
     [
-      "Claim legacy debates",
-      "Nhận quyền sở hữu cuộc tranh luận cũ"
-    ],
-    [
       "Escalate to a human",
       "Chuyển cho nhân viên hỗ trợ"
     ],
@@ -10868,10 +10880,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "How we label AI content",
       "我们如何标识 AI 内容"
-    ],
-    [
-      "Claim legacy debates",
-      "认领旧版辩论"
     ],
     [
       "Escalate to a human",

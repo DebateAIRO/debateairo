@@ -1,0 +1,1056 @@
+{
+  "schema": "task13-fix1-exact-evidence-preview-v1",
+  "scope": "Exactly12 local fix-round commands plus4 named review/context/findings/privacy-summary files. No EML files, originals/private aliases/originalMJS/remote/env/key/user-record/history input or prior archive expansion.",
+  "localCommands": [
+    "fix1-artifacts-red",
+    "fix1-artifacts-red-owned-gid",
+    "fix1-legal-candidate",
+    "fix1-redactor-unit",
+    "fix1-legal-candidate-identity-preserved",
+    "fix1-source-matrix",
+    "fix1-artifacts-green",
+    "fix1-mail-cover",
+    "fix1-legal-check",
+    "fix1-public-profile",
+    "fix1-source-matrix-final",
+    "fix1-artifacts-final"
+  ],
+  "files": [
+    {
+      "path": "task-13-logs/fix1-artifacts-red.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "d4c00b6d255e12aa87d809a84d3f1361454c92a9613b677a89e5bf606b5bfb0d",
+      "bytes": 1068,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-red.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "d4c00b6d255e12aa87d809a84d3f1361454c92a9613b677a89e5bf606b5bfb0d",
+      "candidateBytes": 1068,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-red.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-red.stdout.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-red.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "d54b7ecbcdff098f6e7487e8a5ec67a8fde9a11adbb1f6e8482d7f1f7e3b9cdc",
+      "bytes": 4528,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {
+        "opaque-sequence": 17
+      },
+      "candidatePath": "task-13-logs/fix1-artifacts-red.stderr.log.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "e11afe640d9c63c9892fd8864431b3cbbfd2c5e01b9ed77cc61118cc362f0d9d",
+      "candidateBytes": 4396,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-red.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "3bc08547f9adfcd343b697a1ebfed02e08e6d3b2a74eab471b73fe0e925644e2",
+      "bytes": 1310838,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-red.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "3bc08547f9adfcd343b697a1ebfed02e08e6d3b2a74eab471b73fe0e925644e2",
+      "candidateBytes": 1310838,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-red-owned-gid.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "53490f1d9dbc6898fcbf87f0c9fe95bf003e24dc0b0678d7928c3ce175e63985",
+      "bytes": 1088,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-red-owned-gid.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "53490f1d9dbc6898fcbf87f0c9fe95bf003e24dc0b0678d7928c3ce175e63985",
+      "candidateBytes": 1088,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-red-owned-gid.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-red-owned-gid.stdout.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-red-owned-gid.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "d47ad61157b36633a45e6d44207d8744c3629799b0c7cb522e92f417e69fce1b",
+      "bytes": 3751,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {
+        "opaque-sequence": 14
+      },
+      "candidatePath": "task-13-logs/fix1-artifacts-red-owned-gid.stderr.log.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "37c326db8a7e3d48be79b421758dff52de1222c88461b8bc310c8591205d6582",
+      "candidateBytes": 3670,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-red-owned-gid.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "aad2f4f7c5940e1508bbb176bc960e9603299d0f1494fe72609ea8887ca4f48e",
+      "bytes": 1310838,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-red-owned-gid.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "aad2f4f7c5940e1508bbb176bc960e9603299d0f1494fe72609ea8887ca4f48e",
+      "candidateBytes": 1310838,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-candidate.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "006665a15ba3ebf82da7126410b9e1e00f7ba1bf8e2948f96349a32c42eac11f",
+      "bytes": 1079,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-candidate.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "006665a15ba3ebf82da7126410b9e1e00f7ba1bf8e2948f96349a32c42eac11f",
+      "candidateBytes": 1079,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-candidate.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-candidate.stdout.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-candidate.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "de0026d169175ebbd3046f32ec20d1fbffd9d21d6aecc2d1f1955be06dc4a439",
+      "bytes": 561,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py"
+      ],
+      "riskCategories": {
+        "opaque-sequence": 2,
+        "short-capability-assignment": 1
+      },
+      "candidatePath": "task-13-logs/fix1-legal-candidate.stderr.log.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "8bb49bfea644dad89137f432f7da7cb8fbdc0f59b8658139e724c98bef3242b1",
+      "candidateBytes": 474,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-candidate.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "a0908377342a372dd400469942b5c935a8d6aa79fb220796ad8b5c3ff203fda5",
+      "bytes": 1311245,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-candidate.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "a0908377342a372dd400469942b5c935a8d6aa79fb220796ad8b5c3ff203fda5",
+      "candidateBytes": 1311245,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-redactor-unit.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "0004ee73c285af4fbcba8a11931e7a40dfd96a86ce2fd59b13772d0e7fafd1c1",
+      "bytes": 1061,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "node",
+        "--test",
+        "deploy/preview-mail/v4-20261005/test-review-capture.mjs"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-redactor-unit.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "0004ee73c285af4fbcba8a11931e7a40dfd96a86ce2fd59b13772d0e7fafd1c1",
+      "candidateBytes": 1061,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-redactor-unit.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "20226a3ce6aecfda5cf0b020a757651e17ea3ecf11b5a818b0539244e3cde980",
+      "bytes": 453,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--test",
+        "deploy/preview-mail/v4-20261005/test-review-capture.mjs"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-redactor-unit.stdout.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "20226a3ce6aecfda5cf0b020a757651e17ea3ecf11b5a818b0539244e3cde980",
+      "candidateBytes": 453,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-redactor-unit.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--test",
+        "deploy/preview-mail/v4-20261005/test-review-capture.mjs"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-redactor-unit.stderr.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-redactor-unit.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "a0908377342a372dd400469942b5c935a8d6aa79fb220796ad8b5c3ff203fda5",
+      "bytes": 1311245,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--test",
+        "deploy/preview-mail/v4-20261005/test-review-capture.mjs"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-redactor-unit.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "a0908377342a372dd400469942b5c935a8d6aa79fb220796ad8b5c3ff203fda5",
+      "candidateBytes": 1311245,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-candidate-identity-preserved.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "002052bc218bb066a970b3251acd2b0366ad08ca69cf684aa4745bb4acf5324c",
+      "bytes": 1117,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-candidate-identity-preserved.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "002052bc218bb066a970b3251acd2b0366ad08ca69cf684aa4745bb4acf5324c",
+      "candidateBytes": 1117,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-candidate-identity-preserved.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "7b0a10e5e146862212f8e2e3fa71657bc972687d66ded4f8681e108ae5d5f6d5",
+      "bytes": 134,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-candidate-identity-preserved.stdout.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "7b0a10e5e146862212f8e2e3fa71657bc972687d66ded4f8681e108ae5d5f6d5",
+      "candidateBytes": 134,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-candidate-identity-preserved.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-candidate-identity-preserved.stderr.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-candidate-identity-preserved.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "d42ee3e6995405c3798a6c81b5d924a4d00b00ff218ad9bbbcb04a6cc0f48f38",
+      "bytes": 1311245,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-candidate-identity-preserved.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "d42ee3e6995405c3798a6c81b5d924a4d00b00ff218ad9bbbcb04a6cc0f48f38",
+      "candidateBytes": 1311245,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-source-matrix.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "929b0e7bc87637b35230c4854a532a6be04e96bf9ad3fed4c4cb9d9c2a4db7f7",
+      "bytes": 1297,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "node",
+        "--import",
+        "./node_modules/tsx/dist/loader.mjs",
+        "deploy/preview-mail/v4-20261005/test-source-producer.mjs",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-mail-aliases.private.json",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-fix1-mail-captures"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-source-matrix.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "929b0e7bc87637b35230c4854a532a6be04e96bf9ad3fed4c4cb9d9c2a4db7f7",
+      "candidateBytes": 1297,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-source-matrix.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "05273a5d9112d679639326e0f5f8bbbe40afb90733dd91f3999112bd881930c5",
+      "bytes": 249,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--import",
+        "./node_modules/tsx/dist/loader.mjs",
+        "deploy/preview-mail/v4-20261005/test-source-producer.mjs",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-mail-aliases.private.json",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-fix1-mail-captures"
+      ],
+      "riskCategories": {
+        "phone-shaped-number": 1
+      },
+      "candidatePath": "task-13-logs/fix1-source-matrix.stdout.log.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "5eb0f8c8bbc42ccd7872b250c58f29c48cb0c5a9e08646655598b08a52de5831",
+      "candidateBytes": 347,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-source-matrix.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--import",
+        "./node_modules/tsx/dist/loader.mjs",
+        "deploy/preview-mail/v4-20261005/test-source-producer.mjs",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-mail-aliases.private.json",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-fix1-mail-captures"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-source-matrix.stderr.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-source-matrix.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "b33341c43c0aee98d995eac0a7336cbae605736948d7f4e07c432c18efb9ea42",
+      "bytes": 1311245,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--import",
+        "./node_modules/tsx/dist/loader.mjs",
+        "deploy/preview-mail/v4-20261005/test-source-producer.mjs",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-mail-aliases.private.json",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-fix1-mail-captures"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-source-matrix.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "b33341c43c0aee98d995eac0a7336cbae605736948d7f4e07c432c18efb9ea42",
+      "candidateBytes": 1311245,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-green.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "2acce1520935b597342013a91673f26672bfe2efa1c4d3f088dccbaefaf9685f",
+      "bytes": 1072,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-green.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "2acce1520935b597342013a91673f26672bfe2efa1c4d3f088dccbaefaf9685f",
+      "candidateBytes": 1072,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-green.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-green.stdout.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-green.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "ac418e3e569295dfdbce2cfd15c5257261b67930fd8b3a735ce1e9f027be2ff2",
+      "bytes": 519,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {
+        "opaque-sequence": 5
+      },
+      "candidatePath": "task-13-logs/fix1-artifacts-green.stderr.log.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "a45e706b472344c1005553365d30173acd87e886fd81a39b905dedf845e32285",
+      "candidateBytes": 637,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-green.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "abb0fec251a6864b1849262fe5dea45bd6b5058beec9ab074bd1cd0509dedec7",
+      "bytes": 1311245,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-green.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "abb0fec251a6864b1849262fe5dea45bd6b5058beec9ab074bd1cd0509dedec7",
+      "candidateBytes": 1311245,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-mail-cover.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "d2de3b3018d1f587bf25081ff03d28f202fd001af164c9e43c58c525610db85a",
+      "bytes": 1163,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "node",
+        "--test",
+        "deploy/preview-mail/v4-20261005/test-policy.mjs",
+        "deploy/preview-mail/v4-20261005/test-mail.mjs",
+        "deploy/preview-mail/v4-20261005/test-review-capture.mjs"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-mail-cover.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "d2de3b3018d1f587bf25081ff03d28f202fd001af164c9e43c58c525610db85a",
+      "candidateBytes": 1163,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-mail-cover.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "f631780e43c4fc2a5ed339e22d044f55a93230c4ddac252c481a8f54fac4be65",
+      "bytes": 1541,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--test",
+        "deploy/preview-mail/v4-20261005/test-policy.mjs",
+        "deploy/preview-mail/v4-20261005/test-mail.mjs",
+        "deploy/preview-mail/v4-20261005/test-review-capture.mjs"
+      ],
+      "riskCategories": {
+        "opaque-sequence": 1,
+        "bearer-or-jwt": 1,
+        "phone-shaped-number": 1
+      },
+      "candidatePath": "task-13-logs/fix1-mail-cover.stdout.log.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "7f98cddf99fe1df44b1d5c9f270cc27991086bc8eec794c98dde6f182cf4c7b7",
+      "candidateBytes": 1699,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-mail-cover.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--test",
+        "deploy/preview-mail/v4-20261005/test-policy.mjs",
+        "deploy/preview-mail/v4-20261005/test-mail.mjs",
+        "deploy/preview-mail/v4-20261005/test-review-capture.mjs"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-mail-cover.stderr.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-mail-cover.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "abb0fec251a6864b1849262fe5dea45bd6b5058beec9ab074bd1cd0509dedec7",
+      "bytes": 1311245,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--test",
+        "deploy/preview-mail/v4-20261005/test-policy.mjs",
+        "deploy/preview-mail/v4-20261005/test-mail.mjs",
+        "deploy/preview-mail/v4-20261005/test-review-capture.mjs"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-mail-cover.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "abb0fec251a6864b1849262fe5dea45bd6b5058beec9ab074bd1cd0509dedec7",
+      "candidateBytes": 1311245,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-check.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "78fa401235fe9d5982e55f2c7ffe0108b1e272dc8c2353c580791567d39ce891",
+      "bytes": 1086,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py",
+        "--check"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-check.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "78fa401235fe9d5982e55f2c7ffe0108b1e272dc8c2353c580791567d39ce891",
+      "candidateBytes": 1086,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-check.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "48948d2477803dab64e14330a2417e62e14d5c8d3cb9f32226f8f5684bce5394",
+      "bytes": 129,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py",
+        "--check"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-check.stdout.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "48948d2477803dab64e14330a2417e62e14d5c8d3cb9f32226f8f5684bce5394",
+      "candidateBytes": 129,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-check.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py",
+        "--check"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-check.stderr.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-legal-check.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "abb0fec251a6864b1849262fe5dea45bd6b5058beec9ab074bd1cd0509dedec7",
+      "bytes": 1311245,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/prepare-legal-brand-candidate.py",
+        "--check"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-legal-check.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "abb0fec251a6864b1849262fe5dea45bd6b5058beec9ab074bd1cd0509dedec7",
+      "candidateBytes": 1311245,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-public-profile.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "d56c52269eeab4c01ecc62ebff3bb10955e744f7fac5ec7f3cb2d509477fb866",
+      "bytes": 1200,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/probe-public-profile.py",
+        "--source-root",
+        ".",
+        "--manifest",
+        "docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-public-profile.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "d56c52269eeab4c01ecc62ebff3bb10955e744f7fac5ec7f3cb2d509477fb866",
+      "candidateBytes": 1200,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-public-profile.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e8f5cdd15af4ec3fbe6be4f5ec0f2e0e6365f01c9b33752357b62b902984003f",
+      "bytes": 27473,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/probe-public-profile.py",
+        "--source-root",
+        ".",
+        "--manifest",
+        "docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json"
+      ],
+      "riskCategories": {
+        "opaque-sequence": 188
+      },
+      "candidatePath": "task-13-logs/fix1-public-profile.stdout.log.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "0135407225310d6e66ef02664e3c5236816d2f2d0e8b33e30d93e0b63c9b2ec4",
+      "candidateBytes": 34462,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-public-profile.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/probe-public-profile.py",
+        "--source-root",
+        ".",
+        "--manifest",
+        "docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-public-profile.stderr.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-public-profile.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "abb0fec251a6864b1849262fe5dea45bd6b5058beec9ab074bd1cd0509dedec7",
+      "bytes": 1311245,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/probe-public-profile.py",
+        "--source-root",
+        ".",
+        "--manifest",
+        "docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-public-profile.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "abb0fec251a6864b1849262fe5dea45bd6b5058beec9ab074bd1cd0509dedec7",
+      "candidateBytes": 1311245,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-source-matrix-final.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "85f1296d22e666416628a1904dd59c830f79ae9771dadfbc4c9bebc089959d40",
+      "bytes": 1314,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "node",
+        "--import",
+        "./node_modules/tsx/dist/loader.mjs",
+        "deploy/preview-mail/v4-20261005/test-source-producer.mjs",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-mail-aliases.private.json",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-fix1-mail-captures-final"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-source-matrix-final.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "85f1296d22e666416628a1904dd59c830f79ae9771dadfbc4c9bebc089959d40",
+      "candidateBytes": 1314,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-source-matrix-final.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "a0275a672fcc2d66541e42515a08832554b848d07f5c167dab45063a5291a257",
+      "bytes": 249,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--import",
+        "./node_modules/tsx/dist/loader.mjs",
+        "deploy/preview-mail/v4-20261005/test-source-producer.mjs",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-mail-aliases.private.json",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-fix1-mail-captures-final"
+      ],
+      "riskCategories": {
+        "phone-shaped-number": 1
+      },
+      "candidatePath": "task-13-logs/fix1-source-matrix-final.stdout.log.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "f20c77f02be5e4ec587bbd1f7298b7d5992d29f6c0e809812f1c26b7660c4131",
+      "candidateBytes": 347,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-source-matrix-final.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--import",
+        "./node_modules/tsx/dist/loader.mjs",
+        "deploy/preview-mail/v4-20261005/test-source-producer.mjs",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-mail-aliases.private.json",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-fix1-mail-captures-final"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-source-matrix-final.stderr.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-source-matrix-final.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "a935a3e06e3d05f8f2ff2a974b07b2484cf668756cff38fb6a25fd01ad6f7a7c",
+      "bytes": 1311245,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "node",
+        "--import",
+        "./node_modules/tsx/dist/loader.mjs",
+        "deploy/preview-mail/v4-20261005/test-source-producer.mjs",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-mail-aliases.private.json",
+        "../.superpowers/sdd/2026-10-04-account-onboarding-passkeys/task13-fix1-mail-captures-final"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-source-matrix-final.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "a935a3e06e3d05f8f2ff2a974b07b2484cf668756cff38fb6a25fd01ad6f7a7c",
+      "candidateBytes": 1311245,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-final.receipt.json",
+      "kind": "completed-local-runner-metadata",
+      "originalSha256": "445f087f7ea1155a2c02e23b56f93e9b4c9e350b11621bd71a5a4dd974b8ca03",
+      "bytes": 1072,
+      "checksumMatchesReceipt": null,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-final.receipt.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "445f087f7ea1155a2c02e23b56f93e9b4c9e350b11621bd71a5a4dd974b8ca03",
+      "candidateBytes": 1072,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-final.stdout.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-final.stdout.log",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "candidateBytes": 0,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-final.stderr.log",
+      "kind": "checksum-bound-local-fixture-output",
+      "originalSha256": "b6e2a1dee546efbe1696777e5d57f31059ad55ba7430d2032532f73a3088cc27",
+      "bytes": 519,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {
+        "opaque-sequence": 5
+      },
+      "candidatePath": "task-13-logs/fix1-artifacts-final.stderr.log.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "67ccb7bb35847e5a61b60b6219e66f55d8a087d82754d3a468cd302bd60109c6",
+      "candidateBytes": 637,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-logs/fix1-artifacts-final.source-sha256.json",
+      "kind": "source-path-and-sha256-map-only",
+      "originalSha256": "ce013cab0c7d13e7f6a4524e0f1778ed4db24e9e765cfbef0a7c52290f5430a4",
+      "bytes": 1311245,
+      "checksumMatchesReceipt": true,
+      "command": [
+        "python3",
+        "docs/operations/account-flow-release-2026-10-05/test-release-artifacts.py"
+      ],
+      "riskCategories": {},
+      "candidatePath": "task-13-logs/fix1-artifacts-final.source-sha256.json",
+      "candidateFormat": "unchanged validated metadata or inspected text",
+      "candidateRedactedSha256": "ce013cab0c7d13e7f6a4524e0f1778ed4db24e9e765cfbef0a7c52290f5430a4",
+      "candidateBytes": 1311245,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-review.md",
+      "kind": "explicit-local-review-or-privacy-summary",
+      "originalSha256": "9aa441f9b1bb350f8d759c3933d1ca43a61ee46a968ccdf2711f89154f03f2a5",
+      "bytes": 24036,
+      "checksumMatchesReceipt": null,
+      "command": null,
+      "riskCategories": {
+        "opaque-sequence": 27,
+        "bearer-or-jwt": 1
+      },
+      "candidatePath": "task-13-review.md.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "4a88c09894d32e3543f04325e595f980f3bd5f097959f1b14348338e0d982966",
+      "candidateBytes": 19708,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-fix1-context.md",
+      "kind": "explicit-local-review-or-privacy-summary",
+      "originalSha256": "7cc70c21cb5d911e5ddbc333fc2b0bdda085bf2486f224737546246cc3700001",
+      "bytes": 4304,
+      "checksumMatchesReceipt": null,
+      "command": null,
+      "riskCategories": {
+        "opaque-sequence": 3
+      },
+      "candidatePath": "task-13-fix1-context.md.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "5fc4476b64511c06acee712218c49b34a78c253266bef9f40f138aa9eaf6d83a",
+      "candidateBytes": 3068,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task-13-fix1-findings.md",
+      "kind": "explicit-local-review-or-privacy-summary",
+      "originalSha256": "45bddc7aefdf2f24d315bb8051bb1ee4f72503ea18be7965c43d7fb5b57d4962",
+      "bytes": 7333,
+      "checksumMatchesReceipt": null,
+      "command": null,
+      "riskCategories": {
+        "opaque-sequence": 16
+      },
+      "candidatePath": "task-13-fix1-findings.md.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "d9d8d52810e8ae06df833625ea025b5aea7de7ad888055cadb822b82c64681e4",
+      "candidateBytes": 6603,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    },
+    {
+      "path": "task13-fix1-capture-privacy-preview.json",
+      "kind": "explicit-local-review-or-privacy-summary",
+      "originalSha256": "98b77e8867d68cd4b669b604034abe1d635360a37efd80c19a633b35d2486330",
+      "bytes": 18953,
+      "checksumMatchesReceipt": null,
+      "command": null,
+      "riskCategories": {
+        "opaque-sequence": 157
+      },
+      "candidatePath": "task13-fix1-capture-privacy-preview.json.redacted.txt",
+      "candidateFormat": "plain redacted text; not executable source or original parseable JSON",
+      "candidateRedactedSha256": "d7a0f435ceb5007efe0de733b1300eedfbbf45a3b6f49e9ca472ffd8c9fd8bf3",
+      "candidateBytes": 23951,
+      "candidateStatus": "PREVIEW_ONLY_NOT_COPIED_OR_APPROVED",
+      "provenanceLimit": "Explicit local owned test outputs and named review summaries. Pattern checks do not certify no secrets. Raw originals remain restricted."
+    }
+  ],
+  "riskCategories": {
+    "opaque-sequence": 435,
+    "short-capability-assignment": 1,
+    "phone-shaped-number": 3,
+    "bearer-or-jwt": 2
+  },
+  "redactedLines": 440,
+  "structuredMetadataExceptions": [
+    "completed-local-runner-metadata",
+    "source-path-and-sha256-map-only"
+  ],
+  "durableCopyPerformed": false,
+  "rawValuesPrinted": false,
+  "automaticClassificationIsNotSafetyCertificate": true
+}

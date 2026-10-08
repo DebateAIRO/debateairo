@@ -9251,13 +9251,16 @@ export function declareHatchetWalkingSkeletonTask(input: {
   readonly failures: RunnerFailureRecorder;
   readonly workflowName: string;
   readonly engineRetries: number;
+  readonly previewExecutionTimeout?: "3600s";
 }): TaskWorkflowDeclaration<{ runId: string; workItemId: string }, { kind: string; answerId?: string }> {
+  if(input.previewExecutionTimeout!==undefined&&input.previewExecutionTimeout!=="3600s")throw new TypeError("PREVIEW_EXECUTION_TIMEOUT_INVALID");
   if (!Number.isInteger(input.engineRetries) || input.engineRetries < 0) {
     throw new TypeError("Hatchet retry count must be a non-negative register value");
   }
   return input.client.task({
     name: input.workflowName,
     retries: input.engineRetries,
+    ...(input.previewExecutionTimeout===undefined?{}:{executionTimeout:input.previewExecutionTimeout}),
     // S06 capture binding. It was written in e8d99d33 and destroyed by the
     // conflict resolution in merge 1c9578a2, which took the mainline side of
     // this file whole; the test that specifies it survived the same merge.

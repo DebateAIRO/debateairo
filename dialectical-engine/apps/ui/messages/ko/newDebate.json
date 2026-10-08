@@ -1,7 +1,7 @@
 {
   "newDebate.eyebrow": "새 질문",
   "newDebate.title": "무엇을 토론할까요?",
-  "newDebate.aiNotice": "이 토론에서 생성되는 논거, 검토, 점수, 판정은 모두 AI 모델이 생성하고 기계 판독 가능 표시가 있으며 부정확할 수 있습니다.",
+  "newDebate.aiNotice": "이 토론에서 생성되는 논거, 검토, 점수, 판정은 모두 AI 모델이 생성하고 기계 판독 가능 표시가 있으며 부정확할 수 있습니다. 이는 의료, 심리, 법률, 금융 또는 그 밖의 전문적 자문이 아닙니다.",
   "newDebate.planTier": "요금제 등급",
   "newDebate.free": "무료",
   "newDebate.freePromise": "모든 설정이 고정됩니다. 질문은 자유롭게 정하세요.",

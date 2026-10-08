@@ -1,0 +1,156 @@
+#!/usr/local/bin/node
+import { spawn } from 'node:child_process';
+import { ownedRecoveryRoute103 } from './recovery-mail-policy-two-owned103.mjs';
+import { pathToFileURL } from 'node:url';
+
+const FROM = 'noreply@dezbatere.ro';
+const GMAIL = '[withheld recipient sha256:2896ffbc0c81a347fb66548d4915e538f6de76143fad4b6bc374ac44f0c1b5c8]';
+const STEFAN = '[withheld recipient sha256:2bdfb49c50be86c26e2cc71a2eed037ec88852f7e227ad211cbebbd4e90e3b66]';
+const YAHOO = 'REDACTED_INSTALLED_RECIPIENT';
+const MAX_BYTES = 262144;
+const TOTAL_MS = 4500; // Reserve cleanup before Source's immutable 5000ms transport deadline.
+const CHILD_MS = 4000;
+const GRACE_MS = 100;
+const fail = code => new Error('OWNED_PREVIEW_MAIL_' + code);
+
+export function validateInvocation(argv) {
+  if (!Array.isArray(argv) || argv.length !== 4 || argv[0] !== '-i' || argv[1] !== '-t'
+    || argv[2] !== '-f' || argv[3] !== FROM) throw fail('ARGUMENT_REFUSED');
+}
+
+export function ownedVerificationRoute(message) {
+  if (!Buffer.isBuffer(message) || message.length < 1 || message.length > MAX_BYTES) throw fail('BOUND_REFUSED');
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(message); } catch { throw fail('MIME_REFUSED'); }
+  const at = text.indexOf('\r\n\r\n');
+  if (at < 0 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)) throw fail('MIME_REFUSED');
+  const lines = text.slice(0, at).split('\r\n');
+  if (lines.length !== 5 || lines[0] !== `From: ${FROM}`
+    || ![`To: ${STEFAN}`, `To: ${GMAIL}`, `To: ${YAHOO}`].includes(lines[1])
+    || lines[2] !== 'Subject: Verify your DebateAI email' || lines[3] !== 'MIME-Version: 1.0'
+    || lines[4] !== 'Content-Type: text/plain; charset=UTF-8') throw fail('HEADER_REFUSED');
+  const body = text.slice(at + 4);
+  const match = /^Verify your email by opening this link:\r\nhttps:\/\/v3-preview\.dezbatere\.ro\/verify-email#token=[A-Za-z0-9_-]{43}\r\n\r\nThis link expires at (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\.\r\nIf you cannot find this message, check your spam folder\.\r\n$/.exec(body);
+  if (!match) throw fail('VERIFICATION_MIME_REFUSED');
+  const expires = new Date(match[1]);
+  if (!Number.isFinite(expires.getTime()) || expires.toISOString() !== match[1]) throw fail('VERIFICATION_MIME_REFUSED');
+  const recipient = lines[1] === `To: ${YAHOO}` ? YAHOO : GMAIL;
+  // Input grammar is ASCII. Replace only the single second header line; body/fragment and every other byte stay exact.
+  const begin = Buffer.byteLength(lines[0] + '\r\n');
+  const end = begin + Buffer.byteLength(lines[1]);
+  return Object.freeze({ recipient, message: Buffer.concat([message.subarray(0, begin), Buffer.from(`To: ${recipient}`), message.subarray(end)]) });
+}
+
+export function ownedAccountMailRoute103(message) {
+  try { return ownedVerificationRoute(message); }
+  catch { return ownedRecoveryRoute103(message); }
+}
+
+export function ownedForwardingMessage(message) {
+  return ownedVerificationRoute(message).message;
+}
+
+export function cleanSubmissionEnvironment(ambient = {}) {
+  const result = { PATH: '/usr/sbin:/usr/bin:/bin' };
+  for (const name of ['LANG', 'LC_ALL', 'LC_CTYPE']) {
+    if (typeof ambient[name] === 'string' && /^[A-Za-z0-9_.@-]{1,96}$/.test(ambient[name])) result[name] = ambient[name];
+  }
+  return result;
+}
+
+export async function readBounded(stream, { deadline = Date.now() + TOTAL_MS } = {}) {
+  let timer;
+  try {
+    return await Promise.race([
+      (async () => {
+        const chunks = [];
+        let total = 0;
+        for await (const chunk of stream) {
+          const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          total += bytes.length;
+          if (total > MAX_BYTES) { stream.destroy?.(); throw fail('BOUND_REFUSED'); }
+          chunks.push(bytes);
+        }
+        if (total === 0) throw fail('BOUND_REFUSED');
+        return Buffer.concat(chunks, total);
+      })(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => { stream.destroy?.(); reject(fail('INPUT_TIMEOUT')); }, Math.max(1, deadline - Date.now()));
+      })
+    ]);
+  } finally { clearTimeout(timer); }
+}
+
+// Stub seams are internal exports only; the executable has no configurable destination, MTA, timeouts or environment file.
+export async function submitVerification({ argv, message, ambient = {}, signal,
+  deadline = Date.now() + TOTAL_MS, childTimeoutMs = CHILD_MS, killGraceMs = GRACE_MS,
+  spawnImpl = spawn, killGroup = (pid, name) => process.kill(-pid, name) }) {
+  validateInvocation(argv);
+  const { recipient, message: forwarded } = ownedAccountMailRoute103(message);
+  let child, timer, killTimer, forceTimer, reason;
+  try {
+    if (signal?.aborted) throw fail('CANCELLED');
+    const remaining = deadline - Date.now();
+    if (remaining <= 2 * killGraceMs) throw fail('TIMEOUT');
+    await new Promise((resolve, reject) => {
+      let settled = false, groupKillAttempted = false;
+      const clean = () => { clearTimeout(timer); clearTimeout(killTimer); clearTimeout(forceTimer); signal?.removeEventListener('abort', cancelled); };
+      const finish = (code, termination) => {
+        if (settled) return;
+        // Parent close can precede postdrop descendant exit; retain group cleanup on every reason path.
+        if (reason && !groupKillAttempted) return;
+        settled = true; clean();
+        if (reason) reject(reason);
+        else if (code === 0 && termination === null) resolve();
+        else reject(fail('SUBMIT_REFUSED'));
+      };
+      const kill = name => { if (Number.isInteger(child?.pid)) { try { killGroup(child.pid, name); } catch {} } };
+      const stop = error => {
+        if (settled || reason) return;
+        reason = error; child.stdin?.destroy(); kill('SIGTERM');
+        killTimer = setTimeout(() => {
+          kill('SIGKILL'); groupKillAttempted = true; finish(null, 'SIGKILL');
+        }, killGraceMs);
+        // Bound even a lost/stalled close event after killing only this new child process group.
+        forceTimer = setTimeout(() => {
+          if (!groupKillAttempted) { kill('SIGKILL'); groupKillAttempted = true; }
+          finish(null, 'SIGKILL');
+        }, 2 * killGraceMs);
+      };
+      const cancelled = () => stop(fail('CANCELLED'));
+      try {
+        child = spawnImpl('/usr/sbin/sendmail', ['-i', '-f', FROM, '--', recipient], {
+          stdio: ['pipe', 'ignore', 'ignore'], env: cleanSubmissionEnvironment(ambient), shell: false, detached: true
+        });
+      } catch { finish(null, null); return; }
+      child.once('error', () => stop(fail('SUBMIT_REFUSED')));
+      child.once('close', finish);
+      child.stdin.once('error', () => stop(fail('SUBMIT_REFUSED')));
+      signal?.addEventListener('abort', cancelled, { once: true });
+      timer = setTimeout(() => stop(fail('TIMEOUT')), Math.min(childTimeoutMs, remaining - 2 * killGraceMs));
+      child.stdin.end(forwarded);
+    });
+  } finally {
+    clearTimeout(timer); clearTimeout(killTimer); clearTimeout(forceTimer);
+    forwarded.fill(0);
+  }
+}
+
+async function main() {
+  const deadline = Date.now() + TOTAL_MS;
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  process.once('SIGTERM', cancel); process.once('SIGINT', cancel);
+  let message;
+  try {
+    validateInvocation(process.argv.slice(2));
+    message = await readBounded(process.stdin, { deadline });
+    await submitVerification({ argv: process.argv.slice(2), message, ambient: process.env, signal: controller.signal, deadline });
+  } catch {
+    process.stderr.write('OWNED_PREVIEW_MAIL_REFUSED\n');
+    process.exitCode = 1;
+  } finally {
+    message?.fill(0); process.removeListener('SIGTERM', cancel); process.removeListener('SIGINT', cancel);
+  }
+}
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main();

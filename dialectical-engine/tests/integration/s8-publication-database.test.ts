@@ -2276,7 +2276,9 @@ describe("S8 publication on real PostgreSQL", () => {
     const publishGrant = await grant(identity, runId, "PUBLISH", "9", occurredAt);
     const contentCiphertext = await encryptedSnapshot(publicationRef,runId,"shred-race");
     const blocker = await database.pool.connect();
+    try {
     await blocker.query("BEGIN");
+    await blocker.query("SELECT identity.lock_security_subjects($1::uuid[])", [[identity.userId]]);
     await blocker.query("SELECT 1 FROM core.run WHERE run_id=$1 FOR UPDATE", [runId]);
     const published = repository.publish({
       runId, userId: identity.userId, ownerRef: identity.ownerRef,
@@ -2288,10 +2290,14 @@ describe("S8 publication on real PostgreSQL", () => {
     userDeks.get(identity.userId)?.fill(0);
     userDeks.delete(identity.userId);
     userIdsByOwnerRef.delete(identity.ownerRef);
-    await database.pool.query('DELETE FROM identity."user" WHERE user_id=$1', [identity.userId]);
+    // The erasure winner follows the subject prefix and deletes on that same transaction.
+    await blocker.query('DELETE FROM identity."user" WHERE user_id=$1', [identity.userId]);
     await blocker.query("COMMIT");
-    blocker.release();
     expect(await published).toBe(false);
     expect(await repository.readPublic(publicationRef)).toBeNull();
+    } finally {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      blocker.release();
+    }
   });
 });

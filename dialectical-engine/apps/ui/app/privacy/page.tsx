@@ -7,8 +7,8 @@ import { loadLegalDocument } from "@/lib/legal/server";
 
 export const generateMetadata = () => legalPageMetadata("privacy");
 
-export default async function PrivacyPage() {
-  const { locale, chromeCatalog, legalCatalog } = await loadLegalPageCatalogs();
+export default async function PrivacyPage({searchParams}:{searchParams?:Promise<{lang?:string}>}) {
+  const { locale, chromeCatalog, legalCatalog } = await loadLegalPageCatalogs((await searchParams)?.lang);
   const document = await loadLegalDocument(locale, "privacy");
   return (
     <LegalPageLayout

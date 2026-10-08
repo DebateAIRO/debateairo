@@ -13,7 +13,7 @@ import {
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
-const STATIC_TAIL = "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests";
+const STATIC_TAIL = "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests";
 
 test("createNonce draws 16 random bytes as 24 base64 characters, fresh every call", () => {
   const nonces = new Set();
@@ -56,7 +56,7 @@ test("a malformed nonce is refused, never interpolated into a policy", () => {
 test("the fallback is exactly the pre-nonce production policy and the API policy denies everything", () => {
   assert.equal(
     FALLBACK_CONTENT_SECURITY_POLICY,
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests"
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests"
   );
   assert.equal(API_CONTENT_SECURITY_POLICY, "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
   assert.equal(NONCE_REQUEST_HEADER, "x-nonce");
@@ -94,7 +94,7 @@ test("every document, the checkout and card pages included, gets the same nonce 
   const { middleware } = await import("../middleware.ts");
   const development = process.env.NODE_ENV === "development";
   const nonceOf = (policy) => /'nonce-([^']+)'/.exec(policy)[1];
-  for (const path of ["/checkout", "/checkout/return", "/settings/card", "/", "/settings", "/pricing", "/login"]) {
+  for (const path of ["/checkout", "/checkout/return", "/settings/card", "/", "/settings", "/settings/security", "/pricing", "/login"]) {
     const response = middleware(new NextRequest(`https://dezbatere.test${path}`));
     const policy = response.headers.get("content-security-policy");
     assert.equal(policy, nonceContentSecurityPolicy(nonceOf(policy), development), path);

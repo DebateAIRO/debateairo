@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Tài khoản — Địa chỉ email và địa chỉ email khôi phục (được lưu trữ dưới dạng mã hóa, cùng một chỉ mục có khóa để chúng tôi có thể tìm tài khoản mà không đọc địa chỉ); mật khẩu (được lưu dưới dạng hàm băm, không bao giờ ở dạng rõ); bí mật xác thực hai yếu tố của bạn (được mã hóa); mười mã khôi phục (được lưu dưới dạng hàm băm); bí danh của bạn; thời điểm bạn xác nhận mình từ 18 tuổi trở lên — Bạn, khi đăng ký",
+        "Tài khoản — Địa chỉ email và địa chỉ email khôi phục (được lưu trữ dưới dạng mã hóa, cùng một chỉ mục có khóa để chúng tôi có thể tìm tài khoản mà không đọc địa chỉ); mật khẩu (được lưu dưới dạng hàm băm, không bao giờ ở dạng rõ); bí mật xác thực hai yếu tố của bạn (được mã hóa); mười mã khôi phục (được lưu dưới dạng hàm băm); bí danh của bạn; kết quả kiểm tra độ tuổi, nhưng không lưu ngày sinh — Bạn, khi đăng ký",
+        "Kiểm tra quốc gia theo địa chỉ IP — Khi đăng ký, chúng tôi xác định quốc gia của IP tại chỗ bằng DB-IP Lite và kiểm tra danh sách địa chỉ thoát Tor. Trước mỗi cuộc tranh luận mới, chúng tôi cũng kiểm tra quốc gia của IP ngay trên hệ thống và có thể từ chối nếu quốc gia thuộc danh sách luôn bị chặn. Nếu từ chối, chúng tôi ghi tổng hợp tuyến, mã từ chối, quốc gia, khoảng thời gian và việc địa chỉ IP là căn cứ; Trong nhật ký kiểm toán, địa chỉ IP và chuỗi user-agent chỉ được lưu dưới dạng mã băm một chiều có khóa. — Địa chỉ IP khi đăng ký và bắt đầu cuộc tranh luận mới",
+        "Kiểm tra độ tuổi — Kết quả (khi đăng ký chỉ lưu đạt; với tài khoản hiện có có thể là đạt hoặc không đạt), độ tuổi tối thiểu áp dụng, quốc gia theo IP nếu biết, phiên bản quy tắc, bối cảnh và thời điểm kiểm tra. Không lưu ngày sinh — Ngày sinh nhập để kiểm tra; quốc gia suy ra từ IP",
+        "Khu vực khai báo — Quốc gia cư trú bạn chọn khi đăng ký và, nếu ở Hoa Kỳ, tiểu bang — Bạn, khi đăng ký",
         "Phiên và bảo mật — Mã thông báo phiên đã băm; hàm băm có khóa của chuỗi tác nhân người dùng trong trình duyệt của bạn, dùng để nhận biết khi một phiên chuyển sang trình duyệt khác; dấu thời gian tạo, lần sử dụng cuối và hết hạn. Chúng tôi không lưu địa chỉ IP, tên thiết bị hoặc thông tin chi tiết về trình duyệt của bạn cùng với phiên, và danh sách phiên bạn thấy trong phần Cài đặt chỉ hiển thị dấu thời gian — Trình duyệt của bạn",
         "Dấu vết kiểm toán bảo mật — Nhật ký chỉ được phép ghi nối tiếp về các sự kiện liên quan đến bảo mật — đăng ký, xác minh, nỗ lực đăng nhập, khôi phục, công khai, xóa. Địa chỉ IP và tác nhân người dùng của mỗi sự kiện chỉ được lưu dưới dạng bản tóm lược có khóa một chiều (Argon2id), vì vậy không thể đọc ngược nhưng có thể đối chiếu trong một khoảng thời gian. Các tín hiệu rủi ro đăng nhập và khôi phục được lưu trữ dưới dạng mã hóa trong 90 ngày — Trình duyệt của bạn, tại thời điểm xảy ra từng sự kiện",
         "Nội dung tranh luận — Câu hỏi bạn nhập; các chú thích định hướng bạn thiết lập; các luận điểm, phản biện, tham chiếu bằng chứng, điểm số và phán quyết do công cụ tạo ra; bản ghi nguyên văn nội dung từng nhà cung cấp AI trả về; truy vấn truy xuất và tham chiếu nguồn. Toàn bộ dữ liệu này được lưu trữ dưới dạng mã hóa bằng một khóa dành riêng cho tài khoản của bạn — Bạn và các mô hình AI xử lý câu hỏi của bạn",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Những người không phải người dùng của chúng tôi — Dữ liệu cá nhân về người khác mà bạn đưa vào câu hỏi hoặc công cụ tạo ra khi trả lời câu hỏi. Chúng tôi yêu cầu bạn không làm điều này; mục 11 giải thích cách chúng tôi xử lý khi việc đó vẫn xảy ra — Gián tiếp từ bạn"
         ]
       },
+      { kind: "p", text: "Khi đăng ký, chúng tôi kiểm tra quốc gia của địa chỉ IP ngay trên hệ thống bằng DB-IP Lite và danh sách địa chỉ thoát Tor, không gửi địa chỉ cho bên thứ ba. Chúng tôi từ chối đăng ký từ quốc gia chưa cung cấp dịch vụ, từ địa chỉ thoát Tor và từ địa chỉ không xác định được quốc gia. Trước mỗi cuộc tranh luận mới, chúng tôi cũng kiểm tra quốc gia của IP ngay trên hệ thống và có thể từ chối nếu quốc gia thuộc danh sách luôn bị chặn. Bạn nhập ngày sinh chỉ để kiểm tra độ tuổi; chúng tôi không lưu ngày sinh. Đăng ký thành công chỉ lưu kết quả “đạt”; với tài khoản đã tồn tại, kết quả có thể là “đạt” hoặc “không đạt”. Bạn cũng chọn quốc gia cư trú và, nếu ở Hoa Kỳ, tiểu bang để chúng tôi áp dụng quy định về người tiêu dùng, quyền riêng tư và thuế phù hợp." },
       { kind: "p", text: "Chúng tôi không thu thập dữ liệu phân tích hoặc dữ liệu đo từ xa về cách bạn sử dụng sản phẩm và không đặt cookie cho mục đích đó. Nếu điều này thay đổi, chính sách này và Chính sách Cookie sẽ được thay đổi trước, đồng thời bạn sẽ được hỏi ý kiến." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Một công cụ tranh luận khuyến khích các câu hỏi về chính trị, tôn giáo, sức khỏe, tình dục và niềm tin. Đây là các loại dữ liệu đặc biệt theo Điều 9 GDPR và chúng có thể xuất hiện trong câu hỏi của bạn dù chúng tôi có chủ định thu thập hay không." },
-      { kind: "p", text: "Về bạn. Trước cuộc tranh luận đầu tiên, trên một màn hình riêng biệt, bạn đồng ý rõ ràng cho phép chúng tôi xử lý thông tin nhạy cảm mà bạn lựa chọn đưa vào câu hỏi của mình nhằm vận hành các cuộc tranh luận. Chúng tôi ghi lại phiên bản câu chữ mà bạn đã đồng ý, ngôn ngữ của bạn và thời điểm đồng ý. Nếu không có sự đồng ý này, bạn không thể bắt đầu một cuộc tranh luận. Bạn có thể rút lại sự đồng ý bất cứ lúc nào bằng cách không đưa thông tin đó vào hoặc bằng cách xóa cuộc tranh luận. Nội dung bạn công khai về bản thân là dữ liệu mà bạn đã lựa chọn công khai." },
+      { kind: "p", text: "Về bạn. Trước cuộc tranh luận đầu tiên, trên một màn hình riêng biệt, bạn đồng ý rõ ràng cho phép chúng tôi xử lý thông tin nhạy cảm mà bạn lựa chọn đưa vào câu hỏi của mình nhằm vận hành các cuộc tranh luận. Chúng tôi ghi lại phiên bản câu chữ mà bạn đã đồng ý, ngôn ngữ của bạn và thời điểm đồng ý. Nếu không có sự đồng ý này, bạn không thể bắt đầu một cuộc tranh luận. Bạn có thể rút lại sự đồng ý bất cứ lúc nào bằng cách viết tới privacy@dezbatere.ro. Bạn cũng có thể không đưa thông tin đó vào hoặc xóa cuộc tranh luận chứa thông tin đó. Nội dung bạn công khai về bản thân là dữ liệu mà bạn đã lựa chọn công khai." },
       { kind: "p", text: "Về người khác. Không có điều kiện pháp lý nào cho phép chúng tôi xử lý dữ liệu nhạy cảm về một bên thứ ba mà bạn nêu tên trong câu hỏi, và các nhà cung cấp AI của chúng tôi cũng không có điều kiện đó. Đây là lý do Điều khoản nghiêm cấm việc này, chúng tôi giảm thiểu dữ liệu gửi đi và nhanh chóng gỡ nội dung đó khi có yêu cầu — mục 11." },
       { kind: "p", text: "Thông tin sức khỏe. Một số quốc gia áp dụng luật cụ thể đối với dữ liệu liên quan đến sức khỏe, bao gồm cả các suy luận. Nếu bạn sống tại [the State of Washington], một [Consumer Health Data Privacy Notice] riêng sẽ được áp dụng." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Lý do chúng tôi sử dụng dữ liệu của bạn và cơ sở pháp lý",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Mỗi mục đích có một cơ sở pháp lý theo Điều 6(1) GDPR và chúng tôi không tái sử dụng dữ liệu được thu thập cho một mục đích vào mục đích khác." },
+      { kind: "p", text: "Với mỗi mục đích, chúng tôi nêu cơ sở hoặc các cơ sở pháp lý phù hợp theo Điều 6(1) GDPR. Chúng tôi không sử dụng lại dữ liệu thu thập cho một mục đích vào mục đích khác." },
       {
         kind: "list",
         items: [
         "Tạo và vận hành tài khoản của bạn, xác thực bạn, vận hành và lưu trữ các cuộc tranh luận để bạn có thể mở lại và phát lại — Tài khoản, phiên, nội dung tranh luận — Hợp đồng — Art. 6(1)(b)",
+        "Kiểm tra khả năng đăng ký theo quốc gia của IP, Tor và địa chỉ không xác định; kiểm tra cuộc tranh luận mới theo danh sách quốc gia luôn bị chặn và ghi nhận các lần từ chối — Kiểm tra quốc gia theo địa chỉ IP — Lợi ích hợp pháp — Art. 6(1)(f), cung cấp dịch vụ an toàn; và nghĩa vụ pháp lý — Art. 6(1)(c), tuân thủ chế tài và quy định nơi chúng tôi cung cấp dịch vụ",
+        "Kiểm tra độ tuổi tối thiểu để sử dụng dịch vụ — Kiểm tra độ tuổi — Hợp đồng — Art. 6(1)(b), giao kết hợp đồng; và lợi ích hợp pháp — Art. 6(1)(f), bảo vệ người chưa thành niên",
+        "Áp dụng quy định về người tiêu dùng, quyền riêng tư và thuế phù hợp — Khu vực khai báo — Hợp đồng — Art. 6(1)(b); và nghĩa vụ pháp lý — Art. 6(1)(c)",
         "Gửi câu hỏi của bạn và các phát biểu của công cụ đến các nhà cung cấp AI để tạo một cuộc tranh luận — Nội dung tranh luận — Hợp đồng — Art. 6(1)(b)",
         "Giữ an toàn cho dịch vụ, phát hiện hành vi lạm dụng, giúp bạn nhận biết một lần đăng nhập không phải do mình thực hiện, duy trì dấu vết kiểm toán — Phiên, dấu vết kiểm toán bảo mật, hàm băm chống lạm dụng của hoạt động hỗ trợ — Lợi ích hợp pháp — Art. 6(1)(f): lợi ích của chúng tôi và của bạn đối với một dịch vụ an toàn. Bạn có thể phản đối; mục 10",
         "Chứng minh rằng bạn đã chấp nhận Điều khoản và đã đưa ra hoặc rút lại sự đồng ý — Hồ sơ chấp nhận và đồng ý — Nghĩa vụ pháp lý — Art. 6(1)(c), nghĩa vụ của chúng tôi trong việc chứng minh sự đồng ý theo Art. 7(1) — và lợi ích hợp pháp trong việc chứng minh hợp đồng",
@@ -112,8 +119,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Công khai và khả năng hiển thị",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Các cuộc tranh luận là riêng tư cho đến khi bạn công khai chúng. Việc công khai là một hành động có chủ ý và được xác nhận riêng. Một cuộc tranh luận đã công khai hiển thị bí danh của bạn, câu hỏi đúng như bạn đã viết, cây lập luận, điểm số, phán quyết và dải độ tin cậy, đồng thời mang nhãn hiển thị rõ ràng rằng nội dung do AI tạo ra. Cuộc tranh luận không bao giờ hiển thị địa chỉ email, hồ sơ phiên hoặc lịch sử tài khoản của bạn. [Published debates are / are not] được các công cụ tìm kiếm lập chỉ mục [unless you choose]." },
-      { kind: "p", text: "Việc hủy công khai sẽ gỡ cuộc tranh luận khỏi DebateAI và hủy khóa của bản sao công khai do chúng tôi nắm giữ. Các bản sao mà độc giả, công cụ tìm kiếm hoặc kho lưu trữ đã tạo nằm ngoài tầm kiểm soát của chúng tôi và chúng tôi không thể thu hồi chúng." },
+      { kind: "p", text: "Các cuộc tranh luận là riêng tư cho đến khi bạn công khai chúng. Việc công khai là một hành động có chủ ý và được xác nhận riêng. Một cuộc tranh luận đã công khai hiển thị bí danh của bạn, câu hỏi đúng như bạn đã viết, cây lập luận, điểm số, phán quyết và dải độ tin cậy, đồng thời mang nhãn hiển thị rõ ràng rằng nội dung do AI tạo ra. Cuộc tranh luận không bao giờ hiển thị địa chỉ email, hồ sơ phiên hoặc lịch sử tài khoản của bạn. Công cụ tìm kiếm có thể lập chỉ mục các cuộc tranh luận đã công bố." },
+      { kind: "p", text: "Việc hủy công khai sẽ gỡ cuộc tranh luận khỏi Dialectical Engine và hủy khóa của bản sao công khai do chúng tôi nắm giữ. Các bản sao mà độc giả, công cụ tìm kiếm hoặc kho lưu trữ đã tạo nằm ngoài tầm kiểm soát của chúng tôi và chúng tôi không thể thu hồi chúng." },
       { kind: "p", text: "Khi bạn xóa tài khoản, chúng tôi gỡ mọi cuộc tranh luận bạn đã công khai khỏi quyền truy cập công cộng mà không chậm trễ quá mức và chậm nhất trong vòng 30 ngày, trừ khi pháp luật yêu cầu chúng tôi lưu giữ một mục cụ thể. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -126,10 +133,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Tài khoản — Trong thời gian tài khoản tồn tại, cộng với thời gian gia hạn 7 ngày sau khi bạn yêu cầu đóng — Khóa bị hủy; hồ sơ bị xóa",
+        "Kết quả kiểm tra độ tuổi và thông tin về quy tắc — Trong thời gian tài khoản tồn tại — Xóa cùng tài khoản; không lưu ngày sinh",
+        "Quốc gia cư trú và tiểu bang Hoa Kỳ đã khai báo — Trong thời gian tài khoản tồn tại — Xóa cùng tài khoản",
         "Hồ sơ phiên — 14 ngày sau lần sử dụng cuối hoặc 90 ngày sau khi tạo, tùy thời điểm nào đến trước — Bị xóa",
         "Liên kết xác minh email — 24 giờ — Bị xóa",
         "Tín hiệu rủi ro đăng nhập và khôi phục — 90 ngày, được cơ sở dữ liệu thực thi — Bị xóa sạch",
         "Dấu vết kiểm toán bảo mật — Trong suốt vòng đời của dịch vụ — Chỉ được phép ghi nối tiếp; IP và tác nhân người dùng là bản tóm lược một chiều và không thể đọc ngược",
+        "Địa chỉ IP dùng để xác định quốc gia tại chỗ khi đăng ký và bắt đầu cuộc tranh luận mới — Chỉ trong thời gian xử lý yêu cầu — Không lưu ở dạng đọc được cho bước kiểm tra này; việc từ chối chỉ được ghi tổng hợp và dưới dạng mã băm nêu dưới đây",
+        "Bản ghi kiểm toán tổng hợp về việc từ chối theo quốc gia IP — Trong suốt thời gian dịch vụ hoạt động — Bản ghi chứa mã từ chối, quốc gia, nhãn cho biết IP là căn cứ và mã băm một chiều có khóa của địa chỉ IP cùng chuỗi user-agent; nhật ký chỉ cho phép ghi thêm.",
         "Nội dung tranh luận (riêng tư) — Trong thời gian tài khoản tồn tại — Khóa bị hủy khi đóng, khiến nội dung không thể đọc được",
         "Nội dung tranh luận (đã công khai) — Trong thời gian được công khai và tài khoản còn tồn tại — Bị gỡ khỏi quyền truy cập công cộng khi hủy công khai hoặc đóng tài khoản; khóa bị hủy",
         "Hồ sơ phản hồi của nhà cung cấp và tham chiếu truy xuất — Giống cuộc tranh luận tương ứng — Như trên",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Hạn chế (Art. 18) — Yêu cầu chúng tôi ngừng xử lý dữ liệu cụ thể trong khi tranh chấp liên quan đến dữ liệu đó được giải quyết",
         "Phản đối (Art. 21) — Phản đối việc xử lý dựa trên lợi ích hợp pháp — hoạt động xử lý bảo mật và kiểm toán tại mục 4 — và chúng tôi sẽ dừng trừ khi có thể chứng minh lý do thuyết phục. Phản đối tiếp thị bất cứ lúc nào và chúng tôi sẽ dừng",
         "Khả năng di chuyển dữ liệu (Art. 20) — Các cuộc tranh luận và dữ liệu tài khoản của bạn ở định dạng thông dụng, máy có thể đọc được. [Pending: same export as Access.] Nội dung không phải dữ liệu cá nhân do bạn tạo, chẳng hạn câu hỏi của bạn, sẽ được trả lại theo yêu cầu khi hợp đồng chấm dứt",
-        "Rút lại sự đồng ý (Art. 7(3)) — Rút lại sự đồng ý tiếp thị từ bất kỳ email nào hoặc trong phần Cài đặt; rút lại sự đồng ý về dữ liệu nhạy cảm bằng cách không đưa dữ liệu đó vào hoặc bằng cách xóa một cuộc tranh luận. Việc rút lại không ảnh hưởng đến hoạt động xử lý đã diễn ra",
+        "Rút lại sự đồng ý (Art. 7(3)) — Rút lại sự đồng ý tiếp thị từ bất kỳ email nào hoặc trong phần Cài đặt; rút lại sự đồng ý về dữ liệu nhạy cảm bằng cách viết tới privacy@dezbatere.ro (bạn cũng có thể không đưa dữ liệu đó vào hoặc xóa cuộc tranh luận chứa dữ liệu đó). Việc rút lại không ảnh hưởng đến hoạt động xử lý đã diễn ra",
         "Khiếu nại — Gửi đến cơ quan giám sát Romania, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, anspdcp@dataprotection.ro, hoặc đến cơ quan tại quốc gia nơi bạn sinh sống. Chúng tôi mong bạn liên hệ với chúng tôi trước"
         ]
       },
@@ -188,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Người được nêu tên trong các cuộc tranh luận nhưng không phải người dùng của chúng tôi",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Nếu ai đó đặt cho DebateAI một câu hỏi có nêu tên bạn, chúng tôi có thể lưu giữ dữ liệu cá nhân về bạn mặc dù bạn chưa từng sử dụng dịch vụ. Điều khoản cấm người dùng làm việc này và chúng tôi giảm thiểu dữ liệu gửi đến các nhà cung cấp AI, nhưng việc đó vẫn xảy ra." },
+      { kind: "p", text: "Nếu ai đó đặt cho Dialectical Engine một câu hỏi có nêu tên bạn, chúng tôi có thể lưu giữ dữ liệu cá nhân về bạn mặc dù bạn chưa từng sử dụng dịch vụ. Điều khoản cấm người dùng làm việc này và chúng tôi giảm thiểu dữ liệu gửi đến các nhà cung cấp AI, nhưng việc đó vẫn xảy ra." },
       { kind: "p", text: "Mục này là thông báo mà chúng tôi phải cung cấp cho bạn theo Điều 14 GDPR. Dữ liệu là bất kỳ nội dung nào người dùng đã nhập và công cụ tạo ra để trả lời; nguồn là người dùng đó; mục đích và cơ sở pháp lý được nêu tại mục 4; bên nhận là các nhà cung cấp AI trong Sổ đăng ký; thời hạn lưu giữ tuân theo mục 7. Bạn có mọi quyền trong mục 10 và đặc biệt có thể yêu cầu chúng tôi gỡ một cuộc tranh luận đã công khai hoặc riêng tư có chứa dữ liệu của bạn và cho bạn biết chúng tôi lưu giữ những gì. Bạn không cần tài khoản để thực hiện. Hãy viết đến privacy@dezbatere.ro hoặc sử dụng chức năng Báo cáo trên bất kỳ cuộc tranh luận đã công khai nào, và chúng tôi sẽ xử lý yêu cầu có căn cứ mà không chậm trễ quá mức. Chúng tôi không thể thông báo riêng cho bạn khi việc này xảy ra vì không biết bạn là ai hoặc cách liên hệ; thay vào đó, chúng tôi áp dụng thông báo công khai này và phương thức yêu cầu gỡ bỏ." },
       { kind: "p", text: "Điều tương tự áp dụng đối với thông tin nhạy cảm về bạn — chính trị, sức khỏe, tôn giáo — xuất hiện trong câu hỏi của người khác. Không có điều kiện pháp lý nào cho phép chúng tôi tiếp tục xử lý sau khi bạn phản đối, và chúng tôi sẽ không tiếp tục." }
     ]
@@ -198,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Trẻ em",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI dành cho người trưởng thành. Khi đăng ký, bạn xác nhận mình từ 18 tuổi trở lên và chúng tôi không cố ý xử lý dữ liệu của bất kỳ ai dưới 18 tuổi. Nếu biết một tài khoản thuộc về người dưới 18 tuổi, chúng tôi đóng tài khoản và xóa dữ liệu như mô tả tại mục 7. Một số quốc gia coi việc xác nhận là chưa đủ hoặc yêu cầu thêm; Phụ lục B nêu quy định áp dụng tại từng nơi và Điều khoản giải thích cách chúng tôi xử lý." }
+      { kind: "p", text: "Dialectical Engine dành cho người trưởng thành. Khi đăng ký, bạn xác nhận mình từ 18 tuổi trở lên và chúng tôi không cố ý xử lý dữ liệu của bất kỳ ai dưới 18 tuổi. Nếu biết một tài khoản thuộc về người dưới 18 tuổi, chúng tôi đóng tài khoản và xóa dữ liệu như mô tả tại mục 7. Một số quốc gia coi việc xác nhận là chưa đủ hoặc yêu cầu thêm; Phụ lục B nêu quy định áp dụng tại từng nơi và Điều khoản giải thích cách chúng tôi xử lý." }
     ]
   },
   {
@@ -206,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI sử dụng tám mục, tất cả đều thực sự cần thiết cho dịch vụ bạn đã yêu cầu và tất cả chỉ do DebateAI đặt: bốn cookie và bốn mục nhập trong bộ nhớ trình duyệt của bạn. Chúng tôi không đặt cookie phân tích, quảng cáo hoặc theo dõi. Chính sách Cookie tại [dezbatere.ro/cookies] liệt kê chúng cùng với chức năng của từng mục và bên nhận mục đó, và sẽ được thay đổi trước khi bất kỳ thứ gì khác được thêm vào." },
+      { kind: "p", text: "Dialectical Engine sử dụng 18 mục, tất cả đều thực sự cần thiết cho dịch vụ bạn đã yêu cầu và tất cả chỉ do Dialectical Engine đặt: 13 cookie và 5 mục nhập trong bộ nhớ trình duyệt của bạn. Chúng tôi không đặt cookie phân tích, quảng cáo hoặc theo dõi. Chính sách Cookie tại [dezbatere.ro/cookies] liệt kê chúng cùng với chức năng của từng mục và bên nhận mục đó, và sẽ được thay đổi trước khi bất kỳ thứ gì khác được thêm vào." },
       {
         kind: "list",
         items: [
@@ -214,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — 14 ngày",
         "__Host-debateai-age-refusal — Tệp cookie (HttpOnly) — Sau khi một lần kiểm tra độ tuổi bị từ chối, ngăn trình duyệt này thử lại trong 30 ngày. Nó chỉ chứa từ “bị từ chối”, không có dữ liệu cá nhân. — 30 ngày",
         "debateai.locale — Tệp cookie — Ghi nhớ ngôn ngữ giao diện bạn đã chọn. — 1 năm",
+        "__Host-debateai-staff — Tệp cookie (HttpOnly) — Quyền truy cập nhân viên riêng — Tối đa 8 giờ; 15 phút không hoạt động",
+        "__Host-debateai-staff-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — Tối đa 8 giờ; 15 phút không hoạt động",
+        "__Host-debateai-password-reset — Tệp cookie (HttpOnly) — Chỉ đặt lại mật khẩu — Tối đa 30 phút",
+        "__Host-debateai-password-reset-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — Tối đa 30 phút",
+        "__Host-debateai-mfa-recovery — Tệp cookie (HttpOnly) — Chỉ khôi phục trình xác thực — Tối đa 299 giây",
+        "__Host-debateai-mfa-recovery-csrf — Tệp cookie — Ngăn các trang web khác gửi biểu mẫu dưới danh nghĩa của bạn. — Tối đa 299 giây",
+        "__Host-debateai-social-flow — Tệp cookie (HttpOnly) — Quy trình ngắn đăng nhập qua nhà cung cấp hoặc liên kết tài khoản — Tối đa 5 phút",
+        "__Host-debateai-social-apple — Tệp cookie (HttpOnly) — Quy trình ngắn đăng nhập qua nhà cung cấp hoặc liên kết tài khoản — Tối đa 5 phút",
+        "__Host-debateai-social-browser — Tệp cookie (HttpOnly) — Quy trình ngắn đăng nhập qua nhà cung cấp hoặc liên kết tài khoản — Tối đa 5 phút",
         "debateai.consent — Bộ nhớ cục bộ — Ghi nhớ rằng bạn đã xem thông báo về cookie, để thông báo chỉ hiện một lần. — Cho đến khi bạn xóa",
         "debateai.mode — Bộ nhớ cục bộ — Ghi nhớ bạn dùng chế độ hiển thị sáng hay tối. — Cho đến khi bạn xóa",
         "debateai.languageOffer.dismissed — Bộ nhớ phiên — Ghi nhớ, cho thẻ này, rằng bạn đã từ chối đề nghị hiển thị một cuộc tranh luận bằng ngôn ngữ khác. — Cho đến khi bạn đóng thẻ",
-        "debateai.support.conversation.v2 — Bộ nhớ phiên — Giữ cuộc trò chuyện trợ giúp của bạn trên màn hình khi thẻ vẫn mở. Cuộc trò chuyện bị xóa khi có người đăng nhập hoặc đăng xuất trong thẻ này. — Cho đến khi bạn đóng thẻ"
+        "debateai.support.conversation.v2 — Bộ nhớ phiên — Giữ cuộc trò chuyện trợ giúp của bạn trên màn hình khi thẻ vẫn mở. Cuộc trò chuyện bị xóa khi có người đăng nhập hoặc đăng xuất trong thẻ này. — Cho đến khi bạn đóng thẻ",
+        "debateai.phone-completion-draft.v1 — Bộ nhớ phiên — Câu hỏi chưa hoàn tất ở bước điện thoại; xóa khi đổi phiên, đăng xuất hoặc đổi chủ sở hữu — 15 phút hoặc đến khi bị xóa sớm hơn"
         ]
       },
-      { kind: "p", text: "Không có bên nào khác thu thập, thông qua DebateAI, thông tin về các hoạt động trực tuyến của bạn theo thời gian và trên nhiều trang web khác nhau." },
-      { kind: "p", text: "Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín hiệu tương tự. DebateAI không theo dõi bạn, vì vậy không có gì để tín hiệu đó tắt đi: dịch vụ hoạt động như nhau dù có hay không có tín hiệu đó." },
+      { kind: "p", text: "Không có bên nào khác thu thập, thông qua Dialectical Engine, thông tin về các hoạt động trực tuyến của bạn theo thời gian và trên nhiều trang web khác nhau." },
+      { kind: "p", text: "Trình duyệt có thể gửi tín hiệu “Do Not Track” hoặc một tín hiệu tương tự. Dialectical Engine không theo dõi bạn, vì vậy không có gì để tín hiệu đó tắt đi: dịch vụ hoạt động như nhau dù có hay không có tín hiệu đó." },
       { kind: "p", text: "Để từ chối các mục này, hãy chặn hoặc xóa cookie và dữ liệu trang web của trang này trong phần cài đặt trình duyệt. Khi đó, những gì ngừng hoạt động: việc đăng nhập và việc ghi nhớ lựa chọn ngôn ngữ và chế độ hiển thị của bạn; thông báo cookie cũng sẽ hiển thị lại." }
     ]
   },
@@ -231,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Khi thay đổi chính sách này, chúng tôi đăng phiên bản mới kèm bản tóm tắt những thay đổi và ngày hiệu lực mới, đồng thời lưu các phiên bản trước tại [dezbatere.ro/privacy/versions]. Đối với thay đổi bổ sung mục đích mới hoặc bên nhận mới, chúng tôi thông báo cho bạn trước khi hoạt động xử lý mới bắt đầu, qua email và trong sản phẩm, đồng thời dành cho bạn thời gian phản đối. Khi mục đích mới phụ thuộc vào sự đồng ý của bạn — ví dụ nếu sau này chúng tôi muốn sử dụng nội dung để cải thiện mô hình — chúng tôi sẽ xin sự đồng ý đó một cách riêng biệt và cụ thể; chúng tôi không bao giờ coi việc chấp nhận Điều khoản cập nhật là sự đồng ý cho hoạt động xử lý mới. Đối với các nội dung làm rõ không làm thay đổi cách chúng tôi hành động, chúng tôi chỉ đăng phiên bản mới." },
-      { kind: "p", text: "Chính sách này được cập nhật lần cuối vào [date]. Phiên bản 3.0 thay thế phiên bản 2.1, vốn mô tả dữ liệu phiên, thời hạn lưu giữ, dữ liệu phân tích, việc xuất dữ liệu và tác dụng của việc xóa đối với các cuộc tranh luận đã công khai theo những cách không còn phản ánh đúng dịch vụ." }
+      { kind: "p", text: "Chính sách này được cập nhật lần cuối vào [date]. Phiên bản 3.2 thay thế phiên bản 2.1, vốn mô tả dữ liệu phiên, thời hạn lưu giữ, dữ liệu phân tích, việc xuất dữ liệu và tác dụng của việc xóa đối với các cuộc tranh luận đã công khai theo những cách không còn phản ánh đúng dịch vụ." }
     ]
   },
   {
@@ -263,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Hoa Kỳ (chỉ khi được liệt kê)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Thông báo tại thời điểm thu thập. Bảng tại mục 2 liệt kê từng loại thông tin cá nhân chúng tôi thu thập, mục đích và thời gian lưu giữ (mục 7). Chúng tôi chỉ thu thập các loại thông tin cá nhân nhạy cảm sau đây khi bạn đưa chúng vào câu hỏi của chính mình về bản thân: sức khỏe, niềm tin tôn giáo hoặc triết học, đời sống tình dục hoặc xu hướng tính dục, quan điểm chính trị, tư cách thành viên công đoàn, và nguồn gốc chủng tộc hoặc dân tộc. Chúng tôi chỉ sử dụng chúng để vận hành các cuộc tranh luận của bạn, và chỉ sau khi có sự đồng ý riêng tại mục 3. Chúng tôi không bán hoặc chia sẻ thông tin cá nhân và đã không làm như vậy trong mười hai tháng trước đó. Chúng tôi không sử dụng thông tin cá nhân cho quảng cáo nhắm mục tiêu, và không sử dụng thông tin cá nhân nhạy cảm cho bất kỳ mục đích nào ngoài việc cung cấp dịch vụ bạn yêu cầu. Tín hiệu tùy chọn từ chối tham gia: vì chúng tôi không bán hoặc chia sẻ thông tin cá nhân hay sử dụng thông tin đó cho quảng cáo nhắm mục tiêu, không có gì để từ chối tham gia, và tín hiệu Global Privacy Control không thay đổi điều gì. Các quyền của bạn: quyền được biết, xóa, sửa, từ chối tham gia, hạn chế việc sử dụng thông tin cá nhân nhạy cảm và không bị phân biệt đối xử vì thực hiện các quyền đó; hãy gửi yêu cầu tại privacy@dezbatere.ro. Ưu đãi tài chính: chúng tôi không cung cấp ưu đãi nào; mục đích và biện pháp bảo vệ của chúng tôi là như nhau đối với gói miễn phí và gói trả phí. Thời hạn lưu giữ được nêu tại mục 7. Vi phạm dữ liệu: chúng tôi thông báo cho cư dân và cơ quan chức năng của tiểu bang theo yêu cầu của luật về vi phạm dữ liệu của từng tiểu bang. Thông báo này được cập nhật ít nhất mỗi mười hai tháng; cập nhật lần cuối [date]." },
+      { kind: "p", text: "Thông báo tại thời điểm thu thập. Bảng tại mục 2 liệt kê các loại thông tin cá nhân chúng tôi thu thập và nguồn của chúng. Mục đích và cơ sở pháp lý được nêu tại mục 4; thời hạn lưu giữ được nêu tại mục 7. Chúng tôi chỉ thu thập các loại thông tin cá nhân nhạy cảm sau đây khi bạn đưa chúng vào câu hỏi của chính mình về bản thân: sức khỏe, niềm tin tôn giáo hoặc triết học, đời sống tình dục hoặc xu hướng tính dục, quan điểm chính trị, tư cách thành viên công đoàn, và nguồn gốc chủng tộc hoặc dân tộc. Chúng tôi chỉ sử dụng chúng để vận hành các cuộc tranh luận của bạn, và chỉ sau khi có sự đồng ý riêng tại mục 3. Chúng tôi không bán hoặc chia sẻ thông tin cá nhân và đã không làm như vậy trong mười hai tháng trước đó. Chúng tôi không sử dụng thông tin cá nhân cho quảng cáo nhắm mục tiêu, và không sử dụng thông tin cá nhân nhạy cảm cho bất kỳ mục đích nào ngoài việc cung cấp dịch vụ bạn yêu cầu. Tín hiệu tùy chọn từ chối tham gia: vì chúng tôi không bán hoặc chia sẻ thông tin cá nhân hay sử dụng thông tin đó cho quảng cáo nhắm mục tiêu, không có gì để từ chối tham gia. Nếu sau này bắt đầu bán hoặc chia sẻ thông tin đó, chúng tôi sẽ tôn trọng tín hiệu Global Privacy Control như yêu cầu từ chối tham gia. Các quyền của bạn: quyền được biết, xóa, sửa, từ chối tham gia, hạn chế việc sử dụng thông tin cá nhân nhạy cảm và không bị phân biệt đối xử vì thực hiện các quyền đó; hãy gửi yêu cầu tại privacy@dezbatere.ro. Ưu đãi tài chính: chúng tôi không cung cấp ưu đãi nào; mục đích và biện pháp bảo vệ của chúng tôi là như nhau đối với gói miễn phí và gói trả phí. Thời hạn lưu giữ được nêu tại mục 7. Vi phạm dữ liệu: chúng tôi thông báo cho cư dân và cơ quan chức năng của tiểu bang theo yêu cầu của luật về vi phạm dữ liệu của từng tiểu bang. Thông báo này được cập nhật ít nhất mỗi mười hai tháng; cập nhật lần cuối [date]." },
       { kind: "p", text: "Connecticut: chúng tôi chỉ xử lý dữ liệu nhạy cảm khi có sự đồng ý chủ động của bạn, được đưa ra trên màn hình riêng trước cuộc tranh luận đầu tiên của bạn (mục 3); chúng tôi không sử dụng dữ liệu cá nhân của bạn để huấn luyện mô hình AI. Washington: Thông báo Quyền riêng tư về Dữ liệu Sức khỏe Người tiêu dùng của chúng tôi tại [URL] là một tài liệu riêng áp dụng cho mọi thông tin liên quan đến sức khỏe, bao gồm cả các suy luận. Texas và Nebraska: chúng tôi không bán dữ liệu cá nhân nhạy cảm. Colorado, Connecticut, Virginia và các tiểu bang khác có luật quyền riêng tư toàn diện: các quyền nêu trên áp dụng cho bạn khi pháp luật áp dụng cho chúng tôi. Nếu chúng tôi từ chối một yêu cầu, bạn có thể khiếu nại bằng cách trả lời câu trả lời của chúng tôi tại privacy@dezbatere.ro; nếu chúng tôi bác khiếu nại đó, bạn có thể liên hệ với Tổng Chưởng lý của tiểu bang mình." }
     ]
   },
@@ -304,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraine (chỉ khi được liệt kê)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Luật của Ukraine \"Về bảo vệ dữ liệu cá nhân\" được áp dụng. Chúng tôi không cung cấp DebateAI tại các khu vực của Ukraine không do chính phủ nước này kiểm soát. Dữ liệu của bạn được chuyển đến các quốc gia EU và Hoa Kỳ (xem Sổ đăng ký). Bạn có thể khiếu nại đến Ủy viên Quốc hội Ukraine về Nhân quyền." }
+      { kind: "p", text: "Luật của Ukraine \"Về bảo vệ dữ liệu cá nhân\" được áp dụng. Chúng tôi không cung cấp Dialectical Engine tại các khu vực của Ukraine không do chính phủ nước này kiểm soát. Dữ liệu của bạn được chuyển đến các quốc gia EU và Hoa Kỳ (xem Sổ đăng ký). Bạn có thể khiếu nại đến Ủy viên Quốc hội Ukraine về Nhân quyền." }
     ]
   },
   {
@@ -335,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "6dbd1367a00481704b799d912a7e0d8eb64aaea8575a212b13623a3a4bd19829",
-  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.0 · CÓ HIỆU LỰC [DATE]",
+  version: "3.2",
+  sha256: "57515fb8d62befd64175977fecf833e33b1d47487c5dd77141b89e8d9ab806c9",
+  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.2 · CÓ HIỆU LỰC [DATE]",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",
-  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Nội dung Chính sách quyền riêng tư",
   sectionIdPrefix: "policy-section-",

@@ -81,5 +81,7 @@
   "support.answerRating": "דירוג התשובה",
   "support.privacyPreferences": "פרטיות",
   "support.aiBanner": "התשובות נוצרות בידי בינה מלאכותית, מסומנות באופן קריא למכונה ועלולות להיות שגויות. אפשר לבקש לדבר עם אדם בכל עת.",
-  "support.cookiePreferences": "העוגיות שאנחנו שומרים"
+  "support.cookiePreferences": "העוגיות שאנחנו שומרים",
+  "support.recoverAccount": "שחזור החשבון",
+  "support.countryUnavailable": "Dialectical Engine עדיין לא זמין במדינה שלך."
 }

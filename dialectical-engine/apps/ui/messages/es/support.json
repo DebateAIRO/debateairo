@@ -81,5 +81,7 @@
   "support.answerRating": "Valoración de la respuesta",
   "support.privacyPreferences": "Privacidad",
   "support.aiBanner": "Las respuestas las genera la IA, llevan una marca legible por máquina y pueden ser erróneas. Puede pedir que intervenga una persona en cualquier momento.",
-  "support.cookiePreferences": "Cookies que guardamos"
+  "support.cookiePreferences": "Cookies que guardamos",
+  "support.recoverAccount": "Recuperar tu cuenta",
+  "support.countryUnavailable": "Dialectical Engine aún no está disponible en su país."
 }

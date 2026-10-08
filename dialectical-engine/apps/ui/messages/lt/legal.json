@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "gauti visų trečiųjų šalių, kurios juos gavo, sąrašą;",
   "legal.health.s05.item3": "atšaukti savo sutikimą ir reikalauti juos ištrinti.",
   "legal.health.s06.title": "Kaip jomis pasinaudoti",
-  "legal.health.s06.body": "Nustatymuose arba parašę adresu privacy@dezbatere.ro. Atsakome per 45 dienas. Jei atmesime jūsų prašymą, galėsite jį apskųsti atsakydami į mūsų laišką."
+  "legal.health.s06.body": "Nustatymuose arba parašę adresu privacy@dezbatere.ro. Atsakome per 45 dienas. Jei atmesime jūsų prašymą, galėsite jį apskųsti atsakydami į mūsų laišką.",
+  "legal.cookies.staff.purpose": "Atskira darbuotojų prieiga",
+  "legal.cookies.passwordReset.purpose": "Tik slaptažodžio atkūrimas",
+  "legal.cookies.mfaRecovery.purpose": "Tik autentifikatoriaus atkūrimas",
+  "legal.cookies.social.purpose": "Trumpas prisijungimas per teikėją arba paskyros susiejimas",
+  "legal.cookies.phoneDraft.purpose": "Nebaigtas klausimas telefono veiksmo metu; pašalinamas pasikeitus sesijai, atsijungus ar pasikeitus savininkui",
+  "legal.cookies.staff.life": "Iki 8 valandų; 15 minučių neveiklumo",
+  "legal.cookies.passwordReset.life": "Iki 30 minučių",
+  "legal.cookies.mfaRecovery.life": "Iki 299 sekundžių",
+  "legal.cookies.social.life": "Iki 5 minučių",
+  "legal.cookies.phoneDraft.life": "15 minučių arba iki ankstesnio pašalinimo"
 }

@@ -77,6 +77,17 @@ describe("the gateway refuses any packet the frame builder did not make", () => 
     const result = await gatewayOver({}).call({ ...REQUEST, packet: framed.packet });
     expect(result.content).toBe('{"verdict":"yes"}');
   });
+  it("refuses a bare preview-story contract label before transport", async () => {
+    await expect(gatewayOver({}).call({ ...REQUEST, packet: {
+      messages: [{ role: "user", content: "story.storyteller.v2" }]
+    } })).rejects.toMatchObject({ code: "PROMPT_FRAME_ABSENT" });
+  });
+  it("refuses a valid instruction frame with malformed preview-story material", async () => {
+    const framed = buildFramedPrompt({ contract: { ...CONTRACT, contractId: "story.storyteller.v2" },
+      material: [{ name: "story_material", content: "One synthetic policy position." }] });
+    await expect(gatewayOver({}).call({ ...REQUEST, packet: { messages: [framed.packet.messages[0]!,
+      { role: "user", content: "unframed" }] } })).rejects.toMatchObject({ code: "PROMPT_FRAME_FENCE_MISMATCH" });
+  });
 
   it("refuses a repair packet that drops the frame", async () => {
     const framed = buildFramedPrompt({

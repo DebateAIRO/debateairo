@@ -60,6 +60,7 @@ export const testCountryPolicy: CountryPolicy = Object.freeze({
     GB: rule(true, false, "TAX_NOT_READY"),
     RU: rule(false, false, "SANCTIONS", true)
   }),
+  usStates: Object.freeze({}),
   unknownIp: "REFUSE",
   tor: "REFUSE",
   sourceRef: "test:country-policy"

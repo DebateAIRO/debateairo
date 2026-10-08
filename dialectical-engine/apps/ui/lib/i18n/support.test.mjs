@@ -95,10 +95,12 @@ const expectedKeys = [
   "support.answerRating",
   "support.privacyPreferences",
   "support.aiBanner",
-  "support.cookiePreferences"
+  "support.cookiePreferences",
+  "support.recoverAccount",
+  "support.countryUnavailable"
 ].sort();
 
-test("all 35 locales expose the exact 83-key support chrome contract", () => {
+test("all 35 locales expose the exact 85-key support chrome contract", () => {
   assert.deepEqual(Object.keys(english).sort(), expectedKeys);
   const locales = readdirSync(join(root, "messages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -108,6 +110,9 @@ test("all 35 locales expose the exact 83-key support chrome contract", () => {
   for (const locale of locales) {
     const localized = JSON.parse(source(`messages/${locale}/support.json`));
     assertLocalizedCatalog({ english, localized, locale, namespace: "support" });
+    assert.equal(localized["support.recoverAccount"],JSON.parse(source(`messages/${locale}/auth.json`))["auth.recovery.title"]);
+    // Paid plans G3a: where support is not offered it says the sign-up page's own sentence.
+    assert.equal(localized["support.countryUnavailable"],JSON.parse(source(`messages/${locale}/auth.json`))["auth.signUp.countryUnavailable"]);
   }
 });
 

@@ -70,7 +70,7 @@ describe("S10 self-service erasure UI", () => {
       expect(control).toContain('t(catalog, "settings.erasure.confirmationPhrase")');
       expect(control).toContain('if (locale === "en") return typed === phrase;');
       expect(settingsEnglish["settings.erasure.confirmationPhrase"]).toBe("DELETE MY ACCOUNT");
-      expect(control).toContain('action: "DELETE_ACCOUNT"');
+      expect(control).toMatch(/authorization=\{\{action:\s*['"]DELETE_ACCOUNT['"]/);
       expect(control).not.toContain("target_run_id");
       expect(control).toContain("scheduleAccountErasure(grant.token)");
       expect(control).toContain("readAccountErasure()");
@@ -105,8 +105,8 @@ describe("S10 self-service erasure UI", () => {
     for (const [control, debate, renderSite] of surfaces) {
       expect(debate).toContain(renderSite);
       expect(control).toContain('visibility?.state === "PRIVATE"');
-      expect(control).toContain('action: "DELETE_PRIVATE_DEBATE"');
-      expect(control).toContain("target_run_id: runId");
+      expect(control).toMatch(/authorization=\{\{action:\s*['"]DELETE_PRIVATE_DEBATE['"],target_run_id:runId/);
+      expect(control).toMatch(/target_run_id:\s*runId/);
       expect(control).toContain("deletePrivateDebate(runId, grant.token)");
       expect(control).toContain('t(catalog, "public.publication.deleteExplanation")');
       expect(publicEnglish["public.publication.deleteExplanation"]).toBe(

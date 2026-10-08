@@ -68,16 +68,23 @@ async function click(label: string): Promise<void> {
 
 /** Signs in to the code step, then submits a code against `completeLogin`. */
 async function signInWith(completeLogin: ReturnType<typeof vi.fn>, onAuthenticated = vi.fn()): Promise<void> {
-  const beginLogin = vi.fn().mockResolvedValue({ status: "mfa_required" as const, challenge_token: "challenge" });
+  const challenge = "t".repeat(43);
+  const beginLogin = vi.fn().mockResolvedValue({ status: "mfa_required" as const, challenge_token: challenge,
+    available_methods: ["totp", "recovery_code"] });
   await act(async () => root!.render(
     <LoginFlow client={{ beginLogin, completeLogin }} onAuthenticated={onAuthenticated} />
   ));
   field("email").value = "person@example.test";
   field("password").value = "password";
   await submitForm();
-  field("code").value = "123456";
-  await submitForm();
-  expect(completeLogin).toHaveBeenCalledWith("challenge", "123456");
+  // The current controlled field submits the complete six-digit value once.
+  await act(async () => {
+    const input = field("code");
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "123456");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await settle();
+  expect(completeLogin).toHaveBeenCalledExactlyOnceWith(challenge, "123456");
 }
 
 function alertText(): string | null {

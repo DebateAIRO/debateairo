@@ -1,9 +1,22 @@
 // tests/architecture/ci-security-gates.test.ts
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 const gitRoot = resolve(import.meta.dirname, "../../..");
 const read = (p: string) => readFileSync(resolve(gitRoot, p), "utf8");
+const { commandArguments } = await import(pathToFileURL(resolve(gitRoot, "dialectical-engine/tools/source-map-hotfix.mjs")).href) as {
+  commandArguments: (label: string) => string[];
+};
+
+function executableGateCommands(workflow: string): string[] {
+  return [...workflow.matchAll(/^      - run: ([^\n]+)$/gm)].map((match) => {
+    const run = match[1]!.replace(/\s+#.*$/, "").trim();
+    const wrapper = /^node tools\/source-map-hotfix\.mjs ([a-z]+)$/.exec(run);
+    if (run.startsWith("node tools/source-map-hotfix.mjs") && !wrapper) throw new Error("CI_WRAPPER_COMMAND_INVALID");
+    return wrapper ? ["pnpm", ...commandArguments(wrapper[1]!)].join(" ") : run;
+  });
+}
 
 /**
  * The single Node version humans and CI install. Since dev's 932ed6b5 `engines.node` is a
@@ -24,11 +37,23 @@ describe("CI security gates (F-03)", () => {
   });
   it("pins the ruled Node and runs every gate", () => {
     const wf = read(".github/workflows/security.yml");
-    for (const needle of [`node-version: ${declaredNodeFloor()}`, "pnpm audit --audit-level=moderate", "gitleaks", "pnpm run typecheck", "pnpm run test:ci-gate", "github/codeql-action/analyze"]) expect(wf).toContain(needle);
+    for (const needle of [`node-version: ${declaredNodeFloor()}`, "gitleaks", "github/codeql-action/analyze"]) expect(wf).toContain(needle);
+    expect(executableGateCommands(wf)).toEqual([
+      "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run typecheck",
+      "pnpm run test:ci-gate", "pnpm audit --audit-level=moderate"
+    ]);
+  });
+  it("cannot satisfy an executable gate with a comment or removed step", () => {
+    const wf = read(".github/workflows/security.yml");
+    const auditLine = /^      - run: node tools\/source-map-hotfix\.mjs audit[^\n]*$/m;
+    for (const changed of [wf.replace(auditLine, "      # pnpm audit --audit-level=moderate"), wf.replace(auditLine, "")]) {
+      expect(executableGateCommands(changed)).not.toContain("pnpm audit --audit-level=moderate");
+    }
+    expect(() => executableGateCommands(wf.replace("mjs audit", "mjs audit extra"))).toThrow("CI_WRAPPER_COMMAND_INVALID");
   });
   it("runs the recorded known-red gate, not a raw vitest sweep (B31)", () => {
     const wf = read(".github/workflows/security.yml");
-    expect(wf).toContain("pnpm run test:ci-gate");
+    expect(executableGateCommands(wf)).toContain("pnpm run test:ci-gate");
     expect(wf).not.toContain("vitest run tests/unit tests/architecture");
     const scripts = JSON.parse(read("dialectical-engine/package.json")).scripts as Record<string, string>;
     // tests/render joined the gate by V's ruling of 2026-09-28: it is the only

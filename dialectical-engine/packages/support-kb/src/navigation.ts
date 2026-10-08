@@ -59,8 +59,6 @@ function hrefFor(definition: SupportActionDefinition, context: SupportNavigation
       return UUID.test(context.publicDebateRef ?? "")
         ? `/public/debate/${context.publicDebateRef}`
         : null;
-    case "forgot-password":
-      return null;
     default:
       return definition.href;
   }
@@ -93,12 +91,11 @@ export function resolveSupportActions(
     const href = hrefFor(definition, context);
     if (href === null || !isSafeHref(href)) continue;
     // en and ro keep dev's reviewed catalog labels; the 33 new interface
-    // locales name the control the reader sees (generated UI catalogue), which
-    // has no forgot-password label.
+    // locales name the control the reader sees (generated UI catalogue).
     const language = context.language;
     const label = language === "en" || language === "ro"
       ? definition.labels[language]
-      : definition.id === "forgot-password" ? null : SUPPORT_UI_LABELS[language][definition.id];
+      : SUPPORT_UI_LABELS[language][definition.id];
     if (label === null) continue;
     resolved.push(Object.freeze({
       id: definition.id,

@@ -75,6 +75,13 @@ export const SESSION_POLICY_REGISTER_ROW = Object.freeze({
   sourceRef: SESSION_POLICY_PUBLICATION_ROW.sourceRef
 });
 
+/** Superseding deployment publication; the sealed S5 row above remains 90-day history. */
+export const SESSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
+  rowKey: SESSION_POLICY_ROW_KEY,
+  sourceRef: "2026-10-04-account-onboarding-passkeys:Task8; consumer 14d idle/30d absolute/5min proof",
+  value: Object.freeze({ ...SESSION_POLICY_REGISTER_ROW.value, absolute_ttl_ms: 2592000000 })
+});
+
 export function sessionPolicyFromValue(value: unknown, sourceRef: string): SessionPolicy {
   const parsed = sessionPolicyValueSchema.safeParse(value);
   if (!parsed.success || sourceRef.trim() === "") {

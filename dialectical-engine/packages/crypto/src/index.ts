@@ -1702,11 +1702,13 @@ export function generateVerificationToken(): string {
  */
 export type TokenKind = "session" | "csrf" | "login-challenge" | "step-up-grant"
   | "verification" | "support-session" | "support-case"
-  | "email-change-confirm" | "email-change-cancel";
+  | "email-change-confirm" | "email-change-cancel" | "recovery-email-confirm" | "consumer-recovery-channel" | "consumer-recovery-enroll"
+  | "password-reset-link" | "password-reset-cancel" | "password-reset-session" | "password-reset-csrf" | "backup-email-link" | "mfa-recovery-link" | "mfa-recovery-cancel" | "mfa-recovery-session" | "mfa-recovery-csrf";
 
 const TOKEN_KINDS: ReadonlySet<string> = new Set<TokenKind>([
   "session", "csrf", "login-challenge", "step-up-grant", "verification",
-  "support-session", "support-case", "email-change-confirm", "email-change-cancel"
+  "support-session", "support-case", "email-change-confirm", "email-change-cancel", "recovery-email-confirm", "consumer-recovery-channel", "consumer-recovery-enroll",
+  "password-reset-link", "password-reset-cancel", "password-reset-session", "password-reset-csrf", "backup-email-link", "mfa-recovery-link", "mfa-recovery-cancel", "mfa-recovery-session", "mfa-recovery-csrf"
 ]);
 
 /**

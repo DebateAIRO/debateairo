@@ -219,7 +219,8 @@ describe("Accounts S8 publication architecture", () => {
     const englishHomeCatalog = JSON.parse(englishHome) as Readonly<Record<string, string>>;
     const englishPublicCatalog = JSON.parse(englishPublic) as Readonly<Record<string, string>>;
     for (const control of [applicationControl]) {
-      expect(control).toContain("stepUp(password, code");
+      expect(control).toContain("<SecurityConfirmation");
+    expect(control).toContain("authorization={{action,target_run_id:runId}}");
       expect(control).toContain("publishRun(runId, grant.token)");
       expect(control).toContain("unpublishRun(runId, grant.token)");
       expect(control).toContain('type="checkbox"');
@@ -231,7 +232,7 @@ describe("Accounts S8 publication architecture", () => {
       );
       expect(control).toContain('t(catalog, "public.publication.unpublishWarning")');
       expect(englishPublicCatalog["public.publication.unpublishWarning"]).toBe(
-        "Unpublishing stops future anonymous reads from DebateAI, but copies already downloaded, " +
+        "Unpublishing stops future anonymous reads from Dialectical Engine, but copies already downloaded, " +
         "quoted, cached, or indexed may persist."
       );
     }

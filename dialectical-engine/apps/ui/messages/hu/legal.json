@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "megkapja mindazon harmadik felek listáját, amelyek hozzájuk jutottak;",
   "legal.health.s05.item3": "visszavonja hozzájárulását, és kérje az adatok törlését.",
   "legal.health.s06.title": "Hogyan gyakorolhatja őket",
-  "legal.health.s06.body": "A Beállításokban, vagy a privacy@dezbatere.ro címre írva. 45 napon belül válaszolunk. Ha egy kérelmet elutasítunk, a döntésünkre küldött válaszában fellebbezhet."
+  "legal.health.s06.body": "A Beállításokban, vagy a privacy@dezbatere.ro címre írva. 45 napon belül válaszolunk. Ha egy kérelmet elutasítunk, a döntésünkre küldött válaszában fellebbezhet.",
+  "legal.cookies.staff.purpose": "Külön munkatársi hozzáférés",
+  "legal.cookies.passwordReset.purpose": "Csak jelszó-visszaállítás",
+  "legal.cookies.mfaRecovery.purpose": "Csak hitelesítő-helyreállítás",
+  "legal.cookies.social.purpose": "Rövid szolgáltatói bejelentkezés vagy fiók-összekapcsolás",
+  "legal.cookies.phoneDraft.purpose": "Befejezetlen kérdés a telefonos lépés alatt; munkamenetváltáskor, kijelentkezéskor vagy tulajdonosváltáskor törlődik",
+  "legal.cookies.staff.life": "Legfeljebb 8 óra; 15 perc inaktivitás",
+  "legal.cookies.passwordReset.life": "Legfeljebb 30 perc",
+  "legal.cookies.mfaRecovery.life": "Legfeljebb 299 másodperc",
+  "legal.cookies.social.life": "Legfeljebb 5 perc",
+  "legal.cookies.phoneDraft.life": "15 perc vagy a korábbi törlésig"
 }

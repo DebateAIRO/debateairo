@@ -1,4 +1,4 @@
-import { getLocale, isLocale, type LocaleCode, type LocaleDefinition } from "./locales.js";
+import { catalogLocale, getLocale, isLocale, type LocaleCode, type LocaleDefinition } from "./locales.js";
 
 /**
  * The interface locale that speaks a question's language (spec 2026-09-26
@@ -24,7 +24,7 @@ export function languageOfferLocale(
   questionLocaleCode: LocaleCode | null,
   interfaceLocale: LocaleCode
 ): LocaleDefinition | null {
-  if (questionLocaleCode === null || questionLocaleCode === interfaceLocale) return null;
+  if (questionLocaleCode === null || catalogLocale(questionLocaleCode) === catalogLocale(interfaceLocale)) return null;
   return getLocale(questionLocaleCode);
 }
 

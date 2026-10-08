@@ -1,3 +1,4 @@
+import { previewAskProxyCeiling } from "../../../lib/previewAskProxyCeiling.js";
 import {
   AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
   AGE_REFUSAL_COOKIE_NAME,
@@ -24,7 +25,10 @@ const REQUEST_HEADER_ALLOWLIST = Object.freeze([
   "origin",
   "range",
   "user-agent",
-  "x-csrf-token"
+  "x-csrf-token",
+  "x-staff-csrf-token",
+  "x-password-reset-csrf-token",
+  "x-mfa-recovery-csrf-token"
   ,"x-support-session-token"
   // DL1-F5c/DL3-F4: the case bearer travels in a header now, never in a path.
   ,"x-support-case-token"
@@ -58,6 +62,14 @@ const PUBLISH_UPSTREAM_TIMEOUT_MS = 85_000;
 const RUN_PUBLISH_PATH = /^v1\/runs\/[^/]+\/publish$/u;
 const SESSION_COOKIE_NAME = "__Host-debateai-session";
 const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
+const STAFF_COOKIE_NAME = "__Host-debateai-staff";
+const STAFF_CSRF_COOKIE_NAME = "__Host-debateai-staff-csrf";
+const PASSWORD_RESET_COOKIE_NAME = "__Host-debateai-password-reset";
+const PASSWORD_RESET_CSRF_COOKIE_NAME = "__Host-debateai-password-reset-csrf";
+const MFA_RECOVERY_COOKIE_NAME = "__Host-debateai-mfa-recovery";
+const MFA_RECOVERY_CSRF_COOKIE_NAME = "__Host-debateai-mfa-recovery-csrf";
+const AUTH_COOKIE_NAMES = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, PASSWORD_RESET_COOKIE_NAME, PASSWORD_RESET_CSRF_COOKIE_NAME, MFA_RECOVERY_COOKIE_NAME, MFA_RECOVERY_CSRF_COOKIE_NAME] as const;
+const STAFF_ABSOLUTE_MAX_AGE_SECONDS = 28800;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 /** The API's support capability grammar (apps/api/src/support/session.ts CAPABILITY_PATTERN). */
 const SUPPORT_SESSION_TOKEN_HEADER = "x-support-session-token";
@@ -132,19 +144,24 @@ function filteredSessionCookies(raw: string | null): string | null {
   const selected = new Map<string, string>();
   for (const member of raw.split(";")) {
     const index = member.indexOf("=");
-    if (index < 1) continue;
-    const name = member.slice(0, index).trim();
-    const value = member.slice(index + 1).trim();
-    // Age gate (8j): the lockout travels only in its one constant value.
-    if (name === AGE_REFUSAL_COOKIE_NAME) {
-      if (value === AGE_REFUSAL_COOKIE_VALUE) selected.set(name, value);
+    if (index < 1) {
+      if ([...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME].some((name) => member.trim() === name)) return null;
       continue;
     }
-    if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) continue;
+    const name = member.slice(0, index).trim();
+    const rawValue = member.slice(index + 1);
+    const value = name === STAFF_COOKIE_NAME || name === STAFF_CSRF_COOKIE_NAME ? rawValue : rawValue.trim();
+    // Age gate (8j): the lockout travels only in its one constant value.
+    if (name === AGE_REFUSAL_COOKIE_NAME) {
+      if (selected.has(name) || value !== AGE_REFUSAL_COOKIE_VALUE) return null;
+      selected.set(name, value);
+      continue;
+    }
+    if (!AUTH_COOKIE_NAMES.some((allowed) => allowed === name)) continue;
     if (selected.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
     selected.set(name, value);
   }
-  const pairs = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, AGE_REFUSAL_COOKIE_NAME].flatMap((name) => {
+  const pairs = [...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME].flatMap((name) => {
     const value = selected.get(name);
     return value === undefined ? [] : [`${name}=${value}`];
   });
@@ -163,6 +180,26 @@ function lawfulSetCookie(value: string): boolean {
     return value === `${AGE_REFUSAL_COOKIE_NAME}=${AGE_REFUSAL_COOKIE_VALUE}; Path=/; `
       + `Max-Age=${AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS}; HttpOnly; Secure; SameSite=Lax`;
   }
+  if (name === STAFF_COOKIE_NAME || name === STAFF_CSRF_COOKIE_NAME) {
+    if (value.split(";", 1)[0] !== pair) return false;
+    const cookieValue = pair.slice(pairSeparator + 1);
+    const attributes = members.slice(1);
+    const age = attributes[1]?.match(/^Max-Age=(0|[1-9][0-9]{0,4})$/u);
+    if (age === undefined || age === null) return false;
+    const seconds = Number(age[1]);
+    const expected = ["Path=/", `Max-Age=${seconds}`, ...(name === STAFF_COOKIE_NAME ? ["HttpOnly"] : []), "Secure", "SameSite=Strict"];
+    return (cookieValue === "" ? seconds === 0 : /^[A-Za-z0-9_-]{43}$/.test(cookieValue) && seconds > 0 && seconds <= STAFF_ABSOLUTE_MAX_AGE_SECONDS)
+      && attributes.length === expected.length && attributes.every((attribute, index) => attribute === expected[index]);
+  }
+  if ([PASSWORD_RESET_COOKIE_NAME,PASSWORD_RESET_CSRF_COOKIE_NAME,MFA_RECOVERY_COOKIE_NAME,MFA_RECOVERY_CSRF_COOKIE_NAME].some(allowed=>allowed===name)) {
+    if(value.split(";",1)[0]!==pair) return false;
+    const cookieValue=pair.slice(pairSeparator+1),attributes=members.slice(1);
+    const match=attributes[1]?.match(/^Max-Age=(0|[1-9][0-9]{0,4})$/u);
+    if(!match) return false;
+    const seconds=Number(match[1]),reset=name===PASSWORD_RESET_COOKIE_NAME||name===PASSWORD_RESET_CSRF_COOKIE_NAME;
+    const expected=["Path=/",`Max-Age=${seconds}`,...(name===PASSWORD_RESET_COOKIE_NAME||name===MFA_RECOVERY_COOKIE_NAME?["HttpOnly"]:[]),"Secure","SameSite=Strict"];
+    return (cookieValue===""?seconds===0:/^[A-Za-z0-9_-]{43}$/.test(cookieValue)&&seconds>0&&seconds<=(reset?1800:299))&&attributes.length===expected.length&&attributes.every((attribute,index)=>attribute===expected[index]);
+  }
   if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) return false;
   const cookieValue = pair.slice(pairSeparator + 1);
   const attributes = members.slice(1).map((member) => member.toLowerCase());
@@ -173,6 +210,18 @@ function lawfulSetCookie(value: string): boolean {
   return (cookieValue === "" || /^[A-Za-z0-9_-]{43}$/.test(cookieValue))
     && attributes.length === expected.length
     && attributes.every((attribute, index) => attribute === expected[index]);
+}
+
+/** A success body cannot claim a cookie ceremony completed after transport rejected it. */
+function invalidAuthSetCookies(upstream: Headers): boolean {
+  const seen = new Set<string>();
+  for (const value of upstream.getSetCookie()) {
+    const name = value.split("=", 1)[0]?.trim() ?? "";
+    if (![...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME].some((allowed) => allowed === name)) continue;
+    if (seen.has(name) || !lawfulSetCookie(value)) return true;
+    seen.add(name);
+  }
+  return false;
 }
 
 function createDownstreamHeaders(upstream: Headers): Headers {
@@ -186,8 +235,14 @@ function createDownstreamHeaders(upstream: Headers): Headers {
   if (upstream.has("content-encoding")) headers.delete("content-length");
   const setCookies = typeof upstream.getSetCookie === "function"
     ? upstream.getSetCookie() : [];
+  const counts = new Map<string, number>();
   for (const value of setCookies) {
-    if (lawfulSetCookie(value)) headers.append("set-cookie", value);
+    const name = value.split("=", 1)[0]?.trim() ?? "";
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  for (const value of setCookies) {
+    const name = value.split("=", 1)[0]?.trim() ?? "";
+    if (counts.get(name) === 1 && lawfulSetCookie(value)) headers.append("set-cookie", value);
   }
   return headers;
 }
@@ -244,7 +299,7 @@ function upstreamSignal(request: Request, path: readonly string[]): AbortSignal 
   const streaming = (request.headers.get("accept") ?? "").includes("text/event-stream")
     || path[path.length - 1] === "events";
   const ceiling = request.method === "POST" && RUN_PUBLISH_PATH.test(path.join("/"))
-    ? PUBLISH_UPSTREAM_TIMEOUT_MS : UPSTREAM_TIMEOUT_MS;
+    ? PUBLISH_UPSTREAM_TIMEOUT_MS : previewAskProxyCeiling({method:request.method,path,origin:request.headers.get("origin")},process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) ?? UPSTREAM_TIMEOUT_MS;
   return streaming
     ? request.signal
     : AbortSignal.any([request.signal, AbortSignal.timeout(ceiling)]);
@@ -283,6 +338,11 @@ async function proxyApi(request: Request, context: ProxyContext): Promise<Respon
       error: "API_UPSTREAM_UNREACHABLE",
       message: "The API upstream did not answer the proxy request."
     }, { status: 502 });
+  }
+
+  if (invalidAuthSetCookies(response.headers)) {
+    await response.body?.cancel();
+    return Response.json({ error: "UPSTREAM_AUTH_COOKIES_INVALID" }, { status: 502, headers: { "cache-control": "no-store" } });
   }
 
   return new Response(

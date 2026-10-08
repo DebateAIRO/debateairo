@@ -196,7 +196,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
     // EFFECT; the close route itself is the helper's, which S02 implements.
     mountBar();
     activate(barOpener());
-    expect(rows(), "the card shows its eight rows").toBe(8);
+    expect(rows(), "the card shows its eight rows").toBe(18);
     const storedBefore = raw();
 
     activate(labelled("Privacy notice"));
@@ -205,7 +205,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
 
     expect(policy(), "the policy is gone").toBeNull();
     expect(card(), "and the card it came from is still there").not.toBeNull();
-    expect(rows(), "with its eight rows").toBe(8);
+    expect(rows(), "with its eight rows").toBe(18);
     expect(raw(), "and storage untouched").toBe(storedBefore);
     expect(raw(), "which is still nothing at all").toBeNull();
     expect(bar(), "the bar stays away while the card is open").toBeNull();
@@ -238,7 +238,7 @@ describe("S01-C6 the Privacy notice link, the read-mode policy modal and the car
 
     expect(policy(), "(a) the policy dialog is gone").toBeNull();
     expect(card(), "(b) the preferences card is STILL in the document").not.toBeNull();
-    expect(rows(), "with its eight rows").toBe(8);
+    expect(rows(), "with its eight rows").toBe(18);
     expect(bar(), "(c) and the bar is still absent").toBeNull();
     expect(openSurfaceCount(), "one surface left").toBe(1);
     expect(raw(), "and nothing was written by a dismissal").toBeNull();

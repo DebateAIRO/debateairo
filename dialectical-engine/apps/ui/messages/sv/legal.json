@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "få en förteckning över alla tredje parter som har tagit emot dem;",
   "legal.health.s05.item3": "återkalla ditt samtycke och få dem raderade.",
   "legal.health.s06.title": "Så utövar du dem",
-  "legal.health.s06.body": "Via Inställningar eller genom att skriva till privacy@dezbatere.ro. Vi svarar inom 45 dagar. Om vi avslår en begäran kan du överklaga genom att svara på vårt besked."
+  "legal.health.s06.body": "Via Inställningar eller genom att skriva till privacy@dezbatere.ro. Vi svarar inom 45 dagar. Om vi avslår en begäran kan du överklaga genom att svara på vårt besked.",
+  "legal.cookies.staff.purpose": "Separat personalåtkomst",
+  "legal.cookies.passwordReset.purpose": "Endast lösenordsåterställning",
+  "legal.cookies.mfaRecovery.purpose": "Endast återställning av autentiseraren",
+  "legal.cookies.social.purpose": "Kort leverantörsinloggning eller kontolänkning",
+  "legal.cookies.phoneDraft.purpose": "Ofärdig fråga under telefonsteget; raderas vid sessionsbyte, utloggning eller ägarbyte",
+  "legal.cookies.staff.life": "Upp till 8 timmar; 15 minuters inaktivitet",
+  "legal.cookies.passwordReset.life": "Upp till 30 minuter",
+  "legal.cookies.mfaRecovery.life": "Upp till 299 sekunder",
+  "legal.cookies.social.life": "Upp till 5 minuter",
+  "legal.cookies.phoneDraft.life": "15 minuter eller tills tidigare radering"
 }

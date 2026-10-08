@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "לקבל רשימה של כל צד שלישי שקיבל אותם;",
   "legal.health.s05.item3": "לחזור בכם מהסכמתכם ולדרוש את מחיקתם.",
   "legal.health.s06.title": "כיצד לממש אותן",
-  "legal.health.s06.body": "דרך ההגדרות, או בכתיבה אל privacy@dezbatere.ro. נשיב בתוך 45 ימים. אם נדחה בקשה, תוכלו לערער על ההחלטה בתשובה למענה שלנו."
+  "legal.health.s06.body": "דרך ההגדרות, או בכתיבה אל privacy@dezbatere.ro. נשיב בתוך 45 ימים. אם נדחה בקשה, תוכלו לערער על ההחלטה בתשובה למענה שלנו.",
+  "legal.cookies.staff.purpose": "גישה נפרדת לצוות",
+  "legal.cookies.passwordReset.purpose": "איפוס סיסמה בלבד",
+  "legal.cookies.mfaRecovery.purpose": "שחזור מאמת בלבד",
+  "legal.cookies.social.purpose": "כניסה קצרה דרך ספק או קישור חשבון",
+  "legal.cookies.phoneDraft.purpose": "שאלה שלא הושלמה בשלב הטלפון; נמחקת בשינוי הפעלה, ביציאה או בהחלפת בעלים",
+  "legal.cookies.staff.life": "עד 8 שעות; 15 דקות ללא פעילות",
+  "legal.cookies.passwordReset.life": "עד 30 דקות",
+  "legal.cookies.mfaRecovery.life": "עד 299 שניות",
+  "legal.cookies.social.life": "עד 5 דקות",
+  "legal.cookies.phoneDraft.life": "15 דקות או עד למחיקה מוקדמת"
 }

@@ -1009,6 +1009,7 @@ export {
   loadBillingWithdrawEnvironment,
   loadDeploymentModeSource,
   loadDevelopmentCommandEnvironment,
+  loadOwnerOperatorEnvironment,
   loadKeyRotationEnvironment,
   loadLivenessEnvironment,
   loadMigrationEnvironment,
@@ -1017,6 +1018,7 @@ export {
   loadServeDisclosureReportEnvironment,
   loadSettlementEnvironment,
   parseApiEnvironment,
+  parseStaffAccessEnvironment,
   parseBillingInvoiceEnvironment,
   parseBillingOperatorEnvironment,
   parseBillingRefundDoneEnvironment,
@@ -1083,6 +1085,7 @@ export {
   COUNTRY_POLICY_ROW_KEY,
   countryPolicyFromValue,
   countryRule,
+  declaredRegionRule,
   readCountryPolicy,
   type CountryPolicy,
   type CountryPolicyValue,
@@ -1162,6 +1165,7 @@ export {
 } from "./model-scorecard-policy.js";
 export {
   MFA_POLICY_REGISTER_ROW,
+  MFA_POLICY_DEPLOYMENT_REGISTER_ROW,
   MFA_POLICY_ROW_KEY,
   mfaPolicyFromValue,
   readMfaPolicy,
@@ -1173,6 +1177,7 @@ export {
   ADMISSION_POLICY_REGISTER_ROW,
   ADMISSION_POLICY_ROW_KEY,
   SESSION_POLICY_REGISTER_ROW,
+  SESSION_POLICY_DEPLOYMENT_REGISTER_ROW,
   SESSION_POLICY_ROW_KEY,
   admissionPolicyFromValue,
   assertAskRoomAdmissionSealed,
@@ -1197,9 +1202,16 @@ export {
 export {
   PRODUCT_ROLE_IDS,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
+  PRODUCT_ROLE_POLICY_V2_REGISTER_ROW,
+  PRODUCT_ROLE_POLICY_FUNDED_V2_REGISTER_ROW,
   PRODUCT_ROLE_POLICY_ROW_KEY,
   productRolePolicyFromRegisterRows,
   readProductRolePolicy,
+  readVersionedProductRolePolicy,
+  versionedProductRolePolicyFromRegisterRows,
+  type VersionedProductRolePolicy,
+  type ProductRolePolicyV2,
+  type ProductRoleV2,
   type ProductRole,
   type ProductRoleId,
   type ProductRolePolicy,
@@ -1247,3 +1259,18 @@ export {
   type SupportConfigurationState,
   type SupportConfigurationValues
 } from "./support-config.js";
+
+export {
+  STAFF_ACCESS_POLICY_ROW_KEY, STAFF_ACCESS_POLICY_REGISTER_ROW,
+  INTERNAL_ALLOWANCE_POLICY_ROW_KEY, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW,
+  staffAccessPolicyFromValue, internalAllowancePolicyFromValue,
+  readStaffAccessPolicy, readInternalAllowancePolicy,
+  composeStaffPolicyRegisterPublicationRows
+} from "./staff-access-policy.js";
+
+export { internalAllowancePolicyValue } from "./internal-allowance-policy.js";
+
+export * from "./consumer-recovery-policy.js";
+
+export * from "./password-reset-policy.js";
+export * from "./email-mfa-policy.js";

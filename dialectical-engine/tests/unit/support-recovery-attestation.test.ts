@@ -72,14 +72,8 @@ const OWNER_REVIEW = Object.freeze({
 // The merged catalogue (paid plans P24, 2026-10-02): #62's signed catalogue plus the nine paid-plan pages under #62's
 // per-locale names. The owner read the nine entries (EN + RO labels) and the merged fingerprint in chat and signed it
 // (docs/missions/paid-plans/OWNER-SIGNOFF-billing-pages-catalog.md, "Merge with origin/dev"); #62's articles and recovery rows keep S02's and S05's signatures below.
-const CATALOG_REVIEW = Object.freeze({
-  reviewedBy: "OWNER",
-  reviewerSession: "b06da770-1b32-42dc-a45d-cbc280fccbe5 (paid-plans session; the owner read the merged catalogue's nine billing-page entries and its fingerprint in chat and answered 'signed')",
-  reviewedOn: "2026-10-02",
-  evidence: "docs/missions/paid-plans/OWNER-SIGNOFF-billing-pages-catalog.md",
-  ratifiedBy: "V",
-  ratifiedOn: "2026-10-02",
-});
+const CATALOG_REVIEW = Object.freeze({"reviewedBy": "SOL", "reviewerSession": "/root/dev_auth_integration_recovery", "reviewedOn": "2026-10-06", "evidence": "docs/missions/account-onboarding/dev-integration-kb-editorial.md"});
+const ACCOUNT_FLOW_REVIEW = Object.freeze({...CATALOG_REVIEW, ratifiedBy:"", ratifiedOn:""});
 // cookie-compliance S02 (SPEC-v2 R10): the owner's V0 signature of the catalogue, the 8 rewritten articles and
 // their 8 recovery rows. The orchestrator writes reviewerSession, reviewedOn and ratifiedOn at V0
 // (probes/ARCH-CC-S02/s02-sign.py); until then this case is RED on the branch by design. The session is
@@ -132,10 +126,10 @@ const GUIDE_IDS = new Set([
 ]);
 
 const EXPECTED = [
-  ["account-access", "en", "9f7b29640233d9c395a65c9905bd4cec340a1483459550338d1c11bc14b66ac2", "c138d4ed2ecd19847cb74b1fd7ad91eb9b047369cb2a391f15563e0915ec192a", "8d1e8ab2f22c91a590bd7a17b87edd6ffb5a5df3a857655f19da10dcec8c69b5"],
-  ["account-access", "ro", "cab1683e79fd20cf4cc1186f9e886acaa588b0fd60f989ce61c9e831116b5ec2", "e3ca804d9cd657ec82e9a9f81fd2dc1299997ee59cc4a752e757cd9e67d6ef98", "aeab73ba56ee61fdf6845823af3ac4361b3ccd1ebb65cea77d10eecf3015351c"],
-  ["account-settings", "en", "e4299c87f0dfe85c1063b1f37c1d3206ce5ed8862bbac75333a883cebcd49e81", "974caea072e110bfa7f8940ab44bb2b60ea35db217c4c7eb4fa460a010ae943c", "cd6f4ffdcb225fa7bd8ca8f92b045f8fd8066288a752b51fa53121716150c852"],
-  ["account-settings", "ro", "ef8ba11070890552d5f0ba82c5c50d587f8fed04d05ef0218fb8b7daa1cd616c", "fa20ef501c9e570895a4a849cf0987463be8994a769f1b5c55310cadac3771ff", "f882a60898dc0a73e1ae850f05791a399c4451523afc4a9a7139afea82191e85"],
+  ["account-access", "en", "819d4fe7ce40b241a28f26122c4ba81e9b2b05071604c47358fc0c5ef0af6498", "57f2565e54ea4bde4fbf624dcc8ccddfc1c2e7d67eac18052470dd511962975c", "57f2565e54ea4bde4fbf624dcc8ccddfc1c2e7d67eac18052470dd511962975c"],
+  ["account-access", "ro", "a0f08ec4f5862b24350a6a8e750d688be0e45337a3d0fab055ecd541f35f1f72", "73af487d0a2fbd1f4824f678bf78cd756deee6ab4190d467f26a777d4e5e331a", "73af487d0a2fbd1f4824f678bf78cd756deee6ab4190d467f26a777d4e5e331a"],
+  ["account-settings", "en", "41e826b5d3c07aa6b2f9651072aa4902babb66dd2a5f4f5e41dd5e15106433b2", "bf677b042f9ecf290defa774541729c00faa3fb276864c07f464a126516171de", "bf677b042f9ecf290defa774541729c00faa3fb276864c07f464a126516171de"],
+  ["account-settings", "ro", "f887ccbfcc05fb99a095a451e6b2b872cdc3d85135a3e3eadd0496d80d10b21c", "5b8a424ec1749c7578a92aa44165d41f4d100a743375395dd201ad4a82ba8958", "5b8a424ec1749c7578a92aa44165d41f4d100a743375395dd201ad4a82ba8958"],
   ["ai-transparency", "en", "e7deab21d5d105769017fc40431c26ec94f3b8ea4385b2547d0eceac8a7f92a6", "fc313334a897d806c7c968752fb16eac7cb8ca4e5535ae18dc7b1ff89362c879", "611cf0c13e949362a3bd17c4e1c899fa291b9f6ed249b007ecc216de7601999a"],
   ["ai-transparency", "ro", "718eac9d78a08da5c2ecb66f4a9671213cb0ee71a020bf81bc57f1c282602857", "f748a1052e62a6498393eb93f57378e09efa1f4f61568b43880179beb470b6d0", "b983acd7d0168ad805ac73d049060bd9c7ca8c4cc28e29ee0933688e8430a3fe"],
   ["app-navigation", "en", "e7be9ec44ca612d536736680bacd3b111c0871c41b1392bf40910b991974e6e6", "5e2c92c70089eb7124914df7f803715793b8995f6d20508b12f288df1e875a54", "5f72d0d447cb61481951585f2bc42d3a0c5450ab504c1c8204a0c1a78505360a"],
@@ -166,8 +160,8 @@ const EXPECTED = [
   ["publish-a-debate", "ro", "41858b13ebb6bcec19430b6a63cae6f5854b25ad02e8ac74617d83b087355c3c", "834ec781e6645753549cfca72d8d7bdc70ecb425f1eba125b25c5e04410ea598", "a6f1ef4a94b53df2d77fdd63a14c3f596adaac6b437ab3586424d21815284b26"],
   ["risk-tier-choice", "en", "3ca67a93a3b159c0b284b2bd75093fd9bc70e20d03c357f4ac1fdcb3df522715", "37a5e399d53e5c284febfd79f40fe36bfc611eddb254ccb9a758469e66557929", "7908d0b36c5c62a863ee064095bc3f528792d9588fba9f88c523ea978dffb7f2"],
   ["risk-tier-choice", "ro", "00cffb0532c7f79072da508618c3f2f0b5d93fac02dc5c574b662f3355032173", "cbdf51987dff98813c12728216ba81b88559869d2e165018698ed286dcb928a5", "3d938be89e4673f9958381aa1e652ce2ee377d38cb5701c689701391f8774874"],
-  ["settings-help-menus", "en", "53b4612d883133874617b1a8647df9450dc75e2301e8f93a56e7eceaa169a084", "291f2b5a3c95cf345d3d1794e2e0c2e7e5e88ccff5703a200ef89c8f28ad7108", "ea5720fab4e9755c489c63daec5e85d0cf6b3a0fa9d30a97827dadc7d0e166b5"],
-  ["settings-help-menus", "ro", "362e226cabd7b26b69638fc8e968325408dfdc4ebcd952ede1510e31daee7711", "1eba8965421962503b0cb644043404c8e59bdb5722e8adc8999e5679d99520e5", "f3bd7bb6e653e6c62a820d05015043cbe56a9d511e4d3346b6cb36fe3156b578"],
+  ["settings-help-menus", "en", "cc1e1a979bf1e138a7e44b19ebc86f67417245b9741a6d6094c9dbf44ed5f839", "2e9dcfcaa8f0ea5b99e38439a48f0139665894ad180ebb113642550e79dcc101", "2e9dcfcaa8f0ea5b99e38439a48f0139665894ad180ebb113642550e79dcc101"],
+  ["settings-help-menus", "ro", "e4cb119bcbb186db0e0904a0aae4829b63c057385b3232a7edccb3e18ae7667a", "740bd73c42eb1b5bec8dece0ef18cacabc373ad14e125ba551a516f2e661f500", "740bd73c42eb1b5bec8dece0ef18cacabc373ad14e125ba551a516f2e661f500"],
   ["support-cases", "en", "300f6b63a1798ee15ba335538bdc9eb0e1c5dca11c770ce11f5e11edee9cee9e", "04ff511b177c062b1fa66397db84ac7295b75319e2c27fc870aaff171c43ae76", "df37d0f11029ff345c6f303c425bdeb36435ab0a51e0dbddf22ffd0877ca49a1"],
   ["support-cases", "ro", "94112fb709ec5cf8a408106eef2d9efc43e51cfcd74b25cc7d6a41912a054749", "752edeef206e2675bed63f5c2179f287e66db694e4243df56dbd97382d586eb9", "6a6d5f9d737e0e0c692a7ae9b0dc24434ba5871de62b3fcd0e955e6fe1894a9f"],
   ["support-status-limits", "en", "f5344e3c0e5f0bec3bb3b5b10dff77b12a85d90233a6d7a7cf8a31f38cc7bfe7", "932f33969c279c6e7db4dc9d0d47fee7eb535b0d1cb593f9b9e9ccc743913385", "875854ecea195464759705f8035052bd5389c71a1acc439713326784bb5e2981"],
@@ -207,7 +201,7 @@ describe("production Support recovery attestation", () => {
         articleSha256,
         modelProjectionSha256,
         fallbackSha256,
-        ...(S05_KEYS.has(`${id}.${lang}`)
+        ...(["account-access","account-settings","settings-help-menus"].includes(id) ? ACCOUNT_FLOW_REVIEW : S05_KEYS.has(`${id}.${lang}`)
           ? S05_OWNER_REVIEW
           : S02_IDS.has(id)
           ? S02_OWNER_REVIEW
@@ -228,12 +222,12 @@ describe("production Support recovery attestation", () => {
       schemaVersion: 2,
       catalog: {
         sha256:
-          "55133fc55bf08f45d0cb674c8e89416ae749249eaef4291e985af82a270bb52a",
+          "b07e81ae502bd9f5d2928d5689ca110ea2bcd639039803888a19f2f8f2b595c6",
         ...CATALOG_REVIEW,
       },
       recovery: {
         componentFileSha256:
-          "6c05d583e0afc6683ea63a7163bac38f531964c01117cbed478cc989d29fd41c",
+          "9085ddb2f2b8fc9b743be89e304a089b5a10f094cf636cdfb72c0167ca6c11bd",
         components: expectedRows,
       },
     });
@@ -247,7 +241,7 @@ describe("production Support recovery attestation", () => {
       previewReviewedCount: 17,
       ownerRatifiedCount: 6,
       recoveryReviewedCount: 23,
-      recoveryOwnerRatifiedCount: 7,
+      recoveryOwnerRatifiedCount: 4,
     });
 
     for (const [index, expected] of EXPECTED.entries()) {

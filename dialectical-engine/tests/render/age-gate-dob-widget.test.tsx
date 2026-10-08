@@ -146,6 +146,8 @@ describe("field order per locale (8g)", () => {
   it.each([
     ["en", "en-GB,en;q=0.9", ["d", "m", "y"]],
     ["en", "en-US,en;q=0.9", ["m", "d", "y"]],
+    ["en-US", "en-GB,en;q=0.9", ["m", "d", "y"]],
+    ["en-GB", "en-US,en;q=0.9", ["d", "m", "y"]],
     ["ja", null, ["y", "m", "d"]],
     ["hu", null, ["y", "m", "d"]],
     ["ar", null, ["d", "m", "y"]]

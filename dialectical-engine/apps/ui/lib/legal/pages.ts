@@ -5,7 +5,7 @@
  * Every fact here describes the running product, and `tests/render/legal-pages.test.tsx` pins
  * each one to the code that makes it true — the lifetimes to the Max-Age the API, the contract
  * and the locale switcher set, the model families to `lib/models.ts`, the terms version to the
- * terms document. The eight stored items (four cookies, four browser-storage keys) are the
+ * terms document. The complete current cookie and browser-storage inventory is the
  * inventory of record: `tests/unit/cookie-inventory-drift.test.ts` scans the source for every
  * cookie and storage write and fails when the product stores a name not listed here, or this
  * file lists a name nothing stores. The design's own
@@ -115,7 +115,7 @@ export type LegalInventoryItem = Readonly<{
 }>;
 
 /**
- * The four cookies the product sets, all strictly necessary. The session and CSRF names are the
+ * The cookies the product sets, all strictly necessary. The session and CSRF names are the
  * API's (`apps/api/src/index.ts`, 14-day idle Max-Age), the age-refusal cookie is set by the API
  * when an age check is refused (`AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS`, 30 days, in
  * `packages/contract`), and the locale cookie is written by the language switcher
@@ -125,7 +125,16 @@ export const LEGAL_COOKIES: readonly LegalInventoryItem[] = Object.freeze([
   { name: "__Host-debateai-session", kindKey: "legal.cookies.session.kind", purposeKey: "legal.cookies.session.purpose", lifeKey: "legal.cookies.session.life", recipientKey: "legal.cookies.recipient.server" },
   { name: "__Host-debateai-csrf", kindKey: "legal.cookies.csrf.kind", purposeKey: "legal.cookies.csrf.purpose", lifeKey: "legal.cookies.csrf.life", recipientKey: "legal.cookies.recipient.server" },
   { name: "__Host-debateai-age-refusal", kindKey: "legal.cookies.ageRefusal.kind", purposeKey: "legal.cookies.ageRefusal.purpose", lifeKey: "legal.cookies.ageRefusal.life", recipientKey: "legal.cookies.recipient.server" },
-  { name: LOCALE_COOKIE, kindKey: "legal.cookies.locale.kind", purposeKey: "legal.cookies.locale.purpose", lifeKey: "legal.cookies.locale.life", recipientKey: "legal.cookies.recipient.server" }
+  { name: LOCALE_COOKIE, kindKey: "legal.cookies.locale.kind", purposeKey: "legal.cookies.locale.purpose", lifeKey: "legal.cookies.locale.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-staff", kindKey: "legal.cookies.session.kind", purposeKey: "legal.cookies.staff.purpose", lifeKey: "legal.cookies.staff.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-staff-csrf", kindKey: "legal.cookies.csrf.kind", purposeKey: "legal.cookies.csrf.purpose", lifeKey: "legal.cookies.staff.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-password-reset", kindKey: "legal.cookies.session.kind", purposeKey: "legal.cookies.passwordReset.purpose", lifeKey: "legal.cookies.passwordReset.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-password-reset-csrf", kindKey: "legal.cookies.csrf.kind", purposeKey: "legal.cookies.csrf.purpose", lifeKey: "legal.cookies.passwordReset.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-mfa-recovery", kindKey: "legal.cookies.session.kind", purposeKey: "legal.cookies.mfaRecovery.purpose", lifeKey: "legal.cookies.mfaRecovery.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-mfa-recovery-csrf", kindKey: "legal.cookies.csrf.kind", purposeKey: "legal.cookies.csrf.purpose", lifeKey: "legal.cookies.mfaRecovery.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-social-flow", kindKey: "legal.cookies.session.kind", purposeKey: "legal.cookies.social.purpose", lifeKey: "legal.cookies.social.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-social-apple", kindKey: "legal.cookies.session.kind", purposeKey: "legal.cookies.social.purpose", lifeKey: "legal.cookies.social.life", recipientKey: "legal.cookies.recipient.server" },
+  { name: "__Host-debateai-social-browser", kindKey: "legal.cookies.session.kind", purposeKey: "legal.cookies.social.purpose", lifeKey: "legal.cookies.social.life", recipientKey: "legal.cookies.recipient.server" }
 ]);
 
 /**
@@ -138,10 +147,11 @@ export const LEGAL_BROWSER_STORAGE: readonly LegalInventoryItem[] = Object.freez
   { name: CONSENT_KEY, kindKey: "legal.cookies.consent.kind", purposeKey: "legal.cookies.consent.purpose", lifeKey: "legal.cookies.consent.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: "debateai.mode", kindKey: "legal.cookies.mode.kind", purposeKey: "legal.cookies.mode.purpose", lifeKey: "legal.cookies.mode.life", recipientKey: "legal.cookies.recipient.browser" },
   { name: LANGUAGE_OFFER_DISMISSED_KEY, kindKey: "legal.cookies.languageOffer.kind", purposeKey: "legal.cookies.languageOffer.purpose", lifeKey: "legal.cookies.languageOffer.life", recipientKey: "legal.cookies.recipient.browser" },
-  { name: "debateai.support.conversation.v2", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.supportConversation.purpose", lifeKey: "legal.cookies.supportConversation.life", recipientKey: "legal.cookies.recipient.browser" }
+  { name: "debateai.support.conversation.v2", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.supportConversation.purpose", lifeKey: "legal.cookies.supportConversation.life", recipientKey: "legal.cookies.recipient.browser" },
+  { name: "debateai.phone-completion-draft.v1", kindKey: "legal.cookies.supportConversation.kind", purposeKey: "legal.cookies.phoneDraft.purpose", lifeKey: "legal.cookies.phoneDraft.life", recipientKey: "legal.cookies.recipient.browser" }
 ]);
 
-/** All eight stored items, cookies first, in the order /cookies and the storage card list them. */
+/** All current stored items, cookies first, in the order /cookies and the storage card list them. */
 export const LEGAL_INVENTORY: readonly LegalInventoryItem[] = Object.freeze([...LEGAL_COOKIES, ...LEGAL_BROWSER_STORAGE]);
 
 /** The 24 kind/purpose/life strings of LEGAL_INVENTORY picked out of a legal catalogue (missing keys are left out). */
@@ -277,9 +287,11 @@ export type TermsVersion = Readonly<{
 }>;
 
 /**
- * Every published version of the terms, newest first. Only one exists: the version the terms
- * document carries in its eyebrow. A new version is added here when the document changes.
+ * Every published version of the terms, newest first. The earlier row links to the exact text
+ * that was current before the 2.1 revision.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.0", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" }
+  { version: "2.1", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.0", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/0d1bc079eb2d5b054c1cfc7c0430f234ca5391bd6e6824ecc8958a294f6eaa0e" }
 ]);

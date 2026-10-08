@@ -48,6 +48,8 @@ import {
 } from "../../apps/api/src/support/response-policy.js";
 import {
   STORYTELLER_ANSWER_FORM,
+  STORYTELLER_V1_ANSWER_FORM,
+  STORYTELLER_V1_CONTRACT_ID,
   STORYTELLER_CONTRACT_ID,
   STORY_CHECKER_ANSWER_FORM,
   STORY_CHECKER_CONTRACT_ID,
@@ -508,7 +510,7 @@ describe("SYNC3 / R1 — the support chat's v2 JSON-draft contracts", () => {
  */
 describe("VERDICT STORY — the storyteller's and the checker's answer forms", () => {
   it("pins the storyteller's answer form byte for byte", () => {
-    expect(STORYTELLER_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML, no links, no control characters other than line feed and tab, and no bidirectional embedding, override or isolate characters (U+202A to U+202E and U+2066 to U+2069).
+    expect(STORYTELLER_V1_ANSWER_FORM).toBe(`Return only one JSON object with exactly the following schema and no additional keys, with no text before or after it and no code fence. Every string is plain text: no Markdown, no HTML, no links, no control characters other than line feed and tab, and no bidirectional embedding, override or isolate characters (U+202A to U+202E and U+2066 to U+2069).
 {
   "shape_id": the id of one shape offered in the instruction,
   "short": {
@@ -550,7 +552,8 @@ When satisfied is true, every criterion must be true. When satisfied is false, o
   });
 
   it("carries each form into its contract, under a new contract id", () => {
-    expect(STORYTELLER_CONTRACT_ID).toBe("story.storyteller.v1");
+    expect(STORYTELLER_V1_CONTRACT_ID).toBe("story.storyteller.v1");
+    expect(STORYTELLER_CONTRACT_ID).toBe("story.storyteller.v2");
     expect(STORY_CHECKER_CONTRACT_ID).toBe("story.checker.v1");
     expect(buildStorytellerContract(STORY_PACK).answerForm).toBe(STORYTELLER_ANSWER_FORM);
     expect(buildStoryCheckerContract(STORY_PACK).answerForm).toBe(STORY_CHECKER_ANSWER_FORM);

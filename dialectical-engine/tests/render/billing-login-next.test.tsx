@@ -20,9 +20,9 @@ describe("P19 a signed-in visit to /login honours a safe next", () => {
   it.each([
     ["/checkout?plan=MAX", "/checkout?plan=MAX"],
     ["/settings/card", "/settings/card"],
-    ["//evil.example/checkout", "/#start-a-debate"],
-    ["https://evil.example", "/#start-a-debate"],
-    [undefined, "/#start-a-debate"]
+    ["//evil.example/checkout", "/new"],
+    ["https://evil.example", "/new"],
+    [undefined, "/new"]
   ])("next=%s lands on %s", async (next, expected) => {
     await expect(LoginPage({ searchParams: Promise.resolve(next === undefined ? {} : { next }) })).rejects.toThrow("NEXT_REDIRECT");
     expect(readRedirects()).toEqual([expected]);

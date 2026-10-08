@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Tili — Sähköpostiosoite ja palautussähköpostiosoite (säilytetään salattuina ja avaimellisella indeksillä, jotta löydämme tilin lukematta osoitetta); salasana (säilytetään tiivisteenä, ei koskaan selväkielisenä); kaksivaiheisen tunnistautumisen salaisuus (salattu); kymmenen palautuskoodia (säilytetään tiivisteinä); nimimerkkisi; ajankohta, jolloin vahvistit olevasi vähintään 18-vuotias — Sinulta rekisteröitymisen yhteydessä",
+        "Tili — Sähköpostiosoite ja palautussähköpostiosoite (säilytetään salattuina ja avaimellisella indeksillä, jotta löydämme tilin lukematta osoitetta); salasana (säilytetään tiivisteenä, ei koskaan selväkielisenä); kaksivaiheisen tunnistautumisen salaisuus (salattu); kymmenen palautuskoodia (säilytetään tiivisteinä); nimimerkkisi; ikäsi tarkistuksen tulos — Sinulta rekisteröitymisen yhteydessä",
+        "IP-osoitteen maan tarkistus — Rekisteröityessä selvitämme IP-osoitteen maan paikallisesti DB-IP Lite -aineistolla ja tarkistamme Tor-poistumisosoitteiden luettelon. Jokaisen uuden väittelyn alkaessa selvitämme IP-osoitteen maan uudelleen paikallisesti ja voimme estää väittelyn, jos maa on pysyvästi estetty. Hylkäyksissä koostamme auditointimerkinnät reitin, koodin, maan ja aikajakson mukaan; IP-osoite säilyy siellä vain avaimellisena yksisuuntaisena tiivisteenä. Epäämismerkintä sisältää koodin, maan ja tiedon siitä, että IP-osoite oli perusteena; IP-osoite ja selaimen user-agent-merkkijono säilytetään vain avaimella muodostettuina yksisuuntaisina tiivisteinä. — Selaimesi rekisteröityessä ja uuden väittelyn alkaessa",
+        "Iän tarkistus — Annat syntymäaikasi vain tarkistusta varten; emme tallenna sitä. Tallennamme tuloksen, vähimmäisiän, IP-osoitteen maan, jos se on saatavilla, säännön version, asiayhteyden ja tarkistusajan. Onnistuneissa rekisteröinneissä tallennetaan vain ”hyväksytty”; nykyisten tilien tulos voi olla ”hyväksytty” tai ”hylätty” — Sinä ja selaimesi",
+        "Ilmoitettu asuinpaikka — Maa, jossa ilmoitat asuvasi, ja osavaltio, jos asut Yhdysvalloissa — Sinä rekisteröityessäsi",
         "Istunnot ja turvallisuus — Istuntotunnisteen tiiviste; selaimesi user-agent-merkkijonon avaimellinen tiiviste, jonka avulla havaitsemme istunnon siirtymisen toiseen selaimeen; luonti-, viimeisin käyttö- ja vanhenemisajankohdat. Emme tallenna istunnon yhteyteen IP-osoitettasi, laitteen nimeä tai selaimen tietoja, ja Asetuksissa näkyvä istuntoluettelo näyttää vain ajankohdat — Selaimeltasi",
         "Turvallisuuden kirjausketju — Vain lisäyksiä salliva loki turvallisuuden kannalta merkityksellisistä tapahtumista — rekisteröitymisestä, vahvistamisesta, kirjautumisyrityksistä, palautuksesta, julkaisemisesta ja poistamisesta. Kunkin tapahtuman IP-osoite ja user-agent tallennetaan vain yksisuuntaisina avaimellisina tiivisteinä (Argon2id), joten niitä ei voi lukea takaisin mutta niitä voidaan verrata tietyn ajanjakson sisällä. Kirjautumisen ja palautuksen riskisignaalit säilytetään salattuina 90 päivän ajan — Selaimeltasi kunkin tapahtuman yhteydessä",
         "Väittelyn sisältö — Kirjoittamasi kysymys; asettamasi ohjaavat huomautukset; väitteet, kritiikit, todistusaineistoviitteet, pisteet ja ratkaisut, jotka järjestelmä tuottaa; sanatarkka tallenne kunkin tekoälypalveluntarjoajan vastauksesta; hakukyselyt ja lähdeviitteet. Kaikki nämä säilytetään salattuina tilillesi ominaisella avaimella — Sinulta ja kysymystäsi käsitteleviltä tekoälymalleilta",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Henkilöt, jotka eivät ole käyttäjiämme — Muita henkilöitä koskevat henkilötiedot, jotka sisällytät kysymykseen tai jotka järjestelmä tuottaa siihen vastatessaan. Pyydämme, ettet tee näin; osiossa 11 selitetään, mitä teemme, jos näin kuitenkin tapahtuu — Sinulta välillisesti"
         ]
       },
+      { kind: "p", text: "Rekisteröityessä tarkistamme IP-osoitteesi maan paikallisesti ja hylkäämme rekisteröinnit maista, joissa palvelua ei tarjota, Tor-poistumisosoitteista sekä osoitteista, joiden maata ei tunneta. Emme lähetä IP-osoitetta kolmannelle osapuolelle tätä tarkistusta varten. Käytämme syntymäaikaasi iän tarkistamiseen tallentamatta sitä; ilmoitat myös asuinmaasi ja tarvittaessa Yhdysvaltain osavaltiosi. Jokaisen uuden väittelyn alkaessa tarkistamme myös IP-osoitteen maan paikallisesti ja voimme estää väittelyn, jos maa on pysyvästi estetty; Tor-osoitteiden ja tuntemattomien maiden torjunta koskee rekisteröitymistä." },
       { kind: "p", text: "Emme kerää analytiikkaa tai telemetriatietoja siitä, miten käytät tuotetta, emmekä aseta evästeitä tähän tarkoitukseen. Jos tämä muuttuu, tämä käytäntö ja Evästekäytäntö muutetaan ensin ja sinulta pyydetään lupa." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Väittelyjärjestelmä kannustaa esittämään kysymyksiä politiikasta, uskonnosta, terveydestä, seksuaalisuudesta ja vakaumuksesta. Nämä ovat GDPR:n 9 artiklassa tarkoitettuja erityisiä henkilötietoryhmiä, ja niitä voi sisältyä kysymyksiisi riippumatta siitä, aiommeko kerätä niitä." },
-      { kind: "p", text: "Sinua koskevat tiedot. Ennen ensimmäistä väittelyäsi annat erillisessä näkymässä nimenomaisen suostumuksesi siihen, että käsittelemme omiin kysymyksiisi halutessasi sisällyttämiäsi arkaluonteisia tietoja väittelyjesi toteuttamista varten. Tallennamme hyväksymäsi sanamuodon version, kielesi ja ajankohdan. Ilman tätä suostumusta et voi aloittaa väittelyä. Voit peruuttaa suostumuksesi milloin tahansa jättämällä tällaiset tiedot pois tai poistamalla väittelyn. Itsestäsi julkaisemasi tiedot ovat tietoja, jotka olet päättänyt julkistaa." },
+      { kind: "p", text: "Sinua koskevat tiedot. Ennen ensimmäistä väittelyäsi annat erillisessä näkymässä nimenomaisen suostumuksesi siihen, että käsittelemme omiin kysymyksiisi halutessasi sisällyttämiäsi arkaluonteisia tietoja väittelyjesi toteuttamista varten. Tallennamme hyväksymäsi sanamuodon version, kielesi ja ajankohdan. Ilman tätä suostumusta et voi aloittaa väittelyä. Voit peruuttaa suostumuksesi milloin tahansa kirjoittamalla osoitteeseen privacy@dezbatere.ro. Voit myös jättää tällaiset tiedot pois tai poistaa väittelyn, jossa niitä on. Itsestäsi julkaisemasi tiedot ovat tietoja, jotka olet päättänyt julkistaa." },
       { kind: "p", text: "Muita henkilöitä koskevat tiedot. Mikään oikeudellinen edellytys ei anna meille lupaa käsitellä kysymyksessä nimeämäsi kolmannen osapuolen arkaluonteisia tietoja, eikä tällainen edellytys koske myöskään tekoälypalveluntarjoajiamme. Siksi Ehdot kieltävät sen, siksi minimoimme lähettämämme tiedot ja siksi poistamme tällaisen sisällön pyynnöstä nopeasti — osio 11." },
       { kind: "p", text: "Terveystiedot. Joissakin maissa terveyteen liittyviin tietoihin, päätelmät mukaan lukien, sovelletaan erityislakeja. Jos asut [the State of Washington], sinuun sovelletaan erillistä asiakirjaa [Consumer Health Data Privacy Notice]." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Miksi käytämme tietojasi ja millä perusteella",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Jokaisella tarkoituksella on yksi GDPR:n 6 artiklan 1 kohdassa tarkoitettu oikeusperuste, emmekä käytä yhteen tarkoitukseen kerättyjä tietoja uudelleen toiseen tarkoitukseen." },
+      { kind: "p", text: "Ilmoitamme kunkin tarkoituksen sovellettavat oikeusperusteet, emmekä käytä yhteen tarkoitukseen kerättyjä tietoja uudelleen toiseen tarkoitukseen." },
       {
         kind: "list",
         items: [
         "Tilisi luominen ja ylläpito, tunnistautumisesi, väittelyjesi toteuttaminen ja tallentaminen, jotta voit avata ja toistaa ne uudelleen — Tili, istunnot, väittelyn sisältö — Sopimus — Art. 6(1)(b)",
+        "Rekisteröinnin ja uuden väittelyn aloittamisen sallittavuuden tarkistus IP-osoitteen maan ja alueellisten rajoitusten perusteella — IP-osoitteen maa ja hylkäyksen auditointitiedot — Oikeutetut edut — Art. 6(1)(f) palvelun suojaamiseksi ja ylläpitämiseksi siltä osin kuin laki sallii, ja lakisääteinen velvoite — Art. 6(1)(c), kun pakotteet rajoittavat palvelun tarjoamista",
+        "Vähimmäisiän tarkistus — Iän tarkistuksen tiedot — Sopimus — Art. 6(1)(b), ja oikeutetut edut — Art. 6(1)(f)",
+        "Kuluttaja-, tietosuoja- ja verosääntöjen soveltaminen asuinpaikan mukaan — Ilmoitettu asuinmaa ja mahdollinen Yhdysvaltain osavaltio — Sopimus — Art. 6(1)(b), ja lakisääteinen velvoite — Art. 6(1)(c)",
         "Kysymyksesi ja järjestelmän väitteiden lähettäminen tekoälypalveluntarjoajille väittelyn tuottamiseksi — Väittelyn sisältö — Sopimus — Art. 6(1)(b)",
         "Palvelun suojaaminen, väärinkäytön havaitseminen, sellaisen kirjautumisen havaitsemisen mahdollistaminen, jota et itse tehnyt, ja kirjausketjun ylläpito — Istunnot, turvallisuuden kirjausketju, tukipalvelun väärinkäyttötiivisteet — Oikeutetut edut — Art. 6(1)(f): meidän ja sinun etusi turvalliseen palveluun. Voit vastustaa käsittelyä; osio 10",
         "Sen todistaminen, että hyväksyit Ehdot ja annoit tai peruutit suostumuksen — Hyväksyntä- ja suostumustiedot — Lakisääteinen velvoite — Art. 6(1)(c), velvollisuutemme osoittaa suostumus Art. 7(1) nojalla — sekä oikeutettu etu sopimuksen todentamiseen",
@@ -112,8 +119,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Julkaiseminen ja näkyvyys",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Väittelyt ovat yksityisiä, kunnes julkaiset ne. Julkaiseminen on tietoinen, erikseen vahvistettava toimi. Julkaistu väittely näyttää nimimerkkisi, kysymyksesi kirjoittamassasi muodossa, argumenttipuun, pisteet, ratkaisun ja luottamusvälin, ja siinä on näkyvä merkintä tekoälyn tuottamasta sisällöstä. Se ei koskaan näytä sähköpostiosoitettasi, istuntotietojasi tai tilihistoriaasi. [Published debates are / are not] hakukoneiden indeksoimia [unless you choose]." },
-      { kind: "p", text: "Julkaisun peruuttaminen poistaa väittelyn DebateAI-palvelusta ja tuhoaa julkisen kopiomme avaimen. Lukijoiden, hakukoneiden tai arkistojen jo tekemät kopiot eivät ole hallinnassamme, emmekä voi kutsua niitä takaisin." },
+      { kind: "p", text: "Väittelyt ovat yksityisiä, kunnes julkaiset ne. Julkaiseminen on tietoinen, erikseen vahvistettava toimi. Julkaistu väittely näyttää nimimerkkisi, kysymyksesi kirjoittamassasi muodossa, argumenttipuun, pisteet, ratkaisun ja luottamusvälin, ja siinä on näkyvä merkintä tekoälyn tuottamasta sisällöstä. Se ei koskaan näytä sähköpostiosoitettasi, istuntotietojasi tai tilihistoriaasi. Hakukoneet voivat indeksoida julkaistuja väittelyjä." },
+      { kind: "p", text: "Julkaisun peruuttaminen poistaa väittelyn Dialectical Engine-palvelusta ja tuhoaa julkisen kopiomme avaimen. Lukijoiden, hakukoneiden tai arkistojen jo tekemät kopiot eivät ole hallinnassamme, emmekä voi kutsua niitä takaisin." },
       { kind: "p", text: "Kun poistat tilisi, poistamme kaikki julkaisemasi väittelyt julkisesta käytöstä ilman aiheetonta viivytystä ja viimeistään 30 päivän kuluessa, ellei laki velvoita meitä säilyttämään tiettyä kohdetta. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -126,6 +133,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Tili — Niin kauan kuin tili on olemassa sekä 7 päivän lisäaika sulkemispyyntösi jälkeen — Avaimet tuhotaan; tietue poistetaan",
+        "IP-osoite paikallista maatarkistusta varten — Vain rekisteröintipyynnön tai uuden väittelyn aloittamisen käsittelyn ajan — Tarkistuksen jälkeen IP-osoitetta ei säilytetä luettavassa muodossa; epäämistilanteessa tarkastuslokiin jäävät vain IP-osoitteen ja selaimen user-agent-merkkijonon avaimella muodostetut yksisuuntaiset tiivisteet, kuten jäljempänä kuvataan",
+        "IP-osoitteen maan tarkistuksen hylkäysten auditointitiedot — Palvelun koko elinkaaren ajan — Merkintä sisältää epäämiskoodin, maan, tiedon siitä, että IP-osoite oli perusteena, sekä IP-osoitteen ja selaimen user-agent-merkkijonon avaimella muodostetut yksisuuntaiset tiivisteet; tarkastuslokiin voidaan vain lisätä merkintöjä",
+        "Iän tarkistuksen tulos ja tiedot — Niin kauan kuin tili on olemassa — Poistetaan tilin mukana",
+        "Ilmoitettu asuinmaa ja Yhdysvaltain osavaltio — Niin kauan kuin tili on olemassa — Poistetaan tilin mukana",
         "Istuntotiedot — 14 päivää viimeisestä käytöstä tai 90 päivää luomisesta sen mukaan, kumpi täyttyy ensin — Poistetaan",
         "Sähköpostin vahvistuslinkit — 24 tuntia — Poistetaan",
         "Kirjautumisen ja palautuksen riskisignaalit — 90 päivää, tietokannan teknisesti valvomana — Hävitetään",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Oikeus käsittelyn rajoittamiseen (Art. 18) — Pyydä meitä lopettamaan tiettyjen tietojen käsittely siksi aikaa, kun niitä koskeva erimielisyys ratkaistaan",
         "Vastustamisoikeus (Art. 21) — Vastusta oikeutettuihin etuihin perustuvaa käsittelyä — osiossa 4 tarkoitettua turvallisuus- ja kirjauskäsittelyä — jolloin lopetamme käsittelyn, ellemme voi osoittaa pakottavia perusteita. Vastusta markkinointia milloin tahansa, jolloin lopetamme sen",
         "Oikeus siirtää tiedot järjestelmästä toiseen (Art. 20) — Väittelysi ja tilitietosi yleisesti käytetyssä, koneellisesti luettavassa muodossa. [Pending: same export as Access.] Luomasi muu kuin henkilötieto, kuten kysymyksesi, palautetaan sinulle pyynnöstä sopimuksen päättyessä",
-        "Suostumuksen peruuttaminen (Art. 7(3)) — Peruuta markkinointisuostumus mistä tahansa sähköpostista tai Asetuksista; peruuta arkaluonteisia tietoja koskeva suostumus jättämällä tällaiset tiedot pois tai poistamalla väittely. Peruuttaminen ei vaikuta jo tapahtuneeseen käsittelyyn",
+        "Suostumuksen peruuttaminen (Art. 7(3)) — Peruuta markkinointisuostumus mistä tahansa sähköpostista tai Asetuksista; peruuta arkaluonteisia tietoja koskeva suostumus kirjoittamalla osoitteeseen privacy@dezbatere.ro (voit myös jättää tiedot pois tai poistaa niitä sisältävän väittelyn). Peruuttaminen ei vaikuta jo tapahtuneeseen käsittelyyn",
         "Valituksen tekeminen — Romanian valvontaviranomaiselle ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, tai asuinmaasi viranomaiselle. Toivomme kuitenkin, että otat ensin yhteyttä meihin"
         ]
       },
@@ -188,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Väittelyissä nimetyt henkilöt, jotka eivät ole käyttäjiämme",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Jos joku esittää DebateAI-palvelussa sinut nimeävän kysymyksen, hallussamme voi olla sinua koskevia henkilötietoja, vaikka et olisi koskaan käyttänyt palvelua. Ehdot kieltävät käyttäjiä tekemästä näin, ja minimoimme tekoälypalveluntarjoajille lähettämämme tiedot, mutta näin tapahtuu." },
+      { kind: "p", text: "Jos joku esittää Dialectical Engine-palvelussa sinut nimeävän kysymyksen, hallussamme voi olla sinua koskevia henkilötietoja, vaikka et olisi koskaan käyttänyt palvelua. Ehdot kieltävät käyttäjiä tekemästä näin, ja minimoimme tekoälypalveluntarjoajille lähettämämme tiedot, mutta näin tapahtuu." },
       { kind: "p", text: "Tämä osio on GDPR:n 14 artiklan nojalla sinulle annettava ilmoitus. Tiedot ovat sitä, mitä käyttäjä kirjoitti ja mitä järjestelmä tuotti vastaukseksi; lähde on kyseinen käyttäjä; tarkoitukset ja oikeusperusteet ovat osiossa 4; vastaanottajat ovat Rekisterissä luetellut tekoälypalveluntarjoajat; säilytykseen sovelletaan osiota 7. Sinulla on kaikki osiossa 10 tarkoitetut oikeudet, ja voit erityisesti pyytää meitä poistamaan tietojasi sisältävän julkaistun tai yksityisen väittelyn sekä kertomaan, mitä tietoja meillä on. Et tarvitse siihen tiliä. Kirjoita osoitteeseen privacy@dezbatere.ro tai käytä minkä tahansa julkaistun väittelyn Ilmoita-toimintoa, niin käsittelemme perustellut pyynnöt ilman aiheetonta viivytystä. Emme voi ilmoittaa sinulle erikseen, kun näin tapahtuu, koska emme tiedä, kuka olet tai miten tavoittaisimme sinut; tämän sijasta toteutamme toimenpiteinä tämän julkisen ilmoituksen ja poistamisreitin." },
       { kind: "p", text: "Sama koskee sinua koskevia arkaluonteisia tietoja — politiikkaa, terveyttä ja uskontoa — jotka esiintyvät jonkun muun kysymyksessä. Mikään oikeudellinen edellytys ei anna meille lupaa jatkaa niiden käsittelyä sen jälkeen, kun vastustat sitä, emmekä jatka käsittelyä." }
     ]
@@ -198,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Lapset",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI on tarkoitettu aikuisille. Vahvistat rekisteröityessäsi olevasi vähintään 18-vuotias, emmekä tietoisesti käsittele alle 18-vuotiaiden tietoja. Jos saamme tietää tilin kuuluvan alle 18-vuotiaalle, suljemme sen ja poistamme tiedot osiossa 7 kuvatulla tavalla. Joissakin maissa pelkkää vahvistusta ei pidetä riittävänä tai niissä vaaditaan enemmän; liitteessä B kerrotaan alueellisesti sovellettavat säännöt, ja Ehdoissa selitetään, mitä teemme asian suhteen." }
+      { kind: "p", text: "Dialectical Engine on tarkoitettu aikuisille. Vahvistat rekisteröityessäsi olevasi vähintään 18-vuotias, emmekä tietoisesti käsittele alle 18-vuotiaiden tietoja. Jos saamme tietää tilin kuuluvan alle 18-vuotiaalle, suljemme sen ja poistamme tiedot osiossa 7 kuvatulla tavalla. Joissakin maissa pelkkää vahvistusta ei pidetä riittävänä tai niissä vaaditaan enemmän; liitteessä B kerrotaan alueellisesti sovellettavat säännöt, ja Ehdoissa selitetään, mitä teemme asian suhteen." }
     ]
   },
   {
@@ -206,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Evästeet",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI käyttää kahdeksaa kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain DebateAI: neljä evästettä ja neljä merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa [dezbatere.ro/cookies] oleva Evästekäytäntö luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään." },
+      { kind: "p", text: "Dialectical Engine käyttää 18 kohdetta, jotka kaikki ovat ehdottoman välttämättömiä pyytämällesi palvelulle ja jotka kaikki asettaa vain Dialectical Engine: 13 evästettä ja 5 merkintää selaimesi tallennustilassa. Emme aseta analytiikka-, mainonta- tai seurantaevästeitä. Osoitteessa [dezbatere.ro/cookies] oleva Evästekäytäntö luettelee ne ja kertoo, mitä kukin tekee ja kuka sen vastaanottaa, ja sitä muutetaan ennen kuin mitään muuta lisätään." },
       {
         kind: "list",
         items: [
@@ -214,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Eväste — Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. — 14 päivää",
         "__Host-debateai-age-refusal — Eväste (HttpOnly) — Kun ikätarkistus on hylätty, estää tätä selainta yrittämästä uudelleen 30 päivän ajan. Se sisältää vain sanan ”hylätty”, ei henkilötietoja. — 30 päivää",
         "debateai.locale — Eväste — Muistaa valitsemasi käyttöliittymän kielen. — 1 vuosi",
+        "__Host-debateai-staff — Eväste (HttpOnly) — Erillinen henkilöstön käyttöoikeus — Enintään 8 tuntia; 15 minuuttia käyttämättömyyttä",
+        "__Host-debateai-staff-csrf — Eväste — Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. — Enintään 8 tuntia; 15 minuuttia käyttämättömyyttä",
+        "__Host-debateai-password-reset — Eväste (HttpOnly) — Vain salasanan palautus — Enintään 30 minuuttia",
+        "__Host-debateai-password-reset-csrf — Eväste — Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. — Enintään 30 minuuttia",
+        "__Host-debateai-mfa-recovery — Eväste (HttpOnly) — Vain todentimen palautus — Enintään 299 sekuntia",
+        "__Host-debateai-mfa-recovery-csrf — Eväste — Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. — Enintään 299 sekuntia",
+        "__Host-debateai-social-flow — Eväste (HttpOnly) — Lyhyt palveluntarjoajakirjautuminen tai tilin liittäminen — Enintään 5 minuuttia",
+        "__Host-debateai-social-apple — Eväste (HttpOnly) — Lyhyt palveluntarjoajakirjautuminen tai tilin liittäminen — Enintään 5 minuuttia",
+        "__Host-debateai-social-browser — Eväste (HttpOnly) — Lyhyt palveluntarjoajakirjautuminen tai tilin liittäminen — Enintään 5 minuuttia",
         "debateai.consent — Paikallinen tallennustila — Muistaa, että olet nähnyt evästeilmoituksen, joten se näytetään vain kerran. — Kunnes tyhjennät sen",
         "debateai.mode — Paikallinen tallennustila — Käytätkö vaaleaa vai tummaa tilaa. — Kunnes tyhjennät sen",
         "debateai.languageOffer.dismissed — Istunnon tallennustila — Muistaa tämän välilehden osalta, että kieltäydyit tarjouksesta näyttää väittely toisella kielellä. — Kunnes suljet välilehden",
-        "debateai.support.conversation.v2 — Istunnon tallennustila — Pitää ohjekeskustelusi näytöllä niin kauan kuin välilehti on auki. Se poistetaan, kun joku kirjautuu sisään tai ulos tässä välilehdessä. — Kunnes suljet välilehden"
+        "debateai.support.conversation.v2 — Istunnon tallennustila — Pitää ohjekeskustelusi näytöllä niin kauan kuin välilehti on auki. Se poistetaan, kun joku kirjautuu sisään tai ulos tässä välilehdessä. — Kunnes suljet välilehden",
+        "debateai.phone-completion-draft.v1 — Istunnon tallennustila — Keskeneräinen kysymys puhelinvaiheen aikana; poistetaan istunnon vaihtuessa, uloskirjautuessa tai omistajan vaihtuessa — 15 minuuttia tai aiempaan poistamiseen asti"
         ]
       },
-      { kind: "p", text: "Mikään muu osapuoli ei kerää DebateAI:n kautta tietoja verkkotoiminnastasi ajan mittaan eikä eri verkkosivustoilla." },
-      { kind: "p", text: "Selaimet voivat lähettää ”Do Not Track” -signaalin tai muun vastaavan signaalin. DebateAI ei seuraa sinua, joten tällaisella signaalilla ei ole mitään kytkettävää pois päältä: palvelu toimii samalla tavalla signaalin kanssa tai ilman sitä." },
+      { kind: "p", text: "Mikään muu osapuoli ei kerää Dialectical Engine:n kautta tietoja verkkotoiminnastasi ajan mittaan eikä eri verkkosivustoilla." },
+      { kind: "p", text: "Selaimet voivat lähettää ”Do Not Track” -signaalin tai muun vastaavan signaalin. Dialectical Engine ei seuraa sinua, joten tällaisella signaalilla ei ole mitään kytkettävää pois päältä: palvelu toimii samalla tavalla signaalin kanssa tai ilman sitä." },
       { kind: "p", text: "Voit kieltäytyä näistä kohteista estämällä tai poistamalla tämän sivuston evästeet ja sivustotiedot selaimesi asetuksista. Mikä silloin lakkaa toimimasta: sisäänkirjautuminen sekä kieli- ja näyttövalintojesi muistaminen; myös evästeilmoitus näytetään uudelleen." }
     ]
   },
@@ -231,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kun muutamme tätä käytäntöä, julkaisemme uuden version, yhteenvedon muutoksista ja uuden voimaantulopäivän sekä säilytämme aiemmat versiot osoitteessa [dezbatere.ro/privacy/versions]. Jos muutos lisää uuden tarkoituksen tai uuden vastaanottajan, ilmoitamme sinulle sähköpostitse ja tuotteessa ennen uuden käsittelyn aloittamista ja annamme aikaa vastustaa sitä. Jos uusi tarkoitus perustuu suostumukseesi — esimerkiksi jos joskus haluaisimme käyttää sisältöä mallien parantamiseen — pyydämme suostumuksen erikseen ja yksilöidysti; emme koskaan pidä päivitettyjen Ehtojen hyväksymistä suostumuksena uuteen käsittelyyn. Jos selvennykset eivät muuta toimintaamme, julkaisemme vain uuden version." },
-      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi [date]. Versio 3.0 korvasi version 2.1, jossa istuntotiedot, säilytysajat, analytiikka, tietojen vienti ja poistamisen vaikutus julkaistuihin väittelyihin kuvattiin tavalla, joka ei enää vastannut palvelua." }
+      { kind: "p", text: "Tämä käytäntö päivitettiin viimeksi [date]. Versio 3.2 korvasi version 2.1, jossa istuntotiedot, säilytysajat, analytiikka, tietojen vienti ja poistamisen vaikutus julkaistuihin väittelyihin kuvattiin tavalla, joka ei enää vastannut palvelua." }
     ]
   },
   {
@@ -263,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Yhdysvallat (vain jos lueteltu)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Ilmoitus tietojen keräämisen yhteydessä. Osion 2 taulukossa luetellaan kaikki keräämämme henkilötietoluokat, niiden tarkoitus ja säilytysaika (osio 7). Keräämme seuraavia arkaluonteisten henkilötietojen luokkia vain, jos sisällytät niitä omiin itseäsi koskeviin kysymyksiisi: terveys, uskonnollinen tai filosofinen vakaumus, seksuaalinen käyttäytyminen tai suuntautuminen, poliittiset mielipiteet, ammattiliiton jäsenyys sekä rotu tai etninen alkuperä. Käytämme niitä vain väittelyjesi toteuttamiseen ja vasta osiossa 3 tarkoitetun erillisen suostumuksen jälkeen. Emme myy tai jaa henkilötietoja emmekä ole tehneet niin edeltävien kahdentoista kuukauden aikana. Emme käytä henkilötietoja kohdennettuun mainontaan, emmekä käytä arkaluonteisia henkilötietoja muuhun tarkoitukseen kuin pyytämäsi palvelun tarjoamiseen. Kieltäytymisvalintaa ilmaisevat signaalit: koska emme myy tai jaa henkilötietoja emmekä käytä niitä kohdennettuun mainontaan, ei ole mitään, mistä kieltäytyä, eikä Global Privacy Control -signaali muuta mitään. Oikeutesi: oikeus saada tietää, poistaa ja oikaista tietoja, kieltäytyä käsittelystä, rajoittaa arkaluonteisten henkilötietojen käyttöä sekä olla joutumatta syrjityksi näiden oikeuksien käyttämisen vuoksi; esitä pyyntö osoitteessa privacy@dezbatere.ro. Taloudelliset kannustimet: emme tarjoa niitä; tarkoituksemme ja suojatoimemme ovat samat ilmaisissa ja maksullisissa tilauksissa. Säilytysajat esitetään osiossa 7. Tietoturvaloukkaukset: ilmoitamme asukkaille ja osavaltioiden viranomaisille kunkin osavaltion tietoturvaloukkauksia koskevan lain edellyttämällä tavalla. Tämä ilmoitus päivitetään vähintään kahdentoista kuukauden välein; viimeksi päivitetty [date]." },
+      { kind: "p", text: "Ilmoitus tietojen keräämisen yhteydessä. Kohdan 2 taulukossa luetellaan keräämiemme henkilötietojen luokat ja niiden lähteet. Käsittelyn tarkoitukset ja oikeusperusteet esitetään kohdassa 4 ja säilytysajat kohdassa 7. Keräämme seuraavia arkaluonteisten henkilötietojen luokkia vain, jos sisällytät niitä omiin itseäsi koskeviin kysymyksiisi: terveys, uskonnollinen tai filosofinen vakaumus, seksuaalinen käyttäytyminen tai suuntautuminen, poliittiset mielipiteet, ammattiliiton jäsenyys sekä rotu tai etninen alkuperä. Käytämme niitä vain väittelyjesi toteuttamiseen ja vasta osiossa 3 tarkoitetun erillisen suostumuksen jälkeen. Emme myy tai jaa henkilötietoja emmekä ole tehneet niin edeltävien kahdentoista kuukauden aikana. Emme käytä henkilötietoja kohdennettuun mainontaan, emmekä käytä arkaluonteisia henkilötietoja muuhun tarkoitukseen kuin pyytämäsi palvelun tarjoamiseen. Kieltäytymisvalintaa ilmaisevat signaalit: Tällä hetkellä ei ole mitään, mistä kieltäytyä, koska emme myy tai jaa henkilötietoja. Jos alamme tulevaisuudessa myydä tai jakaa niitä, kunnioitamme Global Privacy Control -signaaleja kieltäytymisilmoituksina. Oikeutesi: oikeus saada tietää, poistaa ja oikaista tietoja, kieltäytyä käsittelystä, rajoittaa arkaluonteisten henkilötietojen käyttöä sekä olla joutumatta syrjityksi näiden oikeuksien käyttämisen vuoksi; esitä pyyntö osoitteessa privacy@dezbatere.ro. Taloudelliset kannustimet: emme tarjoa niitä; tarkoituksemme ja suojatoimemme ovat samat ilmaisissa ja maksullisissa tilauksissa. Säilytysajat esitetään osiossa 7. Tietoturvaloukkaukset: ilmoitamme asukkaille ja osavaltioiden viranomaisille kunkin osavaltion tietoturvaloukkauksia koskevan lain edellyttämällä tavalla. Tämä ilmoitus päivitetään vähintään kahdentoista kuukauden välein; viimeksi päivitetty [date]." },
       { kind: "p", text: "Connecticut: käsittelemme arkaluonteisia tietoja vain nimenomaisella suostumuksellasi, jonka annat erillisessä näkymässä ennen ensimmäistä väittelyäsi (osio 3); emme käytä henkilötietojasi tekoälymallien kouluttamiseen. Washington: erillinen Consumer Health Data Privacy Notice -asiakirjamme osoitteessa [URL] koskee kaikkia terveyteen liittyviä tietoja, päätelmät mukaan lukien. Texas ja Nebraska: emme myy arkaluonteisia henkilötietoja. Colorado, Connecticut, Virginia ja muut osavaltiot, joissa on kattava tietosuojalainsäädäntö: edellä mainitut oikeudet koskevat sinua, jos meihin sovellettava laki niin määrää. Jos hylkäämme pyynnön, voit hakea siihen muutosta vastaamalla vastaukseemme osoitteeseen privacy@dezbatere.ro; jos hylkäämme muutoksenhaun, voit ottaa yhteyttä osavaltiosi oikeusministeriin (Attorney General)." }
     ]
   },
@@ -304,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraina (vain jos lueteltu)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Sovelletaan Ukrainan lakia ”Henkilötietojen suojasta”. Emme tarjoa DebateAI-palvelua niillä Ukrainan alueilla, jotka eivät ole sen hallituksen hallinnassa. Tietosi siirretään EU-maihin ja Yhdysvaltoihin (ks. Rekisteri). Voit tehdä valituksen Ukrainan parlamentin ihmisoikeusvaltuutetulle." }
+      { kind: "p", text: "Sovelletaan Ukrainan lakia ”Henkilötietojen suojasta”. Emme tarjoa Dialectical Engine-palvelua niillä Ukrainan alueilla, jotka eivät ole sen hallituksen hallinnassa. Tietosi siirretään EU-maihin ja Yhdysvaltoihin (ks. Rekisteri). Voit tehdä valituksen Ukrainan parlamentin ihmisoikeusvaltuutetulle." }
     ]
   },
   {
@@ -335,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.0",
-  sha256: "fd3802e5805c0ee21cc79d7bf8ab1dff7f0321553933c9ea67666ecb01c3bf7e",
-  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.0 · VOIMASSA [DATE]",
+  version: "3.2",
+  sha256: "ddaab0578918819f34b7759b2e6685cd552851eea0a52e78034207496d76483e",
+  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.2 · VOIMASSA [DATE]",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",
-  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.0",
+  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tietosuojakäytännön teksti",
   sectionIdPrefix: "policy-section-",

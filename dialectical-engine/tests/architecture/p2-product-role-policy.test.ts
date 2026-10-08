@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { canonicalRegisterJson } from "../../packages/register/src/register-publication.js";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -8,6 +10,14 @@ import {
 } from "../../packages/register/src/product-role-policy.js";
 
 describe("P2-14 sealed product-role catalog", () => {
+  it("preserves the historical v1 canonical publication bytes", () => {
+    const bytes = canonicalRegisterJson(PRODUCT_ROLE_POLICY_REGISTER_ROW.valueAst);
+    expect(Buffer.byteLength(bytes)).toBe(1343);
+    expect(createHash("sha256").update(bytes).digest("hex"))
+      .toBe("b4343e9a5abc4180b94fa001a49c01b5adbc7743162f686f55dd62dc3f94888f");
+    expect(PRODUCT_ROLE_POLICY_REGISTER_ROW.sourceRef)
+      .toBe("wave-2-target-architecture.md#11; wave-3-phase-1-plan.md#phase-2");
+  });
   it("exposes exactly the ruled launch, growth, and reused service identities", () => {
     const policy = productRolePolicyFromRegisterRows([PRODUCT_ROLE_POLICY_REGISTER_ROW]);
     expect(policy).toEqual({

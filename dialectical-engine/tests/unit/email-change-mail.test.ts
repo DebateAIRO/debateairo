@@ -1,3 +1,4 @@
+import { mailAlternatives } from "../support/accountMail.js";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -54,9 +55,9 @@ describe("Turn 14 change-email mail", () => {
     await sender().sendEmailChange({ kind: "confirmation", recipient: "ana.popescu@icub.ro", token, expiresAt });
     const [message] = await captured();
     expect(message).toContain("To: ana.popescu@icub.ro\r\n");
-    expect(message).toContain("Subject: Confirm your new DebateAI email\r\n");
-    expect(message).toContain(`https://debate.test/settings#email-change=confirm&token=${token}\r\n`);
-    expect(message).toContain("This link expires at 2026-09-29T12:00:00.000Z.");
+    expect(message).toContain("Subject: Confirm your new Dialectical Engine email\r\n");
+    expect(mailAlternatives(message!).text).toContain(`https://debate.test/settings#email-change=confirm&token=${token}\r\n`);
+    expect(mailAlternatives(message!).text).toContain("This link expires at 29 September 2026 at 12:00 GMT+0 (UTC).");
   });
 
   it("mails the current address a notice naming the new one, with a cancel link and no confirm link", async () => {
@@ -65,18 +66,20 @@ describe("Turn 14 change-email mail", () => {
     });
     const [message] = await captured();
     expect(message).toContain("To: ana.popescu@unibuc.ro\r\n");
-    expect(message).toContain("Subject: Your DebateAI email is being changed\r\n");
-    expect(message).toContain("change its email to ana.popescu@icub.ro.");
-    expect(message).toContain(`https://debate.test/settings#email-change=cancel&token=${token}\r\n`);
-    expect(message).not.toContain("email-change=confirm");
+    expect(message).toContain("Subject: Your Dialectical Engine email is being changed\r\n");
+    expect(mailAlternatives(message!).text).toContain("change its email to ana.popescu@icub.ro.");
+    expect(mailAlternatives(message!).text).toContain(`https://debate.test/settings#email-change=cancel&token=${token}\r\n`);
+    expect(mailAlternatives(message!).text).not.toContain("email-change=confirm");
+    expect(mailAlternatives(message!).html).toContain(`email-change=cancel&amp;token=${token}`);
   });
 
   it("mails an address that already has an account a note with no link", async () => {
     await sender().sendEmailChange({ kind: "address-unavailable", recipient: "owner@icub.ro" });
     const [message] = await captured();
     expect(message).toContain("To: owner@icub.ro\r\n");
-    expect(message).toContain("already belongs to one");
-    expect(message).not.toContain("https://");
+    expect(mailAlternatives(message!).text).toContain("already belongs to one");
+    expect(mailAlternatives(message!).text).not.toContain("https://");
+    expect(mailAlternatives(message!).html).not.toContain("href=");
   });
 
   it("refuses a second recipient smuggled into either address before spawning sendmail", async () => {

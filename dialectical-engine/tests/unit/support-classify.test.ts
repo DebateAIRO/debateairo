@@ -618,6 +618,7 @@ describe("SUP-01 deterministic support classifier", () => {
     ["en", "Please tell me where the account deletion options are."],
     ["en", "Do not delete my account; where can I find the account deletion options?"],
     ["en", "Where can I sign in?"],
+    ["en", "Where can I sign in to my account?"],
     ["en", "Where is the login page?"],
     ["ro", "Unde pot gestiona sesiunile active?"],
     ["ro", "Unde găsesc opțiunile de ștergere a contului?"],

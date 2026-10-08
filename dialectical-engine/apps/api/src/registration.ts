@@ -1,6 +1,8 @@
+import { normalizeMailDisplay as normalizeAccountMailDisplay } from "./account-mail-template.mjs";
 import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import { performance } from "node:perf_hooks";
-import type { PostgresIdentityRepository, AuthSourceContext } from "@debateai/db";
+import { socialHash } from "./social-providers/hashes.js";
+import type { PostgresSocialIdentityRepository, SocialSignupAuthority, PostgresIdentityRepository, AuthSourceContext } from "@debateai/db";
 import type { AuthPolicy, AuthRouteLimit } from "@debateai/register";
 import {
   Argon2InfrastructureError,
@@ -13,12 +15,15 @@ import {
   hashPassword,
   hashToken,
   normalizeEmailForBlindIndex,
+  parseEncodedArgon2id,
   type Argon2Executor,
   type UserDekStore
 } from "@debateai/crypto";
 import { AGE_RULE_VERSION, MIN_AGE, isDeclaredRegion, type DeclaredRegion } from "@debateai/kernel";
 import type { RegisterLegalDocuments } from "@debateai/contract";
+import { LocaleCodeSchema } from "@debateai/contract/locale";
 import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
+import { normalizeManualPhone } from "./phone-profile.js";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
 
 export const REGISTRATION_PUBLIC_RESPONSE = Object.freeze({
@@ -32,7 +37,8 @@ export const RESEND_PUBLIC_RESPONSE = Object.freeze({
 export interface RegisterInput {
   readonly email: string;
   readonly password: string;
-  readonly recoveryEmail: string;
+  readonly recoveryEmail?: string | null;
+  readonly phone: string;
   /**
    * True only when the API's age gate found a date of birth of at least MIN_AGE; the
    * date itself never reaches this service. Registration records that result.
@@ -41,19 +47,41 @@ export interface RegisterInput {
 }
 
 /**
- * Paid plans L3b: the request-scoped facts the frozen register mount cannot pass in its four input members
- * (apps/api/src/index.ts, S04 — tests/unit/obs-l2-s04-zone.test.ts hashes that region). The age gate's
+ * Paid plans L3b: legal evidence travels on the request source, separately from account profile input.
+ * The S04 gate pins the auth route region (apps/api/src/index.ts). The age gate's
  * edge country already rides here (AuthSourceContext.countryCode); the Terms and Privacy pairs the page
  * displayed and the declared region ride here too, parsed by register preHandler hooks and added by sourceFor.
  */
-export type RegistrationSource = AuthSourceContext & Readonly<{ legal?: RegisterLegalDocuments; region?: DeclaredRegion }>;
+export type VerificationMailSource = AuthSourceContext & Readonly<{
+  /** Validated UI language/time zone for delivery only; carries no identity authority. */
+  mailDisplay?: Readonly<{ locale: string; timeZone: string | null }>;
+}>;
+export type RegistrationSource = VerificationMailSource & Readonly<{ legal?: RegisterLegalDocuments; region?: DeclaredRegion }>;
 
+export type SocialRegisterInput = Omit<RegisterInput, "password" | "recoveryEmail">;
+export type SocialRegistrationResult = typeof REGISTRATION_PUBLIC_RESPONSE | Readonly<{status:"mfa_required";enrollment_token:string;expires_at:string}>;
+
+declare const sourceAdmissionBrand: unique symbol;
+export type AuthSourceAdmission = Readonly<{ [sourceAdmissionBrand]: true; release(): void }>;
+export type AuthSourceAdmissionRequest =
+  | Readonly<{ route: "register"; input: RegisterInput; source: RegistrationSource }>
+  | Readonly<{ route: "social"; input: SocialRegisterInput; source: RegistrationSource }>
+  | Readonly<{ route: "resend"; input: Readonly<{ email: string }>; source: VerificationMailSource }>;
+interface SourceAdmissionGrant {
+  readonly route: "register" | "resend";
+  readonly ip: string;
+  readonly requestId: string;
+  readonly releaseStructural: (() => void) | undefined;
+}
 export interface RegistrationApplication {
-  register(input: RegisterInput, source: RegistrationSource): Promise<typeof REGISTRATION_PUBLIC_RESPONSE>;
+  /** Trusted composition port; the capability never enters public JSON or source metadata. */
+  admitSource?(request: AuthSourceAdmissionRequest): Promise<AuthSourceAdmission>;
+  register(input: RegisterInput, source: RegistrationSource, admission?: AuthSourceAdmission): Promise<typeof REGISTRATION_PUBLIC_RESPONSE>;
   verifyEmail(input: { readonly token: string }, source: AuthSourceContext): Promise<{ readonly status: "mfa_required" }>;
   resendVerification(
     input: { readonly email: string },
-    source: AuthSourceContext
+    source: VerificationMailSource,
+    admission?: AuthSourceAdmission
   ): Promise<typeof RESEND_PUBLIC_RESPONSE>;
 }
 
@@ -94,6 +122,10 @@ export function storedArgon2EnvelopeNotOverPolicy(
   return false;
 }
 
+/** Match the existing worker encoding admission AND its selected per-use cost ceiling. */
+export function consumerPasswordUsable(value: string | null, policy: AuthPolicy): boolean {
+    return value !== null && parseEncodedArgon2id(value) !== undefined && storedArgon2EnvelopeNotOverPolicy(value, policy.password.argon2id, 'password');
+}
 export class AuthFlowError extends Error {
   constructor(readonly code:
     | "AUTH_INPUT_INVALID"
@@ -104,6 +136,7 @@ export class AuthFlowError extends Error {
     | "AUTH_CREDENTIALS_INVALID"
     | "VERIFICATION_TOKEN_INVALID"
     | "MFA_ENROLLMENT_INVALID"
+    | "MFA_FIRST_STEP_UNAVAILABLE"
     | "MFA_ENROLLMENT_STATE_INVALID"
     | "MFA_TOTP_INVALID"
     | "MFA_TOTP_REPLAYED"
@@ -119,7 +152,7 @@ export class AuthFlowError extends Error {
   get statusCode(): 400 | 401 | 409 | 429 | 503 {
     return this.code === "AUTH_CREDENTIALS_INVALID" ? 401
       : this.code === "AUTH_RATE_LIMITED" || this.code === "MFA_RATE_LIMITED" ? 429
-      : this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED"
+      : this.code === "MFA_FIRST_STEP_UNAVAILABLE" || this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED"
         || this.code === "LEGAL_DOCUMENT_STALE" ? 409
       : this.code === "AUTH_REGISTRATION_FAILED" || this.code === "AUTH_MAIL_BUSY"
         || this.code === "AUTH_TEMPORARILY_UNAVAILABLE" ? 503 : 400;
@@ -149,7 +182,14 @@ type AuthRoute = "register" | "verify" | "resend";
 const AUTH_ROUTES = Object.freeze(["register", "verify", "resend"] as const);
 const AUTH_REFUSAL_DISTINCT_SOURCE_CAP = 4_096;
 
+interface RefusalEligibility {
+  pending: number;
+  ready: Promise<void> | undefined;
+  settle: (() => void) | undefined;
+}
 interface RefusalAggregate {
+  /** Shared by every snapshot of this window, without retaining a list of contributors. */
+  readonly eligibility: RefusalEligibility;
   readonly windowStartedAt: number;
   readonly occurredAt: Date;
   readonly source: AuthSourceContext;
@@ -339,6 +379,7 @@ export class InProcessAuthRateLimiter {
     readonly scope: "ip" | "address";
     readonly now: Date;
     readonly source: AuthSourceContext;
+    readonly persistAfter?: Promise<void>;
   }): Readonly<{
     finalized: Readonly<RefusalAggregate> | null;
     startedWindow: boolean;
@@ -353,6 +394,7 @@ export class InProcessAuthRateLimiter {
     const aggregate = current?.windowStartedAt === windowStartedAt
       ? { ...current }
       : {
+          eligibility: { pending: 0, ready: undefined, settle: undefined },
           windowStartedAt,
           occurredAt: input.now,
           source: input.source,
@@ -362,6 +404,17 @@ export class InProcessAuthRateLimiter {
           addressCount: 0,
           distinctSourceCountSaturated: false
         };
+    if (input.persistAfter !== undefined) {
+      const gate = aggregate.eligibility;
+      if (gate.pending++ === 0) gate.ready = new Promise<void>(resolve => { gate.settle = resolve; });
+      const settled = () => {
+        if (--gate.pending === 0) {
+          const release = gate.settle; gate.settle = undefined; gate.ready = undefined; release?.();
+        }
+      };
+      // A failed clamp is also terminal; never orphan its aggregate or reject this shared barrier.
+      void input.persistAfter.then(settled, settled);
+    }
     const sourceDigest = this.refusalSourceDigest(input.route, input.source.ip);
     if (!aggregate.distinctSourceDigests.has(sourceDigest)) {
       if (aggregate.distinctSourceDigests.size < AUTH_REFUSAL_DISTINCT_SOURCE_CAP) {
@@ -435,23 +488,26 @@ function validEmail(value: unknown): value is string {
 
 interface PendingRegistration {
   readonly email: string;
-  readonly recoveryEmail: string;
+  readonly recoveryEmail: string | null;
+  readonly phone: string;
   readonly emailBlindIndex: Buffer;
-  readonly passwordHash: string;
+  readonly passwordHash: string | null;
+  readonly social?: SocialSignupAuthority;
   readonly requestedAt: Date;
   readonly countryCode: string | null;
   readonly documents: SignUpDocuments | null;
   readonly region: DeclaredRegion | null;
-  readonly source: AuthSourceContext;
+  readonly source: VerificationMailSource;
 }
 
 interface VerificationDelivery {
+  readonly reservationId: string;
   readonly userId: string;
   readonly channelBindingId: string;
   readonly email: string;
   readonly token: string;
   readonly expiresAt: Date;
-  readonly source: AuthSourceContext;
+  readonly source: VerificationMailSource;
 }
 
 interface VerificationDeliveryRecord {
@@ -470,7 +526,11 @@ interface DuplicateRegistrationPostwork {
   readonly source: AuthSourceContext;
 }
 
-type RegistrationPostwork = VerificationDeliveryPostwork | DuplicateRegistrationPostwork;
+type RegistrationPostwork = VerificationDeliveryPostwork | DuplicateRegistrationPostwork | Readonly<{kind:"social_collision"}> | Readonly<{kind:"social_enrollment";token:string;expiresAt:Date}>;
+export type RecoveryMailWork = () => Promise<void>;
+export interface RecoveryMailDispatchPort {
+  dispatchRecoveryMail(prepare:()=>Promise<RecoveryMailWork|null>):Promise<void>;
+}
 type MailDispatchRelease = () => Promise<void>;
 interface MailDispatchActivationReceipt {
   readonly activatedAt: number;
@@ -541,7 +601,11 @@ interface RefusalAuditCoordinator {
   writer: Promise<void> | undefined;
 }
 
-function sourceContext(source: AuthSourceContext): AuthSourceContext {
+function normalizeMailDisplay(display: NonNullable<VerificationMailSource["mailDisplay"]>): NonNullable<VerificationMailSource["mailDisplay"]> {
+  if (!LocaleCodeSchema.safeParse(display.locale).success || (display.timeZone !== null && (typeof display.timeZone !== "string" || display.timeZone.length < 1 || display.timeZone.length > 128))) throw new AuthFlowError("AUTH_INPUT_INVALID");
+  return normalizeAccountMailDisplay(display);
+}
+export function sourceContext(source: VerificationMailSource): VerificationMailSource {
   if (source.ip.trim() === "" || source.requestId.trim() === "") {
     throw new AuthFlowError("AUTH_INPUT_INVALID");
   }
@@ -549,7 +613,8 @@ function sourceContext(source: AuthSourceContext): AuthSourceContext {
   return Object.freeze({
     ip: source.ip.slice(0, 64),
     userAgent: (userAgent === "" ? "unknown" : userAgent).slice(0, 256),
-    requestId: source.requestId.slice(0, 128)
+    requestId: source.requestId.slice(0, 128),
+    ...(source.mailDisplay === undefined ? {} : { mailDisplay: normalizeMailDisplay(source.mailDisplay) })
   });
 }
 
@@ -557,6 +622,9 @@ export class RegistrationService implements RegistrationApplication {
   private readonly clock: () => Date;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly pendingMailDispatches = new Set<Promise<void>>();
+  // Ownership tracking only: these preparations already hold a slot or waiter
+  // in the SAME mail dispatcher. This is not another admission pool.
+  private readonly pendingMailPreparations = new Set<Promise<void>>();
   private readonly waitingMailDispatches: WaitingMailDispatch[] = [];
   private mailDispatchReservations = 0;
   private nextMailDispatchActivationAt = Number.NEGATIVE_INFINITY;
@@ -610,9 +678,95 @@ export class RegistrationService implements RegistrationApplication {
    * advances. Nothing here is ever replaced or copied on rollover.
    */
   private readonly refusalAuditRoutes = new Map<AuthRoute, RefusalAuditCoordinator>();
+  private readonly sourceAdmissions = new WeakMap<AuthSourceAdmission, SourceAdmissionGrant>();
+
+  private validateRegistration(input: RegisterInput | SocialRegisterInput, rawSource: RegistrationSource, social = false) {
+    const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
+    if (!validEmail(input.email) || ("recoveryEmail" in input && input.recoveryEmail != null && !validEmail(input.recoveryEmail))
+      || (!social && (!("password" in input) || typeof input.password !== "string"
+      || input.password.length < this.dependencies.policy.password.minimumLength
+      // V-14: the ruled maximum, in the same unit as the minimum. The route
+      // keeps its own 1024-byte request-shape bound ahead of this; a
+      // register version that publishes no maximum leaves that bound alone.
+      || (maximumPasswordLength !== null && input.password.length > maximumPasswordLength)))
+      || input.adultAffirmed !== true) {
+      throw new AuthFlowError("AUTH_INPUT_INVALID");
+    }
+    let phone: string;
+    try { phone = normalizeManualPhone(input.phone); }
+    catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+    // Age gate (R3-3): the source's country — the edge's, else the country gate's lookup — is
+    // recorded with the result, never decisive.
+    const countryCode = typeof rawSource.countryCode === "string" && /^[A-Z]{2}$/.test(rawSource.countryCode)
+      ? rawSource.countryCode : null;
+    // L3b: the pairs of the documents the person read. Input validation, so it runs before
+    // the admission gate and spends no budget; the refusal still sits behind the clamp.
+    const documents = this.dependencies.legalAcceptance === undefined
+      ? null : resolveSignUpDocuments(rawSource.legal);
+    if (this.dependencies.legalAcceptance !== undefined && documents === null) {
+      throw new AuthFlowError("LEGAL_DOCUMENT_STALE");
+    }
+    const source = sourceContext(rawSource);
+    if (rawSource.region !== undefined && !isDeclaredRegion(rawSource.region)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+    const region = rawSource.region ?? null;
+    return { phone, countryCode, documents, source, region };
+  }
+
+  async admitSource(request: AuthSourceAdmissionRequest): Promise<AuthSourceAdmission> {
+    const startedAt = performance.now();
+    let releaseStructural: (() => void) | undefined;
+    let refusalClamped = false;
+    try {
+      const { input, source: rawSource } = request;
+      const route = request.route === "social" ? "register" : request.route;
+      let source: VerificationMailSource;
+      if (request.route !== "resend") {
+        source = this.validateRegistration(request.input, request.source, request.route === "social").source;
+        // The existing 103-registration slot spans proof, provisioning, clamp and handoff: no async stage before it.
+        releaseStructural = this.acquireRegistrationAdmission(randomUUID());
+      } else {
+        if (!validEmail(input.email)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+        source = sourceContext(rawSource);
+      }
+      const now = this.clock();
+      const limit = this.dependencies.limiter.consume({ route, ip: source.ip, addressKey: "", now });
+      if (!limit.allowed) {
+        const persistAfter = (route === "register" ? this.holdRegistrationEnumerationClamp(startedAt) : this.holdEnumerationFloor(startedAt))
+          .finally(() => { refusalClamped = true; });
+        await this.refuseRateLimit({ route, scope: limit.scope, now,
+          source: { ip: source.ip, userAgent: source.userAgent, requestId: source.requestId }, persistAfter });
+      }
+      const capability = Object.freeze({ release: () => { this.releaseSourceAdmission(capability); } }) as AuthSourceAdmission;
+      this.sourceAdmissions.set(capability, Object.freeze({ route, ip: source.ip, requestId: source.requestId, releaseStructural }));
+      releaseStructural = undefined; // The capability now owns this existing slot.
+      return capability;
+    } catch (error) {
+      try {
+        if (!refusalClamped) {
+          if (request.route !== "resend") await this.holdRegistrationEnumerationClamp(startedAt);
+          else await this.holdEnumerationFloor(startedAt);
+        }
+      } finally { releaseStructural?.(); }
+      throw error;
+    }
+  }
+  private releaseSourceAdmission(admission: AuthSourceAdmission): void {
+    const granted = this.takeSourceAdmission(admission);
+    granted?.releaseStructural?.();
+  }
+  private takeSourceAdmission(admission: AuthSourceAdmission): SourceAdmissionGrant | undefined {
+    const granted = this.sourceAdmissions.get(admission);
+    this.sourceAdmissions.delete(admission);
+    return granted;
+  }
+  private assertSourceAdmission(route: "register" | "resend", source: AuthSourceContext, granted: SourceAdmissionGrant | undefined): void {
+    if (!granted || granted.route !== route || granted.ip !== source.ip || granted.requestId !== source.requestId
+      || (route === "register" && granted.releaseStructural === undefined)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+  }
 
   constructor(private readonly dependencies: {
     readonly repository: IdentityRepository;
+    readonly socialRepository?: Pick<PostgresSocialIdentityRepository,"createAccount">;
     readonly mail: MailSender;
     readonly dekStore: UserDekStore;
     readonly blindIndexKey: Uint8Array;
@@ -922,6 +1076,7 @@ export class RegistrationService implements RegistrationApplication {
       // that just landed, and `recordRateLimitRefusal` has no dedup key.
       while (coordinator.queue.length > 0) {
         const writing = coordinator.queue[0]!;
+        while (writing.eligibility.pending > 0) await writing.eligibility.ready;
         await this.recordRefusalAggregate(route, writing);
         const at = coordinator.queue.indexOf(writing);
         if (at >= 0) coordinator.queue.splice(at, 1);
@@ -1121,6 +1276,7 @@ export class RegistrationService implements RegistrationApplication {
     readonly minimumReservationMs?: number;
     readonly activationSpacingMs?: number;
     readonly waitDeadlineMs?: number;
+    readonly enforceMinimum?: boolean;
   }): Promise<MailDispatchActivation> {
     const channel = this.dependencies.policy.channel;
     const minimumReservationMs = request.minimumReservationMs
@@ -1131,7 +1287,7 @@ export class RegistrationService implements RegistrationApplication {
     if (this.mailDispatchReservations < channel.maxConcurrentVerificationDispatches) {
       this.mailDispatchReservations += 1;
       return Promise.resolve(() => this.scheduleMailDispatchActivation(
-        false, minimumReservationMs, activationSpacingMs
+        request.enforceMinimum ?? false, minimumReservationMs, activationSpacingMs
       ));
     }
     if (this.waitingMailDispatches.length >= channel.maxQueuedVerificationDispatches) {
@@ -1183,6 +1339,7 @@ export class RegistrationService implements RegistrationApplication {
     readonly scope: "ip" | "address";
     readonly now: Date;
     readonly source: AuthSourceContext;
+    readonly persistAfter?: Promise<void>;
   }): Promise<never> {
     const aggregate = this.dependencies.limiter.aggregateRefusal(input);
     if (aggregate.finalized !== null) {
@@ -1207,6 +1364,7 @@ export class RegistrationService implements RegistrationApplication {
         );
       });
     }
+    if (input.persistAfter !== undefined) await input.persistAfter;
     throw new AuthFlowError("AUTH_RATE_LIMITED");
   }
 
@@ -1214,11 +1372,12 @@ export class RegistrationService implements RegistrationApplication {
     input: RegistrationPostwork | VerificationDelivery,
     releaseReservation: MailDispatchRelease
   ): void {
+    if ("kind" in input && (input.kind === "social_enrollment" || input.kind === "social_collision")) { this.dispatchMailReservationHold(releaseReservation, true); return; }
     const duplicate = "kind" in input && input.kind === "duplicate" ? input : undefined;
     let delivery: VerificationDelivery | undefined = duplicate === undefined
       ? input as VerificationDelivery
       : undefined;
-    const deliveryAttemptId = delivery?.channelBindingId;
+    const deliveryAttemptId = delivery?.reservationId;
     let pending!: Promise<void>;
     pending = new Promise<void>((resolve) => setImmediate(resolve))
       .then(async () => {
@@ -1270,9 +1429,54 @@ export class RegistrationService implements RegistrationApplication {
     this.pendingMailDispatches.add(pending);
   }
 
+  /** Composition-only: one source-admitted recovery request owns one common ticket.
+   * Both P2 and token preparation run only after activation. No raw token is
+   * retained by a waiter, and public completion never awaits real transport. */
+  dispatchRecoveryMail(prepare:()=>Promise<RecoveryMailWork|null>):Promise<void> {
+    if(this.registrationAdmissionClosing)return Promise.reject(new AuthFlowError("AUTH_MAIL_BUSY"));
+    const startedAt=performance.now();
+    let permit:Promise<MailDispatchActivation>;
+    try { permit=this.reserveMailDispatchPermit({correlationId:randomUUID(),enforceMinimum:true}); }
+    catch(error){return Promise.reject(error);}
+    let preparing!:Promise<void>;
+    preparing=(async()=>{
+      let receipt:MailDispatchActivationReceipt|undefined;
+      let work:RecoveryMailWork|null= null;
+      try {
+        receipt=await(await permit)();
+        work=await prepare();
+        if(performance.now()-receipt.activatedAt>this.dependencies.policy.channel.mailDispatchPreTransportWorkBudgetMs)
+          console.error("[AUTH_CONSUMER_RECOVERY_PREPARATION_SLOW]");
+      } finally {
+        try {
+          await this.holdEnumerationFloor(startedAt);
+          if(receipt!==undefined)await this.holdRegistrationPostActivationFloor(receipt.activatedAt);
+        } finally {
+          if(receipt!==undefined)this.dispatchRecoveryWork(work,receipt.release);
+          work=null;
+          this.pendingMailPreparations.delete(preparing);
+        }
+      }
+    })();
+    this.pendingMailPreparations.add(preparing);
+    return preparing;
+  }
+
+  private dispatchRecoveryWork(work:RecoveryMailWork|null,release:MailDispatchRelease):void {
+    let pending!:Promise<void>;
+    pending=new Promise<void>(resolve=>setImmediate(resolve)).then(async()=>{
+      if(work===null)await this.sleep(this.dependencies.policy.channel.mailDispatchNoSendEqualWorkMs);
+      else await work();
+    }).catch(()=>{console.error("[AUTH_CONSUMER_RECOVERY_DISPATCH_FAILED]");}).finally(async()=>{
+      work=null;
+      try {await release();} finally {this.pendingMailDispatches.delete(pending);}
+    });
+    this.pendingMailDispatches.add(pending);
+  }
+
   async drainMailDispatches(): Promise<void> {
-    while (this.pendingMailDispatches.size > 0) {
-      await Promise.allSettled([...this.pendingMailDispatches]);
+    while (this.pendingMailDispatches.size > 0 || this.pendingMailPreparations.size > 0) {
+      await Promise.allSettled([...this.pendingMailPreparations,...this.pendingMailDispatches]);
     }
   }
 
@@ -1286,13 +1490,19 @@ export class RegistrationService implements RegistrationApplication {
         input.requestedAt.getTime() + this.dependencies.policy.verification.tokenTtlMs
       );
       const dek = generateDek();
+      const emailPlaintext = Buffer.from(input.email, "utf8");
+      const recoveryPlaintext = input.recoveryEmail === null ? null : Buffer.from(input.recoveryEmail, "utf8");
+      const phonePlaintext = Buffer.from(input.phone, "utf8");
       try {
         const keyId = `user-dek:${userId}`;
-        const emailCiphertext = encrypt(dek, Buffer.from(input.email, "utf8"), [
+        const emailCiphertext = encrypt(dek, emailPlaintext, [
           "identity", "user.email_ciphertext", userId, "run:none", userId, keyId, "1"
         ]);
-        const recoveryEmailCiphertext = encrypt(dek, Buffer.from(input.recoveryEmail, "utf8"), [
+        const recoveryEmailCiphertext = recoveryPlaintext === null ? null : encrypt(dek, recoveryPlaintext, [
           "identity", "user.recovery_email_ciphertext", userId, "run:none", userId, keyId, "1"
+        ]);
+        const phoneCiphertext = encrypt(dek, phonePlaintext, [
+          "identity", "user.phone_ciphertext", userId, "run:none", userId, keyId, "1"
         ]);
         const acceptances = input.documents === null || this.dependencies.legalAcceptance === undefined
           ? undefined
@@ -1301,11 +1511,15 @@ export class RegistrationService implements RegistrationApplication {
             documents: input.documents,
             source: input.source
           });
-        const created = await this.dependencies.repository.createPendingAccount({
+        const accountInput = {
           userId,
           emailBlindIndex: input.emailBlindIndex,
           emailCiphertext,
           recoveryEmailCiphertext,
+          phoneCiphertext,
+          phoneSource: "manual" as const,
+          phoneVerificationStatus: "unverified" as const,
+          phoneUpdatedAt: input.requestedAt,
           passwordHash: input.passwordHash,
           pseudonym,
           adultAffirmedAt: input.requestedAt,
@@ -1316,11 +1530,17 @@ export class RegistrationService implements RegistrationApplication {
           },
           verificationTokenHash: tokenHash,
           verificationExpiresAt: expiresAt,
+          verificationTokenTtlMs: this.dependencies.policy.verification.tokenTtlMs,
           occurredAt: input.requestedAt,
           source: input.source,
           ...(acceptances === undefined ? {} : { acceptances }),
           ...(input.region === null ? {} : { declaredRegion: input.region })
-        }, () => this.dependencies.dekStore.store(userId, dek));
+        };
+        const created = input.social === undefined
+          ? await this.dependencies.repository.createPendingAccount({...accountInput,passwordHash:input.passwordHash!}, () => this.dependencies.dekStore.store(userId,dek))
+          : await this.dependencies.socialRepository!.createAccount({...accountInput,...input.social,socialEnrollmentHash:socialHash('enrollment',token)}, () => this.dependencies.dekStore.store(userId,dek));
+        if(created.status==='collision') return {kind:'social_collision'};
+        if(created.status==='enrollment') return {kind:'social_enrollment',token,expiresAt:created.verificationExpiresAt};
         if (created.status === "pseudonym_collision") continue;
         if (created.status === "email_duplicate") {
           return Object.freeze({
@@ -1334,12 +1554,16 @@ export class RegistrationService implements RegistrationApplication {
           kind: "delivery" as const,
           userId: created.userId,
           channelBindingId: created.channelBindingId,
+          reservationId: created.reservationId,
           email: input.email,
           token,
-          expiresAt,
+          expiresAt: created.verificationExpiresAt,
           source: input.source
         });
       } finally {
+        emailPlaintext.fill(0);
+        recoveryPlaintext?.fill(0);
+        phonePlaintext.fill(0);
         dek.fill(0);
       }
     }
@@ -1352,14 +1576,15 @@ export class RegistrationService implements RegistrationApplication {
     let errorCode: string | null = null;
     try {
       await this.dependencies.mail.sendVerification({
-        attemptId: input.channelBindingId,
+        attemptId: input.reservationId,
         recipient: input.email,
         token: input.token,
-        expiresAt: input.expiresAt
+        expiresAt: input.expiresAt,
+        display: normalizeAccountMailDisplay(input.source.mailDisplay)
       });
     } catch (error) {
       errorCode = error instanceof MailDeliveryError ? error.operatorCode : "MAIL_DELIVERY_FAILED";
-      console.error(`[AUTH_MAIL_DELIVERY_FAILED] attempt=${input.channelBindingId} code=${errorCode}`);
+      console.error(`[AUTH_MAIL_DELIVERY_FAILED] attempt=${input.reservationId} code=${errorCode}`);
     }
     return Object.freeze({
       userId: input.userId,
@@ -1396,59 +1621,46 @@ export class RegistrationService implements RegistrationApplication {
     }
   }
 
-  async register(input: RegisterInput, rawSource: RegistrationSource): Promise<typeof REGISTRATION_PUBLIC_RESPONSE> {
+  async register(input: RegisterInput, rawSource: RegistrationSource, admission?: AuthSourceAdmission): Promise<typeof REGISTRATION_PUBLIC_RESPONSE> {
+    const result = await this.registerFlow(input,rawSource,admission);
+    if(!('message' in result)) throw new AuthFlowError('AUTH_REGISTRATION_FAILED');
+    return result;
+  }
+  async registerSocial(input:SocialRegisterInput,source:RegistrationSource,authority:SocialSignupAuthority,admission:AuthSourceAdmission):Promise<SocialRegistrationResult> {
+    if(!this.dependencies.socialRepository || !this.dependencies.legalAcceptance) throw new AuthFlowError('AUTH_TEMPORARILY_UNAVAILABLE');
+    return this.registerFlow(input,source,admission,authority);
+  }
+  private async registerFlow(input: RegisterInput | SocialRegisterInput, rawSource: RegistrationSource, admission?: AuthSourceAdmission,social?:SocialSignupAuthority): Promise<SocialRegistrationResult> {
     const requestedAt = new Date(this.clock().getTime());
     const startedAt = performance.now();
     const correlationId = randomUUID();
+    let responseClamp: Promise<void> | undefined;
+    const clampResponse = () => responseClamp ??= this.holdRegistrationEnumerationClamp(startedAt);
     let pendingPostwork: RegistrationPostwork | undefined;
     let releaseMailDispatch: MailDispatchRelease | undefined;
     let mailDispatchActivatedAt: number | undefined;
     let releaseAdmission: (() => void) | undefined;
     try {
+      const granted = admission === undefined ? undefined : this.takeSourceAdmission(admission);
+      releaseAdmission = granted?.releaseStructural;
       try {
-        const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
-        if (!validEmail(input.email) || !validEmail(input.recoveryEmail)
-          || typeof input.password !== "string"
-          || input.password.length < this.dependencies.policy.password.minimumLength
-          // V-14: the ruled maximum, in the same unit as the minimum. The route
-          // keeps its own 1024-byte request-shape bound ahead of this; a
-          // register version that publishes no maximum leaves that bound alone.
-          || (maximumPasswordLength !== null && input.password.length > maximumPasswordLength)
-          || input.adultAffirmed !== true) {
-          throw new AuthFlowError("AUTH_INPUT_INVALID");
-        }
-        // Age gate (R3-3): the source's country — the edge's, else the country gate's lookup — is
-        // recorded with the result, never decisive.
-        const countryCode = typeof rawSource.countryCode === "string" && /^[A-Z]{2}$/.test(rawSource.countryCode)
-          ? rawSource.countryCode : null;
-        // L3b: the pairs of the documents the person read. Input validation, so it runs before
-        // the admission gate and spends no budget; the refusal still sits behind the clamp.
-        const documents = this.dependencies.legalAcceptance === undefined
-          ? null : resolveSignUpDocuments(rawSource.legal);
-        if (this.dependencies.legalAcceptance !== undefined && documents === null) {
-          throw new AuthFlowError("LEGAL_DOCUMENT_STALE");
-        }
-        // Region picker S01: the register hook parsed the region; other compositions may omit it.
-        if (rawSource.region !== undefined && !isDeclaredRegion(rawSource.region)) {
-          throw new AuthFlowError("AUTH_INPUT_INVALID");
-        }
-        const region = rawSource.region ?? null;
-        const source = sourceContext(rawSource);
+        const { phone, countryCode, documents, source, region } = this.validateRegistration(input, rawSource, social !== undefined);
+        if (admission !== undefined) this.assertSourceAdmission("register", source, granted);
         // THE ADMISSION GATE. After the input and source-context validation,
         // which must never consume budget, and before the first repository
         // await, the limiter lookup, either KDF, the mail reservation, the token
         // mint and every mutation. Nothing above this line has touched a
         // dependency, so the 104th valid request is refused having done no work
         // at all — it only pays the response clamp, like every other arm.
-        releaseAdmission = this.acquireRegistrationAdmission(correlationId);
+        if (admission === undefined) releaseAdmission = this.acquireRegistrationAdmission(correlationId);
         const email = normalizeEmailForBlindIndex(input.email);
-        const recoveryEmail = normalizeEmailForBlindIndex(input.recoveryEmail);
+        const recoveryEmail = !("recoveryEmail" in input) || input.recoveryEmail == null ? null : normalizeEmailForBlindIndex(input.recoveryEmail);
         const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
         // This lookup exists only to preserve the stable address limiter key.
         // Its account audit token never enters a refusal row: that event is a
         // route-window incident with DB-minted event-local actor/target refs.
         const existing = await this.dependencies.repository.findAuditIdentityByBlindIndex(emailBlindIndex);
-        const limit = this.dependencies.limiter.consume({
+        const limit = admission !== undefined ? { allowed: true as const } : this.dependencies.limiter.consume({
           route: "register",
           ip: source.ip,
           addressKey: existing?.addressKey ?? emailBlindIndex.toString("hex"),
@@ -1459,12 +1671,14 @@ export class RegistrationService implements RegistrationApplication {
             route: "register",
             scope: limit.scope,
             now: this.clock(),
-            source
+            source,
+            persistAfter: clampResponse()
           });
         }
 
-        const passwordHashWork = this.scheduleRegistrationHash(input.password);
-        let passwordHash: string;
+        let passwordHash: string | null = null;
+        if(social === undefined) {
+        const passwordHashWork = this.scheduleRegistrationHash((input as RegisterInput).password);
         try {
           passwordHash = await passwordHashWork.promise;
         } catch (error) {
@@ -1478,6 +1692,7 @@ export class RegistrationService implements RegistrationApplication {
           // any mail capacity for a registration that has no completed hash.
           await passwordHashWork.settlement;
           throw error;
+        }
         }
         // Hash first: there is no live positive Argon2+provisioning bound that
         // fits the 600 ms pre-transport budget. Once hashing is complete, bind
@@ -1497,7 +1712,7 @@ export class RegistrationService implements RegistrationApplication {
         mailDispatchActivatedAt = activationReceipt.activatedAt;
         try {
           pendingPostwork = await this.provisionPendingAccount(Object.freeze({
-            email, recoveryEmail, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents, region
+            email, recoveryEmail, phone, emailBlindIndex, passwordHash, requestedAt, countryCode, source, documents, region, ...(social===undefined?{}:{social})
           }));
           const preTransportWorkMs = performance.now() - mailDispatchActivatedAt;
           if (preTransportWorkMs
@@ -1528,7 +1743,7 @@ export class RegistrationService implements RegistrationApplication {
             ? new AuthFlowError("AUTH_TEMPORARILY_UNAVAILABLE", { cause: provisionError })
             : new AuthFlowError("AUTH_REGISTRATION_FAILED");
         }
-        return REGISTRATION_PUBLIC_RESPONSE;
+        return pendingPostwork?.kind === "social_enrollment" ? {status:"mfa_required",enrollment_token:pendingPostwork.token,expires_at:pendingPostwork.expiresAt.toISOString()} : REGISTRATION_PUBLIC_RESPONSE;
       } catch (error) {
         // Password-hash and mail-reservation failures reach here; every Argon2
         // pool failure among them leaves as the one constant 503 envelope.
@@ -1550,7 +1765,7 @@ export class RegistrationService implements RegistrationApplication {
             this.dispatchMailReservationHold(release);
           }
           await Promise.all([
-            this.holdRegistrationEnumerationClamp(startedAt),
+            clampResponse(),
             holdPostActivationFloor
               ? this.holdRegistrationPostActivationFloor(mailDispatchActivatedAt!)
               : Promise.resolve()
@@ -1571,6 +1786,7 @@ export class RegistrationService implements RegistrationApplication {
       // either given successful postwork to `dispatchVerification` or given the
       // reservation to a visible hold. Never at commit, clamp entry, or before
       // the secret/hash and mail-capacity owners have settled.
+      if (admission !== undefined) this.releaseSourceAdmission(admission);
       releaseAdmission?.();
     }
   }
@@ -1634,20 +1850,25 @@ export class RegistrationService implements RegistrationApplication {
 
   async resendVerification(
     input: { readonly email: string },
-    rawSource: AuthSourceContext
+    rawSource: VerificationMailSource,
+    admission?: AuthSourceAdmission
   ): Promise<typeof RESEND_PUBLIC_RESPONSE> {
     const startedAt = performance.now();
     const correlationId = randomUUID();
+    let responseFloor: Promise<void> | undefined;
+    const floorResponse = () => responseFloor ??= this.holdEnumerationFloor(startedAt);
     let pendingDelivery: VerificationDelivery | undefined;
     let releaseMailDispatch: MailDispatchRelease | undefined;
+    const granted = admission === undefined ? undefined : this.takeSourceAdmission(admission);
     try {
       if (!validEmail(input.email)) throw new AuthFlowError("AUTH_INPUT_INVALID");
       const source = sourceContext(rawSource);
+      if (admission !== undefined) this.assertSourceAdmission("resend", source, granted);
       const email = normalizeEmailForBlindIndex(input.email);
       const emailBlindIndex = createEmailBlindIndex(this.dependencies.blindIndexKey, email);
       const identity = await this.dependencies.repository.findAuditIdentityByBlindIndex(emailBlindIndex);
       const now = this.clock();
-      const limit = this.dependencies.limiter.consume({
+      const limit = admission !== undefined ? { allowed: true as const } : this.dependencies.limiter.consume({
         route: "resend",
         ip: source.ip,
         addressKey: identity?.addressKey ?? emailBlindIndex.toString("hex"),
@@ -1658,7 +1879,8 @@ export class RegistrationService implements RegistrationApplication {
           route: "resend",
           scope: limit.scope,
           now,
-          source
+          source,
+          persistAfter: floorResponse()
         });
       }
       releaseMailDispatch = await this.reserveMailDispatch(correlationId);
@@ -1670,15 +1892,20 @@ export class RegistrationService implements RegistrationApplication {
         expiresAt,
         occurredAt: now,
         cooldownMs: this.dependencies.policy.verification.resendCooldownMs,
+        windowMs: this.dependencies.policy.verification.outboundSendWindowMs,
+        maximumSends: this.dependencies.policy.verification.outboundSendMax,
+        tokenTtlMs: this.dependencies.policy.verification.tokenTtlMs,
+        mechanism: this.dependencies.policy.verification.outboundSendMechanism,
         source
       });
       if (prepared.status === "send") {
         pendingDelivery = {
           userId: prepared.userId,
           channelBindingId: prepared.channelBindingId,
+          reservationId: prepared.reservationId,
           email,
           token,
-          expiresAt,
+          expiresAt: prepared.verificationExpiresAt,
           source
         };
       }
@@ -1687,8 +1914,9 @@ export class RegistrationService implements RegistrationApplication {
       // The resend route reaches the pool through its audit derivations.
       throw asAuthFlowFailure(error);
     } finally {
+      if (admission !== undefined) this.releaseSourceAdmission(admission);
       try {
-        await this.holdEnumerationFloor(startedAt);
+        await floorResponse();
       } finally {
         if (pendingDelivery !== undefined && releaseMailDispatch !== undefined) {
           const release = releaseMailDispatch;
@@ -1698,6 +1926,7 @@ export class RegistrationService implements RegistrationApplication {
         if (releaseMailDispatch !== undefined) {
           this.dispatchMailReservationHold(releaseMailDispatch, true);
         }
+        granted?.releaseStructural?.();
       }
     }
   }

@@ -1,0 +1,40 @@
+{
+  "rootSourceEntries": 9292,
+  "buildSourceEntries": 9294,
+  "rootSourceManifestSha256": "c3c5766ab32c9f554a9e59e6fad3d6ea74d4511b83e73e1ed3cc9a56464deb57",
+  "buildSourceManifestSha256": "02fad52c9760b678d2aed2491d659ac9637402e808658105b05b7bee0c3692ed",
+  "changed": [
+    {
+      "path": "docs/operations/account-flow-release-2026-10-05/deployment-handoff.md",
+      "rootSha256": "835bdd6b30054cb72c3782f40a1d468b80c53b3a4d956177bf8e14664be582eb",
+      "buildSha256": "c629b8a176c8ee877a2881f73d6ff5daee9d17178d103faff26a12d941e0dbb9"
+    },
+    {
+      "path": "docs/operations/account-flow-release-2026-10-05/evidence-custody.md",
+      "rootSha256": "7598f1cdf8165b1b85eca3d68bbf16a6520080496527566b11e6fac3a5edd732",
+      "buildSha256": "4d302a44e3ae008642cd51a47c357cf2fdd62a07988a208cd0c4cc36f17dc9ed"
+    },
+    {
+      "path": "docs/operations/account-flow-release-2026-10-05/migration-preservation.json",
+      "rootSha256": "229615239f4aff848707ad400f8991c30c58817852e3658abba5d7255fe03b0a",
+      "buildSha256": "b29c11102123f24c80c1be576fe4504c8de4bf7da00817e85a1a59f5a6c4bf61"
+    },
+    {
+      "path": "docs/operations/account-flow-release-2026-10-05/source-audit-disposition.json",
+      "rootSha256": null,
+      "buildSha256": "97838a52c2b1da9e75175bd4a500e97f5df9e3a79239b4cd46c76ed19bfbfc66"
+    },
+    {
+      "path": "docs/operations/account-flow-release-2026-10-05/source-integration.md",
+      "rootSha256": "d71b893c128c41db6714ce58552980911a643ab7a20503247ea0080edfb07ac4",
+      "buildSha256": "f9a6572ffdbb4b30f8ed69fa668f10efa9c3201d7599665e6d68d6036375b1d5"
+    },
+    {
+      "path": "docs/operations/account-flow-release-2026-10-05/three-tree-baseline-comparison.json",
+      "rootSha256": null,
+      "buildSha256": "bce634ebbc9bc7ddda15e7a292a90dbc92135effec152038364bf76f3e6fe872"
+    }
+  ],
+  "productionOrTestSourceDelta": false,
+  "qualification": "Later explicitly approved fixture-only repairs are separately recorded and covered; this comparison concerns the actual ROOT and build launches."
+}

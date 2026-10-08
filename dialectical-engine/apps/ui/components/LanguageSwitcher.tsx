@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import {
   useCallback,
   useEffect,
@@ -12,9 +13,8 @@ import {
 import {
   filterLocales,
   getLocale,
-  LOCALES,
-  type LocaleCode,
-  type LocaleTier
+  LOCALE_PREFERENCES,
+  type LocaleCode
 } from "@/lib/i18n/locales";
 import { writeLocaleCookie } from "@/lib/i18n/localeChoice";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
@@ -25,19 +25,14 @@ import {
   languageSwitcherCaret
 } from "./languageSwitcherState";
 
-const TIERS: readonly LocaleTier[] = ["EUROPE", "ASIA", "MIDDLE EAST"];
-const TIER_KEYS = {
-  EUROPE: "chrome.europe",
-  ASIA: "chrome.asia",
-  "MIDDLE EAST": "chrome.middleEast"
-} as const;
-
 export function LanguageSwitcher() {
   const { locale, catalog } = useChromeI18n();
   const current = getLocale(locale);
   const panelId = useId();
   const listId = `${panelId}-list`;
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState({ top: 0, left: 12, width: 470 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -55,13 +50,20 @@ export function LanguageSwitcher() {
 
   useEffect(() => {
     if (!open) return;
+    const place = () => {
+      const rect = buttonRef.current?.getBoundingClientRect(); if (!rect) return;
+      const width = Math.min(470, window.innerWidth - 24);
+      const height = panelRef.current?.offsetHeight ?? 424;
+      setPosition({ top: Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - height - 12)), left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)), width });
+    };
+    place(); window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
     searchRef.current?.focus();
     const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current?.contains(event.target as Node)) return;
+      if (rootRef.current?.contains(event.target as Node) || panelRef.current?.contains(event.target as Node)) return;
       close(false);
     };
     document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
+    return () => { document.removeEventListener("pointerdown", onPointerDown); window.removeEventListener("resize", place); window.removeEventListener("scroll", place, true); };
   }, [close, open]);
 
   useEffect(() => {
@@ -99,7 +101,7 @@ export function LanguageSwitcher() {
       ref={rootRef}
       onKeyDown={open ? onKeyDown : undefined}
       onBlur={(event) => {
-        if (!rootRef.current?.contains(event.relatedTarget as Node | null)) close(false);
+        if (!rootRef.current?.contains(event.relatedTarget as Node | null) && !panelRef.current?.contains(event.relatedTarget as Node | null)) close(false);
       }}
     >
       <button
@@ -123,8 +125,10 @@ export function LanguageSwitcher() {
         <span className="languageSwitcherCaret" aria-hidden>{languageSwitcherCaret(open)}</span>
       </button>
 
-      {open ? (
+      {open ? createPortal(
         <div
+          ref={panelRef}
+          style={{ position: "fixed", top: position.top, left: position.left, right: "auto", bottom: "auto", width: position.width }}
           id={panelId}
           className="languageSwitcherPanel"
           role="dialog"
@@ -133,7 +137,7 @@ export function LanguageSwitcher() {
         >
           <div className="languageSwitcherHead">
             <span className="languageSwitcherTitle">{t(catalog, "chrome.interfaceLanguage")}</span>
-            <span className="languageSwitcherCount">{LOCALES.length}</span>
+            <span className="languageSwitcherCount">{LOCALE_PREFERENCES.length}</span>
             <span className="languageSwitcherCurrent">
               <span>{current.code.toUpperCase()}</span>
             </span>
@@ -156,47 +160,34 @@ export function LanguageSwitcher() {
             />
           </div>
           <div className="languageSwitcherList" id={listId} role="listbox">
-            {TIERS.map((tier) => {
-              const tierLocales = filtered.filter((candidate) => candidate.tier === tier);
-              if (tierLocales.length === 0) return null;
-              return (
-                <section className="languageSwitcherGroup" key={tier} aria-label={t(catalog, TIER_KEYS[tier])}>
-                  <div className="languageSwitcherGroupHead">
-                    <span>{t(catalog, TIER_KEYS[tier])}</span>
-                    <span className="languageSwitcherRule" aria-hidden />
-                    <span>{tierLocales.length}</span>
-                  </div>
-                  <div className="languageSwitcherGrid">
-                    {tierLocales.map((candidate) => {
-                      const selected = candidate.code === locale;
-                      const highlighted = candidate.code === highlightedCode;
-                      return (
-                        <button
-                          type="button"
-                          key={candidate.code}
-                          id={`${listId}-${candidate.code}`}
-                          className="languageSwitcherRow"
-                          role="option"
-                          tabIndex={-1}
-                          data-current={selected || undefined}
-                          data-highlighted={highlighted || undefined}
-                          aria-selected={selected}
-                          aria-current={selected ? "true" : undefined}
-                          onFocus={() => setHighlightedCode(candidate.code as LocaleCode)}
-                          onClick={() => select(candidate.code as LocaleCode)}
-                        >
-                          <span className="languageSwitcherRowCode">{candidate.code.toUpperCase()}</span>
-                          <span className="languageSwitcherName">{candidate.nativeName}</span>
-                          <span className="languageSwitcherCheck" aria-hidden />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            })}
+            <div className="languageSwitcherGrid">
+              {filtered.map((candidate) => {
+                const selected = candidate.code === locale;
+                const highlighted = candidate.code === highlightedCode;
+                return (
+                  <button
+                    type="button"
+                    key={candidate.code}
+                    id={`${listId}-${candidate.code}`}
+                    className="languageSwitcherRow"
+                    role="option"
+                    tabIndex={-1}
+                    data-current={selected || undefined}
+                    data-highlighted={highlighted || undefined}
+                    aria-selected={selected}
+                    aria-current={selected ? "true" : undefined}
+                    onFocus={() => setHighlightedCode(candidate.code as LocaleCode)}
+                    onClick={() => select(candidate.code as LocaleCode)}
+                  >
+                    <span className="languageSwitcherRowCode">{candidate.code.toUpperCase()}</span>
+                    <span className="languageSwitcherName">{candidate.nativeName}</span>
+                    <span className="languageSwitcherCheck" aria-hidden />
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        </div>, document.body
       ) : null}
     </div>
   );

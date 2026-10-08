@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "obter a lista de todos os terceiros que os receberam;",
   "legal.health.s05.item3": "retirar o seu consentimento e obter o respetivo apagamento.",
   "legal.health.s06.title": "Como exercê-los",
-  "legal.health.s06.body": "Nas Definições ou escrevendo para privacy@dezbatere.ro. Respondemos no prazo de 45 dias. Se recusarmos um pedido, pode recorrer dessa decisão respondendo à nossa mensagem."
+  "legal.health.s06.body": "Nas Definições ou escrevendo para privacy@dezbatere.ro. Respondemos no prazo de 45 dias. Se recusarmos um pedido, pode recorrer dessa decisão respondendo à nossa mensagem.",
+  "legal.cookies.staff.purpose": "Acesso da equipa separado",
+  "legal.cookies.passwordReset.purpose": "Apenas reposição da palavra-passe",
+  "legal.cookies.mfaRecovery.purpose": "Apenas recuperação do autenticador",
+  "legal.cookies.social.purpose": "Início breve através de fornecedor ou associação de conta",
+  "legal.cookies.phoneDraft.purpose": "Pergunta inacabada durante o passo do telefone; apagada ao mudar a sessão, sair ou mudar o titular",
+  "legal.cookies.staff.life": "Até 8 horas; 15 minutos de inatividade",
+  "legal.cookies.passwordReset.life": "Até 30 minutos",
+  "legal.cookies.mfaRecovery.life": "Até 299 segundos",
+  "legal.cookies.social.life": "Até 5 minutos",
+  "legal.cookies.phoneDraft.life": "15 minutos ou até ser apagado"
 }
