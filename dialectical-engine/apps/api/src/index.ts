@@ -3079,7 +3079,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // No gate composed (local mode, or hosted without countryPolicy): sign-up is open and payment is
     // not offered through this answer.
     return reply.send(GeoAvailabilityResponseSchema.parse(
-      options.countryGate?.availability(source.ip) ?? { signup: true, pay: false }
+      options.countryGate?.availability(source.ip) ?? { signup: true, pay: false, support: true }
     ));
   });
 
@@ -3636,7 +3636,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       || chargeAdmission(scope, route, key).allowed
   });
   installSupportRoutes(
-    api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
+    api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport,
+    // Paid plans G3a: no support assistant where the service is not offered (sign-up's rule).
+    (request) => (options.countryGate?.support(sourceFor(request)) ?? null) !== null
   );
   // Paid plans (R-3): the one billing routes module, always installed.
   const admitBilling: BillingAdmission = Object.freeze({

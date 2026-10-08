@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Tietosuoja",
   "support.aiBanner": "Vastaukset ovat tekoälyn tuottamia ja koneellisesti luettavasti merkittyjä, ja ne voivat olla vääriä. Voit pyytää ihmistä mukaan milloin tahansa.",
   "support.cookiePreferences": "Tallentamamme evästeet",
-  "support.recoverAccount": "Palauta tilisi"
+  "support.recoverAccount": "Palauta tilisi",
+  "support.countryUnavailable": "Dialectical Engine ei ole vielä saatavilla maassasi."
 }

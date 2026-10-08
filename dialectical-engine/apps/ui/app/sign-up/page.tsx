@@ -13,7 +13,7 @@ import { createServerContractClient, readTrustedClientIp } from "@/lib/serverApi
 
 /**
  * Paid plans G3b (sentence G1). The visitor's address is checked server-side through
- * GET /v1/geo/availability, which answers two booleans and never the country. A failed check shows the
+ * GET /v1/geo/availability, which answers booleans and never the country. A failed check shows the
  * form: POST /v1/auth/register applies the same gate (before the age gate judges the date) and refuses
  * with the same sentence.
  */

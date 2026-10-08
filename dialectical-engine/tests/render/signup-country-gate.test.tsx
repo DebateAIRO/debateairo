@@ -54,7 +54,7 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
   });
 
   it("shows G1 and no form when sign-up is closed for this visitor", async () => {
-    mocks.availability.mockResolvedValue({ signup: false, pay: false });
+    mocks.availability.mockResolvedValue({ signup: false, pay: false, support: false });
     await mount(await SignUpPage());
     expect(document.body.textContent).toContain(G1);
     expect(document.querySelector('form[data-form="signup"]')).toBeNull();
@@ -66,7 +66,7 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
   });
 
   it("shows the form when sign-up is open, and when the check itself fails", async () => {
-    mocks.availability.mockResolvedValue({ signup: true, pay: false });
+    mocks.availability.mockResolvedValue({ signup: true, pay: false, support: true });
     await mount(await SignUpPage());
     expect(document.querySelector('form[data-form="signup"]')).not.toBeNull();
     await act(async () => root!.unmount());
@@ -79,7 +79,7 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
     // Hosted mode: without the address every visitor looks like the loopback SSR hop, which the
     // country gate reads as unknown (COUNTRY_UNKNOWN), so everyone would see G1 and no form.
     vi.stubEnv("DIALECTICAL_UI_EDGE", "server.mjs");
-    mocks.availability.mockResolvedValue({ signup: true, pay: false });
+    mocks.availability.mockResolvedValue({ signup: true, pay: false, support: true });
     await SignUpPage();
     expect(mocks.clientArgs).toHaveLength(1);
     expect(mocks.clientArgs[0]![1]).toBeUndefined();
@@ -94,7 +94,7 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
 
   it("keeps the age lockout first: while it lasts the refusal is all the browser sees, and nothing is asked (8j)", async () => {
     mocks.cookies.set(AGE_REFUSAL_COOKIE_NAME, AGE_REFUSAL_COOKIE_VALUE);
-    mocks.availability.mockResolvedValue({ signup: false, pay: false });
+    mocks.availability.mockResolvedValue({ signup: false, pay: false, support: false });
     await mount(await SignUpPage());
     expect(mocks.availability).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain(G1);

@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Конфіденційність",
   "support.aiBanner": "Відповіді створює ШІ; вони мають машинозчитуване маркування й можуть бути помилковими. Будь-коли попросіть залучити людину.",
   "support.cookiePreferences": "Файли cookie, які ми зберігаємо",
-  "support.recoverAccount": "Відновити обліковий запис"
+  "support.recoverAccount": "Відновити обліковий запис",
+  "support.countryUnavailable": "Dialectical Engine поки що недоступний у вашій країні."
 }

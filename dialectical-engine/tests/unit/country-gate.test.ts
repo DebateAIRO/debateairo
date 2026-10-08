@@ -77,18 +77,18 @@ describe("the country gate (paid plans G3a, spec §2.3.3)", () => {
     }
   });
 
-  it("answers availability as two booleans and nothing else", () => {
+  it("answers availability as booleans and nothing else", () => {
     const { gate: countryGate } = gate();
-    expect(countryGate.availability("81.196.20.30")).toEqual({ signup: true, pay: true });
+    expect(countryGate.availability("81.196.20.30")).toEqual({ signup: true, pay: true, support: true });
     // The UK (owner's amendment of 2 October 2026): closed for now, same as Ukraine.
-    expect(countryGate.availability("51.140.1.1")).toEqual({ signup: false, pay: false });
-    expect(countryGate.availability("46.211.1.1")).toEqual({ signup: false, pay: false });
+    expect(countryGate.availability("51.140.1.1")).toEqual({ signup: false, pay: false, support: false });
+    expect(countryGate.availability("46.211.1.1")).toEqual({ signup: false, pay: false, support: false });
     // Switzerland, Israel, Taiwan, Moldova (owner's amendment of 1 October 2026): sign-up, no payment yet.
     for (const ip of ["31.13.1.1", "84.94.1.1", "1.160.1.1", "89.28.1.1"]) {
-      expect(countryGate.availability(ip), ip).toEqual({ signup: true, pay: false });
+      expect(countryGate.availability(ip), ip).toEqual({ signup: true, pay: false, support: true });
     }
-    expect(countryGate.availability("185.220.101.7")).toEqual({ signup: false, pay: false });
-    expect(countryGate.availability("10.0.0.1")).toEqual({ signup: false, pay: false });
+    expect(countryGate.availability("185.220.101.7")).toEqual({ signup: false, pay: false, support: false });
+    expect(countryGate.availability("10.0.0.1")).toEqual({ signup: false, pay: false, support: false });
   });
 
   it("names the country recorded with an age check, and never a Tor exit's or an unknown one (R3-3)", () => {
@@ -242,7 +242,7 @@ describe("the gate on the routes", () => {
     expect(response.statusCode).toBe(202);
     expect(register).toHaveBeenCalledTimes(1);
     const availability = await instance.inject({ method: "GET", url: "/v1/geo/availability", remoteAddress: "5.45.1.1" });
-    expect(availability.json()).toEqual({ signup: true, pay: false });
+    expect(availability.json()).toEqual({ signup: true, pay: false, support: true });
     await instance.close();
   });
 
@@ -254,11 +254,11 @@ describe("the gate on the routes", () => {
     const { instance } = api({ countryGate: gate().gate, admission });
     const first = await instance.inject({ method: "GET", url: "/v1/geo/availability", remoteAddress: "51.140.1.1" });
     expect(first.statusCode).toBe(200);
-    expect(first.json()).toEqual({ signup: false, pay: false });
+    expect(first.json()).toEqual({ signup: false, pay: false, support: false });
     const second = await instance.inject({ method: "GET", url: "/v1/geo/availability", remoteAddress: "51.140.1.1" });
     expect(second.statusCode).toBe(429);
     const other = await instance.inject({ method: "GET", url: "/v1/geo/availability", remoteAddress: "81.196.20.30" });
-    expect(other.json()).toEqual({ signup: true, pay: true });
+    expect(other.json()).toEqual({ signup: true, pay: true, support: true });
     await instance.close();
   });
 

@@ -387,7 +387,7 @@ export interface ContractClient {
   /** Paid plans L4: the documents this person must accept again before the page shows. */
   getLegalStatus(locale: string): Promise<LegalStatusResponse>;
   acceptLegal(input: LegalAcceptRequest): Promise<void>;
-  /** Paid plans G3a: whether this address may sign up and pay — two booleans, never the country. */
+  /** Paid plans G3a: whether this address may sign up, pay and use the support assistant — booleans, never the country. */
   getGeoAvailability(): Promise<GeoAvailabilityResponse>;
   readAccountEmail(): Promise<AccountEmail>;
   phoneProfile():Promise<AccountPhoneProfile>;

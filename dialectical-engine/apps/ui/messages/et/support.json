@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Privaatsus",
   "support.aiBanner": "Vastused on tehisintellekti loodud, masinloetavalt märgistatud ja võivad olla valed. Võite igal ajal paluda inimesega rääkida.",
   "support.cookiePreferences": "Küpsised, mida salvestame",
-  "support.recoverAccount": "Taasta konto"
+  "support.recoverAccount": "Taasta konto",
+  "support.countryUnavailable": "Dialectical Engine ei ole teie riigis veel saadaval."
 }

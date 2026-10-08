@@ -82,5 +82,6 @@
   "support.privacyPreferences": "プライバシー",
   "support.aiBanner": "回答はAIが生成し、機械可読の印が付きますが、誤っている場合があります。いつでも人による対応を依頼できます。",
   "support.cookiePreferences": "保存しているクッキー",
-  "support.recoverAccount": "アカウントを復旧"
+  "support.recoverAccount": "アカウントを復旧",
+  "support.countryUnavailable": "Dialectical Engineは、お住まいの国ではまだご利用いただけません。"
 }
