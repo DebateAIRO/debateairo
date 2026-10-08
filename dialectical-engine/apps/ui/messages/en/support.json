@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Privacy",
   "support.aiBanner": "Replies are AI-generated, machine-readably marked, and can be wrong. Ask for a human at any point.",
   "support.cookiePreferences": "Cookies we store",
-  "support.recoverAccount": "Recover your account"
+  "support.recoverAccount": "Recover your account",
+  "support.countryUnavailable": "Dialectical Engine isn't available in your country yet."
 }

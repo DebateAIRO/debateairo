@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "rasprave",
   "INCIDENT_SURFACE_PUBLISHING": "objavljivanje",
   "INCIDENT_SURFACE_SIGN_IN": "prijavu",
-  "INCIDENT_SURFACE_WHOLE_SITE": "cijelo web-mjesto"
+  "INCIDENT_SURFACE_WHOLE_SITE": "cijelo web-mjesto",
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine još nije dostupan u vašoj zemlji."
 }

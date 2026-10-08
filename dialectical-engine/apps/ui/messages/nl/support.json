@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Privacy",
   "support.aiBanner": "Antwoorden worden door AI gegenereerd, zijn machineleesbaar gemarkeerd en kunnen fout zijn. Vraag op elk moment om een medewerker.",
   "support.cookiePreferences": "Cookies die we opslaan",
-  "support.recoverAccount": "Je account herstellen"
+  "support.recoverAccount": "Je account herstellen",
+  "support.countryUnavailable": "Dialectical Engine is nog niet beschikbaar in uw land."
 }

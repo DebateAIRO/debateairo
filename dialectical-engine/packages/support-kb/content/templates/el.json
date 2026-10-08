@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "τις αντιπαραθέσεις",
   "INCIDENT_SURFACE_PUBLISHING": "τη δημοσίευση",
   "INCIDENT_SURFACE_SIGN_IN": "τη σύνδεση",
-  "INCIDENT_SURFACE_WHOLE_SITE": "ολόκληρο τον ιστότοπο"
+  "INCIDENT_SURFACE_WHOLE_SITE": "ολόκληρο τον ιστότοπο",
+  "COUNTRY_UNAVAILABLE": "Το Dialectical Engine δεν είναι ακόμη διαθέσιμο στη χώρα σας."
 }

@@ -55,19 +55,17 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
   });
 
   it("shows G1 and no form when sign-up is closed for this visitor", async () => {
-    mocks.availability.mockResolvedValue({ signup: false, pay: false });
+    mocks.availability.mockResolvedValue({ signup: false, pay: false, service: false });
     await mount(await SignUpPage());
     expect(document.body.textContent).toContain(G1);
     expect(document.querySelector('form[data-form="signup"]')).toBeNull();
-    // G1 is said once, and signing in stays reachable (spec §2.3.3, §1.5).
+    // G1 is said once. Sign-in is closed at the same addresses (G3a, sign-in), so no link leads there.
     expect(document.body.textContent!.split(G1).length - 1).toBe(1);
-    const logIn = document.querySelector<HTMLAnchorElement>('a[href="/login"]');
-    expect(logIn).not.toBeNull();
-    expect(logIn!.textContent).toBe("Log in");
+    expect(document.querySelector('a[href="/login"]')).toBeNull();
   });
 
   it("shows the form when sign-up is open, and when the check itself fails", async () => {
-    mocks.availability.mockResolvedValue({ signup: true, pay: false });
+    mocks.availability.mockResolvedValue({ signup: true, pay: false, service: true });
     await mount(await SignUpPage());
     expect(document.querySelector('form[data-form="signup"]')).not.toBeNull();
     await act(async () => root!.unmount());
@@ -80,7 +78,7 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
     // Hosted mode: without the address every visitor looks like the loopback SSR hop, which the
     // country gate reads as unknown (COUNTRY_UNKNOWN), so everyone would see G1 and no form.
     vi.stubEnv("DIALECTICAL_UI_EDGE", "server.mjs");
-    mocks.availability.mockResolvedValue({ signup: true, pay: false });
+    mocks.availability.mockResolvedValue({ signup: true, pay: false, service: true });
     await SignUpPage();
     expect(mocks.clientArgs).toHaveLength(1);
     expect(mocks.clientArgs[0]![1]).toBeUndefined();
@@ -95,7 +93,7 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
 
   it("keeps the age lockout first: while it lasts the refusal is all the browser sees, and nothing is asked (8j)", async () => {
     mocks.cookies.set(AGE_REFUSAL_COOKIE_NAME, AGE_REFUSAL_COOKIE_VALUE);
-    mocks.availability.mockResolvedValue({ signup: false, pay: false });
+    mocks.availability.mockResolvedValue({ signup: false, pay: false, service: false });
     await mount(await SignUpPage());
     expect(mocks.availability).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain(G1);

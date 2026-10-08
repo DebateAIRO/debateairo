@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Privatumas",
   "support.aiBanner": "Atsakymus generuoja DI, jie pažymėti kompiuterio skaitoma žyma ir gali būti klaidingi. Bet kada galite paprašyti žmogaus pagalbos.",
   "support.cookiePreferences": "Mūsų saugomi slapukai",
-  "support.recoverAccount": "Atkurti paskyrą"
+  "support.recoverAccount": "Atkurti paskyrą",
+  "support.countryUnavailable": "Dialectical Engine jūsų šalyje dar nepasiekiama."
 }
