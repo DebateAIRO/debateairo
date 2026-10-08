@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Ihre Daten bei Dialectical Engine",
+  "archive.generated": "Erstellt am {time} für {pseudonym}.",
+  "archive.accountHeading": "Konto",
+  "archive.email": "E-Mail",
+  "archive.memberSince": "Mitglied seit",
+  "archive.debatesHeading": "Ihre Debatten ({count})",
+  "archive.question": "Frage",
+  "archive.verdict": "Urteil",
+  "archive.verdictSupported": "Gestützt",
+  "archive.verdictContested": "Umstritten",
+  "archive.verdictUnsupported": "Nicht gestützt",
+  "archive.story": "Die Debatte in Kürze",
+  "archive.arguments": "Argumente",
+  "archive.visibilityPublic": "Veröffentlicht",
+  "archive.visibilityPrivate": "Privat",
+  "archive.unreadable": "Der Inhalt dieser Debatte kann nicht mehr gelesen werden, da ihr Schlüssel vernichtet wurde.",
+  "archive.noDebates": "Sie haben keine Debatten.",
+  "archive.filesNote": "Die JSON-Dateien in diesem ZIP-Archiv enthalten dieselben Daten in maschinenlesbarer Form; README.txt listet sie auf."
+}

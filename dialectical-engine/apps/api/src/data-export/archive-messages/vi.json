@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Dữ liệu của bạn trên Dialectical Engine",
+  "archive.generated": "Được chuẩn bị lúc {time} cho {pseudonym}.",
+  "archive.accountHeading": "Tài khoản",
+  "archive.email": "Địa chỉ email",
+  "archive.memberSince": "Thành viên từ",
+  "archive.debatesHeading": "Các cuộc tranh luận của bạn ({count})",
+  "archive.question": "Câu hỏi",
+  "archive.verdict": "Kết luận",
+  "archive.verdictSupported": "Được ủng hộ",
+  "archive.verdictContested": "Còn tranh cãi",
+  "archive.verdictUnsupported": "Không được ủng hộ",
+  "archive.story": "Tóm tắt cuộc tranh luận",
+  "archive.arguments": "Lập luận",
+  "archive.visibilityPublic": "Đã xuất bản",
+  "archive.visibilityPrivate": "Riêng tư",
+  "archive.unreadable": "Không thể đọc nội dung cuộc tranh luận này nữa vì khóa của nó đã bị hủy.",
+  "archive.noDebates": "Bạn chưa có cuộc tranh luận nào.",
+  "archive.filesNote": "Các tệp JSON trong tệp ZIP này chứa cùng dữ liệu ở định dạng máy có thể đọc được; danh sách tệp nằm trong README.txt."
+}

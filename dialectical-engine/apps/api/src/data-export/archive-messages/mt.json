@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Id-data tiegħek f'Dialectical Engine",
+  "archive.generated": "Imħejji fi {time} għal {pseudonym}.",
+  "archive.accountHeading": "Kont",
+  "archive.email": "Indirizz elettroniku",
+  "archive.memberSince": "Membru minn",
+  "archive.debatesHeading": "Id-dibattiti tiegħek ({count})",
+  "archive.question": "Mistoqsija",
+  "archive.verdict": "Verdett",
+  "archive.verdictSupported": "Sostnut",
+  "archive.verdictContested": "Ikkontestat",
+  "archive.verdictUnsupported": "Mhux sostnut",
+  "archive.story": "Id-dibattitu fil-qosor",
+  "archive.arguments": "Argumenti",
+  "archive.visibilityPublic": "Ippubblikat",
+  "archive.visibilityPrivate": "Privat",
+  "archive.unreadable": "Il-kontenut ta' dan id-dibattitu ma jistax jinqara aktar għax iċ-ċavetta tiegħu nqerdet.",
+  "archive.noDebates": "M'għandekx dibattiti.",
+  "archive.filesNote": "Il-fajls JSON f'dan l-arkivju ZIP fihom l-istess data f'format li jinqara mill-magni; README.txt jelenkahom."
+}

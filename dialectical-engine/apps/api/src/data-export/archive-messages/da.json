@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Dine data fra Dialectical Engine",
+  "archive.generated": "Udarbejdet {time} til {pseudonym}.",
+  "archive.accountHeading": "Konto",
+  "archive.email": "E-mail",
+  "archive.memberSince": "Medlem siden",
+  "archive.debatesHeading": "Dine debatter ({count})",
+  "archive.question": "Spørgsmål",
+  "archive.verdict": "Vurdering",
+  "archive.verdictSupported": "Understøttet",
+  "archive.verdictContested": "Bestridt",
+  "archive.verdictUnsupported": "Ikke understøttet",
+  "archive.story": "Debatten kort fortalt",
+  "archive.arguments": "Argumenter",
+  "archive.visibilityPublic": "Offentliggjort",
+  "archive.visibilityPrivate": "Privat",
+  "archive.unreadable": "Indholdet af denne debat kan ikke længere læses, fordi dens nøgle er blevet slettet.",
+  "archive.noDebates": "Du har ingen debatter.",
+  "archive.filesNote": "JSON-filerne i denne ZIP-fil indeholder de samme data i maskinlæsbart format; README.txt viser en oversigt over dem."
+}
