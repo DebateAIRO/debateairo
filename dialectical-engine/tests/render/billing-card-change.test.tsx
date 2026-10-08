@@ -186,7 +186,7 @@ describe("P20 the card change page (A11, A12)", () => {
     expect(container.textContent).toContain("Your new card is saved. Future payments use it.");
   });
 
-  it("a new card from a country we cannot serve: the page says the hold is released and the old card stays (no email follows)", async () => {
+  it("a new card from a country we cannot serve: the page says nothing was charged and the old card stays (no email follows)", async () => {
     const client = {
       getBillingCardDetails: vi.fn(async () => DETAILS), getBillingSubscription: vi.fn(async () => SUBSCRIBED),
       startCardChange: vi.fn(),
@@ -198,7 +198,7 @@ describe("P20 the card change page (A11, A12)", () => {
     });
     await settle();
     expect(container.textContent).toContain(
-      "We can't accept cards issued in that card's country. The hold on it is released, and your plan keeps the card it had."
+      "We can't accept cards issued in that card's country. Nothing was charged, and your plan keeps the card it had."
     );
     expect(container.textContent).not.toContain("The card couldn't be checked.");
   });

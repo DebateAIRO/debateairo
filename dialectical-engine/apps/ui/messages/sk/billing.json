@@ -159,7 +159,7 @@
   "billing.card.saved": "Vaša nová karta je uložená. Budúce platby ju budú používať.",
   "billing.card.failed": "Kartu sa nepodarilo overiť. Nič sa nezmenilo.",
   "billing.card.notSaved": "Vaša karta bola overená, ale nepodarilo sa ju uložiť pre vaše mesačné platby. Skúste to znova s kartou namiesto digitálnej peňaženky.",
-  "billing.card.countryRefused": "Nemôžeme prijímať karty vydané v krajine tejto karty. Blokácia na nej sa uvoľní a váš program si ponechá doterajšiu kartu.",
+  "billing.card.countryRefused": "Nemôžeme prijímať karty vydané v krajine tejto karty. Nič sa nestiahlo a váš program si ponechá doterajšiu kartu.",
   "billing.card.tryAgainShortly": "Novú kartu sa teraz nepodarilo uložiť, pretože platba za váš program sa ešte potvrdzuje. Vaša súčasná karta zostáva v používaní; skúste to znova o hodinu.",
   "billing.card.notSubscribed": "Na zmenu karty potrebujete aktívny program.",
   "billing.card.back": "Späť do Nastavení",

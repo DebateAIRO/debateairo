@@ -159,7 +159,7 @@
   "billing.card.saved": "Su nueva tarjeta está guardada. Los próximos pagos la usarán.",
   "billing.card.failed": "No se pudo comprobar la tarjeta. No ha cambiado nada.",
   "billing.card.notSaved": "Su tarjeta se ha comprobado, pero no se pudo guardar para sus pagos mensuales. Inténtelo de nuevo con una tarjeta en lugar de un monedero digital.",
-  "billing.card.countryRefused": "No podemos aceptar tarjetas emitidas en el país de esa tarjeta. La retención en ella se libera y su plan conserva la tarjeta que tenía.",
+  "billing.card.countryRefused": "No podemos aceptar tarjetas emitidas en el país de esa tarjeta. No se cobró nada y su plan conserva la tarjeta que tenía.",
   "billing.card.tryAgainShortly": "No pudimos guardar su nueva tarjeta en este momento porque un pago de su plan aún se está confirmando. Su tarjeta actual sigue en uso; inténtelo de nuevo dentro de una hora.",
   "billing.card.notSubscribed": "Necesita un plan activo para cambiar la tarjeta.",
   "billing.card.back": "Volver a Configuración",

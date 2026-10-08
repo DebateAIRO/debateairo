@@ -159,7 +159,7 @@
   "billing.card.saved": "La tua nuova carta è salvata. I pagamenti futuri la useranno.",
   "billing.card.failed": "Non è stato possibile verificare la carta. Non è cambiato nulla.",
   "billing.card.notSaved": "La tua carta è stata verificata, ma non è stato possibile salvarla per i tuoi pagamenti mensili. Riprova con una carta invece che con un portafoglio digitale.",
-  "billing.card.countryRefused": "Non possiamo accettare carte emesse nel paese di quella carta. La preautorizzazione viene sbloccata e il tuo piano mantiene la carta che aveva.",
+  "billing.card.countryRefused": "Non possiamo accettare carte emesse nel paese di quella carta. Non è stato addebitato nulla e il tuo piano mantiene la carta che aveva.",
   "billing.card.tryAgainShortly": "Non siamo riusciti a salvare la tua nuova carta in questo momento perché un pagamento del tuo piano è ancora in fase di conferma. La tua carta attuale resta in uso; riprova tra un’ora.",
   "billing.card.notSubscribed": "Ti serve un piano attivo per cambiare la carta.",
   "billing.card.back": "Torna alle Impostazioni",

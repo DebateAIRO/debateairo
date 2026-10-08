@@ -159,7 +159,7 @@
   "billing.card.saved": "Vaša nova kartica je spremljena. Buduća plaćanja koristit će nju.",
   "billing.card.failed": "Karticu nije bilo moguće provjeriti. Ništa se nije promijenilo.",
   "billing.card.notSaved": "Vaša je kartica provjerena, ali nije ju bilo moguće spremiti za vaša mjesečna plaćanja. Pokušajte ponovno s karticom umjesto digitalnog novčanika.",
-  "billing.card.countryRefused": "Ne možemo prihvatiti kartice izdane u zemlji te kartice. Rezervacija na njoj se otpušta, a vaš plan zadržava dosadašnju karticu.",
+  "billing.card.countryRefused": "Ne možemo prihvatiti kartice izdane u zemlji te kartice. Ništa nije naplaćeno, a vaš plan zadržava dosadašnju karticu.",
   "billing.card.tryAgainShortly": "Trenutačno nismo mogli spremiti vašu novu karticu jer se plaćanje za vaš plan još potvrđuje. Vaša trenutačna kartica ostaje u upotrebi; pokušajte ponovno za sat vremena.",
   "billing.card.notSubscribed": "Za promjenu kartice potreban vam je aktivan plan.",
   "billing.card.back": "Natrag u Postavke",

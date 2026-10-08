@@ -159,7 +159,7 @@
   "billing.card.saved": "Jūsu jaunā karte ir saglabāta. Turpmākie maksājumi izmantos to.",
   "billing.card.failed": "Karti neizdevās pārbaudīt. Nekas nemainījās.",
   "billing.card.notSaved": "Jūsu karte tika pārbaudīta, taču to neizdevās saglabāt jūsu ikmēneša maksājumiem. Lūdzu, mēģiniet vēlreiz ar karti, nevis digitālo maku.",
-  "billing.card.countryRefused": "Mēs nevaram pieņemt kartes, kas izdotas šīs kartes valstī. Rezervācija tajā tiek atbrīvota, un jūsu plāns saglabā līdzšinējo karti.",
+  "billing.card.countryRefused": "Mēs nevaram pieņemt kartes, kas izdotas šīs kartes valstī. Nekas netika iekasēts, un jūsu plāns saglabā līdzšinējo karti.",
   "billing.card.tryAgainShortly": "Pašlaik nevarējām saglabāt jūsu jauno karti, jo maksājums par jūsu plānu vēl tiek apstiprināts. Jūsu pašreizējā karte paliek lietošanā; lūdzu, mēģiniet vēlreiz pēc stundas.",
   "billing.card.notSubscribed": "Lai mainītu karti, jums nepieciešams aktīvs plāns.",
   "billing.card.back": "Atpakaļ uz iestatījumiem",

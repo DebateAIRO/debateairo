@@ -159,7 +159,7 @@
   "billing.card.saved": "Teie uus kaart on salvestatud. Tulevased maksed kasutavad seda.",
   "billing.card.failed": "Kaarti ei õnnestunud kontrollida. Midagi ei muutunud.",
   "billing.card.notSaved": "Teie kaart kontrolliti, kuid seda ei õnnestunud teie igakuiste maksete jaoks salvestada. Proovige uuesti kaardiga, mitte digitaalse rahakotiga.",
-  "billing.card.countryRefused": "Me ei saa vastu võtta kaarte, mis on välja antud selle kaardi riigis. Broneering sellel vabastatakse ja teie pakett jätab alles senise kaardi.",
+  "billing.card.countryRefused": "Me ei saa vastu võtta kaarte, mis on välja antud selle kaardi riigis. Midagi ei võetud ja teie pakett jätab alles senise kaardi.",
   "billing.card.tryAgainShortly": "Me ei saanud teie uut kaarti praegu salvestada, sest teie paketi makset alles kinnitatakse. Teie praegune kaart jääb kasutusse; proovige tunni aja pärast uuesti.",
   "billing.card.notSubscribed": "Kaardi muutmiseks on vaja aktiivset paketti.",
   "billing.card.back": "Tagasi seadetesse",

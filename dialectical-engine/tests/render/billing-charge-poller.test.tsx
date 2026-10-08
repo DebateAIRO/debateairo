@@ -109,7 +109,7 @@ describe("P19 the waiting screen (B5)", () => {
   it("a new card from a country we cannot serve (D6a's CARD_CHECK_REFUSED) says so, since no email follows", async () => {
     await mount(vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CARD_CHECK_REFUSED" })));
     expect(container.textContent).toBe(
-      "We can't accept cards issued in that card's country. The hold on it is released, and your plan keeps the card it had."
+      "We can't accept cards issued in that card's country. Nothing was charged, and your plan keeps the card it had."
     );
     expect(container.textContent).not.toContain("email");
   });

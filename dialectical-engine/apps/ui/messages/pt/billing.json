@@ -159,7 +159,7 @@
   "billing.card.saved": "O seu novo cartão foi guardado. Os pagamentos futuros vão usá-lo.",
   "billing.card.failed": "Não foi possível verificar o cartão. Nada mudou.",
   "billing.card.notSaved": "O seu cartão foi verificado, mas não foi possível guardá-lo para os seus pagamentos mensais. Tente novamente com um cartão em vez de uma carteira digital.",
-  "billing.card.countryRefused": "Não podemos aceitar cartões emitidos no país desse cartão. A retenção nele é libertada e o seu plano mantém o cartão que tinha.",
+  "billing.card.countryRefused": "Não podemos aceitar cartões emitidos no país desse cartão. Nada foi cobrado e o seu plano mantém o cartão que tinha.",
   "billing.card.tryAgainShortly": "Não foi possível guardar o seu novo cartão neste momento porque um pagamento do seu plano ainda está a ser confirmado. O seu cartão atual continua em uso; tente novamente dentro de uma hora.",
   "billing.card.notSubscribed": "Precisa de um plano ativo para mudar de cartão.",
   "billing.card.back": "Voltar às Definições",

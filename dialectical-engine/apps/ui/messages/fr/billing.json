@@ -159,7 +159,7 @@
   "billing.card.saved": "Votre nouvelle carte est enregistrée. Les prochains paiements l’utiliseront.",
   "billing.card.failed": "La carte n’a pas pu être vérifiée. Rien n’a changé.",
   "billing.card.notSaved": "Votre carte a été vérifiée, mais elle n’a pas pu être enregistrée pour vos paiements mensuels. Veuillez réessayer avec une carte plutôt qu’avec un portefeuille numérique.",
-  "billing.card.countryRefused": "Nous ne pouvons pas accepter les cartes émises dans le pays de cette carte. L’autorisation sur celle-ci est libérée et votre formule conserve sa carte actuelle.",
+  "billing.card.countryRefused": "Nous ne pouvons pas accepter les cartes émises dans le pays de cette carte. Rien n’a été prélevé et votre formule conserve sa carte actuelle.",
   "billing.card.tryAgainShortly": "Nous n’avons pas pu enregistrer votre nouvelle carte pour le moment, car un paiement de votre formule est encore en cours de confirmation. Votre carte actuelle reste utilisée ; veuillez réessayer dans une heure.",
   "billing.card.notSubscribed": "Vous avez besoin d’une formule active pour changer de carte.",
   "billing.card.back": "Retour aux Paramètres",

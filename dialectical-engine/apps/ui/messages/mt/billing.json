@@ -159,7 +159,7 @@
   "billing.card.saved": "Il-karta l-ġdida tiegħek ġiet issejvjata. Il-ħlasijiet futuri jużawha.",
   "billing.card.failed": "Il-karta ma setgħetx tiġi ċċekkjata. Ma nbidel xejn.",
   "billing.card.notSaved": "Il-karta tiegħek ġiet iċċekkjata, iżda ma setgħetx tiġi ssejvjata għall-ħlasijiet ta’ kull xahar tiegħek. Erġa’ pprova b’karta minflok kartiera diġitali.",
-  "billing.card.countryRefused": "Ma nistgħux naċċettaw karti maħruġa fil-pajjiż ta’ dik il-karta. Iż-żamma fuqha tinħall, u l-pjan tiegħek iżomm il-karta li kellu.",
+  "billing.card.countryRefused": "Ma nistgħux naċċettaw karti maħruġa fil-pajjiż ta’ dik il-karta. Xejn ma ġie ddebitat, u l-pjan tiegħek iżomm il-karta li kellu.",
   "billing.card.tryAgainShortly": "Ma stajniex nissejvjaw il-karta l-ġdida tiegħek bħalissa għax ħlas fuq il-pjan tiegħek għadu qed jiġi kkonfermat. Il-karta attwali tiegħek tibqa’ tintuża; erġa’ pprova fi żmien siegħa.",
   "billing.card.notSubscribed": "Għandek bżonn pjan attiv biex tibdel il-karta.",
   "billing.card.back": "Lura għall-Issettjar",

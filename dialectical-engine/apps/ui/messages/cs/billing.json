@@ -159,7 +159,7 @@
   "billing.card.saved": "Vaše nová karta je uložena. Budoucí platby ji budou používat.",
   "billing.card.failed": "Kartu se nepodařilo ověřit. Nic se nezměnilo.",
   "billing.card.notSaved": "Vaše karta byla ověřena, ale nepodařilo se ji uložit pro vaše měsíční platby. Zkuste to prosím znovu s kartou místo digitální peněženky.",
-  "billing.card.countryRefused": "Nemůžeme přijímat karty vydané v zemi této karty. Blokace na ní se uvolní a váš plán si ponechá dosavadní kartu.",
+  "billing.card.countryRefused": "Nemůžeme přijímat karty vydané v zemi této karty. Nic se nestrhlo a váš plán si ponechá dosavadní kartu.",
   "billing.card.tryAgainShortly": "Novou kartu se teď nepodařilo uložit, protože se platba za váš plán ještě potvrzuje. Vaše současná karta zůstává v použití; zkuste to prosím znovu za hodinu.",
   "billing.card.notSubscribed": "Ke změně karty potřebujete aktivní plán.",
   "billing.card.back": "Zpět do Nastavení",

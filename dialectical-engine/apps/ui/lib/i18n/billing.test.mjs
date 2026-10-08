@@ -315,6 +315,8 @@ test("every locale names NETOPIA Payments where it names the card processor, and
   assert.equal(english["billing.checkout.continueToCard"], "Continue to payment");
   assert.equal(english["billing.checkout.formUnavailable"], "The payment page could not be opened. Please try again in a minute.");
   assert.equal(catalogue("ro")["billing.checkout.continueToCard"], "Comandă cu obligație de plată");
+  assert.equal(english["billing.card.countryRefused"], "We can't accept cards issued in that card's country. Nothing was charged, and your plan keeps the card it had.");
+  assert.equal(catalogue("ro")["billing.card.countryRefused"], "Nu putem accepta carduri emise în țara acestui card. Nu s-a încasat nimic, iar abonamentul dvs. păstrează cardul pe care îl avea.");
   for (const { code } of LOCALES) {
     const billing = catalogue(code);
     const legal = JSON.parse(source(`messages/${code}/legal.json`));

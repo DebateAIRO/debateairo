@@ -159,7 +159,7 @@
   "billing.card.saved": "Vaša nova kartica je shranjena. Prihodnja plačila jo bodo uporabljala.",
   "billing.card.failed": "Kartice ni bilo mogoče preveriti. Nič se ni spremenilo.",
   "billing.card.notSaved": "Vaša kartica je bila preverjena, vendar je ni bilo mogoče shraniti za vaša mesečna plačila. Poskusite znova s kartico namesto digitalne denarnice.",
-  "billing.card.countryRefused": "Ne moremo sprejemati kartic, izdanih v državi te kartice. Rezervacija na njej se sprosti, vaš paket pa obdrži dosedanjo kartico.",
+  "billing.card.countryRefused": "Ne moremo sprejemati kartic, izdanih v državi te kartice. Ničesar nismo zaračunali, vaš paket pa obdrži dosedanjo kartico.",
   "billing.card.tryAgainShortly": "Vaše nove kartice trenutno nismo mogli shraniti, ker se plačilo za vaš paket še potrjuje. Vaša trenutna kartica ostane v uporabi; poskusite znova čez eno uro.",
   "billing.card.notSubscribed": "Za zamenjavo kartice potrebujete aktiven paket.",
   "billing.card.back": "Nazaj v Nastavitve",

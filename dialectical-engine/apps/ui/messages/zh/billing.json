@@ -159,7 +159,7 @@
   "billing.card.saved": "您的新卡已保存。今后的付款将使用这张卡。",
   "billing.card.failed": "无法验证该卡。没有任何更改。",
   "billing.card.notSaved": "您的卡已通过验证，但无法保存用于每月付款。请使用银行卡而不是数字钱包重试。",
-  "billing.card.countryRefused": "我们无法接受在该卡发卡国签发的银行卡。该卡上的预授权将被释放，您的方案继续使用原来的卡。",
+  "billing.card.countryRefused": "我们无法接受在该卡发卡国签发的银行卡。未扣取任何费用，您的方案继续使用原来的卡。",
   "billing.card.tryAgainShortly": "我们暂时无法保存您的新卡，因为您方案的一笔付款仍在确认中。您当前的卡继续使用；请一小时后重试。",
   "billing.card.notSubscribed": "您需要有效的方案才能更换银行卡。",
   "billing.card.back": "返回设置",

@@ -159,7 +159,7 @@
   "billing.card.saved": "Thẻ mới của bạn đã được lưu. Các khoản thanh toán sau sẽ dùng thẻ này.",
   "billing.card.failed": "Không thể kiểm tra thẻ. Không có gì thay đổi.",
   "billing.card.notSaved": "Thẻ của bạn đã được kiểm tra nhưng không thể lưu cho các khoản thanh toán hằng tháng của bạn. Vui lòng thử lại bằng thẻ thay vì ví điện tử.",
-  "billing.card.countryRefused": "Chúng tôi không thể chấp nhận thẻ được phát hành tại quốc gia của thẻ đó. Khoản tạm giữ trên thẻ được giải phóng, và gói của bạn vẫn dùng thẻ cũ.",
+  "billing.card.countryRefused": "Chúng tôi không thể chấp nhận thẻ được phát hành tại quốc gia của thẻ đó. Không có khoản nào bị thu, và gói của bạn vẫn dùng thẻ cũ.",
   "billing.card.tryAgainShortly": "Hiện chúng tôi chưa thể lưu thẻ mới của bạn vì một khoản thanh toán cho gói của bạn vẫn đang được xác nhận. Thẻ hiện tại vẫn được dùng; vui lòng thử lại sau một giờ.",
   "billing.card.notSubscribed": "Bạn cần có gói đang hoạt động để đổi thẻ.",
   "billing.card.back": "Quay lại Cài đặt",
