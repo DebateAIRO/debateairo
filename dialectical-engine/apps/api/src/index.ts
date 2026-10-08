@@ -4222,6 +4222,9 @@ export type WaitingLineTick = Readonly<{
  */
 const STALLED_START_SECONDS = 300;
 
+/** Step 1: the preview runs with no team listed; the waiting line starts and hands over nothing. */
+const PREVIEW_TEAM_UNSET = Symbol("PREVIEW_TEAM_UNSET");
+
 /** Private SSE snapshot reads have only a local peer/revocation cancellation seam.
  * Destroy the dedicated client on abort, including a blocked PostgreSQL query;
  * do not change pool/global settings or impose the authority-check deadline on content reads. */
@@ -4467,7 +4470,7 @@ export class PostgresAskApplication implements AskApplication {
    * most likely the same outage — the run keeps reading QUEUED, so the one
    * line that names it goes to the operator's log (ids and codes only).
    */
-  async #recordRunSetupFailure(runId: string, step: RunSetupStep | "FUNDING_ENDED"): Promise<void> {
+  async #recordRunSetupFailure(runId: string, step: RunSetupStep | "FUNDING_ENDED" | typeof PREVIEW_TEAM_ONLY): Promise<void> {
     const reason = `RUN_SETUP_FAILED:${step}`;
     try {
       await this.#work.recordSetupFailure({ runId, ...firstRunJob(runId), reason });
@@ -4748,7 +4751,10 @@ export class PostgresAskApplication implements AskApplication {
    * start that throws wrote nothing and stays in line for the next tick. Then
    * (final review Part 1b, Important 4) the started runs whose first job was
    * never handed to a runner are handed over again (`#redispatchStalledStarts`).
-   * Ids and counts only.
+   * On the private preview (Step 1) both start or hand over only the team's runs
+   * (`#previewTeamRuns`): an outsider's is recorded FAILED
+   * (`RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY`) and counted failed; with no team listed
+   * nothing is started, handed over or failed. Ids and counts only.
    */
   async wakeWaitingRuns(): Promise<WaitingLineTick> {
     const line = this.settings.waitingLine;
@@ -4766,9 +4772,20 @@ export class PostgresAskApplication implements AskApplication {
     while (!stopped) {
       const page = await line.wakeCandidates({ after, everyPerson });
       if (page.length === 0) break;
+      const team = await this.#previewTeamRuns(page.map((run) => run.runId));
       for (const run of page) {
         after = Object.freeze({ waitingSince: run.waitingSince, runId: run.runId });
         waiting += 1;
+        // Step 1: on the preview only the team's runs start; an outsider's leaves the line FAILED.
+        if (team === PREVIEW_TEAM_UNSET) {
+          skipped += 1;
+          continue;
+        }
+        if (team !== null && !team.has(run.runId)) {
+          failed += 1;
+          await this.#refusePreviewOutsider(run.runId);
+          continue;
+        }
         const person = run.ownerRef === null ? `legacy:${run.legacyAskerId ?? ""}` : `owner:${run.ownerRef}`;
         if (persons.has(person)) {
           skipped += 1;
@@ -4845,7 +4862,14 @@ export class PostgresAskApplication implements AskApplication {
       if (!listed.has(workItemId)) this.#redispatchedAt.delete(workItemId);
     }
     let redispatched = 0;
+    const team = stalled.length === 0 ? null : await this.#previewTeamRuns(stalled.map((job) => job.runId));
     for (const job of stalled) {
+      // Step 1: on the preview an outsider's job is never handed over; it is recorded FAILED.
+      if (team === PREVIEW_TEAM_UNSET) continue;
+      if (team !== null && !team.has(job.runId)) {
+        await this.#refusePreviewOutsider(job.runId);
+        continue;
+      }
       const nowMs = Date.now();
       const last = this.#redispatchedAt.get(job.workItemId);
       if (last !== undefined && nowMs - last < STALLED_START_SECONDS * 1_000) continue;
@@ -4862,6 +4886,48 @@ export class PostgresAskApplication implements AskApplication {
       console.info(JSON.stringify(Object.freeze({ event: "api.wait.redispatched", runId: job.runId })));
     }
     return redispatched;
+  }
+
+  /**
+   * Step 1 review fix (2026-10-08) — THE TEAM RULE FOR RUNS ALREADY IN THE SYSTEM. The
+   * waker and the stalled-start re-dispatch start or hand over existing runs without
+   * passing POST /v1/asks, so on the private preview each asks this first. Off the
+   * preview: `null`, no rule and no read (nothing changes). An empty team: UNSET, and the
+   * callers start and hand over nothing but fail nothing either, so a team list the
+   * operator forgot never destroys the team's own runs. Otherwise the ids of the runs a
+   * team member owns: the owner is the run's latest ownership event, else its `owner:`
+   * asker id (core.run_waiting_v's rule); a legacy asker's run has none and is never the
+   * team's. One read per call, on the runtime pool, which already resolves owner refs.
+   */
+  async #previewTeamRuns(runIds: readonly string[]): Promise<ReadonlySet<string> | typeof PREVIEW_TEAM_UNSET | null> {
+    if (validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig) === undefined) return null;
+    const teamUserIds = this.settings.previewTeamUserIds ?? [];
+    if (teamUserIds.length === 0) return PREVIEW_TEAM_UNSET;
+    if (runIds.length === 0) return new Set();
+    const result = await this.pool.query<{ run_id: string }>(
+      `SELECT run.run_id::text AS run_id
+       FROM core.run AS run
+       LEFT JOIN LATERAL (
+         SELECT event.owner_ref
+         FROM core.run_ownership_event AS event
+         WHERE event.run_id = run.run_id
+         ORDER BY event.at_seq DESC
+         LIMIT 1
+       ) AS latest ON true
+       JOIN identity."user" AS account
+         ON account.user_id = ANY($2::uuid[])
+        AND (account.owner_ref = latest.owner_ref
+          OR (latest.owner_ref IS NULL AND run.asker_id = 'owner:' || account.owner_ref::text))
+       WHERE run.run_id = ANY($1::uuid[])`,
+      [[...runIds], [...teamUserIds]]
+    );
+    return new Set(result.rows.map((row) => row.run_id));
+  }
+
+  /** Step 1: an outsider's existing run on the preview is recorded FAILED and never dispatched (ids and codes only). */
+  async #refusePreviewOutsider(runId: string): Promise<void> {
+    console.info(JSON.stringify(Object.freeze({ event: "api.wait.preview_team_only", runId })));
+    await this.#recordRunSetupFailure(runId, PREVIEW_TEAM_ONLY);
   }
 
   readAnswer(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null> {
