@@ -234,6 +234,9 @@ async function notifyLine(deps: BillingCheckDeps, publicAppUrl: string): Promise
     const status = response.status === 0 ? "a redirect" : `HTTP ${String(response.status)}`;
     return cross(`${address} answers with a redirect (${status}): NETOPIA does not follow redirects, so PUBLIC_APP_URL must be the site's exact public address.`);
   }
+  if (response.status >= 500) {
+    return cross(`${address} answered HTTP ${String(response.status)}: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start debateai-api, then run the check again).`);
+  }
   return tick(`${address} answers a GET without a redirect (HTTP ${String(response.status)}), so NETOPIA's messages can reach it.`);
 }
 

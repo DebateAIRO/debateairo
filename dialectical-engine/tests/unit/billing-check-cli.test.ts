@@ -159,6 +159,20 @@ describe("N21 pnpm billing:check", () => {
     expect((await answerTo(() => json({}, 503)))?.text).toBe("NETOPIA could not be reached (PAYMENT_PROVIDER_UNAVAILABLE:503); try again in a few minutes.");
   });
 
+  it("crosses the notify address when the site answers but the API behind it does not (HTTP 500 or above)", async () => {
+    const environment = await stage();
+    const address = "https://dezbatere.test/api/v1/billing/netopia/notify";
+    const notifyAnswer = async (notify: () => Response) => (await runBillingCheck(depsFor(environment, { notify })))
+      .filter((line) => line.text.startsWith(address));
+    expect(await notifyAnswer(() => json({ error: "API_UPSTREAM_UNREACHABLE" }, 502))).toEqual([{
+      ok: false,
+      text: `${address} answered HTTP 502: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start debateai-api, then run the check again).`
+    }]);
+    expect(await notifyAnswer(() => json({ error: "NOT_FOUND" }, 404))).toEqual([{
+      ok: true, text: `${address} answers a GET without a redirect (HTTP 404), so NETOPIA's messages can reach it.`
+    }]);
+  });
+
   it("exits 0 when every item is ticked, 1 when any is crossed or nothing could start, 2 for any argument", async () => {
     const environment = await stage();
     const out: string[] = [];
