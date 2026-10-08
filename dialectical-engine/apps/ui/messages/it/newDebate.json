@@ -1,7 +1,7 @@
 {
   "newDebate.eyebrow": "NUOVA DOMANDA",
   "newDebate.title": "Su cosa dovremmo dibattere?",
-  "newDebate.aiNotice": "Tutto ciò che questo dibattito produce — argomentazioni, revisioni, punteggi e verdetto — è generato da modelli di IA, contrassegnato in un formato leggibile dalle macchine e può contenere inesattezze.",
+  "newDebate.aiNotice": "Tutto ciò che questo dibattito produce — argomentazioni, revisioni, punteggi e verdetto — è generato da modelli di IA, contrassegnato in un formato leggibile dalle macchine e può contenere inesattezze. Non costituisce consulenza medica, psicologica, legale, finanziaria o altra consulenza professionale.",
   "newDebate.planTier": "Livello del piano",
   "newDebate.free": "Gratuito",
   "newDebate.freePromise": "Ogni parametro è fisso. La domanda è tua.",

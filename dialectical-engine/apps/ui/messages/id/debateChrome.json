@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "Semua isi debat ini — argumen, tinjauan, skor, dan putusan — dihasilkan oleh model AI, diberi penanda yang dapat dibaca mesin, dan mungkin tidak akurat.",
+  "debateChrome.aiNotice": "Semua isi debat ini — argumen, tinjauan, skor, dan putusan — dihasilkan oleh model AI, diberi penanda yang dapat dibaca mesin, dan mungkin tidak akurat. Ini bukan nasihat medis, psikologis, hukum, atau keuangan, maupun nasihat profesional lainnya.",
   "debateChrome.status.waiting": "Menunggu untuk dimulai. Debat Anda akan dimulai dengan sendirinya pada {time}.",
   "debateChrome.status.waitingOwnDebates": "Debat Anda yang lain sedang memakai sisa batas Anda untuk saat ini. Debat ini akan dimulai dengan sendirinya begitu salah satunya selesai.",
   "debateChrome.backToLibrary": "← Kembali ke pustaka",

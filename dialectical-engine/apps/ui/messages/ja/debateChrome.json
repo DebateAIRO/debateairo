@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "このディベートの論証、レビュー、スコア、判定はすべてAIモデルが生成し、機械可読の印が付きますが、不正確な場合があります。",
+  "debateChrome.aiNotice": "このディベートの論証、レビュー、スコア、判定はすべてAIモデルが生成し、機械可読の印が付きますが、不正確な場合があります。医療、心理、法律、金融その他の専門的助言ではありません。",
   "debateChrome.status.waiting": "開始待ちです。ディベートは{time}に自動的に始まります。",
   "debateChrome.status.waitingOwnDebates": "現在、ほかのディベートが上限の残りを使っています。このディベートは、そのいずれかが終わりしだい自動的に始まります。",
   "debateChrome.backToLibrary": "← ライブラリに戻る",

@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "Viską šiuose debatuose — argumentus, peržiūras, įverčius ir verdiktą — generuoja DI modeliai; turinys pažymėtas kompiuterio skaitoma žyma ir gali būti netikslus.",
+  "debateChrome.aiNotice": "Viską šiuose debatuose — argumentus, peržiūras, įverčius ir verdiktą — generuoja DI modeliai; turinys pažymėtas kompiuterio skaitoma žyma ir gali būti netikslus. Tai nėra medicininė, psichologinė, teisinė, finansinė ar kitokia profesinė konsultacija.",
   "debateChrome.status.waiting": "Laukiama pradžios. Jūsų debatai prasidės patys {time}.",
   "debateChrome.status.waitingOwnDebates": "Kiti jūsų debatai kol kas naudoja likusią jūsų ribos dalį. Šie debatai prasidės patys, kai tik vieni iš jų baigsis.",
   "debateChrome.backToLibrary": "← Grįžti į biblioteką",

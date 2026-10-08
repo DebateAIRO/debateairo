@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "Sämtliche Inhalte dieser Debatte – Argumente, Prüfungen, Bewertungen und das Urteil – werden von KI-Modellen erzeugt, maschinenlesbar gekennzeichnet und können fehlerhaft sein.",
+  "debateChrome.aiNotice": "Sämtliche Inhalte dieser Debatte – Argumente, Prüfungen, Bewertungen und das Urteil – werden von KI-Modellen erzeugt, maschinenlesbar gekennzeichnet und können fehlerhaft sein. Sie stellen keine medizinische, psychologische, rechtliche, finanzielle oder sonstige Fachberatung dar.",
   "debateChrome.status.waiting": "Wartet auf den Start. Ihre Debatte startet von selbst um {time}.",
   "debateChrome.status.waitingOwnDebates": "Ihre anderen Debatten nutzen im Moment den Rest Ihres Limits. Diese Debatte startet von selbst, sobald eine davon beendet ist.",
   "debateChrome.backToLibrary": "← Zurück zur Bibliothek",

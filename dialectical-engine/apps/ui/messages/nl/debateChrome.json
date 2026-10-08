@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "Alles in dit debat — argumenten, beoordelingen, scores en het oordeel — is door AI-modellen gegenereerd, machineleesbaar gemarkeerd en kan onnauwkeurig zijn.",
+  "debateChrome.aiNotice": "Alles in dit debat — argumenten, beoordelingen, scores en het oordeel — is door AI-modellen gegenereerd, machineleesbaar gemarkeerd en kan onnauwkeurig zijn. Het is geen medisch, psychologisch, juridisch, financieel of ander professioneel advies.",
   "debateChrome.status.waiting": "Wacht op de start. Uw debat start vanzelf om {time}.",
   "debateChrome.status.waitingOwnDebates": "Uw andere debatten gebruiken voorlopig de rest van uw limiet. Dit debat start vanzelf zodra er een klaar is.",
   "debateChrome.backToLibrary": "← Terug naar bibliotheek",

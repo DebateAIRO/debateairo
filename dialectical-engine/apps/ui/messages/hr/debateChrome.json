@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "Sve u ovoj raspravi — argumente, preglede, rezultate i presudu — generiraju modeli umjetne inteligencije; sav je taj sadržaj strojno čitljivo označen i može biti netočan.",
+  "debateChrome.aiNotice": "Sve u ovoj raspravi — argumente, preglede, rezultate i presudu — generiraju modeli umjetne inteligencije; sav je taj sadržaj strojno čitljivo označen i može biti netočan. To nije medicinski, psihološki, pravni, financijski ni drugi stručni savjet.",
   "debateChrome.status.waiting": "Čeka na početak. Vaša će rasprava započeti sama u {time}.",
   "debateChrome.status.waitingOwnDebates": "Vaše ostale rasprave zasad koriste ostatak vašeg ograničenja. Ova će rasprava započeti sama čim jedna od njih završi.",
   "debateChrome.backToLibrary": "← Natrag u knjižnicu",
