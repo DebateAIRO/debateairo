@@ -1,12 +1,15 @@
 /**
  * Spec §2.12.2 item 4 (ruling C-3) — the owner records a refund they made in NETOPIA's admin:
  *
- *   pnpm billing:refund-done --charge <32-hex charge ref> --amount <decimal, e.g. 12.10> [--confirm]
+ *   pnpm billing:refund-done --charge <32-hex charge ref> --amount <decimal, e.g. 12.10> [--confirm] [--despite-chargeback]
  *
  * Without --confirm it only prints what it would record and what the customer's email will say. With it, it records
  * REFUNDED at that amount (never above the open request); a smaller amount keeps the rest open and reminded, and the
  * email and the credit note follow the part that closes the request. Runs under `systemd-run` with the API's
  * EnvironmentFile, as the API's principal. A refusal is ONE code on stderr (USAGE exits 2, the others exit 1).
+ *
+ * N15b (ruling PR-41): a refund held by a charge-back on its payment is refused (BILLING_REFUND_DONE_HELD_BY_CHARGEBACK)
+ * unless --despite-chargeback says the owner had already made it in NETOPIA's admin before the dispute arrived.
  */
 import { pathToFileURL } from "node:url";
 import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
@@ -19,7 +22,7 @@ import { consoleBillingAudit } from "./audit.js";
 import { openBillingOperatorPool } from "./operator-connection.js";
 import { RefundDesk, type OwnerRefundPlan } from "./refunds.js";
 
-export type RefundDoneArguments = Readonly<{ chargeRef: string; amountMicros: number; confirm: boolean }>;
+export type RefundDoneArguments = Readonly<{ chargeRef: string; amountMicros: number; confirm: boolean; despiteChargeback: boolean }>;
 export type RefundDoneResult = "RECORDED" | "PART_RECORDED" | "ALREADY_RECORDED";
 export type RefundDoneCliOutput = Readonly<{ stdout(text: string): void; stderr(text: string): void }>;
 export type OpenRefundDoneRecorder = () => Promise<Readonly<{
@@ -35,11 +38,17 @@ const PRINTABLE_CODE = /^[A-Z][A-Z0-9_]{2,95}$/u;
 export function parseRefundDoneArguments(args: readonly string[]): RefundDoneArguments {
   const values = new Map<string, string>();
   let confirm = false;
+  let despiteChargeback = false;
   for (let index = 0; index < args.length; index += 1) {
     const name = args[index];
     if (name === "--confirm") {
       if (confirm) throw new TypeError("BILLING_REFUND_DONE_USAGE");
       confirm = true;
+      continue;
+    }
+    if (name === "--despite-chargeback") {
+      if (despiteChargeback) throw new TypeError("BILLING_REFUND_DONE_USAGE");
+      despiteChargeback = true;
       continue;
     }
     const value = args[index + 1];
@@ -56,7 +65,7 @@ export function parseRefundDoneArguments(args: readonly string[]): RefundDoneArg
   }
   const amountMicros = decimalToMicros(amount);
   if (amountMicros <= 0) throw new TypeError("BILLING_REFUND_DONE_USAGE");
-  return Object.freeze({ chargeRef, amountMicros, confirm });
+  return Object.freeze({ chargeRef, amountMicros, confirm, despiteChargeback });
 }
 
 const money = (micros: number, currency: string): string => `${microsToDecimal(micros)} ${currency}`;
@@ -149,7 +158,9 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
         xmoneyEnvironment: "live",
         netopia: { payments: { status: notHere }, paymentEnvironment, jobs }
       });
-      const plan = (input: RefundDoneArguments) => desk.planOwnerRefund(input.chargeRef, input.amountMicros);
+      const plan = (input: RefundDoneArguments) => desk.planOwnerRefund(input.chargeRef, input.amountMicros, {
+        despiteChargeback: input.despiteChargeback
+      });
       return Object.freeze({
         plan, record: async (input: RefundDoneArguments) => desk.recordOwnerRefund(await plan(input), new Date()), close: () => pool.end()
       });

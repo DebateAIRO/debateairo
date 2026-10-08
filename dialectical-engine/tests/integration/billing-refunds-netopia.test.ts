@@ -11,8 +11,9 @@ import { testBillingPlans, testBillingPolicy, testCountryPolicy } from "../suppo
 import {
   recordingAudit, seedNetopiaSubscription, subscriptionDeps, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
 } from "../support/billingSubscriptionFixtures.js";
+import { recordDisputeOutcome } from "../../apps/api/src/billing/dispute-cli.js";
 import { OwnerJobs } from "../../apps/api/src/billing/owner-jobs.js";
-import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
+import { heldByChargeback, RefundDesk, refundReminderDue } from "../../apps/api/src/billing/refunds.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
@@ -50,7 +51,7 @@ class RefundPort implements Pick<CardPayments, "status" | "refund"> {
 }
 
 const report = (orderId: string, providerPaymentId: string, state: PaymentReport["state"], amountMicros: number): PaymentReport => Object.freeze({
-  orderId, providerPaymentId, state, providerStatus: state === "REFUNDED" ? "8" : "3", amountMicros, currency: "USD",
+  orderId, providerPaymentId, state, providerStatus: state === "REFUNDED" ? "8" : state === "CHARGEBACK_OPENED" ? "9" : "3", amountMicros, currency: "USD",
   cardCountry: "DE", savedCard: null, declineCode: null, declineSide: null, bankDeclined: false, occurredAt: null, clientId: null
 });
 
@@ -346,5 +347,166 @@ describe("N14 the owner's daily job and the withdrawal on a NETOPIA plan", () =>
     expect(await repository.withdrawalOwnerSettlement(seeded.subscriptionId)).toBeNull();
     expect(await settleOwnerWithdrawal(storesFor("sandbox"), { ownerRef: seeded.ownerRef, refundMicros: 0, dashboardMicros: 2_000_000 }))
       .toEqual({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 2_000_000 });
+  });
+});
+
+describe("N15b an owner refund waits while the bank disputes the payment (ruling PR-41)", () => {
+  const REASONS = ["WITHDRAWAL", "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "DUPLICATE_PAYMENT",
+    "UPGRADE_CLOSED", "CARD_CHECK_RELEASE", "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE"];
+  const listed = async (chargeId: string) => (await repository.openOwnerRefunds("sandbox", REASONS)).filter((row) => row.chargeId === chargeId);
+  const verifyJob = (chargeId: string, now: Date) => ({ jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: chargeId, payload: {}, attempts: 1,
+    notBefore: now, createdAt: now, claimedBy: "n15b", claimedAt: now }) as unknown as OutboxJob;
+  const heldAlerts = async (chargeId: string) => (await database.pool.query<{ ref: string; payload: Record<string, string> }>(
+    "SELECT ref, payload FROM billing.outbox WHERE kind = 'EMAIL' AND payload->>'template' = 'O3' AND payload->>'param.reference' = $1"
+      + " AND payload->>'param.reasonCode' = 'REFUND_HELD_BY_CHARGEBACK'", [`charge ${chargeId}`]
+  )).rows;
+  const reminderOn = async (day: Date) => (await database.pool.query<{ payload: Record<string, string> }>(
+    "SELECT payload FROM billing.outbox WHERE kind = 'EMAIL' AND ref = $1", [`O2_REFUND_REMINDER:${day.toISOString().slice(0, 10)}`]
+  )).rows.map((row) => row.payload);
+  /** A day after today on which no refund still open in this suite's database is due for a reminder (each test's own day). */
+  const quietDay = async (): Promise<Date> => {
+    const open = await repository.openOwnerRefunds("sandbox", REASONS);
+    for (let days = 1; days <= 30; days += 1) {
+      const at = new Date(Date.now() + days * DAY);
+      if (!open.some((row) => refundReminderDue({ requestedAt: row.requestedAt, deadline: null }, at))) return at;
+    }
+    throw new Error("no quiet day");
+  };
+  /** The realistic case: a withdrawal's part of the payment, requested at `at` (the plan withdrawn now). */
+  async function withdrawalPart(seeded: Awaited<ReturnType<typeof paidPlan>>, desk: RefundDesk, amountMicros: number, at: Date): Promise<void> {
+    const withdrewAt = new Date();
+    await repository.withTransaction(async (client) => {
+      await jobs.lockOwner(client, seeded.ownerRef);
+      const state = foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId, client));
+      await repository.appendSubscriptionEvent(client, subscriptionEvent(state, "WITHDRAWN", withdrewAt, { withdrew_at: withdrewAt.toISOString() }));
+      await desk.requestAll(client, {
+        ownerRef: seeded.ownerRef, reason: "WITHDRAWAL", at,
+        allocations: [{ chargeId: seeded.initialChargeId, transactionId: seeded.providerPaymentId, amountMicros }]
+      });
+    });
+  }
+  const chargedBack = (port: RefundPort, seeded: Awaited<ReturnType<typeof paidPlan>>) => port.statuses.set(seeded.initialChargeId,
+    report(seeded.initialChargeId, seeded.providerPaymentId, "CHARGEBACK_OPENED", seeded.totalMicros));
+
+  it("an open owner refund is held while the bank disputes the payment", async () => {
+    const seeded = await paidPlan("held");
+    const chargeId = seeded.initialChargeId;
+    const port = new RefundPort(false);
+    const day = await quietDay();
+    const clock = { now: day };
+    const { refunds, verify, audit } = deskFor(port, clock);
+    await withdrawalPart(seeded, refunds, 12_100_000, day);
+    expect(await listed(chargeId)).toHaveLength(1);
+    chargedBack(port, seeded);
+    expect(await verify.handle(verifyJob(chargeId, day), day)).toEqual({ kind: "DONE" });
+    const charge = (await repository.charge(chargeId))!;
+    expect(charge.events.filter((event) => event.kind === "CHARGEBACK")).toHaveLength(1);
+    expect(heldByChargeback(charge, seeded.providerPaymentId)).toBe(true);
+    expect(await listed(chargeId)).toEqual([]);
+    // It was the only refund due today: no reminder at all.
+    expect(await refunds.remindOwnerRefunds(day)).toBe(0);
+    expect(await reminderOn(day)).toEqual([]);
+    const alerts = await heldAlerts(chargeId);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!.ref).toBe(`O3:${chargeId}:REFUND_HELD:${seeded.providerPaymentId}`);
+    expect(alerts[0]!.payload).toMatchObject({ recipient: "OWNER", "param.paymentAlert": "true", "param.jobKind": "PAYMENT" });
+    expect(alerts[0]!.payload["param.nextSteps"]).toBe(`A refund of 12.10 USD (reason WITHDRAWAL) was due on this payment (NETOPIA payment ${seeded.providerPaymentId}), and`
+      + " NETOPIA now reports a charge-back on it: the person's bank is taking the money back. Do not refund it in NETOPIA's"
+      + " admin; the site no longer lists it as due. If the dispute ends for us, record that with"
+      + ` pnpm billing:dispute --charge ${chargeId} --outcome won: the refund is then due again and comes back into the`
+      + " reminder. If it ends for the person, nothing is left to refund. If you had already refunded it in NETOPIA's admin"
+      + ` before the dispute, record that refund with pnpm billing:refund-done --charge ${chargeId} --amount 12.10`
+      + " --despite-chargeback, and tell NETOPIA, so the dispute is answered.");
+    // The same status again: no second O3, no second line.
+    expect(await verify.handle(verifyJob(chargeId, day), day)).toEqual({ kind: "DONE" });
+    expect(await heldAlerts(chargeId)).toHaveLength(1);
+    expect(audit.events.filter((entry) => entry.event === "billing.refund.held_by_chargeback"))
+      .toEqual([{ event: "billing.refund.held_by_chargeback", fields: { reason: "WITHDRAWAL" } }]);
+  });
+
+  it("the command refuses a held refund unless the owner says it was made before the dispute", async () => {
+    const seeded = await paidPlan("held-command");
+    const chargeId = seeded.initialChargeId;
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds, verify } = deskFor(port, clock);
+    await withdrawalPart(seeded, refunds, 12_100_000, clock.now);
+    chargedBack(port, seeded);
+    await verify.handle(verifyJob(chargeId, clock.now), clock.now);
+    await expect(refunds.planOwnerRefund(chargeId, 12_100_000)).rejects.toThrow("BILLING_REFUND_DONE_HELD_BY_CHARGEBACK");
+    const plan = await refunds.planOwnerRefund(chargeId, 12_100_000, { despiteChargeback: true });
+    expect(plan).toMatchObject({
+      providerPaymentId: seeded.providerPaymentId, reason: "WITHDRAWAL", openMicros: 12_100_000, restMicros: 0, despiteChargeback: true
+    });
+    expect(plan.mail).toMatchObject({ template: "M8" });
+    // The recording checks the hold again: a plan without the owner's word is refused, and nothing is written.
+    await expect(refunds.recordOwnerRefund({ ...plan, despiteChargeback: false }, clock.now)).rejects.toThrow("BILLING_REFUND_DONE_HELD_BY_CHARGEBACK");
+    expect(await refundedRows(chargeId)).toEqual([]);
+    expect(await refunds.recordOwnerRefund(plan, clock.now)).toBe("RECORDED");
+    expect(await refundedRows(chargeId)).toEqual([12_100_000]);
+    expect(await emails("M8", seeded.customerId)).toHaveLength(1);
+    const notes = await database.pool.query("SELECT 1 FROM billing.outbox WHERE kind = 'QUADERNO_RECORD_REFUND' AND ref = $1",
+      [`${chargeId}:${seeded.providerPaymentId}`]);
+    expect(notes.rowCount).toBe(1);
+    await expect(refunds.planOwnerRefund(chargeId, 1_000_000, { despiteChargeback: true })).rejects.toThrow("BILLING_REFUND_DONE_NO_OPEN_REQUEST");
+  });
+
+  it("a dispute won makes the refund due again", async () => {
+    const seeded = await paidPlan("held-won");
+    const chargeId = seeded.initialChargeId;
+    const port = new RefundPort(false);
+    const day = await quietDay();
+    const clock = { now: day };
+    const { refunds, verify } = deskFor(port, clock);
+    await withdrawalPart(seeded, refunds, 12_100_000, day);
+    chargedBack(port, seeded);
+    await verify.handle(verifyJob(chargeId, day), day);
+    expect(await listed(chargeId)).toEqual([]);
+    expect(await refunds.remindOwnerRefunds(day)).toBe(0);
+    const stores = Object.freeze({ billing: repository, jobs, entitlements: new EntitlementRepository(database.pool), clock: () => day });
+    expect(await recordDisputeOutcome(stores, { chargeRef: chargeId, outcome: "won" })).toBe("RESOLVED_AFTER_END");
+    const charge = (await repository.charge(chargeId))!;
+    expect(heldByChargeback(charge, seeded.providerPaymentId)).toBe(false);
+    expect(await listed(chargeId)).toEqual([expect.objectContaining({ providerPaymentId: seeded.providerPaymentId, reason: "WITHDRAWAL", requestedMicros: 12_100_000 })]);
+    // Its next due day (every third day from the request): the reminder lists it again, with its command.
+    const next = new Date(day.getTime() + 3 * DAY);
+    expect(await refunds.remindOwnerRefunds(next)).toBeGreaterThan(0);
+    const [reminder] = await reminderOn(next);
+    expect(reminder!["param.refundList"]).toContain(`- charge ${chargeId}, NETOPIA payment ${seeded.providerPaymentId}: refund 12.10 USD (part of the payment), reason WITHDRAWAL`);
+    expect(await refunds.planOwnerRefund(chargeId, 12_100_000)).toMatchObject({ openMicros: 12_100_000, despiteChargeback: false });
+  });
+
+  it("a refund with no charge-back is unchanged", async () => {
+    const seeded = await paidPlan("not-held");
+    const chargeId = seeded.initialChargeId;
+    const second = `${seeded.providerPaymentId}7`;
+    const port = new RefundPort(false);
+    // A day of its own, far from the other cases' reminders: the request is due on it (its first day).
+    const day = new Date(Date.now() + 60 * DAY);
+    const clock = { now: day };
+    const { refunds, verify } = deskFor(port, clock);
+    // A second payment on the same order, to give back whole; then the bank disputes the FIRST payment only.
+    await repository.withTransaction(async (client) => {
+      await repository.appendChargeEvent(client, chargeEvent(chargeId, "DUPLICATE_PAYMENT", day, {
+        providerPaymentId: second, amountMicros: seeded.totalMicros, errorCode: null
+      }));
+      await jobs.lockOwner(client, seeded.ownerRef);
+      await refunds.request(client, {
+        chargeId, transactionId: second, amountMicros: seeded.totalMicros, whole: true, ownerRef: seeded.ownerRef, reason: "DUPLICATE_PAYMENT"
+      }, day);
+    });
+    chargedBack(port, seeded);
+    await verify.handle(verifyJob(chargeId, day), day);
+    const charge = (await repository.charge(chargeId))!;
+    expect(charge.events.filter((event) => event.kind === "CHARGEBACK").map((event) => event.providerPaymentId)).toEqual([seeded.providerPaymentId]);
+    expect(heldByChargeback(charge, seeded.providerPaymentId)).toBe(true);
+    expect(heldByChargeback(charge, second)).toBe(false);
+    expect(await heldAlerts(chargeId)).toHaveLength(0);
+    expect(await listed(chargeId)).toEqual([expect.objectContaining({ providerPaymentId: second, reason: "DUPLICATE_PAYMENT", whole: true })]);
+    expect(await refunds.remindOwnerRefunds(day)).toBeGreaterThan(0);
+    const [reminder] = await reminderOn(day);
+    const amount = (seeded.totalMicros / 1_000_000).toFixed(2);
+    expect(reminder!["param.refundList"]).toContain(`- charge ${chargeId}, NETOPIA payment ${second}: refund ${amount} USD (the whole payment), reason DUPLICATE_PAYMENT`);
+    expect(await refunds.planOwnerRefund(chargeId, seeded.totalMicros)).toMatchObject({ providerPaymentId: second, despiteChargeback: false });
   });
 });

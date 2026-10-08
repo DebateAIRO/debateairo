@@ -1,5 +1,5 @@
 import {
-  decimalToMicros, foldSubscription, invoiceIssuerFor, paymentErrorCode, type CardPayments, type PaymentEnvironment,
+  decimalToMicros, foldSubscription, invoiceIssuerFor, microsToDecimal, paymentErrorCode, type CardPayments, type PaymentEnvironment,
   type PaymentReport, type SubscriptionEvent
 } from "@debateai/billing-core";
 import type {
@@ -24,7 +24,7 @@ import {
 import { queuePaymentAlert } from "./payment-alert.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
 import {
-  covers, openOwnRequest, pendingRefund, refundedAlready, refundedMicros, refundIntentOf, type RefundDesk
+  covers, openOwnRequest, pendingRefund, refundedAlready, refundedMicros, refundIntentOf, type RefundDesk, type RefundIntent
 } from "./refunds.js";
 import { chargeEvent, refundTarget, subscriptionEvent, transactionRoute } from "./rows.js";
 import {
@@ -1307,6 +1307,9 @@ export class VerifyPaymentHandler {
    * `pnpm billing:dispute`; the O3 says the paid features are paused only when the plan folds SUSPENDED afterwards.
    * The audit line billing.chargeback carries `code: "DUPLICATE_PAYMENT"` when the CHARGEBACK written is so coded,
    * as xMoney's `duplicateChargedBack` writes it.
+   * N15b (ruling PR-41): when the CHARGEBACK written finds an open owner refund on the same payment (`openOwnRequest`),
+   * that refund is now held (`heldByChargeback`): the O3 REFUND_HELD_BY_CHARGEBACK is queued in the same transaction,
+   * once per payment ever, and one audit line billing.refund.held_by_chargeback follows.
    */
   private async netopiaChargedBack(
     charge: ChargeWithEvents, report: PaymentReport, now: Date, stage: "OPENED" | "LOST" | "REPRESENTED"
@@ -1314,7 +1317,7 @@ export class VerifyPaymentHandler {
     const paid = charge.events.find((event) => event.kind === "SUCCEEDED");
     const paymentId = paid?.providerPaymentId ?? report.providerPaymentId;
     const owner = await this.owner(charge);
-    type Recorded = Readonly<{ written: boolean; boughtNothing: boolean }>;
+    type Recorded = Readonly<{ written: boolean; boughtNothing: boolean; held: RefundIntent | null }>;
     const recorded = await this.deps.repository.withTransaction(async (client): Promise<Recorded> => {
       await this.deps.jobs.lockOwner(client, owner.ownerRef);
       const current = (await this.deps.repository.charge(charge.chargeId, client)) ?? charge;
@@ -1322,12 +1325,18 @@ export class VerifyPaymentHandler {
         && event.errorCode !== null && BOUGHT_NOTHING.has(event.errorCode))
         || !current.events.some((event) => event.kind === "SUCCEEDED");
       let written = false;
+      let held: RefundIntent | null = null;
       if (!current.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId === paymentId)) {
         const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "CHARGEBACK", now, {
           providerPaymentId: paymentId, amountMicros: paid?.amountMicros ?? charge.totalMicros,
           errorCode: boughtNothing ? "DUPLICATE_PAYMENT" : null
         }));
         written = inserted === "INSERTED";
+        const open = written ? openOwnRequest(current, paymentId) : null;
+        if (open !== null && open.openMicros > 0) {
+          held = open.intent;
+          await this.refundHeldAlert(client, charge, paymentId, open, now);
+        }
         if (written && !boughtNothing) {
           const { subscription } = await this.context(client, charge, null, owner, now);
           if (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE") {
@@ -1349,13 +1358,14 @@ export class VerifyPaymentHandler {
           providerPaymentId: paymentId, amountMicros: paid?.amountMicros ?? charge.totalMicros, errorCode: null
         }));
       }
-      return { written, boughtNothing };
+      return { written, boughtNothing, held };
     });
     if (recorded.written) {
       this.deps.audit("billing.chargeback", recorded.boughtNothing
         ? { chargeKind: charge.kind, code: "DUPLICATE_PAYMENT" }
         : { chargeKind: charge.kind });
     }
+    if (recorded.held !== null) this.deps.audit("billing.refund.held_by_chargeback", { reason: recorded.held.reason });
     if (stage !== "LOST") return DONE;
     const paused = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId)).status === "SUSPENDED";
     const notice = await this.newestNotice(charge.chargeId);
@@ -1373,6 +1383,29 @@ export class VerifyPaymentHandler {
         + ` pnpm billing:dispute --charge ${charge.chargeId} --outcome lost (or --outcome won).`
     });
     return DONE;
+  }
+
+  /**
+   * N15b (ruling PR-41): the owner's O3 REFUND_HELD_BY_CHARGEBACK for an open owner refund the charge-back on its
+   * payment now holds, queued on the transaction that writes the CHARGEBACK, once per payment ever. `amount` is the
+   * open amount, as the reminder and `pnpm billing:refund-done` print it.
+   */
+  private async refundHeldAlert(
+    client: PoolClient, charge: ChargeRow, paymentId: string, open: Readonly<{ intent: RefundIntent; openMicros: number }>, now: Date
+  ): Promise<void> {
+    const amount = microsToDecimal(open.openMicros);
+    await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia!.jobs }, {
+      code: "REFUND_HELD_BY_CHARGEBACK", reference: `charge ${charge.chargeId}`,
+      dedupeRef: `${charge.chargeId}:REFUND_HELD:${paymentId}`, now,
+      nextSteps: `A refund of ${amount} ${charge.currency} (reason ${open.intent.reason}) was due on this payment`
+        + ` (NETOPIA payment ${paymentId}), and NETOPIA now reports a charge-back on it: the person's bank is taking the`
+        + " money back. Do not refund it in NETOPIA's admin; the site no longer lists it as due. If the dispute ends for"
+        + ` us, record that with pnpm billing:dispute --charge ${charge.chargeId} --outcome won: the refund is then due`
+        + " again and comes back into the reminder. If it ends for the person, nothing is left to refund. If you had"
+        + " already refunded it in NETOPIA's admin before the dispute, record that refund with"
+        + ` pnpm billing:refund-done --charge ${charge.chargeId} --amount ${amount} --despite-chargeback, and tell NETOPIA,`
+        + " so the dispute is answered."
+    }, client);
   }
 
   /** Ruling C-7: nothing recorded; the notice's outcome OWNER_REVIEW, audit lines, and one O3 per charge and status. */

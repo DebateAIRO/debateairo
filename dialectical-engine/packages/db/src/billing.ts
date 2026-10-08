@@ -858,6 +858,10 @@ export class BillingRepository {
   /**
    * N14 (spec §2.12.2): every open owner refund of one NETOPIA environment — a REFUND_REQUESTED of more than 0.00 with
    * one of `reasons` (ours, never a provider refund's) whose REFUNDED parts sum to less. Oldest first.
+   * N15b (ruling PR-41, spec §2.13): a request is left out while it is HELD: its charge holds a CHARGEBACK of the
+   * request's `provider_payment_id` and no CHARGEBACK_RESOLVED of that same id. The same rule as `heldByChargeback`
+   * in apps/api/src/billing/refunds.ts and as `dueStatusReads`' REFUND schedule (billing-jobs.ts); keyed by the
+   * payment, never by the charge alone (a charge can carry several payments).
    */
   async openOwnerRefunds(
     paymentEnvironment: PaymentEnvironmentName, reasons: ReadonlyArray<string>, executor: BillingReadExecutor = this.pool
@@ -879,6 +883,12 @@ export class BillingRepository {
       JOIN billing.charge AS charge ON charge.charge_id = requested.charge_id
       WHERE requested.kind = 'REFUND_REQUESTED' AND requested.payment_provider = 'netopia'
         AND requested.payment_environment = $1 AND requested.amount_micros > 0 AND requested.error_code = ANY($2::text[])
+        AND NOT EXISTS (SELECT 1 FROM billing.charge_event AS chargeback
+          WHERE chargeback.charge_id = requested.charge_id AND chargeback.kind = 'CHARGEBACK'
+            AND chargeback.provider_payment_id = requested.provider_payment_id
+            AND NOT EXISTS (SELECT 1 FROM billing.charge_event AS resolved
+              WHERE resolved.charge_id = requested.charge_id AND resolved.kind = 'CHARGEBACK_RESOLVED'
+                AND resolved.provider_payment_id = requested.provider_payment_id))
       ORDER BY requested.at, requested.charge_id
     `, [paymentEnvironment, [...reasons]]);
     return result.rows

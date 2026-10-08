@@ -185,6 +185,30 @@ describe("N16 each charge's next read (spec §2.14)", () => {
     expect(await dueOf(check, plus(paidAt, 2 * DAY))).toBeNull();
   });
 
+  it("never reads daily for an owner refund held by a charge-back, only the payment's own schedule (ruling PR-41)", async () => {
+    const paidAt = epoch(2039);
+    const seeded = await subscription(paidAt);
+    const payment = seeded.initialChargeId;
+    const append = (kind: "REFUND_REQUESTED" | "CHARGEBACK" | "CHARGEBACK_RESOLVED", at: Date, errorCode: string | null) =>
+      repository.withTransaction((client) => repository.appendChargeEvent(client, chargeEvent(payment, kind, at, {
+        providerPaymentId: seeded.providerPaymentId, amountMicros: kind === "REFUND_REQUESTED" ? 5_000_000 : seeded.totalMicros, errorCode
+      })));
+    await readAt(payment, plus(paidAt, DAY + MINUTE), "PAID");
+    await append("REFUND_REQUESTED", plus(paidAt, 2 * DAY), "WITHDRAWAL");
+    expect(await dueOf(payment, plus(paidAt, 2 * DAY + MINUTE))).toMatchObject({ schedule: "REFUND" });
+    await readAt(payment, plus(paidAt, 2 * DAY + 2 * MINUTE), "PAID");
+    // The bank disputes the payment: the open refund is held, so no daily read; the 7-day read of the payment stays.
+    await append("CHARGEBACK", plus(paidAt, 2 * DAY + 3 * MINUTE), null);
+    expect(await dueOf(payment, plus(paidAt, 3 * DAY + 3 * MINUTE))).toBeNull();
+    expect(await dueOf(payment, plus(paidAt, 6 * DAY))).toBeNull();
+    expect(await dueOf(payment, plus(paidAt, 7 * DAY + MINUTE))).toMatchObject({ schedule: "PAID", dueAt: plus(paidAt, 7 * DAY) });
+    await readAt(payment, plus(paidAt, 7 * DAY + 2 * MINUTE), "CHARGEBACK_OPENED");
+    expect(await dueOf(payment, plus(paidAt, 8 * DAY + 3 * MINUTE))).toBeNull();
+    // The dispute is won (billing:dispute --outcome won): the refund is due again, read daily.
+    await append("CHARGEBACK_RESOLVED", plus(paidAt, 9 * DAY), null);
+    expect(await dueOf(payment, plus(paidAt, 9 * DAY + MINUTE))).toMatchObject({ schedule: "REFUND", dueAt: plus(paidAt, 8 * DAY + 2 * MINUTE) });
+  });
+
   it("leaves an unknown renewal to N11's probes, and reads a SUBMITTED one on the open schedule", async () => {
     const start = epoch(2034);
     const unknown = await renewal(await subscription(plus(start, -29 * DAY)), start, false);

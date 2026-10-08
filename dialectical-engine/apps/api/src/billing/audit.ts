@@ -111,6 +111,11 @@ export type BillingAuditEvent =
   | "billing.refund.seen_partial"
   /** N14 (spec §2.12.2 item 4): the owner recorded a refund with `pnpm billing:refund-done`. The reason. */
   | "billing.refund.recorded_by_owner"
+  /**
+   * N15b (ruling PR-41, spec §2.13): a charge-back arrived on a payment with an open owner refund; the refund is held
+   * while the dispute lasts and the owner got O3 REFUND_HELD_BY_CHARGEBACK. The refund's reason.
+   */
+  | "billing.refund.held_by_chargeback"
   | "billing.invoice.unknown"
   /** P12b: a cancel request was written; the field is its source (SETTINGS or EMAIL_LINK). */
   | "billing.cancel"

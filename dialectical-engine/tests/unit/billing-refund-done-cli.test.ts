@@ -15,15 +15,15 @@ const output = () => {
 };
 const plan = (extra: Partial<OwnerRefundPlan> = {}): OwnerRefundPlan => ({
   chargeId: REF, providerPaymentId: "ntp-12345", reason: "WITHDRAWAL", currency: "USD", amountMicros: 5_000_000,
-  openMicros: 12_100_000, restMicros: 7_100_000, mail: null, ...extra
+  openMicros: 12_100_000, restMicros: 7_100_000, mail: null, despiteChargeback: false, ...extra
 });
 
 describe("N14 the refund-done command (spec §2.12.2 item 4)", () => {
   it("accepts --charge <32 hex> --amount <decimal> and an optional --confirm, in any order", () => {
     expect(parseRefundDoneArguments(["--charge", REF, "--amount", "12.10"]))
-      .toEqual({ chargeRef: REF, amountMicros: 12_100_000, confirm: false });
+      .toEqual({ chargeRef: REF, amountMicros: 12_100_000, confirm: false, despiteChargeback: false });
     expect(parseRefundDoneArguments(["--confirm", "--amount", "5", "--charge", REF]))
-      .toEqual({ chargeRef: REF, amountMicros: 5_000_000, confirm: true });
+      .toEqual({ chargeRef: REF, amountMicros: 5_000_000, confirm: true, despiteChargeback: false });
     for (const args of [[], ["--charge", REF], ["--charge", "xyz", "--amount", "1.00"], ["--charge", REF, "--amount", "0"],
       ["--charge", REF, "--amount", "-1"], ["--charge", REF, "--amount", "1.001"], ["--charge", REF, "--amount", "abc"],
       ["--charge", REF, "--amount", "1", "--confirm", "--confirm"], ["--charge", REF, "--amount", "1", "--extra", "x"]]) {
@@ -72,6 +72,41 @@ describe("N14 the refund-done command (spec §2.12.2 item 4)", () => {
     const open = vi.fn(async () => ({ plan: async () => { throw new Error("connection string postgres://x"); }, record: vi.fn(), close: async () => undefined }));
     expect(await runBillingRefundDoneCli(["--charge", REF, "--amount", "1.00"], crashed.sink, open)).toBe(1);
     expect(crashed.lines.err).toBe("BILLING_REFUND_DONE_FAILED\n");
+  });
+
+  it("takes --despite-chargeback at most once, in any position, and hands it to the plan (ruling PR-41)", async () => {
+    expect(parseRefundDoneArguments(["--despite-chargeback", "--charge", REF, "--amount", "1.00"]))
+      .toEqual({ chargeRef: REF, amountMicros: 1_000_000, confirm: false, despiteChargeback: true });
+    expect(parseRefundDoneArguments(["--charge", REF, "--despite-chargeback", "--amount", "1.00", "--confirm"]))
+      .toEqual({ chargeRef: REF, amountMicros: 1_000_000, confirm: true, despiteChargeback: true });
+    expect(parseRefundDoneArguments(["--charge", REF, "--amount", "1.00", "--confirm", "--despite-chargeback"]))
+      .toEqual({ chargeRef: REF, amountMicros: 1_000_000, confirm: true, despiteChargeback: true });
+    for (const args of [["--despite-chargeback", "--charge", REF, "--amount", "1", "--despite-chargeback"],
+      ["--charge", REF, "--amount", "1", "--despite-chargeback", "--despite-chargeback"], ["--despite-chargeback"]]) {
+      expect(() => parseRefundDoneArguments(args), args.join(" ")).toThrow("BILLING_REFUND_DONE_USAGE");
+    }
+    const twice = output();
+    expect(await runBillingRefundDoneCli(["--charge", REF, "--amount", "1", "--despite-chargeback", "--despite-chargeback"], twice.sink, vi.fn())).toBe(2);
+    expect(twice.lines.err).toBe("BILLING_REFUND_DONE_USAGE\n");
+
+    const held = output();
+    const refuse = vi.fn(async () => ({
+      plan: async () => { throw new TypeError("BILLING_REFUND_DONE_HELD_BY_CHARGEBACK"); }, record: vi.fn(), close: async () => undefined
+    }));
+    expect(await runBillingRefundDoneCli(["--charge", REF, "--amount", "1.00", "--confirm"], held.sink, refuse)).toBe(1);
+    expect(held.lines.err).toBe("BILLING_REFUND_DONE_HELD_BY_CHARGEBACK\n");
+    expect(held.lines.out).toBe("");
+
+    const asked: RefundDoneArguments[] = [];
+    const record = vi.fn(async () => "RECORDED" as const);
+    const despite = output();
+    const open = vi.fn(async () => ({
+      plan: async (input: RefundDoneArguments) => { asked.push(input); return plan({ amountMicros: 12_100_000, restMicros: 0, despiteChargeback: true }); },
+      record, close: async () => undefined
+    }));
+    expect(await runBillingRefundDoneCli(["--despite-chargeback", "--charge", REF, "--amount", "12.10", "--confirm"], despite.sink, open)).toBe(0);
+    expect(asked).toEqual([{ chargeRef: REF, amountMicros: 12_100_000, confirm: true, despiteChargeback: true }]);
+    expect(record).toHaveBeenCalledWith({ chargeRef: REF, amountMicros: 12_100_000, confirm: true, despiteChargeback: true });
   });
 
   it("reads NETOPIA's base URL from the API's EnvironmentFile, and refuses to start without it", () => {

@@ -188,6 +188,19 @@ export function openOwnRequest(
   return Object.freeze({ intent, openMicros: Math.max(intent.amountMicros - refunded, 0) });
 }
 
+/**
+ * N15b (ruling PR-41, spec §2.13): whether an owner refund on this payment is HELD: the charge holds a CHARGEBACK of
+ * `paymentId` and no CHARGEBACK_RESOLVED of that same id. A held refund is not due (the person's bank is taking the
+ * money back): the reminder leaves it out, it gets no daily status read, and `pnpm billing:refund-done` refuses it
+ * without `--despite-chargeback`. A dispute won (CHARGEBACK_RESOLVED) makes it due again; a dispute lost writes no
+ * charge event, so it stays held. The same rule as the SQL of `BillingRepository.openOwnerRefunds` and of
+ * `BillingJobQueries.dueStatusReads`' REFUND schedule (packages/db); keyed by the payment, never by the charge alone.
+ */
+export function heldByChargeback(charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>, paymentId: string): boolean {
+  return charge.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId === paymentId)
+    && !charge.events.some((event) => event.kind === "CHARGEBACK_RESOLVED" && event.providerPaymentId === paymentId);
+}
+
 /** Whether a request gives back the WHOLE payment it names (the payment's own amount, nothing recorded of it yet). */
 function wholePaymentOpen(
   charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>, open: Readonly<{ intent: RefundIntent; openMicros: number }>
@@ -236,6 +249,11 @@ export type OwnerRefundPlan = Readonly<{
   amountMicros: number; openMicros: number; restMicros: number;
   /** The customer's follow-up email, rendered in their language; null while a rest stays open, or for none. */
   mail: Readonly<{ template: string; text: string }> | null;
+  /**
+   * N15b: the owner's `--despite-chargeback` (a refund made in NETOPIA's admin before the dispute arrived): only then
+   * is a refund `heldByChargeback` planned and recorded.
+   */
+  despiteChargeback: boolean;
 }>;
 
 const DAY_MS = 86_400_000;
@@ -857,23 +875,34 @@ export class RefundDesk {
     return result;
   }
 
-  /** `pnpm billing:refund-done`'s first half: what it would record, and the email when this amount closes the request. */
-  async planOwnerRefund(chargeId: string, amountMicros: number): Promise<OwnerRefundPlan> {
+  /**
+   * `pnpm billing:refund-done`'s first half: what it would record, and the email when this amount closes the request.
+   * A request held by a charge-back (`heldByChargeback`) is refused with BILLING_REFUND_DONE_HELD_BY_CHARGEBACK unless
+   * `despiteChargeback`; an open request of another payment of the charge that is not held is planned first.
+   */
+  async planOwnerRefund(
+    chargeId: string, amountMicros: number, options: Readonly<{ despiteChargeback?: boolean }> = {}
+  ): Promise<OwnerRefundPlan> {
+    const despiteChargeback = options.despiteChargeback === true;
     const charge = await this.deps.repository.charge(chargeId);
     if (charge === null) throw new TypeError("BILLING_REFUND_DONE_CHARGE_NOT_FOUND");
     const netopia = this.deps.netopia;
     if (netopia === undefined || charge.paymentProvider !== "netopia" || charge.paymentEnvironment !== netopia.paymentEnvironment) {
       throw new TypeError("BILLING_REFUND_DONE_OTHER_PAYMENT_SYSTEM");
     }
-    const open = charge.events.filter((event) => event.kind === "REFUND_REQUESTED" && event.providerPaymentId !== null)
+    const opens = charge.events.filter((event) => event.kind === "REFUND_REQUESTED" && event.providerPaymentId !== null)
       .map((event) => openOwnRequest(charge, event.providerPaymentId!))
-      .find((candidate) => candidate !== null && candidate.openMicros > 0) ?? null;
-    if (open === null) throw new TypeError("BILLING_REFUND_DONE_NO_OPEN_REQUEST");
+      .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null && candidate.openMicros > 0);
+    const open = despiteChargeback ? opens[0] : opens.find((candidate) => !heldByChargeback(charge, candidate.intent.transactionId));
+    if (open === undefined) {
+      throw new TypeError(opens.length > 0 ? "BILLING_REFUND_DONE_HELD_BY_CHARGEBACK" : "BILLING_REFUND_DONE_NO_OPEN_REQUEST");
+    }
     if (amountMicros <= 0 || amountMicros > open.openMicros) throw new TypeError("BILLING_REFUND_DONE_EXCEEDS_REQUEST");
     const restMicros = open.openMicros - amountMicros;
     return Object.freeze({
       chargeId, providerPaymentId: open.intent.transactionId, reason: open.intent.reason, currency: charge.currency,
-      amountMicros, openMicros: open.openMicros, restMicros, mail: restMicros > 0 ? null : await this.followUpMail(open.intent)
+      amountMicros, openMicros: open.openMicros, restMicros, mail: restMicros > 0 ? null : await this.followUpMail(open.intent),
+      despiteChargeback
     });
   }
 
@@ -882,6 +911,10 @@ export class RefundDesk {
     const charge = await this.deps.repository.charge(plan.chargeId);
     const open = charge === null ? null : openOwnRequest(charge, plan.providerPaymentId);
     if (open === null) throw new TypeError("BILLING_REFUND_DONE_NO_OPEN_REQUEST");
+    // N15b: the hold is checked again (a charge-back may have arrived since the plan), unless the owner's flag says so.
+    if (!plan.despiteChargeback && heldByChargeback(charge!, plan.providerPaymentId)) {
+      throw new TypeError("BILLING_REFUND_DONE_HELD_BY_CHARGEBACK");
+    }
     const result = await this.recordNetopiaRefund(open.intent, plan.amountMicros, at);
     this.deps.audit("billing.refund.recorded_by_owner", { reason: plan.reason });
     return result;

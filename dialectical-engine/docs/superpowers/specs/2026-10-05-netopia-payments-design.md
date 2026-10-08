@@ -912,6 +912,9 @@ again. Turning the API mode on is a code change made after the sandbox recording
 - `CHARGEBACK_REPRESENTED` (status 16): when no CHARGEBACK is recorded yet, CHARGEBACK and SUSPENDED first; then
   CHARGEBACK_REPRESENTED, no further change.
 - `billing:dispute` keys on `provider_payment_id`.
+- An owner refund still open on a charged-back payment is held while the charge-back stands (ruling PR-41): not
+  reminded, not read daily, refused by `billing:refund-done` without `--despite-chargeback`; due again when the dispute
+  is won; never due when it is lost. The owner gets one O3 `REFUND_HELD_BY_CHARGEBACK`.
 
 ### 2.14 The checks that replace the transaction listing
 

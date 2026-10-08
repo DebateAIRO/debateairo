@@ -379,7 +379,10 @@ export class BillingJobQueries {
    * Spec §2.14 (SR-21): the NETOPIA charges of one environment whose next status read is due at `now`, newest due first,
    * after `cursor` (exclusive), at most `limit`. Each charge's schedule and next read come from our rows and its newest
    * `billing.status_read` row (every read writes one):
-   * - REFUND: requested refund amounts above the refunded ones (§2.12.2's owner refunds): now, then daily;
+   * - REFUND: requested refund amounts above the refunded ones (§2.12.2's owner refunds): now, then daily; a payment
+   *   whose owner refund is HELD (N15b, ruling PR-41: a CHARGEBACK of that `provider_payment_id` and no
+   *   CHARGEBACK_RESOLVED of it, the rule of `openOwnerRefunds` and of refunds.ts' `heldByChargeback`) counts neither
+   *   its requests nor its refunds here, so it keeps only the PAID schedule;
    * - PAID: SUCCEEDED (never a 0 card check): the latest of 1, 7, 30, 60, 90, 120 days after the payment not read since;
    * - OPEN: a hosted page started (SUBMITTED or SUBMIT_UNKNOWN) or a SUBMITTED renewal, not final: 10 min, 30 min, 1 h,
    *   3 h after the submit, then daily after the last read, up to 30 days; never a renewal N11's probes own;
@@ -413,9 +416,20 @@ export class BillingJobQueries {
           EXISTS (SELECT 1 FROM billing.subscription_event s
             WHERE s.subscription_id = c.subscription_id AND s.kind = 'ENDED') AS ended,
           COALESCE((SELECT sum(e.amount_micros) FROM billing.charge_event e
-            WHERE e.charge_id = c.charge_id AND e.kind = 'REFUND_REQUESTED'), 0)
+            WHERE e.charge_id = c.charge_id AND e.kind = 'REFUND_REQUESTED'
+              AND NOT EXISTS (SELECT 1 FROM billing.charge_event cb
+                WHERE cb.charge_id = c.charge_id AND cb.kind = 'CHARGEBACK' AND cb.provider_payment_id = e.provider_payment_id
+                  AND NOT EXISTS (SELECT 1 FROM billing.charge_event won
+                    WHERE won.charge_id = c.charge_id AND won.kind = 'CHARGEBACK_RESOLVED'
+                      AND won.provider_payment_id = e.provider_payment_id))), 0)
             > COALESCE((SELECT sum(e.amount_micros) FROM billing.charge_event e
-            WHERE e.charge_id = c.charge_id AND e.kind = 'REFUNDED'), 0) AS refund_open,
+            WHERE e.charge_id = c.charge_id AND e.kind = 'REFUNDED'
+              AND NOT EXISTS (SELECT 1 FROM billing.charge_event cb
+                WHERE cb.charge_id = c.charge_id AND cb.kind = 'CHARGEBACK'
+                  AND cb.provider_payment_id = COALESCE(e.refunds_transaction_id, e.provider_payment_id)
+                  AND NOT EXISTS (SELECT 1 FROM billing.charge_event won
+                    WHERE won.charge_id = c.charge_id AND won.kind = 'CHARGEBACK_RESOLVED'
+                      AND won.provider_payment_id = COALESCE(e.refunds_transaction_id, e.provider_payment_id)))), 0) AS refund_open,
           (SELECT max(r.at) FROM billing.status_read r WHERE r.charge_id = c.charge_id) AS last_read_at
         FROM billing.charge c
         LEFT JOIN billing.hosted_payment h ON h.charge_id = c.charge_id
