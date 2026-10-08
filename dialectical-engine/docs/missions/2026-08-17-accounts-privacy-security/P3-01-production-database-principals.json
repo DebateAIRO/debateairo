@@ -474,6 +474,14 @@
           "purpose": "BILLING_CHECK_OPERATOR_COMMAND",
           "binding": "WIRED",
           "condition": "package script billing:check"
+        },
+        {
+          "component": "tools/billing:netopia-sandbox",
+          "sourceFile": "tools/billing/netopia-sandbox.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_NETOPIA_RECORDING_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:netopia-sandbox"
         }
       ]
     },
