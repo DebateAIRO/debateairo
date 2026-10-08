@@ -8,11 +8,10 @@ import type { ExportClaim } from "./snapshot.js";
 import type { ExportSnapshot } from "./types.js";
 import { buildArchive, archiveFilename } from "./archive.js";
 
-export const DATA_EXPORT_TICK_MS = 15_000;
-export const DATA_EXPORT_LEASE_SECONDS = 45;
-export const DATA_EXPORT_RENEW_MS = 15_000;
-export const DATA_EXPORT_MAX_ATTEMPTS = 3;
-export const DATA_EXPORT_LINK_TTL_SECONDS = 86_400;
+const DATA_EXPORT_LEASE_SECONDS = 45;
+const DATA_EXPORT_RENEW_MS = 15_000;
+const DATA_EXPORT_MAX_ATTEMPTS = 3;
+const DATA_EXPORT_LINK_TTL_SECONDS = 86_400;
 
 export type RequestOutcome =
   | { kind: "ACCEPTED"; requestedAt: Date }
