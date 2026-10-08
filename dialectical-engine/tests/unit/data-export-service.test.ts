@@ -8,10 +8,8 @@ import { loadArchiveCatalog } from "../../apps/api/src/data-export/archive-catal
 import { FileDataExportStore } from "../../apps/api/src/data-export/store.js";
 import type { ExportClaim } from "../../apps/api/src/data-export/snapshot.js";
 import type { ExportSnapshot } from "../../apps/api/src/data-export/types.js";
-import {
-  DataExportApplication, DATA_EXPORT_TICK_MS, DATA_EXPORT_LEASE_SECONDS,
-  DATA_EXPORT_RENEW_MS, DATA_EXPORT_MAX_ATTEMPTS, DATA_EXPORT_LINK_TTL_SECONDS
-} from "../../apps/api/src/data-export/service.js";
+import { DataExportApplication } from "../../apps/api/src/data-export/service.js";
+import * as serviceModule from "../../apps/api/src/data-export/service.js";
 import { MemoryDataExportRepository } from "../support/data-export-memory-repository.js";
 
 const USER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -239,7 +237,24 @@ describe("data export application", () => {
     expect(f.repository.calls.filter((call) => call.method === "recordDownload")).toHaveLength(1);
   });
 
-  it("V-14 exports the ruled tick, lease, renewal, attempt and link limits", () => {
-    expect([DATA_EXPORT_TICK_MS, DATA_EXPORT_LEASE_SECONDS, DATA_EXPORT_RENEW_MS, DATA_EXPORT_MAX_ATTEMPTS, DATA_EXPORT_LINK_TTL_SECONDS]).toEqual([15_000, 45, 15_000, 3, 86_400]);
+  it("V-14 keeps timing limits private and renews a 45-second lease after 15 seconds", async () => {
+    expect(Object.keys(serviceModule).filter((key) => key.startsWith("DATA_EXPORT_"))).toEqual([]);
+    vi.useFakeTimers();
+    const f = await fixture();
+    let entered!: () => void;
+    const collecting = new Promise<void>((resolve) => { entered = resolve; });
+    let release!: () => void;
+    f.setCollect(async (claim) => { entered(); await new Promise<void>((resolve) => { release = resolve; }); return snapshotA(claim, f.now()); });
+    await f.request();
+    const work = f.app.runOnce();
+    await collecting;
+    expect(f.latest().leaseUntil).toEqual(new Date(f.now().getTime() + 45_000));
+    expect(f.repository.calls.filter((call) => call.method === "renewLease")).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(14_999);
+    expect(f.repository.calls.filter((call) => call.method === "renewLease")).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f.repository.calls.filter((call) => call.method === "renewLease")).toHaveLength(1);
+    release();
+    await work;
   });
 });

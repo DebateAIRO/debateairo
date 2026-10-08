@@ -17,7 +17,7 @@ import { AccountProfileError, type AccountProfileService } from "./account-profi
 import { RecoveryEmailError, type RecoveryEmailService } from "./recovery-email.js";
 import type { ProfileSession } from "@debateai/db";
 import { normalizeManualPhone } from "./phone-profile.js";
-import type { FundingBasis } from "@debateai/kernel";
+import { exhaustive, type FundingBasis } from "@debateai/kernel";
 import { timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { z } from "zod";
@@ -2779,6 +2779,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       case "IN_PROGRESS": return reply.status(409).send({ error: "EXPORT_IN_PROGRESS" });
       case "RATE_LIMITED": return reply.status(429).header("retry-after", String(outcome.retryAfterSeconds))
         .send({ error: "EXPORT_RATE_LIMITED" });
+      default: return exhaustive(outcome);
     }
   });
   api.get("/v1/account/export", routePolicy("GET /v1/account/export"), async (request, reply) => {
@@ -2801,6 +2802,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       case "INVALID": return reply.status(404).send({ error: "EXPORT_LINK_INVALID" });
       case "HELD": return reply.status(409).send({ error: "EXPORT_ACCOUNT_HELD" });
       case "UNAVAILABLE": return reply.status(503).send({ error: "EXPORT_UNAVAILABLE" });
+      default: return exhaustive(result);
     }
   });
   api.post(
