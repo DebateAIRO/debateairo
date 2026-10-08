@@ -126,7 +126,7 @@
   "public.report.models": "Modeli koji su sudjelovali: {models}",
   "public.report.modelsNotRecorded": "Modeli koji su sudjelovali: nije zabilježeno",
   "public.report.disclosure": "Ovo su izvješće napisali modeli umjetne inteligencije na temelju argumenata iz rasprave.",
-  "public.report.notAdvice": "Izvješće koje je generirala umjetna inteligencija. Nije medicinski, pravni, financijski ni drugi stručni savjet.",
+  "public.report.notAdvice": "Izvješće koje je generirala umjetna inteligencija. Nije medicinski, psihološki, pravni, financijski ni drugi stručni savjet.",
   "public.report.title.inShort": "Ukratko",
   "public.report.title.story": "Cijela priča",
   "public.report.title.why": "Zašto ovaj odgovor",

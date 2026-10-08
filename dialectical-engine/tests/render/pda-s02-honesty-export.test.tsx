@@ -85,6 +85,7 @@ describe("S02 public honesty and export", () => {
     const container = await mount(<PublicDebatePageClient debate={publicDebate} {...PUBLIC_PAGE_I18N} />);
     const notice = container.querySelector('[aria-label="AI disclosure"]');
     expect(notice?.textContent).toContain("may be inaccurate");
+    expect(notice?.textContent).toContain("It is not medical, psychological, legal or financial advice, or any other professional advice.");
     expect(notice?.querySelector('a[href="/ai-transparency"]')).not.toBeNull();
     expect(container.querySelector('[data-ai-generated="true"]')?.textContent).toContain("Public answer content.");
     const download = container.querySelector<HTMLAnchorElement>("a[download]");

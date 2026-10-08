@@ -126,7 +126,7 @@
   "public.report.models": "Zúčastnené modely: {models}",
   "public.report.modelsNotRecorded": "Zúčastnené modely: nezaznamenané",
   "public.report.disclosure": "Túto správu napísali modely AI na základe argumentov z debaty.",
-  "public.report.notAdvice": "Správa vytvorená AI. Nejde o lekárske, právne, finančné ani iné odborné poradenstvo.",
+  "public.report.notAdvice": "Správa vytvorená AI. Nejde o lekárske, psychologické, právne, finančné ani iné odborné poradenstvo.",
   "public.report.title.inShort": "Stručne",
   "public.report.title.story": "Celý príbeh",
   "public.report.title.why": "Prečo táto odpoveď",

@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "Tout ce qui figure dans ce débat — arguments, évaluations, scores et verdict — est généré par des modèles d’IA, signalé dans un format lisible par machine et peut être inexact.",
+  "debateChrome.aiNotice": "Tout ce qui figure dans ce débat — arguments, évaluations, scores et verdict — est généré par des modèles d’IA, signalé dans un format lisible par machine et peut être inexact. Cela ne constitue pas un conseil médical, psychologique, juridique, financier ni aucun autre conseil professionnel.",
   "debateChrome.status.waiting": "En attente de démarrage. Votre débat démarrera de lui-même à {time}.",
   "debateChrome.status.waitingOwnDebates": "Vos autres débats utilisent pour l’instant le reste de votre limite. Celui-ci démarrera de lui-même dès que l’un d’eux sera terminé.",
   "debateChrome.backToLibrary": "← Retour à la bibliothèque",

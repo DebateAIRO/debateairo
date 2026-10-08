@@ -126,7 +126,7 @@
   "public.report.models": "Sodelujoči modeli: {models}",
   "public.report.modelsNotRecorded": "Sodelujoči modeli: niso zabeleženi",
   "public.report.disclosure": "To poročilo so napisali modeli UI na podlagi argumentov iz razprave.",
-  "public.report.notAdvice": "Poročilo, ustvarjeno z UI. Ne pomeni zdravstvenega, pravnega, finančnega ali drugega strokovnega nasveta.",
+  "public.report.notAdvice": "Poročilo, ustvarjeno z UI. Ne pomeni zdravstvenega, psihološkega, pravnega, finančnega ali drugega strokovnega nasveta.",
   "public.report.title.inShort": "Na kratko",
   "public.report.title.story": "Celotna zgodba",
   "public.report.title.why": "Zakaj ta odgovor",

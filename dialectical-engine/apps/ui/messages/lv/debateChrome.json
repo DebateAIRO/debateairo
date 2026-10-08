@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "Visu šajās debatēs — argumentus, pārskatus, vērtējumus un spriedumu — ģenerē MI modeļi; saturs ir mašīnlasāmi marķēts un var būt neprecīzs.",
+  "debateChrome.aiNotice": "Visu šajās debatēs — argumentus, pārskatus, vērtējumus un spriedumu — ģenerē MI modeļi; saturs ir mašīnlasāmi marķēts un var būt neprecīzs. Tas nav medicīniska, psiholoģiska, juridiska, finanšu vai cita profesionāla konsultācija.",
   "debateChrome.status.waiting": "Gaida sākumu. Jūsu debates sāksies pašas {time}.",
   "debateChrome.status.waitingOwnDebates": "Jūsu pārējās debates pagaidām izmanto atlikušo jūsu ierobežojuma daļu. Šīs debates sāksies pašas, tiklīdz kādas no tām beigsies.",
   "debateChrome.backToLibrary": "← Atpakaļ uz bibliotēku",

@@ -1,7 +1,7 @@
 {
   "newDebate.eyebrow": "新问题",
   "newDebate.title": "我们应该辩论什么？",
-  "newDebate.aiNotice": "本场辩论生成的一切内容 — 论证、评审、评分和裁决 — 均由 AI 模型生成，带有机器可读标记，并且可能不准确。",
+  "newDebate.aiNotice": "本场辩论生成的一切内容 — 论证、评审、评分和裁决 — 均由 AI 模型生成，带有机器可读标记，并且可能不准确。这不构成医疗、心理、法律、财务或其他专业建议。",
   "newDebate.planTier": "方案等级",
   "newDebate.free": "免费",
   "newDebate.freePromise": "所有参数均已固定。问题由您决定。",
