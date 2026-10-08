@@ -1714,6 +1714,28 @@ export class BillingRepository {
       created_at AS "createdAt", purpose FROM billing.tool_order WHERE order_id = $1`, [orderId])).rows[0];
     return row === undefined ? null : frozen(row);
   }
+  /**
+   * N22 (spec §2.20.3, ruling PR-24): the newest unrevoked saved card N9's intake stored for a tool order — what the
+   * owner-run recording's `charge --from-order` charges.
+   */
+  async latestToolOrderTokenRow(executor: BillingReadExecutor, orderId: string): Promise<CardTokenRow | null> {
+    const row = (await executor.query<CardTokenRow>(`${CARD_TOKEN_SELECT} WHERE revocation.token_id IS NULL
+      AND token.source_tool_order = $1 ORDER BY token.created_at DESC, token.token_id DESC LIMIT 1`, [orderId])).rows[0];
+    return row === undefined ? null : frozen(row);
+  }
+  /**
+   * N22 (spec §2.20.3, ruling PR-24): every verified message stored for an order whose raw bytes are still kept (14
+   * days), sealed, oldest first — what the recording's `fixture --order` copies out.
+   */
+  async storedNoticeRows(
+    executor: BillingReadExecutor, orderId: string
+  ): Promise<ReadonlyArray<Readonly<{ noticeId: string; receivedAt: Date; rawCiphertext: Buffer }>>> {
+    return (await executor.query<{ noticeId: string; receivedAt: Date; rawCiphertext: Buffer }>(`SELECT
+        notice.notice_id::text AS "noticeId", notice.received_at AS "receivedAt", raw.raw_ciphertext AS "rawCiphertext"
+      FROM billing.payment_notice AS notice
+      JOIN billing.payment_notice_raw AS raw ON raw.notice_id = notice.notice_id
+      WHERE notice.order_id = $1 ORDER BY notice.received_at, notice.notice_id`, [orderId])).rows.map(frozen);
+  }
   /** §2.15.4: the daily owner job's deletes, through 0096's SECURITY DEFINER functions (A15's guard). */
   async purgeRevokedCardTokens(now: Date): Promise<number> {
     const row = (await this.pool.query<{ purged: string }>("SELECT billing.purge_revoked_card_tokens($1) AS purged", [now])).rows[0];

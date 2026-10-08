@@ -927,6 +927,49 @@ describe("N6 — NETOPIA's rows through the repository (spec §2.5.1, §2.5.2)",
     expect(await billing.toolOrder(database.pool, `t-${"0".repeat(30)}`)).toBeNull();
     expect(await billing.purgeShortLived(new Date())).toBeGreaterThanOrEqual(0);
   });
+  it("finds the newest unrevoked saved card of a tool order (N22, ruling PR-24)", async () => {
+    const orderId = `t-${chargeIdOf().slice(0, 30)}`;
+    await inTx((c) => billing.insertToolOrder(c, { orderId, paymentEnvironment: "sandbox", createdAt: anchor, purpose: "SANDBOX_RECORDING" }));
+    expect(await billing.latestToolOrderTokenRow(database.pool, orderId)).toBeNull();
+    const card = (tokenId: string, createdAt: Date) => ({
+      tokenId, customerId: null, paymentProvider: "netopia" as const, paymentEnvironment: "sandbox" as const,
+      sourceChargeId: null, sourceToolOrder: orderId, sourceNoticeId: null, sourcePaidAt: createdAt,
+      tokenCiphertext: sealedBytes, keyId: KEY_ID, expMonth: 12, expYear: 2030, last4: null, cardCountry: null, createdAt
+    });
+    const [older, newer, newest] = [randomUUID(), randomUUID(), randomUUID()];
+    await inTx(async (c) => {
+      await billing.insertCardToken(c, card(older, new Date(anchor.getTime() + 1_000)));
+      await billing.insertCardToken(c, card(newer, new Date(anchor.getTime() + 2_000)));
+      await billing.insertCardToken(c, card(newest, new Date(anchor.getTime() + 3_000)));
+      await billing.revokeCardToken(c, { tokenId: newest, at: new Date(), reason: "TOOL_ORDER" });
+    });
+    const found = await billing.latestToolOrderTokenRow(database.pool, orderId);
+    expect(found).toMatchObject({ tokenId: newer, sourceToolOrder: orderId, revokedAt: null });
+    expect(found?.tokenCiphertext.equals(sealedBytes)).toBe(true);
+    expect(await billing.latestToolOrderTokenRow(database.pool, `t-${"0".repeat(30)}`)).toBeNull();
+  });
+  it("lists every message stored for an order with its sealed raw bytes, oldest first (N22, ruling PR-24)", async () => {
+    const orderId = `t-${chargeIdOf().slice(0, 30)}`;
+    const message = (noticeId: string, receivedAt: Date, body: string) => ({
+      noticeId, paymentProvider: "netopia" as const, paymentEnvironment: "sandbox" as const, receivedAt, bodySha256: hex64(body),
+      orderId, providerPaymentId: "7701", providerStatus: 3, amountText: "1", currency: "USD", cardCountry: "RO",
+      keyFingerprint: hex64("key"), jwtIat: null, allowedCiphertext: sealedBytes, keyId: KEY_ID
+    });
+    const [first, second, bare] = [randomUUID(), randomUUID(), randomUUID()];
+    const [firstRaw, secondRaw] = [Buffer.from([1, 2, 3]), Buffer.from([4, 5, 6])];
+    await inTx(async (c) => {
+      await billing.insertPaymentNotice(c, message(second, new Date(anchor.getTime() + 60_000), `second-${orderId}`));
+      await billing.insertPaymentNoticeRaw(c, { noticeId: second, rawCiphertext: secondRaw, keyId: KEY_ID, storedAt: new Date() });
+      await billing.insertPaymentNotice(c, message(first, anchor, `first-${orderId}`));
+      await billing.insertPaymentNoticeRaw(c, { noticeId: first, rawCiphertext: firstRaw, keyId: KEY_ID, storedAt: new Date() });
+      // A message whose raw bytes are gone (purged after 14 days) is not listed.
+      await billing.insertPaymentNotice(c, message(bare, new Date(anchor.getTime() + 120_000), `bare-${orderId}`));
+    });
+    const rows = await billing.storedNoticeRows(database.pool, orderId);
+    expect(rows.map((row) => [row.noticeId, row.receivedAt.getTime()])).toEqual([[first, anchor.getTime()], [second, anchor.getTime() + 60_000]]);
+    expect([rows[0]!.rawCiphertext.equals(firstRaw), rows[1]!.rawCiphertext.equals(secondRaw)]).toEqual([true, true]);
+    expect(await billing.storedNoticeRows(database.pool, `t-${"0".repeat(30)}`)).toEqual([]);
+  });
   it("brings a live job forward to now, never later, and answers false when none is live", async () => {
     const jobs = new BillingJobQueries(database.pool);
     const ref = chargeIdOf();
