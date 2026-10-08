@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getSettingsView } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
 import { AccountErasureControls } from "@/components/AccountErasureControls";
+import { DataExportCard } from "@/components/DataExportCard";
 import {
   ChangeEmailScreen,
   EmailChangeLinkScreen,
@@ -92,6 +93,7 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog }: Required<Set
           />
           <SessionControls catalog={catalog} locale={locale} />
           <ConsentSettingsPanel />
+          <DataExportCard catalog={catalog} locale={locale} />
           <AccountErasureControls catalog={catalog} locale={locale} />
         </div>
       </div>

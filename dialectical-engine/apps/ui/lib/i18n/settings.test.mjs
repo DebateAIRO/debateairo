@@ -19,7 +19,9 @@ const ownedFiles = [
   "components/SettingsPageClient.tsx",
   "components/EmailSettings.tsx",
   "components/EvaluatorDevMenu.tsx",
-  "components/auth/SecurityActionResume.tsx"
+  "components/auth/SecurityActionResume.tsx",
+  "components/DataExportCard.tsx",
+  "components/ExportDownloadClient.tsx"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");
 const sources = new Map(ownedFiles.map((path) => [path, source(path)]));

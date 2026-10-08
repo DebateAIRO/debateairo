@@ -1,0 +1,120 @@
+"use client";
+import { useEffect, useState } from "react";
+import { ContractHttpError, type ContractClient, type DataExportStatus } from "@debateai/contract";
+import { contractClient } from "@/lib/api";
+import { useSelectedAuthCatalog } from "@/components/AuthShell";
+import { SecurityConfirmation } from "@/components/auth/SecurityConfirmation";
+import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
+import type { LocaleCode } from "@/lib/i18n/locales";
+
+export function refusalMessage(failure: unknown, catalog: MessageCatalog, locale: LocaleCode): string {
+  if (!(failure instanceof ContractHttpError)) return t(catalog, "settings.export.unavailable");
+  if (failure.code === "SESSION_REQUIRED" || failure.serverCode === "COOKIE_SESSION_REQUIRED"
+    || failure.serverCode === "SESSION_REQUIRED") return t(catalog, "settings.export.sessionExpired");
+  switch (failure.serverCode) {
+    case "EXPORT_UNAVAILABLE": return t(catalog, "settings.export.unavailable");
+    case "STEP_UP_REQUIRED": return t(catalog, "settings.export.notAuthorized");
+    case "EXPORT_EMAIL_REQUIRED": return t(catalog, "settings.export.emailRequired");
+    case "EXPORT_ACCOUNT_ERASING": return t(catalog, "settings.export.erasing");
+    case "EXPORT_ACCOUNT_HELD": return t(catalog, "settings.export.held");
+    case "EXPORT_IN_PROGRESS": return t(catalog, "settings.export.inProgress");
+    case "EXPORT_RATE_LIMITED":
+      return failure.retryAfterSeconds === null
+        ? t(catalog, "settings.export.unavailable")
+        : t(catalog, "settings.export.rateLimited", {
+            time: formatDate(locale, new Date(Date.now() + failure.retryAfterSeconds * 1000).toISOString(),
+              { dateStyle: "medium", timeStyle: "short" })
+          });
+    default: return t(catalog, "settings.export.unavailable");
+  }
+}
+
+export function DataExportCard({ catalog, locale, client = contractClient }: {
+  catalog: MessageCatalog;
+  locale: LocaleCode;
+  client?: ContractClient;
+}) {
+  const authCatalog = useSelectedAuthCatalog(locale);
+  const [status, setStatus] = useState<DataExportStatus | null>(null);
+  const [statusUnavailable, setStatusUnavailable] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [noMethod, setNoMethod] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const refresh = () => client.readDataExportStatus().then(
+      (next) => { if (active) { setStatus(next); setStatusUnavailable(false); } },
+      () => { if (active) setStatusUnavailable(true); }
+    );
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 5_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [client]);
+
+  async function beginConfirmation(): Promise<void> {
+    setMessage(null);
+    try {
+      const methods = await client.authMethods();
+      if (methods.available_step_up_methods.length === 0) {
+        setNoMethod(true);
+        setConfirming(false);
+      } else {
+        setNoMethod(false);
+        setConfirming(true);
+      }
+    } catch {
+      setMessage(t(catalog, "settings.export.unavailable"));
+    }
+  }
+
+  async function request(grantToken: string): Promise<void> {
+    setConfirming(false);
+    setRequesting(true);
+    setMessage(null);
+    try {
+      setStatus(await client.requestDataExport(grantToken, locale));
+      setStatusUnavailable(false);
+    } catch (failure) {
+      setMessage(refusalMessage(failure, catalog, locale));
+      try { setStatus(await client.readDataExportStatus()); setStatusUnavailable(false); }
+      catch { setStatusUnavailable(true); }
+    } finally {
+      setRequesting(false);
+    }
+  }
+
+  return (
+    <section className="setCard" aria-labelledby="export-heading">
+      <h2 className="setCardTitle" id="export-heading">{t(catalog, "settings.export.title")}</h2>
+      <p className="setCardHint">{t(catalog, "settings.export.hint")}</p>
+      {status === null && !statusUnavailable ? <p className="setStatus" role="status">{t(catalog, "settings.export.checking")}</p> : null}
+      {statusUnavailable ? <p className="setStatus" role="status">{t(catalog, "settings.export.statusUnavailable")}</p> : null}
+      {status?.status === "PREPARING" ? <p className="setStatus" role="status">{t(catalog, "settings.export.preparing", {
+        time: formatDate(locale, status.requested_at, { dateStyle: "medium", timeStyle: "short" })
+      })}</p> : null}
+      {status?.status === "SENT" ? <p className="setStatus" role="status">{t(catalog, "settings.export.sent", {
+        time: formatDate(locale, status.requested_at, { dateStyle: "medium", timeStyle: "short" }),
+        expires: formatDate(locale, status.expires_at, { dateStyle: "medium", timeStyle: "short" })
+      })}</p> : null}
+      {status?.status === "FAILED" ? <p className="setStatus" role="status">{t(catalog, "settings.export.failed")}</p> : null}
+      {noMethod ? <p className="setStatus" role="status">{t(catalog, "settings.export.noMethod")} <a className="setBtn" href="/settings/security">{t(catalog, "settings.security.title")}</a></p> : null}
+      {status !== null && (status.status === "NONE" || status.status === "FAILED" || status.status === "SENT") && !noMethod ? (
+        <div className="setCardRow">
+          <button className="setBtn" type="button" disabled={requesting || confirming} onClick={() => { void beginConfirmation(); }}>
+            {requesting ? t(catalog, "settings.export.requesting")
+              : status.status === "SENT" ? t(catalog, "settings.export.requestAgain")
+              : t(catalog, "settings.export.request")}
+          </button>
+        </div>
+      ) : null}
+      {status?.status === "SENT" ? <p className="setCardNote">{t(catalog, "settings.export.supersedes")}</p> : null}
+      {confirming ? <SecurityConfirmation catalog={authCatalog} client={client} authorization={{ action: "EXPORT_DATA" }}
+        onError={() => setMessage(t(catalog, "settings.export.notAuthorized"))}
+        onConfirmed={(result) => request(result.step_up_grant.token)}
+        onCancel={() => { setConfirming(false); setMessage(null); }} /> : null}
+      {message ? <p className="setStatus" role="status">{message}</p> : null}
+    </section>
+  );
+}
