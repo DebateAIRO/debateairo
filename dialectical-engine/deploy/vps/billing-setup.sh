@@ -9,7 +9,10 @@
 # Each section asks its values one at a time and says where to find each one. Secrets are read with
 # systemd-ask-password (never shown, never on a command line or in shell history) and written as custody files: 0600,
 # owned by debateai-api, in the 0700 directory /etc/debateai/api/billing, each through a temporary file in the same
-# directory and one rename. An existing key file is kept unless --replace names its section. NETOPIA's public-key file
+# directory and one rename. Every file is first staged (written, given its mode and owner, under a temporary name in
+# its own directory) and renamed into place only once every question has been answered, right before api.env's block
+# is rewritten: a run that stops early (a wrong answer, Ctrl-C, a lost connection) leaves every key file as it was and
+# removes what it staged. An existing key file is kept unless --replace names its section. NETOPIA's public-key file
 # is root's, 0644, never writable by the API's user. The plain values go into ONE block of /etc/debateai/api.env,
 # between the two marker lines below: only that block is rewritten, a dated copy of the file is kept beside it with
 # its mode and owner, and a line outside the block that sets one of the block's keys is commented out with a note
@@ -47,13 +50,22 @@ SECTIONS=""
 REPLACE=" "
 WORK=""
 PENDING=""
+STAGED_TMP=""
+TAB="$(printf '\t')"
 ANSWER=""
 VALUE=""
 
 refuse() { printf '%s\n' "$1" >&2; exit "${2:-1}"; }
 say() { printf '%s\n' "$*" >&2; }
+# On every exit (bash also runs this trap on INT, TERM and HUP): the staged files not yet renamed, then the work folder.
 cleanup() {
+  local staged
   if [ -n "$PENDING" ]; then rm -f "$PENDING"; fi
+  if [ -n "$WORK" ] && [ -f "$WORK/staged" ]; then
+    while IFS="$TAB" read -r staged _; do
+      if [ -n "$staged" ]; then rm -f "$staged"; fi
+    done < "$WORK/staged"
+  fi
   if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
 }
 trap cleanup EXIT
@@ -114,16 +126,28 @@ set_owner() { # <owner:group> <the file now> <its final path>
   fi
 }
 
-# Writes standard input to <path> through a temporary file in the same directory and one rename.
-write_file() { # <path> <mode> <owner:group>
+# Stages standard input for <path>: a temporary file in the same directory, with its final mode and owner, recorded
+# (with the line to print once it is saved) in $WORK/staged. Sets STAGED_TMP. commit_staged renames it into place.
+stage_file() { # <path> <mode> <owner:group> <the line to print once saved>
   local path="$1" tmp
   tmp="$(mktemp "$(dirname "$path")/.billing-setup.XXXXXXXX")"
-  PENDING="$tmp"
+  printf '%s%s%s%s%s\n' "$tmp" "$TAB" "$path" "$TAB" "$4" >> "$WORK/staged"
   cat > "$tmp"
   chmod "$2" "$tmp"
   set_owner "$3" "$tmp" "$path"
-  mv -f "$tmp" "$path"
-  PENDING=""
+  STAGED_TMP="$tmp"
+}
+
+# Renames every staged file onto its final path, in the order staged; asks nothing.
+commit_staged() {
+  local tmp path line
+  [ -f "$WORK/staged" ] || return 0
+  while IFS="$TAB" read -r tmp path line; do
+    mv -f "$tmp" "$path"
+    say ""
+    say "$line"
+  done < "$WORK/staged"
+  : > "$WORK/staged"
 }
 
 ensure_billing_dir() {
@@ -150,7 +174,7 @@ read_secret() { # <prompt>
     say "$1"
     read_line
   else
-    ANSWER="$(systemd-ask-password "$1")" || refuse "BILLING_SETUP_ANSWER_MISSING"
+    ANSWER="$(systemd-ask-password --timeout=0 "$1")" || refuse "BILLING_SETUP_ANSWER_MISSING"
   fi
 }
 too_many() { # <tries so far> <name>
@@ -197,10 +221,10 @@ kept() { # <path> <section>: true (and says so) when the file stays as it is
   return 1
 }
 
-save_secret() { # <path>; the secret in ANSWER, written as "<prefix><ANSWER>"
-  write_file "$1" 0600 debateai-api:debateai-api < <(printf '%s%s\n' "${2:-}" "$ANSWER")
+save_secret() { # <path>; the secret in ANSWER, staged as "<prefix><ANSWER>"
+  stage_file "$1" 0600 debateai-api:debateai-api "Saved $(basename "$1") (mode 0600, owned by debateai-api)." \
+    < <(printf '%s%s\n' "${2:-}" "$ANSWER")
   ANSWER=""
-  say "Saved $(basename "$1") (mode 0600, owned by debateai-api)."
 }
 
 published_fingerprint() { sed -n 's/^# SPKI SHA-256: \([0-9a-f]\{64\}\)$/\1/p' "$PUBLISHED_KEY" | head -n 1; }
@@ -267,9 +291,9 @@ trusted_keys() {
     tries=$((tries + 1))
     too_many "$tries" NETOPIA_IPN_KEYS
   done
-  write_file "$KEYS_FILE" 0644 root:root < "$WORK/keys.pem"
-  say "Saved netopia-ipn-keys.pem (mode 0644, owned by root, not writable by the API's user)."
-  print_fingerprints "$KEYS_FILE"
+  stage_file "$KEYS_FILE" 0644 root:root \
+    "Saved netopia-ipn-keys.pem (mode 0644, owned by root, not writable by the API's user)." < "$WORK/keys.pem"
+  print_fingerprints "$STAGED_TMP"
 }
 
 section_netopia() {
@@ -403,6 +427,7 @@ for section in $SECTIONS; do
   else section_owner_email
   fi
 done
+commit_staged
 rewrite_api_env
 
 if [ "$TEST_MODE" = 1 ]; then

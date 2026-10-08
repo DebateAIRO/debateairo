@@ -2,7 +2,7 @@
 // N21 (spec 2026-10-05 §2.17.2): the guided setup, run in a temporary root with its answers on standard input (the
 // script's test-only switch, refused anywhere else). The files, their modes and owners, the one block of api.env, the
 // commented duplicates, the backup, the refusals, and that no answer is ever printed.
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash, generateKeyPairSync } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -15,6 +15,7 @@ const POS = ["QW12", "ER34", "TY56", "UI78", "OP90"].join("-");
 const API_KEY = ["netopia", "setup", "key", "6b1f"].join("-");
 const NEW_API_KEY = ["netopia", "setup", "key", "live", "77c0"].join("-");
 const QUADERNO_KEY = ["quaderno", "setup", "key", "93ad"].join("-");
+const NEW_QUADERNO_KEY = ["quaderno", "setup", "key", "second", "c41e"].join("-");
 const SMARTBILL_TOKEN = ["smartbill", "setup", "token", "4e7c"].join("-");
 const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const PEM = publicKey.export({ type: "spki", format: "pem" }).toString();
@@ -75,6 +76,12 @@ describe("N21 deploy/vps/billing-setup.sh", () => {
     expect(script).toContain("set -euo pipefail");
     expect(script).not.toMatch(/set -[a-z]*x|set -o xtrace|<<</u);
     expect(script).toContain("systemd-ask-password");
+    // The hidden prompt waits while the owner fetches the key from NETOPIA's, Quaderno's or SmartBill's admin
+    // (systemd-ask-password gives up after 90 s by default).
+    expect(script).toContain("systemd-ask-password --timeout=0");
+    // Committed executable, as vps-deployment-baseline.test.ts pins geoip-refresh.sh.
+    expect(execFileSync("git", ["ls-files", "-s", "--", "deploy/vps/billing-setup.sh"], { cwd: process.cwd(), encoding: "utf8" }))
+      .toMatch(/^100755 /u);
   });
 
   it("writes every key file with its mode and owner, one block in api.env, the backup, and prints no answer", async () => {
@@ -171,6 +178,39 @@ describe("N21 deploy/vps/billing-setup.sh", () => {
     expect(await readFile(join(root, "etc/debateai/api.env"), "utf8")).toBe(ORIGINAL_ENV);
     expect(await backupsOf(root)).toEqual([]);
     expect((await readdir(join(root, "etc/debateai"))).filter((name) => name.startsWith("."))).toEqual([]);
+  });
+
+  it("leaves every key file, api.env and the backups as they were when a run stops before its end", async () => {
+    const root = await stage();
+    expect((await run(["--test-root", root], ALL_ANSWERS)).code).toBe(0);
+    const billing = join(root, "etc/debateai/api/billing");
+    const keysBefore = await readFile(join(billing, "netopia-ipn-keys.pem"));
+    const envBefore = await readFile(join(root, "etc/debateai/api.env"));
+    const leftovers = async () => [
+      ...(await readdir(billing)).filter((name) => name.startsWith(".")),
+      ...(await readdir(join(root, "etc/debateai"))).filter((name) => name.startsWith("."))
+    ];
+
+    const netopia = await run(["--test-root", root, "--replace", "netopia"], ["live", "", NEW_API_KEY, "3", "3", "3"]);
+    expect(netopia.code, netopia.output).toBe(1);
+    expect(netopia.output).toContain("BILLING_SETUP_ANSWER_INVALID:NETOPIA_IPN_KEYS");
+    expect(await readFile(join(billing, "netopia-api-key"), "utf8")).toBe(`${API_KEY}\n`);
+    expect((await readFile(join(billing, "netopia-ipn-keys.pem"))).equals(keysBefore)).toBe(true);
+    expect((await readFile(join(root, "etc/debateai/api.env"))).equals(envBefore)).toBe(true);
+    expect(await backupsOf(root)).toHaveLength(1);
+    expect(await leftovers()).toEqual([]);
+    expect(netopia.output).not.toContain(NEW_API_KEY);
+    expect(netopia.output).not.toContain("Saved ");
+
+    const invoicers = await run(["--test-root", root, "--replace", "quaderno", "--replace", "smartbill"],
+      ["", NEW_QUADERNO_KEY, "http://x", "http://x", "http://x"]);
+    expect(invoicers.code, invoicers.output).toBe(1);
+    expect(invoicers.output).toContain("BILLING_SETUP_ANSWER_INVALID:SMARTBILL_API_BASE_URL");
+    expect(await readFile(join(billing, "quaderno-api-key"), "utf8")).toBe(`${QUADERNO_KEY}\n`);
+    expect((await readFile(join(root, "etc/debateai/api.env"))).equals(envBefore)).toBe(true);
+    expect(await backupsOf(root)).toHaveLength(1);
+    expect(await leftovers()).toEqual([]);
+    expect(invoicers.output).not.toContain(NEW_QUADERNO_KEY);
   });
 
   it("refuses a damaged block before asking anything", async () => {
