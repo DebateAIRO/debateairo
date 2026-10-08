@@ -370,12 +370,12 @@ export interface ContractClient {
   readRunVisibility(runId: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   unpublishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
-  scheduleAccountErasure(stepUpGrant:string):Promise<{
-    status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;
+  scheduleAccountErasure(stepUpGrant:string,deletePublicDebates?:boolean):Promise<{
+    status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;delete_public_debates:boolean;
   }>;
   readAccountErasure():Promise<
     | { status:"NONE" }
-    | { status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string }
+    | { status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;delete_public_debates:boolean }
   >;
   cancelAccountErasure(cancellationRef:string):Promise<{ status:"CANCELLED" }>;
   deletePrivateDebate(runId:string,stepUpGrant:string):Promise<{
@@ -639,10 +639,11 @@ export function createContractClient(
           copies_may_persist_acknowledged: true
         }) }
     ),
-    scheduleAccountErasure:(stepUpGrant:string)=>request(
+    scheduleAccountErasure:(stepUpGrant:string,deletePublicDebates?:boolean)=>request(
       "/v1/account",AccountErasureStatusSchema,
       { method:"DELETE",body:JSON.stringify({
-          confirmation:"DELETE MY ACCOUNT",step_up_grant:stepUpGrant
+          confirmation:"DELETE MY ACCOUNT",step_up_grant:stepUpGrant,
+          delete_public_debates:deletePublicDebates===true
         }) }
     ).then((status)=>{
       if (status.status==="NONE") throw new ContractHttpError(
