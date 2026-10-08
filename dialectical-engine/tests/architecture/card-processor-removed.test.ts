@@ -32,7 +32,9 @@ const HISTORY_FILES: ReadonlyArray<string> = Object.freeze([
   ".gitleaksignore",
   "dialectical-engine/docs/superpowers/specs/2026-09-29-paid-plans-and-payments-design.md",
   "dialectical-engine/docs/superpowers/plans/2026-09-29-paid-plans-and-payments.md",
-  "dialectical-engine/docs/superpowers/specs/2026-10-05-netopia-payments-design.md"
+  "dialectical-engine/docs/superpowers/specs/2026-10-05-netopia-payments-design.md",
+  // dev's auth lineage plan (merged at dedbb2d50), which names the billing tables of its time.
+  "dialectical-engine/docs/superpowers/plans/2026-10-06-auth-dev-preview-integration.md"
 ]);
 const HISTORY_PREFIXES: ReadonlyArray<string> = Object.freeze([
   // This plan.
@@ -45,7 +47,12 @@ const MIGRATIONS: ReadonlyArray<string> = Object.freeze([
   "0084_billing_entitlement.sql", "0085_billing_customers_subscriptions.sql", "0086_billing_charges_invoices.sql",
   "0087_billing_outbox_cancel.sql", "0088_billing_withdrawal_step_up.sql", "0092_billing_query_indexes.sql",
   "0093_billing_runtime_role.sql", "0096_billing_netopia.sql"
-].map((name) => `dialectical-engine/migrations/${name}`));
+].map((name) => `dialectical-engine/migrations/${name}`)).concat([
+  // dev's auth lineage (merged at dedbb2d50): 0093's compatibility executable and the effective-capability verifier,
+  // both bound by SHA-256 in migrations/lineage/auth-dev-20261006.json, list the billing tables 0085-0087 created.
+  "dialectical-engine/migrations/compatibility/auth-dev-20261006/0093_billing_runtime_role.sql",
+  "dialectical-engine/migrations/lineage/verify-effective-capabilities.sql"
+]);
 /**
  * The suites that seed rows of the old provider and prove 0096 keeps them inert, and (PR-33) the proof that a live boot
  * still counts that era's open rows as another payment system's (spec 2026-10-05 §2.5.4).

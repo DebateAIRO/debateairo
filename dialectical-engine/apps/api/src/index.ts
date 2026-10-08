@@ -2473,7 +2473,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   void api.register(async apple=>{
     // Replace the inherited billing-only parser in this callback's encapsulated scope.
-    // The parent still refuses form bodies on all routes except the xMoney notification.
+    // The parent registers no form-body parser (its one extra parser is NETOPIA's notify route's), so form bodies
+    // stay refused everywhere else.
     if (apple.hasContentTypeParser('application/x-www-form-urlencoded')) apple.removeContentTypeParser('application/x-www-form-urlencoded');
     apple.addContentTypeParser('application/x-www-form-urlencoded',{parseAs:'string',bodyLimit:8192},(_request,body,done)=>{
       try {const form=new URLSearchParams(body as string);const value:Record<string,string>={};for(const [key,member] of form){if(Object.hasOwn(value,key)||!['state','code','error','error_description','user'].includes(key))throw new SocialAuthError('SOCIAL_PROOF_INVALID');value[key]=member;}done(null,value);}catch{done(new SocialAuthError('SOCIAL_PROOF_INVALID'));}
