@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Var vi erbjuder DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vi erbjuder DebateAI till personer som bor i [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten." }
+      { kind: "p", text: "Vi erbjuder DebateAI till personer som bor i [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "USA (endast om landet anges i avsnitt 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Vi erbjuder inte DebateAI till personer som bor i Tennessee." },
       { kind: "p", text: "Skiljeavtal och avstående från grupptalan. Om du bor i USA samtycker du och DebateAIRO till att varje tvist som uppkommer med anledning av dessa villkor eller tjänsten ska avgöras genom bindande individuellt skiljeförfarande som administreras av [the American Arbitration Association / JAMS] enligt dess konsumentregler, i stället för i domstol, med undantag för att var och en av oss får väcka ett individuellt anspråk vid domstol för mindre tvistemål. Du får välja att stå utanför genom att skicka e-post till [address] inom 30 dagar från det att du först godkände dessa villkor. Detta avtal regleras av Federal Arbitration Act. Vi betalar ansökningsavgifterna för skiljeförfarandet. Du och DebateAIRO avstår, i den utsträckning lagen tillåter, från grupptalan, kollektiv talan och representativ talan. Detta avsnitt gäller endast framåt i tiden och gäller inte anspråk som uppkom innan du godkände det." },
       { kind: "p", text: "Meddelanden och borttaganden. Intima bilder utan samtycke kan rapporteras på [URL] utan konto och tas bort inom 48 timmar från en giltig begäran. Upphovsrättsliga klagomål skickas till vårt utsedda ombud som anges i avsnitt 16." },
       { kind: "p", text: "Delstatsspecifikt. Kalifornien: villkoren om automatisk förnyelse i avsnitt 12 gäller; du får säga upp online när som helst; vi bevarar ditt samtycke till förnyelsevillkoren i minst tre år. New York: du får säga upp inom 14 dagar från en debitering till ett höjt pris och få en proportionell återbetalning. Texas och Nebraska: vi säljer inte känsliga personuppgifter. Washington: vårt integritetsmeddelande om konsumenthälsouppgifter på [URL] gäller för hälsorelaterade uppgifter. Colorado: ingenting i tjänsten fattar beslut med betydande följder om dig. Vår integritetspolicy, bilaga B.3, beskriver hur vi behandlar dina uppgifter och vilka integritetsrättigheter du har enligt lagen i din delstat." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "f48fc29be04b2e09a92c67c7f0b05c768662c124cf1cf7e0652c6d4b18474365",
+  sha256: "b90363074b466329500ebb00d3d7948df30a0a7cae4dd9335d62c94a256bf003",
   eyebrow: "ANVÄNDARVILLKOR · v2.1 · GÄLLER FRÅN [DATE]",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DebateAIRO S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",

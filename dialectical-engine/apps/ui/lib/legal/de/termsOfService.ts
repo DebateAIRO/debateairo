@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Wo wir DebateAI anbieten",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wir bieten DebateAI Personen an, die in [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
+      { kind: "p", text: "Wir bieten DebateAI Personen an, die in [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Vereinigte Staaten (nur wenn in Abschnitt 2 aufgeführt)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Wir bieten DebateAI Personen, die in Tennessee leben, nicht an." },
       { kind: "p", text: "Schiedsvereinbarung und Verzicht auf Sammelklagen. Wenn Sie in den Vereinigten Staaten leben, vereinbaren Sie und DebateAIRO, alle Streitigkeiten aus diesen Nutzungsbedingungen oder dem Dienst durch ein verbindliches individuelles Schiedsverfahren beizulegen, das von [the American Arbitration Association / JAMS] nach deren Verbraucherschiedsordnung durchgeführt wird, statt vor Gericht; beide Parteien dürfen jedoch einen individuellen Anspruch vor einem Gericht für geringfügige Forderungen geltend machen. Sie können widersprechen, indem Sie innerhalb von 30 Tagen nach der erstmaligen Annahme dieser Nutzungsbedingungen eine E-Mail an [address] senden. Diese Vereinbarung unterliegt dem Federal Arbitration Act. Wir tragen die Anmeldegebühren des Schiedsverfahrens. Auf Sammel-, Kollektiv- und Verbandsklagen wird im gesetzlich zulässigen Umfang verzichtet. Dieser Abschnitt gilt nur für die Zukunft und nicht für Ansprüche, die vor seiner Annahme entstanden sind." },
       { kind: "p", text: "Mitteilungen und Entfernung. Intime Abbildungen, die ohne Einwilligung veröffentlicht wurden, können ohne Konto unter [URL] gemeldet werden und werden innerhalb von 48 Stunden nach Eingang eines wirksamen Antrags entfernt. Urheberrechtsbeschwerden sind an unseren in Abschnitt 16 genannten Beauftragten zu richten." },
       { kind: "p", text: "Bundesstaatsspezifische Regelungen. Kalifornien: Es gelten die Bestimmungen zur automatischen Verlängerung in Abschnitt 12; Sie können jederzeit online kündigen; wir bewahren Ihre Zustimmung zu den Verlängerungsbedingungen mindestens drei Jahre lang auf. New York: Sie können innerhalb von 14 Tagen nach jeder Abbuchung zu einem erhöhten Preis kündigen und eine anteilige Erstattung erhalten. Texas und Nebraska: Wir verkaufen keine sensiblen personenbezogenen Daten. Washington: Unser Datenschutzhinweis zu Verbrauchergesundheitsdaten unter [URL] gilt für gesundheitsbezogene Informationen. Colorado: Der Dienst trifft keine Entscheidungen mit erheblichen Folgen über Sie. Für Ihre Daten und Ihre Datenschutzrechte nach dem Recht der Bundesstaaten gilt unsere Datenschutzerklärung, Anhang B.3." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "444b7b50ad1f5d04f9e08b4e453996755681c966e5b86d7d399dc94a7a0c0ffa",
+  sha256: "3e586b0dc77a72dde3c3161a49244b68e8b151bcf41785816e7a716f23b74aa8",
   eyebrow: "NUTZUNGSBEDINGUNGEN · v2.1 · GÜLTIG AB [DATE]",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DebateAIRO S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",

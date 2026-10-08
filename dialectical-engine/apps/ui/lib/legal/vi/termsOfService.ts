@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Nơi chúng tôi cung cấp DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Chúng tôi cung cấp DebateAI cho những người sống tại [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ." }
+      { kind: "p", text: "Chúng tôi cung cấp DebateAI cho những người sống tại [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hoa Kỳ (chỉ khi được liệt kê tại mục 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Chúng tôi không cung cấp DebateAI cho những người sống tại Tennessee." },
       { kind: "p", text: "Thỏa thuận trọng tài và từ bỏ khởi kiện tập thể. Nếu sống tại Hoa Kỳ, bạn và DebateAIRO đồng ý giải quyết mọi tranh chấp phát sinh từ các Điều khoản này hoặc dịch vụ bằng trọng tài cá nhân có tính ràng buộc do [the American Arbitration Association / JAMS] quản lý theo quy tắc dành cho người tiêu dùng của tổ chức đó, thay vì tại tòa án, ngoại trừ việc mỗi bên có thể đưa khiếu kiện cá nhân ra tòa tiểu ngạch. Bạn có thể từ chối tham gia bằng cách gửi email đến [address] trong vòng 30 ngày kể từ lần đầu chấp nhận các Điều khoản này. Thỏa thuận này chịu sự điều chỉnh của Đạo luật Trọng tài Liên bang. Chúng tôi thanh toán phí nộp đơn trọng tài. Việc khởi kiện tập thể, khởi kiện chung và khởi kiện đại diện bị từ bỏ trong phạm vi pháp luật cho phép. Mục này chỉ áp dụng trong tương lai và không áp dụng cho các khiếu kiện phát sinh trước khi bạn chấp nhận mục này." },
       { kind: "p", text: "Thông báo và gỡ bỏ. Hình ảnh riêng tư không có sự đồng thuận có thể được báo cáo tại [URL] mà không cần tài khoản và được gỡ bỏ trong vòng 48 giờ kể từ khi nhận yêu cầu hợp lệ. Khiếu nại về quyền tác giả được gửi đến đại diện được chỉ định của chúng tôi nêu tại mục 16." },
       { kind: "p", text: "Quy định riêng theo tiểu bang. California: điều khoản tự động gia hạn tại mục 12 được áp dụng; bạn có thể hủy trực tuyến bất kỳ lúc nào; chúng tôi lưu giữ sự đồng ý của bạn với điều khoản gia hạn trong ít nhất ba năm. New York: bạn có thể hủy trong vòng 14 ngày kể từ bất kỳ khoản thu nào theo giá đã tăng và nhận khoản hoàn tiền theo tỷ lệ. Texas và Nebraska: chúng tôi không bán dữ liệu cá nhân nhạy cảm. Washington: Thông báo quyền riêng tư về dữ liệu sức khỏe người tiêu dùng của chúng tôi tại [URL] áp dụng cho thông tin liên quan đến sức khỏe. Colorado: không nội dung nào trong dịch vụ đưa ra quyết định có hậu quả đối với bạn. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn và các quyền riêng tư của bạn theo luật tiểu bang." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "f60d8e119aa1719472344d4b2013da8b2ae9c5c5bbafea4a86b5d6e1a717e83c",
+  sha256: "0684017d38ab27959e5274ae76c211d7c1f90755a15f148a4b8babfdf4145b1c",
   eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.1 · CÓ HIỆU LỰC [DATE]",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DebateAIRO S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",

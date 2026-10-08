@@ -5,6 +5,7 @@ import {
   COUNTRY_POLICY_ROW_KEY,
   countryPolicyFromValue,
   countryRule,
+  declaredRegionRule,
   loadBootstrapRegister,
   readCountryPolicy,
   type CountryPolicy
@@ -68,6 +69,32 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
     expect(countryRule(policy, "ro")).toEqual(countryRule(policy, "RO"));
     expect(policy.unknownIp).toBe("REFUSE");
     expect(policy.tor).toBe("REFUSE");
+  });
+
+  it("closes Tennessee by the Terms (owner's amendment of 8 October 2026) and leaves every other state on the US rule", () => {
+    const excluded = { signup: false, pay: false, reason: "TERMS_EXCLUDED", blocked: false };
+    expect(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value.us_states).toEqual({ TN: { signup: false, pay: false, reason: "TERMS_EXCLUDED" } });
+    expect(policy.usStates).toEqual({ TN: excluded });
+    expect(declaredRegionRule(policy, { country: "US", usState: "TN" })).toEqual(excluded);
+    expect(declaredRegionRule(policy, { country: "US", usState: "TX" })).toEqual(countryRule(policy, "US"));
+    expect(declaredRegionRule(policy, { country: "RO", usState: null })).toEqual(countryRule(policy, "RO"));
+    // A state is declared, never seen in an address: Tennessee does not touch new debates or IP sign-up.
+    expect(policy.usStates.TN!.blocked).toBe(false);
+    expect(decideSignup(policy, { ipCountry: "US", tor: false })).toEqual({ kind: "ALLOW" });
+  });
+
+  it("refuses a state outside the picker's list, a blocked state, and keeps a row without us_states valid", () => {
+    expect(invalid((value) => { value.us_states = { ZZ: { signup: false, pay: false, reason: "TERMS_EXCLUDED" } }; }))
+      .toBe("COUNTRY_POLICY_INVALID");
+    expect(invalid((value) => { value.us_states = { tn: { signup: false, pay: false, reason: "TERMS_EXCLUDED" } }; }))
+      .toBe("COUNTRY_POLICY_INVALID");
+    expect(invalid((value) => { value.us_states = { TN: { signup: false, pay: false, reason: "SANCTIONS", blocked: true } }; }))
+      .toBe("COUNTRY_POLICY_INVALID");
+    expect(invalid((value) => { value.us_states = { TN: { signup: false, pay: true, reason: "OFFERED" } }; }))
+      .toBe("COUNTRY_POLICY_INVALID");
+    expect(invalid((value) => { delete value.us_states; })).toBeUndefined();
+    const { us_states: _states, ...older } = COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value;
+    expect(countryPolicyFromValue(older, "older").usStates).toEqual({});
   });
 
   it("refuses a country that pays without sign-up, a blocked country with a switch on, and a bad code", () => {

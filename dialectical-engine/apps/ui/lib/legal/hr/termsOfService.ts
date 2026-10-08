@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Gdje nudimo DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI nudimo osobama koje žive u [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu." }
+      { kind: "p", text: "DebateAI nudimo osobama koje žive u [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Sjedinjene Američke Države (samo ako su navedene u odjeljku 2.)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Ne nudimo DebateAI osobama koje žive u Tennesseeju." },
       { kind: "p", text: "Sporazum o arbitraži i odricanje od skupne tužbe. Ako živite u Sjedinjenim Američkim Državama, vi i DebateAIRO suglasni ste da ćete svaki spor koji proizlazi iz ovih Uvjeta ili usluge rješavati obvezujućom pojedinačnom arbitražom koju vodi [the American Arbitration Association / JAMS] prema svojim pravilima za potrošače, umjesto pred sudom, osim što svatko od nas može podnijeti pojedinačni zahtjev sudu za sporove male vrijednosti. Možete se izuzeti slanjem e-poruke na [address] u roku od 30 dana od prvog prihvaćanja ovih Uvjeta. Ovaj je sporazum uređen Saveznim zakonom o arbitraži. Mi plaćamo pristojbe za pokretanje arbitraže. Skupne, kolektivne i predstavničke tužbe isključene su u mjeri dopuštenoj zakonom. Ovaj se odjeljak primjenjuje samo ubuduće i ne primjenjuje se na zahtjeve nastale prije nego što ste ga prihvatili." },
       { kind: "p", text: "Obavijesti i uklanjanja. Intimne snimke objavljene bez privole mogu se prijaviti na [URL] bez računa i uklanjaju se u roku od 48 sati od valjanog zahtjeva. Pritužbe zbog autorskih prava upućuju se našem imenovanom zastupniku navedenom u odjeljku 16." },
       { kind: "p", text: "Posebno po saveznim državama. Kalifornija: primjenjuju se uvjeti automatskog obnavljanja iz odjeljka 12.; u bilo kojem trenutku možete otkazati putem interneta; vašu privolu na uvjete obnavljanja čuvamo najmanje tri godine. New York: možete otkazati u roku od 14 dana od svakog terećenja po povećanoj cijeni i dobiti razmjerni povrat. Teksas i Nebraska: ne prodajemo osjetljive osobne podatke. Washington: na zdravstvene podatke primjenjuje se naša Obavijest o privatnosti zdravstvenih podataka potrošača na [URL]. Colorado: ništa u usluzi ne donosi odluke koje imaju znatan učinak na vas. Vaše podatke i vaša prava na privatnost prema zakonima vaše savezne države uređuje Prilog B.3 naših Pravila o privatnosti." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "dcfe839e64755ca9652f7a0217799b8b00042eed472dec4e0c22796c9c47576c",
+  sha256: "f4ea3f34aa7c8d2951701d517b5d4f972dbb84585d4d9c0405090d0d55c6579c",
   eyebrow: "UVJETI KORIŠTENJA · v2.1 · NA SNAZI OD [DATE]",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DebateAIRO S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",

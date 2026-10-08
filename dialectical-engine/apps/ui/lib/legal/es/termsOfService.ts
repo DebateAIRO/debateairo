@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dónde ofrecemos DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Ofrecemos DebateAI a las personas que viven en [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. No lo ofrecemos en ningún otro lugar. Si vive fuera de esos países, es posible que pueda acceder al sitio, pero no dirigimos el servicio a usted, no aceptamos pagos suyos y estos Términos y nuestra Política de privacidad no están adaptados a la legislación de su país. El anexo A establece qué se aplica en cada región en la que prestamos servicio." }
+      { kind: "p", text: "Ofrecemos DebateAI a las personas que viven en [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. No lo ofrecemos en ningún otro lugar. Si vive fuera de esos países, es posible que pueda acceder al sitio, pero no dirigimos el servicio a usted, no aceptamos pagos suyos y estos Términos y nuestra Política de privacidad no están adaptados a la legislación de su país. El anexo A establece qué se aplica en cada región en la que prestamos servicio." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Estados Unidos (solo si figuran en la sección 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. No ofrecemos DebateAI a las personas que viven en Tennessee." },
       { kind: "p", text: "Convenio arbitral y renuncia a acciones colectivas. Si vive en Estados Unidos, usted y DebateAIRO acuerdan resolver cualquier controversia derivada de estos Términos o del servicio mediante arbitraje individual vinculante administrado por [the American Arbitration Association / JAMS] conforme a sus normas de consumo, en lugar de hacerlo ante los tribunales, con la salvedad de que cualquiera de las partes podrá presentar una reclamación individual ante un tribunal de menor cuantía. Puede excluirse enviando un correo electrónico a [address] en un plazo de 30 días desde la primera vez que acepte estos Términos. Este acuerdo se rige por la Federal Arbitration Act. Nosotros pagamos las tasas de presentación del arbitraje. Se renuncia a las acciones colectivas y representativas en la medida permitida por la ley. Esta sección solo se aplica de forma prospectiva y no se aplica a reclamaciones surgidas antes de que usted la aceptara." },
       { kind: "p", text: "Notificaciones y retiradas. Las imágenes íntimas no consentidas pueden denunciarse en [URL] sin una cuenta y se retirarán en un plazo de 48 horas desde una solicitud válida. Las reclamaciones por derechos de autor deben dirigirse a nuestro agente designado indicado en la sección 16." },
       { kind: "p", text: "Disposiciones específicas de cada estado. California: se aplican las condiciones de renovación automática de la sección 12; puede cancelar en línea en cualquier momento; conservamos su consentimiento a las condiciones de renovación durante al menos tres años. Nueva York: puede cancelar en un plazo de 14 días desde cualquier cargo a un precio incrementado y recibir un reembolso proporcional. Texas y Nebraska: no vendemos datos personales sensibles. Washington: nuestro Aviso de privacidad sobre datos de salud del consumidor, disponible en [URL], se aplica a la información relacionada con la salud. Colorado: nada de lo incluido en el servicio toma decisiones con efectos significativos sobre usted. Nuestra Política de privacidad, anexo B.3, cubre sus datos y los derechos de privacidad que le reconoce su estado." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "47d989a2c72e88b6e23a822f59a40d910e2ea76891d942ad5572e32d05dfc5c8",
+  sha256: "b0bf0061d0baab1181f4f534478b8586a9a3253fc34a86aa885b9c2868f49bf8",
   eyebrow: "TÉRMINOS DE SERVICIO · v2.1 · EN VIGOR DESDE [DATE]",
   title: "Lo que usted acepta",
   lede: "El contrato entre usted y DebateAIRO S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.",

@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kus me DebateAI-d pakume",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Pakume DebateAI-d inimestele, kes elavad [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
+      { kind: "p", text: "Pakume DebateAI-d inimestele, kes elavad [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Ameerika Ühendriigid (ainult kui loetletud jaotises 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Me ei paku DebateAI-d inimestele, kes elavad Tennessees." },
       { kind: "p", text: "Vahekohtukokkulepe ja kollektiivhagi esitamisest loobumine. Kui elate Ameerika Ühendriikides, nõustute teie ja DebateAIRO lahendama kõik nendest Tingimustest või teenusest tulenevad vaidlused kohtu asemel siduvas individuaalses vahekohtumenetluses, mida korraldab [the American Arbitration Association / JAMS] oma tarbijareeglite alusel, välja arvatud see, et kumbki meist võib esitada individuaalse nõude väiksemate nõuete kohtule. Võite loobuda, saates 30 päeva jooksul pärast nende Tingimustega esmakordset nõustumist e-kirja aadressile [address]. Kokkulepet reguleerib föderaalne vahekohtuseadus. Meie tasume vahekohtumenetluse algatamise tasud. Kollektiiv-, ühis- ja esindushagidest loobutakse seadusega lubatud ulatuses. Seda jaotist kohaldatakse ainult edasiulatuvalt ja see ei kehti nõuetele, mis tekkisid enne sellega nõustumist." },
       { kind: "p", text: "Teated ja sisu eemaldamine. Nõusolekuta jagatud intiimkujutistest võib ilma kontota teatada aadressil [URL] ning need eemaldatakse 48 tunni jooksul pärast kehtiva taotluse saamist. Autoriõiguse rikkumise kaebused esitatakse jaotises 16 nimetatud määratud esindajale." },
       { kind: "p", text: "Osariigipõhised sätted. California: kohaldatakse jaotise 12 automaatse uuendamise tingimusi; võite igal ajal veebis tühistada; säilitame teie nõusoleku uuendamistingimustega vähemalt kolm aastat. New York: võite 14 päeva jooksul pärast kõrgema hinnaga tasu võtmist tühistada ja saada proportsionaalse tagasimakse. Texas ja Nebraska: me ei müü tundlikke isikuandmeid. Washington: meie tarbija terviseandmete privaatsusteade aadressil [URL] kehtib tervisega seotud teabe kohta. Colorado: miski teenuses ei tee teie kohta oluliste tagajärgedega otsuseid. Teie andmeid ja teie osariigi seadustest tulenevaid privaatsusõigusi käsitleb meie Privaatsuspoliitika lisa B.3." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "c101eb933085b5c3b1850663f5c294f9a63d4b72b6efd0ab639080bd4ff1f427",
+  sha256: "b30aea06c8dde38bc06662f623bfaa13a6f263f670229f95bc38ac6887f68540",
   eyebrow: "TEENUSETINGIMUSED · v2.1 · KEHTIB ALATES [DATE]",
   title: "Millega te nõustute",
   lede: "Teie ja DebateAIRO S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",

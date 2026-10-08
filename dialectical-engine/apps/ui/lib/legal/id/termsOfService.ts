@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Tempat kami menawarkan DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Kami menawarkan DebateAI kepada orang yang tinggal di [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani." }
+      { kind: "p", text: "Kami menawarkan DebateAI kepada orang yang tinggal di [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Amerika Serikat (hanya jika tercantum dalam bagian 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Kami tidak menawarkan DebateAI kepada orang yang tinggal di Tennessee." },
       { kind: "p", text: "Perjanjian arbitrase dan pengesampingan gugatan kelompok. Jika Anda tinggal di Amerika Serikat, Anda dan DebateAIRO sepakat untuk menyelesaikan setiap sengketa yang timbul dari Ketentuan ini atau layanan melalui arbitrase individual yang mengikat dan diselenggarakan oleh [the American Arbitration Association / JAMS] berdasarkan aturan konsumennya, bukan di pengadilan, kecuali bahwa salah satu pihak dapat mengajukan klaim individual di pengadilan gugatan kecil. Anda dapat memilih untuk tidak ikut serta dengan mengirim email ke [address] dalam waktu 30 hari sejak pertama kali menerima Ketentuan ini. Perjanjian ini diatur oleh Federal Arbitration Act. Kami membayar biaya pengajuan arbitrase. Gugatan kelompok, kolektif, dan perwakilan dikesampingkan sejauh diizinkan hukum. Bagian ini hanya berlaku secara prospektif dan tidak berlaku atas klaim yang timbul sebelum Anda menerimanya." },
       { kind: "p", text: "Pemberitahuan dan penurunan konten. Gambar intim tanpa persetujuan dapat dilaporkan di [URL] tanpa akun dan dihapus dalam waktu 48 jam sejak permintaan yang sah. Pengaduan hak cipta diajukan kepada agen yang kami tunjuk sebagaimana disebutkan dalam bagian 16." },
       { kind: "p", text: "Khusus negara bagian. California: ketentuan perpanjangan otomatis dalam bagian 12 berlaku; Anda dapat membatalkan secara daring kapan saja; kami menyimpan persetujuan Anda terhadap ketentuan perpanjangan selama sekurang-kurangnya tiga tahun. New York: Anda dapat membatalkan dalam waktu 14 hari sejak setiap tagihan dengan harga yang dinaikkan dan menerima pengembalian dana prorata. Texas dan Nebraska: kami tidak menjual data pribadi sensitif. Washington: Pemberitahuan Privasi Data Kesehatan Konsumen kami di [URL] berlaku atas informasi terkait kesehatan. Colorado: tidak ada hal dalam layanan yang mengambil keputusan berkonsekuensi mengenai Anda. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda dan hak privasi negara bagian Anda." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "4899386a6a7f10c4d0ab1c7331b60ee7f1b5bbf7decc55b4b394493084ceec5f",
+  sha256: "a693d78259469d9553737a32de4ca34f6b80558fcbf51e93ecc38cdada485a5e",
   eyebrow: "KETENTUAN LAYANAN · v2.1 · BERLAKU [DATE]",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DebateAIRO S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",

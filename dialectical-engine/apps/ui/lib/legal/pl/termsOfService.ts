@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Gdzie oferujemy DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Oferujemy DebateAI osobom mieszkającym na terenie [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nie oferujemy usługi w innych miejscach. Jeżeli mieszkasz poza tymi państwami, możesz mieć dostęp do serwisu, ale usługa nie jest do Ciebie kierowana, nie przyjmujemy od Ciebie płatności, a niniejsze Warunki i nasza Polityka prywatności nie są dostosowane do prawa Twojego państwa. Załącznik A określa zasady mające zastosowanie w każdym obsługiwanym przez nas regionie." }
+      { kind: "p", text: "Oferujemy DebateAI osobom mieszkającym na terenie [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nie oferujemy usługi w innych miejscach. Jeżeli mieszkasz poza tymi państwami, możesz mieć dostęp do serwisu, ale usługa nie jest do Ciebie kierowana, nie przyjmujemy od Ciebie płatności, a niniejsze Warunki i nasza Polityka prywatności nie są dostosowane do prawa Twojego państwa. Załącznik A określa zasady mające zastosowanie w każdym obsługiwanym przez nas regionie." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Stany Zjednoczone (wyłącznie jeżeli wymienione w sekcji 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Nie oferujemy DebateAI osobom mieszkającym w stanie Tennessee." },
       { kind: "p", text: "Umowa o arbitraż i zrzeczenie się udziału w pozwie zbiorowym. Jeżeli mieszkasz w Stanach Zjednoczonych, Ty i DebateAIRO zgadzacie się rozstrzygać wszelkie spory wynikające z niniejszych Warunków lub usługi w drodze wiążącego indywidualnego arbitrażu prowadzonego przez [the American Arbitration Association / JAMS] zgodnie z jej zasadami konsumenckimi, a nie przed sądem, z tym że każda ze stron może wystąpić z indywidualnym roszczeniem do sądu ds. drobnych roszczeń. Możesz zrezygnować z arbitrażu, wysyłając wiadomość e-mail na adres [address] w ciągu 30 dni od pierwszej akceptacji niniejszych Warunków. Umowa ta podlega Federal Arbitration Act. Pokrywamy opłaty za wszczęcie arbitrażu. W zakresie dozwolonym przez prawo strony zrzekają się udziału w postępowaniach zbiorowych, grupowych i przedstawicielskich. Niniejsza sekcja ma zastosowanie wyłącznie na przyszłość i nie obejmuje roszczeń powstałych przed jej zaakceptowaniem." },
       { kind: "p", text: "Zawiadomienia i usuwanie treści. Intymny wizerunek udostępniony bez zgody można zgłosić pod adresem [URL] bez posiadania konta; zostanie on usunięty w ciągu 48 godzin od otrzymania ważnego żądania. Skargi dotyczące praw autorskich należy kierować do naszego wyznaczonego pełnomocnika wskazanego w sekcji 16." },
       { kind: "p", text: "Postanowienia właściwe dla poszczególnych stanów. Kalifornia: zastosowanie mają warunki automatycznego odnawiania określone w sekcji 12; możesz anulować online w dowolnym momencie; przechowujemy Twoją zgodę na warunki odnowienia przez co najmniej trzy lata. Nowy Jork: możesz anulować w ciągu 14 dni od każdego obciążenia według podwyższonej ceny i otrzymać proporcjonalny zwrot. Teksas i Nebraska: nie sprzedajemy wrażliwych danych osobowych. Waszyngton: do informacji związanych ze zdrowiem ma zastosowanie nasza Informacja o prywatności danych o zdrowiu konsumentów dostępna pod adresem [URL]. Kolorado: w ramach usługi nie są podejmowane decyzje wywołujące istotne skutki wobec Ciebie. Twoje dane i Twoje prawa do prywatności wynikające z przepisów Twojego stanu obejmuje Załącznik B.3 do naszej Polityki prywatności." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "8e05ca79f9c82ffea39acbd183388ce34de27dc2f9f03a03c64bd42d97964069",
+  sha256: "df880a8b5a5c072200d55e0904a28c682542b43ceef14c880c5cb0114b146979",
   eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.1 · OBOWIĄZUJĄ OD [DATE]",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DebateAIRO S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",

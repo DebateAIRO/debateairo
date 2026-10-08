@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Missä tarjoamme DebateAI-palvelua",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Tarjoamme DebateAI-palvelua henkilöille, jotka asuvat [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan." }
+      { kind: "p", text: "Tarjoamme DebateAI-palvelua henkilöille, jotka asuvat [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Yhdysvallat (vain jos ne on lueteltu kohdassa 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Emme tarjoa DebateAI-palvelua henkilöille, jotka asuvat Tennesseessä." },
       { kind: "p", text: "Välityssopimus ja ryhmäkanneoikeudesta luopuminen. Jos asut Yhdysvalloissa, sinä ja DebateAIRO sovitte ratkaisevanne kaikki näistä käyttöehdoista tai palvelusta johtuvat riidat tuomioistuinkäsittelyn sijasta sitovassa yksilöllisessä välimiesmenettelyssä, jota [the American Arbitration Association / JAMS] hallinnoi kuluttajasääntöjensä mukaisesti, paitsi että kumpikin meistä voi nostaa yksilöllisen kanteen vähäisiä vaatimuksia käsittelevässä tuomioistuimessa. Voit jättäytyä sopimuksen ulkopuolelle lähettämällä sähköpostia osoitteeseen [address] 30 päivän kuluessa näiden käyttöehtojen ensimmäisestä hyväksymisestä. Tähän sopimukseen sovelletaan Federal Arbitration Act -lakia. Maksamme välimiesmenettelyn vireillepanomaksut. Ryhmä-, kollektiivi- ja edustajakanteista luovutaan lain sallimissa rajoissa. Tätä kohtaa sovelletaan vain tulevaisuuteen, eikä sitä sovelleta ennen hyväksymistäsi syntyneisiin vaatimuksiin." },
       { kind: "p", text: "Ilmoitukset ja poistot. Ilman suostumusta jaetusta intiimistä kuva-aineistosta voi ilmoittaa ilman tiliä osoitteessa [URL], ja se poistetaan 48 tunnin kuluessa pätevästä pyynnöstä. Tekijänoikeusvalitukset osoitetaan kohdassa 16 nimetylle edustajallemme." },
       { kind: "p", text: "Osavaltiokohtaiset ehdot. Kalifornia: kohdan 12 automaattista uusimista koskevia ehtoja sovelletaan; voit peruuttaa verkossa milloin tahansa; säilytämme uusimisehtoja koskevan suostumuksesi vähintään kolme vuotta. New York: voit peruuttaa 14 päivän kuluessa korotetulla hinnalla tehdystä veloituksesta ja saada suhteutetun palautuksen. Texas ja Nebraska: emme myy arkaluonteisia henkilötietoja. Washington: osoitteessa [URL] oleva Consumer Health Data Privacy Notice -ilmoituksemme koskee terveyteen liittyviä tietoja. Colorado: palvelussa ei tehdä sinua koskevia merkittäviä päätöksiä. Tietojasi ja osavaltiosi lainsäädäntöön perustuvia tietosuojaoikeuksiasi käsitellään tietosuojakäytäntömme liitteessä B.3." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "f45362fb448da277167a8552bd6c5a6047501dcebd8a7a62dec8bdf6ec324640",
+  sha256: "83a94b798faab4f57c36e2036c82faf8c67a095a18acc90b4d65d243b784ce5b",
   eyebrow: "KÄYTTÖEHDOT · v2.1 · VOIMASSA [DATE]",
   title: "Mihin sitoudut",
   lede: "Sinun ja DebateAIRO S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",

@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur siūlome DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI siūlome žmonėms, gyvenantiems [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
+      { kind: "p", text: "DebateAI siūlome žmonėms, gyvenantiems [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Jungtinės Amerikos Valstijos (tik jei nurodytos 2 skyriuje)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tenesis. DebateAI nesiūlome žmonėms, gyvenantiems Tenesyje." },
       { kind: "p", text: "Arbitražinis susitarimas ir grupės ieškinio atsisakymas. Jei gyvenate Jungtinėse Amerikos Valstijose, jūs ir DebateAIRO sutinkate visus iš šių Sąlygų ar paslaugos kylančius ginčus spręsti ne teisme, o privalomu individualiu arbitražu, kurį pagal vartotojų taisykles administruoja [the American Arbitration Association / JAMS], išskyrus tai, kad kiekviena šalis gali pareikšti individualų ieškinį nedidelių sumų teisme. Galite atsisakyti arbitražo per 30 dienų nuo pirmojo sutikimo su šiomis Sąlygomis išsiųsdami el. laišką adresu [address]. Šiam susitarimui taikomas Federalinis arbitražo įstatymas. Mes sumokame arbitražo inicijavimo mokesčius. Grupinių, kolektyvinių ir atstovaujamųjų ieškinių atsisakoma tiek, kiek leidžia teisės aktai. Šis skyrius taikomas tik ateityje ir netaikomas reikalavimams, atsiradusiems prieš jums su juo sutinkant." },
       { kind: "p", text: "Pranešimai ir turinio pašalinimas. Apie be sutikimo bendrinamus intymius atvaizdus galima pranešti adresu [URL] neturint paskyros; gavus pagrįstą prašymą jie pašalinami per 48 valandas. Skundai dėl autorių teisių siunčiami 16 skyriuje nurodytam mūsų paskirtam atstovui." },
       { kind: "p", text: "Konkrečios valstijos. Kalifornija: taikomos 12 skyriuje nustatytos automatinio atnaujinimo sąlygos; bet kada galite atšaukti internetu; jūsų sutikimą su atnaujinimo sąlygomis saugome bent trejus metus. Niujorkas: galite per 14 dienų nuo bet kokio nurašymo padidinta kaina atšaukti ir gauti proporcingą pinigų grąžinimą. Teksasas ir Nebraska: neparduodame neskelbtinų asmens duomenų. Vašingtonas: mūsų Vartotojų sveikatos duomenų privatumo pranešimas adresu [URL] taikomas su sveikata susijusiai informacijai. Koloradas: paslauga nepriima jums reikšmingų sprendimų. Jūsų duomenims ir jūsų valstijos privatumo teisėms taikomas mūsų Privatumo politikos B priedo B.3 skirsnis." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "25b74bc6ac669c72a893dd28681033eb7b1974a51ef431af6fc3bd93f75402be",
+  sha256: "849cbcacb1d539fa41432a3a207a54cab3f2d885936435c42ba7d8d020ba0b8c",
   eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.1 · ĮSIGALIOJA [DATE]",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DebateAIRO S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",
