@@ -275,8 +275,10 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
   checkedOn: null
 });
 
-/** The whole Register, in the order `/providers` shows it. */
-/** Serving company for the selected private-preview GLM endpoint; terms reviewed 5 October 2026. */
+/**
+ * Serving company for the selected private-preview GLM endpoint; terms reviewed 5 October 2026.
+ * Listed only by the preview's GLM build (`providerRegister`).
+ */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
   key: "deepinfra",
@@ -292,7 +294,24 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   checkedOn: "2026-10-05"
 });
 
-export const PROVIDER_REGISTER: readonly ProviderRegisterEntry[] = Object.freeze([...MODEL_PROVIDERS, DEEPINFRA_PROVIDER, SUPPORT_PROVIDER]);
+/**
+ * The whole Register, in the order `/providers` shows it. DeepInfra serves GLM only on the private
+ * preview, so only the preview's GLM build lists it: the build that sets the public flag the
+ * new-debate form reads (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, `previewPlanRoster`). Every other
+ * build, the real site included, sets none. The flag's value is checked where it picks the roster,
+ * which refuses a malformed one loudly; here any value counts, so the page discloses rather than
+ * hides, and this module (the root layout imports it) never throws.
+ */
+export function providerRegister(previewFreeModelIdsJson: string | undefined): readonly ProviderRegisterEntry[] {
+  return Object.freeze([
+    ...MODEL_PROVIDERS,
+    ...(previewFreeModelIdsJson === undefined ? [] : [DEEPINFRA_PROVIDER]),
+    SUPPORT_PROVIDER
+  ]);
+}
+
+export const PROVIDER_REGISTER: readonly ProviderRegisterEntry[] =
+  providerRegister(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON);
 
 export type TermsVersion = Readonly<{
   version: string;
