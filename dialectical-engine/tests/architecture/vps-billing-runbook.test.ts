@@ -19,17 +19,17 @@ describe("P22 the Billing runbook", () => {
   it("exists as §14 and names every setting, key file and code an operator needs", () => {
     expect(readme).toContain("## 14. Billing (paid plans)");
     for (const needle of [
-      "XMONEY_PRIVATE_KEY_PATH", "XMONEY_PUBLIC_KEY", "XMONEY_SITE_ID", "XMONEY_API_BASE_URL",
+      "NETOPIA_API_BASE_URL", "NETOPIA_POS_SIGNATURE", "NETOPIA_API_KEY_PATH", "NETOPIA_IPN_KEYS_PATH",
       "QUADERNO_API_KEY_PATH", "QUADERNO_API_BASE_URL", "SMARTBILL_CREDENTIALS_PATH", "SMARTBILL_API_BASE_URL",
       "SMARTBILL_SERIES", "OWNER_REPORT_EMAIL_PATH", "PUBLIC_APP_URL",
-      "RECORDS_KEY_PATH", "GEOIP_COUNTRY_DB_PATH", "TOR_EXIT_LIST_PATH", "XMONEY_SDK_ORIGIN",
+      "RECORDS_KEY_PATH", "GEOIP_COUNTRY_DB_PATH", "TOR_EXIT_LIST_PATH",
       "RECORDS_KEY_PATH_MUST_BE_SEPARATE", "GEOIP_PATHS_REQUIRED",
       "--property=EnvironmentFile=/etc/debateai/api.env",
       "Country data — the GeoIP and Tor refresh",
-      "/api/v1/billing/xmoney/notify", "Sites → Payment Page", "debateai-geoip-refresh.timer",
+      "debateai-geoip-refresh.timer",
       "billingPlans", "billingPolicy", "countryPolicy", "taxAuthorities",
       "pnpm billing:tax-summary --quarter", "pnpm billing:dispute", "IP Geolocation by DB-IP",
-      "BILLING_CONFIGURATION_INCOMPLETE", "BILLING_REQUIRES_ENVELOPE_MEMBERS", "same-origin-allow-popups",
+      "BILLING_CONFIGURATION_INCOMPLETE", "BILLING_REQUIRES_ENVELOPE_MEMBERS",
       // §14.2 and §14.7 (ruling R3-4, D5's R3-A): one source of the company facts, COMPANY, and its one mirror for
       // the API and the emails, SELLER_COMPANY; the CUI as digits only; the refusals while a tax code is bracketed.
       "apps/ui/public/payment-marks/visa.svg",
@@ -53,54 +53,37 @@ describe("P22 the Billing runbook", () => {
       // second payment's charge-back is marked DUPLICATE_PAYMENT, and the command's two newer answers are named.
       "r.provider_payment_id = e.provider_payment_id", "e.error_code", "DUPLICATE_PAYMENT",
       "STILL_DISPUTED", "BILLING_DISPUTE_AMBIGUOUS",
-      // §14.8 (W2, P2-I2): a dispute xMoney reports as its own transaction is listed under the payment it names.
-      "the list shows the xMoney transaction id of the payment the dispute is about",
-      "is recorded under the payment it names, so match that payment's id, not the",
       // §14.8 (D5 5h): no sandbox plan or charge left open when the host moves to live.
-      "Going from xMoney's sandbox to live on the same host", "BILLING_STAGE_RECORDS_OPEN",
       "open_sandbox_subscriptions", "open_sandbox_charges",
       // §14.8 (P2-I4): and no sandbox refund, invoice or credit-note job still queued (the start-up check counts them).
       "open_sandbox_jobs",
       // §14.8 (W14, P2-I19): never on a host whose billing clock moved; the live start's safety net and its limit.
       "**Never take this path on a host that has ever run with `BILLING_STAGE_CLOCK_OFFSET_DAYS`**",
       "BILLING_RECORDS_DATED_AHEAD", "That is only a safety net: a month after such a",
-      // §14.8 step 4 (W14, P2-I20): the live site's id, public key and key files too, then the live notice address.
-      "`XMONEY_SITE_ID` and\n     `XMONEY_PUBLIC_KEY` to the live site's id and public key",
-      "remove `xmoney-private-key` and `quaderno-api-key` on purpose",
-      "rm /etc/debateai/api/billing/xmoney-private-key", "rm /etc/debateai/api/billing/quaderno-api-key",
-      "Finally, set the notification URL in the **live** xMoney dashboard",
-      // §14.8 (W14, go-live rows 19 and 23): the read-back on the day, and the first live notice.
+      // §14.8 (W14, go-live rows 19 and 23): the read-back on the day (N25 pins its NETOPIA lines).
       "**Read the settings back before switching on.**",
-      "grep -E '^(XMONEY_API_BASE_URL|XMONEY_SITE_ID|XMONEY_PUBLIC_KEY|QUADERNO_API_BASE_URL|SMARTBILL_API_BASE_URL)=' /etc/debateai/api.env",
-      "stat -c '%y %n' /etc/debateai/api/billing/xmoney-private-key",
-      "FROM billing.xmoney_notice WHERE xmoney_environment = 'live'",
       // §14.8 (W3 fix round 1): a sandbox withdrawal handed to the owner is settled before the switch, which refuses it.
       "If a sandbox withdrawal was handed to you", "while the host still points at the sandbox, with `pnpm billing:withdraw --owner",
       "After the switch the command refuses a sandbox plan (`NOT_SUBSCRIBED`), and the summary would list it for ever.",
-      // §14.8 (W3 fix round 1): what closes by itself, and when; the refund that never closes without the sandbox key.
+      // §14.8 (W3 fix round 1): what closes by itself, and when; N25: a sandbox refund handed to the owner is recorded first.
       "An invoice or credit note that keeps failing is tried again after 1 minute, 5 minutes, 30 minutes, 2 hours and 12 hours, and then given up.",
       "A payment check is given up after at most about 31 hours.",
-      "A refund that xMoney's sandbox could not be reached for, or that it refused the sandbox key for, is never given up: it is tried again every 12 hours.",
-      "The API's journal shows the line `billing.xmoney.credentials_refused` each time the key is refused.",
-      "Such a refund closes only once the sandbox key and xMoney's sandbox work, so leave the sandbox key in place until the switch is done.",
+      "A refund handed to you in the sandbox (O2_REFUND_DUE) stays open until you record it",
       // §14.8 (W3 fix round 1): the third query counts the payment checks that name a sandbox charge, which the site
       // refuses beside a refund, invoice or credit note of the other system.
       "payment checks that name a sandbox charge",
-      "(the site refuses a refund, invoice, credit note or payment check of the other xMoney system)",
+      "(the site refuses a refund, invoice, credit note or payment check of another payment system)",
       // §14.8: sandbox records stay but are never sales (P1b's quarter summary reads live charges only).
       "they never count as sales", "the quarterly tax summary and its email read only live charges",
-      // §14.5 (ruling Q-2): the notice address's two non-200 answers, and the card pages' Payment Request policy.
-      "What the notice address answers", "once it has stored the notice", "`429`", "`500`", "payment=()",
-      // §14.5 (P19, X0 (e) item 6): today every page sends payment=() from apps/ui/next.config.mjs, and the middleware
-      // sets only the security policy; only X0 (e) item 6's code change would read XMONEY_SDK_ORIGIN on each request.
-      "The website's middleware sets this on each request from `XMONEY_SDK_ORIGIN`", "No rebuild is needed",
+      // §14.5 (N25): the notify address's answers; the card marks' sentence holds "No rebuild is needed".
+      "What the address answers", "`429`", "`503`", "No rebuild is needed",
       // §14.8 (ruling Q-9, D6b P14c): a withdrawal sent by email, carried out by the owner's command.
       "A withdrawal sent by email or on the model form", "pnpm billing:withdraw --owner", "--received", "--refund",
       "WITHDRAWAL_BY_OWNER", "identity_owner_ref",
       // §14.8 (D6b P14c): the dashboard part is refunded there first, then recorded with --dashboard; M8 names the sum.
-      "First, in the xMoney dashboard,", '--dashboard "$DASHBOARD"',
+      "First, in NETOPIA's admin,", '--dashboard "$DASHBOARD"',
       // §14.8 (ruling Q-1): an outage at renewal keeps the plan quietly for up to 3 days.
-      "When xMoney or the tax service is down at a renewal", "retried quietly for up to 3 days",
+      "When NETOPIA or the tax service is down at a renewal", "retried quietly for up to 3 days",
       // §14.8 (P11a judge, carried): the renewal pass's two journal signals, and what each means.
       "\"event\":\"billing.renewal.report\"", "taxRefused", "[BILLING_RENEWAL_PENDING]",
       // §14.8 (W13, P2-I18): the brief's eight signals and the listing line are in the journal table, each with what to
@@ -116,27 +99,27 @@ describe("P22 the Billing runbook", () => {
       "| `\"event\":\"billing.quote.refused\"`, with `code` `TAX_SERVICE_REFUSED` and `reason` |",
       "| `\"event\":\"billing.invoice.unknown\"`, with `issuer`, `kind` and `code` |",
       "| `\"event\":\"billing.payment.mismatch\"`, with `code` or `chargeKind` |",
-      "A list xMoney refuses never causes it",
+      "A status read that fails never causes it",
       // P4-H (the P4-B judge's forward, progress.md: P2-W4): REFUND_CHARGE_MISSING is backed by no record either.
       "`REFUND_NOT_REQUESTED`, `REFUND_CHARGE_MISSING` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note",
-      "`OTHER_XMONEY_SYSTEM`, whatever the kind (a `RENEWAL_NOTICE` too): nothing to do on this host",
-      "WHERE o.outcome = 'MISMATCH'", "refund it there by hand",
+      "`OTHER_PAYMENT_SYSTEM`, whatever the kind (a `RENEWAL_NOTICE` too): nothing to do on this host",
+      "refund it there by hand",
       // W13 fix round 1: the alert promise is exact (O3 never for a dead O3; O2 comes from the refund itself, not for
       // REFUND_PAYLOAD_INVALID or a refund the queue stopped), a refused key keeps a renewal only for its window, and
-      // only this host's xMoney system's mismatches are acted on (N23 removed the listing row and its code needle).
+      // only this host's environment's mismatches are acted on (N23 removed the listing row and its code needle).
       "except when the email that died is O3 itself", "(`REFUND_PAYLOAD_INVALID`)", "usually `OUTBOX_HANDLER_FAILED`",
       "lists every dead refund job whatever its code", "for up to 3 days past its due time (a payment retry: 24 hours)",
       "Fixing the key within that time",
-      "SELECT n.received_at, n.xmoney_environment,", "Act only on rows of this host's xMoney system",
-      // §14.8 (ruling Q-5): a refund that could not be completed reaches the owner at once.
-      "A refund that could not be completed", "O2",
+      "Act only on rows of this host's environment",
+      // §14.8 (ruling Q-5, N25): a refund owed reaches the owner at once, handed to them while the owner mode applies.
+      "**A refund handed to you.**", "O2_REFUND_DUE",
       // §14.8 (W9, P2-I11, P2-M8): the acknowledgement of receipt, the owner's alert for a withdrawal settled by hand,
       // and a dead withdrawal refund's deadline and one-refund rule.
       "M8_RECEIVED", "O2_WITHDRAWAL", "the date the refund is due by", "in one refund",
-      // W9 fix round 1 (F1): look first, never refund twice, and refund exactly the named amount; a smaller or split
-      // refund is not recorded (REFUND_UNRECORDED), so the owner confirms it and tells the accountant.
-      "Look at that payment in the xMoney dashboard first", "never refund it again",
-      "refund exactly the amount the email names", "is not recorded at all", "give its amount to the accountant",
+      // W9 fix round 1 (F1): look first, never refund twice, and refund exactly the named amount (N25: the owner's
+      // command records a part, so nothing is left for the accountant by hand).
+      "Look at that payment in NETOPIA's admin first", "never refund it again",
+      "refund exactly the amount the email names",
       // §14.4 (D6a's recurring net): a new price reaches only new subscriptions.
       "reaches only new subscriptions",
       // §14.8 (D6a P10b, D6b P16b): nobody reads the e-Factura status for you; the summary lists what to check,
@@ -260,7 +243,12 @@ describe("P22 the Billing runbook", () => {
       // P4-H fix round 1 (finding 4): a renewal REBILL_REFUSED on more than one renewal is reported at once.
       "billing.payment.failed",
       // N23: a setting of the previous card processor left in api.env, and an answer of NETOPIA's the site cannot read.
-      "billing.setting.retired", "billing.payment.answer_rejected"
+      "billing.setting.retired", "billing.payment.answer_rejected",
+      // N25: NETOPIA's lines that ask the owner to look or act.
+      "billing.notice.unverified", "billing.notice.parse_failed", "billing.notice.unknown_order",
+      "billing.notice.store_failed", "billing.notice.recheck", "billing.payment.status_unexpected",
+      "billing.payment.owner_review", "billing.renewal.outcome_open", "billing.renewal.retry_held",
+      "billing.reconcile.status_failed", "billing.refund.owner_due", "billing.refund.seen_partial", "billing.card.reminder"
     ]) {
       expect(rowEvents, alarm).toContain(alarm);
     }
@@ -275,8 +263,8 @@ describe("P22 the Billing runbook", () => {
       const line = tableLines.find((candidate) => firstCell(candidate).includes(`\`"event":"${event}"\``)) ?? "";
       return line.replace(/\s*\|\s*$/u, "").split(" | ").map((cell) => cell.replace(/\s+/gu, " "));
     };
-    // Finding 1: RenewalService.holdUnverified holds a renewal whose rebill xMoney answered but whose payment check
-    // has not settled it, under its own code, with the same pending line.
+    // Finding 1: the renewal holds a charge NETOPIA answered but whose payment check has not settled it, under its own
+    // code, with the same pending line.
     const [, pendingMeans = "", pendingDo = ""] = rowOf("billing.renewal.pending");
     for (const needle of ["`PAYMENT_NOT_VERIFIED`", "its payment check has not settled it yet", "still in 3-D Secure"]) {
       expect(pendingMeans, needle).toContain(needle);
@@ -285,30 +273,65 @@ describe("P22 the Billing runbook", () => {
       "still without an outcome 30 days after it was made is counted by `billing.reconcile.expired`"]) {
       expect(pendingDo, needle).toContain(needle);
     }
-    // Finding 2: the owner summary lists a stuck renewal only when a call may have reached xMoney (a SUBMIT_UNKNOWN,
-    // BillingRepository.stuckRenewals), which is exactly closeStuck's REBILL_OUTCOME_UNKNOWN.
+    // Finding 2: the owner summary lists a stuck renewal only when a call may have reached NETOPIA (a SUBMIT_UNKNOWN,
+    // BillingRepository.stuckRenewals), which is closeStuck's CHARGE_OUTCOME_UNKNOWN; an order NETOPIA holds stays open.
     const [, stuckMeans = ""] = rowOf("billing.renewal.stuck");
-    for (const needle of ["Only with `REBILL_OUTCOME_UNKNOWN` does the owner summary list it, as `RENEWAL_STUCK`",
-      "A `REBILL_NOT_SENT` one charged nothing and is not listed there"]) {
+    for (const needle of ["Only with `CHARGE_OUTCOME_UNKNOWN` does the owner summary list it, as `RENEWAL_STUCK`",
+      "A `CHARGE_NOT_SENT` one charged nothing and is not listed there",
+      "An order NETOPIA confirms it holds is never closed this way"]) {
       expect(stuckMeans, needle).toContain(needle);
     }
     expect(stuckMeans).not.toContain("moves to Free. The owner summary lists it as `RENEWAL_STUCK`.");
-    // Finding 4: a failed payment has its own row; REBILL_REFUSED is xMoney refusing the request, not the card.
+    // Finding 4: a failed payment has its own row. N25: a NETOPIA renewal fails only on what NETOPIA reports of the
+    // card (renewalFailureOf), a card the plan lacks, or NO_TRANSACTION; a request refused for our own setup is never
+    // closed as failed (the renewal's not-sent CHARGE_CONFIGURATION_REFUSED), so no "request refused" code is named.
     const [failedSignal = "", failedMeans = "", failedDo = ""] = rowOf("billing.payment.failed");
     expect(failedSignal).toBe("| `\"event\":\"billing.payment.failed\"`, with `chargeKind` and `code`");
-    for (const needle of ["From a payment check", "`PAYMENT_DECLINED`", "`VOIDED`", "From a renewal or a payment retry",
-      "`REBILL_REFUSED`: xMoney refused the renewal request itself, not the card", "`NO_TRANSACTION`",
-      "follows a `billing.renewal.stuck` line"]) {
+    for (const needle of ["From a payment check", "`PAYMENT_DECLINED`", "`VOIDED`", "`CARD_NOT_SAVED`",
+      "From a renewal or a payment retry", "`AUTHENTICATION_REQUIRED`", "`PAYMENT_EXPIRED`", "`NO_TRANSACTION`",
+      "follows a `billing.renewal.stuck` line", "the `billing.renewal.unknown` row's `CHARGE_CONFIGURATION_REFUSED`"]) {
       expect(failedMeans, needle).toContain(needle);
     }
-    for (const needle of ["A decline: nothing", "`REBILL_REFUSED` on more than one renewal: report it at once, with the code",
-      "every renewal falls into the failed-payment path", "`NO_TRANSACTION`: the `billing.renewal.stuck` row"]) {
+    for (const needle of ["A decline: nothing", "`NO_TRANSACTION`: the `billing.renewal.stuck` row"]) {
       expect(failedDo, needle).toContain(needle);
     }
+    expect(failedMeans).not.toContain("CHARGE_REFUSED`:");
+    // The codes the renewal can close a charge with, as the code maps NETOPIA's states (renewal.ts).
+    const renewal = read("apps/api/src/billing/renewal.ts");
+    const stateFailures = new Set([...renewal.matchAll(/return "([A-Z_]+)";/gu)].map((match) => match[1]!)
+      .filter((code) => ["PAYMENT_DECLINED", "AUTHENTICATION_REQUIRED", "PAYMENT_FAILED", "PAYMENT_EXPIRED", "VOIDED"].includes(code)));
+    expect(stateFailures.size, "renewalFailureOf's codes").toBe(5);
+    for (const code of stateFailures) expect(failedMeans, code).toContain(`\`${code}\``);
+    // N25: a renewal whose answer was lost names every code the renewal writes for it (renewal.ts's markers).
+    const [, unknownMeans = ""] = rowOf("billing.renewal.unknown");
+    for (const code of ["CHARGE_NOT_SENT", "CHARGE_CREDENTIALS_REFUSED", "CHARGE_CONFIGURATION_REFUSED", "CHARGE_OUTCOME_UNKNOWN",
+      "CHARGE_ORDER_EXISTS", "SUBMIT_INTERRUPTED"]) {
+      expect(renewal, code).toContain(`"${code}"`);
+      expect(unknownMeans, code).toContain(`\`${code}\``);
+    }
+    // N25 (ruling PR-36): the held retry names N11's three codes.
+    const [, heldMeans = ""] = rowOf("billing.renewal.retry_held");
+    for (const code of ["EARLIER_ATTEMPT_PAID", "EARLIER_ATTEMPT_PENDING", "EARLIER_ATTEMPT_UNREADABLE"]) {
+      expect(read("apps/api/src/billing/maintenance.ts"), code).toContain(`"${code}"`);
+      expect(heldMeans, code).toContain(`\`${code}\``);
+    }
+    // N25: the key refusal names every operation the code writes it for.
+    const [, credentialsMeans = ""] = rowOf("billing.payment.credentials_refused");
+    const operations = new Set(sources("apps/api/src/billing").flatMap((source) => [
+      ...[...source.matchAll(/credentialsRefused\([^,]+, [^,]+, "([a-z_]+)"\)/gu)].map((match) => match[1]!),
+      ...[...source.matchAll(/"billing\.payment\.credentials_refused", \{ operation: "([a-z_]+)" \}/gu)].map((match) => match[1]!),
+      ...[...source.matchAll(/operation: "([a-z_]+)", now/gu)].map((match) => match[1]!)
+    ]));
+    expect(operations.size).toBeGreaterThanOrEqual(6);
+    for (const operation of operations) expect(credentialsMeans, operation).toContain(`\`${operation}\``);
+    // Ruling PR-40: a flood over the intake's budget writes only the admission line.
+    const [, unverifiedMeans = ""] = rowOf("billing.notice.unverified");
+    expect(unverifiedMeans).toContain("`api.admission.refused` for the route `POST /v1/billing/netopia/notify`");
 
     // The rows the brief's sources ask for, word for word where the action matters.
     for (const needle of [
-      // P2-W4 / P2-W3 (b) (the P4-B judge's forward): the other-system row covers a renewal notice too.
+      // P2-W4 / P2-W3 (b) (the P4-B judge's forward): the other-system row covers a renewal notice too (N25: the
+      // row's words name NETOPIA's environments and the previous card processor; the rule is unchanged).
       "or a renewal notice (`RENEWAL_NOTICE`) of a plan of the other system",
       // The daily dead-refund count holds jobs that owe nothing; the summary's code says which.
       "Not every one is owed", "the summary's own names",
@@ -323,20 +346,26 @@ describe("P22 the Billing runbook", () => {
   it("P4-H (the P4-B and P4-C judges' forwards): a refund's three no-refund codes, and C1 in the hand calculation", () => {
     const flat = billing.replace(/\s+/gu, " ");
     const section = (from: string, to: string): string => flat.slice(flat.indexOf(from), flat.indexOf(to, flat.indexOf(from)));
-    // P2-W4: O2 for REFUND_CHARGE_MISSING carries the not-requested sentences; OTHER_XMONEY_SYSTEM has its own.
-    const refund = section("**A refund that could not be completed.**", "**When xMoney or the tax service is down at a renewal.**");
+    // P2-W4: O2 for REFUND_CHARGE_MISSING carries the not-requested sentences; OTHER_PAYMENT_SYSTEM has its own.
+    const refund = section("**A refund handed to you.**", "**When NETOPIA or the tax service is down at a renewal.**");
     for (const needle of [
       "`REFUND_CHARGE_MISSING`: the job names a charge we do not have",
       "the owner summary lists both as `REFUND_NOT_REQUESTED`",
-      "The reason code `OTHER_XMONEY_SYSTEM`", "nothing was sent and nothing is owed on this host",
+      "The reason code `OTHER_PAYMENT_SYSTEM`", "nothing was sent and nothing is owed on this host",
       "no refund reason and no deadline", "lists it as `REFUND_OTHER_SYSTEM`",
-      "refund it in that system's dashboard; a sandbox test payment needs nothing"
+      "refund it in that system's admin; a sandbox test payment needs nothing",
+      "`BILLING_REFUND_DONE_EXCEEDS_REQUEST`", "every third day",
+      // Ruling PR-48: a refund on a disputed payment is held, and recorded despite it only when made before.
+      "do not refund it: the site holds that refund while the dispute lasts and has emailed you once (O3 `REFUND_HELD_BY_CHARGEBACK`)",
+      "record that with `pnpm billing:dispute --outcome won`, and the refund comes back into the reminder",
+      "if it ends for the person, nothing is left to refund",
+      "record that refund with `pnpm billing:refund-done … --despite-chargeback`"
     ]) {
       expect(refund, needle).toContain(needle);
     }
     expect(refund).not.toContain("The one exception is the reason code `REFUND_NOT_REQUESTED`");
     // C1 (P2-W6): a payment made after the withdrawal takes no share, and a later upgrade does not set the credit.
-    const withdrawal = section("**A withdrawal sent by email or on the model form.**", "**A refund that could not be completed.**");
+    const withdrawal = section("**A withdrawal sent by email or on the model form.**", "**A refund handed to you.**");
     for (const needle of [
       "takes no share: it gives back all it still holds",
       "its `SUCCEEDED` row in `billing.charge_event` is dated after",
@@ -455,7 +484,7 @@ describe("P22 the Billing runbook", () => {
     const amountBullet = between("- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only", "- `--requeue` to let the site");
     expect(amountBullet).toContain(C6);
     // The re-review's M-7: a payment refunded before its plan started owes no document, so no command clears its line.
-    expect(amountBullet).toContain("A `REFUNDED_BEFORE_START` line (a payment xMoney refunded before its plan started) needs no command: no invoice or credit note is owed, and `--record` refuses such a charge");
+    expect(amountBullet).toContain("A `REFUNDED_BEFORE_START` line (a payment refunded in NETOPIA's admin before its plan started) needs no command: no invoice or credit note is owed, and `--record` refuses such a charge");
     // N23: the billing.refund.unrecorded row left with the previous card processor's notices, its only writer.
     // C-9: a paused plan its person cancelled lists as CANCEL_REQUESTED and still waits; a won dispute's limit.
     const disputes = between("**Disputes (chargebacks).**", "**A withdrawal sent by email or on the model form.**");
@@ -508,27 +537,19 @@ describe("P22 the Billing runbook", () => {
     }
   });
 
-  it("asks for every billing secret at a prompt, never through an editor, and never replaces one", () => {
-    // Spec §2.2 rule 8: a custody-checked file. The value never appears on screen, on a command line, in shell
-    // history or in an editor's temporary copy (the vendor procedure's rule, README §3).
+  it("enters every billing secret through the guided setup, never through an editor or a hand-made file", () => {
+    // Spec §2.2 rule 8 and §2.17.2: the value never appears on screen, on a command line, in shell history or in an
+    // editor's temporary copy; the runbook sends the owner to the setup for every key.
     expect(billing).not.toMatch(/sudoedit \/etc\/debateai\/api\/billing/u);
-    for (const file of ["xmoney-private-key", "quaderno-api-key", "smartbill-credentials", "owner-report-email"]) {
-      expect(billing, file).toContain(`test ! -e /etc/debateai/api/billing/${file} && (umask 0177 && systemd-ask-password`);
-    }
-    // Re-review item 4 (vps-deployment-baseline): without bracketed paste a waiting prompt takes the NEXT pasted
-    // line as its answer, so every prompting line is the last line of its block.
-    for (const block of billing.matchAll(/```sh\n([\s\S]*?)```/gu)) {
-      const lines = (block[1] ?? "").split("\n").map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#"));
-      lines.forEach((line, index) => {
-        if (line.includes("systemd-ask-password")) expect(index, line).toBe(lines.length - 1);
-      });
+    expect(billing).not.toMatch(/> \/etc\/debateai\/api\/billing\//u);
+    for (const section of ["netopia", "quaderno", "smartbill"]) {
+      expect(billing, section).toContain(`bash /opt/debateai/dialectical-engine/deploy/vps/billing-setup.sh --replace ${section}`);
     }
   });
 
   it("names the same custody files as the API's example environment (P6a)", () => {
     const example = read("deploy/vps/env/api.env.example");
-    // N23 removed the previous card processor's key file from the example; N25 adds NETOPIA's to §14.
-    for (const file of ["quaderno-api-key", "smartbill-credentials", "owner-report-email"]) {
+    for (const file of ["netopia-api-key", "netopia-ipn-keys.pem", "quaderno-api-key", "smartbill-credentials", "owner-report-email"]) {
       const path = `/etc/debateai/api/billing/${file}`;
       expect(example, path).toContain(path);
       expect(billing, path).toContain(path);
@@ -724,46 +745,42 @@ describe("P22 the Billing runbook", () => {
 
   it("§14.9 gives the owner the sandbox run: the test cards, the stage clock and the fake-stack proof", () => {
     for (const needle of [
-      "### 14.9 The sandbox run, end to end (OWNER-RUN)", "4111 1111 1111 1111", "5168 4948 9505 5780",
+      "### 14.9 The sandbox run, end to end (OWNER-RUN)", "9900 0048 1022 5098", "9900 0091 8421 4768",
       "BILLING_STAGE_CLOCK_OFFSET_DAYS=31", "BILLING_STAGE_CLOCK_LIVE_REFUSED",
       "pnpm exec vitest run tests/integration/billing-whole-flow.test.ts",
-      // No stage payment reaches a live invoicer, and no sandbox purchase takes the Romanian route.
-      "BILLING_STAGE_LIVE_INVOICER_REFUSED", "SMARTBILL_API_BASE_URL=https://smartbill.invalid",
-      "made as a buyer outside Romania",
-      // D5's R3-A: a stage boot builds the SmartBill connection from COMPANY too, so the CUI comes first.
+      "BILLING_STAGE_LIVE_INVOICER_REFUSED", "`https://smartbill.invalid`", "made as a buyer outside Romania",
       "Fill in the company's CUI first (§14.7)", "BILLING_COMPANY_FACTS_UNVERIFIED:cui",
-      // The offset only goes up, and leaves only with the stage data.
-      "The stage clock only ever goes up", "A host must never go live holding rows written on a",
-      // P23 fix G1: a live payment never meets a sandbox invoicer (§14.8 step 4; this case searches all of §14).
-      "BILLING_LIVE_SANDBOX_INVOICER_REFUSED",
-      // P23 fix G2: the 3-D Secure try is a second purchase, so it needs a second account.
-      "on a second test account (Germany again", "ALREADY_SUBSCRIBED",
-      // P23 fix F1: the stage rule fails closed.
-      "beside anything but", "Quaderno's sandbox and a `.invalid` SmartBill address",
-      // P23 fix F2: what the moved clock does not reach.
+      "The stage clock only ever goes up", "A host must never go live holding rows written on a moved clock",
+      "BILLING_LIVE_SANDBOX_INVOICER_REFUSED", "on a second test account (Germany again", "ALREADY_SUBSCRIBED",
+      "beside anything but Quaderno's sandbox and a `.invalid` SmartBill address",
       "its usage bars and a withdrawal's credit-used share", "the fake stack in step 6 proves the bars and the share",
-      "`billing:efactura-status`, `billing:invoice`) also\nrun on the real clock", "so do not run them on this host while the line is set",
-      // W13 (P2-I18): the first start with billing on is read for the billing failure lines, before step 1 and after
-      // step 2's restart.
+      "so do not run them on this host while the line is set",
       "**Before step 1: read the journal of the first start with billing on.**",
       "_SYSTEMD_INVOCATION_ID=\"$(systemctl show --property=InvocationID --value debateai-api)\"",
       "run the journal command from **Before step 1** again; it should print nothing",
-      // W13 fix round 1: the step says what the filter really prints.
-      "the lines that say a list failed or our key was refused, and billing's bracketed\nmarkers", "Any other line it prints:",
-      // W2 (P2-I2, P2-M39): the dispute case is part of the owner's proof, run after the whole-flow suite.
       "pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts",
-      "a card dispute found by the daily money check: the plan paused once, with one email, counted",
       "Start the second only after the first has finished",
-      // W14 (P2-I19, the owner's ruling of 2 October 2026): a separate throwaway server, with what it needs of its own.
       "Do this on a **separate, throwaway server**", "**Domain and `PUBLIC_APP_URL`**",
-      "notification URL to the sandbox domain followed by `/api/v1/billing/xmoney/notify`",
       "**Register version with `countryPolicy`**", "`sandbox@example.invalid:not-a-token`",
-      "7. **Destroy the sandbox server.**", "The line never comes out",
-      // P2-M38: pay before the emailed cancel; the closing check lists each charge left with an unknown outcome.
-      "pay for Plus first: a cancel link is\n   sent only for a plan that is paid",
-      "u.kind = 'SUBMIT_UNKNOWN') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED'))"
+      "8. **Destroy the sandbox server.**", "The line never comes out",
+      "pay for Plus first: a cancel link is sent only for a plan that is paid",
+      "u.kind = 'SUBMIT_UNKNOWN') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED'))",
+      "**NETOPIA's own test of our flow.**", "**The small live test, with billing off.**",
+      "Every row must say `TOOL_ORDER`.",
+      // Ruling PR-45: the setup asks the SmartBill user, then the token at a hidden prompt.
+      "then `sandbox@example.invalid` as the API user and `not-a-token` at the hidden token prompt",
+      // Ruling PR-47: every recording run is named, the fixtures are checked before they are committed, and the live
+      // capture folder is deleted.
+      "--order \"$ORDER\" --no-ntp-id", "status --capture-dir /var/tmp/netopia-capture --unknown-order",
+      "billing:netopia-sandbox zero --capture-dir /var/tmp/netopia-capture",
+      "charge --capture-dir /var/tmp/netopia-capture --from-order \"$ORDER\"",
+      "fixture --capture-dir /var/tmp/netopia-capture --order \"$ORDER\"",
+      "--out tests/fixtures/netopia --recorded-on \"$RECORDED_ON\"",
+      "pnpm exec vitest run tests/unit/payments-netopia-recorded-fixtures.test.ts",
+      "A red run means: do not commit, keep the raw folder private, and hand it to a developer session.",
+      "rm -r /var/tmp/netopia-capture"
     ]) {
-      expect(billing, needle).toContain(needle);
+      expect(billing.replace(/\s+/gu, " "), needle).toContain(needle);
     }
     // Lowering the offset mid-run would stall jobs scheduled on the moved clock for a month.
     expect(billing).not.toContain("Remove the line and restart the API again");
@@ -771,5 +788,74 @@ describe("P22 the Billing runbook", () => {
     expect(billing).not.toContain("rebuild the stage host");
     expect(billing).not.toContain("on a **stage** host");
     expect(billing).not.toContain("Publish\n`billingPolicy` with `enabled: true` on that host only");
+  });
+
+  it("N25 (spec 2026-10-05 §2.21): §14 is NETOPIA's: the guided setup, the message, the owner's refunds, the live test", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    // No step of the previous card processor is left, and no hand-made key file.
+    expect(billing).not.toMatch(new RegExp(["x", "money"].join(""), "iu"));
+    expect(billing).not.toContain("SDK_ORIGIN");
+    expect(billing).not.toContain("same-origin-allow-popups");
+    expect(billing).not.toContain("systemd-ask-password");
+    for (const needle of [
+      // §14.1
+      "A NETOPIA Payments merchant account with a point of sale (POS) for the site, in the sandbox first",
+      "Nobody but you ever sees a key. You type each key at the guided setup's hidden prompt yourself, and no agent reads it.",
+      // §14.2: the guided setup and the check command are the only way keys and values are entered.
+      "bash /opt/debateai/dialectical-engine/deploy/vps/billing-setup.sh",
+      "bash /opt/debateai/dialectical-engine/deploy/vps/billing-setup.sh --replace netopia",
+      "# >>> billing settings (billing-setup.sh) >>>", "# <<< billing settings <<<",
+      "/etc/debateai/api/billing/netopia-api-key", "/etc/debateai/api/billing/netopia-ipn-keys.pem",
+      "deploy/vps/netopia/published-ipn-key.pem", "eeba3b06",
+      "Check that fingerprint with NETOPIA before you choose it",
+      "/usr/bin/pnpm billing:check", "It never prints a key.",
+      "BILLING_IPN_KEYS_FILE_UNSAFE", "NETOPIA_IPN_KEYS_INVALID",
+      "BILLING_CONFIGURATION_INVALID:NETOPIA_API_BASE_URL", "BILLING_CONFIGURATION_INVALID:NETOPIA_POS_SIGNATURE",
+      "https://secure-sandbox.netopia-payments.com", "https://secure.netopia-payments.com/api",
+      // §14.5: NETOPIA's message.
+      "/api/v1/billing/netopia/notify", "NETOPIA needs no notification setting in its admin",
+      "`PUBLIC_APP_URL` must be the site's exact public address", "NETOPIA does not follow a redirect",
+      "`{\"errorType\":0,\"errorCode\":0,\"errorMessage\":\"OK\"}`", "kept for 14 days",
+      "checked again at every start of the API", "O4",
+      // §14.7: what NETOPIA checks on the site before it approves the shop.
+      "apps/ui/public/payment-marks/netopia.svg", "ANPC",
+      // §14.8: refunds in the owner mode, the one command, and the reminders.
+      "**A refund handed to you.**", "O2_REFUND_DUE", "O2_REFUND_REMINDER",
+      "refund exactly the amount the email names, on that payment, in one refund",
+      "/usr/bin/pnpm billing:refund-done --charge \"$CHARGE_REF\" --amount \"$AMOUNT\" --confirm",
+      "A whole refund is recorded by the site itself as soon as NETOPIA reports it",
+      // §14.8: sandbox to live, with the guided setup.
+      "Going from NETOPIA's sandbox to live on the same host", "BILLING_OTHER_SYSTEM_RECORDS_OPEN",
+      "grep -E '^(NETOPIA_API_BASE_URL|NETOPIA_POS_SIGNATURE|QUADERNO_API_BASE_URL|SMARTBILL_API_BASE_URL)=' /etc/debateai/api.env",
+      "stat -c '%y %U %a %n' /etc/debateai/api/billing/netopia-api-key /etc/debateai/api/billing/netopia-ipn-keys.pem",
+      "FROM billing.payment_notice WHERE payment_environment = 'live'",
+      // §14.8: disputes are a status of the payment's own order.
+      "NETOPIA reports a dispute as a status of the payment itself",
+      "r.provider_payment_id = e.provider_payment_id",
+      // §14.9: the sandbox run, NETOPIA's own test, and the small live test with billing off.
+      "9900 0048 1022 5098", "9900 0091 8421 4768", "**NETOPIA's own test of our flow.**",
+      "**The small live test, with billing off.**", "provider-only mode",
+      "--live --i-understand-this-charges-my-card", "pnpm billing:netopia-sandbox",
+      "8. **Destroy the sandbox server.**"
+    ]) {
+      expect(flat, needle).toContain(needle);
+    }
+    // Every prompting command (the guided setup, the owner commands' reads) is the last line of its block.
+    for (const block of billing.matchAll(/```sh\n([\s\S]*?)```/gu)) {
+      const lines = (block[1] ?? "").split("\n").map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#"));
+      lines.forEach((line, index) => {
+        if (line.includes("billing-setup.sh") || line.startsWith("read -r")) expect(index, line).toBe(lines.length - 1);
+      });
+    }
+    // The claims stay true of the script the runbook sends the owner to (ruling PR-44: the script's mask is 077).
+    const setup = read("deploy/vps/billing-setup.sh");
+    for (const needle of ["systemd-ask-password", "umask 077", "--replace", "# >>> billing settings (billing-setup.sh) >>>"]) {
+      expect(setup, needle).toContain(needle);
+    }
+    // Every refusal billing:refund-done can print is explained (the command and its RefundDesk checks).
+    const refundDone = ["apps/api/src/billing/refund-done-cli.ts", "apps/api/src/billing/refunds.ts"]
+      .flatMap((path) => read(path).match(/BILLING_REFUND_DONE_[A-Z_]+/gu) ?? []);
+    expect(new Set(refundDone).size).toBeGreaterThanOrEqual(7);
+    for (const code of new Set(refundDone)) expect(flat, code).toContain(`\`${code}\``);
   });
 });

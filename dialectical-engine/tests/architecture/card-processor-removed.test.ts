@@ -55,9 +55,11 @@ const HISTORY_TESTS: ReadonlyArray<string> = Object.freeze([
   "dialectical-engine/tests/integration/billing-netopia-migration.test.ts",
   "dialectical-engine/tests/integration/billing-other-system-records.test.ts"
 ]);
-/** Until N25 rewrites the runbook's §14 and its test; N25 removes these two entries. */
+/**
+ * Until N26 rewrites the go-live rows 14–54 (spec 2026-10-05 §2.21): the runbook test's last two cases pin the
+ * checklist's words; N26 removes this entry with them.
+ */
 const UNTIL_RUNBOOK: ReadonlyArray<string> = Object.freeze([
-  "dialectical-engine/deploy/vps/README.md",
   "dialectical-engine/tests/architecture/vps-billing-runbook.test.ts"
 ]);
 /**
