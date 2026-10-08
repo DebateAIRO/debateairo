@@ -5,18 +5,20 @@
  */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL", "O3"
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL", "O3",
+  "DATA_EXPORT"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
 
 /**
  * How a param is checked and shown. plan: a plan id shown by its catalogue name. amount: a decimal
- * "24.20" shown as USD in the locale. date: an ISO date or instant shown as a long date (UTC). url: https
+ * "24.20" shown as USD in the locale. date: an ISO date or instant shown as a long date (UTC).
+ * datetime: the same date plus 24-hour UTC time. url: https
  * only, rendered as a link. count: a small whole number. text: one short line. block: the owner summary's
  * preformatted lines. flag: "true" or "false"; it only chooses a sentence and is never printed.
  */
-export type MailParamKind = "plan" | "amount" | "date" | "url" | "count" | "text" | "block" | "flag";
+export type MailParamKind = "plan" | "amount" | "date" | "datetime" | "url" | "count" | "text" | "block" | "flag";
 
 /**
  * What a param-dependent paragraph tests. present: an optional param was given. true: a flag is "true".
@@ -259,5 +261,10 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
       "owner.O3.intro", "owner.O3.job", "owner.O3.reference", "owner.O2.reason", { block: "nextSteps" }, "owner.O3.listed"
     ],
     params: { jobKind: "text", reference: "text", reasonCode: "text", nextSteps: "block" }
+  }),
+  DATA_EXPORT: define({
+    catalogue: "mail", subject: "mail.export.subject",
+    paragraphs: ["mail.export.requested", "mail.export.linkLead", "mail.export.validity", "mail.export.notYou"],
+    params: { requested: "date", expires: "datetime", downloadUrl: "url" }
   })
 });

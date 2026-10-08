@@ -141,6 +141,13 @@ function formatParam(kind: MailParamKind, name: string, value: string, locale: M
       if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(value) || !Number.isFinite(at.getTime())) throw invalid(name);
       return { kind: "text", value: new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(at) };
     }
+    case "datetime": {
+      const at = new Date(value);
+      if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(value) || !Number.isFinite(at.getTime())) throw invalid(name);
+      const date = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(at);
+      const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" }).format(at);
+      return { kind: "text", value: `${date}, ${time}` };
+    }
     case "url":
       // A canonical serialisation holds no whitespace, so this is the rule's whole check.
       if (mailLinkOf(value) !== value) throw invalid(name);
