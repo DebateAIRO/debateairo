@@ -280,8 +280,9 @@ describe("S7 deny-by-default authorization", () => {
     expect([...ordinary].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
     expect(staffContractInventory.routes).toHaveLength(18);
     // The merged closed inventory adds the nineteen external recovery routes to the current ordinary inventory and 20 staff/internal
-    // allowance routes; set equality and Fastify mounting above check each one.
-    expect(contractInventory.routes).toHaveLength(158);
+    // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
+    // GET /v1/billing/subscription/card beside dev's 158.
+    expect(contractInventory.routes).toHaveLength(159);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 
