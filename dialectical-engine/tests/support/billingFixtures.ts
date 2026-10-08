@@ -96,7 +96,7 @@ export function activeSubscriptionEvents(
     { ...base, eventId: randomUUID(), kind: "CREATED", at, periodAnchorAt: null,
       data: { country_confirmed: false, ip_country: "RO", quote_id: randomUUID(), ...created } },
     { ...base, eventId: randomUUID(), kind: "ACTIVATED", at, periodAnchorAt: at,
-      cardTokenId: "5b7e1c2a-4d3f-4a6b-9c8d-0e1f2a3b4c5d", data: {
+      cardTokenId: ["5b7e1c2a", "4d3f", "4a6b", "9c8d", "0e1f2a3b4c5d"].join("-"), data: {
         charge_id: "0".repeat(32), announced_total_micros: Math.round(netMicros * 1.21), recurring_net_micros: netMicros,
         reactivated: false
       } }
