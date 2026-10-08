@@ -218,6 +218,19 @@ function rateLimited(reply: FastifyReply, language: SupportLanguage) {
   });
 }
 
+/**
+ * The country gate in front of the support assistant: the same sentence the sign-up page shows,
+ * as a DISABLED envelope the widget renders like any other terminal answer. Code only — never the
+ * country the server saw.
+ */
+function countryClosed(reply: FastifyReply,language: SupportLanguage) {
+  return reply.status(403).send({
+    outcome: "DISABLED",
+    code: "COUNTRY_SERVICE_UNAVAILABLE",
+    text: supportTemplate("COUNTRY_UNAVAILABLE",language)
+  });
+}
+
 function shredded(reply: FastifyReply,language: SupportLanguage) {
   return reply.send({
     kind: "SHREDDED",outcome: "SHREDDED",text: supportTemplate("SHREDDED_NOTICE",language)
@@ -310,9 +323,16 @@ export function installSupportRoutes(
    * say so. A composition with no sealed budget passes a bridge that admits —
    * which is a decision it states, not one it omits.
    */
-  admit: SupportAdmission
+  admit: SupportAdmission,
+  /**
+   * Paid plans G3a: true when the caller's address may not use the support assistant (the
+   * country gate's sign-up rule). Absent — local mode, or a hosted register with no country
+   * policy — nothing is gated. Reads, and an already-opened case's thread, are never gated.
+   */
+  countryClosedFor?: (request: FastifyRequest) => boolean
 ): void {
   const admission = new SupportC3AdmissionWindow();
+  const closedHere = (request: FastifyRequest): boolean => countryClosedFor?.(request) === true;
   /**
    * DL1-F2. `/v1/support/status` composed a multi-CTE aggregate over
    * `support.message`/`session`/`rating`/`case`, a configuration read and a
@@ -347,6 +367,7 @@ export function installSupportRoutes(
       ? request.body as Readonly<Record<string, unknown>> : {};
     const language = languageFrom(body.language ?? "en");
     if (language === null) return reply.status(400).send({ error: "SUPPORT_LANGUAGE_INVALID" });
+    if (closedHere(request)) return countryClosed(reply,language);
     const state = await application.configuration.current();
     if (state.kind === "DISABLED") return reply.status(503).send({ error: state.code });
     if (!state.snapshot.values.supportEnabled) {
@@ -454,6 +475,7 @@ export function installSupportRoutes(
       if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
         return shredded(reply,found.language);
       }
+      if (closedHere(request)) return countryClosed(reply,found.language);
       const state = await application.configuration.current();
       const code = disabledCode(state);
       if (code !== null) {
@@ -851,6 +873,7 @@ export function installSupportRoutes(
       if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
         return shredded(reply,found.language);
       }
+      if (closedHere(request)) return countryClosed(reply,found.language);
       if (found.state === "LOCKED") return rateLimited(reply,found.language);
       const ratings = await application.sessions.rateMessage({
         sessionId: found.sessionId,tokenSha256,messageId: request.params.id,rating: body.rating,
@@ -888,6 +911,7 @@ export function installSupportRoutes(
       if (found.shreddedAt !== undefined && found.shreddedAt !== null) {
         return shredded(reply,found.language);
       }
+      if (closedHere(request)) return countryClosed(reply,found.language);
       if (found.state === "LOCKED") return rateLimited(reply,found.language);
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Readonly<Record<string,unknown>> : {};

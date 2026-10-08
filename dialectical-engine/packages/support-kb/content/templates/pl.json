@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "debaty",
   "INCIDENT_SURFACE_PUBLISHING": "publikowanie",
   "INCIDENT_SURFACE_SIGN_IN": "logowanie",
-  "INCIDENT_SURFACE_WHOLE_SITE": "całą witrynę"
+  "INCIDENT_SURFACE_WHOLE_SITE": "całą witrynę",
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine nie jest jeszcze dostępny w Twoim kraju."
 }

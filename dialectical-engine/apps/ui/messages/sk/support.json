@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Súkromie",
   "support.aiBanner": "Odpovede sú vytvorené AI, strojovo čitateľne označené a môžu byť nesprávne. Kedykoľvek môžete požiadať o pomoc človeka.",
   "support.cookiePreferences": "Súbory cookie, ktoré ukladáme",
-  "support.recoverAccount": "Obnoviť účet"
+  "support.recoverAccount": "Obnoviť účet",
+  "support.countryUnavailable": "Dialectical Engine zatiaľ nie je vo vašej krajine dostupný."
 }

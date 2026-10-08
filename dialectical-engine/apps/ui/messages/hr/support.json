@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Privatnost",
   "support.aiBanner": "Odgovore generira umjetna inteligencija; ti su odgovori strojno čitljivo označeni i mogu biti pogrešni. U bilo kojem trenutku zatražite razgovor s osobom.",
   "support.cookiePreferences": "Kolačići koje pohranjujemo",
-  "support.recoverAccount": "Oporavi račun"
+  "support.recoverAccount": "Oporavi račun",
+  "support.countryUnavailable": "Dialectical Engine još nije dostupan u vašoj zemlji."
 }

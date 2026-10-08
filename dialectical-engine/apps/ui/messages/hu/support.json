@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Adatvédelem",
   "support.aiBanner": "A válaszokat MI hozza létre, géppel olvashatóan jelöljük őket, és tévesek lehetnek. Bármikor kérhet emberi segítséget.",
   "support.cookiePreferences": "Az általunk tárolt sütik",
-  "support.recoverAccount": "Fiók helyreállítása"
+  "support.recoverAccount": "Fiók helyreállítása",
+  "support.countryUnavailable": "A Dialectical Engine az Ön országában még nem érhető el."
 }

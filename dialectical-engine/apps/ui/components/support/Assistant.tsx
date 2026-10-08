@@ -101,6 +101,11 @@ export type SupportAssistantClient = Readonly<{
   createSession(language: SupportAssistantLanguage): Promise<SupportSessionStart>;
   sendMessage(session: SupportSession,text: string): Promise<SupportReply>;
   isSignedIn?(): Promise<boolean>;
+  /**
+   * Paid plans G3a: false when this address may not use the support assistant. The API refuses
+   * there anyway; asking first lets the panel say so instead of offering a composer.
+   */
+  isOpenHere?(): Promise<boolean>;
   rate(
     session: SupportSession,messageId: string,rating: "yes" | "no"
   ): Promise<(SupportCaseAcknowledgement & ServerTimed) | SupportReply | null>;
@@ -296,6 +301,19 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
     if (!response.ok) throw new Error("SUPPORT_IDENTITY_UNKNOWN");
     return true;
   },
+  /** Like the sign-up page, a failed check shows the composer: the API applies the same gate. */
+  async isOpenHere() {
+    try {
+      const response = await fetch("/api/v1/geo/availability",{
+        method: "GET",cache: "no-store",credentials: "same-origin"
+      });
+      if (!response.ok) return true;
+      const body = await response.json() as unknown;
+      return !(body !== null && typeof body === "object" && (body as Record<string,unknown>).service === false);
+    } catch {
+      return true;
+    }
+  },
   async createSession(language) {
     const response = await supportPost("/api/v1/support/sessions",{ language });
     const body = await readJson(response);
@@ -428,6 +446,8 @@ export function Assistant({
    * FIX p2 (CT2-B1): while concealed the panel is busy — no control acts on what it holds.
    */
   const [concealed,setConcealed] = useState(false);
+  /** Paid plans G3a: the support assistant is not offered at this address (the sign-up rule). */
+  const [countryClosed,setCountryClosed] = useState(false);
   /**
    * S04 (PLAN S3.2): the stored transcript is restored only through the gate. "pending" waits for the identity,
    * "settling" awaits the gate, "done" lets the write effect run, "asleep" is a parked page: no gate, no fetch,
@@ -644,6 +664,15 @@ export function Assistant({
     });
     return () => { active = false; };
   },[client,signedIn,identityEpoch]);
+
+  useEffect(() => {
+    if (client.isOpenHere === undefined) return;
+    let active = true;
+    void client.isOpenHere().then((open) => {
+      if (active) setCountryClosed(!open);
+    });
+    return () => { active = false; };
+  },[client]);
 
   // S04 (PLAN S3.3, ADR-0033): a session change in any tab resets this panel to
   // "New conversation"; a sleep parks it at once — hidden, held in memory
@@ -948,7 +977,7 @@ export function Assistant({
 
   // CT2-B1: while concealed every control that acts on the conversation is busy (send, suggestions, escalate,
   // topics, shortcuts, "New conversation"); text typed in the composer stays where it is.
-  const inert = busy || concealed;
+  const inert = busy || concealed || countryClosed;
   // PT-B1: while parked, and until the wake's gate decides, nothing of the conversation is on screen.
   const shownMessages = concealed ? NO_MESSAGES : messages;
   const last = shownMessages.at(-1);
@@ -1026,7 +1055,10 @@ export function Assistant({
     </div>
   ) : null;
 
-  const composer = <form className="supportComposer" onSubmit={(event) => void submit(event)}>
+  // Paid plans G3a: where support is not offered the sentence stands in for the composer.
+  const composer = countryClosed ? <p className="supportComposer supportCountryUnavailable" role="status"
+    data-support-country-unavailable><span>{t(chromeCatalog,"support.countryUnavailable")}</span></p>
+    : <form className="supportComposer" onSubmit={(event) => void submit(event)}>
     <label className="supportComposerLabel" htmlFor="support-message">{t(chromeCatalog,"support.message")}</label>
     <input
       ref={inputRef}

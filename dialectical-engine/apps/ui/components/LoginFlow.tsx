@@ -212,9 +212,11 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
             setCode('');
             attempt.current.edited();
         }
-        catch {
+        catch (failure) {
+            // Paid plans G3a: an address where the service is not offered gets the sign-up page's sentence.
             if (owner === sequence.current)
-                setError(t(catalog, "auth.login.signInFailed"));
+                setError(failure instanceof ContractHttpError && failure.serverCode === 'COUNTRY_SERVICE_UNAVAILABLE'
+                    ? t(catalog, "auth.signUp.countryUnavailable") : t(catalog, "auth.login.signInFailed"));
         }
         finally {
             if (owner === sequence.current) {

@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Zasebnost",
   "support.aiBanner": "Odgovori so ustvarjeni z UI, strojno berljivo označeni in so lahko napačni. Kadar koli lahko zahtevate pomoč človeka.",
   "support.cookiePreferences": "Piškotki, ki jih shranjujemo",
-  "support.recoverAccount": "Obnovi račun"
+  "support.recoverAccount": "Obnovi račun",
+  "support.countryUnavailable": "Dialectical Engine v vaši državi še ni na voljo."
 }

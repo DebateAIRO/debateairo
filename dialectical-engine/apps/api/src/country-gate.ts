@@ -19,7 +19,9 @@ export async function countryPolicyInForce(
  *
  * Composed only in hosted mode AND when the register version in force publishes `countryPolicy`;
  * absent, every route behaves exactly as before. It checks sign-up (the IP's country switch, Tor,
- * unknown) and new debates (the always-blocked list); sign-in and every read are never gated.
+ * unknown), sign-in and the support assistant (the same rule as sign-up: where the service is not
+ * offered) and new debates (the always-blocked list). A session already held, and every read, are
+ * never gated.
  *
  * AUDIT, AGGREGATED. Each refusal writes an identity audit event — the code, the country and the
  * fact that the evidence was the IP — but at most ONE per route, code and country per window, and
@@ -71,6 +73,17 @@ export class CountryGate {
     return decision.code;
   }
 
+  /**
+   * Sign-in and the support assistant: nothing is served where the service is not offered — the
+   * address's sign-up switch, Tor and an unknown address refuse exactly as sign-up does. Not
+   * audited: the audit capability (0080) names only register and asks.
+   */
+  service(source: AuthSourceContext): Exclude<CountryGateRefusal, "COUNTRY_ASK_BLOCKED"> | null {
+    const evidence = this.options.lookup.lookup(source.ip);
+    const decision = decideSignup(this.options.policy, { ipCountry: evidence.country, tor: evidence.tor });
+    return decision.kind === "ALLOW" ? null : decision.code;
+  }
+
   /** Region picker S01: the declared country's sign-up switch, without IP audit evidence. */
   declaredSignupRefusal(country: string): "COUNTRY_SIGNUP_UNAVAILABLE" | null {
     return countryRule(this.options.policy, country).signup ? null : "COUNTRY_SIGNUP_UNAVAILABLE";
@@ -85,11 +98,14 @@ export class CountryGate {
   }
 
   /** Booleans only: the page never learns the country the server saw. */
-  availability(ip: string): Readonly<{ signup: boolean; pay: boolean }> {
+  availability(ip: string): Readonly<{ signup: boolean; pay: boolean; service: boolean }> {
     const evidence = this.options.lookup.lookup(ip);
     const facts = { ipCountry: evidence.country, tor: evidence.tor };
+    const signup = decideSignup(this.options.policy, facts).kind === "ALLOW";
     return Object.freeze({
-      signup: decideSignup(this.options.policy, facts).kind === "ALLOW",
+      signup,
+      // Sign-in and the support assistant follow sign-up's rule (`service` above).
+      service: signup,
       pay: decidePayment(this.options.policy, { ...facts, declaredCountry: evidence.country }).kind === "ALLOW"
     });
   }

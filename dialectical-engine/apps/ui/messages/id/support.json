@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Privasi",
   "support.aiBanner": "Balasan dibuat oleh AI, diberi penanda yang dapat dibaca mesin, dan mungkin salah. Minta bantuan manusia kapan saja.",
   "support.cookiePreferences": "Kuki yang kami simpan",
-  "support.recoverAccount": "Pulihkan akun"
+  "support.recoverAccount": "Pulihkan akun",
+  "support.countryUnavailable": "Dialectical Engine belum tersedia di negara Anda."
 }
