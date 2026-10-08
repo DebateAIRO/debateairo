@@ -109,12 +109,12 @@ describe("the support panel where the service is not offered", () => {
     expect(document.querySelector("[data-support-country-unavailable]")).toBeNull();
   });
 
-  it("reads `support` from the availability check, and fails open like the sign-up page", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ signup: false,pay: false,support: false }));
+  it("reads `service` from the availability check, and fails open like the sign-up page", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ signup: false,pay: false,service: false }));
     vi.stubGlobal("fetch",fetchMock);
     await expect(supportAssistantClient.isOpenHere!()).resolves.toBe(false);
     expect(fetchMock).toHaveBeenCalledWith("/api/v1/geo/availability",expect.objectContaining({ method: "GET" }));
-    fetchMock.mockImplementation(async () => jsonResponse({ signup: true,pay: false,support: true }));
+    fetchMock.mockImplementation(async () => jsonResponse({ signup: true,pay: false,service: true }));
     await expect(supportAssistantClient.isOpenHere!()).resolves.toBe(true);
     fetchMock.mockImplementation(async () => jsonResponse({ error: "RATE_LIMITED" },429));
     await expect(supportAssistantClient.isOpenHere!()).resolves.toBe(true);
@@ -124,7 +124,7 @@ describe("the support panel where the service is not offered", () => {
 
   it("renders the API's own 403 refusal as an answer, not as an outage", async () => {
     vi.stubGlobal("fetch",vi.fn(async () => jsonResponse({
-      outcome: "DISABLED",code: "COUNTRY_SUPPORT_UNAVAILABLE",text: SENTENCE
+      outcome: "DISABLED",code: "COUNTRY_SERVICE_UNAVAILABLE",text: SENTENCE
     },403)));
     const started = await supportAssistantClient.createSession("en");
     expect(started).toMatchObject({ outcome: "DISABLED",text: SENTENCE });

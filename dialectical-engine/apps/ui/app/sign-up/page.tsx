@@ -1,6 +1,5 @@
 import { publicTurnstileConfig } from "@/lib/turnstile";
 import { NONCE_REQUEST_HEADER } from "../../content-security-policy.mjs";
-import Link from "next/link";
 import { cookies, headers } from "next/headers";
 import { AGE_REFUSAL_COOKIE_NAME, AGE_REFUSAL_COOKIE_VALUE } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
@@ -50,9 +49,8 @@ export default async function SignUpPage() {
         description={t(catalog, "auth.signUp.countryUnavailable")}
         footer={null}
       >
-        <p className="authPanelFooter">
-          {t(catalog, "auth.signUp.alreadyHaveOne")} <Link href="/login">{t(catalog, "auth.signUp.logIn")}</Link>
-        </p>
+        {/* Sign-in is closed at the same addresses (paid plans G3a), so no link leads on. */}
+        {null}
       </AuthShell>
     );
   }

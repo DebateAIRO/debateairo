@@ -635,8 +635,8 @@ export const LegalAcceptRequestSchema = z.object({
   locale: z.string().regex(/^[a-z]{2}$/u)
 }).strict();
 export type LegalAcceptRequest = z.infer<typeof LegalAcceptRequestSchema>;
-/** Paid plans G3a: booleans only — never the country the server saw. `support`: the support assistant is open here. */
-export const GeoAvailabilityResponseSchema = z.object({ signup: z.boolean(), pay: z.boolean(), support: z.boolean() }).strict();
+/** Paid plans G3a: booleans only — never the country the server saw. `service`: sign-in and the support assistant are open here. */
+export const GeoAvailabilityResponseSchema = z.object({ signup: z.boolean(), pay: z.boolean(), service: z.boolean() }).strict();
 export type GeoAvailabilityResponse = z.infer<typeof GeoAvailabilityResponseSchema>;
 
 /**

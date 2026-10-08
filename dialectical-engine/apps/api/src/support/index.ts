@@ -226,7 +226,7 @@ function rateLimited(reply: FastifyReply, language: SupportLanguage) {
 function countryClosed(reply: FastifyReply,language: SupportLanguage) {
   return reply.status(403).send({
     outcome: "DISABLED",
-    code: "COUNTRY_SUPPORT_UNAVAILABLE",
+    code: "COUNTRY_SERVICE_UNAVAILABLE",
     text: supportTemplate("COUNTRY_UNAVAILABLE",language)
   });
 }

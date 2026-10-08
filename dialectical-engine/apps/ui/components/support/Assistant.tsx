@@ -309,7 +309,7 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
       });
       if (!response.ok) return true;
       const body = await response.json() as unknown;
-      return !(body !== null && typeof body === "object" && (body as Record<string,unknown>).support === false);
+      return !(body !== null && typeof body === "object" && (body as Record<string,unknown>).service === false);
     } catch {
       return true;
     }
