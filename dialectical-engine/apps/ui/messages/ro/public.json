@@ -126,7 +126,7 @@
   "public.report.models": "Modele care au participat: {models}",
   "public.report.modelsNotRecorded": "Modele care au participat: neînregistrate",
   "public.report.disclosure": "Acest raport a fost scris de modele AI pe baza argumentelor din dezbatere.",
-  "public.report.notAdvice": "Raport generat de AI. Nu reprezintă consultanță medicală, juridică, financiară sau alt tip de consultanță profesională.",
+  "public.report.notAdvice": "Raport generat de AI. Nu reprezintă consultanță medicală, psihologică, juridică, financiară sau alt tip de consultanță profesională.",
   "public.report.title.inShort": "Pe scurt",
   "public.report.title.story": "Povestea completă",
   "public.report.title.why": "De ce acest răspuns",

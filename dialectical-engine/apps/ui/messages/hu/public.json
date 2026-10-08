@@ -126,7 +126,7 @@
   "public.report.models": "Részt vevő modellek: {models}",
   "public.report.modelsNotRecorded": "Részt vevő modellek: nincs rögzítve",
   "public.report.disclosure": "Ezt a jelentést MI-modellek írták a vita érvei alapján.",
-  "public.report.notAdvice": "MI által készített jelentés. Nem minősül orvosi, jogi, pénzügyi vagy más szakmai tanácsadásnak.",
+  "public.report.notAdvice": "MI által készített jelentés. Nem minősül orvosi, pszichológiai, jogi, pénzügyi vagy más szakmai tanácsadásnak.",
   "public.report.title.inShort": "Röviden",
   "public.report.title.story": "A teljes történet",
   "public.report.title.why": "Miért ez a válasz",

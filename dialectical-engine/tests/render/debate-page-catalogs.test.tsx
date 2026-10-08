@@ -96,7 +96,9 @@ function synthesisStrings(locale: string): string[] {
 /** The English page as fc3cb865a rendered it (see the byte-identical row), plus the
  * deliberate later changes, each a hand edit of one element in both files: b68f82dae
  * dropped the language-switcher flag span; PR #56 (eb7269e1) added the
- * publicationControl class to the publication card. fc3cb865a is not in this
+ * publicationControl class to the publication card; the not-advice mission appended
+ * "It is not medical, psychological, legal or financial advice, or any other
+ * professional advice." to the AI notice text. fc3cb865a is not in this
  * repository, so a later deliberate change is applied the same way and listed here. */
 function headFixture(name: "queued" | "lens"): string {
   return readFileSync(resolve(process.cwd(), `tests/render/fixtures/debate-page-en.fc3cb865a.${name}.html`), "utf8");

@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "Tutto ciò che compare in questo dibattito — argomentazioni, revisioni, punteggi e verdetto — è generato da modelli di IA, contrassegnato in un formato leggibile dalle macchine e può contenere inesattezze.",
+  "debateChrome.aiNotice": "Tutto ciò che compare in questo dibattito — argomentazioni, revisioni, punteggi e verdetto — è generato da modelli di IA, contrassegnato in un formato leggibile dalle macchine e può contenere inesattezze. Non costituisce consulenza medica, psicologica, legale, finanziaria o altra consulenza professionale.",
   "debateChrome.status.waiting": "In attesa di partire. Il tuo dibattito partirà da solo alle {time}.",
   "debateChrome.status.waitingOwnDebates": "Gli altri tuoi dibattiti stanno usando per ora il resto del tuo limite. Questo dibattito partirà da solo non appena uno di essi sarà concluso.",
   "debateChrome.backToLibrary": "← Torna alla raccolta",

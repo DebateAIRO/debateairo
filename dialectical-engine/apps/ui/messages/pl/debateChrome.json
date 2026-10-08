@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "Wszystko w tej debacie — argumenty, recenzje, oceny i werdykt — jest generowane przez modele AI, oznaczone w sposób możliwy do odczytu maszynowego i może być niedokładne.",
+  "debateChrome.aiNotice": "Wszystko w tej debacie — argumenty, recenzje, oceny i werdykt — jest generowane przez modele AI, oznaczone w sposób możliwy do odczytu maszynowego i może być niedokładne. Nie stanowi porady medycznej, psychologicznej, prawnej, finansowej ani żadnej innej porady zawodowej.",
   "debateChrome.status.waiting": "Czeka na rozpoczęcie. Twoja debata rozpocznie się sama o {time}.",
   "debateChrome.status.waitingOwnDebates": "Twoje pozostałe debaty wykorzystują na razie resztę Twojego limitu. Ta debata rozpocznie się sama, gdy tylko jedna z nich się zakończy.",
   "debateChrome.backToLibrary": "← Wróć do biblioteki",

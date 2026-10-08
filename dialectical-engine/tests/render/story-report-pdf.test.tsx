@@ -494,7 +494,7 @@ describe("the report in the question's own script (R-fonts)", () => {
     const bare = (text: string) => text.replace(/\s/gu, "");
     const above = first.slice(0, eyebrow).map((line) => (locale === "he" ? [...line].reverse().join("") : line)).join("");
     expect(bare(above)).toBe(bare(reportCatalogs.publicCatalog["public.report.notAdvice"]!));
-    if (locale === "en") expect(above).toContain("It is not medical, legal, financial or other professional advice.");
+    if (locale === "en") expect(above).toContain("It is not medical, psychological, legal or financial advice, or any other professional advice.");
   }, 120_000);
 
   it.each(["hi", "he"] as const)("hands react-pdf every face of the %s report through the glyph fix (reportGlyphs.ts), never the bare font", async (locale) => {
