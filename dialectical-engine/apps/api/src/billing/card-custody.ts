@@ -186,7 +186,8 @@ export class CardCustody {
       template: "M12", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
       dedupeRef: `${state.subscriptionId}:${renewAt.toISOString()}`,
       params: {
-        plan: state.planId, renewDate: renewAt.toISOString(),
+        // The plan the renewal charges (renewal.ts freshQuote: a scheduled downgrade applies at it), as M4 names it (P2-M14).
+        plan: state.scheduledDowngradePlanId ?? state.planId, renewDate: renewAt.toISOString(),
         cardPageUrl: new URL("/settings/card", this.deps.publicAppUrl).toString(), cardExpiring: expiring ? "true" : "false"
       },
       notBefore: now

@@ -193,6 +193,23 @@ describe("N17 asking for a card before it is needed (spec §2.15.3, M12)", () =>
     expect(mail).toMatchObject({ "param.cardExpiring": "false" });
   });
 
+  it("names the plan the renewal charges: a scheduled downgrade's plan, never the current one (spec §2.15.3, P2-M14)", async () => {
+    const seeded = await seedNetopiaSubscription(database.pool, {
+      ownerRef: randomUUID(), planId: "PRO", activatedAt: new Date(Date.now() - 26 * DAY), taxCountry: "DE"
+    });
+    // DOWNGRADE_SCHEDULED (P12b): the plan renews at the lower plan from the next period, so that is what M12 is about.
+    await repository.withTransaction(async (client) => {
+      await jobs.lockOwner(client, seeded.ownerRef);
+      await repository.appendSubscriptionEvent(client, subscriptionEvent(await state(seeded.subscriptionId), "DOWNGRADE_SCHEDULED", new Date(), {
+        announced_total_micros: 24_200_000, recurring_net_micros: 20_000_000
+      }, { planId: "PLUS" }));
+    });
+    await repository.withTransaction((client) => repository.revokeCardToken(client, { tokenId: seeded.cardTokenId, at: new Date(), reason: "OWNER" }));
+    expect(await custodyOf().askForCard(await state(seeded.subscriptionId), new Date())).toBe(true);
+    const [mail] = await m12(seeded.customerId);
+    expect(mail).toMatchObject({ "param.plan": "PLUS", "param.cardExpiring": "false" });
+  });
+
   it("runs the sweep and both purges in the daily owner job, after the tax summary", async () => {
     const steps: string[] = [];
     const owner = new OwnerJobs({
