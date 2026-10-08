@@ -151,16 +151,25 @@ export function createPreviewGuardedFetch(port: PreviewBudgetPort): typeof fetch
 }
 /**
  * Step 1 (owner, 2026-10-08): the v2 gate refuses with 409 and {"error": CODE}. The team's day
- * being used up is the product's daily code (a run-level spend stop lifted by the next day);
- * every other refusal, and any body that is not exactly that shape, keeps the per-run money code.
+ * being used up is the product's daily code (a run-level spend stop lifted by the next day).
+ * Too many calls in flight (CONCURRENCY_LIMIT_REACHED) is the gate's own 429: nothing was
+ * reserved, and the same call fits once one in flight settles, so it is the transient transport
+ * failure every vendor 429 already is (PROVIDER_CALL_FAILED: the gateway wraps it, the runner
+ * cools down and retries), never a money stop. Every other refusal, and any body that is not
+ * exactly that shape, keeps the per-run money code.
  */
 const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_REACHED", "DAILY_CALL_LIMIT_REACHED"]);
+const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED"]);
 function previewAuthorityRefusal(status: number | undefined, row: unknown): TypedDomainError {
   const code = status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
     ? (row as Record<string, unknown>).error : undefined;
-  return typeof code === "string" && PREVIEW_DAILY_REFUSALS.has(code)
-    ? new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "Private preview team budget for today is used up")
-    : new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");
+  if (typeof code === "string" && PREVIEW_DAILY_REFUSALS.has(code)) {
+    return new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "Private preview team budget for today is used up");
+  }
+  if (typeof code === "string" && PREVIEW_TRANSIENT_REFUSALS.has(code)) {
+    return new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate is at its limit of calls in flight");
+  }
+  return new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");
 }
 /** Local IPC only: application principals never receive the provider credential or ledger write access. */
 export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig): PreviewBudgetPort {

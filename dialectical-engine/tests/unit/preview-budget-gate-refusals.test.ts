@@ -2,13 +2,27 @@
 // JSON body {"error": CODE}. The application side reads that body over the real local
 // socket protocol: the team's day being used up becomes the product's own daily code
 // (DAILY_COST_ENVELOPE_REACHED, a run-level spend stop with its own "wait for tomorrow"
-// lift); every other refusal, and any body it cannot read, keeps today's behaviour.
+// lift); too many calls in flight is a transient provider failure (PROVIDER_CALL_FAILED, the
+// runner cools down and retries), never a money stop; every other refusal, and any body it
+// cannot read, keeps today's behaviour.
 import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createPreviewBudgetRpcPort, type PreviewProviderTestConfig } from "@debateai/providers";
+import { isRunLevelSpendStop } from "@debateai/kernel";
+import {
+  createPreviewBudgetRpcPort,
+  createPreviewGuardedFetch,
+  OpenAICompatibleProviderGateway,
+  parsePreviewProviderTestConfig,
+  parseProviderDiscoveryTargets,
+  PROVIDER_COST_ENVELOPE_REFUSAL_CODES,
+  providerTargetGatewayControls,
+  withPreviewProviderCallPolicy,
+  type PreviewProviderTestConfig
+} from "@debateai/providers";
+import { framedFixturePacket } from "../support/framed-packet.js";
 
 type Reply = Readonly<{ status: number; body: string }>;
 const servers: Server[] = [];
@@ -60,7 +74,7 @@ describe("the preview spending gate's 409 refusal body", () => {
     }
   );
 
-  it.each(["CONCURRENCY_LIMIT_REACHED", "PREVIEW_TEST_AUTHORITY_STOPPED", "SOMETHING_NEW"])(
+  it.each(["PREVIEW_TEST_AUTHORITY_STOPPED", "SOMETHING_NEW"])(
     "%s keeps today's per-run money refusal",
     async (code) => {
       const { port } = await gate({ status: 409, body: JSON.stringify({ error: code }) });
@@ -76,6 +90,50 @@ describe("the preview spending gate's 409 refusal body", () => {
   ])("a 409 body that is %s is not read as the daily code", async (_name, body) => {
     const { port } = await gate({ status: 409, body });
     await expect(port.execute(execution)).rejects.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+  });
+
+  it("CONCURRENCY_LIMIT_REACHED is a transient provider failure: never a money stop, never a run-level spend stop", async () => {
+    // Too many GLM calls in flight is the gate's own 429: nothing was reserved or spent, and
+    // the same call fits once one in flight settles. It is the transport failure every vendor
+    // 429 already is (PROVIDER_CALL_FAILED), so the runner cools down and retries instead of
+    // recording the debate's money ceiling as reached.
+    const { port } = await gate({ status: 409, body: JSON.stringify({ error: "CONCURRENCY_LIMIT_REACHED" }) });
+    const refusal: unknown = await port.execute(execution).then(() => null, (error: unknown) => error);
+    expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+    expect(isRunLevelSpendStop(refusal)).toBe(false);
+    expect(PROVIDER_COST_ENVELOPE_REFUSAL_CODES as readonly string[]).not.toContain((refusal as { code: string }).code);
+  });
+
+  it("through the native gateway, CONCURRENCY_LIMIT_REACHED leaves as PROVIDER_CALL_FAILED, the money refusal as itself", async () => {
+    const MODEL = "zai-org/GLM-5.3-Flash";
+    const REF = "preview:fixture-a";
+    const target = parseProviderDiscoveryTargets(JSON.stringify([{
+      provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MODEL,
+      input_price_micros_per_million: 150000, output_price_micros_per_million: 500000,
+      thinking_parameter: "reasoning_effort", thinking_levels: ["high"], context_window_tokens: 1048576
+    }]), [{ providerRef: REF, maker: "Z.AI" }])[0]!;
+    const preview = parsePreviewProviderTestConfig(JSON.stringify({
+      deployment: "v3-preview", free_model_ids: [MODEL], requested_thinking_level: "high",
+      budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture-scope"
+    }))!;
+    const call = async (code: string): Promise<unknown> => {
+      const { port } = await gate({ status: 409, body: JSON.stringify({ error: code }) });
+      const gateway = withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
+        endpoint: target.baseUrl, model: target.model, maker: target.maker, ...providerTargetGatewayControls(target),
+        fetchImplementation: createPreviewGuardedFetch(port),
+        persistRawArtifact: async (artifact) => artifact.artifactId, appendLedgerEntry: async (entry) => entry.attemptId,
+        assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
+      }), preview);
+      return gateway.call({
+        runId: "run:synthetic", subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
+        bound: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 }, contractHash: "contract:test", providerRef: REF,
+        packet: framedFixturePacket("Synthetic school phone policy; no personal data.")
+      }).then(() => null, (error: unknown) => error);
+    };
+    const busy = await call("CONCURRENCY_LIMIT_REACHED");
+    expect(busy).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+    expect(isRunLevelSpendStop(busy)).toBe(false);
+    await expect(call("PREVIEW_TEST_AUTHORITY_STOPPED")).resolves.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
   });
 
   it("an unreadable 409 body keeps today's answer and throws nothing else", async () => {
