@@ -509,4 +509,90 @@ describe("N15b an owner refund waits while the bank disputes the payment (ruling
     expect(reminder!["param.refundList"]).toContain(`- charge ${chargeId}, NETOPIA payment ${second}: refund ${amount} USD (the whole payment), reason DUPLICATE_PAYMENT`);
     expect(await refunds.planOwnerRefund(chargeId, seeded.totalMicros)).toMatchObject({ providerPaymentId: second, despiteChargeback: false });
   });
+
+  // Fix round 1 (F1): the PAYMENT_REFUND job of a held request moves no money and hands nothing to the owner.
+  const heldSteps = (chargeId: string, paymentId: string, amount: string) => `A refund of ${amount} USD (reason WITHDRAWAL) was due on`
+    + ` this payment (NETOPIA payment ${paymentId}), and NETOPIA now reports a charge-back on it: the person's bank is taking`
+    + " the money back. Do not refund it in NETOPIA's admin; the site no longer lists it as due. If the dispute ends for us,"
+    + ` record that with pnpm billing:dispute --charge ${chargeId} --outcome won: the refund is then due again and comes back`
+    + " into the reminder. If it ends for the person, nothing is left to refund. If you had already refunded it in NETOPIA's"
+    + ` admin before the dispute, record that refund with pnpm billing:refund-done --charge ${chargeId} --amount ${amount}`
+    + " --despite-chargeback, and tell NETOPIA, so the dispute is answered.";
+  const heldLines = (audit: ReturnType<typeof deskFor>["audit"]) => audit.events.filter((entry) => entry.event === "billing.refund.held_by_chargeback");
+  const ownerDue = (audit: ReturnType<typeof deskFor>["audit"]) => audit.events.filter((entry) => entry.event === "billing.refund.owner_due");
+
+  it("a refund asked for on a payment already under a dispute is held: its job hands nothing to the owner", async () => {
+    const seeded = await paidPlan("held-before-request");
+    const chargeId = seeded.initialChargeId;
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds, verify, audit } = deskFor(port, clock);
+    chargedBack(port, seeded);
+    expect(await verify.handle(verifyJob(chargeId, clock.now), clock.now)).toEqual({ kind: "DONE" });
+    expect(await heldAlerts(chargeId)).toHaveLength(0); // no refund was open when the charge-back came
+    await requestWhole(seeded, refunds, "WITHDRAWAL", 12_100_000);
+    const job = await claim("PAYMENT_REFUND", `${chargeId}:${seeded.providerPaymentId}`, clock.now);
+    expect(await refunds.handle(job, clock.now)).toEqual({ kind: "DONE" });
+    expect(await stageOf(job.jobId)).toBeNull();
+    expect(await emails("O2_REFUND_DUE", chargeId)).toHaveLength(0);
+    expect(ownerDue(audit)).toEqual([]);
+    expect(await refundedRows(chargeId)).toEqual([]);
+    const alerts = await heldAlerts(chargeId);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!.ref).toBe(`O3:${chargeId}:REFUND_HELD:${seeded.providerPaymentId}`);
+    expect(alerts[0]!.payload["param.nextSteps"]).toBe(heldSteps(chargeId, seeded.providerPaymentId, "12.10"));
+    expect(heldLines(audit)).toEqual([{ event: "billing.refund.held_by_chargeback", fields: { reason: "WITHDRAWAL" } }]);
+    // The request stays open (held): a dispute won brings it back by the existing rules.
+    const charge = (await repository.charge(chargeId))!;
+    expect(heldByChargeback(charge, seeded.providerPaymentId)).toBe(true);
+    expect(charge.events.filter((event) => event.kind === "REFUND_REQUESTED")).toHaveLength(1);
+  });
+
+  it("the job of a refund held after it was asked for sends no O2_REFUND_DUE and no second O3", async () => {
+    const seeded = await paidPlan("held-job-after");
+    const chargeId = seeded.initialChargeId;
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds, verify, audit } = deskFor(port, clock);
+    await requestWhole(seeded, refunds, "WITHDRAWAL", 12_100_000);
+    chargedBack(port, seeded);
+    expect(await verify.handle(verifyJob(chargeId, clock.now), clock.now)).toEqual({ kind: "DONE" });
+    expect(await heldAlerts(chargeId)).toHaveLength(1);
+    const job = await claim("PAYMENT_REFUND", `${chargeId}:${seeded.providerPaymentId}`, clock.now);
+    expect(await refunds.handle(job, clock.now)).toEqual({ kind: "DONE" });
+    expect(await stageOf(job.jobId)).toBeNull();
+    expect(await emails("O2_REFUND_DUE", chargeId)).toHaveLength(0);
+    expect(ownerDue(audit)).toEqual([]);
+    expect(await heldAlerts(chargeId)).toHaveLength(1);
+    expect(heldLines(audit)).toEqual([{ event: "billing.refund.held_by_chargeback", fields: { reason: "WITHDRAWAL" } }]);
+  });
+
+  it("the API mode never calls NETOPIA's refund on a held payment, and still records one NETOPIA already reports", async () => {
+    const seeded = await paidPlan("held-api");
+    const chargeId = seeded.initialChargeId;
+    const port = new RefundPort(true);
+    const clock = { now: new Date() };
+    const { refunds, verify, audit } = deskFor(port, clock);
+    await requestWhole(seeded, refunds, "WITHDRAWAL", 12_100_000);
+    chargedBack(port, seeded);
+    await verify.handle(verifyJob(chargeId, clock.now), clock.now);
+    const job = await claim("PAYMENT_REFUND", `${chargeId}:${seeded.providerPaymentId}`, clock.now);
+    expect(await refunds.handle(job, clock.now)).toEqual({ kind: "DONE" });
+    expect(port.refunds).toEqual([]);
+    expect(await stageOf(job.jobId)).toBeNull();
+    expect(await refundedRows(chargeId)).toEqual([]);
+    expect(await heldAlerts(chargeId)).toHaveLength(1);
+    expect(heldLines(audit)).toHaveLength(1);
+
+    // A retried job looks first: a refund NETOPIA already reports on the held payment is recorded, never made again.
+    const again = await paidPlan("held-api-seen");
+    await requestWhole(again, refunds, "SUBSCRIPTION_ENDED", again.totalMicros);
+    chargedBack(port, again);
+    await verify.handle(verifyJob(again.initialChargeId, clock.now), clock.now);
+    port.statuses.set(again.initialChargeId, report(again.initialChargeId, again.providerPaymentId, "REFUNDED", again.totalMicros));
+    const retried = await claim("PAYMENT_REFUND", `${again.initialChargeId}:${again.providerPaymentId}`, clock.now);
+    expect(await refunds.handle({ ...retried, attempts: 2 } as OutboxJob, clock.now)).toEqual({ kind: "DONE" });
+    expect(port.refunds).toEqual([]);
+    expect(await refundedRows(again.initialChargeId)).toEqual([again.totalMicros]);
+  });
 });

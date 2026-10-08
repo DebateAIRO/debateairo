@@ -16,6 +16,7 @@ import { emailJob, enqueueEmail, type BillingMailTemplateId } from "./email-job.
 import {
   claimLost, DONE, enqueueOnce, failureRetryAt, otherPaymentSystem, otherXMoneySystem, type OutboxHandler, type OutboxOutcome
 } from "./outbox.js";
+import { queuePaymentAlert } from "./payment-alert.js";
 import { chargeEvent, refundTarget } from "./rows.js";
 import { enqueueCreditNote } from "./settlement.js";
 
@@ -191,14 +192,46 @@ export function openOwnRequest(
 /**
  * N15b (ruling PR-41, spec §2.13): whether an owner refund on this payment is HELD: the charge holds a CHARGEBACK of
  * `paymentId` and no CHARGEBACK_RESOLVED of that same id. A held refund is not due (the person's bank is taking the
- * money back): the reminder leaves it out, it gets no daily status read, and `pnpm billing:refund-done` refuses it
- * without `--despite-chargeback`. A dispute won (CHARGEBACK_RESOLVED) makes it due again; a dispute lost writes no
+ * money back): its PAYMENT_REFUND job moves no money and hands nothing to the owner (owner and API mode), the reminder
+ * leaves it out, it gets no daily status read, and `pnpm billing:refund-done` refuses it without `--despite-chargeback`. A dispute won (CHARGEBACK_RESOLVED) makes it due again; a dispute lost writes no
  * charge event, so it stays held. The same rule as the SQL of `BillingRepository.openOwnerRefunds` and of
  * `BillingJobQueries.dueStatusReads`' REFUND schedule (packages/db); keyed by the payment, never by the charge alone.
  */
 export function heldByChargeback(charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>, paymentId: string): boolean {
   return charge.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId === paymentId)
     && !charge.events.some((event) => event.kind === "CHARGEBACK_RESOLVED" && event.providerPaymentId === paymentId);
+}
+
+/**
+ * N15b (ruling PR-41): the owner's one O3 REFUND_HELD_BY_CHARGEBACK for an open owner refund (`open`, from
+ * `openOwnRequest`) that a charge-back on its payment holds (`heldByChargeback`). Once per payment ever, whichever path
+ * finds the hold first: VERIFY_PAYMENT writing the CHARGEBACK while the request is open (`netopiaChargedBack`, queued on
+ * that transaction through `client`), or the PAYMENT_REFUND job of a request made on a payment already under a
+ * dispute (`RefundDesk`, owner and API mode). `amount` is the open amount, as the reminder and
+ * `pnpm billing:refund-done` print it. Returns `queuePaymentAlert`'s answer: false when that payment's O3 was queued
+ * before, so the caller's audit line billing.refund.held_by_chargeback stays once per payment too.
+ */
+export async function queueRefundHeldAlert(
+  deps: Parameters<typeof queuePaymentAlert>[0],
+  charge: Pick<ChargeRow, "chargeId" | "currency">,
+  open: Readonly<{ intent: RefundIntent; openMicros: number }>,
+  now: Date,
+  client?: PoolClient
+): Promise<boolean> {
+  const { chargeId, currency } = charge;
+  const paymentId = open.intent.transactionId;
+  const amount = microsToDecimal(open.openMicros);
+  return queuePaymentAlert(deps, {
+    code: "REFUND_HELD_BY_CHARGEBACK", reference: `charge ${chargeId}`, dedupeRef: `${chargeId}:REFUND_HELD:${paymentId}`, now,
+    nextSteps: `A refund of ${amount} ${currency} (reason ${open.intent.reason}) was due on this payment`
+      + ` (NETOPIA payment ${paymentId}), and NETOPIA now reports a charge-back on it: the person's bank is taking the`
+      + " money back. Do not refund it in NETOPIA's admin; the site no longer lists it as due. If the dispute ends for"
+      + ` us, record that with pnpm billing:dispute --charge ${chargeId} --outcome won: the refund is then due`
+      + " again and comes back into the reminder. If it ends for the person, nothing is left to refund. If you had"
+      + " already refunded it in NETOPIA's admin before the dispute, record that refund with"
+      + ` pnpm billing:refund-done --charge ${chargeId} --amount ${amount} --despite-chargeback, and tell NETOPIA,`
+      + " so the dispute is answered."
+  }, client);
 }
 
 /** Whether a request gives back the WHOLE payment it names (the payment's own amount, nothing recorded of it yet). */
@@ -787,7 +820,11 @@ export class RefundDesk {
       return DONE;
     }
     if (openOwnRequest(charge, intent.transactionId)?.openMicros === 0) return DONE;
-    if (netopia.payments.refund !== undefined) return this.netopiaApiRefund(job, intent, now);
+    // N15b (ruling PR-41), owner mode: a request on a payment already under a dispute is held, not handed to the owner
+    // (no OWNER_REFUND_DUE, no O2_REFUND_DUE); the owner gets the O3 instead. The request stays open: a dispute won
+    // brings it into O2_REFUND_REMINDER. The API mode checks the same after its look-first (`netopiaApiRefund`).
+    if (netopia.payments.refund === undefined && heldByChargeback(charge, intent.transactionId)) return this.refundHeld(intent, charge, now);
+    if (netopia.payments.refund !== undefined) return this.netopiaApiRefund(job, intent, charge, now);
     // §2.12.2 item 1: the owner refunds in NETOPIA's admin. The open REFUND_REQUESTED is what stays open.
     if (!await this.deps.jobs.markJobStage(job, "OWNER_REFUND_DUE")) return claimLost(now);
     const deadline = await this.withdrawalDeadlineOf(intent);
@@ -810,7 +847,7 @@ export class RefundDesk {
    * Spec §2.12.3 (dormant until N-10). A4 (c): after a first attempt, look first: a payment already REFUNDED is recorded,
    * never refunded again; a partial refund whose last call may have landed is never sent twice (O2).
    */
-  private async netopiaApiRefund(job: OutboxJob, intent: RefundIntent, now: Date): Promise<OutboxOutcome> {
+  private async netopiaApiRefund(job: OutboxJob, intent: RefundIntent, charge: ChargeWithEvents, now: Date): Promise<OutboxOutcome> {
     const payments = this.deps.netopia!.payments;
     if (job.attempts > 1) {
       const stage = await this.deps.jobs.jobStage(job.jobId);
@@ -830,6 +867,9 @@ export class RefundDesk {
         return this.deadLetter(intent, "REFUND_OUTCOME_UNKNOWN", now);
       }
     }
+    // N15b (ruling PR-41): after the look-first (a refund NETOPIA already reports is still recorded), a payment under a
+    // dispute never gets a new refund call: the request is held, and the owner gets the O3.
+    if (heldByChargeback(charge, intent.transactionId)) return this.refundHeld(intent, charge, now);
     if (!await this.deps.jobs.markJobStage(job, "REFUND_CALL_STARTED")) return claimLost(now);
     try {
       await payments.refund!({ orderId: intent.chargeId, providerPaymentId: intent.transactionId, amountMicros: intent.amountMicros });
@@ -843,6 +883,20 @@ export class RefundDesk {
       return this.again(job, intent, now, code, paymentNothingSent(error));
     }
     await this.recordNetopiaRefund(intent, intent.amountMicros, now);
+    return DONE;
+  }
+
+  /**
+   * N15b (ruling PR-41): a PAYMENT_REFUND job whose payment is `heldByChargeback` moves no money, writes no job stage
+   * and ends DONE; its request stays open. The owner's one O3 (`queueRefundHeldAlert`), and the audit line
+   * billing.refund.held_by_chargeback only when that O3 was queued now, so the line is once per payment.
+   */
+  private async refundHeld(intent: RefundIntent, charge: ChargeWithEvents, now: Date): Promise<OutboxOutcome> {
+    const open = openOwnRequest(charge, intent.transactionId);
+    if (open !== null && open.openMicros > 0
+      && await queueRefundHeldAlert({ repository: this.deps.repository, jobs: this.deps.netopia!.jobs }, charge, open, now)) {
+      this.deps.audit("billing.refund.held_by_chargeback", { reason: open.intent.reason });
+    }
     return DONE;
   }
 

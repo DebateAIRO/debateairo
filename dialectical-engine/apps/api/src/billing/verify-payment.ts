@@ -1,5 +1,5 @@
 import {
-  decimalToMicros, foldSubscription, invoiceIssuerFor, microsToDecimal, paymentErrorCode, type CardPayments, type PaymentEnvironment,
+  decimalToMicros, foldSubscription, invoiceIssuerFor, paymentErrorCode, type CardPayments, type PaymentEnvironment,
   type PaymentReport, type SubscriptionEvent
 } from "@debateai/billing-core";
 import type {
@@ -24,7 +24,8 @@ import {
 import { queuePaymentAlert } from "./payment-alert.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
 import {
-  covers, openOwnRequest, pendingRefund, refundedAlready, refundedMicros, refundIntentOf, type RefundDesk, type RefundIntent
+  covers, openOwnRequest, pendingRefund, queueRefundHeldAlert, refundedAlready, refundedMicros, refundIntentOf, type RefundDesk,
+  type RefundIntent
 } from "./refunds.js";
 import { chargeEvent, refundTarget, subscriptionEvent, transactionRoute } from "./rows.js";
 import {
@@ -1308,8 +1309,9 @@ export class VerifyPaymentHandler {
    * The audit line billing.chargeback carries `code: "DUPLICATE_PAYMENT"` when the CHARGEBACK written is so coded,
    * as xMoney's `duplicateChargedBack` writes it.
    * N15b (ruling PR-41): when the CHARGEBACK written finds an open owner refund on the same payment (`openOwnRequest`),
-   * that refund is now held (`heldByChargeback`): the O3 REFUND_HELD_BY_CHARGEBACK is queued in the same transaction,
-   * once per payment ever, and one audit line billing.refund.held_by_chargeback follows.
+   * that refund is now held (`heldByChargeback`): the O3 REFUND_HELD_BY_CHARGEBACK (`queueRefundHeldAlert`, shared with
+   * the PAYMENT_REFUND job's hold) is queued in the same transaction, once per payment ever, and the audit line
+   * billing.refund.held_by_chargeback follows only when that O3 was queued now.
    */
   private async netopiaChargedBack(
     charge: ChargeWithEvents, report: PaymentReport, now: Date, stage: "OPENED" | "LOST" | "REPRESENTED"
@@ -1333,9 +1335,9 @@ export class VerifyPaymentHandler {
         }));
         written = inserted === "INSERTED";
         const open = written ? openOwnRequest(current, paymentId) : null;
-        if (open !== null && open.openMicros > 0) {
+        if (open !== null && open.openMicros > 0
+          && await queueRefundHeldAlert({ repository: this.deps.repository, jobs: this.deps.netopia!.jobs }, charge, open, now, client)) {
           held = open.intent;
-          await this.refundHeldAlert(client, charge, paymentId, open, now);
         }
         if (written && !boughtNothing) {
           const { subscription } = await this.context(client, charge, null, owner, now);
@@ -1383,29 +1385,6 @@ export class VerifyPaymentHandler {
         + ` pnpm billing:dispute --charge ${charge.chargeId} --outcome lost (or --outcome won).`
     });
     return DONE;
-  }
-
-  /**
-   * N15b (ruling PR-41): the owner's O3 REFUND_HELD_BY_CHARGEBACK for an open owner refund the charge-back on its
-   * payment now holds, queued on the transaction that writes the CHARGEBACK, once per payment ever. `amount` is the
-   * open amount, as the reminder and `pnpm billing:refund-done` print it.
-   */
-  private async refundHeldAlert(
-    client: PoolClient, charge: ChargeRow, paymentId: string, open: Readonly<{ intent: RefundIntent; openMicros: number }>, now: Date
-  ): Promise<void> {
-    const amount = microsToDecimal(open.openMicros);
-    await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia!.jobs }, {
-      code: "REFUND_HELD_BY_CHARGEBACK", reference: `charge ${charge.chargeId}`,
-      dedupeRef: `${charge.chargeId}:REFUND_HELD:${paymentId}`, now,
-      nextSteps: `A refund of ${amount} ${charge.currency} (reason ${open.intent.reason}) was due on this payment`
-        + ` (NETOPIA payment ${paymentId}), and NETOPIA now reports a charge-back on it: the person's bank is taking the`
-        + " money back. Do not refund it in NETOPIA's admin; the site no longer lists it as due. If the dispute ends for"
-        + ` us, record that with pnpm billing:dispute --charge ${charge.chargeId} --outcome won: the refund is then due`
-        + " again and comes back into the reminder. If it ends for the person, nothing is left to refund. If you had"
-        + " already refunded it in NETOPIA's admin before the dispute, record that refund with"
-        + ` pnpm billing:refund-done --charge ${charge.chargeId} --amount ${amount} --despite-chargeback, and tell NETOPIA,`
-        + " so the dispute is answered."
-    }, client);
   }
 
   /** Ruling C-7: nothing recorded; the notice's outcome OWNER_REVIEW, audit lines, and one O3 per charge and status. */
