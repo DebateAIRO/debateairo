@@ -312,3 +312,63 @@ describe("N16 the reconciler's NETOPIA pass (spec §2.14)", () => {
     for (const open of [onItsWay, young, live.chargeId]) expect((await lastEvent(open))?.[0], open).toBe("SUBMITTED");
   });
 });
+
+describe("N23 the owner's daily counts read NETOPIA's rows (packages/db deadRefunds, longUnsettledCharges)", () => {
+  it("lists a dead NETOPIA refund until its REFUNDED is recorded, and counts only this environment's long-open charges", async () => {
+    const now = epoch(2040);
+    const seeded = await subscription(plus(now, -60 * DAY));
+    const ref = `${seeded.initialChargeId}:${seeded.providerPaymentId}`;
+    const jobId = await repository.withTransaction((client) => repository.enqueue(client, {
+      kind: "PAYMENT_REFUND", ref, notBefore: now,
+      payload: {
+        charge_id: seeded.initialChargeId, transaction_id: seeded.providerPaymentId, amount_micros: 5_000_000, whole: false,
+        owner_ref: seeded.ownerRef, reason: "WITHDRAWAL"
+      }
+    }));
+    const claimed = await repository.claim(["PAYMENT_REFUND"], 100, "n23-reconcile", now);
+    expect(claimed.map((job) => job.jobId)).toContain(jobId);
+    expect(await repository.fail(jobId, "PAYMENT_REFUSED", null, now)).toBe(true);
+    const listed = async () => (await repository.deadRefunds()).filter((row) => row.chargeId === seeded.initialChargeId);
+    expect(await listed()).toEqual([{
+      chargeId: seeded.initialChargeId, transactionId: seeded.providerPaymentId, reason: "WITHDRAWAL", code: "PAYMENT_REFUSED", since: now
+    }]);
+    await repository.withTransaction(async (client) => {
+      await repository.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "REFUND_REQUESTED", plus(now, MINUTE), {
+        providerPaymentId: seeded.providerPaymentId, amountMicros: 5_000_000, errorCode: "WITHDRAWAL"
+      }));
+      await repository.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "REFUNDED", plus(now, 2 * MINUTE), {
+        providerPaymentId: seeded.providerPaymentId, amountMicros: 5_000_000, errorCode: null
+      }));
+    });
+    expect(await listed()).toEqual([]);
+
+    // A renewal open for 31 days in each NETOPIA environment: the sandbox reconciler counts only its own.
+    const createdAt = plus(now, -31 * DAY);
+    const openRenewal = async (environment: "sandbox" | "live"): Promise<string> => {
+      const owner = await seedNetopiaSubscription(database.pool, {
+        ownerRef: randomUUID(), planId: "PLUS", activatedAt: plus(now, -60 * DAY), taxCountry: "RO", paymentEnvironment: environment
+      });
+      const chargeId = newChargeId();
+      await repository.withTransaction(async (client) => {
+        await repository.insertCharge(client, {
+          chargeId, ownerRef: owner.ownerRef, subscriptionId: owner.subscriptionId, kind: "RENEWAL", attempt: 1,
+          periodStart: owner.periodEnd, periodEnd: plus(owner.periodEnd, 30 * DAY), quoteId: owner.initialQuoteId,
+          netMicros: owner.totalMicros, taxMicros: 0, totalMicros: owner.totalMicros, currency: "USD", createdAt,
+          paymentProvider: "netopia", paymentEnvironment: environment
+        });
+        await repository.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", createdAt, {
+          providerPaymentId: null, amountMicros: owner.totalMicros, errorCode: null
+        }));
+      });
+      return chargeId;
+    };
+    const sandboxCharge = await openRenewal("sandbox");
+    const liveCharge = await openRenewal("live");
+    const before = plus(now, -30 * DAY);
+    const sandboxIds = (await repository.longUnsettledCharges(["UPGRADE", "RENEWAL"], before, "sandbox")).map((row) => row.chargeId);
+    expect(sandboxIds).toContain(sandboxCharge);
+    expect(sandboxIds).not.toContain(liveCharge);
+    expect((await repository.longUnsettledCharges(["UPGRADE", "RENEWAL"], before, "live")).map((row) => row.chargeId))
+      .toContain(liveCharge);
+  });
+});

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { TypedDomainError } from "@debateai/kernel";
 import { paymentError, type PaymentReport, type PaymentState } from "@debateai/billing-core";
 import type { BillingRepository, ChargeEventRow, ChargeKind, DueStatusRead, StatusReadCursor } from "@debateai/db";
 import type { BillingAuditEvent, BillingAuditField } from "../../apps/api/src/billing/audit.js";
@@ -136,5 +137,123 @@ describe("N16 the frequent status pass (spec §2.14, SR-21)", () => {
     expect(written).toContain("event:c:FAILED:NO_TRANSACTION");
     expect(written.some((line) => line.startsWith("event:a") || line.startsWith("event:b"))).toBe(false);
     expect(kick).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("N23 the tick's two passes, the owner's daily counts and a charge that throws", () => {
+  const MINUTE = 60_000;
+  const DAY = 24 * HOUR;
+  const idle = Object.freeze({ read: 0, queued: 0, closed: 0, failed: 0 });
+  const unusedNetopia = {
+    payments: {} as never, paymentEnvironment: "sandbox" as const, pool: {} as never, jobs: {} as never
+  };
+  /** A reconciler whose two passes are spied on, its clock moved by the test. */
+  function spiedReconciler(clock: { now: Date }) {
+    const reconciler = new BillingReconciler({
+      billing: {} as never, jobs: {} as never, audit: () => undefined, clock: () => clock.now, kick: () => undefined,
+      netopia: unusedNetopia
+    });
+    const status = vi.spyOn(reconciler, "runStatusChecks").mockResolvedValue(idle);
+    return { reconciler, status };
+  }
+
+  it("runs the status pass on every tick and the daily pass once a day", async () => {
+    const clock = { now: NOW };
+    const { reconciler, status } = spiedReconciler(clock);
+    const daily = vi.spyOn(reconciler, "runDaily").mockResolvedValue({ deadRefunds: 0, expired: 0 });
+    await reconciler.tick();
+    clock.now = new Date(NOW.getTime() + 10 * MINUTE);
+    await reconciler.tick();
+    clock.now = new Date(NOW.getTime() + DAY);
+    await reconciler.tick();
+    expect(status).toHaveBeenCalledTimes(3);
+    expect(daily).toHaveBeenCalledTimes(2);
+    expect(daily.mock.calls.map(([at]) => at)).toEqual([NOW, new Date(NOW.getTime() + DAY)]);
+  });
+
+  it("fails the tick with the daily pass's own error after the status pass ran, and retries the daily pass an hour later", async () => {
+    const clock = { now: NOW };
+    const { reconciler, status } = spiedReconciler(clock);
+    const failure = new TypedDomainError("DATABASE_UNAVAILABLE", "the database did not answer");
+    const daily = vi.spyOn(reconciler, "runDaily").mockRejectedValue(failure);
+    await expect(reconciler.tick()).rejects.toBe(failure);
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(daily).toHaveBeenCalledTimes(1);
+    expect(status.mock.invocationCallOrder[0]!).toBeLessThan(daily.mock.invocationCallOrder[0]!);
+    // Ten minutes on, and still inside the hour: the status pass alone.
+    clock.now = new Date(NOW.getTime() + 10 * MINUTE);
+    expect(await reconciler.tick()).toEqual({ deadRefunds: 0, expired: 0, statusChecks: idle });
+    clock.now = new Date(NOW.getTime() + 59 * MINUTE);
+    await reconciler.tick();
+    expect(status).toHaveBeenCalledTimes(3);
+    expect(daily).toHaveBeenCalledTimes(1);
+    // The first tick more than an hour after the failed attempt tries the daily pass again.
+    clock.now = new Date(NOW.getTime() + 61 * MINUTE);
+    await expect(reconciler.tick()).rejects.toBe(failure);
+    expect(status).toHaveBeenCalledTimes(4);
+    expect(daily).toHaveBeenCalledTimes(2);
+  });
+
+  it("writes the owner's two daily counts, content-free, for this NETOPIA environment's charges only", async () => {
+    const written: Array<[BillingAuditEvent, Readonly<Record<string, BillingAuditField>>]> = [];
+    const audit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => { written.push([event, fields]); };
+    const lists = { dead: [] as unknown[], unsettled: [] as unknown[] };
+    const longUnsettledCharges = vi.fn(async () => lists.unsettled);
+    const billing = { deadRefunds: async () => lists.dead, longUnsettledCharges } as unknown as BillingRepository;
+    const reconciler = new BillingReconciler({
+      billing, jobs: {} as never, audit, clock: () => NOW, kick: () => undefined,
+      netopia: { ...unusedNetopia, paymentEnvironment: "live" }
+    });
+    lists.dead = [{ chargeId: "a".repeat(32), transactionId: "ntp-1", reason: "WITHDRAWAL", code: "PAYMENT_REFUSED", since: NOW }];
+    lists.unsettled = [{ chargeId: "b".repeat(32), kind: "RENEWAL", createdAt: new Date(NOW.getTime() - 31 * DAY) }];
+    expect(await reconciler.runDaily(NOW)).toEqual({ deadRefunds: 1, expired: 1 });
+    expect(written).toEqual([["billing.refund.dead", { count: 1 }], ["billing.reconcile.expired", { count: 1 }]]);
+    expect(longUnsettledCharges).toHaveBeenCalledWith(["UPGRADE", "RENEWAL"], new Date(NOW.getTime() - 30 * DAY), "live");
+    written.length = 0;
+    lists.dead = [];
+    lists.unsettled = [];
+    expect(await reconciler.runDaily(NOW)).toEqual({ deadRefunds: 0, expired: 0 });
+    expect(written).toEqual([]);
+  });
+
+  it("skips a charge whose step throws, still reads the next one, and writes one content-free errors line", async () => {
+    const due = (chargeId: string): DueStatusRead => Object.freeze({
+      chargeId, ownerRef: "5b0f2b1e-0d6c-4f1a-9a37-2f4f3c8e1a01", subscriptionId: "6c1f3c2f-1e7d-4a2b-8b48-3a5a4d9f2b02",
+      kind: "INITIAL", quoteId: null, createdAt: new Date(NOW.getTime() - HOUR), totalMicros: 24_200_000,
+      schedule: "OPEN", dueAt: new Date(NOW.getTime() - HOUR), providerPaymentId: "ntp-1"
+    });
+    const broken = "a".repeat(32);
+    const next = "b".repeat(32);
+    const written: Array<[BillingAuditEvent, Readonly<Record<string, BillingAuditField>>]> = [];
+    const audit = (event: BillingAuditEvent, fields: Readonly<Record<string, BillingAuditField>>) => { written.push([event, fields]); };
+    const chargesAsked: string[] = [];
+    const billing = {
+      withTransaction: async <T>(work: (client: object) => Promise<T>) => work({}),
+      insertStatusRead: async () => undefined,
+      charge: async (chargeId: string) => {
+        chargesAsked.push(chargeId);
+        if (chargeId === broken) throw new TypedDomainError("BILLING_HISTORY_INVALID", "the charge's history does not fold");
+        return { chargeId, kind: "INITIAL", totalMicros: 24_200_000, events: SENT };
+      },
+      quote: async () => null
+    } as unknown as BillingRepository;
+    const statusAsked: string[] = [];
+    const payments = {
+      status: async (input: { orderId: string }) => { statusAsked.push(input.orderId); return report(input.orderId, "PENDING"); }
+    };
+    const kick = vi.fn();
+    const reconciler = new BillingReconciler({
+      billing, jobs: {} as never, audit, clock: () => NOW, kick,
+      netopia: {
+        payments, paymentEnvironment: "sandbox", pool: {} as never,
+        jobs: { dueStatusReads: async () => ({ rows: [due(broken), due(next)], next: null }), bringForward: async () => true }
+      }
+    });
+    expect(await reconciler.runStatusChecks(NOW)).toEqual({ read: 1, queued: 0, closed: 0, failed: 0 });
+    expect(statusAsked).toEqual([broken, next]);
+    expect(chargesAsked).toEqual([broken, next]);
+    expect(written).toEqual([["billing.reconcile.errors", { pass: "STATUS", count: 1, codes: "BILLING_HISTORY_INVALID" }]]);
+    expect(JSON.stringify(written)).not.toContain(broken);
+    expect(kick).not.toHaveBeenCalled();
   });
 });
