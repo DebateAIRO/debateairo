@@ -69,6 +69,9 @@ import {
   BillingUsageResponseSchema,
   BillingWithdrawResponseSchema,
   DeploymentSchema,
+  DataExportDownloadRequestSchema,
+  DataExportRequestSchema,
+  DataExportStatusSchema,
   ExecutionLedgerDigestSchema,
   InspectionSchema,
   InvestigationAcceptedSchema,
@@ -110,6 +113,7 @@ import {
   type BillingUsageResponse,
   type BillingWithdrawResponse,
   type Deployment,
+  type DataExportStatus,
   type EmailChangePending,
   type ExecutionLedgerDigest,
   type Inspection,
@@ -355,6 +359,9 @@ export interface ContractClient {
   beginPasskeyStepUp(authorization:StepUpAuthorizationRequest):Promise<PasskeyAuthenticationOptionsResponse>;
   completePasskeyStepUp(input:{challenge_handle:string;credential:ConsumerAuthenticationCredential}):Promise<StepUpResponse>;
   stepUp(password:string,code:string,authorization?:StepUpAuthorizationRequest):Promise<StepUpResponse>;
+  requestDataExport(stepUpGrant: string, locale: string): Promise<DataExportStatus>;
+  readDataExportStatus(): Promise<DataExportStatus>;
+  downloadDataExport(token: string): Promise<{ bytes: ArrayBuffer; filename: string }>;
   readPublicDebates(limit: number, offset: number): Promise<Readonly<{
     items: readonly Readonly<{
       public_ref: string;
@@ -611,6 +618,37 @@ export function createContractClient(
           ...(authorization === undefined ? {} : { authorization })
         }) }
     ),
+    requestDataExport: (stepUpGrant: string, locale: string) => request(
+      "/v1/account/export", DataExportStatusSchema,
+      { method: "POST", body: JSON.stringify(DataExportRequestSchema.parse({ step_up_grant: stepUpGrant, locale })) }
+    ),
+    readDataExportStatus: () => request("/v1/account/export", DataExportStatusSchema),
+    async downloadDataExport(token: string) {
+      const body = JSON.stringify(DataExportDownloadRequestSchema.parse({ token }));
+      const headers = new Headers({ "content-type": "application/json" });
+      if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+      if (auth.forwardedFor !== undefined) headers.set("x-forwarded-for", auth.forwardedFor);
+      const csrf = auth.csrfToken?.() ?? browserCsrfToken();
+      if (csrf !== null) headers.set("x-csrf-token", csrf);
+      let response: Response;
+      try {
+        response = await fetchImplementation(new URL("/v1/account/export/download", root), {
+          method: "POST", headers, body, cache: "no-store", credentials: "same-origin"
+        });
+      } catch (error) {
+        throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
+      }
+      if (!response.ok) throw await contractErrorForResponse(response);
+      const disposition = response.headers.get("content-disposition") ?? "";
+      const filename = /^attachment;\s*filename="(dialectical-engine-export-\d{4}-\d{2}-\d{2}\.zip)"$/i.exec(disposition)?.[1];
+      if (filename === undefined) throw new ContractHttpError("INVALID_RESPONSE", response.status, "Invalid export filename");
+      try {
+        return { bytes: await response.arrayBuffer(), filename };
+      } catch (error) {
+        throw new ContractHttpError("INVALID_RESPONSE", response.status, error instanceof Error ? error.message : "Invalid export body");
+      }
+    },
     readPublicDebates: (limit: number, offset: number) => request(
       `/v1/public/debates?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`,
       PublicDebateListSchema
