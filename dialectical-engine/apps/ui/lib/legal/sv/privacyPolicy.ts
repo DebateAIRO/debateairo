@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Konto — E-postadress och återställningsadress (lagras krypterade, med ett nycklat index så att vi kan hitta kontot utan att läsa adressen); lösenord (lagras som ett hashvärde, aldrig i klartext); din hemlighet för tvåfaktorsautentisering (krypterad); tio återställningskoder (lagras som hashvärden); din pseudonym; tidpunkten då du bekräftade att du är minst 18 år — Du, vid registreringen",
+        "Konto — E-postadress och återställningsadress (lagras krypterade, med ett nycklat index så att vi kan hitta kontot utan att läsa adressen); lösenord (lagras som ett hashvärde, aldrig i klartext); din hemlighet för tvåfaktorsautentisering (krypterad); tio återställningskoder (lagras som hashvärden); din pseudonym; resultatet av ålderskontrollen, men inte ditt födelsedatum — Du, vid registreringen",
+        "Kontroll av IP-adressens land — Vid registrering slår vi lokalt upp IP-adressens land med DB-IP Lite och kontrollerar listan över Tor-utgångar. Inför varje ny debatt kontrollerar vi också IP-adressens land lokalt och kan neka debatten om landet finns på listan över länder som alltid blockeras. Vid avslag loggar vi väg, kod, land, tidsfönster och att IP-adressen var underlag, i aggregerad form; I granskningsloggen sparas IP-adressen och webbläsarens user-agent endast som nyckelbaserade envägs-hashvärden. — IP-adressen vid registrering och inför en ny debatt",
+        "Ålderskontroll — Resultat (vid registrering endast godkänt; för ett befintligt konto godkänt eller underkänt), tillämpad minimiålder, IP-adressens land om känt, regelversion, sammanhang och tidpunkt. Födelsedatum lagras inte — Födelsedatum som du anger för kontrollen; land från IP-adressen",
+        "Angiven region — Bosättningsland som du väljer vid registrering och, om du bor i USA, delstat — Du, vid registreringen",
         "Sessioner och säkerhet — En hashad sessionstoken; ett nycklat hashvärde av webbläsarens user-agent-sträng, som används för att upptäcka när en session flyttas till en annan webbläsare; tidsstämplar för skapande, senaste användning och utgång. Vi lagrar inte din IP-adress, enhetsnamn eller webbläsaruppgifter tillsammans med en session, och sessionslistan som visas i Inställningar innehåller endast tidsstämplar — Din webbläsare",
         "Säkerhetslogg — En logg över säkerhetsrelevanta händelser som endast kan utökas — registrering, verifiering, inloggningsförsök, återställning, publicering och radering. IP-adressen och user-agent-värdet för varje händelse lagras endast som nycklade envägssammandrag (Argon2id), så att de inte kan läsas tillbaka men kan matchas inom en period. Risksignaler vid inloggning och återställning lagras krypterade i 90 dagar — Din webbläsare, vid tidpunkten för varje händelse",
         "Debattinnehåll — Frågan du skriver; de styranteckningar du anger; påståenden, kritik, hänvisningar till belägg, poäng och utslag som motorn genererar; en ordagrann registrering av vad varje AI-leverantör returnerade; sökfrågor och källreferenser. Allt detta lagras krypterat med en nyckel som är specifik för ditt konto — Du och AI-modellerna som bearbetar din fråga",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Personer som inte är våra användare — Personuppgifter om andra personer som du tar med i en fråga eller som motorn genererar när den besvarar frågan. Vi ber dig att inte göra detta; avsnitt 11 förklarar vad vi gör när det ändå händer — Du, indirekt"
         ]
       },
+      { kind: "p", text: "Vid registrering kontrollerar vi IP-adressens land lokalt med DB-IP Lite och listan över Tor-utgångar, utan att skicka adressen till tredje part. Vi nekar registrering från länder där tjänsten inte erbjuds, från Tor-utgångar och från adresser vars land inte kan fastställas. Inför varje ny debatt kontrollerar vi också IP-adressens land lokalt och kan neka debatten om landet finns på listan över länder som alltid blockeras. Du anger födelsedatum enbart för ålderskontrollen; det lagras inte. En lyckad registrering sparar resultatet ”godkänt”; för befintliga konton kan resultatet vara ”godkänt” eller ”underkänt”. Du anger också bosättningsland och, i USA, delstat så att vi kan tillämpa rätt regler för konsumentskydd, integritet och skatt." },
       { kind: "p", text: "Vi samlar inte in analysdata eller telemetri om hur du använder produkten, och vi placerar inga cookies för detta ändamål. Om det ändras kommer denna policy och cookiepolicyn att ändras först, och du kommer att tillfrågas." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "En debattmotor inbjuder till frågor om politik, religion, hälsa, sexualitet och övertygelse. Dessa är särskilda kategorier av uppgifter enligt artikel 9 i GDPR och de kan förekomma i dina frågor oavsett om vi avser att samla in dem eller inte." },
-      { kind: "p", text: "Om dig. Före din första debatt lämnar du, på en separat skärm, uttryckligt samtycke till att vi behandlar känsliga uppgifter som du väljer att ta med i dina egna frågor i syfte att genomföra dina debatter. Vi dokumenterar vilken version av formuleringen du godkände, ditt språk och tidpunkten. Utan detta samtycke kan du inte starta en debatt. Du kan när som helst återkalla det genom att inte ta med sådana uppgifter eller genom att radera en debatt. Det du publicerar om dig själv är uppgifter som du har valt att offentliggöra." },
+      { kind: "p", text: "Om dig. Före din första debatt lämnar du, på en separat skärm, uttryckligt samtycke till att vi behandlar känsliga uppgifter som du väljer att ta med i dina egna frågor i syfte att genomföra dina debatter. Vi dokumenterar vilken version av formuleringen du godkände, ditt språk och tidpunkten. Utan detta samtycke kan du inte starta en debatt. Du kan när som helst återkalla samtycket genom att skriva till privacy@dezbatere.ro. Du kan också utelämna sådana uppgifter eller radera en debatt som innehåller dem. Det du publicerar om dig själv är uppgifter som du har valt att offentliggöra." },
       { kind: "p", text: "Om andra personer. Inget av undantagen i artikel 9.2 i GDPR tillåter oss att behandla känsliga uppgifter om en tredje person som du namnger i en fråga, och inte heller någon av våra AI-leverantörer kan åberopa ett sådant undantag. Därför förbjuder villkoren detta, därför minimerar vi det vi skickar och därför tar vi snabbt bort sådant innehåll på begäran — se avsnitt 11." },
       { kind: "p", text: "Hälsouppgifter. Vissa länder reglerar hälsorelaterade uppgifter, inklusive slutsatser, genom särskilda lagar. Om du bor i [the State of Washington] gäller ett separat [Consumer Health Data Privacy Notice]." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Varför vi använder dina uppgifter och med vilken grund",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Varje ändamål har en enda rättslig grund enligt artikel 6.1 i GDPR, och vi återanvänder inte uppgifter som samlats in för ett ändamål för ett annat ändamål." },
+      { kind: "p", text: "För varje ändamål anger vi tillämplig rättslig grund eller grunder enligt artikel 6.1 i GDPR. Vi återanvänder inte uppgifter som samlats in för ett ändamål för ett annat." },
       {
         kind: "list",
         items: [
         "Skapa och driva ditt konto, autentisera dig samt genomföra och lagra dina debatter så att du kan öppna och spela upp dem igen — Konto, sessioner, debattinnehåll — Avtal — Art. 6(1)(b)",
+        "Kontrollera registreringens tillgänglighet utifrån IP-land, Tor och okända adresser samt nya debatter utifrån listan över länder som alltid blockeras; dokumentera avslag — Kontroll av IP-adressens land — Berättigade intressen — Art. 6(1)(f), säker drift; och rättslig skyldighet — Art. 6(1)(c), efterlevnad av sanktioner och regler där vi erbjuder tjänsten",
+        "Kontrollera minimiåldern för att använda tjänsten — Ålderskontroll — Avtal — Art. 6(1)(b), ingående av avtal; och berättigade intressen — Art. 6(1)(f), skydd av minderåriga",
+        "Tillämpa rätt regler för konsumentskydd, integritet och skatt — Angiven region — Avtal — Art. 6(1)(b); och rättslig skyldighet — Art. 6(1)(c)",
         "Skicka din fråga och motorns uttalanden till AI-leverantörer för att generera en debatt — Debattinnehåll — Avtal — Art. 6(1)(b)",
         "Hålla tjänsten säker, upptäcka missbruk, låta dig upptäcka en inloggning som du inte har gjort och föra en granskningslogg — Sessioner, säkerhetslogg, hashvärden från supportens missbrukskontroller — Berättigade intressen — Art. 6(1)(f): våra och dina intressen av en säker tjänst. Du kan invända; se avsnitt 10",
         "Bevisa att du godkände villkoren och lämnade eller återkallade ett samtycke — Uppgifter om godkännanden och samtycken — Rättslig förpliktelse — Art. 6(1)(c), vår skyldighet att kunna visa samtycke enligt Art. 7(1), samt berättigade intressen av att styrka avtalet",
@@ -112,7 +119,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Publicering och synlighet",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Debatter är privata tills du publicerar dem. Publicering är en avsiktlig åtgärd som bekräftas separat. En publicerad debatt visar din pseudonym, din fråga såsom du skrev den, argumentträdet, poängen, utslaget och konfidensnivån samt har en synlig märkning om att innehållet är AI-genererat. Den visar aldrig din e-postadress, dina sessionsuppgifter eller din kontohistorik. [Published debates are / are not] indexerade av sökmotorer [unless you choose]." },
+      { kind: "p", text: "Debatter är privata tills du publicerar dem. Publicering är en avsiktlig åtgärd som bekräftas separat. En publicerad debatt visar din pseudonym, din fråga såsom du skrev den, argumentträdet, poängen, utslaget och konfidensnivån samt har en synlig märkning om att innehållet är AI-genererat. Den visar aldrig din e-postadress, dina sessionsuppgifter eller din kontohistorik. Sökmotorer kan indexera publicerade debatter." },
       { kind: "p", text: "När publiceringen återkallas tas debatten bort från Dialectical Engine och nyckeln till vår offentliga kopia förstörs. Kopior som redan har gjorts av läsare, sökmotorer eller arkiv ligger utanför vår kontroll och kan inte återkallas av oss." },
       { kind: "p", text: "När du raderar ditt konto tar vi bort alla debatter som du har publicerat från allmän åtkomst utan onödigt dröjsmål och senast inom 30 dagar, såvida inte lagen kräver att vi behåller en viss post. [Option B — a product change; see the Terms, section 9.]" }
     ]
@@ -126,10 +133,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Konto — Medan kontot finns, plus en frist på 7 dagar efter att du begärt att det ska avslutas — Nycklar förstörs; posten raderas",
+        "Ålderskontrollens resultat och regeluppgifter — Så länge kontot finns — Raderas med kontot; födelsedatum lagras inte",
+        "Angivet bosättningsland och delstat i USA — Så länge kontot finns — Raderas med kontot",
         "Sessionsuppgifter — 14 dagar efter senaste användning eller 90 dagar efter att de skapades, beroende på vilket som inträffar först — Raderas",
         "Länkar för e-postverifiering — 24 timmar — Raderas",
         "Risksignaler vid inloggning och återställning — 90 dagar, vilket upprätthålls av databasen — Rensas",
         "Säkerhetslogg — Under tjänstens hela livstid — Kan endast utökas; IP-adress och user-agent är envägssammandrag och kan inte läsas tillbaka",
+        "IP-adress som används för lokal landskontroll vid registrering och inför en ny debatt — Endast medan begäran behandlas — Adressen sparas inte i läsbar form för denna kontroll; avslag registreras bara aggregerat och som hashvärdet nedan",
+        "Aggregerade granskningsposter om avslag utifrån IP-land — Under tjänstens livstid — Posten innehåller avslagskod, land, uppgift om att IP-adressen var underlag samt nyckelbaserade envägs-hashvärden för IP-adressen och webbläsarens user-agent; loggen är endast tilläggsbar.",
         "Debattinnehåll (privat) — Medan kontot finns — Nycklar förstörs när kontot avslutas, vilket gör innehållet oläsbart",
         "Debattinnehåll (publicerat) — Medan det är publicerat och kontot finns — Tas bort från allmän åtkomst när publiceringen återkallas eller kontot avslutas; nycklar förstörs",
         "Uppgifter om leverantörssvar och sökreferenser — Lika länge som den debatt de tillhör — Samma",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Begränsning (Art. 18) — Be oss att upphöra med behandlingen av vissa uppgifter medan en tvist om dem löses",
         "Invändning (Art. 21) — Invänd mot behandling som grundas på berättigade intressen — säkerhets- och granskningsbehandlingen i avsnitt 4 — så upphör vi om vi inte kan visa tvingande skäl. Invänd när som helst mot marknadsföring, så upphör vi med den",
         "Dataportabilitet (Art. 20) — Dina debatter och kontouppgifter i ett allmänt använt, maskinläsbart format. [Pending: same export as Access.] Icke-personligt innehåll som du skapat, såsom dina frågor, återlämnas till dig på begäran när avtalet upphör",
-        "Återkalla samtycke (Art. 7(3)) — Återkalla samtycke till marknadsföring via ett e-postmeddelande eller Inställningar; återkalla samtycket till känsliga uppgifter genom att inte ta med sådana uppgifter eller genom att radera en debatt. Återkallandet påverkar inte behandling som redan har ägt rum",
+        "Återkalla samtycke (Art. 7(3)) — Återkalla samtycke till marknadsföring via ett e-postmeddelande eller Inställningar; återkalla samtycket till känsliga uppgifter genom att skriva till privacy@dezbatere.ro (du kan också utelämna uppgifterna eller radera en debatt som innehåller dem). Återkallandet påverkar inte behandling som redan har ägt rum",
         "Lämna klagomål — Till den rumänska tillsynsmyndigheten, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, eller till myndigheten i det land där du bor. Vi ser helst att du kontaktar oss först"
         ]
       },
@@ -241,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "När vi ändrar denna policy publicerar vi den nya versionen med en sammanfattning av vad som har ändrats och ett nytt ikraftträdandedatum, och vi behåller tidigare versioner på [dezbatere.ro/privacy/versions]. Om en ändring lägger till ett nytt ändamål eller en ny mottagare informerar vi dig via e-post och i produkten innan den nya behandlingen börjar och ger dig tid att invända. Om ett nytt ändamål är beroende av ditt samtycke — exempelvis om vi någon gång skulle vilja använda innehåll för att förbättra modeller — ber vi separat och specifikt om det samtycket; vi behandlar aldrig godkännande av uppdaterade villkor som samtycke till ny behandling. Vid förtydliganden som inte ändrar något i det vi gör publicerar vi helt enkelt den nya versionen." },
-      { kind: "p", text: "Denna policy uppdaterades senast den [date]. Version 3.0 ersatte version 2.1, som beskrev sessionsdata, lagringstider, analys, export och effekten av radering på publicerade debatter på sätt som inte längre återspeglade tjänsten." }
+      { kind: "p", text: "Denna policy uppdaterades senast den [date]. Version 3.2 ersatte version 2.1, som beskrev sessionsdata, lagringstider, analys, export och effekten av radering på publicerade debatter på sätt som inte längre återspeglade tjänsten." }
     ]
   },
   {
@@ -273,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "USA (endast om regionen anges)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Information vid insamling. Tabellen i avsnitt 2 listar varje kategori av personuppgifter som vi samlar in, dess ändamål och hur länge vi behåller den (avsnitt 7). Vi samlar endast in följande kategorier av känsliga personuppgifter när du tar med dem i dina egna frågor om dig själv: hälsa, religiös eller filosofisk övertygelse, sexualliv eller sexuell läggning, politiska åsikter, medlemskap i fackförening samt ras eller etniskt ursprung. Vi använder dem endast för att genomföra dina debatter, och först efter det separata samtycket i avsnitt 3. Vi säljer eller delar inte personuppgifter och har inte gjort det under de föregående tolv månaderna. Vi använder inte personuppgifter för riktad reklam, och vi använder inte känsliga personuppgifter för något annat ändamål än att tillhandahålla den tjänst du begär. Preferenssignaler för avanmälan: eftersom vi inte säljer eller delar personuppgifter eller använder dem för riktad reklam finns det inget att välja bort, och en Global Privacy Control-signal ändrar ingenting. Dina rättigheter: att få kännedom, radera, rätta, välja bort, begränsa användningen av känsliga personuppgifter och inte diskrimineras för att du utövar dem; gör en begäran på privacy@dezbatere.ro. Ekonomiska incitament: vi erbjuder inga; våra ändamål och skyddsåtgärder är desamma för kostnadsfria och betalda abonnemang. Lagringstider anges i avsnitt 7. Incidenter: vi underrättar invånare och delstatsmyndigheter i enlighet med varje delstats lag om säkerhetsincidenter. Denna information uppdateras minst var tolfte månad; senast uppdaterad [date]." },
+      { kind: "p", text: "Information vid insamling. Tabellen i avsnitt 2 visar vilka kategorier av personuppgifter vi samlar in och deras källor. Ändamål och rättsliga grunder anges i avsnitt 4 och lagringstider i avsnitt 7. Vi samlar endast in följande kategorier av känsliga personuppgifter när du tar med dem i dina egna frågor om dig själv: hälsa, religiös eller filosofisk övertygelse, sexualliv eller sexuell läggning, politiska åsikter, medlemskap i fackförening samt ras eller etniskt ursprung. Vi använder dem endast för att genomföra dina debatter, och först efter det separata samtycket i avsnitt 3. Vi säljer eller delar inte personuppgifter och har inte gjort det under de föregående tolv månaderna. Vi använder inte personuppgifter för riktad reklam, och vi använder inte känsliga personuppgifter för något annat ändamål än att tillhandahålla den tjänst du begär. Preferenssignaler för avanmälan: eftersom vi inte säljer eller delar personuppgifter eller använder dem för riktad reklam finns det inget att välja bort. Om vi någon gång börjar sälja eller dela sådana uppgifter kommer vi att respektera Global Privacy Control-signaler som en begäran om att välja bort försäljning eller delning. Dina rättigheter: att få kännedom, radera, rätta, välja bort, begränsa användningen av känsliga personuppgifter och inte diskrimineras för att du utövar dem; gör en begäran på privacy@dezbatere.ro. Ekonomiska incitament: vi erbjuder inga; våra ändamål och skyddsåtgärder är desamma för kostnadsfria och betalda abonnemang. Lagringstider anges i avsnitt 7. Incidenter: vi underrättar invånare och delstatsmyndigheter i enlighet med varje delstats lag om säkerhetsincidenter. Denna information uppdateras minst var tolfte månad; senast uppdaterad [date]." },
       { kind: "p", text: "Connecticut: vi behandlar känsliga uppgifter endast med ditt uttryckliga samtycke, som du lämnar på den separata skärmen före din första debatt (avsnitt 3); vi använder inte dina personuppgifter för att träna AI-modeller. Washington: vårt separata integritetsmeddelande om konsumenthälsouppgifter på [URL] gäller all hälsorelaterad information, inklusive slutsatser. Texas och Nebraska: vi säljer inte känsliga personuppgifter. Colorado, Connecticut, Virginia och andra delstater med heltäckande integritetslagar: rättigheterna ovan gäller för dig när lagen är tillämplig på oss. Om vi avslår en begäran kan du överklaga genom att svara på vårt svar till privacy@dezbatere.ro; om vi avslår överklagandet kan du vända dig till delstatens justitieminister (Attorney General)." }
     ]
   },
@@ -345,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.1",
-  sha256: "277f99e537160badb54c9562780cd3c727e59567d489c43136ea381975a3873b",
-  eyebrow: "INTEGRITETSPOLICY · v3.1 · GÄLLER FRÅN [DATE]",
+  version: "3.2",
+  sha256: "c62d762718e2ebd4b41fd22ba1fec4361b77848e222f1d830726a4331bb3b38e",
+  eyebrow: "INTEGRITETSPOLICY · v3.2 · GÄLLER FRÅN [DATE]",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",
-  endMarker: "SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.1",
+  endMarker: "SLUT PÅ POLICYN · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Integritetspolicyns text",
   sectionIdPrefix: "policy-section-",

@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Akun — Alamat email dan alamat email pemulihan (disimpan secara terenkripsi, dengan indeks berkunci agar kami dapat menemukan akun tanpa membaca alamat); kata sandi (disimpan sebagai hash, tidak pernah dalam teks biasa); rahasia autentikasi dua faktor Anda (terenkripsi); sepuluh kode pemulihan (disimpan sebagai hash); nama samaran Anda; waktu ketika Anda mengonfirmasi bahwa Anda berusia 18 tahun atau lebih — Anda, saat pendaftaran",
+        "Akun — Alamat email dan alamat email pemulihan (disimpan secara terenkripsi, dengan indeks berkunci agar kami dapat menemukan akun tanpa membaca alamat); kata sandi (disimpan sebagai hash, tidak pernah dalam teks biasa); rahasia autentikasi dua faktor Anda (terenkripsi); sepuluh kode pemulihan (disimpan sebagai hash); nama samaran Anda — Anda dan layanan, saat pendaftaran",
+        "Pemeriksaan negara IP saat pendaftaran dan debat baru — Saat pendaftaran, kami memeriksa negara alamat IP dan daftar keluar Tor secara lokal memakai DB-IP Lite dan daftar Tor. Sebelum setiap debat baru, kami kembali memeriksa negara IP secara lokal dan menolak debat jika negara itu termasuk daftar negara yang selalu diblokir. Pendaftaran dari negara yang tidak dilayani, dari Tor, atau dari alamat IP yang negaranya tidak dapat kami tentukan ditolak; alamat IP tidak dikirim ke pihak ketiga. Penolakan dicatat secara agregat menurut rute, kode, negara, dan jangka waktu; Alamat IP dan agen pengguna hanya disimpan sebagai intisari satu arah dengan kunci. Jenis bukti dicatat sebagai “alamat IP”. — Koneksi Anda",
+        "Pemeriksaan usia — Anda memasukkan tanggal lahir, tetapi kami tidak menyimpannya. Pada pendaftaran yang berhasil, kami mencatat hasil lulus; pemeriksaan akun yang sudah ada dapat mencatat lulus atau ditolak. Catatan mencakup usia minimum, negara alamat IP jika tersedia, versi aturan, konteks, dan waktu pemeriksaan — Anda dan sistem pendaftaran",
+        "Wilayah tempat tinggal yang dinyatakan — Negara tempat tinggal yang Anda pilih saat mendaftar, serta negara bagian jika berada di AS — Anda",
         "Sesi dan keamanan — Token sesi yang di-hash; hash berkunci atas string agen pengguna peramban Anda, yang digunakan untuk mengetahui ketika suatu sesi berpindah ke peramban lain; stempel waktu pembuatan, penggunaan terakhir, dan kedaluwarsa. Kami tidak menyimpan alamat IP, nama perangkat, atau detail peramban Anda bersama sesi, dan daftar sesi yang Anda lihat di Pengaturan hanya menampilkan stempel waktu — Peramban Anda",
         "Jejak audit keamanan — Log peristiwa terkait keamanan yang hanya dapat ditambahi, bukan diubah atau dihapus — pendaftaran, verifikasi, upaya masuk, pemulihan, publikasi, penghapusan. Alamat IP dan agen pengguna setiap peristiwa hanya disimpan sebagai digest berkunci satu arah (Argon2id), sehingga tidak dapat dibaca kembali tetapi dapat dicocokkan dalam suatu periode. Sinyal risiko masuk dan pemulihan disimpan secara terenkripsi selama 90 hari — Peramban Anda, pada saat setiap peristiwa",
         "Konten debat — Pertanyaan yang Anda ketik; anotasi pengarahan yang Anda tetapkan; klaim, kritik, referensi bukti, skor, dan putusan yang dihasilkan mesin; catatan verbatim tentang apa yang dikembalikan setiap penyedia AI; kueri pengambilan dan referensi sumber. Semua ini disimpan secara terenkripsi di bawah kunci khusus untuk akun Anda — Anda, dan model AI yang mengerjakan pertanyaan Anda",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Orang yang bukan pengguna kami — Data pribadi tentang orang lain yang Anda sertakan dalam pertanyaan atau yang dihasilkan mesin saat menjawabnya. Kami meminta Anda untuk tidak melakukan ini; bagian 11 menjelaskan tindakan kami jika hal itu tetap terjadi — Anda, secara tidak langsung"
         ]
       },
+      { kind: "p", text: "Saat mendaftar, kami memeriksa negara alamat IP dan usia Anda. Tanggal lahir dikirim untuk pemeriksaan saja dan tidak disimpan. Pemeriksaan IP dilakukan secara lokal tanpa mengirimkan alamat itu ke pihak ketiga. Sebelum setiap debat baru, kami juga memeriksa negara IP secara lokal; debat ditolak jika negaranya selalu diblokir." },
       { kind: "p", text: "Kami tidak mengumpulkan analitik atau telemetri tentang cara Anda menggunakan produk, dan kami tidak memasang kuki untuk tujuan tersebut. Jika hal itu berubah, kebijakan ini dan Kebijakan Kuki akan berubah terlebih dahulu, dan Anda akan dimintai persetujuan." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Mesin debat mendorong pertanyaan tentang politik, agama, kesehatan, seksualitas, dan keyakinan. Hal-hal tersebut merupakan kategori data khusus berdasarkan Pasal 9 GDPR, dan dapat muncul dalam pertanyaan Anda baik kami bermaksud mengumpulkannya maupun tidak." },
-      { kind: "p", text: "Tentang Anda. Sebelum debat pertama Anda, pada layar terpisah Anda memberikan persetujuan tegas agar kami memproses informasi sensitif yang Anda pilih untuk disertakan dalam pertanyaan Anda sendiri, untuk tujuan menjalankan debat Anda. Kami mencatat versi redaksi yang Anda setujui, bahasa Anda, dan waktunya. Tanpa persetujuan ini, Anda tidak dapat memulai debat. Anda dapat menariknya kapan saja dengan tidak menyertakan informasi tersebut, atau dengan menghapus debat. Apa yang Anda publikasikan tentang diri sendiri adalah data yang telah Anda pilih untuk dijadikan publik." },
+      { kind: "p", text: "Tentang Anda. Sebelum debat pertama Anda, pada layar terpisah Anda memberikan persetujuan tegas agar kami memproses informasi sensitif yang Anda pilih untuk disertakan dalam pertanyaan Anda sendiri, untuk tujuan menjalankan debat Anda. Kami mencatat versi redaksi yang Anda setujui, bahasa Anda, dan waktunya. Tanpa persetujuan ini, Anda tidak dapat memulai debat. Anda dapat menarik persetujuan ini kapan saja dengan menulis ke privacy@dezbatere.ro. Anda juga dapat tidak menyertakan informasi tersebut atau menghapus debat yang memuatnya. Apa yang Anda publikasikan tentang diri sendiri adalah data yang telah Anda pilih untuk dijadikan publik." },
       { kind: "p", text: "Tentang orang lain. Tidak ada ketentuan hukum yang mengizinkan kami memproses data sensitif tentang pihak ketiga yang Anda sebut dalam pertanyaan, dan tidak satu pun penyedia AI kami memiliki dasar tersebut. Itulah sebabnya Ketentuan melarangnya, kami meminimalkan apa yang dikirim, dan kami segera menghapus konten tersebut atas permintaan — bagian 11." },
       { kind: "p", text: "Informasi kesehatan. Beberapa negara memperlakukan data terkait kesehatan, termasuk inferensi, berdasarkan undang-undang khusus. Jika Anda tinggal di [the State of Washington], [Consumer Health Data Privacy Notice] yang terpisah berlaku." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Mengapa kami menggunakan data Anda, dan atas dasar apa",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Setiap tujuan memiliki satu dasar hukum berdasarkan Pasal 6(1) GDPR, dan kami tidak menggunakan kembali data yang dikumpulkan untuk satu tujuan bagi tujuan lain." },
+      { kind: "p", text: "Di bawah ini kami mencantumkan dasar hukum yang berlaku untuk setiap tujuan menurut Pasal 6(1) GDPR. Kami tidak menggunakan kembali data yang dikumpulkan untuk satu tujuan bagi tujuan lain." },
       {
         kind: "list",
         items: [
         "Membuat dan menjalankan akun Anda, mengautentikasi Anda, menjalankan dan menyimpan debat Anda agar dapat dibuka kembali dan diputar ulang — Akun, sesi, konten debat — Kontrak — Art. 6(1)(b)",
+        "Memeriksa negara IP dan Tor saat pendaftaran untuk menolak alamat IP dari negara yang tidak dilayani atau yang negaranya tidak dapat kami tentukan, serta memeriksa negara IP sebelum setiap debat baru untuk menolak negara yang selalu diblokir — Pemeriksaan IP dan audit penolakan — Kepentingan sah — Art. 6(1)(f), layanan yang aman dan patuh; kewajiban hukum — Art. 6(1)(c), jika pembatasan berlaku",
+        "Memeriksa usia saat pendaftaran atau pada akun yang sudah ada — Hasil pemeriksaan usia; tanggal lahir hanya selama pemeriksaan — Kontrak — Art. 6(1)(b); kepentingan sah — Art. 6(1)(f), melindungi anak di bawah umur",
+        "Menerapkan aturan konsumen, privasi, dan pajak menurut tempat tinggal — Negara yang dinyatakan dan negara bagian AS — Kontrak — Art. 6(1)(b); kewajiban hukum — Art. 6(1)(c)",
         "Mengirim pertanyaan Anda dan pernyataan mesin kepada penyedia AI untuk menghasilkan debat — Konten debat — Kontrak — Art. 6(1)(b)",
         "Menjaga keamanan layanan, mendeteksi penyalahgunaan, memungkinkan Anda mengenali upaya masuk yang bukan dilakukan oleh Anda, menyimpan jejak audit — Sesi, jejak audit keamanan, hash penyalahgunaan dukungan — Kepentingan yang sah — Art. 6(1)(f): kepentingan kami dan Anda atas layanan yang aman. Anda dapat mengajukan keberatan; bagian 10",
         "Membuktikan bahwa Anda menerima Ketentuan serta memberikan atau menarik persetujuan — Catatan penerimaan dan persetujuan — Kewajiban hukum — Art. 6(1)(c), kewajiban kami untuk menunjukkan persetujuan berdasarkan Art. 7(1) — dan kepentingan yang sah untuk membuktikan kontrak",
@@ -112,7 +119,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Publikasi dan visibilitas",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Debat bersifat privat sampai Anda memublikasikannya. Publikasi adalah tindakan yang disengaja dan dikonfirmasi secara terpisah. Debat yang dipublikasikan menampilkan nama samaran Anda, pertanyaan Anda sebagaimana ditulis, pohon argumen, skor, putusan, dan rentang keyakinan, serta memuat label yang terlihat bahwa konten dihasilkan AI. Debat tersebut tidak pernah menampilkan alamat email, catatan sesi, atau riwayat akun Anda. [Published debates are / are not] diindeks oleh mesin pencari [unless you choose]." },
+      { kind: "p", text: "Debat bersifat privat sampai Anda memublikasikannya. Publikasi adalah tindakan yang disengaja dan dikonfirmasi secara terpisah. Debat yang dipublikasikan menampilkan nama samaran Anda, pertanyaan Anda sebagaimana ditulis, pohon argumen, skor, putusan, dan rentang keyakinan, serta memuat label yang terlihat bahwa konten dihasilkan AI. Debat tersebut tidak pernah menampilkan alamat email, catatan sesi, atau riwayat akun Anda. Mesin pencari dapat mengindeks debat yang dipublikasikan." },
       { kind: "p", text: "Membatalkan publikasi menghapus debat dari Dialectical Engine dan memusnahkan kunci salinan publik kami. Salinan yang telah dibuat oleh pembaca, mesin pencari, atau arsip berada di luar kendali kami, dan kami tidak dapat menariknya kembali." },
       { kind: "p", text: "Ketika Anda menghapus akun, kami menghapus setiap debat yang Anda publikasikan dari akses publik tanpa penundaan yang tidak semestinya dan paling lambat dalam 30 hari, kecuali hukum mewajibkan kami menyimpan item tertentu. [Option B — a product change; see the Terms, section 9.]" }
     ]
@@ -126,10 +133,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Akun — Selama akun ada, ditambah masa tenggang 7 hari setelah Anda meminta penutupan — Kunci dimusnahkan; catatan dihapus",
+        "Hasil dan konteks pemeriksaan usia — Selama akun ada — Dihapus bersama akun",
+        "Negara tempat tinggal dan negara bagian AS yang dinyatakan — Selama akun ada — Dihapus bersama akun",
         "Catatan sesi — 14 hari setelah penggunaan terakhir, atau 90 hari setelah pembuatan, mana yang lebih dahulu — Dihapus",
         "Tautan verifikasi email — 24 jam — Dihapus",
         "Sinyal risiko masuk dan pemulihan — 90 hari, diterapkan oleh basis data — Dibersihkan",
         "Jejak audit keamanan — Selama masa layanan — Hanya dapat ditambahi, bukan diubah atau dihapus; IP dan agen pengguna merupakan digest satu arah dan tidak dapat dibaca kembali",
+        "Catatan audit penolakan berdasarkan negara IP — Selama layanan beroperasi — Hanya dapat ditambah; mencatat rute, kode penolakan, negara, rentang waktu, dan jenis bukti “alamat IP”; alamat IP dan agen pengguna hanya berupa intisari satu arah dengan kunci",
+        "Alamat IP asli untuk pemeriksaan negara saat pendaftaran atau debat baru — Hanya selama permintaan yang bersangkutan — Pemeriksaan ini tidak menyimpan IP yang dapat dibaca; audit penolakan menyimpan alamat IP dan agen pengguna hanya sebagai intisari satu arah dengan kunci, dan negara IP dapat tercatat dalam pemeriksaan usia",
         "Konten debat (privat) — Selama akun ada — Kunci dimusnahkan saat penutupan sehingga konten tidak dapat dibaca",
         "Konten debat (dipublikasikan) — Selama dipublikasikan dan selama akun ada — Dihapus dari akses publik saat publikasi dibatalkan atau akun ditutup; kunci dimusnahkan",
         "Catatan pengembalian penyedia dan referensi pengambilan — Sama dengan debat terkait — Sama",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Pembatasan (Art. 18) — Minta kami berhenti memproses data tertentu sementara perselisihan mengenainya diselesaikan",
         "Keberatan (Art. 21) — Ajukan keberatan terhadap pemrosesan berdasarkan kepentingan yang sah — pemrosesan keamanan dan audit dalam bagian 4 — dan kami berhenti kecuali dapat menunjukkan alasan kuat. Ajukan keberatan terhadap pemasaran kapan saja, dan kami berhenti",
         "Portabilitas (Art. 20) — Debat dan data akun Anda dalam format yang umum digunakan serta dapat dibaca mesin. [Pending: same export as Access.] Konten nonpribadi yang Anda buat, seperti pertanyaan Anda, dikembalikan kepada Anda atas permintaan ketika kontrak berakhir",
-        "Menarik persetujuan (Art. 7(3)) — Tarik persetujuan pemasaran dari email mana pun atau Pengaturan; tarik persetujuan data sensitif dengan tidak menyertakan data tersebut, atau dengan menghapus debat. Penarikan tidak memengaruhi pemrosesan yang telah terjadi",
+        "Menarik persetujuan (Art. 7(3)) — Tarik persetujuan pemasaran dari email mana pun atau Pengaturan; tarik persetujuan data sensitif dengan menulis ke privacy@dezbatere.ro (Anda juga dapat tidak menyertakan data tersebut atau menghapus debat yang memuatnya). Penarikan tidak memengaruhi pemrosesan yang telah terjadi",
         "Mengadu — Kepada otoritas pengawas Rumania, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukares, anspdcp@dataprotection.ro, atau kepada otoritas di negara tempat Anda tinggal. Kami lebih memilih Anda menghubungi kami terlebih dahulu"
         ]
       },
@@ -241,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Ketika mengubah kebijakan ini, kami menerbitkan versi baru beserta ringkasan perubahan dan tanggal berlaku baru, serta menyimpan versi sebelumnya di [dezbatere.ro/privacy/versions]. Untuk perubahan yang menambahkan tujuan atau penerima baru, kami memberi tahu Anda sebelum pemrosesan baru dimulai, melalui email dan di dalam produk, serta memberi waktu untuk mengajukan keberatan. Jika tujuan baru bergantung pada persetujuan Anda — misalnya jika kami suatu saat ingin menggunakan konten untuk meningkatkan model — kami meminta persetujuan tersebut secara terpisah dan spesifik; kami tidak pernah menganggap penerimaan Ketentuan yang diperbarui sebagai persetujuan atas pemrosesan baru. Untuk klarifikasi yang tidak mengubah apa pun tentang tindakan kami, kami hanya menerbitkan versi baru." },
-      { kind: "p", text: "Kebijakan ini terakhir diperbarui pada [date]. Versi 3.0 menggantikan versi 2.1, yang menjelaskan data sesi, periode retensi, analitik, ekspor, dan dampak penghapusan terhadap debat terpublikasi dengan cara yang tidak lagi mencerminkan layanan." }
+      { kind: "p", text: "Kebijakan ini terakhir diperbarui pada [date]. Versi 3.2 menggantikan versi 2.1, yang menjelaskan data sesi, periode retensi, analitik, ekspor, dan dampak penghapusan terhadap debat terpublikasi dengan cara yang tidak lagi mencerminkan layanan." }
     ]
   },
   {
@@ -273,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Amerika Serikat (hanya jika tercantum)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Pemberitahuan saat pengumpulan. Tabel dalam bagian 2 mencantumkan setiap kategori informasi pribadi yang kami kumpulkan, tujuannya, dan berapa lama kami menyimpannya (bagian 7). Kami hanya mengumpulkan kategori informasi pribadi sensitif berikut jika Anda menyertakannya dalam pertanyaan Anda sendiri tentang diri Anda: kesehatan, keyakinan agama atau filosofis, kehidupan seks atau orientasi seksual, pandangan politik, keanggotaan serikat pekerja, serta asal ras atau etnis. Kami hanya menggunakannya untuk menjalankan debat Anda, dan hanya setelah persetujuan terpisah dalam bagian 3. Kami tidak menjual atau membagikan informasi pribadi, dan tidak pernah melakukannya dalam dua belas bulan sebelumnya. Kami tidak menggunakan informasi pribadi untuk iklan bertarget, dan kami tidak menggunakan informasi pribadi sensitif untuk tujuan apa pun selain menyediakan layanan yang Anda minta. Sinyal preferensi opt-out: karena kami tidak menjual atau membagikan informasi pribadi atau menggunakannya untuk iklan bertarget, tidak ada yang perlu Anda opt-out, dan sinyal Global Privacy Control tidak mengubah apa pun. Hak Anda: mengetahui, menghapus, memperbaiki, melakukan opt-out, membatasi penggunaan informasi pribadi sensitif, dan tidak didiskriminasi karena menggunakannya; ajukan permintaan di privacy@dezbatere.ro. Insentif keuangan: kami tidak menawarkannya; tujuan dan perlindungan kami sama pada paket gratis dan berbayar. Retensi terdapat dalam bagian 7. Pelanggaran: kami memberi tahu penduduk dan otoritas negara bagian sebagaimana diwajibkan oleh undang-undang pelanggaran data di setiap negara bagian. Pemberitahuan ini diperbarui setidaknya setiap dua belas bulan; terakhir diperbarui [date]." },
+      { kind: "p", text: "Pemberitahuan saat pengumpulan. Tabel dalam bagian 2 mencantumkan kategori informasi pribadi yang kami kumpulkan dan sumbernya; tujuan pemrosesan dijelaskan dalam bagian 4 dan masa penyimpanannya dalam bagian 7. Kami hanya mengumpulkan kategori informasi pribadi sensitif berikut jika Anda menyertakannya dalam pertanyaan Anda sendiri tentang diri Anda: kesehatan, keyakinan agama atau filosofis, kehidupan seks atau orientasi seksual, pandangan politik, keanggotaan serikat pekerja, serta asal ras atau etnis. Kami hanya menggunakannya untuk menjalankan debat Anda, dan hanya setelah persetujuan terpisah dalam bagian 3. Kami tidak menjual atau membagikan informasi pribadi, dan tidak pernah melakukannya dalam dua belas bulan sebelumnya. Kami tidak menggunakan informasi pribadi untuk iklan bertarget, dan kami tidak menggunakan informasi pribadi sensitif untuk tujuan apa pun selain menyediakan layanan yang Anda minta. Sinyal preferensi opt-out: Karena saat ini kami tidak menjual atau membagikan informasi pribadi maupun menggunakannya untuk iklan bertarget, tidak ada pilihan keluar yang perlu dilakukan. Jika kelak kami mulai menjual atau membagikannya, kami akan menghormati sinyal Global Privacy Control sebagai permintaan untuk keluar. Hak Anda: mengetahui, menghapus, memperbaiki, melakukan opt-out, membatasi penggunaan informasi pribadi sensitif, dan tidak didiskriminasi karena menggunakannya; ajukan permintaan di privacy@dezbatere.ro. Insentif keuangan: kami tidak menawarkannya; tujuan dan perlindungan kami sama pada paket gratis dan berbayar. Retensi terdapat dalam bagian 7. Pelanggaran: kami memberi tahu penduduk dan otoritas negara bagian sebagaimana diwajibkan oleh undang-undang pelanggaran data di setiap negara bagian. Pemberitahuan ini diperbarui setidaknya setiap dua belas bulan; terakhir diperbarui [date]." },
       { kind: "p", text: "Connecticut: kami memproses data sensitif hanya dengan persetujuan opt-in Anda, yang diberikan pada layar terpisah sebelum debat pertama Anda (bagian 3); kami tidak menggunakan data pribadi Anda untuk melatih model AI. Washington: Pemberitahuan Privasi Data Kesehatan Konsumen kami di [URL] merupakan dokumen terpisah yang berlaku atas informasi terkait kesehatan, termasuk inferensi. Texas dan Nebraska: kami tidak menjual data pribadi sensitif. Colorado, Connecticut, Virginia, dan negara bagian lain dengan undang-undang privasi komprehensif: hak di atas berlaku bagi Anda jika hukum berlaku bagi kami. Jika kami menolak suatu permintaan, Anda dapat mengajukan banding dengan membalas jawaban kami di privacy@dezbatere.ro; jika kami menolak banding tersebut, Anda dapat menghubungi Jaksa Agung negara bagian Anda." }
     ]
   },
@@ -345,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.1",
-  sha256: "a49e3564a813999eab7014af89f450770abce653dda8e724377b0f0498f96f5d",
-  eyebrow: "KEBIJAKAN PRIVASI · v3.1 · BERLAKU [DATE]",
+  version: "3.2",
+  sha256: "ea91ff836015181fe77d07e5b10f6b39827a77852a01551cddaeb9ead49eba16",
+  eyebrow: "KEBIJAKAN PRIVASI · v3.2 · BERLAKU [DATE]",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",
-  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.1",
+  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Teks Kebijakan Privasi",
   sectionIdPrefix: "policy-section-",

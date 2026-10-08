@@ -69,12 +69,12 @@ describe("legal documents — generated data", () => {
   describe("Terms of Service", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(TERMS_OF_SERVICE.key).toBe("terms");
-      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.0 · EFFECTIVE [DATE]");
+      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.1 · EFFECTIVE [DATE]");
       expect(TERMS_OF_SERVICE.title).toBe("What you agree to");
       expect(TERMS_OF_SERVICE.lede).toBe(
         "The contract between you and DebateAIRO S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
       );
-      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.0");
+      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.1");
       expect(TERMS_OF_SERVICE.contact).toBe("[legal@dezbatere.ro]");
       expect(TERMS_OF_SERVICE.bodyLabel).toBe("Terms of Service text");
       expect(TERMS_OF_SERVICE.sectionIdPrefix).toBe("terms-section-");
@@ -194,12 +194,12 @@ describe("legal documents — generated data", () => {
   describe("Privacy Policy", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(PRIVACY_POLICY.key).toBe("privacy");
-      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.1 · EFFECTIVE [DATE]");
+      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.2 · EFFECTIVE [DATE]");
       expect(PRIVACY_POLICY.title).toBe("What we store, and why");
       expect(PRIVACY_POLICY.lede).toBe(
         "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end."
       );
-      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.1");
+      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.2");
       expect(PRIVACY_POLICY.contact).toBe("privacy@dezbatere.ro");
       expect(PRIVACY_POLICY.bodyLabel).toBe("Privacy Policy text");
       expect(PRIVACY_POLICY.sectionIdPrefix).toBe("policy-section-");
@@ -228,12 +228,12 @@ describe("legal documents — generated data", () => {
       expect(texts(section(PRIVACY_POLICY, "00"))[0]!.startsWith("We collect what an account needs")).toBe(true);
     });
 
-    it("turns the collection table into eight rows joined with em dashes", () => {
+    it("turns the collection table into eleven rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
-      expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p"]);
+      expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(8);
+      expect(table.items).toHaveLength(11);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);
       expect(table.items[0]!.endsWith("— You, at registration")).toBe(true);
     });

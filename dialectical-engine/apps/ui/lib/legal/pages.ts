@@ -287,9 +287,11 @@ export type TermsVersion = Readonly<{
 }>;
 
 /**
- * Every published version of the terms, newest first. Only one exists: the version the terms
- * document carries in its eyebrow. A new version is added here when the document changes.
+ * Every published version of the terms, newest first. The earlier row links to the exact text
+ * that was current before the 2.1 revision.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.0", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" }
+  { version: "2.1", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.0", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/0d1bc079eb2d5b054c1cfc7c0430f234ca5391bd6e6824ecc8958a294f6eaa0e" }
 ]);

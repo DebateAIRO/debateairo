@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Konto — E-mailadresse og e-mailadresse til gendannelse (opbevaret krypteret med et nøglebaseret indeks, så vi kan finde kontoen uden at læse adressen); adgangskode (opbevaret som en hash, aldrig i klartekst); din hemmelighed til tofaktorgodkendelse (krypteret); ti gendannelseskoder (opbevaret som hashes); dit pseudonym; tidspunktet, hvor du bekræftede, at du er fyldt 18 år — Dig ved registreringen",
+        "Konto — E-mailadresse og e-mailadresse til gendannelse (opbevaret krypteret med et nøglebaseret indeks, så vi kan finde kontoen uden at læse adressen); adgangskode (opbevaret som en hash, aldrig i klartekst); din hemmelighed til tofaktorgodkendelse (krypteret); ti gendannelseskoder (opbevaret som hashes); dit pseudonym; resultatet af din alderskontrol — Dig ved registreringen",
+        "Kontrol af land ud fra IP-adresse — Ved tilmelding slår vi IP-landet op lokalt med DB-IP Lite og kontrollerer en liste over Tor-udgangsadresser. Ved starten af hver ny debat slår vi igen IP-landet op lokalt og kan afvise debatten, hvis landet altid er blokeret. Ved afslag samler vi revisionsregistreringer efter rute, kode, land og tidsvindue; IP-adressen opbevares her kun som et envejsdigest med nøgle. Afvisningsposten indeholder kode, land og en angivelse af, at IP-adressen var grundlaget; IP-adressen og browserens user-agent gemmes kun som nøglebaserede envejs-hashværdier. — Din browser ved tilmelding og ved starten af en ny debat",
+        "Alderskontrol — Du indtaster din fødselsdato kun til kontrollen; vi gemmer den ikke. Vi gemmer resultatet, minimumsalderen, IP-landet hvis det kendes, regelversionen, sammenhængen og kontroltidspunktet. Ved gennemført tilmelding gemmes kun resultatet »bestået«; for eksisterende konti kan resultatet være »bestået« eller »afvist« — Dig og din browser",
+        "Oplyst bopæl — Det land, du oplyser som bopælsland, og delstaten, hvis du bor i USA — Dig ved tilmelding",
         "Sessioner og sikkerhed — Et hashet sessionstoken; en nøglebaseret hash af din browsers user-agent-streng, der bruges til at opdage, når en session flyttes til en anden browser; tidsstempler for oprettelse, seneste brug og udløb. Vi opbevarer ikke din IP-adresse, enhedsnavn eller browseroplysninger sammen med en session, og den sessionsliste, du ser i Indstillinger, viser kun tidsstempler — Din browser",
         "Sikkerhedsrevisionsspor — En log, der kun kan tilføjes til, over sikkerhedsrelevante hændelser — registrering, bekræftelse, loginforsøg, gendannelse, offentliggørelse og sletning. IP-adressen og user-agent for hver hændelse opbevares kun som envejs, nøglebaserede hashes (Argon2id), så de ikke kan læses igen, men kan sammenholdes inden for en periode. Risikosignaler ved login og gendannelse opbevares krypteret i 90 dage — Din browser på tidspunktet for hver hændelse",
         "Debatindhold — Det spørgsmål, du skriver; de styrende annotationer, du angiver; påstande, kritik, evidenshenvisninger, bedømmelser og konklusioner, som systemet genererer; en ordret registrering af, hvad hver AI-udbyder returnerede; søgeforespørgsler og kildehenvisninger. Alt dette opbevares krypteret under en nøgle, der er specifik for din konto — Dig og de AI-modeller, der arbejder med dit spørgsmål",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Personer, der ikke er vores brugere — Personoplysninger om andre personer, som du medtager i et spørgsmål, eller som systemet genererer som svar. Vi beder dig om ikke at gøre dette; afsnit 11 forklarer, hvad vi gør, når det alligevel sker — Dig, indirekte"
         ]
       },
+      { kind: "p", text: "Ved tilmelding kontrollerer vi lokalt landet ud fra din IP-adresse. Vi afviser adresser fra lande, hvor tjenesten ikke tilbydes, Tor-udgangsadresser og adresser med ukendt land. Vi sender ikke IP-adressen til en tredjepart til denne kontrol. Vi bruger din fødselsdato til alderskontrol uden at gemme den, og du oplyser dit bopælsland samt din delstat, hvis du bor i USA. Ved starten af hver ny debat kontrollerer vi også IP-landet lokalt og kan afvise debatten, hvis landet altid er blokeret; afvisning på grund af Tor eller ukendt land gælder tilmelding." },
       { kind: "p", text: "Vi indsamler ikke analyse- eller telemetridata om, hvordan du bruger produktet, og vi sætter ingen cookies til dette formål. Hvis det ændrer sig, ændres denne politik og Cookiepolitikken først, og du bliver spurgt." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Et debatsystem indbyder til spørgsmål om politik, religion, sundhed, seksualitet og overbevisning. Det er særlige kategorier af oplysninger efter artikel 9 i GDPR, og de kan forekomme i dine spørgsmål, uanset om vi har til hensigt at indsamle dem." },
-      { kind: "p", text: "Om dig. Før din første debat giver du på en særskilt skærm udtrykkeligt samtykke til, at vi behandler følsomme oplysninger, som du vælger at medtage i dine egne spørgsmål, med det formål at gennemføre dine debatter. Vi registrerer den version af ordlyden, som du accepterede, dit sprog og tidspunktet. Uden dette samtykke kan du ikke starte en debat. Du kan til enhver tid trække samtykket tilbage ved ikke at medtage sådanne oplysninger eller ved at slette en debat. Det, du offentliggør om dig selv, er oplysninger, som du har valgt at gøre offentligt tilgængelige." },
+      { kind: "p", text: "Om dig. Før din første debat giver du på en særskilt skærm udtrykkeligt samtykke til, at vi behandler følsomme oplysninger, som du vælger at medtage i dine egne spørgsmål, med det formål at gennemføre dine debatter. Vi registrerer den version af ordlyden, som du accepterede, dit sprog og tidspunktet. Uden dette samtykke kan du ikke starte en debat. Du kan til enhver tid trække samtykket tilbage ved at skrive til privacy@dezbatere.ro. Du kan også undlade at medtage sådanne oplysninger eller slette en debat, der indeholder dem. Det, du offentliggør om dig selv, er oplysninger, som du har valgt at gøre offentligt tilgængelige." },
       { kind: "p", text: "Om andre personer. Ingen retlig betingelse giver os adgang til at behandle følsomme oplysninger om en tredjepart, som du nævner i et spørgsmål, og ingen af vores AI-udbydere har en sådan adgang. Derfor forbyder Vilkårene det, derfor minimerer vi det, vi sender, og derfor fjerner vi hurtigt sådant indhold efter anmodning — se afsnit 11." },
       { kind: "p", text: "Helbredsoplysninger. Nogle lande behandler helbredsrelaterede oplysninger, herunder følgeslutninger, efter særlige love. Hvis du bor i [the State of Washington], finder en særskilt [Consumer Health Data Privacy Notice] anvendelse." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Hvorfor vi bruger dine data, og på hvilket grundlag",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Hvert formål har ét retsgrundlag efter artikel 6, stk. 1, i GDPR, og vi genbruger ikke data, der er indsamlet til ét formål, til et andet." },
+      { kind: "p", text: "Vi angiver de relevante retsgrundlag for hvert formål efter artikel 6, stk. 1, i GDPR, og vi genbruger ikke data, der er indsamlet til ét formål, til et andet." },
       {
         kind: "list",
         items: [
         "Oprettelse og drift af din konto, godkendelse af dig samt gennemførelse og opbevaring af dine debatter, så du kan åbne og afspille dem igen — Konto, sessioner, debatindhold — Kontrakt — Art. 6(1)(b)",
+        "Afgørelse af, om tilmelding og start af en ny debat er mulig ud fra IP-landet og geografiske begrænsninger — IP-land og afslag i revisionssporet — Legitime interesser — Art. 6(1)(f) ved beskyttelse og drift af tjenesten, hvor loven tillader det, og retlig forpligtelse — Art. 6(1)(c), hvor sanktioner begrænser leveringen af tjenesten",
+        "Kontrol af minimumsalder — Alderskontroldata — Kontrakt — Art. 6(1)(b), og legitime interesser — Art. 6(1)(f)",
+        "Anvendelse af regler om forbrugere, privatliv og skat efter bopæl — Oplyst bopælsland og eventuel amerikansk delstat — Kontrakt — Art. 6(1)(b), og retlig forpligtelse — Art. 6(1)(c)",
         "Afsendelse af dit spørgsmål og systemets udsagn til AI-udbydere med henblik på at generere en debat — Debatindhold — Kontrakt — Art. 6(1)(b)",
         "Sikring af tjenesten, opdagelse af misbrug, mulighed for at opdage et login, du ikke har foretaget, og førelse af et revisionsspor — Sessioner, sikkerhedsrevisionsspor, supporthashes vedrørende misbrug — Legitime interesser — Art. 6(1)(f): vores og dine interesser i en sikker tjeneste. Du kan gøre indsigelse; se afsnit 10",
         "Bevis for, at du accepterede Vilkårene og gav eller trak et samtykke tilbage — Registreringer af accept og samtykke — Retlig forpligtelse — Art. 6(1)(c), vores pligt til at påvise samtykke efter Art. 7(1) — og legitime interesser i at dokumentere kontrakten",
@@ -112,7 +119,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Offentliggørelse og synlighed",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Debatter er private, indtil du offentliggør dem. Offentliggørelse er en bevidst handling, der bekræftes særskilt. En offentliggjort debat viser dit pseudonym, dit spørgsmål, som du skrev det, argumenttræet, bedømmelserne, konklusionen og konfidensintervallet og bærer en synlig mærkning af, at indholdet er AI-genereret. Den viser aldrig din e-mailadresse, dine sessionsregistreringer eller din kontohistorik. [Published debates are / are not] indekseret af søgemaskiner [unless you choose]." },
+      { kind: "p", text: "Debatter er private, indtil du offentliggør dem. Offentliggørelse er en bevidst handling, der bekræftes særskilt. En offentliggjort debat viser dit pseudonym, dit spørgsmål, som du skrev det, argumenttræet, bedømmelserne, konklusionen og konfidensintervallet og bærer en synlig mærkning af, at indholdet er AI-genereret. Den viser aldrig din e-mailadresse, dine sessionsregistreringer eller din kontohistorik. Søgemaskiner kan indeksere offentliggjorte debatter." },
       { kind: "p", text: "Når offentliggørelsen ophæves, fjernes debatten fra Dialectical Engine, og nøglen til vores offentlige kopi destrueres. Kopier, som læsere, søgemaskiner eller arkiver allerede har fremstillet, er uden for vores kontrol, og vi kan ikke tilbagekalde dem." },
       { kind: "p", text: "Når du sletter din konto, fjerner vi uden unødig forsinkelse og senest inden for 30 dage alle debatter, du har offentliggjort, fra offentlig adgang, medmindre loven kræver, at vi opbevarer et bestemt element. [Option B — a product change; see the Terms, section 9.]" }
     ]
@@ -126,6 +133,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Konto — Mens kontoen findes samt en frist på 7 dage, efter at du har anmodet om at lukke den — Nøgler destrueres; registreringen slettes",
+        "IP-adresse brugt til lokalt landeopslag — Kun mens tilmelding eller start af en ny debat behandles — Efter kontrollen gemmes IP-adressen ikke i læsbar form; ved afslag gemmer revisionsloggen kun nøglebaserede envejs-hashværdier af IP-adressen og browserens user-agent som beskrevet nedenfor",
+        "Afslag i revisionssporet for IP-landekontrol — I hele tjenestens levetid — Posten indeholder afvisningskode, land, en angivelse af, at IP-adressen var grundlaget, og nøglebaserede envejs-hashværdier af IP-adressen og browserens user-agent; der kan kun tilføjes poster til revisionsloggen",
+        "Resultat og oplysninger fra alderskontrol — Så længe kontoen findes — Slettes med kontoen",
+        "Oplyst bopælsland og amerikansk delstat — Så længe kontoen findes — Slettes med kontoen",
         "Sessionsregistreringer — 14 dage efter seneste brug eller 90 dage efter oprettelsen, alt efter hvad der kommer først — Slettes",
         "Links til e-mailbekræftelse — 24 timer — Slettes",
         "Risikosignaler ved login og gendannelse — 90 dage, håndhævet af databasen — Renses",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Begrænsning (Art. 18) — Bed os om at standse behandlingen af bestemte data, mens en tvist om dem afgøres",
         "Indsigelse (Art. 21) — Gør indsigelse mod behandling baseret på legitime interesser — sikkerheds- og revisionsbehandlingen i afsnit 4 — hvorefter vi standser, medmindre vi kan påvise vægtige grunde. Gør til enhver tid indsigelse mod markedsføring, hvorefter vi standser den",
         "Dataportabilitet (Art. 20) — Dine debatter og kontodata i et almindeligt anvendt, maskinlæsbart format. [Pending: same export as Access.] Ikke-personligt indhold, du har skabt, såsom dine spørgsmål, returneres til dig efter anmodning, når kontrakten ophører",
-        "Tilbagetrækning af samtykke (Art. 7(3)) — Træk samtykke til markedsføring tilbage fra enhver e-mail eller fra Indstillinger; træk samtykket til følsomme data tilbage ved ikke at medtage sådanne data eller ved at slette en debat. Tilbagetrækningen påvirker ikke behandling, der allerede er sket",
+        "Tilbagetrækning af samtykke (Art. 7(3)) — Træk samtykke til markedsføring tilbage fra enhver e-mail eller fra Indstillinger; træk samtykket til følsomme data tilbage ved at skrive til privacy@dezbatere.ro (du kan også undlade at medtage dem eller slette en debat, der indeholder dem). Tilbagetrækningen påvirker ikke behandling, der allerede er sket",
         "Klage — Til den rumænske tilsynsmyndighed, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, eller til myndigheden i det land, hvor du bor. Vi ser helst, at du kontakter os først"
         ]
       },
@@ -241,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Når vi ændrer denne politik, offentliggør vi den nye version med en oversigt over ændringerne og en ny ikrafttrædelsesdato og beholder de tidligere versioner på [dezbatere.ro/privacy/versions]. Ved en ændring, der tilføjer et nyt formål eller en ny modtager, underretter vi dig via e-mail og i produktet, før den nye behandling begynder, og giver dig tid til at gøre indsigelse. Hvor et nyt formål afhænger af dit samtykke — eksempelvis hvis vi nogensinde ønskede at bruge indhold til at forbedre modeller — beder vi særskilt og specifikt om dette samtykke; vi behandler aldrig accept af opdaterede Vilkår som samtykke til ny behandling. Ved præciseringer, der ikke ændrer noget ved det, vi gør, offentliggør vi blot den nye version." },
-      { kind: "p", text: "Denne politik blev senest opdateret den [date]. Version 3.0 erstattede version 2.1, som beskrev sessionsdata, opbevaringsperioder, analyse, eksport og virkningen af sletning på offentliggjorte debatter på måder, der ikke længere afspejlede tjenesten." }
+      { kind: "p", text: "Denne politik blev senest opdateret den [date]. Version 3.2 erstattede version 2.1, som beskrev sessionsdata, opbevaringsperioder, analyse, eksport og virkningen af sletning på offentliggjorte debatter på måder, der ikke længere afspejlede tjenesten." }
     ]
   },
   {
@@ -273,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "USA (kun hvis anført)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Meddelelse ved indsamling. Tabellen i afsnit 2 angiver hver kategori af personoplysninger, vi indsamler, dens formål og opbevaringsperiode (afsnit 7). Vi indsamler kun disse kategorier af følsomme personoplysninger, hvor du medtager dem i dine egne spørgsmål om dig selv: helbred, religiøs eller filosofisk overbevisning, seksuelle forhold eller seksuel orientering, politiske holdninger, fagforeningsmedlemskab og race eller etnisk oprindelse. Vi bruger dem kun til at gennemføre dine debatter og kun efter det særskilte samtykke i afsnit 3. Vi sælger eller deler ikke personoplysninger og har ikke gjort det i de foregående tolv måneder. Vi bruger ikke personoplysninger til målrettet annoncering, og vi bruger ikke følsomme personoplysninger til noget formål ud over at levere den tjeneste, du anmoder om. Præferencesignaler for fravalg: Da vi ikke sælger eller deler personoplysninger eller bruger dem til målrettet annoncering, er der intet at fravælge, og et Global Privacy Control-signal ændrer intet. Dine rettigheder: til at få oplyst, slette, rette, fravælge, begrænse brugen af følsomme personoplysninger og ikke blive forskelsbehandlet for at udøve dem; fremsæt en anmodning på privacy@dezbatere.ro. Økonomiske incitamenter: Vi tilbyder ingen; vores formål og beskyttelse er de samme for gratis og betalte abonnementer. Opbevaring fremgår af afsnit 7. Brud: Vi underretter beboere og delstatsmyndigheder, som hver delstats lov om sikkerhedsbrud kræver. Denne meddelelse opdateres mindst hver tolvte måned; senest opdateret [date]." },
+      { kind: "p", text: "Meddelelse ved indsamling. Tabellen i afsnit 2 angiver de kategorier af personoplysninger, vi indsamler, og deres kilder. Formål og retsgrundlag står i afsnit 4, og opbevaringsperioderne står i afsnit 7. Vi indsamler kun disse kategorier af følsomme personoplysninger, hvor du medtager dem i dine egne spørgsmål om dig selv: helbred, religiøs eller filosofisk overbevisning, seksuelle forhold eller seksuel orientering, politiske holdninger, fagforeningsmedlemskab og race eller etnisk oprindelse. Vi bruger dem kun til at gennemføre dine debatter og kun efter det særskilte samtykke i afsnit 3. Vi sælger eller deler ikke personoplysninger og har ikke gjort det i de foregående tolv måneder. Vi bruger ikke personoplysninger til målrettet annoncering, og vi bruger ikke følsomme personoplysninger til noget formål ud over at levere den tjeneste, du anmoder om. Præferencesignaler for fravalg: Der er i øjeblikket intet at fravælge, da vi ikke sælger eller deler personoplysninger. Hvis vi senere begynder at sælge eller dele dem, respekterer vi Global Privacy Control-signaler som fravalg. Dine rettigheder: til at få oplyst, slette, rette, fravælge, begrænse brugen af følsomme personoplysninger og ikke blive forskelsbehandlet for at udøve dem; fremsæt en anmodning på privacy@dezbatere.ro. Økonomiske incitamenter: Vi tilbyder ingen; vores formål og beskyttelse er de samme for gratis og betalte abonnementer. Opbevaring fremgår af afsnit 7. Brud: Vi underretter beboere og delstatsmyndigheder, som hver delstats lov om sikkerhedsbrud kræver. Denne meddelelse opdateres mindst hver tolvte måned; senest opdateret [date]." },
       { kind: "p", text: "Connecticut: Vi behandler kun følsomme oplysninger med dit aktive samtykke (opt-in), som du giver på den særskilte skærm før din første debat (afsnit 3); vi bruger ikke dine personoplysninger til at træne AI-modeller. Washington: Vores særskilte meddelelse om beskyttelse af forbrugeres helbredsoplysninger på [URL] gælder for alle helbredsrelaterede oplysninger, herunder følgeslutninger. Texas og Nebraska: Vi sælger ikke følsomme personoplysninger. Colorado, Connecticut, Virginia og andre stater med omfattende privatlivslove: Ovenstående rettigheder gælder for dig, hvor loven gælder for os. Hvis vi afslår en anmodning, kan du klage ved at svare på vores svar på privacy@dezbatere.ro; hvis vi afviser klagen, kan du kontakte din delstats Attorney General." }
     ]
   },
@@ -345,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.1",
-  sha256: "08feee28a4d06ac5563d8698ec6b8a65c092bdf1d42a4d767de52df7ecb945f9",
-  eyebrow: "PRIVATLIVSPOLITIK · v3.1 · GÆLDENDE FRA [DATE]",
+  version: "3.2",
+  sha256: "44d5cab4d347ac2f58fffc58d2e1863bc68d6fae98c2445d2349f2f7a8aa0c09",
+  eyebrow: "PRIVATLIVSPOLITIK · v3.2 · GÆLDENDE FRA [DATE]",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",
-  endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.1",
+  endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatlivspolitikkens tekst",
   sectionIdPrefix: "policy-section-",

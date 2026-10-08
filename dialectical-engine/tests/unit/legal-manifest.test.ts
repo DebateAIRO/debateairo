@@ -85,10 +85,32 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
         const entry = currentDocument(kind, code);
         expect(entry, `${code}/${kind}`).not.toBeNull();
         expect(entry!.sha256).toBe(createHash("sha256").update(draftBytes(code, kind)).digest("hex"));
-        expect(entry!.version).toBe(kind === "TERMS" ? "2.0" : "3.1");
+        expect(entry!.version).toBe(kind === "TERMS" ? "2.1" : "3.2");
       }
     }
     expect(legalManifestLocales("TERMS")).toEqual([...CODES].sort());
+    expect(reacceptanceFloor("TERMS")).toBe("2.1");
+    expect(reacceptanceFloor("PRIVACY")).toBe("3.2");
+  });
+
+  it("keeps the sensitive-data withdrawal contact in every locale", () => {
+    for (const { code } of LOCALES) {
+      const privacy = readDraft(code, "PRIVACY");
+      const sensitiveSection = privacy.split(/^## 3\..+$/mu)[1]?.split(/^## 4\./mu)[0];
+      const withdrawalRow = privacy.split("\n").find((line) => line.startsWith("|") && line.includes("Art. 7(3)"));
+      expect(sensitiveSection, `${code} section 3`).toContain("privacy@dezbatere.ro");
+      expect(withdrawalRow, `${code} withdrawal row`).toContain("privacy@dezbatere.ro");
+    }
+  });
+
+  it("names the actual document language in locales that previously said English", () => {
+    const labels = {
+      et: "Keel: eesti", ga: "Teanga: Gaeilge", ja: "言語：日本語", ko: "언어: 한국어",
+      pl: "Język: polski", uk: "Мова: українська", zh: "语言：中文"
+    } as const;
+    for (const [code, label] of Object.entries(labels)) {
+      expect(readDraft(code, "TERMS").split("\n")[23], code).toContain(label);
+    }
   });
 
   it("answers null for a locale it does not carry, and compares pairs exactly", () => {
@@ -102,8 +124,12 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
     expect(LEGAL_DOCUMENT_KINDS).toEqual(["TERMS", "PRIVACY", "CONSENT_RENEWAL", "CONSENT_IMMEDIATE_START"]);
   });
 
-  it("carries no re-acceptance floor today and orders versions numerically", () => {
-    for (const kind of LEGAL_DOCUMENT_KINDS) expect(reacceptanceFloor(kind), kind).toBeNull();
+  it("requires re-acceptance for the revised documents and orders versions numerically", () => {
+    expect(reacceptanceFloor("TERMS")).toBe("2.1");
+    expect(reacceptanceFloor("PRIVACY")).toBe("3.2");
+    for (const kind of ["CONSENT_RENEWAL", "CONSENT_IMMEDIATE_START"] as const) {
+      expect(reacceptanceFloor(kind), kind).toBeNull();
+    }
     expect(documentVersionAtLeast("2.0", "2.0")).toBe(true);
     expect(documentVersionAtLeast("2.10", "2.9")).toBe(true);
     expect(documentVersionAtLeast("2.9", "2.10")).toBe(false);
@@ -121,7 +147,7 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
   it("refuses a re-acceptance floor above any locale's current version, in the package and in the generator", () => {
     const terms = currentDocument("TERMS", "en")!.version;
     const privacy = currentDocument("PRIVACY", "en")!.version;
-    expect([terms, privacy]).toEqual(["2.0", "3.1"]);
+    expect([terms, privacy]).toEqual(["2.1", "3.2"]);
     const manifest = JSON.parse(renderLegalManifest(buildLegalManifest(readDraft, {}, committedArchive()))) as {
       reacceptance: Record<string, unknown>;
       documents: Record<string, Record<string, { version: string; sha256: string }>>;
@@ -130,14 +156,14 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
     const withFloors = (floors: Record<string, unknown>) => ({
       ...structuredClone(manifest), reacceptance: { ...manifest.reacceptance, ...floors }
     });
-    for (const floors of [{ TERMS: "2.1" }, { TERMS: "3.0" }, { PRIVACY: "3.2" }, { TERMS: "2.0", PRIVACY: "4.0" }]) {
+    for (const floors of [{ TERMS: "2.2" }, { TERMS: "3.0" }, { PRIVACY: "3.3" }, { TERMS: "2.1", PRIVACY: "4.0" }]) {
       expect(() => parseLegalManifest(withFloors(floors)), JSON.stringify(floors)).toThrow("LEGAL_MANIFEST_INVALID");
     }
-    for (const floors of [{ TERMS: "2.0" }, { TERMS: "1.9", PRIVACY: "3.0" }, { PRIVACY: "2.10" }]) {
+    for (const floors of [{ TERMS: "2.1" }, { TERMS: "1.9", PRIVACY: "3.2" }, { PRIVACY: "2.10" }]) {
       expect(parseLegalManifest(withFloors(floors)).reacceptance, JSON.stringify(floors)).toMatchObject(floors);
     }
     // Every locale's current pair must have reached the floor, not only English.
-    const lagging = withFloors({ TERMS: "2.0" });
+    const lagging = withFloors({ TERMS: "2.1" });
     const deSha = lagging.documents.TERMS!.de!.sha256;
     lagging.documents.TERMS!.de!.version = "1.9";
     lagging.archive.TERMS!.de![deSha]!.version = "1.9";
@@ -146,13 +172,13 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
       .documents.TERMS.get("de")?.version).toBe("1.9");
 
     // The generator refuses the same configuration before it writes anything, by a code alone.
-    for (const floors of [{ TERMS: "2.1", PRIVACY: null }, { TERMS: null, PRIVACY: "3.2" }, { TERMS: "v2", PRIVACY: null }]) {
+    for (const floors of [{ TERMS: "2.2", PRIVACY: null }, { TERMS: null, PRIVACY: "3.3" }, { TERMS: "v2", PRIVACY: null }]) {
       expect(() => buildLegalManifest(readDraft, {}, committedArchive(), floors), JSON.stringify(floors))
         .toThrow(/^LEGAL_MANIFEST_REACCEPTANCE_FLOOR_INVALID$/u);
     }
-    const raised = buildLegalManifest(readDraft, {}, committedArchive(), { TERMS: "2.0", PRIVACY: "3.0" });
-    expect(raised.reacceptance).toEqual({ PRIVACY: "3.0", TERMS: "2.0" });
-    expect(parseLegalManifest(JSON.parse(renderLegalManifest(raised))).reacceptance.TERMS).toBe("2.0");
+    const raised = buildLegalManifest(readDraft, {}, committedArchive(), { TERMS: "2.1", PRIVACY: "3.2" });
+    expect(raised.reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "2.1" });
+    expect(parseLegalManifest(JSON.parse(renderLegalManifest(raised))).reacceptance.TERMS).toBe("2.1");
   });
 
   it("stamps each generated module with the same version and hash as the manifest", () => {

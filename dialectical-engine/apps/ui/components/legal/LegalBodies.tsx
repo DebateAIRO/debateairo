@@ -296,7 +296,9 @@ export function LegalVersionsBody({ legalCatalog }: { legalCatalog: MessageCatal
           </li>
         ))}
       </ol>
-      <p className="legalVersionsNone">{t(legalCatalog, "legal.versions.none")}</p>
+      {TERMS_VERSIONS.length === 1 ? (
+        <p className="legalVersionsNone">{t(legalCatalog, "legal.versions.none")}</p>
+      ) : null}
     </>
   );
 }

@@ -70,7 +70,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Nõustute nende Tingimustega, märkides ruudu „Olen tutvunud teenusetingimustega ja nõustun nendega“ ning klõpsates nuppu Looge konto. Sellega tekib teie ja DebateAIRO S.R.L.-i vahel leping. Tingimused hõlmavad jaotises 7 esitatud lubatud kasutuse reegleid, jaotises 9 esitatud avaldamisreegleid, jaotises 15 esitatud vastutussätteid, jaotises 18 esitatud kohaldatava õiguse ja vaidluste lahendamise sätteid ning juhul, kui elate Ameerika Ühendriikides, lisas A.3 esitatud vahekohtukokkulepet. Säilitame andmed selle kohta, millise versiooniga ja millal nõustusite, nagu on selgitatud meie Privaatsuspoliitikas." },
       { kind: "p", text: "Meie Privaatsuspoliitikas aadressil [dezbatere.ro/privacy] selgitatakse, kuidas me isikuandmeid töötleme. See on teave, mille oleme kohustatud teile esitama, mitte leping, millega te nõustute, ning miski neis Tingimustes ei muuda seda töötlemiseks antavaks nõusolekuks. Meie Küpsisepoliitika aadressil [dezbatere.ro/cookies] ja tehisintellekti pakkujate register aadressil [dezbatere.ro/providers] on viite kaudu nende Tingimuste osa." },
-      { kind: "p", text: "Enne meiega elektrooniliselt lepingu sõlmimist näidatakse kasutajaliideses vajalikke samme, võimaldatakse teil sisestatu enne esitamist üle vaadata ja parandada ning antakse teada keeled, milles saab lepingu sõlmida. Need Tingimused on kättesaadavad salvestataval ja prinditaval kujul, saadame teile e-posti teel versiooni, millega nõustusite, ning saate igal ajal koopiat taotleda. Miski neis Tingimustes ei piira teie õigusi, mis tulenevad Rumeenia või ELi tarbijaõigusest või teie elukohariigi õigusest ja mida ei saa lepinguga piirata." }
+      { kind: "p", text: "Enne meiega elektrooniliselt lepingu sõlmimist näidatakse kasutajaliideses vajalikke samme, võimaldatakse teil sisestatu enne esitamist üle vaadata ja parandada ning antakse teada keeled, milles saab lepingu sõlmida. Need Tingimused on saadaval salvestataval ja prinditaval kujul. Tasulise paketi ostmisel saadame teile e-posti teel versiooni, millega nõustusite. Koopiat saate taotleda igal ajal. Miski neis Tingimustes ei piira teie õigusi, mis tulenevad Rumeenia või ELi tarbijaõigusest või teie elukohariigi õigusest ja mida ei saa lepinguga piirata." }
     ]
   },
   {
@@ -100,7 +100,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Teie konto",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Registreerumisel kasutate e-posti aadressi, parooli, taastamise e-posti aadressi ja kohustuslikku kaheastmelist autentimist. Valite pseudonüümi, mida näidatakse kõigel, mida avaldate; pseudonüümi ei saa pärast määramist muuta. Hoidke oma parool, autentimisrakendus ja taastekoodid turvaliselt. Vastutate oma kontol toimuva tegevuse eest, välja arvatud juhul, kui see tuleneb meie rikkumisest." },
+      { kind: "p", text: "Registreerumisel kasutate e-posti aadressi, parooli, taastamise e-posti aadressi ja kohustuslikku kaheastmelist autentimist. Määrame teile juhusliku pseudonüümi, mida näidatakse kõigel, mida avaldate. Seda ei saa muuta. Hoidke oma parool, autentimisrakendus ja taastekoodid turvaliselt. Vastutate oma kontol toimuva tegevuse eest, välja arvatud juhul, kui see tuleneb meie rikkumisest." },
       { kind: "p", text: "Kui me ei lepi kokku teisiti, võib teil olla üks konto. Ärge jagage, müüge ega andke seda üle." },
       { kind: "p", text: "Kui kaotate juurdepääsu, toimub konto taastamine tootes avaldatud korra kohaselt, mis sisaldab konto ülevõtmise raskendamiseks mõeldud ooteaegu. Võime taastamistaotluse tagasi lükata, kui me ei suuda mõistlikult kindlaks teha, et see pärineb teilt." },
       { kind: "p", text: "Saate konto igal ajal sulgeda menüüs Seaded → Konto. Sulgemine jõustub pärast 7-päevast ajapikendust, mille jooksul saate selle tühistada, ning teavitame teid kõigi teie registreeritud kanalite kaudu. Jaotises 11 selgitatakse, mida sulgemisel kustutatakse ja mida mitte." }
@@ -116,7 +116,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Teie enda tundlik teave. Teie küsimused võivad puudutada teie enda tervist, veendumusi, poliitilisi vaateid või muid tundlikke teemasid. Annate selleks nõusoleku eraldi ekraanikuval enne oma esimest väitlust. Kui elate kohas, kus kehtivad terviseandmete erireeglid, võib lisa A suunata teid eraldi teate juurde." },
       { kind: "p", text: "Ärge esitage ega avaldage ebaseaduslikku sisu, sealhulgas sisu, mis on laimav, õhutab vägivallale või vihkamisele, ahistab või ähvardab, kujutab nõusolekuta jagatud intiimkujutisi, rikub intellektuaalomandit või konfidentsiaalsust, avaldab ärisaladusi, kujutab laste seksuaalset väärkohtlemist või rikub sanktsioone või ekspordikontrolli." },
       { kind: "p", text: "Ärge kasutage DebateAI-d petmiseks. Ärge esitage loodud väljundit inimese kirjutatuna, kui see oleks eksitav, ärge eemaldage sellelt tehisintellekti loodud sisu märgist ega kasutage seda näilise üksmeele, võltstõendite või kellegi teisena esinemise loomiseks." },
-      { kind: "p", text: "Ärge rünnake teenust. Keelatud on automatiseeritud juurdepääs avaldatud väitlustele, nende kraapimine, roomamine või massiline väljavõtmine ulatuses, mida meie robotifail ei luba; kiiruspiirangutest, autentimisest või avaldamiskontrollidest möödahiilimine; viipade või süsteemijuhiste väljavõtmise katsed; viipade sisestamine eesmärgiga panna mootor oma piiranguid eirama; sondimine või koormustestimine ilma meie kirjaliku loata." },
+      { kind: "p", text: "Ärge rünnake teenust. Otsingumootorid võivad avaldatud väitlusi tavapäraselt indekseerida. Muu automatiseeritud juurdepääs, andmete kraapimine, roomamine või avaldatud väitluste massiline väljavõtmine nõuab meie kirjalikku luba. Keelatud on kiiruspiirangutest, autentimisest või avaldamiskontrollidest möödahiilimine; viipade või süsteemijuhiste väljavõtmise katsed; viipade sisestamine eesmärgiga panna mootor oma piiranguid eirama; ning teenuse sondeerimine või koormustestimine ilma meie kirjaliku loata." },
       { kind: "p", text: "Ärge müüge ega kaubamärgistage teenust ümber ega kasutage seda konkureeriva mootori loomiseks, sealhulgas väljundite kasutamisega treeningandmetena, ilma meie kirjaliku nõusolekuta." },
       { kind: "p", text: "Ärge kasutage DebateAI-d otsuste tegemiseks, mis puudutavad isiku tervist, ohutust, seaduslikke õigusi, töösuhet, krediiti, eluaset või immigratsioonistaatust. See ei ole selleks loodud ja selle väljundid ei ole selliste otsuste turvaline alus." },
       { kind: "p", text: "Kohalik õigus avaldamise kohas. Vastutate selle eest, et kõik, mida avaldate, vastaks teie asukohariigi õigusele. Võime teatud piirkondades piirata teatud teemade avaldamist." },
@@ -143,7 +143,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Väitlused on vaikimisi privaatsed. Miski teie loodust ei ole teistele nähtav, kui te seda ei avalda." },
-      { kind: "p", text: "Mida avaldamine teeb. Avaldamine on tahtlik ja eraldi kinnitatav toiming. Avaldamisel loome väitluse fikseeritud hetktõmmise ja teeme selle kõigile ilma kontota loetavaks. [Search engines may index it. / Published debates are not indexed by search engines unless you choose to allow it.] Hetktõmmisel näidatakse teie pseudonüümi, küsimust sellisel kujul, nagu te selle kirjutasite, argumendipuud, hindeid, otsust ja kindlusastet ning sellel on nähtav märgis, et sisu on tehisintellekti loodud. Sellel ei näidata teie e-posti aadressi, seansikirjeid ega konto ajalugu." },
+      { kind: "p", text: "Mida avaldamine teeb. Avaldamine on tahtlik ja eraldi kinnitatav toiming. Avaldamisel loome väitluse fikseeritud hetktõmmise ja teeme selle kõigile ilma kontota loetavaks. Otsingumootorid võivad selle indekseerida. Hetktõmmisel näidatakse teie pseudonüümi, küsimust sellisel kujul, nagu te selle kirjutasite, argumendipuud, hindeid, otsust ja kindlusastet ning sellel on nähtav märgis, et sisu on tehisintellekti loodud. Sellel ei näidata teie e-posti aadressi, seansikirjeid ega konto ajalugu." },
       { kind: "p", text: "Avaldamine on praktikas sisuliselt pöördumatu. Kui väitlus on avalik, saavad teised inimesed seda lugeda, tsiteerida, ekraanitõmmisele jäädvustada, arhiveerida ja vahemällu salvestada. Avaldamise tühistamisel eemaldatakse see DebateAI-st ja hävitatakse meie koopia võti, kuid juba mujal olevaid koopiaid ei saa sellega kõrvaldada. Ärge avaldage midagi, mille püsivat seostamist oma pseudonüümiga te ei soovi." },
       { kind: "p", text: "Avaldatud väitlused konto sulgemisel. Konto sulgemisel eemaldame kõik teie avaldatud väitlused avalikust juurdepääsust põhjendamatu viivituseta ja igal juhul 30 päeva jooksul, välja arvatud juhul, kui seadus nõuab kiiremat tegutsemist või konkreetse üksuse säilitamist. Enne eemaldamist teiste tehtud koopiad ei ole meie kontrolli all. Kui soovite, et väitlus jääks pärast teie lahkumist kättesaadavaks, laadige see esmalt alla. [This is Option B from the earlier drafts, as recommended in the second-opinion review. It is a product change to implement, not a description of the current system, which keeps published snapshots readable after erasure.]" },
       { kind: "p", text: "Võime avaldatud sisu alati eemaldada. Võime avaldatud väitluse eemaldada või sellele juurdepääsu piirata, kui seda nõuab seadus või kohus või pädev asutus või kui väitlus rikub neid Tingimusi või on ebaseaduslik. Miski selles jaotises ei takista meil tegutseda jaotise 10 kohase kehtiva teate alusel ega luba, et avaldatud väitlus jääb kättesaadavaks." },
@@ -380,12 +380,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.0",
-  sha256: "c6320f98ce1c5f662a432a1637b8b9a5bfab9afea938088684bc0bf0d2711690",
-  eyebrow: "TEENUSETINGIMUSED · v2.0 · KEHTIB ALATES [DATE]",
+  version: "2.1",
+  sha256: "c101eb933085b5c3b1850663f5c294f9a63d4b72b6efd0ab639080bd4ff1f427",
+  eyebrow: "TEENUSETINGIMUSED · v2.1 · KEHTIB ALATES [DATE]",
   title: "Millega te nõustute",
   lede: "Teie ja DebateAIRO S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",
-  endMarker: "TINGIMUSTE LÕPP · v2.0",
+  endMarker: "TINGIMUSTE LÕPP · v2.1",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Teenusetingimuste tekst",
   sectionIdPrefix: "terms-section-",
