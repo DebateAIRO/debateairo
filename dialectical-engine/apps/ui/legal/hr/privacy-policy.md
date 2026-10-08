@@ -146,12 +146,12 @@ Svako od ovih prava možete besplatno ostvariti pisanjem na **privacy@dezbatere.
 
 | Pravo | Što ovdje znači |
 | --- | --- |
-| **Pristup** (Art. 15) | Primjerak osobnih podataka koje imamo o vama i ove informacije. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Pristup** (Art. 15) | Primjerak osobnih podataka koje imamo o vama i ove informacije. U Postavkama odaberite Izvezi podatke: pripremamo ZIP datoteku s JSON datotekama i jednom stranicom koju možete otvoriti u bilo kojem pregledniku te vam e-poštom šaljemo poveznicu za preuzimanje koja vrijedi 24 sata i radi samo dok ste prijavljeni na svoj račun. |
 | **Ispravak** (Art. 16) | Ispravite adresu e-pošte ili adresu e-pošte za oporavak u Postavkama. Vaš pseudonim nije moguće promijeniti iz razloga navedenih u Uvjetima; možete zatvoriti račun i izraditi novi |
 | **Brisanje** (Art. 17) | Izbrišite privatnu raspravu u bilo kojem trenutku sa stranice rasprave. Zatvorite račun u Postavkama; odjeljak 7 točno objašnjava što se time čini. Zatražite da uklonimo objavljenu raspravu koja sadržava vaše podatke bez obzira na to jeste li autor |
 | **Ograničenje** (Art. 18) | Zatražite da prestanemo obrađivati određene podatke dok se ne riješi spor o njima |
 | **Prigovor** (Art. 21) | Uložite prigovor na obradu koja se temelji na legitimnim interesima — sigurnosnu i revizijsku obradu iz odjeljka 4 — i prestat ćemo osim ako možemo dokazati uvjerljive razloge. Uložite prigovor na marketing u bilo kojem trenutku i prestat ćemo |
-| **Prenosivost** (Art. 20) | Vaše rasprave i podaci o računu u uobičajenom, strojno čitljivom formatu. \[Pending: same export as Access.\] Neosobni sadržaj koji ste stvorili, kao što su vaša pitanja, vraća vam se na zahtjev nakon prestanka ugovora |
+| **Prenosivost** (Art. 20) | Vaše rasprave i podaci o računu u uobičajenom, strojno čitljivom formatu. Upotrijebite Izvezi podatke u Postavkama: ZIP sadrži vaše podatke u strojno čitljivim JSON datotekama i jednu čitljivu stranicu; poveznica poslana e-poštom vrijedi 24 sata i radi samo dok ste prijavljeni na svoj račun. Neosobni sadržaj koji ste stvorili, kao što su vaša pitanja, vraća vam se na zahtjev nakon prestanka ugovora |
 | **Povlačenje privole** (Art. 7(3)) | Povucite privolu za marketing iz bilo koje poruke e-pošte ili u Postavkama; povucite privolu za osjetljive podatke pisanjem na privacy@dezbatere.ro (takve podatke možete i izostaviti ili izbrisati raspravu koja ih sadržava). Povlačenje ne utječe na obradu koja je već provedena |
 | **Pritužba** | Rumunjskom nadzornom tijelu, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukurešt, <anspdcp@dataprotection.ro>, ili tijelu u državi u kojoj živite. Radije bismo da nam se prvo obratite |
 

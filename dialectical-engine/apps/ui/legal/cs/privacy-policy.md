@@ -146,12 +146,12 @@ Kterékoli z těchto práv můžete bezplatně uplatnit písemnou žádostí na 
 
 | Právo | Co zde znamená |
 | --- | --- |
-| **Přístup** (Art. 15) | Kopie osobních údajů, které o vás uchováváme, a tyto informace. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Přístup** (Art. 15) | Kopie osobních údajů, které o vás uchováváme, a tyto informace. V Nastavení zvolte Exportovat data: připravíme soubor ZIP se soubory JSON a jednou stránkou, kterou otevřete v libovolném prohlížeči, a e-mailem vám pošleme odkaz ke stažení platný 24 hodin pouze při přihlášení k vašemu účtu. |
 | **Oprava** (Art. 16) | Opravte svou e-mailovou adresu nebo e-mailovou adresu pro obnovení v Nastavení. Váš pseudonym nelze z důvodů uvedených v Podmínkách změnit; účet můžete uzavřít a otevřít nový |
 | **Výmaz** (Art. 17) | Soukromou debatu můžete kdykoli vymazat na její stránce. Uzavřete účet v Nastavení; oddíl 7 přesně vysvětluje následky. Požádejte nás o odstranění zveřejněné debaty obsahující vaše údaje bez ohledu na to, zda jste jejím autorem |
 | **Omezení zpracování** (Art. 18) | Požádejte nás, abychom přestali zpracovávat určité údaje, dokud nebude vyřešen spor, který se jich týká |
 | **Námitka** (Art. 21) | Vzneste námitku proti zpracování založenému na oprávněných zájmech — bezpečnostnímu a auditnímu zpracování podle oddílu 4 — a my je ukončíme, pokud neprokážeme závažné oprávněné důvody. Proti marketingu můžete vznést námitku kdykoli a my jej ukončíme |
-| **Přenositelnost** (Art. 20) | Vaše debaty a údaje účtu v běžně používaném, strojově čitelném formátu. \[Pending: same export as Access.\] Neosobní obsah, který jste vytvořili, například vaše otázky, vám na požádání vrátíme při skončení smlouvy |
+| **Přenositelnost** (Art. 20) | Vaše debaty a údaje účtu v běžně používaném, strojově čitelném formátu. Použijte Exportovat data v Nastavení: soubor ZIP obsahuje vaše údaje ve strojově čitelných souborech JSON a jednu čitelnou stránku; e-mailem vám pošleme odkaz platný 24 hodin pouze při přihlášení k vašemu účtu. Neosobní obsah, který jste vytvořili, například vaše otázky, vám na požádání vrátíme při skončení smlouvy |
 | **Odvolání souhlasu** (Art. 7(3)) | Odvolejte souhlas s marketingem v kterémkoli e-mailu nebo v Nastavení; souhlas se zpracováním citlivých údajů odvolejte napsáním na privacy@dezbatere.ro (takové údaje také nemusíte uvádět nebo můžete smazat debatu, která je obsahuje). Odvolání nemá vliv na zpracování, které již proběhlo |
 | **Stížnost** | Rumunskému dozorovému úřadu **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukurešť, <anspdcp@dataprotection.ro>, nebo úřadu v zemi vašeho bydliště. Budeme raději, když se nejprve obrátíte na nás |
 

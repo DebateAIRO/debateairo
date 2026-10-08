@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Prístup (Art. 15) — Kópia osobných údajov, ktoré o vás uchovávame, a tieto informácie. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Prístup (Art. 15) — Kópia osobných údajov, ktoré o vás uchovávame, a tieto informácie. V Nastaveniach vyberte Exportovať údaje: pripravíme súbor ZIP so súbormi JSON a jednou stránkou, ktorú otvoríte v ľubovoľnom prehliadači, a e-mailom vám pošleme odkaz na stiahnutie platný 24 hodín len vtedy, keď ste prihlásení do svojho účtu.",
         "Oprava (Art. 16) — V Nastaveniach môžete opraviť svoj e-mail alebo e-mail na obnovenie. Váš pseudonym nemožno zmeniť z dôvodov uvedených v podmienkach; účet môžete odstrániť a otvoriť si nový",
         "Vymazanie (Art. 17) — Súkromnú debatu môžete kedykoľvek odstrániť na jej stránke. Účet môžete odstrániť v Nastaveniach; časť 7 presne vysvetľuje účinky. Môžete nás požiadať o odstránenie zverejnenej debaty obsahujúcej vaše údaje bez ohľadu na to, či ste jej autorom",
         "Obmedzenie (Art. 18) — Môžete nás požiadať, aby sme prestali spracúvať konkrétne údaje, kým sa nevyrieši spor o ne",
         "Námietka (Art. 21) — Môžete namietať proti spracúvaniu založenému na oprávnených záujmoch — bezpečnostnému a auditnému spracúvaniu podľa časti 4 — a my ho zastavíme, ak nepreukážeme závažné dôvody. Proti marketingu môžete namietať kedykoľvek a my ho zastavíme",
-        "Prenosnosť (Art. 20) — Vaše debaty a údaje účtu v bežne používanom, strojovo čitateľnom formáte. [Pending: same export as Access.] Neosobný obsah, ktorý ste vytvorili, napríklad vaše otázky, vám na požiadanie vrátime po skončení zmluvy",
+        "Prenosnosť (Art. 20) — Vaše debaty a údaje účtu v bežne používanom, strojovo čitateľnom formáte. Použite Exportovať údaje v Nastaveniach: súbor ZIP obsahuje vaše údaje v strojovo čitateľných súboroch JSON a jednu čitateľnú stránku; odkaz zaslaný e-mailom platí 24 hodín len vtedy, keď ste prihlásení do svojho účtu. Neosobný obsah, ktorý ste vytvorili, napríklad vaše otázky, vám na požiadanie vrátime po skončení zmluvy",
         "Odvolanie súhlasu (Art. 7(3)) — Marketingový súhlas môžete odvolať v ktoromkoľvek e-maile alebo v Nastaveniach; súhlas s citlivými údajmi odvoláte napísaním na privacy@dezbatere.ro (také údaje tiež nemusíte uviesť alebo môžete odstrániť debatu, ktorá ich obsahuje). Odvolanie nemá vplyv na spracúvanie, ktoré sa už uskutočnilo",
         "Sťažnosť — Rumunskému dozornému orgánu ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukurešť, anspdcp@dataprotection.ro, alebo orgánu v krajine, v ktorej žijete. Uprednostňujeme, aby ste sa najskôr obrátili na nás"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "4c82bc806344ff2a052a4c1b1eadea8d102002c832712910e77dce8214b4fec6",
+  sha256: "9b4623dff3a241b712c1ceab408edc4c29efb11cd104a0fb44067bf2bdd1a249",
   eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.2 · ÚČINNÉ OD [DATE]",
   title: "Čo uchovávame a prečo",
   lede: "Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.",

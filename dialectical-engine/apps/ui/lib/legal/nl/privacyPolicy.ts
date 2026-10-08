@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Inzage (Art. 15) — Een kopie van de persoonsgegevens die wij over u bewaren, en deze informatie. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Inzage (Art. 15) — Een kopie van de persoonsgegevens die wij over u bewaren, en deze informatie. Kies in Instellingen voor Gegevens exporteren: wij maken een ZIP-bestand met JSON-bestanden en één pagina die u in elke browser kunt openen, en e-mailen u een downloadlink die 24 uur werkt en alleen wanneer u bent ingelogd op uw account.",
         "Rectificatie (Art. 16) — Corrigeer uw e-mailadres of herstel-e-mailadres via Instellingen. Uw pseudoniem kan niet worden gewijzigd om de redenen in de Voorwaarden; u kunt het account sluiten en een nieuw account openen",
         "Wissing (Art. 17) — Verwijder een privédebat op elk moment vanaf de debatpagina. Sluit uw account via Instellingen; hoofdstuk 7 legt precies uit wat dat doet. Vraag ons een gepubliceerd debat met uw gegevens te verwijderen, ongeacht of u de auteur bent",
         "Beperking (Art. 18) — Vraag ons de verwerking van bepaalde gegevens stop te zetten terwijl een geschil daarover wordt beslecht",
         "Bezwaar (Art. 21) — Maak bezwaar tegen verwerking op grond van gerechtvaardigde belangen — de beveiligings- en auditverwerking in hoofdstuk 4 — en wij stoppen tenzij wij dwingende gronden kunnen aantonen. Maak op elk moment bezwaar tegen marketing en wij stoppen",
-        "Overdraagbaarheid (Art. 20) — Uw debatten en accountgegevens in een gangbaar, machineleesbaar formaat. [Pending: same export as Access.] Niet-persoonlijke inhoud die u hebt gemaakt, zoals uw vragen, wordt op uw verzoek aan u teruggegeven wanneer de overeenkomst eindigt",
+        "Overdraagbaarheid (Art. 20) — Uw debatten en accountgegevens in een gangbaar, machineleesbaar formaat. Gebruik Gegevens exporteren in Instellingen: het ZIP-bestand bevat uw gegevens als machineleesbare JSON-bestanden en één leesbare pagina; de per e-mail verzonden link werkt 24 uur en alleen wanneer u bent ingelogd op uw account. Niet-persoonlijke inhoud die u hebt gemaakt, zoals uw vragen, wordt op uw verzoek aan u teruggegeven wanneer de overeenkomst eindigt",
         "Toestemming intrekken (Art. 7(3)) — Trek uw marketingtoestemming in via een e-mail of Instellingen; trek toestemming voor gevoelige gegevens in door te schrijven naar privacy@dezbatere.ro (u kunt dergelijke gegevens ook weglaten of een debat verwijderen waarin zij voorkomen). Intrekking laat reeds uitgevoerde verwerking onverlet",
         "Klacht indienen — Bij de Roemeense toezichthoudende autoriteit, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Boekarest, anspdcp@dataprotection.ro, of bij de autoriteit in het land waar u woont. Wij horen echter liever eerst van u"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "03915e0570b40bd19a5dd033971fe725594b09e9d22e254917d169586ae1b9a2",
+  sha256: "7058de20f4f7268092e4e9a2b4df18e92cc71022801a4aa3e840a951121f19b7",
   eyebrow: "PRIVACYBELEID · v3.2 · VAN KRACHT OP [DATE]",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",

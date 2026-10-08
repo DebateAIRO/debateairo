@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Aċċess (Art. 15) — Kopja tad-data personali li nżommu dwarek, u din l-informazzjoni. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Aċċess (Art. 15) — Kopja tad-data personali li nżommu dwarek, u din l-informazzjoni. Fl-Issettjar agħżel Esporta d-data: inħejju fajl ZIP b’fajls JSON u paġna waħda li tista’ tiftaħ fi kwalunkwe browser, u nibagħtulek b’email link biex tniżżel il-fajl li jaħdem għal 24 siegħa u biss waqt li tkun dħalt fil-kont tiegħek.",
         "Rettifika (Art. 16) — Ikkoreġi l-indirizz elettroniku jew l-indirizz elettroniku għall-irkupru tiegħek mill-issettjar. Il-psewdonimu tiegħek ma jistax jinbidel, għar-raġunijiet fit-Termini; tista’ tagħlaq il-kont u tiftaħ wieħed ġdid",
         "Tħassir (Art. 17) — Ħassar dibattitu privat fi kwalunkwe ħin mill-paġna tad-dibattitu. Agħlaq il-kont tiegħek mill-issettjar; it-taqsima 7 tispjega eżattament x’jagħmel dan. Itlobna nneħħu dibattitu ppubblikat li jkun fih id-data tiegħek kemm jekk inti l-awtur kif ukoll jekk le",
         "Restrizzjoni (Art. 18) — Itlobna nieqfu nipproċessaw data partikolari waqt li tiġi solvuta tilwima dwarha",
         "Oġġezzjoni (Art. 21) — Oġġezzjona għall-ipproċessar ibbażat fuq interessi leġittimi — l-ipproċessar tas-sigurtà u tal-awditjar fit-taqsima 4 — u nieqfu sakemm ma nkunux nistgħu nuru raġunijiet konvinċenti. Oġġezzjona għall-kummerċjalizzazzjoni fi kwalunkwe ħin, u nieqfu",
-        "Portabbiltà (Art. 20) — Id-dibattiti u d-data tal-kont tiegħek f’format komuni li jista’ jinqara minn magna. [Pending: same export as Access.] Kontenut mhux personali li ħloqt, bħall-mistoqsijiet tiegħek, jingħatalek lura fuq talba meta jintemm il-kuntratt",
+        "Portabbiltà (Art. 20) — Id-dibattiti u d-data tal-kont tiegħek f’format komuni li jista’ jinqara minn magna. Uża Esporta d-data fl-Issettjar: il-ZIP fih id-data tiegħek f’fajls JSON li jistgħu jinqraw minn magna u paġna waħda li tista’ tinqara faċilment; il-link mibgħut b’email jaħdem għal 24 siegħa u biss waqt li tkun dħalt fil-kont tiegħek. Kontenut mhux personali li ħloqt, bħall-mistoqsijiet tiegħek, jingħatalek lura fuq talba meta jintemm il-kuntratt",
         "Irtirar tal-kunsens (Art. 7(3)) — Irtira l-kunsens għall-kummerċjalizzazzjoni minn kwalunkwe messaġġ elettroniku jew mill-issettjar; irtira l-kunsens għal data sensittiva billi tikteb lil privacy@dezbatere.ro (tista’ wkoll tħalli barra din id-data jew tħassar dibattitu li jkun fiha). L-irtirar ma jaffettwax ipproċessar li jkun diġà sar",
         "Ilment — Lill-awtorità superviżorja Rumena, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, jew lill-awtorità fil-pajjiż fejn tgħix. Nippreferu li l-ewwel tikkuntattja lilna"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "c5daf566b44043e42752c0e9b58c3eecc5b9c5affe0e7c8d7346113bd07b8e1f",
+  sha256: "eb9592cf2a32db2f1fe3686006b95427585852ab0bf491e905cc189b9bd6a89a",
   eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.2 · EFFETTIVA [DATE]",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",

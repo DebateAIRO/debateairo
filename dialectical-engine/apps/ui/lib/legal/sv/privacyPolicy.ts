@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Tillgång (Art. 15) — En kopia av de personuppgifter vi har om dig samt denna information. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Tillgång (Art. 15) — En kopia av de personuppgifter vi har om dig samt denna information. Välj Exportera data i Inställningar: vi skapar en ZIP-fil med JSON-filer och en sida som kan öppnas i valfri webbläsare och skickar en nedladdningslänk via e-post som fungerar i 24 timmar och bara när du är inloggad på ditt konto.",
         "Rättelse (Art. 16) — Rätta din e-postadress eller återställningsadress via Inställningar. Din pseudonym kan inte ändras av de skäl som anges i villkoren; du kan avsluta kontot och öppna ett nytt",
         "Radering (Art. 17) — Radera en privat debatt när som helst från debattsidan. Avsluta ditt konto via Inställningar; avsnitt 7 förklarar exakt vad det innebär. Be oss att ta bort en publicerad debatt som innehåller dina uppgifter, oavsett om du är upphovsperson eller inte",
         "Begränsning (Art. 18) — Be oss att upphöra med behandlingen av vissa uppgifter medan en tvist om dem löses",
         "Invändning (Art. 21) — Invänd mot behandling som grundas på berättigade intressen — säkerhets- och granskningsbehandlingen i avsnitt 4 — så upphör vi om vi inte kan visa tvingande skäl. Invänd när som helst mot marknadsföring, så upphör vi med den",
-        "Dataportabilitet (Art. 20) — Dina debatter och kontouppgifter i ett allmänt använt, maskinläsbart format. [Pending: same export as Access.] Icke-personligt innehåll som du skapat, såsom dina frågor, återlämnas till dig på begäran när avtalet upphör",
+        "Dataportabilitet (Art. 20) — Dina debatter och kontouppgifter i ett allmänt använt, maskinläsbart format. Använd Exportera data i Inställningar: ZIP-filen innehåller dina uppgifter i maskinläsbara JSON-filer och en läsbar sida; länken som skickas via e-post fungerar i 24 timmar och bara när du är inloggad på ditt konto. Icke-personligt innehåll som du skapat, såsom dina frågor, återlämnas till dig på begäran när avtalet upphör",
         "Återkalla samtycke (Art. 7(3)) — Återkalla samtycke till marknadsföring via ett e-postmeddelande eller Inställningar; återkalla samtycket till känsliga uppgifter genom att skriva till privacy@dezbatere.ro (du kan också utelämna uppgifterna eller radera en debatt som innehåller dem). Återkallandet påverkar inte behandling som redan har ägt rum",
         "Lämna klagomål — Till den rumänska tillsynsmyndigheten, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, eller till myndigheten i det land där du bor. Vi ser helst att du kontaktar oss först"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "c62d762718e2ebd4b41fd22ba1fec4361b77848e222f1d830726a4331bb3b38e",
+  sha256: "41837b8988cc9924f3e76f490652b91360f67c770d53c554ada6511f3f05c09c",
   eyebrow: "INTEGRITETSPOLICY · v3.2 · GÄLLER FRÅN [DATE]",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",

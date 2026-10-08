@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Auskunft (Art. 15) — Eine Kopie der personenbezogenen Daten, die wir über Sie gespeichert haben, sowie diese Informationen. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Auskunft (Art. 15) — Eine Kopie der personenbezogenen Daten, die wir über Sie gespeichert haben, sowie diese Informationen. Wählen Sie unter Einstellungen Daten exportieren: Wir erstellen eine ZIP-Datei mit JSON-Dateien und einer Seite, die Sie in jedem Browser öffnen können, und senden Ihnen per E-Mail einen Downloadlink, der 24 Stunden lang und nur bei Anmeldung in Ihrem Konto funktioniert.",
         "Berichtigung (Art. 16) — Korrigieren Sie Ihre E-Mail- oder Wiederherstellungs-E-Mail-Adresse in den Einstellungen. Ihr Pseudonym kann aus den in den Nutzungsbedingungen genannten Gründen nicht geändert werden; Sie können das Konto schließen und ein neues eröffnen",
         "Löschung (Art. 17) — Löschen Sie eine private Debatte jederzeit auf der Debattenseite. Schließen Sie Ihr Konto in den Einstellungen; Abschnitt 7 erläutert die Folgen genau. Verlangen Sie von uns die Entfernung einer veröffentlichten Debatte, die Ihre Daten enthält, unabhängig davon, ob Sie sie verfasst haben",
         "Einschränkung (Art. 18) — Verlangen Sie, dass wir die Verarbeitung bestimmter Daten aussetzen, solange eine Streitigkeit darüber geklärt wird",
         "Widerspruch (Art. 21) — Widersprechen Sie einer Verarbeitung auf Grundlage berechtigter Interessen, nämlich der Sicherheits- und Prüfverarbeitung in Abschnitt 4; wir stellen sie ein, sofern wir keine zwingenden Gründe nachweisen können. Der Werbung können Sie jederzeit widersprechen; wir stellen sie ein",
-        "Datenübertragbarkeit (Art. 20) — Ihre Debatten und Kontodaten in einem gängigen, maschinenlesbaren Format. [Pending: same export as Access.] Von Ihnen erstellte nicht personenbezogene Inhalte, etwa Ihre Fragen, werden Ihnen auf Antrag bei Vertragsende herausgegeben",
+        "Datenübertragbarkeit (Art. 20) — Ihre Debatten und Kontodaten in einem gängigen, maschinenlesbaren Format. Nutzen Sie Daten exportieren unter Einstellungen: Die ZIP-Datei enthält Ihre Daten als maschinenlesbare JSON-Dateien und eine lesbare Seite; der per E-Mail versandte Link funktioniert 24 Stunden lang und nur bei Anmeldung in Ihrem Konto. Von Ihnen erstellte nicht personenbezogene Inhalte, etwa Ihre Fragen, werden Ihnen auf Antrag bei Vertragsende herausgegeben",
         "Einwilligung widerrufen (Art. 7(3)) — Widerrufen Sie die Einwilligung in den Erhalt von Werbung über jede E-Mail oder die Einstellungen; widerrufen Sie die Einwilligung zu sensiblen Daten per E-Mail an privacy@dezbatere.ro (Sie können diese Daten auch weglassen oder eine Debatte löschen, die sie enthält). Der Widerruf berührt bereits erfolgte Verarbeitungen nicht",
         "Beschwerde — Bei der rumänischen Aufsichtsbehörde ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, oder bei der Behörde in Ihrem Wohnsitzland. Wir würden es vorziehen, zunächst von Ihnen zu hören"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "91f57a62975e5acac89eb47e3ce27b736db3e03c1c000e405e29f44d280cdbaf",
+  sha256: "9923605aba5720f04a24228da87c43f05760acc92bd686659f86df1fe9374111",
   eyebrow: "DATENSCHUTZERKLÄRUNG · v3.2 · GÜLTIG AB [DATE]",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",

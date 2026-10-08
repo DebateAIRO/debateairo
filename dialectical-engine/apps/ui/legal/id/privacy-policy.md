@@ -146,12 +146,12 @@ Anda dapat menggunakan hak-hak ini secara gratis dengan menghubungi **privacy@de
 
 | Hak | Artinya di sini |
 | --- | --- |
-| **Akses** (Art. 15) | Salinan data pribadi yang kami miliki tentang Anda, dan informasi ini. \[Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.\] |
+| **Akses** (Art. 15) | Salinan data pribadi yang kami miliki tentang Anda, dan informasi ini. Di Pengaturan, pilih Ekspor data: kami menyiapkan berkas ZIP berisi berkas JSON dan satu halaman yang dapat dibuka di peramban apa pun, lalu mengirimkan tautan unduhan melalui email yang berlaku selama 24 jam dan hanya berfungsi saat Anda masuk ke akun Anda. |
 | **Perbaikan** (Art. 16) | Perbaiki email atau email pemulihan Anda dari Pengaturan. Nama samaran Anda tidak dapat diubah karena alasan dalam Ketentuan; Anda dapat menutup akun dan membuka akun baru |
 | **Penghapusan** (Art. 17) | Hapus debat privat kapan saja dari halaman debat. Tutup akun Anda dari Pengaturan; bagian 7 menjelaskan secara tepat akibatnya. Minta kami menghapus debat terpublikasi yang memuat data Anda, baik Anda penulisnya maupun bukan |
 | **Pembatasan** (Art. 18) | Minta kami berhenti memproses data tertentu sementara perselisihan mengenainya diselesaikan |
 | **Keberatan** (Art. 21) | Ajukan keberatan terhadap pemrosesan berdasarkan kepentingan yang sah — pemrosesan keamanan dan audit dalam bagian 4 — dan kami berhenti kecuali dapat menunjukkan alasan kuat. Ajukan keberatan terhadap pemasaran kapan saja, dan kami berhenti |
-| **Portabilitas** (Art. 20) | Debat dan data akun Anda dalam format yang umum digunakan serta dapat dibaca mesin. \[Pending: same export as Access.\] Konten nonpribadi yang Anda buat, seperti pertanyaan Anda, dikembalikan kepada Anda atas permintaan ketika kontrak berakhir |
+| **Portabilitas** (Art. 20) | Debat dan data akun Anda dalam format yang umum digunakan serta dapat dibaca mesin. Gunakan Ekspor data di Pengaturan: ZIP memuat data Anda dalam berkas JSON yang dapat dibaca mesin serta satu halaman yang mudah dibaca; tautan yang dikirim melalui email berlaku selama 24 jam dan hanya berfungsi saat Anda masuk ke akun Anda. Konten nonpribadi yang Anda buat, seperti pertanyaan Anda, dikembalikan kepada Anda atas permintaan ketika kontrak berakhir |
 | **Menarik persetujuan** (Art. 7(3)) | Tarik persetujuan pemasaran dari email mana pun atau Pengaturan; tarik persetujuan data sensitif dengan menulis ke privacy@dezbatere.ro (Anda juga dapat tidak menyertakan data tersebut atau menghapus debat yang memuatnya). Penarikan tidak memengaruhi pemrosesan yang telah terjadi |
 | **Mengadu** | Kepada otoritas pengawas Rumania, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bukares, <anspdcp@dataprotection.ro>, atau kepada otoritas di negara tempat Anda tinggal. Kami lebih memilih Anda menghubungi kami terlebih dahulu |
 

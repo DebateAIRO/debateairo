@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Tarkastusoikeus (Art. 15) — Jäljennös hallussamme olevista sinua koskevista henkilötiedoista sekä nämä tiedot. [Pending: a JSON export from Settings. Until it exists, we compile the copy manually within the month.]",
+        "Tarkastusoikeus (Art. 15) — Jäljennös hallussamme olevista sinua koskevista henkilötiedoista sekä nämä tiedot. Valitse Asetuksista Vie tiedot: kokoamme ZIP-tiedoston, jossa on JSON-tiedostoja ja yksi missä tahansa selaimessa avattava sivu, ja lähetämme sähköpostiisi latauslinkin, joka toimii 24 tuntia ja vain silloin, kun olet kirjautunut tilillesi.",
         "Oikeus tietojen oikaisemiseen (Art. 16) — Korjaa sähköpostiosoitteesi tai palautussähköpostiosoitteesi Asetuksissa. Nimimerkkiäsi ei voi muuttaa Ehdoissa mainituista syistä; voit sulkea tilin ja avata uuden",
         "Oikeus tietojen poistamiseen (Art. 17) — Poista yksityinen väittely milloin tahansa väittelysivulta. Sulje tilisi Asetuksista; osiossa 7 kerrotaan tarkasti, mitä silloin tapahtuu. Pyydä meitä poistamaan tietojasi sisältävä julkaistu väittely riippumatta siitä, oletko sen tekijä",
         "Oikeus käsittelyn rajoittamiseen (Art. 18) — Pyydä meitä lopettamaan tiettyjen tietojen käsittely siksi aikaa, kun niitä koskeva erimielisyys ratkaistaan",
         "Vastustamisoikeus (Art. 21) — Vastusta oikeutettuihin etuihin perustuvaa käsittelyä — osiossa 4 tarkoitettua turvallisuus- ja kirjauskäsittelyä — jolloin lopetamme käsittelyn, ellemme voi osoittaa pakottavia perusteita. Vastusta markkinointia milloin tahansa, jolloin lopetamme sen",
-        "Oikeus siirtää tiedot järjestelmästä toiseen (Art. 20) — Väittelysi ja tilitietosi yleisesti käytetyssä, koneellisesti luettavassa muodossa. [Pending: same export as Access.] Luomasi muu kuin henkilötieto, kuten kysymyksesi, palautetaan sinulle pyynnöstä sopimuksen päättyessä",
+        "Oikeus siirtää tiedot järjestelmästä toiseen (Art. 20) — Väittelysi ja tilitietosi yleisesti käytetyssä, koneellisesti luettavassa muodossa. Käytä Asetusten Vie tiedot -toimintoa: ZIP-tiedosto sisältää tietosi koneellisesti luettavina JSON-tiedostoina ja yhden luettavan sivun; sähköpostitse lähetetty linkki toimii 24 tuntia ja vain silloin, kun olet kirjautunut tilillesi. Luomasi muu kuin henkilötieto, kuten kysymyksesi, palautetaan sinulle pyynnöstä sopimuksen päättyessä",
         "Suostumuksen peruuttaminen (Art. 7(3)) — Peruuta markkinointisuostumus mistä tahansa sähköpostista tai Asetuksista; peruuta arkaluonteisia tietoja koskeva suostumus kirjoittamalla osoitteeseen privacy@dezbatere.ro (voit myös jättää tiedot pois tai poistaa niitä sisältävän väittelyn). Peruuttaminen ei vaikuta jo tapahtuneeseen käsittelyyn",
         "Valituksen tekeminen — Romanian valvontaviranomaiselle ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, tai asuinmaasi viranomaiselle. Toivomme kuitenkin, että otat ensin yhteyttä meihin"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "ddaab0578918819f34b7759b2e6685cd552851eea0a52e78034207496d76483e",
+  sha256: "a686a16fd70c0f689eed03db6164392ec1224d2201623a74a0ea11b3c4fe7b86",
   eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.2 · VOIMASSA [DATE]",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",
