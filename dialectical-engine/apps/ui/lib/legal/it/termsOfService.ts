@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dove offriamo DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Offriamo DebateAI alle persone che vivono [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Non lo offriamo altrove. Se vivi al di fuori di tali Paesi potresti riuscire ad accedere al sito, ma il servizio non è rivolto a te, non accettiamo pagamenti da te e le presenti Condizioni e la nostra Informativa sulla privacy non sono adeguate alla legge del tuo Paese. L'Allegato A stabilisce ciò che si applica in ciascuna regione in cui prestiamo il servizio." }
+      { kind: "p", text: "Offriamo DebateAI alle persone che vivono [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Non lo offriamo altrove. Se vivi al di fuori di tali Paesi potresti riuscire ad accedere al sito, ma il servizio non è rivolto a te, non accettiamo pagamenti da te e le presenti Condizioni e la nostra Informativa sulla privacy non sono adeguate alla legge del tuo Paese. L'Allegato A stabilisce ciò che si applica in ciascuna regione in cui prestiamo il servizio." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Stati Uniti (soltanto se elencati nella sezione 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Non offriamo DebateAI alle persone che vivono nel Tennessee." },
       { kind: "p", text: "Accordo arbitrale e rinuncia alle azioni collettive. Se vivi negli Stati Uniti, tu e DebateAIRO accettate di risolvere qualsiasi controversia derivante dalle presenti Condizioni o dal servizio mediante arbitrato individuale vincolante amministrato da [the American Arbitration Association / JAMS] secondo le relative regole per i consumatori, anziché in tribunale, fermo restando che ciascuna parte può proporre una domanda individuale dinanzi a un tribunale per le controversie di modesta entità. Puoi esercitare il diritto di esclusione inviando un'email a [address] entro 30 giorni dalla prima accettazione delle presenti Condizioni. Il presente accordo è disciplinato dal Federal Arbitration Act. Sosteniamo le spese di deposito dell'arbitrato. Tu e DebateAIRO rinunciate alle azioni di classe, collettive e rappresentative nella misura consentita dalla legge. La presente sezione si applica soltanto per il futuro e non si applica alle pretese sorte prima della sua accettazione." },
       { kind: "p", text: "Avvisi e rimozioni. Le immagini intime non consensuali possono essere segnalate all'indirizzo [URL] senza un account e vengono rimosse entro 48 ore da una richiesta valida. I reclami relativi al diritto d'autore devono essere inviati al nostro agente designato indicato nella sezione 16." },
       { kind: "p", text: "Disposizioni specifiche per Stato. California: si applicano le condizioni di rinnovo automatico di cui alla sezione 12; puoi disdire l'abbonamento online in qualsiasi momento; conserviamo il tuo consenso alle condizioni di rinnovo per almeno tre anni. New York: puoi disdire l'abbonamento entro 14 giorni da qualsiasi addebito a prezzo maggiorato e ricevere un rimborso proporzionale. Texas e Nebraska: non vendiamo dati personali sensibili. Washington: ai dati sanitari si applica la nostra Informativa sulla privacy dei dati sanitari dei consumatori all'indirizzo [URL]. Colorado: nulla nel servizio adotta decisioni con effetti significativi che ti riguardano. La nostra Informativa sulla privacy, Allegato B.3, riguarda i tuoi dati e i diritti in materia di privacy previsti dal tuo Stato." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "f622856c8f39f5a2e900e6799ddfd7c9bbb0f27fbebeacc038adc11e29846c1e",
+  sha256: "eb4b2dcffa75f289eb90bbe04026e75946d01e24ad5418698e26c5f4ca103062",
   eyebrow: "CONDIZIONI DI SERVIZIO · v2.1 · IN VIGORE DAL [DATE]",
   title: "Ciò che accetti",
   lede: "Il contratto tra te e DebateAIRO S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.",

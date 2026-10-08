@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hvor vi tilbyder DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vi tilbyder DebateAI til personer, der bor i [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener." }
+      { kind: "p", text: "Vi tilbyder DebateAI til personer, der bor i [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "USA (kun hvis anført i afsnit 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Vi tilbyder ikke DebateAI til personer, der bor i Tennessee." },
       { kind: "p", text: "Voldgiftsaftale og afkald på gruppesøgsmål. Hvis du bor i USA, aftaler du og DebateAIRO at afgøre enhver tvist, der udspringer af disse vilkår eller tjenesten, ved bindende individuel voldgift administreret af [the American Arbitration Association / JAMS] efter organisationens forbrugerregler i stedet for ved domstolene, dog således at hver af os kan fremsætte et individuelt krav ved en domstol for mindre krav. Du kan fravælge aftalen ved at sende en e-mail til [address] senest 30 dage efter, at du første gang accepterede disse vilkår. Aftalen er underlagt Federal Arbitration Act. Vi betaler gebyrerne for indledning af voldgiftssagen. Der gives afkald på gruppe-, kollektive og repræsentative søgsmål i det omfang, lovgivningen tillader det. Dette afsnit gælder kun fremadrettet og ikke for krav, der opstod, før du accepterede det." },
       { kind: "p", text: "Meddelelser og fjernelse. Intime billeder uden samtykke kan anmeldes på [URL] uden en konto og fjernes inden for 48 timer efter en gyldig anmodning. Klager over ophavsret sendes til vores udpegede repræsentant, som er anført i afsnit 16." },
       { kind: "p", text: "Delstatsspecifikt. Californien: Vilkårene om automatisk fornyelse i afsnit 12 gælder; du kan til enhver tid opsige online; vi opbevarer dit samtykke til fornyelsesvilkårene i mindst tre år. New York: Du kan opsige inden for 14 dage efter enhver debitering til en forhøjet pris og modtage en forholdsmæssig tilbagebetaling. Texas og Nebraska: Vi sælger ikke følsomme personoplysninger. Washington: Vores meddelelse om beskyttelse af forbrugersundhedsdata på [URL] gælder for helbredsrelaterede oplysninger. Colorado: Intet i tjenesten træffer afgørelser om dig med væsentlige konsekvenser. Vores privatlivspolitik, bilag B.3, dækker dine data og dine rettigheder efter delstaternes privatlivslove." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "8d5c59d8b4e0e321c7f9d7334d50e06e507ab7d0fd674d0d9117779d0c22fc6f",
+  sha256: "6705f57014eb41f096fabe2a7b7e153349fc3e65726e111a554be89b4a209667",
   eyebrow: "TJENESTEVILKÅR · v2.1 · GÆLDENDE FRA [DATE]",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DebateAIRO S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",

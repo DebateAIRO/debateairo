@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hol kínáljuk a DebateAI szolgáltatást",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "A DebateAI szolgáltatást a [the European Union and the European Economic Area] területén [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] élő személyeknek kínáljuk. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
+      { kind: "p", text: "A DebateAI szolgáltatást a [the European Union and the European Economic Area] területén [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] élő személyeknek kínáljuk. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Egyesült Államok (csak akkor, ha szerepel a 2. szakaszban)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. A DebateAI szolgáltatást nem kínáljuk a Tennessee államban élő személyeknek." },
       { kind: "p", text: "Választottbírósági megállapodás és lemondás a csoportos keresetről. Ha Ön az Egyesült Államokban él, Ön és a DebateAIRO megállapodnak abban, hogy az e Feltételekből vagy a szolgáltatásból eredő jogvitákat bírósági eljárás helyett a [the American Arbitration Association / JAMS] által a fogyasztói szabályai szerint kezelt, kötelező erejű egyéni választottbírósági eljárásban rendezik, azzal, hogy bármelyik fél egyéni igényt érvényesíthet a kis értékű követelések bírósága előtt. Ön kizárhatja az alkalmazást, ha e Feltételek első elfogadásától számított 30 napon belül e-mailt küld a [address] címre. E megállapodásra a szövetségi választottbíráskodási törvény irányadó. A választottbírósági eljárás benyújtási díjait mi fizetjük. A jogszabályok által megengedett mértékben a felek lemondanak a csoportos, kollektív és képviseleti eljárásokról. E szakasz kizárólag a jövőre nézve alkalmazandó, és nem vonatkozik az Ön általi elfogadás előtt keletkezett igényekre." },
       { kind: "p", text: "Értesítések és eltávolítások. A hozzájárulás nélkül megosztott intim képfelvételeket fiók nélkül be lehet jelenteni a [URL] címen, és érvényes kérelem esetén 48 órán belül eltávolítjuk azokat. A szerzői jogi panaszokat a 16. szakaszban megnevezett kijelölt megbízottunkhoz kell benyújtani." },
       { kind: "p", text: "Államspecifikus rendelkezések. Kalifornia: a 12. szakasz automatikus megújítási feltételei alkalmazandók; Ön bármikor lemondhatja előfizetését online; a megújítási feltételekhez adott hozzájárulását legalább három évig megőrizzük. New York: bármely emelt összegű terheléstől számított 14 napon belül lemondhatja előfizetését, és időarányos visszatérítést kaphat. Texas és Nebraska: érzékeny személyes adatokat nem értékesítünk. Washington: az egészséggel kapcsolatos adatokra a [URL] címen elérhető Fogyasztói egészségügyi adatokra vonatkozó adatvédelmi tájékoztatónk alkalmazandó. Colorado: a szolgáltatás semmilyen, Önre nézve jelentős következménnyel járó döntést nem hoz. Adatait és az állama szerinti adatvédelmi jogait Adatvédelmi szabályzatunk B.3 pontja szabályozza." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "1b2ea34d6890f38f6cf31b43bbff14d98e88554c8c607d98e173451ff715ec96",
+  sha256: "868b1dcecdd9223340b156bdfa37381d1958da0babbf97b86efe1affc5d82fe1",
   eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.1 · HATÁLYOS [DATE]",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DebateAIRO S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",

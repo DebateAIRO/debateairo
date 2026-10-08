@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Onde disponibilizamos a DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Disponibilizamos a DebateAI a pessoas que residam na [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Não a disponibilizamos noutros locais. Se residir fora desses países, poderá conseguir aceder ao sítio, mas não dirigimos o serviço a si, não aceitamos pagamentos seus e estes Termos e a nossa Política de Privacidade não estão adaptados à legislação do seu país. O Anexo A estabelece o que se aplica em cada região que servimos." }
+      { kind: "p", text: "Disponibilizamos a DebateAI a pessoas que residam na [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Não a disponibilizamos noutros locais. Se residir fora desses países, poderá conseguir aceder ao sítio, mas não dirigimos o serviço a si, não aceitamos pagamentos seus e estes Termos e a nossa Política de Privacidade não estão adaptados à legislação do seu país. O Anexo A estabelece o que se aplica em cada região que servimos." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Estados Unidos (apenas se indicados na secção 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Não disponibilizamos a DebateAI a pessoas que residam no Tennessee." },
       { kind: "p", text: "Convenção de arbitragem e renúncia a ações coletivas. Se residir nos Estados Unidos, o utilizador e a DebateAIRO concordam em resolver qualquer litígio decorrente destes Termos ou do serviço através de arbitragem individual vinculativa administrada por [the American Arbitration Association / JAMS] ao abrigo das respetivas regras de arbitragem de consumo, em vez de recorrer aos tribunais, com a exceção de que qualquer uma das partes pode apresentar uma pretensão individual num tribunal de pequenas causas. Pode optar pela não aplicação enviando uma mensagem para [address] no prazo de 30 dias após a primeira aceitação destes Termos. Esta convenção é regida pelo Federal Arbitration Act. Suportamos as taxas de apresentação da arbitragem. Há renúncia a ações coletivas, conjuntas e representativas na medida permitida por lei. Esta secção aplica-se apenas para o futuro e não se aplica a pretensões surgidas antes da sua aceitação." },
       { kind: "p", text: "Notificações e remoções. As imagens íntimas não consentidas podem ser denunciadas em [URL] sem uma conta e são removidas no prazo de 48 horas após um pedido válido. As reclamações relativas a direitos de autor são dirigidas ao nosso agente designado referido na secção 16." },
       { kind: "p", text: "Disposições específicas de cada estado. Califórnia: aplicam-se as condições de renovação automática da secção 12; pode cancelar em linha a qualquer momento; conservamos o seu consentimento para as condições de renovação durante pelo menos três anos. Nova Iorque: pode cancelar no prazo de 14 dias após qualquer cobrança a um preço aumentado e receber um reembolso proporcional. Texas e Nebraska: não vendemos dados pessoais sensíveis. Washington: o nosso Aviso de Privacidade de Dados de Saúde dos Consumidores, disponível em [URL], aplica-se a informações relacionadas com a saúde. Colorado: nada no serviço toma decisões com consequências significativas a seu respeito. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados e os direitos de privacidade previstos no seu estado." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "e7c924f9b5bb3737809402cde0fcdb63e70b56cdc25388bcfa2618d43c8543e3",
+  sha256: "c23c18fffc1839bd87e1c6391f5b1a79976d531d9d2538648c1f11f2075a3120",
   eyebrow: "TERMOS DE SERVIÇO · v2.1 · EM VIGOR DESDE [DATE]",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DebateAIRO S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",

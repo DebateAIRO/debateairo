@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "DebateAI'ı nerelerde sunuyoruz",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI'ı [the European Union and the European Economic Area] sınırları içinde [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir." }
+      { kind: "p", text: "DebateAI'ı [the European Union and the European Economic Area] sınırları içinde [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Amerika Birleşik Devletleri (yalnızca 2. bölümde sayılmışsa)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. DebateAI'ı Tennessee'de yaşayan kişilere sunmuyoruz." },
       { kind: "p", text: "Tahkim anlaşması ve toplu dava hakkından feragat. Amerika Birleşik Devletleri'nde yaşıyorsanız siz ve DebateAIRO, bu Koşullardan veya hizmetten doğan her türlü uyuşmazlığı, taraflardan herhangi birinin küçük talepler mahkemesinde bireysel talepte bulunabilmesi dışında, mahkeme yerine [the American Arbitration Association / JAMS] tarafından kendi tüketici kuralları uyarınca yürütülen bağlayıcı bireysel tahkim yoluyla çözmeyi kabul edersiniz. Bu Koşulları ilk kez kabul etmenizden itibaren 30 gün içinde [address] adresine e-posta göndererek kapsam dışında kalmayı tercih edebilirsiniz. Bu anlaşma Federal Arbitration Act'e tabidir. Tahkim başvuru ücretlerini biz öderiz. Toplu, kolektif ve temsili davalardan hukukun izin verdiği ölçüde feragat edilir. Bu bölüm yalnızca ileriye dönük uygulanır ve kabulünüzden önce doğmuş taleplere uygulanmaz." },
       { kind: "p", text: "Bildirimler ve kaldırmalar. Rıza olmaksızın paylaşılan mahrem görüntüler, hesap olmaksızın [URL] adresinden bildirilebilir ve geçerli bir talebin ardından 48 saat içinde kaldırılır. Telif hakkı şikâyetleri 16. bölümde belirtilen atanmış temsilcimize iletilir." },
       { kind: "p", text: "Eyalete özgü hükümler. Kaliforniya: 12. bölümdeki otomatik yenileme koşulları uygulanır; istediğiniz zaman çevrim içi iptal yapabilirsiniz; yenileme koşullarına verdiğiniz rızayı en az üç yıl saklarız. New York: artan fiyat üzerinden yapılan herhangi bir tahsilattan itibaren 14 gün içinde iptal edebilir ve orantılı geri ödeme alabilirsiniz. Teksas ve Nebraska: hassas kişisel veri satmayız. Washington: [URL] adresindeki Tüketici Sağlık Verileri Gizlilik Bildirimimiz sağlıkla ilgili bilgilere uygulanır. Colorado: hizmet sizin hakkınızda önemli sonuç doğuran kararlar almaz. Verileriniz ve eyalet gizlilik haklarınız Gizlilik Politikamızın Ek B.3'ünde ele alınır." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "1e1990e4643facd3891a03af49a0a8be7c76b584d44fdc9f0742fa6a6cb054cc",
+  sha256: "e8d5197c4a7b2ff2d1249487af444959a477da53cf0f3903fcbbbdb28bd0ce16",
   eyebrow: "HİZMET KOŞULLARI · v2.1 · YÜRÜRLÜK TARİHİ [DATE]",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DebateAIRO S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",

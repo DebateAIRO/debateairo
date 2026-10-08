@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur mēs piedāvājam DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Mēs piedāvājam DebateAI personām, kuras dzīvo [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu." }
+      { kind: "p", text: "Mēs piedāvājam DebateAI personām, kuras dzīvo [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Amerikas Savienotās Valstis (tikai tad, ja norādītas 2. sadaļā)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tenesī. Mēs nepiedāvājam DebateAI personām, kuras dzīvo Tenesī." },
       { kind: "p", text: "Šķīrējtiesas līgums un atteikšanās no kolektīvas prasības. Ja dzīvojat Amerikas Savienotajās Valstīs, jūs un DebateAIRO vienojaties jebkuru no šiem Noteikumiem vai pakalpojuma izrietošu strīdu izšķirt saistošā individuālā šķīrējtiesā, ko pārvalda [the American Arbitration Association / JAMS] saskaņā ar tās patērētāju noteikumiem, nevis tiesā, izņemot to, ka ikviena puse var celt individuālu prasību maza apmēra prasību tiesā. Jūs varat atteikties, nosūtot e-pasta ziņojumu uz [address] 30 dienu laikā pēc pirmās piekrišanas šiem Noteikumiem. Šo līgumu reglamentē Federal Arbitration Act. Mēs sedzam šķīrējtiesas iesniegšanas nodevas. Kolektīvas, kopīgas un pārstāvības prasības tiek izslēgtas tiktāl, cik to atļauj tiesību akti. Šī sadaļa attiecas tikai uz nākotni un neattiecas uz prasījumiem, kas radušies pirms tās pieņemšanas." },
       { kind: "p", text: "Paziņojumi un noņemšana. Par bez piekrišanas kopīgotiem intīmiem attēliem var ziņot vietnē [URL] bez konta, un pēc derīga pieprasījuma tie tiek noņemti 48 stundu laikā. Autortiesību sūdzības tiek nosūtītas mūsu 16. sadaļā norādītajai pilnvarotajai personai." },
       { kind: "p", text: "Štatu īpašie noteikumi. Kalifornija: piemēro 12. sadaļā noteiktos automātiskās atjaunošanas noteikumus; jūs jebkurā laikā varat atcelt abonementu tiešsaistē; mēs glabājam jūsu piekrišanu atjaunošanas noteikumiem vismaz trīs gadus. Ņujorka: varat atcelt abonementu 14 dienu laikā pēc jebkura maksājuma par paaugstinātu cenu un saņemt proporcionālu atmaksu. Teksasa un Nebraska: mēs nepārdodam sensitīvus personas datus. Vašingtona: mūsu Patērētāju veselības datu privātuma paziņojums vietnē [URL] attiecas uz informāciju par veselību. Kolorādo: nekas pakalpojumā nepieņem par jums lēmumus ar būtiskām sekām. Jūsu datiem un jūsu štata privātuma tiesībām piemēro mūsu Privātuma politikas B.3 pielikumu." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "a9a0e9cbe383031fbc26fed9cb637d79941159565e13ef7ab9327c1e07831548",
+  sha256: "ddd89e9fee497a4862df6b4bf3757296ee732ccfbf9d22d053d8a6b3afaf0c66",
   eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.1 · SPĒKĀ NO [DATE]",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DebateAIRO S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",

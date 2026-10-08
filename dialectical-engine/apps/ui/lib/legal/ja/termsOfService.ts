@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "DebateAI を提供する地域",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "当社は、[the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] に居住する方に DebateAI を提供します。それ以外の地域では提供しません。これらの国以外にお住まいの場合、サイトにアクセスできることはありますが、当社はお客様を対象としてサービスを提供せず、お客様から支払いを受け付けず、本規約および当社のプライバシーポリシーはお客様の国の法律に対応していません。附属書Aは、当社がサービスを提供する各地域に適用される事項を定めます。" }
+      { kind: "p", text: "当社は、[the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] に居住する方に DebateAI を提供します。それ以外の地域では提供しません。これらの国以外にお住まいの場合、サイトにアクセスできることはありますが、当社はお客様を対象としてサービスを提供せず、お客様から支払いを受け付けず、本規約および当社のプライバシーポリシーはお客様の国の法律に対応していません。附属書Aは、当社がサービスを提供する各地域に適用される事項を定めます。" }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "米国 (第2条に記載される場合のみ)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "テネシー州。 当社は、テネシー州に居住する方に DebateAI を提供しません。" },
       { kind: "p", text: "仲裁合意および集団訴訟権の放棄。 米国に居住する場合、お客様と DebateAIRO は、本規約またはサービスに起因する紛争を裁判ではなく、[the American Arbitration Association / JAMS] がその消費者規則に基づき管理する拘束力ある個別仲裁によって解決することに同意します。ただし、いずれの当事者も少額裁判所に個別請求を提起できます。お客様は、本規約に初めて同意してから30日以内に [address] 宛てへ電子メールを送信することで、適用除外を選択できます。本合意には連邦仲裁法が適用されます。仲裁申立手数料は当社が負担します。法律で認められる範囲で、集団、集合および代表訴訟の権利を放棄します。本条は将来に向かってのみ適用され、お客様が本条に同意する前に生じた請求には適用されません。" },
       { kind: "p", text: "通知および削除。 同意のない私的画像は、アカウントなしで [URL] に通報でき、有効な申請から48時間以内に削除されます。著作権に関する苦情は、第16条に掲げる当社の指定代理人へ提出してください。" },
       { kind: "p", text: "州別条項。 カリフォルニア州： 第12条の自動更新条件が適用され、いつでもオンラインで解約でき、当社は更新条件へのお客様の同意を少なくとも3年間保持します。ニューヨーク州： 値上げ後の請求から14日以内に解約し、日割りの返金を受けることができます。テキサス州およびネブラスカ州： 当社は機微な個人データを販売しません。ワシントン州： [URL] に掲載する当社の消費者健康データ・プライバシー通知が、健康関連情報に適用されます。コロラド州： 本サービスはいかなる重大な決定もお客様について行いません。お客様のデータおよび州法上のプライバシーの権利については、当社のプライバシーポリシー附属書B.3に定めます。" }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "2fad6566fd213e091792b0802ad443247bf55520dab8864c291fc356d4b150c3",
+  sha256: "4f16fee9f2960b41c16d564fe0c5be7f3c4011e020b59290672ed5182bcb875a",
   eyebrow: "利用規約 · v2.1 · 発効日 [DATE]",
   title: "お客様に同意いただく事項",
   lede: "お客様と DebateAIRO S.R.L. との間の契約を平易な言葉で説明します。全19条および附属書Aです。末尾までスクロールしてください。",

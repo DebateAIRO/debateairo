@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Na háiteanna ina gcuirimid DebateAI ar fáil",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Cuirimid DebateAI ar fáil do dhaoine a bhfuil cónaí orthu san [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid." }
+      { kind: "p", text: "Cuirimid DebateAI ar fáil do dhaoine a bhfuil cónaí orthu san [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Stáit Aontaithe Mheiriceá (ach amháin má tá siad liostaithe i rannán 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Ní chuirimid DebateAI ar fáil do dhaoine a bhfuil cónaí orthu i Tennessee." },
       { kind: "p", text: "Comhaontú eadrána agus tarscaoileadh caingean aicme. Má tá cónaí ort sna Stáit Aontaithe, aontaíonn tú féin agus DebateAIRO aon díospóid a eascraíonn as na Téarmaí seo nó as an tseirbhís a réiteach trí eadráin aonair cheangailteach arna riar ag [the American Arbitration Association / JAMS] faoina rialacha tomhaltóirí, seachas sa chúirt, ach amháin go bhféadfaidh ceachtar againn éileamh aonair a thabhairt os comhair cúirte mionéileamh. Féadfaidh tú roghnú gan a bheith páirteach trí ríomhphost a sheoladh chuig [address] laistigh de 30 lá tar éis duit glacadh leis na Téarmaí seo den chéad uair. Tá an comhaontú seo faoi rialú an Federal Arbitration Act. Íocaimid táillí comhdaithe na headrána. Tarscaoiltear caingne aicme, comhchaingne agus caingne ionadaíocha a mhéid a cheadaíonn an dlí. Ní bhaineann an rannán seo ach leis an todhchaí agus ní bhaineann sé le héilimh a tháinig chun cinn sular ghlac tú leis." },
       { kind: "p", text: "Fógraí agus baint anuas. Féadfar íomhánna dlúthchaidrimh neamhthoiliúla a thuairisciú ag [URL] gan cuntas agus baintear iad laistigh de 48 uair an chloig ó iarratas bailí. Téann gearáin chóipchirt chuig ár ngníomhaire ainmnithe a ainmnítear i rannán 16." },
       { kind: "p", text: "Sonrach do stát. California: tá feidhm ag na téarmaí athnuachana uathoibríche i rannán 12; féadfaidh tú cealú ar líne am ar bith; coinnímid do thoiliú leis na téarmaí athnuachana ar feadh trí bliana ar a laghad. Nua-Eabhrac: féadfaidh tú cealú laistigh de 14 lá ó aon mhuirear ar phraghas méadaithe agus aisíocaíocht pro rata a fháil. Texas agus Nebraska: ní dhíolaimid sonraí pearsanta íogaire. Washington: tá feidhm ag ár bhFógra Príobháideachais Sonraí Sláinte Tomhaltóirí ag [URL] maidir le faisnéis a bhaineann le sláinte. Colorado: ní dhéanann aon ní sa tseirbhís cinntí iarmhartacha fút. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí agus le do chearta príobháideachais stáit." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "7fb84417265b5ffaa761210b6fdcae06cb053fbe3c0119971b7790f1a9d9d337",
+  sha256: "31e85f7ad557616d1cc9d8d04f023e10d55995eb2e3de48f13b2eb0f12e5208a",
   eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.1 · I bhFEIDHM [DATE]",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DebateAIRO S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",

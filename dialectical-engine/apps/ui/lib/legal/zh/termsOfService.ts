@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "DebateAI 的服务地域",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "我们向居住在 [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] 的人士提供 DebateAI。我们不在其他地方提供本服务。如果您居住在这些国家以外，可能仍能访问网站，但本服务并非面向您提供；我们不接受您的付款，且本条款及《隐私政策》并未针对您所在国家的法律作相应调整。附件 A 规定了我们所服务各区域的适用内容。" }
+      { kind: "p", text: "我们向居住在 [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] 的人士提供 DebateAI。我们不在其他地方提供本服务。如果您居住在这些国家以外，可能仍能访问网站，但本服务并非面向您提供；我们不接受您的付款，且本条款及《隐私政策》并未针对您所在国家的法律作相应调整。附件 A 规定了我们所服务各区域的适用内容。" }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "美国 (仅在第 2 节列明时适用)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "田纳西州。 我们不向居住在田纳西州的人士提供 DebateAI。" },
       { kind: "p", text: "仲裁协议与集体诉讼弃权。 如果您居住在美国，您与 DebateAIRO 同意，因本条款或服务产生的任何争议均由 [the American Arbitration Association / JAMS] 根据其消费者规则通过具有约束力的个别仲裁解决，而不诉诸法院；但任何一方均可向小额索赔法院提出个别请求。您可以选择退出，但须在首次接受本条款后 30 天内向 [address] 发送电子邮件。本协议受《联邦仲裁法》管辖。仲裁申请费由我们承担。在法律允许的范围内，各方放弃提起集体、共同或代表性诉讼。本节仅向将来适用，不适用于您接受本节之前产生的请求。" },
       { kind: "p", text: "通知和下架。 无需账户即可通过 [URL] 举报未经同意的私密影像；我们会在收到有效请求后 48 小时内移除。著作权投诉应提交给第 16 节所述我们的指定代理人。" },
       { kind: "p", text: "各州特别规定。 加利福尼亚州：适用第 12 节的自动续订条款；您可以随时在线取消；我们会将您对续订条款的同意至少保留三年。纽约州：您可在按提高后的价格收取任何费用后的 14 天内取消，并获得按比例计算的退款。得克萨斯州和内布拉斯加州：我们不出售敏感个人数据。华盛顿州：我们载于 [URL] 的《消费者健康数据隐私通知》适用于健康相关信息。科罗拉多州：本服务不会对您作出具有重大后果的决定。有关您的数据及您依据各州法律享有的隐私权利，见我们《隐私政策》的附件 B.3。" }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "777b7fc5b22fd74e4b2f17991c89f23b689563fa5c6b3990fb308b5a14230240",
+  sha256: "6f80386c8e1b126ba54489b62cfb7a1029e54b3947c232f40af5f80b1ea8d1bb",
   eyebrow: "服务条款 · v2.1 · 生效日期 [DATE]",
   title: "您同意的内容",
   lede: "以通俗语言说明您与 DebateAIRO S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。",

@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Waar wij DebateAI aanbieden",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wij bieden DebateAI aan personen die wonen in [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
+      { kind: "p", text: "Wij bieden DebateAI aan personen die wonen in [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Verenigde Staten (uitsluitend indien vermeld in hoofdstuk 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Aan personen die in Tennessee wonen, bieden wij DebateAI niet aan." },
       { kind: "p", text: "Arbitrageovereenkomst en afstand van het recht op collectieve vorderingen. Als u in de Verenigde Staten woont, komen u en DebateAIRO overeen elk geschil dat uit deze Voorwaarden of de dienst voortvloeit, op te lossen door bindende individuele arbitrage beheerd door [the American Arbitration Association / JAMS] overeenkomstig haar consumentenregels, in plaats van voor de rechter, behalve dat ieder van ons een individuele vordering bij een rechter voor geringe vorderingen kan instellen. U kunt hiervan afzien door binnen 30 dagen nadat u deze Voorwaarden voor het eerst hebt aanvaard een e-mail naar [address] te sturen. Op deze overeenkomst is de Federal Arbitration Act van toepassing. Wij betalen de kosten voor het aanhangig maken van de arbitrage. Van collectieve, gezamenlijke en representatieve vorderingen wordt afstand gedaan voor zover de wet dit toestaat. Deze arbitrageovereenkomst geldt uitsluitend voor de toekomst en niet voor vorderingen die ontstonden voordat u deze aanvaardde." },
       { kind: "p", text: "Kennisgevingen en verwijderingen. Intieme beelden zonder toestemming kunnen zonder account worden gemeld op [URL] en worden binnen 48 uur na een geldig verzoek verwijderd. Auteursrechtklachten gaan naar onze in hoofdstuk 16 genoemde aangewezen vertegenwoordiger." },
       { kind: "p", text: "Per staat. Californië: de voorwaarden voor automatische verlenging in hoofdstuk 12 zijn van toepassing; u kunt te allen tijde online opzeggen; wij bewaren uw instemming met verlengingsvoorwaarden ten minste drie jaar. New York: u kunt binnen 14 dagen na elke afschrijving tegen een verhoogde prijs opzeggen en een terugbetaling naar rato ontvangen. Texas en Nebraska: wij verkopen geen gevoelige persoonsgegevens. Washington: onze Consumer Health Data Privacy Notice op [URL] is van toepassing op gezondheidsgerelateerde informatie. Colorado: niets in de dienst neemt beslissingen over u die aanzienlijke gevolgen hebben. Bijlage B.3 van ons Privacybeleid heeft betrekking op uw gegevens en uw privacyrechten in uw staat." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "6fa930d83142589688393575ce4cd44bb710ca302ee4051cc727501295276dad",
+  sha256: "be04765d7f3143c9ba4d31d941afa116e2e329f9642929d6010b859b6f45a733",
   eyebrow: "SERVICEVOORWAARDEN · v2.1 · VAN KRACHT OP [DATE]",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DebateAIRO S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",

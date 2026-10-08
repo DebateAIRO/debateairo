@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Fejn noffru DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Noffru DebateAI lil persuni li jgħixu fi [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu." }
+      { kind: "p", text: "Noffru DebateAI lil persuni li jgħixu fi [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "L-Istati Uniti (biss jekk elenkati fit-taqsima 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Ma noffrux DebateAI lil persuni li jgħixu fi Tennessee." },
       { kind: "p", text: "Ftehim ta’ arbitraġġ u rinunzja għal azzjoni kollettiva. Jekk tgħix fl-Istati Uniti, int u DebateAIRO taqblu li ssolvu kwalunkwe tilwima li tirriżulta minn dawn it-Termini jew mis-servizz permezz ta’ arbitraġġ individwali vinkolanti amministrat minn [the American Arbitration Association / JAMS] skont ir-regoli tagħha għall-konsumaturi, minflok fil-qorti, ħlief li kull wieħed minna jista’ jressaq pretensjoni individwali f’qorti għal talbiet żgħar. Tista’ tagħżel li ma tipparteċipax billi tibgħat messaġġ elettroniku lil [address] fi żmien 30 jum mill-ewwel aċċettazzjoni tiegħek ta’ dawn it-Termini. Dan il-ftehim huwa rregolat mill-Federal Arbitration Act. Aħna nħallsu t-tariffi għall-preżentazzjoni tal-arbitraġġ. Azzjonijiet kollettivi, konġunti u rappreżentattivi huma rrinunzjati safejn tippermetti l-liġi. Din it-taqsima tapplika biss għall-futur u ma tapplikax għal pretensjonijiet li qamu qabel ma aċċettajtha." },
       { kind: "p", text: "Avviżi u tneħħijiet. Stampi intimi mhux kunsenswali jistgħu jiġu rrappurtati fuq [URL] mingħajr kont u jitneħħew fi żmien 48 siegħa minn talba valida. Ilmenti dwar id-drittijiet tal-awtur jintbagħtu lill-aġent maħtur tagħna msemmi fit-taqsima 16." },
       { kind: "p", text: "Speċifiku għall-istat. California: japplikaw it-termini tat-tiġdid awtomatiku fit-taqsima 12; tista’ tikkanċella fuq l-internet fi kwalunkwe ħin; inżommu l-kunsens tiegħek għat-termini tat-tiġdid għal mill-inqas tliet snin. New York: tista’ tikkanċella fi żmien 14-il jum minn kwalunkwe ħlas bi prezz miżjud u tirċievi ħlas lura pro rata. Texas u Nebraska: ma nbigħux data personali sensittiva. Washington: l-Avviż tagħna dwar il-Privatezza tad-Data tas-Saħħa tal-Konsumatur fuq [URL] japplika għal informazzjoni relatata mas-saħħa. Colorado: xejn fis-servizz ma jieħu deċiżjonijiet konsegwenzjali dwarek. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek u d-drittijiet tal-privatezza tal-istat tiegħek." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "17b6dad8f564579aef5a71d3f554be31cf7d74438970a8e21c8816d3b5948eb4",
+  sha256: "b996a4727f663a1adc63a79999a8bdd2b195e50809d9683a28b09a5be355d5c0",
   eyebrow: "TERMINI TAS-SERVIZZ · v2.1 · EFFETTIVI [DATE]",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DebateAIRO S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",

@@ -1,6 +1,7 @@
 import type { AuthSourceContext } from "@debateai/db";
 import { decideAsk, decidePayment, decideSignup, UNKNOWN_COUNTRY, type GeoLookup } from "@debateai/geo";
-import { countryRule, type CountryPolicy, type DeploymentMode } from "@debateai/register";
+import type { DeclaredRegion } from "@debateai/kernel";
+import { countryRule, declaredRegionRule, type CountryPolicy, type DeploymentMode } from "@debateai/register";
 
 /**
  * A14's one decision, pure so a test can hold it: the country policy in force is read ONLY in hosted
@@ -84,9 +85,13 @@ export class CountryGate {
     return decision.kind === "ALLOW" ? null : decision.code;
   }
 
-  /** Region picker S01: the declared country's sign-up switch, without IP audit evidence. */
-  declaredSignupRefusal(country: string): "COUNTRY_SIGNUP_UNAVAILABLE" | null {
-    return countryRule(this.options.policy, country).signup ? null : "COUNTRY_SIGNUP_UNAVAILABLE";
+  /**
+   * Region picker S01: the declared region's sign-up switch, without IP audit evidence. A closed US
+   * state answers its own code, so the page can say "your state" rather than "your country".
+   */
+  declaredSignupRefusal(region: DeclaredRegion): "COUNTRY_SIGNUP_UNAVAILABLE" | "STATE_SIGNUP_UNAVAILABLE" | null {
+    if (declaredRegionRule(this.options.policy, region).signup) return null;
+    return countryRule(this.options.policy, region.country).signup ? "STATE_SIGNUP_UNAVAILABLE" : "COUNTRY_SIGNUP_UNAVAILABLE";
   }
 
   ask(source: AuthSourceContext): "COUNTRY_ASK_BLOCKED" | null {

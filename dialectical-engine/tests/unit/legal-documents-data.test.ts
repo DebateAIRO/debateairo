@@ -136,6 +136,11 @@ describe("legal documents — generated data", () => {
       expect(list.items[1]!.startsWith("Moderation decisions about content and accounts.")).toBe(true);
     });
 
+    it("keeps Tennessee out: section 2 lists the United States without it, and Annex A.3 says so first", () => {
+      expect(texts(section(TERMS_OF_SERVICE, "02"))[0]).toContain("[and: the United States (except Tennessee) / Canada");
+      expect(texts(section(TERMS_OF_SERVICE, "A.3"))[0]).toBe("Tennessee. We do not offer DebateAI to people who live in Tennessee.");
+    });
+
     it("says the support chat sends text to a model too, right after the debate paragraph", () => {
       const content = texts(section(TERMS_OF_SERVICE, "08"));
       expect(content[2]!.startsWith("How your content reaches AI providers. To run a debate")).toBe(true);

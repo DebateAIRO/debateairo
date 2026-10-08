@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kde službu DebateAI nabízíme",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Službu DebateAI nabízíme osobám, které žijí v [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Jinde ji nenabízíme. Pokud žijete mimo tyto země, můžete mít k webu přístup, službu však na vás nezaměřujeme, nepřijímáme od vás platby a tyto Podmínky ani naše Zásady ochrany osobních údajů nejsou přizpůsobeny právu vaší země. Příloha A stanoví, co platí v jednotlivých regionech, v nichž službu poskytujeme." }
+      { kind: "p", text: "Službu DebateAI nabízíme osobám, které žijí v [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Jinde ji nenabízíme. Pokud žijete mimo tyto země, můžete mít k webu přístup, službu však na vás nezaměřujeme, nepřijímáme od vás platby a tyto Podmínky ani naše Zásady ochrany osobních údajů nejsou přizpůsobeny právu vaší země. Příloha A stanoví, co platí v jednotlivých regionech, v nichž službu poskytujeme." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Spojené státy (pouze jsou-li uvedeny v oddílu 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Službu DebateAI nenabízíme osobám, které žijí v Tennessee." },
       { kind: "p", text: "Rozhodčí smlouva a vzdání se práva na hromadnou žalobu. Žijete-li ve Spojených státech, vy a DebateAIRO souhlasíte s řešením veškerých sporů vyplývajících z těchto Podmínek nebo služby závazným individuálním rozhodčím řízením vedeným [the American Arbitration Association / JAMS] podle jejích spotřebitelských pravidel, namísto u soudu; každý z nás však může uplatnit individuální nárok u soudu pro drobné nároky. Můžete se odhlásit zasláním e-mailu na [address] do 30 dnů od prvního přijetí těchto Podmínek. Tato dohoda se řídí Federal Arbitration Act. Hradíme poplatky za zahájení rozhodčího řízení. Práva na hromadné, kolektivní a zastupitelské žaloby se vzdáváte v rozsahu dovoleném zákonem. Tento oddíl se použije pouze do budoucna a nevztahuje se na nároky vzniklé před jeho přijetím." },
       { kind: "p", text: "Oznámení a odstraňování. Intimní snímky bez souhlasu lze bez účtu nahlásit na adrese [URL] a budou odstraněny do 48 hodin od platné žádosti. Stížnosti týkající se autorských práv se zasílají našemu určenému zástupci uvedenému v oddílu 16." },
       { kind: "p", text: "Ustanovení pro jednotlivé státy. Kalifornie: použijí se podmínky automatického obnovování podle oddílu 12; předplatné můžete kdykoli zrušit online; váš souhlas s podmínkami obnovování uchováváme nejméně tři roky. New York: do 14 dnů od jakékoli platby se zvýšenou cenou můžete předplatné zrušit a získat poměrné vrácení peněz. Texas a Nebraska: citlivé osobní údaje neprodáváme. Washington: na informace související se zdravím se vztahuje naše Oznámení o ochraně údajů o zdraví spotřebitelů na adrese [URL]. Colorado: nic ve službě o vás nečiní rozhodnutí s následky. Na vaše údaje a vaše práva na ochranu soukromí podle práva jednotlivých států se vztahují naše Zásady ochrany osobních údajů, příloha B.3." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "75fdd0910684375e96c838f96995a3a4cbb7f2db0f7bde3deeaf22d7cc10daf3",
+  sha256: "2d178be8825c84a5609dd63451438d66fd7e77835a438ccb92bc09034ef6d309",
   eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.1 · ÚČINNÉ OD [DATE]",
   title: "S čím souhlasíte",
   lede: "Smlouva mezi vámi a DebateAIRO S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.",

@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Where we offer DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "We offer DebateAI to people who live in [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
+      { kind: "p", text: "We offer DebateAI to people who live in [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "United States (only if listed in section 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. We do not offer DebateAI to people who live in Tennessee." },
       { kind: "p", text: "Arbitration agreement and class-action waiver. If you live in the United States, you and DebateAIRO agree to resolve any dispute arising out of these Terms or the service by binding individual arbitration administered by [the American Arbitration Association / JAMS] under its consumer rules, rather than in court, except that either of us may bring an individual claim in small-claims court. You may opt out by emailing [address] within 30 days of first accepting these Terms. This agreement is governed by the Federal Arbitration Act. We pay the arbitration filing fees. Class, collective and representative actions are waived to the extent the law allows. This section applies prospectively only and does not apply to claims that arose before you accepted it." },
       { kind: "p", text: "Notices and takedowns. Non-consensual intimate imagery may be reported at [URL] without an account and is removed within 48 hours of a valid request. Copyright complaints go to our designated agent named in section 16." },
       { kind: "p", text: "State-specific. California: the automatic-renewal terms in section 12 apply; you may cancel online at any time; we retain your consent to renewal terms for at least three years. New York: you may cancel within 14 days of any charge at an increased price and receive a pro-rata refund. Texas and Nebraska: we do not sell sensitive personal data. Washington: our Consumer Health Data Privacy Notice at [URL] applies to health-related information. Colorado: nothing in the service makes consequential decisions about you. Our Privacy Policy, Annex B.3, covers your data and your state privacy rights." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "023e33934f72c8b739c661421502e1ed5e4f498f5317fe8b3afdd78cc0a32892",
+  sha256: "fe032570217ea191d28a698bef19a89ed43de9425c468256ac4cf8c321eb036c",
   eyebrow: "TERMS OF SERVICE · v2.1 · EFFECTIVE [DATE]",
   title: "What you agree to",
   lede: "The contract between you and DebateAIRO S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",

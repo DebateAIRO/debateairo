@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "DebateAI 제공 지역",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "당사는 [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]에 거주하는 사람에게 DebateAI를 제공합니다. 그 밖의 지역에는 제공하지 않습니다. 해당 국가 밖에 거주하는 경우 사이트에 접속할 수 있더라도 당사는 귀하를 대상으로 서비스를 제공하지 않고 귀하의 결제를 받지 않으며, 본 약관과 당사의 개인정보 처리방침은 귀하의 국가 법률에 맞추어 작성되지 않았습니다. 부속서 A는 당사가 서비스를 제공하는 각 지역에 적용되는 사항을 정합니다." }
+      { kind: "p", text: "당사는 [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]에 거주하는 사람에게 DebateAI를 제공합니다. 그 밖의 지역에는 제공하지 않습니다. 해당 국가 밖에 거주하는 경우 사이트에 접속할 수 있더라도 당사는 귀하를 대상으로 서비스를 제공하지 않고 귀하의 결제를 받지 않으며, 본 약관과 당사의 개인정보 처리방침은 귀하의 국가 법률에 맞추어 작성되지 않았습니다. 부속서 A는 당사가 서비스를 제공하는 각 지역에 적용되는 사항을 정합니다." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "미국 (제2조에 열거된 경우에만 해당)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "테네시. 당사는 테네시에 거주하는 사람에게 DebateAI를 제공하지 않습니다." },
       { kind: "p", text: "중재 합의 및 집단소송 포기. 귀하가 미국에 거주하는 경우 귀하와 DebateAIRO는, 당사자 일방이 소액사건 법원에 개별 청구를 제기할 수 있다는 예외를 두고, 본 약관 또는 서비스에서 발생하는 모든 분쟁을 법원이 아닌 [the American Arbitration Association / JAMS]가 소비자 규칙에 따라 관리하는 구속력 있는 개별 중재로 해결하는 데 동의합니다. 귀하는 본 약관에 최초로 동의한 날부터 30일 이내에 [address]로 이메일을 보내 적용을 거부할 수 있습니다. 이 합의에는 연방중재법이 적용됩니다. 당사가 중재 신청 수수료를 부담합니다. 법률이 허용하는 범위에서 집단, 공동 및 대표 소송을 포기합니다. 본 조는 장래에 대해서만 적용되며 귀하가 이에 동의하기 전에 발생한 청구에는 적용되지 않습니다." },
       { kind: "p", text: "통지 및 삭제 요청. 동의 없는 사적 이미지는 계정 없이 [URL]에서 신고할 수 있으며, 유효한 요청 후 48시간 이내에 삭제됩니다. 저작권 침해 신고는 제16조에 명시된 당사의 지정 대리인에게 제출하십시오." },
       { kind: "p", text: "주별 규정. 캘리포니아: 제12조의 자동 갱신 조건이 적용되며, 귀하는 언제든 온라인으로 취소할 수 있고, 당사는 갱신 조건에 대한 귀하의 동의를 최소 3년간 보관합니다. 뉴욕: 인상된 가격이 청구된 날부터 14일 이내에 취소하고 일할 계산된 환불을 받을 수 있습니다. 텍사스 및 네브래스카: 당사는 민감한 개인정보를 판매하지 않습니다. 워싱턴: [URL]의 당사 소비자 건강 데이터 개인정보 보호 고지가 건강 관련 정보에 적용됩니다. 콜로라도: 서비스의 어떠한 기능도 귀하에 관한 중대한 결정을 내리지 않습니다. 귀하의 데이터와 주 법률상 개인정보 보호 권리에 관하여는 당사 개인정보 처리방침 부속서 B.3이 적용됩니다." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "fb153ec91e3019a9da66d58d3fc952f209f5ec2b2c90388723cf33958a1361dd",
+  sha256: "ac16d7610fdf345e6bd7dd2a8e963c17e0d80a90c404ec26159354aa956ae0e5",
   eyebrow: "서비스 이용약관 · v2.1 · 시행일 [DATE]",
   title: "귀하가 동의하는 사항",
   lede: "귀하와 DebateAIRO S.R.L. 간의 계약을 알기 쉬운 말로 설명합니다. 19개 조항과 부속서 A가 있으며, 끝까지 스크롤하여 확인하십시오.",

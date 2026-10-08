@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Unde oferim DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Oferim DebateAI persoanelor care locuiesc în [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim." }
+      { kind: "p", text: "Oferim DebateAI persoanelor care locuiesc în [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Statele Unite (numai dacă sunt enumerate în secțiunea 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Nu oferim DebateAI persoanelor care locuiesc în Tennessee." },
       { kind: "p", text: "Acord de arbitraj și renunțare la acțiunile colective. Dacă locuiți în Statele Unite, dumneavoastră și DebateAIRO conveniți să soluționați orice litigiu care decurge din acești Termeni sau din serviciu prin arbitraj individual obligatoriu administrat de [the American Arbitration Association / JAMS] în conformitate cu regulile sale pentru consumatori, și nu în instanță, cu excepția faptului că oricare dintre noi poate formula o cerere individuală în fața instanței pentru cereri cu valoare redusă. Puteți renunța la arbitraj trimițând un e-mail la [address] în termen de 30 de zile de la prima acceptare a acestor Termeni. Acest acord este guvernat de Legea federală privind arbitrajul. Noi achităm taxele de înregistrare a arbitrajului. Se renunță la acțiunile colective și reprezentative, în măsura permisă de lege. Această secțiune se aplică numai pentru viitor și nu se aplică pretențiilor născute înainte de acceptarea sa." },
       { kind: "p", text: "Notificări și eliminări. Imaginile intime distribuite fără consimțământ pot fi raportate la [URL] fără un cont și sunt eliminate în termen de 48 de ore de la o cerere valabilă. Reclamațiile privind drepturile de autor sunt adresate agentului nostru desemnat menționat în secțiunea 16." },
       { kind: "p", text: "Dispoziții specifice statelor. California: se aplică condițiile de reînnoire automată din secțiunea 12; puteți anula online în orice moment; păstrăm consimțământul dumneavoastră cu privire la condițiile de reînnoire timp de cel puțin trei ani. New York: puteți anula în termen de 14 zile de la orice debitare la un preț majorat și puteți primi o rambursare proporțională. Texas și Nebraska: nu vindem date cu caracter personal sensibile. Washington: Informarea noastră privind confidențialitatea datelor de sănătate ale consumatorilor de la [URL] se aplică informațiilor referitoare la sănătate. Colorado: nicio componentă a serviciului nu ia decizii cu efecte semnificative cu privire la dumneavoastră. Politica noastră de confidențialitate, Anexa B.3, se referă la datele dumneavoastră și la drepturile privind confidențialitatea conferite de legislația statului dumneavoastră." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "2f145d1297d60a0b7742286cb6e8e570fc533881d9ed555f19651a6fdae98dc8",
+  sha256: "778142e916f3abc2abbaa8f56b8e0f5bbf7cea65f437aa48eff2b1dd98639ae7",
   eyebrow: "TERMENII SERVICIULUI · v2.1 · ÎN VIGOARE DE LA [DATE]",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DebateAIRO S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",

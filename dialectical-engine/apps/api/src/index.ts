@@ -2266,9 +2266,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ? request.body as Record<string, unknown> : null;
     const region = body === null ? null : parseDeclaredRegion(body);
     if (region === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
-    if (options.countryGate?.declaredSignupRefusal(region.country) === "COUNTRY_SIGNUP_UNAVAILABLE") {
-      return reply.status(403).send({ error: "COUNTRY_SIGNUP_UNAVAILABLE" });
-    }
+    const declaredRefusal = options.countryGate?.declaredSignupRefusal(region) ?? null;
+    if (declaredRefusal !== null) return reply.status(403).send({ error: declaredRefusal });
     registerDeclaredRegions.set(request, region);
   });
   /**

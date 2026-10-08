@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kde službu DebateAI ponúkame",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Službu DebateAI ponúkame osobám, ktoré žijú v [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
+      { kind: "p", text: "Službu DebateAI ponúkame osobám, ktoré žijú v [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
     ]
   },
   {
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Spojené štáty (iba ak sú uvedené v časti 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. DebateAI neponúkame osobám, ktoré žijú v Tennessee." },
       { kind: "p", text: "Rozhodcovská zmluva a vzdanie sa práva na hromadnú žalobu. Ak žijete v Spojených štátoch, vy a DebateAIRO súhlasíte s riešením všetkých sporov vyplývajúcich z týchto Podmienok alebo služby záväzným individuálnym rozhodcovským konaním vedeným [the American Arbitration Association / JAMS] podľa jej spotrebiteľských pravidiel namiesto súdu; každý z nás však môže uplatniť individuálny nárok na súde pre drobné nároky. Rozhodcovskú zmluvu môžete odmietnuť zaslaním e-mailu na [address] do 30 dní od prvého prijatia týchto Podmienok. Táto dohoda sa riadi Federal Arbitration Act. Hradíme poplatky za začatie rozhodcovského konania. Vy aj DebateAIRO sa v rozsahu povolenom zákonom vzdávate práva na hromadné, kolektívne a zastupiteľské žaloby. Táto časť sa uplatňuje iba do budúcnosti a nevzťahuje sa na nároky, ktoré vznikli pred jej prijatím." },
       { kind: "p", text: "Oznámenia a odstraňovanie. Intímne snímky zdieľané bez súhlasu možno bez účtu nahlásiť na adrese [URL] a budú odstránené do 48 hodín od platnej žiadosti. Sťažnosti týkajúce sa autorských práv sa zasielajú nášmu určenému zástupcovi uvedenému v časti 16." },
       { kind: "p", text: "Ustanovenia pre jednotlivé štáty. Kalifornia: uplatnia sa podmienky automatického obnovovania podľa časti 12; predplatné môžete kedykoľvek zrušiť online; váš súhlas s podmienkami obnovovania uchovávame najmenej tri roky. New York: do 14 dní od akejkoľvek platby so zvýšenou cenou môžete predplatné zrušiť a získať pomerné vrátenie peňazí. Texas a Nebraska: citlivé osobné údaje nepredávame. Washington: na informácie súvisiace so zdravím sa vzťahuje naše Oznámenie o ochrane údajov o zdraví spotrebiteľov na adrese [URL]. Colorado: nič v službe o vás neprijíma rozhodnutia so závažnými dôsledkami. Vaše údaje a vaše práva na ochranu súkromia podľa práva vášho štátu upravuje príloha B.3 našich Zásady ochrany osobných údajov." }
@@ -381,7 +382,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "a42c96b3823e964792314b9ccf275b1a189fbfd1c1973ae6427759e10d600727",
+  sha256: "6b850c73e9530e4eec3cd0ccb33dbbab41059a7b6421a8e8e52faa6f9470a8b0",
   eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.1 · ÚČINNÉ OD [DATE]",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DebateAIRO S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",
