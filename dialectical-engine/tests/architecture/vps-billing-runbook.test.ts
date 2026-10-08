@@ -607,26 +607,30 @@ describe("P22 the Billing runbook", () => {
     expect(registerReadme).not.toMatch(/the site does not show\s+it yet/u);
   });
 
-  it("the go-live checklist carries the billing rows 14–54 after B11b's row 13, each with a way to prove it", () => {
+  it("the go-live checklist carries the billing rows 14–73 after B11b's row 13, each with a way to prove it", () => {
     const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
     const rows = [...checklist.matchAll(/^\| (\d+) \|/gmu)].map((match) => Number(match[1]));
-    expect(rows).toEqual(Array.from({ length: 54 }, (_unused, index) => index + 1));
+    // Numbered in order with no gap: a void row keeps its number so the later lines keep theirs.
+    expect(rows).toEqual(Array.from({ length: 73 }, (_unused, index) => index + 1));
     // The needles must be in the table itself: the dated notes under it repeat some of these words (P16a's note names
     // the One-Stop Shop), and a note never stands in for a row.
     const table = checklist.split("\n").filter((line) => /^\| \d+ \|/u.test(line)).join("\n");
     for (const needle of [
-      "xMoney has approved the merchant account", "sandbox end-to-end run", "One-Stop Shop",
-      "payment-marks", "SELLER_COMPANY", "notice URL", "same-origin-allow-popups", "records key",
-      "daily ceiling covers the subscribers", "XMONEY_SDK_ORIGIN", "Terms §13", "counsel",
-      // D5 5k: the recorded suites cannot stay skipped by accident.
-      "all 28 required X0 kinds present", "the X0 suites green", "Permissions-Policy",
-      // W14 (P2-I3): X0 shows whether the card check's order's rebill takes the money; a hold changes A12 first.
-      "transaction-rebill-auth-order-released", "only holds the money, A12 (the card change) is changed before billing is on",
-      // W14 (P2-I20): row 19 needs a LIVE notice, row 23 the live site's id, public key and key files.
-      "`xmoney_environment = 'live'`", "`XMONEY_SITE_ID` and `XMONEY_PUBLIC_KEY` are the live site's",
-      "`xmoney-private-key`, `quaderno-api-key` and `smartbill-credentials` files hold the live keys",
-      // W13 (P2-I18): X0 confirms the daily money check's dispute listing.
-      "`dateType=charge-back` listing is accepted", "transaction-list-charge-back",
+      // Spec 2026-10-05 §2.21: row 14 is NETOPIA's approval and answers; the answers that gate billing have rows 55–66.
+      "NETOPIA Payments has approved the shop for AI subscriptions", "the gated ones have their own rows (55–66)",
+      "sandbox end-to-end run", "One-Stop Shop", "payment-marks", "SELLER_COMPANY", "records key",
+      "daily ceiling covers the subscribers", "Terms §13", "counsel",
+      // Row 15: the throwaway server's run, the owner mode's refund, the fake-stack and NETOPIA suites.
+      "on the throwaway sandbox server", "refunded in full by the owner mode", "`tests/integration/billing-*netopia*.test.ts`",
+      // Row 17: NETOPIA's mark first, then the two card marks, in the footer and on the checkout.
+      "`netopia.svg`, `visa.svg` and `mastercard.svg`", "in the footer and on the checkout",
+      // Row 19: no notify setting at NETOPIA; a LIVE message reaching the site is the proof.
+      "NETOPIA has no notify setting in its admin", "travels with every payment", "`payment_environment = 'live'`",
+      // Row 23 (spec 2026-10-05 §2.17): the live values through the guided setup, named by setting, never by value.
+      "`billing-setup.sh --replace netopia`", "`NETOPIA_API_BASE_URL` is a live address", "`NETOPIA_POS_SIGNATURE` is the live POS's",
+      "`NETOPIA_API_KEY_PATH`", "`NETOPIA_IPN_KEYS_PATH`", "`pnpm billing:check` shows a tick on every line",
+      // Row 24 (spec 2026-10-05 §2.22; N20's question): NETOPIA in the legal texts, the ANPC marks, the order button.
+      "NETOPIA Payments as a recipient", "ANPC SAL", "the English order button",
       "Quaderno and SmartBill fixtures committed and their recorded-fixture suites green",
       "tests/unit/invoice-smartbill-recorded-fixtures.test.ts", "partial-credit shapes are still ⚠",
       // Ruling Q-12: the records key's proof is the drill line.
@@ -643,7 +647,7 @@ describe("P22 the Billing runbook", () => {
       "native or legal reader",
       // The owner's answer to P18 Step 0a, question 3 (2026-10-02): the two help articles reworded for paid plans.
       "app-navigation", "budget-tier-choice",
-      // Row 23 (P23 fix G1): going live moves the invoicers' addresses too, not only xMoney's.
+      // Row 23 (P23 fix G1): going live moves the invoicers' addresses too, not only the card processor's.
       "SMARTBILL_API_BASE_URL",
       // P24 (2026-10-02): billing stays off until every item of Part 2's final review is closed.
       "PART2-FINAL-REVIEW-OPEN-ITEMS.md",
@@ -652,6 +656,8 @@ describe("P22 the Billing runbook", () => {
       // W16 (the W7, W10 and W15 judges' notes): row 36's reader also reads the keys Part 2b wrote.
       "`settings.erasure.paidPlan`", "`billing.checkout.rateLimited`", "`billing.cancelPage.nothingToCancel`",
       "`billing.checkout.refundedBeforeStart`",
+      // Spec 2026-10-05 §2.18 and N20's note: row 36's reader reads the card-saving agreement first.
+      "`billing.consent.renewal` first",
       // W16 (P2-M34): the card marks are copied before the website's last start.
       "restart `debateai-ui`",
       // Part 3's final review (2026-10-03): billing stays off until every item of Part 3's final review is closed.
@@ -659,19 +665,39 @@ describe("P22 the Billing runbook", () => {
     ]) {
       expect(table, needle).toContain(needle);
     }
-    // W16: rows 40–54 hold the items the final review deferred to a ruling or a vendor fact that Part 2b did not build,
+    const row = (number: number): string => table.split("\n").find((line) => line.startsWith(`| ${number} |`)) ?? "";
+    const cells = (number: number): string[] => row(number).replace(/^\|\s*/u, "").replace(/\s*\|\s*$/u, "").split(" | ");
+    // Every row cites where it comes from, and every row still in force says how it is proven; a void or removed row
+    // keeps its text struck through, says "—" there, and its last cell says why.
+    for (const number of rows) {
+      const [, mustBeTrue = "", comesFrom = "", howToProve = "", proof = ""] = cells(number);
+      expect(comesFrom.trim(), `row ${number} cites its source`).not.toMatch(/^(—)?$/u);
+      if (mustBeTrue.startsWith("~~")) {
+        expect(howToProve, `row ${number} is closed`).toBe("—");
+        expect(proof, `row ${number} says why it is closed`).toMatch(/^\*\*(Removed|Closed) /u);
+      } else {
+        expect(howToProve.trim(), `row ${number} has a way to prove it`).not.toMatch(/^(—)?$/u);
+      }
+    }
+    // Spec 2026-10-05 §2.21: the rows only the previous card processor needed are void, dated, each with its reason.
+    for (const [number, reason] of [
+      [20, "void: card processor changed to NETOPIA — no card form on our pages, no 3-D Secure pop-up or Payment Request policy to decide"],
+      [40, "void: card processor changed to NETOPIA (the card change is NETOPIA's 0 check, N-11)"],
+      [46, "void: card processor changed to NETOPIA (one refund rule: `netopiaRefunded`, spec §2.12.4)"]
+    ] as const) {
+      expect(row(number), `row ${number} is void`).toMatch(new RegExp(`^\\| ${number} \\| ~~`, "u"));
+      expect(row(number), `row ${number} is void`).toContain(`| — | **Closed 2026-10-08:** ${reason}`);
+    }
+    // W16: rows 41–54 hold the items the final review deferred to a ruling or a vendor fact that Part 2b did not build,
     // plus the "later" Minors (row 54); each names who decides and how it is proven. Every other open item is a row of
     // the open-items file whose status names the go-live rows that share its work, and row 38 holds them all.
-    const row = (number: number): string => table.split("\n").find((line) => line.startsWith(`| ${number} |`)) ?? "";
     for (const [number, needles] of [
-      [40, ["P2-I3", "A12 (the card change)", "`transaction-rebill-auth-order-released` reads `void-ok`"]],
       [41, ["P2-I5", "billing-only database role", "`runner-runtime`", "`scheduler-liveness`", "`email_ciphertext`",
         "(a) to (c)"]],
       [42, ["P2-I8", "Terms §13", "how an upgrade's own days are counted", "CRD art. 14(3)"]],
       [43, ["P2-I9", "public holiday", "Regulation 1182/71 art. 3(4)", "withdrawal-deadline.ts"]],
       [44, ["P2-I13", "`withdrawal_days`", "`billing.consent.immediateStart`", "country-neutral", "generate:legal:check"]],
-      [45, ["P2-I15", "never took money", "`billing.purge_expired_records`", "Privacy Policy"]],
-      [46, ["P2-M2", "refund transaction", "verify-payment.ts", "refunds.ts", "reconcile.ts", "`refund-ok`"]],
+      [45, ["P2-I15", "never took money", "`billing.purge_expired_records`", "Privacy Policy", "phone number"]],
       [47, ["P2-M17", "`billing.checkout.total`", "31 January", "anchor day"]],
       [48, ["P2-M21", "the buyer's language", "packages/tax-quaderno/src/index.ts", "tax-quaderno-recorded-fixtures.test.ts"]],
       [49, ["P2-M25", "`mentions`", "debateai-charge:", "accountant"]],
@@ -685,17 +711,53 @@ describe("P22 the Billing runbook", () => {
       const line = row(number);
       for (const needle of ["**Decided by:**", "**Proven by:**", ...needles]) expect(line, `row ${number}: ${needle}`).toContain(needle);
       // Row 41 is done (pull request #77, migration 0093, 2026-10-04): its proof names the merge, the migration and the
-      // principals test. Every other row here is still open.
+      // principals test. Row 54 is done once P2-M40, the last "later" Minor, is void (spec 2026-10-05 §2.21). Every
+      // other row here is still open.
       if (number === 41) {
         expect(line, "row 41 is done").toMatch(
           /\| \*\*Done 2026-10-04\*\* by pull request #77 [^|]*0093_billing_runtime_role\.sql[^|]*production-database-principals\.test\.ts[^|]*\|$/u
         );
+      } else if (number === 54) {
+        expect(line, "row 54 is done").toMatch(/\| \*\*Done 2026-10-08:\*\* [^|]*P2-M40[^|]*void: card processor changed to NETOPIA[^|]*\|$/u);
       } else {
         expect(line, `row ${number} is open`).toMatch(/\| — \|$/u);
       }
     }
     // W16 fix F1: the "later" Minors gate switching billing on, each fixed or accepted in writing.
     expect(row(54)).not.toContain("None blocks switching billing on alone");
+    // Spec 2026-10-05 §2.21 and §2.24: each question whose Gate column says yes has its own row, in the table's order,
+    // saying what the build assumes until NETOPIA answers and what changes with another answer.
+    const gated = ["N-2", "N-4", "N-5", "N-7", "N-8", "N-11", "N-14", "N-15", "N-17", "N-23", "N-24", "N-26"];
+    gated.forEach((question, index) => {
+      const line = row(55 + index);
+      for (const needle of [`| ${55 + index} | Before billing is switched on: NETOPIA has answered ${question},`,
+        "Until NETOPIA answers, the build assumes", "if the answer differs", `Spec 2026-10-05 §2.24 ${question}`,
+        "**Decided by:**", "**Proven by:**"]) {
+        expect(line, `row ${55 + index} (${question}): ${needle}`).toContain(needle);
+      }
+      expect(line, `row ${55 + index} is open`).toMatch(/\| — \|$/u);
+    });
+    // The owner's steps of spec 2026-10-05 §1.6 and the rulings that left the owner a decision, after the questions.
+    for (const [number, needles] of [
+      [67, ["`tests/fixtures/netopia/`", "twelve required kinds", "`tests/unit/payments-netopia-recorded-fixtures.test.ts` is green",
+        "PR-47", "N-2, N-4, N-9, N-11, N-16 and N-24"]],
+      [68, ["NETOPIA's own test of our flow has passed", "throwaway sandbox server", "N-26"]],
+      [69, ["provider-only mode", "billing still off", "`start --live`", "`charge --live`", "refunded in NETOPIA's live admin",
+        "`TOOL_ORDER`", "the live capture folder is deleted"]],
+      [70, ["signed the support catalogue again", "Subscription checkout", "billing details", "NETOPIA payment page",
+        "`catalog.sha256`", "§1.6 item 9"]],
+      [71, ["native reader", "`apps/ui/lib/billing/callingCodes.ts`", "calling code"]],
+      [72, ["PR-41", "keeps it or changes it", "`--despite-chargeback`", "`REFUND_HELD_BY_CHARGEBACK`"]],
+      [73, ["Part C", "N-14"]]
+    ] as const) {
+      const line = row(number);
+      for (const needle of [`| ${number} | Before billing is switched on`, "**Decided by:**", "**Proven by:**", ...needles]) {
+        expect(line, `row ${number}: ${needle}`).toContain(needle);
+      }
+      expect(line, `row ${number} is open`).toMatch(/\| — \|$/u);
+    }
+    // The P19 note bound row 20 to the previous card form's six points; it is void with row 20.
+    expect(checklist).toMatch(/\*Void since 2026-10-08:\* card processor changed to NETOPIA[^\n]*P19/u);
   });
 
   it("the final review's open items say, for each row, whether Part 2b fixed it or which go-live row holds it (W16)", () => {
@@ -708,25 +770,44 @@ describe("P22 the Billing runbook", () => {
     for (const cells of rows) {
       const status = cells.at(-1) ?? "";
       expect(status, cells[0]).toMatch(/^(fixed in Part 2b \(W\d+(, W\d+)*\)|open: go-live rows? \d+|closed)/u);
+      // Spec 2026-10-05 §2.21: rows 20, 40 and 46 are void and row 14 is NETOPIA's, so nothing still open waits on them.
+      if (status.startsWith("open")) expect(status, cells[0]).not.toMatch(/\b(14|20|40)\b|\b46 \(P2-M2\)/u);
     }
     // The mappings below describe rows still open; a row the controller has closed has done its job, but a missing
     // row is still a failure.
     const rowOf = (id: string): string[] | undefined => rows.find((cells) => cells[0] === id);
+    const rowStarting = (prefix: string): string[] | undefined => rows.find((cells) => cells[0]!.startsWith(prefix));
     const isClosed = (cells: readonly string[]): boolean => (cells.at(-1) ?? "").startsWith("closed");
     for (const [id, needle] of [
       ["P2-I1", "fixed in Part 2b (W1)"], ["P2-I3", "go-live rows 14 and 40"], ["P2-I5 (part 3)", "go-live row 41"],
       ["P2-I8", "go-live rows 24 and 42"], ["P2-I9", "go-live row 43"], ["P2-I13", "go-live row 44"],
       ["P2-I15", "go-live row 45"], ["P2-M34", "go-live row 17"], ["Later", "go-live row 54"],
-      ["Owner items", "go-live rows 14, 16, 24 and 38"]
+      ["Owner items", "go-live rows 16, 24 and 38"]
     ] as const) {
       const cells = rowOf(id);
       expect(cells, `no row ${id}`).toBeDefined();
       if (!isClosed(cells!)) expect(cells!.at(-1), id).toContain(needle);
     }
+    // Spec 2026-10-05 §2.21: an item only the previous card processor raised is closed as void, with the date; an item
+    // that is not only its keeps its row open, with only its processor-only parts marked void.
+    const VOID = "void: card processor changed to NETOPIA (2026-10-08)";
+    for (const prefix of ["P2-I1 (X0)", "P2-I2 (", "P2-I18 (X0)"]) {
+      const cells = rowStarting(prefix);
+      expect(cells, `no row ${prefix}`).toBeDefined();
+      expect(cells!.at(-1), prefix).toMatch(new RegExp(`^closed: ${VOID.replace(/[()]/gu, "\\$&")}`, "u"));
+    }
+    for (const prefix of ["P2-I12 (X0, owner)", "P2-I3, P2-I19, P2-I20, P2-M38 (X0, owner)", "P2-I21, ",
+      "P2-M1, P2-M3, P2-M5, P2-M27 (X0, owner)", "Owner items"]) {
+      const cells = rowStarting(prefix);
+      expect(cells, `no row ${prefix}`).toBeDefined();
+      expect(cells![1], prefix).toContain(`**${VOID}.**`);
+      expect(cells!.at(-1), prefix).toMatch(/^open: go-live rows? \d+/u);
+    }
+    expect(rowOf("Later")?.at(-1)).toMatch(/^closed: [^|]*P2-M40 void: card processor changed to NETOPIA \(2026-10-08\)/u);
     const ruled = rows.find((cells) => cells[0] === "Minors" && cells[1]!.startsWith("P2-M2 "));
     expect(ruled, "no ruled Minors row").toBeDefined();
     if (!isClosed(ruled!)) {
-      for (const needle of ["46 (P2-M2)", "47 (P2-M17)", "48 (P2-M21)", "49 (P2-M25)", "50 (P2-M26)", "51 (P2-M28)",
+      for (const needle of ["46 (P2-M2: void", "47 (P2-M17)", "48 (P2-M21)", "49 (P2-M25)", "50 (P2-M26)", "51 (P2-M28)",
         "52 (P2-M36)", "53 (P2-M37)"]) {
         expect(ruled!.at(-1), needle).toContain(needle);
       }
@@ -742,7 +823,7 @@ describe("P22 the Billing runbook", () => {
       "change their billing country or address", "before billing is switched on"]) {
       expect(owner[1], needle).toContain(needle);
     }
-    expect(owner[2]).toBe("owner; xMoney (through the owner); counsel (go-live row 24); accountant (go-live row 16)");
+    expect(owner[2]).toBe("owner; counsel (go-live row 24); accountant (go-live row 16)");
     // W16 fix G1: the deletion screen's sentence is one of the owner's wording picks.
     const erasure = rowOf("P2-I10 (owner, accountant)") ?? [];
     expect(erasure[1]).toContain("(4) The owner picks the final wording of the deletion screen's sentence (`settings.erasure.paidPlan`)");

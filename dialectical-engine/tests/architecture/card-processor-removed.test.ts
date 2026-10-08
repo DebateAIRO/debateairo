@@ -65,13 +65,6 @@ const HISTORY_TESTS: ReadonlyArray<string> = Object.freeze([
   "dialectical-engine/tests/integration/billing-other-system-records.test.ts"
 ]);
 /**
- * Until N26 rewrites the go-live rows 14–54 (spec 2026-10-05 §2.21): the runbook test's last two cases pin the
- * checklist's words; N26 removes this entry with them.
- */
-const UNTIL_RUNBOOK: ReadonlyArray<string> = Object.freeze([
-  "dialectical-engine/tests/architecture/vps-billing-runbook.test.ts"
-]);
-/**
  * Code that names the old provider only to recognise what it left: the outbox kind and the provider value 0087 and
  * 0109 keep for old rows, an old CREATED's environment, the removed settings a boot warns about. Every line of these
  * files that names it must match its pattern.
@@ -87,7 +80,7 @@ const CODE_LINES: Readonly<Record<string, RegExp>> = Object.freeze({
 
 function allowed(path: string): boolean {
   return HISTORY_FILES.includes(path) || HISTORY_PREFIXES.some((prefix) => path.startsWith(prefix))
-    || MIGRATIONS.includes(path) || HISTORY_TESTS.includes(path) || UNTIL_RUNBOOK.includes(path)
+    || MIGRATIONS.includes(path) || HISTORY_TESTS.includes(path)
     || Object.hasOwn(CODE_LINES, path);
 }
 
