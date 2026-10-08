@@ -189,6 +189,12 @@ export function CheckoutFlow({
         navigate(`/login?next=${encodeURIComponent(`/checkout?plan=${planId}`)}`);
         return;
       }
+      // N19b (spec §2.6.3, A3 (a)): a failed start leaves a FAILED charge holding this quote's one use, so it is never
+      // sent again; the next try asks for a fresh price, accepted afresh (as requestQuote does).
+      setQuote(null);
+      setCountryConfirmed(false);
+      setRenewalAccepted(false);
+      setImmediateAccepted(false);
       setMessageKey(checkoutFailureKey(failure));
     }
   }

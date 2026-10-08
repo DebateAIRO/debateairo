@@ -237,6 +237,36 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(goToPayment.mock.calls).toEqual([[page]]);
   });
 
+  it("drops an upgrade quote whose start failed, so choosing the upgrade again pays a fresh price (N19b)", async () => {
+    const used = "55555555-5555-4555-8555-555555555555";
+    const fresh = "66666666-6666-4666-8666-666666666666";
+    const upgradeQuote = (quoteRef: string) => ({
+      quote_ref: quoteRef, plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", tax_name: "TVA",
+      tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
+      renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
+    });
+    const page = "https://secure-sandbox.netopia-payments.com/ui/card?p=0123456789ab";
+    client.quoteSubscriptionUpgrade.mockResolvedValueOnce(upgradeQuote(used)).mockResolvedValueOnce(upgradeQuote(fresh));
+    client.upgradeSubscription
+      .mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 503, "x", "PAYMENT_PROVIDER_UNAVAILABLE"))
+      .mockResolvedValueOnce({ redirect_url: page, charge_ref: "0123456789abcdef0123456789abcdef" });
+    await render();
+    await click("Change plan");
+    await click("Upgrade to Pro");
+    await upgradeAndPay();
+    expect(client.upgradeSubscription).toHaveBeenLastCalledWith("PRO", used, { locale: "en", renewal_terms: CONSENT });
+    expect(text()).toContain((billingEnglish as Record<string, string>)["billing.checkout.formUnavailable"]!);
+    // The server's FAILED charge holds the quote's one use: no pay button for it any more.
+    expect(upgradeButton()).toBeUndefined();
+    await click("Upgrade to Pro");
+    expect(client.quoteSubscriptionUpgrade).toHaveBeenCalledTimes(2);
+    expect(container.querySelector<HTMLInputElement>("#upgrade-agreement")!.checked).toBe(false);
+    await upgradeAndPay();
+    expect(client.upgradeSubscription).toHaveBeenCalledTimes(2);
+    expect(client.upgradeSubscription).toHaveBeenLastCalledWith("PRO", fresh, { locale: "en", renewal_terms: CONSENT });
+    expect(goToPayment.mock.calls).toEqual([[page]]);
+  });
+
   it("offers no upgrade when the server says none is possible, and still offers the downgrades", async () => {
     client.getBillingSubscription.mockResolvedValue({ subscription: subscription({ plan_id: "PRO", can_upgrade: false }) });
     await render();

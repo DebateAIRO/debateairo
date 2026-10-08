@@ -295,6 +295,42 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     expect(goToPayment).not.toHaveBeenCalled();
   });
 
+  // N19b (A3 (a)): a failed start leaves a FAILED charge holding the quote's one use, so the next try needs a new price.
+  for (const [code, status, key] of [
+    ["PAYMENT_PROVIDER_UNAVAILABLE", 503, "billing.checkout.formUnavailable"],
+    ["BILLING_ADDRESS_REQUIRED", 422, "billing.checkout.detailsRequired"]
+  ] as const) {
+    it(`a failed start (${status} ${code}) asks for a fresh price and never resends the used one`, async () => {
+      const used = "22222222-2222-4222-8222-222222222222";
+      const fresh = "33333333-3333-4333-8333-333333333333";
+      client.createBillingQuote.mockResolvedValueOnce(quote())
+        .mockResolvedValueOnce(quote({ quote_ref: used })).mockResolvedValueOnce(quote({ quote_ref: fresh }));
+      client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", status, "x", code))
+        .mockResolvedValueOnce(STARTED);
+      await render();
+      await fillDetails();
+      await click(button("billing.checkout.showPrice")!);
+      await consentAndContinue();
+      expect(client.startBillingCheckout).toHaveBeenLastCalledWith(expect.objectContaining({ quote_ref: used }));
+      expect(text()).toContain(EN[key]);
+      // The used price is gone: nothing to continue with until the price is asked again.
+      expect(button("billing.checkout.continueToCard")).toBeUndefined();
+      expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+      const asked = client.createBillingQuote.mock.calls.length;
+      await click(button("billing.checkout.showPrice")!);
+      expect(client.createBillingQuote).toHaveBeenCalledTimes(asked + 1);
+      // The fresh price is accepted afresh: both confirmations start unticked.
+      expect(checkbox(0).checked).toBe(false);
+      expect(checkbox(1).checked).toBe(false);
+      expect(button("billing.checkout.continueToCard")!.disabled).toBe(true);
+      await consentAndContinue();
+      expect(client.startBillingCheckout).toHaveBeenCalledTimes(2);
+      expect(client.startBillingCheckout).toHaveBeenLastCalledWith(expect.objectContaining({ quote_ref: fresh }));
+      expect(client.startBillingCheckout.mock.calls.filter(([body]) => body.quote_ref === used)).toHaveLength(1);
+      expect(goToPayment.mock.calls).toEqual([[PAGE]]);
+    });
+  }
+
   it("links the updated-Terms sentence to the accept screen, and sends the age gate and a lost session where they belong", async () => {
     client.createBillingQuote.mockResolvedValue(quote());
     client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("FORBIDDEN", 403, "x", "LEGAL_REACCEPTANCE_REQUIRED"));

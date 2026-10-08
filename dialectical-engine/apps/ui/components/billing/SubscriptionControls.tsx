@@ -425,9 +425,17 @@ export function SubscriptionControls({
                 <button type="button" className="setBtn" disabled={busy || !upgradeAgreed || renewalConsent === null}
                   onClick={() => { void run(async () => {
                     if (renewalConsent === null) return;
-                    const started = await client.upgradeSubscription(upgrade.planId, upgrade.quote.quote_ref, {
-                      locale, renewal_terms: renewalConsent
-                    });
+                    let started: Awaited<ReturnType<SubscriptionClient["upgradeSubscription"]>>;
+                    try {
+                      started = await client.upgradeSubscription(upgrade.planId, upgrade.quote.quote_ref, {
+                        locale, renewal_terms: renewalConsent
+                      });
+                    } catch (failure) {
+                      // N19b (A3 (a)): a failed start holds this quote's one use, so it is never sent again; choosing
+                      // the upgrade again asks for a fresh quote. `run` words the failure as for every other action.
+                      setUpgrade(null);
+                      throw failure;
+                    }
                     // N12's 409 UPGRADE_PENDING read as data: wait on that charge instead of paying twice.
                     if ("state" in started) {
                       setUpgradeCharge({ planId: upgrade.planId, chargeRef: started.charge_ref });
