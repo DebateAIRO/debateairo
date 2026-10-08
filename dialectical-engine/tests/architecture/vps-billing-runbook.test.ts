@@ -618,6 +618,9 @@ describe("P22 the Billing runbook", () => {
     for (const needle of [
       // Spec 2026-10-05 §2.21: row 14 is NETOPIA's approval and answers; the answers that gate billing have rows 55–66.
       "NETOPIA Payments has approved the shop for AI subscriptions", "the gated ones have their own rows (55–66)",
+      "only they keep billing off until NETOPIA answers (§2.24's Gate column); for the others the build's assumption stands meanwhile",
+      // Row 38: the items Part 2's review left are the owner's, counsel's or the accountant's; the old recording's are void.
+      "each item it leaves to the owner, counsel or the accountant decided and done",
       "sandbox end-to-end run", "One-Stop Shop", "payment-marks", "SELLER_COMPANY", "records key",
       "daily ceiling covers the subscribers", "Terms §13", "counsel",
       // Row 15: the throwaway server's run, the owner mode's refund, the fake-stack and NETOPIA suites.
@@ -670,6 +673,7 @@ describe("P22 the Billing runbook", () => {
     // Every row cites where it comes from, and every row still in force says how it is proven; a void or removed row
     // keeps its text struck through, says "—" there, and its last cell says why.
     for (const number of rows) {
+      expect(cells(number), `row ${number} has five cells`).toHaveLength(5);
       const [, mustBeTrue = "", comesFrom = "", howToProve = "", proof = ""] = cells(number);
       expect(comesFrom.trim(), `row ${number} cites its source`).not.toMatch(/^(—)?$/u);
       if (mustBeTrue.startsWith("~~")) {
@@ -779,7 +783,7 @@ describe("P22 the Billing runbook", () => {
     const rowStarting = (prefix: string): string[] | undefined => rows.find((cells) => cells[0]!.startsWith(prefix));
     const isClosed = (cells: readonly string[]): boolean => (cells.at(-1) ?? "").startsWith("closed");
     for (const [id, needle] of [
-      ["P2-I1", "fixed in Part 2b (W1)"], ["P2-I3", "go-live rows 14 and 40"], ["P2-I5 (part 3)", "go-live row 41"],
+      ["P2-I1", "fixed in Part 2b (W1)"], ["P2-I5 (part 3)", "go-live row 41"],
       ["P2-I8", "go-live rows 24 and 42"], ["P2-I9", "go-live row 43"], ["P2-I13", "go-live row 44"],
       ["P2-I15", "go-live row 45"], ["P2-M34", "go-live row 17"], ["Later", "go-live row 54"],
       ["Owner items", "go-live rows 16, 24 and 38"]
@@ -788,6 +792,11 @@ describe("P22 the Billing runbook", () => {
       expect(cells, `no row ${id}`).toBeDefined();
       if (!isClosed(cells!)) expect(cells!.at(-1), id).toContain(needle);
     }
+    // Spec 2026-10-05 §2.21: P2-I3's left-over change waited on rows 14 and 40 for the previous processor's recording; it is
+    // void now, so its row says so instead of naming those rows.
+    const rebill = rowOf("P2-I3");
+    expect(rebill, "no row P2-I3").toBeDefined();
+    expect(rebill!.at(-1), "P2-I3").toContain("void: card processor changed to NETOPIA (2026-10-08)");
     // Spec 2026-10-05 §2.21: an item only the previous card processor raised is closed as void, with the date; an item
     // that is not only its keeps its row open, with only its processor-only parts marked void.
     const VOID = "void: card processor changed to NETOPIA (2026-10-08)";
