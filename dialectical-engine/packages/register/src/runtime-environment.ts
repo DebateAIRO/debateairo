@@ -427,6 +427,7 @@ const apiEnvironmentShape = {
     AUDIT_KEY_STORE_PATH: z.string().min(1),
     AUDIT_SOURCE_IP_SALT_PATH: z.string().min(1),
     USER_DEK_STORE_PATH: z.string().min(1),
+    DATA_EXPORT_STORE_PATH: z.string().min(1).optional(),
     CONTENT_ENCRYPTION_ENABLED: z.enum(["true", "false"]).default("false"),
     CONTENT_BLIND_INDEX_KEY_PATH: z.string().min(1).optional(),
     CONTENT_PROVISION_DATABASE_URL: z.string().url(),
