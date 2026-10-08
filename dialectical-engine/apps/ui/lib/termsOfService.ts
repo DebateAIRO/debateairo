@@ -49,6 +49,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Privacy and data protection — privacy@dezbatere.ro",
         "Reporting illegal content — [abuse@dezbatere.ro] — see section 10",
         "Point of contact for authorities — [dsa@dezbatere.ro] — Romanian and English",
+        "Removal orders for terrorist content (EU Regulation 2021/784) — [dsa@dezbatere.ro] — our contact point for these orders; Romanian and English; see section 10",
         "Representatives in other countries — Listed in Annex A for the regions where we have appointed one"
         ]
       },
@@ -166,9 +167,11 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Moderation decisions about content and accounts. Removing or restricting a published debate, or suspending or closing an account, is a decision we make against these Terms or the law. A person is involved in every such decision that affects your account. Section 11 describes the grounds."
         ]
       },
-      { kind: "p", text: "Statement of reasons. Whenever we remove or restrict the visibility of your content, or suspend or terminate your account, we give you a statement of reasons: what we did and how far it reaches, the facts we relied on and whether they came from a report or our own checks, whether automated means were used, the legal or contractual ground, and how you can challenge the decision." },
+      { kind: "p", text: "Statement of reasons. Whenever we remove or restrict the visibility of your content, or suspend or terminate your account, we give you a statement of reasons: what we did and how far it reaches, the facts we relied on and whether they came from a report or our own checks, whether automated means were used, the legal or contractual ground, and how you can challenge the decision: through our complaints route below, through an out-of-court dispute settlement body certified under the EU Digital Services Act, or in court." },
       { kind: "p", text: "Complaining about a decision. If you disagree with a moderation decision, reply to the statement of reasons or write to [appeals@dezbatere.ro] within six months. A person who was not involved in the original decision reviews it, and we tell you the outcome with reasons. This does not affect your right to go to court or to use alternative dispute resolution under section 18. The complaints route also accepts complaints that we have failed to act on a report, that content was wrongly removed, that an account was wrongly restricted, or that an automated tool wrongly affected your content." },
+      { kind: "p", text: "Out-of-court dispute settlement. If you are in the European Union, you may take a dispute about one of our moderation decisions to an out-of-court dispute settlement body certified under Article 21 of the EU Digital Services Act (Regulation (EU) 2022/2065). This covers a decision about your content or your account, and our decision on a report you made. You choose the body from the list the European Commission publishes at digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, and you do not have to use our complaints route first. We take part in good faith, and we decline only if the same dispute, about the same content and on the same grounds, has already been settled. The body's decision does not bind either of us, and you keep your right to go to court. The body may charge you a small fee or nothing. If it decides in your favour, we pay its fees and repay your reasonable expenses; if it decides in ours, you do not pay our fees or expenses unless the body finds that you acted manifestly in bad faith." },
       { kind: "p", text: "Contacting a human. Our support assistant is an AI system and says so. You can ask to speak to a person at any time, and every support conversation offers that route. We do not rely on automated tools alone to communicate with you." },
+      { kind: "p", text: "Terrorist content. Terrorist content is illegal and is not allowed on DebateAI (section 7). Competent authorities in the European Union can send us removal orders under Regulation (EU) 2021/784 at the contact point in section 1. When we receive one, we remove the content, or block access to it in every EU country, within one hour. We tell the person who published it that it was removed and, if they ask, why and how to challenge the order, unless the authority decides that public security requires silence for a limited period. As the Regulation requires, we keep the removed content and the related data for six months, so that the removal can be reviewed and, if it was wrong, reversed. The person who published the content can challenge the order in the courts of the country whose authority issued it, and can also use our complaints route. No authority has required us to take specific measures against terrorist content under the Regulation; if one does, we will describe those measures here, including any automated tools." },
       { kind: "p", text: "Serious risk to life or safety. If we become aware of information suggesting a criminal offence involving a threat to someone's life or safety, we inform the competent authorities." }
     ]
   },
@@ -177,7 +180,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Suspension and termination",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "By you. Close your account at any time from Settings, as section 6 describes. You do not need a reason." },
+      { kind: "p", text: "By you. Close your account at any time from Settings, as section 6 describes. You do not need a reason. Closing your account ends these Terms. They end when the closure takes effect, after the 7-day grace period; the sections listed at the end of this section continue to apply after that." },
       { kind: "p", text: "By us. We may suspend or close your account, or remove or restrict your content, where: you materially breach these Terms, in particular section 7; your content is illegal, or the law or a court or authority requires us to act; your use threatens the security, integrity or availability of the service or the rights of others; your account has been inactive for [24 months] and we have given you notice; or we stop providing the service, or stop providing it in your country." },
       { kind: "p", text: "Except where the breach is serious, the law requires immediate action, or delay would cause harm, we tell you what the problem is and give you a reasonable opportunity to fix it before we suspend or close the account. We always give a statement of reasons under section 10, and you can challenge the decision." },
       { kind: "p", text: "If we close the service entirely, or withdraw it from your country, we give at least 30 days' notice, refund any prepaid amount for the period after closure, and provide a way to export your debates first." },
@@ -274,7 +277,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Severability. If any provision of these Terms is found unenforceable, that provision does not apply, and the rest of the Terms continue in force." },
       { kind: "p", text: "No waiver. If we do not enforce a term straight away, we do not lose the right to enforce it later." },
       { kind: "p", text: "Entire agreement. These Terms, together with the Cookie Policy and the AI Provider Register, are the whole agreement between us about the service. Commitments we make in the Privacy Policy bind us. Nothing in this paragraph excludes liability for fraudulent misrepresentation." },
-      { kind: "p", text: "Language. These Terms are published in English [and Romanian]. [State which version prevails for which users; Annex A notes where a local language is required.]" },
+      { kind: "p", text: "Language. These Terms are published in every language the site offers. The contract is in the language you signed up in: the language of the version you accepted, which our acceptance record keeps. If you later accept a new version in another language, the contract continues in that language. The other language versions are translations. Where the law of the country where you live says that a version in its own language prevails, that version prevails. If two language versions differ, we apply the meaning that is more favourable to you." },
       { kind: "p", text: "Contact. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bucharest, Romania." }
     ]
   },
@@ -382,7 +385,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "fe032570217ea191d28a698bef19a89ed43de9425c468256ac4cf8c321eb036c",
+  sha256: "8dc9f3c8216397e981350dc53678b849d588a1cef520a67a8325e6d565fcb7e4",
   eyebrow: "TERMS OF SERVICE · v2.1 · EFFECTIVE [DATE]",
   title: "What you agree to",
   lede: "The contract between you and DebateAIRO S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",
