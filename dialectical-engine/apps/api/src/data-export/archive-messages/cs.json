@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Vaše údaje z Dialectical Engine",
+  "archive.generated": "Připraveno {time} pro {pseudonym}.",
+  "archive.accountHeading": "Účet",
+  "archive.email": "E-mail",
+  "archive.memberSince": "Členem od",
+  "archive.debatesHeading": "Vaše debaty ({count})",
+  "archive.question": "Otázka",
+  "archive.verdict": "Verdikt",
+  "archive.verdictSupported": "Podpořeno",
+  "archive.verdictContested": "Sporné",
+  "archive.verdictUnsupported": "Nepodpořeno",
+  "archive.story": "Stručný průběh debaty",
+  "archive.arguments": "Argumenty",
+  "archive.visibilityPublic": "Zveřejněno",
+  "archive.visibilityPrivate": "Soukromé",
+  "archive.unreadable": "Obsah této debaty už nelze přečíst, protože její klíč byl zničen.",
+  "archive.noDebates": "Nemáte žádné debaty.",
+  "archive.filesNote": "Soubory JSON v tomto archivu ZIP obsahují stejná data ve strojově čitelné podobě; jejich seznam najdete v README.txt."
+}

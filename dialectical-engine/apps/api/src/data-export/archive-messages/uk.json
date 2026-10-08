@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "Ваші дані в Dialectical Engine",
+  "archive.generated": "Підготовлено {time} для {pseudonym}.",
+  "archive.accountHeading": "Обліковий запис",
+  "archive.email": "Електронна пошта",
+  "archive.memberSince": "Учасник від",
+  "archive.debatesHeading": "Ваші дебати ({count})",
+  "archive.question": "Запитання",
+  "archive.verdict": "Висновок",
+  "archive.verdictSupported": "Підтримано",
+  "archive.verdictContested": "Оспорено",
+  "archive.verdictUnsupported": "Не підтримано",
+  "archive.story": "Дебати стисло",
+  "archive.arguments": "Аргументи",
+  "archive.visibilityPublic": "Опубліковано",
+  "archive.visibilityPrivate": "Приватне",
+  "archive.unreadable": "Вміст цих дебатів більше неможливо прочитати, оскільки їхній ключ знищено.",
+  "archive.noDebates": "У вас немає дебатів.",
+  "archive.filesNote": "Файли JSON у цьому ZIP-архіві містять ті самі дані у форматі для машинної обробки; їх перелік наведено в README.txt."
+}

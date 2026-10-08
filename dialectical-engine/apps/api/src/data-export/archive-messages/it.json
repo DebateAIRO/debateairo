@@ -1,0 +1,20 @@
+{
+  "archive.pageTitle": "I tuoi dati su Dialectical Engine",
+  "archive.generated": "Preparato il {time} per {pseudonym}.",
+  "archive.accountHeading": "Il tuo account",
+  "archive.email": "Indirizzo email",
+  "archive.memberSince": "Iscritto dal",
+  "archive.debatesHeading": "I tuoi dibattiti ({count})",
+  "archive.question": "Domanda",
+  "archive.verdict": "Verdetto",
+  "archive.verdictSupported": "Sostenuta",
+  "archive.verdictContested": "Contestata",
+  "archive.verdictUnsupported": "Non sostenuta",
+  "archive.story": "Il dibattito in breve",
+  "archive.arguments": "Argomentazioni",
+  "archive.visibilityPublic": "Pubblicato",
+  "archive.visibilityPrivate": "Privato",
+  "archive.unreadable": "Il contenuto di questo dibattito non è più leggibile perché la sua chiave è stata distrutta.",
+  "archive.noDebates": "Non hai dibattiti.",
+  "archive.filesNote": "I file JSON in questo archivio ZIP contengono gli stessi dati in formato leggibile da una macchina; README.txt li elenca."
+}
