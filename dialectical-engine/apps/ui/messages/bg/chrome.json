@@ -64,6 +64,7 @@
   "chrome.footer.cancel": "Прекратяване на план",
   "chrome.footer.withdraw": "Отказ от план",
   "chrome.footer.paymentMarks": "Карти, които приемаме",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

@@ -64,6 +64,7 @@
   "chrome.footer.cancel": "Отменить тариф",
   "chrome.footer.withdraw": "Отказаться от тарифа",
   "chrome.footer.paymentMarks": "Принимаемые карты",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

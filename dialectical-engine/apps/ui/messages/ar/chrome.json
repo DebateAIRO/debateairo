@@ -64,6 +64,7 @@
   "chrome.footer.cancel": "إلغاء خطة",
   "chrome.footer.withdraw": "الانسحاب من خطة",
   "chrome.footer.paymentMarks": "البطاقات التي نقبلها",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   sessionCheckedWith: [] as string[],
   ageAskedWith: [] as string[],
   consentMissingFor: null as string | null,
+  marks: { netopia: false, visa: false, mastercard: false },
   flowProps: [] as Record<string, unknown>[],
   pollerProps: [] as Record<string, unknown>[]
 }));
@@ -34,6 +35,8 @@ vi.mock("@/lib/billing/serverBilling", () => ({
   sessionConfirmed: async (sessionToken: string) => { mocks.sessionCheckedWith.push(sessionToken); return mocks.sessionLive; },
   ageConfirmationOwed: async (sessionToken: string) => { mocks.ageAskedWith.push(sessionToken); return mocks.ageOwed; }
 }));
+// The owner's artwork is read from the disk on the server (N25b); the flow and the footer get the same answer.
+vi.mock("@/lib/billing/paymentMarks", () => ({ availablePaymentMarks: () => mocks.marks }));
 vi.mock("@/components/billing/CheckoutFlow", () => ({
   CheckoutFlow: (props: Record<string, unknown>) => { mocks.flowProps.push(props); return null; }
 }));
@@ -59,6 +62,7 @@ beforeEach(() => {
   mocks.sessionCheckedWith = [];
   mocks.ageAskedWith = [];
   mocks.consentMissingFor = null;
+  mocks.marks = { netopia: false, visa: false, mastercard: false };
   mocks.flowProps = [];
   mocks.pollerProps = [];
   resetRedirects();
@@ -97,6 +101,17 @@ describe("P19 /checkout and /checkout/return", () => {
     // The country comes from the connection through P8b's first quote, never from the browser's language.
     expect(Object.keys(mocks.flowProps[0]!)).not.toContain("suggestedCountry");
     expect(Object.keys(mocks.flowProps[0]!)).not.toContain("sdkOrigin");
+  });
+
+  it("reads the payment marks on the server and hands them to the flow, NETOPIA's beside the card marks (N25b)", async () => {
+    mocks.session = "t".repeat(43);
+    mocks.marks = { netopia: true, visa: false, mastercard: true };
+    const html = renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps[0]?.paymentMarks).toEqual({ netopia: true, visa: false, mastercard: true });
+    // The footer under the flow shows the same two.
+    expect(html).toContain('src="/payment-marks/netopia.svg"');
+    expect(html).toContain('src="/payment-marks/mastercard.svg"');
+    expect(html).not.toContain('src="/payment-marks/visa.svg"');
   });
 
   it("is not found while billing is off, for the checkout and its return page alike", async () => {

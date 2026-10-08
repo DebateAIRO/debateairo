@@ -64,6 +64,7 @@
   "chrome.footer.cancel": "Paketi tühistamine",
   "chrome.footer.withdraw": "Paketist taganemine",
   "chrome.footer.paymentMarks": "Kaardid, mida aktsepteerime",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

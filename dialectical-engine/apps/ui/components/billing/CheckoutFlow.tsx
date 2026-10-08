@@ -5,12 +5,14 @@ import {
   BUCHAREST_COUNTY, BUCHAREST_SECTORS, ContractHttpError, isRomanianInvoiceLocality, postcodeOptional, ROMANIA_COUNTIES,
   type ContractClient
 } from "@debateai/contract";
+import { PaymentMarksGroup } from "@/components/SiteFooter";
 import { ageConfirmationHref } from "@/lib/ageConfirmation";
 import { contractClient } from "@/lib/api";
 import { phonePrefill, phoneTyped } from "@/lib/billing/callingCodes";
 import { checkoutFailureKey } from "@/lib/billing/checkoutFailure";
 import { COUNTRY_CODES } from "@/lib/billing/countries";
 import { countryName, formatUsd, planName, renewDayLabel, taxLabel } from "@/lib/billing/format";
+import type { PaymentMarks } from "@/lib/billing/paymentMarks";
 import type { PaidPlanId } from "@/lib/billing/plans";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import billingEnglish from "@/messages/en/billing.json";
@@ -25,6 +27,7 @@ export type CheckoutConsents = Readonly<{ renewal: ConsentPair; immediateStart: 
 /** A31 (h), R-15: the countries whose region the invoice and the tax need (as N18's `addressRequired`). */
 const REGION_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA", "RO"]);
 const EMPTY_DETAILS: BillingDetails = Object.freeze({ firstName: "", lastName: "", phone: "", street: "", postalCode: "" });
+const NO_MARKS: PaymentMarks = Object.freeze({ netopia: false, visa: false, mastercard: false });
 
 /** Leaves for the age gate's interstitial the way AuthGate does (no history entry back to a page that cannot pay). */
 const leaveFor = (href: string): void => { window.location.replace(href); };
@@ -41,7 +44,8 @@ export function CheckoutFlow({
   consents,
   client = contractClient,
   navigate = leaveFor,
-  goToPayment = leaveForPayment
+  goToPayment = leaveForPayment,
+  paymentMarks = NO_MARKS
 }: Readonly<{
   planId: PaidPlanId;
   locale: string;
@@ -50,6 +54,8 @@ export function CheckoutFlow({
   client?: CheckoutClient;
   navigate?: (href: string) => void;
   goToPayment?: (url: string) => void;
+  /** Spec §2.18 (N25b): the marks whose artwork the owner supplied, read on the server by the page; none by default. */
+  paymentMarks?: PaymentMarks;
 }>) {
   // Empty until the first quote answers the connection's country (spec §1.3: pre-filled from the address).
   const [country, setCountry] = useState("");
@@ -367,6 +373,8 @@ export function CheckoutFlow({
               {t(catalog, "billing.checkout.continueToCard")}
             </button>
           </div>
+          {/* Spec §2.18: NETOPIA's logo and the card marks NETOPIA's shop approval asks for on the checkout, as in the footer. */}
+          <PaymentMarksGroup marks={paymentMarks} />
         </section>
       ) : null}
     </section>

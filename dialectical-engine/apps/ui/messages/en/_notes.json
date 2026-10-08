@@ -30,7 +30,7 @@
   "billing.cancelPage.confirmLede": "The page cannot know the plan's state, so it states both cases before the button: with a payment overdue the plan ends at once; otherwise it runs to the end of the paid month. Keep both.",
   "billing.cancelPage.done": "Promise no date here: the confirmation email names the exact day access ends.",
   "chrome.footer.dbipCredit": "Keep exactly 'IP Geolocation by DB-IP' in every locale: DB-IP's free licence requires this credit text.",
-  "chrome.footer.visa": "Brand names: keep 'Visa' and 'Mastercard' as they are.",
+  "chrome.footer.visa": "Brand names: keep 'NETOPIA Payments', 'Visa' and 'Mastercard' as they are.",
   "legal.notice.s01.seller": "{company} is the company's legal name, filled in from the legal notice's facts; keep both.",
   "legal.notice.s04.payments": "NETOPIA Payments is a brand name; keep it.",
   "legal.archive.textId": "{id} is the first 12 characters of the text's fingerprint (letters a–f and digits); copy it unchanged.",

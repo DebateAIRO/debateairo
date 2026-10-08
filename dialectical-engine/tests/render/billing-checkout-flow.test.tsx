@@ -378,3 +378,40 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     }
   });
 });
+
+describe("N25b the payment marks under Continue (spec §2.18)", () => {
+  const marksImages = (): string[][] => [...container.querySelectorAll('[role="group"] img')]
+    .map((image) => [image.getAttribute("src") ?? "", image.getAttribute("alt") ?? ""]);
+  async function renderWithMarks(paymentMarks?: Readonly<{ netopia: boolean; visa: boolean; mastercard: boolean }>): Promise<void> {
+    await act(async () => {
+      root.render(<CheckoutFlow planId="PLUS" locale="en" catalog={billingEnglish} consents={CONSENTS}
+        client={client as unknown as CheckoutClient} goToPayment={goToPayment} paymentMarks={paymentMarks} />);
+    });
+    await settle();
+  }
+
+  it("shows the marks it is given, NETOPIA's first, in the footer's words, right under the Continue button", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    await renderWithMarks({ netopia: true, visa: true, mastercard: true });
+    expect(marksImages()).toEqual([
+      ["/payment-marks/netopia.svg", "NETOPIA Payments"],
+      ["/payment-marks/visa.svg", "Visa"],
+      ["/payment-marks/mastercard.svg", "Mastercard"]
+    ]);
+    const group = container.querySelector('[role="group"]')!;
+    expect(group.getAttribute("aria-label")).toBe("Cards we accept");
+    expect(group.previousElementSibling?.contains(button("billing.checkout.continueToCard")!)).toBe(true);
+  });
+
+  it("shows only the marks whose files are there, and no group when none is given or none is there", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    await renderWithMarks({ netopia: true, visa: false, mastercard: false });
+    expect(marksImages()).toEqual([["/payment-marks/netopia.svg", "NETOPIA Payments"]]);
+    await renderWithMarks({ netopia: false, visa: false, mastercard: false });
+    expect(button("billing.checkout.continueToCard")).toBeDefined();
+    expect(container.querySelector('[role="group"]')).toBeNull();
+    await renderWithMarks();
+    expect(button("billing.checkout.continueToCard")).toBeDefined();
+    expect(container.querySelectorAll("img")).toHaveLength(0);
+  });
+});

@@ -64,6 +64,7 @@
   "chrome.footer.cancel": "योजना रद्द करें",
   "chrome.footer.withdraw": "योजना से अनुबंध वापस लें",
   "chrome.footer.paymentMarks": "हम ये कार्ड स्वीकार करते हैं",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

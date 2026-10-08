@@ -2369,9 +2369,10 @@ the list of files in that folder only when it starts, so after copying the files
 `systemctl restart debateai-ui`. Until then the footer shows them as broken images. No rebuild is needed.
 
 NETOPIA's shop approval also asks for NETOPIA's own mark beside the card marks, in the footer and on the checkout.
-Keep its official artwork at `apps/ui/public/payment-marks/netopia.svg` with the other two. The site does not show that
-mark yet, and the checkout shows no mark at all: showing them is a code change, made before NETOPIA checks the site
-(go-live rows 17 and N-23).
+Keep its official artwork at `apps/ui/public/payment-marks/netopia.svg` with the other two. The footer and the checkout
+(under its Continue button) show NETOPIA's mark first, then Visa and Mastercard, each only when its file is there, so
+put all three files in place, and restart the website as above, before NETOPIA checks the site (go-live rows 17 and
+N-23).
 
 **What NETOPIA checks on the site before it approves the shop.** NETOPIA looks at the live site (or at the test
 server, if it agrees: go-live row N-26) before it lets the POS take real payments. Make sure each of these is there and

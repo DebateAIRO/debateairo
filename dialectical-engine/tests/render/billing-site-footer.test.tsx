@@ -18,8 +18,10 @@ const full = (billing: SiteFooterBilling | null): Element =>
   markup(<SiteFooter variant="full" billing={billing} />).querySelector("footer.siteFooterFull")!;
 const fullWithoutProp = (): Element => markup(<SiteFooter variant="full" />).querySelector("footer.siteFooterFull")!;
 const hrefs = (root: Element): string[] => [...root.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "");
-const on = (visa: boolean, mastercard: boolean): SiteFooterBilling => ({ billingOn: true, marks: { visa, mastercard } });
-const OFF_WITH_MARKS: SiteFooterBilling = { billingOn: false, marks: { visa: true, mastercard: true } };
+const on = (visa: boolean, mastercard: boolean, netopia = false): SiteFooterBilling =>
+  ({ billingOn: true, marks: { netopia, visa, mastercard } });
+const OFF_WITH_MARKS: SiteFooterBilling = { billingOn: false, marks: { netopia: true, visa: true, mastercard: true } };
+const NO_MARKS = { netopia: false, visa: false, mastercard: false };
 const BILLING_LINKS = ["/pricing", "/cancel", "/withdraw"];
 
 describe("P21 the site footer, extended for paid plans (R3-4; the card processor's website rules, DB-IP's licence)", () => {
@@ -59,6 +61,26 @@ describe("P21 the site footer, extended for paid plans (R3-4; the card processor
     expect(both.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("Cards we accept");
   });
 
+  it("puts NETOPIA's mark first, before Visa and Mastercard, and shows no group when none of the three is there (spec §2.18)", () => {
+    const netopiaOnly = full(on(false, false, true));
+    expect([...netopiaOnly.querySelectorAll('[role="group"] img')].map((image) => [image.getAttribute("src"), image.getAttribute("alt")]))
+      .toEqual([["/payment-marks/netopia.svg", "NETOPIA Payments"]]);
+    const all = full(on(true, true, true));
+    expect([...all.querySelectorAll('[role="group"] img')].map((image) => image.getAttribute("src")))
+      .toEqual(["/payment-marks/netopia.svg", "/payment-marks/visa.svg", "/payment-marks/mastercard.svg"]);
+    expect([...all.querySelectorAll('[role="group"] img')].map((image) => image.getAttribute("alt")))
+      .toEqual(["NETOPIA Payments", "Visa", "Mastercard"]);
+    expect(full(on(false, false, false)).querySelector('[role="group"]')).toBeNull();
+  });
+
+  it("names NETOPIA Payments untranslated in every locale, as Visa and Mastercard are", () => {
+    expect(chromeEnglish["chrome.footer.netopia"]).toBe("NETOPIA Payments");
+    for (const locale of readdirSync(resolve("apps/ui/messages"))) {
+      const chrome = JSON.parse(readFileSync(resolve("apps/ui/messages", locale, "chrome.json"), "utf8")) as Record<string, string>;
+      expect(chrome["chrome.footer.netopia"], locale).toBe("NETOPIA Payments");
+    }
+  });
+
   it("leaves the one-line footer exactly as it was: the seven legal links, and nothing about paying", () => {
     const line = markup(<SiteFooter variant="line" />).querySelector("footer.siteFooterLine")!;
     expect(hrefs(line)).toEqual(LEGAL_PAGES.map(({ href }) => href));
@@ -66,9 +88,9 @@ describe("P21 the site footer, extended for paid plans (R3-4; the card processor
 
   it("takes billing's state from the one plans read, and the marks from the owner's files (none in the repository)", async () => {
     mocks.billingOn = false;
-    expect(await siteFooterBilling()).toEqual({ billingOn: false, marks: { visa: false, mastercard: false } });
+    expect(await siteFooterBilling()).toEqual({ billingOn: false, marks: NO_MARKS });
     mocks.billingOn = true;
-    expect(await siteFooterBilling()).toEqual({ billingOn: true, marks: { visa: false, mastercard: false } });
-    expect(billingPageFooter()).toEqual({ billingOn: true, marks: { visa: false, mastercard: false } });
+    expect(await siteFooterBilling()).toEqual({ billingOn: true, marks: NO_MARKS });
+    expect(billingPageFooter()).toEqual({ billingOn: true, marks: NO_MARKS });
   });
 });

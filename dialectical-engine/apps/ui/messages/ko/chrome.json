@@ -64,6 +64,7 @@
   "chrome.footer.cancel": "요금제 해지",
   "chrome.footer.withdraw": "요금제 철회",
   "chrome.footer.paymentMarks": "사용 가능한 카드",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

@@ -64,6 +64,7 @@
   "chrome.footer.cancel": "Atcelt plānu",
   "chrome.footer.withdraw": "Atteikties no plāna",
   "chrome.footer.paymentMarks": "Kartes, ko pieņemam",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

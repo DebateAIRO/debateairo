@@ -5,6 +5,7 @@ import { CheckoutFlow, type CheckoutConsents } from "@/components/billing/Checko
 import { SiteFooter } from "@/components/SiteFooter";
 import { ageConfirmationHref } from "@/lib/ageConfirmation";
 import { billingPageFooter } from "@/lib/billing/footerBilling";
+import { availablePaymentMarks } from "@/lib/billing/paymentMarks";
 import { isPaidPlanId } from "@/lib/billing/plans";
 import { ageConfirmationOwed, billingIsOn, sessionConfirmed } from "@/lib/billing/serverBilling";
 import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
@@ -65,6 +66,7 @@ export default async function CheckoutPage({
           locale={locale}
           catalog={billingCatalog}
           consents={consentPairs(locale)}
+          paymentMarks={availablePaymentMarks()}
         />
       </div>
       <SiteFooter variant="full" billing={billingPageFooter()} />
