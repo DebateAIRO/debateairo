@@ -41,7 +41,8 @@ describe.runIf(fixtures.length > 0)("N22 — recorded NETOPIA fixtures (OWNER-RU
     for (const candidate of fixtures) {
       expect(candidate.format, candidate.kind).toBe(NETOPIA_FIXTURE_FORMAT);
       for (const pos of candidate.bodyText.match(/[A-Z0-9]{4}(?:-[A-Z0-9]{4}){4}/gu) ?? []) expect(pos, candidate.kind).toBe(SCRUBBED_POS_SIGNATURE);
-      for (const token of candidate.bodyText.match(/"token"\s*:\s*"([^"]*)"/gu) ?? []) expect(token, candidate.kind).toMatch(/"fake-token-[0-9]+"$/u);
+      // Every member whose key holds "token", in any letter case (customerAction.authenticationToken, binding.cardToken, …).
+      for (const [, key, value] of candidate.bodyText.matchAll(/"([^"]*token[^"]*)"\s*:\s*"([^"]*)"/giu)) expect(value, `${candidate.kind} ${key}`).toMatch(/^fake-token-[0-9]+$/u);
     }
   });
 

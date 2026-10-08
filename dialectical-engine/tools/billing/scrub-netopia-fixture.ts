@@ -108,21 +108,29 @@ export class NetopiaScrubber {
 
   scrub(bodyText: string): string {
     const originals = new Map<string, string>();
-    const scrubbed = writeJson(this.#node(readJson(bodyText), null, originals));
+    const scrubbed = writeJson(this.#node(readJson(bodyText), null, false, originals));
     for (const [original, key] of originals) if (original.length >= LEFTOVER_MIN && scrubbed.includes(original)) throw new TypeError(`NETOPIA_SCRUB_LEFT_A_VALUE:${key}`);
     return scrubbed;
   }
 
-  #node(node: Node, key: string | null, originals: Map<string, string>): Node {
-    if (node.t === "object") return { t: "object", members: node.members.map(([name, member]) => [name, this.#node(member, name, originals)]) };
-    if (node.t === "array") return { t: "array", items: node.items.map((item) => this.#node(item, key, originals)) };
+  /**
+   * `inFormData`: below a `formData` member (NETOPIA's 3-D Secure customerAction.formData, e.g. paReq and MD). NETOPIA's
+   * OpenAPI says that data must not be stored and no code of ours reads it, so every string there keeps only its shape.
+   */
+  #node(node: Node, key: string | null, inFormData: boolean, originals: Map<string, string>): Node {
+    if (node.t === "object") {
+      return { t: "object", members: node.members.map(([name, member]) => [name, this.#node(member, name, inFormData || name.toLowerCase() === "formdata", originals)]) };
+    }
+    if (node.t === "array") return { t: "array", items: node.items.map((item) => this.#node(item, key, inFormData, originals)) };
     const name = (key ?? "").toLowerCase();
     if (name === "expiremonth" || name === "expmonth") return node.t === "string" ? { t: "string", value: "12" } : { t: "number", text: "12" };
     if (name === "expireyear" || name === "expyear") return node.t === "string" ? { t: "string", value: "2030" } : { t: "number", text: "2030" };
     if (node.t !== "string") return node;
     const value = node.value;
     const keep = (replacement: string): Node => { if (value !== replacement) originals.set(value, key ?? ""); return { t: "string", value: replacement }; };
-    if (name === "token") return keep(this.#token(value));
+    if (inFormData) return keep(shapeOf(value));
+    // Any key holding "token" (token, Token, cardToken, token_id, customerAction.authenticationToken, …): spec §2.2 rule 5.
+    if (name.includes("token")) return keep(this.#token(value));
     if (POS_KEYS.has(name)) return keep(SCRUBBED_POS_SIGNATURE);
     if (FIXED[name] !== undefined) return keep(FIXED[name]!);
     if (SHAPED.has(name)) return keep(shapeOf(value));
@@ -160,8 +168,22 @@ export function scrubCapture(capture: NetopiaCapture, scrubber: NetopiaScrubber,
   if (!RECORDED_ON.test(recordedOn)) throw new TypeError("NETOPIA_SCRUB_RECORDED_ON_INVALID");
   return Object.freeze({
     format: NETOPIA_FIXTURE_FORMAT, kind: capture.kind, environment, recordedOn,
-    httpStatus: capture.httpStatus, contentType: capture.contentType, bodyText: scrubber.scrub(capture.bodyText)
+    httpStatus: capture.httpStatus, contentType: capture.contentType, bodyText: scrubbedBody(capture.bodyText, scrubber)
   });
+}
+
+/**
+ * A body that is not JSON (an HTTP 404 or 405 with an empty or HTML page, which NETOPIA's own clients treat as distinct
+ * cases) is kept only as a fixed marker of its length: not one original character, so nothing personal or secret can
+ * survive, and the rest of the recording is still written. The fixture's httpStatus and contentType carry the facts.
+ */
+function scrubbedBody(bodyText: string, scrubber: NetopiaScrubber): string {
+  try {
+    return scrubber.scrub(bodyText);
+  } catch (error) {
+    if (error instanceof TypeError && error.message === "NETOPIA_SCRUB_NOT_JSON") return `[not JSON: ${bodyText.length} characters]`;
+    throw error;
+  }
 }
 
 export type ScrubberOutput = Readonly<{ stdout(text: string): void; stderr(text: string): void }>;

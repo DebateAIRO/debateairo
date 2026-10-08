@@ -39,7 +39,8 @@ const MIN_TOOL_AMOUNT_MICROS = 10_000;
 const RECORDING_DESCRIPTION = "DebateAI NETOPIA recording";
 const SANDBOX_PAYER_IP = "192.0.2.10";
 const PRINTABLE_CODE = /^[A-Z][A-Z0-9_]{2,95}(?::[A-Za-z0-9_.-]{1,64})?$/u;
-const TOKEN_MEMBER = /"token"\s*:\s*"(?:[^"\\]|\\.)*"/giu;
+/** A string member whose key holds "token" in any letter case (token, Token, cardToken, token_id, authenticationToken, …). */
+const TOKEN_MEMBER = /"([^"\\]*token[^"\\]*)"\s*:\s*"(?:[^"\\]|\\.)*"/giu;
 /** A made-up payer for the sandbox (NETOPIA's sandbox needs a complete one; nothing here is a person's). */
 const SANDBOX_PAYER: Payer = Object.freeze({
   firstName: "Sandbox", lastName: "Payer", email: "sandbox-payer@example.com", phone: "+40700000001", country: "RO",
@@ -113,9 +114,13 @@ export function newToolOrderId(): string {
   return `t-${randomBytes(15).toString("hex")}`;
 }
 
-/** Every `"token":"…"` value, in any letter case, becomes "[token]" (the key stays, so the token's PATH is still recorded). */
+/**
+ * The string value of every member whose key holds "token", in any letter case and anywhere in the key (NETOPIA's
+ * payment.token and binding.token, customerAction.authenticationToken, a cardToken, a token_id, …), becomes "[token]".
+ * The key stays exactly as written, so a capture still shows NETOPIA's real key, its letter case and the token's PATH.
+ */
 export function redactTokens(text: string): string {
-  return text.replace(TOKEN_MEMBER, '"token":"[token]"');
+  return text.replace(TOKEN_MEMBER, '"$1":"[token]"');
 }
 
 export type CapturedExchange = Readonly<{ path: string; requestText: string; httpStatus: number | null; contentType: string | null; responseText: string | null }>;
@@ -260,7 +265,9 @@ async function status(command: Extract<ToolCommand, { command: "status" }>, sess
   } catch (error) {
     line = codeOf(error);
   }
-  const kind = read === "NO_SUCH_ORDER" ? "status-no-such-order" : ntpId === null ? "status-answer-without-ntp-id" : "status-answer";
+  // The kind follows the command, not the parse: an --unknown-order read IS how NETOPIA says "no such order", whatever
+  // the package made of the answer (a code or an HTTP status the build did not guess is exactly what the recording is for).
+  const kind = command.orderId === null || read === "NO_SUCH_ORDER" ? "status-no-such-order" : ntpId === null ? "status-answer-without-ntp-id" : "status-answer";
   writeExchanges(command.captureDir, session, from, { request: null, answer: kind }, orderId, at);
   output.stdout(`NETOPIA_SANDBOX_STATUS=${line}\n`);
   return read === null ? 1 : 0;
@@ -298,8 +305,13 @@ async function fixture(command: Extract<ToolCommand, { command: "fixture" }>, se
   if (state === null) throw new TypeError("NETOPIA_SANDBOX_STATE_MISSING");
   const notices = await session.storedNotices(command.orderId);
   notices.forEach((notice, index) => {
-    writeCapture(command.captureDir, session, index === 0 ? `notice-${state.run}` : `notice-${state.run}-${index + 1}`, command.orderId, notice.receivedAt,
-      { httpStatus: null, contentType: "application/json", bodyText: redactTokens(notice.rawBody.toString("utf8")) });
+    try {
+      writeCapture(command.captureDir, session, index === 0 ? `notice-${state.run}` : `notice-${state.run}-${index + 1}`, command.orderId, notice.receivedAt,
+        { httpStatus: null, contentType: "application/json", bodyText: redactTokens(notice.rawBody.toString("utf8")) });
+    } catch (error) {
+      // Already copied by an earlier run: the same order, kind and receivedAt name the same file ('wx' answers EEXIST).
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
   });
   output.stdout(`NETOPIA_SANDBOX_NOTICES=${notices.length}\n`);
   return notices.length > 0 ? 0 : 1;

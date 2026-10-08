@@ -76,6 +76,22 @@ describe("N22 — NetopiaScrubber", () => {
     expect(link.payment.paymentURL).toBe("https://secure-sandbox.netopia-payments.com/ui/card?p=SCRUBBED");
   });
 
+  it("replaces a token under any key holding 'token', keeping the key as written, and shapes every 3-D Secure formData value", () => {
+    const piece = (name: string): string => [name, "n22", "secret", "7f3a9c"].join("-");
+    const [auth, paReq, md, card, binding] = [piece("auth"), `${piece("pareq")}+/=`, piece("md"), piece("card"), piece("bind")];
+    const text = JSON.stringify({
+      customerAction: { type: "Authentication3D", authenticationToken: auth, formData: { paReq, MD: md } },
+      payment: { binding: { cardToken: card, Token: binding } }
+    });
+    const scrubbed = new NetopiaScrubber().scrub(text);
+    for (const original of [auth, paReq, md, card, binding]) expect(scrubbed, original).not.toContain(original);
+    expect(JSON.parse(scrubbed)).toEqual({
+      customerAction: { type: "Authentication3D", authenticationToken: "fake-token-1",
+        formData: { paReq: "XXXXX-X00-XXXXXX-0X0X0X+/=", MD: "XX-X00-XXXXXX-0X0X0X" } },
+      payment: { binding: { cardToken: "fake-token-2", Token: "fake-token-3" } }
+    });
+  });
+
   it("refuses to write a body where a personal value survives under a key it does not know", () => {
     const leaky = '{"order":{"billing":{"email":"stefan.real@example.org"},"data":{"note":"stefan.real@example.org"}}}';
     expect(() => new NetopiaScrubber().scrub(leaky)).toThrow("NETOPIA_SCRUB_LEFT_A_VALUE:email");
@@ -106,5 +122,29 @@ describe("N22 — captures to fixtures", () => {
     expect(readFileSync(join(out, "start-request.json"), "utf8")).toContain('"amount\\":2.00');
     expect(lines.join("")).toContain("NETOPIA_FIXTURES_WRITTEN=2");
     expect(runNetopiaScrubber(["--capture-dir", dir, "--out", out], { stdout: () => undefined, stderr: () => undefined })).toBe(2);
+  });
+
+  const html = "<html><body><h1>404 Not Found</h1><p>nginx secret-host-n22</p></body></html>";
+  const notFound = { ...capture("status-no-such-order", html), httpStatus: 404, contentType: "text/html" };
+
+  it("keeps a body that is not JSON only as a marker of its length, with its status and content type", () => {
+    const fixture = scrubCapture(notFound, new NetopiaScrubber(), "2026-10-08");
+    expect(fixture).toEqual({ format: NETOPIA_FIXTURE_FORMAT, kind: "status-no-such-order", environment: "sandbox", recordedOn: "2026-10-08",
+      httpStatus: 404, contentType: "text/html", bodyText: `[not JSON: ${html.length} characters]` });
+    expect(JSON.stringify(fixture)).not.toContain("nginx");
+    expect(() => new NetopiaScrubber().scrub(html)).toThrow("NETOPIA_SCRUB_NOT_JSON");
+  });
+
+  it("completes a recording whose folder holds a capture that is not JSON", () => {
+    const dir = mkdtempSync(join(tmpdir(), "n22-scrub-in-"));
+    chmodSync(dir, 0o700);
+    const out = mkdtempSync(join(tmpdir(), "n22-scrub-out-"));
+    writeFileSync(join(dir, "status-no-such-order-1.json"), JSON.stringify(notFound));
+    writeFileSync(join(dir, "start-request-2.json"), JSON.stringify(capture("start-request", startRequest)));
+    const lines: string[] = [];
+    expect(runNetopiaScrubber(["--capture-dir", dir, "--out", out, "--recorded-on", "2026-10-08"], { stdout: (text) => lines.push(text), stderr: (text) => lines.push(text) })).toBe(0);
+    expect(lines.join("")).toContain("NETOPIA_FIXTURES_WRITTEN=2");
+    expect(readdirSync(out).sort()).toEqual(["start-request.json", "status-no-such-order.json"]);
+    expect(readFileSync(join(out, "status-no-such-order.json"), "utf8")).not.toContain("nginx");
   });
 });

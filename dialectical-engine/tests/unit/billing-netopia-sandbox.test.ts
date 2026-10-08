@@ -36,6 +36,8 @@ async function notifySink(): Promise<Readonly<{ publicAppUrl: string; bodies: Bu
   return { publicAppUrl: `http://127.0.0.1:${(server.address() as AddressInfo).port}`, bodies };
 }
 
+const STORED_AT = Date.parse("2026-10-08T10:00:00.000Z");
+
 type Harness = Readonly<{
   fake: FakeNetopia; session: SandboxSession; dir: string; out: string[]; err: string[];
   toolOrders: Array<Readonly<{ orderId: string; paymentEnvironment: string; purpose: string }>>;
@@ -61,7 +63,8 @@ async function harness(o: Readonly<{ environment?: PaymentEnvironment; apiKey?: 
     insertToolOrder: async (row) => { toolOrders.push(row); },
     toolOrder: async (orderId) => toolOrders.find((row) => row.orderId === orderId) ?? null,
     latestCard: async (orderId) => (cards.has(orderId) ? createSecretToken(cards.get(orderId)!) : null),
-    storedNotices: async (orderId) => (notices.get(orderId) ?? []).map((rawBody) => ({ receivedAt: new Date(), rawBody })),
+    // As the database does: each stored message keeps its own receivedAt, the same on every read.
+    storedNotices: async (orderId) => (notices.get(orderId) ?? []).map((rawBody, index) => ({ receivedAt: new Date(STORED_AT + index * 1_000), rawBody })),
     close: async () => undefined
   });
   const out: string[] = [];
@@ -103,12 +106,17 @@ describe("N22 — the tool's arguments (spec §2.20.3)", () => {
     }
   });
 
-  it("redacts every token value in captured text, whatever its place or letter case", () => {
+  it("redacts every token value in captured text, whatever its place, its key or its letter case, keeping the key as written", () => {
     const secret = ["tok", "n22", "secret", "0001"].join("-");
-    const text = `{"payment":{"token":"${secret}","binding":{"Token" : "${secret}","expireMonth":12},"instrument":{"token":"a\\"b"}}}`;
+    const card = ["card", "n22", "secret", "0002"].join("-");
+    const id = ["tid", "n22", "secret", "0003"].join("-");
+    const auth = ["auth", "n22", "secret", "0004"].join("-");
+    const text = `{"payment":{"token":"${secret}","binding":{"Token" : "${secret}","expireMonth":12,"cardToken":"${card}","token_id":"${id}"},`
+      + `"instrument":{"token":"a\\"b"}},"customerAction":{"type":"Authentication3D","authenticationToken":"${auth}"}}`;
     const redacted = redactTokens(text);
-    expect(redacted).not.toContain(secret);
-    expect(redacted).toBe('{"payment":{"token":"[token]","binding":{"token":"[token]","expireMonth":12},"instrument":{"token":"[token]"}}}');
+    for (const value of [secret, card, id, auth]) expect(redacted).not.toContain(value);
+    expect(redacted).toBe('{"payment":{"token":"[token]","binding":{"Token":"[token]","expireMonth":12,"cardToken":"[token]","token_id":"[token]"},'
+      + '"instrument":{"token":"[token]"}},"customerAction":{"type":"Authentication3D","authenticationToken":"[token]"}}');
   });
 });
 
@@ -159,6 +167,14 @@ describe("N22 — start, status and zero on the sandbox", () => {
     expect(await h.run("status", "--capture-dir", h.dir, "--order", newToolOrderId())).toBe(1);
     expect(h.err.join("")).toContain("NETOPIA_SANDBOX_TOOL_ORDER_UNKNOWN");
   });
+
+  it("files an unknown-order read as status-no-such-order even when the package refuses NETOPIA's answer", async () => {
+    const h = await harness();
+    h.fake.failNext("MERCHANT_SETTINGS", "STATUS");
+    expect(await h.run("status", "--capture-dir", h.dir, "--unknown-order")).toBe(1);
+    expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("PAYMENT_CONFIGURATION_REFUSED:32");
+    expect(kinds(h.dir)).toEqual(["status-no-such-order"]);
+  });
 });
 
 describe("N22 — charge and fixture", () => {
@@ -205,6 +221,31 @@ describe("N22 — charge and fixture", () => {
     expect(stored.map((entry) => entry.capture.kind).sort()).toEqual(["notice-start", "notice-start-2"]);
     expect(JSON.stringify(stored)).not.toContain(h.fake.orders.get(orderId)!.token!);
     expect(String(stored.find((entry) => entry.capture.kind === "notice-start-2")!.capture.bodyText)).toContain('"token":"[token]"');
+  });
+
+  it("copies again into the same folder: what is already there is skipped, only messages that arrived since are added", async () => {
+    const h = await harness();
+    await h.run("start", "--capture-dir", h.dir);
+    const orderId = printed(h.out, "NETOPIA_SANDBOX_ORDER")!;
+    h.fake.pay(orderId, "DECLINE", "20");
+    h.fake.pay(orderId, "APPROVE");
+    await h.fake.deliverNotices();
+    h.notices.set(orderId, [...h.bodies]);
+    const noticeFiles = (): string[] => captures(h.dir).filter((entry) => String(entry.capture.kind).startsWith("notice-")).map((entry) => entry.name);
+    expect(await h.run("fixture", "--capture-dir", h.dir, "--order", orderId)).toBe(0);
+    const first = noticeFiles();
+    expect(first).toHaveLength(2);
+    h.out.length = 0;
+    expect(await h.run("fixture", "--capture-dir", h.dir, "--order", orderId)).toBe(0);
+    expect(printed(h.out, "NETOPIA_SANDBOX_NOTICES")).toBe("2");
+    expect(noticeFiles()).toEqual(first);
+    h.notices.get(orderId)!.push(Buffer.from(h.bodies[1]!));
+    h.out.length = 0;
+    expect(await h.run("fixture", "--capture-dir", h.dir, "--order", orderId)).toBe(0);
+    expect(printed(h.out, "NETOPIA_SANDBOX_NOTICES")).toBe("3");
+    const third = noticeFiles().filter((name) => !first.includes(name));
+    expect(third).toHaveLength(1);
+    expect(captures(h.dir).find((entry) => entry.name === third[0])!.capture.kind).toBe("notice-start-3");
   });
 });
 
