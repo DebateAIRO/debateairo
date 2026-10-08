@@ -170,7 +170,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     return <section className="authSecurityConfirmation" aria-label={t(catalog, "auth.security.title")}>
  {error ? <p role="alert">{error}</p> : null}
  {backup ? <EphemeralCodes codes={[backup]} catalog={catalog}/> : null}
- {held || initialProof ? <button type="button" disabled={busy || disabled} onClick={async () => {
+ {held || initialProof ? <button className="setBtn setBtnPrimary" type="button" disabled={busy || disabled} onClick={async () => {
                 const result = held ?? initialProof!;
                 if (!matchingSecurityGrant(result, authorization)) {
                     setHeld(null);
@@ -196,33 +196,33 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                     setBusy(false);
                 }
             }}>{t(catalog, "auth.security.confirm")}</button> : <>
- {methods?.available_step_up_methods.includes('passkey') ? <button type="button" disabled={busy || disabled} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button> : null}
- {methods?.available_step_up_methods.includes('provider') ? <div><p>{t(catalog, "auth.security.providerProof")}</p>{methods.step_up_providers.map(providerId => <button type="button" key={providerId} disabled={busy || disabled} onClick={() => void provider(providerId)}>{t(catalog, "auth.social.continue", { provider: providerId === 'google' ? 'Google' : providerId === 'apple' ? 'Apple' : providerId === 'facebook' ? 'Facebook' : 'X' })}</button>)}</div> : null}
- {methods?.available_step_up_methods.includes('password_totp') ? <><button type="button" disabled={busy || disabled} onClick={() => {
+ {methods?.available_step_up_methods.includes('passkey') ? <div className="authSecurityRow"><button className="setBtn" type="button" disabled={busy || disabled} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button></div> : null}
+ {methods?.available_step_up_methods.includes('provider') ? <div><p className="authSecurityHint">{t(catalog, "auth.security.providerProof")}</p><div className="authSecurityRow">{methods.step_up_providers.map(providerId => <button className="setBtn" type="button" key={providerId} disabled={busy || disabled} onClick={() => void provider(providerId)}>{t(catalog, "auth.social.continue", { provider: providerId === 'google' ? 'Google' : providerId === 'apple' ? 'Apple' : providerId === 'facebook' ? 'Facebook' : 'X' })}</button>)}</div></div> : null}
+ {methods?.available_step_up_methods.includes('password_totp') ? <><div className="authSecurityRow"><button className="setBtn" type="button" aria-pressed={passwordMode} disabled={busy || disabled} onClick={() => {
                     browser.cancel();
                     setPasswordMode(!passwordMode);
-                }}>{t(catalog, "auth.security.passwordMethod")}</button>{passwordMode ? <form method="post" action="/settings/security" noValidate onSubmit={e => {
+                }}>{t(catalog, "auth.security.passwordMethod")}</button></div>{passwordMode ? <form className="authSecurityForm" method="post" action="/settings/security" noValidate onSubmit={e => {
                         e.preventDefault();
                         const data = new FormData(e.currentTarget);
                         void passwordProof(String(data.get('security-code') ?? ''), String(data.get('security-password') ?? ''));
                     }}>
- <label htmlFor={`${id}-password`}>{t(catalog, "auth.password")}</label><input id={`${id}-password`} name="security-password" type="password" autoComplete="current-password" value={password} disabled={busy || disabled} onChange={e => {
+ <div className="setField"><label htmlFor={`${id}-password`}>{t(catalog, "auth.password")}</label><input id={`${id}-password`} name="security-password" type="password" autoComplete="current-password" placeholder={t(catalog, "auth.password")} value={password} disabled={busy || disabled} onChange={e => {
                         setPassword(e.target.value);
                         attempt.current.edited();
-                    }}/>
- <label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" maxLength={6} value={code} disabled={busy || disabled} onChange={e => {
+                    }}/></div>
+ <div className="setField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" maxLength={6} placeholder={t(catalog, "auth.login.authenticationCodeLabel")} value={code} disabled={busy || disabled} onChange={e => {
                         const value = e.target.value.replace(/\D/g, '').slice(0, 6);
                         if (value !== code)
                             attempt.current.edited();
                         setCode(value);
                         if (value.length === 6)
                             void passwordProof(value, String(e.currentTarget.form ? new FormData(e.currentTarget.form).get('security-password') ?? '' : password));
-                    }}/>
- <button type="submit" disabled={busy || disabled || !password || code.length !== 6}>{t(catalog, "auth.security.confirm")}</button>
+                    }}/></div>
+ <button className="setBtn setBtnPrimary" type="submit" disabled={busy || disabled || !password || code.length !== 6}>{t(catalog, "auth.security.confirm")}</button>
  </form> : null}</> : null}
  {!methods && !error ? <p role="status">{t(catalog, "auth.login.checking")}</p> : null}
  </>}
- {onCancel ? <button type="button" onClick={() => {
+ {onCancel ? <div><button className="setBtn setBtnQuiet" type="button" onClick={() => {
                 sequence.current++;
                 browser.cancel();
                 flight.current = false;
@@ -233,6 +233,6 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                 setBackup(null);
                 setHeld(null);
                 onCancel();
-            }}>{t(catalog, "auth.security.cancel")}</button> : null}
+            }}>{t(catalog, "auth.security.cancel")}</button></div> : null}
  </section>;
 }
