@@ -1,20 +1,19 @@
 import { randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { TypedDomainError } from "@debateai/kernel";
 import { BillingJobQueries, BillingRepository, createPool, EntitlementRepository, migrate, type OutboxJob } from "@debateai/db";
 import { foldSubscription, microsToDecimal, withdrawalRefundPerPaymentMicros } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
-import { testBillingPolicy } from "../support/billingFixtures.js";
 import {
   mountSubscriptionRoutes,
+  netopiaRefundDesk,
+  ownerRefundDone,
   recordingAudit,
-  seedActiveSubscription,
+  seedNetopiaSubscription,
   seedPaidUpgrade,
   seedWithdrawalGrant,
   subscriptionDeps
 } from "../support/billingSubscriptionFixtures.js";
-import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { chargeEvent } from "../../apps/api/src/billing/rows.js";
 import { withdraw } from "../../apps/api/src/billing/withdrawal.js";
 
@@ -30,7 +29,7 @@ const DAY = 86_400_000;
 async function start(label: string, input: Readonly<{ activatedDaysAgo: number; taxCountry: string; spentMicros?: number }>) {
   const identity = testHttpIdentity(label);
   const now = new Date();
-  const seeded = await seedActiveSubscription(database.pool, {
+  const seeded = await seedNetopiaSubscription(database.pool, {
     ownerRef: identity.authenticated.ownerRef, planId: "PLUS",
     activatedAt: new Date(now.getTime() - input.activatedDaysAgo * DAY), taxCountry: input.taxCountry
   });
@@ -67,22 +66,24 @@ const emailOf = async (template: string, ref: string) => (await database.pool.qu
   "SELECT payload FROM billing.outbox WHERE kind='EMAIL' AND ref=$1", [`${template}:${ref}`]
 )).rows.map((row) => row.payload);
 
-/** The XMONEY_REFUND jobs these refs name, claimed as P7's worker would (attempt 1). */
+/** The PAYMENT_REFUND jobs these refs name, claimed as P7's worker would (attempt 1). */
 async function claimRefunds(refs: readonly string[]): Promise<OutboxJob[]> {
-  const claimed = await new BillingRepository(database.pool).claim(["XMONEY_REFUND"], 50, "p12d-test", new Date());
+  const claimed = await new BillingRepository(database.pool).claim(["PAYMENT_REFUND"], 50, "p12d-test", new Date());
   return claimed.filter((job) => refs.includes(job.ref)).sort((left, right) => left.ref.localeCompare(right.ref));
 }
 
-/** P9b's desk over the real tables (its lease and the owner lock on the same pool), with an xMoney that refunds (or refuses) every call. */
-const deskWith = (refund: () => Promise<void>) => new RefundDesk({
-  repository: new BillingRepository(database.pool), jobs: new BillingJobQueries(database.pool),
-  xmoney: {
-    refund,
-    getTransaction: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "not read at attempt 1"); },
-    listTransactions: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "not listed at attempt 1"); }
-  },
-  policy: testBillingPolicy, audit: recordingAudit(), clock: () => new Date(), xmoneyEnvironment: "stage"
-});
+/** The API's desk in NETOPIA's owner mode (spec §2.12.2): a refund job hands the refund to the owner, moving no money. */
+const desk = () => netopiaRefundDesk(database.pool);
+const stageOf = (jobId: string) => new BillingJobQueries(database.pool).jobStage(jobId);
+
+/** The REFUNDED amounts recorded on a charge (none until the owner runs `pnpm billing:refund-done`). */
+const refundedOf = async (billing: BillingRepository, chargeId: string) =>
+  (await billing.charge(chargeId))!.events.filter((event) => event.kind === "REFUNDED").map((event) => event.amountMicros);
+
+/** The credit-note jobs a refund queued under `<charge>:<payment>` (RO sells through SmartBill: its storno). */
+const creditNotesOf = async (ref: string) => (await database.pool.query<{ kind: string; payload: Record<string, unknown> }>(
+  "SELECT kind, payload FROM billing.outbox WHERE kind IN ('SMARTBILL_STORNO','QUADERNO_RECORD_REFUND') AND ref=$1", [ref]
+)).rows;
 
 describe("P12d withdrawal on real PostgreSQL", () => {
   it("refunds the unused share across both charges newest first, ends the plan, and sends M8 after the last refund", async () => {
@@ -90,7 +91,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     const upgradeAt = new Date(run.now.getTime() - 12 * 3_600_000);
     const upgrade = await seedPaidUpgrade(database.pool, run.seeded, {
       at: upgradeAt, netMicros: 15_000_000, taxMicros: 3_150_000,
-      transactionId: "7700123", monthCreditOverrideMicros: 12_500_000
+      providerPaymentId: "7700123", monthCreditOverrideMicros: 12_500_000
     });
     // W6 (P2-I8): each payment over its own coverage; the upgrade's starts at its quote, a minute before it was paid.
     const expected = withdrawalRefundPerPaymentMicros({
@@ -113,9 +114,11 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     // A4(b): the newest transaction (the upgrade) is refunded first, and never beyond what it took.
     expect(await refundRequests(run.billing, upgrade.chargeId)).toEqual([["7700123", 18_150_000, "WITHDRAWAL"]]);
     expect(await refundRequests(run.billing, run.seeded.initialChargeId)).toEqual(
-      [[run.seeded.initialTransactionId, expected - 18_150_000, "WITHDRAWAL"]]
+      [[run.seeded.providerPaymentId, expected - 18_150_000, "WITHDRAWAL"]]
     );
-    const refs = [`${run.seeded.initialChargeId}:${run.seeded.initialTransactionId}`, `${upgrade.chargeId}:7700123`].sort();
+    const initialRef = `${run.seeded.initialChargeId}:${run.seeded.providerPaymentId}`;
+    const upgradeRef = `${upgrade.chargeId}:7700123`;
+    const refs = [initialRef, upgradeRef].sort();
     expect(run.audit.events.map(({ event }) => event)).toContain("billing.withdrawal");
     expect(run.kick).toHaveBeenCalledTimes(1);
     // No "we refunded" email while the money has not moved.
@@ -128,16 +131,33 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     expect(await emailOf("O2_WITHDRAWAL", run.seeded.subscriptionId)).toEqual([]);
     const jobs = await claimRefunds(refs);
     expect(jobs.map((job) => job.ref)).toEqual(refs);
-    const desk = deskWith(async () => undefined);
-    // The upgrade's refund lands first, and xMoney reports it as its own refund transaction naming the payment
-    // (D5 5g: REFUNDED on 7700999 with refundsTransactionId 7700123), which the follow-up must still count.
-    await desk.recordRefunded({
-      chargeId: upgrade.chargeId, transactionId: "7700123", amountMicros: 18_150_000, whole: false,
-      ownerRef: run.identity.authenticated.ownerRef, reason: "WITHDRAWAL"
-    }, new Date(), "7700999");
+    const owner = desk();
+    // Spec §2.12.2 (owner mode): each PAYMENT_REFUND job hands its refund to the owner, with the amount, the reason and
+    // the withdrawal's legal deadline, and moves no money.
+    for (const job of jobs) {
+      expect(await owner.handle(job, new Date())).toEqual({ kind: "DONE" });
+      expect(await stageOf(job.jobId)).toBe("OWNER_REFUND_DUE");
+    }
+    // The upgrade's payment goes back whole; the first payment only in part.
+    for (const [ref, amountMicros, whole] of [[upgradeRef, 18_150_000, "true"], [initialRef, expected - 18_150_000, "false"]] as const) {
+      expect(await emailOf("O2_REFUND_DUE", ref)).toEqual([expect.objectContaining({
+        template: "O2_REFUND_DUE", recipient: "OWNER", "param.refundAmount": microsToDecimal(amountMicros),
+        "param.refundReason": "WITHDRAWAL", "param.whole": whole,
+        "param.refundDeadline": new Date(run.now.getTime() + 14 * DAY).toISOString()
+      })]);
+    }
+    expect(await refundedOf(run.billing, upgrade.chargeId)).toEqual([]);
+    expect(await refundedOf(run.billing, run.seeded.initialChargeId)).toEqual([]);
     expect(await m8Of(run.seeded.subscriptionId)).toEqual([]);
-    const initialJob = jobs.find((job) => job.ref.startsWith(`${run.seeded.initialChargeId}:`))!;
-    expect(await desk.handle(initialJob, new Date())).toEqual({ kind: "DONE" });
+    // The owner refunds the upgrade's share in NETOPIA's admin and records it: its credit note follows, M8 waits.
+    expect(await ownerRefundDone(owner, upgrade.chargeId, 18_150_000)).toContain("Recorded.");
+    expect(await refundedOf(run.billing, upgrade.chargeId)).toEqual([18_150_000]);
+    expect((await creditNotesOf(upgradeRef)).map((row) => row.payload)).toEqual([expect.objectContaining({ refund_micros: 18_150_000 })]);
+    expect(await m8Of(run.seeded.subscriptionId)).toEqual([]);
+    // The last refund of the withdrawal, recorded the same way: M8 names the whole refund.
+    expect(await ownerRefundDone(owner, run.seeded.initialChargeId, expected - 18_150_000)).toContain("Recorded.");
+    expect((await creditNotesOf(initialRef)).map((row) => row.payload))
+      .toEqual([expect.objectContaining({ refund_micros: expected - 18_150_000 })]);
     const m8 = await m8Of(run.seeded.subscriptionId);
     expect(m8).toHaveLength(1);
     expect(m8[0]!.payload).toMatchObject({ "param.refundAmount": microsToDecimal(expected), "param.plan": "PRO" });
@@ -147,19 +167,59 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     await run.api.close();
   });
 
-  it("never sends M8 for a withdrawal whose refund xMoney refused", async () => {
+  it("never sends M8 for a withdrawal whose refund the owner has not recorded", async () => {
     const run = await start("p12d-refused", { activatedDaysAgo: 1, taxCountry: "DE" });
     expect((await run.withdraw()).statusCode).toBe(200);
-    const [job] = await claimRefunds([`${run.seeded.initialChargeId}:${run.seeded.initialTransactionId}`]);
-    const refused = deskWith(async () => { throw new TypedDomainError("XMONEY_REFUSED", "fake refusal"); });
-    expect(await refused.handle(job!, new Date())).toEqual({ kind: "DEAD", code: "XMONEY_REFUSED" });
+    const ref = `${run.seeded.initialChargeId}:${run.seeded.providerPaymentId}`;
+    const [request] = (await refundRequests(run.billing, run.seeded.initialChargeId)).filter(([, , reason]) => reason === "WITHDRAWAL");
+    const [job] = await claimRefunds([ref]);
+    // Owner mode: the job ends DONE having moved no money; the refund stays open until the owner records it.
+    expect(await desk().handle(job!, new Date())).toEqual({ kind: "DONE" });
+    expect(await stageOf(job!.jobId)).toBe("OWNER_REFUND_DUE");
+    expect(await refundedOf(run.billing, run.seeded.initialChargeId)).toEqual([]);
+    expect(await creditNotesOf(ref)).toEqual([]);
     expect(await m8Of(run.seeded.subscriptionId)).toEqual([]);
-    // W9: the person still holds the acknowledgement, and the owner's O2 names the reason and the legal deadline.
+    // W9: the person still holds the acknowledgement, and the owner's O2_REFUND_DUE names the amount, the reason and
+    // the legal deadline.
     expect(await emailOf("M8_RECEIVED", run.seeded.subscriptionId)).toHaveLength(1);
-    expect(await emailOf("O2", `${run.seeded.initialChargeId}:${run.seeded.initialTransactionId}`)).toEqual([expect.objectContaining({
-      template: "O2", recipient: "OWNER", "param.reasonCode": "XMONEY_REFUSED", "param.refundReason": "WITHDRAWAL",
-      "param.refundDeadline": new Date(run.now.getTime() + 14 * DAY).toISOString()
+    expect(await emailOf("O2_REFUND_DUE", ref)).toEqual([expect.objectContaining({
+      template: "O2_REFUND_DUE", recipient: "OWNER", "param.refundAmount": microsToDecimal(request![1] as number),
+      "param.refundReason": "WITHDRAWAL", "param.refundDeadline": new Date(run.now.getTime() + 14 * DAY).toISOString()
     })]);
+    await run.api.close();
+  });
+
+  it("keeps the rest of a withdrawal refund open when the owner records a part: still reminded, no M8 until the rest", async () => {
+    const run = await start("p12d-part", { activatedDaysAgo: 1, taxCountry: "RO" });
+    expect((await run.withdraw()).statusCode).toBe(200);
+    const ref = `${run.seeded.initialChargeId}:${run.seeded.providerPaymentId}`;
+    const [request] = (await refundRequests(run.billing, run.seeded.initialChargeId)).filter(([, , reason]) => reason === "WITHDRAWAL");
+    const requestedMicros = request![1] as number;
+    const partMicros = 5_000_000;
+    expect(requestedMicros).toBeGreaterThan(partMicros);
+    const owner = desk();
+    const [job] = await claimRefunds([ref]);
+    expect(await owner.handle(job!, new Date())).toEqual({ kind: "DONE" });
+    // The owner refunded only a part in NETOPIA's admin and records that part.
+    expect(await ownerRefundDone(owner, run.seeded.initialChargeId, partMicros))
+      .toContain(`${microsToDecimal(requestedMicros - partMicros)} USD is still open`);
+    expect(await refundedOf(run.billing, run.seeded.initialChargeId)).toEqual([partMicros]);
+    // A part runs no follow-up: no M8 and no credit note yet, and the rest is in the owner's reminder.
+    expect(await m8Of(run.seeded.subscriptionId)).toEqual([]);
+    expect(await creditNotesOf(ref)).toEqual([]);
+    const now = new Date();
+    expect(await owner.remindOwnerRefunds(now)).toBeGreaterThan(0);
+    const [reminder] = await emailOf("O2_REFUND_REMINDER", now.toISOString().slice(0, 10));
+    expect(String(reminder!["param.refundList"])).toContain(
+      `- charge ${run.seeded.initialChargeId}, NETOPIA payment ${run.seeded.providerPaymentId}:`
+        + ` refund ${microsToDecimal(requestedMicros - partMicros)} USD (part of the payment), reason WITHDRAWAL`
+    );
+    // The rest recorded: M8 and the credit note now follow, for the whole refund.
+    expect(await ownerRefundDone(owner, run.seeded.initialChargeId, requestedMicros - partMicros)).toContain("Recorded.");
+    expect(await refundedOf(run.billing, run.seeded.initialChargeId)).toEqual([partMicros, requestedMicros - partMicros]);
+    expect((await creditNotesOf(ref)).map((row) => row.payload)).toEqual([expect.objectContaining({ refund_micros: requestedMicros })]);
+    expect((await m8Of(run.seeded.subscriptionId)).map((row) => row.payload))
+      .toEqual([expect.objectContaining({ "param.refundAmount": microsToDecimal(requestedMicros) })]);
     await run.api.close();
   });
 
@@ -209,7 +269,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
         readOwnerSpentMicros: async () => {
           await seedPaidUpgrade(database.pool, run.seeded, {
             at: new Date(run.now.getTime() - 60_000), netMicros: 15_000_000, taxMicros: 3_150_000,
-            transactionId: "7700456", monthCreditOverrideMicros: 12_500_000
+            providerPaymentId: "7700456", monthCreditOverrideMicros: 12_500_000
           });
           return 0;
         }
@@ -223,11 +283,11 @@ describe("P12d withdrawal on real PostgreSQL", () => {
 
   it("hands the withdrawal to the owner when a dashboard refund touched a payment: plan ended, no refund, no M8", async () => {
     const run = await start("p12d-dashboard", { activatedDaysAgo: 1, taxCountry: "RO" });
-    // P9c's record of a refund made in the xMoney dashboard: its true amount is unknown (an upper bound here).
+    // VERIFY_PAYMENT's record of a refund made in NETOPIA's admin: its true amount is unknown (an upper bound here).
     await run.billing.withTransaction(async (client) => {
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await run.billing.appendChargeEvent(client, chargeEvent(run.seeded.initialChargeId, kind, new Date(run.now.getTime() - 60_000), {
-          providerPaymentId: run.seeded.initialTransactionId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
+          providerPaymentId: run.seeded.providerPaymentId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
         }));
       }
     });
@@ -265,20 +325,21 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     const run = await start("p12d-held", { activatedDaysAgo: 1, taxCountry: "RO" });
     const upgrade = await seedPaidUpgrade(database.pool, run.seeded, {
       at: new Date(run.now.getTime() - 12 * 3_600_000), netMicros: 15_000_000, taxMicros: 3_150_000,
-      transactionId: "7700789", monthCreditOverrideMicros: 12_500_000
+      providerPaymentId: "7700789", monthCreditOverrideMicros: 12_500_000
     });
     // An earlier refund of ours on the INITIAL payment, still in flight: that transaction cannot take a second request.
     await run.billing.withTransaction((client) => run.billing.appendChargeEvent(client, chargeEvent(
       run.seeded.initialChargeId, "REFUND_REQUESTED", new Date(run.now.getTime() - 60_000), {
-        providerPaymentId: run.seeded.initialTransactionId, amountMicros: 1_000_000, errorCode: "SUBSCRIPTION_ENDED"
+        providerPaymentId: run.seeded.providerPaymentId, amountMicros: 1_000_000, errorCode: "SUBSCRIPTION_ENDED"
       }
     )));
     const response = await run.withdraw();
     expect(response.json()).toEqual({ refund: null });
     // The upgrade's intent was written first (newest first) and went back with the savepoint, job and all.
     expect(await refundRequests(run.billing, upgrade.chargeId)).toEqual([]);
+    // No job of any kind (a refund job or its follow-ups) names the upgrade's payment.
     expect((await database.pool.query(
-      "SELECT 1 FROM billing.outbox WHERE kind='XMONEY_REFUND' AND ref=$1", [`${upgrade.chargeId}:7700789`]
+      "SELECT 1 FROM billing.outbox WHERE ref=$1", [`${upgrade.chargeId}:7700789`]
     )).rowCount).toBe(0);
     expect((await run.billing.subscriptionEvents(run.seeded.subscriptionId)).at(-1))
       .toMatchObject({ kind: "WITHDRAWN", data: { refund_micros: null, refund_by_owner: true } });
@@ -296,15 +357,15 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     const [request] = (await refundRequests(run.billing, run.seeded.initialChargeId))
       .filter(([, , reason]) => reason === "WITHDRAWAL");
     const amountMicros = request![1] as number;
+    // The owner's command plans the refund first (it reads, and takes no lock), then records it.
+    const owner = desk();
+    const plan = await owner.planOwnerRefund(run.seeded.initialChargeId, amountMicros);
     const holder = await database.pool.connect();
-    let recording: Promise<void> | undefined;
+    let recording: Promise<unknown> | undefined;
     try {
       await holder.query("BEGIN");
       await new BillingJobQueries(database.pool).lockOwner(holder, ownerRef);
-      recording = deskWith(async () => undefined).recordRefunded({
-        chargeId: run.seeded.initialChargeId, transactionId: run.seeded.initialTransactionId, amountMicros,
-        whole: false, ownerRef, reason: "WITHDRAWAL"
-      }, new Date());
+      recording = owner.recordOwnerRefund(plan, new Date());
       // Wait until the recording is queued behind the owner lock this test holds.
       const deadline = Date.now() + 5_000;
       let waiting = false;
@@ -325,16 +386,17 @@ describe("P12d withdrawal on real PostgreSQL", () => {
       await holder.query("ROLLBACK");
       holder.release();
     }
-    await recording;
+    expect(await recording).toBe("RECORDED");
     const m8 = await m8Of(run.seeded.subscriptionId);
     expect(m8).toHaveLength(1);
     expect(m8[0]!.payload).toMatchObject({ "param.refundAmount": microsToDecimal(amountMicros) });
     await run.api.close();
   });
 
-  it("records one refund once when the call's answer and VERIFY_PAYMENT's report of it arrive at once: one REFUNDED, one M8 (P2-M6)", async () => {
-    // 3.00 of Plus's 5.00 credit used: the larger share is 60 %, so the refund is under half the payment and 0086's sum
-    // guard alone would let a second REFUNDED row for it in.
+  it("records one refund once when the owner's command runs twice at once: one REFUNDED, one M8 (P2-M6)", async () => {
+    // 3.00 of Plus's 5.00 credit used: the larger share is 60 %, so the refund is under half the payment and the sum
+    // guard alone would let a second REFUNDED row for it in (a NETOPIA refund may be recorded in parts, PR-20: no
+    // unique key stops a second one, only the re-read under the owner lock does).
     const run = await start("p2-m6-two-recorders", { activatedDaysAgo: 1, taxCountry: "RO", spentMicros: 3_000_000 });
     expect((await run.withdraw()).statusCode).toBe(200);
     const ownerRef = run.identity.authenticated.ownerRef;
@@ -343,16 +405,13 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     const amountMicros = request![1] as number;
     const paidMicros = (await run.billing.charge(run.seeded.initialChargeId))!.totalMicros;
     expect(2 * amountMicros).toBeLessThanOrEqual(paidMicros);
-    const intent = {
-      chargeId: run.seeded.initialChargeId, transactionId: run.seeded.initialTransactionId, amountMicros,
-      whole: false, ownerRef, reason: "WITHDRAWAL" as const
-    };
-    // Two API processes: one's RefundDesk records the call's answer (on the payment), the other's VERIFY_PAYMENT
-    // records xMoney's own refund transaction naming the payment (D5 5g), each on its own connection.
-    await Promise.all([
-      deskWith(async () => undefined).recordRefunded(intent, new Date()),
-      deskWith(async () => undefined).recordRefunded(intent, new Date(), "7700991", new Date())
-    ]);
+    expect(ownerRef).toBe(run.seeded.ownerRef);
+    // Two runs of `pnpm billing:refund-done` for the whole request (the owner pressed it twice), each on its own desk
+    // and connection, both planned while the request was still open.
+    const [first, second] = [desk(), desk()];
+    const plans = await Promise.all([first, second].map((owner) => owner.planOwnerRefund(run.seeded.initialChargeId, amountMicros)));
+    const results = await Promise.all([first.recordOwnerRefund(plans[0]!, new Date()), second.recordOwnerRefund(plans[1]!, new Date())]);
+    expect([...results].sort()).toEqual(["ALREADY_RECORDED", "RECORDED"]);
     const refunded = (await run.billing.charge(run.seeded.initialChargeId))!.events.filter((event) => event.kind === "REFUNDED");
     expect(refunded).toHaveLength(1);
     expect(refunded[0]).toMatchObject({ amountMicros });

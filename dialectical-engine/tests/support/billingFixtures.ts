@@ -15,6 +15,13 @@ import { FakeTaxEngine, fakeTaxMicros } from "./fake-tax-engine.js";
  */
 export const PROFILE_ADDRESS_ONLY: BillingRecipientReader = Object.freeze({ currentAddress: async () => null });
 
+/**
+ * N24b: the xMoney system the API's dependency types still require until N23 deletes the member. A suite that runs on
+ * NETOPIA alone spreads this instead of naming xMoney itself: it serves no NETOPIA plan or charge, so it changes no
+ * outcome, and N23 deletes it here, in one place.
+ */
+export const XMONEY_SYSTEM_UNTIL_N23 = Object.freeze({ xmoneyEnvironment: "stage" as const });
+
 export const testBillingPlans: BillingPlans = Object.freeze({
   currency: "USD",
   sourceRef: "test:billing-plans",

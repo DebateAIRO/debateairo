@@ -3,9 +3,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
 import { foldSubscription } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { testBillingPolicy } from "../support/billingFixtures.js";
+import { testBillingPolicy, XMONEY_SYSTEM_UNTIL_N23 } from "../support/billingFixtures.js";
 import {
-  recordingAudit, seedActiveSubscription, seedPaidUpgrade, subscriptionDeps, TEST_PUBLIC_APP_URL
+  recordingAudit, seedNetopiaSubscription, seedPaidUpgrade, subscriptionDeps, TEST_PUBLIC_APP_URL
 } from "../support/billingSubscriptionFixtures.js";
 import { startBillingHarness, type BillingHarness } from "../support/billingHarness.js";
 import { recordDisputeOutcome, type DisputeStores } from "../../apps/api/src/billing/dispute-cli.js";
@@ -29,20 +29,20 @@ afterAll(async () => {
 
 const DAY = 86_400_000;
 
-/** What VERIFY_PAYMENT (P9c, A9, R-33) leaves after a charge-back: CHARGEBACK, SUSPENDED and a FREE entitlement. */
+/** What VERIFY_PAYMENT (P9c, A9, R-33; N15 on NETOPIA) leaves after a charge-back: CHARGEBACK, SUSPENDED and a FREE entitlement. */
 async function disputed(
   planId: "PLUS" | "PRO" = "PRO",
-  beforeChargeback?: (seeded: Awaited<ReturnType<typeof seedActiveSubscription>>) => Promise<void>,
+  beforeChargeback?: (seeded: Awaited<ReturnType<typeof seedNetopiaSubscription>>) => Promise<void>,
   activatedAt: Date = new Date(Date.now() - 5 * DAY)
 ) {
-  const seeded = await seedActiveSubscription(database.pool, {
+  const seeded = await seedNetopiaSubscription(database.pool, {
     ownerRef: randomUUID(), planId, activatedAt, taxCountry: "DE"
   });
   if (beforeChargeback !== undefined) await beforeChargeback(seeded);
   const billing = new BillingRepository(database.pool);
   await billing.withTransaction(async (client) => {
     await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", new Date(), {
-      providerPaymentId: seeded.initialTransactionId, amountMicros: seeded.totalMicros, errorCode: null
+      providerPaymentId: seeded.providerPaymentId, amountMicros: seeded.totalMicros, errorCode: null
     }));
     const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId));
     await billing.appendSubscriptionEvent(client, subscriptionEvent(state, "SUSPENDED", new Date(), {
@@ -68,7 +68,7 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     const billing = new BillingRepository(database.pool);
     expect(foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId)).status).toBe("ACTIVE");
     expect((await billing.charge(seeded.initialChargeId))!.events.at(-1)).toMatchObject({
-      kind: "CHARGEBACK_RESOLVED", providerPaymentId: seeded.initialTransactionId
+      kind: "CHARGEBACK_RESOLVED", providerPaymentId: seeded.providerPaymentId
     });
     expect(await new EntitlementRepository(database.pool).current(seeded.ownerRef, new Date())).toMatchObject({
       planId: "PRO", cause: "RESUMED", periodAnchorAt: seeded.periodStart, paidThrough: seeded.periodEnd
@@ -78,7 +78,7 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
 
   it("gives back the period's own credit after a won dispute: an upgrade's prorated override (A6)", async () => {
     const seeded = await disputed("PLUS", (plus) => seedPaidUpgrade(database.pool, plus, {
-      at: new Date(Date.now() - DAY), netMicros: 15_000_000, taxMicros: 2_850_000, transactionId: "7710001",
+      at: new Date(Date.now() - DAY), netMicros: 15_000_000, taxMicros: 2_850_000, providerPaymentId: "7710001",
       monthCreditOverrideMicros: 12_500_000
     }).then(() => undefined));
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("RESUMED");
@@ -109,7 +109,7 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("RESOLVED_AFTER_END");
     // The money is recorded as won back; the plan is neither resumed nor given a paid entitlement for an ended period.
     expect((await repository.charge(seeded.initialChargeId))!.events.at(-1)).toMatchObject({
-      kind: "CHARGEBACK_RESOLVED", providerPaymentId: seeded.initialTransactionId
+      kind: "CHARGEBACK_RESOLVED", providerPaymentId: seeded.providerPaymentId
     });
     const kinds = (await repository.subscriptionEvents(seeded.subscriptionId)).map((event) => event.kind);
     expect(kinds).not.toContain("RESUMED");
@@ -117,14 +117,15 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     expect(await new EntitlementRepository(database.pool).current(seeded.ownerRef, new Date())).toMatchObject({
       planId: "FREE", cause: "SUSPENDED_CHARGEBACK"
     });
-    // P11b's next maintenance pass ends it as a dispute (its renewal stand-in throws: nothing here may renew).
+    // P11b's next maintenance pass, serving NETOPIA's sandbox, ends it as a dispute (its renewal stand-in throws: nothing
+    // here may renew).
     const neverRenews = new Proxy({}, {
       get: () => async () => { throw new Error("the dispute test never renews"); }
     }) as MaintenanceDeps["renewal"];
     await new BillingMaintenance({
       repository, jobs: new BillingJobQueries(database.pool), entitlements: new EntitlementRepository(database.pool),
       renewal: neverRenews, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL,
-      xmoneyEnvironment: seeded.xmoneyEnvironment, audit: recordingAudit(), clock: () => new Date()
+      ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment: seeded.paymentEnvironment, audit: recordingAudit(), clock: () => new Date()
     }).runOnce();
     expect(foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId))).toMatchObject({
       status: "ENDED", endedCause: "DISPUTE"
@@ -133,7 +134,7 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
   }, 20_000);
 
   it("settles a second payment's charge-back on its own transaction and never touches the plan (D5 5f)", async () => {
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "RO"
     });
     const billing = new BillingRepository(database.pool);
@@ -172,16 +173,16 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("RESUMED");
     const resolvedTransactions = async () => (await new BillingRepository(database.pool).charge(seeded.initialChargeId))!
       .events.filter((event) => event.kind === "CHARGEBACK_RESOLVED").map((event) => event.providerPaymentId);
-    expect(await resolvedTransactions()).toEqual([seeded.initialTransactionId]);
+    expect(await resolvedTransactions()).toEqual([seeded.providerPaymentId]);
     // The next call settles the one still open, the second payment's; once both are settled nothing is left.
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("SECOND_PAYMENT");
-    expect(await resolvedTransactions()).toEqual([seeded.initialTransactionId, "7719101"]);
+    expect(await resolvedTransactions()).toEqual([seeded.providerPaymentId, "7719101"]);
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("ALREADY_SETTLED");
     expect(foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId)).status).toBe("ACTIVE");
   }, 10_000);
 
   it("settles two second payments' charge-backs on one charge one after the other (D5 5f)", async () => {
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "RO"
     });
     const billing = new BillingRepository(database.pool);
@@ -232,16 +233,16 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     const entitlements = new EntitlementRepository(database.pool);
     // The usual stolen-card case: the first payment and its upgrade are both charged back. P9c suspends on the first
     // and, the plan being SUSPENDED already, writes only the CHARGEBACK row for the upgrade's.
-    const seedBoth = async (transactionId: string) => {
+    const seedBoth = async (providerPaymentId: string) => {
       let upgradeChargeId = "";
       const seeded = await disputed("PLUS", async (plus) => {
         upgradeChargeId = (await seedPaidUpgrade(database.pool, plus, {
-          at: new Date(Date.now() - DAY), netMicros: 15_000_000, taxMicros: 2_850_000, transactionId,
+          at: new Date(Date.now() - DAY), netMicros: 15_000_000, taxMicros: 2_850_000, providerPaymentId,
           monthCreditOverrideMicros: 12_500_000
         })).chargeId;
       });
       await billing.withTransaction((client) => billing.appendChargeEvent(client, chargeEvent(upgradeChargeId,
-        "CHARGEBACK", new Date(), { providerPaymentId: transactionId, amountMicros: 17_850_000, errorCode: null })));
+        "CHARGEBACK", new Date(), { providerPaymentId, amountMicros: 17_850_000, errorCode: null })));
       return { seeded, upgradeChargeId };
     };
 
@@ -270,7 +271,7 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
   }, 20_000);
 
   it("refuses a charge that has no chargeback, and one that does not exist", async () => {
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO"
     });
     await expect(recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" }))

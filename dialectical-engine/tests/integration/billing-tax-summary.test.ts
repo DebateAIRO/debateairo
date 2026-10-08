@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { foldSubscription, type SubscriptionEvent } from "@debateai/billing-core";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate } from "@debateai/db";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { seedActiveSubscription, TEST_RECORDS_KEY } from "../support/billingSubscriptionFixtures.js";
+import { seedNetopiaSubscription, TEST_RECORDS_KEY } from "../support/billingSubscriptionFixtures.js";
 import { openEfacturaStatusRecorder, runBillingEfacturaStatusCli } from "../../apps/api/src/billing/efactura-status-cli.js";
 import { sealIpEvidence } from "../../apps/api/src/billing/records.js";
 import { chargeEvent, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
@@ -25,17 +25,17 @@ describe("P16b the summary reads our own rows", () => {
     const quarter = currentQuarter(new Date());
     const soon = new Date(quarter.from.getTime() + 3_600_000);
     const billing = new BillingRepository(database.pool);
-    const ro = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: soon, taxCountry: "RO" });
-    const de = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PRO", activatedAt: soon, taxCountry: "DE", taxRateBasisPoints: 1_900 });
+    const ro = await seedNetopiaSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: soon, taxCountry: "RO" });
+    const de = await seedNetopiaSubscription(database.pool, { ownerRef: randomUUID(), planId: "PRO", activatedAt: soon, taxCountry: "DE", taxRateBasisPoints: 1_900 });
     await billing.withTransaction(async (client) => {
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(ro.initialChargeId, kind, new Date(soon.getTime() + 3_600_000), {
-          providerPaymentId: ro.initialTransactionId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL"
+          providerPaymentId: ro.providerPaymentId, amountMicros: 12_100_000, errorCode: "WITHDRAWAL"
         }));
       }
       // A charge-back no dispute has won back yet: listed for the accountant (P1a's CHARGEBACK row).
       await billing.appendChargeEvent(client, chargeEvent(de.initialChargeId, "CHARGEBACK", new Date(soon.getTime() + 7_200_000), {
-        providerPaymentId: de.initialTransactionId, amountMicros: de.totalMicros, errorCode: null
+        providerPaymentId: de.providerPaymentId, amountMicros: de.totalMicros, errorCode: null
       }));
       const ip = sealIpEvidence(TEST_RECORDS_KEY, de.initialChargeId, "192.0.2.10");
       await billing.insertLocationEvidence(client, {
@@ -43,8 +43,8 @@ describe("P16b the summary reads our own rows", () => {
         verdict: "CONFLICTING", ipCiphertext: ip.ciphertext, keyId: ip.keyId, at: soon
       });
     });
-    // The seeded subscriptions live in xMoney's sandbox system ("stage"), so they are read as such here.
-    const rows = await billing.quarterSummaryRows(quarter.from, quarter.to, { provider: "xmoney", environment: "stage" });
+    // The seeded subscriptions live in NETOPIA's sandbox, so they are read as such here (ruling PR-21).
+    const rows = await billing.quarterSummaryRows(quarter.from, quarter.to, { provider: "netopia", environment: "sandbox" });
     const mine = rows.filter((row) => row.chargeId === ro.initialChargeId || row.chargeId === de.initialChargeId);
     expect(mine).toEqual(expect.arrayContaining([
       expect.objectContaining({ type: "SALE", chargeId: ro.initialChargeId, taxCountry: "RO", taxStatus: "TAXABLE",
@@ -57,13 +57,13 @@ describe("P16b the summary reads our own rows", () => {
     ]));
     expect(mine).toHaveLength(4);
     // A sandbox payment is never a sale: the live summary, the one the command and O1 read, sees none of them.
-    expect((await billing.quarterSummaryRows(quarter.from, quarter.to, { provider: "xmoney", environment: "live" }))
+    expect((await billing.quarterSummaryRows(quarter.from, quarter.to, { provider: "netopia", environment: "live" }))
       .filter((row) => row.chargeId === ro.initialChargeId || row.chargeId === de.initialChargeId)).toEqual([]);
   });
 
   it("lists invoice jobs that ended INVOICE_UNKNOWN until an invoice row exists for them", async () => {
     const billing = new BillingRepository(database.pool);
-    const seeded = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
+    const seeded = await seedNetopiaSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
     await billing.withTransaction((client) => billing.enqueue(client, {
       kind: "SMARTBILL_INVOICE", ref: seeded.initialChargeId, notBefore: new Date(0), payload: { charge_id: seeded.initialChargeId }
     }));
@@ -85,10 +85,10 @@ describe("P16b the summary reads our own rows", () => {
     expect((await billing.invoiceUnknownItems()).map((item) => item.chargeId)).not.toContain(seeded.initialChargeId);
   });
 
-  it("lists a Romanian invoice SmartBill never issued and a dashboard refund with no credit note (D5 5j, P9c)", async () => {
+  it("lists a Romanian invoice SmartBill never issued and a refund made in NETOPIA's admin with no credit note (D5 5j, P9c)", async () => {
     const billing = new BillingRepository(database.pool);
-    const refused = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
-    const dashboard = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
+    const refused = await seedNetopiaSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
+    const dashboard = await seedNetopiaSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
     await billing.withTransaction(async (client) => {
       await billing.enqueue(client, {
         kind: "SMARTBILL_INVOICE", ref: refused.initialChargeId, notBefore: new Date(0), payload: { charge_id: refused.initialChargeId }
@@ -100,7 +100,7 @@ describe("P16b the summary reads our own rows", () => {
       });
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(dashboard.initialChargeId, kind, new Date(), {
-          providerPaymentId: dashboard.initialTransactionId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
+          providerPaymentId: dashboard.providerPaymentId, amountMicros: 5_000_000, errorCode: "PROVIDER_REFUND"
         }));
       }
     });
@@ -125,71 +125,74 @@ describe("P16b the summary reads our own rows", () => {
     expect((await billing.invoiceUnknownItems()).map((item) => item.chargeId)).not.toContain(dashboard.initialChargeId);
   });
 
-  it("marks a dashboard refund recorded on the payment itself as of unknown amount, and one xMoney reported as its own transaction as known", async () => {
+  it("marks a refund made in NETOPIA's admin as of unknown amount, and one we requested and the owner recorded in parts as known", async () => {
     const quarter = currentQuarter(new Date());
     const billing = new BillingRepository(database.pool);
-    const onPayment = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
-    const ownTransaction = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
-    const refundTransactionId = String(8_800_000_000 + Math.floor(Math.random() * 99_999_999));
+    const onPayment = await seedNetopiaSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
+    const ours = await seedNetopiaSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
     await billing.withTransaction(async (client) => {
-      // A verified sale, whose invoice was asked of SmartBill (C-5: so its dashboard refund owes a credit note).
+      // A verified sale, whose invoice was asked of SmartBill (C-5: so its refund made elsewhere owes a credit note).
       await billing.insertInvoiceIntent(client, {
         chargeId: onPayment.initialChargeId, kind: "INVOICE", issuer: "SMARTBILL", requestedAt: new Date()
       });
-      // P9c, xMoney's read naming no refunded amount: recorded on the payment at what was left of the charge.
+      // VERIFY_PAYMENT's record of a refund NETOPIA reported with no amount of its own: recorded on the payment at what
+      // was left of the charge, an upper bound.
       for (const kind of ["REFUND_REQUESTED", "REFUNDED"] as const) {
         await billing.appendChargeEvent(client, chargeEvent(onPayment.initialChargeId, kind, new Date(), {
-          providerPaymentId: onPayment.initialTransactionId, amountMicros: onPayment.totalMicros, errorCode: "PROVIDER_REFUND"
+          providerPaymentId: onPayment.providerPaymentId, amountMicros: onPayment.totalMicros, errorCode: "PROVIDER_REFUND"
         }));
       }
-      // D5 5g: a dashboard refund xMoney lists as its own transaction, naming the payment: its amount is known.
-      await billing.appendChargeEvent(client, chargeEvent(ownTransaction.initialChargeId, "REFUND_REQUESTED", new Date(), {
-        providerPaymentId: ownTransaction.initialTransactionId, amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND"
+      // Spec §2.12.2 item 4: a refund we requested, which the owner refunded in NETOPIA's admin and recorded in two
+      // parts (`pnpm billing:refund-done`, ruling PR-20): each part's amount is known.
+      await billing.appendChargeEvent(client, chargeEvent(ours.initialChargeId, "REFUND_REQUESTED", new Date(), {
+        providerPaymentId: ours.providerPaymentId, amountMicros: 3_000_000, errorCode: "SUBSCRIPTION_ENDED"
       }));
-      await billing.appendChargeEvent(client, chargeEvent(ownTransaction.initialChargeId, "REFUNDED", new Date(), {
-        providerPaymentId: refundTransactionId, amountMicros: 3_000_000, errorCode: "PROVIDER_REFUND",
-        refundsTransactionId: ownTransaction.initialTransactionId
-      }));
+      for (const part of [1_000_000, 2_000_000]) {
+        await billing.appendChargeEvent(client, chargeEvent(ours.initialChargeId, "REFUNDED", new Date(), {
+          providerPaymentId: ours.providerPaymentId, amountMicros: part, errorCode: "SUBSCRIPTION_ENDED"
+        }));
+      }
     });
-    const refunds = (await billing.quarterSummaryRows(quarter.from, quarter.to, { provider: "xmoney", environment: "stage" })).filter((row) => row.type === "REFUND"
-      && (row.chargeId === onPayment.initialChargeId || row.chargeId === ownTransaction.initialChargeId));
+    const refunds = (await billing.quarterSummaryRows(quarter.from, quarter.to, { provider: "netopia", environment: "sandbox" })).filter((row) => row.type === "REFUND"
+      && (row.chargeId === onPayment.initialChargeId || row.chargeId === ours.initialChargeId));
     expect(refunds).toEqual(expect.arrayContaining([
       expect.objectContaining({ chargeId: onPayment.initialChargeId, amountMicros: onPayment.totalMicros, amountKnown: false }),
-      expect.objectContaining({ chargeId: ownTransaction.initialChargeId, amountMicros: 3_000_000, amountKnown: true })
+      expect.objectContaining({ chargeId: ours.initialChargeId, amountMicros: 1_000_000, amountKnown: true }),
+      expect.objectContaining({ chargeId: ours.initialChargeId, amountMicros: 2_000_000, amountKnown: true })
     ]));
-    expect(refunds).toHaveLength(2);
-    // The check-by-hand list names exactly the refund whose amount is unknown: the one on its own transaction gets its
-    // credit-note job automatically (P9c, D5 5g) and is listed only if that job dies.
+    expect(refunds).toHaveLength(3);
+    // The check-by-hand list names exactly the refund whose amount is unknown: ours gets its credit-note job
+    // automatically (RefundDesk's follow-up) and is listed only if that job dies.
     const handChecks = async () => (await billing.invoiceUnknownItems())
-      .filter((item) => item.chargeId === onPayment.initialChargeId || item.chargeId === ownTransaction.initialChargeId);
+      .filter((item) => item.chargeId === onPayment.initialChargeId || item.chargeId === ours.initialChargeId);
     expect(await handChecks()).toEqual([
       expect.objectContaining({ chargeId: onPayment.initialChargeId, jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL" })
     ]);
-    const stornoRef = `${ownTransaction.initialChargeId}:${ownTransaction.initialTransactionId}`;
+    const stornoRef = `${ours.initialChargeId}:${ours.providerPaymentId}`;
     await billing.withTransaction((client) => billing.enqueue(client, {
       kind: "SMARTBILL_STORNO", ref: stornoRef, notBefore: new Date(0), payload: {
-        charge_id: ownTransaction.initialChargeId, transaction_id: ownTransaction.initialTransactionId, refund_micros: 3_000_000
+        charge_id: ours.initialChargeId, transaction_id: ours.providerPaymentId, refund_micros: 3_000_000
       }
     }));
     const [storno] = (await billing.claim(["SMARTBILL_STORNO"], 50, "p16b-test", new Date()))
       .filter((claimed) => claimed.ref === stornoRef);
     expect(await billing.fail(storno!.jobId, "CREDIT_NOTE_MANUAL", null, new Date())).toBe(true);
-    const listed = (await handChecks()).filter((item) => item.chargeId === ownTransaction.initialChargeId);
+    const listed = (await handChecks()).filter((item) => item.chargeId === ours.initialChargeId);
     expect(listed).toEqual([
-      expect.objectContaining({ chargeId: ownTransaction.initialChargeId, jobKind: "SMARTBILL_STORNO", code: "CREDIT_NOTE_MANUAL" })
+      expect.objectContaining({ chargeId: ours.initialChargeId, jobKind: "SMARTBILL_STORNO", code: "CREDIT_NOTE_MANUAL" })
     ]);
   });
 
   it("lists a subscription whose history does not fold, and a renewal closed with its outcome unknown", async () => {
     const billing = new BillingRepository(database.pool);
     const now = new Date();
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 40 * 86_400_000), taxCountry: "RO"
     });
     // An illegal history (WITHDRAWN straight after CREATED), written past P1b's fold check the way D5's own test does:
     // appendSubscriptionEvent would refuse it.
     const broken = randomUUID();
-    for (const [kind, data] of [["CREATED", { xmoney_environment: "stage" }], ["WITHDRAWN", {}]] as const) {
+    for (const [kind, data] of [["CREATED", { payment_provider: "netopia", payment_environment: "sandbox" }], ["WITHDRAWN", {}]] as const) {
       await database.pool.query(`
         INSERT INTO billing.subscription_event (event_id, subscription_id, owner_ref, kind, at, plan_id, data)
         VALUES ($1, $2, $3, $4, clock_timestamp(), 'PLUS', $5::jsonb)
@@ -204,9 +207,10 @@ describe("P16b the summary reads our own rows", () => {
         chargeId: renewal, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "RENEWAL", attempt: 1,
         periodStart: seeded.periodEnd, periodEnd: new Date(seeded.periodEnd.getTime() + 30 * 86_400_000),
         quoteId: seeded.initialQuoteId, netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000,
-        currency: "USD", createdAt: new Date(now.getTime() - 2 * 86_400_000), paymentProvider: "xmoney", paymentEnvironment: "stage"
+        currency: "USD", createdAt: new Date(now.getTime() - 2 * 86_400_000), paymentProvider: "netopia", paymentEnvironment: "sandbox"
       });
-      for (const [kind, errorCode] of [["REQUESTED", null], ["SUBMIT_UNKNOWN", "REBILL_OUTCOME_UNKNOWN"], ["FAILED", "NO_TRANSACTION"]] as const) {
+      // N11's saved-card charge whose answer was lost (CHARGE_OUTCOME_UNKNOWN), closed with no payment found.
+      for (const [kind, errorCode] of [["REQUESTED", null], ["SUBMIT_UNKNOWN", "CHARGE_OUTCOME_UNKNOWN"], ["FAILED", "NO_TRANSACTION"]] as const) {
         await billing.appendChargeEvent(client, chargeEvent(renewal, kind, new Date(now.getTime() - 86_400_000), {
           providerPaymentId: null, amountMicros: 24_200_000, errorCode
         }));
@@ -222,7 +226,7 @@ describe("P16b the summary reads our own rows", () => {
     const jobs = new BillingJobQueries(database.pool);
     const issuedAt = new Date(quarter.from.getTime() + 2 * 3_600_000);
     const seedInvoice = async () => {
-      const seeded = await seedActiveSubscription(database.pool, {
+      const seeded = await seedNetopiaSubscription(database.pool, {
         ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(quarter.from.getTime() + 3_600_000), taxCountry: "RO"
       });
       const number = String(Math.floor(Math.random() * 900_000) + 100_000);
@@ -266,7 +270,7 @@ describe("P16b the summary reads our own rows", () => {
   it("lists a dunning the tax service could not price and a plan it ended, never a charged dunning (R2 Q-1)", async () => {
     const billing = new BillingRepository(database.pool);
     const now = new Date();
-    const seed = () => seedActiveSubscription(database.pool, {
+    const seed = () => seedNetopiaSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 40 * 86_400_000), taxCountry: "RO"
     });
     const unpriced = await seed();
@@ -298,7 +302,7 @@ describe("P16b the summary reads our own rows", () => {
     const billing = new BillingRepository(database.pool);
     const entitlements = new EntitlementRepository(database.pool);
     const now = new Date();
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 40 * 86_400_000), taxCountry: "RO"
     });
     // P11a's taxRefused hold: written inside the lead, paid through 72 hours past the period end, lapsed by now.
@@ -319,7 +323,7 @@ describe("P16b the summary reads our own rows", () => {
       kind: "RENEWAL", attempt: 1, periodStart: seeded.periodEnd,
       periodEnd: new Date(seeded.periodEnd.getTime() + 30 * 86_400_000), quoteId: seeded.initialQuoteId,
       netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000, currency: "USD", createdAt: now,
-      paymentProvider: "xmoney", paymentEnvironment: "stage"
+      paymentProvider: "netopia", paymentEnvironment: "sandbox"
     }));
     expect(await blocked(now)).toEqual([]);
   });
@@ -332,7 +336,7 @@ describe("P16b the summary reads our own rows", () => {
     const billing = new BillingRepository(database.pool);
     const entitlements = new EntitlementRepository(database.pool);
     const now = new Date();
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 40 * 86_400_000), taxCountry: "RO"
     });
     const paidThrough = new Date(seeded.periodEnd.getTime() + 72 * 3_600_000);
@@ -396,14 +400,14 @@ describe("W12 every dead legal document and every dead email reaches the owner's
 
   it("lists a dead invoice or credit-note job whatever its code, with its own code, and only the latest job of its ref", async () => {
     const billing = new BillingRepository(database.pool);
-    const quaderno = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "DE", taxRateBasisPoints: 1_900 });
-    const smartbill = await seedActiveSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
+    const quaderno = await seedNetopiaSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "DE", taxRateBasisPoints: 1_900 });
+    const smartbill = await seedNetopiaSubscription(database.pool, { ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(), taxCountry: "RO" });
     // A revoked Quaderno key kills the sale on its first attempt; a SmartBill storno waits for an invoice that never
     // came; a Quaderno outage longer than the retries.
     await deadJob(billing, "QUADERNO_RECORD_SALE", quaderno.initialChargeId, "TAX_SERVICE_REFUSED", { card_country: "DE" });
-    const stornoRef = `${smartbill.initialChargeId}:${smartbill.initialTransactionId}`;
+    const stornoRef = `${smartbill.initialChargeId}:${smartbill.providerPaymentId}`;
     await deadJob(billing, "SMARTBILL_STORNO", stornoRef, "INVOICE_ORIGINAL_MISSING", {
-      charge_id: smartbill.initialChargeId, transaction_id: smartbill.initialTransactionId, refund_micros: 5_000_000
+      charge_id: smartbill.initialChargeId, transaction_id: smartbill.providerPaymentId, refund_micros: 5_000_000
     });
     const mine = async () => (await billing.invoiceUnknownItems())
       .filter((item) => item.chargeId === quaderno.initialChargeId || item.chargeId === smartbill.initialChargeId)

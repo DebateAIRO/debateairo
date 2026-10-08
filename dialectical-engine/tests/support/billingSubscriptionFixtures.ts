@@ -5,7 +5,7 @@ import type { Pool } from "pg";
 import {
   AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, type CustomerXMoneyEnvironment
 } from "@debateai/db";
-import { computeWindows, foldSubscription, type SecretToken } from "@debateai/billing-core";
+import { computeWindows, foldSubscription, microsToDecimal, type SecretToken } from "@debateai/billing-core";
 import { hashToken } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import type { XMoneyClient } from "@debateai/payments-xmoney";
@@ -14,6 +14,7 @@ import type { BillingAudit, BillingAuditEvent, BillingAuditField } from "../../a
 import type { BillingAdmissionScope } from "../../apps/api/src/billing/index.js";
 import type { ConsentKind } from "../../apps/api/src/billing/checkout.js";
 import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
+import { runBillingRefundDoneCli, type RefundDoneArguments } from "../../apps/api/src/billing/refund-done-cli.js";
 import { sealBillingProfile, sealCardToken, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { chargeEvent, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
@@ -159,7 +160,8 @@ export type SeededNetopiaSubscription = Readonly<{
   /** The saved card ACTIVATED adopted: a sealed made-up token, its source the INITIAL charge, expiring in December three years on. */
   cardTokenId: string;
   periodStart: Date; periodEnd: Date; totalMicros: number;
-  paymentEnvironment: "sandbox";
+  /** NETOPIA's sandbox unless a test asks for "live" (a plan of the other environment, spec §2.5.4). */
+  paymentEnvironment: "sandbox" | "live";
 }>;
 
 /** A SecretToken over a made-up value (tests never hold a real token): it prints `[token]` everywhere. */
@@ -177,16 +179,19 @@ export function testCardToken(plaintext: string): SecretToken {
 /**
  * One ACTIVE NETOPIA subscription as the switched flows leave it (skeleton §2.5; until N18 a new checkout still makes
  * an xMoney one): customer, sealed profile with the payer's fields, SUBSCRIBE quote with its sealed location (ip
- * 192.0.2.10), INITIAL charge in NETOPIA's sandbox (REQUESTED, SUCCEEDED with an ntpID) that spent the quote, the
- * card that payment saved, CREATED naming `payment_provider`/`payment_environment`, ACTIVATED adopting the card,
- * SUBSCRIBED entitlement paid through the period end.
+ * 192.0.2.10), INITIAL charge in NETOPIA's sandbox, or in the environment a test names (REQUESTED, SUCCEEDED with an
+ * ntpID), that spent the quote, the card that payment saved, CREATED naming `payment_provider`/`payment_environment`,
+ * ACTIVATED adopting the card, SUBSCRIBED entitlement paid through the period end.
  */
 export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
   ownerRef: string; planId: Exclude<PlanId, "FREE">; activatedAt: Date; taxCountry: string;
   taxRateBasisPoints?: number; email?: string; netMicros?: number;
+  /** N24b: the plan's NETOPIA environment; "sandbox" unless a test seeds a plan of the other one. */
+  paymentEnvironment?: "sandbox" | "live";
 }>): Promise<SeededNetopiaSubscription> {
   const billing = new BillingRepository(pool);
   const entitlements = new EntitlementRepository(pool);
+  const environment = input.paymentEnvironment ?? "sandbox";
   const rate = input.taxRateBasisPoints ?? 2_100;
   const netMicros = input.netMicros ?? planById(testBillingPlans, input.planId).netPriceMicros;
   const taxMicros = Math.floor(netMicros * rate / 10_000 / 10_000) * 10_000;
@@ -225,7 +230,7 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
     await billing.insertCharge(client, {
       chargeId: initialChargeId, ownerRef: input.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1,
       periodStart, periodEnd, quoteId: initialQuoteId, netMicros, taxMicros, totalMicros, currency: "USD",
-      createdAt: checkoutAt, paymentProvider: "netopia", paymentEnvironment: "sandbox"
+      createdAt: checkoutAt, paymentProvider: "netopia", paymentEnvironment: environment
     });
     await billing.useQuote(client, { quoteId: initialQuoteId, usedAt: checkoutAt, chargeId: initialChargeId });
     await billing.appendChargeEvent(client, chargeEvent(initialChargeId, "REQUESTED", checkoutAt, {
@@ -236,7 +241,7 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
     }));
     const sealedCard = sealCardToken(TEST_RECORDS_KEY, cardTokenId, testCardToken(["test", "card", cardTokenId.slice(0, 8)].join("-")));
     await billing.insertCardToken(client, {
-      tokenId: cardTokenId, customerId: customer.customerId, paymentProvider: "netopia", paymentEnvironment: "sandbox",
+      tokenId: cardTokenId, customerId: customer.customerId, paymentProvider: "netopia", paymentEnvironment: environment,
       sourceChargeId: initialChargeId, sourceToolOrder: null, sourceNoticeId: null, sourcePaidAt: periodStart,
       tokenCiphertext: sealedCard.ciphertext, keyId: sealedCard.keyId, expMonth: 12,
       expYear: periodStart.getUTCFullYear() + 3, last4: "1111", cardCountry: input.taxCountry, createdAt: periodStart
@@ -249,7 +254,7 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
       // 0096 `subscription_event_created_names_payment_system`: a NETOPIA CREATED names both keys (spec §2.5.1).
       data: {
         country_confirmed: false, ip_country: input.taxCountry, quote_id: initialQuoteId,
-        payment_provider: "netopia", payment_environment: "sandbox"
+        payment_provider: "netopia", payment_environment: environment
       }
     });
     await billing.appendSubscriptionEvent(client, {
@@ -264,19 +269,19 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
   });
   return Object.freeze({
     ownerRef: input.ownerRef, subscriptionId, customerId, initialQuoteId, initialChargeId, providerPaymentId, cardTokenId,
-    periodStart, periodEnd, totalMicros, paymentEnvironment: "sandbox"
+    periodStart, periodEnd, totalMicros, paymentEnvironment: environment
   });
 }
 
 /**
- * What VERIFY_PAYMENT (P9c, A9) leaves after the first payment of `seeded` is charged back: CHARGEBACK on the charge,
- * SUSPENDED, and a FREE entitlement effective `at` (paid features paused while the dispute is open).
+ * What VERIFY_PAYMENT (P9c, A9; N15 on NETOPIA) leaves after the first payment of `seeded` is charged back: CHARGEBACK
+ * on the charge, SUSPENDED, and a FREE entitlement effective `at` (paid features paused while the dispute is open).
  */
-export async function suspendForChargeback(pool: Pool, seeded: SeededSubscription, at: Date = new Date()): Promise<void> {
+export async function suspendForChargeback(pool: Pool, seeded: SeededNetopiaSubscription, at: Date = new Date()): Promise<void> {
   const billing = new BillingRepository(pool);
   await billing.withTransaction(async (client) => {
     await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", at, {
-      providerPaymentId: seeded.initialTransactionId, amountMicros: seeded.totalMicros, errorCode: null
+      providerPaymentId: seeded.providerPaymentId, amountMicros: seeded.totalMicros, errorCode: null
     }));
     const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId, client));
     await billing.appendSubscriptionEvent(client, subscriptionEvent(state, "SUSPENDED", at, { charge_id: seeded.initialChargeId }));
@@ -317,9 +322,13 @@ export async function seedWithdrawalGrant(pool: Pool, identity: TestHttpIdentity
   `, [randomUUID(), hashToken("step-up-grant", grantToken), sessionId, userId]);
 }
 
-/** A paid UPGRADE on a seeded subscription, as P12c + the UPGRADE settlement leave it (quote, charge, UPGRADED, entitlement). */
-export async function seedPaidUpgrade(pool: Pool, seeded: SeededSubscription, input: Readonly<{
-  at: Date; netMicros: number; taxMicros: number; transactionId: string; monthCreditOverrideMicros: number;
+/**
+ * A paid UPGRADE on a seeded NETOPIA subscription, as N12's hosted upgrade and the UPGRADE settlement leave it (quote,
+ * charge in the plan's environment with REQUESTED, SUBMITTED and SUCCEEDED naming `providerPaymentId`, UPGRADED,
+ * entitlement).
+ */
+export async function seedPaidUpgrade(pool: Pool, seeded: SeededNetopiaSubscription, input: Readonly<{
+  at: Date; netMicros: number; taxMicros: number; providerPaymentId: string; monthCreditOverrideMicros: number;
   /** The plan upgraded to (PRO by default); its full price, with Romania's 21 %, is the next renewal's. */
   planId?: "PRO" | "MAX";
 }>): Promise<Readonly<{ chargeId: string; quoteId: string }>> {
@@ -347,12 +356,13 @@ export async function seedPaidUpgrade(pool: Pool, seeded: SeededSubscription, in
       chargeId, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "UPGRADE", attempt: 1,
       periodStart: quotedAt, periodEnd: seeded.periodEnd, quoteId, netMicros: input.netMicros,
       taxMicros: input.taxMicros, totalMicros, currency: "USD", createdAt: new Date(input.at.getTime() - 30_000),
-      paymentProvider: "xmoney", paymentEnvironment: seeded.xmoneyEnvironment
+      paymentProvider: "netopia", paymentEnvironment: seeded.paymentEnvironment
     });
     await billing.useQuote(client, { quoteId, usedAt: new Date(input.at.getTime() - 30_000), chargeId });
-    for (const [kind, transactionId] of [["REQUESTED", null], ["SUBMITTED", input.transactionId], ["SUCCEEDED", input.transactionId]] as const) {
+    for (const [kind, providerPaymentId] of [["REQUESTED", null], ["SUBMITTED", input.providerPaymentId], ["SUCCEEDED", input.providerPaymentId]] as const) {
       await billing.appendChargeEvent(client, chargeEvent(chargeId, kind, input.at, {
-        providerPaymentId: transactionId, amountMicros: totalMicros, errorCode: null
+        providerPaymentId, amountMicros: totalMicros, errorCode: null,
+        ...(kind === "SUCCEEDED" ? { providerCreatedAt: input.at } : {})
       }));
     }
     const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId));
@@ -412,6 +422,48 @@ export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRout
     cancelLinks: { request: async () => "SILENT" as const, cancelByToken: async () => "INVALID" as const },
     ...overrides
   });
+}
+
+/**
+ * N24b: the API's RefundDesk in NETOPIA's owner mode (spec §2.12.2: no refund call is configured), over the real tables
+ * (its lease, the job stage and the owner lock on the same pool). A PAYMENT_REFUND job it handles moves no money: it
+ * ends DONE at the stage OWNER_REFUND_DUE with O2_REFUND_DUE queued to the owner. It never reads NETOPIA.
+ */
+export function netopiaRefundDesk(pool: Pool, input: Readonly<{
+  audit?: BillingAudit; clock?: () => Date; paymentEnvironment?: "sandbox" | "live";
+}> = {}): RefundDesk {
+  const repository = new BillingRepository(pool);
+  const jobs = new BillingJobQueries(pool);
+  const unread = async (): Promise<never> => {
+    throw new TypedDomainError("PAYMENT_PROVIDER_UNAVAILABLE", "the owner mode never reads NETOPIA in these tests");
+  };
+  return new RefundDesk({
+    repository, jobs, xmoney: UNCONFIGURED_XMONEY, policy: testBillingPolicy, audit: input.audit ?? recordingAudit(),
+    clock: input.clock ?? (() => new Date()), xmoneyEnvironment: "stage",
+    netopia: { payments: { status: unread }, paymentEnvironment: input.paymentEnvironment ?? "sandbox", jobs }
+  });
+}
+
+/**
+ * N24b: the owner's `pnpm billing:refund-done --charge <charge> --amount <amount> --confirm` (spec §2.12.2 item 4), run
+ * through the command's own parser and printer over `desk`, as its entry block wires it (`refund-done-cli.ts`): what
+ * the owner records after refunding that amount in NETOPIA's admin. Its output; a refusal throws its code.
+ */
+export async function ownerRefundDone(desk: RefundDesk, chargeId: string, amountMicros: number, at: Date = new Date()): Promise<string> {
+  const output: string[] = [];
+  const sink = { stdout: (text: string) => { output.push(text); }, stderr: (text: string) => { output.push(text); } };
+  const code = await runBillingRefundDoneCli(
+    ["--charge", chargeId, "--amount", microsToDecimal(amountMicros), "--confirm"], sink, async () => {
+      const plan = (input: RefundDoneArguments) => desk.planOwnerRefund(input.chargeRef, input.amountMicros, {
+        despiteChargeback: input.despiteChargeback
+      });
+      return Object.freeze({
+        plan, record: async (input: RefundDoneArguments) => desk.recordOwnerRefund(await plan(input), at), close: async () => undefined
+      });
+    }
+  );
+  if (code !== 0) throw new Error(`OWNER_REFUND_DONE_${String(code)}:${output.join("").trim()}`);
+  return output.join("");
 }
 
 /**

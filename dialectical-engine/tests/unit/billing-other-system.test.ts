@@ -11,7 +11,7 @@ import { createRenewalNoticeHandler } from "../../apps/api/src/billing/renewal-n
 import { subscriptionView, withdrawalOpenUntil } from "../../apps/api/src/billing/subscription-view.js";
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 import { recordWithdrawal, type WithdrawalDeps } from "../../apps/api/src/billing/withdrawal.js";
-import { activeSubscriptionEvents, testBillingPolicy } from "../support/billingFixtures.js";
+import { activeSubscriptionEvents, testBillingPolicy, XMONEY_SYSTEM_UNTIL_N23 } from "../support/billingFixtures.js";
 
 /*
  * P2-I4 (D5 5h): after §14.8's same-host switch, the database still holds the sandbox's records. Every refund,
@@ -34,17 +34,20 @@ function only<T extends object>(members: Partial<Record<string, unknown>>, name:
   }) as T;
 }
 
-/** A paid sandbox charge (the connectors below talk to live), with its payment and a refund of it. */
-function stageCharge(): ChargeRow & { events: ChargeEventRow[] } {
+/**
+ * A paid sandbox charge (the connectors below talk to live), with its payment and a refund of it: xMoney's stage system
+ * by default (kept for N23), or NETOPIA's sandbox (ruling PR-38).
+ */
+function stageCharge(system: Pick<ChargeRow, "paymentProvider" | "paymentEnvironment"> = { paymentProvider: "xmoney", paymentEnvironment: "stage" }): ChargeRow & { events: ChargeEventRow[] } {
   const event = (kind: ChargeEventRow["kind"], amountMicros: number, errorCode: string | null = null): ChargeEventRow => ({
     eventId: `${kind}-1`, chargeId: CHARGE_ID, kind, at: ACTIVATED, providerPaymentId: "61001", amountMicros, errorCode,
-    paymentProvider: "xmoney", paymentEnvironment: "stage", refundsTransactionId: null
+    ...system, refundsTransactionId: null
   });
   return {
     chargeId: CHARGE_ID, ownerRef: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", subscriptionId: "5d0a1c2b-3e4f-4a5b-8c6d-7e8f9a0b1c2d",
     kind: "INITIAL", attempt: 1, periodStart: ACTIVATED, periodEnd: new Date("2026-11-08T09:00:00.000Z"), quoteId: "q-1",
     netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000, currency: "USD", createdAt: ACTIVATED,
-    paymentProvider: "xmoney", paymentEnvironment: "stage",
+    ...system,
     events: [event("SUCCEEDED", 24_200_000), event("REFUND_REQUESTED", 24_200_000, "WITHDRAWAL"), event("REFUNDED", 24_200_000)]
   };
 }
@@ -134,6 +137,34 @@ describe("P2-I4 a job of the other xMoney system never reaches a vendor", () => 
       expect(lines, kind).toEqual([{ event: "billing.outbox.other_system", fields: { kind, code: "OTHER_XMONEY_SYSTEM" } }]);
     }
   });
+
+  it("ends each of the four invoice and credit-note jobs of a NETOPIA charge of the other environment DEAD OTHER_PAYMENT_SYSTEM (PR-38)", async () => {
+    // A NETOPIA sandbox charge, on an API serving NETOPIA live, or serving no NETOPIA environment at all (null): the
+    // invoice guard (`otherSystemOutcome`) refuses it before Quaderno or SmartBill, with one audit line.
+    const netopiaSandbox = { paymentProvider: "netopia", paymentEnvironment: "sandbox" } as const;
+    const deps = (audit: ReturnType<typeof recorder>["audit"], paymentEnvironment: "live" | null) => ({
+      repository: only<never>({ charge: async () => stageCharge(netopiaSandbox) }, "repository"),
+      jobs: only<never>({}, "jobs"), issuer: only<never>({}, "issuer"), tax: only<never>({}, "tax"),
+      recipients: only<never>({}, "recipients"),
+      recordsKey: Buffer.alloc(32), policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", audit,
+      ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment
+    });
+    const credit = { charge_id: CHARGE_ID, transaction_id: "61001", refund_micros: 24_200_000 };
+    const cases: Array<readonly [OutboxJob["kind"], (made: ReturnType<typeof deps>) => OutboxHandler, OutboxJob]> = [
+      ["QUADERNO_RECORD_SALE", createQuadernoSaleHandler, job("QUADERNO_RECORD_SALE", CHARGE_ID, { card_country: "DE" })],
+      ["QUADERNO_RECORD_REFUND", createQuadernoRefundHandler, job("QUADERNO_RECORD_REFUND", `${CHARGE_ID}:61001`, credit)],
+      ["SMARTBILL_INVOICE", createSmartBillInvoiceHandler, job("SMARTBILL_INVOICE", CHARGE_ID, { card_country: "RO" })],
+      ["SMARTBILL_STORNO", createSmartBillStornoHandler, job("SMARTBILL_STORNO", `${CHARGE_ID}:61001`, credit)]
+    ];
+    for (const served of ["live", null] as const) {
+      for (const [kind, create, queued] of cases) {
+        const { lines, audit } = recorder();
+        expect(await create(deps(audit, served))(queued, NOW), `${kind} on ${String(served)}`)
+          .toEqual({ kind: "DEAD", code: "OTHER_PAYMENT_SYSTEM" });
+        expect(lines, kind).toEqual([{ event: "billing.outbox.other_system", fields: { kind, code: "OTHER_PAYMENT_SYSTEM" } }]);
+      }
+    }
+  });
 });
 
 function state(overrides: Partial<SubscriptionState> = {}): SubscriptionState {
@@ -169,21 +200,24 @@ describe("P2-I4 a plan of the other xMoney system offers no withdrawal and canno
   });
 });
 
-/** A sandbox plan (activeSubscriptionEvents names "stage"), activated at `at`, folded by the handlers below. */
-function stageSubscription(at: Date): Readonly<{ events: SubscriptionEvent[]; subscriptionId: string; ownerRef: string }> {
-  const events = activeSubscriptionEvents("0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", at, "PLUS", { provider: "xmoney", environment: "stage" });
+/**
+ * A plan of NETOPIA's live environment (rule 4 of N24b: the OTHER environment of an API serving the sandbox), activated
+ * at `at`, folded by the handlers below.
+ */
+function liveSubscription(at: Date): Readonly<{ events: SubscriptionEvent[]; subscriptionId: string; ownerRef: string }> {
+  const events = activeSubscriptionEvents("0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", at, "PLUS", { provider: "netopia", environment: "live" });
   return { events, subscriptionId: events[0]!.subscriptionId, ownerRef: events[0]!.ownerRef };
 }
 
-describe("P2-W3 (b) a renewal notice or yearly reminder of the other xMoney system is never priced or sent", () => {
+describe("P2-W3 (b) a renewal notice or yearly reminder of the other payment system is never priced or sent", () => {
   // Activated 1 October: the period ends 1 November, inside the 10-business-day look-ahead from 20 October.
   const activated = new Date("2026-10-01T09:00:00.000Z");
   const periodEnd = "2026-11-01T09:00:00.000Z";
   const noticeAt = new Date("2026-10-20T12:00:00.000Z");
 
-  function noticeRun(api: "stage" | "live") {
+  function noticeRun(api: "sandbox" | "live") {
     const { lines, audit } = recorder();
-    const subscription = stageSubscription(activated);
+    const subscription = liveSubscription(activated);
     const priced: string[] = [];
     const written: string[] = [];
     const handler = createRenewalNoticeHandler({
@@ -196,31 +230,31 @@ describe("P2-W3 (b) a renewal notice or yearly reminder of the other xMoney syst
         freshQuote: async () => { priced.push("quote"); return { tax: { totalMicros: 30_000_000 } }; },
         writeNotice: async () => { written.push("notice"); }
       }, "renewal"),
-      policy: testBillingPolicy, xmoneyEnvironment: api, audit
+      policy: testBillingPolicy, ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment: api, audit
     });
     const notice = job("RENEWAL_NOTICE", `${subscription.subscriptionId}:${periodEnd}`, {});
     return { run: () => handler(notice, noticeAt), lines, priced, written };
   }
 
-  it("ends a sandbox plan's RENEWAL_NOTICE on a live API DEAD OTHER_XMONEY_SYSTEM before any quote, with one audit line", async () => {
-    const live = noticeRun("live");
-    expect(await live.run()).toEqual({ kind: "DEAD", code: "OTHER_XMONEY_SYSTEM" });
-    expect(live.priced).toEqual([]);
-    expect(live.written).toEqual([]);
-    expect(live.lines).toEqual([{ event: "billing.outbox.other_system", fields: { kind: "RENEWAL_NOTICE", code: "OTHER_XMONEY_SYSTEM" } }]);
+  it("ends a live plan's RENEWAL_NOTICE on a sandbox API DEAD OTHER_PAYMENT_SYSTEM before any quote, with one audit line", async () => {
+    const sandbox = noticeRun("sandbox");
+    expect(await sandbox.run()).toEqual({ kind: "DEAD", code: "OTHER_PAYMENT_SYSTEM" });
+    expect(sandbox.priced).toEqual([]);
+    expect(sandbox.written).toEqual([]);
+    expect(sandbox.lines).toEqual([{ event: "billing.outbox.other_system", fields: { kind: "RENEWAL_NOTICE", code: "OTHER_PAYMENT_SYSTEM" } }]);
   });
 
   it("still prices and writes the notice in the plan's own system (control)", async () => {
-    const stage = noticeRun("stage");
-    expect(await stage.run()).toEqual({ kind: "DONE" });
-    expect(stage.priced).toEqual(["quote"]);
-    expect(stage.written).toEqual(["notice"]);
-    expect(stage.lines).toEqual([]);
+    const live = noticeRun("live");
+    expect(await live.run()).toEqual({ kind: "DONE" });
+    expect(live.priced).toEqual(["quote"]);
+    expect(live.written).toEqual(["notice"]);
+    expect(live.lines).toEqual([]);
   });
 
-  async function reminderPass(api: "stage" | "live") {
+  async function reminderPass(api: "sandbox" | "live") {
     // M4: a plan activated a year ago, visited inside the 7 days after its anniversary.
-    const subscription = stageSubscription(new Date("2025-10-01T09:00:00.000Z"));
+    const subscription = liveSubscription(new Date("2025-10-01T09:00:00.000Z"));
     const enqueued: Array<Readonly<{ kind: string; ref: string; payload: Readonly<Record<string, unknown>> }>> = [];
     const maintenance = new BillingMaintenance({
       repository: only<BillingRepository>({
@@ -237,22 +271,22 @@ describe("P2-W3 (b) a renewal notice or yearly reminder of the other xMoney syst
         outboxJobExists: async () => false
       }, "jobs"),
       entitlements: only({}, "entitlements"), renewal: only({}, "renewal"),
-      policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", xmoneyEnvironment: api,
+      policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment: api,
       audit: () => undefined, clock: () => new Date("2026-10-03T12:00:00.000Z")
     });
     const report = await maintenance.runOnce();
     return { report, enqueued };
   }
 
-  it("sends no yearly reminder (M4) for a sandbox plan on a live API", async () => {
-    const live = await reminderPass("live");
-    expect(live.enqueued).toEqual([]);
-    expect(live.report).toMatchObject({ visited: 1, reminded: 0, failed: 0 });
+  it("sends no yearly reminder (M4) for a live plan on a sandbox API", async () => {
+    const sandbox = await reminderPass("sandbox");
+    expect(sandbox.enqueued).toEqual([]);
+    expect(sandbox.report).toMatchObject({ visited: 1, reminded: 0, failed: 0 });
   });
 
   it("sends the yearly reminder in the plan's own system (control)", async () => {
-    const stage = await reminderPass("stage");
-    expect(stage.enqueued).toEqual([expect.objectContaining({ kind: "EMAIL", payload: expect.objectContaining({ template: "M4" }) })]);
-    expect(stage.report).toMatchObject({ visited: 1, reminded: 1, failed: 0 });
+    const live = await reminderPass("live");
+    expect(live.enqueued).toEqual([expect.objectContaining({ kind: "EMAIL", payload: expect.objectContaining({ template: "M4" }) })]);
+    expect(live.report).toMatchObject({ visited: 1, reminded: 1, failed: 0 });
   });
 });
