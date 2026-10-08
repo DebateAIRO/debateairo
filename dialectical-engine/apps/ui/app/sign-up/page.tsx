@@ -1,3 +1,5 @@
+import { publicTurnstileConfig } from "@/lib/turnstile";
+import { NONCE_REQUEST_HEADER } from "../../content-security-policy.mjs";
 import Link from "next/link";
 import { cookies, headers } from "next/headers";
 import { AGE_REFUSAL_COOKIE_NAME, AGE_REFUSAL_COOKIE_VALUE } from "@debateai/contract";
@@ -27,6 +29,9 @@ async function signupOpenFor(requestHeaders: Headers): Promise<boolean> {
 }
 
 export default async function SignUpPage() {
+  const requestHeaders = await headers();
+  // Public config only. Task11 consumes this through the reusable managed widget.
+  const turnstile = publicTurnstileConfig(process.env.TURNSTILE_SITE_KEY, requestHeaders.get(NONCE_REQUEST_HEADER) ?? undefined, process.env.NODE_ENV === "production");
   const cookieStore = await cookies();
   const requestedLocale = cookieStore.get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
@@ -51,5 +56,5 @@ export default async function SignUpPage() {
       </AuthShell>
     );
   }
-  return <SignUpFlow catalog={catalog} dobLocale={dobLocale} refused={refused} />;
+  return <SignUpFlow catalog={catalog} dobLocale={dobLocale} refused={refused} turnstile={turnstile} />;
 }

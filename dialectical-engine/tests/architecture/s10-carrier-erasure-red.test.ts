@@ -233,6 +233,7 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
       "apps/runner/src/run-seats.ts",
       "packages/evaluator/src/index.ts",
       "packages/judgement/src/index.ts",
+      "packages/providers/src/preview-test.ts",
       // Verdict story: the writer calls ONLY the gateway the runner hands it (the
       // run-required, leased gateway above), from the post-settle hook inside the
       // runner's lease, and every request names the run it belongs to.
@@ -242,6 +243,7 @@ describe("S10 carrier erasure — RED acceptance contracts", () => {
     expect(contents.get("apps/runner/src/index.ts")).toMatch(/PROVIDER_RUN_REQUIRED/);
     expect(contents.get("packages/story/src/writer.ts")).toMatch(/runId: input\.story\.runId,/);
     expect(contents.get("packages/story/src/writer.ts")).toMatch(/lane: "story",/);
+    expect(contents.get("packages/providers/src/preview-test.ts")).toMatch(/gateway\.call\(\{\s*\.\.\.request,/);
     expect(contents.get("packages/evaluator/src/consumer.ts")).toMatch(/withPublicSampleLease\(sample/);
     expect(contents.get("packages/evaluator/src/consumer.ts")).toMatch(/provider\.classify/);
     expect(contents.get("packages/evaluator/src/index.ts")).toMatch(/withRunContentLease/);

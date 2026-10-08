@@ -120,7 +120,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. A közzététel szándékos, külön megerősítést igénylő művelet. Egy közzétett vita megjeleníti az Ön álnevét, az Ön által megfogalmazott kérdést, az érvelési fát, a pontszámokat, a döntést és a megbízhatósági sávot, továbbá látható címkével jelzi, hogy a tartalmat MI hozta létre. Soha nem jeleníti meg e-mail-címét, munkamenet-nyilvántartásait vagy fiókelőzményeit. A keresőmotorok indexelhetik a közzétett vitákat." },
-      { kind: "p", text: "A közzététel visszavonása eltávolítja a vitát a DebateAI felületéről, és megsemmisíti a nyilvános példányunk kulcsát. Az olvasók, keresőmotorok vagy archívumok által már elkészített másolatok nem állnak ellenőrzésünk alatt, és nem tudjuk azokat visszahívni." },
+      { kind: "p", text: "A közzététel visszavonása eltávolítja a vitát a Dialectical Engine felületéről, és megsemmisíti a nyilvános példányunk kulcsát. Az olvasók, keresőmotorok vagy archívumok által már elkészített másolatok nem állnak ellenőrzésünk alatt, és nem tudjuk azokat visszahívni." },
       { kind: "p", text: "Fiókja törlésekor az Ön által közzétett minden vitát indokolatlan késedelem nélkül, de legfeljebb 30 napon belül eltávolítunk a nyilvános hozzáférésből, kivéve, ha a jogszabály egy konkrét elem megőrzésére kötelez bennünket. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -199,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Vitákban megnevezett személyek, akik nem felhasználóink",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Ha valaki olyan kérdést tesz fel a DebateAI-nak, amelyben Önt megnevezi, akkor is kezelhetünk Önről személyes adatokat, ha Ön soha nem használta a szolgáltatást. A Feltételek tiltják, hogy a felhasználók ezt tegyék, és minimalizáljuk az MI-szolgáltatóknak továbbított adatokat, de ez megtörténhet." },
+      { kind: "p", text: "Ha valaki olyan kérdést tesz fel a Dialectical Engine-nak, amelyben Önt megnevezi, akkor is kezelhetünk Önről személyes adatokat, ha Ön soha nem használta a szolgáltatást. A Feltételek tiltják, hogy a felhasználók ezt tegyék, és minimalizáljuk az MI-szolgáltatóknak továbbított adatokat, de ez megtörténhet." },
       { kind: "p", text: "Ez a szakasz a GDPR 14. cikke alapján Önnek nyújtandó tájékoztatás. Az adat mindaz, amit a felhasználó beírt, és amit a motor válaszként létrehozott; a forrás ez a felhasználó; a célok és a jogalap a 4. szakaszban szerepelnek; a címzettek a Nyilvántartásban feltüntetett MI-szolgáltatók; a megőrzés a 7. szakaszt követi. A 10. szakaszban szereplő valamennyi jog megilleti Önt, és különösen kérheti, hogy távolítsunk el egy közzétett vagy az Ön adatait tartalmazó magánjellegű vitát, és közöljük, milyen adatokat tárolunk. Ehhez nincs szüksége fiókra. Írjon a privacy@dezbatere.ro címre, vagy használja bármely közzétett vitán a Jelentés vezérlőt; a megalapozott kérelmekre indokolatlan késedelem nélkül intézkedünk. Ilyen esetben nem tudjuk Önt egyénileg értesíteni, mert nem tudjuk, ki Ön, és hogyan érhetjük el; ehelyett ezt a nyilvános tájékoztatást és az eltávolítási lehetőséget biztosítjuk." },
       { kind: "p", text: "Ugyanez vonatkozik az Önre vonatkozó különleges adatokra — politikai véleményre, egészségre, vallásra —, amelyek más személy kérdésében jelennek meg. Semmilyen jogi feltétel nem teszi lehetővé, hogy tiltakozása után tovább kezeljük őket, és ezt nem is tesszük." }
     ]
@@ -209,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Gyermekek",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "A DebateAI felnőtteknek készült. Regisztrációkor megerősíti, hogy betöltötte a 18. életévét, és tudatosan nem kezeljük 18 éven aluli személyek adatait. Ha tudomást szerzünk arról, hogy egy fiók 18 éven aluli személyhez tartozik, megszüntetjük azt, és a 7. szakaszban leírtak szerint töröljük az adatokat. Egyes országok a megerősítést elégtelennek tekintik, vagy többet követelnek; a B. melléklet közli, hol mi alkalmazandó, a Feltételek pedig ismertetik, mit teszünk ezzel kapcsolatban." }
+      { kind: "p", text: "A Dialectical Engine felnőtteknek készült. Regisztrációkor megerősíti, hogy betöltötte a 18. életévét, és tudatosan nem kezeljük 18 éven aluli személyek adatait. Ha tudomást szerzünk arról, hogy egy fiók 18 éven aluli személyhez tartozik, megszüntetjük azt, és a 7. szakaszban leírtak szerint töröljük az adatokat. Egyes országok a megerősítést elégtelennek tekintik, vagy többet követelnek; a B. melléklet közli, hol mi alkalmazandó, a Feltételek pedig ismertetik, mit teszünk ezzel kapcsolatban." }
     ]
   },
   {
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Sütik",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "A DebateAI nyolc elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a DebateAI helyezi el: négy sütit és négy bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A [dezbatere.ro/cookies] címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
+      { kind: "p", text: "A Dialectical Engine 18 elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a Dialectical Engine helyezi el: 13 sütit és 5 bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A [dezbatere.ro/cookies] címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
       {
         kind: "list",
         items: [
@@ -225,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — 14 nap",
         "__Host-debateai-age-refusal — Süti (HttpOnly) — Elutasított életkor-ellenőrzés után 30 napig megakadályozza, hogy ez a böngésző újra próbálkozzon. Csak az „elutasítva” szót tartalmazza, személyes adatot nem. — 30 nap",
         "debateai.locale — Süti — Megjegyzi, milyen nyelvű felületet választott. — 1 év",
+        "__Host-debateai-staff — Süti (HttpOnly) — Külön munkatársi hozzáférés — Legfeljebb 8 óra; 15 perc inaktivitás",
+        "__Host-debateai-staff-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — Legfeljebb 8 óra; 15 perc inaktivitás",
+        "__Host-debateai-password-reset — Süti (HttpOnly) — Csak jelszó-visszaállítás — Legfeljebb 30 perc",
+        "__Host-debateai-password-reset-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — Legfeljebb 30 perc",
+        "__Host-debateai-mfa-recovery — Süti (HttpOnly) — Csak hitelesítő-helyreállítás — Legfeljebb 299 másodperc",
+        "__Host-debateai-mfa-recovery-csrf — Süti — Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. — Legfeljebb 299 másodperc",
+        "__Host-debateai-social-flow — Süti (HttpOnly) — Rövid szolgáltatói bejelentkezés vagy fiók-összekapcsolás — Legfeljebb 5 perc",
+        "__Host-debateai-social-apple — Süti (HttpOnly) — Rövid szolgáltatói bejelentkezés vagy fiók-összekapcsolás — Legfeljebb 5 perc",
+        "__Host-debateai-social-browser — Süti (HttpOnly) — Rövid szolgáltatói bejelentkezés vagy fiók-összekapcsolás — Legfeljebb 5 perc",
         "debateai.consent — Helyi tárhely — Megjegyzi, hogy Ön már látta a sütikről szóló értesítést, így az csak egyszer jelenik meg. — Amíg Ön nem törli",
         "debateai.mode — Helyi tárhely — Megjegyzi, hogy a világos vagy a sötét módot használja. — Amíg Ön nem törli",
         "debateai.languageOffer.dismissed — Munkamenet-tárhely — Megjegyzi ennél a lapnál, hogy Ön elutasította az ajánlatot, hogy egy vitát más nyelven mutassunk meg. — Amíg be nem zárja a lapot",
-        "debateai.support.conversation.v2 — Munkamenet-tárhely — A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. — Amíg be nem zárja a lapot"
+        "debateai.support.conversation.v2 — Munkamenet-tárhely — A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. — Amíg be nem zárja a lapot",
+        "debateai.phone-completion-draft.v1 — Munkamenet-tárhely — Befejezetlen kérdés a telefonos lépés alatt; munkamenetváltáskor, kijelentkezéskor vagy tulajdonosváltáskor törlődik — 15 perc vagy a korábbi törlésig"
         ]
       },
-      { kind: "p", text: "Semmilyen más fél nem gyűjt a DebateAI-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően." },
-      { kind: "p", text: "A böngészők küldhetnek „Do Not Track” jelzést vagy hasonló jelzést. A DebateAI nem követi Önt, így egy ilyen jelzésnek nincs mit kikapcsolnia: a szolgáltatás a jelzéssel és anélkül is ugyanúgy működik." },
+      { kind: "p", text: "Semmilyen más fél nem gyűjt a Dialectical Engine-on keresztül információt az Ön online tevékenységeiről az idő során és különböző webhelyeken átívelően." },
+      { kind: "p", text: "A böngészők küldhetnek „Do Not Track” jelzést vagy hasonló jelzést. A Dialectical Engine nem követi Önt, így egy ilyen jelzésnek nincs mit kikapcsolnia: a szolgáltatás a jelzéssel és anélkül is ugyanúgy működik." },
       { kind: "p", text: "Ha el szeretné utasítani ezeket az elemeket, böngészője beállításaiban tiltsa le vagy törölje ennek az oldalnak a sütijeit és webhelyadatait. Ami ezután nem működik: a bejelentkezés, valamint a nyelv- és megjelenítési választásának megjegyzése; a sütikről szóló tájékoztatás is ismét megjelenik." }
     ]
   },
@@ -242,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a [dezbatere.ro/privacy/versions] címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot." },
-      { kind: "p", text: "Ezt a szabályzatot legutóbb [date] napján frissítettük. A 3.1-s verzió a 2.1-es verzió helyébe lépett, amely a munkamenetadatokat, a megőrzési időket, az analitikát, az exportálást és a törlés közzétett vitákra gyakorolt hatását már nem a szolgáltatásnak megfelelő módon írta le." }
+      { kind: "p", text: "Ezt a szabályzatot legutóbb [date] napján frissítettük. A 3.2-s verzió a 2.1-es verzió helyébe lépett, amely a munkamenetadatokat, a megőrzési időket, az analitikát, az exportálást és a törlés közzétett vitákra gyakorolt hatását már nem a szolgáltatásnak megfelelő módon írta le." }
     ]
   },
   {
@@ -315,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukrajna (csak ha fel van sorolva)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Ukrajna „A személyes adatok védelméről” szóló törvénye alkalmazandó. A DebateAI szolgáltatást nem kínáljuk Ukrajna azon területein, amelyek nem állnak a kormánya ellenőrzése alatt. Adatai uniós országokba és az Egyesült Államokba kerülnek (lásd a Nyilvántartást). Panaszt az Ukrainian Parliament Commissioner for Human Rights hivatalánál tehet." }
+      { kind: "p", text: "Ukrajna „A személyes adatok védelméről” szóló törvénye alkalmazandó. A Dialectical Engine szolgáltatást nem kínáljuk Ukrajna azon területein, amelyek nem állnak a kormánya ellenőrzése alatt. Adatai uniós országokba és az Egyesült Államokba kerülnek (lásd a Nyilvántartást). Panaszt az Ukrainian Parliament Commissioner for Human Rights hivatalánál tehet." }
     ]
   },
   {
@@ -346,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.1",
-  sha256: "ec42fa591bbc9f3ac390a2a4a11cb1f233377f2ebc9d115ab128d33967af0d29",
-  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.1 · HATÁLYOS [DATE]",
+  version: "3.2",
+  sha256: "22d4f4b916051b46cd985fa88d498426ca101c08891ef0da4a97b6d839f2c18c",
+  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.2 · HATÁLYOS [DATE]",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",
-  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.1",
+  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Az Adatvédelmi szabályzat szövege",
   sectionIdPrefix: "policy-section-",

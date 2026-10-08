@@ -81,5 +81,6 @@
   "support.answerRating": "Bedømmelse af svar",
   "support.privacyPreferences": "Privatliv",
   "support.aiBanner": "Svar er AI-genereret, maskinlæsbart markeret og kan være forkerte. Spørg efter et menneske på ethvert tidspunkt.",
-  "support.cookiePreferences": "Cookies, vi gemmer"
+  "support.cookiePreferences": "Cookies, vi gemmer",
+  "support.recoverAccount": "Gendan din konto"
 }

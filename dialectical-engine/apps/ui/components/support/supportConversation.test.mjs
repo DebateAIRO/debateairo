@@ -329,12 +329,21 @@ test("DL3-F3: the assistant persists through the whitelisting writer and holds t
 });
 
 test("DL3-F3: ending a session erases the support conversation in the same tab", () => {
-  const source = read("../SessionControls.tsx");
-  assert.match(source, /clearStoredSupportConversation/u);
-  const finish = source.slice(source.indexOf("const finishSession"));
-  assert.match(
-    finish.slice(0, finish.indexOf("}")),
-    /clearStoredSupportConversation\(\)/u,
-    "logout, revoke-all and revoking this session all run through finishSession"
-  );
+  const source = read("../../lib/endSession.ts");
+  assert.match(source, /clearStoredSupportConversation\(\)/u);
+  assert.match(read("../SessionControls.tsx"), /endSession/u);
+  assert.match(read("../billing/LegalAcceptGate.tsx"), /endSession/u);
+
+});
+
+
+test("regional English preferences validate actions against the English support catalog", async () => {
+  const { supportActionsFrom } = await loadConversation();
+  for (const language of ["en-US", "en-GB"]) {
+    assert.deepEqual(supportActionsFrom([
+      { id: "start-debate", label: "Start a debate", href: "/login?next=%2Fnew" }
+    ], { signedIn: false, language }), [
+      { id: "start-debate", label: "Start a debate", href: "/login?next=%2Fnew" }
+    ]);
+  }
 });

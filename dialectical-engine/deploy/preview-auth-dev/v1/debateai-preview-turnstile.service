@@ -1,0 +1,54 @@
+# Install only after creating debateai-preview-turnstile and the debateai-preview-ts-clients group.
+# Only debateai-preview-api joins clients; it cannot read the systemd credential or source secret.
+[Unit]
+Description=Reviewed preview-only Turnstile Siteverify relay
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=debateai-preview-turnstile
+Group=debateai-preview-ts-clients
+WorkingDirectory=/opt/debateai-v3-preview/current-api/dialectical-engine
+Environment=NODE_ENV=production
+# This root-owned file contains only PUBLIC_APP_URL, matching the API's exact deployment origin.
+Environment=PUBLIC_APP_URL=https://v3-preview.dezbatere.ro
+Environment=TURNSTILE_SOCKET_PATH=/run/debateai-preview-turnstile/siteverify.sock
+LoadCredential=turnstile-secret:/etc/debateai-v3-preview/turnstile/secret
+ExecStart=/usr/bin/node /opt/debateai-v3-preview/current-api/dialectical-engine/deploy/turnstile/siteverify-relay.mjs
+RuntimeDirectory=debateai-preview-turnstile
+RuntimeDirectoryMode=0750
+UMask=0077
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/run/debateai-preview-turnstile
+# An explicit deny for all identity, KEK/DEK, provider and database material. The worker gets
+# only its private systemd credential (not the root source file) and public config.
+InaccessiblePaths=-/etc/debateai -/etc/debateai-v3-preview -/var/lib/debateai -/var/lib/postgresql -/run/postgresql -/var/run/postgresql -/run/debateai-v3-preview
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitNOFILE=256
+TasksMax=32
+[Install]
+WantedBy=multi-user.target

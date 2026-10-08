@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "eine Liste aller Dritten erhalten, denen diese Daten übermittelt wurden;",
   "legal.health.s05.item3": "Ihre Einwilligung widerrufen und die Daten löschen lassen.",
   "legal.health.s06.title": "So machen Sie Ihre Rechte geltend",
-  "legal.health.s06.body": "Über die Einstellungen oder per E-Mail an privacy@dezbatere.ro. Wir antworten innerhalb von 45 Tagen. Lehnen wir einen Antrag ab, können Sie Einspruch einlegen, indem Sie auf unsere Nachricht antworten."
+  "legal.health.s06.body": "Über die Einstellungen oder per E-Mail an privacy@dezbatere.ro. Wir antworten innerhalb von 45 Tagen. Lehnen wir einen Antrag ab, können Sie Einspruch einlegen, indem Sie auf unsere Nachricht antworten.",
+  "legal.cookies.staff.purpose": "Getrennter Mitarbeiterzugang",
+  "legal.cookies.passwordReset.purpose": "Nur Passwortzurücksetzung",
+  "legal.cookies.mfaRecovery.purpose": "Nur Wiederherstellung des Authentifikators",
+  "legal.cookies.social.purpose": "Kurze Anbieteranmeldung oder Kontoverknüpfung",
+  "legal.cookies.phoneDraft.purpose": "Unfertige Frage während des Telefonschritts; gelöscht bei Sitzungswechsel, Abmeldung oder Besitzerwechsel",
+  "legal.cookies.staff.life": "Bis zu 8 Stunden; 15 Minuten Inaktivität",
+  "legal.cookies.passwordReset.life": "Bis zu 30 Minuten",
+  "legal.cookies.mfaRecovery.life": "Bis zu 299 Sekunden",
+  "legal.cookies.social.life": "Bis zu 5 Minuten",
+  "legal.cookies.phoneDraft.life": "15 Minuten oder bis zur früheren Löschung"
 }

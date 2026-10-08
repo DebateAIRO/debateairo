@@ -1,0 +1,25 @@
+{
+  "v3": {
+    "README.md": "5c733190b9617a725910fd8c17ca2d452f94ff0e5c70704fda14d75a94f2821d",
+    "SHA256SUMS": "6ce065fb5476006600c3a23d8f1945c3e92ae0efb814ecc09b809afbac9f73d9",
+    "account-mail-template.mjs": "8c9436739e82efbe13e6f35cee0071262055d846fd55d4cb3493ef6fd5f2a412",
+    "predecessor-freeze-sha256.json": "6f189be1bc4f73a6656d59d04e787d740b14af39ec099233f9173f48002bd8d5",
+    "sendmail-owned-preview.mjs": "d67d48b625a52564540d0a0ddf6f27a5b3800b8df2bd8b29f92997466131d7de",
+    "source-producer-sha256.json": "98ed6c671cd1f8281637aa4b49241ba5f1d8f15325bd34fa52a3d98de9178b1f",
+    "test-mail.mjs": "9452512dff814eaa7d2e3cdeaf4a49ce278641e94806dc3be9a7556abfacb897",
+    "test-source-producer.mjs": "97e0f49341b2a3208803d94816bc598e44687d2d2183f5806405c5d22122a84e"
+  },
+  "v2FrozenInventory": {
+    "root": "v2-account-mail-2026-10-05",
+    "files": {
+      "README.md": "af7352533a6a0e48dd4405a969bb06fc0ff6d863ba5f59aaa84dd75e8186fac7",
+      "SHA256SUMS": "c633620518f9a085d0a60793fe0521f1466762ac88cbda4e103c66abaa3a85e3",
+      "account-mail-template.mjs": "326ee5c07f2785ea57bde4869dad412df702c47da25fedf3576bd56635eef4e2",
+      "historical-freeze-sha256.json": "932c693d612f7208a82e8475a71a3fe5f42dc9207111da3f5594a9f4bcf5aa3b",
+      "sendmail-owned-preview.mjs": "e713ae55f83216c9e7d9f23d0fc57f80443a95e1a22894c0e145292280fdca3b",
+      "source-producer-sha256.json": "a0e7f9122082f9cc4a9423ce8f56d28bd552abce184be49b95a0fd75262b5dac",
+      "test-mail.mjs": "ee874d1202c3882e6c0bbe270348cd088cac1cb81d5451a60f5ebcc19bcb9a06",
+      "test-source-producer.mjs": "22a332312a86637599cc2330366a709dc5203c2a364b4380e5b556c1c8584792"
+    }
+  }
+}

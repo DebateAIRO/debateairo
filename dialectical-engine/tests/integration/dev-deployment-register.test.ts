@@ -1,3 +1,4 @@
+import {readConsumerRecoveryPolicy} from "@debateai/register";
 import { spawn } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { chmod, link, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
@@ -159,6 +160,7 @@ describe("DEV-05 complete development deployment register", () => {
       adminPool: database.pool, providerPanel: TEST_DEVELOPMENT_PROVIDER_PANEL,
       repositoryRoot, roleRefs
     });
+    expect((await readMfaPolicy(database.pool,registerVersionToSafeLegacyNumber(parseRegisterVersionText(first.registerVersion)))).issuer).toBe("Dialectical Engine");
     const before = await database.pool.query(
       "SELECT row_key, value_json, source_ref FROM register.register_row WHERE register_version=$1 AND row_key IN ('synthesizerRoleRef','evaluatorRoleRef') ORDER BY row_key",
       [first.registerVersion]
@@ -377,6 +379,7 @@ describe("DEV-05 complete development deployment register", () => {
   it("persists recovery and product-role policies inside an exact sealed bootstrap version", async () => {
     const bootstrap = await loadBootstrapRegister();
     await persistBootstrapRegister(database.pool, bootstrap);
+    await expect(readConsumerRecoveryPolicy(database.pool, bootstrap.registerVersion)).rejects.toMatchObject({code:'CONSUMER_RECOVERY_POLICY_INVALID'});
     await expect(readRecoveryPolicy(database.pool, bootstrap.registerVersion)).resolves.toMatchObject({
       policyVersion: 1,
       publicResponse: "ENUMERATION_RESISTANT_GENERIC"
@@ -439,6 +442,7 @@ describe("DEV-05 complete development deployment register", () => {
 
     await expect(assertBootstrapEquality(database.pool, bootstrap)).resolves.toBeUndefined();
     const registerVersion = registerVersionToSafeLegacyNumber(first.registerVersion);
+    await expect(readConsumerRecoveryPolicy(database.pool,registerVersion)).resolves.toMatchObject({kind:'CONSUMER_RECOVERY_POLICY',token_ttl_ms:900000,capability_ttl_ms:300000,maximum_send_attempts:3,dispatch:'SHARED_SELECTED_AUTH_MAIL_PERMIT_BEFORE_BOTH_MECHANISMS_WITH_PRETRANSPORT_RESPONSE_FLOOR'});
     const [auth, mfa, session, recovery, roles, makers, discovery, structural, risk, callTokenCeilings, publicationCheck] = await Promise.all([
       readAuthPolicy(database.pool, registerVersion),
       readMfaPolicy(database.pool, registerVersion),
@@ -457,8 +461,16 @@ describe("DEV-05 complete development deployment register", () => {
     expect(callTokenCeilings).toEqual({ judge: 2048, synthesizer: 2048, evaluator: 2048 });
     expect(publicationCheck).toEqual({ deadlineMs: 60_000 });
     expect(auth.channel.structuralMaximumConcurrentRegistrations).toBe(103);
+    expect(auth.verification).toMatchObject({ resendCooldownMs: 60_000, outboundSendWindowMs: 3_600_000,
+      outboundSendMax: 3, outboundSendMechanism: "atomic_rolling_reservation_ledger" });
+    const historicalAuth = await readAuthPolicy(database.pool, bootstrap.registerVersion);
+    expect(historicalAuth.verification).toMatchObject({ resendCooldownMs: 1_200_000,
+      outboundSendMechanism: "per_row_last_sent_timestamp_minimum_spacing" });
+    await expect(readAuthPolicy(database.pool, 999_999)).rejects.toThrow();
     expect(mfa.totp.algorithm).toBe("SHA1");
-    expect(session.absoluteTtlMs).toBeGreaterThan(session.idleTtlMs);
+    expect(session).toMatchObject({idleTtlMs:1209600000,absoluteTtlMs:2592000000,stepUpFreshnessMs:300000});
+    expect(await readSessionPolicy(database.pool,bootstrap.registerVersion)).toMatchObject({idleTtlMs:1209600000,absoluteTtlMs:7776000000,stepUpFreshnessMs:300000});
+    await expect(readSessionPolicy(database.pool,999999)).rejects.toMatchObject({code:"SESSION_POLICY_UNRESOLVED"});
     expect(recovery).toMatchObject({
       policyVersion: 1,
       publicResponse: "ENUMERATION_RESISTANT_GENERIC",

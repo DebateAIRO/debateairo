@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+vi.mock("@/components/auth/TurnstileChallenge", async()=>{const {useEffect}=await import("react");return {TurnstileChallenge:({onToken}:{onToken:(value:string)=>void})=>{useEffect(()=>onToken("test-proof"),[onToken]);return null;}};});
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -46,8 +47,8 @@ const checkAge = vi.fn();
 const register = vi.fn();
 async function mountFlow(key = "initial"): Promise<void> {
   checkAge.mockReset().mockResolvedValue({ outcome: "allowed" });
-  register.mockReset().mockResolvedValue({ message: "Registration sent" });
-  await act(async () => root.render(<SignUpFlow key={key} catalog={english} client={{ checkAge, register }} />));
+  register.mockReset().mockResolvedValue({ message: "Registration sent", retry_after_seconds:60 });
+  await act(async () => root.render(<SignUpFlow key={key} catalog={english} turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={{ checkAge, register }} />));
 }
 async function fillFlow(): Promise<void> {
   for (const [name, value] of [["dob-d", "01"], ["dob-m", "01"], ["dob-y", "1990"]] as const) {
@@ -57,7 +58,7 @@ async function fillFlow(): Promise<void> {
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
-  for (const [name, value] of [["email", "person@example.test"], ["confirm-email", "person@example.test"], ["recovery-email", "recovery@example.test"], ["password", "Passw0rd!"], ["confirm-password", "Passw0rd!"]] as const) {
+  for (const [name, value] of [["email", "person@example.test"], ["phone", "+40722123456"], ["password", "Passw0rd!"]] as const) {
     query<HTMLInputElement>(`input[name="${name}"]`).value = value;
   }
   for (const name of ["privacy-accepted", "terms-accepted"]) query<HTMLInputElement>(`input[name="${name}"]`).checked = true;
@@ -84,10 +85,10 @@ afterEach(async () => {
 });
 
 describe("RegionField artboard states", () => {
-  it("E1 places one region field between confirmation and date of birth", async () => {
+  it("E1 places one region field between password and date of birth", async () => {
     await mountFlow();
     const form = query<HTMLFormElement>('form[data-form="signup"]');
-    const confirmation = query("#signup-confirm-password");
+    const confirmation = query("#signup-password");
     const region = query("#signup-region-trigger");
     const date = query(".dobFieldset");
     expect(form.querySelectorAll(".regionField")).toHaveLength(1);
@@ -351,8 +352,8 @@ describe("RegionField artboard states", () => {
     await pickRegion("US", "TX");
     await fillFlow();
     await submitFlow();
-    expect(query<HTMLButtonElement>("#signup-region-trigger").disabled).toBe(true);
-    expect(query<HTMLSelectElement>("#signup-region-state").disabled).toBe(true);
+    expect(host.querySelector("#signup-region-trigger")).toBeNull();
+    expect(host.querySelector("#signup-region-state")).toBeNull();
   });
 
   it("P11 keeps the sent pick during an in-flight request when its grid was already open", async () => {
@@ -366,11 +367,12 @@ describe("RegionField artboard states", () => {
     await submitFlow();
     expect(register).toHaveBeenCalledTimes(1);
     expect(host.querySelector(".regionPopover"), "busy closes the already-open grid").toBeNull();
-    const sent = register.mock.calls[0]?.[5];
+    const sent = register.mock.calls[0]?.[0];
     const cell = host.querySelector<HTMLButtonElement>('.regionCountry[data-code="DE"]');
     if (cell !== null) await act(async () => cell.click());
     await act(async () => rejectRegister(new ContractHttpError("FORBIDDEN", 403, "COUNTRY_UNKNOWN", "COUNTRY_UNKNOWN")));
-    expect(sent).toEqual({ country: "RO", usState: null });
+    expect(sent).toMatchObject({ country: "RO" });
+    expect(sent).not.toHaveProperty("us_state");
     expect(query(".regionName").textContent).toBe("Romania");
   });
 
@@ -385,16 +387,17 @@ describe("RegionField artboard states", () => {
     expect(query<HTMLSelectElement>("#signup-region-state").value).toBe("TX");
   });
 
-  it("E15 passes the complete US and non-US picks as the sixth argument", async () => {
+  it("E15 sends the complete US and non-US picks in the registration request", async () => {
     await mountFlow();
     await pickRegion("US", "TX");
     await fillFlow();
     await submitFlow();
-    expect(register.mock.calls[0]?.[5]).toEqual({ country: "US", usState: "TX" });
+    expect(register.mock.calls[0]?.[0]).toMatchObject({ country: "US", us_state: "TX" });
     await mountFlow("non-us");
     await pickRegion("RO");
     await fillFlow();
     await submitFlow();
-    expect(register.mock.calls[0]?.[5]).toEqual({ country: "RO", usState: null });
+    expect(register.mock.calls[0]?.[0]).toMatchObject({ country: "RO" });
+    expect(register.mock.calls[0]?.[0]).not.toHaveProperty("us_state");
   });
 });

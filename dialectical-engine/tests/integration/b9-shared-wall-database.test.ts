@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import { createInitialBatteryRows } from "@debateai/battery";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import {
@@ -57,6 +57,10 @@ async function pinOwner(runId: string, ownerRef: string): Promise<void> {
   const client = await database.pool.connect();
   try {
     await client.query("BEGIN");
+    // Financial account guards require a real active mapping, including synthetic ledger fixtures.
+    await client.query(`INSERT INTO identity."user"(user_id,owner_ref,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
+      VALUES($1,$2,$3,'{}','{}','fixture-password',$4,'active',clock_timestamp()) ON CONFLICT(owner_ref) DO NOTHING`,
+      [randomUUID(),ownerRef,randomBytes(32),`b9a:${randomUUID()}`]);
     const anchor = new Date("2026-09-01T00:00:00.000Z");
     const entitlementEventId = await entitlements.append(client, {
       ownerRef, planId: "FREE", periodAnchorAt: anchor, cause: "SIGNED_UP_FREE",

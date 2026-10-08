@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState } from "react";
 import type { ContractClient, SessionSummary } from "@debateai/contract";
 import { contractClient } from "../lib/api.js";
 import type { LocaleCode } from "../lib/i18n/locales.js";
 import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import settingsEnglish from "../messages/en/settings.json";
-import { clearStoredSupportConversation } from "./support/conversation.js";
-import { announceSessionChange } from "./support/sessionChange.js";
+import { endSession, finishSessionCleanup } from "../lib/endSession";
 
 export type SessionControlClient = Pick<ContractClient,
-  "listSessions" | "logout" | "revokeSession" | "revokeAllSessions" | "stepUp"
+  "listSessions" | "logout" | "revokeSession" | "revokeAllSessions"
 >;
 
 export interface SessionControlsProps {
@@ -73,20 +72,13 @@ export function SessionControls({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [stepUpComplete, setStepUpComplete] = useState(false);
   // Read after mount: navigator is absent during SSR, and reading it in render
   // would desynchronise the server and client markup.
   const [deviceLabel, setDeviceLabel] = useState<string | null>(null);
   useEffect(() => { setDeviceLabel(currentDeviceLabel()); }, []);
   const finishSession = () => {
-    // DL3-F3: the support widget's transcript is tab-scoped, so without this it
-    // outlived the account that produced it — the next person to sign in on this
-    // browser opened Help and read the previous person's support conversation.
-    clearStoredSupportConversation();
-    // S04-R01: the other tabs of this browser drop their copies too.
-    announceSessionChange();
-    if (onSessionEnded !== undefined) onSessionEnded();
-    else if (typeof window !== "undefined") window.location.assign("/settings");
+    finishSessionCleanup(onSessionEnded ? null : "/settings");
+    onSessionEnded?.();
   };
 
   async function refresh(): Promise<void> {
@@ -121,9 +113,9 @@ export function SessionControls({
     setBusy("all");
     setError(null);
     try {
-      await client.revokeAllSessions();
+      await endSession(client, { all: true, redirectTo: onSessionEnded ? null : "/settings" });
       setSessions([]);
-      finishSession();
+      onSessionEnded?.();
     } catch (failure) {
       setError(describeFailure(failure, catalog));
     } finally {
@@ -135,31 +127,9 @@ export function SessionControls({
     setBusy("logout");
     setError(null);
     try {
-      await client.logout();
+      await endSession(client, { redirectTo: onSessionEnded ? null : "/settings" });
       setSessions([]);
-      finishSession();
-    } catch (failure) {
-      setError(describeFailure(failure, catalog));
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function stepUp(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
-    setBusy("step-up");
-    setError(null);
-    setStepUpComplete(false);
-    try {
-      await client.stepUp(
-        String(data.get("step-up-password") ?? ""),
-        String(data.get("step-up-code") ?? "")
-      );
-      setStepUpComplete(true);
-      form.reset();
-      await refresh();
+      onSessionEnded?.();
     } catch (failure) {
       setError(describeFailure(failure, catalog));
     } finally {
@@ -251,41 +221,7 @@ export function SessionControls({
         </div>
       </section>
 
-      <form className="setCard" data-session-step-up="true" onSubmit={stepUp}>
-        <h3 className="setCardTitle">{t(catalog, "settings.sessions.freshAuthentication")}</h3>
-        <p className="setCardHint">{t(catalog, "settings.sessions.freshAuthenticationHint")}</p>
-        <div className="setCardRow">
-          <div className="setField">
-            <label htmlFor="step-up-password">{t(catalog, "settings.password")}</label>
-            <input
-              id="step-up-password"
-              name="step-up-password"
-              type="password"
-              autoComplete="current-password"
-              placeholder={t(catalog, "settings.password")}
-              required
-            />
-          </div>
-          <div className="setField">
-            <label htmlFor="step-up-code">{t(catalog, "settings.authenticatorCode")}</label>
-            <input
-              id="step-up-code"
-              name="step-up-code"
-              autoComplete="one-time-code"
-              placeholder={t(catalog, "settings.authenticatorCode")}
-              required
-            />
-          </div>
-          <button type="submit" className="setBtn setBtnPrimary" disabled={busy !== null}>
-            {t(catalog, "settings.sessions.verify")}
-          </button>
-        </div>
-        {stepUpComplete ? (
-          <p className="setStatus" role="status">
-            {t(catalog, "settings.sessions.freshAuthenticationComplete")}
-          </p>
-        ) : null}
-      </form>
+
     </>
   );
 }

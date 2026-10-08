@@ -81,5 +81,6 @@
   "support.answerRating": "Atsakymo įvertinimas",
   "support.privacyPreferences": "Privatumas",
   "support.aiBanner": "Atsakymus generuoja DI, jie pažymėti kompiuterio skaitoma žyma ir gali būti klaidingi. Bet kada galite paprašyti žmogaus pagalbos.",
-  "support.cookiePreferences": "Mūsų saugomi slapukai"
+  "support.cookiePreferences": "Mūsų saugomi slapukai",
+  "support.recoverAccount": "Atkurti paskyrą"
 }

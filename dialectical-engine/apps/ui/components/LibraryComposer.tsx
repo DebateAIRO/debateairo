@@ -2,12 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { COOKIE_SESSION_MARKER, contractClient, createDebate, validateSession } from "@/lib/api";
+import { contractClient, validateSession } from "@/lib/api";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { useAskRoom, waitingRoomOf, type AskRoomQuery } from "@/lib/billing/room";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { classifyRequestFailure, requestFailureMessage } from "@/lib/v3/requestFailure";
-import { isSensitiveDataConsentRefusal, useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
+import { useSensitiveDataConsent } from "@/components/SensitiveDataConsent";
 import { isCrisisSupportRefusal, useCrisisSupport } from "@/components/CrisisSupport";
 
 /* The composer asks with /new's Free defaults; the room depends on the ask's settings. */
@@ -68,21 +68,8 @@ export function LibraryComposer({
         setBusy(false);
         return;
       }
-      const create = () => createDebate(
-        topic.trim(), { max_depth: 3, branching: 2, max_tokens: 800 }, COOKIE_SESSION_MARKER
-      );
-      let debate;
-      try {
-        debate = await create();
-      } catch (refusal) {
-        if (!isSensitiveDataConsentRefusal(refusal)) throw refusal;
-        if (!await consent.ensureConsent({ known: "required" })) {
-          setBusy(false);
-          return;
-        }
-        debate = await create();
-      }
-      router.push(`/debate/${debate.id}`);
+      // /new owns complete ask provenance and account completion. Keep the question.
+      router.push(`/new?topic=${encodeURIComponent(topic.trim())}`);
       return;
     } catch (exc) {
       if (isCrisisSupportRefusal(exc)) {

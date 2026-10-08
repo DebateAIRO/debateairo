@@ -146,7 +146,7 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
   it("writes nothing when nothing is owed: the route is idempotent and cannot grow the table", async () => {
     // legal.acceptance is append-only for the life of the account, so a free signed-in account
     // posting the current pairs over and over must not add a row per request.
-    const { repository, recorded } = fakeAcceptances({ TERMS: "2.1", PRIVACY_SHOWN: "3.1" });
+    const { repository, recorded } = fakeAcceptances({ TERMS: "2.1", PRIVACY_SHOWN: "3.2" });
     const legal = new RepositoryLegalAcceptanceApplication({
       acceptances: repository as never, recordsKey: randomBytes(32), owedWithoutRecord: true, clock: () => NOW
     });

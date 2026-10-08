@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "saada loetelu kõigist kolmandatest isikutest, kellele need on edastatud;",
   "legal.health.s05.item3": "võtta oma nõusolek tagasi ja lasta andmed kustutada.",
   "legal.health.s06.title": "Kuidas oma õigusi kasutada",
-  "legal.health.s06.body": "Menüüs Seaded või kirjutades aadressile privacy@dezbatere.ro. Vastame 45 päeva jooksul. Kui keeldume taotlust rahuldamast, saate otsuse edasi kaevata, vastates meie kirjale."
+  "legal.health.s06.body": "Menüüs Seaded või kirjutades aadressile privacy@dezbatere.ro. Vastame 45 päeva jooksul. Kui keeldume taotlust rahuldamast, saate otsuse edasi kaevata, vastates meie kirjale.",
+  "legal.cookies.staff.purpose": "Eraldi töötajate juurdepääs",
+  "legal.cookies.passwordReset.purpose": "Ainult parooli lähtestamine",
+  "legal.cookies.mfaRecovery.purpose": "Ainult autentija taastamine",
+  "legal.cookies.social.purpose": "Lühike teenusepakkuja sisselogimine või konto sidumine",
+  "legal.cookies.phoneDraft.purpose": "Lõpetamata küsimus telefonisammu ajal; kustutatakse seansi vahetusel, väljalogimisel või omaniku vahetusel",
+  "legal.cookies.staff.life": "Kuni 8 tundi; 15 minutit tegevusetust",
+  "legal.cookies.passwordReset.life": "Kuni 30 minutit",
+  "legal.cookies.mfaRecovery.life": "Kuni 299 sekundit",
+  "legal.cookies.social.life": "Kuni 5 minutit",
+  "legal.cookies.phoneDraft.life": "15 minutit või varasema kustutamiseni"
 }

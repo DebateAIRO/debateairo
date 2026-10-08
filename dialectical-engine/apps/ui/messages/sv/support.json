@@ -81,5 +81,6 @@
   "support.answerRating": "Betyg för svaret",
   "support.privacyPreferences": "Integritet",
   "support.aiBanner": "Svaren är AI-genererade, maskinläsbart märkta och kan vara felaktiga. Be när som helst att få prata med en person.",
-  "support.cookiePreferences": "Cookies vi sparar"
+  "support.cookiePreferences": "Cookies vi sparar",
+  "support.recoverAccount": "Återställ ditt konto"
 }

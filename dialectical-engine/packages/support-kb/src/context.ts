@@ -243,7 +243,7 @@ function actionEvidenceScore(
   corpusLocale: SupportCorpusLanguage
 ): number {
   const legacy = isLegacyLanguage(language);
-  const uiAliases = legacy || definition.id === "forgot-password"
+  const uiAliases = legacy
     ? [] : SUPPORT_UI_LABEL_ALIASES[language][definition.id];
   const hasIntent = ACTION_INTENT.test(query)
     || !legacy && uiAliases.some((label) => phraseScore(query,label) > 0);
@@ -253,6 +253,9 @@ function actionEvidenceScore(
     .flatMap(({ labels }) => labels[corpusLocale]);
   const terms = legacy ? [definition.labels[language],...guideAliases] : [...uiAliases,...guideAliases];
   return Math.max(0,...terms.map((term) => {
+    // Hindi "secure" in a Help-conversation question shares a long stem with
+    // the Security tab label. Only the exact tab phrase names that action.
+    if (language === "hi" && definition.id === "security" && phraseScore(query,term) === 0) return 0;
     const score = orderedPhraseScore(query,term);
     if (definition.id === "method"
       && /^(?:how\s+it\s+works|cum\s+functioneaza)$/u.test(normalizedText(term))
@@ -366,7 +369,6 @@ export function buildSupportKnowledgeContext(input: Readonly<{
   const guideMatches = SUPPORT_GUIDE_LABELS.map((item) => {
     if (item.requiresNavigationIntent && !hasActionIntent) return Object.freeze({ item,score:0 });
     const uiAliases = isLegacyLanguage(input.language) || item.actionId === null
-      || item.actionId === "forgot-password"
       ? [] : SUPPORT_UI_LABEL_ALIASES[input.language][item.actionId];
     const score = Math.max(0,...[...item.labels[corpusLocale],...uiAliases].map((label) => {
       const matched = item.actionId === null

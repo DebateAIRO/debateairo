@@ -1,4 +1,16 @@
+import { passwordResetEndpointContracts, passwordResetContractSchemas } from "./password-reset.js";
+import { mfaRecoveryEndpointContracts, backupEmailEndpointContracts, mfaRecoveryContractSchemas } from "./mfa-recovery.js";
+export * from "./password-reset.js";
+export * from "./mfa-recovery.js";
+import { socialAuthContractSchemas } from './social-auth.js';
+export * from './social-auth.js';
+import { staffContractInventory, fundedStaffContractInventory } from "./staff-access.js";
+export * from "./staff-access.js";
 import { z } from "zod";
+import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
+export * from "./auth-shared.js";
+import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
+export * from "./consumer-auth.js";
 import { ABSTENTION_KINDS, CONDITION_MARKS, DEBATE_ROLES, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
@@ -175,7 +187,7 @@ export type AskRequest = z.infer<typeof AskRequestSchema>;
  * The same four words as `SpendScope` in @debateai/budget (the contract cannot
  * import it); tests/unit/b6a-waiting-projection.test.ts reads both.
  */
-export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"]);
 
 /**
  * Final review Part 1b, Important 1 — WHY A QUESTION WAITS when no reset is
@@ -188,7 +200,7 @@ export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK",
  * tests/unit/b6a-waiting-projection.test.ts reads both.
  */
 export const WaitsForSchema = z.enum(["OWN_DEBATES"]);
-const PERSON_SCOPES: ReadonlySet<string> = new Set(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]);
+const PERSON_SCOPES: ReadonlySet<string> = new Set(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"]);
 
 /**
  * Paid plans (spec 2026-09-29 §2.3.4): the gauges the SERVER decided for an
@@ -257,6 +269,10 @@ export type AskAlreadyWaiting = z.infer<typeof AskAlreadyWaitingSchema>;
 
 /** Paid-plans spec §1.2: the four plans, as billingPlans names them (`PlanId` in @debateai/register). */
 export const PlanIdSchema = z.enum(["FREE", "PLUS", "PRO", "MAX"]);
+export const FundingBasisSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("SUBSCRIPTION"), planId: PlanIdSchema, entitlementEventId: z.uuid() }).strict(),
+  z.object({ kind: z.literal("INTERNAL"), grantId: z.uuid(), grantEventId: z.uuid() }).strict()
+]) satisfies z.ZodType<import("@debateai/kernel").FundingBasis>;
 
 /** Budget spec §2.7: GET /v1/asks/room — the ask's settings class, as query parameters. */
 export const AskRoomQuerySchema = z.object({
@@ -270,9 +286,9 @@ export const AskRoomQuerySchema = z.object({
  * about, when that limit resets or the waiting question starts, the person's own
  * waiting run, and their plan. Never a figure (I6: figures are a capacity oracle).
  */
-export const AskRoomResponseSchema = z.object({
+const CustomerAskRoomResponseSchema = z.object({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
-  scope: SpendScopeSchema.nullable(),
+  scope: z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]).nullable(),
   resets_at: z.iso.datetime().nullable(),
   waiting_run_ref: z.string().min(1).nullable(),
   plan_id: PlanIdSchema.nullable(),
@@ -296,10 +312,22 @@ export const AskRoomResponseSchema = z.object({
     context.addIssue({ code: "custom", message: "a question that would wait says when it would start" });
   }
 });
+const InternalFundingUsageSchema = z.object({kind:z.literal("INTERNAL"),expires_at:z.iso.datetime()}).strict();
+const InternalAskRoomResponseSchema = z.object({
+  room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]).nullable(),
+  resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional()
+}).strict().superRefine((answer,context)=>{
+  if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
+    || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))
+    || ((answer.room==="FULL" || answer.room==="ALREADY_WAITING") && answer.resets_at===null)
+    || (answer.waits_for!==undefined && (!(answer.room==="FULL" || answer.room==="ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope??""))))
+    context.addIssue({code:"custom",message:"Internal room state is inconsistent"});
+});
+export const AskRoomResponseSchema = z.union([CustomerAskRoomResponseSchema,InternalAskRoomResponseSchema]);
 export type AskRoomResponse = z.infer<typeof AskRoomResponseSchema>;
 
 /** Paid-plans spec §1.2 (U1): GET /v1/billing/usage — whole percentages per window, never an amount. */
-export const BillingUsageResponseSchema = z.object({
+const CustomerBillingUsageResponseSchema = z.object({
   plan_id: PlanIdSchema,
   windows: z.array(z.object({
     scope: z.enum(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]),
@@ -307,6 +335,10 @@ export const BillingUsageResponseSchema = z.object({
     resets_at: z.iso.datetime()
   }).strict()).max(3)
 }).strict();
+const InternalBillingUsageResponseSchema = z.object({
+ plan_id:z.null(),funding:InternalFundingUsageSchema,windows:z.array(z.object({scope:z.enum(["PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]),percent:z.number().int().min(0).max(100),resets_at:z.iso.datetime()}).strict()).min(1).max(3)
+}).strict();
+export const BillingUsageResponseSchema = z.union([CustomerBillingUsageResponseSchema,InternalBillingUsageResponseSchema]);
 export type BillingUsageResponse = z.infer<typeof BillingUsageResponseSchema>;
 
 /** Paid-plans spec §2.5.3: money crosses the wire as a decimal string with exactly two places, "20.00". */
@@ -551,26 +583,6 @@ export const RunProjectionSchema = z.object({
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
 
-const ServerSessionSchema = z.object({
-  asker_id: z.string().regex(/^owner:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
-  session_id: z.uuid(),
-  caller_scope: z.literal("ASKER"),
-  ownership_provenance: z.literal("server_session"),
-  provisional_identity_model: z.literal(false),
-  /**
-   * A21 (owner decision O4, 2026-09-28): ONE yes/no for the /new page, which reads this
-   * response already — is a VALID model scorecard in force for this deployment? When it is
-   * not, the model-strength control is shown greyed out and marked not in effect. Never the
-   * scorecard's version, source, state name or refusal reason. GET /v1/session always sends
-   * it; it is optional so every other session (the login answer, the API's own) reads
-   * exactly as before.
-   */
-  model_scorecard_in_force: z.boolean().optional()
-}).strict();
-
-export const SessionSchema = ServerSessionSchema;
-export type Session = z.infer<typeof SessionSchema>;
-
 export const SessionSummarySchema = z.object({
   session_id: z.uuid(),
   created_at: z.iso.datetime(),
@@ -602,13 +614,6 @@ export const AgeCheckResultSchema = z.object({ outcome: z.enum(["allowed", "refu
 export type AgeCheckResult = z.infer<typeof AgeCheckResultSchema>;
 export const AgeConfirmationStatusSchema = z.object({ status: z.enum(["required", "confirmed"]) }).strict();
 export type AgeConfirmationStatus = z.infer<typeof AgeConfirmationStatusSchema>;
-/** Paid plans L2/L3b: a legal document as the manifest names it — `Version N.M` and the draft's sha256. */
-export const LegalDocumentPairSchema = z.object({
-  version: z.string().regex(/^[0-9]{1,4}\.[0-9]{1,4}$/u),
-  sha256: z.string().regex(/^[0-9a-f]{64}$/u)
-}).strict();
-export type LegalDocumentPairWire = z.infer<typeof LegalDocumentPairSchema>;
-
 /** What sign-up sends for the two documents it displayed, and the locale it displayed them in. */
 export const RegisterLegalDocumentsSchema = z.object({
   terms: LegalDocumentPairSchema,
@@ -658,11 +663,15 @@ export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
     target_run_id: z.uuid()
   }).strict(),
   z.object({ action: z.literal("DELETE_ACCOUNT") }).strict(),
+  z.object({ action: z.literal("REMOVE_AUTH_METHOD"), target_factor_id: z.uuid() }).strict(),
+  z.object({ action: z.enum(["LINK_PROVIDER", "UNLINK_PROVIDER"]), target_provider: z.enum(["google", "apple", "facebook", "x"]) }).strict(),
   z.object({ action: z.literal("CHANGE_EMAIL") }).strict(),
-  // A18: withdrawing from a paid plan is account-scoped like account deletion.
+  z.object({ action: z.enum(["READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES"]) }).strict(),
   z.object({ action: z.literal("WITHDRAW_SUBSCRIPTION") }).strict()
 ]);
 const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
+  z.object({ token:z.string().regex(/^[A-Za-z0-9_-]{43}$/), action:z.literal("REMOVE_AUTH_METHOD"), target_factor_id:z.uuid(), expires_at:z.iso.datetime() }).strict(),
+  z.object({ token:z.string().regex(/^[A-Za-z0-9_-]{43}$/), action:z.enum(["LINK_PROVIDER","UNLINK_PROVIDER"]), target_provider:z.enum(["google","apple","facebook","x"]), expires_at:z.iso.datetime() }).strict(),
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
     action: RunTargetedGrantActionSchema,
@@ -676,7 +685,7 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   }).strict(),
   z.object({
     token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-    action: z.literal("CHANGE_EMAIL"),
+    action: z.enum(["CHANGE_EMAIL", "READ_PHONE_PROFILE", "CHANGE_PHONE_PROFILE", "CHANGE_RECOVERY_EMAIL", "ADD_PASSKEY", "ADD_TOTP", "REGENERATE_RECOVERY_CODES"]),
     expires_at: z.iso.datetime()
   }).strict(),
   z.object({
@@ -686,10 +695,28 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
   }).strict()
 ]);
 export const StepUpResponseSchema = z.object({
+  replacement_recovery_code:z.string().min(1).max(1024).optional(),
   status: z.literal("step_up_complete"),
   csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   step_up_grant: StepUpGrantResponseSchema.optional()
 }).strict();
+
+export type StepUpAuthorizationRequest = z.infer<typeof StepUpAuthorizationRequestSchema>;
+export type StepUpResponse = z.infer<typeof StepUpResponseSchema>;
+export const BeginSocialStepUpRequestSchema = z.object({authorization:StepUpAuthorizationRequestSchema,next:z.enum(['/','/new','/settings','/settings/security','/account']).optional()}).strict();
+export const SocialStepUpStatusRequestSchema = z.object({continuation_token:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
+export const SocialStepUpStatusResponseSchema = z.object({authorization:StepUpAuthorizationRequestSchema,expires_at:z.iso.datetime(),available_methods:z.array(z.enum(['passkey','totp','recovery_code']))}).strict();
+export const CompleteSocialStepUpRequestSchema = z.union([SocialStepUpStatusRequestSchema.extend({code:z.string().min(1).max(1024)}).strict(),SocialStepUpStatusRequestSchema.extend({challenge_handle:z.string().regex(/^[A-Za-z0-9_-]{43}$/),credential:ConsumerAuthenticationCredentialSchema}).strict()]);
+export type SocialStepUpStatusResponse = z.infer<typeof SocialStepUpStatusResponseSchema>;
+export type CompleteSocialStepUpRequest = z.infer<typeof CompleteSocialStepUpRequestSchema>;
+export const BeginPasskeyStepUpRequestSchema = z.object({ authorization:StepUpAuthorizationRequestSchema }).strict();
+export const CompletePasskeyStepUpRequestSchema = z.object({ challenge_handle:z.string().regex(/^[A-Za-z0-9_-]{43}$/),credential:ConsumerAuthenticationCredentialSchema }).strict();
+export const AuthMethodsResponseSchema = z.object({ methods:z.array(z.object({ factor_id:z.uuid(),type:z.enum(["passkey","totp"]),label:z.string().nullable(),created_at:z.iso.datetime(),last_used_at:z.iso.datetime().nullable(),removable:z.boolean() }).strict()),recovery_codes_remaining:z.number().int().min(0).max(10),available_step_up_methods:z.array(z.enum(["passkey","password_totp","provider"])).max(3),step_up_providers:z.array(z.enum(["google","apple","facebook","x"])).max(4) }).strict();
+export type AuthMethodsResponse = z.infer<typeof AuthMethodsResponseSchema>;
+export const RemoveAuthMethodRequestSchema = z.object({factor_id:z.uuid(),step_up_grant:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
+export const RegenerateRecoveryCodesRequestSchema = z.object({step_up_grant:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
+export const RecoveryCodesResponseSchema = z.object({codes:z.array(z.string()).length(10)}).strict();
+export const consumerSecurityContractSchemas=Object.freeze({StepUpAuthorizationRequestSchema,StepUpResponseSchema,BeginPasskeyStepUpRequestSchema,CompletePasskeyStepUpRequestSchema,AuthMethodsResponseSchema,RemoveAuthMethodRequestSchema,RegenerateRecoveryCodesRequestSchema,RecoveryCodesResponseSchema});
 
 export const PUBLICATION_PART_KINDS = ["QUESTION", "SUMMARY", "ARGUMENTS", "REVIEWS", "STORY"] as const;
 export const PublicationPartKindSchema = z.enum(PUBLICATION_PART_KINDS);
@@ -753,7 +780,7 @@ export const AccountErasureCancelledSchema = z.object({
 const EmailAddressSchema = z.string().min(3).max(254);
 export const AccountEmailSchema = z.object({
   email: EmailAddressSchema,
-  recovery_email: EmailAddressSchema,
+  recovery_email: EmailAddressSchema.nullable(),
   pending: z.object({
     new_email: EmailAddressSchema,
     expires_at: z.iso.datetime()
@@ -775,6 +802,23 @@ export const EmailChangeLinkRequestSchema = z.object({
 }).strict();
 export const EmailChangeConfirmedSchema = z.object({ status: z.literal("CONFIRMED") }).strict();
 export const EmailChangeCancelledSchema = z.object({ status: z.literal("CANCELLED") }).strict();
+
+export const AccountPhoneProfileSchema=z.object({phone_present:z.boolean(),phone_masked:z.string().nullable(),phone_verified:z.literal(false),updated_at:z.iso.datetime().nullable()}).strict();
+export type AccountPhoneProfile=z.infer<typeof AccountPhoneProfileSchema>;
+export const PhoneProfileRevealRequestSchema=z.object({step_up_grant:StepUpGrantTokenSchema}).strict();
+export const PhoneProfileRevealSchema=z.object({phone:z.string().nullable(),phone_verified:z.literal(false)}).strict();
+export type PhoneProfileReveal=z.infer<typeof PhoneProfileRevealSchema>;
+export const PhoneProfileUpdateRequestSchema=z.object({phone:z.string().min(1).max(128),step_up_grant:StepUpGrantTokenSchema}).strict();
+export const RecoveryEmailSettingsSchema=z.object({state:z.enum(["absent","pending","verified"]),email:EmailAddressSchema.nullable(),pending:z.object({email:EmailAddressSchema,expires_at:z.iso.datetime()}).strict().nullable()}).strict();
+export type RecoveryEmailSettings=z.infer<typeof RecoveryEmailSettingsSchema>;
+export const RecoveryEmailRequestSchema=z.object({email:EmailAddressSchema,step_up_grant:StepUpGrantTokenSchema}).strict();
+export const RecoveryEmailRemoveRequestSchema=z.object({step_up_grant:StepUpGrantTokenSchema}).strict();
+
+export const accountProfileContractSchemas = {
+  AccountPhoneProfileSchema, PhoneProfileRevealRequestSchema, PhoneProfileRevealSchema, PhoneProfileUpdateRequestSchema,
+  RecoveryEmailSettingsSchema, RecoveryEmailRequestSchema, RecoveryEmailRemoveRequestSchema,
+  EmailChangeLinkRequestSchema, EmailChangeConfirmedSchema
+} as const;
 
 export const PrivateDebateErasureRequestSchema = z.object({
   step_up_grant:StepUpGrantTokenSchema
@@ -1276,15 +1320,52 @@ export type RunEvent = z.infer<typeof RunEventSchema>;
 
 export const contractInventory = Object.freeze({
   routes: Object.freeze([
+    ...Object.keys(passwordResetEndpointContracts),
+    ...Object.keys(mfaRecoveryEndpointContracts),
+    ...Object.keys(backupEmailEndpointContracts),
+    ...staffContractInventory.routes,
+    ...fundedStaffContractInventory.routes,
+    // Current social account surfaces are governed and documented like every other route.
+    "GET /v1/auth/providers",
+    "POST /v1/auth/social/{provider}/begin",
+    "GET /v1/auth/social/{provider}/callback",
+    "POST /v1/auth/social/apple/callback",
+    "POST /v1/auth/social/signup/status",
+    "POST /v1/auth/social/login/status",
+    "POST /v1/auth/social/signup/complete",
+    "GET /v1/account/social-providers",
+    "POST /v1/account/social/{provider}/link",
+    "POST /v1/account/social/unlink",
+    "POST /v1/account/social/{provider}/step-up/begin",
+    "POST /v1/account/social/step-up/status",
+    "POST /v1/account/social/step-up/passkey-options",
+    "POST /v1/account/social/step-up/complete",
     "POST /v1/auth/age-check",
     "POST /v1/auth/register",
     "POST /v1/auth/verify-email",
     "POST /v1/auth/resend-verification",
     "POST /v1/auth/recovery/start",
+    "POST /v1/auth/recovery/prove",
+    "POST /v1/auth/recovery/enrollment/options",
+    "POST /v1/auth/recovery/enrollment/complete",
+    "POST /v1/auth/recovery/enrollment/status",
+    "POST /v1/auth/recovery/enrollment/complete-evidence",
+    "POST /v1/auth/onboarding/status",
+    "POST /v1/auth/onboarding/complete",
+    "POST /v1/auth/passkeys/step-up/options",
+    "POST /v1/auth/passkeys/step-up/complete",
+    "GET /v1/account/auth-methods",
+    "POST /v1/account/auth-methods/remove",
+    "POST /v1/account/recovery-codes/regenerate",
+
     "POST /v1/auth/mfa/totp/begin",
     "POST /v1/auth/mfa/totp/verify",
     "POST /v1/auth/mfa/recovery-codes/generate",
     "POST /v1/auth/mfa/recovery-codes/confirm",
+    "POST /v1/auth/passkeys/enrollment/options",
+    "POST /v1/auth/passkeys/enrollment/complete",
+    "POST /v1/auth/passkeys/login/options",
+    "POST /v1/auth/passkeys/login/complete",
     "POST /v1/auth/login",
     "POST /v1/auth/logout",
     "GET /v1/auth/sessions",
@@ -1301,6 +1382,13 @@ export const contractInventory = Object.freeze({
     "GET /v1/account/legal-status",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
+    "GET /v1/account/profile",
+    "POST /v1/account/profile/reveal",
+    "POST /v1/account/profile",
+    "GET /v1/account/recovery-email",
+    "POST /v1/account/recovery-email",
+    "POST /v1/account/recovery-email/confirm",
+    "DELETE /v1/account/recovery-email",
     "GET /v1/account/email",
     "POST /v1/account/email/change",
     "POST /v1/account/email/change/resend",
@@ -1361,6 +1449,13 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/cancel-by-token"
   ]),
   resources: Object.freeze({
+    ...passwordResetContractSchemas,
+    ...mfaRecoveryContractSchemas,
+    ...consumerAuthContractSchemas,
+    ...socialAuthContractSchemas,
+    ...staffContractInventory.resources,
+    ...fundedStaffContractInventory.resources,
+    FundingBasisSchema,
     AskRequestSchema, AskAcceptedSchema, AskAlreadyWaitingSchema, AskRoomQuerySchema, AskRoomResponseSchema,
     BillingUsageResponseSchema, RunProjectionSchema, SessionSchema, SessionSummarySchema,
     SessionListSchema, RevokeAllSessionsSchema, VisibilityGrantActionSchema,
@@ -1368,11 +1463,13 @@ export const contractInventory = Object.freeze({
     LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
     SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
-    StepUpAuthorizationRequestSchema, StepUpResponseSchema,
+    BeginSocialStepUpRequestSchema,SocialStepUpStatusRequestSchema,SocialStepUpStatusResponseSchema,CompleteSocialStepUpRequestSchema,StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
     PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,
+    AccountPhoneProfileSchema,PhoneProfileRevealRequestSchema,PhoneProfileRevealSchema,PhoneProfileUpdateRequestSchema,
+    RecoveryEmailSettingsSchema,RecoveryEmailRequestSchema,RecoveryEmailRemoveRequestSchema,
     AccountEmailSchema,EmailChangeRequestSchema,EmailChangePendingSchema,EmailChangeLinkRequestSchema,
     EmailChangeConfirmedSchema,EmailChangeCancelledSchema,
     PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,

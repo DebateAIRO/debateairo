@@ -81,5 +81,6 @@
   "support.answerRating": "답변 평가",
   "support.privacyPreferences": "개인정보",
   "support.aiBanner": "답변은 AI가 생성하고 기계 판독 가능 표시가 있으며 틀릴 수 있습니다. 언제든 사람의 지원을 요청하세요.",
-  "support.cookiePreferences": "저장하는 쿠키"
+  "support.cookiePreferences": "저장하는 쿠키",
+  "support.recoverAccount": "계정 복구"
 }

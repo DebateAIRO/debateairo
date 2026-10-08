@@ -1,0 +1,762 @@
+{
+  "schema": "account-flow-migration-preservation-v1",
+  "base": "b20373576c5cb9140fe47d555056220f5c708dce",
+  "scope": "Exact source transformation only; actual catalog and roles tested separately",
+  "permittedChanges": [
+    "CREATE TABLE/INDEX IF NOT EXISTS",
+    "CREATE OR REPLACE FUNCTION retaining exact declaration/body",
+    "ADD COLUMN IF NOT EXISTS",
+    "DROP CONSTRAINT IF EXISTS",
+    "Exactly named phone consistency and login_first_step replacement drops"
+  ],
+  "files": [
+    {
+      "path": "migrations/0000_s00.sql",
+      "kind": "immutable-historical",
+      "sha256": "d79a8ef0d56de16df775181403e53f5dcb400f93367ff826495a193567a1d7b8"
+    },
+    {
+      "path": "migrations/0001_s01.sql",
+      "kind": "immutable-historical",
+      "sha256": "4b8afa89cddddbb5d994edb3b7c5158389f41da707702964d1e824ec3dc8600e"
+    },
+    {
+      "path": "migrations/0002_s02.sql",
+      "kind": "immutable-historical",
+      "sha256": "e6166c2a35b18493b34fa770a8893d2d34469a17a3dab0b07ac9dfe937d810ca"
+    },
+    {
+      "path": "migrations/0003_s03.sql",
+      "kind": "immutable-historical",
+      "sha256": "4541343a70eb2373d507864ee8a06484b0e3f182f81d674b4cdbd956a0d9df49"
+    },
+    {
+      "path": "migrations/0004_s04.sql",
+      "kind": "immutable-historical",
+      "sha256": "95cea2c9407d3edb35f9e82836e0275ae47e8630f81e9554a6aab3d6f26455dc"
+    },
+    {
+      "path": "migrations/0005_s04_rework.sql",
+      "kind": "immutable-historical",
+      "sha256": "9ebc3da6759659b8140fb3640e48c120927e168cc56c4c8fe3b53de4bed7255a"
+    },
+    {
+      "path": "migrations/0006_s05.sql",
+      "kind": "immutable-historical",
+      "sha256": "e4e98b1cfb7f219e78fa48df8f0e90a8ad67bea1bc121e189a9f97fdf5a9356f"
+    },
+    {
+      "path": "migrations/0007_s05_rework.sql",
+      "kind": "immutable-historical",
+      "sha256": "b39087d595c754d6a06ee7847b69c93d354f79c3b79b851b12b1afcb03b669f9"
+    },
+    {
+      "path": "migrations/0008_s06.sql",
+      "kind": "immutable-historical",
+      "sha256": "f705b0b2c1b04ec1002f552aa37f281a9aa6ca6805375a09c7ba1c7ab542c795"
+    },
+    {
+      "path": "migrations/0009_s06_rework.sql",
+      "kind": "immutable-historical",
+      "sha256": "090d04610dc5ad9d00770765930b5766efd7fdfd7bc557cb3f62d3d52252ad86"
+    },
+    {
+      "path": "migrations/0010_s07.sql",
+      "kind": "immutable-historical",
+      "sha256": "cff69d2894154f6d3d90c20adfc1f804ef0d9d2cef525a8e4d9dbad852fd3c1a"
+    },
+    {
+      "path": "migrations/0011_s08.sql",
+      "kind": "immutable-historical",
+      "sha256": "bd2dc729822b0ef7fb2c07f5c2fe079db75ab9494270ff41369d9df2267cd5f9"
+    },
+    {
+      "path": "migrations/0012_s09.sql",
+      "kind": "immutable-historical",
+      "sha256": "977bd8a904a044a3aa3eab1edb0b21bd8a6d376e778ed86646d55578efc0cbbd"
+    },
+    {
+      "path": "migrations/0013_s10.sql",
+      "kind": "immutable-historical",
+      "sha256": "5edcc1243e72bac6ac601ed2bc5d9e70d4a5158e01349861b72b4f70e502259b"
+    },
+    {
+      "path": "migrations/0014_s11.sql",
+      "kind": "immutable-historical",
+      "sha256": "42b217a1abc38fb3a128944914e27becadba53850196ae9544460947e86c165d"
+    },
+    {
+      "path": "migrations/0015_s12.sql",
+      "kind": "immutable-historical",
+      "sha256": "7640060fb001fbc3a55f9c52d17440e5929d4d6daa992f8178cf199e1da97656"
+    },
+    {
+      "path": "migrations/0016_s13.sql",
+      "kind": "immutable-historical",
+      "sha256": "d6914b788016c9d6d39de2184c9dda67d2670d4a9e8de8b7e32a0dbe9d94177b"
+    },
+    {
+      "path": "migrations/0017_s14.sql",
+      "kind": "immutable-historical",
+      "sha256": "661bf1dd6a12f4b3616403a2a8bad527d8ef3248fcc6755d9ff1d421af725945"
+    },
+    {
+      "path": "migrations/0018_panel01_rework.sql",
+      "kind": "immutable-historical",
+      "sha256": "7fd3b5f1890ce59796d30ed1d21eb06bb6e64375e61c12da43479f2ad626dfd7"
+    },
+    {
+      "path": "migrations/0019_xrev01_node_review.sql",
+      "kind": "immutable-historical",
+      "sha256": "1c325db096446b8948b884cf38c6f828683d151928fc6928223bdb873631b11a"
+    },
+    {
+      "path": "migrations/0020_prov01_machine_default.sql",
+      "kind": "immutable-historical",
+      "sha256": "bda013a1010807c6dce0ee33bcbe2458f9bf1ceae95fbebc03b18cdaf75dc116"
+    },
+    {
+      "path": "migrations/0021_dr174_cooldown_prune.sql",
+      "kind": "immutable-historical",
+      "sha256": "62c1b4cd649ec7f07722251ed02cb322fb25e633510403c584b7e28b5ae98fab"
+    },
+    {
+      "path": "migrations/0022_dr181_discovery.sql",
+      "kind": "immutable-historical",
+      "sha256": "b04c3a5e37720e2a63a411187594c1a9311ee903a73d056ed45602e22633d3c0"
+    },
+    {
+      "path": "migrations/0023_evaluator_foundation.sql",
+      "kind": "immutable-historical",
+      "sha256": "0ab03086a6396f1320ff993646dade9f2daa394efd5b639392151e964367af67"
+    },
+    {
+      "path": "migrations/0024_evaluator_domain_seed.sql",
+      "kind": "immutable-historical",
+      "sha256": "4aa3951cd90ab3c8b843a050607da0c396129ccb01674034748f009a5890d6fb"
+    },
+    {
+      "path": "migrations/0025_dr184_derived_standing.sql",
+      "kind": "immutable-historical",
+      "sha256": "50fdbeff3e7324900ce8df890b36918cd997d904855afcaa276cee4630e64c35"
+    },
+    {
+      "path": "migrations/0025_evaluator_domain_refusal_receipts.sql",
+      "kind": "immutable-historical",
+      "sha256": "0b3c0c5a8737768a0654ae78674e1c2e9e37c0c498f99671ae80d70629e4ab33"
+    },
+    {
+      "path": "migrations/0026_evaluator_judge_addon.sql",
+      "kind": "immutable-historical",
+      "sha256": "8e42bb07520f5f46d738384ddca4893678e55fd21c030d6c50e608c23bbc9efb"
+    },
+    {
+      "path": "migrations/0027_evaluator_rank_metric.sql",
+      "kind": "immutable-historical",
+      "sha256": "1b0582660e7384e9b8dc1c4acd3f9aa3d2f6d63aed985267655e8c5326239679"
+    },
+    {
+      "path": "migrations/0028_evaluator_consumer_refresh.sql",
+      "kind": "immutable-historical",
+      "sha256": "621edc059eec0ebe873162495bd879d3892ef983bd7465288a79541c6cbe8058"
+    },
+    {
+      "path": "migrations/0029_evaluator_dev_menu_grants.sql",
+      "kind": "immutable-historical",
+      "sha256": "211591ac8e05bf55b3e217a97bd0d35360f67029e638a723076506d381eee204"
+    },
+    {
+      "path": "migrations/0030_identity_foundation.sql",
+      "kind": "immutable-historical",
+      "sha256": "04a380ae5df3dc316103f578127058b4c8950c514d5981d2560db34b9c59856b"
+    },
+    {
+      "path": "migrations/0031_registration_verification.sql",
+      "kind": "immutable-historical",
+      "sha256": "f7883bdef15e9e2b56238e484de3b865ec638a24b870c02740a9d431c76bcf24"
+    },
+    {
+      "path": "migrations/0032_registration_audit_erasure_checks.sql",
+      "kind": "immutable-historical",
+      "sha256": "bdf5c856a40859fa4023820e4387337f75258942ab8a2488b9e1ac48d5034497"
+    },
+    {
+      "path": "migrations/0033_verification_token_credentials.sql",
+      "kind": "immutable-historical",
+      "sha256": "34fadf7cd618c165d82d71536001628f7dff9165648c10c03f51beb6c4d94e2f"
+    },
+    {
+      "path": "migrations/0034_obs_foundation.sql",
+      "kind": "immutable-historical",
+      "sha256": "ffea9b5f8daa4428d7f93603de6823570323ff2463ad9cee8a3912207f592be8"
+    },
+    {
+      "path": "migrations/0035_mfa_enrollment.sql",
+      "kind": "immutable-historical",
+      "sha256": "48bdc39ee18d16cd3fc98e2b8f7d3d268ac0693890cf21377640190500971a92"
+    },
+    {
+      "path": "migrations/0036_sessions.sql",
+      "kind": "immutable-historical",
+      "sha256": "900d6af3be7a47d784b51d79e318b452089e71bfc06c5d314de5487e06f085b4"
+    },
+    {
+      "path": "migrations/0037_run_ownership.sql",
+      "kind": "immutable-historical",
+      "sha256": "8ebd8735270adf0b758cc37c0bf39f5f94e3a265e57e7f8e68656a46c8c49f5c"
+    },
+    {
+      "path": "migrations/0038_content_encryption.sql",
+      "kind": "immutable-historical",
+      "sha256": "eccf0d1007442975639dc029a52406b5229850d5badf1f25b928a5be404e7f42"
+    },
+    {
+      "path": "migrations/0039_publication_visibility.sql",
+      "kind": "immutable-historical",
+      "sha256": "d202a2522309aee37afc514710191eb714a6d3873261506b54194a979a1e73f2"
+    },
+    {
+      "path": "migrations/0040_account_erasure.sql",
+      "kind": "immutable-historical",
+      "sha256": "17b45ec9a15c3617fcfcd6ff5d41fa871c71250ed1b98dc2b31fc14a9a37cead"
+    },
+    {
+      "path": "migrations/0041_dev_token_retirement.sql",
+      "kind": "immutable-historical",
+      "sha256": "5a2e4bd3db85c785c5dc7013e2886ffdb9399da3e0047680d113a91c6e88e45e"
+    },
+    {
+      "path": "migrations/0042_refusal_audit_forensics.sql",
+      "kind": "immutable-historical",
+      "sha256": "12b4cd524be7a302b34e615f0e097066f66517cbe7acc41b36f1dcf9c96f2633"
+    },
+    {
+      "path": "migrations/0043_legacy_audit_erasure_residual.sql",
+      "kind": "immutable-historical",
+      "sha256": "1999596c9832e67867556e89f4a25ce85219c40c3b9d6e627900b83f1d475dca"
+    },
+    {
+      "path": "migrations/0044_account_recovery_persistence.sql",
+      "kind": "immutable-historical",
+      "sha256": "2519e7875d6a538ff6892be6b1314d3356ade11a76603076f8d69c0ad108b5b5"
+    },
+    {
+      "path": "migrations/0045_account_recovery_start.sql",
+      "kind": "immutable-historical",
+      "sha256": "4a70b662cc0bdd6a99b92d934f497787b134262399541f9a78a23231398ab564"
+    },
+    {
+      "path": "migrations/0046_authentication_risk_signals.sql",
+      "kind": "immutable-historical",
+      "sha256": "e4b4b953967a2e3eeacf469cded6956509dc3ecb00d3e806bebcc719b0b0c3dc"
+    },
+    {
+      "path": "migrations/0047_passkey_credential_storage.sql",
+      "kind": "immutable-historical",
+      "sha256": "8cadeffc3a1a161ba1a4606bb368ea8952b726b1ae8381a864fb9da3d49b1210"
+    },
+    {
+      "path": "migrations/0048_provider_probe_capability.sql",
+      "kind": "immutable-historical",
+      "sha256": "5ad5e60888c4c2e005d5355ffa73554fa89d9250ed605a508a3f9a031c4f0ab3"
+    },
+    {
+      "path": "migrations/0049_terminal_recorded_facts.sql",
+      "kind": "immutable-historical",
+      "sha256": "4ab9757996ddbccb742c422fd42271333125576fa1b8564a3edc8977674f0251"
+    },
+    {
+      "path": "migrations/0050_support_foundation.sql",
+      "kind": "immutable-historical",
+      "sha256": "fff406537325bd52eea77d1028d7b4f6b2ee99740548c11c8eab9641a604d271"
+    },
+    {
+      "path": "migrations/0050_t16_algorithm_register_rows.sql",
+      "kind": "immutable-historical",
+      "sha256": "fc25eb674c63c1ab47790968cdee6499e913dc774e68a562cf28c23ac2fc2b32"
+    },
+    {
+      "path": "migrations/0051_support_cases.sql",
+      "kind": "immutable-historical",
+      "sha256": "7e2c0f5dd6af1fbd2c13caa1794b01b89a0649bb43ce73205757031ddc8cccde"
+    },
+    {
+      "path": "migrations/0051_t8_remove_strict_and.sql",
+      "kind": "immutable-historical",
+      "sha256": "a2e1f4b2046d4f067c13c6cfb648601567c5af6729ad612a419843ba26570aaf"
+    },
+    {
+      "path": "migrations/0052_support_tool_calls.sql",
+      "kind": "immutable-historical",
+      "sha256": "fee54935eb56f1694c8eb6c1c4210f99b2c17d77dc7fed951bd647123d8245fe"
+    },
+    {
+      "path": "migrations/0052_t5_reviewer_measured_edges.sql",
+      "kind": "immutable-historical",
+      "sha256": "8bac8db7f2091ae3689857afa060510a3ee44be427ec0d14e0ef78b65d03e8f3"
+    },
+    {
+      "path": "migrations/0053_support_public_incident.sql",
+      "kind": "immutable-historical",
+      "sha256": "4a1f84b400f2802b149e32a0a471c04f880cce0dddd8d40cf98899b604deee33"
+    },
+    {
+      "path": "migrations/0053_t06_review_outcome_disclosure.sql",
+      "kind": "immutable-historical",
+      "sha256": "d24a6c6c96cdf9b384137e17e2f7e655432616a5e63682b8984dcc6e8050135a"
+    },
+    {
+      "path": "migrations/0054_support_keys_audit.sql",
+      "kind": "immutable-historical",
+      "sha256": "11f0808ca522285448493fc59352977fe79630f29bf75f13d0c940baeadaf095"
+    },
+    {
+      "path": "migrations/0054_tint1_reject_edge_mutation_public_revoke.sql",
+      "kind": "immutable-historical",
+      "sha256": "a8d0efc52c0262e890151244f56f50ceb04de4e7fb3c7be882b3f9ca10d53fb4"
+    },
+    {
+      "path": "migrations/0055_register_support_publication.sql",
+      "kind": "immutable-historical",
+      "sha256": "c75235f4b33009fdea08290661fc8538e64dedf2dc699524cb0234f6817370d0"
+    },
+    {
+      "path": "migrations/0055_t10_served_root_selection.sql",
+      "kind": "immutable-historical",
+      "sha256": "32dcf447fae69e67bc60b4b4b75d501f4c092d3c4a39f38096f51c7be12c8da3"
+    },
+    {
+      "path": "migrations/0056_security_truncate_definer_searchpath.sql",
+      "kind": "immutable-historical",
+      "sha256": "790bdb2bc4529a5c42a8c0d26eacde250202f90dd898013d133cc1d8886ef804"
+    },
+    {
+      "path": "migrations/0057_observation_foundation.sql",
+      "kind": "immutable-historical",
+      "sha256": "2f67d8d5d2e7b45b86cacc3b9ca39d1934d268db9f1b2e3b09251147e4177c43"
+    },
+    {
+      "path": "migrations/0057_t09_synthesis_round.sql",
+      "kind": "immutable-historical",
+      "sha256": "105a818738c87c4d81d5fb5b7e28bcadcd224a04b663aa2b7f502fe852bd267e"
+    },
+    {
+      "path": "migrations/0058_observation_safe_views.sql",
+      "kind": "immutable-historical",
+      "sha256": "8430472442b9392c85f8817f28b6ffd16494ed671686ca54d92174f99e0a9d03"
+    },
+    {
+      "path": "migrations/0059_observation_pg_monitor.sql",
+      "kind": "immutable-historical",
+      "sha256": "6f41646f40741470a60902d7d1382620a1739e71c0e68576a5a41dee4e548d65"
+    },
+    {
+      "path": "migrations/0060_observation_throughput_views.sql",
+      "kind": "immutable-historical",
+      "sha256": "e6bff0acc9fb014d52d5adda75af64367a0b48996042d61a1025a84b5e67928d"
+    },
+    {
+      "path": "migrations/0061_algorithm_publication_profiles.sql",
+      "kind": "immutable-historical",
+      "sha256": "2016a42fdeef103c3b8ee232eb6d4e48bd555b63842f778ec9f6d933900c4fc2"
+    },
+    {
+      "path": "migrations/0062_obs_view_owner_column_floor.sql",
+      "kind": "immutable-historical",
+      "sha256": "02946a63bc89f847d6f5159e6dc7ea8100a5016bffe924ef40bb5385b98f6af4"
+    },
+    {
+      "path": "migrations/0063_serve_answer_content_carrier.sql",
+      "kind": "immutable-historical",
+      "sha256": "06eae3914bdd444cd5cf111a723dce54fa9761d675814acc5b090e961210d5f7"
+    },
+    {
+      "path": "migrations/0064_synthesis_role_cost_rows.sql",
+      "kind": "immutable-historical",
+      "sha256": "1848126f92ba0eafada19442c34b68ac07351c31e6ec1c6597a26d38925ede9c"
+    },
+    {
+      "path": "migrations/0065_security_delta_guards.sql",
+      "kind": "immutable-historical",
+      "sha256": "b575cab22b3ad6c5478fc88c03b36a018a7d79ed71bf66b6a2230dbc22a6ab15"
+    },
+    {
+      "path": "migrations/0066_model_spend_ledger.sql",
+      "kind": "immutable-historical",
+      "sha256": "1321b10d4917e515e1ad5631132b58395f9ac18dd9b612cabeb4ad9ce5d2bd55"
+    },
+    {
+      "path": "migrations/0067_plan_tier_on_run.sql",
+      "kind": "immutable-historical",
+      "sha256": "bf97776a359bdcc8777d18ab076f201f5a7d582782adcaf23df0b7daaa0c3c19"
+    },
+    {
+      "path": "migrations/0068_observation_stats_window.sql",
+      "kind": "immutable-historical",
+      "sha256": "a98502cfd6a03c7ab6c807d647ff760e06c5391a7cabd4571542690106b234ce"
+    },
+    {
+      "path": "migrations/0069_remaining_content_carriers.sql",
+      "kind": "immutable-historical",
+      "sha256": "07d868a938da8ed14aff650225e8785afaa5c45856dd6e0bfb15103b64744c8e"
+    },
+    {
+      "path": "migrations/0071_observation_threshold_operator.sql",
+      "kind": "immutable-historical",
+      "sha256": "6f52785ed60173124c82b1db27ddbacf3a99a707a330958715948fed9557c3ec"
+    },
+    {
+      "path": "migrations/0072_argument_language.sql",
+      "kind": "immutable-historical",
+      "sha256": "896e2692af477464eb61d7b2a4136a84576b6e7c869c9a17fdcf227aa919c15c"
+    },
+    {
+      "path": "migrations/0073_support_interface_locale.sql",
+      "kind": "immutable-historical",
+      "sha256": "1b57dc6bf738ca73da5a71c22457f0db0d9fb06bb4c1836d2f0e4e41c82047b5"
+    },
+    {
+      "path": "migrations/0074_answer_story.sql",
+      "kind": "immutable-historical",
+      "sha256": "dffc237e62548df81a31ae6de85934fb5bec61c9558f284b4280f362488ad0de"
+    },
+    {
+      "path": "migrations/0075_model_spend_phase.sql",
+      "kind": "immutable-historical",
+      "sha256": "e8d33062295a338ce679d4ead7e8f90c81ef948170aac2e73ada1e1efc7dbce3"
+    },
+    {
+      "path": "migrations/0076_serve_disclosure.sql",
+      "kind": "immutable-historical",
+      "sha256": "35cbc48f285920f8e0fe415fd288227d3ecc1b8ed48999735ed73489ce14ae4d"
+    },
+    {
+      "path": "migrations/0077_age_gate.sql",
+      "kind": "immutable-historical",
+      "sha256": "f2ced039cf1a1b9b290ff742be37a3501cd8641b44534cea4cc0cedcecd3d17b"
+    },
+    {
+      "path": "migrations/0078_sensitive_data_consent.sql",
+      "kind": "immutable-historical",
+      "sha256": "7ae5443e0e4770285e466273011dd958431fd1eebea83276285f7a989507b1d7"
+    },
+    {
+      "path": "migrations/0079_email_change.sql",
+      "kind": "immutable-historical",
+      "sha256": "3e2eada7826b77e104382ba7d746bd7b65c506024db2edbb7bc558025a2d35b7"
+    },
+    {
+      "path": "migrations/0080_legal_acceptance.sql",
+      "kind": "immutable-historical",
+      "sha256": "214d37ececcc1c55a98a31cd061ebdf73bbb5bda7b3adb6d9b60f082baf666e9"
+    },
+    {
+      "path": "migrations/0081_publication_check_record.sql",
+      "kind": "immutable-historical",
+      "sha256": "e21400fba50db15bece32810ce5eb0cd70498a6c7e05c9ed64272cc09c1898a5"
+    },
+    {
+      "path": "migrations/0082_publication_check_record_identifiers.sql",
+      "kind": "immutable-historical",
+      "sha256": "eca4d6038d1e144f8c259ddc68e18f428135f582aed89fd7559dabce9ceb70f5"
+    },
+    {
+      "path": "migrations/0083_budget_holds_waiting_line.sql",
+      "kind": "immutable-historical",
+      "sha256": "69123884d7ad2e87b11ee0094f5e34ec99fe6bc8637e6a8b19a937f6f60600f9"
+    },
+    {
+      "path": "migrations/0084_billing_entitlement.sql",
+      "kind": "immutable-historical",
+      "sha256": "ab263dddcee413ec8972494c215df3176a71f13c8b87ce2ca5b4c6b6a23599e4"
+    },
+    {
+      "path": "migrations/0085_staff_access_foundation.sql",
+      "kind": "immutable-historical",
+      "sha256": "378115d3423fd6a5f118110fd318725d7a375cf0a2302e9a4011d1d9fbb68085"
+    },
+    {
+      "path": "migrations/0086_staff_webauthn.sql",
+      "kind": "immutable-historical",
+      "sha256": "48ff09b8caaea36240b089d7ae099713704dc8931cf2902ad8056ef0f756e821"
+    },
+    {
+      "path": "migrations/0087_staff_authorization_guards.sql",
+      "kind": "immutable-historical",
+      "sha256": "1590b04f3fc0579919eb13ef0cd60e88679ac23b590a850bc4983bc5528858f0"
+    },
+    {
+      "path": "migrations/0088_staff_alert_delivery.sql",
+      "kind": "immutable-historical",
+      "sha256": "2de3103b8861a43c42629ed9865ab87b9ed43163142d8ef50bba465016f58ac9"
+    },
+    {
+      "path": "migrations/0089_owner_recovery.sql",
+      "kind": "immutable-historical",
+      "sha256": "926942069ffff4c0f11ce1cd7dfcf1aa13da85db1bfc46ca6b33524d693a802c"
+    },
+    {
+      "path": "migrations/0090_staff_http_projections.sql",
+      "kind": "immutable-historical",
+      "sha256": "db094b114d5ccd407f68309994a766abccb96d9ac596ca45bd8808b06e4e7ceb"
+    },
+    {
+      "path": "migrations/0091_staff_activation_receipt.sql",
+      "kind": "immutable-historical",
+      "sha256": "3a40e17d1157b01d2959d4040a359dab19901e6b7bc8844ead5a0d8b0a18595b"
+    },
+    {
+      "path": "migrations/0092_internal_funded_allowance.sql",
+      "kind": "immutable-historical",
+      "sha256": "3f6655439738d94122c083d8caaf3b5bcae73b0d5ffa73987375a977c33e0a65"
+    },
+    {
+      "path": "migrations/0093_internal_provider_admission.sql",
+      "kind": "immutable-historical",
+      "sha256": "6b941117f89fba41dcefe70dfd730288d3e7d41671776bbc9dffad1ad195ee6a"
+    },
+    {
+      "path": "migrations/0094_owner_one_verified_key.sql",
+      "kind": "immutable-historical",
+      "sha256": "a5c69805da6652f043fdb17b7099f3e6dfad0112837669fcae1749075530fbaf"
+    },
+    {
+      "path": "migrations/0095_phone_profile_optional_recovery.sql",
+      "kind": "guard-only-pending",
+      "baseSha256": "d7163ab2aeb6b31823b67d0e55ccb6a9e2f7e1b4c80a715d1654a6a4b51df1b0",
+      "candidateSha256": "c61f4b261ac8daf4460fb883402861c3e5e85f6fda190e6220e24773ea2df9d5",
+      "exactApprovedTransformMatches": true,
+      "dollarQuotedBodiesUnchanged": 3,
+      "bodySha256": [
+        "3a73d44524869c0f816ce58612195d8dd65c7dd14f949a3800fcec642e86db92",
+        "17306e84959c48c8ce205f0ebfe0994df13101513a138ddec4a3081c9ee61af6",
+        "b617882f409c347e35ec24f02aec1b19a6027a157a42da02af0df96b7812fa9d"
+      ]
+    },
+    {
+      "path": "migrations/0096_verification_delivery_budget.sql",
+      "kind": "guard-only-pending",
+      "baseSha256": "2e019f19b0d6fed784dea2cf59f8b20073cd77adf459670b357b4e465be7266a",
+      "candidateSha256": "e1d5cfcfd2bee9b67edea77586b92bc79b469a7afcaeed9f09fb6747f478df6d",
+      "exactApprovedTransformMatches": true,
+      "dollarQuotedBodiesUnchanged": 6,
+      "bodySha256": [
+        "23f0647d558cdb6c0c48e58f75963210bd50e90d47d03086fc2313181473e623",
+        "2843c77004633f8cbc76ee14c3b621e11484d5cf6a983236ee491b5fd6dbdfc2",
+        "3b1e18df0430495a8585c3e785aa90fcb2eee66c2d159b46a716f519630fa123",
+        "e5e872ef399e5d01f135e3bea56f845dd3cf22821d0f264f2db907c637342ea8",
+        "01d420c17ebc72026e4aa793bb5b1b752a7a88469ed7bbf3487cd441e03f51af",
+        "1200d5092a9fef05205b9b5fe69f0d31be13e4db02a2f27d519cf63b4a1ce28c"
+      ]
+    },
+    {
+      "path": "migrations/0097_recovery_email_verification.sql",
+      "kind": "guard-only-pending",
+      "baseSha256": "df48a7f74992c5476bdf7188a01e7dbb3bb29380ff156bc5fb2103a51925c950",
+      "candidateSha256": "3a8ffcd4ae92c4b4308f043d2a75a351577e53d3dee4c0ae137f24f420258b53",
+      "exactApprovedTransformMatches": true,
+      "dollarQuotedBodiesUnchanged": 13,
+      "bodySha256": [
+        "0348b57abacc89997e222555114e76c8b9131273247b31c1126fd438ab574380",
+        "3cd035588e307a6b39cc10554de2f7ad36394ce09b9ce16023cd23d7b6aa70d0",
+        "a43291c27a0599a953d7234291945126738df5eafc4d5ae455cd3ab34ee3ecd3",
+        "024d2748e811ec0b46fc1a812ced4552888008949a465aa9e7a19a530a6b1284",
+        "d0a2f51f1d318912ac5768ef0ee325263de598d1eaa49db18b5c96ee52a7316a",
+        "5abc071cdb2544a3edb3b8b2cb453322829919b2b3ce90b4da0417a086af83cb",
+        "6eac679ed9e068e4e2365c01b33a0c2906b670893275390a27479c0b149ed230",
+        "75a936b4b28fa888cdec538f51c2cc434217733d05b35b55ec03975fd8b48e76",
+        "96b315e75b2647fd223e463b1fed8bc311e447f4823cc5bb391b391e9f0337eb",
+        "7a7867f00ed77aed0f41c9c9447ae7bc46a59f8f77d1c1f5c74ec343bde255ea",
+        "7b28dcdaab25bee026a01a49c7af1cd3f072402356053565a558860234dbb197",
+        "7d094f0d071dc5cc033cfd0d3c537dfd2ff4caed21350a118aa5308b8d5d0d0a",
+        "c805f6f0a119da382a576180fe04c423edb61d6611ee5dba333095eaed1287ed"
+      ]
+    },
+    {
+      "path": "migrations/0098_consumer_passkeys.sql",
+      "kind": "guard-only-pending",
+      "baseSha256": "71cb20cb95fceecb2df4015ecccf07d3894ef977f048bc43bd8635cc64967976",
+      "candidateSha256": "e61274a1c7180b450ce1bd82cdfacadabe6bd3cd0945d2b7a373f6baab2833d4",
+      "exactApprovedTransformMatches": true,
+      "dollarQuotedBodiesUnchanged": 17,
+      "bodySha256": [
+        "5520eb8ec05e4185a3dc26f50d4f1fee2b2e6074ffacb66acbcd3584a28efad7",
+        "853527c0c018cfdf4082f281fad5a111914e98ba2bac327ba37fc4172644f95a",
+        "80ccae8d78718de6ccfad3271ca2cc6e42170a053a5d8c7c16f5a6bfade8e439",
+        "420641d73069b3bfc68f979ce485ceff2069ba718f4fad12df34116587fcdf5f",
+        "86c7eaa928438c6f71a868a0cec8aeae54f9391c8d66b311081910ea383a3612",
+        "85fa405de187a50604f8815a3862c232cc84d292ff2091f1bce5c4ed380ad3e3",
+        "e005d67ec8004e315a0761e61c5acf728357b1e6b2b46e3689420a37622be8aa",
+        "1754fe2bde887a096febc99982d34005eec521ad2167aa02858ae1306cac7bc9",
+        "06ca52bb100cc14bebe992adfbdd42ec2761d5162d220ca6b8a1fbe6dd5c1eaa",
+        "a892f3bdbb504da1b90f739553b1c84e52e7681bd2c6d357f9bf3a3f6fccd9ae",
+        "3235bdc3cefcd02d22e499bb6e16d229225dda7d774de169204f8fd2567deb57",
+        "30b1da5a7a1becc86866d98ae0824b0dacf8b41eefcc0b5eae6b57464b30f947",
+        "eb87eb887bb3ff904136ac3e69f4e9d23cf47f5f7f8ff3b3b26b28a05fc7bf2a",
+        "6c0dd844057f2da056450dac3adc0ce3a560a62dcf56124ec9c53761b2d0f420",
+        "7c175b88f9b1d9d9c2a2828d9457b194191b04e77d23ad5c2491c4b4f6e22747",
+        "efa94537ed5c962c1f402a223e0bda14296c5313d98ec84f4ef5ae446eee90ef",
+        "2878f38b4ebe7d91cd89c64e78dceeedc26a31e726995df73a87ee6a3a8e0f4c"
+      ]
+    },
+    {
+      "path": "migrations/0099_direct_secure_sessions.sql",
+      "kind": "guard-only-pending",
+      "baseSha256": "070eaa418c8ab08bfc92eb7c1b8ce70d15f8ec89e69e2ba905fd7b24f1e32e03",
+      "candidateSha256": "923c87dacb8c30f64ad8a3d2812c05a86ce87a376e276d0d0bb5004b675036bd",
+      "exactApprovedTransformMatches": true,
+      "dollarQuotedBodiesUnchanged": 20,
+      "bodySha256": [
+        "76c02d0e9eed971d68a995378e6f8f444c70b0352251ec132d197ddaccf15e0d",
+        "e3ceb426009e2b5684806cc18fe1ce4bf2c14a45640e9d438a4dca1b30e5cda1",
+        "9015d6b37c1b217fd237920d073c5bab4ac2f2b51738919303ad0b570e4a7545",
+        "ae0f43c1e680720e8efec3c50928b8d44a7dc540fb36f3a6b7bf66f987d48943",
+        "f9c28e99fa7db5994aef7c1d48a429e0f6d6a6bc846201cf717703117a534f35",
+        "2023eebecc48979cbc6fe819c4fe938d4ab837fb209544924ec4401fbba6d24a",
+        "7da6b01cb63ce50dbe0e718319c52661362b7a109616ff5d98527f2788b8b492",
+        "ba28fb9ff6ba0762274ed5e86a0bba3977bd49ccb5fb08bfbb9e1c688d5219d8",
+        "1a17be90dee3e44f2db08f263bea10aa7f059df57ca4c111917d96864c5a7381",
+        "2452efdf2566b3fc47c56a80a20c6aaf524321683b01a641d68fb25d13b3e7a4",
+        "2a2f01ce1b86465dd641383dcfe4aabe1773cd84c8e904c5c0af1a301262d7d9",
+        "bc1ce2fd30b32e61db78a93a65573e60df08fbc83f1fa1e3cff58a036a7b3adf",
+        "6fa68c2ebf3e225dd4c890eb19a172ff7b6945492c10375ee15a90d174647717",
+        "64c92ea3022691853b5cb299fbf688e8d5873bacfbfa8472f3bf26825a47c6c2",
+        "0b673532f3df417cc372ab22c4155b0d2897d6e06faa41de5944965dc04789e9",
+        "0311b2afde3f6d91a89e187711468178d241a3dc00d5033e38614f9795a146b7",
+        "a61b2a01741ae1988655f9f3e20704cbcbb240b2657b07c0cddb27df1e695215",
+        "8b85eed0d8479c37ef7493a0d2e8c8c65cb5c57917865b7dd3082e915c373414",
+        "e1632365807dde6bcab0bb7a6ecb218276a27c86bae9c210474ab2bc873c73cd",
+        "d511b567bdb2c816d8efec140d24d8d83da84dbfe4ab5ecf109d61ea2c5ed617"
+      ]
+    },
+    {
+      "path": "migrations/0100_consumer_security_recovery.sql",
+      "kind": "guard-only-pending",
+      "baseSha256": "3e2d964f6e4147d500114a4196fd0f79592b226983c4b7238e88347e738c47ab",
+      "candidateSha256": "41c44a2cedda95907bcfa6c333fa59471a1718ad2c8261d89888cc9539bb9e44",
+      "exactApprovedTransformMatches": true,
+      "dollarQuotedBodiesUnchanged": 49,
+      "bodySha256": [
+        "be28892862f76ba78d807796ab3231d0c00ae97fe289b4bf75d75060a0902ffe",
+        "60b96e354097396c377739bde50469894a2fd2f1fc667e199fb66f77481e75b2",
+        "ad5ad8e136d8323ee15de0f5f8c60c4c39669ed0c1fa6f600d2dd4223a9addc3",
+        "e0c2b5e865512590771b827445a8066ef26c00017136a907f4fc92e054b0c2b3",
+        "aede3b91684dae73251bbb4e1f6d2ebcf9222cb25f16289d898f0f51567516b8",
+        "20312195ea47dbb649216afc65ec2d2672dcae39310a749ef4ab931f072e81c0",
+        "e7588dafb41e39cefe214805b560cb2b5057f3796f3d386f57479dee0b3cbe7c",
+        "d7a6aeee2e74575d575b5f54481fa67265e394b4c92914f7e558d584b0e4d1b4",
+        "7d0cb5a80f40665d7df5179249d8f41a5acd28e68550a743470a80d5cace2f9a",
+        "b4faf243da7c51fe8df27838704c72159a0126fd788b466ef2876414fdaaed19",
+        "44e413d2cce620bd3907cd4a2b912314f30b16de7d766036cc6142172b690748",
+        "0313c860567f1d749e5e4bb299bcded21fd41b644923035a26816241d004cb61",
+        "832b09189db97c19a552a25d177443f9bd3f410b0c15213bfbb997c6547d8163",
+        "a0bb9754ab6978a0280f7c51c9ea156b17e48d2b7d151ac779fb2dfd6b406d42",
+        "4fc7e536bcd74acf2f89b2197632316c95b58232a2af572b03d2afc7ec50c61d",
+        "d680771853fb6a527e88b4f7b441c7bea81e9cc1c681d6d8c7a43b11055efa21",
+        "283e2dca02a524d84a210cfd2b2ecbdb1f653f1e951ba9cb4313cc5b1e728225",
+        "fba0871afea50432636dba320405c21a4c7c389a1c1e13892af6e7ae6b16350f",
+        "1297581e8af0f48ea1cdc6fa93246384fe074b2ede1aa0f8cba2e36803eca0db",
+        "29a6483b59de7c82dbb8738d0254775eb36b846ecc92e606776905251d2a836d",
+        "e2ce8d9434de800300f6d4944173d16350104d1443ea7eb324473f071e915f7f",
+        "e46c9bae1675a8c76b852688e553bbd61b982fcc26f8b20174929e2f02730abe",
+        "fcb2e4ef0abedfdf1ebaf50f892e05fc66ec77fd0c0cc07d51ee7450420012ca",
+        "1bdf7c0ac90b8282057534f614bd28e19815157161ccc1dc0cd56c2e2d846bc3",
+        "d40b66b1c9382e85fcc013ea98e1aa08536f83e8d9402041016a3e879d03e237",
+        "df00793634b90a1d3f6af99aac9a4042ded2db9df08b2ffdd050ed0c40b91779",
+        "67293053909b53ca0ac5d41d9f5668999f92e9027428d339f08c07c44ee7a8bf",
+        "92cea2d05d67a4fe430ba751987814b5d4c852704a1e6fdfde306bcb668ff153",
+        "4b4b311cc4df542ff9af9b1673886de22d6c2bcf4fcc727f5cee8e085f23b8c0",
+        "5e2f02d91e72f008090d24305d43e45dde0040f057fea493cc4f7c5d73ad063b",
+        "a92f30b9f72f1f1e06e619883260f3b57723406de2d91689554107133926ae31",
+        "d4c7b75ef871d9a02fb5cd9e4391b9b4b3825e0160b643a0e17cedf6380d4d1f",
+        "d122e9616d1796da4650a8f25d4e8b3b8c85e07073915753e02d2341b793bb5b",
+        "82c404b395be563a6ef5d6bde174e5013ccad52c2f2c761a5a457d639a2ae559",
+        "f0b2b578405b15fe8d9d12d73f8a6f0a5ba49a5776af1352facac79e94e53916",
+        "b27646eed61d7283dd032e772d5a1443568e8a779aa29045ee822184e227d04c",
+        "3040b4600d09080cbe1fc90e2b8590ee65e40f0478aa9522eef57ee1b43eaf0e",
+        "2faf756c47acb1382d8bc05facb31965f51e85ab808660f4826679ea8bc4ee8d",
+        "f28eb9caf0461f96f5a3fe99dc996ddabc25ed4974956334304b9c5db8873ba7",
+        "4186d39c7e62290e18b3f950561b3bc066a9da73976b83a4556c77d7501ae6b9",
+        "cac639215c354404b568f3952c960cd45aabcf154a32b919c8e1d0bf3a7ec833",
+        "d27fc69548f89185f6495b8903ea7c18b68efa12bc67d409db14d1299fd99eee",
+        "c297ba7530a76129d5f0b68d8e59f71aefb0f63ac11fa17952cc4517e1e77c11",
+        "786ddde65bd39cc970f6e4b62a221a1364b50c0dce7b555f374789d19b9f34f1",
+        "a9e0427e93ccc018c3520965ac6f4925420ba28a549fbbbdf80c48f48d79fc7b",
+        "ba906a8ebed463c46224cb45ff7f9c97ef2f5b1955922b04e81a84f1936b866a",
+        "1d5220d914fe848372541dac51091eb9361703c70a665df7bc839dac0ffcd808",
+        "e1b878bca8df350ed6b730fb944c051b3c5107254d573f4d3acda359dbba3db7",
+        "c2a16c4a6048a935ebb29568d334b26cf1d51e1f9015d6b7d292999ddbdd08d2"
+      ]
+    },
+    {
+      "path": "migrations/0101_social_identities.sql",
+      "kind": "guard-only-pending",
+      "baseSha256": "a9ca07e3d8d17c9fe67a8223691b675a38e658ac14b3ee5c41c05b468cfe33b5",
+      "candidateSha256": "6d84a2c80f3349aa7ea67e83ee0282a39e8d5938e650bc3cfffd584d8406892f",
+      "exactApprovedTransformMatches": true,
+      "dollarQuotedBodiesUnchanged": 39,
+      "bodySha256": [
+        "e760f694f8001abafd8588cf45f358a96f3da8d6dafcdd4ac70b3f36afd07f4b",
+        "b9894f916d896e42e5513f915d876cf68788551716787a7873d933af8ce40768",
+        "3f5d906b4756ad15f5d6004b9505a3a21c4814783a0339479e0fb9e1429e2861",
+        "dbe240db1f977922120cd5fcfaa6ff05fbea5be08a736ddda4c0336fea95f11c",
+        "1a347929a89819c9fbe5c8dbea8c8acb18b9931733ac19871e45a1248b5a199e",
+        "ee9e585cda397266147c8abfdd3260f04d7b6ea49a87a0a7b6e036c5a964e7fd",
+        "9c0178565f2b55379319c6592e1890170f507dd29b7b40dedfd489e4951706c6",
+        "8a811b1a8c27155c6ce6d8e7c410f3222996ff94ada2df521c0c3433cd76cd2a",
+        "2474a4943987e91b4a99c7bb8e836dfd92f7b9c10186f1d59c0dea1539ab89c4",
+        "aa72fd0a12294d3ff0abb57be26eba761745575ae6ceb415f985d20166e08070",
+        "a8d54a1ef6d11853f6d105409deb17f01a7d1e3a24ad3f099e6f3e917e5a7c49",
+        "8d59aba2fea7c53dfd0e7b6004f8bcbc73c93f4692b23a912b1065680d06303f",
+        "58cf5f0c14e88ede9f1a85df6022488a4af8d0cd20d4955a3324eefc8b8ffd57",
+        "e4b610c1e20897bfdfa7e8c75c9c4e1d20cc73a9a4a964cafb4f5fad43d3a3f4",
+        "2476512c089eddae95437c4bbe3fb61c8f2301d626014fd6c98a1e4f8a82be50",
+        "1001e1233031f8a497e67f69a8a732cd59d7d9268ab8866259cd2f46d1b88adf",
+        "0f7c64e48601d284ded586b23523cc9d4a729992e3908a5a48dbdb4a34e2a74b",
+        "9baf897630d502f069f393e7db95945c2aa9cb98ef94a31ce896b4ec24212a9e",
+        "8aa3c175debf8d8cf2edadae0ded3a06ce37edcc776d69b802d5ed73d66e41dc",
+        "2b6850fab66294d90b6ad3c9071c1ffbc53a90c640c234d95201d07569a9b85b",
+        "cf526149159d9b4eff5ea2b72a0dc5ed936437467eb500d042505bd35dd1c1a8",
+        "cdfda38f6400e9b204486fc9bab1b8d598958c477e1891f0c8a1b0eb3434f110",
+        "bc3826ca79b3d0a1ac06839cd181d1398b59f03dea762b68794ad4056d5e380f",
+        "2fd51ad2b9697dd1c4a464056e70ef7b783e0d8afad17bb7980fd0702507c7dc",
+        "865fd402b05291bb5c2d33f57a6861b616f5586ff2dd3762ffd6cb8684c7ad5e",
+        "92a0cb4bcba40c1a2c436e9c8b1a9c88ad856e783ee7c75c9e9026e5455e3bc3",
+        "6f99a70251dac718145e6a08abe15ef15a1f77584dfff75a7abbe1428b3ba348",
+        "7fd6c737b364e8e012120a793029c4004119e833071a73a50cc16baffa2b540c",
+        "6f9f771f5c6f263ffb6cd9a8be21019ba5061dfbc810878909b2d98f8bd0952c",
+        "860c2f32c8279f3279224b7b3d9195083172900b02904feb5162ee7a6590ccad",
+        "ec3dccc215eaf7b73330077a8805c04556d1aee8674621ad768651b9a5fd279a",
+        "e3f650559a087aa89f15db688d143be00199aa94b0dbf6bd92cccc87b2859733",
+        "d026fcf4cbe2b65b9f08187f9168d312b47b5a91afbbbd7b38c7a72e3a9904f2",
+        "d573c6baf1be26cffd9932f142e4d490e01c182f0b2c698d9c7cad5692a7ddc2",
+        "617072c958a451da4ecfbe1ec5becd45863d72b19666f5e4ad88b5a73e5ce1b9",
+        "3af28e2f2fb146b6aad27ef52f7b203960060cc9ac5d5e2f75ed4ae869857e74",
+        "7e9e37e46eab38c5bf64ab163d54b64a0ce9b537f9da2cf77671e8861b382701",
+        "52d3f1898ceb68b0b47bed25bb3545c2b3b7a7253be896db29cb10ac4b1ebcda",
+        "06f335a338532adfff9d292d0d7f12f4c54991a8a39188ddd14127aafeaeacf6"
+      ]
+    },
+    {
+      "path": "migrations/0102_consumer_auth_method_availability.sql",
+      "kind": "guard-only-pending",
+      "baseSha256": "8b82b29322d43a2f7712f735f7b664ed1ecbf20defe5d049ca1f016d64239274",
+      "candidateSha256": "3ede1d7c9f15f0638bb54c0606468c3fcb8a20886318bcf5ea78ecac88d36789",
+      "exactApprovedTransformMatches": true,
+      "dollarQuotedBodiesUnchanged": 1,
+      "bodySha256": [
+        "77b6f8f0e6845496d6de99465371b6cf5f7c4751ff0374c2fb8797f595ffa795"
+      ]
+    },
+    {
+      "path": "migrations/0103_password_recovery_t2.sql",
+      "kind": "immutable-external103",
+      "sha256": "d90e9eaef8ffd4e21f86e99f2f9c669e0cb61897f89da4a8f15f1f1c857e082f"
+    },
+    {
+      "path": "migrations/0104_account_flow_recovery_bridge.sql",
+      "kind": "new-forward-bridge",
+      "sha256": "4650a5ac2cf402faaedfe437b71e9143ecaa1f0a00a2c775160383ff37727bcc"
+    }
+  ]
+}

@@ -1,5 +1,31 @@
+import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
+import { SocialStepUpStatusResponseSchema,type SocialStepUpStatusResponse,type CompleteSocialStepUpRequest } from './index.js';
+import { SocialLoginStatusResponseSchema, type SocialLoginStatusResponse, AuthProvidersResponseSchema, BeginSocialLoginResponseSchema, SocialSignupStatusResponseSchema, CompleteSocialSignupResponseSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type CompleteSocialSignupRequest, type CompleteSocialSignupResponse, type SocialLinksResponse } from './social-auth.js';
+import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSchema,OnboardingRequirementsResponseSchema,
+ type ConsumerRecoveryProveRequest,type ConsumerRecoveryProofResponse,type RecoveryEnrollmentBeginRequest,type RecoveryEnrollmentCompleteRequest,type RecoveryEnrollmentOptionsResponse,type PendingOnboardingStatusRequest,type PendingOnboardingCompleteRequest,type RecoveryEvidenceStatusRequest,type RecoveryEvidenceCompleteRequest,type OnboardingRequirementsResponse} from './consumer-auth.js';
+import {AuthMethodsResponseSchema,RecoveryCodesResponseSchema,type AuthMethodsResponse} from "./index.js";
+import type {ConsumerAuthenticationCredential} from "./consumer-auth.js";
+import type { StepUpAuthorizationRequest, StepUpResponse } from "./index.js";
+import {PasskeyRegistrationOptionsResponseSchema, PasskeyAuthenticationOptionsResponseSchema, PasskeyEnrollmentResponseSchema,
+ type BeginPasskeyEnrollmentRequest,type CompletePasskeyEnrollmentRequest,type BeginPasskeyLoginRequest,type CompletePasskeyLoginRequest,
+ type PasskeyRegistrationOptionsResponse,type PasskeyAuthenticationOptionsResponse,type PasskeyEnrollmentResponse} from './consumer-auth.js';
 import {
+  AuthenticationResponseSchema, BeginTotpEnrollmentRequestSchema, CompleteTotpEnrollmentRequestSchema, TotpEnrollmentOptionsResponseSchema, TotpEnrollmentResponseSchema, LoginContinuationResponseSchema,
+  type BeginTotpEnrollmentRequest, type CompleteTotpEnrollmentRequest, type TotpEnrollmentOptionsResponse, type TotpEnrollmentResponse, type LoginContinuationResponse,
+  REGISTRATION_PUBLIC_MESSAGE,
+  RESEND_VERIFICATION_PUBLIC_MESSAGE,
+  RegisterRequestSchema,
+  ResendVerificationRequestSchema,
+  RegistrationVerificationAckSchema,
+  ResendVerificationAckSchema,
+  type RegisterRequest,
+  type ResendVerificationRequest,
+  type VerificationAck,
+  type AuthenticationResponse,
   AccountEmailSchema,
+  AccountPhoneProfileSchema,PhoneProfileRevealSchema,PhoneProfileRevealRequestSchema,PhoneProfileUpdateRequestSchema,
+  RecoveryEmailSettingsSchema,RecoveryEmailRequestSchema,RecoveryEmailRemoveRequestSchema,
+  type AccountPhoneProfile,type PhoneProfileReveal,type RecoveryEmailSettings,
   AccountErasureCancelRequestSchema,
   AgeCheckResultSchema,
   AgeConfirmationStatusSchema,
@@ -8,7 +34,6 @@ import {
   type SensitiveDataConsentStatus,
   type AgeCheckResult,
   type AgeConfirmationStatus,
-  type RegisterLegalDocuments,
   LegalStatusResponseSchema,
   type LegalAcceptRequest,
   type LegalStatusResponse,
@@ -100,40 +125,7 @@ import {
 } from "./index.js";
 import type { DeclaredRegion } from "@debateai/kernel";
 
-export type ContractErrorCode =
-  | "SESSION_REQUIRED"
-  | "RATE_LIMITED"
-  | "NOT_FOUND"
-  | "MALFORMED_REQUEST"
-  | "UNPROCESSABLE"
-  | "FORBIDDEN"
-  | "SERVER_FAILURE"
-  | "NETWORK_FAILURE"
-  | "INVALID_RESPONSE";
-
-/** What a 422 ASK_ALREADY_WAITING says about the person's waiting run. */
-export type ContractWaitingRefusal = Readonly<{ runRef: string; waitsUntil: string; waitsFor?: "OWN_DEBATES" }>;
-
-export class ContractHttpError extends Error {
-  constructor(
-    readonly code: ContractErrorCode,
-    readonly status: number,
-    message: string,
-    readonly serverCode: string | null = null,
-    readonly statement: PublicationRefusalStatement | null = null,
-    /**
-     * Budget spec §2.7: set only for 422 ASK_ALREADY_WAITING whose body parses
-     * as `AskAlreadyWaitingSchema`: the waiting run and its expected start (no
-     * figure), and `waitsFor` when that start waits on the person's own running
-     * debates rather than a reset (final review Part 1b, Important 1). The ask
-     * page shows sentence D with that time when its room re-read fails.
-     */
-    readonly waiting: ContractWaitingRefusal | null = null
-  ) {
-    super(message);
-    this.name = "ContractHttpError";
-  }
-}
+export { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 
 function codeForStatus(status: number): ContractErrorCode {
   if (status === 400) return "MALFORMED_REQUEST";
@@ -277,19 +269,17 @@ export type ContractClientAuth = Readonly<{
 
 function browserCsrfToken(): string | null {
   if (typeof document === "undefined") return null;
-  const values = document.cookie.split(";").flatMap((member) => {
+  const raw = document.cookie;
+  if (/[\r\n\0]/.test(raw)) return null;
+  const values = raw.split(";").flatMap((member) => {
     const index = member.indexOf("=");
     if (index < 1 || member.slice(0, index).trim() !== "__Host-debateai-csrf") return [];
     const value = member.slice(index + 1).trim();
-    return /^[A-Za-z0-9_-]{43}$/.test(value) ? [value] : [];
+    return [value];
   });
-  return values.length === 1 ? values[0]! : null;
+  return values.length === 1 && /^[A-Za-z0-9_-]{43}$/.test(values[0]!) ? values[0]! : null;
 }
 
-const REGISTRATION_PUBLIC_MESSAGE =
-  "If this address can be registered, verification instructions will arrive. Check your spam folder." as const;
-const RESEND_VERIFICATION_PUBLIC_MESSAGE =
-  "If this address is awaiting verification, new instructions will arrive. Check your spam folder." as const;
 const RECOVERY_START_PUBLIC_MESSAGE =
   "If this account can be recovered, instructions will arrive through an eligible channel." as const;
 
@@ -310,34 +300,36 @@ function exactPublicMessageSchema<const Message extends string>(message: Message
   });
 }
 
-const RegistrationPublicResponseSchema = exactPublicMessageSchema(REGISTRATION_PUBLIC_MESSAGE);
-const ResendVerificationPublicResponseSchema = exactPublicMessageSchema(RESEND_VERIFICATION_PUBLIC_MESSAGE);
 const RecoveryStartPublicResponseSchema = exactPublicMessageSchema(RECOVERY_START_PUBLIC_MESSAGE);
 
 export interface ContractClient {
   /** Age gate: answers `refused` (and sets the lockout cookie) for anyone under the minimum age. */
   checkAge(dateOfBirth: string): Promise<AgeCheckResult>;
-  register(
-    email: string,
-    password: string,
-    recoveryEmail: string,
-    dateOfBirth: string,
-    legal: RegisterLegalDocuments,
-    region: DeclaredRegion
-  ): Promise<Readonly<{ message: typeof REGISTRATION_PUBLIC_MESSAGE }>>;
-  resendVerification(email: string): Promise<Readonly<{
-    message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE;
-  }>>;
+  register(input: RegisterRequest): Promise<VerificationAck>;
+  resendVerification(input: ResendVerificationRequest): Promise<VerificationAck>;
   startRecovery(email: string): Promise<Readonly<{
     message: typeof RECOVERY_START_PUBLIC_MESSAGE;
   }>>;
-  beginLogin(email: string, password: string): Promise<{ status: "mfa_required"; challenge_token: string }>;
-  completeLogin(challengeToken: string, code: string): Promise<{
-    status: "authenticated";
-    csrf_token: string;
-    session: Session;
-    replacement_recovery_code?: string;
-  }>;
+  beginSocialStepUp(provider:'google'|'apple'|'facebook'|'x',authorization:StepUpAuthorizationRequest):Promise<{authorization_url:string}>;
+  socialStepUpStatus(continuationToken:string):Promise<SocialStepUpStatusResponse>;
+  beginSocialStepUpPasskey(continuationToken:string):Promise<PasskeyAuthenticationOptionsResponse>;
+  completeSocialStepUp(input:CompleteSocialStepUpRequest):Promise<StepUpResponse>;
+  authProviders():Promise<AuthProvidersResponse>;
+  beginSocialLogin(provider:'google'|'apple'|'facebook'|'x',input?:{next?:'/'|'/new'|'/settings'|'/settings/security'|'/account'}):Promise<{authorization_url:string}>;
+  socialLoginStatus(continuationToken:string):Promise<SocialLoginStatusResponse>;
+  socialSignupStatus(input:{continuation_token:string}):Promise<SocialSignupStatusResponse>;
+  completeSocialSignup(input:CompleteSocialSignupRequest):Promise<CompleteSocialSignupResponse>;
+  linkedSocialProviders():Promise<SocialLinksResponse>;
+  beginSocialLink(provider:'google'|'apple'|'facebook'|'x',grant:string):Promise<{authorization_url:string}>;
+  unlinkSocialProvider(provider:'google'|'apple'|'facebook'|'x',grant:string):Promise<void>;
+  beginPasskeyEnrollment(input:BeginPasskeyEnrollmentRequest):Promise<PasskeyRegistrationOptionsResponse>;
+  completePasskeyEnrollment(input:CompletePasskeyEnrollmentRequest):Promise<PasskeyEnrollmentResponse>;
+  beginPasskeyLogin(input?:BeginPasskeyLoginRequest):Promise<PasskeyAuthenticationOptionsResponse>;
+  completePasskeyLogin(input:CompletePasskeyLoginRequest):Promise<AuthenticationResponse>;
+  beginTotpEnrollment(input:BeginTotpEnrollmentRequest):Promise<TotpEnrollmentOptionsResponse>;
+  completeTotpEnrollment(input:CompleteTotpEnrollmentRequest):Promise<TotpEnrollmentResponse>;
+  beginLogin(email: string, password: string): Promise<LoginContinuationResponse>;
+  completeLogin(challengeToken: string, code: string): Promise<AuthenticationResponse>;
   logout(): Promise<void>;
   listSessions(): Promise<SessionList>;
   revokeSession(sessionId: string): Promise<void>;
@@ -350,25 +342,19 @@ export interface ContractClient {
   readSensitiveDataConsent(): Promise<SensitiveDataConsentStatus>;
   /** Agrees to the current sensitive-data notice, shown in `locale`. */
   giveSensitiveDataConsent(locale: string): Promise<SensitiveDataConsentStatus>;
-  stepUp(password: string, code: string, authorization?:
-    | Readonly<{
-      action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
-      target_run_id: string;
-    }>
-    | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" }>): Promise<{
-    status: "step_up_complete";
-    csrf_token: string;
-    step_up_grant?: ({
-      token: string;
-      action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
-      target_run_id: string;
-      expires_at: string;
-    } | {
-      token: string;
-      action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION";
-      expires_at: string;
-    }) | undefined;
-  }>;
+  recoveryProve(input:ConsumerRecoveryProveRequest):Promise<ConsumerRecoveryProofResponse>;
+  beginRecoveryEnrollment(input:RecoveryEnrollmentBeginRequest):Promise<RecoveryEnrollmentOptionsResponse>;
+  completeRecoveryEnrollment(input:RecoveryEnrollmentCompleteRequest):Promise<AuthenticationResponse>;
+  pendingOnboardingStatus(input:PendingOnboardingStatusRequest):Promise<OnboardingRequirementsResponse>;
+  completePendingOnboarding(input:PendingOnboardingCompleteRequest):Promise<void>;
+  recoveryEnrollmentStatus(input:RecoveryEvidenceStatusRequest):Promise<OnboardingRequirementsResponse>;
+  completeRecoveryEvidence(input:RecoveryEvidenceCompleteRequest):Promise<void>;
+  authMethods():Promise<AuthMethodsResponse>;
+  removeAuthMethod(factorId:string,grant:string):Promise<void>;
+  regenerateRecoveryCodes(grant:string):Promise<{codes:string[]}>;
+  beginPasskeyStepUp(authorization:StepUpAuthorizationRequest):Promise<PasskeyAuthenticationOptionsResponse>;
+  completePasskeyStepUp(input:{challenge_handle:string;credential:ConsumerAuthenticationCredential}):Promise<StepUpResponse>;
+  stepUp(password:string,code:string,authorization?:StepUpAuthorizationRequest):Promise<StepUpResponse>;
   readPublicDebates(limit: number, offset: number): Promise<Readonly<{
     items: readonly Readonly<{
       public_ref: string;
@@ -404,6 +390,13 @@ export interface ContractClient {
   /** Paid plans G3a: whether this address may sign up and pay — two booleans, never the country. */
   getGeoAvailability(): Promise<GeoAvailabilityResponse>;
   readAccountEmail(): Promise<AccountEmail>;
+  phoneProfile():Promise<AccountPhoneProfile>;
+  revealPhoneProfile(grantToken:string):Promise<PhoneProfileReveal>;
+  updatePhoneProfile(input:Readonly<{phone:string;grantToken:string}>):Promise<AccountPhoneProfile>;
+  recoveryEmail():Promise<RecoveryEmailSettings>;
+  requestRecoveryEmail(input:Readonly<{email:string;grantToken:string}>):Promise<RecoveryEmailSettings>;
+  confirmRecoveryEmail(input:Readonly<{token:string}>):Promise<{status:"CONFIRMED"}>;
+  removeRecoveryEmail(input:Readonly<{grantToken:string}>):Promise<void>;
   requestEmailChange(newEmail: string, stepUpGrant: string): Promise<EmailChangePending>;
   resendEmailChange(): Promise<EmailChangePending>;
   cancelEmailChange(): Promise<void>;
@@ -480,6 +473,14 @@ export function createContractClient(
     init: RequestInit = {},
     expectedStatus?: number
   ) => requestJson(root.href, fetchImplementation, path, schema, init, auth, expectedStatus);
+  async function register(input: RegisterRequest): Promise<VerificationAck> {
+    return request("/v1/auth/register", RegistrationVerificationAckSchema,
+      {method:"POST",body:JSON.stringify(RegisterRequestSchema.parse(input))},202);
+  }
+  async function resendVerification(input: ResendVerificationRequest): Promise<VerificationAck> {
+    return request("/v1/auth/resend-verification", ResendVerificationAckSchema,
+      { method: "POST", body: JSON.stringify(ResendVerificationRequestSchema.parse(input)) }, 202);
+  }
   const eventResponse = async (runId: string, signal?: AbortSignal): Promise<Response> => {
     let response: Response;
     try {
@@ -518,31 +519,7 @@ export function createContractClient(
       AgeCheckResultSchema,
       { method: "POST", body: JSON.stringify({ date_of_birth: dateOfBirth }) }
     ),
-    register: (
-      email: string,
-      password: string,
-      recoveryEmail: string,
-      dateOfBirth: string,
-      legal: RegisterLegalDocuments,
-      region: DeclaredRegion
-    ) => request(
-      "/v1/auth/register",
-      RegistrationPublicResponseSchema,
-      { method: "POST", body: JSON.stringify({
-          email,
-          password,
-          recovery_email: recoveryEmail,
-          date_of_birth: dateOfBirth,
-          // Paid plans L3b (R3-2): the displayed documents, beside the age gate's date.
-          terms: legal.terms,
-          privacy: legal.privacy,
-          locale: legal.locale,
-          // Region picker S01 (SPEC R16): the declared country, and the US state only for "US".
-          country: region.country,
-          ...(region.country === "US" ? { us_state: region.usState } : {})
-        }) },
-      202
-    ),
+    register,
     readAgeConfirmation: () => request("/v1/auth/age-confirmation", AgeConfirmationStatusSchema),
     confirmAge: (dateOfBirth: string) => request(
       "/v1/auth/age-confirmation",
@@ -555,41 +532,20 @@ export function createContractClient(
       SensitiveDataConsentStatusSchema,
       { method: "POST", body: JSON.stringify({ notice_version: SENSITIVE_DATA_NOTICE_VERSION, locale }) }
     ),
-    resendVerification: (email: string) => request(
-      "/v1/auth/resend-verification",
-      ResendVerificationPublicResponseSchema,
-      { method: "POST", body: JSON.stringify({ email }) },
-      202
-    ),
+    resendVerification,
     startRecovery: (email: string) => request(
       "/v1/auth/recovery/start",
       RecoveryStartPublicResponseSchema,
       { method: "POST", body: JSON.stringify({ email }) },
       202
     ),
-    beginLogin: (email: string, password: string) => request("/v1/auth/login", {
-      parse(value: unknown) {
-        if (typeof value !== "object" || value === null) throw new TypeError("Invalid login challenge response");
-        const row = value as Record<string, unknown>;
-        if (row.status !== "mfa_required" || typeof row.challenge_token !== "string") throw new TypeError("Invalid login challenge response");
-        return { status: "mfa_required" as const, challenge_token: row.challenge_token };
-      }
-    }, { method: "POST", body: JSON.stringify({ email, password }) }),
-    completeLogin: (challengeToken: string, code: string) => request("/v1/auth/login", {
-      parse(value: unknown) {
-        if (typeof value !== "object" || value === null) throw new TypeError("Invalid login response");
-        const row = value as Record<string, unknown>;
-        if (row.status !== "authenticated" || typeof row.csrf_token !== "string") throw new TypeError("Invalid login response");
-        const session = SessionSchema.parse(row.session);
-        return {
-          status: "authenticated" as const,
-          csrf_token: row.csrf_token,
-          session,
-          ...(typeof row.replacement_recovery_code === "string"
-            ? { replacement_recovery_code: row.replacement_recovery_code } : {})
-        };
-      }
-    }, { method: "POST", body: JSON.stringify({ challenge_token: challengeToken, code }) }),
+    beginTotpEnrollment:(input:BeginTotpEnrollmentRequest)=>request('/v1/auth/mfa/totp/begin',TotpEnrollmentOptionsResponseSchema,{method:'POST',body:JSON.stringify(BeginTotpEnrollmentRequestSchema.parse(input))}),
+    completeTotpEnrollment:(input:CompleteTotpEnrollmentRequest)=>request('/v1/auth/mfa/totp/verify',TotpEnrollmentResponseSchema,{method:'POST',body:JSON.stringify(CompleteTotpEnrollmentRequestSchema.parse(input))}),
+    beginLogin:(email:string,password:string)=>request('/v1/auth/login',LoginContinuationResponseSchema,{method:'POST',body:JSON.stringify({email,password})}),
+    completeLogin: (challengeToken: string, code: string) => request(
+      "/v1/auth/login", AuthenticationResponseSchema,
+      { method: "POST", body: JSON.stringify({ challenge_token: challengeToken, code }) }
+    ),
     async logout() {
       let response: Response;
       const headers = new Headers();
@@ -608,6 +564,22 @@ export function createContractClient(
       }
       if (!response.ok) throw await contractErrorForResponse(response);
     },
+    beginSocialStepUp:(provider:'google'|'apple'|'facebook'|'x',authorization:StepUpAuthorizationRequest)=>request(`/v1/account/social/${provider}/step-up/begin`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify({authorization,next:'/settings/security'})}),
+    socialStepUpStatus:(continuationToken:string)=>request('/v1/account/social/step-up/status',SocialStepUpStatusResponseSchema,{method:'POST',body:JSON.stringify({continuation_token:continuationToken})}),
+    beginSocialStepUpPasskey:(continuationToken:string)=>request('/v1/account/social/step-up/passkey-options',PasskeyAuthenticationOptionsResponseSchema,{method:'POST',body:JSON.stringify({continuation_token:continuationToken})}),
+    completeSocialStepUp:(input:CompleteSocialStepUpRequest)=>request('/v1/account/social/step-up/complete',StepUpResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    authProviders:()=>request('/v1/auth/providers',AuthProvidersResponseSchema),
+    beginSocialLogin:(provider:"google"|"apple"|"facebook"|"x",input:{next?:"/"|"/new"|"/settings"|"/settings/security"|"/account"}={})=>request(`/v1/auth/social/${provider}/begin`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    socialLoginStatus:(continuationToken:string)=>request('/v1/auth/social/login/status',SocialLoginStatusResponseSchema,{method:'POST',body:JSON.stringify({continuation_token:continuationToken})}),
+    socialSignupStatus:(input:{continuation_token:string})=>request('/v1/auth/social/signup/status',SocialSignupStatusResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completeSocialSignup:(input:CompleteSocialSignupRequest)=>request('/v1/auth/social/signup/complete',CompleteSocialSignupResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    linkedSocialProviders:()=>request('/v1/account/social-providers',SocialLinksResponseSchema),
+    beginSocialLink:(provider:"google"|"apple"|"facebook"|"x",grant:string)=>request(`/v1/account/social/${provider}/link`,BeginSocialLoginResponseSchema,{method:'POST',body:JSON.stringify({step_up_grant:grant,next:'/settings/security'})}),
+    unlinkSocialProvider:(provider:"google"|"apple"|"facebook"|"x",grant:string)=>requestNoContent(root.href,fetchImplementation,'/v1/account/social/unlink',{method:'POST',body:JSON.stringify({provider,step_up_grant:grant})},auth),
+    beginPasskeyEnrollment:(input:BeginPasskeyEnrollmentRequest)=>request('/v1/auth/passkeys/enrollment/options',PasskeyRegistrationOptionsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completePasskeyEnrollment:(input:CompletePasskeyEnrollmentRequest)=>request('/v1/auth/passkeys/enrollment/complete',PasskeyEnrollmentResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    beginPasskeyLogin:(input:BeginPasskeyLoginRequest={})=>request('/v1/auth/passkeys/login/options',PasskeyAuthenticationOptionsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completePasskeyLogin:(input:CompletePasskeyLoginRequest)=>request('/v1/auth/passkeys/login/complete',AuthenticationResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     listSessions: () => request("/v1/auth/sessions", SessionListSchema),
     revokeSession: (sessionId: string) => requestNoContent(
       root.href,
@@ -619,12 +591,19 @@ export function createContractClient(
     revokeAllSessions: () => request(
       "/v1/auth/sessions", RevokeAllSessionsSchema, { method: "DELETE" }
     ),
-    stepUp: (password: string, code: string, authorization?:
-      | Readonly<{
-        action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
-        target_run_id: string;
-      }>
-      | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" }>) => request(
+    recoveryProve:(input:ConsumerRecoveryProveRequest)=>request('/v1/auth/recovery/prove',ConsumerRecoveryProofResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    beginRecoveryEnrollment:(input:RecoveryEnrollmentBeginRequest)=>request('/v1/auth/recovery/enrollment/options',RecoveryEnrollmentOptionsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completeRecoveryEnrollment:(input:RecoveryEnrollmentCompleteRequest)=>request('/v1/auth/recovery/enrollment/complete',AuthenticationResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    pendingOnboardingStatus:(input:PendingOnboardingStatusRequest)=>request('/v1/auth/onboarding/status',OnboardingRequirementsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completePendingOnboarding:(input:PendingOnboardingCompleteRequest)=>requestNoContent(root.href,fetchImplementation,'/v1/auth/onboarding/complete',{method:'POST',body:JSON.stringify(input)},auth),
+    recoveryEnrollmentStatus:(input:RecoveryEvidenceStatusRequest)=>request('/v1/auth/recovery/enrollment/status',OnboardingRequirementsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    completeRecoveryEvidence:(input:RecoveryEvidenceCompleteRequest)=>requestNoContent(root.href,fetchImplementation,'/v1/auth/recovery/enrollment/complete-evidence',{method:'POST',body:JSON.stringify(input)},auth),
+    authMethods:()=>request('/v1/account/auth-methods',AuthMethodsResponseSchema),
+    removeAuthMethod:(factorId:string,grant:string)=>requestNoContent(root.href,fetchImplementation,'/v1/account/auth-methods/remove',{method:'POST',body:JSON.stringify({factor_id:factorId,step_up_grant:grant})},auth),
+    regenerateRecoveryCodes:(grant:string)=>request('/v1/account/recovery-codes/regenerate',RecoveryCodesResponseSchema,{method:'POST',body:JSON.stringify({step_up_grant:grant})}),
+    beginPasskeyStepUp:(authorization:StepUpAuthorizationRequest)=>request('/v1/auth/passkeys/step-up/options',PasskeyAuthenticationOptionsResponseSchema,{method:'POST',body:JSON.stringify({authorization})}),
+    completePasskeyStepUp:(input:{challenge_handle:string;credential:ConsumerAuthenticationCredential})=>request('/v1/auth/passkeys/step-up/complete',StepUpResponseSchema,{method:'POST',body:JSON.stringify(input)}),
+    stepUp: (password: string, code: string, authorization?:StepUpAuthorizationRequest) => request(
       "/v1/auth/step-up", StepUpResponseSchema,
       { method: "POST", body: JSON.stringify({
           password,
@@ -674,6 +653,13 @@ export function createContractClient(
     readAccountErasure:()=>request(
       "/v1/account/erasure",AccountErasureStatusSchema
     ),
+    phoneProfile:()=>request("/v1/account/profile",AccountPhoneProfileSchema),
+    revealPhoneProfile:(grantToken:string)=>request("/v1/account/profile/reveal",PhoneProfileRevealSchema,{method:"POST",body:JSON.stringify(PhoneProfileRevealRequestSchema.parse({step_up_grant:grantToken}))}),
+    updatePhoneProfile:(input:Readonly<{phone:string;grantToken:string}>)=>request("/v1/account/profile",AccountPhoneProfileSchema,{method:"POST",body:JSON.stringify(PhoneProfileUpdateRequestSchema.parse({phone:input.phone,step_up_grant:input.grantToken}))}),
+    recoveryEmail:()=>request("/v1/account/recovery-email",RecoveryEmailSettingsSchema),
+    requestRecoveryEmail:(input:Readonly<{email:string;grantToken:string}>)=>request("/v1/account/recovery-email",RecoveryEmailSettingsSchema,{method:"POST",body:JSON.stringify(RecoveryEmailRequestSchema.parse({email:input.email,step_up_grant:input.grantToken}))},202),
+    confirmRecoveryEmail:(input:Readonly<{token:string}>)=>request("/v1/account/recovery-email/confirm",EmailChangeConfirmedSchema,{method:"POST",body:JSON.stringify(EmailChangeLinkRequestSchema.parse(input))}),
+    removeRecoveryEmail:(input:Readonly<{grantToken:string}>)=>requestNoContent(root.href,fetchImplementation,"/v1/account/recovery-email",{method:"DELETE",body:JSON.stringify(RecoveryEmailRemoveRequestSchema.parse({step_up_grant:input.grantToken}))},auth),
     readAccountEmail: () => request("/v1/account/email", AccountEmailSchema),
     requestEmailChange: (newEmail: string, stepUpGrant: string) => request(
       "/v1/account/email/change", EmailChangePendingSchema,
@@ -825,3 +811,6 @@ export function createContractClient(
     }
   });
 }
+
+export { createPasswordResetClient } from "./password-reset.js";
+export { createMfaRecoveryClient, createBackupEmailClient } from "./mfa-recovery.js";

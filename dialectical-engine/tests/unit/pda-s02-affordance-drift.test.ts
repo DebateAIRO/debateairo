@@ -76,7 +76,8 @@ describe("S02 owner/public affordance drift pins", () => {
     // READ — explanatory copy is covered by the public disclosure/honesty surfaces.
     expectLocalizedAriaLabel(topBar, "chrome.howItWorks", "How it works", 2);
     // MUTATION-CAPABLE OWNER ACCOUNT SURFACE — settings stays owner-only.
-    expectLocalizedAriaLabel(topBar, "chrome.settings", "Settings", 2);
+    expectLocalizedAriaLabel(topBar, "chrome.settings", "Settings", 0);
+    expect(occurrences(topBar, "<AccountMenu catalog={chromeCatalog} />")).toBe(1);
     // READ/STRUCTURAL — owner overflow itself contains the duplicated responsive actions.
     expectLocalizedAriaLabel(topBar, "chrome.moreDebateActions", "More debate actions", 1);
     // MUTATION — challenge callbacks stay owner-only. The owner and public routes
@@ -98,7 +99,8 @@ describe("S02 owner/public affordance drift pins", () => {
     // it catches an interactive element ADDED to the top bar that none of the
     // aria-label counts above happens to name.
     const interactiveElementCount = (topBar.match(/<(?:button|a|Link|summary)\b/g) ?? []).length;
-    expect(interactiveElementCount).toBe(21);
+    // The two direct Settings links moved into the one shared AccountMenu.
+    expect(interactiveElementCount).toBe(19);
   });
 
   it("pins and classifies every owner honesty section", () => {

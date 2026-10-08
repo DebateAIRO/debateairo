@@ -19,9 +19,12 @@ export const identityUser = identity.table("user", {
   userId: uuid("user_id").primaryKey().defaultRandom(),
   emailBlindIndex: bytea("email_blind_index").notNull().unique(),
   emailCiphertext: jsonb("email_ciphertext").notNull(),
-  recoveryEmailCiphertext: jsonb("recovery_email_ciphertext").notNull(),
+  recoveryEmailCiphertext: jsonb("recovery_email_ciphertext"),
   phoneCiphertext: jsonb("phone_ciphertext"),
-  passwordHash: text("password_hash").notNull(),
+  phoneSource: text("phone_source"),
+  phoneVerificationStatus: text("phone_verification_status"),
+  phoneUpdatedAt: timestamp("phone_updated_at", { withTimezone: true }),
+  passwordHash: text("password_hash"),
   pseudonym: text("pseudonym").notNull().unique(),
   auditToken: uuid("audit_token").notNull().defaultRandom().unique(),
   ownerRef: uuid("owner_ref").notNull().defaultRandom().unique(),
@@ -1198,3 +1201,58 @@ export const evaluatorConsumerOutput = evaluator.table("consumer_output", {
 });
 
 void [scorecard, memory, evaluator, identity];
+
+/** Staff authority is accessed through enumerated SQL capabilities. */
+export const staff = pgSchema("staff");
+export const accountSecurityHold = identity.table("account_security_hold", {
+  userId: uuid("user_id").primaryKey().references(() => identityUser.userId, { onDelete: "cascade" }),
+  held: boolean("held").notNull().default(false),
+  securityEpoch: bigint("security_epoch", { mode: "number" }).notNull().default(0),
+  changedAt: timestamp("changed_at", { withTimezone: true }).notNull().defaultNow()
+});
+export const staffSubject = staff.table("subject", {
+  staffId: uuid("staff_id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => identityUser.userId, { onDelete: "set null" }),
+  state: text("state").notNull().default("ACTIVE"),
+  securityEpoch: bigint("security_epoch", { mode: "number" }).notNull().default(0),
+  grantRevision: bigint("grant_revision", { mode: "number" }).notNull().default(0),
+  capabilities: text("capabilities").array().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const STAFF_ACCESS_SCHEMA_MANIFEST = Object.freeze({
+  migration: "0085_staff_access_foundation.sql",
+  ownershipRole: "debateai_staff_security_owner",
+  recoveryCapabilityRole: "debateai_staff_recovery",
+  recoveryLoginRole: "debateai_prod_staff_recovery",
+  accountGuardRelation: "identity.account_security_hold",
+  relations: Object.freeze([
+    "subject", "owner_designation", "bootstrap_marker", "grant_event", "invitation",
+    "privilege_session", "action_proof", "invitation_proof", "owner_command",
+    "password_totp_rotation_receipt", "prerequisite_receipt", "webauthn_challenge",
+    "owner_possession_receipt", "audit_event", "alert_outbox", "alert_delivery_receipt"
+  ])
+});
+
+/** Identifying owned WebAuthn metadata erases with either its account or factor. */
+export const staffWebAuthnMetadata = identity.table("staff_webauthn_metadata", {
+  mfaFactorId: uuid("mfa_factor_id").primaryKey().references(() => mfaFactor.mfaFactorId, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => identityUser.userId, { onDelete: "cascade" }),
+  userHandleSha256: text("user_handle_sha256").notNull(),
+  transports: text("transports").array().notNull().default([])
+});
+export const STAFF_WEBAUTHN_SCHEMA_MANIFEST = Object.freeze({
+  migration: "0086_staff_webauthn.sql",
+  identityMetadataRelation: "identity.staff_webauthn_metadata",
+  identityOwnership: "EXISTING_MFA_FACTOR_OWNER",
+  staffOwnershipRole: "debateai_staff_security_owner",
+  runtimeFunctions: Object.freeze([
+    "staff.begin_owned_webauthn", "staff.read_owned_webauthn_challenge",
+    "staff.fail_owned_webauthn", "staff.complete_owned_webauthn_registration",
+    "staff.complete_owned_webauthn_assertion", "identity.staff_read_owned_webauthn_key"
+  ]),
+  sourcePaths: Object.freeze([
+    "apps/api/src/staff/webauthn.ts", "apps/api/src/staff/webauthn-codec.ts",
+    "apps/api/src/staff/webauthn-verifier.ts", "apps/ui/lib/staffWebAuthn.ts"
+  ])
+});

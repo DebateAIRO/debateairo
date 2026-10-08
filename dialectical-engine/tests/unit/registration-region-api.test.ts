@@ -1,3 +1,4 @@
+import { canonicalSignup, passedTurnstile } from "../support/turnstileFixtures.js";
 import { describe, expect, it, vi } from "vitest";
 import { REGION_COUNTRY_CODES } from "@debateai/kernel";
 import { COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW, countryPolicyFromValue } from "@debateai/register";
@@ -16,12 +17,13 @@ const gate = () => {
   const audit = { recordCountryGateRefusal: vi.fn(async (_input: unknown) => undefined) };
   return { gate: new CountryGate({ policy, lookup, audit }), audit };
 };
-const REGISTER_BODY = { email: "alice@example.test", password: "correct horse battery staple", recovery_email: "alice.recovery@example.test", date_of_birth: "1990-01-01" };
+const { country: _defaultCountry, ...REGISTER_BODY } = canonicalSignup;
 const invalid = { error: "AUTH_INPUT_INVALID", message: "AUTH_INPUT_INVALID" };
 function api(countryGate?: CountryGate) {
   const register = vi.fn(async (_input: unknown, _source: unknown) => ({ message: "If this address can be registered, verification instructions will arrive. Check your spam folder." }));
   const instance = buildApi({
     application: { submit: vi.fn() } as unknown as AskApplication,
+    turnstile: passedTurnstile,
     registration: { register, verifyEmail: vi.fn(), resendVerification: vi.fn() } as never,
     sessions: testSessionApplication([testHttpIdentity("region-api")]), allowedOrigin: TEST_APP_ORIGIN,
     ...(countryGate === undefined ? {} : { countryGate })

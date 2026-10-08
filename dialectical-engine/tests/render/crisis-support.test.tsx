@@ -212,18 +212,21 @@ describe("crisis check on the home composer", () => {
     expect(mocks.createDebate).not.toHaveBeenCalled();
   });
 
-  it("lets a policy question about suicide start a debate", async () => {
+  it("preserves a policy question about suicide in the complete /new flow", async () => {
     await startFromHome(POLICY);
     expect(crisisDialog()).toBeNull();
-    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
-    expect(mocks.push).toHaveBeenCalledWith("/debate/run-1");
+    expect(mocks.createDebate).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith(`/new?topic=${encodeURIComponent(POLICY)}`);
   });
 
-  it("shows the screen when the API refuses the ask as a crisis", async () => {
+  it("shows the screen on /new when the API refuses the ask as a crisis", async () => {
     mocks.createDebate.mockRejectedValue(new ContractHttpError(
       "UNPROCESSABLE", 422, "CRISIS_SUPPORT_OFFERED: CRISIS_SUPPORT_OFFERED", "CRISIS_SUPPORT_OFFERED"
     ));
-    await startFromHome(POLICY, "RO");
+    const container = await mount(<NewDebatePage catalog={catalogue("en", "newDebate")} homeCatalog={catalogue("en", "home")} chromeCatalog={catalogue("en", "chrome")} locale="en" crisisCountryHint="RO"/>);
+    await type(container.querySelector<HTMLTextAreaElement>("textarea")!, POLICY);
+    await act(async()=>{container.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));});
+    await settle();
     expect(crisisDialog()).not.toBeNull();
     expect(mocks.push).not.toHaveBeenCalled();
   });

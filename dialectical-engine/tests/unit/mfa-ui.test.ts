@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { mailAlternatives } from "../support/accountMail.js";
 import { SendmailMailSender } from "../../apps/api/src/mail-channel.js";
 import {
   consumeMailedEnrollmentTokenFromUrl,
@@ -51,9 +52,8 @@ describe("S4 mailed-token enrolment UI", () => {
       }
     );
     expect(consumed).toBe(token);
-    expect(order).toEqual(["replace", "replace", "verify"]);
+    expect(order).toEqual(["replace", "verify"]);
     expect(replacedWith).toEqual([
-      `/verify-email?campaign=welcome#setup&token=${token}`,
       "/verify-email?campaign=welcome#setup"
     ]);
     expect(replacedWith.at(-1)).not.toContain(token);
@@ -91,9 +91,12 @@ describe("S4 mailed-token enrolment UI", () => {
         expiresAt: new Date("2026-08-23T12:00:00.000Z")
       });
       const message = await readFile(messageFile, "utf8");
-      const mailedHref = message.match(/https:\/\/[^\s]+/)?.[0];
+      const alternatives = mailAlternatives(message);
+      const mailedHref = alternatives.text.match(/https:\/\/[^\s]+/)?.[0];
       expect(mailedHref).toBe(`https://debate.test/verify-email#token=${expectedToken}`);
-      expect(message).not.toContain("?token=");
+      expect(message.split("\r\n\r\n")[0]).not.toContain(expectedToken);
+      expect(alternatives.text).not.toContain("?token=");
+      expect(alternatives.html).not.toContain("?token=");
       const mailedUrl = new URL(mailedHref!);
       // The bearer rides in the fragment: the request line a server, proxy or
       // access log ever sees is the bare path (L3-F8).
@@ -148,3 +151,13 @@ describe("S4 mailed-token enrolment UI", () => {
     });
   });
 });
+import {takeFragmentToken} from '../../apps/ui/lib/mfaEnrollment.js';
+it.each([
+ '/verify-email#token='+ 'a'.repeat(43)+'&token='+ 'b'.repeat(43),
+ '/verify-email?token='+ 'a'.repeat(43)+'#token='+ 'b'.repeat(43),
+ '/verify-email?token='+ 'a'.repeat(43)+'&%74oken='+ 'b'.repeat(43),
+ '/verify-email?token%GG='+ 'a'.repeat(43),
+ '/verify-email#token=',
+ '/verify-email#%74oken=malformed',
+ '/verify-email#token%GG='+ 'a'.repeat(43)
+])('rejects ambiguous/malformed %s while scrubbing every bearer before any request',async path=>{let cleaned=path;const verify=vi.fn();const location={href:'https://test.invalid'+path},history={state:null,replaceState(_state:unknown,_unused:string,url?:string|URL|null){cleaned=String(url);}};expect(takeFragmentToken(location,history,true)).toBeNull();await consumeMailedEnrollmentTokenFromUrl(location,history,verify);expect(verify).not.toHaveBeenCalled();expect(cleaned).not.toContain('token');expect(cleaned).not.toContain('a'.repeat(43));expect(cleaned).not.toContain('b'.repeat(43));});

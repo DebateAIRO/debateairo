@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "saņemt sarakstu ar visām trešajām personām, kas tos ir saņēmušas;",
   "legal.health.s05.item3": "atsaukt savu piekrišanu un panākt šo datu dzēšanu.",
   "legal.health.s06.title": "Kā tās izmantot",
-  "legal.health.s06.body": "Sadaļā Iestatījumi vai rakstot uz privacy@dezbatere.ro. Mēs atbildam 45 dienu laikā. Ja mēs pieprasījumu noraidām, varat šo lēmumu pārsūdzēt, atbildot uz mūsu atbildes vēstuli."
+  "legal.health.s06.body": "Sadaļā Iestatījumi vai rakstot uz privacy@dezbatere.ro. Mēs atbildam 45 dienu laikā. Ja mēs pieprasījumu noraidām, varat šo lēmumu pārsūdzēt, atbildot uz mūsu atbildes vēstuli.",
+  "legal.cookies.staff.purpose": "Atsevišķa personāla piekļuve",
+  "legal.cookies.passwordReset.purpose": "Tikai paroles atiestatīšana",
+  "legal.cookies.mfaRecovery.purpose": "Tikai autentifikatora atkopšana",
+  "legal.cookies.social.purpose": "Īsa pakalpojuma sniedzēja pierakstīšanās vai konta sasaiste",
+  "legal.cookies.phoneDraft.purpose": "Nepabeigts jautājums tālruņa soļa laikā; dzēsts pie sesijas maiņas, izrakstīšanās vai īpašnieka maiņas",
+  "legal.cookies.staff.life": "Līdz 8 stundām; 15 minūtes neaktivitātes",
+  "legal.cookies.passwordReset.life": "Līdz 30 minūtēm",
+  "legal.cookies.mfaRecovery.life": "Līdz 299 sekundēm",
+  "legal.cookies.social.life": "Līdz 5 minūtēm",
+  "legal.cookies.phoneDraft.life": "15 minūtes vai līdz agrākai dzēšanai"
 }

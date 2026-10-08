@@ -120,7 +120,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Dezbaterile sunt private până când le publicați. Publicarea este o acțiune deliberată, confirmată separat. O dezbatere publicată afișează pseudonimul dumneavoastră, întrebarea exact așa cum ați formulat-o, arborele argumentelor, punctajele, verdictul și intervalul de încredere și poartă o etichetă vizibilă care arată că materialul este generat de IA. Nu afișează niciodată adresa de e-mail, evidențele sesiunilor sau istoricul contului. Motoarele de căutare pot indexa dezbaterile publicate." },
-      { kind: "p", text: "Retragerea publicării elimină dezbaterea din DebateAI și distruge cheia copiei noastre publice. Copiile deja realizate de cititori, motoare de căutare sau arhive nu se află sub controlul nostru și nu le putem retrage." },
+      { kind: "p", text: "Retragerea publicării elimină dezbaterea din Dialectical Engine și distruge cheia copiei noastre publice. Copiile deja realizate de cititori, motoare de căutare sau arhive nu se află sub controlul nostru și nu le putem retrage." },
       { kind: "p", text: "Când vă ștergeți contul, eliminăm din accesul public fiecare dezbatere publicată, fără întârzieri nejustificate și în cel mult 30 de zile, cu excepția cazului în care legea ne obligă să păstrăm un anumit element. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -199,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Persoane menționate în dezbateri care nu sunt utilizatorii noștri",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Dacă cineva adresează DebateAI o întrebare în care vă menționează, este posibil să deținem date cu caracter personal despre dumneavoastră, chiar dacă nu ați utilizat niciodată serviciul. Termenii le interzic utilizatorilor acest lucru și reducem la minimum ceea ce trimitem furnizorilor de IA, însă se poate întâmpla." },
+      { kind: "p", text: "Dacă cineva adresează Dialectical Engine o întrebare în care vă menționează, este posibil să deținem date cu caracter personal despre dumneavoastră, chiar dacă nu ați utilizat niciodată serviciul. Termenii le interzic utilizatorilor acest lucru și reducem la minimum ceea ce trimitem furnizorilor de IA, însă se poate întâmpla." },
       { kind: "p", text: "Această secțiune reprezintă informarea pe care trebuie să v-o furnizăm potrivit articolului 14 din GDPR. Datele sunt cele introduse de utilizator și cele generate de motor ca răspuns; sursa este utilizatorul respectiv; scopurile și temeiul juridic sunt cele din secțiunea 4; destinatarii sunt furnizorii de IA din Registru; păstrarea urmează secțiunea 7. Beneficiați de toate drepturile din secțiunea 10 și, în special, ne puteți solicita să eliminăm o dezbatere publicată sau una privată care conține datele dumneavoastră și să vă comunicăm ce date deținem. Nu aveți nevoie de cont pentru aceasta. Scrieți la privacy@dezbatere.ro sau folosiți comanda Raportare din orice dezbatere publicată, iar noi soluționăm solicitările justificate fără întârzieri nejustificate. Nu vă putem notifica individual când se întâmplă acest lucru deoarece nu știm cine sunteți sau cum vă putem contacta; această informare publică și calea de eliminare sunt măsurile pe care le luăm în schimb." },
       { kind: "p", text: "Același lucru este valabil pentru informațiile sensibile despre dumneavoastră — politică, sănătate, religie — care apar în întrebarea altei persoane. Nicio condiție juridică nu ne permite să continuăm prelucrarea lor după ce vă opuneți, iar noi nu o vom face." }
     ]
@@ -209,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Copii",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI este destinat adulților. La înregistrare confirmați că aveți cel puțin 18 ani și nu prelucrăm cu bună știință datele niciunei persoane sub 18 ani. Dacă aflăm că un cont aparține unei persoane sub 18 ani, îl închidem și ștergem datele conform secțiunii 7. Unele țări consideră că o confirmare nu este suficientă sau impun cerințe suplimentare; Anexa B precizează normele aplicabile, iar Termenii explică măsurile noastre." }
+      { kind: "p", text: "Dialectical Engine este destinat adulților. La înregistrare confirmați că aveți cel puțin 18 ani și nu prelucrăm cu bună știință datele niciunei persoane sub 18 ani. Dacă aflăm că un cont aparține unei persoane sub 18 ani, îl închidem și ștergem datele conform secțiunii 7. Unele țări consideră că o confirmare nu este suficientă sau impun cerințe suplimentare; Anexa B precizează normele aplicabile, iar Termenii explică măsurile noastre." }
     ]
   },
   {
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Module cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI folosește opt elemente, toate strict necesare pentru serviciul pe care l-ați solicitat și toate setate numai de DebateAI: patru module cookie și patru intrări în spațiul de stocare al browserului dumneavoastră. Nu setăm module cookie analitice, publicitare sau de urmărire. Politica privind modulele cookie de la [dezbatere.ro/cookies] le enumeră, arătând ce face fiecare și cine îl primește, și va fi modificată înainte de adăugarea oricărui alt element." },
+      { kind: "p", text: "Dialectical Engine folosește 18 elemente, toate strict necesare pentru serviciul pe care l-ați solicitat și toate setate numai de Dialectical Engine: 13 module cookie și 5 intrări în spațiul de stocare al browserului dumneavoastră. Nu setăm module cookie analitice, publicitare sau de urmărire. Politica privind modulele cookie de la [dezbatere.ro/cookies] le enumeră, arătând ce face fiecare și cine îl primește, și va fi modificată înainte de adăugarea oricărui alt element." },
       {
         kind: "list",
         items: [
@@ -225,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Modul cookie — Împiedică alte site-uri să trimită formulare în numele dumneavoastră. — 14 zile",
         "__Host-debateai-age-refusal — Modul cookie (HttpOnly) — După ce o verificare a vârstei este refuzată, împiedică acest browser să încerce din nou timp de 30 de zile. Conține doar cuvântul „refuzat”, fără date personale. — 30 de zile",
         "debateai.locale — Modul cookie — Reține limba interfeței pe care ați ales-o. — 1 an",
+        "__Host-debateai-staff — Modul cookie (HttpOnly) — Acces separat pentru personal — Cel mult 8 ore; expiră după 15 minute de inactivitate",
+        "__Host-debateai-staff-csrf — Modul cookie — Împiedică alte site-uri să trimită formulare în numele dumneavoastră. — Cel mult 8 ore; expiră după 15 minute de inactivitate",
+        "__Host-debateai-password-reset — Modul cookie (HttpOnly) — Doar resetarea parolei — Cel mult 30 de minute",
+        "__Host-debateai-password-reset-csrf — Modul cookie — Împiedică alte site-uri să trimită formulare în numele dumneavoastră. — Cel mult 30 de minute",
+        "__Host-debateai-mfa-recovery — Modul cookie (HttpOnly) — Doar recuperarea autentificatorului — Cel mult 299 de secunde",
+        "__Host-debateai-mfa-recovery-csrf — Modul cookie — Împiedică alte site-uri să trimită formulare în numele dumneavoastră. — Cel mult 299 de secunde",
+        "__Host-debateai-social-flow — Modul cookie (HttpOnly) — Flux scurt de autentificare prin furnizor sau asociere a contului — Cel mult 5 minute",
+        "__Host-debateai-social-apple — Modul cookie (HttpOnly) — Flux scurt de autentificare prin furnizor sau asociere a contului — Cel mult 5 minute",
+        "__Host-debateai-social-browser — Modul cookie (HttpOnly) — Flux scurt de autentificare prin furnizor sau asociere a contului — Cel mult 5 minute",
         "debateai.consent — Stocare locală — Reține că ați văzut deja notificarea despre cookie-uri, ca să fie afișată o singură dată. — Până când îl ștergeți",
         "debateai.mode — Stocare locală — Dacă folosiți modul luminos sau modul întunecat. — Până când îl ștergeți",
         "debateai.languageOffer.dismissed — Stocare de sesiune — Reține, pentru această filă, că ați refuzat propunerea de a afișa o dezbatere în altă limbă. — Până când închideți fila",
-        "debateai.support.conversation.v2 — Stocare de sesiune — Păstrează pe ecran conversația dvs. din chatul de ajutor cât timp fila rămâne deschisă. Se șterge când cineva se autentifică sau se deconectează în această filă. — Până când închideți fila"
+        "debateai.support.conversation.v2 — Stocare de sesiune — Păstrează pe ecran conversația dvs. din chatul de ajutor cât timp fila rămâne deschisă. Se șterge când cineva se autentifică sau se deconectează în această filă. — Până când închideți fila",
+        "debateai.phone-completion-draft.v1 — Stocare de sesiune — Întrebare neterminată în timpul completării telefonului; se șterge la schimbarea sesiunii, deconectare sau schimbarea titularului — 15 minute sau până la ștergere"
         ]
       },
-      { kind: "p", text: "Nicio altă parte nu colectează, prin intermediul DebateAI, informații despre activitățile dumneavoastră online de-a lungul timpului și pe diferite site-uri web." },
-      { kind: "p", text: "Browserele pot trimite un semnal „Do Not Track” sau un semnal similar. DebateAI nu vă urmărește, așa că un astfel de semnal nu are nimic de oprit: serviciul funcționează la fel cu sau fără el." },
+      { kind: "p", text: "Nicio altă parte nu colectează, prin intermediul Dialectical Engine, informații despre activitățile dumneavoastră online de-a lungul timpului și pe diferite site-uri web." },
+      { kind: "p", text: "Browserele pot trimite un semnal „Do Not Track” sau un semnal similar. Dialectical Engine nu vă urmărește, așa că un astfel de semnal nu are nimic de oprit: serviciul funcționează la fel cu sau fără el." },
       { kind: "p", text: "Pentru a refuza aceste elemente, blocați sau ștergeți modulele cookie și datele site-ului pentru acest site din setările browserului dumneavoastră. Ce nu mai funcționează atunci: autentificarea și reținerea alegerilor dumneavoastră privind limba și modul de afișare; notificarea privind modulele cookie va fi, de asemenea, afișată din nou." }
     ]
   },
@@ -242,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la [dezbatere.ro/privacy/versions]. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune." },
-      { kind: "p", text: "Această politică a fost actualizată ultima dată la [date]. Versiunea 3.1 a înlocuit versiunea 2.1, care descria datele de sesiune, perioadele de păstrare, analiza utilizării, exportul și efectul ștergerii asupra dezbaterilor publicate în moduri care nu mai reflectau serviciul." }
+      { kind: "p", text: "Această politică a fost actualizată ultima dată la [date]. Versiunea 3.2 a înlocuit versiunea 2.1, care descria datele de sesiune, perioadele de păstrare, analiza utilizării, exportul și efectul ștergerii asupra dezbaterilor publicate în moduri care nu mai reflectau serviciul." }
     ]
   },
   {
@@ -315,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ucraina (numai dacă este enumerată)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Se aplică Legea Ucrainei „Privind protecția datelor cu caracter personal”. Nu oferim DebateAI în zonele Ucrainei care nu sunt controlate de guvernul acesteia. Datele dumneavoastră ajung în țări din UE și în Statele Unite (a se vedea Registrul). Puteți depune o plângere la Comisarul pentru drepturile omului al Radei Supreme a Ucrainei." }
+      { kind: "p", text: "Se aplică Legea Ucrainei „Privind protecția datelor cu caracter personal”. Nu oferim Dialectical Engine în zonele Ucrainei care nu sunt controlate de guvernul acesteia. Datele dumneavoastră ajung în țări din UE și în Statele Unite (a se vedea Registrul). Puteți depune o plângere la Comisarul pentru drepturile omului al Radei Supreme a Ucrainei." }
     ]
   },
   {
@@ -346,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.1",
-  sha256: "355fdc0311339a0747597a526990e7727f0f8f75246084fb9b0362292548bf1e",
-  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.1 · ÎN VIGOARE DE LA [DATE]",
+  version: "3.2",
+  sha256: "416a6489ad36f2531f0353a0eadcd9ea9ac0011b543a26b2b1cdf48c7728ff62",
+  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.2 · ÎN VIGOARE DE LA [DATE]",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",
-  endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.1",
+  endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Textul Politicii de confidențialitate",
   sectionIdPrefix: "policy-section-",

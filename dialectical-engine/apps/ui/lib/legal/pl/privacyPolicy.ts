@@ -120,7 +120,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Debaty są prywatne do chwili ich opublikowania. Publikacja jest działaniem celowym i osobno potwierdzanym. Opublikowana debata pokazuje Twój pseudonim, pytanie w brzmieniu wpisanym przez Ciebie, drzewo argumentów, wyniki, werdykt i przedział ufności oraz zawiera widoczne oznaczenie, że treść została wygenerowana przez AI. Nigdy nie pokazuje Twojego adresu e-mail, rejestrów sesji ani historii konta. Wyszukiwarki mogą indeksować opublikowane debaty." },
-      { kind: "p", text: "Wycofanie publikacji usuwa debatę z DebateAI i niszczy klucz do naszej publicznej kopii. Kopie wykonane wcześniej przez czytelników, wyszukiwarki lub archiwa pozostają poza naszą kontrolą i nie możemy ich wycofać." },
+      { kind: "p", text: "Wycofanie publikacji usuwa debatę z Dialectical Engine i niszczy klucz do naszej publicznej kopii. Kopie wykonane wcześniej przez czytelników, wyszukiwarki lub archiwa pozostają poza naszą kontrolą i nie możemy ich wycofać." },
       { kind: "p", text: "Gdy usuwasz konto, bez zbędnej zwłoki i nie później niż w ciągu 30 dni usuwamy z publicznego dostępu każdą opublikowaną przez Ciebie debatę, chyba że prawo wymaga od nas zachowania konkretnego elementu. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -199,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Osoby wymienione w debatach, które nie są naszymi użytkownikami",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Jeżeli ktoś zada DebateAI pytanie, w którym Cię wymieni, możemy przechowywać Twoje dane osobowe, mimo że nigdy nie korzystano z usługi. Warunki świadczenia usług zabraniają użytkownikom takich działań i minimalizujemy zakres danych wysyłanych dostawcom AI, ale takie sytuacje się zdarzają." },
+      { kind: "p", text: "Jeżeli ktoś zada Dialectical Engine pytanie, w którym Cię wymieni, możemy przechowywać Twoje dane osobowe, mimo że nigdy nie korzystano z usługi. Warunki świadczenia usług zabraniają użytkownikom takich działań i minimalizujemy zakres danych wysyłanych dostawcom AI, ale takie sytuacje się zdarzają." },
       { kind: "p", text: "Niniejsza sekcja stanowi informację, którą jesteśmy Ci winni na mocy art. 14 RODO. Dane obejmują wszystko, co użytkownik wpisał, i wszystko, co silnik wygenerował w odpowiedzi; źródłem jest ten użytkownik; cele i podstawy prawne określono w sekcji 4; odbiorcami są dostawcy AI wskazani w Rejestrze; okres przechowywania wynika z sekcji 7. Przysługują Ci wszystkie prawa wymienione w sekcji 10, a w szczególności można poprosić nas o usunięcie opublikowanej lub prywatnej debaty zawierającej Twoje dane oraz o przekazanie informacji o przechowywanych przez nas danych. Nie jest do tego potrzebne konto. Napisz na adres privacy@dezbatere.ro lub użyj funkcji Zgłoś przy dowolnej opublikowanej debacie, a podejmiemy działania w odpowiedzi na uzasadnione żądania bez zbędnej zwłoki. Nie możemy powiadomić Cię indywidualnie, gdy dochodzi do takiej sytuacji, ponieważ nie wiemy, kim jesteś ani jak się z Tobą skontaktować; zamiast tego stosujemy niniejszą publiczną informację i procedurę usunięcia." },
       { kind: "p", text: "To samo dotyczy informacji wrażliwych na Twój temat — polityki, zdrowia, religii — które pojawiają się w pytaniu innej osoby. Żadna przesłanka prawna nie pozwala nam dalej ich przetwarzać po wniesieniu przez Ciebie sprzeciwu i nie będziemy tego robić." }
     ]
@@ -209,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Dzieci",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI jest przeznaczone dla osób dorosłych. Podczas rejestracji potwierdzasz, że masz co najmniej 18 lat, i świadomie nie przetwarzamy danych osób poniżej 18. roku życia. Jeżeli dowiemy się, że konto należy do osoby poniżej 18. roku życia, zamkniemy je i usuniemy dane w sposób opisany w sekcji 7. Niektóre kraje uznają potwierdzenie za niewystarczające lub wymagają dodatkowych działań; załącznik B określa zasady obowiązujące w poszczególnych miejscach, a Warunki świadczenia usług wyjaśniają nasze postępowanie." }
+      { kind: "p", text: "Dialectical Engine jest przeznaczone dla osób dorosłych. Podczas rejestracji potwierdzasz, że masz co najmniej 18 lat, i świadomie nie przetwarzamy danych osób poniżej 18. roku życia. Jeżeli dowiemy się, że konto należy do osoby poniżej 18. roku życia, zamkniemy je i usuniemy dane w sposób opisany w sekcji 7. Niektóre kraje uznają potwierdzenie za niewystarczające lub wymagają dodatkowych działań; załącznik B określa zasady obowiązujące w poszczególnych miejscach, a Warunki świadczenia usług wyjaśniają nasze postępowanie." }
     ]
   },
   {
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Pliki cookie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI używa ośmiu elementów, z których wszystkie są bezwzględnie konieczne do świadczenia usługi, o którą prosisz, i wszystkie są ustawiane wyłącznie przez DebateAI: czterech plików cookie i czterech wpisów w pamięci Twojej przeglądarki. Nie ustawiamy plików cookie do celów analitycznych, reklamowych ani śledzenia. Polityka plików cookie pod adresem [dezbatere.ro/cookies] wymienia je wraz z opisem tego, do czego służy każdy z nich i kto go otrzymuje, i zostanie zmieniona, zanim zostanie dodane cokolwiek innego." },
+      { kind: "p", text: "Dialectical Engine używa 18 elementów, z których wszystkie są bezwzględnie konieczne do świadczenia usługi, o którą prosisz, i wszystkie są ustawiane wyłącznie przez Dialectical Engine: 13 plików cookie i 5 wpisów w pamięci Twojej przeglądarki. Nie ustawiamy plików cookie do celów analitycznych, reklamowych ani śledzenia. Polityka plików cookie pod adresem [dezbatere.ro/cookies] wymienia je wraz z opisem tego, do czego służy każdy z nich i kto go otrzymuje, i zostanie zmieniona, zanim zostanie dodane cokolwiek innego." },
       {
         kind: "list",
         items: [
@@ -225,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Plik cookie — Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. — 14 dni",
         "__Host-debateai-age-refusal — Plik cookie (HttpOnly) — Po odrzuconej weryfikacji wieku uniemożliwia tej przeglądarce ponowną próbę przez 30 dni. Zawiera tylko słowo „odrzucono”, żadnych danych osobowych. — 30 dni",
         "debateai.locale — Plik cookie — Zapamiętuje wybrany przez Ciebie język interfejsu. — 1 rok",
+        "__Host-debateai-staff — Plik cookie (HttpOnly) — Oddzielny dostęp personelu — Do 8 godzin; 15 minut bezczynności",
+        "__Host-debateai-staff-csrf — Plik cookie — Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. — Do 8 godzin; 15 minut bezczynności",
+        "__Host-debateai-password-reset — Plik cookie (HttpOnly) — Tylko resetowanie hasła — Do 30 minut",
+        "__Host-debateai-password-reset-csrf — Plik cookie — Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. — Do 30 minut",
+        "__Host-debateai-mfa-recovery — Plik cookie (HttpOnly) — Tylko odzyskiwanie uwierzytelniacza — Do 299 sekund",
+        "__Host-debateai-mfa-recovery-csrf — Plik cookie — Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. — Do 299 sekund",
+        "__Host-debateai-social-flow — Plik cookie (HttpOnly) — Krótkie logowanie przez dostawcę lub łączenie konta — Do 5 minut",
+        "__Host-debateai-social-apple — Plik cookie (HttpOnly) — Krótkie logowanie przez dostawcę lub łączenie konta — Do 5 minut",
+        "__Host-debateai-social-browser — Plik cookie (HttpOnly) — Krótkie logowanie przez dostawcę lub łączenie konta — Do 5 minut",
         "debateai.consent — Pamięć lokalna — Zapamiętuje, że komunikat o plikach cookie był już wyświetlony, więc pokazuje się tylko raz. — Do wyczyszczenia",
         "debateai.mode — Pamięć lokalna — Czy korzystasz z trybu jasnego, czy ciemnego. — Do wyczyszczenia",
         "debateai.languageOffer.dismissed — Pamięć sesji — Zapamiętuje dla tej karty, że odrzucono propozycję pokazania debaty w innym języku. — Do zamknięcia karty",
-        "debateai.support.conversation.v2 — Pamięć sesji — Utrzymuje Twoją rozmowę z czatem pomocy na ekranie, dopóki karta jest otwarta. Zostaje usunięta, gdy ktokolwiek zaloguje się lub wyloguje w tej karcie. — Do zamknięcia karty"
+        "debateai.support.conversation.v2 — Pamięć sesji — Utrzymuje Twoją rozmowę z czatem pomocy na ekranie, dopóki karta jest otwarta. Zostaje usunięta, gdy ktokolwiek zaloguje się lub wyloguje w tej karcie. — Do zamknięcia karty",
+        "debateai.phone-completion-draft.v1 — Pamięć sesji — Niedokończone pytanie podczas kroku z telefonem; usuwane przy zmianie sesji, wylogowaniu lub zmianie właściciela — 15 minut lub do wcześniejszego usunięcia"
         ]
       },
-      { kind: "p", text: "Żaden inny podmiot nie zbiera za pośrednictwem DebateAI informacji o Twojej aktywności w internecie na przestrzeni czasu i w różnych witrynach." },
-      { kind: "p", text: "Przeglądarki mogą wysyłać sygnał „Do Not Track” lub podobny sygnał. DebateAI Cię nie śledzi, więc taki sygnał nie ma czego wyłączyć: usługa działa tak samo z nim i bez niego." },
+      { kind: "p", text: "Żaden inny podmiot nie zbiera za pośrednictwem Dialectical Engine informacji o Twojej aktywności w internecie na przestrzeni czasu i w różnych witrynach." },
+      { kind: "p", text: "Przeglądarki mogą wysyłać sygnał „Do Not Track” lub podobny sygnał. Dialectical Engine Cię nie śledzi, więc taki sygnał nie ma czego wyłączyć: usługa działa tak samo z nim i bez niego." },
       { kind: "p", text: "Aby odmówić tych elementów, zablokuj lub usuń pliki cookie i dane witryny dla tej witryny w ustawieniach przeglądarki. Co wtedy przestaje działać: logowanie oraz zapamiętywanie Twojego wyboru języka i trybu wyświetlania; powiadomienie o plikach cookie również pojawi się ponownie." }
     ]
   },
@@ -242,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Gdy zmieniamy niniejszą politykę, publikujemy nową wersję wraz z podsumowaniem zmian i nową datą wejścia w życie, a poprzednie wersje zachowujemy pod adresem [dezbatere.ro/privacy/versions]. O zmianie wprowadzającej nowy cel lub nowego odbiorcę informujemy Cię przed rozpoczęciem nowego przetwarzania, pocztą elektroniczną i w produkcie, oraz zapewniamy czas na wniesienie sprzeciwu. Jeżeli nowy cel zależy od Twojej zgody — na przykład gdybyśmy kiedykolwiek chcieli wykorzystać treści do ulepszania modeli — prosimy o tę zgodę osobno i w sposób konkretny; nigdy nie traktujemy akceptacji zaktualizowanych Warunków świadczenia usług jako zgody na nowe przetwarzanie. W przypadku wyjaśnień, które nie zmieniają naszych działań, po prostu publikujemy nową wersję." },
-      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana [date]. Wersja 3.1 zastąpiła wersję 2.1, która opisywała dane sesji, okresy przechowywania, analitykę, eksport oraz wpływ usunięcia konta na opublikowane debaty w sposób nieodzwierciedlający już działania usługi." }
+      { kind: "p", text: "Niniejsza polityka została ostatnio zaktualizowana [date]. Wersja 3.2 zastąpiła wersję 2.1, która opisywała dane sesji, okresy przechowywania, analitykę, eksport oraz wpływ usunięcia konta na opublikowane debaty w sposób nieodzwierciedlający już działania usługi." }
     ]
   },
   {
@@ -315,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraina (tylko jeśli wymieniona)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Zastosowanie ma ukraińska ustawa „O ochronie danych osobowych”. Nie oferujemy DebateAI na obszarach Ukrainy, które nie są kontrolowane przez jej rząd. Twoje dane trafiają do państw UE i Stanów Zjednoczonych (zob. Rejestr). Możesz złożyć skargę do Ukrainian Parliament Commissioner for Human Rights." }
+      { kind: "p", text: "Zastosowanie ma ukraińska ustawa „O ochronie danych osobowych”. Nie oferujemy Dialectical Engine na obszarach Ukrainy, które nie są kontrolowane przez jej rząd. Twoje dane trafiają do państw UE i Stanów Zjednoczonych (zob. Rejestr). Możesz złożyć skargę do Ukrainian Parliament Commissioner for Human Rights." }
     ]
   },
   {
@@ -346,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.1",
-  sha256: "4e82041539c4398066b12da86a12bfd29fff8e36ff72186f6bbe926890cdf5a6",
-  eyebrow: "POLITYKA PRYWATNOŚCI · v3.1 · OBOWIĄZUJE OD [DATE]",
+  version: "3.2",
+  sha256: "0bf712afb038641da219d1effa5000c61decba4e8874a66e329f1d7eaf19d0e6",
+  eyebrow: "POLITYKA PRYWATNOŚCI · v3.2 · OBOWIĄZUJE OD [DATE]",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",
-  endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.1",
+  endMarker: "KONIEC POLITYKI · RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679) · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst Polityki prywatności",
   sectionIdPrefix: "policy-section-",

@@ -202,8 +202,13 @@ describe("P1a — billing tables are append-only and guarded", () => {
     const source = await readFile(new URL("../../migrations/0093_billing_runtime_role.sql", import.meta.url), "utf8");
     const contract = /DO \$billing_0093_contract\$[\s\S]*?\$billing_0093_contract\$;/u.exec(source)?.[0];
     expect(contract).toBeDefined();
+    const names=JSON.parse(await readFile(new URL('../fixtures/dev95-ledger-names.json',import.meta.url),'utf8')) as string[];
+    expect(names).toHaveLength(103);
+    const historical=await startTestDatabase();
+    try {
+    for(const name of names) await historical.pool.query(await readFile(new URL(`../../migrations/${name}`,import.meta.url),'utf8'));
     const replay = async (drift: string): Promise<string> => {
-      const client = await database.pool.connect();
+      const client = await historical.pool.connect();
       try {
         await client.query("BEGIN");
         await client.query(drift);
@@ -236,6 +241,7 @@ describe("P1a — billing tables are append-only and guarded", () => {
       .toMatch(/^BILLING_0093_RUNTIME_READS /u);
     expect(await replay("GRANT EXECUTE ON FUNCTION billing.owner_age_frozen(uuid) TO debateai_runtime"))
       .toMatch(/^BILLING_0093_RUNTIME_FUNCTIONS /u);
+    } finally { await historical.stop(); }
   });
 
   it("queues every job kind the billing jobs use, the refund executor and the yearly purge included (R-30)", async () => {

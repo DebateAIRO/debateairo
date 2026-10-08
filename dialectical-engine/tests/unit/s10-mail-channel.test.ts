@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+import { mailAlternatives } from "../support/accountMail.js";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,7 +28,7 @@ describe("S10 own-sendmail security notification adapter", () => {
       const messageId = "11111111-1111-4111-8111-111111111111";
       const executeAt = new Date("2026-08-31T00:00:00.000Z");
       for (const [eventKind, expected] of [
-        ["SCHEDULED", "Deletion is scheduled for 2026-08-31T00:00:00.000Z."],
+        ["SCHEDULED", "Deletion is scheduled for 31 August 2026 at 00:00 GMT+0 (UTC)."],
         ["CANCELLED", "The scheduled account deletion was cancelled."],
         ["COMPLETION", "Your account deletion has entered its irreversible completion step."]
       ] as const) {
@@ -37,10 +39,13 @@ describe("S10 own-sendmail security notification adapter", () => {
           executeAt
         });
         const message = readFileSync(capture, "utf8");
-        expect(message).toContain("From: noreply@debateai.test\r\n");
+        expect(message).toContain("From: dezbatere.ro <noreply@debateai.test>\r\n");
         expect(message).toContain("To: person@example.test\r\n");
         expect(message).toContain(`Message-ID: <${messageId}@debateai.local>\r\n`);
-        expect(message).toContain(expected);
+        expect(mailAlternatives(message).text).toContain(expected);
+        const html=new DOMParser().parseFromString(mailAlternatives(message).html,"text/html");
+        expect(html.body.textContent).toContain(expected);
+        expect(html.documentElement.lang).toBe("en");
         expect(message).not.toContain("DELETE MY ACCOUNT");
       }
       await expect(sender.sendSecurityNotification({

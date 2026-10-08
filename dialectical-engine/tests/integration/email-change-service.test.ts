@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { migrate, PostgresEmailChangeRepository } from "@debateai/db";
+import { createPool, migrate, PostgresEmailChangeRepository, type Pool } from "@debateai/db";
 import {
   createEmailBlindIndex,
   encrypt,
@@ -19,6 +19,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 // only as purpose-bound hashes, and the mail port carries every link.
 
 let database: TestDatabase;
+let authorization: Pool;
 
 const blindIndexKey = Buffer.alloc(32, 0x5a);
 const source = Object.freeze({ ip: "192.0.2.41", userAgent: "T14 Service", requestId: "request:t14s" });
@@ -45,12 +46,12 @@ function addressAad(userId: string, field: "user.email_ciphertext" | "user.recov
   return ["identity", field, userId, "run:none", userId, `user-dek:${userId}`, "1"] as const;
 }
 
-async function fixtureAccount(email: string, recoveryEmail = `recovery.${email}`): Promise<Account> {
+async function fixtureAccount(email: string, recoveryEmail: string | null = `recovery.${email}`): Promise<Account> {
   const userId = randomUUID();
   const dek = generateDek();
   await users.store(userId, dek);
   const emailCiphertext = encrypt(dek, Buffer.from(email, "utf8"), addressAad(userId, "user.email_ciphertext"));
-  const recoveryCiphertext = encrypt(dek, Buffer.from(recoveryEmail, "utf8"),
+  const recoveryCiphertext = recoveryEmail === null ? null : encrypt(dek, Buffer.from(recoveryEmail, "utf8"),
     addressAad(userId, "user.recovery_email_ciphertext"));
   await database.pool.query(`
     INSERT INTO identity."user" (
@@ -58,11 +59,12 @@ async function fixtureAccount(email: string, recoveryEmail = `recovery.${email}`
       phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at
     ) VALUES ($1,$2,$3::jsonb,$4::jsonb,NULL,'$argon2id$fixture',$5,$6,$7,'active',now(),now())
   `, [userId, createEmailBlindIndex(blindIndexKey, email), JSON.stringify(emailCiphertext),
-    JSON.stringify(recoveryCiphertext), `t14s-${userId.slice(0, 12)}`, randomUUID(), randomUUID()]);
+    recoveryCiphertext === null ? null : JSON.stringify(recoveryCiphertext), `t14s-${userId.slice(0, 12)}`, randomUUID(), randomUUID()]);
   await database.pool.query(`
     INSERT INTO identity.channel_binding (user_id,channel_type,address_ciphertext,state,created_at,verified_at)
-    VALUES ($1,'email',$2::jsonb,'verified',now(),now()),($1,'recovery_email',$3::jsonb,'verified',now(),now())
-  `, [userId, JSON.stringify(emailCiphertext), JSON.stringify(recoveryCiphertext)]);
+    VALUES ($1,'email',$2::jsonb,'verified',now(),now())
+  `, [userId, JSON.stringify(emailCiphertext)]);
+  if (recoveryCiphertext !== null) await database.pool.query(`INSERT INTO identity.channel_binding(user_id,channel_type,address_ciphertext,state,created_at,verified_at) VALUES($1,'recovery_email',$2::jsonb,'verified',now(),now())`, [userId, JSON.stringify(recoveryCiphertext)]);
   const sessionId = randomUUID();
   await database.pool.query(`
     INSERT INTO identity.session (
@@ -87,7 +89,7 @@ async function grantFor(account: Account): Promise<string> {
 function harness(overrides: Partial<{ resendCooldownMs: number }> = {}) {
   const mail = new MemoryEmailChangeMailSender();
   const service = new EmailChangeService({
-    repository: new PostgresEmailChangeRepository(database.pool, fakeAuditHasher),
+    repository: new PostgresEmailChangeRepository(authorization, fakeAuditHasher),
     users,
     blindIndexKey,
     mail,
@@ -107,9 +109,12 @@ async function expectCode(operation: Promise<unknown>, code: string): Promise<vo
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  const url = new URL(database.connectionString);
+  url.searchParams.set("options", "-c role=debateai_authorization_runtime");
+  authorization = createPool(url.toString());
 }, 120_000);
 
-afterAll(async () => database?.stop());
+afterAll(async () => { await authorization?.end(); await database?.stop(); });
 
 describe("Turn 14 change-email service", () => {
   it("reads the current and recovery addresses with no change pending", async () => {
@@ -117,6 +122,15 @@ describe("Turn 14 change-email service", () => {
     const { service } = harness();
     await expect(service.settings(session(account))).resolves.toEqual({
       email: "ana.popescu@unibuc.ro", recoveryEmail: "a.popescu@proton.me", pending: null
+    });
+  });
+
+  it("reads Settings when recovery email is absent", async () => {
+    expect((await authorization.query("SELECT current_user AS role")).rows[0].role).toBe("debateai_authorization_runtime");
+    const account = await fixtureAccount(`no-recovery.${randomUUID()}@example.test`, null);
+    const { service } = harness();
+    await expect(service.settings(session(account))).resolves.toEqual({
+      email: account.email, recoveryEmail: null, pending: null
     });
   });
 

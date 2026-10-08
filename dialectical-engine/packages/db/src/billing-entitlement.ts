@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
+import type { FundingBasis } from "@debateai/kernel";
 
 /**
  * PAID PLANS, Part 1b (spec 2026-09-29 §2.4.2-§2.4.3; R1 A6, A8, A20) — WHO HAS
@@ -193,16 +194,41 @@ export class EntitlementRepository {
   }
 
   async recordRunChargeScope(client: PoolClient, input: Readonly<{
-    runId: string;
-    ownerRef: string;
-    planId: EntitlementPlanId;
-    entitlementEventId: string;
-    admittedAt: Date;
-  }>): Promise<void> {
+    runId: string; ownerRef: string; admittedAt: Date;
+  }> & (Readonly<{ planId: EntitlementPlanId; entitlementEventId: string }> | Readonly<{ basis: FundingBasis }>)): Promise<void> {
+    if ("basis" in input && input.basis.kind === "INTERNAL") {
+      if (!UUID_V4.test(input.basis.grantId) || !UUID_V4.test(input.basis.grantEventId)) {
+        throw new TypedDomainError("RUN_FUNDING_BASIS_INVALID", "The internal grant basis is malformed");
+      }
+      await client.query("SELECT billing.record_internal_charge_scope($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::timestamptz)",
+        [input.runId, ownerRefOf(input.ownerRef), input.basis.grantId, input.basis.grantEventId, input.admittedAt]);
+      return;
+    }
+    const subscription = "basis" in input ? input.basis : input;
+    if (!("planId" in subscription) || !("entitlementEventId" in subscription)) throw new TypedDomainError("RUN_FUNDING_BASIS_INVALID", "A subscription basis is required");
     await client.query(
       `INSERT INTO billing.run_charge_scope (run_id, owner_ref, plan_id, entitlement_event_id, admitted_at)
        VALUES ($1::uuid, $2::uuid, $3, $4::uuid, $5)`,
-      [input.runId, ownerRefOf(input.ownerRef), input.planId, input.entitlementEventId, input.admittedAt]
+      [input.runId, ownerRefOf(input.ownerRef), subscription.planId, subscription.entitlementEventId, input.admittedAt]
     );
+  }
+
+  async readRunFundingBasis(runId: string): Promise<FundingBasis | null> {
+    if (!UUID_V4.test(runId)) throw new TypedDomainError("RUN_FUNDING_BASIS_INVALID", "A run identifier must be a UUID v4");
+    const result = await this.pool.query<{ value: unknown }>("SELECT billing.read_run_funding_basis($1::uuid) AS value", [runId]);
+    const value = result.rows[0]?.value;
+    if (value === null) return null;
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      const basis = value as Record<string, unknown>;
+      if (basis.kind === "SUBSCRIPTION" && Object.keys(basis).length === 3 && ENTITLEMENT_PLAN_IDS.includes(basis.planId as EntitlementPlanId)
+        && typeof basis.entitlementEventId === "string" && UUID_V4.test(basis.entitlementEventId)) {
+        return Object.freeze({ kind: "SUBSCRIPTION", planId: basis.planId as EntitlementPlanId, entitlementEventId: basis.entitlementEventId });
+      }
+      if (basis.kind === "INTERNAL" && Object.keys(basis).length === 3 && typeof basis.grantId === "string" && UUID_V4.test(basis.grantId)
+        && typeof basis.grantEventId === "string" && UUID_V4.test(basis.grantEventId)) {
+        return Object.freeze({ kind: "INTERNAL", grantId: basis.grantId, grantEventId: basis.grantEventId });
+      }
+    }
+    throw new TypedDomainError("RUN_FUNDING_BASIS_INVALID", "A stored run has a malformed funding basis");
   }
 }

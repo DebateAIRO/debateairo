@@ -1,0 +1,32 @@
+const FROM='noreply@dezbatere.ro', YAHOO='REDACTED_INSTALLED_RECIPIENT', OWNED_GMAIL='REDACTED_INSTALLED_RECIPIENT', ORIGIN='https://v3-preview.dezbatere.ro';
+const subjects=Object.freeze({PROOF:'Continue your DebateAI account recovery',STARTED:'DebateAI account recovery started',COMPLETED:'Your DebateAI password was changed',CANCELLED:'DebateAI account recovery cancelled',REFUSED:'DebateAI account recovery stopped'});
+const statements=Object.freeze({STARTED:'An account recovery request was started for your DebateAI account.',COMPLETED:'Your password and authenticator were replaced after account recovery. All previous sessions and recovery codes were revoked. Sign in with your new password and authenticator.',CANCELLED:'The account recovery request was cancelled.',REFUSED:'The account recovery request was stopped. Your password was not changed.'});
+const refused=()=>{throw new Error('OWNED_RECOVERY103_MAIL_REFUSED');};
+export function ownedRecoveryRoute103(raw) {
+ if(!Buffer.isBuffer(raw)||raw.length<1||raw.length>16384)refused();
+ let text;try{text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(raw);}catch{refused();}
+ if(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)||/[\r\n]/.test(text.replaceAll('\r\n','')))refused();
+ const lines=text.split('\r\n');
+ if(lines[0]!==`From: ${FROM}`||![`To: ${YAHOO}`,`To: ${OWNED_GMAIL}`].includes(lines[1])||lines[4]!=='MIME-Version: 1.0'||lines[5]!=='Content-Type: text/plain; charset=UTF-8'||lines[6]!=='')refused();
+ if(!/^Message-ID: <recovery-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}@v3-preview\.dezbatere\.ro>$/.test(lines[3]))refused();
+ const event=Object.keys(subjects).find(kind=>lines[2]===`Subject: ${subjects[kind]}`);if(!event)refused();
+ const recipient=lines[1].slice(4);if(event==='PROOF'&&recipient!==YAHOO)refused();
+ const body=lines.slice(7);let expected;
+ if(event==='PROOF') {
+  const link=body[3],expires=body[5];
+  if(!/^https:\/\/v3-preview\.dezbatere\.ro\/recover-password#token=[A-Za-z0-9_-]{43}$/.test(link))refused();
+  const date=/^This link expires at (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\.$/.exec(expires);
+  if(!date||!Number.isFinite(new Date(date[1]).getTime())||new Date(date[1]).toISOString()!==date[1])refused();
+  expected=['Hello,','','Open this link to continue recovering your account:',link,'',expires,'You will also need one saved unused recovery code, then a new password and authenticator. The email link alone cannot reset your password.','If you did not request this, use the cancellation link in the separate security notice.','','The DebateAI team',''];
+ } else if(event==='STARTED') {
+  const link=body[5];if(!/^https:\/\/v3-preview\.dezbatere\.ro\/recover-password#cancel=[A-Za-z0-9_-]{43}$/.test(link))refused();
+  expected=['Hello,','',statements[event],'','If this was not you, open this link and confirm cancellation:',link,'Cancelling does not change your password. New recovery requests will pause for 24 hours.','','The DebateAI team',''];
+ } else expected=['Hello,','',statements[event],'','The DebateAI team',''];
+ if(JSON.stringify(body)!==JSON.stringify(expected))refused();
+ return Object.freeze({recipient,message:Buffer.from(raw),event});
+}
+/** The complete required historical recipient set must be reviewed before enabling the worker. */
+export function assertOwnedRecoveryRecipients103(recipients) {
+ if(!Array.isArray(recipients)||recipients.length<2||recipients.length>32||recipients.some(value=>![YAHOO,OWNED_GMAIL].includes(value))||!recipients.includes(YAHOO)||!recipients.includes(OWNED_GMAIL))refused();
+ return Object.freeze({approvedRecipientCount:2,requiredChannelCount:recipients.length,origin:ORIGIN,from:FROM});
+}

@@ -47,11 +47,11 @@ const DOCUMENTS = {
   privacy: {
     key: "privacy",
     manifestKind: "PRIVACY",
-    reacceptanceFrom: "3.1",
+    reacceptanceFrom: "3.2",
     draft: "privacy-policy.md",
     module: "privacyPolicy.ts",
     englishOutput: "apps/ui/lib/privacyPolicy.ts",
-    versionAnchor: "Version 3.1",
+    versionAnchor: "Version 3.2",
     numberedSections: 14,
     annexLetter: "B",
     annexParts: 11,

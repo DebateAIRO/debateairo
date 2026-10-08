@@ -1,6 +1,6 @@
 import { PLAN_TIER_ROSTERS, type AskApplied, type AskRequest, type PlanTier } from "@debateai/contract";
 import type { CostEstimator, PersonAllowanceSource } from "@debateai/budget";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, type FundingBasis } from "@debateai/kernel";
 import { planById, type BillingPlan, type BillingPlans, type PlanId } from "@debateai/register";
 
 /**
@@ -28,18 +28,20 @@ export type AskBilling = Readonly<{
   coarseFit: Readonly<{
     personAllowance: PersonAllowanceSource;
     spend: Readonly<{
-      readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number>;
-      readOwnerCountedHoldsMicros(ownerRef: string): Promise<number>;
+      readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?: FundingBasis, scope?: import("@debateai/budget").SpendScope): Promise<number>;
+      readOwnerCountedHoldsMicros(ownerRef: string, funding?: FundingBasis): Promise<number>;
     }>;
     estimator: CostEstimator;
   }>;
+  funding?: Readonly<{resolveAskFunding(ownerRef:string,now:Date):Promise<FundingBasis>}>;
   clock: () => Date;
 }>;
 
 export type BillingAskResolution = Readonly<{
   ask: AskRequest;
-  planId: PlanId;
-  entitlementEventId: string;
+  planId: PlanId | null;
+  entitlementEventId: string | null;
+  fundingBasis?: FundingBasis;
   normalised: boolean;
 }>;
 
@@ -124,6 +126,11 @@ export async function resolveBillingAsk(
   billing: AskBilling,
   now: Date
 ): Promise<BillingAskResolution> {
+  const funding = await billing.funding?.resolveAskFunding(ownerRef,now);
+  if (funding?.kind === "INTERNAL") {
+    const decided = ask.plan_tier === "premium" ? ask : Object.freeze({...ask,plan_tier:"premium" as const});
+    return Object.freeze({ask:decided,planId:null,entitlementEventId:null,fundingBasis:funding,normalised:decided !== ask});
+  }
   const entitlement = await billing.entitlements.current(ownerRef, now);
   const plan = planById(billing.plans, entitlement.planId);
   const normalised = normaliseAskForPlan(ask, plan);
@@ -131,6 +138,7 @@ export async function resolveBillingAsk(
     ask: normalised.ask,
     planId: plan.planId,
     entitlementEventId: entitlement.eventId,
+    ...(funding === undefined ? {} : {fundingBasis:funding}),
     normalised: normalised.normalised
   });
 }
@@ -148,6 +156,8 @@ export async function decideRoomSettings<T extends AskSettings>(
   billing: AskBilling | undefined
 ): Promise<T> {
   if (billing === undefined || ownerRef === null) return settings;
+  const basis = await billing.funding?.resolveAskFunding(ownerRef,billing.clock());
+  if (basis?.kind === "INTERNAL") return settings.plan_tier === "premium" ? settings : Object.freeze({...settings,plan_tier:"premium" as const});
   const entitlement = await billing.entitlements.current(ownerRef, billing.clock());
   return decideSettingsForPlan(settings, planById(billing.plans, entitlement.planId));
 }
@@ -194,14 +204,14 @@ export async function coarseFitFor(ask: AskRequest, ownerRef: string, billing: A
   const windows = await billing.coarseFit.personAllowance.read(ownerRef, now);
   if (windows.length === 0) return "AS_ASKED";
   const [holdsMicros, estimateMicros, spent] = await Promise.all([
-    billing.coarseFit.spend.readOwnerCountedHoldsMicros(ownerRef),
+    billing.coarseFit.spend.readOwnerCountedHoldsMicros(ownerRef,windows[0]?.funding),
     billing.coarseFit.estimator.estimateMicros({
       planTier: "premium",
       compositionBudgetTier: ask.composition_budget_tier,
       makerCount: PLAN_TIER_ROSTERS.premium.length,
       depth: ask.depth_params.depth
     }),
-    Promise.all(windows.map((window) => billing.coarseFit.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt)))
+    Promise.all(windows.map((window) => billing.coarseFit.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope)))
   ]);
   return decideCoarseFit({
     planTier: "premium",

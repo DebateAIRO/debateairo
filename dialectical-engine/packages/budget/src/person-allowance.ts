@@ -8,7 +8,7 @@
  * costEnvelopePolicy band's). An EMPTY list means no personal limit: billing off,
  * local mode, or a legacy asker with no owner_ref.
  */
-export type SpendScope = "SITE_DAY" | "PERSON_DAY" | "PERSON_WEEK" | "PERSON_MONTH";
+export type SpendScope = "SITE_DAY" | "PERSON_DAY" | "PERSON_WEEK" | "PERSON_MONTH" | "PERSON_GRANT";
 
 export type PersonWindow = Readonly<{
   scope: Exclude<SpendScope, "SITE_DAY">;
@@ -18,12 +18,14 @@ export type PersonWindow = Readonly<{
   periodStart: Date;
   /** When the next window starts; spend before this instant counts. */
   resetsAt: Date;
+  /** Exact internal grant pin; absent on historical customer windows. */
+  funding?: import("@debateai/kernel").FundingBasis;
   finishBasisPoints: number;
   closeBasisPoints: number;
 }>;
 
 export interface PersonAllowanceSource {
-  read(ownerRef: string, now: Date): Promise<ReadonlyArray<PersonWindow>>;
+  read(ownerRef: string, now: Date, context?: Readonly<{ runId: string }>): Promise<ReadonlyArray<PersonWindow>>;
 }
 
 /** The only source until billing is switched on: nobody has a personal limit. */

@@ -81,5 +81,6 @@
   "support.answerRating": "Bewertung der Antwort",
   "support.privacyPreferences": "Datenschutz",
   "support.aiBanner": "Antworten werden von KI erzeugt, maschinenlesbar gekennzeichnet und können fehlerhaft sein. Sie können jederzeit einen Menschen verlangen.",
-  "support.cookiePreferences": "Gespeicherte Cookies"
+  "support.cookiePreferences": "Gespeicherte Cookies",
+  "support.recoverAccount": "Konto wiederherstellen"
 }

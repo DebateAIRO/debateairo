@@ -2531,7 +2531,7 @@ describe("SUP-01 support routes", () => {
     ["Nu vreau să validez tokenul de resetare; arată pagina de recuperare a parolei.","ro"],
     ["Arată pagina pentru recuperarea p%61rolei.","ro"]
   ] as const).map((item,index) => [...item,`203.0.113.${100 + index}`] as const))(
-  "returns canonical deterministic unresolved Forgot password guidance without a model: %s", async (
+  "returns canonical deterministic first-party Forgot password guidance without a model: %s", async (
     requestText,language,clientIp
   ) => {
     const respond = vi.fn<SupportAnswerPort["respond"]>();
@@ -2552,7 +2552,7 @@ describe("SUP-01 support routes", () => {
     expect(response.json()).toMatchObject({
       outcome: "REFUSE_ZONE",
       text: expect.stringContaining("canonical:"),
-      sources: [],actions: []
+      sources: [],actions: [],refusal_link:"/recover"
     });
     expect(respond).not.toHaveBeenCalled();
     expect(write).toHaveBeenCalledTimes(2);
@@ -2876,6 +2876,7 @@ describe("SUP-01 support routes", () => {
       requireReviewedRecovery:true
     });
     expect(snapshot.entries).toHaveLength(46);
+    expect(snapshot.entries.map(entry=>`${entry.id}.${entry.lang}`)).toEqual(expect.arrayContaining(["settings-help-menus.en","settings-help-menus.ro"]));
     const complete = vi.fn(async () => Object.freeze({
       text:JSON.stringify({
         kind:"answer",text:"Alege Creează un cont.",

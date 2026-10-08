@@ -40,7 +40,7 @@ export interface EmailChangeSession {
 
 export interface EmailSettings {
   readonly email: string;
-  readonly recoveryEmail: string;
+  readonly recoveryEmail: string | null;
   readonly pending: Readonly<{ newEmail: string; expiresAt: Date }> | null;
 }
 
@@ -67,7 +67,7 @@ function addressAad(userId: string, field: "user.email_ciphertext" | "user.recov
   return ["identity", field, userId, "run:none", userId, `user-dek:${userId}`, "1"] as const;
 }
 
-function normalizedAddress(value: unknown): string {
+export function normalizedAddress(value: unknown): string {
   if (typeof value !== "string" || value.length > MAX_ADDRESS_LENGTH) throw new EmailChangeError("EMAIL_INVALID");
   let normalized: string;
   try {
@@ -114,7 +114,8 @@ export class EmailChangeService {
     if (record === null) return null;
     return this.withDek(session.userId, (dek) => Object.freeze({
       email: this.open(dek, session.userId, record.emailCiphertext, "user.email_ciphertext"),
-      recoveryEmail: this.open(dek, session.userId, record.recoveryEmailCiphertext, "user.recovery_email_ciphertext"),
+      recoveryEmail: record.recoveryEmailCiphertext === null ? null
+        : this.open(dek, session.userId, record.recoveryEmailCiphertext, "user.recovery_email_ciphertext"),
       pending: record.pending === null ? null : Object.freeze({
         newEmail: this.open(dek, session.userId, record.pending.newEmailCiphertext, "user.email_ciphertext"),
         expiresAt: record.pending.expiresAt

@@ -1,0 +1,6 @@
+// @vitest-environment jsdom
+import {act} from "react";
+import {expect,it,vi} from "vitest";
+import {SecurityEnrollment} from "../../apps/ui/components/auth/SecurityEnrollment.js";
+import {mount,unmount,click,input} from "./task11-harness.js";
+it("five digits send nothing, sixth sends once, unchanged rejection does not loop, edits retry",async()=>{const client={beginTotpEnrollment:vi.fn().mockResolvedValue({enrollment_token:"c".repeat(43),secret:"A".repeat(32),otpauthUri:"otpauth://totp/test?secret="+"A".repeat(32),expires_at:new Date(Date.now()+300000).toISOString()}),completeTotpEnrollment:vi.fn().mockRejectedValue(new Error("rejected"))};const {host,root}=await mount(<SecurityEnrollment authority={{kind:"pending",token:"b".repeat(43)}} client={client as any}/>);try{await click(host,"Use an authenticator app instead");await input(host,"input[name=code]","12345");expect(client.completeTotpEnrollment).not.toHaveBeenCalled();await input(host,"input[name=code]","123456");expect(client.completeTotpEnrollment).toHaveBeenCalledOnce();await act(async()=>host.querySelector("form")!.requestSubmit());expect(client.completeTotpEnrollment).toHaveBeenCalledOnce();await input(host,"input[name=code]","12345");await input(host,"input[name=code]","123456");expect(client.completeTotpEnrollment).toHaveBeenCalledTimes(2);}finally{await unmount(root,host);}});

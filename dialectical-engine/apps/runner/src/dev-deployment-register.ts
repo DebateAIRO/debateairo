@@ -1,3 +1,4 @@
+import { CONSUMER_RECOVERY_POLICY_REGISTER_ROW } from "@debateai/register";
 import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, readFile, rename, unlink } from "node:fs/promises";
@@ -19,10 +20,10 @@ import {
   ALGORITHM_REGISTER_ROW_KEYS,
   AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
   ENGINE_BAND_ORDER,
-  MFA_POLICY_REGISTER_ROW,
+  MFA_POLICY_DEPLOYMENT_REGISTER_ROW,
   PRODUCT_ROLE_POLICY_REGISTER_ROW,
   RECOVERY_POLICY_REGISTER_ROW,
-  SESSION_POLICY_REGISTER_ROW,
+  SESSION_POLICY_DEPLOYMENT_REGISTER_ROW,
   buildAlgorithmRegisterRows,
   buildStoryRegisterRows,
   loadBootstrapRegister,
@@ -33,6 +34,7 @@ import {
   computeRegisterSnapshotSha256,
   canonicalDecimal,
   canonicalRegisterJson,
+  composeStaffPolicyRegisterPublicationRows,
   createPostgresRegisterPublicationPort,
   parseCanonicalRegisterJson,
   parseRegisterVersionText,
@@ -691,9 +693,10 @@ function developmentRows(
     // rows (`passwordPolicy` with `max_length`). The sealed historical set is
     // published unchanged by `persistBootstrapRegister` at its own version.
     ...AUTH_POLICY_DEPLOYMENT_REGISTER_ROWS,
-    MFA_POLICY_REGISTER_ROW,
-    SESSION_POLICY_REGISTER_ROW,
+    MFA_POLICY_DEPLOYMENT_REGISTER_ROW,
+    SESSION_POLICY_DEPLOYMENT_REGISTER_ROW,
     RECOVERY_POLICY_REGISTER_ROW,
+    CONSUMER_RECOVERY_POLICY_REGISTER_ROW,
     PRODUCT_ROLE_POLICY_REGISTER_ROW,
     // DL1-F2/DL1-F7: the SUPERSEDING admission row, on the same precedent as
     // V-14's authentication rows above. The sealed three-scope row stays the
@@ -1007,4 +1010,17 @@ export async function seedDevelopmentDeploymentRegister(
   });
   await writeDevelopmentDeploymentRegisterReceipt(resolve(input.repositoryRoot), receipt);
   return receipt;
+}
+
+/** Future-release proposal only; default development seeding and historical bootstrap retain v1. */
+export async function buildDevelopmentStaffV2DeploymentRegisterPublicationRows(
+  bootstrap: BootstrapRegister,
+  providerPanel: DevelopmentProviderPanel,
+  roleRefs: DevelopmentSynthesisRoleRefs = deriveSynthesisRoleRefs(providerPanel.configuredProviders),
+  deployment: "local" | "hosted" = "local",
+  internalAllowance?: Extract<import("@debateai/kernel").InternalAllowancePolicy, { enabled: true }>
+): Promise<readonly RegisterPublicationRow[]> {
+  return composeStaffPolicyRegisterPublicationRows(
+    await buildDevelopmentDeploymentRegisterPublicationRows(bootstrap, providerPanel, roleRefs, deployment), { policyVersion: 2, ...(internalAllowance === undefined ? {} : { internalAllowance }) }
+  );
 }

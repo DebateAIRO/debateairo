@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "saada luettelon kaikista kolmansista osapuolista, jotka ovat saaneet niitä;",
   "legal.health.s05.item3": "peruuttaa suostumuksesi ja pyytää tietojen poistamista.",
   "legal.health.s06.title": "Näin käytät oikeuksiasi",
-  "legal.health.s06.body": "Kohdassa Asetukset tai kirjoittamalla osoitteeseen privacy@dezbatere.ro. Vastaamme 45 päivän kuluessa. Jos hylkäämme pyynnön, voit valittaa päätöksestä vastaamalla vastaukseemme."
+  "legal.health.s06.body": "Kohdassa Asetukset tai kirjoittamalla osoitteeseen privacy@dezbatere.ro. Vastaamme 45 päivän kuluessa. Jos hylkäämme pyynnön, voit valittaa päätöksestä vastaamalla vastaukseemme.",
+  "legal.cookies.staff.purpose": "Erillinen henkilöstön käyttöoikeus",
+  "legal.cookies.passwordReset.purpose": "Vain salasanan palautus",
+  "legal.cookies.mfaRecovery.purpose": "Vain todentimen palautus",
+  "legal.cookies.social.purpose": "Lyhyt palveluntarjoajakirjautuminen tai tilin liittäminen",
+  "legal.cookies.phoneDraft.purpose": "Keskeneräinen kysymys puhelinvaiheen aikana; poistetaan istunnon vaihtuessa, uloskirjautuessa tai omistajan vaihtuessa",
+  "legal.cookies.staff.life": "Enintään 8 tuntia; 15 minuuttia käyttämättömyyttä",
+  "legal.cookies.passwordReset.life": "Enintään 30 minuuttia",
+  "legal.cookies.mfaRecovery.life": "Enintään 299 sekuntia",
+  "legal.cookies.social.life": "Enintään 5 minuuttia",
+  "legal.cookies.phoneDraft.life": "15 minuuttia tai aiempaan poistamiseen asti"
 }

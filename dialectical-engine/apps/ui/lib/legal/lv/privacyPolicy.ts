@@ -120,7 +120,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Debates ir privātas līdz brīdim, kad tās publicējat. Publicēšana ir apzināta, atsevišķi apstiprināta darbība. Publicētās debatēs tiek parādīts jūsu pseidonīms, jūsu jautājums tieši tādā veidā, kā to uzrakstījāt, argumentu koks, vērtējumi, spriedums un ticamības pakāpe, kā arī redzams marķējums, ka saturu ir ģenerējis MI. Tajās nekad netiek parādīta jūsu e-pasta adrese, sesiju ieraksti vai konta vēsture. Meklētājprogrammas var indeksēt publicētās debates." },
-      { kind: "p", text: "Publikācijas atcelšana noņem debates no DebateAI un iznīcina mūsu publiskās kopijas atslēgu. Kopijas, kuras jau ir izveidojuši lasītāji, meklētājprogrammas vai arhīvi, nav mūsu kontrolē, un mēs nevaram tās atsaukt." },
+      { kind: "p", text: "Publikācijas atcelšana noņem debates no Dialectical Engine un iznīcina mūsu publiskās kopijas atslēgu. Kopijas, kuras jau ir izveidojuši lasītāji, meklētājprogrammas vai arhīvi, nav mūsu kontrolē, un mēs nevaram tās atsaukt." },
       { kind: "p", text: "Kad dzēšat savu kontu, mēs bez nepamatotas kavēšanās un ne vēlāk kā 30 dienu laikā liedzam publisku piekļuvi visām jūsu publicētajām debatēm, ja vien tiesību akti neprasa mums saglabāt konkrētu vienumu. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -199,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Debatēs minētas personas, kuras nav mūsu lietotāji",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Ja kāds pakalpojumam DebateAI uzdod jautājumu, kurā esat minēts, mūsu rīcībā var būt jūsu personas dati, lai gan jūs nekad neesat izmantojis pakalpojumu. Noteikumi aizliedz lietotājiem tā rīkoties, un mēs samazinām MI pakalpojumu sniedzējiem nosūtāmās informācijas apjomu, tomēr tas notiek." },
+      { kind: "p", text: "Ja kāds pakalpojumam Dialectical Engine uzdod jautājumu, kurā esat minēts, mūsu rīcībā var būt jūsu personas dati, lai gan jūs nekad neesat izmantojis pakalpojumu. Noteikumi aizliedz lietotājiem tā rīkoties, un mēs samazinām MI pakalpojumu sniedzējiem nosūtāmās informācijas apjomu, tomēr tas notiek." },
       { kind: "p", text: "Šī sadaļa ir paziņojums, kas mums jums jāsniedz saskaņā ar GDPR 14. pantu. Dati ir lietotāja ievadītais un dzinēja atbildē ģenerētais saturs; avots ir šis lietotājs; nolūki un tiesiskais pamats ir norādīti 4. sadaļā; saņēmēji ir Reģistrā minētie MI pakalpojumu sniedzēji; glabāšana notiek saskaņā ar 7. sadaļu. Jums ir visas 10. sadaļā minētās tiesības, un jo īpaši jūs varat pieprasīt mums noņemt publicētas vai privātas debates, kas satur jūsu datus, un paziņot, kādi dati ir mūsu rīcībā. Lai to darītu, jums nav vajadzīgs konts. Rakstiet uz privacy@dezbatere.ro vai izmantojiet vadīklu Ziņot jebkurās publicētās debatēs; mēs bez nepamatotas kavēšanās rīkojamies attiecībā uz pamatotiem pieprasījumiem. Mēs nevaram jūs individuāli informēt, kad tas notiek, jo nezinām, kas jūs esat vai kā ar jums sazināties; tā vietā mēs nodrošinām šo publisko paziņojumu un noņemšanas iespēju." },
       { kind: "p", text: "Tas pats attiecas uz sensitīvu informāciju par jums — politiku, veselību, reliģiju —, kas parādās citas personas jautājumā. Pēc tam, kad esat iebildis, neviens juridiskais nosacījums mums neļauj turpināt tās apstrādi, un mēs to nedarīsim." }
     ]
@@ -209,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Bērni",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI ir paredzēts pieaugušajiem. Reģistrējoties jūs apstiprināt, ka esat vismaz 18 gadus vecs, un mēs apzināti neapstrādājam nevienas personas, kas jaunāka par 18 gadiem, datus. Ja uzzinām, ka konts pieder personai, kura ir jaunāka par 18 gadiem, mēs to slēdzam un dzēšam datus, kā aprakstīts 7. sadaļā. Dažās valstīs apstiprinājums tiek uzskatīts par nepietiekamu vai tiek prasīts vairāk; B pielikumā ir norādīts, kas ir piemērojams katrā vietā, un Noteikumos ir paskaidrota mūsu rīcība." }
+      { kind: "p", text: "Dialectical Engine ir paredzēts pieaugušajiem. Reģistrējoties jūs apstiprināt, ka esat vismaz 18 gadus vecs, un mēs apzināti neapstrādājam nevienas personas, kas jaunāka par 18 gadiem, datus. Ja uzzinām, ka konts pieder personai, kura ir jaunāka par 18 gadiem, mēs to slēdzam un dzēšam datus, kā aprakstīts 7. sadaļā. Dažās valstīs apstiprinājums tiek uzskatīts par nepietiekamu vai tiek prasīts vairāk; B pielikumā ir norādīts, kas ir piemērojams katrā vietā, un Noteikumos ir paskaidrota mūsu rīcība." }
     ]
   },
   {
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Sīkdatnes",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI izmanto astoņus elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai DebateAI: četras sīkdatnes un četrus ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. Sīkdatņu politikā vietnē [dezbatere.ro/cookies] tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits." },
+      { kind: "p", text: "Dialectical Engine izmanto 18 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 5 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. Sīkdatņu politikā vietnē [dezbatere.ro/cookies] tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits." },
       {
         kind: "list",
         items: [
@@ -225,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Sīkdatne — Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. — 14 dienas",
         "__Host-debateai-age-refusal — Sīkdatne (HttpOnly) — Pēc noraidītas vecuma pārbaudes 30 dienas neļauj šai pārlūkprogrammai mēģināt vēlreiz. Tajā ir tikai vārds “noraidīts”, nekādu personas datu. — 30 dienas",
         "debateai.locale — Sīkdatne — Atceras jūsu izvēlēto saskarnes valodu. — 1 gads",
+        "__Host-debateai-staff — Sīkdatne (HttpOnly) — Atsevišķa personāla piekļuve — Līdz 8 stundām; 15 minūtes neaktivitātes",
+        "__Host-debateai-staff-csrf — Sīkdatne — Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. — Līdz 8 stundām; 15 minūtes neaktivitātes",
+        "__Host-debateai-password-reset — Sīkdatne (HttpOnly) — Tikai paroles atiestatīšana — Līdz 30 minūtēm",
+        "__Host-debateai-password-reset-csrf — Sīkdatne — Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. — Līdz 30 minūtēm",
+        "__Host-debateai-mfa-recovery — Sīkdatne (HttpOnly) — Tikai autentifikatora atkopšana — Līdz 299 sekundēm",
+        "__Host-debateai-mfa-recovery-csrf — Sīkdatne — Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. — Līdz 299 sekundēm",
+        "__Host-debateai-social-flow — Sīkdatne (HttpOnly) — Īsa pakalpojuma sniedzēja pierakstīšanās vai konta sasaiste — Līdz 5 minūtēm",
+        "__Host-debateai-social-apple — Sīkdatne (HttpOnly) — Īsa pakalpojuma sniedzēja pierakstīšanās vai konta sasaiste — Līdz 5 minūtēm",
+        "__Host-debateai-social-browser — Sīkdatne (HttpOnly) — Īsa pakalpojuma sniedzēja pierakstīšanās vai konta sasaiste — Līdz 5 minūtēm",
         "debateai.consent — Lokālā krātuve — Atceras, ka esat redzējis paziņojumu par sīkdatnēm, tāpēc tas tiek parādīts tikai vienreiz. — Līdz jūs to notīrāt",
         "debateai.mode — Lokālā krātuve — Vai izmantojat gaišo vai tumšo režīmu. — Līdz jūs to notīrāt",
         "debateai.languageOffer.dismissed — Sesijas krātuve — Atceras šai cilnei, ka atteicāties no piedāvājuma rādīt debates citā valodā. — Līdz jūs aizverat cilni",
-        "debateai.support.conversation.v2 — Sesijas krātuve — Saglabā jūsu palīdzības tērzēšanas sarunu ekrānā, kamēr cilne ir atvērta. Tā tiek izdzēsta, kad šajā cilnē kāds pierakstās vai izrakstās. — Līdz jūs aizverat cilni"
+        "debateai.support.conversation.v2 — Sesijas krātuve — Saglabā jūsu palīdzības tērzēšanas sarunu ekrānā, kamēr cilne ir atvērta. Tā tiek izdzēsta, kad šajā cilnē kāds pierakstās vai izrakstās. — Līdz jūs aizverat cilni",
+        "debateai.phone-completion-draft.v1 — Sesijas krātuve — Nepabeigts jautājums tālruņa soļa laikā; dzēsts pie sesijas maiņas, izrakstīšanās vai īpašnieka maiņas — 15 minūtes vai līdz agrākai dzēšanai"
         ]
       },
-      { kind: "p", text: "Neviena cita puse ar DebateAI starpniecību nevāc informāciju par jūsu darbībām tiešsaistē laika gaitā un dažādās tīmekļa vietnēs." },
-      { kind: "p", text: "Pārlūkprogrammas var sūtīt signālu “Do Not Track” vai līdzīgu signālu. DebateAI jūs neizseko, tāpēc šādam signālam nav ko izslēgt: pakalpojums darbojas vienādi gan ar to, gan bez tā." },
+      { kind: "p", text: "Neviena cita puse ar Dialectical Engine starpniecību nevāc informāciju par jūsu darbībām tiešsaistē laika gaitā un dažādās tīmekļa vietnēs." },
+      { kind: "p", text: "Pārlūkprogrammas var sūtīt signālu “Do Not Track” vai līdzīgu signālu. Dialectical Engine jūs neizseko, tāpēc šādam signālam nav ko izslēgt: pakalpojums darbojas vienādi gan ar to, gan bez tā." },
       { kind: "p", text: "Lai atteiktos no šiem elementiem, pārlūkprogrammas iestatījumos bloķējiet vai dzēsiet šīs vietnes sīkdatnes un vietnes datus. Kas tad pārstāj darboties: pierakstīšanās un jūsu valodas un attēlojuma izvēles atcerēšanās; arī paziņojums par sīkdatnēm tiks parādīts atkārtoti." }
     ]
   },
@@ -242,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē [dezbatere.ro/privacy/versions]. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju." },
-      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta [date]. Versija 3.1 aizstāja versiju 2.1, kurā sesiju dati, glabāšanas termiņi, analītika, eksportēšana un dzēšanas ietekme uz publicētajām debatēm bija aprakstīti veidā, kas vairs neatspoguļoja pakalpojumu." }
+      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta [date]. Versija 3.2 aizstāja versiju 2.1, kurā sesiju dati, glabāšanas termiņi, analītika, eksportēšana un dzēšanas ietekme uz publicētajām debatēm bija aprakstīti veidā, kas vairs neatspoguļoja pakalpojumu." }
     ]
   },
   {
@@ -315,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukraina (tikai tad, ja norādīta)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Piemēro Ukrainas likumu „Par personas datu aizsardzību”. Mēs nepiedāvājam DebateAI tajās Ukrainas teritorijās, kuras nekontrolē tās valdība. Jūsu dati tiek nosūtīti uz ES valstīm un Amerikas Savienotajām Valstīm (skatīt Reģistru). Jūs varat iesniegt sūdzību Ukrainian Parliament Commissioner for Human Rights." }
+      { kind: "p", text: "Piemēro Ukrainas likumu „Par personas datu aizsardzību”. Mēs nepiedāvājam Dialectical Engine tajās Ukrainas teritorijās, kuras nekontrolē tās valdība. Jūsu dati tiek nosūtīti uz ES valstīm un Amerikas Savienotajām Valstīm (skatīt Reģistru). Jūs varat iesniegt sūdzību Ukrainian Parliament Commissioner for Human Rights." }
     ]
   },
   {
@@ -346,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.1",
-  sha256: "68ba642c8f450c7f7f2a59ab601efb1f35377b77460858fafbf1289c7dbbbd02",
-  eyebrow: "PRIVĀTUMA POLITIKA · v3.1 · SPĒKĀ NO [DATE]",
+  version: "3.2",
+  sha256: "1db871fd2177ad52a624e086047ee89c784775c01e97bfd88a9e41ea7763a537",
+  eyebrow: "PRIVĀTUMA POLITIKA · v3.2 · SPĒKĀ NO [DATE]",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",
-  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.1",
+  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privātuma politikas teksts",
   sectionIdPrefix: "policy-section-",

@@ -18,7 +18,8 @@ const STATIC_DIRECTIVES = Object.freeze([
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self'",
-  "connect-src 'self'",
+  "connect-src 'self' https://challenges.cloudflare.com",
+  "frame-src https://challenges.cloudflare.com",
   "object-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
@@ -109,10 +110,15 @@ export function cardFormContentSecurityPolicy(nonce, development, origins) {
     refuseOrigin();
   }
   const base = nonceContentSecurityPolicy(nonce, development);
-  const connect = origins.api === null ? origins.sdk : `${origins.sdk} ${origins.api}`;
-  return base
-    .replace(/script-src ([^;]+);/, `script-src $1 ${origins.sdk};`)
-    .replace("connect-src 'self';", `connect-src 'self' ${connect};`)
-    .replace("object-src 'none';", `frame-src 'self' ${origins.sdk}; object-src 'none';`)
-    .replace("form-action 'self';", `form-action 'self' ${origins.sdk};`);
+  const additions={
+    "script-src":[origins.sdk],
+    "connect-src":[origins.sdk,...(origins.api===null?[]:[origins.api])],
+    "frame-src":["'self'",origins.sdk],
+    "form-action":[origins.sdk]
+  };
+  return base.split("; ").map(directive=>{
+    const [name,...sources]=directive.split(" ");
+    if(!Object.hasOwn(additions,name))return directive;
+    return [name,...new Set([...sources,...additions[name]])].join(" ");
+  }).join("; ");
 }

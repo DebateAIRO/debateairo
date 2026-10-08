@@ -120,7 +120,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Debatten zijn privé totdat u ze publiceert. Publicatie is een bewuste handeling die afzonderlijk wordt bevestigd. Een gepubliceerd debat toont uw pseudoniem, uw vraag zoals u die hebt geschreven, de argumentboom, de scores, het oordeel en de zekerheidsband, en draagt een zichtbaar label dat de inhoud door AI is gegenereerd. Het toont nooit uw e-mailadres, sessiegegevens of accountgeschiedenis. Zoekmachines kunnen gepubliceerde debatten indexeren." },
-      { kind: "p", text: "Door de publicatie in te trekken, wordt het debat uit DebateAI verwijderd en wordt de sleutel tot onze openbare kopie vernietigd. Kopieën die reeds door lezers, zoekmachines of archieven zijn gemaakt, vallen buiten onze controle en kunnen wij niet terugroepen." },
+      { kind: "p", text: "Door de publicatie in te trekken, wordt het debat uit Dialectical Engine verwijderd en wordt de sleutel tot onze openbare kopie vernietigd. Kopieën die reeds door lezers, zoekmachines of archieven zijn gemaakt, vallen buiten onze controle en kunnen wij niet terugroepen." },
       { kind: "p", text: "Wanneer u uw account verwijdert, verwijderen wij elk door u gepubliceerd debat zonder onnodige vertraging en uiterlijk binnen 30 dagen uit de openbare toegang, tenzij de wet ons verplicht een specifiek item te bewaren. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -199,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Personen die in debatten worden genoemd maar geen gebruiker van ons zijn",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Als iemand DebateAI een vraag stelt waarin u wordt genoemd, kunnen wij persoonsgegevens over u bewaren, ook al hebt u de dienst nooit gebruikt. De Voorwaarden verbieden gebruikers dit te doen en wij beperken wat wij naar AI-aanbieders sturen tot een minimum, maar het gebeurt." },
+      { kind: "p", text: "Als iemand Dialectical Engine een vraag stelt waarin u wordt genoemd, kunnen wij persoonsgegevens over u bewaren, ook al hebt u de dienst nooit gebruikt. De Voorwaarden verbieden gebruikers dit te doen en wij beperken wat wij naar AI-aanbieders sturen tot een minimum, maar het gebeurt." },
       { kind: "p", text: "Dit hoofdstuk is de kennisgeving die wij u krachtens artikel 14 GDPR verschuldigd zijn. De gegevens zijn wat de gebruiker heeft ingevoerd en wat de engine als antwoord heeft gegenereerd; de bron is die gebruiker; de doeleinden en rechtsgrondslagen staan in hoofdstuk 4; de ontvangers zijn de AI-aanbieders in het Register; de bewaring volgt hoofdstuk 7. U hebt alle rechten uit hoofdstuk 10 en kunt ons in het bijzonder vragen een gepubliceerd of privédebat dat uw gegevens bevat te verwijderen en u te vertellen wat wij bewaren. Daarvoor hebt u geen account nodig. Schrijf naar privacy@dezbatere.ro of gebruik de knop Melden bij een gepubliceerd debat; wij handelen onderbouwde verzoeken zonder onnodige vertraging af. Wij kunnen u niet individueel informeren wanneer dit gebeurt, omdat wij niet weten wie u bent of hoe wij u kunnen bereiken; deze openbare kennisgeving en de verwijderingsmogelijkheid zijn de maatregelen die wij in plaats daarvan nemen." },
       { kind: "p", text: "Hetzelfde geldt voor gevoelige informatie over u — politiek, gezondheid, religie — die in de vraag van iemand anders voorkomt. Geen enkele rechtsgrond staat ons toe deze te blijven verwerken nadat u bezwaar hebt gemaakt, en dat zullen wij niet doen." }
     ]
@@ -209,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kinderen",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI is bestemd voor volwassenen. Bij uw registratie bevestigt u dat u 18 jaar of ouder bent, en wij verwerken niet bewust gegevens van personen jonger dan 18 jaar. Als wij vernemen dat een account toebehoort aan iemand jonger dan 18, sluiten wij het en verwijderen wij de gegevens zoals beschreven in hoofdstuk 7. Sommige landen vinden een bevestiging onvoldoende of vereisen meer; Bijlage B vermeldt wat waar van toepassing is en de Voorwaarden leggen uit wat wij daaraan doen." }
+      { kind: "p", text: "Dialectical Engine is bestemd voor volwassenen. Bij uw registratie bevestigt u dat u 18 jaar of ouder bent, en wij verwerken niet bewust gegevens van personen jonger dan 18 jaar. Als wij vernemen dat een account toebehoort aan iemand jonger dan 18, sluiten wij het en verwijderen wij de gegevens zoals beschreven in hoofdstuk 7. Sommige landen vinden een bevestiging onvoldoende of vereisen meer; Bijlage B vermeldt wat waar van toepassing is en de Voorwaarden leggen uit wat wij daaraan doen." }
     ]
   },
   {
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI gebruikt acht items, die alle strikt noodzakelijk zijn voor de dienst waarom u hebt gevraagd en die alle uitsluitend door DebateAI worden geplaatst: vier cookies en vier vermeldingen in de opslag van uw browser. Wij plaatsen geen analyse-, reclame- of trackingcookies. Het Cookiebeleid op [dezbatere.ro/cookies] vermeldt ze, met wat elk item doet en wie het ontvangt, en wordt gewijzigd voordat er iets anders wordt toegevoegd." },
+      { kind: "p", text: "Dialectical Engine gebruikt 18 items, die alle strikt noodzakelijk zijn voor de dienst waarom u hebt gevraagd en die alle uitsluitend door Dialectical Engine worden geplaatst: 13 cookies en 5 vermeldingen in de opslag van uw browser. Wij plaatsen geen analyse-, reclame- of trackingcookies. Het Cookiebeleid op [dezbatere.ro/cookies] vermeldt ze, met wat elk item doet en wie het ontvangt, en wordt gewijzigd voordat er iets anders wordt toegevoegd." },
       {
         kind: "list",
         items: [
@@ -225,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — 14 dagen",
         "__Host-debateai-age-refusal — Cookiebestand (HttpOnly) — Na een geweigerde leeftijdscontrole voorkomt deze dat deze browser het 30 dagen lang opnieuw probeert. Hij bevat alleen het woord ‘geweigerd’, geen persoonsgegevens. — 30 dagen",
         "debateai.locale — Cookiebestand — Onthoudt de interfacetaal die u hebt gekozen. — 1 jaar",
+        "__Host-debateai-staff — Cookiebestand (HttpOnly) — Afzonderlijke medewerkerstoegang — Tot 8 uur; 15 minuten inactiviteit",
+        "__Host-debateai-staff-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — Tot 8 uur; 15 minuten inactiviteit",
+        "__Host-debateai-password-reset — Cookiebestand (HttpOnly) — Alleen wachtwoordreset — Tot 30 minuten",
+        "__Host-debateai-password-reset-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — Tot 30 minuten",
+        "__Host-debateai-mfa-recovery — Cookiebestand (HttpOnly) — Alleen herstel van de authenticator — Tot 299 seconden",
+        "__Host-debateai-mfa-recovery-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — Tot 299 seconden",
+        "__Host-debateai-social-flow — Cookiebestand (HttpOnly) — Korte aanmelding via aanbieder of accountkoppeling — Tot 5 minuten",
+        "__Host-debateai-social-apple — Cookiebestand (HttpOnly) — Korte aanmelding via aanbieder of accountkoppeling — Tot 5 minuten",
+        "__Host-debateai-social-browser — Cookiebestand (HttpOnly) — Korte aanmelding via aanbieder of accountkoppeling — Tot 5 minuten",
         "debateai.consent — Lokale opslag — Onthoudt dat u de cookiemelding hebt gezien, zodat die maar één keer wordt getoond. — Totdat u dit wist",
         "debateai.mode — Lokale opslag — Of u de lichte of de donkere weergave gebruikt. — Totdat u dit wist",
         "debateai.languageOffer.dismissed — Sessieopslag — Onthoudt voor dit tabblad dat u het aanbod hebt afgeslagen om een debat in een andere taal te tonen. — Totdat u het tabblad sluit",
-        "debateai.support.conversation.v2 — Sessieopslag — Houdt uw gesprek met de hulpchat op het scherm zolang het tabblad open blijft. Het wordt gewist wanneer iemand zich in dit tabblad aanmeldt of afmeldt. — Totdat u het tabblad sluit"
+        "debateai.support.conversation.v2 — Sessieopslag — Houdt uw gesprek met de hulpchat op het scherm zolang het tabblad open blijft. Het wordt gewist wanneer iemand zich in dit tabblad aanmeldt of afmeldt. — Totdat u het tabblad sluit",
+        "debateai.phone-completion-draft.v1 — Sessieopslag — Onvoltooide vraag tijdens de telefoonstap; gewist bij sessiewisseling, afmelden of eigenaarswissel — 15 minuten of tot eerder wissen"
         ]
       },
-      { kind: "p", text: "Geen enkele andere partij verzamelt via DebateAI informatie over uw onlineactiviteiten in de loop van de tijd en over verschillende websites heen." },
-      { kind: "p", text: "Browsers kunnen een „Do Not Track”-signaal of een vergelijkbaar signaal verzenden. DebateAI volgt u niet, dus er is niets wat zo'n signaal kan uitschakelen: de dienst werkt hetzelfde met of zonder dat signaal." },
+      { kind: "p", text: "Geen enkele andere partij verzamelt via Dialectical Engine informatie over uw onlineactiviteiten in de loop van de tijd en over verschillende websites heen." },
+      { kind: "p", text: "Browsers kunnen een „Do Not Track”-signaal of een vergelijkbaar signaal verzenden. Dialectical Engine volgt u niet, dus er is niets wat zo'n signaal kan uitschakelen: de dienst werkt hetzelfde met of zonder dat signaal." },
       { kind: "p", text: "Om deze items te weigeren, blokkeert of verwijdert u cookies en sitegegevens voor deze site in uw browserinstellingen. Wat er dan niet meer werkt: het aanmelden en het onthouden van uw keuzes voor taal en weergave; ook de cookiemelding wordt opnieuw getoond." }
     ]
   },
@@ -242,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Wanneer wij dit beleid wijzigen, publiceren wij de nieuwe versie met een samenvatting van de wijzigingen en een nieuwe ingangsdatum, en bewaren wij eerdere versies op [dezbatere.ro/privacy/versions]. Bij een wijziging die een nieuw doel of een nieuwe ontvanger toevoegt, informeren wij u per e-mail en in het product voordat de nieuwe verwerking begint en geven wij u tijd om bezwaar te maken. Wanneer een nieuw doel afhankelijk is van uw toestemming — bijvoorbeeld als wij ooit inhoud zouden willen gebruiken om modellen te verbeteren — vragen wij die toestemming afzonderlijk en specifiek; wij beschouwen aanvaarding van bijgewerkte Voorwaarden nooit als toestemming voor nieuwe verwerking. Bij verduidelijkingen die niets veranderen aan wat wij doen, publiceren wij eenvoudigweg de nieuwe versie." },
-      { kind: "p", text: "Dit beleid is voor het laatst bijgewerkt op [date]. Versie 3.1 verving versie 2.1, waarin sessiegegevens, bewaartermijnen, analyse, export en het effect van verwijdering op gepubliceerde debatten werden beschreven op manieren die niet langer met de dienst overeenkwamen." }
+      { kind: "p", text: "Dit beleid is voor het laatst bijgewerkt op [date]. Versie 3.2 verving versie 2.1, waarin sessiegegevens, bewaartermijnen, analyse, export en het effect van verwijdering op gepubliceerde debatten werden beschreven op manieren die niet langer met de dienst overeenkwamen." }
     ]
   },
   {
@@ -315,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Oekraïne (alleen indien vermeld)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "De Oekraïense wet „Inzake de bescherming van persoonsgegevens” is van toepassing. Wij bieden DebateAI niet aan in de gebieden van Oekraïne die niet onder controle van de Oekraïense regering staan. Uw gegevens gaan naar EU-landen en de Verenigde Staten (zie het Register). U kunt een klacht indienen bij de Ukrainian Parliament Commissioner for Human Rights." }
+      { kind: "p", text: "De Oekraïense wet „Inzake de bescherming van persoonsgegevens” is van toepassing. Wij bieden Dialectical Engine niet aan in de gebieden van Oekraïne die niet onder controle van de Oekraïense regering staan. Uw gegevens gaan naar EU-landen en de Verenigde Staten (zie het Register). U kunt een klacht indienen bij de Ukrainian Parliament Commissioner for Human Rights." }
     ]
   },
   {
@@ -346,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.1",
-  sha256: "a895a4e1962aaa6f9efb81e7fa74916edb52858d7dbd248b604f85b4d9d91d3a",
-  eyebrow: "PRIVACYBELEID · v3.1 · VAN KRACHT OP [DATE]",
+  version: "3.2",
+  sha256: "03915e0570b40bd19a5dd033971fe725594b09e9d22e254917d169586ae1b9a2",
+  eyebrow: "PRIVACYBELEID · v3.2 · VAN KRACHT OP [DATE]",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",
-  endMarker: "EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.1",
+  endMarker: "EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst van het privacybeleid",
   sectionIdPrefix: "policy-section-",

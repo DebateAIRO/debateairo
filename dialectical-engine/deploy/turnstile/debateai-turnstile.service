@@ -1,0 +1,54 @@
+# Install only after creating debateai-turnstile and the debateai-turnstile-clients group.
+# Only debateai-api joins clients; it cannot read the systemd credential or source secret.
+[Unit]
+Description=Dialectical Engine confined Turnstile Siteverify relay
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=debateai-turnstile
+Group=debateai-turnstile-clients
+WorkingDirectory=/opt/debateai/dialectical-engine
+Environment=NODE_ENV=production
+# This root-owned file contains only PUBLIC_APP_URL, matching the API's exact deployment origin.
+EnvironmentFile=/etc/debateai/turnstile-public.env
+Environment=TURNSTILE_SOCKET_PATH=/run/debateai-turnstile/siteverify.sock
+LoadCredential=turnstile-secret:/etc/debateai/turnstile/secret
+ExecStart=/usr/bin/node /opt/debateai/dialectical-engine/deploy/turnstile/siteverify-relay.mjs
+RuntimeDirectory=debateai-turnstile
+RuntimeDirectoryMode=0750
+UMask=0077
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/run/debateai-turnstile
+# An explicit deny for all identity, KEK/DEK, provider and database material. The worker gets
+# only its private systemd credential (not the root source file) and public config.
+InaccessiblePaths=-/etc/debateai -/var/lib/debateai -/run/postgresql -/var/run/postgresql
+NoNewPrivileges=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitNOFILE=256
+TasksMax=32
+[Install]
+WantedBy=multi-user.target

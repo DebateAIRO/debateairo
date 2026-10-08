@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "získat seznam všech třetích stran, které je obdržely;",
   "legal.health.s05.item3": "odvolat svůj souhlas a nechat je vymazat.",
   "legal.health.s06.title": "Jak svá práva uplatnit",
-  "legal.health.s06.body": "V Nastavení nebo e-mailem na adrese privacy@dezbatere.ro. Odpovíme do 45 dnů. Pokud žádost zamítneme, můžete se proti tomu odvolat odpovědí na naše rozhodnutí."
+  "legal.health.s06.body": "V Nastavení nebo e-mailem na adrese privacy@dezbatere.ro. Odpovíme do 45 dnů. Pokud žádost zamítneme, můžete se proti tomu odvolat odpovědí na naše rozhodnutí.",
+  "legal.cookies.staff.purpose": "Oddělený přístup pracovníků",
+  "legal.cookies.passwordReset.purpose": "Pouze obnovení hesla",
+  "legal.cookies.mfaRecovery.purpose": "Pouze obnova autentizátoru",
+  "legal.cookies.social.purpose": "Krátké přihlášení přes poskytovatele nebo propojení účtu",
+  "legal.cookies.phoneDraft.purpose": "Nedokončená otázka během telefonního kroku; odstraněna při změně relace, odhlášení nebo změně vlastníka",
+  "legal.cookies.staff.life": "Až 8 hodin; 15 minut nečinnosti",
+  "legal.cookies.passwordReset.life": "Až 30 minut",
+  "legal.cookies.mfaRecovery.life": "Až 299 sekund",
+  "legal.cookies.social.life": "Až 5 minut",
+  "legal.cookies.phoneDraft.life": "15 minut nebo do dřívějšího vymazání"
 }

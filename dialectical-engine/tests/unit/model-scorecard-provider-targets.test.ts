@@ -88,10 +88,11 @@ describe("model scorecard — a provider target declares its thinking levels and
   it("the runner's composition root hands every target's controls to its gateway", async () => {
     const main = await readFile(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
     const factory = main.slice(
-      main.indexOf("return createPostgresProviderGateway(pool, {"),
+      main.indexOf("const gateway = createPostgresProviderGateway(pool, {"),
       main.indexOf("const runRepository = new RunRepository(pool);")
     );
     expect(factory).toContain("...providerTargetGatewayControls(target),");
+    expect(factory).toContain("return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig);");
   });
 });
 

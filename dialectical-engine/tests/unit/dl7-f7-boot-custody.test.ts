@@ -274,6 +274,32 @@ describe("DL7-F7 a synchronous boot decision answers to the ledger too", () => {
 });
 
 describe("DL7-F7 every awaited boot stage runs under an owner", () => {
+  it.each(["read failure", "VALID conflict"])("cleans owned keys and pools on the actual early preview %s before credentials", async reason => {
+    const source = await readFile("apps/api/src/main.ts", "utf8");
+    const start = source.indexOf("if (previewConfig !== undefined) {", source.indexOf("const declaredProviderTargets"));
+    const end = source.indexOf("const previewFetch =", start);
+    expect(start).toBeGreaterThan(-1);expect(end).toBeGreaterThan(start);
+    const AsyncFunction = Object.getPrototypeOf(async () => undefined).constructor;
+    const execute = new AsyncFunction("boot", "previewConfig", "declaredProviderTargets", "assertPreviewProviderTargets",
+      "readModelScorecard", "pool", "environment", "readEngineVersion", "TypedDomainError", "credentials",
+      source.slice(start,end)+"\ncredentials();");
+    const boot = installBootCustody({ logger: { error: () => undefined } });
+    const handle = boot.holdKek(heldKek()), ended: string[] = [];
+    boot.hold({ end: async () => { ended.push("pool"); } });
+    const failure = new Error("SCORECARD_READ_FAILED"), credentials = vi.fn();
+    const read = async () => { if (reason === "read failure") throw failure;return { state: "VALID" }; };
+    class DomainError extends Error { constructor(readonly code: string,message: string){super(message);} }
+    try {
+      await expect(execute(boot, {}, [], () => undefined, read, {}, { REGISTER_VERSION: "8" },
+        async () => "stage-version", DomainError, credentials)).rejects.toMatchObject(reason === "read failure"
+          ? { message: failure.message } : { code: "PREVIEW_SCORECARD_CONFLICT" });
+      expect(credentials).not.toHaveBeenCalled();
+      expect(ended).toEqual(["pool"]);
+      expect(() => kekId(handle)).toThrowError(expect.objectContaining({ code: "KEK_DESTROYED" }));
+    } finally {
+      await boot.run("test-cleanup", async () => { throw new Error("CLEANUP"); }).catch(() => undefined);
+    }
+  });
   /**
    * Fix round 1, Important 2. The old scan matched only lines that BEGIN with
    * `await` or `const … = await`, so the two indented awaits inside

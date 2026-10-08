@@ -84,13 +84,13 @@ describe("privacy policy modal — rendered", () => {
   });
 
   // S02-S35 — header copy is byte-exact and `×` is labelled. The eyebrow and the lede are
-  // derived from the v3.1 draft's own version line by the generator.
+  // derived from the v3.2 draft's own version line by the generator.
   it("shows the header copy byte-exact and labels the close control", async () => {
     await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     expect(dialog.querySelector(".policyEyebrow")!.textContent).toBe(
-      "PRIVACY POLICY · v3.1 · EFFECTIVE [DATE]"
+      "PRIVACY POLICY · v3.2 · EFFECTIVE [DATE]"
     );
     expect(dialog.querySelector(".policyTitle")!.textContent).toBe("What we store, and why");
     expect(dialog.querySelector(".policyLede")!.textContent).toBe(
@@ -125,7 +125,7 @@ describe("privacy policy modal — rendered", () => {
     }
   });
 
-  // S02-S37 — every section of the v3.1 draft, in order: the summary, fourteen numbered
+  // S02-S37 — every section of the v3.2 draft, in order: the summary, fourteen numbered
   // sections, the annex and its nine parts, each with number, title, paragraphs, bullets and
   // accent.
   it("renders the twenty-seven sections in order, with their paragraphs, bullets and accent tokens", async () => {
@@ -181,7 +181,7 @@ describe("privacy policy modal — rendered", () => {
       0
     );
     expect(expectedParagraphs).toBe(51);
-    expect(expectedBullets).toBe(56);
+    expect(expectedBullets).toBe(66);
     expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
 
@@ -205,7 +205,7 @@ describe("privacy policy modal — rendered", () => {
 
     const scrollRegion = dialog.querySelector(".policyBody")!;
     const last = scrollRegion.lastElementChild!;
-    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.1");
+    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.2");
 
     // The honesty rule: this repository generates no policy PDF, so no control claims one.
     const pdf = [...dialog.querySelectorAll("*")].filter(

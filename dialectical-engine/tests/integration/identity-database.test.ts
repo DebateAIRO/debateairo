@@ -52,11 +52,18 @@ describe("S2 identity schema on real PostgreSQL", () => {
     expect(tables.rows.map((row) => row.table_name)).toEqual([
       "account_erasure_notification_outbox", "account_erasure_request",
       "account_recovery_binding", "account_recovery_request",
-      "account_recovery_state_event", "age_check", "audit_event", "authentication_risk_signal",
-      "channel_binding", "email_change_request", "login_challenge", "mfa_factor", "private_erasure_audit_binding",
-      "publication_event_binding", "recovery_code", "registration_region", "run_execution_binding", "runtime_audit_attempt",
-      "sensitive_data_consent", "session", "step_up_grant", "user",
-      "verification_token_credential"
+      "account_recovery_state_event", "account_security_hold", "age_check", "audit_event", "authentication_risk_signal",
+      "channel_binding",
+      "consumer_passkey_challenge", "consumer_passkey_credential", "consumer_passkey_subject",
+      "consumer_recovery_enrollment", "consumer_recovery_gate", "consumer_recovery_reservation", "consumer_recovery_token",
+      "consumer_security_challenge", "consumer_security_notice", "consumer_totp_enrollment",
+      "email_change_request", "login_challenge", "mfa_factor",
+      "password_recovery_control", "password_recovery_feed", "password_recovery_notice",
+      "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",
+      "private_erasure_audit_binding",
+      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding", "runtime_audit_attempt",
+      "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "user",
+      "verification_delivery_reservation", "verification_token_credential"
     ]);
 
     const columns = await database.pool.query<{ table_name: string; column_name: string; data_type: string }>(`
@@ -70,6 +77,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
         AND (relation.relname,attribute.attname) IN (
           ('user','user_id'),('user','email_blind_index'),('user','email_ciphertext'),
           ('user','recovery_email_ciphertext'),('user','phone_ciphertext'),
+          ('user','phone_source'),('user','phone_verification_status'),('user','phone_updated_at'),
           ('audit_event','prev_hash'),('audit_event','this_hash'),
           ('audit_event','actor_ciphertext'),('audit_event','occurred_at'),
           ('audit_event','source_context'),('audit_event','success'),
@@ -120,6 +128,9 @@ describe("S2 identity schema on real PostgreSQL", () => {
       { table_name: "user", column_name: "email_blind_index", data_type: "bytea" },
       { table_name: "user", column_name: "email_ciphertext", data_type: "jsonb" },
       { table_name: "user", column_name: "phone_ciphertext", data_type: "jsonb" },
+      { table_name: "user", column_name: "phone_source", data_type: "text" },
+      { table_name: "user", column_name: "phone_updated_at", data_type: "timestamp with time zone" },
+      { table_name: "user", column_name: "phone_verification_status", data_type: "text" },
       { table_name: "user", column_name: "recovery_email_ciphertext", data_type: "jsonb" },
       { table_name: "user", column_name: "user_id", data_type: "uuid" }
     ]);

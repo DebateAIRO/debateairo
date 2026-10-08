@@ -128,13 +128,13 @@ describe("the home composer asks before the first debate", () => {
     expect(mocks.createDebate).not.toHaveBeenCalled();
   });
 
-  it("agreeing records the consent in the interface language, then starts the debate", async () => {
+  it("agreeing records the consent in the interface language, then preserves the question for /new", async () => {
     await startFromHome("ro");
     await click(agreeButton());
     expect(mocks.giveSensitiveDataConsent).toHaveBeenCalledWith("ro");
     expect(dialog()).toBeNull();
-    expect(mocks.createDebate).toHaveBeenCalledTimes(1);
-    expect(mocks.push).toHaveBeenCalledWith("/debate/run-1");
+    expect(mocks.createDebate).not.toHaveBeenCalled();
+    expect(mocks.push).toHaveBeenCalledWith(`/new?topic=${encodeURIComponent(QUESTION)}`);
   });
 
   it("declining starts nothing, keeps what was typed, and says why", async () => {
@@ -181,18 +181,10 @@ describe("the home composer asks before the first debate", () => {
     mocks.readSensitiveDataConsent.mockResolvedValue({ status: "given" });
     await startFromHome();
     expect(dialog()).toBeNull();
-    expect(mocks.push).toHaveBeenCalledWith("/debate/run-1");
+    expect(mocks.push).toHaveBeenCalledWith(`/new?topic=${encodeURIComponent(QUESTION)}`);
   });
 
-  it("shows the screen when the server refuses the debate for want of consent", async () => {
-    mocks.readSensitiveDataConsent.mockResolvedValue({ status: "given" });
-    mocks.createDebate.mockRejectedValueOnce(consentRefusal()).mockResolvedValueOnce({ id: "run-2" });
-    await startFromHome();
-    expect(dialog()).not.toBeNull();
-    await click(agreeButton());
-    expect(mocks.createDebate).toHaveBeenCalledTimes(2);
-    expect(mocks.push).toHaveBeenCalledWith("/debate/run-2");
-  });
+
 });
 
 describe("/new asks before the first debate too", () => {
@@ -228,5 +220,14 @@ describe("/new asks before the first debate too", () => {
     expect(mocks.giveSensitiveDataConsent).toHaveBeenCalledWith("en");
     expect(mocks.createDebate).toHaveBeenCalledTimes(1);
     expect(mocks.push).toHaveBeenCalledWith("/debate/run-1?starting=1");
+  });
+  it("/new shows the screen when the server refuses the debate for want of consent", async () => {
+    mocks.readSensitiveDataConsent.mockResolvedValue({ status: "given" });
+    mocks.createDebate.mockRejectedValueOnce(consentRefusal()).mockResolvedValueOnce({ id: "run-2" });
+    await startFromNew();
+    expect(dialog()).not.toBeNull();
+    await click(agreeButton());
+    expect(mocks.createDebate).toHaveBeenCalledTimes(2);
+    expect(mocks.push).toHaveBeenCalledWith("/debate/run-2?starting=1");
   });
 });

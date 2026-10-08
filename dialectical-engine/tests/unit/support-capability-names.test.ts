@@ -115,12 +115,13 @@ describe("S05 capability names in the model's capability line (SPEC-v5 R13, V-22
   it("writes a TRANSLATE-row name in all 33 locales: present, not empty, not the en name, no digit, not a control's label", () => {
     // D-ORCH-S05-2 (N3): each locale's names are compared with its FULL label set — the generated pairs hold only the
     // labels that differ from en, so the en labels a locale shows unchanged ("Account", "Privacy" in it/nl) are added
-    // back from the other locales' pairs; the union names all 53 lexicon controls today (asserted, so a control that
+    // back from the other locales' pairs; the union names all 52 current lexicon controls after the retired legacy-claim
+    // control was removed (asserted, so a control that
     // becomes identical in every locale fails here instead of slipping out of the set).
     for (const name of REFUSE) expect(refusal(name), `refuse ${JSON.stringify(name)}`).not.toBe("");     // RECHECK-S05 N2 class
     for (const name of ACCEPT) expect(refusal(name), `accept ${JSON.stringify(name)}`).toBe("");
     const allEn = new Set(OTHER.flatMap((loc) => SUPPORT_CONTROL_NAMES[loc].map(([en]) => en)));
-    expect(allEn.size).toBe(53);
+    expect(allEn.size).toBe(52);
     for (const loc of OTHER) {
       const differing = new Set(SUPPORT_CONTROL_NAMES[loc].map(([en]) => en));
       const labels = [...SUPPORT_CONTROL_NAMES[loc].map(([, local]) => local), ...[...allEn].filter((en) => !differing.has(en))];

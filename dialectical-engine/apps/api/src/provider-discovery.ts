@@ -44,6 +44,8 @@ export function createProviderDiscoveryResolver(input: Readonly<{
   probes: ProviderDiscoveryProbeStore;
   probeFreshnessMs: number;
   probeTimeoutMs: number;
+  thinkingLevel?: string;
+  probeTokenCeiling?: number;
   fetchImplementation?: typeof fetch;
   clock?: () => Date;
 }>): () => Promise<readonly DiscoveredPanelMember[]> {
@@ -73,6 +75,8 @@ export function createProviderDiscoveryResolver(input: Readonly<{
             target,
             probes: input.probes,
             timeoutMs: input.probeTimeoutMs,
+            ...(input.thinkingLevel===undefined?{}:{thinkingLevel:input.thinkingLevel}),
+            ...(input.probeTokenCeiling===undefined?{}:{tokenCeiling:input.probeTokenCeiling}),
             fetchImplementation,
             clock
           });

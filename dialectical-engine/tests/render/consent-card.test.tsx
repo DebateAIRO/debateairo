@@ -29,7 +29,7 @@ const globalsSource = (): string =>
 const EYEBROW = "WHAT WE STORE";
 const TITLE = "Cookies and browser storage";
 const LEDE =
-  "Eight items, each needed for the service to work. Nothing here is optional, and nothing is shared with anyone else.";
+  "18 items, each needed for the service to work. Nothing here is optional, and nothing is shared with anyone else.";
 const FOOTER = ["Privacy notice", "Cookie policy", "Close"];
 
 /** PLAN §2 Key map, en, EXACT (SPEC-v2 R09): kind and lifetime per INV item, in INV order. */
@@ -38,8 +38,18 @@ const EN_KIND = [
   "Cookie",
   "Cookie (HttpOnly)",
   "Cookie",
+  "Cookie (HttpOnly)",
+  "Cookie",
+  "Cookie (HttpOnly)",
+  "Cookie",
+  "Cookie (HttpOnly)",
+  "Cookie",
+  "Cookie (HttpOnly)",
+  "Cookie (HttpOnly)",
+  "Cookie (HttpOnly)",
   "Local storage",
   "Local storage",
+  "Session storage",
   "Session storage",
   "Session storage"
 ];
@@ -48,12 +58,22 @@ const EN_LIFE = [
   "14 days",
   "30 days",
   "1 year",
+  "Up to 8 hours; 15-minute idle expiry",
+  "Up to 8 hours; 15-minute idle expiry",
+  "Up to 30 minutes",
+  "Up to 30 minutes",
+  "Up to 299 seconds",
+  "Up to 299 seconds",
+  "Up to 5 minutes",
+  "Up to 5 minutes",
+  "Up to 5 minutes",
   "Until you clear it",
   "Until you clear it",
   "Until you close the tab",
-  "Until you close the tab"
+  "Until you close the tab",
+  "15 minutes or until earlier clearing"
 ];
-const DURATION = /\b\d+\s*(days?|years?|months?|hours?|minutes?)\b/gi;
+const DURATION = /\b\d+\s*(days?|years?|months?|hours?|minutes?|seconds?)\b/gi;
 
 /** The catalogue the card is served: consent plus the 24 inventory strings of legal (D-28). */
 const CARD_CATALOG: MessageCatalog = {
@@ -176,7 +196,7 @@ describe("S01 the cookie card (10b): a read-only list of the eight items", () =>
     mountCard();
     const rows = [...document.querySelectorAll<HTMLElement>(".consentCatRow")];
     expect(rows.length, "one row per LEGAL_INVENTORY item").toBe(LEGAL_INVENTORY.length);
-    expect(LEGAL_INVENTORY.length, "eight items").toBe(8);
+    expect(LEGAL_INVENTORY.length, "eight items").toBe(18);
     rows.forEach((row, index) => {
       const item = LEGAL_INVENTORY[index]!;
       const legal = legalEnglish as MessageCatalog;
@@ -329,7 +349,7 @@ describe("S01 the cookie card (10b): a read-only list of the eight items", () =>
     const names = [...card.querySelectorAll("code")].map((code) => code.textContent);
     expect([...names].sort(), "every INV name, each once").toEqual(LEGAL_INVENTORY.map((item) => item.name).sort());
     for (const match of (card.textContent ?? "").matchAll(DURATION)) {
-      expect(["14 days", "30 days", "1 year"], `duration ${match[0]}`).toContain(match[0]);
+      expect(["14 days", "30 days", "1 year", "8 hours", "15 minutes", "30 minutes", "299 seconds", "5 minutes"], `duration ${match[0]}`).toContain(match[0]);
     }
   });
 });

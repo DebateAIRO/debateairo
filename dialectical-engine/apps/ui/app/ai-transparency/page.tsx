@@ -7,7 +7,7 @@ import { t } from "@/lib/i18n/translate";
 const AI_GENERATED_MARKING = 'data-ai-generated="true"';
 const AUTOMATED_ORIGIN_MARKING = 'data-content-origin="automated"';
 const AI_DISCLOSURE_FIELD = "ai_disclosure";
-const DEBATEAI_BRAND = "DebateAI";
+const DEBATEAI_BRAND = "Dialectical Engine";
 const PRODUCT_NAME = "Dialectical Engine";
 
 async function settingsCatalog() {

@@ -2,6 +2,8 @@ import { analyzeSupportCredentialText } from "./support-credentials.js";
 
 export * from "./argument-language.js";
 export * from "./date-of-birth.js";
+export type * from "./staff-access.js";
+export type * from "./provider-funding.js";
 export * from "./region.js";
 
 export type Brand<T, Name extends string> = T & { readonly __brand: Name };
@@ -474,3 +476,5 @@ export function redactSupportText(text: string): Readonly<{ text: string;redacte
   const redactedText = labelled.replace(SUPPORT_SECRET_LIKE_PATTERN,"[REDACTED_SECRET_LIKE]");
   return Object.freeze({ text: redactedText,redacted: redactedText !== text });
 }
+
+export { normalizeManualPhone } from "./manualPhone.js";

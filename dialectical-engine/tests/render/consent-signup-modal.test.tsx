@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+vi.mock("@/components/auth/TurnstileChallenge", async()=>{const {useEffect}=await import("react");return {TurnstileChallenge:({onToken}:{onToken:(token:string)=>void})=>{useEffect(()=>onToken("test-proof"),[onToken]);return null;}};});
 
 /**
  * S02-C7 — wiring the policy modal into the sign-up card.
@@ -88,7 +89,7 @@ async function mount(client?: {
     checkAge: vi.fn().mockResolvedValue({ outcome: "allowed" })
   };
   await act(async () => {
-    root!.render((<SignUpFlow client={stub} />) as ReactNode);
+    root!.render((<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={stub} />) as ReactNode);
   });
   await settle();
   await pickRegion("RO");
@@ -521,8 +522,8 @@ describe("sign-up card ↔ privacy policy modal", () => {
   it("closes on one Escape and nothing else acts on that event", async () => {
     await mount();
     await type("email", "person@example.test");
-    await type("recovery-email", "recovery@example.test");
-    await type("password", "correct horse battery staple");
+    await type("phone", "+40712345678");
+    await type("password", "Correct horse 7!");
     await type("dob-d", "01");
     await type("dob-m", "01");
     await type("dob-y", "1990");
@@ -546,8 +547,8 @@ describe("sign-up card ↔ privacy policy modal", () => {
     expect(document.body.contains(field("terms-accepted"))).toBe(true);
     // (c) the three text fields still hold what was typed
     expect(field("email").value).toBe("person@example.test");
-    expect(field("recovery-email").value).toBe("recovery@example.test");
-    expect(field("password").value).toBe("correct horse battery staple");
+    expect(field("phone").value).toBe("+40712345678");
+    expect(field("password").value).toBe("Correct horse 7!");
     expect([field("dob-d").value, field("dob-m").value, field("dob-y").value], "the date of birth stays")
       .toEqual(["01", "01", "1990"]);
     // (d) the boxes are untouched

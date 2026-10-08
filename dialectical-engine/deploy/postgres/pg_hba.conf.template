@@ -24,6 +24,7 @@ local     debateai   debateai_prod_api_erasure               scram-sha-256
 local     debateai   debateai_prod_api_authorization         scram-sha-256
 local     debateai   debateai_prod_api_publication_cleanup   scram-sha-256
 local     debateai   debateai_prod_api_support               scram-sha-256
+local     debateai   debateai_prod_staff_recovery            scram-sha-256
 local     debateai   debateai_prod_support_config_operator   scram-sha-256
 local     debateai   debateai_prod_runner_runtime            scram-sha-256
 local     debateai   debateai_prod_scheduler_replay          scram-sha-256

@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "memperoleh daftar semua pihak ketiga yang telah menerimanya;",
   "legal.health.s05.item3": "menarik persetujuan Anda dan meminta data tersebut dihapus.",
   "legal.health.s06.title": "Cara menggunakan hak Anda",
-  "legal.health.s06.body": "Melalui Pengaturan, atau dengan menulis ke privacy@dezbatere.ro. Kami membalas dalam 45 hari. Jika kami menolak permintaan Anda, Anda dapat mengajukan banding dengan membalas jawaban kami."
+  "legal.health.s06.body": "Melalui Pengaturan, atau dengan menulis ke privacy@dezbatere.ro. Kami membalas dalam 45 hari. Jika kami menolak permintaan Anda, Anda dapat mengajukan banding dengan membalas jawaban kami.",
+  "legal.cookies.staff.purpose": "Akses staf terpisah",
+  "legal.cookies.passwordReset.purpose": "Hanya pengaturan ulang kata sandi",
+  "legal.cookies.mfaRecovery.purpose": "Hanya pemulihan autentikator",
+  "legal.cookies.social.purpose": "Alur singkat masuk melalui penyedia atau penautan akun",
+  "legal.cookies.phoneDraft.purpose": "Pertanyaan belum selesai pada langkah telepon; dihapus saat sesi berubah, keluar, atau pemilik berubah",
+  "legal.cookies.staff.life": "Hingga 8 jam; 15 menit tidak aktif",
+  "legal.cookies.passwordReset.life": "Hingga 30 menit",
+  "legal.cookies.mfaRecovery.life": "Hingga 299 detik",
+  "legal.cookies.social.life": "Hingga 5 menit",
+  "legal.cookies.phoneDraft.life": "15 menit atau sampai lebih awal dihapus"
 }

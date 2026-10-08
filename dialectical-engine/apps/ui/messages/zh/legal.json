@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "获取曾接收这些数据的所有第三方的名单；",
   "legal.health.s05.item3": "撤回您的同意，并要求删除这些数据。",
   "legal.health.s06.title": "如何行使这些权利",
-  "legal.health.s06.body": "您可以在“设置”中操作，或发送电子邮件至 privacy@dezbatere.ro。我们会在 45 天内答复。如果我们拒绝您的请求，您可以直接回复我们的答复提出申诉。"
+  "legal.health.s06.body": "您可以在“设置”中操作，或发送电子邮件至 privacy@dezbatere.ro。我们会在 45 天内答复。如果我们拒绝您的请求，您可以直接回复我们的答复提出申诉。",
+  "legal.cookies.staff.purpose": "单独的员工访问",
+  "legal.cookies.passwordReset.purpose": "仅重置密码",
+  "legal.cookies.mfaRecovery.purpose": "仅恢复验证器",
+  "legal.cookies.social.purpose": "短期服务商登录或账户关联流程",
+  "legal.cookies.phoneDraft.purpose": "电话步骤中未完成的问题；会话变更、退出登录或所有者变更时清除",
+  "legal.cookies.staff.life": "最多8小时；闲置15分钟",
+  "legal.cookies.passwordReset.life": "最多30分钟",
+  "legal.cookies.mfaRecovery.life": "最多299秒",
+  "legal.cookies.social.life": "最多5分钟",
+  "legal.cookies.phoneDraft.life": "15分钟或提前清除"
 }

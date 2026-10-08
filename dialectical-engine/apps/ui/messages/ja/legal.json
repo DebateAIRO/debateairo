@@ -159,5 +159,15 @@
   "legal.health.s05.item2": "そのデータを受け取ったすべての第三者の一覧を入手すること。",
   "legal.health.s05.item3": "同意を撤回し、当該データを削除させること。",
   "legal.health.s06.title": "権利の行使方法",
-  "legal.health.s06.body": "「設定」から、または privacy@dezbatere.ro 宛てにご連絡いただくことで行使できます。当社は45日以内に回答します。当社が請求を拒否した場合は、その回答に返信することで不服を申し立てることができます。"
+  "legal.health.s06.body": "「設定」から、または privacy@dezbatere.ro 宛てにご連絡いただくことで行使できます。当社は45日以内に回答します。当社が請求を拒否した場合は、その回答に返信することで不服を申し立てることができます。",
+  "legal.cookies.staff.purpose": "個別のスタッフアクセス",
+  "legal.cookies.passwordReset.purpose": "パスワードリセットのみ",
+  "legal.cookies.mfaRecovery.purpose": "認証器の復旧のみ",
+  "legal.cookies.social.purpose": "短いプロバイダーサインインまたはアカウント連携",
+  "legal.cookies.phoneDraft.purpose": "電話の手続き中の未完了の質問。セッション変更、サインアウト、所有者変更時に削除",
+  "legal.cookies.staff.life": "最大8時間。15分間操作なし",
+  "legal.cookies.passwordReset.life": "最大30分",
+  "legal.cookies.mfaRecovery.life": "最大299秒",
+  "legal.cookies.social.life": "最大5分",
+  "legal.cookies.phoneDraft.life": "15分またはそれ以前の削除まで"
 }

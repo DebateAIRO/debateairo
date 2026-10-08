@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
+import { normalizeMailDisplay, serializeAccountMail, singleRecipient, type MailDisplay, type AccountMailInput } from "./account-mail-template.mjs";
 import { randomUUID } from "node:crypto";
-import { MailTemplateError, mailAttachmentFactsOf, renderMail, type MailTemplateId } from "@debateai/mail-templates";
+import { MailTemplateError, mailAttachmentFactsOf, renderMail as renderTemplatedMail, type MailTemplateId } from "@debateai/mail-templates";
 import { buildTemplatedMessage, type MailAttachment } from "./mail-mime.js";
 
 // With `sendmail -t` the MTA reads every recipient out of the header block on
@@ -10,13 +11,23 @@ import { buildTemplatedMessage, type MailAttachment } from "./mail-mime.js";
 // vetted. The shape below rejects whitespace through `\s` but not those
 // separators, so each is checked explicitly and stays checked if the shape is
 // ever widened.
-const RECIPIENT_SHAPE = /^[^\s@]+@[^\s@]+$/;
-
 export function isSingleDeliverableRecipient(recipient: string): boolean {
-  return RECIPIENT_SHAPE.test(recipient)
-    && !/[\r\n]/.test(recipient)
-    && !/\s/.test(recipient)
-    && !/[,;]/.test(recipient);
+  return singleRecipient(recipient);
+}
+
+/** Composition-owned URL only; public display metadata never supplies an origin. */
+function isPublicAppUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return !/[\u0000-\u0020\u007f]/.test(value) && url.protocol === "https:"
+      && url.username === "" && url.password === "" && url.search === "" && url.hash === "";
+  } catch { return false; }
+}
+
+/** Render validation errors stay opaque at the transport boundary. */
+function renderMail(input: AccountMailInput, from: string): string {
+  try { return serializeAccountMail(input, from); }
+  catch { throw new MailDeliveryError("MAIL_INPUT_INVALID"); }
 }
 
 export interface VerificationMail {
@@ -24,6 +35,7 @@ export interface VerificationMail {
   readonly recipient: string;
   readonly token: string;
   readonly expiresAt: Date;
+  readonly display?: MailDisplay;
 }
 
 export interface MailSender {
@@ -55,7 +67,7 @@ export class MemoryMailSender implements MailSender {
   readonly messages: VerificationMail[] = [];
 
   async sendVerification(mail: VerificationMail): Promise<void> {
-    this.messages.push(Object.freeze({ ...mail }));
+    this.messages.push(Object.freeze({ ...mail, display: normalizeMailDisplay(mail.display) }));
   }
 }
 
@@ -68,7 +80,7 @@ export class SendmailMailSender implements MailSender {
   }) {
     if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)
       || options.executable.trim() === ""
-      || !/^https:\/\//.test(options.publicAppUrl)
+      || !isPublicAppUrl(options.publicAppUrl)
       || !Number.isInteger(options.timeoutMs)
       || options.timeoutMs <= 0) {
       throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
@@ -85,48 +97,8 @@ export class SendmailMailSender implements MailSender {
     // grammar above is fragment-safe verbatim; nothing is percent-encoded.
     const verificationUrl = new URL("/verify-email", this.options.publicAppUrl);
     verificationUrl.hash = `token=${mail.token}`;
-    const message = [
-      `From: ${this.options.from}`,
-      `To: ${mail.recipient}`,
-      "Subject: Verify your DebateAI email",
-      "MIME-Version: 1.0",
-      "Content-Type: text/plain; charset=UTF-8",
-      "",
-      "Verify your email by opening this link:",
-      verificationUrl.toString(),
-      "",
-      `This link expires at ${mail.expiresAt.toISOString()}.`,
-      "If you cannot find this message, check your spam folder.",
-      ""
-    ].join("\r\n");
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn(this.options.executable, ["-i", "-t", "-f", this.options.from], {
-        stdio: ["pipe", "ignore", "ignore"]
-      });
-      let settled = false;
-      const timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        fail("SENDMAIL_TIMEOUT");
-      }, this.options.timeoutMs);
-      const fail = (code: string): void => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        reject(new MailDeliveryError(code));
-      };
-      child.once("error", () => fail("SENDMAIL_EXEC_FAILED"));
-      child.once("exit", (code, signal) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        if (code === 0) resolve();
-        else reject(new MailDeliveryError(
-          signal === null ? `SENDMAIL_EXIT_${String(code ?? "UNKNOWN")}` : `SENDMAIL_SIGNAL_${signal}`
-        ));
-      });
-      child.stdin.once("error", () => fail("SENDMAIL_STDIN_FAILED"));
-      child.stdin.end(message, "utf8");
-    });
+    const message = renderMail({ template: "verification-v1", recipient: mail.recipient, url: verificationUrl, expiresAt: mail.expiresAt, ...(mail.display === undefined ? {} : { display: mail.display }) }, this.options.from);
+    await sendRenderedMail(message, this.options);
   }
 }
 
@@ -151,62 +123,15 @@ export class SendmailSecurityNotificationSender implements SecurityNotificationS
       || !Number.isFinite(mail.executeAt.getTime())) {
       throw new MailDeliveryError("MAIL_INPUT_INVALID");
     }
-    const subject=mail.eventKind==="SCHEDULED"
-      ? "DebateAI account deletion scheduled"
-      : mail.eventKind==="CANCELLED"
-        ? "DebateAI account deletion cancelled"
-        : "DebateAI account deletion is completing";
-    const detail=mail.eventKind==="SCHEDULED"
-      ? `Deletion is scheduled for ${mail.executeAt.toISOString()}.`
-      : mail.eventKind==="CANCELLED"
-        ? "The scheduled account deletion was cancelled."
-        : "Your account deletion has entered its irreversible completion step.";
-    const message=[
-      `From: ${this.options.from}`,
-      `To: ${mail.recipient}`,
-      `Message-ID: <${mail.messageId}@debateai.local>`,
-      `Subject: ${subject}`,
-      "MIME-Version: 1.0",
-      "Content-Type: text/plain; charset=UTF-8",
-      "",
-      detail,
-      "If you did not request this action, contact the site operator immediately.",
-      ""
-    ].join("\r\n");
-    await new Promise<void>((resolve,reject)=>{
-      const child=spawn(
-        this.options.executable,["-i","-t","-f",this.options.from],
-        { stdio:["pipe","ignore","ignore"] }
-      );
-      let settled=false;
-      const fail=(code:string):void=>{
-        if (settled) return;
-        settled=true;
-        clearTimeout(timer);
-        reject(new MailDeliveryError(code));
-      };
-      const timer=setTimeout(()=>{
-        child.kill("SIGKILL");
-        fail("SENDMAIL_TIMEOUT");
-      },this.options.timeoutMs);
-      child.once("error",()=>fail("SENDMAIL_EXEC_FAILED"));
-      child.once("exit",(code,signal)=>{
-        if (settled) return;
-        settled=true;
-        clearTimeout(timer);
-        if (code===0) resolve();
-        else reject(new MailDeliveryError(
-          signal===null ? `SENDMAIL_EXIT_${String(code??"UNKNOWN")}`
-            : `SENDMAIL_SIGNAL_${signal}`
-        ));
-      });
-      child.stdin.once("error",()=>fail("SENDMAIL_STDIN_FAILED"));
-      child.stdin.end(message,"utf8");
-    });
+    const templates = { SCHEDULED: "security-scheduled-v1", CANCELLED: "security-cancelled-v1", COMPLETION: "security-completion-v1" } as const;
+    const template = templates[mail.eventKind];
+    if (template === undefined) throw new MailDeliveryError("MAIL_INPUT_INVALID");
+    const message = renderMail({ template, recipient: mail.recipient, expiresAt: mail.executeAt, messageId: mail.messageId }, this.options.from);
+    await sendRenderedMail(message, this.options);
   }
 }
 
-// Turn 14 — change email. Three messages, all plain text through `sendmail -t`:
+// Turn 14 — change email. Three purpose-specific alternatives through `sendmail -t`:
 // the confirmation link to the NEW address, a notice with a cancel link to the
 // CURRENT address, and, when the new address already belongs to an account, a
 // note to that address instead of a link (the requester is never told). Both
@@ -237,6 +162,55 @@ export function emailChangeLink(publicAppUrl: string, action: "confirm" | "cance
   return url.toString();
 }
 
+type SendmailTransportOptions = Readonly<{
+  executable: string;
+  from: string;
+  timeoutMs: number;
+  /** Recovery retains its original fixed exit diagnostic; email change keeps detailed codes. */
+  exitFailureCode?: "SENDMAIL_EXIT_FAILED";
+}>;
+
+/** Process lifecycle only: each sender validates and renders its own mail. */
+async function sendRenderedMail(message: string, options: SendmailTransportOptions): Promise<void> {
+  let child: ReturnType<typeof spawn>;
+  try {
+    child = spawn(options.executable, ["-i", "-t", "-f", options.from], {
+      stdio: ["pipe", "ignore", "ignore"]
+    });
+  } catch {
+    throw new MailDeliveryError("SENDMAIL_EXEC_FAILED");
+  }
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const fail = (code: string): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new MailDeliveryError(code));
+    };
+    const timer = setTimeout(() => {
+      // Claim timeout before kill can synchronously deliver another process event.
+      fail("SENDMAIL_TIMEOUT");
+      try { child.kill("SIGKILL"); } catch { /* Timeout remains the delivery outcome. */ }
+    }, options.timeoutMs);
+    child.once("error", () => fail("SENDMAIL_EXEC_FAILED"));
+    child.once("exit", (code: number | null, signal: NodeJS.Signals | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code === 0) resolve();
+      else reject(new MailDeliveryError(options.exitFailureCode
+        ?? (signal === null ? `SENDMAIL_EXIT_${String(code ?? "UNKNOWN")}` : `SENDMAIL_SIGNAL_${signal}`)));
+    });
+    if (child.stdin === null) {
+      fail("SENDMAIL_STDIN_FAILED");
+      return;
+    }
+    child.stdin.once("error", () => fail("SENDMAIL_STDIN_FAILED"));
+    try { child.stdin.end(message, "utf8"); } catch { fail("SENDMAIL_STDIN_FAILED"); }
+  });
+}
+
 export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
   constructor(private readonly options: {
     readonly executable: string;
@@ -246,7 +220,7 @@ export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
   }) {
     if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)
       || options.executable.trim() === ""
-      || !/^https:\/\//.test(options.publicAppUrl)
+      || !isPublicAppUrl(options.publicAppUrl)
       || !Number.isInteger(options.timeoutMs)
       || options.timeoutMs <= 0) {
       throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
@@ -258,72 +232,78 @@ export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
       || (mail.kind === "notice" && !isSingleDeliverableRecipient(mail.newEmail))) {
       throw new MailDeliveryError("MAIL_INPUT_INVALID");
     }
-    const [subject, body] = this.render(mail);
-    const message = [
-      `From: ${this.options.from}`,
-      `To: ${mail.recipient}`,
-      `Subject: ${subject}`,
-      "MIME-Version: 1.0",
-      "Content-Type: text/plain; charset=UTF-8",
-      "",
-      ...body,
-      ""
-    ].join("\r\n");
-    await new Promise<void>((resolve, reject) => {
-      const child = spawn(this.options.executable, ["-i", "-t", "-f", this.options.from], {
-        stdio: ["pipe", "ignore", "ignore"]
-      });
-      let settled = false;
-      const fail = (code: string): void => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        reject(new MailDeliveryError(code));
-      };
-      const timer = setTimeout(() => {
-        child.kill("SIGKILL");
-        fail("SENDMAIL_TIMEOUT");
-      }, this.options.timeoutMs);
-      child.once("error", () => fail("SENDMAIL_EXEC_FAILED"));
-      child.once("exit", (code, signal) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        if (code === 0) resolve();
-        else reject(new MailDeliveryError(
-          signal === null ? `SENDMAIL_EXIT_${String(code ?? "UNKNOWN")}` : `SENDMAIL_SIGNAL_${signal}`
-        ));
-      });
-      child.stdin.once("error", () => fail("SENDMAIL_STDIN_FAILED"));
-      child.stdin.end(message, "utf8");
+    const input: AccountMailInput = mail.kind === "confirmation"
+      ? { template: "email-change-confirm-v1", recipient: mail.recipient, expiresAt: mail.expiresAt, url: new URL(emailChangeLink(this.options.publicAppUrl, "confirm", mail.token)) }
+      : mail.kind === "notice"
+        ? { template: "email-change-notice-v1", recipient: mail.recipient, newEmail: mail.newEmail, expiresAt: mail.expiresAt, url: new URL(emailChangeLink(this.options.publicAppUrl, "cancel", mail.cancelToken)) }
+        : { template: "email-change-unavailable-v1", recipient: mail.recipient };
+    await sendRenderedMail(renderMail(input, this.options.from), this.options);
+  }
+}
+
+export type RecoveryEmailMail = Readonly<{
+  kind: "confirmation";
+  recipient: string;
+  token: string;
+  expiresAt: Date;
+}>;
+export interface RecoveryEmailMailSender {
+  sendRecoveryEmail(mail: RecoveryEmailMail): Promise<void>;
+}
+export class MemoryRecoveryEmailMailSender implements RecoveryEmailMailSender {
+  readonly messages: RecoveryEmailMail[] = [];
+  async sendRecoveryEmail(mail: RecoveryEmailMail): Promise<void> {
+    this.messages.push(Object.freeze({
+      ...mail
+    }));
+  }
+}
+export function recoveryEmailLink(publicAppUrl: string, token: string): string {
+  if (!EMAIL_CHANGE_BEARER.test(token))
+    throw new MailDeliveryError("MAIL_INPUT_INVALID");
+  const url = new URL("/verify-recovery-email", publicAppUrl);
+  url.hash = `token=${token}`;
+  return url.toString();
+}
+/** Narrow adapter; delivery remains governed by the configured mail transport. */
+export class SendmailRecoveryEmailMailSender implements RecoveryEmailMailSender {
+  constructor(private readonly options: {
+    readonly executable: string;
+    readonly from: string;
+    readonly publicAppUrl: string;
+    readonly timeoutMs: number;
+  }) {
+    if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from) || !options.executable.trim() || !isPublicAppUrl(options.publicAppUrl) || !Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0)
+      throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
+  }
+  async sendRecoveryEmail(mail: RecoveryEmailMail): Promise<void> {
+    if (!isSingleDeliverableRecipient(mail.recipient) || !(mail.expiresAt instanceof Date) || !Number.isFinite(mail.expiresAt.getTime()))
+      throw new MailDeliveryError("MAIL_INPUT_INVALID");
+    const message = renderMail({ template: "recovery-v1", recipient: mail.recipient, url: new URL(recoveryEmailLink(this.options.publicAppUrl, mail.token)), expiresAt: mail.expiresAt }, this.options.from);
+    await sendRenderedMail(message, {
+      ...this.options, exitFailureCode: "SENDMAIL_EXIT_FAILED"
     });
   }
+}
 
-  private render(mail: EmailChangeMail): readonly [string, readonly string[]] {
-    if (mail.kind === "confirmation") {
-      return ["Confirm your new DebateAI email", [
-        "Confirm this address for your DebateAI account by opening this link:",
-        emailChangeLink(this.options.publicAppUrl, "confirm", mail.token),
-        "",
-        `This link expires at ${mail.expiresAt.toISOString()}.`,
-        "If you did not ask for this, ignore this message. Nothing changes until the link is opened."
-      ]];
-    }
-    if (mail.kind === "notice") {
-      return ["Your DebateAI email is being changed", [
-        `Someone signed in to your DebateAI account asked to change its email to ${mail.newEmail}.`,
-        "Your current address keeps working until the new one is confirmed.",
-        "",
-        "If this wasn't you, cancel the change by opening this link:",
-        emailChangeLink(this.options.publicAppUrl, "cancel", mail.cancelToken),
-        "",
-        "Then sign in and review your active sessions in Settings."
-      ]];
-    }
-    return ["DebateAI email change", [
-      "Someone asked to use this address for a DebateAI account, but it already belongs to one.",
-      "Nothing was changed. If this was you, sign in with this address instead."
-    ]];
+export type ConsumerSecurityNoticeKind='METHOD_CHANGED'|'CODES_REGENERATED'|'RECOVERY_PROVED'|'RECOVERY_COMPLETED';
+export interface ConsumerSecurityNoticeSender {
+  sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date}>):Promise<void>;
+}
+/** Task9 purposes require their reviewed wrapper/template revision at deployment. */
+export class SendmailConsumerAccountSender implements ConsumerSecurityNoticeSender {
+  constructor(private readonly options:Readonly<{executable:string;from:string;timeoutMs:number;publicAppUrl:string}>){
+    if(!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)||!options.executable.trim()||!Number.isInteger(options.timeoutMs)||options.timeoutMs<1||!isPublicAppUrl(options.publicAppUrl))throw new TypeError('OWN_MAIL_CONFIGURATION_INVALID');
+  }
+  async sendRecovery(mail:Readonly<{recipient:string;token:string;expiresAt:Date}>):Promise<void>{
+    if(!isSingleDeliverableRecipient(mail.recipient)||!/^[A-Za-z0-9_-]{43}$/.test(mail.token))throw new MailDeliveryError('MAIL_INPUT_INVALID');
+    const url=new URL('/recover',this.options.publicAppUrl);url.hash='token='+mail.token;
+    await sendRenderedMail(renderMail({template:'consumer-recovery-v1',recipient:mail.recipient,url,expiresAt:mail.expiresAt},this.options.from),this.options);
+  }
+  async sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date}>):Promise<void>{
+    const templates={METHOD_CHANGED:'security-method-changed-v1',CODES_REGENERATED:'security-codes-regenerated-v1',RECOVERY_PROVED:'security-recovery-proved-v1',RECOVERY_COMPLETED:'security-recovery-completed-v1'} as const;
+    const template=templates[mail.eventKind];if(!template)throw new MailDeliveryError('MAIL_INPUT_INVALID');
+    await sendRenderedMail(renderMail({template,recipient:mail.recipient,messageId:mail.messageId,expiresAt:mail.happenedAt},this.options.from),this.options);
   }
 }
 
@@ -354,12 +334,12 @@ function composeTemplatedMessage(from: string, mail: TemplatedMail, boundary: st
   if (attachments.length > 4 || attachmentBytes > 8 * 1024 * 1024) {
     throw new MailDeliveryError("MAIL_ATTACHMENTS_TOO_LARGE");
   }
-  let rendered: ReturnType<typeof renderMail>;
+  let rendered: ReturnType<typeof renderTemplatedMail>;
   try {
     // The wording follows what this message REALLY carries: P7's EMAIL job drops a resolver's null, so a Terms
     // version the archive does not hold, or a PDF SmartBill could not give, is simply absent here, and the sentence
     // says so.
-    rendered = renderMail(mail.templateId, mail.locale, mail.params, { attached: mailAttachmentFactsOf(attachments) });
+    rendered = renderTemplatedMail(mail.templateId, mail.locale, mail.params, { attached: mailAttachmentFactsOf(attachments) });
   } catch (error) {
     if (error instanceof MailTemplateError) throw new MailDeliveryError(error.code);
     throw error;

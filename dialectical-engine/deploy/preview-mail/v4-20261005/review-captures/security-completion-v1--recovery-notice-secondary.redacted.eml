@@ -1,0 +1,37 @@
+From: dezbatere.ro <noreply@dezbatere.ro>
+To: recovery-notice-secondary@fixture.invalid
+Message-ID: <11111111-1111-4111-8111-111111111111@debateai.local>
+Subject: Dialectical Engine account deletion is completing
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="dialectical-account-v1"
+X-Account-Template: security-completion-v1
+X-Account-Expires: 1791186060000
+X-Account-Locale: en
+X-Account-Time-Zone: UTC
+X-Account-Runtime: node=26.8.2;icu=78.3;tz=2026a;cldr=48.0;unicode=17.0
+
+--dialectical-account-v1
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: base64
+
+RGlhbGVjdGljYWwgRW5naW5lDQoNCllvdXIgYWNjb3VudCBkZWxldGlvbiBoYXMgZW50ZXJlZCBp
+dHMgaXJyZXZlcnNpYmxlIGNvbXBsZXRpb24gc3RlcC4NCg0KSWYgeW91IGRpZCBub3QgcmVxdWVz
+dCB0aGlzIGFjdGlvbiwgY29udGFjdCB0aGUgc2l0ZSBvcGVyYXRvciBpbW1lZGlhdGVseS4NCg==
+--dialectical-account-v1
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: base64
+
+PCFkb2N0eXBlIGh0bWw+PGh0bWwgbGFuZz0iZW4iPjxoZWFkPjxtZXRhIGNoYXJzZXQ9IlVURi04
+Ij48dGl0bGU+RGlhbGVjdGljYWwgRW5naW5lIGFjY291bnQgZGVsZXRpb24gaXMgY29tcGxldGlu
+ZzwvdGl0bGU+PC9oZWFkPjxib2R5IHN0eWxlPSJtYXJnaW46MDtiYWNrZ3JvdW5kOiNmN2YzZTg7
+Y29sb3I6IzI0MjQyNDtmb250LWZhbWlseTpBcmlhbCxzYW5zLXNlcmlmIj48bWFpbiBzdHlsZT0i
+bWF4LXdpZHRoOjYwMHB4O21hcmdpbjozMnB4IGF1dG87cGFkZGluZzozMnB4O2JvcmRlci10b3A6
+NHB4IHNvbGlkICNiODliNWUiPjxwIHN0eWxlPSJmb250LXNpemU6MjJweDtmb250LXdlaWdodDpi
+b2xkIj5EaWFsZWN0aWNhbCBFbmdpbmU8L3A+PGgxIHN0eWxlPSJmb250LXNpemU6MjRweCI+RGlh
+bGVjdGljYWwgRW5naW5lIGFjY291bnQgZGVsZXRpb24gaXMgY29tcGxldGluZzwvaDE+PHAgc3R5
+bGU9ImxpbmUtaGVpZ2h0OjEuNiI+WW91ciBhY2NvdW50IGRlbGV0aW9uIGhhcyBlbnRlcmVkIGl0
+cyBpcnJldmVyc2libGUgY29tcGxldGlvbiBzdGVwLjwvcD48cCBzdHlsZT0ibGluZS1oZWlnaHQ6
+MS42Ij5JZiB5b3UgZGlkIG5vdCByZXF1ZXN0IHRoaXMgYWN0aW9uLCBjb250YWN0IHRoZSBzaXRl
+IG9wZXJhdG9yIGltbWVkaWF0ZWx5LjwvcD48cCBzdHlsZT0iZm9udC1zaXplOjEycHgiPmRlemJh
+dGVyZS5ybzwvcD48L21haW4+PC9ib2R5PjwvaHRtbD4NCg==
+--dialectical-account-v1--

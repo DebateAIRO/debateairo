@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
   allocateSequence,
+  queryPrivateStream,
   decryptLeasedContentForRun,
   encryptAttestedLeasedContentForRun,
   prepareLeasedContentEncryptionForRun,
@@ -531,15 +532,15 @@ export class GraphRepository {
     return this.withGraphWrite(input.runId, (writer) => writer.spawnPendingChild(input));
   }
 
-  async readNodeLifecycleEvents(runId: string): Promise<readonly NodeLifecycleEvent[]> {
+  async readNodeLifecycleEvents(runId: string, signal?: AbortSignal): Promise<readonly NodeLifecycleEvent[]> {
     const [spawned, judging, scored] = await Promise.all([
-      this.pool.query<{
+      queryPrivateStream<{
         node_id: string;
         parent_node_id: string;
         node_seq: string;
         edge_id: string;
         edge_seq: string;
-      }>(
+      }>(this.pool,
         `SELECT node.node_id, node.parent_node_id, node.created_at_seq AS node_seq,
                 edge.edge_id, edge.created_at_seq AS edge_seq
          FROM core.node AS node
@@ -548,17 +549,17 @@ export class GraphRepository {
           AND edge.target_kind='NODE' AND edge.target_node_id=node.parent_node_id
          WHERE node.run_id=$1 AND node.parent_node_id IS NOT NULL
            AND node.generation_status='pending'`,
-        [runId]
+        [runId], signal
       ),
-      this.pool.query<{ ledger_entry_id: string; sequence: string; subject_item_id: string }>(
+      queryPrivateStream<{ ledger_entry_id: string; sequence: string; subject_item_id: string }>(this.pool,
         `SELECT entry.ledger_entry_id, entry.sequence, entry.subject_item_id
          FROM ledger.ledger_entry AS entry
          JOIN core.node AS node
            ON node.run_id=entry.run_id AND node.node_id::text=entry.subject_item_id
          WHERE entry.run_id=$1 AND entry.action_kind='JUDGEMENT_SCHEDULED'`,
-        [runId]
+        [runId], signal
       ),
-      this.pool.query<{
+      queryPrivateStream<{
         propagation_run_id: string;
         at_seq: string;
         node_id: string;
@@ -567,7 +568,7 @@ export class GraphRepository {
         source_ref: string;
         producer: string;
         replay_handle: string;
-      }>(
+      }>(this.pool,
         `SELECT propagation.propagation_run_id, propagation.at_seq, strength.node_id,
                 strength.strength, strength.number_kind, strength.source_ref,
                 strength.producer, strength.replay_handle
@@ -576,7 +577,7 @@ export class GraphRepository {
            ON propagation.propagation_run_id=strength.propagation_run_id
          JOIN core.node AS node ON node.node_id=strength.node_id AND node.run_id=propagation.run_id
          WHERE propagation.run_id=$1`,
-        [runId]
+        [runId], signal
       )
     ]);
     const events: NodeLifecycleEvent[] = [];

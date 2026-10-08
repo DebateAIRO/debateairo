@@ -1,3 +1,30 @@
+import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, PREVIEW_GLM_GENERATION_TOKEN_FLOOR, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
+import { readModelScorecard, readEngineVersion } from "@debateai/register";
+import { PasswordResetService } from "./password-reset.js";
+import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
+import { BackupEmailService, MfaRecoveryService } from "./email-mfa-recovery.js";
+import { EmailRecoveryNotificationWorker, SendmailEmailRecoverySender } from "./email-mfa-mail.js";
+import { PostgresPasswordResetRepository } from "../../../packages/db/src/password-reset.js";
+import { PostgresBackupEmailRepository, PostgresMfaRecoveryRepository } from "../../../packages/db/src/email-mfa-recovery.js";
+import { readPasswordResetPolicy, readBackupEmailPolicy, readMfaRecoveryPolicy } from "@debateai/register";
+import { SocialStepUpService } from './social-step-up.js';
+import { SocialAuthService } from './social-auth.js';
+import { SocialProviders, UnixSocialTransport, socialConfigurations } from './social-providers/provider.js';
+import { PostgresSocialIdentityRepository } from '@debateai/db';
+import {ConsumerRecoveryService} from "./consumer-recovery.js";
+import {OnboardingEvidenceService} from "./onboarding-evidence.js";
+import {ConsumerSecurityNoticeReconciler} from "./consumer-security-notices.js";
+import {PostgresConsumerRecoveryRepository,PostgresOnboardingEvidenceRepository,PostgresConsumerSecurityNoticeRepository} from "@debateai/db";
+import {readConsumerRecoveryPolicy} from "@debateai/register";
+import {SendmailConsumerAccountSender} from "./mail-channel.js";
+import { ConsumerSecurityService } from "./consumer-security.js";
+import { PostgresConsumerSecurityRepository } from "@debateai/db";
+import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
+import { PostgresConsumerAuthRepository } from "@debateai/db";
+import { UnixTurnstileVerifier } from "./turnstile.js";
+import { AccountProfileService } from "./account-profile.js";
+import { RecoveryEmailService } from "./recovery-email.js";
+import { PostgresAccountProfileRepository,PostgresRecoveryEmailRepository } from "@debateai/db";
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -16,7 +43,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -68,6 +95,7 @@ import {
 import { firstCallsByPlanRoster, firstPositionCallProjections } from "@debateai/judgement";
 import { firstCallPlanModels } from "@debateai/scorecard";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
+import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
 import { SELLER_COMPANY } from "@debateai/billing-core";
 import { createHelpCorpusSnapshotLookup,loadHelpCorpus } from "@debateai/support-kb";
 import {
@@ -101,6 +129,9 @@ import {
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
 import { SessionService } from "./sessions.js";
+import { StaffWebAuthnService } from "./staff/webauthn.js";
+import { StaffAccessService } from "./staff/access.js";
+import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication } from "./publications.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { createPublicationJudgeSwitch, createPublicationJudgeTransport, publicationJudgeOffFlagPath } from "./publication-check/judge-transport.js";
@@ -108,9 +139,9 @@ import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } fr
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
-import { SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
-import { billingMailAttachmentResolvers } from "./mail-attachments.js";
+import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
 import { EmailChangeService } from "./email-change.js";
+import { billingMailAttachmentResolvers } from "./mail-attachments.js";
 import {
   AccountErasureNotificationReconciler,
   createSingleFlightErasureReconciler,
@@ -146,6 +177,10 @@ import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
+const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
+if (previewConfig !== undefined && environment.PUBLIC_APP_URL !== "https://v3-preview.dezbatere.ro") {
+  throw new TypeError("PREVIEW_PROVIDER_ORIGIN_INVALID");
+}
 // V-9(c) / V-28: a hosted deployment may not admit an ask — nor probe a paid
 // vendor, which is itself a model call — until the per-run and daily cost
 // envelopes are sealed. The seam is `readSealedCostEnvelopeStatus` in
@@ -285,6 +320,9 @@ await boot.run("database-roles", () => Promise.all([
 const authPolicy = await boot.run("auth-policy", () => readAuthPolicy(pool, environment.REGISTER_VERSION));
 const mfaPolicy = await boot.run("mfa-policy", () => readMfaPolicy(pool, environment.REGISTER_VERSION));
 const sessionPolicy = await boot.run("session-policy", () => readSessionPolicy(pool, environment.REGISTER_VERSION));
+const passwordResetPolicy = await boot.run("password-reset-policy", () => readPasswordResetPolicy(pool, environment.REGISTER_VERSION));
+const backupEmailPolicy = await boot.run("backup-email-policy", () => readBackupEmailPolicy(pool, environment.REGISTER_VERSION));
+const mfaRecoveryPolicy = await boot.run("mfa-recovery-policy", () => readMfaRecoveryPolicy(pool, environment.REGISTER_VERSION));
 const recoveryPolicy = await boot.run("recovery-policy", () => readRecoveryPolicy(pool, environment.REGISTER_VERSION));
 const admissionPolicy = await boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION));
 /**
@@ -435,6 +473,15 @@ const declaredProviderTargets = boot.runSync("provider-targets", () => {
 });
 // V-9(2): the ask-time health probe needs the same credential the runner uses, so
 // it resolves each vendor's file through the same custody-checked seam.
+if (previewConfig !== undefined) {
+  await boot.run("preview-scorecard-conflict", async () => {
+    assertPreviewProviderTargets(previewConfig, declaredProviderTargets);
+    if ((await readModelScorecard(pool, environment.REGISTER_VERSION, await readEngineVersion())).state === "VALID") {
+      throw new TypedDomainError("PREVIEW_SCORECARD_CONFLICT", "Preview roster cannot override a valid scorecard");
+    }
+  });
+}
+const previewFetch = previewConfig === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPort(previewConfig));
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
   resolveProviderTargetCredentials(declaredProviderTargets, readCustodyAuthorizationHeader));
 const resolveProviderPanel = createProviderDiscoveryResolver({
@@ -442,7 +489,8 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   targets: providerDiscoveryTargets,
   probes,
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
-  probeTimeoutMs: environment.PROVIDER_PROBE_TIMEOUT_MS
+  probeTimeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
+  ...(previewConfig === undefined ? {} : { thinkingLevel: "high", probeTokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR, fetchImplementation: previewFetch! })
 });
 /**
  * Budget spec 2026-09-28 §2.4–§2.7 and the paid-plans spec §2.4 (B6b): THE ROOM.
@@ -482,9 +530,16 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
       assertAskRoomAdmissionSealed({ envelope: costEnvelopeRows.runPolicy, admission: admissionPolicy });
       const spend = new PostgresModelSpendStore(pool);
       const entitlements = billingPlans === null ? null : new EntitlementRepository(pool);
+      const allowances = new PostgresInternalAllowanceRepository(pool,{registerVersion:environment.REGISTER_VERSION});
+      const selectedFunding = await allowances.readPolicy();
+      const configuredFunding = environment.STAFF_ACCESS.policyVersion === 2 ? environment.STAFF_ACCESS.internalAllowancePolicy : undefined;
+      if ((selectedFunding === null) !== (configuredFunding === undefined)) throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","The configured funding selection is mismatched");
+      const fundedAllowance = selectedFunding === null ? undefined : entitlements === null || billingPlans === null
+        ? (()=>{throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Internal funding requires hosted billing");})()
+        : new FundingAwarePersonAllowanceSource({allowances,entitlements,plans:billingPlans,registerVersion:environment.REGISTER_VERSION,closeBasisPoints:band.closeBasisPoints});
       const personAllowance = entitlements === null || billingPlans === null
         ? NO_PERSON_ALLOWANCE
-        : new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });
+        : fundedAllowance ?? new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });
       const estimator = new RecentRunsCostEstimator({
         source: new PostgresRecentRunUsageSource(pool),
         prices: buildApiProviderPriceMap(declaredProviderTargets, environment.DEPLOYMENT_MODE),
@@ -498,6 +553,7 @@ const askRoomComposition = environment.DEPLOYMENT_MODE === "hosted" && costEnvel
         personAllowance,
         entitlements,
         billingPlans,
+        ...(fundedAllowance === undefined ? {} : {funding:fundedAllowance}),
         dailyCeilingMicros: costEnvelopeRows.runPolicy.dailyCeilingMicros,
         closeBasisPoints: band.closeBasisPoints,
         waitingLinePerPerson: band.waitingLinePerPerson
@@ -588,6 +644,7 @@ const askBilling: AskBilling | undefined = askRoomComposition === undefined
   ? undefined
   : Object.freeze({
       plans: askRoomComposition.billingPlans,
+      ...(askRoomComposition.personAllowance instanceof FundingAwarePersonAllowanceSource ? {funding:askRoomComposition.personAllowance} : {}),
       entitlements: askRoomComposition.entitlements,
       coarseFit: Object.freeze({
         personAllowance: askRoomComposition.personAllowance,
@@ -648,7 +705,10 @@ const authenticationRiskSignals = new PostgresAuthenticationRiskSignalRepository
   pool,auditContextHasher,dekStore,recoveryPolicy.riskSignals.rawSignalRetentionMs,
   recoveryPolicy.riskSignals.maximumEvaluatorSignals
 );
+const consumerRecoveryPolicy=await boot.run("consumer-recovery-policy",()=>readConsumerRecoveryPolicy(pool,environment.REGISTER_VERSION));
 const recovery = new RecoveryStartService({
+  consumerPrepare:(input,source)=>consumerRecovery.prepareStart(input,source),
+  mailDispatch:{dispatchRecoveryMail:prepare=>registration.dispatchRecoveryMail(prepare)},
   repository: new PostgresRecoveryStartRepository(pool,auditContextHasher,dekStore),
   riskSignals:authenticationRiskSignals,
   onRiskSignalFailure:(error)=>console.error(
@@ -676,8 +736,11 @@ const runKeyStore = boot.runSync("run-content-key-store", () =>
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   configureContentEncryption(pool, new ContentCipher(runKeyStore));
 }
+const socialProviders = (()=>{try{return new SocialProviders(socialConfigurations(environment.SOCIAL_PROVIDERS_JSON,environment.PUBLIC_APP_URL),environment.SOCIAL_SOCKET_PATH===undefined?undefined:new UnixSocialTransport(environment.SOCIAL_SOCKET_PATH));}catch{console.error('[SOCIAL_CONFIGURATION_INVALID]');return new SocialProviders([]);}})();
+const socialRepository = new PostgresSocialIdentityRepository(authorizationPool,auditContextHasher,pool);
 const registration = new RegistrationService({
   repository: identityRepository,
+  socialRepository,
   mail: new SendmailMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
@@ -705,14 +768,9 @@ const legal = new RepositoryLegalAcceptanceApplication({
   recordsKey,
   owedWithoutRecord: environment.DEPLOYMENT_MODE === "hosted"
 });
-const mfa = new MfaEnrollmentService({
-  repository: identityRepository,
-  dekStore,
-  argon2: argon2Pool,
-  policy: mfaPolicy
-});
 const sessions = await boot.run("session-service", () => SessionService.create({
   repository: new PostgresSessionRepository(authorizationPool, auditContextHasher),
+  ...(environment.STAFF_ACCESS.policyVersion === 2 ? {staffPrerequisites: new PostgresStaffPrerequisiteProducer(pool, auditContextHasher)} : {}),
   riskSignals:authenticationRiskSignals,
   onRiskSignalFailure:(error)=>console.error(
     "[LOGIN_RISK_SIGNAL_PENDING]",riskSignalFailureIdentity(error)
@@ -722,10 +780,72 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   authPolicy,
   mfaPolicy,
   sessionPolicy,
+  socialProviderBindings:async()=>(await socialProviders.available()).map(p=>p.configuration),
   blindIndexKey
 }));
-// Turn 14 — change email: the capabilities of migration 0079 are granted to the
-// authorization role, beside the step-up that mints their CHANGE_EMAIL grant.
+const socialAuth = new SocialAuthService(socialRepository,socialProviders,sessions.consumerProducer(),{registration,security:new PostgresConsumerSecurityRepository(authorizationPool,auditContextHasher),authPolicy,blindIndexKey});
+const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL});
+const consumerRecovery=new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy,authPolicy,policy:consumerRecoveryPolicy,blindIndexKey,mail:consumerAccountMail,onMailFailure:()=>console.error('[CONSUMER_RECOVERY_MAIL_FAILED]')});
+const onboardingEvidence=new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),recordsKey);
+const consumerSecurityNotices=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(authorizationPool),dekStore,consumerAccountMail);
+const passwordResetRepository=passwordResetPolicy?new PostgresPasswordResetRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
+if(passwordResetRepository)await boot.run("password-reset-role",()=>passwordResetRepository.assertRole());
+const passwordReset=passwordResetRepository&&passwordResetPolicy?new PasswordResetService({repository:passwordResetRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,passwordResetPolicy,blindIndexKey,reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
+const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
+const triggerPasswordResetReconciliation=passwordResetNotices?createSingleFlightErasureReconciler(()=>passwordResetNotices.reconcile(100),()=>console.error("[PASSWORD_RESET_RECONCILIATION_PENDING]")):undefined;
+let passwordResetTimer:ReturnType<typeof setInterval>|undefined;
+const backupEmailRepository=backupEmailPolicy?new PostgresBackupEmailRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
+const mfaRecoveryRepository=mfaRecoveryPolicy?new PostgresMfaRecoveryRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
+if(backupEmailRepository)await boot.run("backup-email-role",()=>backupEmailRepository.assertRole());
+if(mfaRecoveryRepository)await boot.run("mfa-recovery-role",()=>mfaRecoveryRepository.assertRole());
+const backupEmail=backupEmailRepository&&backupEmailPolicy?new BackupEmailService({repository:backupEmailRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:backupEmailPolicy}):undefined;
+const mfaRecovery=mfaRecoveryRepository&&mfaRecoveryPolicy?new MfaRecoveryService({repository:mfaRecoveryRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:mfaRecoveryPolicy,blindIndexKey}):undefined;
+const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs});
+const emailRecoveryWorkers=[...(backupEmailRepository?[new EmailRecoveryNotificationWorker({flow:"backup_email",repository:backupEmailRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(mfaRecoveryRepository?[new EmailRecoveryNotificationWorker({flow:"mfa_recovery",repository:mfaRecoveryRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[])];
+const triggerEmailRecoveryReconciliation=emailRecoveryWorkers.length?createSingleFlightErasureReconciler(async()=>{for(const worker of emailRecoveryWorkers)await worker.reconcile(100);},()=>console.error("[EMAIL_RECOVERY_RECONCILIATION_PENDING]")):undefined;
+let emailRecoveryTimer:ReturnType<typeof setInterval>|undefined;
+
+boot.hold({end:async()=>{await passwordResetNotices?.close();for(const worker of emailRecoveryWorkers)await worker.close();}});
+
+const mfa = new MfaEnrollmentService({
+  repository: identityRepository,
+  consumerRepository: new PostgresConsumerAuthRepository(authorizationPool,auditContextHasher),
+  sessions: sessions.consumerProducer(),
+  dekStore,
+  argon2: argon2Pool,
+  policy: mfaPolicy
+});
+// Explicit v2 composition retains current-state checks and refuses unavailable operator readiness.
+const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
+  ? new StaffAccessService(new PostgresStaffRepository(pool), sessions) : undefined;
+// Explicit protected adapters plus installation/policy/current publication are startup-only gates.
+const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
+  ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
+if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
+const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
+  access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
+  webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
+  intents: staffAlerts.intents,
+  targetInvitationTransport: staffAlerts.targetInvitationTransport,
+  ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
+};
+// Self-service profile/recovery capabilities use the existing authorization
+// role and account DEK custody, beside purpose-bound TOTP grant rotation.
+const accountProfile = new AccountProfileService({
+  repository: new PostgresAccountProfileRepository(authorizationPool, auditContextHasher),
+  users: dekStore
+});
+const recoveryEmail = new RecoveryEmailService({
+  repository: new PostgresRecoveryEmailRepository(authorizationPool, auditContextHasher),
+  users: dekStore,
+  blindIndexKey,
+  mail: new SendmailRecoveryEmailMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    publicAppUrl: environment.PUBLIC_APP_URL,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  })
+});
 const emailChange = new EmailChangeService({
   repository: new PostgresEmailChangeRepository(authorizationPool, auditContextHasher),
   users: dekStore,
@@ -741,6 +861,7 @@ const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
 const application = new PostgresAskApplication(pool, dispatcher, {
+  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   registerVersion: environment.REGISTER_VERSION,
   batteryVersion: environment.BATTERY_VERSION,
@@ -755,6 +876,7 @@ const application = new PostgresAskApplication(pool, dispatcher, {
         assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
       }),
   ...(askBilling === undefined ? {} : { billing: askBilling }),
+  accountProfile,
   resolveDiscoveredPanel: resolveProviderPanel,
   // A20: the per-role model picker (built above, under the boot ledger).
   modelPicker,
@@ -855,6 +977,7 @@ const reconcileErasure = async ():Promise<void> => {
   // Completion notifications must be acknowledged while the user DEK still
   // exists. Account cleanup runs last, so a same-cycle ACK can open the
   // authoritative SQL gate before any key destruction begins.
+  try { await consumerSecurityNotices.reconcile(100); } catch { console.error('[CONSUMER_SECURITY_NOTICE_PENDING]'); }
   await erasureNotifications.reconcile(100);
   await accountErasure.reconcileRunKeyProvisionIntents(100);
   await privateErasure.reconcile(reconciliationSource(),100);
@@ -1187,6 +1310,7 @@ const billingUsageReader = askRoomComposition === undefined || askRoomCompositio
   : new PersonUsageReader({
       entitlements: askRoomComposition.entitlements,
       allowance: askRoomComposition.personAllowance,
+      ...(askRoomComposition.personAllowance instanceof FundingAwarePersonAllowanceSource ? { funding: askRoomComposition.personAllowance } : {}),
       spend: askRoomComposition.spend
     });
 const billingRouteOptions: BillingRouteOptions | undefined =
@@ -1197,6 +1321,7 @@ const billingRouteOptions: BillingRouteOptions | undefined =
         ...(billingRuntime === undefined ? {} : billingRuntime.routes)
       });
 const api = buildApi({
+  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig }),
   application,
   stories: new RepositoryAnswerStoryApplication(storyRepository),
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
@@ -1207,12 +1332,27 @@ const api = buildApi({
   modelScorecardInForce: modelPicker.scorecard.state === "VALID",
   accountErasure:erasureApplication,
   registration,
+  socialAuth,
+  socialStepUp:new SocialStepUpService(socialRepository,socialProviders,sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy}),
+  turnstile: new UnixTurnstileVerifier({ publicAppUrl: environment.PUBLIC_APP_URL, ...(environment.TURNSTILE_SOCKET_PATH === undefined ? {} : { socketPath: environment.TURNSTILE_SOCKET_PATH }) }),
   recovery,
+  ...(passwordReset?{passwordReset}:{}),
+  ...(backupEmail?{backupEmail}:{}),
+  ...(mfaRecovery?{mfaRecovery}:{}),
+  consumerRecovery,
+  onboardingEvidence,
   mfa,
   sessions,
+  consumerSecurity:new ConsumerSecurityService(new PostgresConsumerSecurityRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,argon2:argon2Pool,mfaPolicy,authPolicy}),
+  consumerWebAuthn: new ConsumerWebAuthnService(new PostgresConsumerAuthRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL}),
+  ...(staffAccess === undefined ? {} : { staffAccess }),
+  staffPolicyVersion: environment.STAFF_ACCESS.policyVersion,
+  ...(staffHttp === undefined ? {} : {staff: staffHttp}),
   legacyRunClaim,
   legal,
   emailChange,
+  accountProfile,
+  recoveryEmail,
   // B10: the sealed admission budgets are always composed in production.
   admission: new AdmissionLimiter(admissionPolicy),
   // B7a: the room read and, while billing is on, the usage read. Absent, the
@@ -1271,6 +1411,13 @@ api.addHook("onClose",async () => billingRuntime?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
 api.addHook("onClose",async () => askWaker?.stop());
+api.addHook("onClose",async () => staffAlerts?.close());
+api.addHook("onClose",async()=>{
+ if(passwordResetTimer)clearInterval(passwordResetTimer);
+ if(emailRecoveryTimer)clearInterval(emailRecoveryTimer);
+ await passwordResetNotices?.close();
+ for(const worker of emailRecoveryWorkers)await worker.close();
+});
 const startup = installStartupResourceOwner({
   api,
   registration,
@@ -1350,3 +1497,8 @@ if (askRoom !== undefined) {
   triggerAskWake();
   askWaker = everyWholeMinute(triggerAskWake);
 }
+
+staffAlerts?.start();
+
+if(triggerPasswordResetReconciliation){passwordResetTimer=setInterval(triggerPasswordResetReconciliation,30_000);passwordResetTimer.unref();triggerPasswordResetReconciliation();}
+if(triggerEmailRecoveryReconciliation){emailRecoveryTimer=setInterval(triggerEmailRecoveryReconciliation,30_000);emailRecoveryTimer.unref();triggerEmailRecoveryReconciliation();}

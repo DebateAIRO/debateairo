@@ -1,3 +1,4 @@
+import { canonicalSignup, passedTurnstile } from "../support/turnstileFixtures.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
 import { buildApi, type ApiOptions } from "../../apps/api/src/index.js";
@@ -61,7 +62,7 @@ async function observedAuthSource(input: Readonly<{
       return RESEND_PUBLIC_RESPONSE;
     }
   };
-  const api = buildApi({ application: inertApplication(), registration });
+  const api = buildApi({ application: inertApplication(), turnstile: passedTurnstile, registration });
   try {
     const response = await api.inject({
       method: "POST",
@@ -71,11 +72,10 @@ async function observedAuthSource(input: Readonly<{
         ? {}
         : { headers: { "x-forwarded-for": input.xForwardedFor } }),
       payload: {
+        ...canonicalSignup,
         email: "alice@example.test",
         password: "correct horse battery staple",
-        recovery_email: "recovery@example.test",
-        date_of_birth: "1990-01-01",
-        country: "RO"
+        country: "RO", date_of_birth: "1990-01-01"
       }
     });
     expect(response.statusCode).toBe(202);

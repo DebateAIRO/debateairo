@@ -81,5 +81,6 @@
   "support.answerRating": "A válasz értékelése",
   "support.privacyPreferences": "Adatvédelem",
   "support.aiBanner": "A válaszokat MI hozza létre, géppel olvashatóan jelöljük őket, és tévesek lehetnek. Bármikor kérhet emberi segítséget.",
-  "support.cookiePreferences": "Az általunk tárolt sütik"
+  "support.cookiePreferences": "Az általunk tárolt sütik",
+  "support.recoverAccount": "Fiók helyreállítása"
 }

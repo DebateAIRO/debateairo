@@ -648,8 +648,8 @@ describe("budget spec §2.14 — one hosted debate under a tiny daily limit wait
       },
       whileWaiting: async ({ runId, accepted }) => {
         expect(accepted.applied).toEqual({ plan_tier: "free", risk_tier: "standard", composition_budget_tier: "low", depth: 2 });
-        // Not pinned yet: a waiting question has no charge scope until it starts.
-        expect(await chargeScopeOf(runId)).toEqual([]);
+        // Task11: queue entry pins the ordinary kind/event; wake retains current-plan rules.
+        expect(await chargeScopeOf(runId)).toEqual([{owner_ref:owner.ownerRef,plan_id:"FREE"}]);
       },
       afterAnswer: async ({ runId, owner }) => {
         // R-19: the waking pinned the run to its owner's plan, the one Free entitlement the ask wrote.

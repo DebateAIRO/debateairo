@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { LocaleCode } from "@/lib/i18n/locales";
+import { legalLocale, type CatalogLocaleCode, type LocaleCode } from "@/lib/i18n/locales";
 import type { LegalDocument, LegalDocumentKey } from "@/lib/legalDocument";
 import { PRIVACY_POLICY } from "@/lib/privacyPolicy";
 import { TERMS_OF_SERVICE } from "@/lib/termsOfService";
@@ -153,13 +153,13 @@ const LOADERS = Object.freeze({
     privacy: () => import(/* @vite-ignore */ "@/lib/legal/zh/privacyPolicy.js").then(({ PRIVACY_POLICY }) => PRIVACY_POLICY),
     terms: () => import(/* @vite-ignore */ "@/lib/legal/zh/termsOfService.js").then(({ TERMS_OF_SERVICE }) => TERMS_OF_SERVICE)
   }
-} satisfies Readonly<Record<LocaleCode, Readonly<Record<LegalDocumentKey, LegalDocumentLoader>>>>);
+} satisfies Readonly<Record<CatalogLocaleCode, Readonly<Record<LegalDocumentKey, LegalDocumentLoader>>>>);
 
 export async function loadLegalDocument(
   locale: LocaleCode,
   key: LegalDocumentKey
 ): Promise<LegalDocument> {
-  const loaders = LOADERS[locale] ?? LOADERS.en;
+  const loaders = LOADERS[legalLocale(locale)] ?? LOADERS.en;
   try {
     return await loaders[key]();
   } catch {

@@ -120,7 +120,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Rasprave su privatne dok ih ne objavite. Objavljivanje je namjerna, zasebno potvrđena radnja. Objavljena rasprava prikazuje vaš pseudonim, vaše pitanje kako ste ga napisali, stablo argumenata, rezultate, presudu i raspon pouzdanosti te nosi vidljivu oznaku da je sadržaj generiran umjetnom inteligencijom. Nikada ne prikazuje vašu adresu e-pošte, zapise o sesijama ni povijest računa. Tražilice mogu indeksirati objavljene rasprave." },
-      { kind: "p", text: "Povlačenjem objave rasprava se uklanja s DebateAI-ja i uništava se ključ naše javne kopije. Kopije koje su čitatelji, tražilice ili arhivi već izradili izvan su naše kontrole i ne možemo ih povratiti." },
+      { kind: "p", text: "Povlačenjem objave rasprava se uklanja s Dialectical Engine-ja i uništava se ključ naše javne kopije. Kopije koje su čitatelji, tražilice ili arhivi već izradili izvan su naše kontrole i ne možemo ih povratiti." },
       { kind: "p", text: "Kada izbrišete račun, svaku raspravu koju ste objavili uklanjamo iz javnog pristupa bez nepotrebne odgode, a najkasnije u roku od 30 dana, osim ako nam zakon nalaže čuvanje određenog sadržaja. [Option B — a product change; see the Terms, section 9.]" }
     ]
   },
@@ -199,7 +199,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Osobe imenovane u raspravama koje nisu naši korisnici",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Ako netko sustavu DebateAI postavi pitanje u kojem vas imenuje, možemo imati osobne podatke o vama iako nikada niste upotrebljavali uslugu. Uvjeti korisnicima zabranjuju da to čine i svodimo na najmanju mjeru ono što šaljemo pružateljima usluga umjetne inteligencije, ali to se događa." },
+      { kind: "p", text: "Ako netko sustavu Dialectical Engine postavi pitanje u kojem vas imenuje, možemo imati osobne podatke o vama iako nikada niste upotrebljavali uslugu. Uvjeti korisnicima zabranjuju da to čine i svodimo na najmanju mjeru ono što šaljemo pružateljima usluga umjetne inteligencije, ali to se događa." },
       { kind: "p", text: "Ovaj je odjeljak obavijest koju vam dugujemo prema članku 14. GDPR-a. Podaci su sve što je korisnik upisao i sve što je sustav stvorio u odgovoru; izvor je taj korisnik; svrhe i pravna osnova navedene su u odjeljku 4; primatelji su pružatelji usluga umjetne inteligencije iz Registra; čuvanje slijedi odjeljak 7. Imate sva prava iz odjeljka 10, a osobito možete zatražiti da uklonimo objavljenu ili privatnu raspravu koja sadržava vaše podatke i da vam kažemo što imamo. Za to vam nije potreban račun. Pišite na privacy@dezbatere.ro ili upotrijebite kontrolu Prijavite na bilo kojoj objavljenoj raspravi, a mi ćemo bez nepotrebne odgode postupiti po potkrijepljenim zahtjevima. Ne možemo vas pojedinačno obavijestiti kada se to dogodi jer ne znamo tko ste ni kako vam se obratiti; umjesto toga dajemo ovu javnu obavijest i omogućujemo uklanjanje." },
       { kind: "p", text: "Isto se odnosi na osjetljive informacije o vama — o vašim političkim stavovima, zdravlju ili vjeri — koje se pojave u tuđem pitanju. Nijedan pravni uvjet ne dopušta nam da ih nastavimo obrađivati nakon što uložite prigovor i nećemo to činiti." }
     ]
@@ -209,7 +209,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Djeca",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "DebateAI namijenjen je odraslima. Pri registraciji potvrđujete da imate 18 ili više godina i ne obrađujemo svjesno podatke osoba mlađih od 18 godina. Ako saznamo da račun pripada osobi mlađoj od 18 godina, zatvaramo ga i brišemo podatke kako je opisano u odjeljku 7. Neke države potvrdu smatraju nedostatnom ili zahtijevaju više; Prilog B navodi što se primjenjuje na kojem području, a Uvjeti objašnjavaju što u vezi s tim činimo." }
+      { kind: "p", text: "Dialectical Engine namijenjen je odraslima. Pri registraciji potvrđujete da imate 18 ili više godina i ne obrađujemo svjesno podatke osoba mlađih od 18 godina. Ako saznamo da račun pripada osobi mlađoj od 18 godina, zatvaramo ga i brišemo podatke kako je opisano u odjeljku 7. Neke države potvrdu smatraju nedostatnom ili zahtijevaju više; Prilog B navodi što se primjenjuje na kojem području, a Uvjeti objašnjavaju što u vezi s tim činimo." }
     ]
   },
   {
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kolačići",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI koristi osam stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo DebateAI: četiri kolačića i četiri zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. Pravila o kolačićima na [dezbatere.ro/cookies] navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo." },
+      { kind: "p", text: "Dialectical Engine koristi 18 stavki, sve strogo nužne za uslugu koju ste zatražili i sve ih postavlja isključivo Dialectical Engine: 13 kolačića i 5 zapisa u pohrani vašeg preglednika. Ne postavljamo analitičke, oglasne ni prateće kolačiće. Pravila o kolačićima na [dezbatere.ro/cookies] navode ih uz opis onoga što svaka stavka radi i tko je prima te će se promijeniti prije nego što se doda bilo što drugo." },
       {
         kind: "list",
         items: [
@@ -225,14 +225,24 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Kolačić — Sprječava druga web-mjesta da u vaše ime šalju obrasce. — 14 dana",
         "__Host-debateai-age-refusal — Kolačić (HttpOnly) — Nakon odbijene provjere dobi sprječava ovaj preglednik da pokuša ponovno tijekom 30 dana. Sadrži samo riječ „odbijeno”, bez osobnih podataka. — 30 dana",
         "debateai.locale — Kolačić — Pamti jezik sučelja koji ste odabrali. — 1 godina",
+        "__Host-debateai-staff — Kolačić (HttpOnly) — Odvojeni pristup osoblja — Do 8 sati; 15 minuta neaktivnosti",
+        "__Host-debateai-staff-csrf — Kolačić — Sprječava druga web-mjesta da u vaše ime šalju obrasce. — Do 8 sati; 15 minuta neaktivnosti",
+        "__Host-debateai-password-reset — Kolačić (HttpOnly) — Samo ponovno postavljanje lozinke — Do 30 minuta",
+        "__Host-debateai-password-reset-csrf — Kolačić — Sprječava druga web-mjesta da u vaše ime šalju obrasce. — Do 30 minuta",
+        "__Host-debateai-mfa-recovery — Kolačić (HttpOnly) — Samo oporavak autentifikatora — Do 299 sekundi",
+        "__Host-debateai-mfa-recovery-csrf — Kolačić — Sprječava druga web-mjesta da u vaše ime šalju obrasce. — Do 299 sekundi",
+        "__Host-debateai-social-flow — Kolačić (HttpOnly) — Kratka prijava preko pružatelja ili povezivanje računa — Do 5 minuta",
+        "__Host-debateai-social-apple — Kolačić (HttpOnly) — Kratka prijava preko pružatelja ili povezivanje računa — Do 5 minuta",
+        "__Host-debateai-social-browser — Kolačić (HttpOnly) — Kratka prijava preko pružatelja ili povezivanje računa — Do 5 minuta",
         "debateai.consent — Lokalna pohrana — Pamti da ste vidjeli obavijest o kolačićima, pa se prikazuje samo jednom. — Dok ga ne izbrišete",
         "debateai.mode — Lokalna pohrana — Upotrebljavate li svijetli ili tamni način prikaza. — Dok ga ne izbrišete",
         "debateai.languageOffer.dismissed — Pohrana sesije — Pamti, za ovu karticu, da ste odbili ponudu da se rasprava prikaže na drugom jeziku. — Dok ne zatvorite karticu",
-        "debateai.support.conversation.v2 — Pohrana sesije — Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se bilo tko prijavi ili odjavi u ovoj kartici. — Dok ne zatvorite karticu"
+        "debateai.support.conversation.v2 — Pohrana sesije — Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se bilo tko prijavi ili odjavi u ovoj kartici. — Dok ne zatvorite karticu",
+        "debateai.phone-completion-draft.v1 — Pohrana sesije — Nedovršeno pitanje tijekom koraka s telefonom; briše se pri promjeni sesije, odjavi ili promjeni vlasnika — 15 minuta ili do ranijeg brisanja"
         ]
       },
-      { kind: "p", text: "Nijedna druga strana putem DebateAI-ja ne prikuplja informacije o vašim internetskim aktivnostima tijekom vremena i na različitim web-mjestima." },
-      { kind: "p", text: "Preglednici mogu slati signal „Do Not Track” ili sličan signal. DebateAI vas ne prati, pa takav signal nema što isključiti: usluga radi jednako s njim ili bez njega." },
+      { kind: "p", text: "Nijedna druga strana putem Dialectical Engine-ja ne prikuplja informacije o vašim internetskim aktivnostima tijekom vremena i na različitim web-mjestima." },
+      { kind: "p", text: "Preglednici mogu slati signal „Do Not Track” ili sličan signal. Dialectical Engine vas ne prati, pa takav signal nema što isključiti: usluga radi jednako s njim ili bez njega." },
       { kind: "p", text: "Da biste odbili ove stavke, blokirajte ili izbrišite kolačiće i podatke web-mjesta za ovo web-mjesto u postavkama preglednika. Što tada prestaje raditi: prijava te pamćenje vašeg odabira jezika i načina prikaza; obavijest o kolačićima također će se ponovno prikazati." }
     ]
   },
@@ -242,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kada izmijenimo ova pravila, objavljujemo novu verziju sa sažetkom izmjena i novim datumom stupanja na snagu te čuvamo prethodne verzije na [dezbatere.ro/privacy/versions]. Za izmjenu kojom se dodaje nova svrha ili novi primatelj obavještavamo vas prije početka nove obrade, e-poštom i u proizvodu, te vam dajemo vrijeme za prigovor. Ako nova svrha ovisi o vašoj privoli — primjerice ako ikada poželimo upotrebljavati sadržaj za poboljšavanje modela — tu privolu tražimo zasebno i određeno; prihvaćanje ažuriranih Uvjeta nikada ne smatramo privolom za novu obradu. Za pojašnjenja koja ništa ne mijenjaju u vezi s našim postupanjem jednostavno objavljujemo novu verziju." },
-      { kind: "p", text: "Ova su pravila posljednji put ažurirana [date]. Verzija 3.1 zamijenila je verziju 2.1, koja je podatke o sesijama, rokove čuvanja, analitiku, izvoz i učinak brisanja na objavljene rasprave opisivala na načine koji više nisu odražavali uslugu." }
+      { kind: "p", text: "Ova su pravila posljednji put ažurirana [date]. Verzija 3.2 zamijenila je verziju 2.1, koja je podatke o sesijama, rokove čuvanja, analitiku, izvoz i učinak brisanja na objavljene rasprave opisivala na načine koji više nisu odražavali uslugu." }
     ]
   },
   {
@@ -315,7 +325,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukrajina (samo ako je navedena)",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Primjenjuje se Zakon Ukrajine „O zaštiti osobnih podataka”. DebateAI ne nudimo na područjima Ukrajine koja nisu pod nadzorom njezine vlade. Vaši se podaci prenose u države EU-a i Sjedinjene Američke Države (vidi Registar). Pritužbu možete podnijeti Povjereniku ukrajinskog parlamenta za ljudska prava." }
+      { kind: "p", text: "Primjenjuje se Zakon Ukrajine „O zaštiti osobnih podataka”. Dialectical Engine ne nudimo na područjima Ukrajine koja nisu pod nadzorom njezine vlade. Vaši se podaci prenose u države EU-a i Sjedinjene Američke Države (vidi Registar). Pritužbu možete podnijeti Povjereniku ukrajinskog parlamenta za ljudska prava." }
     ]
   },
   {
@@ -346,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.1",
-  sha256: "7b695ff6d9cbd52d56037a33f50c7eb06a6de357c2524714845802db507fb7e9",
-  eyebrow: "PRAVILA O PRIVATNOSTI · v3.1 · NA SNAZI OD [DATE]",
+  version: "3.2",
+  sha256: "aaf48222dd809eae4aa3a3f57e0dff5cd1d948aa7a3d7e8be8908aed01f50c7c",
+  eyebrow: "PRAVILA O PRIVATNOSTI · v3.2 · NA SNAZI OD [DATE]",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",
-  endMarker: "KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.1",
+  endMarker: "KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tekst Pravila o privatnosti",
   sectionIdPrefix: "policy-section-",

@@ -1,0 +1,62 @@
+{
+  "name": "@simplewebauthn/server",
+  "version": "14.0.2",
+  "exports": {
+    ".": "./src/index.ts",
+    "./helpers": "./src/helpers/index.ts"
+  },
+  "tasks": {
+    "build": {
+      "command": "deno run -A build_npm.ts",
+      "dependencies": [
+        "test"
+      ]
+    },
+    "test": "deno test -A src/ --trace-leaks",
+    "test:watch": "deno test -A --watch src/",
+    "docs:serve": {
+      "command": "deno run -A jsr:@std/http/file-server --host 127.0.0.1 docs/",
+      "dependencies": [
+        "docs:html"
+      ]
+    },
+    "docs:html": "deno doc --html src/index.ts",
+    "docs:lint": "deno doc --lint src/index.ts",
+    "publish": {
+      "command": "deno task publish:jsr && deno task publish:npm",
+      "dependencies": [
+        "build"
+      ]
+    },
+    "publish:jsr": "deno publish",
+    "publish:npm": "(cd npm; npm publish)"
+  },
+  "fmt": {
+    "singleQuote": true,
+    "lineWidth": 100
+  },
+  "imports": {
+    "reflect-metadata": "npm:reflect-metadata@^0.2.2",
+    "tiny-cbor": "npm:@levischuck/tiny-cbor@^0.2.2",
+    "@hexagon/base64": "npm:@hexagon/base64@^1.1.27",
+    "@levischuck/tiny-cbor": "npm:@levischuck/tiny-cbor@^0.2.2",
+    "@peculiar/asn1-android": "npm:@peculiar/asn1-android@^2.6.0",
+    "@peculiar/asn1-ecc": "npm:@peculiar/asn1-ecc@^2.6.1",
+    "@peculiar/asn1-rsa": "npm:@peculiar/asn1-rsa@^2.6.1",
+    "@peculiar/asn1-schema": "npm:@peculiar/asn1-schema@^2.6.0",
+    "@peculiar/asn1-x509": "npm:@peculiar/asn1-x509@^2.6.1",
+    "@peculiar/asn1-x509-post-quantum": "npm:@peculiar/asn1-x509-post-quantum@^2.9.4",
+    "@peculiar/x509": "npm:@peculiar/x509@^2.1.0"
+  },
+  "publish": {
+    "include": [
+      "README.md",
+      "LICENSE.md",
+      "src/**/*.ts"
+    ],
+    "exclude": [
+      "src/**/*.test.ts",
+      "./npm"
+    ]
+  }
+}

@@ -81,6 +81,8 @@ describe("age gate on real PostgreSQL", () => {
       emailBlindIndex: createEmailBlindIndex(Buffer.alloc(32, 7), email),
       emailCiphertext: encrypt(dek, Buffer.from(email), ["identity", "user.email_ciphertext", userId, "run:none", userId, keyId, "1"]),
       recoveryEmailCiphertext: encrypt(dek, Buffer.from(`r-${email}`), ["identity", "user.recovery_email_ciphertext", userId, "run:none", userId, keyId, "1"]),
+      phoneCiphertext: encrypt(dek, Buffer.from("+40722123456"), ["identity", "user.phone_ciphertext", userId, "run:none", userId, keyId, "1"]),
+      phoneSource: "manual", phoneVerificationStatus: "unverified", phoneUpdatedAt: new Date(),
       passwordHash: "age-gate-password-hash",
       pseudonym: `age-gate-${userId}`,
       adultAffirmedAt: new Date("2026-09-28T00:00:00.000Z"),

@@ -20,7 +20,7 @@ const LOCALES = readdirSync(LEGAL_DIR, { withFileTypes: true })
   .sort();
 
 /** The ASCII digit runs each lifetime cell carries, in LISTED order (SPEC-v2 R12 iv). */
-const DIGIT_RUNS: readonly (readonly string[])[] = [["14"], ["14"], ["30"], ["1"], [], [], [], []];
+const DIGIT_RUNS: readonly (readonly string[])[] = [["14"], ["14"], ["30"], ["1"], ["8", "15"], ["8", "15"], ["30"], ["30"], ["299"], ["299"], ["5"], ["5"], ["5"], [], [], [], [], ["15"]];
 
 type Block = { kind: "p" | "table"; text: string };
 
@@ -85,7 +85,7 @@ function catalog(locale: string): Record<string, unknown> {
   return JSON.parse(readFileSync(join(ROOT, "apps/ui/messages", locale, "legal.json"), "utf8")) as Record<string, unknown>;
 }
 
-describe("Privacy Policy §13 — the eight items of record in every locale (SPEC-v2 R12, R13, R18)", () => {
+describe("Privacy Policy §13 — the eighteen actual stored items in every locale (R12, R13, R18)", () => {
   it("every locale's §13 table names exactly the LISTED items, both ways", () => {
     expect(LOCALES).toHaveLength(35);
     expect(compareNames(LISTED.map(({ name }) => name))).toEqual([]);
@@ -102,6 +102,12 @@ describe("Privacy Policy §13 — the eight items of record in every locale (SPE
     }
   });
 
+  it("the comparison refuses an extra unlisted name in every locale", () => {
+    const reports = compareNames([...LISTED.map(({ name }) => name), "synthetic-unlisted-item"]);
+    expect(reports).toHaveLength(35);
+    for (const report of reports) expect(report).toContain("listed but not in §13 [synthetic-unlisted-item]");
+  });
+
   it("every locale's §13 table binds name, kind and lifetime to that locale's /cookies strings", () => {
     const misses: string[] = [];
     for (const locale of LOCALES) {
@@ -116,6 +122,7 @@ describe("Privacy Policy §13 — the eight items of record in every locale (SPE
         if (row.length !== 4) misses.push(`${locale} row ${index + 1}: ${row.length} columns, want 4`);
         if (nameOf(row) !== item.name) misses.push(`${locale} row ${index + 1}: name ${nameOf(row)} want ${item.name}`);
         if (row[1] !== legal[item.kindKey]) misses.push(`${locale} ${item.name}: kind ${JSON.stringify(row[1])} != ${JSON.stringify(legal[item.kindKey])}`);
+        if (row[2] !== legal[item.purposeKey]) misses.push(`${locale} ${item.name}: purpose differs from its exact locale catalogue`);
         if (row[3] !== legal[item.lifeKey]) misses.push(`${locale} ${item.name}: lifetime ${JSON.stringify(row[3])} != ${JSON.stringify(legal[item.lifeKey])}`);
         const digits = (row[3] ?? "").match(/[0-9]+/g) ?? [];
         if (JSON.stringify(digits) !== JSON.stringify(DIGIT_RUNS[index])) {
@@ -131,7 +138,7 @@ describe("Privacy Policy §13 — the eight items of record in every locale (SPE
     const found = blocks(section);
     expect(found.map(({ kind }) => kind)).toEqual(["p", "table", "p", "p", "p"]);
     const phrases: Record<number, readonly string[]> = {
-      0: ["strictly necessary", "only by DebateAI", "Cookie Policy", "dezbatere.ro/cookies"],
+      0: ["18 items", "13 cookies", "5 entries", "strictly necessary", "only by Dialectical Engine", "Cookie Policy", "dezbatere.ro/cookies"],
       2: ["no other party", "across websites"],
       3: ["Do Not Track", "with or without"],
       4: ["block or delete", "browser settings", "stops working", "signing in", "language", "display"]

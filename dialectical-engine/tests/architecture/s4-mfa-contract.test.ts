@@ -38,30 +38,33 @@ describe("S4 MFA architecture contract", () => {
     });
   });
 
-  it("contains no Phase-1 passkey or WebAuthn behavior", async () => {
+  it("uses separate consumer passkeys and direct TOTP completion", async () => {
     const [api, mfa] = await Promise.all([
       read("apps/api/src/index.ts"),
       read("apps/api/src/mfa.ts")
     ]);
     const behavior = `${api}\n${mfa}`;
-    expect(behavior).not.toMatch(/auth\/mfa\/passkey|webauthn/i);
+    expect(behavior).toMatch(/auth\/passkeys\/enrollment/);
+    expect(behavior).toContain("completeAuthenticatedResponse");
     expect(behavior).toMatch(/auth\/mfa\/totp\/begin/);
     expect(behavior).toMatch(/auth\/mfa\/recovery-codes\/confirm/);
   });
 
   it("keeps provisioning local and same-origin with no browser persistence", async () => {
-    const [page, client, qr, englishAuth] = await Promise.all([
+    const [page, client, qr, englishAuth, enrollment] = await Promise.all([
       read("apps/ui/app/enroll-mfa/page.tsx"),
       read("apps/ui/lib/mfaEnrollment.ts"),
       read("apps/ui/lib/totpQr.ts"),
-      readFile(join(process.cwd(), "apps/ui/messages/en/auth.json"), "utf8")
+      readFile(join(process.cwd(), "apps/ui/messages/en/auth.json"), "utf8"),
+      read("apps/ui/components/auth/SecurityEnrollment.tsx")
     ]);
     const englishAuthCatalog = JSON.parse(englishAuth) as Readonly<Record<string, string>>;
     expect(client).toMatch(/createSameOriginFetch\(API_BASE\)/);
     expect(qr).not.toMatch(/fetch\(|https?:\/\//);
-    expect(`${page}\n${client}`).not.toMatch(/localStorage|sessionStorage|console\.(?:log|error)/);
-    expect(page).toContain('t(catalog, "auth.enroll.copyableSetupKey")');
-    expect(englishAuthCatalog["auth.enroll.copyableSetupKey"]).toBe("Copyable setup key");
-    expect(page).toMatch(/setProvisioning\(null\)/);
+    expect(`${page}\n${client}\n${enrollment}`).not.toMatch(/localStorage|sessionStorage|console\.(?:log|error)/);
+    expect(page).toContain("<SecurityEnrollment");
+    expect(enrollment).toContain('t(catalog, "auth.enroll.copySetupKey")');
+    expect(englishAuthCatalog["auth.enroll.copySetupKey"]).toBe("Copy setup key");
+    expect(enrollment).toMatch(/setTotp\(null\)/);
   });
 });

@@ -175,7 +175,7 @@ describe("B7a installBillingRoutes(api, deps) — the one billing routes module 
  */
 describe("B7a the API root supplies the room read and the usage read", () => {
   const BILLING_ON_GUARD = String.raw`askRoomComposition\s*===\s*undefined\s*\|\|\s*askRoomComposition\.entitlements\s*===\s*null\s*\?\s*undefined\s*:\s*`;
-  const READER = String.raw`new\s+PersonUsageReader\(\s*\{\s*entitlements:\s*askRoomComposition\.entitlements\s*,\s*allowance:\s*askRoomComposition\.personAllowance\s*,\s*spend:\s*askRoomComposition\.spend\s*,?\s*\}\s*\)`;
+  const READER = String.raw`new\s+PersonUsageReader\(\s*\{\s*entitlements:\s*askRoomComposition\.entitlements\s*,\s*allowance:\s*askRoomComposition\.personAllowance\s*,\s*(?:\.\.\.\(askRoomComposition\.personAllowance\s+instanceof\s+FundingAwarePersonAllowanceSource\s*\?\s*\{\s*funding:\s*askRoomComposition\.personAllowance\s*\}\s*:\s*\{\}\),\s*)?spend:\s*askRoomComposition\.spend\s*,?\s*\}\s*\)`;
 
   function billingRouteOptionsStatement(main: string): string {
     const start = main.search(/const\s+billingRouteOptions\s*:\s*BillingRouteOptions\s*\|\s*undefined\s*=/u);
