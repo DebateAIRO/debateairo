@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Fil-qosor",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Niġbru dak li jeħtieġ kont u dak li tagħżel li tittajpja. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna; ma jintużawx għat-taħriġ tal-mudelli. Id-dibattiti huma privati sakemm ma tippubblikahomx. It-tħassir tal-kont tiegħek jeqred iċ-ċwievet tad-data privata tiegħek; meta tiskedah, tagħżel jekk id-dibattiti ppubblikati tiegħek jitneħħewx ukoll jew jibqgħux pubbliċi taħt il-psewdonimu preċedenti tiegħek. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jitolbu t-tneħħija mingħajr kont." }
+      { kind: "p", text: "Niġbru dak li jeħtieġ kont u dak li tagħżel li tittajpja. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna; ma jintużawx għat-taħriġ tal-mudelli. Id-dibattiti huma privati sakemm ma tippubblikahomx. It-tħassir tal-kont tiegħek jeqred iċ-ċwievet tad-data privata tiegħek; meta tiskedah, tagħżel jekk id-dibattiti ppubblikati tiegħek jitneħħewx ukoll jew jibqgħux pubbliċi taħt il-psewdonimu rtirat tiegħek. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jitolbu t-tneħħija mingħajr kont." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Rekord tal-awditjar ta’ rifjut skont il-pajjiż tal-IP — Għall-ħajja kollha tas-servizz — Jiżdied miegħu biss; jirreġistra r-rotta, il-kodiċi tar-rifjut, il-pajjiż, il-perjodu ta’ żmien u t-tip ta’ evidenza “indirizz IP”; l-indirizz IP u l-aġent tal-utent jinżammu biss bħala diġests unidirezzjonali b’ċavetta",
         "Indirizz IP mhux ipproċessat għall-verifika tal-pajjiż waqt ir-reġistrazzjoni jew qabel dibattitu ġdid — Biss waqt it-talba korrispondenti — Din il-verifika ma taħżinx IP li jista’ jinqara; l-awditjar tar-rifjut iżomm l-indirizz IP u l-aġent tal-utent biss bħala diġests unidirezzjonali b’ċavetta, u l-pajjiż tal-IP jista’ jidher fir-rekord tal-verifika tal-età",
         "Kontenut tad-dibattitu (privat) — Sakemm jeżisti l-kont — Jinqerdu ċ-ċwievet mal-għeluq, u b’hekk il-kontenut ma jkunx jista’ jinqara",
-        "Kontenut tad-dibattitu (ippubblikat) — Sakemm ikun ippubblikat; jekk tagħlaq il-kont u tħalli \"Ħassar ukoll id-dibattiti pubbliċi tiegħi\" mingħajr marka, dibattitu ppubblikat jibqa’ pubbliku taħt il-psewdonimu preċedenti tiegħek — Jitneħħa mill-aċċess pubbliku u ċ-ċavetta tiegħu tinqered meta tneħħi l-pubblikazzjoni, jew waqt l-għeluq jekk immarkajt \"Ħassar ukoll id-dibattiti pubbliċi tiegħi\"",
+        "Kontenut tad-dibattitu (ippubblikat) — Sakemm ikun ippubblikat; jekk tagħlaq il-kont u tħalli \"Ħassar ukoll id-dibattiti pubbliċi tiegħi\" mingħajr marka, dibattitu ppubblikat jibqa’ pubbliku taħt il-psewdonimu rtirat tiegħek — Jitneħħa mill-aċċess pubbliku u ċ-ċavetta tiegħu tinqered meta tneħħi l-pubblikazzjoni, jew waqt l-għeluq jekk immarkajt \"Ħassar ukoll id-dibattiti pubbliċi tiegħi\"",
         "Rekords tat-tweġibiet tal-fornituri u referenzi tas-sorsi miġjuba — L-istess bħad-dibattitu li jappartjenu għalih — L-istess",
         "Konverżazzjonijiet u każijiet tal-appoġġ — [Until closed plus 12 months] — Jinqerdu ċ-ċwievet",
         "Rekords tal-aċċettazzjoni u tal-kunsens — Il-ħajja tal-kont flimkien ma’ 6 snin — l-itwal perjodu ta’ preskrizzjoni li japplika għalina — Jitħassru",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "de65146cc702ee209f1620a490a62e1b04e88bd2c2b23259588d1f7d6e5e5430",
+  sha256: "db3791c7c7c4efac7d49f960ae7cfea05b67c9f2b1f08765e8f1616097ba02d3",
   eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.2 · EFFETTIVA [DATE]",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",

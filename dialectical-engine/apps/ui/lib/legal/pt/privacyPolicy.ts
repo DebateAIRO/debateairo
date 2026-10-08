@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Em resumo",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Recolhemos o que é necessário para uma conta e o que decide escrever. As suas perguntas são enviadas aos fornecedores de IA indicados no nosso Registo; não são utilizadas para treinar modelos. Os debates são privados, salvo se os publicar. A eliminação da conta destrói as chaves dos seus dados privados; ao programá-la, escolhe se os debates que publicou também são retirados ou se continuam públicos sob o seu antigo pseudónimo. Pode contactar-nos através de privacy@dezbatere.ro, e as pessoas mencionadas num debate podem pedir a remoção sem terem uma conta." }
+      { kind: "p", text: "Recolhemos o que é necessário para uma conta e o que decide escrever. As suas perguntas são enviadas aos fornecedores de IA indicados no nosso Registo; não são utilizadas para treinar modelos. Os debates são privados, salvo se os publicar. A eliminação da conta destrói as chaves dos seus dados privados; ao programá-la, escolhe se os debates que publicou também são retirados ou se continuam públicos sob o seu pseudónimo desativado. Pode contactar-nos através de privacy@dezbatere.ro, e as pessoas mencionadas num debate podem pedir a remoção sem terem uma conta." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Endereço IP usado para determinar localmente o país no registo e no início de cada novo debate — Apenas durante o processamento do pedido — Não é conservado em texto simples para esta verificação; a recusa é registada apenas de forma agregada e no resumo abaixo",
         "Registos agregados de auditoria de recusas pelo país do IP — Durante a vida útil do serviço — O registo contém o código de recusa, o país, a indicação de que o IP foi a prova e resumos unidirecionais baseados numa chave do IP e do identificador do navegador (user-agent); apenas se acrescentam registos.",
         "Conteúdo do debate (privado) — Enquanto a conta existir — As chaves são destruídas no encerramento, tornando o conteúdo ilegível",
-        "Conteúdo do debate (publicado) — Enquanto estiver publicado; se encerrar a conta e deixar «Eliminar também os meus debates públicos» por selecionar, um debate publicado permanece público sob o seu antigo pseudónimo — É removido do acesso público e a sua chave é destruída quando cancela a publicação, ou no encerramento se tiver selecionado «Eliminar também os meus debates públicos»",
+        "Conteúdo do debate (publicado) — Enquanto estiver publicado; se encerrar a conta e deixar «Eliminar também os meus debates públicos» por selecionar, um debate publicado permanece público sob o seu pseudónimo desativado — É removido do acesso público e a sua chave é destruída quando cancela a publicação, ou no encerramento se tiver selecionado «Eliminar também os meus debates públicos»",
         "Registos de respostas dos fornecedores e referências de pesquisa — O mesmo período que o debate a que pertencem — O mesmo",
         "Conversas e casos de apoio — [Until closed plus 12 months] — As chaves são destruídas",
         "Registos de aceitação e consentimento — Vida útil da conta acrescida de 6 anos — o prazo de prescrição mais longo que nos é aplicável — São eliminados",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "78c3c888234f79d50fc6f296eb4c99c235bb178b631cb91a304f58d4b96ff8e9",
+  sha256: "ae6c3719c99af13795d5252513dff1706fa94c20aa79be0024e99251c8e4edd4",
   eyebrow: "POLÍTICA DE PRIVACIDADE · v3.2 · EM VIGOR DESDE [DATE]",
   title: "O que armazenamos e porquê",
   lede: "Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.",

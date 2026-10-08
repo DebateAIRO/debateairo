@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Trumpai",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Renkame tai, ko reikia paskyrai, ir tai, ką nusprendžiate įvesti. Jūsų klausimai perduodami mūsų Registre išvardytiems DI paslaugų teikėjams; jie nenaudojami modeliams mokyti. Debatai yra privatūs, nebent juos paskelbiate. Ištrynus paskyrą sunaikinami jūsų privačių duomenų raktai; planuodami ištrynimą pasirenkate, ar bus pašalinti ir paskelbti debatai, ar jie liks vieši su jūsų ankstesniu slapyvardžiu. Su mumis galite susisiekti adresu privacy@dezbatere.ro, o debatuose paminėti asmenys gali prašyti pašalinti duomenis ir neturėdami paskyros." }
+      { kind: "p", text: "Renkame tai, ko reikia paskyrai, ir tai, ką nusprendžiate įvesti. Jūsų klausimai perduodami mūsų Registre išvardytiems DI paslaugų teikėjams; jie nenaudojami modeliams mokyti. Debatai yra privatūs, nebent juos paskelbiate. Ištrynus paskyrą sunaikinami jūsų privačių duomenų raktai; planuodami ištrynimą pasirenkate, ar bus pašalinti ir paskelbti debatai, ar jie liks vieši su jūsų nebenaudojamu slapyvardžiu. Su mumis galite susisiekti adresu privacy@dezbatere.ro, o debatuose paminėti asmenys gali prašyti pašalinti duomenis ir neturėdami paskyros." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "IP šalies patikros atmetimo audito įrašas — Visą paslaugos gyvavimo laiką — Tik papildomas; įrašomas maršrutas, atmetimo kodas, šalis, laiko intervalas ir įrodymo rūšis „IP adresas“; IP adresas ir naudotojo agentas saugomi tik kaip vienkryptės santraukos, sudarytos naudojant raktą",
         "Neapdorotas IP adresas šalies patikrai registruojantis arba pradedant naujus debatus — Tik atitinkamos užklausos metu — Ši patikra nesaugo skaitomo IP; atmetimo audite IP adresas ir naudotojo agentas saugomi tik kaip vienkryptės santraukos, sudarytos naudojant raktą, o IP šalis gali būti amžiaus patikros įraše",
         "Debatų turinys (privatus) — Kol paskyra egzistuoja — Uždarius paskyrą raktai sunaikinami ir turinio perskaityti nebegalima",
-        "Debatų turinys (paskelbtas) — Kol yra paskelbtas; jei uždarote paskyrą ir nepažymite „Taip pat ištrinti mano viešus debatus“, paskelbti debatai lieka vieši su jūsų ankstesniu slapyvardžiu — Pašalinamas iš viešos prieigos, o jo raktas sunaikinamas atšaukus paskelbimą arba uždarant paskyrą, jei pažymėjote „Taip pat ištrinti mano viešus debatus“",
+        "Debatų turinys (paskelbtas) — Kol yra paskelbtas; jei uždarote paskyrą ir nepažymite „Taip pat ištrinti mano viešus debatus“, paskelbti debatai lieka vieši su jūsų nebenaudojamu slapyvardžiu — Pašalinamas iš viešos prieigos, o jo raktas sunaikinamas atšaukus paskelbimą arba uždarant paskyrą, jei pažymėjote „Taip pat ištrinti mano viešus debatus“",
         "Paslaugų teikėjų atsakymų įrašai ir paieškos nuorodos — Tiek pat, kiek saugomi debatai, kuriems jie priklauso — Tas pats",
         "Pagalbos pokalbiai ir atvejai — [Until closed plus 12 months] — Raktai sunaikinami",
         "Sutikimo su sąlygomis ir kitų sutikimų įrašai — Paskyros gyvavimo laiką ir dar 6 metus — ilgiausią mums taikomą senaties terminą — Ištrinami",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "32a3629e9cfb61c1128262e9f06b7dbe45b7efbb6b974eb593ac600b9c76ffc6",
+  sha256: "be5d00c0f8194bd9bc3ff62408b3a9a46409e932946777ff3fcf4c79e2d47697",
   eyebrow: "PRIVATUMO POLITIKA · v3.2 · ĮSIGALIOJA [DATE]",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",

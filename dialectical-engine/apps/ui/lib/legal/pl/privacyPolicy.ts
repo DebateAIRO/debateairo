@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "W skrócie",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Gromadzimy dane potrzebne do działania konta oraz treści, które zdecydujesz się wpisać. Twoje pytania trafiają do dostawców AI wymienionych w naszym Rejestrze; nie są wykorzystywane do trenowania modeli. Debaty są prywatne, chyba że je opublikujesz. Usunięcie konta niszczy klucze do Twoich prywatnych danych; planując usunięcie, wybierasz, czy opublikowane debaty również zostaną wycofane, czy pozostaną publiczne pod Twoim dawnym pseudonimem. Możesz skontaktować się z nami pod adresem privacy@dezbatere.ro, a osoby wymienione w debacie mogą zażądać jej usunięcia bez posiadania konta." }
+      { kind: "p", text: "Gromadzimy dane potrzebne do działania konta oraz treści, które zdecydujesz się wpisać. Twoje pytania trafiają do dostawców AI wymienionych w naszym Rejestrze; nie są wykorzystywane do trenowania modeli. Debaty są prywatne, chyba że je opublikujesz. Usunięcie konta niszczy klucze do Twoich prywatnych danych; planując usunięcie, wybierasz, czy opublikowane debaty również zostaną wycofane, czy pozostaną publiczne pod Twoim wycofanym pseudonimem. Możesz skontaktować się z nami pod adresem privacy@dezbatere.ro, a osoby wymienione w debacie mogą zażądać jej usunięcia bez posiadania konta." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Adres IP użyty do lokalnego ustalenia kraju przy rejestracji i rozpoczęciu nowej debaty — Tylko podczas obsługi żądania — Adres nie jest przechowywany w postaci jawnej w związku z kontrolą; odmowę odnotowujemy wyłącznie zbiorczo i jako skrót opisany poniżej",
         "Zbiorcze wpisy audytu odmów według kraju IP — Przez okres działania usługi — Wpis zawiera kod odmowy, kraj, oznaczenie adresu IP jako dowodu oraz jednokierunkowe skróty adresu IP i identyfikatora przeglądarki (user-agent) oparte na kluczu; dziennik jest tylko do dopisywania.",
         "Treść debat (prywatna) — Przez okres istnienia konta — Przy zamknięciu klucze zostają zniszczone, przez co treść staje się nieczytelna",
-        "Treść debat (opublikowana) — Przez okres publikacji; jeśli zamkniesz konto i pozostawisz „Usuń również moje publiczne debaty” bez zaznaczenia, opublikowana debata pozostanie publiczna pod Twoim dawnym pseudonimem — Zostaje usunięta z publicznego dostępu, a jej klucz zniszczony, gdy wycofasz publikację, lub przy zamknięciu konta, jeśli zaznaczysz „Usuń również moje publiczne debaty”",
+        "Treść debat (opublikowana) — Przez okres publikacji; jeśli zamkniesz konto i pozostawisz „Usuń również moje publiczne debaty” bez zaznaczenia, opublikowana debata pozostanie publiczna pod Twoim wycofanym pseudonimem — Zostaje usunięta z publicznego dostępu, a jej klucz zniszczony, gdy wycofasz publikację, lub przy zamknięciu konta, jeśli zaznaczysz „Usuń również moje publiczne debaty”",
         "Rejestry odpowiedzi dostawców i odwołania do wyników wyszukiwania — Tak długo jak debata, do której należą — Tak samo",
         "Rozmowy i sprawy dotyczące wsparcia — [Until closed plus 12 months] — Klucze zostają zniszczone",
         "Rejestry akceptacji i zgód — Przez okres istnienia konta oraz 6 lat — najdłuższy mający do nas zastosowanie termin przedawnienia — Zostają usunięte",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "6a6817fa917ce5abffe42c2eadd0c91361f06374fe6b08b3bb5bf77348c8b0ad",
+  sha256: "ba61785b48b8c5eaeaa1678d1872a00c14f7cfeb2697d51cb39d3e25b88da1fc",
   eyebrow: "POLITYKA PRYWATNOŚCI · v3.2 · OBOWIĄZUJE OD [DATE]",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",

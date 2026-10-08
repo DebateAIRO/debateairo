@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ringkasnya",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Kami mengumpulkan apa yang diperlukan akun dan apa yang Anda pilih untuk diketik. Pertanyaan Anda dikirim kepada penyedia AI yang tercantum dalam Daftar kami; pertanyaan tersebut tidak digunakan untuk melatih model. Debat bersifat privat kecuali Anda memublikasikannya. Penghapusan akun memusnahkan kunci data pribadi Anda; saat menjadwalkannya, Anda memilih apakah debat yang Anda publikasikan juga diturunkan atau tetap dapat diakses publik dengan nama samaran lama Anda. Anda dapat menghubungi kami di privacy@dezbatere.ro, dan orang yang disebut dalam debat dapat meminta penghapusan tanpa memiliki akun." }
+      { kind: "p", text: "Kami mengumpulkan apa yang diperlukan akun dan apa yang Anda pilih untuk diketik. Pertanyaan Anda dikirim kepada penyedia AI yang tercantum dalam Daftar kami; pertanyaan tersebut tidak digunakan untuk melatih model. Debat bersifat privat kecuali Anda memublikasikannya. Penghapusan akun memusnahkan kunci data pribadi Anda; saat menjadwalkannya, Anda memilih apakah debat yang Anda publikasikan juga diturunkan atau tetap dapat diakses publik dengan nama samaran yang tidak lagi digunakan. Anda dapat menghubungi kami di privacy@dezbatere.ro, dan orang yang disebut dalam debat dapat meminta penghapusan tanpa memiliki akun." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Catatan audit penolakan berdasarkan negara IP — Selama layanan beroperasi — Hanya dapat ditambah; mencatat rute, kode penolakan, negara, rentang waktu, dan jenis bukti “alamat IP”; alamat IP dan agen pengguna hanya berupa intisari satu arah dengan kunci",
         "Alamat IP asli untuk pemeriksaan negara saat pendaftaran atau debat baru — Hanya selama permintaan yang bersangkutan — Pemeriksaan ini tidak menyimpan IP yang dapat dibaca; audit penolakan menyimpan alamat IP dan agen pengguna hanya sebagai intisari satu arah dengan kunci, dan negara IP dapat tercatat dalam pemeriksaan usia",
         "Konten debat (privat) — Selama akun ada — Kunci dimusnahkan saat penutupan sehingga konten tidak dapat dibaca",
-        "Konten debat (dipublikasikan) — Selama dipublikasikan; jika Anda menutup akun dan membiarkan \"Hapus juga debat publik saya\" tidak dicentang, debat yang dipublikasikan tetap tersedia untuk umum dengan nama samaran lama Anda — Dihapus dari akses publik dan kuncinya dimusnahkan saat Anda membatalkan publikasinya, atau pada penutupan akun jika Anda mencentang \"Hapus juga debat publik saya\"",
+        "Konten debat (dipublikasikan) — Selama dipublikasikan; jika Anda menutup akun dan membiarkan \"Hapus juga debat publik saya\" tidak dicentang, debat yang dipublikasikan tetap tersedia untuk umum dengan nama samaran yang tidak lagi digunakan — Dihapus dari akses publik dan kuncinya dimusnahkan saat Anda membatalkan publikasinya, atau pada penutupan akun jika Anda mencentang \"Hapus juga debat publik saya\"",
         "Catatan pengembalian penyedia dan referensi pengambilan — Sama dengan debat terkait — Sama",
         "Percakapan dan kasus dukungan — [Until closed plus 12 months] — Kunci dimusnahkan",
         "Catatan penerimaan dan persetujuan — Masa berlaku akun ditambah 6 tahun — periode pembatasan terpanjang yang berlaku bagi kami — Dihapus",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "a17f529f9ab78062e724454ab7b0c63a174febf789e4148ab82f599d8c74f246",
+  sha256: "9c41f5177ca9a4aa8ab46563f6f394f56dd7c391f953bc427ab69b8a5a37e400",
   eyebrow: "KEBIJAKAN PRIVASI · v3.2 · BERLAKU [DATE]",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",

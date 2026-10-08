@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Na kratko",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Zbiramo podatke, ki jih potrebuje račun, in to, kar se odločite vnesti. Vaša vprašanja se pošljejo ponudnikom umetne inteligence, navedenim v našem Registru; ne uporabljajo se za učenje modelov. Razprave so zasebne, razen če jih objavite. Z izbrisom računa se uničijo ključi vaših zasebnih podatkov; ob načrtovanju izbrisa izberete, ali bodo odstranjene tudi objavljene razprave ali bodo ostale javne pod vašim nekdanjim psevdonimom. Dosegljivi smo na privacy@dezbatere.ro, osebe, navedene v razpravi, pa lahko zahtevajo odstranitev brez računa." }
+      { kind: "p", text: "Zbiramo podatke, ki jih potrebuje račun, in to, kar se odločite vnesti. Vaša vprašanja se pošljejo ponudnikom umetne inteligence, navedenim v našem Registru; ne uporabljajo se za učenje modelov. Razprave so zasebne, razen če jih objavite. Z izbrisom računa se uničijo ključi vaših zasebnih podatkov; ob načrtovanju izbrisa izberete, ali bodo odstranjene tudi objavljene razprave ali bodo ostale javne pod vašim umaknjenim psevdonimom. Dosegljivi smo na privacy@dezbatere.ro, osebe, navedene v razpravi, pa lahko zahtevajo odstranitev brez računa." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Naslov IP za lokalno določitev države ob registraciji in začetku nove razprave — Samo med obdelavo zahtevka — Za to preverjanje ga ne hranimo v berljivi obliki; zavrnitev zabeležimo le združeno in z zgoščeno vrednostjo, opisano spodaj",
         "Združeni revizijski zapisi zavrnitev glede na državo IP — Za celotno življenjsko dobo storitve — Zapis vsebuje kodo zavrnitve, državo, oznako naslova IP kot dokaza ter enosmerni zgoščeni vrednosti naslova IP in niza user-agent s ključem; v revizijsko sled je mogoče le dodajati.",
         "Vsebina razprave (zasebna) — Dokler račun obstaja — Ob zaprtju se ključi uničijo, zato vsebine ni mogoče prebrati",
-        "Vsebina razprave (objavljena) — Dokler je objavljena; če zaprete račun in možnosti »Izbriši tudi moje javne razprave« ne označite, objavljena razprava ostane javna pod vašim nekdanjim psevdonimom — Odstrani se iz javnega dostopa in njen ključ se uniči, ko umaknete objavo, ali ob zaprtju, če ste označili »Izbriši tudi moje javne razprave«",
+        "Vsebina razprave (objavljena) — Dokler je objavljena; če zaprete račun in možnosti »Izbriši tudi moje javne razprave« ne označite, objavljena razprava ostane javna pod vašim umaknjenim psevdonimom — Odstrani se iz javnega dostopa in njen ključ se uniči, ko umaknete objavo, ali ob zaprtju, če ste označili »Izbriši tudi moje javne razprave«",
         "Evidence odgovorov ponudnikov in sklici za pridobivanje — Enako kot razprava, ki ji pripadajo — Enako",
         "Pogovori in primeri podpore — [Until closed plus 12 months] — Ključi se uničijo",
         "Evidence sprejetja in privolitev — Življenjska doba računa in še 6 let — najdaljši zastaralni rok, ki velja za nas — Izbrišejo se",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "777a7607c93e86c1c135fa1d68bf13aa18158c4e3259f2ea26f12fe301b792b9",
+  sha256: "2f3bd435512bee09ba54dafe24b49d6f6dd1010c3cd85cd71d1c2dde4c57d7c4",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.2 · VELJA OD [DATE]",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",

@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kort fortalt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Vi indsamler det, en konto har brug for, og det, du vælger at skrive. Dine spørgsmål sendes til AI-udbydere, der er anført i vores Register; de bruges ikke til at træne modeller. Debatter er private, medmindre du offentliggør dem. Når du sletter din konto, destrueres nøglerne til dine private data; når du planlægger sletningen, vælger du, om dine offentliggjorte debatter også skal fjernes eller forblive offentlige under dit tidligere pseudonym. Du kan kontakte os på privacy@dezbatere.ro, og personer, som nævnes i en debat, kan anmode om fjernelse uden at have en konto." }
+      { kind: "p", text: "Vi indsamler det, en konto har brug for, og det, du vælger at skrive. Dine spørgsmål sendes til AI-udbydere, der er anført i vores Register; de bruges ikke til at træne modeller. Debatter er private, medmindre du offentliggør dem. Når du sletter din konto, destrueres nøglerne til dine private data; når du planlægger sletningen, vælger du, om dine offentliggjorte debatter også skal fjernes eller forblive offentlige under dit udfasede pseudonym. Du kan kontakte os på privacy@dezbatere.ro, og personer, som nævnes i en debat, kan anmode om fjernelse uden at have en konto." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Risikosignaler ved login og gendannelse — 90 dage, håndhævet af databasen — Renses",
         "Sikkerhedsrevisionsspor — I hele tjenestens levetid — Der kan kun tilføjes; IP-adresse og user-agent er envejs-hashes og kan ikke læses igen",
         "Debatindhold (privat) — Mens kontoen findes — Nøgler destrueres ved lukning, så indholdet bliver ulæseligt",
-        "Debatindhold (offentliggjort) — Mens det er offentliggjort; hvis du lukker din konto og lader „Slet også mine offentlige debatter“ være umarkeret, forbliver en offentliggjort debat offentlig under dit tidligere pseudonym — Fjernes fra offentlig adgang, og dens nøgle destrueres, når du ophæver offentliggørelsen, eller ved lukning, hvis du har markeret „Slet også mine offentlige debatter“",
+        "Debatindhold (offentliggjort) — Mens det er offentliggjort; hvis du lukker din konto og lader \"Slet også mine offentlige debatter\" være umarkeret, forbliver en offentliggjort debat offentlig under dit udfasede pseudonym — Fjernes fra offentlig adgang, og dens nøgle destrueres, når du ophæver offentliggørelsen, eller ved lukning, hvis du har markeret \"Slet også mine offentlige debatter\"",
         "Registreringer af udbydersvar og søgehenvisninger — Samme periode som den debat, de tilhører — Det samme",
         "Supportsamtaler og -sager — [Until closed plus 12 months] — Nøgler destrueres",
         "Registreringer af accept og samtykke — Kontoens levetid plus 6 år — den længste forældelsesfrist, der gælder for os — Slettes",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Sikkerhedskopier [pending] — [… days] efter at den aktive kopi er slettet — Overskrives"
         ]
       },
-      { kind: "p", text: "Hvad sletning faktisk gør. Dine private debatter og kontodata er krypteret under nøgler, der er specifikke for din konto og for hver debat. Når din konto slettes, destrueres disse nøgler, hvorefter de krypterede registreringer ikke kan læses af os eller andre, og vi sletter din kontoregistrering. Nøglen til en offentlig kopi af en offentliggjort debat destrueres ved sletning kun, hvis du har markeret „Slet også mine offentlige debatter“ (afsnit 6). Vi beskriver dette som sletning, fordi det er virkningen, og vi har en dokumenteret vurdering, der underbygger det; spørg os, hvis du vil vide mere. Tre forhold bør fremhæves: Sikkerhedsrevisionssporet kan kun tilføjes til og slettes ikke, men indeholder ingen læsbare identifikatorer for dig; et mindre antal ældre debatter er fra før vores nuværende krypteringsordning, og hvis det gælder din konto, fortæller vi dig, hvad en lukning medfører for dem; og kopier af data, der allerede er sendt til en AI-udbyder, er underlagt den pågældende udbyders opbevaringsvilkår i Registret, ikke vores sletning." },
+      { kind: "p", text: "Hvad sletning faktisk gør. Dine private debatter og kontodata er krypteret under nøgler, der er specifikke for din konto og for hver debat. Når din konto slettes, destrueres disse nøgler, hvorefter de krypterede registreringer ikke kan læses af os eller andre, og vi sletter din kontoregistrering. Nøglen til en offentlig kopi af en offentliggjort debat destrueres ved sletning kun, hvis du har markeret \"Slet også mine offentlige debatter\" (afsnit 6). Vi beskriver dette som sletning, fordi det er virkningen, og vi har en dokumenteret vurdering, der underbygger det; spørg os, hvis du vil vide mere. Tre forhold bør fremhæves: Sikkerhedsrevisionssporet kan kun tilføjes til og slettes ikke, men indeholder ingen læsbare identifikatorer for dig; et mindre antal ældre debatter er fra før vores nuværende krypteringsordning, og hvis det gælder din konto, fortæller vi dig, hvad en lukning medfører for dem; og kopier af data, der allerede er sendt til en AI-udbyder, er underlagt den pågældende udbyders opbevaringsvilkår i Registret, ikke vores sletning." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "821d39cd4fcd52234806cc7260e62e92d104cb8b946617fb45520aa8f93d2710",
+  sha256: "c55f16b671cba0305ba6fbb7abc8ecfd7ea52af7914ae0a297dd57a6f06b9706",
   eyebrow: "PRIVATLIVSPOLITIK · v3.2 · GÆLDENDE FRA [DATE]",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",

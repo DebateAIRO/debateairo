@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Stručne",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Zhromažďujeme údaje potrebné pre účet a to, čo sa rozhodnete napísať. Vaše otázky sa odosielajú poskytovateľom umelej inteligencie uvedeným v našom registri; nepoužívajú sa na trénovanie modelov. Debaty sú súkromné, pokiaľ ich nezverejníte. Odstránením účtu sa zničia kľúče k vašim súkromným údajom; pri plánovaní odstránenia si zvolíte, či sa odstránia aj vaše zverejnené debaty, alebo zostanú verejné pod vaším bývalým pseudonymom. Môžete nás kontaktovať na privacy@dezbatere.ro a osoby uvedené v debate môžu požiadať o odstránenie aj bez účtu." }
+      { kind: "p", text: "Zhromažďujeme údaje potrebné pre účet a to, čo sa rozhodnete napísať. Vaše otázky sa odosielajú poskytovateľom umelej inteligencie uvedeným v našom registri; nepoužívajú sa na trénovanie modelov. Debaty sú súkromné, pokiaľ ich nezverejníte. Odstránením účtu sa zničia kľúče k vašim súkromným údajom; pri plánovaní odstránenia si zvolíte, či sa odstránia aj vaše zverejnené debaty, alebo zostanú verejné pod vaším vyradeným pseudonymom. Môžete nás kontaktovať na privacy@dezbatere.ro a osoby uvedené v debate môžu požiadať o odstránenie aj bez účtu." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "IP adresa použitá na lokálne určenie krajiny pri registrácii a začatí novej debaty — Len počas spracovania žiadosti — Na túto kontrolu sa neuchováva v čitateľnej podobe; odmietnutie sa zaznamenáva iba súhrnne a vo forme súhrnu opísaného nižšie",
         "Súhrnné auditné záznamy odmietnutí podľa krajiny IP — Počas životnosti služby — Záznam obsahuje kód odmietnutia, krajinu, označenie IP adresy ako dôkazu a jednosmerné súhrny IP adresy a reťazca user-agent vytvorené pomocou kľúča; do záznamu možno iba pridávať.",
         "Obsah debaty (súkromný) — Počas existencie účtu — Pri odstránení účtu sa zničia kľúče, čím sa obsah stane nečitateľným",
-        "Obsah debaty (zverejnený) — Počas zverejnenia; ak zrušíte účet a možnosť „Odstrániť aj moje verejné debaty“ necháte nezaškrtnutú, zverejnená debata zostane verejná pod vaším bývalým pseudonymom — Odstráni sa z verejného prístupu a jej kľúč sa zničí pri zrušení zverejnenia alebo pri zrušení účtu, ak ste zaškrtli „Odstrániť aj moje verejné debaty“",
+        "Obsah debaty (zverejnený) — Počas zverejnenia; ak zrušíte účet a možnosť „Odstrániť aj moje verejné debaty“ necháte nezaškrtnutú, zverejnená debata zostane verejná pod vaším vyradeným pseudonymom — Odstráni sa z verejného prístupu a jej kľúč sa zničí pri zrušení zverejnenia alebo pri zrušení účtu, ak ste zaškrtli „Odstrániť aj moje verejné debaty“",
         "Záznamy odpovedí poskytovateľa a odkazy na vyhľadávanie — Rovnako dlho ako debata, ku ktorej patria — Rovnako",
         "Konverzácie a prípady podpory — [Until closed plus 12 months] — Kľúče sa zničia",
         "Záznamy o prijatí a súhlase — Počas existencie účtu a ďalších 6 rokov — najdlhšia premlčacia lehota, ktorá sa na nás vzťahuje — Vymažú sa",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "db7d2df6a7ef4955cf92d277b65f90ca29e4d42c3b081383c5443b181009b3ce",
+  sha256: "70834ed1ea96833efc5861923a207d916cb049c2564dbc2c98c5e817fa4b1994",
   eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.2 · ÚČINNÉ OD [DATE]",
   title: "Čo uchovávame a prečo",
   lede: "Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.",

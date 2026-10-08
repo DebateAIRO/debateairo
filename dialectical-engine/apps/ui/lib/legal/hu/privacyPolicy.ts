@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Röviden",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "A fiók működéséhez szükséges és az Ön által megadni választott adatokat gyűjtjük. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk; azokat nem használják modellek betanítására. A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti magánjellegű adatainak kulcsait; a törlés ütemezésekor Ön dönt arról, hogy közzétett vitáit is eltávolítsuk-e, vagy azok korábbi álneve alatt nyilvánosak maradjanak. A privacy@dezbatere.ro címen érhet el bennünket, és a vitában megnevezett személyek fiók nélkül is kérhetik az eltávolítást." }
+      { kind: "p", text: "A fiók működéséhez szükséges és az Ön által megadni választott adatokat gyűjtjük. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk; azokat nem használják modellek betanítására. A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti magánjellegű adatainak kulcsait; a törlés ütemezésekor Ön dönt arról, hogy közzétett vitáit is eltávolítsuk-e, vagy azok visszavont álneve alatt nyilvánosak maradjanak. A privacy@dezbatere.ro címen érhet el bennünket, és a vitában megnevezett személyek fiók nélkül is kérhetik az eltávolítást." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "IP-cím országa szerinti elutasítás auditbejegyzése — A szolgáltatás teljes élettartama alatt — Csak hozzáfűzhető; rögzíti az útvonalat, az elutasítás kódját, az országot, az időablakot és az „IP-cím” bizonyítéktípust; az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel",
         "Nyers IP-cím a regisztrációs vagy új vita előtti országellenőrzéshez — Csak az adott kérés ideje alatt — Az ellenőrzés nem tárol olvasható IP-címet; az elutasítás auditjában az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel, az IP országa pedig az életkor-ellenőrzésben szerepelhet",
         "Vitatartalom (magánjellegű) — A fiók fennállásáig — Megszüntetéskor megsemmisítjük a kulcsokat, így a tartalom olvashatatlanná válik",
-        "Vitatartalom (közzétett) — A közzététel idején; ha megszünteti fiókját, és nem jelöli be a „Töröljék a nyilvános vitáimat is” lehetőséget, a közzétett vita korábbi álneve alatt nyilvános marad — A nyilvános hozzáférésből eltávolítjuk, és kulcsát megsemmisítjük a közzététel visszavonásakor vagy a fiók megszüntetésekor, ha bejelölte a „Töröljék a nyilvános vitáimat is” lehetőséget",
+        "Vitatartalom (közzétett) — A közzététel idején; ha megszünteti fiókját, és nem jelöli be a „Töröljék a nyilvános vitáimat is” lehetőséget, a közzétett vita visszavont álneve alatt nyilvános marad — A nyilvános hozzáférésből eltávolítjuk, és kulcsát megsemmisítjük a közzététel visszavonásakor vagy a fiók megszüntetésekor, ha bejelölte a „Töröljék a nyilvános vitáimat is” lehetőséget",
         "Szolgáltatói válasznyilvántartások és visszakeresési hivatkozások — Ugyanaddig, mint a vita, amelyhez tartoznak — Ugyanaz",
         "Támogatási beszélgetések és ügyek — [Until closed plus 12 months] — A kulcsokat megsemmisítjük",
         "Elfogadási és hozzájárulási nyilvántartások — A fiók élettartama plusz 6 év — a ránk alkalmazandó leghosszabb elévülési idő — Töröljük",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "ed5e20a587554cd9519d15809903f5144b01b700675793949516ea6613a3eb1a",
+  sha256: "463fac11a8c0232654ef08b4fcaf67b87a377822a98deb42c81537b3a893d653",
   eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.2 · HATÁLYOS [DATE]",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",

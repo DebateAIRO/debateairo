@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kurz gesagt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Wir erheben, was für ein Konto erforderlich ist und was Sie freiwillig eingeben. Ihre Fragen werden an die in unserem Verzeichnis aufgeführten KI-Anbieter übermittelt; sie werden nicht zum Trainieren von Modellen verwendet. Debatten sind privat, sofern Sie sie nicht veröffentlichen. Bei der Löschung Ihres Kontos werden die Schlüssel zu Ihren privaten Daten vernichtet; bei der Planung entscheiden Sie, ob auch Ihre veröffentlichten Debatten entfernt werden oder unter Ihrem früheren Pseudonym öffentlich bleiben. Sie erreichen uns unter privacy@dezbatere.ro; in einer Debatte genannte Personen können auch ohne Konto die Entfernung verlangen." }
+      { kind: "p", text: "Wir erheben, was für ein Konto erforderlich ist und was Sie freiwillig eingeben. Ihre Fragen werden an die in unserem Verzeichnis aufgeführten KI-Anbieter übermittelt; sie werden nicht zum Trainieren von Modellen verwendet. Debatten sind privat, sofern Sie sie nicht veröffentlichen. Bei der Löschung Ihres Kontos werden die Schlüssel zu Ihren privaten Daten vernichtet; bei der Planung entscheiden Sie, ob auch Ihre veröffentlichten Debatten entfernt werden oder unter Ihrem stillgelegten Pseudonym öffentlich bleiben. Sie erreichen uns unter privacy@dezbatere.ro; in einer Debatte genannte Personen können auch ohne Konto die Entfernung verlangen." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Risikoindikatoren für Anmeldung und Wiederherstellung — 90 Tage, durch die Datenbank durchgesetzt — Bereinigt",
         "Sicherheitsprotokoll — Für die Lebensdauer des Dienstes — Nur ergänzbar; IP und User-Agent sind Einweg-Digests und können nicht ausgelesen werden",
         "Debatteninhalte (privat) — Solange das Konto besteht — Schlüssel bei Schließung vernichtet, wodurch die Inhalte unlesbar werden",
-        "Debatteninhalte (veröffentlicht) — Solange sie veröffentlicht sind; wenn Sie Ihr Konto schließen und „Auch meine öffentlichen Debatten löschen“ nicht auswählen, bleibt eine veröffentlichte Debatte unter Ihrem früheren Pseudonym öffentlich — Beim Aufheben der Veröffentlichung oder bei der Schließung, wenn Sie „Auch meine öffentlichen Debatten löschen“ ausgewählt haben, aus dem öffentlichen Zugriff entfernt und ihr Schlüssel vernichtet",
+        "Debatteninhalte (veröffentlicht) — Solange sie veröffentlicht sind; wenn Sie Ihr Konto schließen und „Auch meine öffentlichen Debatten löschen“ nicht auswählen, bleibt eine veröffentlichte Debatte unter Ihrem stillgelegten Pseudonym öffentlich — Beim Aufheben der Veröffentlichung oder bei der Schließung, wenn Sie „Auch meine öffentlichen Debatten löschen“ ausgewählt haben, aus dem öffentlichen Zugriff entfernt und ihr Schlüssel vernichtet",
         "Aufzeichnungen der Antworten der Anbieter und Suchreferenzen — So lange wie die zugehörige Debatte — Ebenso",
         "Support-Gespräche und -fälle — [Until closed plus 12 months] — Schlüssel vernichtet",
         "Nachweise über Annahme und Einwilligung — Lebensdauer des Kontos zuzüglich 6 Jahren – die längste für uns geltende Verjährungsfrist — Gelöscht",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "f19691ae1c98e6b6c26abca6d383b1dd32997c9facae11b4cb10a250c2038ae1",
+  sha256: "a1ab9725eda7c375d50ce392b74f3b5d731a93348f6a98c05529db42ddb0ed8b",
   eyebrow: "DATENSCHUTZERKLÄRUNG · v3.2 · GÜLTIG AB [DATE]",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",

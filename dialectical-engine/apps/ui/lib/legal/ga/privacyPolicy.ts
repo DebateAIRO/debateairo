@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Go hachomair",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Bailímid an méid atá de dhíth ar chuntas agus an méid a roghnaíonn tú a chlóscríobh. Seoltar do cheisteanna chuig soláthraithe IS atá liostaithe inár gClár; ní úsáidtear iad chun samhlacha a oiliúint. Bíonn díospóireachtaí príobháideach mura bhfoilsíonn tú iad. Scriosann scriosadh do chuntais na heochracha do do shonraí príobháideacha; nuair a sceidealaíonn tú é, roghnaíonn tú an mbainfear anuas do dhíospóireachtaí foilsithe freisin nó an bhfanfaidh siad poiblí faoi do sheanainm cleite. Is féidir teagmháil a dhéanamh linn ag privacy@dezbatere.ro, agus is féidir le daoine a ainmnítear i ndíospóireacht a iarraidh go mbainfí í gan cuntas a bheith acu." }
+      { kind: "p", text: "Bailímid an méid atá de dhíth ar chuntas agus an méid a roghnaíonn tú a chlóscríobh. Seoltar do cheisteanna chuig soláthraithe IS atá liostaithe inár gClár; ní úsáidtear iad chun samhlacha a oiliúint. Bíonn díospóireachtaí príobháideach mura bhfoilsíonn tú iad. Scriosann scriosadh do chuntais na heochracha do do shonraí príobháideacha; nuair a sceidealaíonn tú é, roghnaíonn tú an mbainfear anuas do dhíospóireachtaí foilsithe freisin nó an bhfanfaidh siad poiblí faoi d'ainm cleite scortha. Is féidir teagmháil a dhéanamh linn ag privacy@dezbatere.ro, agus is féidir le daoine a ainmnítear i ndíospóireacht a iarraidh go mbainfí í gan cuntas a bheith acu." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Comharthaí riosca sínithe isteach agus athshlánaithe — 90 lá, arna fhorfheidhmiú ag an mbunachar sonraí — Glantar iad",
         "Rian iniúchóireachta slándála — Ar feadh saolré na seirbhíse — Ní féidir ach cur leis; is achoimrí aontreo iad an seoladh IP agus an gníomhaire úsáideora agus ní féidir iad a léamh ar ais",
         "Ábhar díospóireachta (príobháideach) — Fad atá an cuntas ann — Scriostar eochracha tráth dúnta, rud a fhágann nach féidir an t-ábhar a léamh",
-        "Ábhar díospóireachta (foilsithe) — Fad atá sé foilsithe; má dhúnann tú do chuntas agus má fhágann tú \"Scrios mo dhíospóireachtaí poiblí freisin\" gan tic, fanann díospóireacht fhoilsithe poiblí faoi do sheanainm cleite — Baintear ó rochtain phoiblí é agus scriostar a eochair nuair a dhífhoilsíonn tú é, nó ag dúnadh an chuntais má chuir tú tic le \"Scrios mo dhíospóireachtaí poiblí freisin\"",
+        "Ábhar díospóireachta (foilsithe) — Fad atá sé foilsithe; má dhúnann tú do chuntas agus má fhágann tú \"Scrios mo dhíospóireachtaí poiblí freisin\" gan tic, fanann díospóireacht fhoilsithe poiblí faoi d'ainm cleite scortha — Baintear ó rochtain phoiblí é agus scriostar a eochair nuair a dhífhoilsíonn tú é, nó ag dúnadh an chuntais má chuir tú tic le \"Scrios mo dhíospóireachtaí poiblí freisin\"",
         "Taifid den mhéid a thug soláthraithe IS ar ais agus tagairtí aisghabhála — Chomh fada leis an díospóireacht lena mbaineann siad — Mar an gcéanna",
         "Comhráite agus cásanna tacaíochta — [Until closed plus 12 months] — Scriostar na heochracha",
         "Taifid ghlactha agus toilithe — Saolré an chuntais móide 6 bliana — an tréimhse theorann is faide a bhfuil feidhm aici maidir linn — Scriostar iad",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "b4207e30e1964632c3d852a35235386b63be32d7119e01e780c23429750d70bf",
+  sha256: "74de6619516c1582fbcd9c9af13b954d3c2e42cf1377c7635603e709a700f810",
   eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.2 · I bhFEIDHM [DATE]",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",

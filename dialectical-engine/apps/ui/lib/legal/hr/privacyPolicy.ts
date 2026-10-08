@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ukratko",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Prikupljamo ono što je potrebno za račun i ono što odlučite upisati. Vaša se pitanja šalju pružateljima usluga umjetne inteligencije navedenima u našem Registru; ne upotrebljavaju se za treniranje modela. Rasprave su privatne osim ako ih objavite. Brisanjem računa uništavaju se ključevi vaših privatnih podataka; pri zakazivanju birate hoće li se i vaše objavljene rasprave ukloniti ili ostati javne pod vašim bivšim pseudonimom. Možete nam se obratiti na privacy@dezbatere.ro, a osobe imenovane u raspravi mogu zatražiti uklanjanje i bez računa." }
+      { kind: "p", text: "Prikupljamo ono što je potrebno za račun i ono što odlučite upisati. Vaša se pitanja šalju pružateljima usluga umjetne inteligencije navedenima u našem Registru; ne upotrebljavaju se za treniranje modela. Rasprave su privatne osim ako ih objavite. Brisanjem računa uništavaju se ključevi vaših privatnih podataka; pri zakazivanju birate hoće li se i vaše objavljene rasprave ukloniti ili ostati javne pod vašim pseudonimom koji se više ne upotrebljava. Možete nam se obratiti na privacy@dezbatere.ro, a osobe imenovane u raspravi mogu zatražiti uklanjanje i bez računa." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Zapis o odbijanju pri provjeri države IP adrese — Za cijelog trajanja usluge — Može se samo dopunjavati; bilježe se putanja, kod odbijanja, država, vremensko razdoblje i vrsta dokaza „IP adresa”; IP adresa i korisnički agent čuvaju se samo kao jednosmjerni sažeci s ključem",
         "Izvorna IP adresa za provjeru države pri registraciji ili novoj raspravi — Samo tijekom odgovarajućeg zahtjeva — Ova provjera ne čuva čitljivu IP adresu; revizija odbijanja čuva IP adresu i korisnički agent samo kao jednosmjerne sažetke s ključem, a država IP adrese može biti u zapisu provjere dobi",
         "Sadržaj rasprave (privatan) — Dok račun postoji — Ključevi se uništavaju pri zatvaranju, čime sadržaj postaje nečitljiv",
-        "Sadržaj rasprave (objavljen) — Dok je objavljen; ako zatvorite račun i ostavite „Izbrišite i moje javne rasprave” neoznačenim, objavljena rasprava ostaje javna pod vašim bivšim pseudonimom — Uklanja se iz javnog pristupa i njegov se ključ uništava kada povučete objavu ili pri zatvaranju ako ste označili „Izbrišite i moje javne rasprave”",
+        "Sadržaj rasprave (objavljen) — Dok je objavljen; ako zatvorite račun i ostavite „Izbrišite i moje javne rasprave” neoznačenim, objavljena rasprava ostaje javna pod vašim pseudonimom koji se više ne upotrebljava — Uklanja se iz javnog pristupa i njegov se ključ uništava kada povučete objavu ili pri zatvaranju ako ste označili „Izbrišite i moje javne rasprave”",
         "Zapisi odgovora pružatelja i upućivanja za dohvaćanje — Jednako kao rasprava kojoj pripadaju — Jednako",
         "Razgovori i predmeti podrške — [Until closed plus 12 months] — Ključevi se uništavaju",
         "Evidencija prihvaćanja i privola — Trajanje računa uz još 6 godina — najdulji rok zastare koji se na nas primjenjuje — Briše se",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "1ef34236a279970f0c86c226f8e258d0181134bf083b6720e04dc4a76d2e0014",
+  sha256: "f7309a0c25873e93bd990bd6edfb32be13d54a5a1d70c3d24826b10a7c98c12f",
   eyebrow: "PRAVILA O PRIVATNOSTI · v3.2 · NA SNAZI OD [DATE]",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",

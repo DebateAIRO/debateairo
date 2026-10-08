@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "In breve",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Raccogliamo ciò che serve a un account e ciò che scegli di digitare. Le tue domande vengono inviate ai fornitori di IA elencati nel nostro Registro; non sono utilizzate per addestrare i modelli. I dibattiti sono privati, salvo che tu non li pubblichi. La cancellazione dell’account distrugge le chiavi dei tuoi dati privati; quando la programmi, scegli se rimuovere anche i dibattiti pubblicati o lasciarli pubblici con il tuo precedente pseudonimo. Puoi contattarci all'indirizzo privacy@dezbatere.ro e le persone nominate in un dibattito possono chiederne la rimozione senza avere un account." }
+      { kind: "p", text: "Raccogliamo ciò che serve a un account e ciò che scegli di digitare. Le tue domande vengono inviate ai fornitori di IA elencati nel nostro Registro; non sono utilizzate per addestrare i modelli. I dibattiti sono privati, salvo che tu non li pubblichi. La cancellazione dell’account distrugge le chiavi dei tuoi dati privati; quando la programmi, scegli se rimuovere anche i dibattiti pubblicati o lasciarli pubblici con il tuo pseudonimo dismesso. Puoi contattarci all'indirizzo privacy@dezbatere.ro e le persone nominate in un dibattito possono chiederne la rimozione senza avere un account." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Audit dei rifiuti per Paese dell’IP — Per tutta la vita del servizio — Di sola aggiunta; registra percorso, codice del rifiuto, Paese, intervallo di tempo e tipo di prova «indirizzo IP»; indirizzo IP e user-agent figurano solo come digest unidirezionali con chiave",
         "Indirizzo IP in chiaro per verificare il Paese alla registrazione o prima di un nuovo dibattito — Solo durante la relativa richiesta — Questa verifica non conserva l’IP leggibile; nell’audit del rifiuto l’indirizzo IP e lo user-agent figurano solo come digest unidirezionali con chiave e il Paese dell’IP può figurare nel record della verifica dell’età",
         "Contenuto dei dibattiti (privato) — Finché l'account esiste — Chiavi distrutte alla chiusura, rendendo il contenuto illeggibile",
-        "Contenuto dei dibattiti (pubblicato) — Finché è pubblicato; se chiudi l’account e lasci „Elimina anche i miei dibattiti pubblici” deselezionato, un dibattito pubblicato rimane pubblico con il tuo precedente pseudonimo — Rimosso dall’accesso pubblico e con la chiave distrutta quando ne revochi la pubblicazione, o alla chiusura se hai selezionato „Elimina anche i miei dibattiti pubblici”",
+        "Contenuto dei dibattiti (pubblicato) — Finché è pubblicato; se chiudi l’account e lasci \"Elimina anche i miei dibattiti pubblici\" deselezionato, un dibattito pubblicato rimane pubblico con il tuo pseudonimo dismesso — Rimosso dall’accesso pubblico e con la chiave distrutta quando ne revochi la pubblicazione, o alla chiusura se hai selezionato \"Elimina anche i miei dibattiti pubblici\"",
         "Registrazioni delle risposte dei fornitori e riferimenti di ricerca — Come il dibattito cui appartengono — Come per il dibattito cui appartengono",
         "Conversazioni e casi di assistenza — [Until closed plus 12 months] — Chiavi distrutte",
         "Registri di accettazione e consenso — Durata dell'account più 6 anni — il termine di prescrizione più lungo a noi applicabile — Cancellati",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Backup [pending] — [… days] dopo la cancellazione della copia attiva — Sovrascritti"
         ]
       },
-      { kind: "p", text: "Cosa comporta effettivamente la cancellazione. I tuoi dibattiti privati e i dati del tuo account sono cifrati mediante chiavi specifiche per il tuo account e per ogni dibattito. La cancellazione dell'account distrugge tali chiavi, dopodiché i record cifrati non possono più essere letti da noi o da chiunque altro, e cancelliamo il record del tuo account. La chiave della copia pubblica di un dibattito pubblicato viene distrutta alla cancellazione solo se hai selezionato „Elimina anche i miei dibattiti pubblici” (sezione 6). Definiamo questa operazione cancellazione perché tale è il suo effetto e disponiamo di una valutazione documentata che la supporta; se desideri saperne di più, chiedicelo. Vi sono tre aspetti da conoscere: il registro di controllo della sicurezza è di sola aggiunta e non viene cancellato, ma non contiene identificativi leggibili che ti riguardino; un numero limitato di dibattiti meno recenti precede il nostro attuale sistema di cifratura e, se ciò riguarda il tuo account, ti comunicheremo quale effetto produce la chiusura su di essi; le copie dei dati già inviate a un fornitore di IA sono disciplinate dalle condizioni di conservazione di tale fornitore indicate nel Registro, non dalla nostra cancellazione." },
+      { kind: "p", text: "Cosa comporta effettivamente la cancellazione. I tuoi dibattiti privati e i dati del tuo account sono cifrati mediante chiavi specifiche per il tuo account e per ogni dibattito. La cancellazione dell'account distrugge tali chiavi, dopodiché i record cifrati non possono più essere letti da noi o da chiunque altro, e cancelliamo il record del tuo account. La chiave della copia pubblica di un dibattito pubblicato viene distrutta alla cancellazione solo se hai selezionato \"Elimina anche i miei dibattiti pubblici\" (sezione 6). Definiamo questa operazione cancellazione perché tale è il suo effetto e disponiamo di una valutazione documentata che la supporta; se desideri saperne di più, chiedicelo. Vi sono tre aspetti da conoscere: il registro di controllo della sicurezza è di sola aggiunta e non viene cancellato, ma non contiene identificativi leggibili che ti riguardino; un numero limitato di dibattiti meno recenti precede il nostro attuale sistema di cifratura e, se ciò riguarda il tuo account, ti comunicheremo quale effetto produce la chiusura su di essi; le copie dei dati già inviate a un fornitore di IA sono disciplinate dalle condizioni di conservazione di tale fornitore indicate nel Registro, non dalla nostra cancellazione." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "d8601b6666fbf8f9f4db62f40b5becd628a361afdf769583403a7fd062750b79",
+  sha256: "e8d47aba5b24995f2446a829334077b6a6fae6e5a0296203c0880f272cd1efd7",
   eyebrow: "INFORMATIVA SULLA PRIVACY · v3.2 · IN VIGORE DAL [DATE]",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",

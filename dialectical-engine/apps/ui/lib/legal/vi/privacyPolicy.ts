@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Tóm tắt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Chúng tôi thu thập những gì cần thiết để tài khoản hoạt động và những gì bạn lựa chọn nhập. Câu hỏi của bạn được gửi đến các nhà cung cấp AI nêu trong Sổ đăng ký của chúng tôi; chúng không được dùng để huấn luyện mô hình. Các cuộc tranh luận là riêng tư trừ khi bạn công khai chúng. Việc xóa tài khoản sẽ hủy khóa của dữ liệu riêng tư; khi lên lịch xóa, bạn chọn gỡ cả các cuộc tranh luận đã công khai hoặc để chúng tiếp tục công khai dưới bút danh cũ. Bạn có thể liên hệ với chúng tôi tại privacy@dezbatere.ro, và người được nêu tên trong một cuộc tranh luận có thể yêu cầu gỡ bỏ mà không cần tài khoản." }
+      { kind: "p", text: "Chúng tôi thu thập những gì cần thiết để tài khoản hoạt động và những gì bạn lựa chọn nhập. Câu hỏi của bạn được gửi đến các nhà cung cấp AI nêu trong Sổ đăng ký của chúng tôi; chúng không được dùng để huấn luyện mô hình. Các cuộc tranh luận là riêng tư trừ khi bạn công khai chúng. Việc xóa tài khoản sẽ hủy khóa của dữ liệu riêng tư; khi lên lịch xóa, bạn chọn gỡ cả các cuộc tranh luận đã công khai hoặc để chúng tiếp tục công khai dưới bút danh đã ngừng sử dụng. Bạn có thể liên hệ với chúng tôi tại privacy@dezbatere.ro, và người được nêu tên trong một cuộc tranh luận có thể yêu cầu gỡ bỏ mà không cần tài khoản." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Địa chỉ IP dùng để xác định quốc gia tại chỗ khi đăng ký và bắt đầu cuộc tranh luận mới — Chỉ trong thời gian xử lý yêu cầu — Không lưu ở dạng đọc được cho bước kiểm tra này; việc từ chối chỉ được ghi tổng hợp và dưới dạng mã băm nêu dưới đây",
         "Bản ghi kiểm toán tổng hợp về việc từ chối theo quốc gia IP — Trong suốt thời gian dịch vụ hoạt động — Bản ghi chứa mã từ chối, quốc gia, nhãn cho biết IP là căn cứ và mã băm một chiều có khóa của địa chỉ IP cùng chuỗi user-agent; nhật ký chỉ cho phép ghi thêm.",
         "Nội dung tranh luận (riêng tư) — Trong thời gian tài khoản tồn tại — Khóa bị hủy khi đóng, khiến nội dung không thể đọc được",
-        "Nội dung tranh luận (đã công khai) — Trong thời gian công khai; nếu bạn đóng tài khoản và không chọn “Xóa cả các cuộc tranh luận công khai của tôi”, một cuộc tranh luận đã công khai vẫn công khai dưới bút danh cũ của bạn — Bị gỡ khỏi quyền truy cập công cộng và khóa của nó bị hủy khi bạn hủy công khai, hoặc khi đóng tài khoản nếu bạn chọn “Xóa cả các cuộc tranh luận công khai của tôi”",
+        "Nội dung tranh luận (đã công khai) — Trong thời gian công khai; nếu bạn đóng tài khoản và không chọn \"Xóa cả các cuộc tranh luận công khai của tôi\", một cuộc tranh luận đã công khai vẫn công khai dưới bút danh đã ngừng sử dụng của bạn — Bị gỡ khỏi quyền truy cập công cộng và khóa của nó bị hủy khi bạn hủy công khai, hoặc khi đóng tài khoản nếu bạn chọn \"Xóa cả các cuộc tranh luận công khai của tôi\"",
         "Hồ sơ phản hồi của nhà cung cấp và tham chiếu truy xuất — Giống cuộc tranh luận tương ứng — Như trên",
         "Cuộc trò chuyện và vụ việc hỗ trợ — [Until closed plus 12 months] — Khóa bị hủy",
         "Hồ sơ chấp nhận và đồng ý — Vòng đời tài khoản cộng 6 năm — thời hiệu dài nhất áp dụng cho chúng tôi — Bị xóa",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Bản sao lưu [pending] — [… days] sau khi bản đang hoạt động bị xóa — Bị ghi đè"
         ]
       },
-      { kind: "p", text: "Việc xóa thực sự có tác dụng gì. Các cuộc tranh luận riêng tư và dữ liệu tài khoản của bạn được mã hóa bằng các khóa dành riêng cho tài khoản và từng cuộc tranh luận. Việc xóa tài khoản sẽ hủy các khóa đó, sau đó chúng tôi và bất kỳ ai khác đều không thể đọc được các hồ sơ đã mã hóa, đồng thời chúng tôi xóa hồ sơ tài khoản của bạn. Khóa của bản sao công khai một cuộc tranh luận đã công khai chỉ bị hủy khi xóa tài khoản nếu bạn chọn “Xóa cả các cuộc tranh luận công khai của tôi” (mục 6). Chúng tôi gọi đây là xóa vì đó chính là tác dụng của việc này và chúng tôi lưu giữ bản đánh giá được lập thành văn bản làm căn cứ; nếu bạn muốn biết thêm, hãy hỏi. Có ba điều cần biết: dấu vết kiểm toán bảo mật chỉ được phép ghi nối tiếp và không bị xóa, nhưng không chứa mã định danh nào của bạn có thể đọc được; một số ít cuộc tranh luận cũ có trước cơ chế mã hóa hiện tại của chúng tôi, và nếu điều đó áp dụng cho tài khoản của bạn, chúng tôi sẽ cho bạn biết việc đóng tài khoản có tác dụng gì đối với chúng; và các bản sao dữ liệu đã được gửi đến nhà cung cấp AI chịu sự điều chỉnh của điều khoản lưu giữ của nhà cung cấp đó trong Sổ đăng ký, chứ không phải việc xóa của chúng tôi." },
+      { kind: "p", text: "Việc xóa thực sự có tác dụng gì. Các cuộc tranh luận riêng tư và dữ liệu tài khoản của bạn được mã hóa bằng các khóa dành riêng cho tài khoản và từng cuộc tranh luận. Việc xóa tài khoản sẽ hủy các khóa đó, sau đó chúng tôi và bất kỳ ai khác đều không thể đọc được các hồ sơ đã mã hóa, đồng thời chúng tôi xóa hồ sơ tài khoản của bạn. Khóa của bản sao công khai một cuộc tranh luận đã công khai chỉ bị hủy khi xóa tài khoản nếu bạn chọn \"Xóa cả các cuộc tranh luận công khai của tôi\" (mục 6). Chúng tôi gọi đây là xóa vì đó chính là tác dụng của việc này và chúng tôi lưu giữ bản đánh giá được lập thành văn bản làm căn cứ; nếu bạn muốn biết thêm, hãy hỏi. Có ba điều cần biết: dấu vết kiểm toán bảo mật chỉ được phép ghi nối tiếp và không bị xóa, nhưng không chứa mã định danh nào của bạn có thể đọc được; một số ít cuộc tranh luận cũ có trước cơ chế mã hóa hiện tại của chúng tôi, và nếu điều đó áp dụng cho tài khoản của bạn, chúng tôi sẽ cho bạn biết việc đóng tài khoản có tác dụng gì đối với chúng; và các bản sao dữ liệu đã được gửi đến nhà cung cấp AI chịu sự điều chỉnh của điều khoản lưu giữ của nhà cung cấp đó trong Sổ đăng ký, chứ không phải việc xóa của chúng tôi." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "56fd7a2428ffb822e40ad8264d206b86e257b46be76e6e28727a8a09415e5568",
+  sha256: "380ce8adad1ea0f20896c8a60deb47e2d74d54f810a34931e9b637b53e5d9a6a",
   eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.2 · CÓ HIỆU LỰC [DATE]",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",

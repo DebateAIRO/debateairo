@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Stručně",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Shromažďujeme údaje nezbytné pro účet a údaje, které se rozhodnete zadat. Vaše otázky jsou předávány poskytovatelům AI uvedeným v našem Registru; nepoužívají se k trénování modelů. Debaty jsou soukromé, dokud je nezveřejníte. Výmaz účtu zničí klíče k vašim soukromým údajům; při jeho plánování si zvolíte, zda se odstraní i vaše zveřejněné debaty, nebo zůstanou veřejné pod vaším bývalým pseudonymem. Můžete nás kontaktovat na privacy@dezbatere.ro a osoby uvedené v debatě mohou požádat o odstranění i bez účtu." }
+      { kind: "p", text: "Shromažďujeme údaje nezbytné pro účet a údaje, které se rozhodnete zadat. Vaše otázky jsou předávány poskytovatelům AI uvedeným v našem Registru; nepoužívají se k trénování modelů. Debaty jsou soukromé, dokud je nezveřejníte. Výmaz účtu zničí klíče k vašim soukromým údajům; při jeho plánování si zvolíte, zda se odstraní i vaše zveřejněné debaty, nebo zůstanou veřejné pod vaším vyřazeným pseudonymem. Můžete nás kontaktovat na privacy@dezbatere.ro a osoby uvedené v debatě mohou požádat o odstranění i bez účtu." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Rizikové signály přihlášení a obnovení — 90 dnů, vynuceno databází — Odstraněny",
         "Bezpečnostní auditní stopa — Po dobu existence služby — Pouze s možností připojování; IP adresa a user-agent jsou jednosměrné hashe a nelze je zpětně přečíst",
         "Obsah debaty (soukromý) — Po dobu existence účtu — Při uzavření jsou zničeny klíče, čímž se obsah stane nečitelným",
-        "Obsah debaty (zveřejněný) — Po dobu zveřejnění; pokud uzavřete účet a necháte možnost „Smazat také mé veřejné debaty“ nezaškrtnutou, zveřejněná debata zůstane veřejná pod vaším bývalým pseudonymem — Z veřejného přístupu se odstraní a její klíč se zničí při zrušení zveřejnění nebo při uzavření účtu, pokud jste zaškrtli „Smazat také mé veřejné debaty“",
+        "Obsah debaty (zveřejněný) — Po dobu zveřejnění; pokud uzavřete účet a necháte možnost „Smazat také mé veřejné debaty“ nezaškrtnutou, zveřejněná debata zůstane veřejná pod vaším vyřazeným pseudonymem — Z veřejného přístupu se odstraní a její klíč se zničí při zrušení zveřejnění nebo při uzavření účtu, pokud jste zaškrtli „Smazat také mé veřejné debaty“",
         "Záznamy odpovědí poskytovatelů a odkazy pro vyhledávání — Stejně jako debata, ke které patří — Stejný postup",
         "Konverzace a případy podpory — [Until closed plus 12 months] — Klíče jsou zničeny",
         "Záznamy o přijetí a souhlasech — Po dobu existence účtu a dalších 6 let — nejdelší promlčecí lhůta, která se na nás vztahuje — Vymazány",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "c8b2dcb0b55aabe9ddc189772d241174c927ebd5007978a4cb5a19024c24668f",
+  sha256: "68e379aa01333ba072a43e5346ebcc36db9cda89a46d0f444527204e351ea91f",
   eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.2 · ÚČINNÉ OD [DATE]",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",

@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "En resumen",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Recopilamos lo que una cuenta necesita y lo que usted decide escribir. Sus preguntas se envían a los proveedores de IA que figuran en nuestro Registro; no se utilizan para entrenar modelos. Los debates son privados salvo que usted los publique. La eliminación de su cuenta destruye las claves de sus datos privados; al programarla, usted elige si también se retiran sus debates publicados o si permanecen públicos bajo su antiguo seudónimo. Puede escribirnos a privacy@dezbatere.ro, y las personas mencionadas en un debate pueden solicitar su retirada sin disponer de una cuenta." }
+      { kind: "p", text: "Recopilamos lo que una cuenta necesita y lo que usted decide escribir. Sus preguntas se envían a los proveedores de IA que figuran en nuestro Registro; no se utilizan para entrenar modelos. Los debates son privados salvo que usted los publique. La eliminación de su cuenta destruye las claves de sus datos privados; al programarla, usted elige si también se retiran sus debates publicados o si permanecen públicos bajo su seudónimo retirado. Puede escribirnos a privacy@dezbatere.ro, y las personas mencionadas en un debate pueden solicitar su retirada sin disponer de una cuenta." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Señales de riesgo de inicio de sesión y recuperación — 90 días, aplicado por la base de datos — Se purgan",
         "Registro de auditoría de seguridad — Durante toda la vida del servicio — Solo permite adiciones; la IP y el agente de usuario son resúmenes unidireccionales y no pueden volver a leerse",
         "Contenido de los debates (privados) — Mientras exista la cuenta — Se destruyen las claves al cerrar la cuenta, lo que hace ilegible el contenido",
-        "Contenido de los debates (publicados) — Mientras estén publicados; si cierra su cuenta y deja «Eliminar también mis debates públicos» sin marcar, un debate publicado permanece público bajo su antiguo seudónimo — Se retira del acceso público y se destruye su clave cuando usted retira la publicación, o al cerrar la cuenta si marcó «Eliminar también mis debates públicos»",
+        "Contenido de los debates (publicados) — Mientras estén publicados; si cierra su cuenta y deja «Eliminar también mis debates públicos» sin marcar, un debate publicado permanece público bajo su seudónimo retirado — Se retira del acceso público y se destruye su clave cuando usted retira la publicación, o al cerrar la cuenta si marcó «Eliminar también mis debates públicos»",
         "Registros de respuestas de proveedores y referencias de recuperación — El mismo plazo que el debate al que pertenecen — Igual",
         "Conversaciones y casos de soporte — [Until closed plus 12 months] — Se destruyen las claves",
         "Registros de aceptación y consentimiento — Vida de la cuenta más 6 años: el plazo de prescripción más largo que nos resulta aplicable — Se eliminan",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "fd5774ec78d84954b5d65437532ba02fc1399501405a995880da5fdabaa44faa",
+  sha256: "db489b281de7be714bcc40219dca8350befff30e3f0770af3d0d272cfeff1589",
   eyebrow: "POLÍTICA DE PRIVACIDAD · v3.2 · EN VIGOR DESDE [DATE]",
   title: "Qué almacenamos y por qué",
   lede: "Sus derechos y nuestras obligaciones conforme al RGPD – GDPR (EU) 2016/679, en lenguaje claro. Catorce secciones y el anexo B — desplácese hasta el final.",

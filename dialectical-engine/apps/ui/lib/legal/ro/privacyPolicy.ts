@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Pe scurt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Colectăm ceea ce este necesar unui cont și ceea ce alegeți să introduceți. Întrebările dumneavoastră sunt transmise furnizorilor de IA enumerați în Registrul furnizorilor de IA; acestea nu sunt folosite pentru antrenarea modelelor. Dezbaterile sunt private dacă nu le publicați. Ștergerea contului distruge cheile datelor dumneavoastră private; când o programați, alegeți dacă dezbaterile publicate sunt și ele eliminate sau rămân publice sub fostul dumneavoastră pseudonim. Ne puteți contacta la privacy@dezbatere.ro, iar persoanele menționate într-o dezbatere pot solicita eliminarea fără a avea cont." }
+      { kind: "p", text: "Colectăm ceea ce este necesar unui cont și ceea ce alegeți să introduceți. Întrebările dumneavoastră sunt transmise furnizorilor de IA enumerați în Registrul furnizorilor de IA; acestea nu sunt folosite pentru antrenarea modelelor. Dezbaterile sunt private dacă nu le publicați. Ștergerea contului distruge cheile datelor dumneavoastră private; când o programați, alegeți dacă dezbaterile publicate sunt și ele eliminate sau rămân publice sub pseudonimul dumneavoastră retras. Ne puteți contacta la privacy@dezbatere.ro, iar persoanele menționate într-o dezbatere pot solicita eliminarea fără a avea cont." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Adresa IP folosită pentru stabilirea locală a țării la înregistrare și la începutul unei dezbateri noi — Numai pe durata prelucrării cererii — Nu este păstrată în clar pentru această verificare; refuzul este înregistrat doar agregat și prin amprenta descrisă mai jos",
         "Înregistrări agregate ale auditului refuzurilor pe baza țării IP — Pe durata de viață a serviciului — Înregistrarea păstrează codul refuzului, țara, mențiunea că adresa IP a fost proba și amprentele unidirecționale bazate pe cheie ale adresei IP și ale identificatorului browserului (user-agent); jurnalul permite doar adăugări.",
         "Conținutul dezbaterii (privat) — Cât timp există contul — Cheile sunt distruse la închidere, făcând conținutul ilizibil",
-        "Conținutul dezbaterii (publicat) — Cât timp este publicat; dacă închideți contul și lăsați „Ștergeți și dezbaterile mele publice” nebifată, o dezbatere publicată rămâne publică sub fostul dumneavoastră pseudonim — Eliminat din accesul public, iar cheia sa distrusă, când retrageți publicarea sau la închidere dacă ați bifat „Ștergeți și dezbaterile mele publice”",
+        "Conținutul dezbaterii (publicat) — Cât timp este publicat; dacă închideți contul și lăsați „Ștergeți și dezbaterile mele publice” nebifată, o dezbatere publicată rămâne publică sub pseudonimul dumneavoastră retras — Eliminat din accesul public, iar cheia sa distrusă, când retrageți publicarea sau la închidere dacă ați bifat „Ștergeți și dezbaterile mele publice”",
         "Evidențele răspunsurilor furnizorilor și referințele de regăsire — La fel ca dezbaterea căreia îi aparțin — La fel",
         "Conversații și cazuri de asistență — [Until closed plus 12 months] — Cheile sunt distruse",
         "Evidențe privind acceptarea și consimțământul — Durata de viață a contului plus 6 ani — cel mai lung termen de prescripție care ni se aplică — Șterse",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "a39f956c4553ef01ac41ad7173a0f5c7199feec6dec5a9efd20af497f11dc40c",
+  sha256: "6868ccde9e134844f2d47f133b4ae90334c514be74ead1393b129dd54b00a92e",
   eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.2 · ÎN VIGOARE DE LA [DATE]",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",

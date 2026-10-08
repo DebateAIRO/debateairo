@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "In het kort",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Wij verzamelen wat nodig is voor een account en wat u zelf invoert. Uw vragen gaan naar de AI-aanbieders die in ons Register staan en worden niet gebruikt om modellen te trainen. Debatten zijn privé, tenzij u ze publiceert. Wanneer u uw account verwijdert, worden de sleutels tot uw privégegevens vernietigd; bij het plannen kiest u of ook uw gepubliceerde debatten worden verwijderd of openbaar blijven onder uw vroegere pseudoniem. U kunt ons bereiken via privacy@dezbatere.ro, en personen die in een debat worden genoemd, kunnen zonder account om verwijdering verzoeken." }
+      { kind: "p", text: "Wij verzamelen wat nodig is voor een account en wat u zelf invoert. Uw vragen gaan naar de AI-aanbieders die in ons Register staan en worden niet gebruikt om modellen te trainen. Debatten zijn privé, tenzij u ze publiceert. Wanneer u uw account verwijdert, worden de sleutels tot uw privégegevens vernietigd; bij het plannen kiest u of ook uw gepubliceerde debatten worden verwijderd of openbaar blijven onder uw uitgefaseerde pseudoniem. U kunt ons bereiken via privacy@dezbatere.ro, en personen die in een debat worden genoemd, kunnen zonder account om verwijdering verzoeken." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Auditvastlegging van een weigering op basis van het IP-land — Gedurende de levensduur van de dienst — Alleen toevoegingen; route, weigeringscode, land, tijdvenster en bewijssoort ‘IP-adres’ worden vastgelegd; IP-adres en user-agent worden uitsluitend als eenrichtingsdigests met sleutel bewaard",
         "Onbewerkt IP-adres voor de landencontrole bij registratie of een nieuw debat — Alleen tijdens het betreffende verzoek — Deze controle bewaart geen leesbaar IP; de weigeringaudit bewaart het IP-adres en de user-agent uitsluitend als eenrichtingsdigests met sleutel, en het IP-land kan in de leeftijdscontrole worden vastgelegd",
         "Debatinhoud (privé) — Zolang het account bestaat — Sleutels worden bij sluiting vernietigd, waardoor de inhoud onleesbaar wordt",
-        "Debatinhoud (gepubliceerd) — Zolang deze is gepubliceerd; als u uw account sluit en „Ook mijn openbare debatten verwijderen” niet aanvinkt, blijft een gepubliceerd debat openbaar onder uw vroegere pseudoniem — Uit de openbare toegang verwijderd en de sleutel vernietigd wanneer u de publicatie intrekt, of bij sluiting als u „Ook mijn openbare debatten verwijderen” hebt aangevinkt",
+        "Debatinhoud (gepubliceerd) — Zolang deze is gepubliceerd; als u uw account sluit en „Ook mijn openbare debatten verwijderen” niet aanvinkt, blijft een gepubliceerd debat openbaar onder uw uitgefaseerde pseudoniem — Uit de openbare toegang verwijderd en de sleutel vernietigd wanneer u de publicatie intrekt, of bij sluiting als u „Ook mijn openbare debatten verwijderen” hebt aangevinkt",
         "Door aanbieders geretourneerde gegevens en zoekreferenties — Even lang als het debat waartoe zij behoren — Hetzelfde",
         "Ondersteuningsgesprekken en ondersteuningsverzoeken — [Until closed plus 12 months] — Sleutels vernietigd",
         "Vastleggingen van aanvaarding en toestemming — Levensduur van het account plus 6 jaar — de langste verjaringstermijn die op ons van toepassing is — Verwijderd",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "e79d891995c2ef2fb58dc26af4483d72ef6a801e7da79c11a06df9a57ea3368e",
+  sha256: "60d06c1d7ac46a3f90540cafe066f791187da5b4ff98c1e1a79b7f19692aa144",
   eyebrow: "PRIVACYBELEID · v3.2 · VAN KRACHT OP [DATE]",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",

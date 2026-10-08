@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Lühidalt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie privaatsete andmete võtmed; kustutamist ajastades valite, kas ka teie avaldatud väitlused eemaldatakse või jäävad teie endise varjunime all avalikuks. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota." }
+      { kind: "p", text: "Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie privaatsete andmete võtmed; kustutamist ajastades valite, kas ka teie avaldatud väitlused eemaldatakse või jäävad teie kasutuselt kõrvaldatud pseudonüümi all avalikuks. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Sisselogimise ja taastamise riskisignaalid — 90 päeva, mida jõustab andmebaas — Kõrvaldatakse",
         "Turbeauditilogi — Teenuse kogu kasutusaja jooksul — Ainult lisatav; IP-aadress ja user-agent on ühesuunalised sõnumilühendid ning neid ei saa tagasi lugeda",
         "Väitluse sisu (privaatne) — Konto olemasolu ajal — Sulgemisel hävitatakse võtmed, mistõttu sisu muutub loetamatuks",
-        "Väitluse sisu (avaldatud) — Avaldamise ajal; kui sulgete konto ja jätate valiku „Kustuta ka minu avalikud väitlused“ märkimata, jääb avaldatud väitlus teie endise varjunime all avalikuks — Eemaldatakse avalikust vaatest ja selle võti hävitatakse, kui tühistate avaldamise või konto sulgemisel, kui märkisite valiku „Kustuta ka minu avalikud väitlused“",
+        "Väitluse sisu (avaldatud) — Avaldamise ajal; kui sulgete konto ja jätate valiku „Kustuta ka minu avalikud väitlused“ märkimata, jääb avaldatud väitlus teie kasutuselt kõrvaldatud pseudonüümi all avalikuks — Eemaldatakse avalikust vaatest ja selle võti hävitatakse, kui tühistate avaldamise või konto sulgemisel, kui märkisite valiku „Kustuta ka minu avalikud väitlused“",
         "Pakkuja tagastatud kirjed ja otsinguviited — Sama kaua kui väitlus, mille juurde need kuuluvad — Sama",
         "Kasutajatoe vestlused ja juhtumid — [Until closed plus 12 months] — Võtmed hävitatakse",
         "Nõustumise ja nõusoleku kirjed — Konto kasutusaeg ja 6 aastat — pikim meile kohalduv aegumistähtaeg — Kustutatakse",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "3d77f91640b0e5bd67cf0ef96e09abf876c716d9c3fba79c7be010167fb20711",
+  sha256: "7d816a63eface898805f3d61a7f17affe90442bb219242eedb5a0111c307b0be",
   eyebrow: "PRIVAATSUSPOLIITIKA · v3.2 · KEHTIB ALATES [DATE]",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",

@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Īsumā",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Mēs vācam konta darbībai nepieciešamo informāciju un to, ko izvēlaties ievadīt. Jūsu jautājumi tiek nosūtīti mūsu Reģistrā norādītajiem MI pakalpojumu sniedzējiem; tie netiek izmantoti modeļu apmācībai. Debates ir privātas, ja vien jūs tās nepublicējat. Dzēšot kontu, tiek iznīcinātas jūsu privāto datu atslēgas; plānojot dzēšanu, jūs izvēlaties, vai arī publicētās debates tiks noņemtas vai paliks publiskas ar jūsu bijušo pseidonīmu. Varat ar mums sazināties, rakstot uz privacy@dezbatere.ro, un debatēs minētās personas var pieprasīt satura noņemšanu arī bez konta." }
+      { kind: "p", text: "Mēs vācam konta darbībai nepieciešamo informāciju un to, ko izvēlaties ievadīt. Jūsu jautājumi tiek nosūtīti mūsu Reģistrā norādītajiem MI pakalpojumu sniedzējiem; tie netiek izmantoti modeļu apmācībai. Debates ir privātas, ja vien jūs tās nepublicējat. Dzēšot kontu, tiek iznīcinātas jūsu privāto datu atslēgas; plānojot dzēšanu, jūs izvēlaties, vai arī publicētās debates tiks noņemtas vai paliks publiskas ar jūsu vairs neizmantoto pseidonīmu. Varat ar mums sazināties, rakstot uz privacy@dezbatere.ro, un debatēs minētās personas var pieprasīt satura noņemšanu arī bez konta." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "IP valsts pārbaudes atteikuma audita ieraksts — Visu pakalpojuma darbības laiku — Tikai papildināms; reģistrē maršrutu, atteikuma kodu, valsti, laika intervālu un pierādījuma veidu “IP adrese”; IP adresi un lietotāja aģentu glabā tikai kā ar atslēgu veidotus vienvirziena īssavilkumus",
         "Neapstrādāta IP adrese valsts pārbaudei reģistrējoties vai sākot jaunas debates — Tikai attiecīgā pieprasījuma laikā — Šī pārbaude neglabā nolasāmu IP; atteikuma auditā IP adresi un lietotāja aģentu glabā tikai kā ar atslēgu veidotus vienvirziena īssavilkumus, bet IP valsts var būt vecuma pārbaudes ierakstā",
         "Debašu saturs (privāts) — Kamēr konts pastāv — Slēgšanas brīdī atslēgas tiek iznīcinātas, padarot saturu nenolasāmu",
-        "Debašu saturs (publicēts) — Kamēr tas ir publicēts; ja slēdzat kontu un neatzīmējat „Dzēst arī manas publiskās debates“, publicētas debates paliek publiskas ar jūsu bijušo pseidonīmu — Tiek noņemts no publiskas piekļuves un tā atslēga iznīcināta, kad atceļat publikāciju vai konta slēgšanas laikā, ja atzīmējāt „Dzēst arī manas publiskās debates“",
+        "Debašu saturs (publicēts) — Kamēr tas ir publicēts; ja slēdzat kontu un neatzīmējat „Dzēst arī manas publiskās debates”, publicētas debates paliek publiskas ar jūsu vairs neizmantoto pseidonīmu — Tiek noņemts no publiskas piekļuves un tā atslēga iznīcināta, kad atceļat publikāciju vai konta slēgšanas laikā, ja atzīmējāt „Dzēst arī manas publiskās debates”",
         "Pakalpojumu sniedzēju atbilžu ieraksti un izguves atsauces — Tikpat ilgi kā debates, uz kurām tie attiecas — Tas pats",
         "Atbalsta sarunas un lietas — [Until closed plus 12 months] — Atslēgas tiek iznīcinātas",
         "Piekrišanas un akceptēšanas ieraksti — Konta darbības laiks plus 6 gadi — ilgākais mums piemērojamais noilguma termiņš — Tiek dzēsti",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Dublējumkopijas [pending] — [… days] pēc aktīvās kopijas dzēšanas — Tiek pārrakstītas"
         ]
       },
-      { kind: "p", text: "Ko dzēšana faktiski dara. Jūsu privātās debates un konta dati ir šifrēti, izmantojot tieši jūsu kontam un katrām debatēm paredzētas atslēgas. Dzēšot kontu, šīs atslēgas tiek iznīcinātas, pēc tam šifrētos ierakstus vairs nevar nolasīt ne mēs, ne kāds cits, un mēs dzēšam jūsu konta ierakstu. Publicētu debašu publiskās kopijas atslēga dzēšanas laikā tiek iznīcināta tikai tad, ja atzīmējāt „Dzēst arī manas publiskās debates“ (6. sadaļa). Mēs to saucam par dzēšanu, jo tāds ir šīs darbības rezultāts, un mūsu rīcībā ir to pamatojošs dokumentēts novērtējums; ja vēlaties uzzināt vairāk, jautājiet. Ir jāzina trīs lietas: drošības audita pieraksts ir tikai papildināms un netiek dzēsts, taču tajā nav lasāmu jūsu identifikatoru; neliels skaits vecāku debašu ir izveidots pirms mūsu pašreizējās šifrēšanas shēmas, un, ja tas attiecas uz jūsu kontu, mēs jums paskaidrosim, ko slēgšana panāk attiecībā uz tām; uz datu kopijām, kas jau nosūtītas MI pakalpojumu sniedzējam, attiecas Reģistrā norādītie šā pakalpojumu sniedzēja glabāšanas noteikumi, nevis mūsu veiktā dzēšana." },
+      { kind: "p", text: "Ko dzēšana faktiski dara. Jūsu privātās debates un konta dati ir šifrēti, izmantojot tieši jūsu kontam un katrām debatēm paredzētas atslēgas. Dzēšot kontu, šīs atslēgas tiek iznīcinātas, pēc tam šifrētos ierakstus vairs nevar nolasīt ne mēs, ne kāds cits, un mēs dzēšam jūsu konta ierakstu. Publicētu debašu publiskās kopijas atslēga dzēšanas laikā tiek iznīcināta tikai tad, ja atzīmējāt „Dzēst arī manas publiskās debates” (6. sadaļa). Mēs to saucam par dzēšanu, jo tāds ir šīs darbības rezultāts, un mūsu rīcībā ir to pamatojošs dokumentēts novērtējums; ja vēlaties uzzināt vairāk, jautājiet. Ir jāzina trīs lietas: drošības audita pieraksts ir tikai papildināms un netiek dzēsts, taču tajā nav lasāmu jūsu identifikatoru; neliels skaits vecāku debašu ir izveidots pirms mūsu pašreizējās šifrēšanas shēmas, un, ja tas attiecas uz jūsu kontu, mēs jums paskaidrosim, ko slēgšana panāk attiecībā uz tām; uz datu kopijām, kas jau nosūtītas MI pakalpojumu sniedzējam, attiecas Reģistrā norādītie šā pakalpojumu sniedzēja glabāšanas noteikumi, nevis mūsu veiktā dzēšana." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "302fbb3ef69406d1dadcdd9091d5ead7e48b609c705b3f3722f8182a347c262a",
+  sha256: "e5e0fa72c5774282fd63e467d667f86db8dbba0410f3e08823032159286912f0",
   eyebrow: "PRIVĀTUMA POLITIKA · v3.2 · SPĒKĀ NO [DATE]",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",

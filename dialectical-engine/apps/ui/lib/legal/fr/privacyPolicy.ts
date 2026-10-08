@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "En bref",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Nous collectons ce dont un compte a besoin et ce que vous choisissez de saisir. Vos questions sont transmises aux fournisseurs d'IA répertoriés dans notre Registre ; elles ne servent pas à entraîner des modèles. Les débats restent privés, sauf si vous les publiez. La suppression de votre compte détruit les clés de vos données privées ; lorsque vous la programmez, vous choisissez si vos débats publiés sont aussi retirés ou restent publics sous votre ancien pseudonyme. Vous pouvez nous contacter à l'adresse privacy@dezbatere.ro, et les personnes nommées dans un débat peuvent demander son retrait sans avoir de compte." }
+      { kind: "p", text: "Nous collectons ce dont un compte a besoin et ce que vous choisissez de saisir. Vos questions sont transmises aux fournisseurs d'IA répertoriés dans notre Registre ; elles ne servent pas à entraîner des modèles. Les débats restent privés, sauf si vous les publiez. La suppression de votre compte détruit les clés de vos données privées ; lorsque vous la programmez, vous choisissez si vos débats publiés sont aussi retirés ou restent publics sous votre pseudonyme retiré. Vous pouvez nous contacter à l'adresse privacy@dezbatere.ro, et les personnes nommées dans un débat peuvent demander son retrait sans avoir de compte." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Signaux de risque liés à la connexion et à la récupération — 90 jours, durée appliquée par la base de données — Purgés",
         "Journal d'audit de sécurité — Pendant toute la durée de vie du service — Inaltérable ; l'adresse IP et le user-agent sont des condensés irréversibles qui ne peuvent pas être relus",
         "Contenu des débats (privé) — Tant que le compte existe — Clés détruites à la clôture, ce qui rend le contenu illisible",
-        "Contenu des débats (publié) — Tant qu’il est publié ; si vous clôturez votre compte en laissant « Supprimer aussi mes débats publics » décoché, un débat publié reste public sous votre ancien pseudonyme — Retiré de l’accès public, et sa clé détruite, lorsque vous retirez sa publication ou lors de la clôture si vous avez coché « Supprimer aussi mes débats publics »",
+        "Contenu des débats (publié) — Tant qu’il est publié ; si vous clôturez votre compte en laissant « Supprimer aussi mes débats publics » décoché, un débat publié reste public sous votre pseudonyme retiré — Retiré de l’accès public, et sa clé détruite, lorsque vous retirez sa publication ou lors de la clôture si vous avez coché « Supprimer aussi mes débats publics »",
         "Enregistrements des réponses des fournisseurs et références de recherche — Aussi longtemps que le débat auquel ils se rapportent — Même traitement",
         "Conversations et dossiers d'assistance — [Until closed plus 12 months] — Clés détruites",
         "Preuves d'acceptation et de consentement — Durée de vie du compte plus 6 ans — le délai de prescription le plus long qui nous est applicable — Supprimées",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "a52cabdb43b1768ee75febdb8ba1629acc637bfd695cbcff0aaffb290483be76",
+  sha256: "ff9845b127e600ca784842689582fcbee32d1a49fd8335e3f68e43377f2a94f4",
   eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.2 · EN VIGUEUR LE [DATE]",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",

@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kort sagt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Vi samlar in det som behövs för ett konto och det du väljer att skriva. Dina frågor skickas till de AI-leverantörer som anges i vårt register; de används inte för att träna modeller. Debatter är privata om du inte publicerar dem. När du raderar ditt konto förstörs nycklarna till dina privata uppgifter; när du schemalägger raderingen väljer du om dina publicerade debatter också ska tas bort eller förbli offentliga under din tidigare pseudonym. Du kan nå oss på privacy@dezbatere.ro, och personer som nämns i en debatt kan begära borttagning utan att ha ett konto." }
+      { kind: "p", text: "Vi samlar in det som behövs för ett konto och det du väljer att skriva. Dina frågor skickas till de AI-leverantörer som anges i vårt register; de används inte för att träna modeller. Debatter är privata om du inte publicerar dem. När du raderar ditt konto förstörs nycklarna till dina privata uppgifter; när du schemalägger raderingen väljer du om dina publicerade debatter också ska tas bort eller förbli offentliga under din avvecklade pseudonym. Du kan nå oss på privacy@dezbatere.ro, och personer som nämns i en debatt kan begära borttagning utan att ha ett konto." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "IP-adress som används för lokal landskontroll vid registrering och inför en ny debatt — Endast medan begäran behandlas — Adressen sparas inte i läsbar form för denna kontroll; avslag registreras bara aggregerat och som hashvärdet nedan",
         "Aggregerade granskningsposter om avslag utifrån IP-land — Under tjänstens livstid — Posten innehåller avslagskod, land, uppgift om att IP-adressen var underlag samt nyckelbaserade envägs-hashvärden för IP-adressen och webbläsarens user-agent; loggen är endast tilläggsbar.",
         "Debattinnehåll (privat) — Medan kontot finns — Nycklar förstörs när kontot avslutas, vilket gör innehållet oläsbart",
-        "Debattinnehåll (publicerat) — Medan det är publicerat; om du avslutar kontot och lämnar ”Radera även mina offentliga debatter” omarkerat, förblir en publicerad debatt offentlig under din tidigare pseudonym — Tas bort från allmän åtkomst och dess nyckel förstörs när du återkallar publiceringen, eller vid avslut om du har markerat ”Radera även mina offentliga debatter”",
+        "Debattinnehåll (publicerat) — Medan det är publicerat; om du avslutar kontot och lämnar ”Radera även mina offentliga debatter” omarkerat, förblir en publicerad debatt offentlig under din avvecklade pseudonym — Tas bort från allmän åtkomst och dess nyckel förstörs när du återkallar publiceringen, eller vid avslut om du har markerat ”Radera även mina offentliga debatter”",
         "Uppgifter om leverantörssvar och sökreferenser — Lika länge som den debatt de tillhör — Samma",
         "Supportsamtal och ärenden — [Until closed plus 12 months] — Nycklar förstörs",
         "Uppgifter om godkännanden och samtycken — Kontots livstid plus 6 år — den längsta preskriptionstid som gäller för oss — Raderas",
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "260138998911c8e66f0f5b8e225715f6d4d62862b65b06775bff9909ee207376",
+  sha256: "7fb10f5e5a43591d39ba9d095082bd414baeeee4d96af9618632d24bdd0b2eb0",
   eyebrow: "INTEGRITETSPOLICY · v3.2 · GÄLLER FRÅN [DATE]",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",
