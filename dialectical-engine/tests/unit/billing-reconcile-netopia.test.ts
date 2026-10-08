@@ -115,8 +115,7 @@ describe("N16 the frequent status pass (spec §2.14, SR-21)", () => {
     };
     const reconciler = new BillingReconciler({
       billing, jobs: { lockOwner: async () => undefined, withSubscriptionLease: async () => ({ kind: "BUSY" as const }) },
-      xmoney: { listTransactions: async () => [], getOrder: async () => { throw new Error("unused"); } },
-      environment: "stage", audit, clock: () => NOW, kick,
+      audit, clock: () => NOW, kick,
       netopia: {
         payments, paymentEnvironment: "sandbox", pool: { query: async () => ({ rows: [] }) } as never,
         jobs: {

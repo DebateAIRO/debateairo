@@ -51,15 +51,11 @@ function group(root: string, overrides: Partial<BillingEnvironmentGroup> = {}): 
     quadernoApiKeyPath: join(root, "quaderno"), quadernoApiBaseUrl: "https://debateai.sandbox-quadernoapp.com/api",
     smartbillCredentialsPath: join(root, "smartbill"), smartbillApiBaseUrl: "https://ws.smartbill.ro/SBORO/api",
     smartbillSeries: "DBT", ownerReportEmailPath: join(root, "owner"), publicAppUrl: "https://debateai.test",
-    xmoney: null, ...overrides
+    ...overrides
   };
 }
-const xmoneyGroup = (root: string, overrides: Partial<NonNullable<BillingEnvironmentGroup["xmoney"]>> = {}) => ({
-  xmoneyPrivateKeyPath: join(root, "xmoney"), xmoneyPublicKey: "pk_stage_0123456789", xmoneySiteId: "4242",
-  xmoneyApiBaseUrl: "https://api-stage.xmoney.com", ...overrides
-});
 const files = {
-  netopia: `${NETOPIA_KEY}\n`, xmoney: "0123456789abcdef0123456789abcdef\n", quaderno: "qk_0123456789\n",
+  netopia: `${NETOPIA_KEY}\n`, quaderno: "qk_0123456789\n",
   smartbill: "owner@firma.ro:tok_0123456789\n", owner: "owner@firma.ro\n"
 };
 const filledCui: SellerCompany = Object.freeze({
@@ -83,12 +79,10 @@ function failureOf(run: () => unknown): string {
 }
 
 describe("N8 — BillingConnectors", () => {
-  it("builds NETOPIA's connector from its files, and an inert xMoney stand-in when no xMoney setting is left", async () => {
-    const held: Array<{ end(): Promise<void> }> = [];
+  it("builds NETOPIA's connector from its files, and the invoicers and the owner's address beside it", () => {
     const recordsKey = Buffer.alloc(32, 3);
     const connectors = loadBillingConnectors({
-      environment: group(custody(files)), company, recordsKey, hold: (resource) => held.push(resource),
-      trustedKeyOwners: OWN
+      environment: group(custody(files)), company, recordsKey, trustedKeyOwners: OWN
     });
     expect(connectors.paymentEnvironment).toBe("sandbox");
     expect(connectors.payments.provider).toBe("netopia");
@@ -101,13 +95,6 @@ describe("N8 — BillingConnectors", () => {
     expect(typeof connectors.tax.quote).toBe("function");
     expect(typeof connectors.invoiceRo.issue).toBe("function");
     expect(connectors.invoiceRo.lookup).toBeUndefined();
-    // The stand-in: nothing ever leaves the host, and every call fails as "unavailable".
-    expect(connectors.xmoneyEnvironment).toBe("stage");
-    await expect(connectors.xmoney.getOrder("1")).rejects.toMatchObject({ code: "XMONEY_UNAVAILABLE" });
-    expect(held).toHaveLength(1);
-    expect(connectors.xmoneyPrivateKey.byteLength).toBe(32);
-    await held[0]!.end();
-    expect(connectors.xmoneyPrivateKey.every((byte) => byte === 0)).toBe(true);
     // The API key is never part of what the port prints or serialises (spec §2.2 rule 5).
     expect(`${JSON.stringify(connectors.payments) ?? ""} ${String(connectors.payments)}`).not.toContain(NETOPIA_KEY);
   });
@@ -115,49 +102,29 @@ describe("N8 — BillingConnectors", () => {
   it("follows the base URL: a live base makes a live connector", () => {
     const connectors = loadBillingConnectors({
       environment: group(custody(files), { netopiaApiBaseUrl: "https://secure.netopia-payments.com/api" }),
-      company, recordsKey: Buffer.alloc(32), hold: () => undefined, trustedKeyOwners: OWN
+      company, recordsKey: Buffer.alloc(32), trustedKeyOwners: OWN
     });
     expect(connectors.paymentEnvironment).toBe("live");
     expect(connectors.payments.environment).toBe("live");
   });
 
-  it("still builds the real xMoney client when all four xMoney settings are set (until N23)", async () => {
-    const held: Array<{ end(): Promise<void> }> = [];
-    const root = custody(files);
-    const connectors = loadBillingConnectors({
-      environment: group(root, { xmoney: xmoneyGroup(root) }), company, recordsKey: Buffer.alloc(32),
-      hold: (resource) => held.push(resource), trustedKeyOwners: OWN
-    });
-    expect(connectors.xmoneyEnvironment).toBe("stage");
-    expect(connectors.siteId).toBe("4242");
-    expect(connectors.xmoneyPublicKey).toBe("pk_stage_0123456789");
-    expect(connectors.xmoneyPrivateKey.toString("latin1")).toBe("0123456789abcdef0123456789abcdef");
-    expect(typeof connectors.xmoney.rebill).toBe("function");
-    expect(held).toHaveLength(1);
-    await held[0]!.end();
-    expect(connectors.xmoneyPrivateKey.every((byte) => byte === 0)).toBe(true);
-  });
-
   it("refuses a base URL that is not one of NETOPIA's four, before reading any file", () => {
-    const held: Array<{ end(): Promise<void> }> = [];
     const root = custody({}, null);
     for (const netopiaApiBaseUrl of [
       "https://secure.netopia-payments.com.evil.test", "https://secure.netopia-payments.com", "http://127.0.0.1:9"
     ]) {
       expect(failureOf(() => loadBillingConnectors({
         environment: group(root, { netopiaApiBaseUrl }), company, recordsKey: Buffer.alloc(32),
-        hold: (resource) => held.push(resource), trustedKeyOwners: OWN
+        trustedKeyOwners: OWN
       })), netopiaApiBaseUrl).toContain("BILLING_CONFIGURATION_INVALID:NETOPIA_API_BASE_URL");
     }
-    expect(held).toHaveLength(0);
   });
 
   it("refuses a POS signature that is not five groups of four, before reading any file", () => {
     const root = custody({}, null);
     for (const netopiaPosSignature of ["test-ab12-cd34-ef56-gh78", "TEST-AB12-CD34-EF56", `${POS}-ZZZZ`]) {
       expect(failureOf(() => loadBillingConnectors({
-        environment: group(root, { netopiaPosSignature }), company, recordsKey: Buffer.alloc(32), hold: () => undefined,
-        trustedKeyOwners: OWN
+        environment: group(root, { netopiaPosSignature }), company, recordsKey: Buffer.alloc(32), trustedKeyOwners: OWN
       }))).toContain("BILLING_CONFIGURATION_INVALID:NETOPIA_POS_SIGNATURE");
     }
   });
@@ -166,7 +133,7 @@ describe("N8 — BillingConnectors", () => {
     const root = custody(files);
     const load = (owners?: TrustedKeyFileOwners, path?: string) => () => loadBillingConnectors({
       environment: group(root, path === undefined ? {} : { netopiaIpnKeysPath: path }), company,
-      recordsKey: Buffer.alloc(32), hold: () => undefined, ...(owners === undefined ? {} : { trustedKeyOwners: owners })
+      recordsKey: Buffer.alloc(32), ...(owners === undefined ? {} : { trustedKeyOwners: owners })
     });
     // Production owners: root owns it, and the API user is this process. A test user's own file is refused.
     if (uid !== 0) expect(failureOf(load())).toContain("BILLING_IPN_KEYS_FILE_UNSAFE:WRITABLE_BY_API_USER");
@@ -183,18 +150,18 @@ describe("N8 — BillingConnectors", () => {
   it("refuses a trusted-key file whose blocks are not keys NETOPIA could sign with", () => {
     const root = custody(files, "-----BEGIN PUBLIC KEY-----\nbm90LWEta2V5\n-----END PUBLIC KEY-----\n");
     expect(failureOf(() => loadBillingConnectors({
-      environment: group(root), company, recordsKey: Buffer.alloc(32), hold: () => undefined, trustedKeyOwners: OWN
+      environment: group(root), company, recordsKey: Buffer.alloc(32), trustedKeyOwners: OWN
     }))).toContain("NETOPIA_IPN_KEYS_INVALID");
   });
 
   it("reads NETOPIA's API key as a custody text file", () => {
     const root = custody({ ...files, netopia: "two\nlines\n" });
     expect(failureOf(() => loadBillingConnectors({
-      environment: group(root), company, recordsKey: Buffer.alloc(32), hold: () => undefined, trustedKeyOwners: OWN
+      environment: group(root), company, recordsKey: Buffer.alloc(32), trustedKeyOwners: OWN
     }))).toContain("PROVIDER_CREDENTIAL_FILE_INVALID");
     const absent = custody({ quaderno: files.quaderno, smartbill: files.smartbill, owner: files.owner });
     expect(failureOf(() => loadBillingConnectors({
-      environment: group(absent), company, recordsKey: Buffer.alloc(32), hold: () => undefined, trustedKeyOwners: OWN
+      environment: group(absent), company, recordsKey: Buffer.alloc(32), trustedKeyOwners: OWN
     }))).toContain("PROVIDER_CREDENTIAL_FILE_ABSENT");
   });
 
@@ -205,8 +172,8 @@ describe("N8 — BillingConnectors", () => {
       return new Response(Buffer.from("%PDF-1.4 recorded"), { status: 200 });
     }) as typeof fetch;
     const connectors = loadBillingConnectors({
-      environment: group(custody(files)), company, recordsKey: Buffer.alloc(32), hold: () => undefined,
-      fetch: recordingFetch, trustedKeyOwners: OWN
+      environment: group(custody(files)), company, recordsKey: Buffer.alloc(32), fetch: recordingFetch,
+      trustedKeyOwners: OWN
     });
     await connectors.invoiceRo.pdf!({ series: "DBT", number: "7" });
     expect(urls).toHaveLength(1);
@@ -214,30 +181,24 @@ describe("N8 — BillingConnectors", () => {
   });
 
   it("refuses, before reading any secret, a CUI that is still the legal notice's bracketed placeholder, or malformed", () => {
-    const held: Array<{ end(): Promise<void> }> = [];
     const root = custody(files);
     const load = (facts: SellerCompany) => () => loadBillingConnectors({
-      environment: group(root), company: facts, recordsKey: Buffer.alloc(32), hold: (resource) => held.push(resource),
-      trustedKeyOwners: OWN
+      environment: group(root), company: facts, recordsKey: Buffer.alloc(32), trustedKeyOwners: OWN
     });
     expect(load({ ...company, cui: "[…]" })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:cui");
     expect(load({ ...company, cui: "CIF 123" })).toThrow("BILLING_COMPANY_FACTS_INVALID:cui");
     expect(load({ ...company, cui: "RO12345678" })).toThrow("BILLING_COMPANY_FACTS_INVALID:cui");
-    expect(held).toHaveLength(0);
   });
 
   it("refuses, before reading any secret, a company fact every email prints that is still bracketed (P2-M35)", () => {
-    const held: Array<{ end(): Promise<void> }> = [];
     const root = custody(files);
     const load = (facts: SellerCompany) => () => loadBillingConnectors({
-      environment: group(root), company: facts, recordsKey: Buffer.alloc(32), hold: (resource) => held.push(resource),
-      trustedKeyOwners: OWN
+      environment: group(root), company: facts, recordsKey: Buffer.alloc(32), trustedKeyOwners: OWN
     });
     expect(load({ ...company, registeredOffice: SELLER_COMPANY.registeredOffice })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice");
     expect(load({ ...company, emails: SELLER_COMPANY.emails })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:emails.general");
     expect(load({ ...company, legalName: "[…] S.R.L." })).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:legalName");
     expect(load(SELLER_COMPANY)).toThrow("BILLING_COMPANY_FACTS_UNVERIFIED:cui");
-    expect(held).toHaveLength(0);
   });
 
   it("builds SmartBill's code in the form X1 row 16 names, from the CUI and the RO VAT code (never a reshaped CUI)", () => {
@@ -265,33 +226,14 @@ describe("N8 — BillingConnectors", () => {
     }
   });
 
-  it("keeps the xMoney checks of before while xMoney is configured: key length, the text loader, the public key", () => {
-    const held: Array<{ end(): Promise<void> }> = [];
-    const short = custody({ ...files, xmoney: "too-short-key\n" });
-    expect(() => loadBillingConnectors({
-      environment: group(short, { xmoney: xmoneyGroup(short) }), company, recordsKey: Buffer.alloc(32, 3),
-      hold: (resource) => held.push(resource), trustedKeyOwners: OWN
-    })).toThrow(expect.objectContaining({ code: "XMONEY_KEY_LENGTH_INVALID" }));
-    expect(held).toHaveLength(1);
-    const root = custody(files);
-    expect(() => loadBillingConnectors({
-      environment: group(root, { xmoney: xmoneyGroup(root, { xmoneyPrivateKeyPath: join(root, "absent") }) }), company,
-      recordsKey: Buffer.alloc(32), hold: () => undefined, trustedKeyOwners: OWN
-    })).toThrow(expect.objectContaining({ code: "SECRET_TEXT_ABSENT" }));
-    expect(() => loadBillingConnectors({
-      environment: group(root, { xmoney: xmoneyGroup(root, { xmoneyPublicKey: "0123456789abcdef0123456789abcdef" }) }),
-      company, recordsKey: Buffer.alloc(32), hold: () => undefined, trustedKeyOwners: OWN
-    })).toThrow("BILLING_CONFIGURATION_INVALID:XMONEY_PUBLIC_KEY");
-  });
-
   it("refuses SmartBill credentials that are not e-mail:token, and an owner address that is not one", () => {
     expect(() => loadBillingConnectors({
       environment: group(custody({ ...files, smartbill: "no-colon\n" })), company, recordsKey: Buffer.alloc(32),
-      hold: () => undefined, trustedKeyOwners: OWN
+      trustedKeyOwners: OWN
     })).toThrow("BILLING_CONFIGURATION_INVALID:SMARTBILL_CREDENTIALS_PATH");
     expect(() => loadBillingConnectors({
       environment: group(custody({ ...files, owner: "not-an-address\n" })), company, recordsKey: Buffer.alloc(32),
-      hold: () => undefined, trustedKeyOwners: OWN
+      trustedKeyOwners: OWN
     })).toThrow("BILLING_CONFIGURATION_INVALID:OWNER_REPORT_EMAIL_PATH");
   });
 
@@ -313,9 +255,9 @@ describe("N8 — BillingConnectors", () => {
 
   it("lists every configured billing custody file, NETOPIA's two included, for the secret-domain check", () => {
     expect(billingCustodyPaths({
-      NETOPIA_API_KEY_PATH: "/n", NETOPIA_IPN_KEYS_PATH: "/p", XMONEY_PRIVATE_KEY_PATH: "/a",
-      QUADERNO_API_KEY_PATH: undefined, SMARTBILL_CREDENTIALS_PATH: "/b", OWNER_REPORT_EMAIL_PATH: undefined
-    })).toEqual(["/n", "/p", "/a", "/b"]);
+      NETOPIA_API_KEY_PATH: "/n", NETOPIA_IPN_KEYS_PATH: "/p", QUADERNO_API_KEY_PATH: undefined,
+      SMARTBILL_CREDENTIALS_PATH: "/b", OWNER_REPORT_EMAIL_PATH: undefined
+    })).toEqual(["/n", "/p", "/b"]);
   });
 
   it("judges a trusted-key file by its owner and its write bits only", () => {

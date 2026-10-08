@@ -8,8 +8,8 @@ import type { ChargeEventRow, ChargeRow } from "@debateai/db";
 import { planById } from "@debateai/register";
 import type { AuthenticatedSession } from "../sessions.js";
 import { enqueueEmail } from "./email-job.js";
+import { isThisPaymentSystem } from "./outbox.js";
 import { allocateRefund, paidTransactions, type PaidTransaction, type RefundAllocation } from "./refunds.js";
-import { servedHere } from "./renewal-rules.js";
 import { appendChecked, lockedSubscription, refuse } from "./subscription-core.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 import { initialTaxCountry, withdrawalOpenUntil } from "./subscription-view.js";
@@ -17,7 +17,7 @@ import { initialTaxCountry, withdrawalOpenUntil } from "./subscription-view.js";
 /** What a withdrawal needs: the route's composition, or the owner's command (P14c) over its operator pool. */
 export type WithdrawalDeps = Pick<SubscriptionRouteDeps,
   | "billing" | "jobs" | "entitlements" | "plans" | "policy" | "ownerSpend" | "refunds" | "audit" | "clock" | "kick"
-  | "xmoneyEnvironment" | "paymentEnvironment">;
+  | "paymentEnvironment">;
 
 export type WithdrawalRequest = Readonly<{
   ownerRef: string;
@@ -65,7 +65,7 @@ const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
 
 /**
  * Spec §2.5.6 withdraw. The decision and every record commit together — WITHDRAWN, the FREE entitlement and the
- * refund intents (P9b's RefundDesk: REFUND_REQUESTED + one XMONEY_REFUND job per transaction, split newest first) —
+ * refund intents (P9b's RefundDesk: REFUND_REQUESTED + one PAYMENT_REFUND job per payment, split newest first) —
  * and only then does money move, through the outbox this function kicks; M8 ("we refunded …") follows the last
  * refund (RefundDesk's WITHDRAWAL follow-up), or goes now when nothing is due back. W9 (P2-I11): the same transaction
  * queues the acknowledgement of receipt (Directive 2011/83/EU art. 11(3)) for every withdrawal it records: M8_RECEIVED
@@ -80,7 +80,7 @@ const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
  * owner ran the command) takes no share: it goes back whole, what it still holds, on top of that sum. The refund is
  * still split newest first, so such a payment is the first to go back.
  *
- * D6a F20(c): when a refund made in the xMoney dashboard touched any paid transaction (`providerRefunded`, whose
+ * D6a F20(c): when a refund made in NETOPIA's admin touched any paid payment (`providerRefunded`, whose
  * refunded amount is only an upper bound), or when a transaction already holds a refund request
  * (`REFUND_TRANSACTION_ALREADY_REFUNDED`), the refund due cannot be taken from our rows: the withdrawal is recorded
  * (the plan ends now) with `refund_by_owner`, and no intent and no M8 are written. The owner settles it with
@@ -96,13 +96,12 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
     || before.currentPeriodEnd === null || before.activatedAt === null
     || withdrewAt.getTime() < before.currentPeriodStart.getTime()
     // D5 5h (P2-I4), skeleton §1 rule 2: its payments live in another payment system, where this API cannot refund them.
-    || !servedHere(before, { xmoneyEnvironment: deps.xmoneyEnvironment, paymentEnvironment: deps.paymentEnvironment })) {
+    || !isThisPaymentSystem(before, deps.paymentEnvironment)) {
     refuse(409, "NOT_SUBSCRIBED");
   }
   const taxCountry = await initialTaxCountry(deps.billing, before);
   if (withdrawalOpenUntil({
-    state: before, taxCountry, policy: deps.policy, now: withdrewAt, xmoneyEnvironment: deps.xmoneyEnvironment,
-    paymentEnvironment: deps.paymentEnvironment
+    state: before, taxCountry, policy: deps.policy, now: withdrewAt, paymentEnvironment: deps.paymentEnvironment
   }) === null) {
     refuse(409, "WITHDRAWAL_WINDOW_CLOSED");
   }
@@ -168,7 +167,7 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
     // told at once only what has happened (W9, M8_RECEIVED: the refund on its way, or the owner's check), and
     // RefundDesk queues M8 after the last refund; a withdrawal handed to the owner gets its M8 when the owner settles
     // it (P14c).
-    const customer = await deps.billing.customerByOwner(ownerRef, undefined, client);
+    const customer = await deps.billing.customerByOwner(ownerRef, client);
     const withdrawalDate = withdrewAt.toISOString();
     if (customer !== null) {
       const recipient = { kind: "CUSTOMER", customerId: customer.customerId } as const;

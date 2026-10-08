@@ -8,7 +8,7 @@ import { sealBillingProfile, sealCardToken, sealQuoteLocation } from "../../apps
 import { RenewalService, type NetopiaRenewalDeps, type RenewalDeps } from "../../apps/api/src/billing/renewal.js";
 import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import type { ChargeSettlement } from "../../apps/api/src/billing/settlement.js";
-import { activeSubscriptionEvents, testBillingPlans, testBillingPolicy, XMONEY_SYSTEM_UNTIL_N23 } from "../support/billingFixtures.js";
+import { activeSubscriptionEvents, testBillingPlans, testBillingPolicy } from "../support/billingFixtures.js";
 import { testCardToken } from "../support/billingSubscriptionFixtures.js";
 
 const MINUTE = 60_000;
@@ -69,7 +69,7 @@ describe("P2-I7 a dunning retry is dated by the clock inside its lease, never by
       } as unknown as MaintenanceDeps["jobs"],
       entitlements: { append: vi.fn() },
       renewal: renewal as unknown as MaintenanceDeps["renewal"],
-      policy: testBillingPolicy, publicAppUrl: "https://dezbatere.test", ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment: "sandbox",
+      policy: testBillingPolicy, publicAppUrl: "https://dezbatere.test", paymentEnvironment: "sandbox",
       audit: vi.fn(), clock: clock.read
     });
 
@@ -125,10 +125,9 @@ describe("P2-I7 a saved-card charge's outcome rows are dated when the call retur
       } as unknown as BillingRepository,
       jobs: { bringForward: vi.fn() } as unknown as RenewalDeps["jobs"],
       entitlements: { append: vi.fn(), current: vi.fn() } as unknown as RenewalDeps["entitlements"],
-      xmoney: { rebill: unused, listTransactions: unused } as unknown as RenewalDeps["xmoney"],
       tax: { quote: vi.fn() } as unknown as RenewalDeps["tax"], settlement: {} as ChargeSettlement, policy: testBillingPolicy,
       plans: testBillingPlans, recordsKey: RECORDS_KEY, publicAppUrl: "https://dezbatere.test", audit: vi.fn(),
-      clock: clock.read, kick: () => undefined, ...XMONEY_SYSTEM_UNTIL_N23,
+      clock: clock.read, kick: () => undefined,
       netopia: {
         payments: { chargeSavedCard, status: unused }, paymentEnvironment: "sandbox",
         recipients: { currentAddress: async () => "timing@example.test" }, orderText: englishOrderText

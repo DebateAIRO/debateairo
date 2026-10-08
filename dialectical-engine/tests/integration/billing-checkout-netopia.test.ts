@@ -138,7 +138,7 @@ describe("N18 the checkout starts NETOPIA's page (spec §2.6.2)", () => {
     expect(await trail(result.chargeId)).toEqual(["REQUESTED", "SUBMITTED"]);
     const [created] = await w.repository.subscriptionEvents(charge!.subscriptionId);
     expect(created).toMatchObject({
-      kind: "CREATED", xmoneyCustomerId: null,
+      kind: "CREATED",
       data: { payment_provider: "netopia", payment_environment: "sandbox", country_confirmed: false, ip_country: "RO" }
     });
     const hosted = await w.repository.withTransaction((client) => w.repository.hostedPaymentForCharge(client, result.chargeId));
@@ -151,8 +151,6 @@ describe("N18 the checkout starts NETOPIA's page (spec §2.6.2)", () => {
     });
     expect((await database.pool.query("SELECT kind, surface FROM legal.acceptance WHERE owner_ref = $1 ORDER BY kind", [w.ownerRef])).rows)
       .toEqual([{ kind: "IMMEDIATE_START", surface: "CHECKOUT" }, { kind: "RENEWAL_TERMS", surface: "CHECKOUT" }]);
-    // NETOPIA has no customer object: no xMoney link is written (spec §2.6.2 step 2).
-    expect((await database.pool.query("SELECT 1 FROM billing.customer_xmoney WHERE customer_id = $1", [customer!.customerId])).rowCount).toBe(0);
     // Spec §2.2 rule 5: no audit line carries the URL, the phone or the address.
     const lines = JSON.stringify(w.audit.events);
     for (const secret of ["netopia-payments.com", "+40712345678", "buyer@example.test", "Memorandumului"]) expect(lines).not.toContain(secret);
@@ -367,7 +365,7 @@ describe("N18 one open checkout at a time (spec §2.6.3)", () => {
 
   it("abandons an open checkout of another payment system and never reads it at NETOPIA (spec §2.5.4)", async () => {
     const w = world();
-    // An xMoney-era checkout (its CREATED names no payment_provider), seeded as billing-other-system-records does.
+    // A checkout of NETOPIA's live environment, open on this sandbox API (README §14.8's same-host switch, backwards).
     const subscriptionId = randomUUID();
     const legacyQuote = await w.quote();
     const quoted = (await w.repository.quote(legacyQuote, w.ownerRef))!;
@@ -375,14 +373,14 @@ describe("N18 one open checkout at a time (spec §2.6.3)", () => {
     await w.repository.withTransaction(async (client) => {
       await w.repository.appendSubscriptionEvent(client, {
         eventId: randomUUID(), subscriptionId, ownerRef: w.ownerRef, kind: "CREATED", at: clock.now, planId: "PLUS",
-        periodAnchorAt: null, xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null, cardTokenId: null,
-        data: { xmoney_environment: "stage" }
+        periodAnchorAt: null, cardTokenId: null,
+        data: { payment_provider: "netopia", payment_environment: "live" }
       });
       const month = computeWindows(clock.now, clock.now).month;
       await w.repository.insertCharge(client, {
         chargeId: legacyCharge, ownerRef: w.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1, periodStart: month.start,
         periodEnd: month.end, quoteId: quoted.quoteId, netMicros: quoted.netMicros, taxMicros: quoted.taxMicros,
-        totalMicros: quoted.totalMicros, currency: "USD", createdAt: clock.now, paymentProvider: "xmoney", paymentEnvironment: "stage"
+        totalMicros: quoted.totalMicros, currency: "USD", createdAt: clock.now, paymentProvider: "netopia", paymentEnvironment: "live"
       });
       for (const kind of ["REQUESTED", "SUBMITTED"] as const) {
         await w.repository.appendChargeEvent(client, chargeEvent(legacyCharge, kind, clock.now, {

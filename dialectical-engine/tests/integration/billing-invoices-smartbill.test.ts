@@ -76,7 +76,7 @@ beforeAll(async () => {
   const deps = () => ({
     repository: h.repository, jobs: h.jobs, issuer: smartbill.port(), recordsKey: h.recordsKey,
     recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy,
-    publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const, paymentEnvironment: "sandbox" as const
+    publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, paymentEnvironment: "sandbox" as const
   });
   invoiceDeps = deps;
   invoiceHandler = () => createSmartBillInvoiceHandler(deps());

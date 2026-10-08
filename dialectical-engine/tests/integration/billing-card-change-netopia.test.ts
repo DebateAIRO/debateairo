@@ -1,13 +1,13 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { foldSubscription, paymentError, type PaymentState } from "@debateai/billing-core";
-import { BillingCardChangeResponseSchema, BillingCardDetailsResponseSchema } from "@debateai/contract";
+import { BillingCardChangeResponseSchema, BillingCardDetailsResponseSchema, e164Phone } from "@debateai/contract";
 import { BillingRepository, migrate } from "@debateai/db";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
 import { StubGeo } from "../support/billingFixtures.js";
 import {
-  mountSubscriptionRoutes, recordingAudit, seedActiveSubscription, seedNetopiaSubscription, subscriptionDeps, testAgreement,
+  mountSubscriptionRoutes, recordingAudit, seedNetopiaSubscription, subscriptionDeps, testAgreement,
   testCardToken, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
 } from "../support/billingSubscriptionFixtures.js";
 import { netopiaVerifyHandler, verifyJob } from "../support/netopia-verify.js";
@@ -108,9 +108,11 @@ describe("N13 the card page's details and NETOPIA's 0 check (spec §2.11)", () =
       street: "Strada Exemplu 1", city: "Bucuresti", postal_code: "010101"
     });
     await run.api.close();
-    const identity = testHttpIdentity("n13-details-xmoney");
-    await seedActiveSubscription(database.pool, {
-      ownerRef: identity.authenticated.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO"
+    // A plan of the other NETOPIA environment (the API serves the sandbox) has no card to change here.
+    const identity = testHttpIdentity("n13-details-other");
+    await seedNetopiaSubscription(database.pool, {
+      ownerRef: identity.authenticated.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO",
+      paymentEnvironment: "live"
     });
     const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool), identity);
     const refused = await api.inject({
@@ -174,7 +176,7 @@ describe("N13 the card page's details and NETOPIA's 0 check (spec §2.11)", () =
     await run.api.close();
   });
 
-  it("refuses a stale agreement, a phone that is not E.164, an xMoney plan, an open renewal outcome and a failed start", async () => {
+  it("refuses a stale agreement, a phone that is not E.164, another system's plan, an open renewal outcome and a failed start", async () => {
     const run = await start("n13-refusals");
     const stale = await run.change({ renewal_terms: { version: "2026-01-01", sha256: "0".repeat(63) + "1" } });
     expect([stale.statusCode, stale.json().error]).toEqual([409, "LEGAL_DOCUMENT_STALE"]);
@@ -215,17 +217,28 @@ describe("N13 the card page's details and NETOPIA's 0 check (spec §2.11)", () =
     expect((await failing.change()).statusCode).toBe(200);
     await failing.api.close();
 
-    const identity = testHttpIdentity("n13-xmoney");
-    await seedActiveSubscription(database.pool, {
-      ownerRef: identity.authenticated.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO"
+    const identity = testHttpIdentity("n13-other-system");
+    await seedNetopiaSubscription(database.pool, {
+      ownerRef: identity.authenticated.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO",
+      paymentEnvironment: "live"
     });
     const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool), identity);
-    const xmoney = await api.inject({
+    const other = await api.inject({
       method: "POST", url: "/v1/billing/subscription/card", headers: { "x-test-session": identity.rawSessionToken },
       payload: { locale: "en", renewal_terms: testAgreement("en"), ...CORRECTED }
     });
-    expect([xmoney.statusCode, xmoney.json().error]).toEqual([409, "NOT_SUBSCRIBED"]);
+    expect([other.statusCode, other.json().error]).toEqual([409, "NOT_SUBSCRIBED"]);
     await api.close();
+  });
+
+  it("takes a phone in any spelling the checkout takes, and sends it as E.164 (ruling PR-43: one rule)", async () => {
+    const run = await start("n13-phone-spelling");
+    // The checkout's own rule (`e164Phone`, @debateai/contract) takes this spelling; the card page takes it too.
+    expect(e164Phone("+40-712-345-678")).toBe("+40712345678");
+    const response = await run.change({ phone: "+40-712-345-678" });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(run.payments.hosted.at(-1)?.payer).toMatchObject({ phone: "+40712345678" });
+    await run.api.close();
   });
 });
 

@@ -1,11 +1,11 @@
-import { addBusinessDays, foldSubscription, type SubscriptionEvent, type SubscriptionState } from "@debateai/billing-core";
+import { addBusinessDays, type SubscriptionEvent, type SubscriptionState } from "@debateai/billing-core";
 
 export function addDays(from: Date, days: number): Date {
   return new Date(from.getTime() + days * 86_400_000);
 }
 
 /**
- * Ruling Q-1: how long a renewal waits out an outage (the tax service down, xMoney unreachable, a rebill whose outcome
+ * Ruling Q-1: how long a renewal waits out an outage (the tax service down, NETOPIA unreachable, a charge whose outcome
  * is still unknown) before the normal dunning starts. A function, not an exported number (the source audit's rule).
  */
 export function renewalPendingMs(): number {
@@ -57,29 +57,6 @@ export function dunningProgress(
   });
 }
 
-/**
- * A2 with A12 (D6b's finding 6): every xMoney order that could hold a payment for a charge made at `chargeCreatedAt`,
- * oldest first, without repeats. First the order in force when the charge was made (the fold of the events at or
- * before that instant, as P14a's `adoptOne` reads it), then each order a later event set: a `CARD_CHANGED` (the new
- * card's order), or an `ACTIVATED` (the other kind P2's fold moves the order on). A card change moves the
- * subscription to its new order, but a rebill sent before it went to the old one; the adoption looks on all of them
- * before any resubmission, so a payment on the old card is never missed and the new card never charged a second
- * time. Empty only for a history with no order at all.
- */
-export function ordersHoldingCharge(events: ReadonlyArray<SubscriptionEvent>, chargeCreatedAt: Date): string[] {
-  const madeAt = chargeCreatedAt.getTime();
-  const before = events.filter((event) => event.at.getTime() <= madeAt);
-  const orders: string[] = [];
-  const inForce = before.length === 0 ? null : foldSubscription(before).xmoneyOrderId;
-  if (inForce !== null) orders.push(inForce);
-  for (const event of events) {
-    if (event.at.getTime() <= madeAt || event.xmoneyOrderId === null) continue;
-    if (event.kind !== "CARD_CHANGED" && event.kind !== "ACTIVATED") continue;
-    if (!orders.includes(event.xmoneyOrderId)) orders.push(event.xmoneyOrderId);
-  }
-  return orders;
-}
-
 function netOf(event: SubscriptionEvent): number | null {
   const value = event.data.recurring_net_micros;
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
@@ -123,8 +100,9 @@ export type RenewalNoticeDecision =
   | Readonly<{ kind: "WAIT"; until: Date }>;
 
 /**
- * A7 and xMoney's merchant rule: a charge whose amount changed needs a notice at least `noticeBusinessDays`
- * business days before it. The announced total is set at activation, upgrade, downgrade and every notice (P2's fold).
+ * A7's notice rule (kept for NETOPIA until N-23 is answered): a charge whose amount changed needs a notice at least
+ * `noticeBusinessDays` business days before it. The announced total is set at activation, upgrade, downgrade and every
+ * notice (P2's fold).
  */
 export function renewalNoticeDecision(input: Readonly<{
   freshTotalMicros: number;
@@ -168,21 +146,4 @@ export function anniversaryDue(activatedAt: Date, now: Date, windowDays: number)
  */
 export function renewalLeadMs(): number {
   return 5 * 60_000;
-}
-
-/** The two payment systems this API serves: its xMoney system (until N23) and its NETOPIA environment (null: none). */
-export type PaymentSystems = Readonly<{ xmoneyEnvironment: "stage" | "live"; paymentEnvironment: "sandbox" | "live" | null }>;
-
-/**
- * Spec §2.5.4: whether a subscription or a charge belongs to a payment system this API serves. Provider AND environment
- * together: "live" exists in both providers, so a NETOPIA live row is never read as the xMoney live system. Every guard
- * that used to compare `xmoneyEnvironment` alone reads this one rule; a row of another system stays "other system".
- */
-export function servedHere(
-  row: Readonly<{ paymentProvider: "xmoney" | "netopia"; paymentEnvironment: "stage" | "sandbox" | "live" }>,
-  systems: PaymentSystems
-): boolean {
-  return row.paymentProvider === "xmoney"
-    ? row.paymentEnvironment === systems.xmoneyEnvironment
-    : systems.paymentEnvironment !== null && row.paymentEnvironment === systems.paymentEnvironment;
 }

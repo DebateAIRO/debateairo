@@ -11,6 +11,7 @@ import {
   type TaxDueRule
 } from "@debateai/register";
 import { deadEmailAction, documentJobAction } from "./dead-jobs.js";
+import { otherSystemCode } from "./outbox.js";
 
 export type TaxQuarter = Readonly<{ year: number; quarter: 1 | 2 | 3 | 4; from: Date; to: Date; label: string }>;
 /**
@@ -33,11 +34,11 @@ export type EFacturaCheckItem = Readonly<{
   document: string; kind: "INVOICE" | "CREDIT_NOTE"; chargeId: string; issuedAt: Date; status: string | null;
 }>;
 /**
- * What the owner checks in xMoney or at the tax service: a refund xMoney refused (still owed) or one whose outcome is
+ * What the owner checks in NETOPIA's admin or at the tax service: a refund NETOPIA refused (still owed) or one whose outcome is
  * unknown; a refund job the charge records no request for, naming a charge we do not have, or whose payload cannot be
  * read (P2-I5's REFUND_NOT_REQUESTED, with C-7's REFUND_PAYLOAD_INVALID: nothing was sent, it is no refund to make, and
  * whoever runs the server checks who queued it); a
- * refund job of a payment of the other xMoney system (P2-W4's REFUND_OTHER_SYSTEM: nothing was sent, nothing is owed on
+ * refund job of a payment of another payment system (P2-W4's REFUND_OTHER_SYSTEM: nothing was sent, nothing is owed on
  * this server); a second refund made elsewhere on one payment,
  * which our records cannot hold (P9c's REFUND_UNRECORDED: its amount is in no line of the summary); a withdrawal
  * handed to the owner; a renewal closed with its outcome unknown; a charge with no outcome after 30 days; R2 Q-1's
@@ -52,7 +53,7 @@ export type PaymentCheck =
 export type PaymentToCheckItem = Readonly<{
   what: PaymentCheck;
   /**
-   * What the owner looks up: a charge ref; the refund transaction's xMoney id for REFUND_UNRECORDED; the owner ref
+   * What the owner looks up: a charge ref; the refund transaction's payment id for REFUND_UNRECORDED; the owner ref
    * that `pnpm billing:withdraw --owner` takes for WITHDRAWAL_BY_OWNER; the subscription id for DUNNING_UNPRICED,
    * ENDED_UNPRICED, RENEWAL_BLOCKED and SUBSCRIPTION_HISTORY_INVALID.
    */
@@ -78,14 +79,14 @@ export type TaxSummaryLine = Readonly<{
   /** Refunds subtracted above (their amount is known). */
   refunds: number;
   /**
-   * Dashboard refunds of unknown amount on this line's charges: NOT subtracted, listed in `TaxSummary.unknownRefunds`.
+   * Admin refunds of unknown amount on this line's charges: NOT subtracted, listed in `TaxSummary.unknownRefunds`.
    * Not a payment refunded before its plan started (a REFUNDED_BEFORE_START line, Part 4 final review C-5): no credit
    * note is owed for it, and its own line is its only instruction.
    */
   unknownRefunds: number;
   statusCounts: Readonly<Record<TaxStatus, number>>;
 }>;
-/** A refund made in the xMoney dashboard whose amount our rows cannot know; `upToMicros` is its upper bound. */
+/** A refund made in NETOPIA's admin whose amount our rows cannot know; `upToMicros` is its upper bound. */
 export type UnknownRefundItem = Readonly<{
   chargeId: string; taxCountry: string; taxRegion: string | null; upToMicros: number; at: Date;
 }>;
@@ -101,7 +102,7 @@ export type TaxSummary = Readonly<{
    */
   chargebacks: ReadonlyArray<Readonly<{ chargeId: string; taxCountry: string; amountMicros: number; at: Date; saleRecorded: boolean }>>;
   /**
-   * Not subtracted from any line: the owner reads each amount in the dashboard, records its credit note with
+   * Not subtracted from any line: the owner reads each amount in NETOPIA's admin, records its credit note with
    * `--amount`, and until then adjusts that country by hand. Never a charge with a REFUNDED_BEFORE_START line (C-5).
    */
   unknownRefunds: ReadonlyArray<UnknownRefundItem>;
@@ -266,17 +267,19 @@ export async function unverifiedNoticeDaysFrom(
 }
 
 /**
- * Which list a dead XMONEY_REFUND job goes on, by its dead-letter code (an open set of strings). REFUND_NOT_REQUESTED
+ * Which list a dead refund job goes on, by its dead-letter code (an open set of strings). REFUND_NOT_REQUESTED
  * (P2-I5) and REFUND_CHARGE_MISSING (P2-W4: the job names a charge we do not have) moved no money and are no refund to
- * make; REFUND_PAYLOAD_INVALID (Part 4 final review C-7) ended before any xMoney call, and only a row written by
+ * make; REFUND_PAYLOAD_INVALID (Part 4 final review C-7) ended before any call to NETOPIA, and only a row written by
  * something other than `RefundDesk.request` holds an unreadable payload, so it goes with them: its reason is only the
  * job's claim, and REFUND_NOT_REQUESTED's legend sends the owner to the charge's own refund requests (one never
- * refunded is still owed, progress.md's P4-B ruling); OTHER_XMONEY_SYSTEM (P2-W4) moved none and is owed nothing on
+ * refunded is still owed, progress.md's P4-B ruling); OTHER_PAYMENT_SYSTEM (P2-W4, `otherSystemCode`: the code the
+ * previous card processor's era stored too) moved none and is owed nothing on
  * this server; every other dead end leaves the money owed.
  */
 function deadRefundCheck(
   code: string | null
 ): "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_OTHER_SYSTEM" {
+  if (otherSystemCode(code)) return "REFUND_OTHER_SYSTEM";
   switch (code) {
     case "REFUND_OUTCOME_UNKNOWN":
       return "REFUND_OUTCOME_UNKNOWN";
@@ -284,8 +287,6 @@ function deadRefundCheck(
     case "REFUND_CHARGE_MISSING":
     case "REFUND_PAYLOAD_INVALID":
       return "REFUND_NOT_REQUESTED";
-    case "OTHER_XMONEY_SYSTEM":
-      return "REFUND_OTHER_SYSTEM";
     default:
       return "REFUND_REFUSED";
   }
@@ -295,7 +296,7 @@ function deadRefundCheck(
 function subjectOf(item: PaymentToCheckItem): string {
   switch (item.what) {
     case "REFUND_UNRECORDED":
-      return `xMoney transaction ${item.ref}`;
+      return `NETOPIA payment ${item.ref}`;
     case "WITHDRAWAL_BY_OWNER":
       return `owner ${item.ref}`;
     case "DUNNING_UNPRICED":
@@ -357,7 +358,7 @@ export function buildTaxSummary(input: Readonly<{
       continue;
     }
     if (row.type === "REFUND" && !row.amountKnown && refundedBeforeStart.has(row.chargeId)) {
-      // C-5: a payment xMoney refunded before its plan started owes no credit note (A29 (q)); the 'amount unknown'
+      // C-5: a payment NETOPIA refunded before its plan started owes no credit note (A29 (q)); the 'amount unknown'
       // list asks for one via --amount, which the command refuses for it. Its REFUNDED_BEFORE_START line alone tells
       // the owner to take the sale and the refund out by hand; this row changes no figure and is listed nowhere else.
       continue;
@@ -377,7 +378,7 @@ export function buildTaxSummary(input: Readonly<{
         notRegistered.push(Object.freeze({ chargeId: row.chargeId, taxCountry: row.taxCountry, taxRegion: row.taxRegion, at: row.at }));
       }
     } else if (!row.amountKnown) {
-      // P9c's dashboard refund on the payment itself: `amountMicros` is only an upper bound. Subtracting it would
+      // P9c's admin refund on the payment itself: `amountMicros` is only an upper bound. Subtracting it would
       // understate this country's sales and tax; it is listed for the owner instead, and changes no figure. (A charge
       // refunded before its plan started never reaches here: see the C-5 skip above.)
       unknownRefunds.push(Object.freeze({
@@ -409,7 +410,7 @@ export function buildTaxSummary(input: Readonly<{
     conflicting: Object.freeze(conflicting), notRegistered: Object.freeze(notRegistered),
     chargebacks: Object.freeze(chargebacks), unknownRefunds: Object.freeze(unknownRefunds),
     // C-5: a REFUNDED_BEFORE_START line belongs to its sale's quarter (quarterSummaryRows dates the SALE when the money
-    // moved, and keeps only one xMoney system's charges); every other line prints in every quarter.
+    // moved, and keeps only one payment system's charges); every other line prints in every quarter.
     invoiceUnknown: Object.freeze(input.invoiceUnknown.filter((item) =>
       item.jobKind !== "REFUNDED_BEFORE_START" || soldThisQuarter.has(item.chargeId))),
     efactura: Object.freeze([...input.efactura]), paymentsToCheck: Object.freeze([...input.paymentsToCheck]),
@@ -476,7 +477,7 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
     out.push(`  Net sales ${microsToDecimal(line.netMicros)} USD, tax collected ${microsToDecimal(line.taxMicros)} USD,`
       + ` from ${plural(line.sales, "sale", "sales")} and ${plural(line.refunds, "refund", "refunds")}.`);
     if (line.unknownRefunds > 0) {
-      out.push(`  Not subtracted: ${plural(line.unknownRefunds, "refund", "refunds")} made in the xMoney dashboard,`
+      out.push(`  Not subtracted: ${plural(line.unknownRefunds, "refund", "refunds")} made in NETOPIA's admin,`
         + " amount unknown (listed below).");
     }
     const statuses = (Object.entries(line.statusCounts) as Array<[TaxStatus, number]>)
@@ -529,9 +530,9 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " accountant decides, except for a line that says no sale was recorded for it):",
     (item) => `charge ${item.chargeId}, ${item.taxCountry}, ${microsToDecimal(item.amountMicros)} USD, on ${isoDay(item.at)}`
       + (item.saleRecorded ? "" : ": no sale was recorded for it"));
-  section(summary.unknownRefunds, "Refunds made in the xMoney dashboard, amount unknown: none.",
+  section(summary.unknownRefunds, "Refunds made in NETOPIA's admin, amount unknown: none.",
     // P4-K (P2-W12): once the owner records the credit note with its amount, `quarterSummaryRows` subtracts it.
-    "Refunds made in the xMoney dashboard, amount unknown (not subtracted above; read the amount in the dashboard,"
+    "Refunds made in NETOPIA's admin, amount unknown (not subtracted above; read the amount in NETOPIA's admin,"
       + " issue its credit note by hand and record it with its amount (pnpm billing:invoice --amount, as its line under"
       + " the invoices and credit notes to check by hand says), and the summary then subtracts it at that amount; until"
       + " then, adjust that country's net sales and tax by hand, at most the amount shown):",
@@ -570,25 +571,25 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " <series>-<number> --status ACCEPTED|REJECTED):",
     (item) => `${item.kind === "INVOICE" ? "invoice" : "credit note"} ${item.document} (charge ${item.chargeId}),`
       + ` issued ${isoDay(item.issuedAt)}: ${item.status === null ? "no status recorded" : `last status ${item.status}`}`);
-  section(summary.paymentsToCheck, "Payments to check by hand in xMoney: none.",
-    "Payments to check by hand in xMoney (REFUND_REFUSED: xMoney refused our refund, the money is still owed, refund"
-      + " it from the dashboard; REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check the"
-      + " dashboard before refunding again; a WITHDRAWAL refund is due within 14 days of the withdrawal;"
+  section(summary.paymentsToCheck, "Payments to check by hand in NETOPIA's admin: none.",
+    "Payments to check by hand in NETOPIA's admin (REFUND_REFUSED: NETOPIA refused our refund, the money is still owed,"
+      + " refund it from NETOPIA's admin; REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check"
+      + " NETOPIA's admin before refunding again; a WITHDRAWAL refund is due within 14 days of the withdrawal;"
       + " REFUND_NOT_REQUESTED: a refund job that matches no refund request our records hold for this payment, so"
-      + " nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to the"
+      + " nothing was sent to NETOPIA and it is no refund to make; do not refund it: something able to write to the"
       + " billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
       + " (one never refunded is still owed);"
-      + " REFUND_OTHER_SYSTEM: a refund job for a payment of the other xMoney system (sandbox or live): nothing was"
-      + " sent, and nothing is owed on this server;"
-      + " REFUND_UNRECORDED: a second refund made in the xMoney dashboard on a payment that already had one, which our"
-      + " records cannot hold, so it is in no figure above: read its amount on that transaction in the dashboard and"
+      + " REFUND_OTHER_SYSTEM: a refund job for a payment of another payment system (the previous card processor, or"
+      + " NETOPIA's sandbox or live): nothing was sent, and nothing is owed on this server;"
+      + " REFUND_UNRECORDED: a second refund made in NETOPIA's admin on a payment that already had one, which our"
+      + " records cannot hold, so it is in no figure above: read its amount on that payment in NETOPIA's admin and"
       + " take it off that country's net sales and tax by hand."
       // Part 4 final review C-6: P4-K's --amount credit note is already subtracted above (quarterSummaryRows).
-      + " A refund transaction of a payment whose dashboard-refund credit note is recorded is already in the figures"
+      + " A refund of a payment whose admin-refund credit note is recorded is already in the figures"
       + " above: do not take it off again;"
-      + " WITHDRAWAL_BY_OWNER: a withdrawal over a payment a dashboard refund touched, refund in the dashboard what the"
+      + " WITHDRAWAL_BY_OWNER: a withdrawal over a payment an admin refund touched, refund in NETOPIA's admin what the"
       + " command cannot take back, then settle it with pnpm billing:withdraw --owner <ref> --refund <amount>"
-      + " --dashboard <amount refunded in the dashboard>; RENEWAL_STUCK: a renewal closed with its outcome"
+      + " --dashboard <amount refunded in NETOPIA's admin>; RENEWAL_STUCK: a renewal closed with its outcome"
       + " unknown, check whether the card was charged; PAYMENT_UNSETTLED: no outcome after 30 days;"
       + " DUNNING_UNPRICED: a renewal the tax service could not price within the 3-day quiet retry, so the payment"
       + " reminders run with nothing charged, check the tax service; ENDED_UNPRICED: such a plan ended after its last"

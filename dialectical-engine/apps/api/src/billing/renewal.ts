@@ -1,19 +1,18 @@
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import {
-  computeWindows, decimalToMicros, foldSubscription, microsToDecimal, paymentErrorCode, type CardPayments,
+  computeWindows, foldSubscription, microsToDecimal, paymentErrorCode, type CardPayments,
   type PaymentReport, type PaymentState, type SavedCardCharge, type SubscriptionState, type TaxEngine, type TaxQuote
 } from "@debateai/billing-core";
 import type {
-  BillingJobQueries, BillingRepository, CardTokenRow, ChargeEventRow, ChargeRow, CustomerXMoneyEnvironment,
+  BillingJobQueries, BillingRepository, CardTokenRow, ChargeEventRow, ChargeRow,
   DueRenewalCursor, EntitlementRepository, OutboxJob, QuoteRow
 } from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import { answeredOrderReused, netopiaLanguageOf } from "@debateai/payments-netopia";
-import { XMoneyPaymentFailedError, type XMoneyClient } from "@debateai/payments-xmoney";
 import type { BillingPlans, BillingPolicy, PlanId } from "@debateai/register";
 import type { BillingRecipientReader } from "./account-email.js";
-import { credentialsRefused, rejectedRows, type BillingAudit } from "./audit.js";
+import { answerRejected, type BillingAudit } from "./audit.js";
 import { enqueueEmail } from "./email-job.js";
 import { netopiaNotifyUrl, payerFromProfile, paymentReturnUrl } from "./netopia-payer.js";
 import { planName, type BillingOrderText } from "./order-text.js";
@@ -21,7 +20,7 @@ import { queuePaymentAlert } from "./payment-alert.js";
 import { taxRefusalDetail } from "./quote.js";
 import { openCardToken, openQuoteLocation, sealCardToken, sealQuoteLocation, type QuoteLocation } from "./records.js";
 import {
-  dunningProgress, ordersHoldingCharge, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingMs,
+  dunningProgress, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingMs,
   renewalPendingUntil, unverifiedLookBackMs
 } from "./renewal-rules.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "./rows.js";
@@ -29,10 +28,7 @@ import type { ChargeSettlement } from "./settlement.js";
 import { writeDunningAttempt } from "./settlement-renewal.js";
 import { quoteTaxAt, storedTaxContext } from "./stored-tax-context.js";
 
-/**
- * N11: what a NETOPIA renewal needs beyond today's deps. Optional so the xMoney harnesses keep building the service
- * unchanged; the runtime always passes it (N8's connectors). Absent, no NETOPIA pass runs.
- */
+/** N11: what a NETOPIA renewal needs (N8's connectors). */
 export type NetopiaRenewalDeps = Readonly<{
   /** N8's `connectors.payments` (the sandbox clock's wrapper included). */
   payments: Pick<CardPayments, "chargeSavedCard" | "status">;
@@ -47,12 +43,10 @@ export type NetopiaRenewalDeps = Readonly<{
 export type RenewalDeps = Readonly<{
   repository: BillingRepository;
   jobs: Pick<BillingJobQueries,
-    | "lockOwner" | "withSubscriptionLease" | "openCharges" | "unverifiedRenewals" | "chargeIdForTransaction"
-    | "outboxJobExists" | "bringForward" | "openPaymentCharges" | "submittedPaymentRenewals">;
+    | "lockOwner" | "withSubscriptionLease" | "outboxJobExists" | "bringForward" | "openPaymentCharges"
+    | "submittedPaymentRenewals">;
   /** `current`: whether this period's RENEWAL_PENDING is already in force (Q-1, `holdPending`). */
   entitlements: Pick<EntitlementRepository, "append" | "current">;
-  /** xMoney's rebill and listing, for the xMoney rows still on file (removed in N23). */
-  xmoney: Pick<XMoneyClient, "rebill" | "listTransactions">;
   tax: Pick<TaxEngine, "quote">;
   /** The RENEWAL settlement VERIFY_PAYMENT uses; a synchronous refusal goes through the same `failed`. */
   settlement: ChargeSettlement;
@@ -68,10 +62,8 @@ export type RenewalDeps = Readonly<{
   audit: BillingAudit;
   clock: () => Date;
   kick: () => void;
-  /** D5 5h: the xMoney system (connectors.xmoneyEnvironment) whose subscriptions and charges this pass renews. */
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
-  /** N11: the NETOPIA side; absent in the xMoney harnesses. */
-  netopia?: NetopiaRenewalDeps;
+  /** N11: the NETOPIA side: whose subscriptions and charges this pass renews (D5 5h), and how. */
+  netopia: NetopiaRenewalDeps;
   /**
    * R-34, R3-2: whether this owner must never be charged again: an account erasure pending or finished, or an
    * account the age gate froze (0077's `age_frozen`). P15 supplies it (`billing.owner_erasure_pending`, which P15
@@ -80,10 +72,8 @@ export type RenewalDeps = Readonly<{
   erasurePending?: (ownerRef: string) => Promise<boolean>;
 }>;
 
-/** One payment system a renewal pass serves (spec §2.5.4: provider and environment together). */
-type RenewalSystem =
-  | Readonly<{ provider: "xmoney"; environment: CustomerXMoneyEnvironment }>
-  | Readonly<{ provider: "netopia"; environment: "sandbox" | "live" }>;
+/** The payment system a renewal pass serves (spec §2.5.4: provider and environment together). */
+type RenewalSystem = Readonly<{ provider: "netopia"; environment: "sandbox" | "live" }>;
 type ChargeWithEvents = ChargeRow & { events: ChargeEventRow[] };
 
 export type PricedRenewal = Readonly<{ planId: PlanId; location: QuoteLocation; tax: TaxQuote }>;
@@ -111,37 +101,26 @@ const MAX_PAGES = 20;
 const DAY_MS = 86_400_000;
 
 /**
- * Spec 2026-10-05 §2.5.5: an xMoney plan renews only on its order and customer (the rebill needs both); a NETOPIA plan
- * needs no payment handle — with no usable card it renews into a CARD_NOT_SAVED attempt (§2.9.2), never into silence.
+ * Spec 2026-10-05 §2.5.5: a NETOPIA plan needs no payment handle — with no usable card it renews into a CARD_NOT_SAVED
+ * attempt (§2.9.2), never into silence.
  */
 function renewable(state: SubscriptionState, now: Date): boolean {
   return state.status === "ACTIVE" && !state.cancelRequested && state.currentPeriodEnd !== null
     && state.periodAnchorAt !== null
-    && (state.paymentProvider !== "xmoney" || (state.xmoneyOrderId !== null && state.xmoneyCustomerId !== null))
     && (state.renewalPostponedUntil === null || state.renewalPostponedUntil.getTime() <= now.getTime());
-}
-
-function amountMatches(decimal: string, micros: number): boolean {
-  try {
-    return decimalToMicros(decimal) === micros;
-  } catch {
-    return false;
-  }
 }
 
 /**
  * A2's call markers and outcomes. Every call is preceded by a committed REQUESTED: the charge's first one (code
- * null) for the first call, `RESUBMIT_STARTED` (xMoney) or `RESEND_STARTED` (NETOPIA, the same orderID) for each later
- * one. A call that proves nothing was processed appends a REQUESTED carrying why (`REBILL_NOT_SENT`,
- * `REBILL_CREDENTIALS_REFUSED`; on NETOPIA `CHARGE_NOT_SENT`, `CHARGE_CREDENTIALS_REFUSED`, `CHARGE_CONFIGURATION_REFUSED`,
- * ruling C-8; D5 5i: the request still stands). Only an outcome that may have reached the processor is a SUBMIT_UNKNOWN
- * (`REBILL_OUTCOME_UNKNOWN`, `CHARGE_OUTCOME_UNKNOWN`, `CHARGE_ORDER_EXISTS`, `SUBMIT_INTERRUPTED`), so their count is the
- * count of blind unknowns.
+ * null) for the first call, `RESEND_STARTED` (the same orderID) for each later one. A call that proves nothing was
+ * processed appends a REQUESTED carrying why (`CHARGE_NOT_SENT`, `CHARGE_CREDENTIALS_REFUSED`,
+ * `CHARGE_CONFIGURATION_REFUSED`, ruling C-8; D5 5i: the request still stands). Only an outcome that may have reached
+ * NETOPIA is a SUBMIT_UNKNOWN (`CHARGE_OUTCOME_UNKNOWN`, `CHARGE_ORDER_EXISTS`, `SUBMIT_INTERRUPTED`), so their count is
+ * the count of blind unknowns.
  */
-const RESUBMIT_STARTED = "RESUBMIT_STARTED";
 const RESEND_STARTED = "RESEND_STARTED";
 const NOT_SENT_CODES: ReadonlySet<string> = new Set([
-  "REBILL_NOT_SENT", "REBILL_CREDENTIALS_REFUSED", "CHARGE_NOT_SENT", "CHARGE_CREDENTIALS_REFUSED", "CHARGE_CONFIGURATION_REFUSED"
+  "CHARGE_NOT_SENT", "CHARGE_CREDENTIALS_REFUSED", "CHARGE_CONFIGURATION_REFUSED"
 ]);
 /** C-8: the not-sent markers that are our own setup: never closed into the dunning, and the owner is emailed. */
 const OUR_SETUP_CODES: ReadonlySet<string> = new Set(["CHARGE_CREDENTIALS_REFUSED", "CHARGE_CONFIGURATION_REFUSED"]);
@@ -183,12 +162,11 @@ const OWNER_STEPS: Readonly<Record<
 });
 
 /**
- * Whether a RENEWAL charge's rebill may have reached xMoney with no outcome recorded yet: what `recoverOpenCharge`
- * adopts, looking on every order that could hold the payment (`ordersHoldingCharge`), and after 30 quiet minutes
- * resubmits on the subscription's current order (A2). A charge settled (SUCCEEDED, FAILED) or linked to its
- * transaction (SUBMITTED) is not open, nor one whose last call was proven never sent; a SUBMIT_UNKNOWN, or a call
- * marker with no outcome (a call in flight, or a process that died during it), is. P12e keeps a card change from
- * moving the order while this holds (defense in depth).
+ * Whether a RENEWAL charge may have reached NETOPIA with no outcome recorded yet: what `recoverOpenCharge` probes on
+ * its own orderID and resends after its quiet wait (spec §2.9.3). A charge settled (SUCCEEDED, FAILED) or linked to its
+ * payment (SUBMITTED) is not open, nor one whose last call was proven never sent; a SUBMIT_UNKNOWN, or a call marker
+ * with no outcome (a call in flight, or a process that died during it), is. P12e keeps a card change from changing the
+ * card while this holds (defense in depth).
  */
 export function rebillOutcomeOpen(events: ReadonlyArray<Pick<ChargeEventRow, "kind" | "errorCode">>): boolean {
   if (events.some((event) => event.kind === "SUCCEEDED" || event.kind === "FAILED" || event.kind === "SUBMITTED")) return false;
@@ -197,10 +175,7 @@ export function rebillOutcomeOpen(events: ReadonlyArray<Pick<ChargeEventRow, "ki
   const last = trail.at(-1);
   return last !== undefined && (last.errorCode === null || !NOT_SENT_CODES.has(last.errorCode));
 }
-/** Only payments are adopted, never a refund, credit or chargeback row of the order. */
-const ADOPTABLE_TYPES: ReadonlySet<string | null> = new Set([null, "deposit"]);
-
-/** Review Focus 5: a rebill that never reached xMoney is tried again after 1 min, 5 min, 15 min, then hourly. */
+/** Review Focus 5: a charge that never reached NETOPIA is tried again after 1 min, 5 min, 15 min, then hourly. */
 function notSentBackoffMs(notSentSoFar: number): number {
   const steps = [60_000, 300_000, 900_000, 3_600_000];
   return steps[Math.min(Math.max(notSentSoFar, 1), steps.length) - 1]!;
@@ -308,10 +283,8 @@ export class RenewalService {
     const codes = new Set<string>();
     // D5 5d: each pass has its own try, so a failure in one never stops the next. One due list per payment system.
     const passes: Array<() => Promise<void>> = this.systems().map((system) => () => this.renewDue(now, system, report, codes));
-    passes.push(() => this.recoverOpen(now, report, codes));
-    if (this.deps.netopia !== undefined) passes.push(() => this.recoverPaymentCharges(now, report, codes));
-    passes.push(() => this.holdUnverified(now, report, codes));
-    if (this.deps.netopia !== undefined) passes.push(() => this.decidePending(now, report, codes));
+    passes.push(() => this.recoverPaymentCharges(now, report, codes));
+    passes.push(() => this.decidePending(now, report, codes));
     for (const pass of passes) {
       try {
         await pass();
@@ -330,18 +303,12 @@ export class RenewalService {
     return report;
   }
 
-  /** The payment systems this API renews: its xMoney system and, when wired, its NETOPIA environment. */
+  /** The payment system this API renews: its NETOPIA environment. */
   private systems(): ReadonlyArray<RenewalSystem> {
-    const xmoney: RenewalSystem = Object.freeze({ provider: "xmoney" as const, environment: this.deps.xmoneyEnvironment });
-    const netopia = this.deps.netopia;
-    return netopia === undefined
-      ? [xmoney]
-      : [xmoney, Object.freeze({ provider: "netopia" as const, environment: netopia.paymentEnvironment })];
+    return [Object.freeze({ provider: "netopia" as const, environment: this.deps.netopia.paymentEnvironment })];
   }
 
-  /** The NETOPIA deps; a NETOPIA charge reaching a service built without them is a wiring error, retried next tick. */
   private netopiaDeps(): NetopiaRenewalDeps {
-    if (this.deps.netopia === undefined) throw new TypedDomainError("BILLING_CONFIGURATION_INCOMPLETE", "no NETOPIA renewal deps");
     return this.deps.netopia;
   }
 
@@ -383,64 +350,6 @@ export class RenewalService {
       if (invalid.size > 0) {
         this.deps.audit("billing.renewal.history_invalid", { count: invalid.size, code: "BILLING_SUBSCRIPTION_EVENTS_INVALID" });
       }
-    }
-  }
-
-  /** A2's recovery of open RENEWAL charges, paged on (created_at, charge_id) so none starves another (D6b). */
-  private async recoverOpen(now: Date, report: RenewalReport, codes: Set<string>): Promise<void> {
-    let after: Readonly<{ createdAt: Date; chargeId: string }> | null = null;
-    for (let page = 0; page < MAX_PAGES; page += 1) {
-      const open = await this.deps.jobs.openCharges({
-        environment: this.deps.xmoneyEnvironment, kinds: ["RENEWAL"], after,
-        closeBefore: new Date(now.getTime() - DAY_MS), renewalCloseBefore: new Date(now.getTime() - renewalPendingMs()),
-        limit: PAGE
-      });
-      for (const charge of open) {
-        try {
-          const leased = await this.deps.jobs.withSubscriptionLease(charge.subscriptionId, () => this.recoverOpenCharge(charge.chargeId));
-          if (leased.kind === "RAN" && leased.value) report.recovered += 1;
-        } catch (error) {
-          report.failed += 1;
-          codes.add(failureCode(error));
-        }
-      }
-      const last = open.at(-1);
-      if (open.length < PAGE || last === undefined) break;
-      after = Object.freeze({ createdAt: last.createdAt, chargeId: last.chargeId });
-    }
-  }
-
-  /**
-   * Q-1 ("a rebill outcome still unknown"): a renewal whose rebill answered (SUBMITTED) but whose VERIFY_PAYMENT has
-   * not settled it (the transaction still in 3-D Secure or in progress, or xMoney unreadable) keeps the plan past the
-   * period end through the same RENEWAL_PENDING hold, so a person already charged never drops to Free while the
-   * check waits. Only a charge SUBMITTED a minute ago or more: the tick that sent it kicked its check. `holdPending`
-   * writes at most one row per period and nothing once the window is over; the charge is never closed here (a real
-   * transaction exists and may have moved money: VERIFY_PAYMENT and P14a own its outcome).
-   */
-  private async holdUnverified(now: Date, report: RenewalReport, codes: Set<string>): Promise<void> {
-    let after: Readonly<{ createdAt: Date; chargeId: string }> | null = null;
-    for (let page = 0; page < MAX_PAGES; page += 1) {
-      const waiting = await this.deps.jobs.unverifiedRenewals({
-        environment: this.deps.xmoneyEnvironment,
-        periodStartFrom: new Date(now.getTime() - unverifiedLookBackMs(this.deps.policy.renewalNoticeBusinessDays)),
-        periodStartTo: now, submittedBefore: new Date(now.getTime() - 60_000), after, limit: PAGE
-      });
-      for (const charge of waiting) {
-        try {
-          const leased = await this.deps.jobs.withSubscriptionLease(charge.subscriptionId, async () => {
-            const state = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId));
-            return this.holdPending(state, charge.periodStart, now, "PAYMENT_NOT_VERIFIED");
-          });
-          if (leased.kind === "RAN" && leased.value) report.held += 1;
-        } catch (error) {
-          report.failed += 1;
-          codes.add(failureCode(error));
-        }
-      }
-      const last = waiting.at(-1);
-      if (waiting.length < PAGE || last === undefined) break;
-      after = Object.freeze({ createdAt: last.createdAt, chargeId: last.chargeId });
     }
   }
 
@@ -595,7 +504,7 @@ export class RenewalService {
   /**
    * A tax refusal at renewal or at a dunning retry (P4: a revoked key, a refused request). One content-free operator
    * alarm per subscription period per process, with P4's detail; no charge, no dunning, no email. Paid access follows
-   * the precedent of xMoney's refused key: an ACTIVE renewal gets the same RENEWAL_PENDING hold as an outage, labelled
+   * the precedent of NETOPIA's refused key: an ACTIVE renewal gets the same RENEWAL_PENDING hold as an outage, labelled
    * with the real code (`holdPending` writes nothing for a PAST_DUE plan, whose grace already runs).
    */
   async taxRefused(state: SubscriptionState, periodStart: Date, now: Date, error: unknown): Promise<void> {
@@ -609,7 +518,7 @@ export class RenewalService {
 
   /**
    * Ruling Q-1: while an outage blocks the renewal of the period starting at `periodStart` (the tax service down,
-   * xMoney unreachable or refusing our key, a rebill whose outcome is still unknown), the plan stays: ONE
+   * NETOPIA unreachable or refusing our key, a charge whose outcome is still unknown), the plan stays: ONE
    * `RENEWAL_PENDING` entitlement event per period moves `paid_through` to `renewalPendingUntil` (72 hours past the
    * due instant), with no email. Written under the owner lock, and only while the subscription, folded again inside
    * it, is still ACTIVE on that period with no cancel pending (a cancel, a withdrawal or an erasure in between is
@@ -709,7 +618,6 @@ export class RenewalService {
       await this.deps.jobs.lockOwner(client, state.ownerRef);
       const fresh = foldSubscription(await this.deps.repository.subscriptionEvents(state.subscriptionId, client));
       if (fresh.status !== "PAST_DUE" || fresh.cancelRequested
-        || (fresh.paymentProvider === "xmoney" && (fresh.xmoneyOrderId === null || fresh.xmoneyCustomerId === null))
         || fresh.currentPeriodEnd?.getTime() !== periodStart.getTime()) return null;
       const existing = await this.deps.repository.chargesForSubscription(state.subscriptionId, client);
       if (existing.some((row) => row.kind === "RENEWAL" && row.periodStart.getTime() === periodStart.getTime()
@@ -743,7 +651,7 @@ export class RenewalService {
       const charges = await this.deps.repository.chargesForSubscription(state.subscriptionId, client);
       if (charges.some((row) => row.kind === "RENEWAL" && row.periodStart.getTime() === periodStart.getTime()
         && row.attempt >= attempt)) return false;
-      const customer = await this.deps.repository.customerByOwner(fresh.ownerRef, undefined, client);
+      const customer = await this.deps.repository.customerByOwner(fresh.ownerRef, client);
       if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a subscription without its customer");
       await writeDunningAttempt(this.deps, client, {
         subscription: fresh, customerId: customer.customerId, attempt, chargeId: null, reason: code, chargeErrorCode: null,
@@ -757,54 +665,12 @@ export class RenewalService {
 
   /**
    * Called only under the subscription lease, after the call's marker (the charge's REQUESTED, or a later
-   * `RESUBMIT_STARTED`) is committed. Never retries a call whose outcome it could not see. P2-I7: every row the
-   * call's answer writes (SUBMITTED, SUBMIT_UNKNOWN, the not-sent REQUESTED, a refusal's FAILED, the hold and the
-   * check) is dated by the clock read when the call returned, never by the caller's `now`: A2's waits (the minute
-   * before the first look, the 30 quiet minutes before the one resubmission, the not-sent backoff) start when the
-   * call really ended, however long the pass that made it had already run.
+   * `RESEND_STARTED`) is committed. Never retries a call whose outcome it could not see. P2-I7: every row the call's
+   * answer writes (SUBMITTED, SUBMIT_UNKNOWN, the not-sent REQUESTED, a refusal's FAILED, the hold and the check) is
+   * dated by the clock read when the call returned, never by the caller's `now`.
    */
   async submit(charge: ChargeRow, state: SubscriptionState): Promise<void> {
-    // Skeleton §1 rule 2: a NETOPIA charge takes the saved-card path; an xMoney one keeps the rebill below (N23 removes it).
-    if (charge.paymentProvider === "netopia") return this.submitNetopia(charge, state);
-    let submitted: { transactionId: string };
-    try {
-      submitted = await this.deps.xmoney.rebill({
-        orderId: state.xmoneyOrderId!, customerId: state.xmoneyCustomerId!, amountDecimal: microsToDecimal(charge.totalMicros)
-      });
-    } catch (error) {
-      const now = this.deps.clock();
-      const code = error instanceof TypedDomainError ? error.code : null;
-      if (code === "XMONEY_PAYMENT_FAILED" || code === "XMONEY_REFUSED") {
-        const declinedTransaction = error instanceof XMoneyPaymentFailedError ? error.transactionId : null;
-        await this.refused(charge, code === "XMONEY_PAYMENT_FAILED" ? "PAYMENT_DECLINED" : "REBILL_REFUSED", declinedTransaction, now);
-        return;
-      }
-      // D5 5i: nothing was processed (P3b: a refused connection or a 429 is XMONEY_UNAVAILABLE; a 401/403 is our key).
-      // The request stands: no FAILED, no settlement, no M5, and A2's one extra submission is not spent.
-      const notSent = code === "XMONEY_UNAVAILABLE" ? "REBILL_NOT_SENT"
-        : credentialsRefused(this.deps.audit, error, "rebill") ? "REBILL_CREDENTIALS_REFUSED" : null;
-      const kind = notSent === null ? "SUBMIT_UNKNOWN" as const : "REQUESTED" as const;
-      const recorded = notSent ?? "REBILL_OUTCOME_UNKNOWN";
-      await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
-        chargeEvent(charge.chargeId, kind, now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: recorded })));
-      this.deps.audit("billing.renewal.unknown", { attempt: charge.attempt, code: recorded });
-      // Q-1: the renewal itself keeps the plan while it is retried quietly (a dunning retry already runs on its grace).
-      if (charge.attempt === 1) await this.holdPending(state, charge.periodStart, now, recorded);
-      return;
-    }
-    await this.linkTransaction(charge, submitted.transactionId, this.deps.clock());
-  }
-
-  private async linkTransaction(charge: ChargeRow, transactionId: string, now: Date): Promise<void> {
-    await this.deps.repository.withTransaction(async (client) => {
-      await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "SUBMITTED", now, {
-        providerPaymentId: transactionId, amountMicros: charge.totalMicros, errorCode: null
-      }));
-      await this.deps.repository.enqueue(client, {
-        kind: "VERIFY_PAYMENT", ref: transactionId, notBefore: now, payload: { charge_id: charge.chargeId }
-      });
-    });
-    this.deps.kick();
+    return this.submitNetopia(charge, state);
   }
 
   private async refused(
@@ -821,7 +687,7 @@ export class RenewalService {
       if (inserted === "DUPLICATE") return;
       const events = await this.deps.repository.subscriptionEvents(charge.subscriptionId, client);
       await this.deps.settlement.failed({
-        client, now, charge, transaction: null, payment: null, subscription: foldSubscription(events), events, quote,
+        client, now, charge, payment: null, subscription: foldSubscription(events), events, quote,
         ownerRef: charge.ownerRef, customerId: customer.customerId, cardCountry: null, errorCode,
         ...(bankDeclined === undefined ? {} : { bankDeclined })
       });
@@ -830,136 +696,18 @@ export class RenewalService {
   }
 
   /**
-   * A2: adopt a transaction one of the charge's orders already has (`adopt`: the order in force when the charge was
-   * made and every order a later card change set); otherwise call again a charge whose last call never reached xMoney
-   * (after its backoff), or submit a blind unknown once more after 30 quiet minutes; after a second blind unknown only
-   * adoption continues. The charge is closed for the owner, and the normal dunning starts, when its window is over
-   * (`windowOver`: Q-1's 72 hours for the renewal itself, A2's 24 hours for a dunning retry). Returns whether it acted.
+   * Spec §2.9.3: an open RENEWAL charge is probed on its own orderID, resent after its quiet wait, and closed for the
+   * owner when its window is over (`recoverNetopiaCharge`). Returns whether it acted.
    */
   async recoverOpenCharge(chargeId: string): Promise<boolean> {
     const now = this.deps.clock();
     const charge = await this.deps.repository.charge(chargeId);
     if (charge === null) return false;
-    // Spec §2.9.3: a NETOPIA charge is probed on its own orderID, never adopted from a listing (N23 removes the rest).
-    if (charge.paymentProvider === "netopia") return this.recoverNetopiaCharge(charge, now);
-    // Seq order (P1b's `charge` reads events ORDER BY seq): a call's marker comes right before its outcome.
-    const trail = charge.events.filter((event) => event.kind === "REQUESTED" || event.kind === "SUBMIT_UNKNOWN");
-    const last = trail.at(-1);
-    if (last === undefined) return false;
-    const blind = charge.events.filter((event) => event.kind === "SUBMIT_UNKNOWN");
-    const notSentLast = last.kind === "REQUESTED" && last.errorCode !== null && NOT_SENT_CODES.has(last.errorCode);
-    if (last.kind === "REQUESTED" && !notSentLast) {
-      // A call's marker with no outcome after 10 minutes: the process died during the call. A blind unknown.
-      if (now.getTime() - last.at.getTime() < 10 * 60_000) return false;
-      await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
-        chargeEvent(charge.chargeId, "SUBMIT_UNKNOWN", now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: "SUBMIT_INTERRUPTED" })));
-      this.deps.audit("billing.renewal.unknown", { attempt: charge.attempt, code: "SUBMIT_INTERRUPTED" });
-      // Q-1: an interrupted renewal call is an outcome still unknown; the plan stays while it is looked for.
-      if (charge.attempt === 1) {
-        const state = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId));
-        await this.holdPending(state, charge.periodStart, now, "SUBMIT_INTERRUPTED");
-      }
-      return false;
-    }
-    const lastBlind = blind.at(-1) ?? null;
-    // "Every LATER pass": xMoney's listing may trail its own write, so the first look for a lost rebill comes a minute
-    // after its unknown (never in the tick that recorded it).
-    if (lastBlind !== null && now.getTime() - lastBlind.at.getTime() < 60_000) return false;
-    // R-34 / A2: once a call may have reached xMoney, the adoption check runs before any resubmission, whatever the
-    // subscription's state, on every order that could hold the payment (A12: a card change since does not hide it): a
-    // transaction that went through is claimed (the settlement refunds it when the plan is no longer live). Calls that
-    // all proved nothing was sent have nothing to adopt.
-    if (blind.length > 0 && await this.adopt(charge, now)) return true;
-    // Folded afresh: the lease is held, but a chargeback or a cancel takes only the owner lock.
-    const fresh = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId));
-    const windowOver = this.windowOver(charge, fresh, lastBlind, trail[0]!, now);
-    const stuckCode = lastBlind === null ? "REBILL_NOT_SENT" : "REBILL_OUTCOME_UNKNOWN";
-    // Q-1: the renewal itself is retried quietly for 72 hours past its due instant; then the normal dunning starts.
-    if (charge.attempt === 1 && windowOver) return this.closeStuck(charge, stuckCode, now);
-    if (blind.length >= 2) {
-      // A2 allows one more submission after an unknown; a third blind rebill is never made. Closed for the owner.
-      return windowOver ? this.closeStuck(charge, stuckCode, now) : false;
-    }
-    if (last.kind === "SUBMIT_UNKNOWN" && now.getTime() - last.at.getTime() < 30 * 60_000) return false;
-    if (notSentLast) {
-      const notSent = trail.filter((event) => event.kind === "REQUESTED" && event.errorCode !== null
-        && NOT_SENT_CODES.has(event.errorCode)).length;
-      if (now.getTime() - last.at.getTime() < notSentBackoffMs(notSent)) return false;
-    }
-    const live = charge.attempt === 1 ? fresh.status === "ACTIVE" : fresh.status === "PAST_DUE";
-    if (!live || fresh.cancelRequested || fresh.currentPeriodEnd?.getTime() !== charge.periodStart.getTime()
-      || fresh.xmoneyOrderId === null || fresh.xmoneyCustomerId === null) {
-      // Never charged again. A charge no call of which reached xMoney can hold no money: closed now. Otherwise it is
-      // left open, so a first submit that did go through is still adopted, until the window ends.
-      if (blind.length === 0) {
-        await this.refused(charge, "NO_TRANSACTION", null, now);
-        return true;
-      }
-      return windowOver ? this.closeStuck(charge, stuckCode, now) : false;
-    }
-    if (await this.erasureBlocks(fresh.ownerRef)) return false;
-    // The marker is committed before the call: a process that dies during it leaves RESUBMIT_STARTED last, which
-    // becomes SUBMIT_INTERRUPTED 10 minutes on, so it is never submitted blind a third time.
-    await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
-      chargeEvent(charge.chargeId, "REQUESTED", now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: RESUBMIT_STARTED })));
-    await this.submit(charge, fresh);
-    return true;
+    return this.recoverNetopiaCharge(charge, now);
   }
 
   /**
-   * A2's adoption: a payment (never a refund or chargeback row), since the charge was made, of its amount, that no
-   * charge of this xMoney system has claimed, on EVERY order that could hold it (A12, D6b's finding 6): the order in
-   * force when the charge was made and each order a later card change set (`ordersHoldingCharge`). A card change
-   * between an unknown submit and the resubmission moves the subscription to the new card's order while the lost
-   * payment sits on the old one; listing only the current order would read "nothing there" and charge the new card
-   * again. The caller resubmits only after this answers false for all of them, and a listing that fails throws, so
-   * nothing is resubmitted on a partial look. xMoney stamps creation to the whole second, and its clock may run a few
-   * seconds behind ours: the listing itself starts at the floor the rows are checked against (the charge's whole second
-   * minus 5 s), so a rebill stamped in the charge row's own second, or a few seconds before it, is listed and never read
-   * as older (a listing from the charge's own instant would drop it at xMoney, and the one resubmission would charge
-   * the card twice). Rows the parser refuses are counted in one line for the look (D5 5i).
-   */
-  private async adopt(charge: ChargeRow, now: Date): Promise<boolean> {
-    const orders = ordersHoldingCharge(await this.deps.repository.subscriptionEvents(charge.subscriptionId), charge.createdAt);
-    const earliest = Math.floor(charge.createdAt.getTime() / 1_000) * 1_000 - 5_000;
-    const rejected = rejectedRows(this.deps.audit, "renewal");
-    try {
-      for (const orderId of orders) {
-        const listed = await this.deps.xmoney.listTransactions({
-          from: new Date(earliest), to: now, orderId, dateType: "creation", onRejected: rejected.onRejected
-        });
-        for (const transaction of listed) {
-          if (!ADOPTABLE_TYPES.has(transaction.transactionType)) continue;
-          if (transaction.createdAt !== null && transaction.createdAt.getTime() < earliest) continue;
-          if (transaction.currency !== "USD" || !amountMatches(transaction.amountDecimal, charge.totalMicros)) continue;
-          if (await this.deps.jobs.chargeIdForTransaction(transaction.transactionId, null, this.deps.xmoneyEnvironment) !== null) continue;
-          await this.linkTransaction(charge, transaction.transactionId, now);
-          return true;
-        }
-      }
-      return false;
-    } finally {
-      rejected.report();
-    }
-  }
-
-  /**
-   * When an open charge with no outcome is given up. The renewal itself (attempt 1): at Q-1's 72 hours past its due
-   * instant, and a blind unknown only once A2's 30 quiet minutes of adoption have passed since it. A dunning retry:
-   * A2's 24 hours after its latest call (its first marker when no call reached xMoney), as before Q-1.
-   */
-  private windowOver(
-    charge: ChargeRow, state: SubscriptionState, lastBlind: ChargeEventRow | null, firstMarker: ChargeEventRow, now: Date
-  ): boolean {
-    if (charge.attempt === 1) {
-      const quiet = lastBlind === null || now.getTime() - lastBlind.at.getTime() >= 30 * 60_000;
-      return quiet && now.getTime() >= renewalPendingUntil(state, charge.periodStart).getTime();
-    }
-    return now.getTime() - (lastBlind ?? firstMarker).at.getTime() >= DAY_MS;
-  }
-
-  /**
-   * The end state of a charge whose rebill never reached xMoney or whose outcome stayed unknown past its window:
+   * The end state of a charge that never reached NETOPIA or whose outcome stayed unknown past its window:
    * FAILED(NO_TRANSACTION), one audit line naming why, and the settlement's normal dunning (Q-1: PAST_DUE, its grace,
    * M5A–C). P16b's owner summary lists it.
    */
@@ -984,7 +732,7 @@ export class RenewalService {
     const fresh = foldSubscription(await this.deps.repository.subscriptionEvents(state.subscriptionId, client));
     if (fresh.status !== "ACTIVE" || fresh.cancelRequested || fresh.currentPeriodEnd === null
       || fresh.currentPeriodEnd.getTime() !== state.currentPeriodEnd?.getTime()) return false;
-    const customer = await this.deps.repository.customerByOwner(fresh.ownerRef, undefined, client);
+    const customer = await this.deps.repository.customerByOwner(fresh.ownerRef, client);
     if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a subscription without its customer");
     await enqueueEmail(this.deps.repository, client, {
       template: "M3", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
@@ -1050,7 +798,7 @@ export class RenewalService {
   }
 
   // ---------------------------------------------------------------------------------------------------------------
-  // N11 — the NETOPIA renewal (spec §2.9). N23 deletes the xMoney rebill, adoption and resubmission above.
+  // N11 — the NETOPIA renewal (spec §2.9).
   // ---------------------------------------------------------------------------------------------------------------
 
   /** N11 (spec §2.9.3): the open NETOPIA RENEWAL charges of the last 30 days, each under its subscription lease. */
@@ -1174,6 +922,7 @@ export class RenewalService {
       }
       // PAYMENT_OUTCOME_UNKNOWN, an answer of an unexpected shape, anything else: it may have reached NETOPIA (§2.9.3).
       // PR-27: the full code `PAYMENT_OUTCOME_UNKNOWN:56` says NETOPIA confirmed the order exists.
+      answerRejected(this.deps.audit, error, "renewal");
       const recorded = error instanceof TypedDomainError && error.code === "PAYMENT_OUTCOME_UNKNOWN:56" ? ORDER_EXISTS : "CHARGE_OUTCOME_UNKNOWN";
       await this.deps.repository.withTransaction((client) => this.deps.repository.appendChargeEvent(client,
         chargeEvent(charge.chargeId, "SUBMIT_UNKNOWN", now, { providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: recorded })));
@@ -1242,7 +991,7 @@ export class RenewalService {
     const card = answer.savedCard;
     if (card === null) return;
     if ((await this.deps.repository.cardTokensFromCharge(client, charge.chargeId)).length > 0) return;
-    const customer = await this.deps.repository.customerByOwner(charge.ownerRef, undefined, client);
+    const customer = await this.deps.repository.customerByOwner(charge.ownerRef, client);
     if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a charge without its customer");
     const tokenId = randomUUID();
     const sealed = sealCardToken(this.deps.recordsKey, tokenId, card.token);
@@ -1460,7 +1209,7 @@ export class RenewalService {
    * report is still PENDING or AUTHORIZED at NETOPIA: "PENDING", the owner gets O3 RENEWAL_OUTCOME_OPEN once for that
    * charge, and no retry this pass (its money could still be taken). An attempt that cannot be read: "UNKNOWN", and no
    * retry this pass (a second payment is never risked); "PENDING" wins over "UNKNOWN". Every other read (NO_SUCH_ORDER, a
-   * final unpaid state, REFUNDED, CHARGEBACK_*, UNCLEAR) holds nothing. An xMoney plan: "NONE".
+   * final unpaid state, REFUNDED, CHARGEBACK_*, UNCLEAR) holds nothing. A plan of another payment system: "NONE".
    */
   async earlierAttemptPaid(
     state: SubscriptionState, periodStart: Date, attempt: number, now: Date

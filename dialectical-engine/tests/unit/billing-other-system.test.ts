@@ -11,11 +11,11 @@ import { createRenewalNoticeHandler } from "../../apps/api/src/billing/renewal-n
 import { subscriptionView, withdrawalOpenUntil } from "../../apps/api/src/billing/subscription-view.js";
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 import { recordWithdrawal, type WithdrawalDeps } from "../../apps/api/src/billing/withdrawal.js";
-import { activeSubscriptionEvents, testBillingPolicy, XMONEY_SYSTEM_UNTIL_N23 } from "../support/billingFixtures.js";
+import { activeSubscriptionEvents, testBillingPolicy } from "../support/billingFixtures.js";
 
 /*
  * P2-I4 (D5 5h): after §14.8's same-host switch, the database still holds the sandbox's records. Every refund,
- * invoice and credit-note job of a charge paid in the other xMoney system ends DEAD before any vendor call, and a
+ * invoice and credit-note job of a charge paid in another payment system ends DEAD before any vendor call, and a
  * withdrawal of a plan created there is refused, as P12c and P12e refuse an upgrade and a card change.
  */
 
@@ -34,11 +34,10 @@ function only<T extends object>(members: Partial<Record<string, unknown>>, name:
   }) as T;
 }
 
-/**
- * A paid sandbox charge (the connectors below talk to live), with its payment and a refund of it: xMoney's stage system
- * by default (kept for N23), or NETOPIA's sandbox (ruling PR-38).
- */
-function stageCharge(system: Pick<ChargeRow, "paymentProvider" | "paymentEnvironment"> = { paymentProvider: "xmoney", paymentEnvironment: "stage" }): ChargeRow & { events: ChargeEventRow[] } {
+/** A paid NETOPIA sandbox charge (the connectors below talk to live), with its payment and a refund of it. */
+function sandboxCharge(
+  system: Pick<ChargeRow, "paymentProvider" | "paymentEnvironment"> = { paymentProvider: "netopia", paymentEnvironment: "sandbox" }
+): ChargeRow & { events: ChargeEventRow[] } {
   const event = (kind: ChargeEventRow["kind"], amountMicros: number, errorCode: string | null = null): ChargeEventRow => ({
     eventId: `${kind}-1`, chargeId: CHARGE_ID, kind, at: ACTIVATED, providerPaymentId: "61001", amountMicros, errorCode,
     ...system, refundsTransactionId: null
@@ -62,12 +61,12 @@ function recorder() {
   return { lines, audit: (event: BillingAuditEvent, fields: Readonly<Record<string, unknown>>) => { lines.push({ event, fields }); } };
 }
 
-describe("P2-I4 a job of the other xMoney system never reaches a vendor", () => {
-  it("ends RefundDesk's job DEAD with O2 and one audit line, before any xMoney call", async () => {
+describe("P2-I4 a job of another payment system never reaches a vendor", () => {
+  it("ends RefundDesk's job DEAD with O2 and one audit line, before any call to NETOPIA", async () => {
     const { lines, audit } = recorder();
     const enqueued: Array<Readonly<{ kind: string; ref: string }>> = [];
     const repository = only<ConstructorParameters<typeof RefundDesk>[0]["repository"]>({
-      charge: async () => stageCharge(),
+      charge: async () => sandboxCharge(),
       withTransaction: async (work: (client: unknown) => Promise<unknown>) => work({}),
       enqueue: async (_client: unknown, queued: Readonly<{ kind: string; ref: string }>) => { enqueued.push(queued); return "queued"; },
       // W9 (P2-M8): a dead WITHDRAWAL refund's O2 looks up the withdrawal for its deadline; none is recorded here.
@@ -76,78 +75,40 @@ describe("P2-I4 a job of the other xMoney system never reaches a vendor", () => 
     const desk = new RefundDesk({
       repository,
       jobs: only({ withLease: async (_key: string, work: () => Promise<unknown>) => ({ kind: "RAN", value: await work() }) }, "jobs"),
-      xmoney: only({}, "xmoney"), policy: testBillingPolicy, audit, clock: () => NOW, xmoneyEnvironment: "live"
+      policy: testBillingPolicy, audit, clock: () => NOW,
+      netopia: { payments: only({}, "payments"), paymentEnvironment: "live", jobs: only({}, "netopia.jobs") }
     });
-    const refund = job("XMONEY_REFUND", `${CHARGE_ID}:61002`, {
+    const refund = job("PAYMENT_REFUND", `${CHARGE_ID}:61002`, {
       charge_id: CHARGE_ID, transaction_id: "61002", amount_micros: 5_000_000, whole: false,
-      owner_ref: stageCharge().ownerRef, reason: "WITHDRAWAL"
+      owner_ref: sandboxCharge().ownerRef, reason: "WITHDRAWAL"
     });
-    expect(await desk.handle(refund, NOW)).toEqual({ kind: "DEAD", code: "OTHER_XMONEY_SYSTEM" });
+    expect(await desk.handle(refund, NOW)).toEqual({ kind: "DEAD", code: "OTHER_PAYMENT_SYSTEM" });
     expect(enqueued).toHaveLength(1);
-    expect(enqueued[0]).toMatchObject({ kind: "EMAIL", payload: expect.objectContaining({ template: "O2", "param.reasonCode": "OTHER_XMONEY_SYSTEM" }) });
-    expect(lines).toEqual([{ event: "billing.outbox.other_system", fields: { kind: "XMONEY_REFUND", code: "OTHER_XMONEY_SYSTEM" } }]);
+    expect(enqueued[0]).toMatchObject({ kind: "EMAIL", payload: expect.objectContaining({ template: "O2", "param.reasonCode": "OTHER_PAYMENT_SYSTEM" }) });
+    expect(lines).toEqual([{ event: "billing.outbox.other_system", fields: { kind: "PAYMENT_REFUND", code: "OTHER_PAYMENT_SYSTEM" } }]);
   });
 
-  it("ends RefundDesk's job DONE quietly when the other system's refund is already recorded", async () => {
-    // The job crashed between its REFUNDED row and its completion: nothing is left to do, so no O2 and no audit line.
-    const { lines, audit } = recorder();
-    const desk = new RefundDesk({
-      repository: only({ charge: async () => stageCharge() }, "repository"),
-      jobs: only({ withLease: async (_key: string, work: () => Promise<unknown>) => ({ kind: "RAN", value: await work() }) }, "jobs"),
-      xmoney: only({}, "xmoney"), policy: testBillingPolicy, audit, clock: () => NOW, xmoneyEnvironment: "live"
-    });
-    const refund = { ...job("XMONEY_REFUND", `${CHARGE_ID}:61001`, {
-      charge_id: CHARGE_ID, transaction_id: "61001", amount_micros: 24_200_000, whole: true,
-      owner_ref: stageCharge().ownerRef, reason: "WITHDRAWAL"
-    }), attempts: 2 };
-    expect(await desk.handle(refund, NOW)).toEqual({ kind: "DONE" });
-    expect(lines).toEqual([]);
-  });
-
-  it("ends a payment check that names the other system's charge DEAD with one audit line, before any xMoney call", async () => {
+  it("ends a payment check that names the other system's charge DEAD with one audit line, before any status read", async () => {
     const { lines, audit } = recorder();
     const handler = new VerifyPaymentHandler(only<ConstructorParameters<typeof VerifyPaymentHandler>[0]>({
-      repository: only({ charge: async () => stageCharge() }, "repository"),
-      jobs: only({}, "jobs"), xmoney: only({}, "xmoney"), refunds: only({}, "refunds"), entitlements: only({}, "entitlements"),
-      audit, xmoneyEnvironment: "live"
+      repository: only({ charge: async () => sandboxCharge() }, "repository"),
+      jobs: only({}, "jobs"), refunds: only({}, "refunds"), entitlements: only({}, "entitlements"),
+      audit, netopia: { payments: only({}, "payments"), paymentEnvironment: "live", jobs: only({}, "netopia.jobs") }
     }, "deps"));
-    const verify = job("VERIFY_PAYMENT", "61003", { charge_id: CHARGE_ID });
-    expect(await handler.handle(verify, NOW)).toEqual({ kind: "DEAD", code: "OTHER_XMONEY_SYSTEM" });
-    expect(lines).toEqual([{ event: "billing.outbox.other_system", fields: { kind: "VERIFY_PAYMENT", code: "OTHER_XMONEY_SYSTEM" } }]);
-  });
-
-  it("ends each of the four invoice and credit-note jobs DEAD with one audit line, before Quaderno or SmartBill", async () => {
-    const deps = (audit: ReturnType<typeof recorder>["audit"]) => ({
-      repository: only<never>({ charge: async () => stageCharge() }, "repository"),
-      jobs: only<never>({}, "jobs"), issuer: only<never>({}, "issuer"), tax: only<never>({}, "tax"),
-      recipients: only<never>({}, "recipients"),
-      recordsKey: Buffer.alloc(32), policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", audit,
-      xmoneyEnvironment: "live" as const
-    });
-    const credit = { charge_id: CHARGE_ID, transaction_id: "61001", refund_micros: 24_200_000 };
-    const cases: Array<readonly [OutboxJob["kind"], (made: ReturnType<typeof deps>) => OutboxHandler, OutboxJob]> = [
-      ["QUADERNO_RECORD_SALE", createQuadernoSaleHandler, job("QUADERNO_RECORD_SALE", CHARGE_ID, { card_country: "DE" })],
-      ["QUADERNO_RECORD_REFUND", createQuadernoRefundHandler, job("QUADERNO_RECORD_REFUND", `${CHARGE_ID}:61001`, credit)],
-      ["SMARTBILL_INVOICE", createSmartBillInvoiceHandler, job("SMARTBILL_INVOICE", CHARGE_ID, { card_country: "RO" })],
-      ["SMARTBILL_STORNO", createSmartBillStornoHandler, job("SMARTBILL_STORNO", `${CHARGE_ID}:61001`, credit)]
-    ];
-    for (const [kind, create, queued] of cases) {
-      const { lines, audit } = recorder();
-      expect(await create(deps(audit))(queued, NOW), kind).toEqual({ kind: "DEAD", code: "OTHER_XMONEY_SYSTEM" });
-      expect(lines, kind).toEqual([{ event: "billing.outbox.other_system", fields: { kind, code: "OTHER_XMONEY_SYSTEM" } }]);
-    }
+    const verify = job("VERIFY_PAYMENT", CHARGE_ID, { charge_id: CHARGE_ID });
+    expect(await handler.handle(verify, NOW)).toEqual({ kind: "DEAD", code: "OTHER_PAYMENT_SYSTEM" });
+    expect(lines).toEqual([{ event: "billing.outbox.other_system", fields: { kind: "VERIFY_PAYMENT", code: "OTHER_PAYMENT_SYSTEM" } }]);
   });
 
   it("ends each of the four invoice and credit-note jobs of a NETOPIA charge of the other environment DEAD OTHER_PAYMENT_SYSTEM (PR-38)", async () => {
-    // A NETOPIA sandbox charge, on an API serving NETOPIA live, or serving no NETOPIA environment at all (null): the
-    // invoice guard (`otherSystemOutcome`) refuses it before Quaderno or SmartBill, with one audit line.
-    const netopiaSandbox = { paymentProvider: "netopia", paymentEnvironment: "sandbox" } as const;
-    const deps = (audit: ReturnType<typeof recorder>["audit"], paymentEnvironment: "live" | null) => ({
-      repository: only<never>({ charge: async () => stageCharge(netopiaSandbox) }, "repository"),
+    // A NETOPIA sandbox charge, on an API serving NETOPIA live: the invoice guard (`otherSystemOutcome`) refuses it
+    // before Quaderno or SmartBill, with one audit line.
+    const deps = (audit: ReturnType<typeof recorder>["audit"], paymentEnvironment: "live") => ({
+      repository: only<never>({ charge: async () => sandboxCharge() }, "repository"),
       jobs: only<never>({}, "jobs"), issuer: only<never>({}, "issuer"), tax: only<never>({}, "tax"),
       recipients: only<never>({}, "recipients"),
       recordsKey: Buffer.alloc(32), policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", audit,
-      ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment
+      paymentEnvironment
     });
     const credit = { charge_id: CHARGE_ID, transaction_id: "61001", refund_micros: 24_200_000 };
     const cases: Array<readonly [OutboxJob["kind"], (made: ReturnType<typeof deps>) => OutboxHandler, OutboxJob]> = [
@@ -156,7 +117,7 @@ describe("P2-I4 a job of the other xMoney system never reaches a vendor", () => 
       ["SMARTBILL_INVOICE", createSmartBillInvoiceHandler, job("SMARTBILL_INVOICE", CHARGE_ID, { card_country: "RO" })],
       ["SMARTBILL_STORNO", createSmartBillStornoHandler, job("SMARTBILL_STORNO", `${CHARGE_ID}:61001`, credit)]
     ];
-    for (const served of ["live", null] as const) {
+    for (const served of ["live"] as const) {
       for (const [kind, create, queued] of cases) {
         const { lines, audit } = recorder();
         expect(await create(deps(audit, served))(queued, NOW), `${kind} on ${String(served)}`)
@@ -171,28 +132,28 @@ function state(overrides: Partial<SubscriptionState> = {}): SubscriptionState {
   return Object.freeze({
     subscriptionId: "5d0a1c2b-3e4f-4a5b-8c6d-7e8f9a0b1c2d", ownerRef: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", planId: "PLUS",
     status: "ACTIVE", periodAnchorAt: ACTIVATED, currentPeriodStart: ACTIVATED, currentPeriodEnd: new Date("2026-11-08T09:00:00.000Z"),
-    cancelRequested: true, scheduledDowngradePlanId: null, xmoneyOrderId: "901", xmoneyCustomerId: "77", cardRef: "4242",
+    cancelRequested: true, scheduledDowngradePlanId: null,
     activatedAt: ACTIVATED, endedCause: null, pastDueSince: null, retryIndex: 0, renewalPostponedUntil: null,
-    announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "xmoney", paymentEnvironment: "stage",
+    announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "netopia", paymentEnvironment: "sandbox",
     cardTokenId: null,
     ...overrides
   });
 }
 
-describe("P2-I4 a plan of the other xMoney system offers no withdrawal and cannot be withdrawn", () => {
+describe("P2-I4 a plan of another payment system offers no withdrawal and cannot be withdrawn", () => {
   it("hides the withdrawal window of a sandbox plan on live, and shows it in its own system", () => {
-    const input = (xmoneyEnvironment: "stage" | "live") => ({
-      state: state(), taxCountry: "RO", policy: testBillingPolicy, now: NOW, xmoneyEnvironment
+    const input = (paymentEnvironment: "sandbox" | "live") => ({
+      state: state(), taxCountry: "RO", policy: testBillingPolicy, now: NOW, paymentEnvironment
     });
     expect(subscriptionView(input("live"))).toMatchObject({ withdrawal_open_until: null, withdrawal_last_day: null });
     expect(withdrawalOpenUntil(input("live"))).toBeNull();
-    expect(subscriptionView(input("stage")).withdrawal_open_until).not.toBeNull();
+    expect(subscriptionView(input("sandbox")).withdrawal_open_until).not.toBeNull();
   });
 
   it("refuses the withdrawal NOT_SUBSCRIBED before reading anything else or writing", async () => {
     const deps = only<WithdrawalDeps>({
       billing: only({ subscriptionForOwner: async () => state() }, "billing"),
-      clock: () => NOW, xmoneyEnvironment: "live"
+      clock: () => NOW, paymentEnvironment: "live"
     }, "deps");
     await expect(recordWithdrawal(deps, {
       ownerRef: state().ownerRef, withdrewAt: NOW, source: "SETTINGS", authorize: async () => undefined
@@ -230,7 +191,7 @@ describe("P2-W3 (b) a renewal notice or yearly reminder of the other payment sys
         freshQuote: async () => { priced.push("quote"); return { tax: { totalMicros: 30_000_000 } }; },
         writeNotice: async () => { written.push("notice"); }
       }, "renewal"),
-      policy: testBillingPolicy, ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment: api, audit
+      policy: testBillingPolicy, paymentEnvironment: api, audit
     });
     const notice = job("RENEWAL_NOTICE", `${subscription.subscriptionId}:${periodEnd}`, {});
     return { run: () => handler(notice, noticeAt), lines, priced, written };
@@ -271,7 +232,7 @@ describe("P2-W3 (b) a renewal notice or yearly reminder of the other payment sys
         outboxJobExists: async () => false
       }, "jobs"),
       entitlements: only({}, "entitlements"), renewal: only({}, "renewal"),
-      policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment: api,
+      policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", paymentEnvironment: api,
       audit: () => undefined, clock: () => new Date("2026-10-03T12:00:00.000Z")
     });
     const report = await maintenance.runOnce();

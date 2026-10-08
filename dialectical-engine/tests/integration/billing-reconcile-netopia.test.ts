@@ -2,12 +2,10 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { paymentError } from "@debateai/billing-core";
 import { BillingJobQueries, BillingRepository, migrate } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
-import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { StubGeo } from "../support/billingFixtures.js";
 import {
-  recordingAudit, seedActiveSubscription, seedNetopiaSubscription, subscriptionDeps, testAgreement, TEST_RECORDS_KEY,
+  recordingAudit, seedNetopiaSubscription, subscriptionDeps, testAgreement, TEST_RECORDS_KEY,
   type SeededNetopiaSubscription
 } from "../support/billingSubscriptionFixtures.js";
 import { StubCardPayments, stubPaymentReport } from "../support/stub-card-payments.js";
@@ -88,16 +86,11 @@ const lastEvent = async (chargeId: string) => (await repository.charge(chargeId)
 function reconcilerFor(payments: StubCardPayments, clock: { now: Date }) {
   const audit = recordingAudit();
   const kick = vi.fn();
-  const listed: unknown[] = [];
-  const xmoney = {
-    listTransactions: async (query: unknown) => { listed.push(query); return []; },
-    getOrder: async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "unused"); }
-  } as unknown as Pick<XMoneyClient, "listTransactions" | "getOrder">;
   const reconciler = new BillingReconciler({
-    billing: repository, jobs, xmoney, environment: "stage", audit, clock: () => clock.now, kick,
+    billing: repository, jobs, audit, clock: () => clock.now, kick,
     netopia: { payments, paymentEnvironment: "sandbox", jobs, pool: database.pool }
   });
-  return { reconciler, audit, kick, listed };
+  return { reconciler, audit, kick };
 }
 
 /** An upgrade opened on NETOPIA's page at `at` (N12's flow), for the CLOSED schedule and the quote-lifetime close. */
@@ -256,7 +249,7 @@ describe("N16 each charge's next read (spec §2.14)", () => {
 });
 
 describe("N16 the reconciler's NETOPIA pass (spec §2.14)", () => {
-  it("queues VERIFY_PAYMENT for what our rows do not record, isolates a failed read, and never reads an xMoney row", async () => {
+  it("queues VERIFY_PAYMENT for what our rows do not record, isolates a failed read, and never reads another system's row", async () => {
     const now = epoch(2036);
     const clock = { now };
     const payments = new StubCardPayments();
@@ -264,20 +257,19 @@ describe("N16 the reconciler's NETOPIA pass (spec §2.14)", () => {
     const paid = await subscription(plus(now, -7 * DAY - MINUTE));
     const authorised = await hostedCheck(paid, plus(now, -20 * MINUTE));
     const unreadable = await hostedCheck(paid, plus(now, -15 * MINUTE));
-    const xmoney = await seedActiveSubscription(database.pool, {
-      ownerRef: randomUUID(), planId: "PLUS", activatedAt: plus(now, -7 * DAY - MINUTE), taxCountry: "RO"
+    const other = await seedNetopiaSubscription(database.pool, {
+      ownerRef: randomUUID(), planId: "PLUS", activatedAt: plus(now, -7 * DAY - MINUTE), taxCountry: "RO", paymentEnvironment: "live"
     });
     payments.scriptStatus(authorised, stubPaymentReport(authorised, "AUTHORIZED", { amountMicros: 0 }));
     payments.scriptStatus(unreadable, paymentError("PAYMENT_PROVIDER_UNAVAILABLE"));
     payments.scriptStatus(refunded.initialChargeId, stubPaymentReport(refunded.initialChargeId, "REFUNDED", { providerPaymentId: refunded.providerPaymentId }));
     payments.scriptStatus(paid.initialChargeId, stubPaymentReport(paid.initialChargeId, "PAID", { providerPaymentId: paid.providerPaymentId }));
-    const { reconciler, audit, kick, listed } = reconcilerFor(payments, clock);
+    const { reconciler, audit, kick } = reconcilerFor(payments, clock);
     const report = await reconciler.tick();
     expect(report.statusChecks).toEqual({ read: 4, queued: 2, closed: 0, failed: 1 });
     expect(new Set(payments.statusReads.map((read) => read.orderId)))
       .toEqual(new Set([authorised, unreadable, refunded.initialChargeId, paid.initialChargeId]));
-    expect(payments.statusReads.map((read) => read.orderId)).not.toContain(xmoney.initialChargeId);
-    expect(listed.length).toBeGreaterThan(0);
+    expect(payments.statusReads.map((read) => read.orderId)).not.toContain(other.initialChargeId);
     const verify = (await database.pool.query<{ ref: string; not_before: Date }>(
       "SELECT ref, not_before FROM billing.outbox WHERE kind = 'VERIFY_PAYMENT' AND ref = ANY($1::text[])",
       [[authorised, refunded.initialChargeId, paid.initialChargeId, unreadable]]

@@ -185,7 +185,7 @@ describe("N17 asking for a card before it is needed (spec §2.15.3, M12)", () =>
     const maintenance = new BillingMaintenance({
       repository, jobs, entitlements,
       renewal: { submit: unused, createRetryCharge: unused, retryPrice: unused, failUnpricedAttempt: unused, taxRefused: unused, erasureBlocks: unused } as never,
-      policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL, xmoneyEnvironment: "stage", paymentEnvironment: "sandbox",
+      policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL, paymentEnvironment: "sandbox",
       audit: recordingAudit(), clock: () => new Date(), custody: custodyOf()
     });
     await maintenance.runOnce();

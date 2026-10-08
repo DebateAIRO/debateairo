@@ -365,7 +365,7 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     // The live runtime's pass, on the same database as the harness's sandbox subscriptions.
     const live = new BillingMaintenance({
       repository: h.repository, jobs: h.jobs, entitlements: h.entitlements, renewal: h.renewal, policy: testBillingPolicy,
-      publicAppUrl: TEST_PUBLIC_APP_URL, xmoneyEnvironment: "live", paymentEnvironment: "live", audit: h.audit, clock: h.clock.read
+      publicAppUrl: TEST_PUBLIC_APP_URL, paymentEnvironment: "live", audit: h.audit, clock: h.clock.read
     });
     const { paid: pastDue, failedAt } = await firstFailure();
     const orderId = pastDue.subscriptionId;
@@ -409,7 +409,7 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     const shorter = new BillingMaintenance({
       repository: h.repository, jobs: h.jobs, entitlements: h.entitlements, renewal: h.renewal,
       policy: { ...testBillingPolicy, dunningRetryDays: [1] },
-      publicAppUrl: TEST_PUBLIC_APP_URL, xmoneyEnvironment: "stage", paymentEnvironment: "sandbox", audit: h.audit, clock: h.clock.read
+      publicAppUrl: TEST_PUBLIC_APP_URL, paymentEnvironment: "sandbox", audit: h.audit, clock: h.clock.read
     });
     // Two attempts failed under +1/+3/+7: the plan waits for its +3 retry, which the new policy no longer has.
     const { paid, failedAt } = await firstFailure();

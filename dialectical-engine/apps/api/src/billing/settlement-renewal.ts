@@ -158,7 +158,7 @@ export function createRenewalSettlement(deps: RenewalSettlementDeps): ChargeSett
     /**
      * Spec §2.5.5 failures: PAST_DUE with retries at the policy's days, then ENDED(DUNNING) and Free. Only for the
      * subscription's current unpaid period, and never once a cancel is pending: a cancelled plan is ended by P11b's
-     * sweep (ENDED(CANCEL)), never dunned, retried or emailed. `NO_TRANSACTION` (a rebill that never reached xMoney, or
+     * sweep (ENDED(CANCEL)), never dunned, retried or emailed. `NO_TRANSACTION` (a charge that never reached NETOPIA, or
      * whose outcome stayed unknown, closed by P11a) reaches here only once Q-1's 72 hours of quiet retries are over, so
      * it takes the normal path, emails included (the ruling: "PAST_DUE, retries +1/+3/+7 days with M5A–C").
      */
@@ -170,10 +170,9 @@ export function createRenewalSettlement(deps: RenewalSettlementDeps): ChargeSett
       // Every retry is timed from the first failure. Read from the history folded under this lock (the attempt-1
       // failure may have had no charge, Q-1), never from charge rows through a second connection.
       const firstFailedAt = charge.attempt === 1 ? now : dunningProgress(context.events, subscription)?.firstFailedAt ?? now;
-      // W10: an xMoney PAYMENT_DECLINED was always the bank's; a NETOPIA decline names the bank only when NETOPIA says so
-      // (spec §2.4.5: not for antifraud, risk or a failed 3-D Secure), and a caller that did not say is never read as one.
-      const bankDeclined = context.bankDeclined
-        ?? (context.charge.paymentProvider === "xmoney" && context.errorCode === "PAYMENT_DECLINED");
+      // W10: a NETOPIA decline names the bank only when NETOPIA says so (spec §2.4.5: not for antifraud, risk or a
+      // failed 3-D Secure), and a caller that did not say is never read as one.
+      const bankDeclined = context.bankDeclined ?? false;
       await writeDunningAttempt(deps, client, {
         subscription, customerId: context.customerId, attempt: charge.attempt, chargeId: charge.chargeId, reason: null,
         chargeErrorCode: context.errorCode, bankDeclined, periodStart: charge.periodStart, firstFailedAt, now

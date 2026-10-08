@@ -1,15 +1,5 @@
 import { TypedDomainError } from "@debateai/kernel";
 import type { PaymentEnvironment } from "@debateai/billing-core";
-import {
-  XMoneyClient,
-  type XMoneyRefundsSeen,
-  type XMoneyTransaction,
-  type XMoneyTransactionListQuery
-} from "@debateai/payments-xmoney";
-
-/** Until N23: xMoney's stage API, the only xMoney host a sandbox deployment may still name. */
-const STAGE_API_HOST = "api-stage.xmoney.com";
-const LIVE_API_HOST = "api.xmoney.com";
 
 function hostOf(url: string | null): string {
   if (url === null) return "";
@@ -25,20 +15,17 @@ export type BillingStageClock = Readonly<{ clock: () => Date; offsetMs: number }
 /**
  * The billing runtime's clock. OWNER-RUN sandbox only (spec 2026-10-05 §2.3, §2.17.1: "renew by advancing the
  * clock"): an offset moves renewals, retries and the period-end sweep forward by whole days, so a month can be tested
- * in minutes. It is refused unless the payments go to NETOPIA's SANDBOX (and, until N23, unless any xMoney setting
- * still present names xMoney's stage API), so a moved clock can never touch live money. Absent, this is the real
- * clock with an offset of 0. main.ts hands the offset to TimeShiftedCardPayments and StageShiftedXMoneyClient.
+ * in minutes. It is refused unless the payments go to NETOPIA's SANDBOX, so a moved clock can never touch live money.
+ * Absent, this is the real clock with an offset of 0. main.ts hands the offset to TimeShiftedCardPayments.
  */
 export function billingClock(input: Readonly<{
   paymentEnvironment: PaymentEnvironment | null;
-  xmoneyApiBaseUrl: string | null;
   offsetDays: number | null;
   now?: () => Date;
 }>): BillingStageClock {
   const now = input.now ?? (() => new Date());
   if (input.offsetDays === null) return Object.freeze({ clock: now, offsetMs: 0 });
-  if (input.paymentEnvironment !== "sandbox"
-    || (input.xmoneyApiBaseUrl !== null && hostOf(input.xmoneyApiBaseUrl) !== STAGE_API_HOST)) {
+  if (input.paymentEnvironment !== "sandbox") {
     throw new TypedDomainError("BILLING_STAGE_CLOCK_LIVE_REFUSED", "the billing clock moves only against NETOPIA's sandbox");
   }
   if (!Number.isInteger(input.offsetDays) || input.offsetDays < 1 || input.offsetDays > 400) {
@@ -48,101 +35,20 @@ export function billingClock(input: Readonly<{
   return Object.freeze({ clock: () => new Date(now().getTime() + offsetMs), offsetMs });
 }
 
-/**
- * The billing runtime lives on the moved clock; xMoney does not. Every time the runtime SENDS (a listing's `from` and
- * `to`, including refundsOf's refund-date window) moves back by the offset, and every time it READS (`createdAt`, the
- * one time on a transaction or a listed refund row) moves forward, so A2's adoption check, P14's reconciliation
- * windows and RefundDesk's check-before-retry ask xMoney about the real moments they mean. Every public method
- * delegates to the real client (#inner); the base class's own transport is never used, and its unreachable address
- * makes any method a later XMoneyClient adds fail loudly here instead of reaching xMoney untranslated (a unit test
- * also pins that every method is overridden).
- */
-export class StageShiftedXMoneyClient extends XMoneyClient {
-  readonly #inner: XMoneyClient;
-  readonly #offsetMs: () => number;
-
-  constructor(inner: XMoneyClient, offsetMs: () => number) {
-    super({ baseUrl: "https://stage-clock.invalid", privateKey: Buffer.alloc(1), siteId: "0" });
-    this.#inner = inner;
-    this.#offsetMs = offsetMs;
-  }
-
-  #forward(transaction: XMoneyTransaction, offset: number): XMoneyTransaction {
-    return transaction.createdAt === null
-      ? transaction
-      : Object.freeze({ ...transaction, createdAt: new Date(transaction.createdAt.getTime() + offset) });
-  }
-
-  override createCustomer(i: Parameters<XMoneyClient["createCustomer"]>[0]): ReturnType<XMoneyClient["createCustomer"]> {
-    return this.#inner.createCustomer(i);
-  }
-
-  override async getTransaction(transactionId: string): Promise<XMoneyTransaction> {
-    return this.#forward(await this.#inner.getTransaction(transactionId), this.#offsetMs());
-  }
-
-  override getOrder(orderId: string): ReturnType<XMoneyClient["getOrder"]> {
-    return this.#inner.getOrder(orderId);
-  }
-
-  override getCard(cardId: string, customerId: string): ReturnType<XMoneyClient["getCard"]> {
-    return this.#inner.getCard(cardId, customerId);
-  }
-
-  override rebill(i: Parameters<XMoneyClient["rebill"]>[0]): ReturnType<XMoneyClient["rebill"]> {
-    return this.#inner.rebill(i);
-  }
-
-  override refund(i: Parameters<XMoneyClient["refund"]>[0]): ReturnType<XMoneyClient["refund"]> {
-    return this.#inner.refund(i);
-  }
-
-  override async listTransactions(i: XMoneyTransactionListQuery): Promise<ReadonlyArray<XMoneyTransaction>> {
-    const offset = this.#offsetMs();
-    const listed = await this.#inner.listTransactions({
-      ...i, from: new Date(i.from.getTime() - offset), to: new Date(i.to.getTime() - offset)
-    });
-    return Object.freeze(listed.map((transaction) => this.#forward(transaction, offset)));
-  }
-
-  /**
-   * The refund listing RefundDesk's check-before-retry (A4 (c)) and P9c's dashboard-refund amount read once they move
-   * onto it (D6a Open question 5). `from`/`to` bound the REFUND date, so they move back like any listing window; each
-   * listed refund row's `createdAt` moves forward. The real client answers from real time, so a refund made just now
-   * is found from the moved side. Asking #inner with the moved dates unshifted would find no refund at all.
-   */
-  override async refundsOf(i: Parameters<XMoneyClient["refundsOf"]>[0]): Promise<XMoneyRefundsSeen | null> {
-    const offset = this.#offsetMs();
-    const seen = await this.#inner.refundsOf({
-      ...i, from: new Date(i.from.getTime() - offset), to: new Date(i.to.getTime() - offset)
-    });
-    return seen === null
-      ? null
-      : Object.freeze({
-          ...seen,
-          rows: Object.freeze(seen.rows.map((row) => Object.freeze({
-            ...row, createdAt: row.createdAt === null ? null : new Date(row.createdAt.getTime() + offset)
-          })))
-        });
-  }
-}
-
 type BillingInvoicerEnvironment = Readonly<{
   paymentEnvironment: PaymentEnvironment | null;
-  /** Until N23: an xMoney base still set in api.env. */
-  xmoneyApiBaseUrl: string | null;
   quadernoApiBaseUrl: string | null;
   smartbillApiBaseUrl: string | null;
 }>;
 
-/** A sandbox payment system is configured: NETOPIA's sandbox, or (until N23) xMoney's stage API. */
+/** A sandbox payment system is configured: NETOPIA's sandbox. */
 function takesSandboxPayments(input: BillingInvoicerEnvironment): boolean {
-  return input.paymentEnvironment === "sandbox" || hostOf(input.xmoneyApiBaseUrl) === STAGE_API_HOST;
+  return input.paymentEnvironment === "sandbox";
 }
 
-/** A live payment system is configured: NETOPIA live, or (until N23) xMoney's live API. */
+/** A live payment system is configured: NETOPIA live. */
 function takesLivePayments(input: BillingInvoicerEnvironment): boolean {
-  return input.paymentEnvironment === "live" || hostOf(input.xmoneyApiBaseUrl) === LIVE_API_HOST;
+  return input.paymentEnvironment === "live";
 }
 
 /**

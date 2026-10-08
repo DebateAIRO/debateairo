@@ -23,9 +23,8 @@ describe("N8 — the API boot wires billing only when hosted, switched on or pro
     expect(main).toContain('import { SELLER_COMPANY } from "@debateai/billing-core";');
     expect(main).toContain('import { BillingPersonAllowanceSource } from "@debateai/billing-core";');
     expect(main).not.toContain("SMARTBILL_COMPANY_CIF");
-    expect(main).toContain("hold: (resource) => boot.hold(resource)");
+    expect(main).not.toContain("hold: (resource) => boot.hold(resource)");
     expect(main).toContain("...billingCustodyPaths(environment)");
-    expect(main).toContain("billingConnectors.xmoneyPrivateKey.fill(0)");
     expect(main).not.toContain("PUBLIC_SITE_ORIGIN");
     // No development knob reaches the production boot.
     expect(main).not.toContain("trustedKeyOwners");
@@ -43,7 +42,7 @@ describe("N8 — the API boot wires billing only when hosted, switched on or pro
     expect(main).toContain('event: "billing.provider_only.incomplete"');
   });
 
-  it("refuses a live boot while another payment system's records are open, after the connectors know the system", async () => {
+  it("refuses a live boot while another payment system's records are open, after the connectors know the payment system", async () => {
     const main = await readFile("apps/api/src/main.ts", "utf8");
     const connectors = main.indexOf('boot.runSync("billing-connectors"');
     const other = main.indexOf('boot.run("billing-other-system-records"');
@@ -54,7 +53,6 @@ describe("N8 — the API boot wires billing only when hosted, switched on or pro
     );
     expect(main.slice(other, other + 300)).toContain('paymentProvider: "netopia", paymentEnvironment: "live"');
     expect(main).not.toContain("assertStageRecordsClosed");
-    expect(main).not.toContain("xmoneyEnvironment === \"live\"");
   });
 
   it("refuses a live boot while billing rows or open jobs are dated more than a day ahead (W14, P2-I19)", async () => {

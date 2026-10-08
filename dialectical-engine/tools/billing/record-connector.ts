@@ -212,7 +212,8 @@ export function smartbillRecordingSale(chargeId: string, issuedOn: Date): SaleRe
     },
     lines: [{ description: "DebateAI Plus, inregistrare de test", netMicros: 1_000_000, taxMicros: 210_000, taxRateBasisPoints: 2100 }],
     taxCode: "saas",
-    evidence: { billingCountry: "RO", ipAddress: "203.0.113.10", bankCountry: "RO" }
+    evidence: { billingCountry: "RO", ipAddress: "203.0.113.10", bankCountry: "RO" },
+    processor: "netopia"
   };
 }
 
@@ -222,7 +223,8 @@ export function smartbillRecordingRefund(
   return {
     chargeId, transactionId: "0", issuedOn, refundTotalMicros,
     original: { documentId: original.externalRef, number: original.number },
-    description: "Rambursare DebateAI Plus"
+    description: "Rambursare DebateAI Plus",
+    processor: "netopia"
   };
 }
 
@@ -298,7 +300,7 @@ async function recordQuaderno(argv: readonly string[]): Promise<ConnectorCapture
   const vatCountry = argument(argv, "--vat-country");
   const recorder = new ConnectorRecorder(baseUrl);
   const engine = new QuadernoTaxEngine({ baseUrl, apiKey: readTextSecret(argument(argv, "--key-file")), fetch: recorder.fetch });
-  // Digits, like an xMoney transaction id, and new on every run so the sandbox books a fresh sale.
+  // Digits, like a payment number, and new on every run so the sandbox books a fresh sale.
   await recordQuadernoRun({ recorder, engine, vatCountry, vatId, transactionId: String(Date.now()) });
   return recorder.capture("quaderno");
 }

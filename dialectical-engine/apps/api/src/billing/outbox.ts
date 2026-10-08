@@ -20,27 +20,35 @@ export const DONE: OutboxOutcome = Object.freeze({ kind: "DONE" as const });
 const DECLARED_CODE = /^[A-Z][A-Z0-9_]{2,63}$/;
 
 /**
- * P2-I4 (D5 5h): the two xMoney systems number their transactions separately, and the database keeps the sandbox's
- * records across README §14.8's same-host switch. A refund, invoice or credit-note job, or a payment check
- * (VERIFY_PAYMENT) that names its own charge, whose charge was paid in the other system, and (P2-W3 (b)) a
- * still-due RENEWAL_NOTICE whose plan belongs to the other system end here, DEAD before any vendor call or quote,
- * with this one content-free code and one audit line (the kind and the code). The charge jobs' callers compare
- * `charge.xmoneyEnvironment` with the connectors' system; the RENEWAL_NOTICE handler compares the subscription's
- * `xmoneyEnvironment` (its folded state) instead, since a notice names no charge.
+ * P2-I4 (D5 5h), NETOPIA spec 2026-10-05 §2.5.4: a payment system is a provider and its environment (NETOPIA's
+ * sandbox or live), and the database keeps the rows of every system it ever ran, the previous card processor's
+ * included. A refund, invoice or credit-note job, a payment check that names its own charge, or a still-due
+ * RENEWAL_NOTICE whose charge or plan belongs to another system ends here, DEAD before any vendor call or quote, with
+ * this one content-free code and one audit line (the kind and the code). The charge jobs compare the charge's
+ * provider and environment with the connectors' (`isThisPaymentSystem`); the RENEWAL_NOTICE handler compares the
+ * subscription's folded state instead, since a notice names no charge.
  */
-export function otherXMoneySystem(
-  audit: BillingAudit, kind: OutboxKind
-): Readonly<{ kind: "DEAD"; code: "OTHER_XMONEY_SYSTEM" }> {
-  audit("billing.outbox.other_system", { kind, code: "OTHER_XMONEY_SYSTEM" });
-  return Object.freeze({ kind: "DEAD" as const, code: "OTHER_XMONEY_SYSTEM" as const });
-}
-
-/** Spec §2.5.4: a job of another payment system ends DEAD before any vendor call (one content-free audit line). */
 export function otherPaymentSystem(
   audit: BillingAudit, kind: OutboxKind
 ): Readonly<{ kind: "DEAD"; code: "OTHER_PAYMENT_SYSTEM" }> {
   audit("billing.outbox.other_system", { kind, code: "OTHER_PAYMENT_SYSTEM" });
   return Object.freeze({ kind: "DEAD" as const, code: "OTHER_PAYMENT_SYSTEM" as const });
+}
+
+/** True only for a NETOPIA row of this host's environment; a row of any other provider is never this system. */
+export function isThisPaymentSystem(
+  row: Readonly<{ paymentProvider: string; paymentEnvironment: string }>, environment: "sandbox" | "live"
+): boolean {
+  return row.paymentProvider === "netopia" && row.paymentEnvironment === environment;
+}
+
+/**
+ * The dead-letter code of another system: OTHER_PAYMENT_SYSTEM, and the code the previous card processor's era
+ * stored (spec 2026-10-05 §2.19), which the owner's lists still read as "nothing is owed here".
+ */
+const OTHER_SYSTEM_CODE = /^OTHER_[A-Z]+_SYSTEM$/u;
+export function otherSystemCode(code: string | null): boolean {
+  return code !== null && OTHER_SYSTEM_CODE.test(code);
 }
 
 /**
@@ -128,7 +136,7 @@ export class BillingOutboxWorker {
    * one after another, so each is re-claimed right before its handler: P1b hands a job whose claim is older than its
    * 5-minute lease to the next claimer, and a job another process took meanwhile is skipped, not run a second time.
    * This holds because one handler, once started, finishes well inside the lease (every external call is bounded;
-   * VERIFY_PAYMENT, the slowest, makes about three 10-second xMoney calls).
+   * VERIFY_PAYMENT, the slowest, makes one 10-second status read).
    */
   async runOnce(): Promise<OutboxRunReport> {
     const kinds = [...this.handlers.keys()];
@@ -170,7 +178,7 @@ export class BillingOutboxWorker {
 
   /**
    * Runs rounds until one claims nothing, at most `maxRounds`; returns how many jobs it handled. A handler that
-   * queues a follow-up job due now (VERIFY_PAYMENT → XMONEY_REFUND → EMAIL) is served in the same drain. A job
+   * queues a follow-up job due now (VERIFY_PAYMENT → PAYMENT_REFUND → EMAIL) is served in the same drain. A job
    * retried later is not re-claimed: its `not_before` is in the future, and a job whose settle failed keeps its
    * five-minute claim lease.
    */

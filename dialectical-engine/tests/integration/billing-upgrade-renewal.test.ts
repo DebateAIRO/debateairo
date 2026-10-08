@@ -150,7 +150,7 @@ describe("P12c an upgrade and a renewal are never open together", () => {
     const result = await h.repository.withTransaction(async (client) => {
       const events = await h.repository.subscriptionEvents(paid.subscriptionId, client);
       return settlement.succeeded({
-        client, now: h.clock.now, charge: upgrade, transaction: null, payment, subscription: foldSubscription(events), events, quote,
+        client, now: h.clock.now, charge: upgrade, payment, subscription: foldSubscription(events), events, quote,
         ownerRef: paid.ownerRef, customerId: customer.customerId, cardCountry: "RO"
       });
     });

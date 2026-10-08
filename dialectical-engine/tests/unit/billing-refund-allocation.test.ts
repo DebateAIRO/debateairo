@@ -12,11 +12,11 @@ const paid: PaidTransaction[] = [
 function charge(kind: ChargeRow["kind"], chargeId: string, events: Array<Partial<ChargeEventRow> & Pick<ChargeEventRow, "kind">>) {
   return Object.assign({
     chargeId, ownerRef: "owner", subscriptionId: "sub", kind, periodStart: T0, periodEnd: T1, attempt: 1, quoteId: null,
-    netMicros: 0, taxMicros: 0, totalMicros: 10_000_000, currency: "USD" as const, createdAt: T0, paymentProvider: "xmoney" as const, paymentEnvironment: "stage" as const
+    netMicros: 0, taxMicros: 0, totalMicros: 10_000_000, currency: "USD" as const, createdAt: T0, paymentProvider: "netopia" as const, paymentEnvironment: "sandbox" as const
   }, {
     events: events.map((event) => ({
       eventId: "e", chargeId, at: T0, providerPaymentId: null, amountMicros: null, errorCode: null,
-      paymentProvider: "xmoney", paymentEnvironment: "stage", refundsTransactionId: null, ...event
+      paymentProvider: "netopia", paymentEnvironment: "sandbox", refundsTransactionId: null, ...event
     }) as ChargeEventRow)
   }) as ChargeRow & { events: ChargeEventRow[] };
 }
@@ -65,7 +65,8 @@ describe("P9b the refund split, newest transaction first (A4b)", () => {
       { kind: "DUPLICATE_PAYMENT", providerPaymentId: "6", amountMicros: 24_200_000, at: T0 },
       { kind: "REFUND_REQUESTED", providerPaymentId: "6", amountMicros: 24_200_000, errorCode: "DUPLICATE_PAYMENT" },
       { kind: "REFUNDED", providerPaymentId: "6", amountMicros: 24_200_000, errorCode: "DUPLICATE_PAYMENT" },
-      // D5 5g: a withdrawal refund xMoney reported as its own transaction "7", refunding payment "5".
+      // D5 5g: a withdrawal refund recorded as its own transaction "7", refunding payment "5" (the previous card
+      // processor's shape; 0096 keeps refunds_transaction_id NULL on NETOPIA rows, and old rows still read this way).
       { kind: "REFUND_REQUESTED", providerPaymentId: "5", amountMicros: 3_000_000, errorCode: "WITHDRAWAL" },
       { kind: "REFUNDED", providerPaymentId: "7", refundsTransactionId: "5", amountMicros: 3_000_000, errorCode: "WITHDRAWAL" }
     ])];
@@ -74,7 +75,7 @@ describe("P9b the refund split, newest transaction first (A4b)", () => {
     ]);
   });
 
-  it("marks a transaction a refund made at xMoney touched, whose true refunded amount is unknown (P9c)", () => {
+  it("marks a transaction a refund made in NETOPIA's admin touched, whose true refunded amount is unknown (P9c)", () => {
     const dashboard = charge("INITIAL", "dashboard", [
       { kind: "SUCCEEDED", providerPaymentId: "3", amountMicros: 24_200_000, at: T0 },
       { kind: "REFUND_REQUESTED", providerPaymentId: "3", amountMicros: 24_200_000, errorCode: "PROVIDER_REFUND" },

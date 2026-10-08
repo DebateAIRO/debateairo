@@ -90,7 +90,6 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
   { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
   { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
-  { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" },
   { route: "POST /v1/billing/netopia/notify", auth: "public", resource: "billing", action: "notify" },
   { route: "GET /v1/billing/subscription", auth: "user", resource: "billing", action: "read-subscription" },
   { route: "GET /v1/billing/invoices", auth: "user", resource: "billing", action: "list-invoices" },

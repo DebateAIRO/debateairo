@@ -8,10 +8,10 @@ import type { BillingJobQueries, BillingRepository, ChargeEventRow, HostedPaymen
 import { sealAcceptanceEvidence } from "../legal.js";
 import type { BillingAudit } from "./audit.js";
 import type { ConsentPair } from "./checkout.js";
+import { isThisPaymentSystem } from "./outbox.js";
 import { queuePaymentAlert } from "./payment-alert.js";
 import { sealPaymentUrl } from "./records.js";
 import { BillingRefusal } from "./refusal.js";
-import { servedHere } from "./renewal-rules.js";
 import { chargeEvent } from "./rows.js";
 import { refuse } from "./subscription-core.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
@@ -202,11 +202,10 @@ export async function recordCardAgreement(
   })]);
 }
 
-/** Spec §2.5.4: a NETOPIA subscription of the environment this API serves (an xMoney plan is never paid here). */
+/** Spec §2.5.4: a NETOPIA subscription of the environment this API serves (another system's plan is never paid here). */
 export function servedByNetopia(
-  deps: Pick<SubscriptionRouteDeps, "xmoneyEnvironment" | "paymentEnvironment">,
+  deps: Pick<SubscriptionRouteDeps, "paymentEnvironment">,
   state: Pick<SubscriptionState, "paymentProvider" | "paymentEnvironment">
 ): boolean {
-  return state.paymentProvider === "netopia"
-    && servedHere(state, { xmoneyEnvironment: deps.xmoneyEnvironment, paymentEnvironment: deps.paymentEnvironment });
+  return isThisPaymentSystem(state, deps.paymentEnvironment);
 }

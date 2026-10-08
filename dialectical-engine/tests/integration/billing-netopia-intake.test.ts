@@ -64,16 +64,16 @@ function intakeFor(options: Partial<{ mode: NetopiaIntakeMode; keys: typeof KEYS
 }
 
 /** An open charge of ours (a card check: no quote, nothing settled), its owner's customer created. */
-async function openCharge(provider: "netopia" | "xmoney" = "netopia", environment: "sandbox" | "live" | "stage" = "sandbox") {
+async function openCharge(environment: "sandbox" | "live" = "sandbox") {
   const ownerRef = randomUUID();
   const chargeId = newChargeId();
   const at = new Date("2026-10-06T08:00:00.000Z");
   const customerId = await repository.withTransaction(async (client: PoolClient) => {
-    const customer = await repository.ensureCustomer(client, { ownerRef, locale: "en", now: at, environment: "stage" });
+    const customer = await repository.ensureCustomer(client, { ownerRef, locale: "en", now: at });
     await repository.insertCharge(client, {
       chargeId, ownerRef, subscriptionId: randomUUID(), kind: "CARD_CHECK", attempt: 1, periodStart: at,
       periodEnd: new Date(at.getTime() + 30 * 86_400_000), quoteId: null, netMicros: 0, taxMicros: 0, totalMicros: 0,
-      currency: "USD", createdAt: at, paymentProvider: provider, paymentEnvironment: environment
+      currency: "USD", createdAt: at, paymentProvider: "netopia", paymentEnvironment: environment
     });
     return customer.customerId;
   });
@@ -177,11 +177,11 @@ describe("N9 NETOPIA's verified message", () => {
 
   it("keeps no card and queues nothing for a charge of another payment system or environment", async () => {
     const { intake } = intakeFor();
-    for (const [provider, environment, label] of [["xmoney", "stage", "sandbox"], ["netopia", "live", "live"]] as const) {
-      const { chargeId } = await openCharge(provider, environment);
+    for (const [environment, label] of [["live", "live"]] as const) {
+      const { chargeId } = await openCharge(environment);
       await intake.receive(arrival(sign(body(chargeId)), hour(5)));
       const [notice] = await noticesFor(chargeId);
-      expect([notice?.payment_environment, await outcomesOf(notice!.notice_id)], provider).toEqual([label, ["OTHER_SYSTEM"]]);
+      expect([notice?.payment_environment, await outcomesOf(notice!.notice_id)], environment).toEqual([label, ["OTHER_SYSTEM"]]);
       expect(await tokensFor("source_charge_id", chargeId)).toEqual([]);
       expect(await jobsFor(chargeId)).toEqual([]);
     }

@@ -85,8 +85,11 @@ describe("VPS env examples cover the strict environment shapes (Task 14 amendmen
       expect(text, key).toMatch(new RegExp(`^# ${key}=`, "mu"));
     }
     for (const key of billing.filter((name) => !netopia.includes(name))) expect(present.has(key), key).toBe(true);
-    // xMoney's settings are no longer set by the example (N23 turns any left in api.env into a boot warning).
-    for (const key of ["XMONEY_PRIVATE_KEY_PATH", "XMONEY_PUBLIC_KEY", "XMONEY_SITE_ID", "XMONEY_API_BASE_URL"]) {
+    // The previous card processor's settings are no longer set by the example (N23 turns any left in api.env into a
+    // boot warning).
+    const retired = (runtimeEnvironment as Readonly<Record<string, unknown>>).RETIRED_BILLING_SETTINGS as readonly string[];
+    expect(retired).toHaveLength(4);
+    for (const key of retired) {
       expect(present.has(key), key).toBe(false);
     }
     expect(present.has("PUBLIC_SITE_ORIGIN")).toBe(false);

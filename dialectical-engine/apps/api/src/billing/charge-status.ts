@@ -11,7 +11,7 @@ export type ChargeStatusAnswer = ChargeStatus & Readonly<{ kind: ChargeKind }>;
  * The waiting screen's answer, derived only from our own events: a payment we refunded because we refuse it
  * (a blocked card country, a duplicate plan) reads FAILED with that reason; a bank decline reads NEEDS_ACTION,
  * because the person can try another card; a void reads FAILED. P2-M5: `activated` false (a checkout whose plan never
- * started) reads a refund or void made at xMoney (PROVIDER_REFUND, PROVIDER_VOID) as FAILED too: the money came and
+ * started) reads a refund or void made at NETOPIA (PROVIDER_REFUND, PROVIDER_VOID) as FAILED too: the money came and
  * went, and nothing was bought. On a plan that did start, such a refund changes nothing (A9), so it reads SUCCEEDED.
  * Part 4 final review C-19 (the controller's ruling): a checkout's payment charged back before we verified it writes
  * only the CHARGEBACK (no SUCCEEDED, no plan), so an unstarted checkout reads it as FAILED (reason CHARGEBACK; the

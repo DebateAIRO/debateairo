@@ -11,10 +11,9 @@ const MIDDLE = new Date("2026-10-16T00:00:00.000Z");
 const state = (overrides: Partial<SubscriptionState> = {}): SubscriptionState => Object.freeze({
   subscriptionId: "sub-1", ownerRef: "owner-1", planId: "PLUS", status: "ACTIVE",
   periodAnchorAt: START, currentPeriodStart: START, currentPeriodEnd: END,
-  cancelRequested: false, scheduledDowngradePlanId: null, xmoneyOrderId: "901", xmoneyCustomerId: "77",
-  cardRef: "4242", activatedAt: START, endedCause: null, pastDueSince: null, retryIndex: 0,
-  renewalPostponedUntil: null, announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "xmoney",
-  paymentEnvironment: "stage", cardTokenId: null,
+  cancelRequested: false, scheduledDowngradePlanId: null, activatedAt: START, endedCause: null, pastDueSince: null, retryIndex: 0,
+  renewalPostponedUntil: null, announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "netopia",
+  paymentEnvironment: "sandbox", cardTokenId: null,
   ...overrides
 });
 
@@ -30,7 +29,7 @@ const quote: QuoteRow = Object.freeze({
 const charge = (periodEnd: Date = END): ChargeRow => Object.freeze({
   chargeId: "c".repeat(32), ownerRef: "owner-1", subscriptionId: "sub-1", kind: "UPGRADE", attempt: 1,
   periodStart: MIDDLE, periodEnd, quoteId: "q-1", netMicros: 15_000_000, taxMicros: 3_150_000, totalMicros: 18_150_000,
-  currency: "USD", createdAt: MIDDLE, paymentProvider: "xmoney", paymentEnvironment: "stage"
+  currency: "USD", createdAt: MIDDLE, paymentProvider: "netopia", paymentEnvironment: "sandbox"
 });
 
 describe("P12c what the UPGRADE settlement writes when an upgrade is paid", () => {

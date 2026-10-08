@@ -4,12 +4,12 @@
  *
  *   pnpm billing:withdraw --owner <owner ref> [--received <UTC instant, e.g. 2026-10-12T08:30:00Z>]
  *   pnpm billing:withdraw --owner <owner ref> --refund <amount through RefundDesk, e.g. 12.10> [--dashboard <amount
- *     the owner refunded in the xMoney dashboard for this withdrawal, e.g. 5.00>]
+ *     the owner refunded in NETOPIA's admin for this withdrawal, e.g. 5.00>]
  *
  * The first (R2 Q-9) records the withdrawal as of the instant the statement arrived — now, unless `--received` names
  * an earlier arrival — through P12d's `recordWithdrawal`; the second settles one P12d handed to the owner, and M8
  * names the sum of both amounts. On the host it runs under `systemd-run` with the API's EnvironmentFile and
- * writes as the API's own principal; it never calls xMoney (the API's outbox moves the money). It prints one plain
+ * writes as the API's own principal; it never calls NETOPIA (the API's outbox moves the money). It prints one plain
  * line; a refusal is ONE code on stderr (`BILLING_WITHDRAW_USAGE` exits 2, the others exit 1).
  */
 import { pathToFileURL } from "node:url";
@@ -22,7 +22,6 @@ import {
   EntitlementRepository,
   type ChargeEventRow,
   type ChargeRow,
-  type CustomerXMoneyEnvironment,
   type Pool
 } from "@debateai/db";
 import {
@@ -32,20 +31,20 @@ import {
   type BillingPlans,
   type BillingPolicy
 } from "@debateai/register";
-import { xmoneyEnvironmentOf, type XMoneyClient } from "@debateai/payments-xmoney";
+import { netopiaEnvironmentOf } from "@debateai/payments-netopia";
 import { consoleBillingAudit, type BillingAudit } from "./audit.js";
 import { enqueueEmail } from "./email-job.js";
 import { openBillingOperatorPool } from "./operator-connection.js";
+import { isThisPaymentSystem } from "./outbox.js";
 import { allocateRefund, paidTransactions, RefundDesk } from "./refunds.js";
 import { BillingRefusal } from "./refusal.js";
-import { servedHere } from "./renewal-rules.js";
 import { refuse } from "./subscription-core.js";
 import { recordWithdrawal, type WithdrawalDeps } from "./withdrawal.js";
 
 export type WithdrawArguments =
   /** `receivedAt` null: no `--received` was given, so the statement counts as received when the command runs. */
   | Readonly<{ kind: "RECORD"; ownerRef: string; receivedAt: Date | null }>
-  /** `dashboardMicros`: what the owner refunded in the xMoney dashboard for this withdrawal (0 without `--dashboard`). */
+  /** `dashboardMicros`: what the owner refunded in NETOPIA's admin for this withdrawal (0 without `--dashboard`). */
   | Readonly<{ kind: "SETTLE"; ownerRef: string; refundMicros: number; dashboardMicros: number }>;
 export type WithdrawResult =
   | Readonly<{ kind: "REFUNDING"; refundMicros: number }>
@@ -102,27 +101,20 @@ export function parseWithdrawArguments(args: readonly string[]): WithdrawArgumen
   throw new TypeError("BILLING_WITHDRAW_USAGE");
 }
 
+/** RefundDesk only writes intents here (A4a); its handler runs in the API, which holds NETOPIA's key. */
 const notHere = async (): Promise<never> => {
-  throw new TypedDomainError("XMONEY_UNAVAILABLE", "the owner's command never calls xMoney: the API's outbox moves the money");
+  throw new TypedDomainError("PAYMENT_PROVIDER_UNAVAILABLE", "the owner's command never calls a payment provider");
 };
-/**
- * RefundDesk only writes intents here (A4a); its handler runs in the API, which holds the xMoney key. Annotated with
- * the constructor's whole xMoney Pick, so a member P9b's desk adds later is reported here, at the definition.
- */
-const NO_XMONEY_HERE: Pick<XMoneyClient, "refund" | "getTransaction" | "listTransactions"> = Object.freeze({
-  refund: notHere, getTransaction: notHere, listTransactions: notHere
-});
 
 /**
  * The command's stores over its operator pool: the same classes the API composes, so the shipped setup is tested.
- * `xmoneyEnvironment` and `paymentEnvironment` are the API's payment systems, from the same EnvironmentFile (D5 5h,
- * P2-I4): a plan of another system is refused, since the API's outbox could never refund it.
+ * `paymentEnvironment` is the API's payment system, from the same EnvironmentFile (D5 5h, P2-I4): a plan of another
+ * system is refused, since the API's outbox could never refund it.
  */
 export function withdrawStoresFor(pool: Pool, input: Readonly<{
   policy: BillingPolicy; plans: BillingPlans; audit: BillingAudit; clock: () => Date;
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
-  /** N14: the API's NETOPIA environment (spec §2.5.4); null until N23 reads NETOPIA_API_BASE_URL here (PR-5). */
-  paymentEnvironment: "sandbox" | "live" | null;
+  /** The API's NETOPIA environment (spec §2.5.4), from its NETOPIA_API_BASE_URL. */
+  paymentEnvironment: "sandbox" | "live";
 }>): WithdrawStores {
   const billing = new BillingRepository(pool);
   const jobs = new BillingJobQueries(pool);
@@ -130,11 +122,11 @@ export function withdrawStoresFor(pool: Pool, input: Readonly<{
     billing, jobs, entitlements: new EntitlementRepository(pool), plans: input.plans, policy: input.policy,
     ownerSpend: new PostgresModelSpendStore(pool),
     refunds: new RefundDesk({
-      repository: billing, jobs, xmoney: NO_XMONEY_HERE, policy: input.policy, audit: input.audit, clock: input.clock,
-      xmoneyEnvironment: input.xmoneyEnvironment
+      repository: billing, jobs, policy: input.policy, audit: input.audit, clock: input.clock,
+      netopia: { payments: { status: notHere }, paymentEnvironment: input.paymentEnvironment, jobs }
     }),
-    audit: input.audit, clock: input.clock, xmoneyEnvironment: input.xmoneyEnvironment, paymentEnvironment: input.paymentEnvironment,
-    // No outbox runs in this process: the API's worker takes the refund jobs (XMONEY_REFUND, PAYMENT_REFUND) at its next tick.
+    audit: input.audit, clock: input.clock, paymentEnvironment: input.paymentEnvironment,
+    // No outbox runs in this process: the API's worker takes the PAYMENT_REFUND jobs at its next tick.
     kick: () => undefined
   });
 }
@@ -155,9 +147,9 @@ export async function recordOwnerWithdrawal(
 
 /**
  * `--refund` / `--dashboard`: the settlement of a withdrawal handed to the owner. The `--refund` amount goes back
- * through RefundDesk only on the payments no dashboard refund touched, newest first (more than they hold is
- * REFUND_EXCEEDS_CHARGE, and the transaction writes nothing: the owner refunds that part in the dashboard first). The
- * `--dashboard` amount — what the owner refunded in the xMoney dashboard for this withdrawal — is recorded once, in
+ * through RefundDesk only on the payments no admin refund touched, newest first (more than they hold is
+ * REFUND_EXCEEDS_CHARGE, and the transaction writes nothing: the owner refunds that part in NETOPIA's admin first). The
+ * `--dashboard` amount — what the owner refunded in NETOPIA's admin for this withdrawal — is recorded once, in
  * P12a's `billing.withdrawal_owner_settlement`, in the same transaction; both together may not exceed what the
  * withdrawal's payments took (a typo, BILLING_WITHDRAW_EXCEEDS_PAID). M8 names the sum: RefundDesk's WITHDRAWAL
  * follow-up sends it after the last refund, or it goes now when nothing moves through RefundDesk. P2-M7: when both
@@ -174,10 +166,8 @@ export async function settleOwnerWithdrawal(
     if (waiting === undefined) throw new TypeError("BILLING_WITHDRAW_NOT_AWAITING_OWNER");
     const events = await stores.billing.subscriptionEvents(waiting.subscriptionId, client);
     const folded = foldSubscription(events);
-    // D5 5h (P2-I4), spec §2.5.4: its payments live in another payment system, where the API's outbox cannot refund them.
-    if (!servedHere(folded, { xmoneyEnvironment: stores.xmoneyEnvironment, paymentEnvironment: stores.paymentEnvironment })) {
-      refuse(409, "NOT_SUBSCRIBED");
-    }
+    // D5 5h (P2-I4): its payments live in another payment system, where the API's outbox cannot refund them.
+    if (!isThisPaymentSystem(folded, stores.paymentEnvironment)) refuse(409, "NOT_SUBSCRIBED");
     const activatedAt = folded.activatedAt;
     const withdrawn = events.find((event) => event.kind === "WITHDRAWN");
     if (activatedAt === null || withdrawn === undefined) throw new TypeError("BILLING_WITHDRAW_NOT_AWAITING_OWNER");
@@ -198,7 +188,7 @@ export async function settleOwnerWithdrawal(
       dashboardRefundMicros: input.dashboardMicros, settledAt: now
     });
     if (allocations.length === 0) {
-      const customer = await stores.billing.customerByOwner(input.ownerRef, undefined, client);
+      const customer = await stores.billing.customerByOwner(input.ownerRef, client);
       if (customer !== null) {
         await enqueueEmail(stores.billing, client, {
           template: "M8", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
@@ -235,21 +225,21 @@ export function renderWithdrawResult(result: WithdrawResult, input: WithdrawArgu
     case "NOTHING_DUE":
       return `The withdrawal of ${owner} is recorded: the plan has ended and nothing was due back. M8 is queued.\n`;
     case "OWNER_REVIEW":
-      return `The withdrawal of ${owner} is recorded and the plan has ended, but a refund made in the xMoney dashboard`
-        + " touched a payment, so nothing was refunded. Check the dashboard: refund there what this command cannot take"
-        + " back (a payment the dashboard refund touched), then, within 14 days of the withdrawal, run"
+      return `The withdrawal of ${owner} is recorded and the plan has ended, but a refund made in NETOPIA's admin`
+        + " touched a payment, so nothing was refunded. Check NETOPIA's admin: refund there what this command cannot take"
+        + " back (a payment the earlier refund touched), then, within 14 days of the withdrawal, run"
         + ` pnpm billing:withdraw --owner ${input.ownerRef} --refund <amount through this command>`
-        + " --dashboard <amount refunded in the dashboard>. M8 names the sum.\n";
+        + " --dashboard <amount refunded in NETOPIA's admin>. M8 names the sum.\n";
     case "SETTLED":
       if (result.refundMicros === 0) {
         return result.dashboardMicros === 0
           ? `The withdrawal of ${owner} is settled: nothing more goes back. M8 is queued.\n`
-          : `The withdrawal of ${owner} is settled: ${microsToDecimal(result.dashboardMicros)} USD was refunded in the`
-            + " dashboard. M8 is queued.\n";
+          : `The withdrawal of ${owner} is settled: ${microsToDecimal(result.dashboardMicros)} USD was refunded in`
+            + " NETOPIA's admin. M8 is queued.\n";
       }
       return `The withdrawal of ${owner} is settled: ${microsToDecimal(result.refundMicros)} USD goes back to the card`
         + (result.dashboardMicros === 0 ? ""
-          : ` and ${microsToDecimal(result.dashboardMicros)} USD was refunded in the dashboard`
+          : ` and ${microsToDecimal(result.dashboardMicros)} USD was refunded in NETOPIA's admin`
             + ` (M8 says ${microsToDecimal(result.refundMicros + result.dashboardMicros)})`)
         + ". M8 follows once the refund is done.\n";
     default:
@@ -293,6 +283,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     stderr: (text) => process.stderr.write(text)
   }, async () => {
     const environment = loadBillingWithdrawEnvironment();
+    const paymentEnvironment = netopiaEnvironmentOf(environment.NETOPIA_API_BASE_URL.replace(/\/+$/u, ""));
+    if (paymentEnvironment === null) throw new TypeError("BILLING_CONFIGURATION_INVALID:NETOPIA_API_BASE_URL");
     const pool = await openBillingOperatorPool(environment.DATABASE_URL, {
       production: environment.NODE_ENV === "production", readOnly: false, max: 2
     });
@@ -301,8 +293,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       const plans = await readBillingPlans(pool, environment.REGISTER_VERSION);
       if (policy === null || plans === null) throw new TypeError("BILLING_WITHDRAW_REGISTER_UNRESOLVED");
       const stores = withdrawStoresFor(pool, {
-        policy, plans, audit: consoleBillingAudit, clock: () => new Date(),
-        xmoneyEnvironment: xmoneyEnvironmentOf(environment.XMONEY_API_BASE_URL), paymentEnvironment: null
+        policy, plans, audit: consoleBillingAudit, clock: () => new Date(), paymentEnvironment
       });
       return Object.freeze({ run: (input: WithdrawArguments) => runWithdrawCommand(stores, input), close: () => pool.end() });
     } catch (error) {

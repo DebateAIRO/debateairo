@@ -8,7 +8,7 @@ import { renderMail } from "@debateai/mail-templates";
 import { planById } from "@debateai/register";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
-import { testBillingPlans, testBillingPolicy, XMONEY_SYSTEM_UNTIL_N23 } from "../support/billingFixtures.js";
+import { testBillingPlans, testBillingPolicy } from "../support/billingFixtures.js";
 import {
   netopiaRefundDesk,
   ownerRefundDone,
@@ -50,7 +50,7 @@ const DAY = 86_400_000;
  * N14's `servedHere` guard: with `null` a NETOPIA plan would be refused NOT_SUBSCRIBED).
  */
 const stores = (audit = recordingAudit(), paymentEnvironment: "sandbox" | "live" = "sandbox") => withdrawStoresFor(operator, {
-  policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => new Date(), ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment
+  policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => new Date(), paymentEnvironment
 });
 const rows = () => new BillingRepository(database.pool);
 
@@ -128,10 +128,10 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     const state = foldSubscription(await rows().subscriptionEvents(seeded.subscriptionId));
     // In its own environment: the window is closed by the date alone, not by the plan's payment system.
     expect(withdrawalOpenUntil({
-      state, taxCountry: "RO", policy: testBillingPolicy, now, ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment: "sandbox"
+      state, taxCountry: "RO", policy: testBillingPolicy, now, paymentEnvironment: "sandbox"
     })).toBeNull();
     expect(withdrawalOpenUntil({
-      state, taxCountry: "RO", policy: testBillingPolicy, now: receivedAt, ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment: "sandbox"
+      state, taxCountry: "RO", policy: testBillingPolicy, now: receivedAt, paymentEnvironment: "sandbox"
     })).not.toBeNull();
     const expected = withdrawalRefundMicros({
       paidTotalMicros: seeded.totalMicros, periodStart: seeded.periodStart, periodEnd: seeded.periodEnd,
@@ -203,7 +203,7 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     });
     const audit = recordingAudit();
     const clocked = withdrawStoresFor(operator, {
-      policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => at, ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment: "sandbox"
+      policy: testBillingPolicy, plans: testBillingPlans, audit, clock: () => at, paymentEnvironment: "sandbox"
     });
     expect(await runWithdrawCommand(clocked, parseWithdrawArguments(["--owner", seeded.ownerRef])))
       .toMatchObject({ kind: "REFUNDING" });

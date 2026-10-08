@@ -2,7 +2,7 @@ import type { PoolClient } from "pg";
 import type { EntitlementRepository } from "@debateai/db";
 import { planById } from "@debateai/register";
 import { enqueueEmail } from "./email-job.js";
-import { servedHere } from "./renewal-rules.js";
+import { isThisPaymentSystem } from "./outbox.js";
 import { quoteTax, storedTaxContext } from "./stored-tax-context.js";
 import { appendChecked, lockedAfter, lockedSubscription, refuse, type LockedSubscription } from "./subscription-core.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
@@ -61,7 +61,7 @@ export async function requestCancelLocked(
   const { accessEndsAt } = written;
   const paused = state.status === "SUSPENDED";
   const canUndo = !paused && accessEndsAt.getTime() > now.getTime();
-  const customer = await deps.billing.customerByOwner(state.ownerRef, undefined, client);
+  const customer = await deps.billing.customerByOwner(state.ownerRef, client);
   if (customer !== null) {
     await enqueueEmail(deps.billing, client, {
       template: "M7",
@@ -163,7 +163,7 @@ export async function revokeCancelForOwner(deps: SubscriptionRouteDeps, ownerRef
     if (state.status !== "ACTIVE" && state.status !== "PAST_DUE") return "NOT_SUBSCRIBED" as const;
     // D5 5h (P2-I4), spec §2.5.4: a plan of another payment system is never renewed here, so its cancel stands (a
     // sandbox plan revoked on live would stay ACTIVE for ever and refuse the next live start).
-    if (!servedHere(state, { xmoneyEnvironment: deps.xmoneyEnvironment, paymentEnvironment: deps.paymentEnvironment })) {
+    if (!isThisPaymentSystem(state, deps.paymentEnvironment)) {
       return "NOT_SUBSCRIBED" as const;
     }
     if (!state.cancelRequested) return "NOTHING" as const;
@@ -188,7 +188,7 @@ export async function revokeCancelForOwner(deps: SubscriptionRouteDeps, ownerRef
  * paid tax quote). Gated on the Terms re-acceptance first (spec §2.3.2, R2 Q-10): a downgrade sets the new recurring
  * price, a change of the contract, and the refusal comes before any read or tax quote, so a refused downgrade never
  * pays for one. Once the renewal charge for the next period is written (inside the lead, or retrying through an
- * xMoney outage, R2 Q-1), it is priced at the current plan and settles RENEWED at it, so a downgrade then would only
+ * NETOPIA outage, R2 Q-1), it is priced at the current plan and settles RENEWED at it, so a downgrade then would only
  * move to the month after while the person was told "from today": it is refused DOWNGRADE_NOT_AVAILABLE_NOW (as
  * P12c refuses an upgrade), read under the lock on its own connection, as `requestCancelLocked` reads it.
  */

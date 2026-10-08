@@ -1,7 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 
-import { trimTrailingSlashes as xmoneyTrim } from "../../packages/payments-xmoney/src/client.js";
 import { trimTrailingSlashes as smartbillTrim } from "../../packages/invoice-smartbill/src/index.js";
 import { quadernoAmountMicros, trimTrailingSlashes as quadernoTrim } from "../../packages/tax-quaderno/src/index.js";
 
@@ -10,7 +9,7 @@ import { quadernoAmountMicros, trimTrailingSlashes as quadernoTrim } from "../..
  * `/0+$/u`. CodeQL flagged both (js/polynomial-redos, PR #64): on many "/" or "0" that are not at the end, every start
  * position rescans the run, so the time is quadratic. The one-pass trims must give the old patterns' results.
  */
-const TRIMS = [["xMoney", xmoneyTrim], ["SmartBill", smartbillTrim], ["Quaderno", quadernoTrim]] as const;
+const TRIMS = [["SmartBill", smartbillTrim], ["Quaderno", quadernoTrim]] as const;
 
 describe("the vendor clients trim a base URL's trailing slashes in one pass", () => {
   it.each(TRIMS)("%s matches the old pattern on any mix of slashes and other characters", (_name, trim) => {

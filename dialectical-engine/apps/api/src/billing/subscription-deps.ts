@@ -1,7 +1,6 @@
-import type { AcceptanceRepository, BillingJobQueries, BillingRepository, CustomerXMoneyEnvironment, EntitlementRepository } from "@debateai/db";
+import type { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
 import type { CardPayments, TaxEngine } from "@debateai/billing-core";
 import type { GeoLookup } from "@debateai/geo";
-import type { XMoneyClient } from "@debateai/payments-xmoney";
 import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/register";
 import type { AccountEmailReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
@@ -35,17 +34,13 @@ export type SubscriptionRouteDeps = Readonly<{
   legal: BillingLegalGate;
   audit: BillingAudit;
   clock: () => Date;
-  /** P12c: xMoney's rebill. Unused from N12 (the upgrade pays on NETOPIA's page); N23 removes it. */
-  xmoney: Pick<XMoneyClient, "rebill">;
-  /**
-   * P6a's `connectors.xmoneyEnvironment`: the xMoney system every call above goes to. A charge made here names it,
-   * and a subscription created in the other system is never charged or re-carded here (D5 5h).
-   */
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
   /** N12/N13 (spec §2.10, §2.11): NETOPIA's port (N8's `connectors.payments`): the hosted page and the status read. */
   payments: Pick<CardPayments, "startHostedPayment" | "status">;
-  /** N12/N14: N8's connectors.paymentEnvironment, the NETOPIA environment this API serves; null when none. */
-  paymentEnvironment: "sandbox" | "live" | null;
+  /**
+   * N8's connectors.paymentEnvironment: the NETOPIA environment this API talks to. A charge made here is paid in it,
+   * and a subscription created in another payment system is never charged or re-carded here (D5 5h).
+   */
+  paymentEnvironment: "sandbox" | "live";
   /** N12/N13 (spec §2.18): where the card-saving agreement is recorded (RENEWAL_TERMS, surface UPGRADE or CARD_CHANGE). */
   acceptances: Pick<AcceptanceRepository, "record">;
   /** `currentDocument` from @debateai/legal-manifest: the agreement's version and hash in force in each locale. */

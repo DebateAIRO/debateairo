@@ -23,7 +23,7 @@ describe("P14c the withdrawal command", () => {
     expect(parseWithdrawArguments(["--refund", "12.10", "--owner", OWNER]))
       .toEqual({ kind: "SETTLE", ownerRef: OWNER, refundMicros: 12_100_000, dashboardMicros: 0 });
     expect(parseWithdrawArguments(["--owner", OWNER, "--refund", "0.00"])).toMatchObject({ refundMicros: 0, dashboardMicros: 0 });
-    // What the owner refunded in the xMoney dashboard for this withdrawal: M8 names the sum of both parts.
+    // What the owner refunded in NETOPIA's admin for this withdrawal: M8 names the sum of both parts.
     expect(parseWithdrawArguments(["--owner", OWNER, "--dashboard", "5.00", "--refund", "3.00"]))
       .toEqual({ kind: "SETTLE", ownerRef: OWNER, refundMicros: 3_000_000, dashboardMicros: 5_000_000 });
     for (const args of [
@@ -46,15 +46,15 @@ describe("P14c the withdrawal command", () => {
       .toContain("18.15 USD goes back to the card");
     expect(renderWithdrawResult({ kind: "NOTHING_DUE" }, record)).toContain("nothing was due back");
     const review = renderWithdrawResult({ kind: "OWNER_REVIEW" }, record);
-    // First the dashboard for what the command cannot take back, then the settle with both amounts.
+    // First NETOPIA's admin for what the command cannot take back, then the settle with both amounts.
     expect(review).toContain("refund there what this command cannot take back");
     expect(review).toContain(`pnpm billing:withdraw --owner ${OWNER} --refund <amount through this command>`
-      + " --dashboard <amount refunded in the dashboard>");
+      + " --dashboard <amount refunded in NETOPIA's admin>");
     const settle = parseWithdrawArguments(["--owner", OWNER, "--refund", "3.00", "--dashboard", "5.00"]);
     expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 3_000_000, dashboardMicros: 5_000_000 }, settle))
-      .toContain("3.00 USD goes back to the card and 5.00 USD was refunded in the dashboard (M8 says 8.00)");
+      .toContain("3.00 USD goes back to the card and 5.00 USD was refunded in NETOPIA's admin (M8 says 8.00)");
     expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 17_590_000 }, settle))
-      .toContain("17.59 USD was refunded in the dashboard. M8 is queued");
+      .toContain("17.59 USD was refunded in NETOPIA's admin. M8 is queued");
     expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 0 }, settle)).toContain("nothing more goes back");
   });
 
@@ -75,12 +75,12 @@ describe("P14c the withdrawal command", () => {
     expect(done.lines.err).toBe("");
   });
 
-  it("reads the API's xMoney address too, and refuses to start without it (P2-I4: the system it may refund in)", () => {
+  it("reads the API's NETOPIA address too, and refuses to start without it (P2-I4: the system it may refund in)", () => {
     const base = {
       DATABASE_URL: "postgresql://debateai_prod_api_runtime:x@localhost/debateai", REGISTER_VERSION: "7", NODE_ENV: "test"
     };
-    expect(parseBillingWithdrawEnvironment({ ...base, XMONEY_API_BASE_URL: "https://api-stage.xmoney.com" }))
-      .toMatchObject({ REGISTER_VERSION: 7, XMONEY_API_BASE_URL: "https://api-stage.xmoney.com" });
+    expect(parseBillingWithdrawEnvironment({ ...base, NETOPIA_API_BASE_URL: "https://secure-sandbox.netopia-payments.com" }))
+      .toMatchObject({ REGISTER_VERSION: 7, NETOPIA_API_BASE_URL: "https://secure-sandbox.netopia-payments.com" });
     expect(() => parseBillingWithdrawEnvironment(base)).toThrow();
   });
 });

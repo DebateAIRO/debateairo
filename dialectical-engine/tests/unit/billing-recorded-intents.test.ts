@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { paymentError, type PaymentErrorCode } from "@debateai/billing-core";
 import type { ChargeEventRow, ChargeRow, InvoiceRow, OutboxJob, QuoteRow } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
 import type { BillingAuditEvent } from "../../apps/api/src/billing/audit.js";
 import { creditNoteContext, type CreditNoteContext } from "../../apps/api/src/billing/invoice-common.js";
 import { createQuadernoRefundHandler } from "../../apps/api/src/billing/invoice-quaderno.js";
@@ -14,7 +14,7 @@ import { testBillingPolicy } from "../support/billingFixtures.js";
 /*
  * P2-I5 (1)(2): the money executor and the credit-note jobs act only on what the charge's own rows record. Any process
  * holding the runtime role can INSERT into billing.outbox; a row it forged must move no money and issue no document.
- * (1) An XMONEY_REFUND job refunds only the REFUND_REQUESTED of its transaction, at that amount and for that reason
+ * (1) A PAYMENT_REFUND job refunds only the REFUND_REQUESTED of its payment, at that amount and for that reason
  * (`whole` only for a reason that refunds a whole payment, at its full amount); anything else is DEAD
  * REFUND_NOT_REQUESTED with O2. (2) A credit note is issued for the amount of the transaction's REFUNDED row, and
  * waits while there is none.
@@ -52,7 +52,7 @@ function event(
 ): ChargeEventRow {
   return {
     eventId: `${kind}-${transactionId}-${amountMicros}`, chargeId: CHARGE_ID, kind, at, providerPaymentId: transactionId,
-    amountMicros, errorCode, paymentProvider: "xmoney", paymentEnvironment: "live", refundsTransactionId
+    amountMicros, errorCode, paymentProvider: "netopia", paymentEnvironment: "live", refundsTransactionId
   };
 }
 
@@ -61,7 +61,7 @@ function charge(events: ChargeEventRow[], kind: ChargeRow["kind"] = "INITIAL"): 
     chargeId: CHARGE_ID, ownerRef: OWNER_REF, subscriptionId: "5d0a1c2b-3e4f-4a5b-8c6d-7e8f9a0b1c2d", kind, attempt: 1,
     periodStart: PAID_AT, periodEnd: new Date("2026-11-08T09:00:00.000Z"), quoteId: QUOTE_ID,
     netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: TOTAL, currency: "USD", createdAt: PAID_AT,
-    paymentProvider: "xmoney", paymentEnvironment: "live", events
+    paymentProvider: "netopia", paymentEnvironment: "live", events
   };
 }
 
@@ -77,18 +77,18 @@ function recorder() {
 
 type RefundPayload = Readonly<{ transaction: string; amount: number; whole: boolean; reason: string; owner?: string }>;
 
-const refundJob = (payload: RefundPayload): OutboxJob => job("XMONEY_REFUND", `${CHARGE_ID}:${payload.transaction}`, {
+const refundJob = (payload: RefundPayload): OutboxJob => job("PAYMENT_REFUND", `${CHARGE_ID}:${payload.transaction}`, {
   charge_id: CHARGE_ID, transaction_id: payload.transaction, amount_micros: payload.amount, whole: payload.whole,
   owner_ref: payload.owner ?? OWNER_REF, reason: payload.reason
 });
 
 /**
- * A RefundDesk over one charge whose xMoney records every refund call it receives and answers it (or, with
- * `refusal`, refuses it with that code). `stale`: the job was claimed again by another worker (P2-M6), so its stage
- * write is refused.
+ * A RefundDesk over one charge in NETOPIA's API mode (spec §2.12.3: a `refund` on the port) on a live API, whose port
+ * records every refund call it receives and answers it (or, with `refusal`, refuses it with that code). `stale`: the
+ * job was claimed again by another worker (P2-M6), so its stage write is refused.
  */
-function desk(recorded: (ChargeRow & { events: ChargeEventRow[] }) | null, refusal: string | null = null, stale = false) {
-  const calls: Array<Readonly<{ transactionId: string; amountDecimal: string | null }>> = [];
+function desk(recorded: (ChargeRow & { events: ChargeEventRow[] }) | null, refusal: PaymentErrorCode | null = null, stale = false) {
+  const calls: Array<Readonly<{ providerPaymentId: string; amountMicros: number }>> = [];
   const enqueued: Array<Readonly<{ kind: string; ref: string; payload: Record<string, unknown> }>> = [];
   const appended: ChargeEventRow["kind"][] = [];
   const { lines, audit } = recorder();
@@ -115,13 +115,16 @@ function desk(recorded: (ChargeRow & { events: ChargeEventRow[] }) | null, refus
       // P2-M6: every refund recording takes the owner lock before it reads the charge again.
       lockOwner: async () => undefined
     }, "jobs"),
-    xmoney: only({
-      refund: async (input: Readonly<{ transactionId: string; amountDecimal: string | null }>) => {
-        calls.push({ transactionId: input.transactionId, amountDecimal: input.amountDecimal });
-        if (refusal !== null) throw new TypedDomainError(refusal, `${refusal}:1402`);
-      }
-    }, "xmoney"),
-    policy: testBillingPolicy, audit, clock: () => NOW, xmoneyEnvironment: "live"
+    policy: testBillingPolicy, audit, clock: () => NOW,
+    netopia: {
+      payments: only({
+        refund: async (input: Readonly<{ providerPaymentId: string; amountMicros: number }>) => {
+          calls.push({ providerPaymentId: input.providerPaymentId, amountMicros: input.amountMicros });
+          if (refusal !== null) throw paymentError(refusal);
+        }
+      }, "payments"),
+      paymentEnvironment: "live", jobs: only({}, "netopia.jobs")
+    }
   });
   return { refundDesk, calls, enqueued, appended, lines };
 }
@@ -150,7 +153,7 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
     ["another person's owner reference than the charge's",
       withdrawalRequested,
       { transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "WITHDRAWAL", owner: "1c5f3b0d-7a2e-4d4f-8b8c-3e6a9f2d1b04" }],
-    ["a refund made at xMoney (P9c's provider row), which is no request of ours",
+    ["a refund made at NETOPIA (P9c's provider row), which is no request of ours",
       () => charge([event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", SECOND_PAYMENT, 5_000_000, "PROVIDER_REFUND"),
         event("DUPLICATE_PAYMENT", SECOND_PAYMENT, 5_000_000)]),
       { transaction: SECOND_PAYMENT, amount: 5_000_000, whole: false, reason: "DUPLICATE_PAYMENT" }],
@@ -161,7 +164,7 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
   ];
 
   for (const [name, recorded, payload] of forged) {
-    it(`ends a forged job DEAD REFUND_NOT_REQUESTED with O2 and no xMoney call: ${name}`, async () => {
+    it(`ends a forged job DEAD REFUND_NOT_REQUESTED with O2 and no refund call: ${name}`, async () => {
       const made = desk(recorded());
       expect(await made.refundDesk.handle(refundJob(payload), NOW)).toEqual({ kind: "DEAD", code: "REFUND_NOT_REQUESTED" });
       expect(made.calls).toEqual([]);
@@ -177,17 +180,17 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
     });
   }
 
-  it("keeps today's O2 for a refund xMoney refused: the flag off and the refund job's own ref", async () => {
+  it("keeps today's O2 for a refund NETOPIA refused: the flag off and the refund job's own ref", async () => {
     const made = desk(charge([
       event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 5_000_000, "SUBSCRIPTION_ENDED")
-    ]), "XMONEY_REFUSED");
+    ]), "PAYMENT_CONFIGURATION_REFUSED");
     expect(await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "SUBSCRIPTION_ENDED" }), NOW))
-      .toEqual({ kind: "DEAD", code: "XMONEY_REFUSED" });
-    expect(made.calls).toEqual([{ transactionId: PAYMENT, amountDecimal: "5.00" }]);
+      .toEqual({ kind: "DEAD", code: "PAYMENT_CONFIGURATION_REFUSED" });
+    expect(made.calls).toEqual([{ providerPaymentId: PAYMENT, amountMicros: 5_000_000 }]);
     expect(made.enqueued).toEqual([expect.objectContaining({
       kind: "EMAIL", ref: `O2:${CHARGE_ID}:${PAYMENT}`,
       payload: expect.objectContaining({
-        template: "O2", "param.chargeRef": CHARGE_ID, "param.refundAmount": "5.00", "param.reasonCode": "XMONEY_REFUSED",
+        template: "O2", "param.chargeRef": CHARGE_ID, "param.refundAmount": "5.00", "param.reasonCode": "PAYMENT_CONFIGURATION_REFUSED",
         "param.notRequested": "false"
       })
     })]);
@@ -196,13 +199,13 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
   it("names a dead withdrawal refund's reason and its 14-day deadline in O2, from when the person withdrew (W9, P2-M8)", async () => {
     const made = desk(charge([
       event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 5_000_000, "WITHDRAWAL")
-    ]), "XMONEY_REFUSED");
+    ]), "PAYMENT_CONFIGURATION_REFUSED");
     expect(await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "WITHDRAWAL" }), NOW))
-      .toEqual({ kind: "DEAD", code: "XMONEY_REFUSED" });
+      .toEqual({ kind: "DEAD", code: "PAYMENT_CONFIGURATION_REFUSED" });
     expect(made.enqueued).toEqual([expect.objectContaining({
       kind: "EMAIL", ref: `O2:${CHARGE_ID}:${PAYMENT}`,
       payload: expect.objectContaining({
-        template: "O2", "param.reasonCode": "XMONEY_REFUSED", "param.notRequested": "false",
+        template: "O2", "param.reasonCode": "PAYMENT_CONFIGURATION_REFUSED", "param.notRequested": "false",
         "param.refundReason": "WITHDRAWAL", "param.refundDeadline": "2026-10-23T08:30:00.000Z"
       })
     })]);
@@ -211,7 +214,7 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
   it("names another refund's reason in O2 without a deadline, and a forged job's O2 carries neither (W9, P2-M8)", async () => {
     const made = desk(charge([
       event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 5_000_000, "SUBSCRIPTION_ENDED")
-    ]), "XMONEY_REFUSED");
+    ]), "PAYMENT_CONFIGURATION_REFUSED");
     await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "SUBSCRIPTION_ENDED" }), NOW);
     expect(made.enqueued[0]!.payload).toMatchObject({ "param.refundReason": "SUBSCRIPTION_ENDED" });
     expect(made.enqueued[0]!.payload).not.toHaveProperty("param.refundDeadline");
@@ -238,33 +241,33 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
     expect(made.enqueued[0]!.payload).not.toHaveProperty("param.refundDeadline");
   });
 
-  it("tells the owner a job of the other xMoney system was never sent, with no deadline (P2-W4: OTHER_XMONEY_SYSTEM)", async () => {
+  it("tells the owner a job of another payment system was never sent, with no deadline (P2-W4: OTHER_PAYMENT_SYSTEM)", async () => {
     // A sandbox payment's withdrawal refund on the live API: this API never sees that system's refunds, so neither
     // "refund exactly … M8 follows by itself" nor the legal deadline is true here; nor is its reason a recorded one.
-    const stagePaid = charge([
+    const livePaid = charge([
       event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 5_000_000, "WITHDRAWAL")
     ]);
-    const made = desk({ ...stagePaid, paymentEnvironment: "stage" });
+    const made = desk({ ...livePaid, paymentEnvironment: "sandbox" });
     expect(await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "WITHDRAWAL" }), NOW))
-      .toEqual({ kind: "DEAD", code: "OTHER_XMONEY_SYSTEM" });
+      .toEqual({ kind: "DEAD", code: "OTHER_PAYMENT_SYSTEM" });
     expect(made.calls).toEqual([]);
     expect(made.enqueued).toEqual([expect.objectContaining({
       kind: "EMAIL", ref: `O2:${CHARGE_ID}:${PAYMENT}:other-system`,
       payload: expect.objectContaining({
-        template: "O2", "param.reasonCode": "OTHER_XMONEY_SYSTEM", "param.notRequested": "false", "param.otherSystem": "true"
+        template: "O2", "param.reasonCode": "OTHER_PAYMENT_SYSTEM", "param.notRequested": "false", "param.otherSystem": "true"
       })
     })]);
     expect(made.enqueued[0]!.payload).not.toHaveProperty("param.refundDeadline");
     expect(made.enqueued[0]!.payload).not.toHaveProperty("param.refundReason");
     // Control: the same withdrawal refund refused in this API's own system keeps its deadline, and no other-system flag.
-    const refused = desk(stagePaid, "XMONEY_REFUSED");
+    const refused = desk(livePaid, "PAYMENT_CONFIGURATION_REFUSED");
     await refused.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "WITHDRAWAL" }), NOW);
     expect(refused.enqueued[0]!.payload).toMatchObject({ "param.refundDeadline": "2026-10-23T08:30:00.000Z" });
     expect(refused.enqueued[0]!.payload).not.toHaveProperty("param.otherSystem");
   });
 
-  it("refuses a forged job before its retry looks anything up at xMoney", async () => {
-    // A later attempt reads the job's stage and the transaction first (A4c); a forged job never gets that far.
+  it("refuses a forged job before its retry looks anything up at NETOPIA", async () => {
+    // A later attempt reads the job's stage and the payment's status first (A4c); a forged job never gets that far.
     const made = desk(charge([event("SUCCEEDED", PAYMENT, TOTAL)]));
     const retried = { ...refundJob({ transaction: PAYMENT, amount: TOTAL, whole: true, reason: "CARD_CHECK_RELEASE" }), attempts: 3 };
     expect(await made.refundDesk.handle(retried, NOW)).toEqual({ kind: "DEAD", code: "REFUND_NOT_REQUESTED" });
@@ -277,7 +280,7 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
     ], "CARD_CHECK"));
     expect(await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: TOTAL, whole: true, reason: "CARD_CHECK_RELEASE" }), NOW))
       .toEqual({ kind: "DONE" });
-    expect(made.calls).toEqual([{ transactionId: PAYMENT, amountDecimal: null }]);
+    expect(made.calls).toEqual([{ providerPaymentId: PAYMENT, amountMicros: TOTAL }]);
     expect(made.appended).toEqual(["REFUNDED"]);
   });
 
@@ -290,7 +293,7 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
     expect(await made.refundDesk.handle(
       refundJob({ transaction: SECOND_PAYMENT, amount: 12_100_000, whole: true, reason: "DUPLICATE_PAYMENT" }), NOW
     )).toEqual({ kind: "DONE" });
-    expect(made.calls).toEqual([{ transactionId: SECOND_PAYMENT, amountDecimal: null }]);
+    expect(made.calls).toEqual([{ providerPaymentId: SECOND_PAYMENT, amountMicros: 12_100_000 }]);
     expect(made.enqueued).toEqual([expect.objectContaining({ kind: "EMAIL", payload: expect.objectContaining({ template: "M11_DUPLICATE" }) })]);
   });
 
@@ -300,10 +303,10 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
     ]));
     expect(await made.refundDesk.handle(refundJob({ transaction: PAYMENT, amount: 5_000_000, whole: false, reason: "SUBSCRIPTION_ENDED" }), NOW))
       .toEqual({ kind: "DONE" });
-    expect(made.calls).toEqual([{ transactionId: PAYMENT, amountDecimal: "5.00" }]);
+    expect(made.calls).toEqual([{ providerPaymentId: PAYMENT, amountMicros: 5_000_000 }]);
   });
 
-  it("records a 0.00 card-check hold's release with no xMoney call (P2-M4)", async () => {
+  it("records a 0.00 card-check hold's release with no refund call (P2-M4)", async () => {
     const made = desk(charge([
       event("SUCCEEDED", PAYMENT, 0), event("REFUND_REQUESTED", PAYMENT, 0, "CARD_CHECK_RELEASE")
     ], "CARD_CHECK"));
@@ -338,10 +341,10 @@ describe("P2-I5 (1) the refund executor moves money only for a recorded refund r
   });
 
   it("records nothing, and runs no follow-up, for a refund its payment already holds a REFUNDED for (P2-M6)", async () => {
-    // Another process recorded xMoney's own refund transaction for it (D5 5g) while this one held the call's answer.
+    // Another process recorded the refund for it (VERIFY_PAYMENT's REFUNDED status) while this one held the call's answer.
     const made = desk(charge([
       event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 5_000_000, "SUBSCRIPTION_ENDED"),
-      event("REFUNDED", "61009", 5_000_000, "SUBSCRIPTION_ENDED", REFUNDED_AT, PAYMENT)
+      event("REFUNDED", PAYMENT, 5_000_000, "SUBSCRIPTION_ENDED", REFUNDED_AT)
     ]));
     await made.refundDesk.recordRefunded({
       chargeId: CHARGE_ID, transactionId: PAYMENT, amountMicros: 5_000_000, whole: false, ownerRef: OWNER_REF,
@@ -394,7 +397,7 @@ function invoiceDeps(recorded: ChargeRow & { events: ChargeEventRow[] }, taxCoun
       jobs: only<never>({}, "jobs"), issuer: only<never>({}, "issuer"), tax: only<never>({}, "tax"),
       recipients: { currentAddress: async () => PROFILE.email },
       recordsKey: RECORDS_KEY, policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", audit,
-      xmoneyEnvironment: "live" as const
+      paymentEnvironment: "live" as const
     }
   };
 }
@@ -445,8 +448,8 @@ describe("P2-I5 (2) a credit note is issued only for a recorded refund, at its r
   });
 
   for (const [kind, create] of handlers) {
-    it(`sends a ${kind} job for a dashboard refund recorded on the payment itself to the owner, never at its upper bound`, async () => {
-      // P9c: xMoney's read named no amount, so the row holds what was left of the payment (amountKnown=false).
+    it(`sends a ${kind} job for an admin refund recorded on the payment itself to the owner, never at its upper bound`, async () => {
+      // P9c: NETOPIA's status named no amount, so the row holds what was left of the payment (amountKnown=false).
       const { deps, lines } = invoiceDeps(charge([
         event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, TOTAL, "PROVIDER_REFUND", REFUNDED_AT),
         event("REFUNDED", PAYMENT, TOTAL, "PROVIDER_REFUND", REFUNDED_AT)
@@ -467,15 +470,5 @@ describe("P2-I5 (2) a credit note is issued only for a recorded refund, at its r
     ]));
     const context = await creditNoteContext(deps as never, creditJob("QUADERNO_RECORD_REFUND", PAYMENT, TOTAL), NOW, "QUADERNO");
     expect((context as CreditNoteContext).refund).toMatchObject({ refundTotalMicros: TOTAL, issuedOn: REFUNDED_AT });
-  });
-
-  it("credits a refund xMoney reported as its own transaction, at that REFUNDED row's amount", async () => {
-    // D5 5g: the REFUNDED row sits on the refund transaction and names the payment it refunds.
-    const { deps } = invoiceDeps(charge([
-      event("SUCCEEDED", PAYMENT, TOTAL), event("REFUND_REQUESTED", PAYMENT, 7_000_000, "PROVIDER_REFUND", REFUNDED_AT),
-      event("REFUNDED", "61009", 7_000_000, "PROVIDER_REFUND", REFUNDED_AT, PAYMENT)
-    ]));
-    const context = await creditNoteContext(deps as never, creditJob("QUADERNO_RECORD_REFUND", PAYMENT, TOTAL), NOW, "QUADERNO");
-    expect((context as CreditNoteContext).refund).toMatchObject({ refundTotalMicros: 7_000_000, issuedOn: REFUNDED_AT });
   });
 });

@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 import type {
-  ChargeKind, CustomerXMoneyEnvironment, OutboxJob, OutboxKind, OutboxPayload, PaymentEnvironmentName, PaymentProviderName
+  ChargeKind, OutboxJob, OutboxKind, OutboxPayload, PaymentEnvironmentName, PaymentProviderName
 } from "./billing.js";
 
 /** Spec 2026-10-05 §2.14: which read schedule a NETOPIA charge is on. */
@@ -221,111 +221,10 @@ export class BillingJobQueries {
   }
 
   /**
-   * A1(1): the charge that recorded this xMoney transaction in an event of `kind` (any kind when null), in ONE xMoney
-   * system (D5 5h): stage and live number their transactions separately, so a live id never matches a stage row.
-   * The event's provider and environment are the charge's provider and environment (0096's foreign key on
-   * `(charge_id, payment_provider, payment_environment)`).
-   */
-  async chargeIdForTransaction(
-    transactionId: string, kind: string | null, environment: CustomerXMoneyEnvironment
-  ): Promise<string | null> {
-    const result = await this.pool.query<{ charge_id: string }>(
-      `SELECT charge_id FROM billing.charge_event
-        WHERE provider_payment_id=$1 AND ($2::text IS NULL OR kind=$2) AND payment_provider='xmoney' AND payment_environment=$3
-        ORDER BY at LIMIT 1`,
-      [transactionId, kind, environment]
-    );
-    return result.rows[0]?.charge_id ?? null;
-  }
-
-  /**
-   * A2: charges of these kinds, in this xMoney system (D5 5h), that were requested but carry no transaction and no
-   * outcome yet: one keyset page after `after`, oldest first (D6b: paged like P14a's `adoptionCandidates`, so old
-   * charges never starve fresh ones). A charge holding two or more SUBMIT_UNKNOWN events has spent A2's one extra
-   * submission and is only adopted (P14a's daily pass does that too): it is left out until its close can be due,
-   * when P11a lists it once more and closes it — a renewal's own charge (attempt 1) once the earliest instant its
-   * window can end is at or before `renewalCloseBefore` (now − Q-1's 72 hours): P2-M11, its due instant, which is the
-   * period start or the end of a notice postponement past it, never the instant the charge was made (a charge made
-   * late, after a tax outage, is closed when its hold lapses); P11a's `renewalPendingUntil` decides the exact instant.
-   * A dunning retry is listed once its latest SUBMIT_UNKNOWN is at or before `closeBefore`.
-   */
-  async openCharges(input: Readonly<{
-    environment: CustomerXMoneyEnvironment;
-    kinds: ReadonlyArray<string>;
-    after: Readonly<{ createdAt: Date; chargeId: string }> | null;
-    closeBefore: Date;
-    renewalCloseBefore: Date;
-    limit: number;
-  }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; createdAt: Date }>>> {
-    const result = await this.pool.query<{ charge_id: string; subscription_id: string; created_at: Date }>(
-      `SELECT c.charge_id, c.subscription_id, c.created_at FROM billing.charge c
-        WHERE c.payment_provider = 'xmoney' AND c.payment_environment = $1 AND c.kind = ANY($2::text[])
-          AND ($3::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($3::timestamptz, $4::text))
-          AND NOT EXISTS (SELECT 1 FROM billing.charge_event e
-                           WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUCCEEDED', 'FAILED'))
-          AND (
-            (SELECT count(*) FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') < 2
-            OR (c.attempt = 1 AND GREATEST(c.period_start, COALESCE((
-                  SELECT max(postponed.until) FROM (
-                    SELECT CASE WHEN p.data ->> 'until' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$'
-                                THEN (p.data ->> 'until')::timestamptz END AS until
-                      FROM billing.subscription_event p
-                     WHERE p.subscription_id = c.subscription_id AND p.kind = 'RENEWAL_POSTPONED'
-                  ) AS postponed WHERE postponed.until > c.period_start
-                ), c.period_start)) <= $6)
-            OR (c.attempt > 1
-                AND (SELECT max(u.at) FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') <= $5)
-          )
-        ORDER BY c.created_at, c.charge_id LIMIT $7`,
-      [
-        input.environment, [...input.kinds], input.after?.createdAt ?? null, input.after?.chargeId ?? null,
-        input.closeBefore, input.renewalCloseBefore, input.limit
-      ]
-    );
-    return result.rows.map((row) => Object.freeze({
-      chargeId: row.charge_id, subscriptionId: row.subscription_id, createdAt: row.created_at
-    }));
-  }
-
-  /**
-   * Q-1 ("a rebill outcome still unknown"): the renewals of this xMoney system whose rebill answered (SUBMITTED, at
-   * or before `submittedBefore`) and whose VERIFY_PAYMENT has not settled them (no SUCCEEDED, no FAILED), for a period
-   * that started in `(periodStartFrom, periodStartTo]`. Only a renewal's own charge (attempt 1): a dunning retry
-   * already runs on its grace. One keyset page on `(created_at, charge_id)`, like `openCharges`.
-   */
-  async unverifiedRenewals(input: Readonly<{
-    environment: CustomerXMoneyEnvironment;
-    periodStartFrom: Date;
-    periodStartTo: Date;
-    submittedBefore: Date;
-    after: Readonly<{ createdAt: Date; chargeId: string }> | null;
-    limit: number;
-  }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; periodStart: Date; createdAt: Date }>>> {
-    const result = await this.pool.query<{ charge_id: string; subscription_id: string; period_start: Date; created_at: Date }>(
-      `SELECT c.charge_id, c.subscription_id, c.period_start, c.created_at FROM billing.charge c
-        WHERE c.payment_provider = 'xmoney' AND c.payment_environment = $1 AND c.kind = 'RENEWAL' AND c.attempt = 1
-          AND c.period_start > $2 AND c.period_start <= $3
-          AND ($5::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($5::timestamptz, $6::text))
-          AND EXISTS (SELECT 1 FROM billing.charge_event s
-                       WHERE s.charge_id = c.charge_id AND s.kind = 'SUBMITTED' AND s.at <= $4)
-          AND NOT EXISTS (SELECT 1 FROM billing.charge_event e
-                           WHERE e.charge_id = c.charge_id AND e.kind IN ('SUCCEEDED', 'FAILED'))
-        ORDER BY c.created_at, c.charge_id LIMIT $7`,
-      [
-        input.environment, input.periodStartFrom, input.periodStartTo, input.submittedBefore,
-        input.after?.createdAt ?? null, input.after?.chargeId ?? null, input.limit
-      ]
-    );
-    return result.rows.map((row) => Object.freeze({
-      chargeId: row.charge_id, subscriptionId: row.subscription_id, periodStart: row.period_start, createdAt: row.created_at
-    }));
-  }
-
-  /**
    * N11 (spec §2.9.3): the charges of these kinds, in ONE payment system (provider and environment), made since
    * `createdFrom`, that hold no SUBMITTED, SUCCEEDED or FAILED yet: a call marker, a not-sent request or an unknown
-   * outcome. Unlike `openCharges` (xMoney's A2), the number of unknowns is no limit: probing and resending the same
-   * orderID is safe (NETOPIA's error 56). One keyset page on (created_at, charge_id), oldest first.
+   * outcome. The number of unknowns is no limit: probing and resending the same orderID is safe (NETOPIA's error 56).
+   * One keyset page on (created_at, charge_id), oldest first.
    */
   async openPaymentCharges(input: Readonly<{
     provider: PaymentProviderName; environment: PaymentEnvironmentName; kinds: ReadonlyArray<ChargeKind>;
@@ -497,46 +396,6 @@ export class BillingJobQueries {
   async outboxJobExists(client: PoolClient, kind: string, ref: string): Promise<boolean> {
     const result = await client.query("SELECT 1 FROM billing.outbox WHERE kind=$1 AND ref=$2 LIMIT 1", [kind, ref]);
     return result.rowCount !== null && result.rowCount > 0;
-  }
-
-  /**
-   * D7 #5: whether our own rows say a payment for this INITIAL charge may be on its way: a stored notice naming it
-   * (as `externalOrderId`) that is not `complete-failed` and whose transaction the charge has not recorded as FAILED
-   * or as CHARGEBACK (P2-N1: a first payment charged back before it was verified), or an open VERIFY_PAYMENT job
-   * for it (a notice's job names it as `external_order_id`, a rebill's as `charge_id`). A not-final attempt
-   * (`start`, `in-progress`, `3d-pending`) counts only while it is fresh: a notice with such a status only when
-   * received at or after `notFinalSince`, and a job the check last retried as PAYMENT_NOT_FINAL only when its notice
-   * (else the job itself) is that recent. A job not run yet, and any other status, always count. A
-   * notice VERIFY_PAYMENT ended MISMATCH (P2-I1: its order reference is not xMoney's, or its payer is not the
-   * checkout's customer) names nothing on its way: a notice is not authenticated, so it never holds a checkout.
-   * Read in the checkout's transaction, under the owner lock.
-   */
-  async checkoutPaymentSignals(
-    client: PoolClient, chargeId: string, environment: CustomerXMoneyEnvironment, notFinalSince: Date
-  ): Promise<boolean> {
-    const result = await client.query<{ pending: boolean }>(`
-      SELECT EXISTS (
-        SELECT 1 FROM billing.xmoney_notice AS notice
-        WHERE notice.external_order_id = $1 AND notice.xmoney_environment = $2 AND notice.status <> 'complete-failed'
-          AND (notice.status NOT IN ('start', 'in-progress', '3d-pending') OR notice.received_at >= $3)
-          AND NOT EXISTS (
-            SELECT 1 FROM billing.charge_event AS failed
-            WHERE failed.charge_id = $1 AND failed.kind IN ('FAILED', 'CHARGEBACK')
-              AND failed.provider_payment_id = notice.transaction_id
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM billing.xmoney_notice_outcome AS outcome
-            WHERE outcome.notice_id = notice.notice_id AND outcome.outcome = 'MISMATCH'
-          )
-      ) OR EXISTS (
-        SELECT 1 FROM billing.outbox AS job
-        LEFT JOIN billing.xmoney_notice AS origin ON origin.notice_id::text = job.payload->>'notice_id'
-        WHERE job.kind = 'VERIFY_PAYMENT' AND job.done_at IS NULL AND job.dead_at IS NULL
-          AND (job.payload->>'external_order_id' = $1 OR job.payload->>'charge_id' = $1)
-          AND (job.last_error_code IS DISTINCT FROM 'PAYMENT_NOT_FINAL' OR COALESCE(origin.received_at, job.created_at) >= $3)
-      ) AS pending
-    `, [chargeId, environment, notFinalSince]);
-    return result.rows[0]?.pending === true;
   }
 
   /**

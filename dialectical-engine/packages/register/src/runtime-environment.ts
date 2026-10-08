@@ -241,7 +241,7 @@ export function loadDevelopmentCommandEnvironment(): Readonly<Record<string, str
     DEBATEAI_DEV_SYNTHESIZER_ROLE_REF: z.string().min(1).optional(),
     DEBATEAI_DEV_EVALUATOR_ROLE_REF: z.string().min(1).optional(),
     DEBATEAI_DEV_SUPPORT_MODEL_TARGET_JSON: z.string().min(1).optional(),
-    // Paid plans (P6b): "1" makes dev:auth:up start the fake xMoney, Quaderno and SmartBill servers.
+    // Paid plans (P6b, N24): "1" makes dev:auth:up start the fake NETOPIA, Quaderno and SmartBill servers.
     DEBATEAI_BILLING_FAKES: z.enum(["0", "1"]).optional(),
     NODE_ENV: z.enum(["development", "test", "production"]).optional()
   });
@@ -337,13 +337,13 @@ export function loadBillingOperatorEnvironment() {
 }
 
 /**
- * Paid plans P2-I4 (D5 5h): `pnpm billing:withdraw` also reads `XMONEY_API_BASE_URL` from the API's EnvironmentFile,
- * the one source of the xMoney system the API's outbox refunds in (A22), so it refuses a plan of the other system.
- * Required: without it the command cannot tell the systems apart and refuses to start.
+ * Paid plans P2-I4 (D5 5h), NETOPIA spec 2026-10-05 §2.17.1: `pnpm billing:withdraw` also reads `NETOPIA_API_BASE_URL`
+ * from the API's EnvironmentFile, the one source of the payment system the API's outbox refunds in, so it refuses a
+ * plan of another system. Required: without it the command cannot tell the systems apart and refuses to start.
  */
 export function parseBillingWithdrawEnvironment(source: EnvironmentSource) {
   return withProductionFloors(parseEnvironmentSource({
-    ...billingOperatorShape, XMONEY_API_BASE_URL: z.string().url()
+    ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url()
   }, source));
 }
 
@@ -352,13 +352,14 @@ export function loadBillingWithdrawEnvironment() {
 }
 
 /**
- * Paid plans W12 (P2-I17): `pnpm billing:invoice` reads, from the API's EnvironmentFile, `XMONEY_API_BASE_URL` (the
- * xMoney system the API's invoicers follow, P2-I4: it refuses a charge of the other system) and `PUBLIC_APP_URL` (the
- * origin a recorded Quaderno receipt's M2 links to when it carries no Quaderno link, R-7). Both required.
+ * Paid plans W12 (P2-I17), NETOPIA spec 2026-10-05 §2.17.1: `pnpm billing:invoice` reads, from the API's
+ * EnvironmentFile, `NETOPIA_API_BASE_URL` (the payment system the API's invoicers follow: it refuses a charge of
+ * another system) and `PUBLIC_APP_URL` (the origin a recorded Quaderno receipt's M2 links to when it carries no
+ * Quaderno link, R-7). Both required.
  */
 export function parseBillingInvoiceEnvironment(source: EnvironmentSource) {
   return withProductionFloors(parseEnvironmentSource({
-    ...billingOperatorShape, XMONEY_API_BASE_URL: z.string().url(),
+    ...billingOperatorShape, NETOPIA_API_BASE_URL: z.string().url(),
     PUBLIC_APP_URL: z.string().url().refine((value) => value.startsWith("https://"))
   }, source));
 }
@@ -472,15 +473,10 @@ const apiEnvironmentShape = {
     NETOPIA_POS_SIGNATURE: z.string().min(1).optional(),
     NETOPIA_API_KEY_PATH: z.string().min(1).optional(),
     NETOPIA_IPN_KEYS_PATH: z.string().min(1).optional(),
-    // Until N23: xMoney's settings are still accepted (and read, when set) while the flows switch one by one.
-    XMONEY_PRIVATE_KEY_PATH: z.string().min(1).optional(),
-    XMONEY_PUBLIC_KEY: z.string().min(1).optional(),
-    XMONEY_SITE_ID: z.string().min(1).optional(),
-    XMONEY_API_BASE_URL: z.string().url().optional(),
     /**
      * OWNER-RUN sandbox only (spec 2026-10-05 §2.3, README §14.9): whole days added to the billing jobs' clock.
-     * Absent in every real deployment; `billingClock` refuses it unless NETOPIA_API_BASE_URL is a NETOPIA sandbox base
-     * (and any xMoney setting still present names xMoney's stage API).
+     * Absent in every real deployment; `billingClock` refuses it unless NETOPIA_API_BASE_URL is one of NETOPIA's
+     * sandbox bases.
      */
     BILLING_STAGE_CLOCK_OFFSET_DAYS: z.coerce.number().int().min(1).max(400).optional(),
     QUADERNO_API_KEY_PATH: z.string().min(1).optional(),
@@ -663,11 +659,23 @@ export const NETOPIA_ENVIRONMENT_KEYS = Object.freeze([
 ] as const);
 export type NetopiaEnvironmentKey = typeof NETOPIA_ENVIRONMENT_KEYS[number];
 
-/** Until N23: xMoney's four settings, still accepted while the flows switch to NETOPIA one by one. */
-export const XMONEY_ENVIRONMENT_KEYS = Object.freeze([
+/**
+ * NETOPIA spec 2026-10-05 §2.17.1: the API settings of the previous card processor are removed from the shape, so a
+ * boot ignores them. A boot that still finds one names it once (main.ts), never its value, and starts normally.
+ */
+export const RETIRED_BILLING_SETTINGS = Object.freeze([
   "XMONEY_PRIVATE_KEY_PATH", "XMONEY_PUBLIC_KEY", "XMONEY_SITE_ID", "XMONEY_API_BASE_URL"
 ] as const);
-export type XMoneyEnvironmentKey = typeof XMONEY_ENVIRONMENT_KEYS[number];
+export type RetiredBillingSetting = typeof RETIRED_BILLING_SETTINGS[number];
+
+/** The removed settings that are set in `source`, in the list's order; an empty value counts as set. */
+export function retiredBillingSettingsIn(source: EnvironmentSource): ReadonlyArray<RetiredBillingSetting> {
+  return Object.freeze(RETIRED_BILLING_SETTINGS.filter((key) => source[key] !== undefined));
+}
+
+export function loadRetiredBillingSettings(): ReadonlyArray<RetiredBillingSetting> {
+  return retiredBillingSettingsIn(process.env);
+}
 
 /** Paid plans: the ten keys of the billing group, in the order a missing one is reported. */
 export const BILLING_ENVIRONMENT_KEYS = Object.freeze([
@@ -689,22 +697,14 @@ export type NetopiaEnvironmentGroup = Readonly<{
   publicAppUrl: string;
 }>;
 
-export type XMoneyEnvironmentGroup = Readonly<{
-  xmoneyPrivateKeyPath: string; xmoneyPublicKey: string; xmoneySiteId: string; xmoneyApiBaseUrl: string;
-}>;
-
 export type BillingEnvironmentGroup = NetopiaEnvironmentGroup & Readonly<{
   quadernoApiKeyPath: string; quadernoApiBaseUrl: string;
   smartbillCredentialsPath: string; smartbillApiBaseUrl: string; smartbillSeries: string;
   ownerReportEmailPath: string;
-  /** Until N23: xMoney's settings when all four are set; null when none is. */
-  xmoney: XMoneyEnvironmentGroup | null;
 }>;
 
-type GroupKey = BillingEnvironmentKey | XMoneyEnvironmentKey;
+type GroupKey = BillingEnvironmentKey;
 type GroupSource = Readonly<Partial<Record<GroupKey, string | undefined>>> & Readonly<{ PUBLIC_APP_URL: string }>;
-
-const XMONEY_API_HOSTS: ReadonlySet<string> = new Set(["api.xmoney.com", "api-stage.xmoney.com"]);
 
 function billingInvalid(key: GroupKey): never {
   throw new TypeError(`BILLING_CONFIGURATION_INVALID:${key}`);
@@ -751,24 +751,6 @@ export function readNetopiaEnvironmentGroup(environment: GroupSource): NetopiaEn
   });
 }
 
-/** Until N23: null when no xMoney key is set; all four when any is (the checks of before). */
-export function readXMoneyEnvironmentGroup(environment: GroupSource): XMoneyEnvironmentGroup | null {
-  if (XMONEY_ENVIRONMENT_KEYS.every((key) => presentValue(environment, key) === null)) return null;
-  const values = Object.fromEntries(XMONEY_ENVIRONMENT_KEYS.map((key) => [key, requiredValue(environment, key)])) as
-    Record<XMoneyEnvironmentKey, string>;
-  if (!XMONEY_API_HOSTS.has(httpsBillingUrl(values.XMONEY_API_BASE_URL, "XMONEY_API_BASE_URL").hostname)) {
-    billingInvalid("XMONEY_API_BASE_URL");
-  }
-  if (!/^[0-9]{1,12}$/u.test(values.XMONEY_SITE_ID)) billingInvalid("XMONEY_SITE_ID");
-  if (!/^[\x21-\x7e]{8,256}$/u.test(values.XMONEY_PUBLIC_KEY)) billingInvalid("XMONEY_PUBLIC_KEY");
-  return Object.freeze({
-    xmoneyPrivateKeyPath: values.XMONEY_PRIVATE_KEY_PATH,
-    xmoneyPublicKey: values.XMONEY_PUBLIC_KEY,
-    xmoneySiteId: values.XMONEY_SITE_ID,
-    xmoneyApiBaseUrl: trimSlashes(values.XMONEY_API_BASE_URL)
-  });
-}
-
 /**
  * A22: called by the API boot ONLY when hosted and the billingPolicy row in force says enabled.
  * BILLING_CONFIGURATION_INCOMPLETE:<KEY> names the first missing key; BILLING_CONFIGURATION_INVALID:<KEY>
@@ -794,8 +776,7 @@ export function readBillingEnvironmentGroup(environment: GroupSource): BillingEn
     smartbillCredentialsPath,
     smartbillApiBaseUrl: trimSlashes(smartbillApiBaseUrl),
     smartbillSeries,
-    ownerReportEmailPath,
-    xmoney: readXMoneyEnvironmentGroup(environment)
+    ownerReportEmailPath
   });
 }
 

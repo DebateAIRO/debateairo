@@ -2,8 +2,8 @@
 
 /**
  * JSON.parse keeping every number as its exact SOURCE TEXT (the reviver's `context.source`), so "24.20" reaches the money
- * parser as written and an ntpID never loses digits; a runtime without the source throws instead of rounding (the rule of
- * packages/payments-xmoney/src/json.ts, which N23 removes).
+ * parser as written and an ntpID never loses digits; a runtime without the source throws instead of rounding (the rule
+ * the first card processor's package followed, and tax-quaderno's reader follows).
  */
 export function parseJsonKeepingNumberText(text: string): unknown {
   return JSON.parse(text, (_key: string, value: unknown, context?: { source?: string }) => {

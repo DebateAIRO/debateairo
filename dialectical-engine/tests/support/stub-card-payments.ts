@@ -1,6 +1,5 @@
 // tests/support/stub-card-payments.ts
-// The NETOPIA counterpart of StubXMoney (tests/support/billingHarness.ts:83): a port-level stub of CardPayments (spec
-// 2026-10-05 §2.3) for the flow suites. What it answers is scripted per order; every call is recorded.
+// A port-level stub of CardPayments (spec 2026-10-05 §2.3) for the flow suites. What it answers is scripted per order; every call is recorded.
 import type {
   CardPayments, HostedPaymentStart, HostedPaymentStarted, PaymentEnvironment, PaymentReport, PaymentState, SavedCardCharge
 } from "@debateai/billing-core";

@@ -106,28 +106,27 @@ describe("P22 the Billing runbook", () => {
       // §14.8 (W13, P2-I18): the brief's eight signals and the listing line are in the journal table, each with what to
       // do; the three daily listings fail on their own; a CUSTOMER_MISMATCH reaches the operator with the hand refund.
       "What billing writes to the API's journal",
-      "| `\"event\":\"billing.reconcile.listing_failed\"`, with `listing` and `code` |",
       "| `[BILLING_RECONCILIATION_PENDING]` (a bare marker) |", "| `[BILLING_OUTBOX_PENDING]` (a bare marker) |",
       "| `[BILLING_ERASURE_SWEEP_PENDING]` (a bare marker) |", "| `[BILLING_OWNER_JOBS_PENDING]` (a bare marker) |",
       "| `\"event\":\"billing.outbox.dead\"`, with `kind`, `code` and `attempts` |",
       "| `\"event\":\"billing.outbox.alert_failed\"`, with `kind` and `code` |",
       "| `\"event\":\"billing.outbox.settle_failed\"`, with `kind`, `outcome` and `attempts` |",
-      "| `\"event\":\"billing.xmoney.credentials_refused\"`, with `operation` |",
+      "| `\"event\":\"billing.payment.credentials_refused\"`, with `operation` |",
       // P2-M27: a quote the tax service refuses is its own signal (a wrong Quaderno key), never read as an outage.
       "| `\"event\":\"billing.quote.refused\"`, with `code` `TAX_SERVICE_REFUSED` and `reason` |",
       "| `\"event\":\"billing.invoice.unknown\"`, with `issuer`, `kind` and `code` |",
       "| `\"event\":\"billing.payment.mismatch\"`, with `code` or `chargeKind` |",
-      "this one is asked again on its own every hour", "A list xMoney refuses never causes it",
+      "A list xMoney refuses never causes it",
       // P4-H (the P4-B judge's forward, progress.md: P2-W4): REFUND_CHARGE_MISSING is backed by no record either.
       "`REFUND_NOT_REQUESTED`, `REFUND_CHARGE_MISSING` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note",
       "`OTHER_XMONEY_SYSTEM`, whatever the kind (a `RENEWAL_NOTICE` too): nothing to do on this host",
       "WHERE o.outcome = 'MISMATCH'", "refund it there by hand",
       // W13 fix round 1: the alert promise is exact (O3 never for a dead O3; O2 comes from the refund itself, not for
-      // REFUND_PAYLOAD_INVALID or a refund the queue stopped), a refused key keeps a renewal only for its window, any
-      // other listing code is reported, and only this host's xMoney system's mismatches are acted on.
+      // REFUND_PAYLOAD_INVALID or a refund the queue stopped), a refused key keeps a renewal only for its window, and
+      // only this host's xMoney system's mismatches are acted on (N23 removed the listing row and its code needle).
       "except when the email that died is O3 itself", "(`REFUND_PAYLOAD_INVALID`)", "usually `OUTBOX_HANDLER_FAILED`",
       "lists every dead refund job whatever its code", "for up to 3 days past its due time (a payment retry: 24 hours)",
-      "Fixing the key within that time", "Any other code (for example `UNKNOWN`",
+      "Fixing the key within that time",
       "SELECT n.received_at, n.xmoney_environment,", "Act only on rows of this host's xMoney system",
       // §14.8 (ruling Q-5): a refund that could not be completed reaches the owner at once.
       "A refund that could not be completed", "O2",
@@ -247,20 +246,21 @@ describe("P22 the Billing runbook", () => {
     // Each line that asks the owner to act (part4-scope.md §4.3, the open-items row "P2-I18 (X0)" and the W13
     // re-review's additions) is a row of its own, never only the routine sentence.
     for (const alarm of [
-      "billing.notice.undecryptable", "billing.mail.attachment_missing", "billing.renewal.stuck",
+      "billing.mail.attachment_missing", "billing.renewal.stuck",
       "billing.renewal.price_missing", "billing.renewal.history_invalid", "billing.maintenance.report",
-      "billing.reconcile.errors", "billing.reconcile.expired", "billing.reconcile.rows_rejected", "billing.refund.dead",
-      "billing.refund.unrecorded", "billing.xmoney.row_rejected", "billing.outbox.other_system",
+      "billing.reconcile.errors", "billing.reconcile.expired", "billing.refund.dead", "billing.outbox.other_system",
       "billing.refund.outcome_unknown", "billing.refund.refused", "billing.renewal.owner_stopped",
-      "billing.renewal.dunning_unpriced", "billing.reconcile.no_transaction", "billing.cancel_link.failed",
+      "billing.renewal.dunning_unpriced", "billing.cancel_link.failed",
       "billing.renewal.tax_refused", "billing.renewal.unknown", "billing.renewal.pending", "billing.chargeback",
       "billing.withdrawal.owner_review",
       // W13's rows, kept.
-      "billing.renewal.report", "billing.reconcile.listing_failed", "billing.outbox.dead", "billing.outbox.alert_failed",
-      "billing.outbox.settle_failed", "billing.xmoney.credentials_refused", "billing.quote.refused",
+      "billing.renewal.report", "billing.outbox.dead", "billing.outbox.alert_failed",
+      "billing.outbox.settle_failed", "billing.payment.credentials_refused", "billing.quote.refused",
       "billing.invoice.unknown", "billing.payment.mismatch",
       // P4-H fix round 1 (finding 4): a renewal REBILL_REFUSED on more than one renewal is reported at once.
-      "billing.payment.failed"
+      "billing.payment.failed",
+      // N23: a setting of the previous card processor left in api.env, and an answer of NETOPIA's the site cannot read.
+      "billing.setting.retired", "billing.payment.answer_rejected"
     ]) {
       expect(rowEvents, alarm).toContain(alarm);
     }
@@ -305,7 +305,6 @@ describe("P22 the Billing runbook", () => {
       "every renewal falls into the failed-payment path", "`NO_TRANSACTION`: the `billing.renewal.stuck` row"]) {
       expect(failedDo, needle).toContain(needle);
     }
-    expect(read("packages/payments-xmoney/src/client.ts")).toContain("throw new TypedDomainError(\"XMONEY_REFUSED\"");
 
     // The rows the brief's sources ask for, word for word where the action matters.
     for (const needle of [
@@ -313,8 +312,6 @@ describe("P22 the Billing runbook", () => {
       "or a renewal notice (`RENEWAL_NOTICE`) of a plan of the other system",
       // The daily dead-refund count holds jobs that owe nothing; the summary's code says which.
       "Not every one is owed", "the summary's own names",
-      // A notice the key cannot open is answered 200 and never stored, so its payment waits for the daily check.
-      "this host's xMoney private key cannot decrypt",
       // The erasure stop that failed at scheduling is repeated by the sweep.
       "the sweep in front of the money check",
       "The page had already said a link is on its way"
@@ -459,9 +456,7 @@ describe("P22 the Billing runbook", () => {
     expect(amountBullet).toContain(C6);
     // The re-review's M-7: a payment refunded before its plan started owes no document, so no command clears its line.
     expect(amountBullet).toContain("A `REFUNDED_BEFORE_START` line (a payment xMoney refunded before its plan started) needs no command: no invoice or credit note is owed, and `--record` refuses such a charge");
-    const unrecorded = billing.split("\n").find((line) => line.startsWith("| `\"event\":\"billing.refund.unrecorded\"`")) ?? "";
-    expect(unrecorded).toContain("take it off that country's net sales and tax by hand");
-    expect(unrecorded.replace(/\s+/gu, " ")).toContain(C6);
+    // N23: the billing.refund.unrecorded row left with the previous card processor's notices, its only writer.
     // C-9: a paused plan its person cancelled lists as CANCEL_REQUESTED and still waits; a won dispute's limit.
     const disputes = between("**Disputes (chargebacks).**", "**A withdrawal sent by email or on the model form.**");
     for (const needle of [
@@ -532,7 +527,8 @@ describe("P22 the Billing runbook", () => {
 
   it("names the same custody files as the API's example environment (P6a)", () => {
     const example = read("deploy/vps/env/api.env.example");
-    for (const file of ["xmoney-private-key", "quaderno-api-key", "smartbill-credentials", "owner-report-email"]) {
+    // N23 removed the previous card processor's key file from the example; N25 adds NETOPIA's to §14.
+    for (const file of ["quaderno-api-key", "smartbill-credentials", "owner-report-email"]) {
       const path = `/etc/debateai/api/billing/${file}`;
       expect(example, path).toContain(path);
       expect(billing, path).toContain(path);

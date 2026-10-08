@@ -10,8 +10,8 @@ const NOW = new Date("2026-11-02T10:00:00.000Z");
 /** A checkout started an hour ago: the visit folds it and has nothing to do (not yet abandoned). */
 const fresh = (subscriptionId: string): SubscriptionEvent[] => [{
   eventId: `${subscriptionId}-created`, subscriptionId, ownerRef: "o", kind: "CREATED", at: new Date(NOW.getTime() - 3_600_000),
-  planId: "PLUS", periodAnchorAt: null, xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null, cardTokenId: null,
-  data: { xmoney_environment: "stage" }
+  planId: "PLUS", periodAnchorAt: null, cardTokenId: null,
+  data: { payment_provider: "netopia", payment_environment: "sandbox" }
 } as SubscriptionEvent];
 
 function pass(ids: string[], subscriptionEvents: (subscriptionId: string) => Promise<SubscriptionEvent[]>) {
@@ -22,7 +22,7 @@ function pass(ids: string[], subscriptionEvents: (subscriptionId: string) => Pro
     jobs: { liveSubscriptionIds, lockOwner: vi.fn(), withSubscriptionLease: vi.fn(), outboxJobExists: vi.fn() } as unknown as MaintenanceDeps["jobs"],
     entitlements: { append: vi.fn() },
     renewal: {} as MaintenanceDeps["renewal"],
-    policy: testBillingPolicy, publicAppUrl: "https://dezbatere.test", xmoneyEnvironment: "stage", audit, clock: () => NOW
+    policy: testBillingPolicy, publicAppUrl: "https://dezbatere.test", paymentEnvironment: "sandbox", audit, clock: () => NOW
   });
   return { maintenance, audit };
 }

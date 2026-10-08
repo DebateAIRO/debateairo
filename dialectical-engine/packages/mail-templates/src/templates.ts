@@ -84,7 +84,7 @@ export const RESERVED_MAIL_PARAMS = Object.freeze(["merchantName", "merchantAddr
 const define = (template: MailTemplateDefinition): MailTemplateDefinition => Object.freeze(template);
 /**
  * W10 (P2-I21): `bankDeclined` is "true" only for a charge the bank declined (PAYMENT_DECLINED); every other failed
- * attempt (an outage past Q-1's 72 hours, our refused key, an unknown outcome, xMoney's own refusal, a tax service
+ * attempt (an outage past Q-1's 72 hours, our refused key, an unknown outcome, NETOPIA's own refusal, a tax service
  * that stayed down, a retry whose total changed) asked no bank, so its email never says one refused.
  * N11 (spec §2.9.2): the optional flag `confirmCard` is "true" for AUTHENTICATION_REQUIRED (the bank asked for its
  * security check on a renewal nobody was present to finish): its sentence replaces the bank's refusal. An M5 queued
@@ -240,12 +240,12 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   // Ruling Q-5: RefundDesk's dead-letter path (P9b) sends this to the owner at once. Our charge id, the amount and
   // the dead job's code; never a customer's name, email or card. P2-I5: a job the charge records no request for
   // (REFUND_NOT_REQUESTED, notRequested "true") moved no money and is no refund to make, so it says that instead:
-  // nothing went to xMoney, the amount is only the job's, and whoever runs the server checks the charge's requests.
+  // nothing went to NETOPIA, the amount is only the job's, and whoever runs the server checks the charge's requests.
   // W9 (P2-M8): a real refund's O2 also names what the refund was for (`refundReason`, the intent's reason) and, for a
   // withdrawal's, its legal deadline and how to refund by hand so that M8 still follows (`refundDeadline`). Both are
   // optional, so an O2 queued before them renders as it did; RefundDesk sends neither for REFUND_NOT_REQUESTED.
-  // P2-W4: REFUND_CHARGE_MISSING also takes the not-requested sentences (notRequested "true"). A job of the other
-  // xMoney system (OTHER_XMONEY_SYSTEM, the optional flag `otherSystem` "true") says nothing was sent and nothing is
+  // P2-W4: REFUND_CHARGE_MISSING also takes the not-requested sentences (notRequested "true"). A job of another
+  // payment system (OTHER_PAYMENT_SYSTEM, the optional flag `otherSystem` "true") says nothing was sent and nothing is
   // owed on this server, with no deadline; notRequested wins if both were ever set. Left out, it changes nothing.
   O2: define({
     catalogue: "owner", subject: "owner.O2.subject",

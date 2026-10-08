@@ -4,7 +4,7 @@
  *   pnpm billing:tax-summary --quarter 2026-Q4
  *
  * On the host it runs under `systemd-run` with the API's EnvironmentFile, on a read-only one-connection pool as the
- * API's own principal (P14b). It is built from our own rows of the live xMoney system, so it does not depend on any
+ * API's own principal (P14b). It is built from our own rows of the live payment system, so it does not depend on any
  * vendor being up.
  */
 import { pathToFileURL } from "node:url";

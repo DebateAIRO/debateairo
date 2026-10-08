@@ -351,7 +351,7 @@ export function SubscriptionControls({
               ? <a className="setBtn" href="/settings/card">{t(catalog, "billing.subscription.updateCard")}</a>
               : null}
             {/* C-15: Undo only where the server says the revoke route would accept it (`can_revoke_cancel`): never for
-                a plan of the other xMoney system, whose cancel stands. After the period end the server refuses the undo
+                a plan of another payment system, whose cancel stands. After the period end the server refuses the undo
                 (NOT_SUBSCRIBED) and the sweep ends the plan: offer neither (the page's own clock hides it too, for a
                 view read just before the end). While SUSPENDED it refuses the undo too, whatever wrote the cancel
                 (P2-W10, the W7 review's item 3); a won dispute resumes the plan, and the undo comes back until the

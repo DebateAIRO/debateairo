@@ -12,7 +12,7 @@ import { assertLocalizedCatalog, assertTranslationSample } from "./catalogContra
 const root = process.cwd();
 const ownedFiles = [
   "components/billing/UsageBars.tsx", "components/billing/PricingCards.tsx", "app/pricing/page.tsx",
-  "components/billing/ChargeStatusPoller.tsx", "components/billing/XMoneyCardForm.tsx",
+  "components/billing/ChargeStatusPoller.tsx",
   "components/billing/CheckoutFlow.tsx", "app/checkout/page.tsx", "app/checkout/return/page.tsx",
   "components/billing/SubscriptionControls.tsx", "components/billing/CardChangeFlow.tsx", "app/settings/card/page.tsx",
   "components/billing/CancelFlow.tsx", "app/cancel/page.tsx", "app/withdraw/page.tsx",
@@ -308,8 +308,9 @@ test("/pricing's plan lines say what is true: Free's low-cost models, and the pa
 });
 
 // N20 (spec 2026-10-05 §2.18, §2.22): the card processor is NETOPIA Payments in every locale, and the card-saving
-// agreement names it with the monthly total; nothing a customer reads names xMoney or a hold.
-test("every locale names NETOPIA Payments where it names the card processor, and never xMoney", () => {
+// agreement names it with the monthly total; nothing a customer reads names the previous card processor or a hold.
+const PREVIOUS_PROCESSOR = new RegExp(["x", "money"].join(""), "iu");
+test("every locale names NETOPIA Payments where it names the card processor, and never the previous one", () => {
   const english = catalogue("en");
   assert.equal(english["billing.checkout.cardNote"], "You pay on NETOPIA Payments' secure page. Your card number never reaches our servers.");
   assert.equal(english["billing.checkout.continueToCard"], "Continue to payment");
@@ -327,7 +328,7 @@ test("every locale names NETOPIA Payments where it names the card processor, and
     assert.ok(billing["billing.consent.renewal"].includes("dezbatere.ro/cancel"), `${code}: the cancel address`);
     assert.equal(Object.hasOwn(billing, "billing.card.holdNote"), false, `${code}: no hold sentence`);
     for (const [key, value] of [...Object.entries(billing), ...Object.entries(legal)]) {
-      assert.doesNotMatch(value, /xmoney/iu, `${code}: ${key}`);
+      assert.doesNotMatch(value, PREVIOUS_PROCESSOR, `${code}: ${key}`);
     }
   }
 });

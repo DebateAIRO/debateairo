@@ -20,13 +20,17 @@ export type OutboxKind =
   | "VERIFY_PAYMENT" | "QUADERNO_RECORD_SALE" | "QUADERNO_RECORD_REFUND" | "SMARTBILL_INVOICE"
   | "SMARTBILL_STORNO" | "EMAIL" | "RENEWAL_NOTICE" | "OWNER_TAX_SUMMARY"
   // R-30: the durable refund executor (P9b/P12d) and the yearly retention purge (P16c). Spec 2026-10-05 §2.12.1:
-  // RefundDesk's job becomes PAYMENT_REFUND; XMONEY_REFUND stays for old rows only (0096's CHECK keeps both).
+  // RefundDesk's job is PAYMENT_REFUND; the previous card processor's refund kind stays for old rows only (0096's
+  // CHECK keeps both; RETIRED_OUTBOX_KINDS below).
   | "XMONEY_REFUND" | "RETENTION_PURGE" | "PAYMENT_REFUND";
-/** R-14: an xMoney customer lives in one environment; the connectors' `xmoneyEnvironment` names it. */
-export type CustomerXMoneyEnvironment = "stage" | "live";
-/** Spec 2026-10-05 §2.5.1: the provider a charge row is paid with (xMoney rows are inert history, §2.5.4). */
+/**
+ * NETOPIA spec 2026-10-05 §2.5.4: the kinds only the previous card processor's flows queued. 0087's CHECK keeps them
+ * for old rows and no flow queues one now; each ends DEAD OTHER_PAYMENT_SYSTEM (apps/api/src/billing/retired-jobs.ts).
+ */
+export const RETIRED_OUTBOX_KINDS: ReadonlyArray<OutboxKind> = Object.freeze(["XMONEY_REFUND"]);
+/** Spec 2026-10-05 §2.5.1: the provider a charge row is paid with (the previous card processor's rows are inert history, §2.5.4). */
 export type PaymentProviderName = "xmoney" | "netopia";
-/** xMoney's systems were stage and live; NETOPIA's are sandbox and live (0096's paired CHECK). */
+/** The previous card processor's systems were stage and live; NETOPIA's are sandbox and live (0096's paired CHECK). */
 export type PaymentEnvironmentName = "stage" | "sandbox" | "live";
 export type ChargeKind = "INITIAL" | "RENEWAL" | "UPGRADE" | "CARD_CHECK";
 export type ChargeEventKind =
@@ -59,11 +63,11 @@ export type ChargeRow = Readonly<{
 }>;
 export type ChargeEventRow = Readonly<{
   eventId: string; chargeId: string; kind: ChargeEventKind; at: Date;
-  /** The provider's payment id (xMoney's transaction id, NETOPIA's ntpID), when the row names a payment. */
+  /** The provider's payment id (NETOPIA's ntpID; an old row's own processor's id), when the row names a payment. */
   providerPaymentId: string | null; amountMicros: number | null; errorCode: string | null;
   paymentProvider: PaymentProviderName;
   paymentEnvironment: PaymentEnvironmentName;
-  /** REFUND_REQUESTED/REFUNDED only, xMoney rows only: the PAID transaction refunded, when it is not the row's own. */
+  /** REFUND_REQUESTED/REFUNDED only, old rows only (0096 refuses it on a NETOPIA row): the payment refunded, when not the row's own. */
   refundsTransactionId: string | null;
 }>;
 /**
@@ -94,12 +98,6 @@ export type InvoiceRow = Readonly<{
   invoiceId: string; chargeId: string; issuer: InvoiceIssuerName; kind: InvoiceKind; externalRef: string;
   series: string | null; number: string; url: string | null; totalMicros: number; at: Date;
 }>;
-export type NoticeRow = Readonly<{
-  noticeId: string; receivedAt: Date; payloadSha256: string; transactionId: string; orderId: string;
-  externalOrderId: string | null; status: string;
-  /** The xMoney system whose key decrypted the notice (connectors.xmoneyEnvironment). */
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
-}>;
 export type OutboxJob = Readonly<{
   jobId: string; kind: OutboxKind; ref: string; payload: OutboxPayload; createdAt: Date; notBefore: Date;
   attempts: number; claimedBy: string | null; claimedAt: Date | null;
@@ -109,15 +107,15 @@ export type OutboxJob = Readonly<{
  * charge total), one REFUND per REFUNDED event (`amountMicros` = the refunded amount), one CHARGEBACK per CHARGEBACK
  * event whose own transaction has no CHARGEBACK_RESOLVED (`amountMicros` = the event's amount, else the charge total). Only
  * charges of the payment system `quarterSummaryRows` is asked for: a sandbox payment is never a sale. `at` is when
- * xMoney says the money moved (the event's `provider_created_at`, present only on a SUCCEEDED or on a REFUNDED that is
- * its own refund transaction), else when it was recorded — so a refund or charge-back of the payment itself is dated
+ * NETOPIA says the money moved (the event's `provider_created_at`, present only on a SUCCEEDED, or on an old row of a
+ * separate refund transaction), else when it was recorded — so a refund or charge-back of the payment itself is dated
  * when it was recorded, never by the payment's date. Tax fields come from the charge's quote, money fields from the
  * charge, the verdict from its location evidence (null when none). `amountKnown` is false on exactly one shape: a
- * REFUND that D6a's P9c recorded for a refund made in the xMoney dashboard on the payment itself (error code
- * `PROVIDER_REFUND`, no `refunds_transaction_id`), because xMoney's read named no amount and P9c wrote what was left
+ * REFUND that D6a's P9c recorded for a refund made in NETOPIA's admin on the payment itself (error code
+ * `PROVIDER_REFUND`, no `refunds_transaction_id`), because NETOPIA's status named no amount and P9c wrote what was left
  * of the charge, an upper bound — P16b lists such a row instead of subtracting it — until the owner records its credit
  * note (P4-K, P2-W12: `pnpm billing:invoice --record --amount`): the row then carries the credit note's amount and is
- * known. Every other row is true, a `PROVIDER_REFUND` on xMoney's own refund transaction and a `PROVIDER_VOID` included.
+ * known. Every other row is true, a `PROVIDER_VOID` included.
  * `saleRecorded` (Part 4 final review C-19) says whether the charge holds a SUCCEEDED, in any quarter: always true for a
  * SALE; false for a charge-back of a payment we never verified (a checkout charged back before its plan started), for
  * which no sale was ever counted.
@@ -218,8 +216,8 @@ function refundRefusal(error: unknown): boolean {
 
 type SubscriptionEventRaw = {
   event_id: string; seq: string; subscription_id: string; owner_ref: string; kind: SubscriptionEventKind; at: Date;
-  plan_id: PlanId; period_anchor_at: Date | null; xmoney_order_id: string | null; xmoney_customer_id: string | null;
-  card_ref: string | null; card_token_id: string | null; data: Record<string, string | number | boolean | null>;
+  plan_id: PlanId; period_anchor_at: Date | null; card_token_id: string | null;
+  data: Record<string, string | number | boolean | null>;
 };
 type ChargeRaw = {
   charge_id: string; owner_ref: string; subscription_id: string; kind: ChargeKind; attempt: number;
@@ -248,8 +246,7 @@ type InvoiceRaw = {
 };
 
 const SUBSCRIPTION_EVENT_COLUMNS = `event.event_id, event.seq, event.subscription_id, event.owner_ref, event.kind,
-  event.at, event.plan_id, event.period_anchor_at, event.xmoney_order_id, event.xmoney_customer_id, event.card_ref,
-  event.card_token_id, event.data`;
+  event.at, event.plan_id, event.period_anchor_at, event.card_token_id, event.data`;
 const CHARGE_COLUMNS = `charge.charge_id, charge.owner_ref, charge.subscription_id, charge.kind, charge.attempt,
   charge.period_start, charge.period_end, charge.quote_id, charge.net_micros, charge.tax_micros, charge.total_micros,
   charge.currency, charge.created_at, charge.payment_provider, charge.payment_environment`;
@@ -257,8 +254,7 @@ const CHARGE_COLUMNS = `charge.charge_id, charge.owner_ref, charge.subscription_
 function toSubscriptionEvent(row: SubscriptionEventRaw): SubscriptionEvent {
   return Object.freeze({
     eventId: row.event_id, subscriptionId: row.subscription_id, ownerRef: row.owner_ref, kind: row.kind, at: row.at,
-    planId: row.plan_id, periodAnchorAt: row.period_anchor_at, xmoneyOrderId: row.xmoney_order_id,
-    xmoneyCustomerId: row.xmoney_customer_id, cardRef: row.card_ref, cardTokenId: row.card_token_id,
+    planId: row.plan_id, periodAnchorAt: row.period_anchor_at, cardTokenId: row.card_token_id,
     data: Object.freeze({ ...row.data })
   });
 }
@@ -467,7 +463,7 @@ export class BillingRepository {
 
   /**
    * P14c: the owner's settlement of a withdrawal handed to the owner, in the caller's transaction (with the refund
-   * intents): what the owner refunded in the xMoney dashboard for it. Once per withdrawal (P12a's primary key).
+   * intents): what the owner refunded in NETOPIA's admin for it. Once per withdrawal (P12a's primary key).
    */
   async recordWithdrawalOwnerSettlement(client: PoolClient, input: Readonly<{
     subscriptionId: string; withdrawnEventId: string; ownerRef: string; dashboardRefundMicros: number; settledAt: Date;
@@ -492,37 +488,21 @@ export class BillingRepository {
   }
 
   /**
-   * The one customer row per owner, and the xMoney customer linked in `environment` — `null` when that environment
-   * has none yet (a fresh start, or the first live checkout after stage), so the caller creates one there (R-14).
-   * `environment` null (NETOPIA, spec 2026-10-05 §2.6.2 step 2: no customer object there) reads no link; N23 removes it.
+   * The one customer row per owner (R-14), created on first use. NETOPIA keeps no customer object (spec 2026-10-05
+   * §2.6.2 step 2): 0085's table of the previous card processor's customer links stays for old rows; nothing reads it.
    */
   async ensureCustomer(
-    c: PoolClient,
-    i: Readonly<{ ownerRef: string; locale: string; now: Date; environment: CustomerXMoneyEnvironment | null }>
-  ): Promise<{ customerId: string; xmoneyCustomerId: string | null }> {
+    c: PoolClient, i: Readonly<{ ownerRef: string; locale: string; now: Date }>
+  ): Promise<{ customerId: string }> {
     await c.query(`
       INSERT INTO billing.customer (customer_id, owner_ref, created_at, created_locale)
       VALUES ($1, $2, $3, $4) ON CONFLICT (owner_ref) DO NOTHING
     `, [randomUUID(), i.ownerRef, i.now, i.locale]);
-    const row = (await c.query<{ customer_id: string; xmoney_customer_id: string | null }>(`
-      SELECT customer.customer_id,
-        CASE WHEN $2::text IS NULL THEN NULL ELSE
-          (SELECT link.xmoney_customer_id FROM billing.customer_xmoney AS link
-            WHERE link.customer_id = customer.customer_id AND link.environment = $2::text) END AS xmoney_customer_id
-      FROM billing.customer AS customer WHERE customer.owner_ref = $1
-    `, [i.ownerRef, i.environment])).rows[0];
+    const row = (await c.query<{ customer_id: string }>(`
+      SELECT customer.customer_id FROM billing.customer AS customer WHERE customer.owner_ref = $1
+    `, [i.ownerRef])).rows[0];
     if (row === undefined) throw new TypedDomainError("BILLING_CUSTOMER_UNRESOLVED", "the billing customer was not created");
-    return Object.freeze({ customerId: row.customer_id, xmoneyCustomerId: row.xmoney_customer_id });
-  }
-
-  /** R-14: the first link per environment wins; a repeat of the same link is a no-op. */
-  async setXMoneyCustomerId(
-    c: PoolClient, customerId: string, xmoneyCustomerId: string, environment: CustomerXMoneyEnvironment
-  ): Promise<void> {
-    await c.query(`
-      INSERT INTO billing.customer_xmoney (customer_id, environment, xmoney_customer_id, at)
-      VALUES ($1, $2, $3, clock_timestamp()) ON CONFLICT (customer_id, environment) DO NOTHING
-    `, [customerId, environment, xmoneyCustomerId]);
+    return Object.freeze({ customerId: row.customer_id });
   }
 
   async appendProfile(c: PoolClient, i: Readonly<{
@@ -547,26 +527,18 @@ export class BillingRepository {
     });
   }
 
-  /**
-   * `xmoneyCustomerId` is the link in `environment`; without `environment`, the most recent link of any
-   * environment (for callers that need only `customerId` and `locale`).
-   */
+  /** The owner's customer row and the locale of its latest profile (else the one it was created in). */
   async customerByOwner(
-    ownerRef: string, environment?: CustomerXMoneyEnvironment, executor: BillingReadExecutor = this.pool
-  ): Promise<{ customerId: string; xmoneyCustomerId: string | null; locale: string } | null> {
-    const row = (await executor.query<{ customer_id: string; xmoney_customer_id: string | null; locale: string }>(`
+    ownerRef: string, executor: BillingReadExecutor = this.pool
+  ): Promise<{ customerId: string; locale: string } | null> {
+    const row = (await executor.query<{ customer_id: string; locale: string }>(`
       SELECT customer.customer_id,
-        (SELECT link.xmoney_customer_id FROM billing.customer_xmoney AS link
-          WHERE link.customer_id = customer.customer_id AND ($2::text IS NULL OR link.environment = $2::text)
-          ORDER BY link.at DESC LIMIT 1) AS xmoney_customer_id,
         COALESCE((SELECT profile.locale FROM billing.customer_profile_event AS profile
           WHERE profile.customer_id = customer.customer_id ORDER BY profile.seq DESC LIMIT 1),
           customer.created_locale) AS locale
       FROM billing.customer AS customer WHERE customer.owner_ref = $1
-    `, [ownerRef, environment ?? null])).rows[0];
-    return row === undefined ? null : Object.freeze({
-      customerId: row.customer_id, xmoneyCustomerId: row.xmoney_customer_id, locale: row.locale
-    });
+    `, [ownerRef])).rows[0];
+    return row === undefined ? null : Object.freeze({ customerId: row.customer_id, locale: row.locale });
   }
 
   async insertQuote(c: PoolClient, q: QuoteRow): Promise<void> {
@@ -622,10 +594,10 @@ export class BillingRepository {
     foldSubscription([...stored, e]);
     await c.query(`
       INSERT INTO billing.subscription_event (event_id, subscription_id, owner_ref, kind, at, plan_id,
-        period_anchor_at, xmoney_order_id, xmoney_customer_id, card_ref, card_token_id, data)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
-    `, [e.eventId, e.subscriptionId, e.ownerRef, e.kind, e.at, e.planId, e.periodAnchorAt, e.xmoneyOrderId,
-      e.xmoneyCustomerId, e.cardRef, e.cardTokenId, JSON.stringify(e.data)]);
+        period_anchor_at, card_token_id, data)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)
+    `, [e.eventId, e.subscriptionId, e.ownerRef, e.kind, e.at, e.planId, e.periodAnchorAt, e.cardTokenId,
+      JSON.stringify(e.data)]);
   }
 
   async subscriptionEvents(subscriptionId: string, executor: BillingReadExecutor = this.pool): Promise<SubscriptionEvent[]> {
@@ -705,12 +677,12 @@ export class BillingRepository {
   }
 
   /**
-   * NETOPIA (spec 2026-10-05 §2.5.4): what is still open OUTSIDE the deployment's own payment system — xMoney-era
-   * rows and, after a same-host switch, NETOPIA sandbox rows: subscriptions not ENDED/WITHDRAWN and not ACTIVE with a
-   * cancel pending (one whose history does not fold counts as open), charges with no SUCCEEDED/FAILED event whose
-   * subscription is not settled, and outbox jobs neither done nor dead that name such a charge (by payload
-   * `charge_id`, an xMoney notice job's `external_order_id`, or the two invoice jobs' ref). A CREATED of the xMoney
-   * era names no `payment_provider`: it is xMoney's.
+   * NETOPIA (spec 2026-10-05 §2.5.4): what is still open OUTSIDE the deployment's own payment system — the previous
+   * card processor's rows and, after a same-host switch, NETOPIA sandbox rows: subscriptions not ENDED/WITHDRAWN and
+   * not ACTIVE with a cancel pending (one whose history does not fold counts as open), charges with no SUCCEEDED/FAILED
+   * event whose subscription is not settled, and outbox jobs neither done nor dead that name such a charge (by payload
+   * `charge_id`, an old notice job's `external_order_id`, or the two invoice jobs' ref). A CREATED of that era names no
+   * `payment_provider` (PR-33: the SQL below reads it as the old provider's).
    */
   async openOtherSystemRecordCounts(own: Readonly<{
     paymentProvider: PaymentProviderName; paymentEnvironment: PaymentEnvironmentName;
@@ -757,7 +729,7 @@ export class BillingRepository {
 
   /**
    * W14 (P2-I19): what lies more than a day ahead of `now`, the API's real clock at a live boot. `rows`: the billing
-   * changes, whichever xMoney system, by the time they record (every writer stamps them with the billing clock's
+   * changes, whichever payment system, by the time they record (every writer stamps them with the billing clock's
    * `now`, so only a moved stage clock dates one ahead): subscription events (`at`), entitlement events
    * (`effective_at`), charges (`created_at`) and charge events (`at`). `jobs`: outbox jobs neither done nor dead whose
    * `not_before` is ahead (their `created_at` is the database's own clock, so a job queued on a moved clock shows only
@@ -969,24 +941,6 @@ export class BillingRepository {
     }));
   }
 
-  async insertNotice(c: PoolClient, n: NoticeRow): Promise<"INSERTED" | "DUPLICATE"> {
-    const result = await c.query(`
-      INSERT INTO billing.xmoney_notice (notice_id, received_at, payload_sha256, transaction_id, order_id,
-        external_order_id, status, xmoney_environment)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (payload_sha256) DO NOTHING RETURNING notice_id
-    `, [n.noticeId, n.receivedAt, n.payloadSha256, n.transactionId, n.orderId, n.externalOrderId, n.status,
-      n.xmoneyEnvironment]);
-    return result.rowCount === 1 ? "INSERTED" : "DUPLICATE";
-  }
-
-  /** A21: processing a notice is recorded as a following row. */
-  async recordNoticeOutcome(c: PoolClient, i: Readonly<{ noticeId: string; at: Date; outcome: string }>): Promise<void> {
-    await c.query(`
-      INSERT INTO billing.xmoney_notice_outcome (notice_id, at, outcome) VALUES ($1,$2,$3)
-      ON CONFLICT (notice_id) DO NOTHING
-    `, [i.noticeId, i.at, i.outcome]);
-  }
-
   async enqueue(c: PoolClient, j: Readonly<{
     kind: OutboxKind; ref: string; notBefore: Date; payload: OutboxPayload;
   }>): Promise<string> {
@@ -1144,7 +1098,7 @@ export class BillingRepository {
       amount_known: boolean; sale_recorded: boolean; verdict: LocationVerdict | null;
     }>(`
       WITH dated AS (
-        -- When xMoney says the money moved; a row recorded without it falls back to when we recorded it.
+        -- When the processor says the money moved; a row recorded without it falls back to when we recorded it.
         SELECT event.*, COALESCE(event.provider_created_at, event.at) AS money_at FROM billing.charge_event AS event
         WHERE event.kind IN ('SUCCEEDED','REFUNDED','CHARGEBACK')
       )
@@ -1206,124 +1160,18 @@ export class BillingRepository {
     }));
   }
 
-  /** P14a: the charge-event kinds already recorded for each xMoney transaction id of one xMoney system. */
-  async chargeEventKindsByTransaction(
-    transactionIds: readonly string[], environment: CustomerXMoneyEnvironment
-  ): Promise<ReadonlyMap<string, ReadonlySet<ChargeEventKind>>> {
-    const kinds = new Map<string, Set<ChargeEventKind>>();
-    if (transactionIds.length === 0) return kinds;
-    const result = await this.pool.query<{ transaction_id: string; kind: ChargeEventKind }>(`
-      SELECT DISTINCT provider_payment_id::text AS transaction_id, kind
-      FROM billing.charge_event
-      WHERE payment_provider = 'xmoney' AND payment_environment = $2 AND provider_payment_id::text = ANY($1::text[])
-    `, [[...new Set(transactionIds)], environment]);
-    for (const row of result.rows) {
-      const seen = kinds.get(row.transaction_id) ?? new Set<ChargeEventKind>();
-      seen.add(row.kind);
-      kinds.set(row.transaction_id, seen);
-    }
-    return kinds;
-  }
-
   /**
-   * P2-M1: the amounts (micros) of the REFUNDED rows written on each of these paid transactions' own rows, in one
-   * xMoney system: our refunds recorded when their call answered, and a provider refund read from the payment's own
-   * status. A refund xMoney lists as its own transaction is settled through its payment only by one of these of the
-   * same amount; any other is a refund made elsewhere, for VERIFY_PAYMENT to record or hand to the owner.
-   */
-  async refundedAmountsByPayment(
-    paymentIds: readonly string[], environment: CustomerXMoneyEnvironment
-  ): Promise<ReadonlyMap<string, ReadonlyArray<number>>> {
-    const amounts = new Map<string, number[]>();
-    if (paymentIds.length === 0) return amounts;
-    const result = await this.pool.query<{ transaction_id: string; amount_micros: string | null }>(`
-      SELECT provider_payment_id::text AS transaction_id, amount_micros
-      FROM billing.charge_event
-      WHERE kind = 'REFUNDED' AND payment_provider = 'xmoney' AND payment_environment = $2 AND provider_payment_id::text = ANY($1::text[])
-    `, [[...new Set(paymentIds)], environment]);
-    for (const row of result.rows) {
-      if (row.amount_micros === null) continue;
-      const seen = amounts.get(row.transaction_id) ?? [];
-      seen.push(micros(row.amount_micros));
-      amounts.set(row.transaction_id, seen);
-    }
-    return amounts;
-  }
-
-  /**
-   * P14a: charges of these kinds in one xMoney system with neither SUCCEEDED nor FAILED, created before
-   * `createdBefore`, oldest first.
-   */
-  async unsettledCharges(
-    kinds: readonly ChargeKind[], createdBefore: Date, limit: number, environment: CustomerXMoneyEnvironment
-  ): Promise<Array<ChargeRow & { events: ChargeEventRow[] }>> {
-    const result = await this.pool.query<{ charge_id: string }>(`
-      SELECT charge.charge_id
-      FROM billing.charge AS charge
-      WHERE charge.kind = ANY($1::text[])
-        AND charge.created_at < $2
-        AND charge.payment_provider = 'xmoney' AND charge.payment_environment = $4
-        AND NOT EXISTS (
-          SELECT 1 FROM billing.charge_event AS event
-          WHERE event.charge_id = charge.charge_id AND event.kind IN ('SUCCEEDED','FAILED')
-        )
-      ORDER BY charge.created_at
-      LIMIT $3
-    `, [[...kinds], createdBefore, limit, environment]);
-    return this.chargesById(result.rows.map((row) => row.charge_id));
-  }
-
-  /**
-   * P14a (A2): the charges the adoption pass may look up, oldest first after a keyset cursor: no SUCCEEDED or FAILED,
-   * the latest SUBMITTED/SUBMIT_UNKNOWN is SUBMIT_UNKNOWN (or there is none), created in [createdFrom, createdBefore).
-   * `maxUnknowns` (null = any) leaves out charges with more SUBMIT_UNKNOWN events. A SUBMITTED charge is never one:
-   * it belongs to VERIFY_PAYMENT and the daily listing.
-   */
-  async adoptionCandidates(input: Readonly<{
-    kinds: readonly ChargeKind[]; environment: CustomerXMoneyEnvironment; createdFrom: Date; createdBefore: Date;
-    after: Readonly<{ createdAt: Date; chargeId: string }> | null; maxUnknowns: number | null; limit: number;
-  }>): Promise<Array<ChargeRow & { events: ChargeEventRow[] }>> {
-    const result = await this.pool.query<{ charge_id: string }>(`
-      SELECT charge.charge_id
-      FROM billing.charge AS charge
-      LEFT JOIN LATERAL (
-        SELECT submit.kind FROM billing.charge_event AS submit
-        WHERE submit.charge_id = charge.charge_id AND submit.kind IN ('SUBMITTED','SUBMIT_UNKNOWN')
-        ORDER BY submit.at DESC, submit.seq DESC
-        LIMIT 1
-      ) AS last_submit ON true
-      WHERE charge.kind = ANY($1::text[])
-        AND charge.payment_provider = 'xmoney' AND charge.payment_environment = $8
-        AND charge.created_at >= $2 AND charge.created_at < $3
-        AND ($4::timestamptz IS NULL OR (charge.created_at, charge.charge_id) > ($4::timestamptz, $5::text))
-        AND NOT EXISTS (
-          SELECT 1 FROM billing.charge_event AS settled
-          WHERE settled.charge_id = charge.charge_id AND settled.kind IN ('SUCCEEDED','FAILED')
-        )
-        AND (last_submit.kind IS NULL OR last_submit.kind = 'SUBMIT_UNKNOWN')
-        AND ($6::integer IS NULL OR (
-          SELECT count(*) FROM billing.charge_event AS unknown
-          WHERE unknown.charge_id = charge.charge_id AND unknown.kind = 'SUBMIT_UNKNOWN'
-        ) <= $6::integer)
-      ORDER BY charge.created_at, charge.charge_id
-      LIMIT $7
-    `, [[...input.kinds], input.createdFrom, input.createdBefore, input.after?.createdAt ?? null,
-      input.after?.chargeId ?? null, input.maxUnknowns, input.limit, input.environment]);
-    return this.chargesById(result.rows.map((row) => row.charge_id));
-  }
-
-  /**
-   * P14a/P16b: charges of these kinds with no SUCCEEDED or FAILED, created before `createdBefore` — in one xMoney
-   * system for the reconciler's count, in every system (`null`) for the owner's summary.
+   * P14a/P16b: charges of these kinds with no SUCCEEDED or FAILED, created before `createdBefore` — in one NETOPIA
+   * environment for the reconciler's count, in every system (`null`) for the owner's summary.
    */
   async longUnsettledCharges(
-    kinds: readonly ChargeKind[], createdBefore: Date, environment: CustomerXMoneyEnvironment | null = null
+    kinds: readonly ChargeKind[], createdBefore: Date, environment: "sandbox" | "live" | null = null
   ): Promise<Array<{ chargeId: string; kind: ChargeKind; createdAt: Date }>> {
     const result = await this.pool.query<{ charge_id: string; kind: ChargeKind; created_at: Date }>(`
       SELECT charge.charge_id, charge.kind, charge.created_at
       FROM billing.charge AS charge
       WHERE charge.kind = ANY($1::text[]) AND charge.created_at < $2
-        AND ($3::text IS NULL OR (charge.payment_provider = 'xmoney' AND charge.payment_environment = $3::text))
+        AND ($3::text IS NULL OR (charge.payment_provider = 'netopia' AND charge.payment_environment = $3::text))
         AND NOT EXISTS (
           SELECT 1 FROM billing.charge_event AS settled
           WHERE settled.charge_id = charge.charge_id AND settled.kind IN ('SUCCEEDED','FAILED')
@@ -1334,17 +1182,19 @@ export class BillingRepository {
   }
 
   /**
-   * P14a/P16b: refund jobs that ended without a refund — dead `XMONEY_REFUND` jobs (ref
-   * `${chargeId}:${transactionId}`, P9b) whatever their code, while no REFUNDED exists for that charge and paid
-   * transaction (read as P8c's `refundTarget`: a REFUNDED on xMoney's own refund transaction names the payment in
+   * P14a/P16b: refund jobs that ended without a refund — dead `PAYMENT_REFUND` jobs, and the dead refund jobs of the
+   * previous card processor (`RETIRED_OUTBOX_KINDS`, code OTHER_PAYMENT_SYSTEM or the code that era stored); ref
+   * `${chargeId}:${transactionId}`, P9b — whatever their code, while no REFUNDED exists for that charge and paid
+   * payment (read as P8c's `refundTarget`: an old REFUNDED of a separate refund transaction names the payment in
    * `refunds_transaction_id`, D5 5g). Not every one leaves money owed: the summary reads each code (`deadRefundCheck`).
    * Three codes owe nothing on this server: REFUND_NOT_REQUESTED and REFUND_CHARGE_MISSING (no request of ours backs
-   * it) and OTHER_XMONEY_SYSTEM (the payment was taken in the other xMoney system). REFUND_PAYLOAD_INVALID (a payload
+   * it) and OTHER_PAYMENT_SYSTEM (the payment was taken in another payment system). REFUND_PAYLOAD_INVALID (a payload
    * that failed its check, so nothing was sent; only a row written by something else holds one) is listed with the
    * first two, its reason withheld (Part 4 final review C-7): the charge's own refund requests say whether money is
-   * still owed. For REFUND_OUTCOME_UNKNOWN the dashboard says whether it landed, and every other code (xMoney refused
-   * it, and the like) is still owed. (R2 Q-5: RefundDesk's dead-letter path also emails the owner O2 at once, except
-   * for REFUND_PAYLOAD_INVALID, which names no charge it could read; this list is the daily and quarterly reminder.)
+   * still owed. For REFUND_OUTCOME_UNKNOWN NETOPIA's admin says whether it landed, and every other code (NETOPIA
+   * refused it, and the like) is still owed. (R2 Q-5: RefundDesk's dead-letter path also emails the owner O2 at once,
+   * except for REFUND_PAYLOAD_INVALID, which names no charge it could read; this list is the daily and quarterly
+   * reminder.)
    */
   async deadRefunds(): Promise<Array<{
     chargeId: string; transactionId: string; reason: string | null; code: string | null; since: Date;
@@ -1355,14 +1205,14 @@ export class BillingRepository {
       SELECT split_part(outbox.ref, ':', 1) AS charge_id, split_part(outbox.ref, ':', 2) AS transaction_id,
         outbox.payload ->> 'reason' AS reason, outbox.last_error_code AS code, outbox.dead_at AS since
       FROM billing.outbox AS outbox
-      WHERE outbox.kind = 'XMONEY_REFUND' AND outbox.dead_at IS NOT NULL
+      WHERE outbox.kind = ANY($1) AND outbox.dead_at IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM billing.charge_event AS refunded
           WHERE refunded.charge_id = split_part(outbox.ref, ':', 1) AND refunded.kind = 'REFUNDED'
             AND COALESCE(refunded.refunds_transaction_id, refunded.provider_payment_id) = split_part(outbox.ref, ':', 2)
         )
       ORDER BY outbox.dead_at, outbox.ref
-    `);
+    `, [["PAYMENT_REFUND", ...RETIRED_OUTBOX_KINDS]]);
     return result.rows.map((row) => ({
       chargeId: row.charge_id, transactionId: row.transaction_id, reason: row.reason, code: row.code, since: row.since
     }));
@@ -1378,13 +1228,12 @@ export class BillingRepository {
    * replaces it, and only that one is listed if it dies too. Also every dashboard refund P9c recorded on the payment
    * itself (PROVIDER_REFUND REFUNDED with no `refunds_transaction_id`, job kind DASHBOARD_REFUND) whose charge has no
    * credit note: its amount is unknown (the rows `quarterSummaryRows` marks `amountKnown: false`), so P9c issues none
-   * automatically. A dashboard refund xMoney reports as its own transaction (D5 5g) names its amount and gets its
-   * credit-note job automatically (none for a second payment, which was never a sale); it reaches this list only
-   * through that job, if the job dies.
+   * automatically. A refund that names its amount (a PROVIDER_VOID, or our own) gets its credit-note job automatically
+   * (none for a second payment, which was never a sale); it reaches this list only through that job, if the job dies.
    * Part 4 final review C-5 (the controller's ruling): DASHBOARD_REFUND only for a charge that holds an INVOICE row or
    * intent (the row needs its intent, 0086's foreign key, so the intent is read) or a sale-invoice job (queued, done or
    * dead: the invoice is owed, whether or not it is issued yet; the intent is written only when the issuer is called).
-   * P9c's never-verified path (a checkout's, an upgrade's or a renewal's payment xMoney refunded before we ever saw it
+   * P9c's never-verified path (a checkout's, an upgrade's or a renewal's payment NETOPIA refunded before we ever saw it
    * paid) queues none of the three, and A29 (q) owes no invoice and no credit note for it: its line is
    * REFUNDED_BEFORE_START (code NO_DOCUMENT_OWED), whose words (`documentJobAction`) ask for no document. It has
    * nothing to record, so this query always returns it; the tax summary (`buildTaxSummary`) prints it in its sale's
@@ -1566,7 +1415,7 @@ export class BillingRepository {
 
   /**
    * P16b (D6a, P11a): renewals closed FAILED(NO_TRANSACTION) after a submit whose outcome stayed unknown, closed since
-   * `since`. xMoney may still have charged the card, so the owner checks each in the dashboard.
+   * `since`. NETOPIA may still have charged the card, so the owner checks each in NETOPIA's admin.
    */
   async stuckRenewals(since: Date): Promise<Array<{ chargeId: string; since: Date }>> {
     const result = await this.pool.query<{ charge_id: string; since: Date }>(`
@@ -1586,11 +1435,11 @@ export class BillingRepository {
 
   /**
    * P16b (P9c's durable mark, D6a): second refunds made elsewhere on a payment that already holds a refund record,
-   * which P1a's one-request-per-transaction key cannot hold. P9c ends that refund transaction's VERIFY_PAYMENT job
-   * DEAD with REFUND_UNRECORDED (ref = the refund transaction's id), whether a notice or P14a's listing brought it; a
-   * notice xMoney sends again makes a new job that dies the same way, so the jobs are grouped by ref, each listed from
-   * its first death if that is since `since`. The owner opens the transaction in the xMoney dashboard: its amount is
-   * known only there. Content-free: xMoney transaction ids and times.
+   * which P1a's one-request-per-transaction key cannot hold. P9c ended that refund transaction's VERIFY_PAYMENT job
+   * DEAD with REFUND_UNRECORDED (ref = the refund transaction's id); old jobs of the previous card processor's era
+   * still hold that code, so the jobs are grouped by ref, each listed from its first death if that is since `since`.
+   * The owner opens the payment in the processor's admin: its amount is known only there. Content-free: payment ids
+   * and times.
    */
   async unrecordedRefunds(since: Date): Promise<Array<{ transactionId: string; since: Date }>> {
     const result = await this.pool.query<{ transaction_id: string; since: Date }>(`

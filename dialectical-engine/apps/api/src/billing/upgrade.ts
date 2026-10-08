@@ -169,7 +169,7 @@ export async function startUpgrade(deps: SubscriptionRouteDeps, input: UpgradeIn
   if (await deps.billing.ownerErasurePending(input.ownerRef)) refuse(409, "ACCOUNT_ERASURE_PENDING");
   const before = await deps.billing.subscriptionForOwner(input.ownerRef);
   const environment = deps.paymentEnvironment;
-  if (before === null || before.status !== "ACTIVE" || environment === null || !servedByNetopia(deps, before)) {
+  if (before === null || before.status !== "ACTIVE" || !servedByNetopia(deps, before)) {
     refuse(409, "NOT_SUBSCRIBED");
   }
   const open = await openUpgrade(deps, before, input.quoteRef, now);
@@ -372,7 +372,7 @@ const laterOf = (left: Date | null, right: Date | null): Date | null =>
 export function upgradeSucceededWrites(input: Readonly<{
   state: SubscriptionState; charge: ChargeRow; quote: QuoteRow; plans: BillingPlans;
   currentMonthCreditOverrideMicros: number | null; now: Date;
-  /** N12: the token N10 chose at the decision (null: the payment saved no usable card); absent on xMoney. */
+  /** N12: the token N10 chose at the decision (null: the payment saved no usable card). */
   cardTokenId?: string | null;
 }>): UpgradeSucceededWrites {
   const { state, charge, quote, plans } = input;

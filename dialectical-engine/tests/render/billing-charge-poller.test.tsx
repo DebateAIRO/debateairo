@@ -85,9 +85,9 @@ describe("P19 the waiting screen (B5)", () => {
     expect(container.textContent).toBe("REFUSED");
   });
 
-  // W15 F1 (P2-M5): a checkout whose payment was refunded at xMoney before we verified it reads FAILED with
+  // W15 F1 (P2-M5): a checkout whose payment was refunded at NETOPIA before we verified it reads FAILED with
   // PROVIDER_REFUND. The money was taken and given back, so never "no money was taken", and no email follows it.
-  it("a checkout refunded at xMoney before it started says the card was refunded and the plan didn't start (P2-M5)", async () => {
+  it("a checkout refunded at NETOPIA before it started says the card was refunded and the plan didn't start (P2-M5)", async () => {
     await mount(vi.fn(async () => ({ state: "FAILED" as const, reason_code: "PROVIDER_REFUND" })));
     expect(container.textContent).toBe(billingEnglish["billing.checkout.refundedBeforeStart"]);
     expect(container.textContent).toBe("This payment was refunded to your card in full, and your plan didn't start. You can try again.");

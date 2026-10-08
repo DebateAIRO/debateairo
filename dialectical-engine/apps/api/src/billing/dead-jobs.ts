@@ -1,5 +1,6 @@
 import type { BillingRepository, OutboxJob } from "@debateai/db";
 import { emailJob } from "./email-job.js";
+import { otherSystemCode } from "./outbox.js";
 
 /**
  * W12 (P2-I16, P2-I17; the controller's rulings of 2 October 2026): what the owner is told about a legal document or
@@ -36,15 +37,16 @@ export function chargeOfDocumentJob(ref: string): string {
  * Dead-letter codes that mean our records do not back the job, so there is nothing to issue, record or re-queue:
  * CREDIT_NOTE_REFUND_MISSING (P2-I5 (2): no REFUNDED row of the sale backs this credit note; the W4 judge's forward,
  * progress.md: never offered to `--record` or `--requeue`), CREDIT_NOTE_PAYLOAD_INVALID (a malformed job),
- * INVOICE_CHARGE_NOT_PAID (no payment is recorded for the charge) and OTHER_XMONEY_SYSTEM (P2-I4: a payment of the
- * other xMoney system, which owes no document here). `pnpm billing:invoice` refuses each of them.
+ * INVOICE_CHARGE_NOT_PAID (no payment is recorded for the charge) and OTHER_PAYMENT_SYSTEM (P2-I4: a payment of
+ * another payment system, which owes no document here; the code the previous card processor's era stored reads the
+ * same, `otherSystemCode`). `pnpm billing:invoice` refuses each of them.
  */
 const UNBACKED_DOCUMENT_CODES: ReadonlySet<string> = new Set([
-  "CREDIT_NOTE_REFUND_MISSING", "CREDIT_NOTE_PAYLOAD_INVALID", "INVOICE_CHARGE_NOT_PAID", "OTHER_XMONEY_SYSTEM"
+  "CREDIT_NOTE_REFUND_MISSING", "CREDIT_NOTE_PAYLOAD_INVALID", "INVOICE_CHARGE_NOT_PAID", "OTHER_PAYMENT_SYSTEM"
 ]);
 
 export function unbackedDocumentCode(code: string): boolean {
-  return UNBACKED_DOCUMENT_CODES.has(code);
+  return UNBACKED_DOCUMENT_CODES.has(code) || otherSystemCode(code);
 }
 
 /**
@@ -54,7 +56,7 @@ export function unbackedDocumentCode(code: string): boolean {
  */
 export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: string; code: string }>): string {
   if (item.jobKind === "REFUNDED_BEFORE_START") {
-    // Part 4 final review C-5 (the controller's ruling): P9c's never-verified path (a payment xMoney refunded before we
+    // Part 4 final review C-5 (the controller's ruling): P9c's never-verified path (a payment NETOPIA refunded before we
     // ever saw it paid, for a checkout, an upgrade or a renewal) queues no invoice; A29 (q) owes no invoice and no
     // credit note for it. The quarter still counts its SALE (its refund is listed nowhere else: buildTaxSummary keeps
     // it out of the 'amount unknown' list), so the owner takes both out by hand; the summary prints this line in the
@@ -66,7 +68,7 @@ export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: st
     // P4-K (P2-W12, the owner's ruling of 3 October 2026, option (b)): P9c queued no job for this refund, so the
     // owner issues the credit note by hand and records it with its amount (`--amount`, at most what the payment held).
     // One credit note per charge (0086's invoice_one_per_intent): the command refuses a second one.
-    return "a refund made in the xMoney dashboard, whose amount only the dashboard shows: issue its credit note by hand"
+    return "a refund made in NETOPIA's admin, whose amount only the admin shows: issue its credit note by hand"
       + " in SmartBill (a Romanian sale) or Quaderno, then record it with its amount: pnpm billing:invoice --charge"
       + ` ${item.chargeId} --kind CREDIT_NOTE --record <series>-<number> (SmartBill) or <Quaderno id> --amount <the amount`
       + " refunded, for example 12.10>, at most what the payment held; the line then leaves this list and the quarter's"
@@ -76,9 +78,9 @@ export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: st
   if (item.code === "CREDIT_NOTE_REFUND_MISSING") {
     return "no refund is recorded for this sale: nothing to issue or re-queue; tell whoever runs the server";
   }
-  if (item.code === "OTHER_XMONEY_SYSTEM") {
-    return "a payment of the other xMoney system (sandbox or live), which owes no document here: nothing to issue or"
-      + " re-queue";
+  if (otherSystemCode(item.code)) {
+    return "a payment of another payment system (the previous card processor, or NETOPIA's sandbox or live), which owes"
+      + " no document here: nothing to issue or re-queue";
   }
   if (unbackedDocumentCode(item.code) || !isDocumentJobKind(item.jobKind)) {
     return "our records do not back this job (no payment is recorded, or the job is malformed): nothing to issue or"
@@ -113,7 +115,7 @@ export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: st
       + ` line), then ${requeue}`;
   }
   if (item.code === "CREDIT_NOTE_MANUAL") {
-    // F5: a refund made in the dashboard of unknown amount has no job; its line is DASHBOARD_REFUND, above (P4-K's
+    // F5: a refund made in NETOPIA's admin of unknown amount has no job; its line is DASHBOARD_REFUND, above (P4-K's
     // `--amount` records its credit note).
     return `a credit note ${issuer} cannot make by itself (a partial refund, or a second refund of one charge): issue it`
       + ` by hand in ${issuer} and record it with ${record}; the command refuses a second credit note of one charge, so`

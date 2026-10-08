@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
 import { microsToDecimal } from "@debateai/billing-core";
-import type { BillingCardChangeResponse, BillingCardDetailsResponse } from "@debateai/contract";
+import { e164Phone, type BillingCardChangeResponse, type BillingCardDetailsResponse } from "@debateai/contract";
 import type { BillingRepository } from "@debateai/db";
 import { decideCardCountry } from "@debateai/geo";
 import { netopiaLanguageOf } from "@debateai/payments-netopia";
@@ -23,9 +23,6 @@ function cardCheckHoldMicros(): number {
   return 0;
 }
 
-/** E.164 as NETOPIA's payer and N7's profile both take it: `+`, then 8–15 digits, the first not 0. */
-const E164 = /^\+[1-9][0-9]{7,14}$/u;
-
 /**
  * A RENEWAL charge of this subscription whose charge may have reached the processor with no outcome recorded
  * (`rebillOutcomeOpen`, which N11 taught NETOPIA's markers). A2, kept: the card never changes under such a renewal.
@@ -43,12 +40,12 @@ async function renewalOutcomeOpen(
 }
 
 type CardDeps = Pick<SubscriptionRouteDeps,
-  | "billing" | "jobs" | "legal" | "geo" | "countryPolicy" | "recordsKey" | "accountEmail" | "audit" | "xmoneyEnvironment"
+  | "billing" | "jobs" | "legal" | "geo" | "countryPolicy" | "recordsKey" | "accountEmail" | "audit"
   | "paymentEnvironment" | "payments" | "acceptances" | "consentDocuments" | "orderText" | "publicAppUrl">;
 
 /** A live plan (ACTIVE or PAST_DUE) of this API's NETOPIA environment; anything else has no card to change here. */
 function liveNetopiaPlan(
-  deps: Pick<SubscriptionRouteDeps, "xmoneyEnvironment" | "paymentEnvironment">,
+  deps: Pick<SubscriptionRouteDeps, "paymentEnvironment">,
   state: Parameters<typeof servedByNetopia>[1] & Readonly<{ status: string }>
 ): boolean {
   return (state.status === "ACTIVE" || state.status === "PAST_DUE") && servedByNetopia(deps, state);
@@ -59,7 +56,7 @@ function liveNetopiaPlan(
  * newest profile's payer fields, each falling back to the checkout quote's sealed location.
  */
 export async function readCardDetails(
-  deps: Pick<SubscriptionRouteDeps, "billing" | "recordsKey" | "xmoneyEnvironment" | "paymentEnvironment">, ownerRef: string
+  deps: Pick<SubscriptionRouteDeps, "billing" | "recordsKey" | "paymentEnvironment">, ownerRef: string
 ): Promise<BillingCardDetailsResponse> {
   const state = await deps.billing.subscriptionForOwner(ownerRef);
   if (state === null || !liveNetopiaPlan(deps, state)) refuse(409, "NOT_SUBSCRIBED");
@@ -94,9 +91,10 @@ export async function startCardChange(deps: CardDeps, input: CardChangeInput): P
   if (await deps.billing.ownerErasurePending(input.ownerRef)) refuse(409, "ACCOUNT_ERASURE_PENDING");
   const before = await deps.billing.subscriptionForOwner(input.ownerRef);
   const environment = deps.paymentEnvironment;
-  if (before === null || environment === null || !liveNetopiaPlan(deps, before)) refuse(409, "NOT_SUBSCRIBED");
-  const phone = input.details.phone.replaceAll(" ", "");
-  if (!E164.test(phone)) refuse(422, "BILLING_PHONE_INVALID");
+  if (before === null || !liveNetopiaPlan(deps, before)) refuse(409, "NOT_SUBSCRIBED");
+  // Ruling PR-43: the checkout's one E.164 rule (`e164Phone`), so a phone the checkout takes is taken here too.
+  const phone = e164Phone(input.details.phone);
+  if (phone === null) refuse(422, "BILLING_PHONE_INVALID");
   const stored = await storedTaxContext({ billing: deps.billing, recordsKey: deps.recordsKey }, before);
   const place = decidePaymentPlace({ geo: deps.geo, policy: deps.countryPolicy, ip: input.ip, declaredCountry: stored.location.country });
   if (place.kind === "REFUSE") throw placeRefusal(place, deps.audit);
@@ -157,8 +155,6 @@ export async function startCardChange(deps: CardDeps, input: CardChangeInput): P
   return Object.freeze({ redirect_url: redirectUrl, charge_ref: chargeId, hold_amount: microsToDecimal(hold) });
 }
 
-/** The hold of an xMoney card change that took effect is released; RefundDesk makes the call (R-32). Until N23. */
-const RELEASE: SettlementResult = Object.freeze({ kind: "REFUND" as const, reason: "CARD_CHECK_RELEASE" as const });
 type CardCheckRefusal = "CARD_CHECK_NOT_LIVE" | "CARD_CHECK_REFUSED" | "CARD_CHECK_DEFERRED";
 
 /**
@@ -168,8 +164,7 @@ type CardCheckRefusal = "CARD_CHECK_NOT_LIVE" | "CARD_CHECK_REFUSED" | "CARD_CHE
  * renewal whose charge may have reached the processor defers the change (`CARD_CHECK_DEFERRED`). Each refusal is a
  * REFUND result; on NETOPIA its 0.00 release is recorded with no call and the check's own saved card is revoked
  * NOT_ADOPTED (SR-1). NETOPIA's success (N13, spec §2.11): CARD_CHANGED with the card N10 adopted at the decision, the
- * old card revoked REPLACED, nothing released (a 0 check holds nothing). xMoney's (until N23): CARD_CHANGED with the new
- * order and the 1.00 hold released. Every read runs on `context.client`.
+ * old card revoked REPLACED, nothing released (a 0 check holds nothing). Every read runs on `context.client`.
  */
 export function createCardCheckSettlement(deps: Readonly<{
   repository: Pick<BillingRepository,
@@ -181,14 +176,12 @@ export function createCardCheckSettlement(deps: Readonly<{
 }>): ChargeSettlement {
   return Object.freeze({
     async succeeded(context: SettlementContext): Promise<SettlementResult> {
-      const { subscription, transaction, payment, client, now, cardCountry } = context;
-      if (transaction === null && payment === null) throw new TypeError("BILLING_CARD_CHECK_WITHOUT_PAYMENT");
+      const { subscription, payment, client, now, cardCountry } = context;
+      if (payment === null) throw new TypeError("BILLING_CARD_CHECK_WITHOUT_PAYMENT");
       const repository = deps.repository;
       const refused = async (reason: CardCheckRefusal): Promise<SettlementResult> => {
-        if (payment !== null) {
-          for (const token of await repository.cardTokensFromCharge(client, context.charge.chargeId)) {
-            await repository.revokeCardToken(client, { tokenId: token.tokenId, at: now, reason: "NOT_ADOPTED" });
-          }
+        for (const token of await repository.cardTokensFromCharge(client, context.charge.chargeId)) {
+          await repository.revokeCardToken(client, { tokenId: token.tokenId, at: now, reason: "NOT_ADOPTED" });
         }
         return Object.freeze({ kind: "REFUND" as const, reason });
       };
@@ -196,7 +189,7 @@ export function createCardCheckSettlement(deps: Readonly<{
       const throughClient = Object.freeze({
         chargesForSubscription: (subscriptionId: string) => repository.chargesForSubscription(subscriptionId, client),
         quote: (quoteId: string, ownerRef: string) => repository.quote(quoteId, ownerRef, client),
-        customerByOwner: (ownerRef: string) => repository.customerByOwner(ownerRef, undefined, client),
+        customerByOwner: (ownerRef: string) => repository.customerByOwner(ownerRef, client),
         latestProfile: (customerId: string) => repository.latestProfile(customerId, client)
       });
       const stored = await storedTaxContext({ billing: throughClient, recordsKey: deps.recordsKey }, subscription);
@@ -211,24 +204,16 @@ export function createCardCheckSettlement(deps: Readonly<{
       }
       const locked = { state: subscription, events: context.events };
       const data = { charge_id: context.charge.chargeId, retry_now: subscription.status === "PAST_DUE" };
-      if (payment !== null) {
-        // N10 chose the newest eligible token of this check (§2.15.2); none means the card cannot be used: try again.
-        if (payment.cardTokenId === null) {
-          deps.audit("billing.card.not_adopted", {});
-          return refused("CARD_CHECK_DEFERRED");
-        }
-        await appendChecked(repository, client, locked, { kind: "CARD_CHANGED", at: now, cardTokenId: payment.cardTokenId, data });
-        if (subscription.cardTokenId !== null && subscription.cardTokenId !== payment.cardTokenId) {
-          await repository.revokeCardToken(client, { tokenId: subscription.cardTokenId, at: now, reason: "REPLACED" });
-        }
-        return APPLIED;
+      // N10 chose the newest eligible token of this check (§2.15.2); none means the card cannot be used: try again.
+      if (payment.cardTokenId === null) {
+        deps.audit("billing.card.not_adopted", {});
+        return refused("CARD_CHECK_DEFERRED");
       }
-      if (transaction === null) throw new TypeError("BILLING_CARD_CHECK_WITHOUT_TRANSACTION");
-      await appendChecked(repository, client, locked, {
-        kind: "CARD_CHANGED", at: now, xmoneyOrderId: transaction.orderId, xmoneyCustomerId: transaction.customerId,
-        cardRef: transaction.cardId, data
-      });
-      return RELEASE;
+      await appendChecked(repository, client, locked, { kind: "CARD_CHANGED", at: now, cardTokenId: payment.cardTokenId, data });
+      if (subscription.cardTokenId !== null && subscription.cardTokenId !== payment.cardTokenId) {
+        await repository.revokeCardToken(client, { tokenId: subscription.cardTokenId, at: now, reason: "REPLACED" });
+      }
+      return APPLIED;
     },
     async failed(): Promise<void> {
       return;

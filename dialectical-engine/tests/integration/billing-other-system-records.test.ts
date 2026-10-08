@@ -21,7 +21,7 @@ type System = Readonly<Record<string, string>>;
 function event(subscriptionId: string, ownerRef: string, kind: SubscriptionEvent["kind"], extra: Partial<SubscriptionEvent> = {}): SubscriptionEvent {
   return {
     eventId: randomUUID(), subscriptionId, ownerRef, kind, at: anchor, planId: "PLUS", periodAnchorAt: null,
-    xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null, cardTokenId: null, data: {}, ...extra
+    cardTokenId: null, data: {}, ...extra
   };
 }
 
@@ -29,10 +29,9 @@ async function active(ownerRef: string, created: System): Promise<string> {
   const subscriptionId = randomUUID();
   await billing.withTransaction(async (client) => {
     await billing.appendSubscriptionEvent(client, event(subscriptionId, ownerRef, "CREATED", { data: created }));
-    // An xMoney-era plan (no payment_provider in CREATED) still needs its order to fold (N7); a NETOPIA plan has none.
+    // N23: an old plan (no payment_provider in CREATED) folds without its order now; the column stays for old rows.
     await billing.appendSubscriptionEvent(client, event(subscriptionId, ownerRef, "ACTIVATED", {
-      periodAnchorAt: anchor, xmoneyOrderId: created.payment_provider === undefined ? "4711" : null,
-      data: { announced_total_micros: 24_200_000, recurring_net_micros: 20_000_000 }
+      periodAnchorAt: anchor, data: { announced_total_micros: 24_200_000, recurring_net_micros: 20_000_000 }
     }));
   });
   return subscriptionId;

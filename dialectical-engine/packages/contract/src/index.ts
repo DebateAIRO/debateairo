@@ -515,7 +515,7 @@ export type BillingUpgradePendingResponse = Readonly<{ state: "PENDING"; charge_
 /** P12d: the step-up grant for WITHDRAW_SUBSCRIPTION (the same 43-character token every step-up grant is). */
 export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
 /**
- * `refund`: what goes back to the card. Null when a refund made in the xMoney dashboard already touched a payment:
+ * `refund`: what goes back to the card. Null when a refund made in NETOPIA's admin already touched a payment:
  * the plan has ended, and the owner settles what is still due and writes (P14c; M8 follows).
  */
 export const BillingWithdrawResponseSchema = z.object({ refund: BillingDecimalMoneySchema.nullable() }).strict();
@@ -1399,7 +1399,6 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/quote",
     "POST /v1/billing/checkout",
     "GET /v1/billing/charges/{chargeRef}",
-    "POST /v1/billing/xmoney/notify",
     "POST /v1/billing/netopia/notify",
     "GET /v1/billing/subscription",
     "GET /v1/billing/invoices",

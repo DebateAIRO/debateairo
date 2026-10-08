@@ -237,7 +237,7 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
         if (this.deps.mode === "PROVIDER_ONLY") return "BILLING_OFF";
         if (!target.ours) return "OTHER_SYSTEM";
         // A charge always has its owner's customer row (the checkout writes it first); without one no card is kept.
-        const customer = await this.deps.repository.customerByOwner(target.ownerRef, undefined, client);
+        const customer = await this.deps.repository.customerByOwner(target.ownerRef, client);
         if (customer !== null) {
           await this.saveCard(client, parsed, {
             customerId: customer.customerId, sourceChargeId: target.chargeId, sourceToolOrder: null, environment: target.environment

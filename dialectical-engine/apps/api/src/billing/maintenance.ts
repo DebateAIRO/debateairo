@@ -1,13 +1,13 @@
 import { addBusinessDays, foldSubscription, microsToDecimal, type SubscriptionState } from "@debateai/billing-core";
-import type { BillingJobQueries, BillingRepository, CustomerXMoneyEnvironment, EntitlementRepository } from "@debateai/db";
+import type { BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import type { BillingPolicy } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
 import type { CardCustody } from "./card-custody.js";
 import { emailJob } from "./email-job.js";
-import { enqueueOnce } from "./outbox.js";
+import { enqueueOnce, isThisPaymentSystem } from "./outbox.js";
 import { codeOf, failureCode, type RenewalService, type RetryPrice } from "./renewal.js";
-import { addDays, anniversaryDue, dunningProgress, servedHere, type PaymentSystems } from "./renewal-rules.js";
+import { addDays, anniversaryDue, dunningProgress } from "./renewal-rules.js";
 import { subscriptionEvent } from "./rows.js";
 import { endDunning } from "./settlement-renewal.js";
 
@@ -21,12 +21,10 @@ export type MaintenanceDeps = Readonly<{
   /** R-7: PUBLIC_APP_URL. */
   publicAppUrl: string;
   /**
-   * D5 5h: P6a's connectors.xmoneyEnvironment; with `paymentEnvironment` (N8's NETOPIA environment, absent in the xMoney
-   * harnesses), the systems this pass serves (`servedHere`): a subscription of any other system is never retried here,
-   * nor its renewal announced, nor its yearly reminder (M4) sent.
+   * D5 5h: N8's connectors.paymentEnvironment, the NETOPIA environment this pass serves (`isThisPaymentSystem`): a
+   * subscription of any other system is never retried here, nor its renewal announced, nor its yearly reminder (M4) sent.
    */
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
-  paymentEnvironment?: "sandbox" | "live";
+  paymentEnvironment: "sandbox" | "live";
   audit: BillingAudit;
   /** N17 (spec §2.15.3): A7's daily look-ahead also asks for a card ten days before a renewal (M12). Absent: none. */
   custody?: Pick<CardCustody, "askForCard">;
@@ -41,8 +39,8 @@ export class BillingMaintenance {
 
   constructor(private readonly deps: MaintenanceDeps) {}
 
-  private systems(): PaymentSystems {
-    return Object.freeze({ xmoneyEnvironment: this.deps.xmoneyEnvironment, paymentEnvironment: this.deps.paymentEnvironment ?? null });
+  private served(state: SubscriptionState): boolean {
+    return isThisPaymentSystem(state, this.deps.paymentEnvironment);
   }
 
   async runOnce(): Promise<MaintenanceReport> {
@@ -168,7 +166,7 @@ export class BillingMaintenance {
       const state = foldSubscription(events);
       if (state.status !== "PAST_DUE" || state.cancelRequested || state.currentPeriodEnd === null) return false;
       // D5 5h / spec §2.5.4: another payment system's plan is never charged from here, nor dunned without a charge.
-      if (!servedHere(state, this.systems())) return false;
+      if (!this.served(state)) return false;
       const progress = dunningProgress(events, state);
       if (progress === null) return false;
       const periodStart = state.currentPeriodEnd;
@@ -206,9 +204,7 @@ export class BillingMaintenance {
           ? "RETRIED" : false;
       }
       // Spec §2.9.3 step 5: a NETOPIA retry is a NEW orderID, so no earlier attempt of the period may still hold a payment.
-      // (An xMoney plan keeps today's path: its retry is never probed here.)
-      const earlier = state.paymentProvider === "netopia"
-        ? await this.deps.renewal.earlierAttemptPaid(state, periodStart, next, now) : "NONE";
+      const earlier = await this.deps.renewal.earlierAttemptPaid(state, periodStart, next, now);
       if (earlier !== "NONE") {
         this.deps.audit("billing.renewal.retry_held", {
           code: earlier === "PAID" ? "EARLIER_ATTEMPT_PAID"
@@ -251,7 +247,7 @@ export class BillingMaintenance {
       const later = (await this.deps.repository.chargesForSubscription(seen.subscriptionId, client)).some((charge) =>
         charge.kind === "RENEWAL" && charge.periodStart.getTime() === periodStart.getTime() && charge.attempt > failedAttempts);
       if (later) return false;
-      const customer = await this.deps.repository.customerByOwner(state.ownerRef, undefined, client);
+      const customer = await this.deps.repository.customerByOwner(state.ownerRef, client);
       if (customer === null) throw new TypedDomainError("BILLING_CUSTOMER_MISSING", "a subscription without its customer");
       await endDunning(this.deps, client, {
         subscription: state, customerId: customer.customerId, data: { retry_days_spent: true }, now
@@ -263,7 +259,7 @@ export class BillingMaintenance {
   private async remind(state: SubscriptionState, now: Date, report: MaintenanceReport): Promise<void> {
     if (state.activatedAt === null || state.cancelRequested || state.currentPeriodEnd === null) return;
     // D5 5h (P2-W3 (b)'s sibling): another payment system's plan is never renewed here, so it is never reminded either.
-    if (!servedHere(state, this.systems())) return;
+    if (!this.served(state)) return;
     const years = anniversaryDue(state.activatedAt, now, 7);
     if (years === null) return;
     const customer = await this.deps.repository.customerByOwner(state.ownerRef);
@@ -285,7 +281,7 @@ export class BillingMaintenance {
     const end = state.currentPeriodEnd;
     if (state.cancelRequested || end === null || end.getTime() <= now.getTime()) return;
     // D5 5h: P11a's renewal never renews another payment system's plan (`dueRenewals`), so nothing is announced for it.
-    if (!servedHere(state, this.systems())) return;
+    if (!this.served(state)) return;
     if (addBusinessDays(now, this.deps.policy.lookAheadBusinessDays).getTime() < end.getTime()) return;
     const queued = await this.deps.repository.withTransaction((client) => enqueueOnce(this.deps, client, {
       kind: "RENEWAL_NOTICE", ref: `${state.subscriptionId}:${end.toISOString()}`, notBefore: now, payload: {}

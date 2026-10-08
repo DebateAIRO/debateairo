@@ -14,32 +14,30 @@ function state(overrides: Partial<SubscriptionState> = {}): SubscriptionState {
     subscriptionId: "sub-1", ownerRef: "owner-1", planId: "PLUS", status: "ACTIVE",
     periodAnchorAt: ACTIVATED, currentPeriodStart: ACTIVATED, currentPeriodEnd: PERIOD_END,
     cancelRequested: false, scheduledDowngradePlanId: null,
-    xmoneyOrderId: "901", xmoneyCustomerId: "77", cardRef: "4242",
     activatedAt: ACTIVATED, endedCause: null, pastDueSince: null, retryIndex: 0,
-    renewalPostponedUntil: null, announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "xmoney",
-    paymentEnvironment: "stage", cardTokenId: null,
+    renewalPostponedUntil: null, announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "netopia",
+    paymentEnvironment: "sandbox", cardTokenId: null,
     ...overrides
   });
 }
 
-// The API's two systems: xMoney stage and NETOPIA sandbox (the fixture's `subscriptionDeps` defaults).
+// The API's payment system: NETOPIA's sandbox (the fixture's `subscriptionDeps` default).
 const view = (overrides: Partial<SubscriptionState> = {}, taxCountry: string | null = "RO", now = NOW) => subscriptionView({
-  state: state(overrides), taxCountry, policy: testBillingPolicy, now, xmoneyEnvironment: "stage", paymentEnvironment: "sandbox"
+  state: state(overrides), taxCountry, policy: testBillingPolicy, now, paymentEnvironment: "sandbox"
 });
-/** A NETOPIA plan of the API's environment: since N12 the only plan the upgrade route serves. */
+/** A NETOPIA plan of the API's environment (the default plan above): the only plan the upgrade route serves. */
 const NETOPIA: Partial<SubscriptionState> = Object.freeze({ paymentProvider: "netopia", paymentEnvironment: "sandbox" });
 
 describe("P12b the subscription as the person sees it", () => {
   it("shows the renewal date, the announced total and the open withdrawal window", () => {
-    // Since N12 an xMoney plan is never offered the upgrade, and since N13 never the card change (both routes serve
-    // NETOPIA plans only).
+    // A NETOPIA plan of this API's environment, ACTIVE, below Max and outside the renewal's lead: both are offered.
     expect(view()).toEqual({
       plan_id: "PLUS", status: "ACTIVE", cancel_requested: false,
       current_period_end: "2026-11-01T09:00:00.000Z", renews_on: "2026-11-01T09:00:00.000Z",
       renewal_total: "24.20", scheduled_downgrade_plan_id: null,
       // Romania: the 14 days run 2–15 October, Bucharest time; the window closes at the next local midnight.
       withdrawal_open_until: "2026-10-15T21:00:00.000Z", withdrawal_last_day: "2026-10-15",
-      can_upgrade: false, can_change_card: false, can_revoke_cancel: false
+      can_upgrade: true, can_change_card: true, can_revoke_cancel: false
     });
   });
 
@@ -58,7 +56,7 @@ describe("P12b the subscription as the person sees it", () => {
   it("closes the withdrawal window at the end of the 14th calendar day, the consumer's time (R2 Q-6)", () => {
     const open = (overrides: Partial<SubscriptionState>, taxCountry: string | null, now: Date) =>
       withdrawalOpenUntil({
-        state: state(overrides), taxCountry, policy: testBillingPolicy, now, xmoneyEnvironment: "stage", paymentEnvironment: "sandbox"
+        state: state(overrides), taxCountry, policy: testBillingPolicy, now, paymentEnvironment: "sandbox"
       });
     // Romania, activated Thursday 1 October 09:00 UTC: the last day is Thursday 15 October.
     expect(open({}, "RO", new Date("2026-10-15T20:59:59.999Z"))).toEqual(new Date("2026-10-15T21:00:00.000Z"));
@@ -72,7 +70,7 @@ describe("P12b the subscription as the person sees it", () => {
   it("rolls a 14th day on a Saturday or Sunday to the next Monday (W6, P2-I9: Regulation 1182/71 art. 3(4))", () => {
     const open = (overrides: Partial<SubscriptionState>, taxCountry: string | null, now: Date) =>
       withdrawalOpenUntil({
-        state: state(overrides), taxCountry, policy: testBillingPolicy, now, xmoneyEnvironment: "stage", paymentEnvironment: "sandbox"
+        state: state(overrides), taxCountry, policy: testBillingPolicy, now, paymentEnvironment: "sandbox"
       });
     // Romania, activated Saturday 3 October: the 14th day is Saturday 17 October, so the window stays open through
     // Sunday 18 and Monday 19 October and closes at Monday's midnight, Bucharest time.
@@ -134,56 +132,47 @@ describe("P12b the subscription as the person sees it", () => {
   });
 
   it("offers the upgrade only to a NETOPIA plan of this API's environment (N12, spec §2.5.4, §2.10)", () => {
-    const read = (api: "sandbox" | "live" | null, overrides: Partial<SubscriptionState>) => subscriptionView({
-      state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now: NOW, xmoneyEnvironment: "stage",
-      paymentEnvironment: api
+    const read = (api: "sandbox" | "live", overrides: Partial<SubscriptionState>) => subscriptionView({
+      state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now: NOW, paymentEnvironment: api
     });
     // Control: a NETOPIA plan of the API's own environment is offered it, sandbox or live.
     expect(read("sandbox", NETOPIA).can_upgrade).toBe(true);
     expect(read("live", { paymentProvider: "netopia", paymentEnvironment: "live" }).can_upgrade).toBe(true);
-    // A plan of the other NETOPIA environment, or one read by an API that serves no NETOPIA environment, is not.
+    // A plan of the other NETOPIA environment is not: the route answers it NOT_SUBSCRIBED.
     expect(read("live", NETOPIA).can_upgrade).toBe(false);
     expect(read("sandbox", { paymentProvider: "netopia", paymentEnvironment: "live" }).can_upgrade).toBe(false);
-    expect(read(null, NETOPIA).can_upgrade).toBe(false);
-    // An xMoney plan of the API's own xMoney system is not offered it either: the route answers it NOT_SUBSCRIBED.
-    expect(read("sandbox", {}).can_upgrade).toBe(false);
   });
 
   it("offers the card change only to a NETOPIA plan of this API's environment (N13, spec §2.5.4, §2.11)", () => {
     // Both routes refuse anything else NOT_SUBSCRIBED (upgrade.ts, card-change.ts), so Settings never offers them.
-    const read = (api: "sandbox" | "live" | null, overrides: Partial<SubscriptionState> = {}) => subscriptionView({
-      state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now: NOW, xmoneyEnvironment: "stage",
-      paymentEnvironment: api
+    const read = (api: "sandbox" | "live", overrides: Partial<SubscriptionState> = {}) => subscriptionView({
+      state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now: NOW, paymentEnvironment: api
     });
     // Control: a NETOPIA plan of the API's own environment is offered it, ACTIVE or PAST_DUE, sandbox or live.
     expect(read("sandbox", NETOPIA).can_change_card).toBe(true);
     expect(read("sandbox", { ...NETOPIA, status: "PAST_DUE" }).can_change_card).toBe(true);
     expect(read("live", { paymentProvider: "netopia", paymentEnvironment: "live" }).can_change_card).toBe(true);
-    // A plan of the other NETOPIA environment, or one read by an API that serves no NETOPIA environment, is not.
-    expect(read("live", NETOPIA).can_change_card).toBe(false);
-    expect(read(null, NETOPIA).can_change_card).toBe(false);
-    // An xMoney plan, even of the API's own xMoney system, is offered neither (P2-W3 (a), D5 5h).
-    expect(read("sandbox")).toMatchObject({ can_upgrade: false, can_change_card: false });
-    expect(read("sandbox", { status: "PAST_DUE" })).toMatchObject({ can_upgrade: false, can_change_card: false });
+    // A plan of the other NETOPIA environment is offered neither (P2-W3 (a), D5 5h).
+    expect(read("live", NETOPIA)).toMatchObject({ can_upgrade: false, can_change_card: false });
+    expect(read("live", { ...NETOPIA, status: "PAST_DUE" })).toMatchObject({ can_upgrade: false, can_change_card: false });
   });
 
-  it("offers Undo only where the revoke route accepts it: ACTIVE, this API's xMoney system, a cancel pending, before the period end (C-15)", () => {
-    const read = (api: "stage" | "live", overrides: Partial<SubscriptionState> = {}, now = NOW) => subscriptionView({
-      state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now, xmoneyEnvironment: api,
-      paymentEnvironment: "sandbox"
+  it("offers Undo only where the revoke route accepts it: ACTIVE, this API's payment system, a cancel pending, before the period end (C-15)", () => {
+    const read = (api: "sandbox" | "live", overrides: Partial<SubscriptionState> = {}, now = NOW) => subscriptionView({
+      state: state(overrides), taxCountry: "RO", policy: testBillingPolicy, now, paymentEnvironment: api
     });
     // README §14.8's same-host switch: a live start allows a sandbox plan only ACTIVE with a cancel pending, and the
     // revoke route refuses it NOT_SUBSCRIBED (subscription-actions.ts), which Settings would word as "try again".
     expect(read("live", { cancelRequested: true }).can_revoke_cancel).toBe(false);
     // Control: the plan's own system offers it, and a live plan on the live API too.
-    expect(read("stage", { cancelRequested: true }).can_revoke_cancel).toBe(true);
+    expect(read("sandbox", { cancelRequested: true }).can_revoke_cancel).toBe(true);
     expect(read("live", { cancelRequested: true, paymentEnvironment: "live" }).can_revoke_cancel).toBe(true);
     // Nothing to undo; the period is over (the route refuses it there); a plan paused by a dispute (refused while paused).
-    expect(read("stage").can_revoke_cancel).toBe(false);
-    expect(read("stage", { cancelRequested: true }, new Date(PERIOD_END.getTime() - 1)).can_revoke_cancel).toBe(true);
-    expect(read("stage", { cancelRequested: true }, PERIOD_END).can_revoke_cancel).toBe(false);
-    expect(read("stage", { cancelRequested: true, status: "SUSPENDED" }).can_revoke_cancel).toBe(false);
-    expect(read("stage", { cancelRequested: true, status: "ENDED" }).can_revoke_cancel).toBe(false);
+    expect(read("sandbox").can_revoke_cancel).toBe(false);
+    expect(read("sandbox", { cancelRequested: true }, new Date(PERIOD_END.getTime() - 1)).can_revoke_cancel).toBe(true);
+    expect(read("sandbox", { cancelRequested: true }, PERIOD_END).can_revoke_cancel).toBe(false);
+    expect(read("sandbox", { cancelRequested: true, status: "SUSPENDED" }).can_revoke_cancel).toBe(false);
+    expect(read("sandbox", { cancelRequested: true, status: "ENDED" }).can_revoke_cancel).toBe(false);
   });
 
   it("names only paid plans, every one of them a PlanIdSchema member, and never shows Free as a subscription", () => {

@@ -13,6 +13,7 @@ import type { BillingAudit } from "./audit.js";
 import { bestPaymentId, paidOrAlmost, readPaymentStatus, startHostedCharge, stillPayable } from "./hosted-payment.js";
 import { clientIdOf, netopiaNotifyUrl, payerFromProfile, paymentReturnUrl } from "./netopia-payer.js";
 import { englishOrderText, planName, type BillingOrderText } from "./order-text.js";
+import { isThisPaymentSystem } from "./outbox.js";
 import { decidePaymentPlace, placeRefusal } from "./place.js";
 import { addressRequired, LIVE_SUBSCRIPTION_STATUSES } from "./quote.js";
 import {
@@ -213,7 +214,7 @@ export class CheckoutService implements CheckoutServicePort {
       await this.deps.acceptances.record(client, this.consentRows(input));
       // Spec §2.6.2 step 2: NETOPIA has no customer object; our own customer is the client id's source (§2.6.4).
       const customer = await this.deps.repository.ensureCustomer(client, {
-        ownerRef: input.ownerRef, locale: input.locale, now: input.now, environment: null
+        ownerRef: input.ownerRef, locale: input.locale, now: input.now
       });
       const profile: BillingProfile = {
         email, locale: input.locale, name: location.company?.name ?? location.name, firstName: location.firstName,
@@ -232,8 +233,7 @@ export class CheckoutService implements CheckoutServicePort {
       const subscriptionId = randomUUID();
       await this.deps.repository.appendSubscriptionEvent(client, {
         eventId: randomUUID(), subscriptionId, ownerRef: input.ownerRef, kind: "CREATED", at: input.now,
-        planId: quote.planId, periodAnchorAt: null, xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null,
-        cardTokenId: null,
+        planId: quote.planId, periodAnchorAt: null, cardTokenId: null,
         data: {
           country_confirmed: place.kind === "CONFIRM_COUNTRY", ip_country: place.ipCountry, quote_id: quote.quoteId,
           // Spec §2.5.5: the payment system this subscription's charges and saved card belong to.
@@ -313,9 +313,9 @@ export class CheckoutService implements CheckoutServicePort {
     return Object.freeze({ chargeId: initial.chargeId, read: answer === "UNREADABLE" ? "READ_FAILED" : answer });
   }
 
-  /** Spec §2.5.4: a NETOPIA charge of the environment this API pays in (an xMoney-era checkout is never paid here). */
+  /** Spec §2.5.4: a NETOPIA charge of the environment this API pays in (another system's checkout is never paid here). */
   private servedHere(charge: Pick<ChargeRow, "paymentProvider" | "paymentEnvironment">): boolean {
-    return charge.paymentProvider === "netopia" && charge.paymentEnvironment === this.deps.payments.environment;
+    return isThisPaymentSystem(charge, this.deps.payments.environment);
   }
 
   /** Spec §2.6.3 under the owner lock: the open checkout's charge, from its rows and the read made before the lock. */
@@ -325,7 +325,7 @@ export class CheckoutService implements CheckoutServicePort {
   ): Promise<Verdict> {
     const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId, client))
       .find((charge) => charge.kind === "INITIAL");
-    // An xMoney-era checkout, or one of another environment, is never paid here: it is abandoned (spec §2.5.4).
+    // A checkout of another payment system is never paid here: it is abandoned (spec §2.5.4).
     if (initial === undefined || !this.servedHere(initial)) return { kind: "ABANDON" };
     const events = (await this.deps.repository.charge(initial.chargeId, client))?.events ?? [];
     const hosted = await this.deps.repository.hostedPaymentForCharge(client, initial.chargeId);

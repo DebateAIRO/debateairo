@@ -158,24 +158,24 @@ describe("P16b the summary", () => {
     // P2-I5: a refund job the charge records no request for moved no money; the help text says it is no refund to make.
     expect(text).toContain(`charge ${"4".repeat(32)}: REFUND_NOT_REQUESTED, since 2026-11-17`);
     expect(text).toContain("REFUND_NOT_REQUESTED: a refund job that matches no refund request our records hold for this"
-      + " payment, so nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to"
-      + " the billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
+      + " payment, so nothing was sent to NETOPIA and it is no refund to make; do not refund it: something able to write"
+      + " to the billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
       + " (one never refunded is still owed);");
-    // P2-W4: a refund job of the other xMoney system sent nothing and is owed nothing on this server (C2's legend).
+    // P2-W4: a refund job of another payment system sent nothing and is owed nothing on this server (C2's legend).
     expect(text).toContain(`charge ${"2".repeat(32)}: REFUND_OTHER_SYSTEM, since 2026-11-20`);
-    expect(text).toContain("REFUND_OTHER_SYSTEM: a refund job for a payment of the other xMoney system (sandbox or live):"
-      + " nothing was sent, and nothing is owed on this server;");
+    expect(text).toContain("REFUND_OTHER_SYSTEM: a refund job for a payment of another payment system (the previous card"
+      + " processor, or NETOPIA's sandbox or live): nothing was sent, and nothing is owed on this server;");
     // The two real dead ends keep their own words.
-    expect(text).toContain("(REFUND_REFUSED: xMoney refused our refund, the money is still owed, refund it from the dashboard;"
-      + " REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check the dashboard before refunding again;"
+    expect(text).toContain("(REFUND_REFUSED: NETOPIA refused our refund, the money is still owed, refund it from NETOPIA's"
+      + " admin; REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check NETOPIA's admin before refunding again;"
       + " a WITHDRAWAL refund is due within 14 days of the withdrawal; REFUND_NOT_REQUESTED:");
-    // P9c's second refund made elsewhere: named by the xMoney transaction the owner opens in the dashboard.
-    expect(text).toContain("xMoney transaction 9912345: REFUND_UNRECORDED, since 2026-11-11");
-    expect(text).toContain("REFUND_UNRECORDED: a second refund made in the xMoney dashboard");
+    // P9c's second refund made elsewhere: named by the payment the owner opens in NETOPIA's admin.
+    expect(text).toContain("NETOPIA payment 9912345: REFUND_UNRECORDED, since 2026-11-11");
+    expect(text).toContain("REFUND_UNRECORDED: a second refund made in NETOPIA's admin");
     // Part 4 final review C-6: a refund transaction of a payment whose dashboard-refund credit note is recorded
     // (P4-K's --amount, which the figures already subtract) is never taken off a second time by hand.
-    expect(text).toContain("take it off that country's net sales and tax by hand. A refund transaction of a payment whose"
-      + " dashboard-refund credit note is recorded is already in the figures above: do not take it off again;");
+    expect(text).toContain("take it off that country's net sales and tax by hand. A refund of a payment whose"
+      + " admin-refund credit note is recorded is already in the figures above: do not take it off again;");
     expect(text).toContain("owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93: WITHDRAWAL_BY_OWNER, since 2026-11-10");
     expect(text).toContain(`charge ${"5".repeat(32)}: RENEWAL_STUCK, since 2026-11-12`);
     expect(text).toContain(`charge ${"8".repeat(32)}: PAYMENT_UNSETTLED, since 2026-10-02`);
@@ -214,14 +214,14 @@ describe("P16b the summary", () => {
     }]);
     const text = renderTaxSummary(alone);
     expect(text).toContain("Net sales 20.00 USD, tax collected 4.20 USD, from 1 sale and 0 refunds.");
-    expect(text).toContain("Not subtracted: 1 refund made in the xMoney dashboard, amount unknown (listed below).");
-    expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown (not subtracted above;");
+    expect(text).toContain("Not subtracted: 1 refund made in NETOPIA's admin, amount unknown (listed below).");
+    expect(text).toContain("Refunds made in NETOPIA's admin, amount unknown (not subtracted above;");
     // P4-K (P2-W12): the owner records the hand-made credit note with its amount, and the summary then subtracts it.
     expect(text).toContain("issue its credit note by hand and record it with its amount (pnpm billing:invoice --amount, as"
       + " its line under the invoices and credit notes to check by hand says), and the summary then subtracts it at that"
       + " amount; until then, adjust that country's net sales and tax by hand, at most the amount shown):");
     expect(text).toContain(`charge ${"a".repeat(32)}, RO, up to 24.20 USD, on 2026-11-20`);
-    // A refund whose amount is known (ours, or one xMoney reported as its own transaction) is still subtracted.
+    // A refund whose amount is known (ours, or an old one recorded as its own transaction) is still subtracted.
     const known = row({ chargeId: "a".repeat(32), type: "REFUND", amountMicros: 12_100_000, amountKnown: true });
     const both = buildTaxSummary({
       quarter: Q4, rows: [sale, unknown, known], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: []
@@ -252,7 +252,7 @@ describe("P16b the summary", () => {
     expect(text).toContain(`charge ${charge}: REFUNDED_BEFORE_START (NO_DOCUMENT_OWED), since 2026-11-20`);
     expect(text).toContain("  * REFUNDED_BEFORE_START (NO_DOCUMENT_OWED): Refunded before it started: no invoice or credit"
       + " note is owed. Take this sale and its refund out of the quarter's figures by hand.");
-    expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown: none.");
+    expect(text).toContain("Refunds made in NETOPIA's admin, amount unknown: none.");
     expect(text).not.toContain("Not subtracted:");
     expect(text).not.toContain(`charge ${charge}, RO, up to`);
 
@@ -266,7 +266,7 @@ describe("P16b the summary", () => {
     }]);
     expect(dashboard.lines.find((line) => line.taxCountry === "RO")).toMatchObject({ unknownRefunds: 1 });
     const dashboardText = renderTaxSummary(dashboard);
-    expect(dashboardText).toContain("Not subtracted: 1 refund made in the xMoney dashboard, amount unknown (listed below).");
+    expect(dashboardText).toContain("Not subtracted: 1 refund made in NETOPIA's admin, amount unknown (listed below).");
     expect(dashboardText).toContain(`charge ${charge}, RO, up to 24.20 USD, on 2026-11-20`);
     expect(dashboardText).toContain(`charge ${charge}: DASHBOARD_REFUND (CREDIT_NOTE_MANUAL), since 2026-11-20`);
   });
@@ -343,11 +343,11 @@ describe("P16b the summary", () => {
     expect(text).toContain("Charges with conflicting location evidence: none.");
     expect(text).toContain("Sales where we are not registered: none.");
     expect(text).toContain("Charge-backs this quarter: none.");
-    expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown: none.");
+    expect(text).toContain("Refunds made in NETOPIA's admin, amount unknown: none.");
     expect(text).toContain("Invoices and credit notes to check by hand: none.");
     expect(text).toContain("Emails that never went out: none.");
     expect(text).toContain("Romanian e-Factura documents to confirm: none.");
-    expect(text).toContain("Payments to check by hand in xMoney: none.");
+    expect(text).toContain("Payments to check by hand in NETOPIA's admin: none.");
   });
 
   it("gathers the payments to check from every list the owner must act on", async () => {
@@ -355,16 +355,16 @@ describe("P16b the summary", () => {
     const owner = "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93";
     const items = await paymentsToCheckFrom({
       deadRefunds: async () => [
-        { chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "XMONEY_REFUSED", since: now },
+        { chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "PAYMENT_CONFIGURATION_REFUSED", since: now },
         { chargeId: "6".repeat(32), transactionId: "2", reason: "WITHDRAWAL", code: "REFUND_OUTCOME_UNKNOWN", since: now },
         // P2-I5: a forged job's payload reason is only its claim, so the line carries none.
         { chargeId: "4".repeat(32), transactionId: "3", reason: "CARD_CHECK_RELEASE", code: "REFUND_NOT_REQUESTED", since: now },
-        // P2-W4: neither reached xMoney, so neither is a refund xMoney refused. A job naming a charge we do not have is
-        // no refund to make; a job of the other xMoney system is owed nothing here. Neither payload reason is verified.
+        // P2-W4: neither reached NETOPIA, so neither is a refund NETOPIA refused. A job naming a charge we do not have
+        // is no refund to make; a job of another payment system is owed nothing here. Neither payload reason is verified.
         { chargeId: "3".repeat(32), transactionId: "4", reason: "WITHDRAWAL", code: "REFUND_CHARGE_MISSING", since: now },
-        { chargeId: "2".repeat(32), transactionId: "5", reason: "WITHDRAWAL", code: "OTHER_XMONEY_SYSTEM", since: now },
-        // Part 4 final review C-7: an unreadable payload ended before any xMoney call, and only a row written by
-        // something else holds one, so it is listed like the claimed-only codes: no refund xMoney refused, and its
+        { chargeId: "2".repeat(32), transactionId: "5", reason: "WITHDRAWAL", code: "OTHER_PAYMENT_SYSTEM", since: now },
+        // Part 4 final review C-7: an unreadable payload ended before any call to NETOPIA, and only a row written by
+        // something else holds one, so it is listed like the claimed-only codes: no refund NETOPIA refused, and its
         // reason is never printed (REFUND_NOT_REQUESTED's legend sends the owner to the charge's own requests).
         { chargeId: "1".repeat(32), transactionId: "6", reason: "WITHDRAWAL", code: "REFUND_PAYLOAD_INVALID", since: now }
       ],

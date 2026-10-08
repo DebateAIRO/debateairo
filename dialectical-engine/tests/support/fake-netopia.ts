@@ -1,6 +1,6 @@
 // tests/support/fake-netopia.ts
 // The server lives in acceptance/ so the development stack (apps/runner) can start it without importing a test module
-// (tools/orphan-audit/src/index.ts:726). The NETOPIA counterpart of tests/support/fake-xmoney.ts.
+// (tools/orphan-audit/src/index.ts:726).
 export {
   startFakeNetopia,
   type FakeNetopia,

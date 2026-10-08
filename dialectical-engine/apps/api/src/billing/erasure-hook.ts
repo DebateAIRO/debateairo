@@ -44,7 +44,7 @@ export function erasurePendingOf(
  * Spec §2.5.6 "Erasure", as the owner ruled on 2 October 2026 (W7, P2-I10; spec A29 (j)). Read under the owner lock,
  * one of three things happens:
  * - The erasure has committed (0091's `billing.owner_erasure_committed`), or (R3-2) the age gate froze the account:
- *   the plan ends as P15 ended it at scheduling before: ERASURE_STOPPED and the FREE entitlement, never an xMoney call
+ *   the plan ends as P15 ended it at scheduling before: ERASURE_STOPPED and the FREE entitlement, never a call to NETOPIA
  *   (A4d), never a refund. A freeze marks the row `stopped_for: "AGE_FROZEN"` and the audit line
  *   `billing.age_frozen.stopped` (P2's fold has one stop kind, so the mark lives on the row), so it is never read as
  *   an erasure. Whether its money goes back is the owner's question, not this hook's. N17 (spec §2.15.4): at a

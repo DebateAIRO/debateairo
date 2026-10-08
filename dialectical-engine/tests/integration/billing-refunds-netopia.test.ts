@@ -2,10 +2,9 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { computeWindows, foldSubscription, type CardPayments, type PaymentReport } from "@debateai/billing-core";
 import {
-  AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type OutboxJob
+  AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, migrate, RETIRED_OUTBOX_KINDS,
+  type OutboxJob
 } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
-import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testBillingPlans, testBillingPolicy, testCountryPolicy } from "../support/billingFixtures.js";
 import {
@@ -33,9 +32,6 @@ beforeAll(async () => {
 afterAll(async () => database?.stop());
 
 const DAY = 86_400_000;
-const unused = async (): Promise<never> => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "no xMoney in this suite"); };
-const NO_XMONEY = Object.freeze({ getTransaction: unused, getOrder: unused, getCard: unused, refund: unused, listTransactions: unused }) as
-  unknown as Pick<XMoneyClient, "getTransaction" | "getOrder" | "getCard" | "refund" | "listTransactions">;
 
 /** The port: scripted status reads, and (API mode only) a refund call that records what it was asked. */
 class RefundPort implements Pick<CardPayments, "status" | "refund"> {
@@ -58,13 +54,13 @@ const report = (orderId: string, providerPaymentId: string, state: PaymentReport
 function deskFor(port: RefundPort, clock: { now: Date }) {
   const audit = recordingAudit();
   const refunds = new RefundDesk({
-    repository, jobs, xmoney: NO_XMONEY, policy: testBillingPolicy, audit, clock: () => clock.now, xmoneyEnvironment: "stage",
+    repository, jobs, policy: testBillingPolicy, audit, clock: () => clock.now,
     netopia: { payments: port, paymentEnvironment: "sandbox", jobs }
   });
   const entitlements = new EntitlementRepository(database.pool);
   const verify = new VerifyPaymentHandler({
-    repository, jobs, xmoney: NO_XMONEY, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
-    recordsKey: TEST_RECORDS_KEY, audit, xmoneyEnvironment: "stage", netopia: { payments: port, paymentEnvironment: "sandbox", jobs }
+    repository, jobs, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
+    recordsKey: TEST_RECORDS_KEY, audit, netopia: { payments: port, paymentEnvironment: "sandbox", jobs }
   });
   verify.registerSettlement("INITIAL", createInitialSettlement({
     repository, entitlements, acceptances: new AcceptanceRepository(database.pool), policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL
@@ -115,7 +111,9 @@ describe("N14 refunds on NETOPIA: the owner mode", () => {
     const { refunds, audit } = deskFor(port, clock);
     await requestWhole(seeded, refunds, "SUBSCRIPTION_ENDED", seeded.totalMicros);
     const ref = `${seeded.initialChargeId}:${seeded.providerPaymentId}`;
-    expect((await database.pool.query("SELECT 1 FROM billing.outbox WHERE kind = 'XMONEY_REFUND' AND ref = $1", [ref])).rowCount).toBe(0);
+    // No job of the previous card processor's refund kind (N23: RETIRED_OUTBOX_KINDS).
+    expect((await database.pool.query("SELECT 1 FROM billing.outbox WHERE kind = ANY($2::text[]) AND ref = $1",
+      [ref, [...RETIRED_OUTBOX_KINDS]])).rowCount).toBe(0);
     const job = await claim("PAYMENT_REFUND", ref, clock.now);
     expect(await refunds.handle(job, clock.now)).toEqual({ kind: "DONE" });
     expect(await stageOf(job.jobId)).toBe("OWNER_REFUND_DUE");
@@ -214,7 +212,7 @@ describe("N14 refunds on NETOPIA: the owner mode", () => {
     const clock = { now: new Date() };
     const audit = recordingAudit();
     const live = new RefundDesk({
-      repository, jobs, xmoney: NO_XMONEY, policy: testBillingPolicy, audit, clock: () => clock.now, xmoneyEnvironment: "stage",
+      repository, jobs, policy: testBillingPolicy, audit, clock: () => clock.now,
       netopia: { payments: new RefundPort(false), paymentEnvironment: "live", jobs }
     });
     await expect(live.planOwnerRefund(seeded.initialChargeId, 1_000_000)).rejects.toThrow("BILLING_REFUND_DONE_OTHER_PAYMENT_SYSTEM");
@@ -323,9 +321,8 @@ describe("N14 the owner's daily job and the withdrawal on a NETOPIA plan", () =>
   it("lets the owner's withdraw command take a NETOPIA plan of its own environment only (ruling PR-32, G2)", async () => {
     const seeded = await paidPlan("command");
     const now = new Date();
-    const storesFor = (paymentEnvironment: "sandbox" | "live" | null) => withdrawStoresFor(database.pool, {
-      policy: testBillingPolicy, plans: testBillingPlans, audit: recordingAudit(), clock: () => new Date(),
-      xmoneyEnvironment: "stage", paymentEnvironment
+    const storesFor = (paymentEnvironment: "sandbox" | "live") => withdrawStoresFor(database.pool, {
+      policy: testBillingPolicy, plans: testBillingPlans, audit: recordingAudit(), clock: () => new Date(), paymentEnvironment
     });
     // A refund made in NETOPIA's admin on the payment (A9's PROVIDER_REFUND): the withdrawal is the owner's to settle.
     await repository.withTransaction(async (client) => {
@@ -337,8 +334,6 @@ describe("N14 the owner's daily job and the withdrawal on a NETOPIA plan", () =>
     });
     const receivedAt = new Date(now.getTime() - 60_000);
     await expect(recordOwnerWithdrawal(storesFor("live"), { ownerRef: seeded.ownerRef, receivedAt }))
-      .rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
-    await expect(recordOwnerWithdrawal(storesFor(null), { ownerRef: seeded.ownerRef, receivedAt }))
       .rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
     expect(await recordOwnerWithdrawal(storesFor("sandbox"), { ownerRef: seeded.ownerRef, receivedAt })).toEqual({ kind: "OWNER_REVIEW" });
     // The settlement: refused from another environment, taken in its own.

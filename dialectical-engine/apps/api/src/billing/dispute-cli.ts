@@ -65,7 +65,7 @@ export async function recordDisputeOutcome(stores: DisputeStores, input: Dispute
   // plan. One CHARGEBACK_RESOLVED per transaction (0086's (provider_payment_id, kind) key): a charge-back is open
   // while its own transaction has none. The dispute to settle is the newest OPEN charge-back of the subscription's
   // own payment, else the newest open one of a second payment.
-  // D5 5f / spec §2.13: a payment that bought nothing — a DUPLICATE_PAYMENT row (xMoney's second payment on an order),
+  // D5 5f / spec §2.13: a payment that bought nothing — a DUPLICATE_PAYMENT row (an old second payment on an order),
   // or a CHARGEBACK coded DUPLICATE_PAYMENT (VERIFY_PAYMENT's mark for a refused NETOPIA payment, which has no
   // DUPLICATE_PAYMENT row) — never changed the plan.
   const secondPayments = new Set([

@@ -15,13 +15,6 @@ import { FakeTaxEngine, fakeTaxMicros } from "./fake-tax-engine.js";
  */
 export const PROFILE_ADDRESS_ONLY: BillingRecipientReader = Object.freeze({ currentAddress: async () => null });
 
-/**
- * N24b: the xMoney system the API's dependency types still require until N23 deletes the member. A suite that runs on
- * NETOPIA alone spreads this instead of naming xMoney itself: it serves no NETOPIA plan or charge, so it changes no
- * outcome, and N23 deletes it here, in one place.
- */
-export const XMONEY_SYSTEM_UNTIL_N23 = Object.freeze({ xmoneyEnvironment: "stage" as const });
-
 export const testBillingPlans: BillingPlans = Object.freeze({
   currency: "USD",
   sourceRef: "test:billing-plans",
@@ -83,8 +76,8 @@ export function unusedAskApplication(): AskApplication {
   };
 }
 
-/** The payment system a subscription was created in: NETOPIA's sandbox unless a test names the previous system. */
-export type TestPaymentSystem = Readonly<{ provider: "xmoney" | "netopia"; environment: "stage" | "sandbox" | "live" }>;
+/** The payment system a subscription was created in: NETOPIA's sandbox unless a test names its live system. */
+export type TestPaymentSystem = Readonly<{ provider: "netopia"; environment: "sandbox" | "live" }>;
 
 /**
  * CREATED then ACTIVATED for one owner: the smallest live subscription the fold accepts. CREATED names its payment
@@ -97,19 +90,13 @@ export function activeSubscriptionEvents(
 ): SubscriptionEvent[] {
   const subscriptionId = randomUUID();
   const netMicros = testBillingPlans.plans.find((plan) => plan.planId === planId)!.netPriceMicros;
-  const onNetopia = system.provider === "netopia";
-  const base = {
-    subscriptionId, ownerRef, planId, xmoneyCustomerId: onNetopia ? null : "9001", cardRef: null, cardTokenId: null
-  } as const;
-  const created = onNetopia
-    ? { payment_provider: "netopia", payment_environment: system.environment }
-    : { xmoney_environment: system.environment };
+  const base = { subscriptionId, ownerRef, planId, cardTokenId: null } as const;
+  const created = { payment_provider: system.provider, payment_environment: system.environment };
   return [
-    { ...base, eventId: randomUUID(), kind: "CREATED", at, periodAnchorAt: null, xmoneyOrderId: null,
+    { ...base, eventId: randomUUID(), kind: "CREATED", at, periodAnchorAt: null,
       data: { country_confirmed: false, ip_country: "RO", quote_id: randomUUID(), ...created } },
     { ...base, eventId: randomUUID(), kind: "ACTIVATED", at, periodAnchorAt: at,
-      xmoneyOrderId: onNetopia ? null : "9002", cardRef: onNetopia ? null : "9003",
-      cardTokenId: onNetopia ? "5b7e1c2a-4d3f-4a6b-9c8d-0e1f2a3b4c5d" : null, data: {
+      cardTokenId: "5b7e1c2a-4d3f-4a6b-9c8d-0e1f2a3b4c5d", data: {
         charge_id: "0".repeat(32), announced_total_micros: Math.round(netMicros * 1.21), recurring_net_micros: netMicros,
         reactivated: false
       } }

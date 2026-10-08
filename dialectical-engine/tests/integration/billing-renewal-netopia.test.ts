@@ -5,9 +5,7 @@ import {
   type PaymentState, type SavedCardCharge
 } from "@debateai/billing-core";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
 import { createNetopiaPayments, createSecretToken } from "@debateai/payments-netopia";
-import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { AdjustableTaxEngine, testBillingPlans, testBillingPolicy } from "../support/billingFixtures.js";
 import {
@@ -94,10 +92,6 @@ class ScriptedPayments implements CardPayments {
   }
 }
 
-const unconfigured = async (): Promise<never> => {
-  throw new TypedDomainError("XMONEY_UNAVAILABLE", "no xMoney in this suite");
-};
-const NO_XMONEY: Pick<XMoneyClient, "rebill" | "listTransactions"> = Object.freeze({ rebill: unconfigured, listTransactions: unconfigured });
 
 const PROFILE: BillingProfile = Object.freeze({
   email: "stored@example.test", locale: "ro", name: "Ana Pop", firstName: "Ana", lastName: "Pop", phone: "+40712345678",
@@ -131,9 +125,9 @@ async function due(profile: Partial<BillingProfile> = {}) {
   const entitlements = new EntitlementRepository(database.pool);
   const settlement = createRenewalSettlement({ repository, entitlements, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL });
   const renewal = new RenewalService({
-    repository, jobs, entitlements, xmoney: NO_XMONEY, tax: new AdjustableTaxEngine(), settlement, policy: testBillingPolicy,
+    repository, jobs, entitlements, tax: new AdjustableTaxEngine(), settlement, policy: testBillingPolicy,
     plans: testBillingPlans, recordsKey: TEST_RECORDS_KEY, publicAppUrl: TEST_PUBLIC_APP_URL, audit,
-    clock: () => clock.now, kick: () => undefined, xmoneyEnvironment: "stage",
+    clock: () => clock.now, kick: () => undefined,
     netopia: {
       payments, paymentEnvironment: "sandbox", orderText: englishOrderText,
       recipients: { currentAddress: async (customerId: string) => `${customerId}@example.test` }
@@ -141,7 +135,7 @@ async function due(profile: Partial<BillingProfile> = {}) {
   });
   const maintenance = new BillingMaintenance({
     repository, jobs, entitlements, renewal, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL,
-    xmoneyEnvironment: "stage", paymentEnvironment: "sandbox", audit, clock: () => clock.now
+    paymentEnvironment: "sandbox", audit, clock: () => clock.now
   });
   return { ownerRef, seeded, email, clock, payments, audit, repository, entitlements, renewal, maintenance };
 }
@@ -237,7 +231,7 @@ describe("N11 a NETOPIA renewal charges the saved card (spec §2.9.2)", () => {
   it("uses the checkout quote's address when the profile holds no payment IP", async () => {
     const run = await due({ paymentIp: null });
     await renewNow(run);
-    // seedNetopiaSubscription seals the SUBSCRIBE quote's location with ip 192.0.2.10, as seedActiveSubscription does.
+    // seedNetopiaSubscription seals the SUBSCRIBE quote's location with ip 192.0.2.10.
     expect(run.payments.charges[0]?.payerIp).toBe("192.0.2.10");
   });
 

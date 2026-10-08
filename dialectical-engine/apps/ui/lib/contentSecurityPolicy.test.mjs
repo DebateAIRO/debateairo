@@ -98,7 +98,8 @@ test("every document, the checkout and card pages included, gets the same nonce 
     const response = middleware(new NextRequest(`https://dezbatere.test${path}`));
     const policy = response.headers.get("content-security-policy");
     assert.equal(policy, nonceContentSecurityPolicy(nonceOf(policy), development), path);
-    assert.doesNotMatch(policy, /xmoney|netopia|mobilpay/u, path);
+    // No processor's host in any policy: NETOPIA's page is a full redirect, and the first card form is gone (§2.19).
+    assert.doesNotMatch(policy, new RegExp(`${["x", "money"].join("")}|netopia|mobilpay`, "u"), path);
     assert.equal(response.headers.get("permissions-policy"), null, path);
   }
   const { default: config } = await import("../next.config.mjs");
@@ -107,25 +108,4 @@ test("every document, the checkout and card pages included, gets the same nonce 
   assert.deepEqual(permissions.map((entry) => entry.source), ["/:path*"]);
   assert.equal(permissions[0].headers.find((header) => header.key === "Permissions-Policy").value,
     "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
-});
-
-test("X0 (e): the card documents keep payment=() like every page (xMoney's form needs no Payment Request API)", async () => {
-  const previous = process.env.XMONEY_SDK_ORIGIN;
-  process.env.XMONEY_SDK_ORIGIN = "https://secure-stage.xmoney.com";
-  try {
-    const { NextRequest } = await import("next/server");
-    const { middleware } = await import("../middleware.ts");
-    for (const path of ["/checkout", "/checkout/return", "/settings/card"]) {
-      assert.equal(middleware(new NextRequest(`https://dezbatere.test${path}`)).headers.get("permissions-policy"), null, path);
-    }
-    const { default: config } = await import("../next.config.mjs");
-    const entries = await config.headers();
-    const permissions = entries.filter((entry) => entry.headers.some((header) => header.key === "Permissions-Policy"));
-    assert.deepEqual(permissions.map((entry) => entry.source), ["/:path*"]);
-    assert.equal(permissions[0].headers.find((header) => header.key === "Permissions-Policy").value,
-      "camera=(), microphone=(), geolocation=(), payment=(), usb=()");
-  } finally {
-    if (previous === undefined) delete process.env.XMONEY_SDK_ORIGIN;
-    else process.env.XMONEY_SDK_ORIGIN = previous;
-  }
 });

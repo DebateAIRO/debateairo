@@ -1,7 +1,6 @@
 // apps/api/src/billing/connectors.ts
-import { randomBytes, timingSafeEqual } from "node:crypto";
 import { closeSync, constants, fstatSync, openSync, readFileSync, type Stats } from "node:fs";
-import { readCustodyAuthorizationHeader, readCustodyTextSecretBytes } from "@debateai/crypto";
+import { readCustodyAuthorizationHeader } from "@debateai/crypto";
 import {
   isUnverifiedCompanyFact,
   type CardPayments,
@@ -14,8 +13,7 @@ import {
   NETOPIA_ENVIRONMENT_KEYS,
   type BillingEnvironmentGroup,
   type NetopiaEnvironmentGroup,
-  type NetopiaEnvironmentKey,
-  type XMoneyEnvironmentGroup
+  type NetopiaEnvironmentKey
 } from "@debateai/register";
 import {
   createNetopiaPayments,
@@ -24,12 +22,6 @@ import {
   netopiaEnvironmentOf,
   type NoticeTrust
 } from "@debateai/payments-netopia";
-import {
-  XMoneyClient,
-  aesKeyFromPrivateKey,
-  xmoneyEnvironmentOf,
-  type XMoneyEnvironment
-} from "@debateai/payments-xmoney";
 import { QuadernoTaxEngine } from "@debateai/tax-quaderno";
 import { SmartBillInvoiceIssuer } from "@debateai/invoice-smartbill";
 
@@ -53,31 +45,20 @@ export type NetopiaConnectors = Readonly<{
 }>;
 
 export type BillingConnectors = NetopiaConnectors & Readonly<{
-  /** Until N23: xMoney's client, or an inert stand-in when api.env names no xMoney system. */
-  xmoney: XMoneyClient;
-  /** A22 / R-35: derived from XMONEY_API_BASE_URL; "stage" for the stand-in. Removed in N23. */
-  xmoneyEnvironment: XMoneyEnvironment;
   tax: TaxEngine;
   /** P5's SmartBill issuer: `creditPartial` and `pdf` present, `lookup` absent (R-24). */
   invoiceRo: InvoiceIssuer;
-  /** A23: bytes, held by boot.hold and zeroed at shutdown (a random key nobody holds for the stand-in). */
-  xmoneyPrivateKey: Buffer;
-  xmoneyPublicKey: string;
-  siteId: string;
   ownerReportEmail: string;
 }>;
-
-type Closable = { end(): Promise<void> };
 
 /** The configured billing custody files, for assertPublicationSecretDomains' path-aliasing check. */
 export function billingCustodyPaths(environment: Readonly<{
   NETOPIA_API_KEY_PATH?: string | undefined; NETOPIA_IPN_KEYS_PATH?: string | undefined;
-  XMONEY_PRIVATE_KEY_PATH?: string | undefined; QUADERNO_API_KEY_PATH?: string | undefined;
-  SMARTBILL_CREDENTIALS_PATH?: string | undefined; OWNER_REPORT_EMAIL_PATH?: string | undefined;
+  QUADERNO_API_KEY_PATH?: string | undefined; SMARTBILL_CREDENTIALS_PATH?: string | undefined;
+  OWNER_REPORT_EMAIL_PATH?: string | undefined;
 }>): string[] {
   return [
-    environment.NETOPIA_API_KEY_PATH, environment.NETOPIA_IPN_KEYS_PATH,
-    environment.XMONEY_PRIVATE_KEY_PATH, environment.QUADERNO_API_KEY_PATH,
+    environment.NETOPIA_API_KEY_PATH, environment.NETOPIA_IPN_KEYS_PATH, environment.QUADERNO_API_KEY_PATH,
     environment.SMARTBILL_CREDENTIALS_PATH, environment.OWNER_REPORT_EMAIL_PATH
   ].filter((path): path is string => path !== undefined);
 }
@@ -142,19 +123,12 @@ export function assertMailedCompanyFacts(company: SellerCompany): void {
   }
 }
 
-/** The public key goes to every browser; if it were the private key, anyone could sign orders and read notices. */
-function refuseTheSecretAsPublic(publicKey: string, privateKey: Buffer): void {
-  const candidate = Buffer.from(publicKey, "latin1");
-  if (candidate.byteLength === privateKey.byteLength && timingSafeEqual(candidate, privateKey)) {
-    throw new TypeError("BILLING_CONFIGURATION_INVALID:XMONEY_PUBLIC_KEY");
-  }
-}
-
 /**
  * Going live (spec 2026-10-05 §2.5.4): a live boot is refused while anything of another payment system is still
- * open — an xMoney-era subscription or charge, or a NETOPIA sandbox one after the same-host switch — and while any
- * outbox job of such a charge is still queued: the live outbox would claim it and run it against live SmartBill or
- * Quaderno (each handler also refuses it, DEAD OTHER_PAYMENT_SYSTEM). The runbook's switch-on step closes them first.
+ * open — a subscription or charge of the previous card processor, or a NETOPIA sandbox one after the same-host
+ * switch — and while any outbox job of such a charge is still queued: the live outbox would claim it and run it
+ * against live SmartBill or Quaderno (each handler also refuses it, DEAD OTHER_PAYMENT_SYSTEM). The runbook's
+ * switch-on step closes them first.
  * The counts are content-free (`BillingRepository.openOtherSystemRecordCounts`).
  */
 export function assertOtherSystemRecordsClosed(
@@ -302,52 +276,18 @@ export function loadNetopiaConnectors(input: Readonly<{
   });
 }
 
-/** Every call of the stand-in answers HTTP 429, which XMoneyClient reads as XMONEY_UNAVAILABLE: nothing is sent. */
-const refuseEveryXMoneyCall = (async () => new Response("", { status: 429 })) as typeof fetch;
-
-/**
- * Until N23 (spec 2026-10-05 §2.19): the xMoney members of BillingConnectors. With xMoney's four settings set, the
- * real client and keys, exactly as before (A23: the private key held for zeroing the moment it exists, checked to key
- * AES-256, never equal to the public key). With none set, an inert stand-in: a random private key nobody holds (so no
- * notice ever decrypts and no order it signs can be paid) and a client whose every call fails before leaving the host.
- */
-function xmoneyMembers(
-  group: XMoneyEnvironmentGroup | null, hold: (resource: Closable) => unknown, fetchOption: Readonly<{ fetch?: typeof fetch }>
-): Pick<BillingConnectors, "xmoney" | "xmoneyEnvironment" | "xmoneyPrivateKey" | "xmoneyPublicKey" | "siteId"> {
-  if (group === null) {
-    const standIn = randomBytes(32);
-    hold({ end: async () => { standIn.fill(0); } });
-    return {
-      xmoney: new XMoneyClient({
-        baseUrl: "https://xmoney-not-configured.invalid", privateKey: standIn, siteId: "0", fetch: refuseEveryXMoneyCall
-      }),
-      xmoneyEnvironment: "stage", xmoneyPrivateKey: standIn, xmoneyPublicKey: "xmoney-not-configured", siteId: "0"
-    };
-  }
-  const privateKey = readCustodyTextSecretBytes(group.xmoneyPrivateKeyPath);
-  hold({ end: async () => { privateKey.fill(0); } });
-  aesKeyFromPrivateKey(privateKey).fill(0);
-  refuseTheSecretAsPublic(group.xmoneyPublicKey, privateKey);
-  return {
-    xmoney: new XMoneyClient({ baseUrl: group.xmoneyApiBaseUrl, privateKey, siteId: group.xmoneySiteId, ...fetchOption }),
-    xmoneyEnvironment: xmoneyEnvironmentOf(group.xmoneyApiBaseUrl), xmoneyPrivateKey: privateKey,
-    xmoneyPublicKey: group.xmoneyPublicKey, siteId: group.xmoneySiteId
-  };
-}
-
 /**
  * Builds every billing connector from the custody files. Called under boot.runSync, so a refusal closes the boot
  * ledger (DL7-F7). SmartBill's code is built from the company's facts first, before any secret is read
  * (smartBillCompanyCif; main.ts passes SELLER_COMPANY, tests and the development fakes pass the mirror filled with
  * their fake's code), and the facts every email prints must be filled in too (assertMailedCompanyFacts, P2-M35). Then
- * NETOPIA's connector (loadNetopiaConnectors), the xMoney members until N23, and Quaderno's key, SmartBill's
- * `user:token` and the owner's address, read as text credentials (`readCustodyAuthorizationHeader`).
+ * NETOPIA's connector (loadNetopiaConnectors), and Quaderno's key, SmartBill's `user:token` and the owner's address,
+ * read as text credentials (`readCustodyAuthorizationHeader`).
  */
 export function loadBillingConnectors(input: Readonly<{
   environment: BillingEnvironmentGroup;
   company: SellerCompany;
   recordsKey: Buffer;
-  hold: (resource: Closable) => unknown;
   fetch?: typeof fetch;
   trustedKeyOwners?: TrustedKeyFileOwners;
   allowLoopbackBase?: true;
@@ -361,11 +301,9 @@ export function loadBillingConnectors(input: Readonly<{
     ...(input.trustedKeyOwners === undefined ? {} : { trustedKeyOwners: input.trustedKeyOwners }),
     ...(input.allowLoopbackBase === undefined ? {} : { allowLoopbackBase: input.allowLoopbackBase })
   });
-  const xmoney = xmoneyMembers(environment.xmoney, input.hold, fetchOption);
   const smartbill = smartBillCredentials(readCustodyAuthorizationHeader(environment.smartbillCredentialsPath));
   return Object.freeze({
     ...netopia,
-    ...xmoney,
     tax: new QuadernoTaxEngine({
       baseUrl: environment.quadernoApiBaseUrl,
       apiKey: readCustodyAuthorizationHeader(environment.quadernoApiKeyPath),

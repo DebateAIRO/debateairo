@@ -42,7 +42,7 @@ function stub(sealedLocation: QuoteLocation) {
     quote: async (id: string, owner: string) => id === quoteId && owner === ownerRef
       ? { quoteId, ownerRef, locationCiphertext: sealQuoteLocation(KEY, quoteId, sealedLocation).ciphertext } : null,
     customerByOwner: async (owner: string) => owner === ownerRef
-      ? { customerId, xmoneyCustomerId: null, locale: "de" } : null,
+      ? { customerId, locale: "de" } : null,
     latestProfile: async (id: string) => id === customerId
       ? { profileCiphertext: sealBillingProfile(KEY, customerId, LATER_PROFILE).ciphertext, keyId: "k", at: new Date(), locale: "de" }
       : null

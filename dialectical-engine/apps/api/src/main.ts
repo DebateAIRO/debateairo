@@ -33,6 +33,7 @@ import {
   readNetopiaEnvironmentGroup,
   type BillingPolicy,
   loadApiEnvironment,
+  loadRetiredBillingSettings,
   createSupportConfigurationPort,
   readDeploymentRiskTier,
   computeStructuralCeilingBasis,
@@ -91,7 +92,6 @@ import { consoleBillingAudit } from "./billing/audit.js";
 import { NetopiaNoticeIntake } from "./billing/netopia-intake.js";
 import { createBillingRuntime } from "./billing/runtime.js";
 import {
-  StageShiftedXMoneyClient,
   assertLiveInvoicersAreLive,
   assertStageInvoicersAreSandboxes,
   billingClock
@@ -150,6 +150,8 @@ import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
+// NETOPIA spec 2026-10-05 §2.17.1: a removed card-processor setting still in api.env is named once, never its value.
+for (const key of loadRetiredBillingSettings()) console.warn(JSON.stringify({ event: "billing.setting.retired", key }));
 // V-9(c) / V-28: a hosted deployment may not admit an ask — nor probe a paid
 // vendor, which is itself a model call — until the per-run and daily cost
 // envelopes are sealed. The seam is `readSealedCostEnvelopeStatus` in
@@ -635,8 +637,7 @@ const billingConnectors: BillingConnectors | null = billingMode === "ON"
       environment: readBillingEnvironmentGroup(environment),
       // RULINGS-R3 R3-4: SmartBill's CIF is built from the legal notice's facts (COMPANY, mirrored), never a setting.
       company: SELLER_COMPANY,
-      recordsKey,
-      hold: (resource) => boot.hold(resource)
+      recordsKey
     }))
   : null;
 const providerOnlyConnectors: NetopiaConnectors | null = billingMode === "PROVIDER_ONLY"
@@ -658,8 +659,9 @@ const providerOnlyIntake = providerOnlyConnectors === null ? undefined : new Net
   recordsKey: providerOnlyConnectors.recordsKey, paymentEnvironment: providerOnlyConnectors.paymentEnvironment,
   mode: "PROVIDER_ONLY", audit: consoleBillingAudit, kick: () => undefined
 });
-// Going live (spec §2.5.4): anything of another payment system still open (xMoney-era rows, or NETOPIA sandbox rows
-// after the same-host switch) would never be renewed or settled by the live passes. The runbook's step closes it first.
+// A live boot refuses while rows of another payment system (NETOPIA's sandbox, or the previous card processor) are
+// open: the live renewal pass never renews them, so they would stay ACTIVE for ever. The runbook's switch-on step
+// closes them first.
 if (billingConnectors?.paymentEnvironment === "live") {
   await boot.run("billing-other-system-records", async () => {
     assertOtherSystemRecordsClosed(await new BillingRepository(pool).openOtherSystemRecordCounts({
@@ -1154,7 +1156,8 @@ const billingRuntime = billingConnectors === null
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingCheckout admission scope");
     }
-    // Paid plans P9a: xMoney's notices charge the source-keyed billingNotify budget (contract §2: 120 a minute).
+    // Paid plans P9a, NETOPIA spec §2.7.1: an unverified payment message charges the source-keyed billingNotify budget
+    // (contract §2: 120 a minute).
     if (admissionPolicy.billingNotify === null) {
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingNotify admission scope");
@@ -1167,31 +1170,26 @@ const billingRuntime = billingConnectors === null
     // A sandbox payment never reaches a live invoicing service (SmartBill has no sandbox), offset or not.
     assertStageInvoicersAreSandboxes({
       paymentEnvironment: billingConnectors.paymentEnvironment,
-      xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
       quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
       smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
     });
     // ... and a live payment never meets a sandbox invoicer (exactly one legal invoice per charge).
     assertLiveInvoicersAreLive({
       paymentEnvironment: billingConnectors.paymentEnvironment,
-      xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
       quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
       smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
     });
     const stageOffsetDays = environment.BILLING_STAGE_CLOCK_OFFSET_DAYS ?? null;
     const stageClock = billingClock({
       paymentEnvironment: billingConnectors.paymentEnvironment,
-      xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
       offsetDays: stageOffsetDays
     });
-    // One moved clock for everything the runtime records and decides; real time wherever it talks to NETOPIA (and,
-    // until N23, to xMoney).
+    // One moved clock for everything the runtime records and decides; real time wherever it talks to NETOPIA.
     const runtimeConnectors = stageClock.offsetMs === 0 || stageOffsetDays === null
       ? billingConnectors
       : Object.freeze({
         ...billingConnectors,
-        payments: new TimeShiftedCardPayments(billingConnectors.payments, stageOffsetDays),
-        xmoney: new StageShiftedXMoneyClient(billingConnectors.xmoney, () => stageClock.offsetMs)
+        payments: new TimeShiftedCardPayments(billingConnectors.payments, stageOffsetDays)
       });
     return createBillingRuntime({
       pool, connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
@@ -1342,9 +1340,7 @@ const startup = installStartupResourceOwner({
     // Paid plans G3a: the country lookup is closed with the process (close only sets a flag, so twice is harmless).
     { end: async () => { geoLookup?.close(); } },
     // L1: the records key outlives the boot ledger; it is zeroed after every pool has closed.
-    { end: async () => { recordsKey.fill(0); } },
-    // P6a: the xMoney private key outlives the boot ledger too; P7/P8 consume the connectors.
-    ...(billingConnectors === null ? [] : [{ end: async () => { billingConnectors.xmoneyPrivateKey.fill(0); } }])
+    { end: async () => { recordsKey.fill(0); } }
   ],
   // L2-F7: zeroed after every pool that borrows from them has closed. A
   // changeover's PREVIOUS keys are in this list for the same reason the current

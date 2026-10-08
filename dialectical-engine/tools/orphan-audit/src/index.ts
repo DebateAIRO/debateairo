@@ -36,8 +36,6 @@ const rows: readonly Row[] = [
   // types (budget) are TYPE imports, so db and the connector packages may depend
   // on billing-core without a cycle (register already depends on db).
   ["billing-core", "packages/billing-core", ["kernel"]],
-  // Paid plans (A26(a)): xMoney order signing, notice decryption and (P3b) the HTTP client.
-  ["payments-xmoney", "packages/payments-xmoney", ["kernel"]],
   // NETOPIA (spec 2026-10-05 §2.4): the card processor's package over plain fetch and node:crypto; billing-core for the
   // payment port's types and error vocabulary (billing-core depends on kernel alone, so no cycle).
   ["payments-netopia", "packages/payments-netopia", ["kernel", "billing-core"]],
@@ -61,7 +59,7 @@ const rows: readonly Row[] = [
   // SUP-01 C1 — schema, role grants, kill switch, reservation, status"); the table
   // lagged the product only because this audit was crashing on the retired `web`
   // manifest read and had never reported a verdict. Both rows are the same commit.
-  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "judgement", "providers", "support-kb", "story", "legal-manifest", "geo", "billing-core", "payments-xmoney", "payments-netopia", "tax-quaderno", "invoice-smartbill", "mail-templates", "scorecard"]],
+  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "judgement", "providers", "support-kb", "story", "legal-manifest", "geo", "billing-core", "payments-netopia", "tax-quaderno", "invoice-smartbill", "mail-templates", "scorecard"]],
   ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "billing-core", "contract", "support-kb", "story", "scorecard"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],

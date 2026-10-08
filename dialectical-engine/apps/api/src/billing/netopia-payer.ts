@@ -1,8 +1,7 @@
 import type { Payer } from "@debateai/billing-core";
+import { e164Phone } from "@debateai/contract";
 import type { BillingProfile } from "./records.js";
 
-/** E.164 as the quote stores it (spec §2.6.1): `+` and 8–15 digits. */
-const E164 = /^\+[0-9]{8,15}$/;
 const UUID = /^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$/;
 
 const filled = (value: string | null | undefined): string | null => {
@@ -21,11 +20,11 @@ export function payerFromProfile(profile: BillingProfile | null, email: string |
   if (profile === null || email === null) return null;
   const firstName = filled(profile.firstName);
   const lastName = filled(profile.lastName);
-  const phone = filled(profile.phone);
+  // Ruling PR-43: the checkout's one E.164 rule (`e164Phone`, spec §2.6.1), the phone as the quote stores it.
+  const phone = profile.phone === null ? null : e164Phone(profile.phone);
   const city = filled(profile.city);
   const street = filled(profile.street);
   if (firstName === null || lastName === null || phone === null || city === null || street === null) return null;
-  if (!E164.test(phone)) return null;
   return Object.freeze({
     firstName, lastName, email, phone, country: profile.country, region: filled(profile.region), city,
     postalCode: filled(profile.postalCode), street

@@ -32,9 +32,12 @@ export type BillingRefundReason =
   | "DUPLICATE_PAYMENT"
   /** N12 (spec §2.10): a late payment for a closed upgrade that can no longer buy what it was priced for; whole, M11_DUPLICATE. */
   | "UPGRADE_CLOSED"
-  /** P9c (A9): refunded in the xMoney dashboard, not by us. Recorded, never requested. */
+  /**
+   * P9c (A9), NETOPIA spec §2.12.4: refunded in NETOPIA's admin, not by us (a REFUNDED status with no request of ours).
+   * Recorded, never requested.
+   */
   | "PROVIDER_REFUND"
-  /** P9c (A9): voided or cancelled at xMoney after it had succeeded. Recorded, never requested. */
+  /** P9c (A9): voided at NETOPIA (status 4) after it had succeeded. Recorded, never requested. */
   | "PROVIDER_VOID";
 
 /** The reasons for which WE move money back; each is executed by P9b's `RefundDesk` (R-32). */
@@ -52,7 +55,7 @@ export const REFUND_REASONS_REFUSING_THE_PAYMENT: ReadonlySet<BillingRefundReaso
 export type ChargeFailureCode = "PAYMENT_DECLINED" | "VOIDED" | "REBILL_REFUSED" | "NO_TRANSACTION";
 
 /**
- * `billing.xmoney_notice_outcome.outcome` (A21). `UNRECORDED_REFUND` (P9c): a second refund made elsewhere on a
+ * `billing.payment_notice_outcome.outcome` (A21). `UNRECORDED_REFUND` (P9c): a second refund made elsewhere on a
  * payment that already holds one, which P1a's one-request-per-transaction key cannot record; handed to the owner.
  */
 export type NoticeOutcome =

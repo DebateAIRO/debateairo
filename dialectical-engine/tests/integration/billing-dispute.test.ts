@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
 import { foldSubscription } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { testBillingPolicy, XMONEY_SYSTEM_UNTIL_N23 } from "../support/billingFixtures.js";
+import { testBillingPolicy } from "../support/billingFixtures.js";
 import {
   recordingAudit, seedNetopiaSubscription, seedPaidUpgrade, subscriptionDeps, TEST_PUBLIC_APP_URL
 } from "../support/billingSubscriptionFixtures.js";
@@ -125,7 +125,7 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
     await new BillingMaintenance({
       repository, jobs: new BillingJobQueries(database.pool), entitlements: new EntitlementRepository(database.pool),
       renewal: neverRenews, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL,
-      ...XMONEY_SYSTEM_UNTIL_N23, paymentEnvironment: seeded.paymentEnvironment, audit: recordingAudit(), clock: () => new Date()
+      paymentEnvironment: seeded.paymentEnvironment, audit: recordingAudit(), clock: () => new Date()
     }).runOnce();
     expect(foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId))).toMatchObject({
       status: "ENDED", endedCause: "DISPUTE"

@@ -104,7 +104,7 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
     await alert(job("EMAIL", `M1:${CHARGE}`, { template: "M1", recipient: "CUSTOMER" }), "BILLING_PROFILE_UNREADABLE", NOW);
     await alert(job("EMAIL", `M3:sub:2026-11-01T00:00:00.000Z:23800000`, { template: "M3", recipient: "CUSTOMER" }), "OUTBOX_HANDLER_FAILED", NOW);
     await alert(job("EMAIL", `O3:${JOB_ID}`, { template: "O3", recipient: "OWNER" }), "OUTBOX_HANDLER_FAILED", NOW);
-    await alert(job("XMONEY_REFUND", `${CHARGE}:9912345`), "XMONEY_REFUSED", NOW);
+    await alert(job("PAYMENT_REFUND", CHARGE), "PAYMENT_CONFIGURATION_REFUSED", NOW);
     await alert(job("VERIFY_PAYMENT", "9912345"), "CHARGE_NOT_FOUND", NOW);
     expect(enqueued.map((entry) => [entry.payload["param.jobKind"], entry.payload["param.reference"]])).toEqual([
       ["EMAIL M1", `M1:${CHARGE}`],
@@ -116,7 +116,7 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
   it("presents a job our records do not back as nothing to issue or re-queue (the W4 forward), never as a document to record", () => {
     const missing = documentJobAction({ chargeId: CHARGE, jobKind: "SMARTBILL_STORNO", code: "CREDIT_NOTE_REFUND_MISSING" });
     expect(missing).toContain("no refund is recorded for this sale: nothing to issue or re-queue; tell whoever runs the server");
-    for (const code of ["CREDIT_NOTE_REFUND_MISSING", "CREDIT_NOTE_PAYLOAD_INVALID", "INVOICE_CHARGE_NOT_PAID", "OTHER_XMONEY_SYSTEM"]) {
+    for (const code of ["CREDIT_NOTE_REFUND_MISSING", "CREDIT_NOTE_PAYLOAD_INVALID", "INVOICE_CHARGE_NOT_PAID", "OTHER_PAYMENT_SYSTEM"]) {
       expect(unbackedDocumentCode(code), code).toBe(true);
       const text = documentJobAction({ chargeId: CHARGE, jobKind: "QUADERNO_RECORD_REFUND", code });
       expect(text, code).not.toContain("--record");
@@ -136,7 +136,7 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
     expect(say("SMARTBILL_INVOICE", "INVOICE_SERVICE_REFUSED")).toContain("SmartBill never issued it");
     expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).toContain(`--kind CREDIT_NOTE --record <series>-<number>`);
     expect(say("QUADERNO_RECORD_SALE", "INVOICE_UNKNOWN")).toContain("--record <Quaderno id>");
-    expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("only the dashboard shows");
+    expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("only the admin shows");
     // P4-K (P2-W12, the owner's ruling of 3 October 2026, option (b)): the owner issues the credit note by hand and
     // records it with its amount; the line clears and the quarter's figure subtracts it. One credit note per charge.
     expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("issue its credit note by hand in SmartBill (a Romanian"
@@ -147,13 +147,13 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
     expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("the line then leaves this list and the quarter's tax"
       + " summary subtracts that amount");
     expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).not.toContain("cannot record");
-    // Part 4 final review C-5 (the controller's ruling): a payment xMoney refunded before we ever saw it paid owes no
+    // Part 4 final review C-5 (the controller's ruling): a payment NETOPIA refunded before we ever saw it paid owes no
     // invoice and no credit note (A29 (q)), so its line asks for no document and names no command.
     expect(say("REFUNDED_BEFORE_START", "NO_DOCUMENT_OWED")).toBe("Refunded before it started: no invoice or credit note"
       + " is owed. Take this sale and its refund out of the quarter's figures by hand.");
     expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).not.toContain("--amount");
     expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).toContain("(a partial refund, or a second refund of one charge)");
-    expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).not.toContain("dashboard");
+    expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).not.toContain("admin");
     // A SmartBill job is re-queued only after the owner checked SmartBill: it has no lookup (X1 row 8).
     expect(say("SMARTBILL_INVOICE", "OUTBOX_HANDLER_FAILED")).toContain("--requeue --confirm-not-issued");
     expect(say("SMARTBILL_INVOICE", "OUTBOX_HANDLER_FAILED")).toContain("checked in SmartBill that nothing was issued");

@@ -85,7 +85,7 @@ describe("Support catalog route coverage", () => {
 
   it("keeps the paid-plan pages actionless, and the card pages out of Support", () => {
     // Property: the assistant may name a paid-plan page but never act through one, and it never names the pages
-    // that carry xMoney's card form (A11).
+    // that carried the first card form (A11), now the billing details and NETOPIA's page.
     const byRoute = new Map(SUPPORT_CAPABILITIES.map((capability) => [capability.route, capability]));
     const publicPages = ["/cancel", "/pricing", "/withdraw", "/privacy/versions", "/terms/versions/[sha256]", "/privacy/versions/[sha256]"];
     for (const route of publicPages) {

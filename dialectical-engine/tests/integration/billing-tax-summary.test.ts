@@ -364,8 +364,8 @@ describe("P16b the summary reads our own rows", () => {
     const billing = new BillingRepository(database.pool);
     const refundTransactionId = String(7_700_000_000 + Math.floor(Math.random() * 99_999_999));
     const deadAt: Date[] = [];
-    // P9c ends the refund transaction's check DEAD with REFUND_UNRECORDED; a notice xMoney sends again makes a new
-    // job of the same ref (one LIVE job per kind and ref), which dies the same way.
+    // P9c ends the refund transaction's check DEAD with REFUND_UNRECORDED; a notice the previous card processor sent
+    // again made a new job of the same ref (one LIVE job per kind and ref), which died the same way.
     for (let copy = 0; copy < 2; copy += 1) {
       const jobId = await billing.withTransaction((client) => billing.enqueue(client, {
         kind: "VERIFY_PAYMENT", ref: refundTransactionId, notBefore: new Date(0), payload: {}

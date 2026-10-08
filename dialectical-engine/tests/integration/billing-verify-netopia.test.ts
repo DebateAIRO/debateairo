@@ -8,7 +8,6 @@ import {
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import { createSecretToken } from "@debateai/payments-netopia";
-import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { planById } from "@debateai/register";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testBillingPlans, testBillingPolicy, testCountryPolicy } from "../support/billingFixtures.js";
@@ -60,20 +59,20 @@ class ScriptedStatus implements Pick<CardPayments, "status"> {
   }
 }
 
-const unused = async (): Promise<never> => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "no xMoney in this suite"); };
-const NO_XMONEY = Object.freeze({ getTransaction: unused, getOrder: unused, getCard: unused, refund: unused, listTransactions: unused }) as
-  unknown as Pick<XMoneyClient, "getTransaction" | "getOrder" | "getCard" | "refund" | "listTransactions">;
+/** RefundDesk reads nothing here: VERIFY_PAYMENT only writes refund intents and records NETOPIA's REFUNDED. */
+const unused = async (): Promise<never> => { throw new TypedDomainError("PAYMENT_PROVIDER_UNAVAILABLE", "no read in this suite"); };
 
 function handlerFor(status: ScriptedStatus, now: { at: Date }, paymentEnvironment: "sandbox" | "live" = "sandbox") {
   const jobs = new BillingJobQueries(database.pool);
   const entitlements = new EntitlementRepository(database.pool);
   const audit = recordingAudit();
   const refunds = new RefundDesk({
-    repository, jobs, xmoney: NO_XMONEY, policy: testBillingPolicy, audit, clock: () => now.at, xmoneyEnvironment: "stage"
+    repository, jobs, policy: testBillingPolicy, audit, clock: () => now.at,
+    netopia: { payments: { status: unused }, paymentEnvironment, jobs }
   });
   const verify = new VerifyPaymentHandler({
-    repository, jobs, xmoney: NO_XMONEY, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
-    recordsKey: TEST_RECORDS_KEY, audit, xmoneyEnvironment: "stage",
+    repository, jobs, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
+    recordsKey: TEST_RECORDS_KEY, audit,
     netopia: { payments: status, paymentEnvironment, jobs }
   });
   verify.registerSettlement("INITIAL", createInitialSettlement({
@@ -105,7 +104,7 @@ async function checkout(_label: string) {
     postalCode: "10115", city: "Berlin", street: "Unter den Linden 1", ip: "192.0.2.10", ipCountry: "DE", company: null
   });
   const customerId = await repository.withTransaction(async (client) => {
-    const customer = await repository.ensureCustomer(client, { ownerRef, locale: "en", now: at, environment: "stage" });
+    const customer = await repository.ensureCustomer(client, { ownerRef, locale: "en", now: at });
     const profile = sealBillingProfile(TEST_RECORDS_KEY, customer.customerId, {
       email: `${ownerRef}@example.test`, locale: "en", name: "Ana Pop", firstName: "Ana", lastName: "Pop",
       phone: "+4915112345678", paymentIp: "192.0.2.10", country: "DE", region: null, postalCode: "10115", city: "Berlin",
@@ -126,7 +125,7 @@ async function checkout(_label: string) {
     await repository.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", at, { providerPaymentId: null, amountMicros: totalMicros, errorCode: null }));
     await repository.appendSubscriptionEvent(client, {
       eventId: randomUUID(), subscriptionId, ownerRef, kind: "CREATED", at, planId: "PLUS", periodAnchorAt: null,
-      xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null, cardTokenId: null,
+      cardTokenId: null,
       data: { country_confirmed: false, ip_country: "DE", quote_id: quoteId, payment_provider: "netopia", payment_environment: "sandbox" }
     });
     return customer.customerId;
@@ -356,7 +355,6 @@ describe("N10 (ruling PR-21): the owner's tax summary counts NETOPIA sales of it
       { type: "SALE", amountMicros: bought.totalMicros, taxCountry: "DE" }
     ]);
     expect(await sales({ provider: "netopia", environment: "live" })).toEqual([]);
-    expect(await sales({ provider: "xmoney", environment: "live" })).toEqual([]);
   });
 });
 

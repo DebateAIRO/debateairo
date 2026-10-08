@@ -37,7 +37,7 @@ const state = (extra: Partial<SubscriptionState> = {}): SubscriptionState => ({
 
 const cardChanged = (day: number): SubscriptionEvent => ({
   eventId: "cc", subscriptionId: SUBSCRIPTION, ownerRef: "owner", kind: "CARD_CHANGED", at: at(day), planId: "PLUS",
-  periodAnchorAt: at(0), xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null, cardTokenId: "new", data: {}
+  periodAnchorAt: at(0), cardTokenId: "new", data: {}
 }) as SubscriptionEvent;
 
 const paid = [{ kind: "SUCCEEDED" as const, errorCode: null }];

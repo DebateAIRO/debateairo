@@ -16,7 +16,6 @@ import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
 import { BillingJobQueries, BillingRepository } from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import { netopiaEnvironmentOf } from "@debateai/payments-netopia";
-import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { loadBillingRefundDoneEnvironment, readBillingPolicy } from "@debateai/register";
 import { consoleBillingAudit } from "./audit.js";
 import { openBillingOperatorPool } from "./operator-connection.js";
@@ -133,9 +132,6 @@ export async function runBillingRefundDoneCli(
 const notHere = async (): Promise<never> => {
   throw new TypedDomainError("PAYMENT_PROVIDER_UNAVAILABLE", "the owner's command never calls a payment provider");
 };
-const NO_XMONEY_HERE: Pick<XMoneyClient, "refund" | "getTransaction" | "listTransactions"> = Object.freeze({
-  refund: notHere, getTransaction: notHere, listTransactions: notHere
-});
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   process.exitCode = await runBillingRefundDoneCli(process.argv.slice(2), {
@@ -154,8 +150,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       const billing = new BillingRepository(pool);
       const jobs = new BillingJobQueries(pool);
       const desk = new RefundDesk({
-        repository: billing, jobs, xmoney: NO_XMONEY_HERE, policy, audit: consoleBillingAudit, clock: () => new Date(),
-        xmoneyEnvironment: "live",
+        repository: billing, jobs, policy, audit: consoleBillingAudit, clock: () => new Date(),
         netopia: { payments: { status: notHere }, paymentEnvironment, jobs }
       });
       const plan = (input: RefundDoneArguments) => desk.planOwnerRefund(input.chargeRef, input.amountMicros, {

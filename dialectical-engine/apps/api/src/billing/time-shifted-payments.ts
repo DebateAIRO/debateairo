@@ -17,10 +17,9 @@ const MAX_OFFSET_DAYS = 400;
  * runtime lives `offsetDays` ahead (BILLING_STAGE_CLOCK_OFFSET_DAYS) so a month renews in minutes; NETOPIA does not. The
  * port sends no time of its own (the NETOPIA package writes `order.dateTime` from the real clock), so nothing on the way
  * out moves; the one time read back, `PaymentReport.occurredAt`, moves FORWARD by the offset, so a plan's month starts
- * on the runtime's own clock, as StageShiftedXMoneyClient does for xMoney's `createdAt` (stage-clock.ts). It refuses a
- * live port with the stage clock's own codes. Every port method is wrapped (tests/unit/billing-payment-port.test.ts
- * pins the list against the CardPayments type), and `refund` exists here exactly when the inner port has it, so
- * RefundDesk's owner mode (§2.12.2) still sees it absent.
+ * on the runtime's own clock. It refuses a live port with the stage clock's own codes. Every port method is wrapped
+ * (tests/unit/billing-payment-port.test.ts pins the list against the CardPayments type), and `refund` exists here
+ * exactly when the inner port has it, so RefundDesk's owner mode (§2.12.2) still sees it absent.
  */
 export class TimeShiftedCardPayments implements CardPayments {
   readonly provider: PaymentProvider;

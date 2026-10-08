@@ -110,7 +110,7 @@ function settingsLines(environment: BillingCheckEnvironment): CheckLine[] {
     : cross("NETOPIA_POS_SIGNATURE is missing or not five groups of four capital letters or digits."));
   if (system !== null) {
     const invoicers = {
-      paymentEnvironment: system, xmoneyApiBaseUrl: null,
+      paymentEnvironment: system,
       quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null, smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
     };
     try {

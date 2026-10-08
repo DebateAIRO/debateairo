@@ -207,8 +207,6 @@ export function developmentBillingEnvironmentGroup(receipt: DevelopmentBillingFa
     smartbillApiBaseUrl: receipt.smartbill.baseUrl,
     smartbillSeries: receipt.smartbill.series,
     ownerReportEmailPath: receipt.ownerReportEmailPath,
-    publicAppUrl: receipt.publicAppUrl,
-    // Until N23 removes the member: the development stack names no xMoney system.
-    xmoney: null
+    publicAppUrl: receipt.publicAppUrl
   });
 }

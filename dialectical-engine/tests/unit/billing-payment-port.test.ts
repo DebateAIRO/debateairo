@@ -147,7 +147,7 @@ describe("N1 — the payment error vocabulary (spec §2.3)", () => {
       expect(paymentErrorCode(paymentError(code))).toBe(code);
       expect(paymentErrorCode(paymentError(code, "400"))).toBe(code);
     }
-    expect(paymentErrorCode(new TypedDomainError("XMONEY_UNAVAILABLE", "x"))).toBeNull();
+    expect(paymentErrorCode(new TypedDomainError("TAX_SERVICE_UNAVAILABLE", "x"))).toBeNull();
     expect(paymentErrorCode(new TypedDomainError("PAYMENT_OUTCOME_UNKNOWNX", "x"))).toBeNull();
     expect(paymentErrorCode(new TypedDomainError("PAYMENT_DECLINED:20", "x"))).toBeNull();
     expect(paymentErrorCode(new Error("PAYMENT_OUTCOME_UNKNOWN"))).toBeNull();
@@ -171,7 +171,7 @@ describe("N1 — the payment error vocabulary (spec §2.3)", () => {
       expect(paymentNothingSent(paymentError(code as PaymentErrorCode, "x1")), `${code}:x1`).toBe(nothingSent);
     }
     expect(paymentNothingSent(new Error("boom"))).toBe(false);
-    expect(paymentNothingSent(new TypedDomainError("XMONEY_UNAVAILABLE", "x"))).toBe(false);
+    expect(paymentNothingSent(new TypedDomainError("TAX_SERVICE_UNAVAILABLE", "x"))).toBe(false);
     expect(paymentNothingSent(undefined)).toBe(false);
   });
 

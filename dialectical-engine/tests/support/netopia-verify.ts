@@ -6,7 +6,6 @@ import {
   AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, type OutboxJob
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
-import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { createCardCheckSettlement } from "../../apps/api/src/billing/card-change.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
@@ -16,10 +15,10 @@ import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.
 import { testBillingPlans, testBillingPolicy, testCountryPolicy } from "./billingFixtures.js";
 import { recordingAudit, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY, type RecordingAudit } from "./billingSubscriptionFixtures.js";
 
-const unused = async (): Promise<never> => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "no xMoney in a NETOPIA suite"); };
-const NO_XMONEY = Object.freeze({
-  getTransaction: unused, getOrder: unused, getCard: unused, refund: unused, listTransactions: unused, rebill: unused
-}) as unknown as XMoneyClient;
+/** RefundDesk only writes intents here: its PAYMENT_REFUND jobs are not run by these suites. */
+const unused = async (): Promise<never> => {
+  throw new TypedDomainError("PAYMENT_PROVIDER_UNAVAILABLE", "RefundDesk reads nothing in these suites");
+};
 
 export function netopiaVerifyHandler(pool: Pool, input: Readonly<{
   payments: Pick<CardPayments, "status">; clock: () => Date; paymentEnvironment?: "sandbox" | "live";
@@ -28,13 +27,15 @@ export function netopiaVerifyHandler(pool: Pool, input: Readonly<{
   const jobs = new BillingJobQueries(pool);
   const entitlements = new EntitlementRepository(pool);
   const audit = recordingAudit();
+  const paymentEnvironment = input.paymentEnvironment ?? "sandbox";
   const refunds = new RefundDesk({
-    repository, jobs, xmoney: NO_XMONEY, policy: testBillingPolicy, audit, clock: input.clock, xmoneyEnvironment: "stage"
+    repository, jobs, policy: testBillingPolicy, audit, clock: input.clock,
+    netopia: { payments: { status: unused }, paymentEnvironment, jobs }
   });
   const verify = new VerifyPaymentHandler({
-    repository, jobs, xmoney: NO_XMONEY, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
-    recordsKey: TEST_RECORDS_KEY, audit, xmoneyEnvironment: "stage",
-    netopia: { payments: input.payments, paymentEnvironment: input.paymentEnvironment ?? "sandbox", jobs }
+    repository, jobs, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
+    recordsKey: TEST_RECORDS_KEY, audit,
+    netopia: { payments: input.payments, paymentEnvironment, jobs }
   });
   verify.registerSettlement("INITIAL", createInitialSettlement({
     repository, entitlements, acceptances: new AcceptanceRepository(pool), policy: testBillingPolicy,

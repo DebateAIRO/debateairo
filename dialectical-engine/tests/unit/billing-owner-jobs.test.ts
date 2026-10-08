@@ -27,7 +27,7 @@ function fakes(rows: TaxSummaryRow[] = []) {
     // N9: the quarantined NETOPIA messages the summary counts by day.
     quarantineSince: vi.fn(async (_client: unknown, _since: Date) => []),
     deadRefunds: async () => [{
-      chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "XMONEY_REFUSED",
+      chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "PAYMENT_CONFIGURATION_REFUSED",
       since: new Date("2026-12-20T00:00:00.000Z")
     }],
     unrecordedRefunds: async () => [],
@@ -72,7 +72,7 @@ describe("P16c the owner's tax-summary job", () => {
     });
     expect(await owner.taxSummary(job("OWNER_TAX_SUMMARY", "tax-summary:2026-Q4"), new Date("2027-01-05T06:00:00.000Z")))
       .toEqual({ kind: "DONE" });
-    // The live xMoney system only (a sandbox payment is never a sale), and P10b's e-Factura read of the same quarter.
+    // NETOPIA's live system only (a sandbox payment is never a sale), and P10b's e-Factura read of the same quarter.
     expect(billing.quarterSummaryRows).toHaveBeenCalledWith(new Date("2026-10-01T00:00:00.000Z"), new Date("2027-01-01T00:00:00.000Z"), { provider: "netopia", environment: "live" });
     expect(jobs.smartBillDocumentsNotAccepted).toHaveBeenCalledWith(new Date("2027-01-01T00:00:00.000Z"));
     const o1 = enqueued.find((entry) => entry.kind === "EMAIL");
@@ -106,7 +106,7 @@ describe("P16c the owner's tax-summary job", () => {
         code: "MAIL_RELAY_UNAVAILABLE", since: new Date("2026-12-21T00:00:00.000Z")
       }))),
       deadRefunds: async () => Array.from({ length: 300 }, (_, index) => ({
-        chargeId: hex(index), transactionId: String(index), reason: "WITHDRAWAL", code: "XMONEY_REFUSED",
+        chargeId: hex(index), transactionId: String(index), reason: "WITHDRAWAL", code: "PAYMENT_CONFIGURATION_REFUSED",
         since: new Date("2026-12-20T00:00:00.000Z")
       }))
     };
@@ -128,7 +128,7 @@ describe("P16c the owner's tax-summary job", () => {
     expect(text).toContain(`charge ${hex(0)}: QUADERNO_RECORD_SALE (TAX_SERVICE_UNAVAILABLE), since 2026-11-04\n`);
     expect(text).not.toContain(`charge ${hex(40)}: QUADERNO_RECORD_SALE`);
     expect(text).toContain("Romanian e-Factura documents to confirm");
-    expect(text).toContain("Payments to check by hand in xMoney");
+    expect(text).toContain("Payments to check by hand in NETOPIA's admin");
   });
 
   it("queues O1 at most once per quarter: a re-run after the quarter's O1 exists mails nobody and audits nothing", async () => {

@@ -79,7 +79,7 @@ describe("P6b — development billing fakes", () => {
       const connectors = loadBillingConnectors({
         environment: developmentBillingEnvironmentGroup(first.receipt),
         company: companyAnswering(first.receipt.smartbill.companyCif),
-        recordsKey: randomBytes(32), hold: () => undefined,
+        recordsKey: randomBytes(32),
         trustedKeyOwners: { ownerUid: process.getuid!(), apiUid: -1 }, allowLoopbackBase: true
       });
       // The API's NETOPIA client talks to the fake with the custody key: a hosted start answers the fake's page.
@@ -112,7 +112,7 @@ describe("P6b — development billing fakes", () => {
         },
         lines: [{ description: "DebateAI Plus", netMicros: 1_000_000, taxMicros: 210_000, taxRateBasisPoints: 2100 }],
         taxCode: "saas",
-        evidence: { billingCountry: "RO", ipAddress: "203.0.113.10", bankCountry: "RO" }
+        evidence: { billingCountry: "RO", ipAddress: "203.0.113.10", bankCountry: "RO" }, processor: "netopia"
       });
       expect(invoice.series).toBe("DEV");
       key = await readFile(keyPath, "latin1");

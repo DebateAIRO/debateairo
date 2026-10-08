@@ -9,7 +9,7 @@ import { startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from ".
 let h: BillingHarness;
 beforeAll(async () => {
   h = await startBillingHarness();
-  const deps = { repository: h.repository, tax: h.tax, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const, paymentEnvironment: "sandbox" as const };
+  const deps = { repository: h.repository, tax: h.tax, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, paymentEnvironment: "sandbox" as const };
   h.worker.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler(deps));
   h.worker.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler(deps));
 });

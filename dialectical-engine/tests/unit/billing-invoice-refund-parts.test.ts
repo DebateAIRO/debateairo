@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { BillingRepository, ChargeEventRow, ChargeRow, InvoiceRow, OutboxJob, QuoteRow } from "@debateai/db";
 import { creditNoteContext, saleRefundOf, type CreditNoteContext } from "../../apps/api/src/billing/invoice-common.js";
 import { sealBillingProfile, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
-import { testBillingPolicy, XMONEY_SYSTEM_UNTIL_N23 } from "../support/billingFixtures.js";
+import { testBillingPolicy } from "../support/billingFixtures.js";
 
 /*
  * Ruling PR-39 (spec §2.12.2 item 4, ruling PR-20): the owner may record a NETOPIA refund in parts, several REFUNDED rows
@@ -85,8 +85,7 @@ describe("PR-39 the NETOPIA credit note of a refund recorded in parts", () => {
     } as OutboxJob;
     const context = await creditNoteContext({
       repository, recordsKey: RECORDS_KEY, recipients: { currentAddress: async () => "parts@example.test" },
-      policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", ...XMONEY_SYSTEM_UNTIL_N23,
-      paymentEnvironment: "sandbox", audit: () => undefined
+      policy: testBillingPolicy, publicAppUrl: "https://debate.example.test", paymentEnvironment: "sandbox", audit: () => undefined
     }, job, LAST_PART_AT, "SMARTBILL");
     expect(context).toHaveProperty("refund");
     const { refund } = context as CreditNoteContext;

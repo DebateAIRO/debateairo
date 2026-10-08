@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BillingJobQueries, BillingRepository, RunRepository, migrate } from "@debateai/db";
+import { BillingRepository, RunRepository, migrate } from "@debateai/db";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
@@ -712,7 +712,6 @@ describe("P2-M43 — migration 0092: an index for each recurring billing query (
       }
     });
     const billing = new BillingRepository(viaClient);
-    const jobs = new BillingJobQueries(viaClient);
     // Every index any plan node of the method's queries reads.
     const plans = async (run: () => Promise<unknown>): Promise<string[]> => {
       sent.length = 0;
@@ -803,10 +802,6 @@ describe("P2-M43 — migration 0092: an index for each recurring billing query (
       await client.query("ANALYZE billing.xmoney_notice, billing.outbox, billing.subscription_event, billing.charge, billing.charge_event, billing.entitlement_event");
       await client.query("SET LOCAL enable_seqscan = off");
       const now = new Date();
-      const checkout = await plans(() => jobs.checkoutPaymentSignals(recording as unknown as PoolClient, chargeIdOf(), "stage", now));
-      for (const index of ["xmoney_notice_external_order_idx", "xmoney_notice_id_text_idx", "outbox_live_verify_external_order_idx", "outbox_live_verify_charge_idx"]) {
-        expect(checkout, `checkoutPaymentSignals: ${index} in ${checkout.join(",")}`).toContain(index);
-      }
       expect(await plans(() => billing.withdrawalsAwaitingOwner())).toContain("subscription_event_withdrawn_by_owner_idx");
       expect(await plans(() => billing.deadRefunds())).toContain("outbox_dead_idx");
       const invoice = await plans(() => billing.invoiceUnknownItems());

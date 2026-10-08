@@ -41,7 +41,6 @@ apps/api/src/billing/location-verdict.ts
 apps/api/src/billing/maintenance.ts
 apps/api/src/billing/netopia-intake.ts
 apps/api/src/billing/netopia-payer.ts
-apps/api/src/billing/notice-intake.ts
 apps/api/src/billing/operator-connection.ts
 apps/api/src/billing/order-text-catalogue.ts
 apps/api/src/billing/order-text.ts
@@ -58,6 +57,7 @@ apps/api/src/billing/refusal.ts
 apps/api/src/billing/renewal-notice-job.ts
 apps/api/src/billing/renewal-rules.ts
 apps/api/src/billing/renewal.ts
+apps/api/src/billing/retired-jobs.ts
 apps/api/src/billing/rows.ts
 apps/api/src/billing/runtime.ts
 apps/api/src/billing/settlement-initial.ts
@@ -401,7 +401,6 @@ apps/ui/components/billing/ResetSentence.tsx
 apps/ui/components/billing/RoomNotice.tsx
 apps/ui/components/billing/SubscriptionControls.tsx
 apps/ui/components/billing/UsageBars.tsx
-apps/ui/components/billing/XMoneyCardForm.tsx
 apps/ui/components/consent/ConsentSettingsPanel.tsx
 apps/ui/components/consent/CookieBar.tsx
 apps/ui/components/consent/CookieConsent.tsx
@@ -463,7 +462,6 @@ apps/ui/lib/billing/room.ts
 apps/ui/lib/billing/roomCatalog.ts
 apps/ui/lib/billing/serverBilling.ts
 apps/ui/lib/billing/usage.ts
-apps/ui/lib/billing/xmoneySdk.ts
 apps/ui/lib/canvasViewport.ts
 apps/ui/lib/consent.ts
 apps/ui/lib/contentSecurityPolicy.test.mjs
@@ -810,12 +808,6 @@ packages/payments-netopia/src/requests.ts
 packages/payments-netopia/src/secret-token.ts
 packages/payments-netopia/src/status.ts
 packages/payments-netopia/src/time.ts
-packages/payments-xmoney/src/client.ts
-packages/payments-xmoney/src/index.ts
-packages/payments-xmoney/src/json.ts
-packages/payments-xmoney/src/notice.ts
-packages/payments-xmoney/src/signing.ts
-packages/payments-xmoney/src/types.ts
 packages/propagation/src/index.ts
 packages/providers/src/content-rule.ts
 packages/providers/src/index.ts

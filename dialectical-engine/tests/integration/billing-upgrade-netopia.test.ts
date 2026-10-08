@@ -10,7 +10,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import { testHttpIdentity } from "../support/httpSession.js";
 import { AdjustableTaxEngine, StubGeo } from "../support/billingFixtures.js";
 import {
-  mountSubscriptionRoutes, recordingAudit, seedActiveSubscription, seedNetopiaSubscription, subscriptionDeps, testAgreement,
+  mountSubscriptionRoutes, recordingAudit, seedNetopiaSubscription, subscriptionDeps, testAgreement,
   testCardToken, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
 } from "../support/billingSubscriptionFixtures.js";
 import { netopiaVerifyHandler, verifyJob } from "../support/netopia-verify.js";
@@ -565,15 +565,17 @@ describe("N12 refusals before any charge", () => {
     expect((await repository.chargesForSubscription(run.seeded.subscriptionId)).map((row) => row.kind)).toEqual(["INITIAL"]);
     await run.api.close();
 
-    const identity = testHttpIdentity("n12-xmoney-plan");
-    await seedActiveSubscription(database.pool, {
-      ownerRef: identity.authenticated.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 5 * DAY), taxCountry: "RO"
+    // A plan of the other NETOPIA environment (the API serves the sandbox) is never upgraded here.
+    const identity = testHttpIdentity("n12-other-system-plan");
+    await seedNetopiaSubscription(database.pool, {
+      ownerRef: identity.authenticated.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 5 * DAY), taxCountry: "RO",
+      paymentEnvironment: "live"
     });
     const deps = subscriptionDeps(database.pool, { geo: new StubGeo(), accountEmail: { read: async () => EMAIL } });
-    const xmoneyQuote = await quoteUpgrade(deps, { ownerRef: identity.authenticated.ownerRef, planId: "PRO", ip: BUYER_IP, now: new Date() });
+    const otherQuote = await quoteUpgrade(deps, { ownerRef: identity.authenticated.ownerRef, planId: "PRO", ip: BUYER_IP, now: new Date() });
     await expect(startUpgrade(deps, {
       ownerRef: identity.authenticated.ownerRef, userId: identity.authenticated.userId, planId: "PRO",
-      quoteRef: xmoneyQuote.quote_ref, ip: BUYER_IP, userAgent: "n12", locale: "en", agreement: testAgreement("en")!
+      quoteRef: otherQuote.quote_ref, ip: BUYER_IP, userAgent: "n12", locale: "en", agreement: testAgreement("en")!
     })).rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
   });
 });

@@ -2,8 +2,6 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { foldSubscription, type CardPayments, type PaymentReport, type PaymentState } from "@debateai/billing-core";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type OutboxJob } from "@debateai/db";
-import { TypedDomainError } from "@debateai/kernel";
-import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testBillingPolicy, testCountryPolicy } from "../support/billingFixtures.js";
 import { recordingAudit, seedNetopiaSubscription, TEST_RECORDS_KEY } from "../support/billingSubscriptionFixtures.js";
@@ -27,9 +25,6 @@ afterAll(async () => database?.stop());
 
 const DAY = 86_400_000;
 const STATUS: Partial<Record<PaymentState, string>> = { CHARGEBACK_OPENED: "9", CHARGEBACK_LOST: "10", CHARGEBACK_REPRESENTED: "16", PAID: "3" };
-const unused = async (): Promise<never> => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "no xMoney in this suite"); };
-const NO_XMONEY = Object.freeze({ getTransaction: unused, getOrder: unused, getCard: unused, refund: unused, listTransactions: unused }) as
-  unknown as Pick<XMoneyClient, "getTransaction" | "getOrder" | "getCard" | "refund" | "listTransactions">;
 
 /** NETOPIA's status of each order, set by the test before each check. */
 class Statuses implements Pick<CardPayments, "status"> {
@@ -48,12 +43,12 @@ class Statuses implements Pick<CardPayments, "status"> {
 function handler(statuses: Statuses) {
   const audit = recordingAudit();
   const refunds = new RefundDesk({
-    repository, jobs, xmoney: NO_XMONEY, policy: testBillingPolicy, audit, clock: () => new Date(), xmoneyEnvironment: "stage",
+    repository, jobs, policy: testBillingPolicy, audit, clock: () => new Date(),
     netopia: { payments: statuses, paymentEnvironment: "sandbox", jobs }
   });
   const verify = new VerifyPaymentHandler({
-    repository, jobs, xmoney: NO_XMONEY, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
-    recordsKey: TEST_RECORDS_KEY, audit, xmoneyEnvironment: "stage", netopia: { payments: statuses, paymentEnvironment: "sandbox", jobs }
+    repository, jobs, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
+    recordsKey: TEST_RECORDS_KEY, audit, netopia: { payments: statuses, paymentEnvironment: "sandbox", jobs }
   });
   const check = (chargeId: string) => verify.handle({
     jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: chargeId, payload: {}, attempts: 1, notBefore: new Date(),

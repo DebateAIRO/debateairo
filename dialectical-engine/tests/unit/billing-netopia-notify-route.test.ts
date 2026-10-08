@@ -102,7 +102,7 @@ describe("N9 POST /v1/billing/netopia/notify", () => {
     await rejected.api.close();
   });
 
-  it("is always registered: 404 when billing is off, public in the policy table, in the contract, after xMoney's route", async () => {
+  it("is always registered: 404 when billing is off, public in the policy table, in the contract, after the charge status route", async () => {
     const { api } = harness(() => OK, { billing: "off" });
     expect(api.hasRoute({ method: "POST", url: NETOPIA_NOTIFY_PATH })).toBe(true);
     expect((await api.inject(notice({ "verification-token": HEADER }))).statusCode).toBe(404);
@@ -110,8 +110,8 @@ describe("N9 POST /v1/billing/netopia/notify", () => {
     expect(authorizationPolicyInventory).toContainEqual(
       { route: "POST /v1/billing/netopia/notify", auth: "public", resource: "billing", action: "notify" });
     const paths = BILLING_ROUTE_PATHS as readonly string[];
-    expect(paths.indexOf("POST /v1/billing/netopia/notify")).toBe(paths.indexOf("POST /v1/billing/xmoney/notify") + 1);
+    expect(paths.indexOf("POST /v1/billing/netopia/notify")).toBe(paths.indexOf("GET /v1/billing/charges/{chargeRef}") + 1);
     const routes = contractInventory.routes as readonly string[];
-    expect(routes.indexOf("POST /v1/billing/netopia/notify")).toBe(routes.indexOf("POST /v1/billing/xmoney/notify") + 1);
+    expect(routes.indexOf("POST /v1/billing/netopia/notify")).toBe(routes.indexOf("GET /v1/billing/charges/{chargeRef}") + 1);
   });
 });

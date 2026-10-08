@@ -26,7 +26,8 @@ const sale = (transactionId: string): SaleRecord => ({
     city: "Berlin", street: null, taxId: null, locale: "de" },
   lines: [{ description: "DebateAI Plus, October 2026", netMicros: 20_000_000, taxMicros: 3_800_000, taxRateBasisPoints: 1900 }],
   taxCode: "saas",
-  evidence: { billingCountry: "DE", ipAddress: "203.0.113.10", bankCountry: "DE" }
+  evidence: { billingCountry: "DE", ipAddress: "203.0.113.10", bankCountry: "DE" },
+  processor: "netopia"
 });
 
 describe("P4 — exact decimal parsing", () => {
@@ -97,7 +98,7 @@ describe("P4 — Quaderno client against the fake", () => {
     expect(fake.sales.filter((recorded) => recorded.processor_id === "7001")).toHaveLength(1);
     const body = fake.sales.find((recorded) => recorded.processor_id === "7001")!;
     expect(body).toMatchObject({
-      type: "sale", currency: "USD", processor: "xmoney",
+      type: "sale", currency: "USD", processor: "netopia",
       customer: { first_name: "Test Person", email: "person@example.test", country: "DE" },
       evidence: { billing_country: "DE", ip_address: "203.0.113.10", bank_country: "DE" },
       custom_metadata: { charge_id: "c0ffee00c0ffee00c0ffee00c0ffee00" },
@@ -140,7 +141,7 @@ describe("P4 — Quaderno client against the fake", () => {
     const refund = {
       chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId: "7001", issuedOn: new Date("2026-10-05T10:00:00Z"),
       refundTotalMicros: 11_900_000, original: { documentId: "1", number: "Q-1" },
-      description: "Rückerstattung zu Rechnung Q-1"
+      description: "Rückerstattung zu Rechnung Q-1", processor: "netopia" as const
     };
     const sent = fake.requests.length;
     const first = await engine.recordRefund(refund);
@@ -183,7 +184,8 @@ describe("P4 — a lookup that does not answer a list never leads to a second do
     await expect(local.recordSale(sale("7401"))).rejects.toMatchObject({ code: "TAX_SERVICE_REFUSED", message: "QUADERNO_RESPONSE_INVALID" });
     await expect(local.recordRefund({
       chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId: "7401", issuedOn: new Date("2026-10-05T10:00:00Z"),
-      refundTotalMicros: 1_000_000, original: { documentId: "1", number: "Q-1" }, description: "Gutschrift"
+      refundTotalMicros: 1_000_000, original: { documentId: "1", number: "Q-1" }, description: "Gutschrift",
+      processor: "netopia"
     })).rejects.toMatchObject({ code: "TAX_SERVICE_REFUSED", message: "QUADERNO_RESPONSE_INVALID" });
     expect(methods).toEqual(["GET", "GET"]);
   });
@@ -193,7 +195,8 @@ describe("P4 — R-24's charge-id half: the same processor id is not enough to a
   const CHARGE = "c0ffee00c0ffee00c0ffee00c0ffee00";
   const refund = {
     chargeId: CHARGE, transactionId: "7501", issuedOn: new Date("2026-10-05T10:00:00Z"),
-    refundTotalMicros: 1_000_000, original: { documentId: "1", number: "Q-1" }, description: "Gutschrift"
+    refundTotalMicros: 1_000_000, original: { documentId: "1", number: "Q-1" }, description: "Gutschrift",
+    processor: "netopia" as const
   };
   /** Lists `listed` on every GET and books a new document on POST; remembers each call's method and path. */
   function stubListing(listed: unknown): { fetch: typeof fetch; calls: string[] } {

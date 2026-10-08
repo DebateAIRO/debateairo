@@ -51,7 +51,7 @@ beforeAll(async () => {
   });
   const common = {
     repository: h.repository, recordsKey: h.recordsKey, recipients: PROFILE_ADDRESS_ONLY, policy: testBillingPolicy,
-    publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, xmoneyEnvironment: "stage" as const, paymentEnvironment: "sandbox" as const
+    publicAppUrl: TEST_PUBLIC_APP_URL, audit: h.audit, paymentEnvironment: "sandbox" as const
   };
   const sb = () => ({ ...common, jobs: h.jobs, issuer: smartbill.port() });
   documents.register("SMARTBILL_INVOICE", async (job, now) => createSmartBillInvoiceHandler(sb())(job, now));
@@ -67,13 +67,13 @@ const sink = () => {
   return { lines, output: { stdout: (text: string) => { lines.out += text; }, stderr: (text: string) => { lines.err += text; } } };
 };
 /**
- * `pnpm billing:invoice` as the host runs it: the operator pool on the database URL, the API's payment system. Its
- * NETOPIA line is what N23 Step 9 (d) makes the command read; until then it decides by XMONEY_API_BASE_URL alone.
+ * `pnpm billing:invoice` as the host runs it: the operator pool on the database URL, the API's payment system (it
+ * follows NETOPIA_API_BASE_URL).
  */
 async function invoiceCommand(...args: string[]) {
   const { lines, output } = sink();
   const environment = {
-    DATABASE_URL: h.database.connectionString, XMONEY_API_BASE_URL: "https://api-stage.xmoney.com",
+    DATABASE_URL: h.database.connectionString,
     NETOPIA_API_BASE_URL: "https://secure-sandbox.netopia-payments.com", PUBLIC_APP_URL: TEST_PUBLIC_APP_URL
   };
   const code = await runBillingInvoiceCli(args, output, () => openInvoiceCommand(environment), h.clock.read);
@@ -388,12 +388,12 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
       .toMatchObject({ code: 1, err: "BILLING_INVOICE_NOTHING_LISTED\n" });
     const live = sink();
     const liveEnvironment = {
-      DATABASE_URL: h.database.connectionString, XMONEY_API_BASE_URL: "https://api.xmoney.com",
+      DATABASE_URL: h.database.connectionString,
       NETOPIA_API_BASE_URL: "https://secure.netopia-payments.com/api", PUBLIC_APP_URL: TEST_PUBLIC_APP_URL
     };
     expect(await runBillingInvoiceCli(["--charge", paid.chargeId, "--kind", "INVOICE", "--requeue"], live.output,
       () => openInvoiceCommand(liveEnvironment), h.clock.read)).toBe(1);
-    expect(live.lines.err).toBe("BILLING_INVOICE_OTHER_XMONEY_SYSTEM\n");
+    expect(live.lines.err).toBe("BILLING_INVOICE_OTHER_PAYMENT_SYSTEM\n");
   });
   it("gives a payment refunded before we ever saw it paid its own line, which asks for no document (C-5)", async () => {
     // Part 4 final review C-5 (the controller's ruling): P9c's never-verified path records the money coming and going

@@ -98,9 +98,6 @@ importers:
       '@debateai/payments-netopia':
         specifier: workspace:*
         version: link:packages/payments-netopia
-      '@debateai/payments-xmoney':
-        specifier: workspace:*
-        version: link:packages/payments-xmoney
       '@debateai/propagation':
         specifier: workspace:*
         version: link:packages/propagation
@@ -218,9 +215,6 @@ importers:
       '@debateai/payments-netopia':
         specifier: workspace:*
         version: link:../../packages/payments-netopia
-      '@debateai/payments-xmoney':
-        specifier: workspace:*
-        version: link:../../packages/payments-xmoney
       '@debateai/providers':
         specifier: workspace:*
         version: link:../../packages/providers
@@ -737,12 +731,6 @@ importers:
       '@debateai/billing-core':
         specifier: workspace:*
         version: link:../billing-core
-      '@debateai/kernel':
-        specifier: workspace:*
-        version: link:../kernel
-
-  packages/payments-xmoney:
-    dependencies:
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel

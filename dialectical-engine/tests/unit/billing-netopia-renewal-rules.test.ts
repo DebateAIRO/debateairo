@@ -5,8 +5,8 @@ import {
   clientIdOf, netopiaNotifyUrl, payerFromProfile, paymentReturnUrl
 } from "../../apps/api/src/billing/netopia-payer.js";
 import type { BillingProfile } from "../../apps/api/src/billing/records.js";
+import { isThisPaymentSystem } from "../../apps/api/src/billing/outbox.js";
 import { renewalFailureOf } from "../../apps/api/src/billing/renewal.js";
-import { servedHere } from "../../apps/api/src/billing/renewal-rules.js";
 
 const PROFILE: BillingProfile = Object.freeze({
   email: "stored@example.test", locale: "ro", name: "Ana Pop", firstName: "Ana", lastName: "Pop", phone: "+40712345678",
@@ -61,17 +61,12 @@ describe("N11 the ids and addresses every NETOPIA payment carries", () => {
 });
 
 describe("N11 which payment system a row belongs to (spec §2.5.4)", () => {
-  const systems = { xmoneyEnvironment: "stage", paymentEnvironment: "sandbox" } as const;
-  it("serves the API's xMoney system and its NETOPIA environment, and nothing else", () => {
-    expect(servedHere({ paymentProvider: "xmoney", paymentEnvironment: "stage" }, systems)).toBe(true);
-    expect(servedHere({ paymentProvider: "xmoney", paymentEnvironment: "live" }, systems)).toBe(false);
-    expect(servedHere({ paymentProvider: "netopia", paymentEnvironment: "sandbox" }, systems)).toBe(true);
-    // "live" exists in both providers: a NETOPIA live row is never the xMoney live system.
-    expect(servedHere({ paymentProvider: "netopia", paymentEnvironment: "live" }, systems)).toBe(false);
-    expect(servedHere({ paymentProvider: "netopia", paymentEnvironment: "live" },
-      { xmoneyEnvironment: "live", paymentEnvironment: "sandbox" })).toBe(false);
-    expect(servedHere({ paymentProvider: "netopia", paymentEnvironment: "sandbox" },
-      { xmoneyEnvironment: "stage", paymentEnvironment: null })).toBe(false);
+  it("serves the API's NETOPIA environment, and nothing else (N23: `isThisPaymentSystem`)", () => {
+    expect(isThisPaymentSystem({ paymentProvider: "netopia", paymentEnvironment: "sandbox" }, "sandbox")).toBe(true);
+    expect(isThisPaymentSystem({ paymentProvider: "netopia", paymentEnvironment: "live" }, "live")).toBe(true);
+    // Provider and environment together: a NETOPIA row of the other environment is another system's.
+    expect(isThisPaymentSystem({ paymentProvider: "netopia", paymentEnvironment: "live" }, "sandbox")).toBe(false);
+    expect(isThisPaymentSystem({ paymentProvider: "netopia", paymentEnvironment: "sandbox" }, "live")).toBe(false);
   });
 });
 

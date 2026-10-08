@@ -338,20 +338,10 @@ export async function startBillingStack(): Promise<BillingStack> {
     }
   };
 
-  /** Until N23 removes them from BillingConnectors: the inert xMoney members main.ts builds when api.env names none (N8). */
-  const noXMoney = async (): Promise<never> => { throw new Error("BILLING_STACK_HAS_NO_XMONEY"); };
   const connectors: BillingConnectors = Object.freeze({
     payments,
     noticeTrust: Object.freeze({ posSignature: netopia.posSignature, keys: loadTrustedKeys(netopia.trustedKeysPem) }),
     paymentEnvironment: "sandbox",
-    xmoney: Object.freeze({
-      getTransaction: noXMoney, getOrder: noXMoney, getCard: noXMoney, refund: noXMoney, listTransactions: noXMoney,
-      rebill: noXMoney, createCustomer: noXMoney
-    }) as unknown as BillingConnectors["xmoney"],
-    xmoneyEnvironment: "stage",
-    xmoneyPrivateKey: randomBytes(32),
-    xmoneyPublicKey: "xmoney-not-configured",
-    siteId: "0",
     tax,
     invoiceRo: invoices,
     recordsKey,
@@ -368,8 +358,7 @@ export async function startBillingStack(): Promise<BillingStack> {
   // runtime.ts's own `new BillingReconciler({...})`, over the stack's members.
   const reconcilerJobs = new BillingJobQueries(database.pool);
   const reconciler = new BillingReconciler({
-    billing: billingRepository, jobs: reconcilerJobs, xmoney: connectors.xmoney, environment: connectors.xmoneyEnvironment,
-    audit: () => undefined, clock: now, kick: () => undefined,
+    billing: billingRepository, jobs: reconcilerJobs, audit: () => undefined, clock: now, kick: () => undefined,
     netopia: { payments: connectors.payments, paymentEnvironment: connectors.paymentEnvironment, jobs: reconcilerJobs, pool: database.pool }
   });
   const taxAuthorities = taxAuthoritiesFromValue(
@@ -430,8 +419,7 @@ export async function startBillingStack(): Promise<BillingStack> {
   const ownerJobQueries = new BillingJobQueries(database.pool);
   const ownerDesk = new RefundDesk({
     repository: billingRepository, jobs: ownerJobQueries,
-    xmoney: Object.freeze({ refund: notHere, getTransaction: notHere, listTransactions: notHere }) as never,
-    policy: testBillingPolicy, audit: () => undefined, clock: now, xmoneyEnvironment: "stage",
+    policy: testBillingPolicy, audit: () => undefined, clock: now,
     netopia: { payments: { status: notHere }, paymentEnvironment: "sandbox", jobs: ownerJobQueries }
   });
 

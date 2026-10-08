@@ -19,6 +19,7 @@ import { sealCardToken } from "../../apps/api/src/billing/records.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { RenewalService, type RenewalDeps } from "../../apps/api/src/billing/renewal.js";
 import { createRenewalNoticeHandler } from "../../apps/api/src/billing/renewal-notice-job.js";
+import { registerRetiredJobs } from "../../apps/api/src/billing/retired-jobs.js";
 import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
 import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-renewal.js";
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
@@ -78,7 +79,7 @@ export type HarnessChargeOutcome =
   | "UNAVAILABLE" | "CREDENTIALS" | "CONFIGURATION";
 
 /**
- * NETOPIA's port in memory (the NETOPIA counterpart of the harness's former xMoney stub; the protocol itself runs
+ * NETOPIA's port in memory (the protocol itself runs
  * against N5's fake in the fake stack). Our charge id is NETOPIA's orderID, so every report is keyed by charge. A status
  * read answers the order's current report: a started page is untouched (status 1) until it is paid; an order never
  * started is NO_SUCH_ORDER. There is no `refund`: RefundDesk runs in the owner mode (spec §2.12.2), as in production
@@ -299,12 +300,6 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   });
   /** N10, N11, N14 (skeleton §1 rule 2): what the NETOPIA paths of VERIFY_PAYMENT, the renewal and RefundDesk need. */
   const netopiaPort = Object.freeze({ payments, paymentEnvironment: "sandbox" as const, jobs });
-  /** Until N23: the xMoney deps member the not-yet-cleaned services still type; every call fails before any byte. */
-  const noXMoney = async (): Promise<never> => { throw new Error("HARNESS_HAS_NO_XMONEY"); };
-  const NO_XMONEY = Object.freeze({
-    getTransaction: noXMoney, getOrder: noXMoney, getCard: noXMoney, refund: noXMoney, listTransactions: noXMoney,
-    rebill: noXMoney, createCustomer: noXMoney
-  });
   const auditLines: Array<Readonly<Record<string, unknown>>> = [];
   const audit: BillingAudit = (event, fields) => { auditLines.push(Object.freeze({ event, ...fields })); };
   const quotes = new QuoteService({
@@ -319,12 +314,11 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     new CheckoutService({ ...checkoutDeps, ...overrides } as CheckoutDeps);
   const checkout = checkoutWith({});
   const refunds = new RefundDesk({
-    repository, jobs, xmoney: NO_XMONEY as never, policy: testBillingPolicy, audit, clock: clock.read, xmoneyEnvironment: "stage",
-    netopia: netopiaPort
+    repository, jobs, policy: testBillingPolicy, audit, clock: clock.read, netopia: netopiaPort
   });
   const verify = new VerifyPaymentHandler({
-    repository, jobs, xmoney: NO_XMONEY as never, refunds, entitlements, countryPolicy: testCountryPolicy,
-    policy: testBillingPolicy, recordsKey, audit, xmoneyEnvironment: "stage", netopia: netopiaPort
+    repository, jobs, refunds, entitlements, countryPolicy: testCountryPolicy,
+    policy: testBillingPolicy, recordsKey, audit, netopia: netopiaPort
   });
   verify.registerSettlement("INITIAL", createInitialSettlement({
     repository, entitlements, acceptances, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL
@@ -339,8 +333,8 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
     repository: pool === null ? repository : new BillingRepository(pool),
     jobs: pool === null ? jobs : new BillingJobQueries(pool),
     entitlements: pool === null ? entitlements : new EntitlementRepository(pool),
-    xmoney: NO_XMONEY as never, tax, settlement: renewalSettlement, policy: testBillingPolicy, plans: testBillingPlans,
-    recordsKey, publicAppUrl: TEST_PUBLIC_APP_URL, audit, clock: clock.read, kick: () => undefined, xmoneyEnvironment: "stage",
+    tax, settlement: renewalSettlement, policy: testBillingPolicy, plans: testBillingPlans,
+    recordsKey, publicAppUrl: TEST_PUBLIC_APP_URL, audit, clock: clock.read, kick: () => undefined,
     netopia: { payments, paymentEnvironment: "sandbox", recipients: HARNESS_PAYERS, orderText: englishOrderText },
     erasurePending: async (ownerRef) => erasures.has(ownerRef) || frozen.has(ownerRef)
   });
@@ -348,14 +342,15 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   const renewal = renewalOn(null);
   const worker = new BillingOutboxWorker({ repository, workerId: "harness", clock: clock.read, audit, batchSize: 20 });
   worker.register("VERIFY_PAYMENT", verify.handle);
-  worker.register("XMONEY_REFUND", refunds.handle);
   worker.register("PAYMENT_REFUND", refunds.handle);
+  // As runtime.ts: the previous card processor's queued refunds end DEAD OTHER_PAYMENT_SYSTEM (spec §2.5.4).
+  registerRetiredJobs(worker, audit);
   const maintenance = new BillingMaintenance({
     repository, jobs, entitlements, renewal, policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL,
-    xmoneyEnvironment: "stage", paymentEnvironment: "sandbox", audit, clock: clock.read
+    paymentEnvironment: "sandbox", audit, clock: clock.read
   });
   worker.register("RENEWAL_NOTICE", createRenewalNoticeHandler({
-    repository, jobs, renewal, policy: testBillingPolicy, xmoneyEnvironment: "stage", paymentEnvironment: "sandbox", audit
+    repository, jobs, renewal, policy: testBillingPolicy, paymentEnvironment: "sandbox", audit
   }));
   const sentMail: BillingMail[] = [];
   const mailWorker = new BillingOutboxWorker({ repository, workerId: "harness-mail", clock: clock.read, audit, batchSize: 20 });

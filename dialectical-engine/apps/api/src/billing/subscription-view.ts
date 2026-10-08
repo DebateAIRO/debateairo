@@ -1,9 +1,10 @@
 import { TypedDomainError } from "@debateai/kernel";
 import { microsToDecimal, withdrawalDeadline, type SubscriptionState, type WithdrawalDeadline } from "@debateai/billing-core";
 import type { BillingInvoicesResponse, BillingSubscriptionResponse } from "@debateai/contract";
-import type { BillingRepository, CustomerXMoneyEnvironment } from "@debateai/db";
+import type { BillingRepository } from "@debateai/db";
 import type { BillingPolicy, PlanId } from "@debateai/register";
-import { renewalLeadMs, servedHere } from "./renewal-rules.js";
+import { isThisPaymentSystem } from "./outbox.js";
+import { renewalLeadMs } from "./renewal-rules.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 
 export type SubscriptionView = NonNullable<BillingSubscriptionResponse["subscription"]>;
@@ -29,15 +30,16 @@ export async function initialTaxCountry(
 
 type WindowInput = Readonly<{
   state: SubscriptionState; taxCountry: string | null; policy: BillingPolicy; now: Date;
-  /** P2-I4 (D5 5h): the connectors' xMoney system; a plan created in the other one is never offered a withdrawal. */
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
-  /** N12: the connectors' NETOPIA environment; absent or null, no NETOPIA plan is served here (spec §2.5.4). */
-  paymentEnvironment?: "sandbox" | "live" | null;
+  /**
+   * P2-I4 (D5 5h), N8's connectors.paymentEnvironment: the NETOPIA environment this API talks to; a plan of another
+   * payment system is never offered a withdrawal, an upgrade or a card change (spec §2.5.4).
+   */
+  paymentEnvironment: "sandbox" | "live";
 }>;
 
-/** Spec §2.5.4: the plan belongs to a payment system this API serves (provider and environment together). */
+/** Spec §2.5.4: the plan belongs to the payment system this API serves (provider and environment together). */
 function served(input: WindowInput): boolean {
-  return servedHere(input.state, { xmoneyEnvironment: input.xmoneyEnvironment, paymentEnvironment: input.paymentEnvironment ?? null });
+  return isThisPaymentSystem(input.state, input.paymentEnvironment);
 }
 
 /**
@@ -73,23 +75,23 @@ const iso = (value: Date | null): string | null => value === null ? null : value
  * An upgrade is offered only while it can be charged at a prorated price: ACTIVE, below Max, no postponed renewal
  * running, outside the renewal's lead (P12c refuses it there with UPGRADE_NOT_AVAILABLE_NOW), and a NETOPIA plan of
  * the environment this API serves (spec §2.5.4, §2.10; P2-W3 (a): the upgrade refuses any other plan NOT_SUBSCRIBED).
- * Since N12 the upgrade route serves NETOPIA plans only (`servedByNetopia`'s rule), so an xMoney plan is never offered it.
+ * The upgrade route serves NETOPIA plans only (`servedByNetopia`'s rule), so another system's plan is never offered it.
  */
 function upgradeOffered(input: WindowInput): boolean {
   const { state, now } = input;
   return state.status === "ACTIVE" && state.planId !== "MAX" && state.renewalPostponedUntil === null
-    && state.paymentProvider === "netopia" && served(input)
+    && served(input)
     && state.currentPeriodEnd !== null && now.getTime() < state.currentPeriodEnd.getTime() - renewalLeadMs();
 }
 
 /**
  * A card change is offered while ACTIVE or PAST_DUE, for a plan of a payment system this API serves (spec §2.5.4).
- * N13's route takes NETOPIA plans only (P2-W3 (a), C-15: offer an action only where its route accepts it), so an
- * xMoney plan is another system's for the card change, as for the upgrade (N12's ruling).
+ * N13's route takes NETOPIA plans only (P2-W3 (a), C-15: offer an action only where its route accepts it), as the
+ * upgrade does (N12's ruling).
  */
 function cardChangeOffered(input: WindowInput): boolean {
   const { state } = input;
-  return (state.status === "ACTIVE" || state.status === "PAST_DUE") && state.paymentProvider === "netopia" && served(input);
+  return (state.status === "ACTIVE" || state.status === "PAST_DUE") && served(input);
 }
 
 /**
@@ -132,13 +134,13 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
 }
 
 export async function readSubscriptionView(
-  deps: Pick<SubscriptionRouteDeps, "billing" | "policy" | "xmoneyEnvironment" | "paymentEnvironment">, ownerRef: string, now: Date
+  deps: Pick<SubscriptionRouteDeps, "billing" | "policy" | "paymentEnvironment">, ownerRef: string, now: Date
 ): Promise<SubscriptionView | null> {
   const state = await deps.billing.subscriptionForOwner(ownerRef);
   if (state === null) return null;
   return subscriptionView({
     state, taxCountry: await initialTaxCountry(deps.billing, state), policy: deps.policy, now,
-    xmoneyEnvironment: deps.xmoneyEnvironment, paymentEnvironment: deps.paymentEnvironment
+    paymentEnvironment: deps.paymentEnvironment
   });
 }
 

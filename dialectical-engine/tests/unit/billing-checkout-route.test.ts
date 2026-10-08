@@ -199,7 +199,7 @@ describe("P8c GET /v1/billing/charges/{chargeRef}", () => {
     // P12e's refused new card: the hold is released and the card change reads FAILED.
     expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED"), event("REFUND_REQUESTED", "CARD_CHECK_REFUSED")]))
       .toEqual({ state: "FAILED", reasonCode: "CARD_CHECK_REFUSED" });
-    // P2-M5: a checkout whose plan never started, its payment refunded or voided at xMoney first, bought nothing.
+    // P2-M5: a checkout whose plan never started, its payment refunded or voided at NETOPIA first, bought nothing.
     for (const reason of ["PROVIDER_REFUND", "PROVIDER_VOID"]) {
       expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED"), event("REFUND_REQUESTED", reason)], false), reason)
         .toEqual({ state: "FAILED", reasonCode: reason });

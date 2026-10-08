@@ -22,7 +22,7 @@ const on = (visa: boolean, mastercard: boolean): SiteFooterBilling => ({ billing
 const OFF_WITH_MARKS: SiteFooterBilling = { billingOn: false, marks: { visa: true, mastercard: true } };
 const BILLING_LINKS = ["/pricing", "/cancel", "/withdraw"];
 
-describe("P21 the site footer, extended for paid plans (R3-4; xMoney's website rules, DB-IP's licence)", () => {
+describe("P21 the site footer, extended for paid plans (R3-4; the card processor's website rules, DB-IP's licence)", () => {
   it("credits DB-IP on every full footer, billing on or off, in exactly those words in every locale", () => {
     for (const root of [fullWithoutProp(), full(null), full(OFF_WITH_MARKS), full(on(false, false))]) {
       expect(root.querySelector('a[href="https://db-ip.com"]')?.textContent).toBe("IP Geolocation by DB-IP");

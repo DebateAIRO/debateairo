@@ -21,7 +21,7 @@ export type SubscriptionEventData = Readonly<Record<string, string | number | bo
 
 export type SubscriptionEvent = Readonly<{
   eventId: string; subscriptionId: string; ownerRef: string; kind: SubscriptionEventKind; at: Date; planId: PlanId;
-  periodAnchorAt: Date | null; xmoneyOrderId: string | null; xmoneyCustomerId: string | null; cardRef: string | null;
+  periodAnchorAt: Date | null;
   /** Spec 2026-10-05 §2.15.2: the saved card an adopting event (ACTIVATED, RENEWED, UPGRADED, CARD_CHANGED, CARD_SAVED) names. */
   cardTokenId: string | null;
   data: SubscriptionEventData;
@@ -31,8 +31,6 @@ export type SubscriptionState = Readonly<{
   subscriptionId: string; ownerRef: string; planId: PlanId; status: SubscriptionStatus;
   periodAnchorAt: Date | null; currentPeriodStart: Date | null; currentPeriodEnd: Date | null;
   cancelRequested: boolean; scheduledDowngradePlanId: PlanId | null;
-  /** xMoney-era handles, kept readable for old rows; a NETOPIA plan never holds them. */
-  xmoneyOrderId: string | null; xmoneyCustomerId: string | null; cardRef: string | null;
   activatedAt: Date | null; endedCause: EndedCause | null; pastDueSince: Date | null; retryIndex: number;
   renewalPostponedUntil: Date | null;
   /** A7: the recurring total the person was last told about (checkout, upgrade, downgrade, notice M3). */
@@ -40,8 +38,8 @@ export type SubscriptionState = Readonly<{
   lastNoticeAt: Date | null;
   /**
    * Spec 2026-10-05 §2.5.5: the payment system the subscription was created in, for life — from CREATED's
-   * `data.payment_provider` and `data.payment_environment`, or, for an old row, `data.xmoney_environment` read as
-   * provider "xmoney". Renewals, charge matching and the other-system guards read both together (§2.5.4).
+   * `data.payment_provider` and `data.payment_environment` (an old row: `paymentSystemOf` below). Renewals, charge
+   * matching and the other-system guards read both together (§2.5.4).
    */
   paymentProvider: "xmoney" | "netopia";
   paymentEnvironment: "stage" | "sandbox" | "live";
@@ -52,8 +50,7 @@ export type SubscriptionState = Readonly<{
 type Working = {
   subscriptionId: string; ownerRef: string; planId: PlanId; status: SubscriptionStatus;
   periodAnchorAt: Date | null; periodIndex: number; periodStart: Date | null; periodEnd: Date | null;
-  cancelRequested: boolean; scheduledDowngradePlanId: PlanId | null; xmoneyOrderId: string | null;
-  xmoneyCustomerId: string | null; cardRef: string | null; activatedAt: Date | null; endedCause: EndedCause | null;
+  cancelRequested: boolean; scheduledDowngradePlanId: PlanId | null; activatedAt: Date | null; endedCause: EndedCause | null;
   pastDueSince: Date | null; retryIndex: number; renewalPostponedUntil: Date | null;
   announcedTotalMicros: number | null; lastNoticeAt: Date | null;
   paymentProvider: "xmoney" | "netopia"; paymentEnvironment: "stage" | "sandbox" | "live"; cardTokenId: string | null;
@@ -72,18 +69,11 @@ const CARD_TOKEN_KINDS: ReadonlySet<SubscriptionEventKind> = new Set<Subscriptio
   "ACTIVATED", "RENEWED", "UPGRADED", "CARD_CHANGED", "CARD_SAVED"
 ]);
 
-/**
- * Spec 2026-10-05 §2.5.5: only an adopting event carries a card, and only on a NETOPIA plan; a NETOPIA plan never holds
- * an xMoney id (new code never writes them).
- */
+/** Spec 2026-10-05 §2.5.5: only an adopting event carries a card, and only on a NETOPIA plan. */
 function checkPaymentFields(state: Pick<Working, "paymentProvider">, event: SubscriptionEvent): void {
   if (event.cardTokenId !== null) {
     if (!CARD_TOKEN_KINDS.has(event.kind)) illegal(`${event.kind} carries a card`);
-    if (state.paymentProvider !== "netopia") illegal(`${event.kind} carries a card on an xMoney plan`);
-  }
-  if (state.paymentProvider === "netopia"
-    && (event.xmoneyOrderId !== null || event.xmoneyCustomerId !== null || event.cardRef !== null)) {
-    illegal(`${event.kind} carries an xMoney id on a NETOPIA plan`);
+    if (state.paymentProvider !== "netopia") illegal(`${event.kind} carries a card on another payment system's plan`);
   }
 }
 
@@ -142,8 +132,7 @@ function apply(state: Working, event: SubscriptionEvent): void {
       if (!(state.status === "CREATED" || (state.status === "ENDED" && state.endedCause === "ABANDONED"))) {
         illegal(`ACTIVATED while ${state.status}`);
       }
-      // §2.5.5: a NETOPIA plan starts with or without a saved card; an xMoney plan still needs its order (old rows).
-      if (state.paymentProvider === "xmoney" && event.xmoneyOrderId === null) illegal("ACTIVATED without an xMoney order");
+      // §2.5.5: a NETOPIA plan starts with or without a saved card.
       state.announcedTotalMicros = announced(event);
       const anchor = event.periodAnchorAt ?? event.at;
       state.status = "ACTIVE";
@@ -154,9 +143,6 @@ function apply(state: Working, event: SubscriptionEvent): void {
       state.periodStart = anchor;
       state.periodEnd = periodBoundary(anchor, 1);
       state.activatedAt = event.at;
-      state.xmoneyOrderId = event.xmoneyOrderId;
-      state.xmoneyCustomerId = event.xmoneyCustomerId ?? state.xmoneyCustomerId;
-      state.cardRef = event.cardRef ?? state.cardRef;
       return;
     }
     case "RENEWED":
@@ -261,15 +247,8 @@ function apply(state: Working, event: SubscriptionEvent): void {
       return;
     case "CARD_CHANGED":
       requireStatus(state, event, ["ACTIVE", "PAST_DUE"]);
-      // §2.5.5: a NETOPIA plan's new card is the token the card check saved; an xMoney plan's is a new order.
-      if (state.paymentProvider === "netopia") {
-        if (event.cardTokenId === null) illegal("CARD_CHANGED without the new card");
-        return;
-      }
-      if (event.xmoneyOrderId === null) illegal("CARD_CHANGED without the new order");
-      state.xmoneyOrderId = event.xmoneyOrderId;
-      state.xmoneyCustomerId = event.xmoneyCustomerId ?? state.xmoneyCustomerId;
-      state.cardRef = event.cardRef;
+      // §2.5.5: a NETOPIA plan's new card is the token the card check saved.
+      if (state.paymentProvider === "netopia" && event.cardTokenId === null) illegal("CARD_CHANGED without the new card");
       return;
     case "CARD_SAVED":
       // §2.5.5 / §2.15.2: a saved card that arrived after the deciding event; it changes nothing but the card.
@@ -302,17 +281,14 @@ function apply(state: Working, event: SubscriptionEvent): void {
 /**
  * Spec 2026-10-05 §2.5.5: the payment system comes from CREATED. A NETOPIA row names `data.payment_provider` and
  * `data.payment_environment`; an older row names only `data.xmoney_environment` (0085's CHECK) and folds as provider
- * "xmoney" (every payment reader treats it as another system once N23 lands).
+ * "xmoney", which no code acts on any more (every reader treats it as another payment system).
  */
 function paymentSystemOf(data: SubscriptionEvent["data"]): Pick<SubscriptionState, "paymentProvider" | "paymentEnvironment"> {
-  const provider = data.payment_provider;
-  const environment = data.payment_environment;
-  const xmoney = data.xmoney_environment;
-  if (provider === "netopia" && (environment === "sandbox" || environment === "live")) {
-    return { paymentProvider: "netopia", paymentEnvironment: environment };
+  if (data.payment_provider === "netopia" && (data.payment_environment === "sandbox" || data.payment_environment === "live")) {
+    return { paymentProvider: "netopia", paymentEnvironment: data.payment_environment };
   }
-  if (provider === undefined && (xmoney === "stage" || xmoney === "live")) {
-    return { paymentProvider: "xmoney", paymentEnvironment: xmoney };
+  if (data.payment_provider === undefined && (data.xmoney_environment === "stage" || data.xmoney_environment === "live")) {
+    return { paymentProvider: "xmoney", paymentEnvironment: data.xmoney_environment };
   }
   throw new TypedDomainError("BILLING_SUBSCRIPTION_EVENTS_INVALID", "CREATED must name its payment system");
 }
@@ -326,8 +302,7 @@ export function foldSubscription(events: ReadonlyArray<SubscriptionEvent>): Subs
   const state: Working = {
     subscriptionId: first.subscriptionId, ownerRef: first.ownerRef, planId: first.planId, status: "CREATED",
     periodAnchorAt: null, periodIndex: 0, periodStart: null, periodEnd: null, cancelRequested: false,
-    scheduledDowngradePlanId: null, xmoneyOrderId: first.xmoneyOrderId, xmoneyCustomerId: first.xmoneyCustomerId,
-    cardRef: first.cardRef, activatedAt: null, endedCause: null, pastDueSince: null, retryIndex: 0,
+    scheduledDowngradePlanId: null, activatedAt: null, endedCause: null, pastDueSince: null, retryIndex: 0,
     renewalPostponedUntil: null, announcedTotalMicros: null, lastNoticeAt: null,
     paymentProvider: system.paymentProvider, paymentEnvironment: system.paymentEnvironment, cardTokenId: null
   };
@@ -347,7 +322,6 @@ export function foldSubscription(events: ReadonlyArray<SubscriptionEvent>): Subs
     subscriptionId: state.subscriptionId, ownerRef: state.ownerRef, planId: state.planId, status: state.status,
     periodAnchorAt: state.periodAnchorAt, currentPeriodStart: state.periodStart, currentPeriodEnd: state.periodEnd,
     cancelRequested: state.cancelRequested, scheduledDowngradePlanId: state.scheduledDowngradePlanId,
-    xmoneyOrderId: state.xmoneyOrderId, xmoneyCustomerId: state.xmoneyCustomerId, cardRef: state.cardRef,
     activatedAt: state.activatedAt, endedCause: state.endedCause, pastDueSince: state.pastDueSince,
     retryIndex: state.retryIndex, renewalPostponedUntil: state.renewalPostponedUntil,
     announcedTotalMicros: state.announcedTotalMicros, lastNoticeAt: state.lastNoticeAt,
