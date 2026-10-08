@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Sistem za razprave spodbuja vprašanja o politiki, veri, zdravju, spolnosti in prepričanjih. Po členu 9 GDPR so to posebne vrste podatkov, ki se lahko pojavijo v vaših vprašanjih ne glede na to, ali jih nameravamo zbirati." },
-      { kind: "p", text: "O vas. Pred svojo prvo razpravo na ločenem zaslonu podate izrecno privolitev, da obdelujemo občutljive podatke, ki jih po lastni izbiri vključite v svoja vprašanja, zaradi izvajanja vaših razprav. Zabeležimo različico besedila, v katero ste privolili, vaš jezik in čas. Brez te privolitve ne morete začeti razprave. Privolitev lahko kadar koli prekličete s pisanjem na privacy@dezbatere.ro. Take podatke lahko tudi izpustite ali izbrišete razpravo, ki jih vsebuje. Kar objavite o sebi, so podatki, za katere ste se odločili, da jih boste javno objavili." },
+      { kind: "p", text: "O vas. Pred svojo prvo razpravo na ločenem zaslonu podate izrecno privolitev, da obdelujemo občutljive podatke, ki jih po lastni izbiri vključite v svoja vprašanja, zaradi izvajanja vaših razprav. Zabeležimo različico besedila, v katero ste privolili, vaš jezik in čas. Brez te privolitve ne morete začeti razprave. Privolitev lahko kadar koli prekličete z zaprtjem računa v Nastavitvah. Take podatke lahko tudi izpustite ali izbrišete razpravo, ki jih vsebuje. Kar objavite o sebi, so podatki, za katere ste se odločili, da jih boste javno objavili." },
       { kind: "p", text: "O drugih osebah. Noben pravni pogoj nam ne dovoljuje obdelave občutljivih podatkov o tretji osebi, ki jo navedete v vprašanju, prav tako ga nima noben od naših ponudnikov umetne inteligence. Zato Pogoji to prepovedujejo, zato zmanjšujemo količino poslanih podatkov in zato tako vsebino na zahtevo hitro odstranimo — glejte razdelek 11." },
       { kind: "p", text: "Zdravstveni podatki. Nekatere države podatke, povezane z zdravjem, vključno z izpeljanimi sklepi, urejajo s posebnimi zakoni. Če živite v [the State of Washington], se uporablja ločeno [Consumer Health Data Privacy Notice]." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Omejitev (Art. 18) — Prosite nas lahko, naj prenehamo obdelovati določene podatke, dokler se spor o njih ne razreši",
         "Ugovor (Art. 21) — Ugovarjate lahko obdelavi na podlagi zakonitih interesov — varnostni in revizijski obdelavi iz razdelka 4 — in prenehali bomo, razen če lahko dokažemo nujne razloge. Trženju lahko ugovarjate kadar koli in prenehali bomo",
         "Prenosljivost (Art. 20) — Vaše razprave in podatki računa v splošno uporabljani, strojno berljivi obliki. [Pending: same export as Access.] Neosebna vsebina, ki ste jo ustvarili, na primer vaša vprašanja, vam bo na zahtevo vrnjena ob prenehanju pogodbe",
-        "Preklic privolitve (Art. 7(3)) — Privolitev za trženje prekličete v katerem koli e-poštnem sporočilu ali Nastavitvah; privolitev za občutljive podatke prekličete s pisanjem na privacy@dezbatere.ro (take podatke lahko tudi izpustite ali izbrišete razpravo, ki jih vsebuje). Preklic ne vpliva na obdelavo, ki je že bila izvedena",
+        "Preklic privolitve (Art. 7(3)) — Privolitev za trženje prekličete v katerem koli e-poštnem sporočilu ali Nastavitvah; privolitev za občutljive podatke prekličete z zaprtjem računa v Nastavitvah (take podatke lahko tudi izpustite ali izbrišete razpravo, ki jih vsebuje). Preklic ne vpliva na obdelavo, ki je že bila izvedena",
         "Pritožba — Romunskemu nadzornemu organu ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarešta, anspdcp@dataprotection.ro, ali organu v državi, v kateri živite. Raje bi videli, da se najprej obrnete na nas"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "212dd537a6ab1784f7c60fc390960573ed20c57bb915bc425a211e6632429bc5",
+  sha256: "653477ad2221456e71f2245e19caaeabff601b91c9ebd6cdb642fb4b9e493fa8",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.2 · VELJA OD [DATE]",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",
