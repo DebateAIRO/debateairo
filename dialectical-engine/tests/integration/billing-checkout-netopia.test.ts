@@ -1,13 +1,14 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
-  paymentError, type CardPayments, type HostedPaymentStart, type HostedPaymentStarted, type PaymentReport, type PaymentState
+  computeWindows, paymentError, type CardPayments, type HostedPaymentStart, type HostedPaymentStarted, type PaymentReport, type PaymentState
 } from "@debateai/billing-core";
 import { AcceptanceRepository, BillingJobQueries, BillingRepository, migrate } from "@debateai/db";
 import { ChargeStatusReader, waitingCheckAfterMs } from "../../apps/api/src/billing/charge-status.js";
 import { CheckoutService, type CheckoutDeps, type ConsentKind } from "../../apps/api/src/billing/checkout.js";
 import { QuoteService, type QuoteInput } from "../../apps/api/src/billing/quote.js";
 import { openBillingProfile, openPaymentUrl } from "../../apps/api/src/billing/records.js";
+import { englishOrderText, type BillingOrderText } from "../../apps/api/src/billing/order-text.js";
 import { chargeEvent } from "../../apps/api/src/billing/rows.js";
 import { consentDocument } from "../../apps/ui/scripts/legal-consent-manifest.mjs";
 import {
@@ -77,7 +78,7 @@ class ScriptedPayments implements CardPayments {
   }
 }
 
-function world() {
+function world(extra: Partial<CheckoutDeps> = {}) {
   const repository = new BillingRepository(database.pool);
   const jobs = new BillingJobQueries(database.pool);
   const payments = new ScriptedPayments();
@@ -90,7 +91,7 @@ function world() {
   const deps: CheckoutDeps = {
     repository, jobs, acceptances: new AcceptanceRepository(database.pool), payments,
     accountEmail: { read: async () => "buyer@example.test" }, geo, countryPolicy: testCountryPolicy,
-    policy: testBillingPolicy, consentDocuments, recordsKey: TEST_RECORDS_KEY, publicAppUrl: TEST_PUBLIC_APP_URL, audit
+    policy: testBillingPolicy, consentDocuments, recordsKey: TEST_RECORDS_KEY, publicAppUrl: TEST_PUBLIC_APP_URL, audit, ...extra
   };
   const checkout = new CheckoutService(deps);
   // Ruling PR-19: every billing owner_ref is a uuid (0085).
@@ -157,6 +158,30 @@ describe("N18 the checkout starts NETOPIA's page (spec §2.6.2)", () => {
     for (const secret of ["netopia-payments.com", "+40712345678", "buyer@example.test", "Memorandumului"]) expect(lines).not.toContain(secret);
   });
 
+  it("words the order line and NETOPIA's page language in the buyer's locale through the order-text port (spec §2.3, §2.4.2)", async () => {
+    const romanian: BillingOrderText = (kind, locale, params) => locale === "ro" && kind === "ORDER_PLAN"
+      ? `DebateAI ${params.plan ?? ""}, abonament lunar` : englishOrderText(kind, locale, params);
+    const w = world({
+      orderText: romanian,
+      consentDocuments: (kind, locale) => (locale === "en" || locale === "ro" ? consentDocument(TEXT[kind]) : null)
+    });
+    await w.start(await w.quote(), { locale: "ro" });
+    expect(w.payments.starts).toHaveLength(1);
+    expect(w.payments.starts[0]).toMatchObject({ description: "DebateAI Plus, abonament lunar", language: "ro" });
+  });
+
+  it("keeps a confirmed country on CREATED so VERIFY_PAYMENT can weigh the card country by it", async () => {
+    geo.country = "DE";
+    const w = world();
+    const result = await w.start(await w.quote(), { countryConfirmed: true });
+    const charge = await w.repository.charge(result.chargeId);
+    const [created] = await w.repository.subscriptionEvents(charge!.subscriptionId);
+    expect(created).toMatchObject({
+      kind: "CREATED",
+      data: { country_confirmed: true, ip_country: "DE", payment_provider: "netopia", payment_environment: "sandbox" }
+    });
+  });
+
   it("refuses 422 a checkout whose quote lacks a payer field, and a phone it cannot read, and calls nobody", async () => {
     const w = world();
     await expect(w.start(await w.quote({ phone: null }))).rejects.toMatchObject({ status: 422, code: "BILLING_ADDRESS_REQUIRED" });
@@ -194,9 +219,16 @@ describe("N18 the checkout starts NETOPIA's page (spec §2.6.2)", () => {
     ] as const) {
       const w = world();
       w.payments.startFailure = failure;
-      await expect(w.start(await w.quote()), code).rejects.toMatchObject({ status: 503, code: "PAYMENT_PROVIDER_UNAVAILABLE" });
+      const failedQuote = await w.quote();
+      await expect(w.start(failedQuote), code).rejects.toMatchObject({ status: 503, code: "PAYMENT_PROVIDER_UNAVAILABLE" });
       const [charge] = await w.repository.chargesForSubscription((await w.repository.subscriptionForOwner(w.ownerRef))!.subscriptionId);
       expect(await trail(charge!.chargeId), code).toEqual(["REQUESTED", `FAILED:${code}`]);
+      // A3 (a): the failed charge holds the quote's single use (spec §2.6.2 step 4), so a retry with the same quote is
+      // refused and rolls back whole: no start, the abandon's ENDED undone, no second charge.
+      await expect(w.start(failedQuote), code).rejects.toMatchObject({ status: 409, code: "QUOTE_EXPIRED" });
+      expect(w.payments.starts, code).toHaveLength(1);
+      expect((await w.repository.subscriptionEvents(charge!.subscriptionId)).at(-1), code).toMatchObject({ kind: "CREATED" });
+      expect(await w.repository.chargesForSubscription(charge!.subscriptionId), code).toHaveLength(1);
       expect(await w.repository.withTransaction((client) => w.repository.hostedPaymentForCharge(client, charge!.chargeId))).toBeNull();
       if (alert !== null) expect(await ownerAlerts(alert, charge!.chargeId), code).toBe(1);
       if (code === "PAYMENT_CREDENTIALS_REFUSED") {
@@ -258,9 +290,30 @@ describe("N18 one open checkout at a time (spec §2.6.3)", () => {
     expect(paid.payments.reads).toHaveLength(0);
   });
 
-  it("makes one charge and one start for two checkouts at once; the other waits on that charge or gets its page", async () => {
-    const w = world();
-    const [a, b] = await Promise.allSettled([w.start(await w.quote()), w.start(await w.quote())]);
+  it("makes one charge and one start for two checkouts at once; the other waits on that charge", async () => {
+    // Both reads before the lock (the only subscriptionForOwner calls without the transaction's client) finish before
+    // either checkout goes on, so neither transaction has committed when they run: the second checkout always meets
+    // the first's charge under the owner lock. Without this gate the second checkout's first query can wait for a new
+    // pool connection until the first checkout is done, and then reuse its page (measured).
+    const base = new BillingRepository(database.pool);
+    const gated = Object.create(base) as BillingRepository;
+    let preLockReads = 0;
+    let release!: () => void;
+    const bothRead = new Promise<void>((resolve) => { release = resolve; });
+    gated.subscriptionForOwner = async (ownerRef, executor) => {
+      const found = await base.subscriptionForOwner(ownerRef, executor);
+      if (executor === undefined) {
+        preLockReads += 1;
+        if (preLockReads === 2) release();
+        await bothRead;
+      }
+      return found;
+    };
+    const w = world({ repository: gated });
+    const first = await w.quote();
+    const second = await w.quote();
+    const [a, b] = await Promise.allSettled([w.start(first), w.start(second)]);
+    expect(preLockReads).toBe(2);
     expect(w.payments.starts).toHaveLength(1);
     const subscription = await w.repository.subscriptionForOwner(w.ownerRef);
     const charges = await w.repository.chargesForSubscription(subscription!.subscriptionId);
@@ -271,6 +324,81 @@ describe("N18 one open checkout at a time (spec §2.6.3)", () => {
     for (const settled of [a, b]) {
       if (settled.status === "rejected") expect(settled.reason).toMatchObject({ status: 409, code: "CHECKOUT_PENDING" });
     }
+    const fulfilled = [a, b].filter((settled) => settled.status === "fulfilled");
+    const rejected = [a, b].filter((settled) => settled.status === "rejected");
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((fulfilled[0] as PromiseFulfilledResult<Awaited<ReturnType<typeof w.start>>>).value)
+      .toMatchObject({ chargeId: charges[0]!.chargeId, reused: false });
+    expect((rejected[0] as PromiseRejectedResult).reason)
+      .toMatchObject({ status: 409, code: "CHECKOUT_PENDING", chargeRef: charges[0]!.chargeId });
+  });
+
+  it("makes a new charge from the new quote when the buyer's phone, street or last name changed within 30 minutes (A3 (b))", async () => {
+    const w = world();
+    const first = await w.start(await w.quote());
+    const customer = await w.repository.customerByOwner(w.ownerRef);
+    let open = first;
+    let starts = 1;
+    // Each step changes one more payer field of samePurchaser's comparison; the other fields stay as the open quote's.
+    const steps: ReadonlyArray<Readonly<{ change: Partial<QuoteInput>; expected: Record<string, string> }>> = [
+      { change: { phone: "+40 712 345 679" }, expected: { phone: "+40712345679" } },
+      { change: { phone: "+40 712 345 679", street: "Strada Horea 2" }, expected: { street: "Strada Horea 2" } },
+      { change: { phone: "+40 712 345 679", street: "Strada Horea 2", lastName: "Popescu" }, expected: { lastName: "Popescu" } }
+    ];
+    for (const { change, expected } of steps) {
+      const label = Object.keys(expected)[0] ?? "";
+      advance(5 * MINUTE);
+      const quoteRef = await w.quote(change);
+      const again = await w.start(quoteRef);
+      expect(again.reused, label).toBe(false);
+      expect(again.chargeId, label).not.toBe(open.chargeId);
+      expect(await w.repository.charge(again.chargeId), label).toMatchObject({ quoteId: quoteRef });
+      starts += 1;
+      expect(w.payments.starts, label).toHaveLength(starts);
+      const before = (await w.repository.charge(open.chargeId))!;
+      expect((await w.repository.subscriptionEvents(before.subscriptionId)).at(-1), label)
+        .toMatchObject({ kind: "ENDED", data: { cause: "ABANDONED", reason: "NEW_CHECKOUT" } });
+      const profile = await w.repository.latestProfile(customer!.customerId);
+      expect(openBillingProfile(TEST_RECORDS_KEY, customer!.customerId, profile!.profileCiphertext), label).toMatchObject(expected);
+      open = again;
+    }
+  });
+
+  it("abandons an open checkout of another payment system and never reads it at NETOPIA (spec §2.5.4)", async () => {
+    const w = world();
+    // An xMoney-era checkout (its CREATED names no payment_provider), seeded as billing-other-system-records does.
+    const subscriptionId = randomUUID();
+    const legacyQuote = await w.quote();
+    const quoted = (await w.repository.quote(legacyQuote, w.ownerRef))!;
+    const legacyCharge = randomUUID().replaceAll("-", "");
+    await w.repository.withTransaction(async (client) => {
+      await w.repository.appendSubscriptionEvent(client, {
+        eventId: randomUUID(), subscriptionId, ownerRef: w.ownerRef, kind: "CREATED", at: clock.now, planId: "PLUS",
+        periodAnchorAt: null, xmoneyOrderId: null, xmoneyCustomerId: null, cardRef: null, cardTokenId: null,
+        data: { xmoney_environment: "stage" }
+      });
+      const month = computeWindows(clock.now, clock.now).month;
+      await w.repository.insertCharge(client, {
+        chargeId: legacyCharge, ownerRef: w.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1, periodStart: month.start,
+        periodEnd: month.end, quoteId: quoted.quoteId, netMicros: quoted.netMicros, taxMicros: quoted.taxMicros,
+        totalMicros: quoted.totalMicros, currency: "USD", createdAt: clock.now, paymentProvider: "xmoney", paymentEnvironment: "stage"
+      });
+      for (const kind of ["REQUESTED", "SUBMITTED"] as const) {
+        await w.repository.appendChargeEvent(client, chargeEvent(legacyCharge, kind, clock.now, {
+          providerPaymentId: kind === "SUBMITTED" ? "4711" : null, amountMicros: quoted.totalMicros, errorCode: null
+        }));
+      }
+    });
+    const started = await w.start(await w.quote());
+    expect(started.reused).toBe(false);
+    expect(started.chargeId).not.toBe(legacyCharge);
+    expect(w.payments.reads).toEqual([]);
+    expect((await w.repository.subscriptionEvents(subscriptionId)).at(-1))
+      .toMatchObject({ kind: "ENDED", data: { cause: "ABANDONED", reason: "NEW_CHECKOUT" } });
+    expect(await w.repository.charge(started.chargeId))
+      .toMatchObject({ kind: "INITIAL", paymentProvider: "netopia", paymentEnvironment: "sandbox" });
+    expect(w.payments.starts).toHaveLength(1);
   });
 });
 
