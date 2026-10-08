@@ -9,7 +9,7 @@ import {
   StepUpAuthorizationRequestSchema,
   StepUpGrantResponseSchema
 } from "../../packages/contract/src/index.js";
-import { createContractClient } from "../../packages/contract/src/client.js";
+import { ContractHttpError, createContractClient } from "../../packages/contract/src/client.js";
 
 const grant = "g".repeat(43);
 const token = "t".repeat(43);
@@ -112,5 +112,25 @@ describe("data export contract", () => {
       { path: "/v1/account/export", method: "GET", body: undefined },
       { path: "/v1/account/export/download", method: "POST", body: { token } }
     ]);
+  });
+
+  it("K-11 carries numeric Retry-After seconds on rate limit errors and rejects other forms", async () => {
+    const cases: readonly [string | null, number | null][] = [
+      ["3600", 3600],
+      ["60", 60],
+      [null, null],
+      ["soon", null],
+      ["Wed, 21 Oct 2026 07:28:00 GMT", null]
+    ];
+    for (const [header, expected] of cases) {
+      const fetchStub: typeof fetch = async () => Response.json(
+        { error: "EXPORT_RATE_LIMITED" },
+        { status: 429, headers: header === null ? {} : { "retry-after": header } }
+      );
+      const client = createContractClient("https://example.test", fetchStub);
+      const error: unknown = await client.requestDataExport(grant, "ro").catch((reason: unknown) => reason);
+      expect(error).toBeInstanceOf(ContractHttpError);
+      expect((error as ContractHttpError).retryAfterSeconds).toBe(expected);
+    }
   });
 });

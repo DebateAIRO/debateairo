@@ -28,7 +28,8 @@ export class ContractHttpError extends Error {
      * debates rather than a reset (final review Part 1b, Important 1). The ask
      * page shows sentence D with that time when its room re-read fails.
      */
-    readonly waiting: ContractWaitingRefusal | null = null
+    readonly waiting: ContractWaitingRefusal | null = null,
+    readonly retryAfterSeconds: number | null = null
   ) {
     super(message);
     this.name = "ContractHttpError";
