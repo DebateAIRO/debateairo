@@ -3,6 +3,7 @@ import type { BillingJobQueries, BillingRepository, CustomerXMoneyEnvironment, E
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import type { BillingPolicy } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
+import type { CardCustody } from "./card-custody.js";
 import { emailJob } from "./email-job.js";
 import { enqueueOnce } from "./outbox.js";
 import { codeOf, failureCode, type RenewalService, type RetryPrice } from "./renewal.js";
@@ -27,6 +28,8 @@ export type MaintenanceDeps = Readonly<{
   xmoneyEnvironment: CustomerXMoneyEnvironment;
   paymentEnvironment?: "sandbox" | "live";
   audit: BillingAudit;
+  /** N17 (spec §2.15.3): A7's daily look-ahead also asks for a card ten days before a renewal (M12). Absent: none. */
+  custody?: Pick<CardCustody, "askForCard">;
   clock: () => Date;
 }>;
 
@@ -90,7 +93,10 @@ export class BillingMaintenance {
           return;
         }
         await this.remind(state, now, report);
-        if (lookAhead) await this.announce(state, now, report);
+        if (lookAhead) {
+          await this.announce(state, now, report);
+          await this.deps.custody?.askForCard(state, now);
+        }
         return;
       case "PAST_DUE":
         // Spec §1.3 / §2.5.6: a cancel while past due ends the plan now; it is never retried or dunned again.

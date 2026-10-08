@@ -1672,6 +1672,14 @@ export class BillingRepository {
     return (await executor.query<CardTokenRow>(`${CARD_TOKEN_SELECT} WHERE revocation.token_id IS NULL AND token.created_at < $1
       ORDER BY token.created_at, token.token_id`, [before])).rows.map(frozen);
   }
+  /**
+   * N17 (spec §2.15.4): every token of one customer that is not revoked, oldest first — what an erasure commit revokes
+   * at once. Read on the caller's executor (the revoking transaction's client).
+   */
+  async liveCardTokensForCustomer(executor: BillingReadExecutor, customerId: string): Promise<ReadonlyArray<CardTokenRow>> {
+    return (await executor.query<CardTokenRow>(`${CARD_TOKEN_SELECT} WHERE revocation.token_id IS NULL AND token.customer_id = $1
+      ORDER BY token.created_at, token.token_id`, [customerId])).rows.map(frozen);
+  }
   /** Content-free and once: a second revocation keeps the first one's time and reason. */
   async revokeCardToken(c: PoolClient, row: Readonly<{ tokenId: string; at: Date; reason: CardTokenRevocationReason }>): Promise<void> {
     await c.query(`INSERT INTO billing.card_token_revocation (token_id, at, reason) VALUES ($1,$2,$3)

@@ -1,5 +1,6 @@
 import type { BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
 import type { BillingAudit } from "./audit.js";
+import type { CardCustody } from "./card-custody.js";
 import type { BillingReconciler, ReconcileReport } from "./reconcile.js";
 import { writeCancelLocked } from "./subscription-actions.js";
 import { appendChecked, lockedSubscription } from "./subscription-core.js";
@@ -10,6 +11,8 @@ export type BillingErasureDeps = Readonly<{
   entitlements: EntitlementRepository;
   audit: BillingAudit;
   clock: () => Date;
+  /** N17 (spec §2.15.4): an erasure commit revokes the owner's saved cards at once. Absent: the daily sweep does it. */
+  custody?: Pick<CardCustody, "revokeForErasure">;
 }>;
 
 /** The states the fold (P2) lets ERASURE_STOPPED end. */
@@ -44,7 +47,8 @@ export function erasurePendingOf(
  *   the plan ends as P15 ended it at scheduling before: ERASURE_STOPPED and the FREE entitlement, never an xMoney call
  *   (A4d), never a refund. A freeze marks the row `stopped_for: "AGE_FROZEN"` and the audit line
  *   `billing.age_frozen.stopped` (P2's fold has one stop kind, so the mark lives on the row), so it is never read as
- *   an erasure. Whether its money goes back is the owner's question, not this hook's.
+ *   an erasure. Whether its money goes back is the owner's question, not this hook's. N17 (spec §2.15.4): at a
+ *   committed erasure the owner's saved cards are revoked at once (`custody`), whatever state the plan is in.
  * - A deletion is scheduled and has not run: only the renewal stops, at once — CANCEL_REQUESTED with
  *   `source: "ACCOUNT_ERASURE"` (`writeCancelLocked`, no M7) — and the paid plan goes on until the commit, with its
  *   14-day withdrawal still open. A PAST_DUE plan (whose next charge would be a dunning retry) or one whose renewal is
@@ -65,8 +69,9 @@ export class BillingErasureHook {
       const locked = await lockedSubscription(this.deps, client, ownerRef);
       if (locked === null) return null;
       const frozen = await billing.ownerAgeFrozen(ownerRef, client);
-      if (frozen || await billing.ownerErasureCommitted(ownerRef, client)) {
-        if (!STOPPABLE.has(locked.state.status)) return null;
+      const committed = !frozen && await billing.ownerErasureCommitted(ownerRef, client);
+      if (frozen || committed) {
+        if (!STOPPABLE.has(locked.state.status)) return Object.freeze({ kind: "NOTHING" as const, frozen, committed });
         await appendChecked(billing, client, locked, {
           kind: "ERASURE_STOPPED", at: now, data: frozen ? AGE_FROZEN_STOP : ERASURE_STOP
         });
@@ -74,14 +79,20 @@ export class BillingErasureHook {
           ownerRef, planId: "FREE", periodAnchorAt: now, cause: "ERASURE_STOPPED", effectiveAt: now,
           subscriptionId: locked.state.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
         });
-        return Object.freeze({ kind: "STOPPED" as const, frozen });
+        return Object.freeze({ kind: "STOPPED" as const, frozen, committed });
       }
       // Neither committed nor frozen, so this is a deletion still scheduled (and not cancelled), or none at all.
       if (!await billing.ownerErasurePending(ownerRef, client)) return null;
       const written = await writeCancelLocked(this.deps, client, locked, now, "ACCOUNT_ERASURE");
-      return written.outcome === "REQUESTED" ? Object.freeze({ kind: "RENEWAL_STOPPED" as const, frozen: false }) : null;
+      return written.outcome === "REQUESTED"
+        ? Object.freeze({ kind: "RENEWAL_STOPPED" as const, frozen: false, committed: false })
+        : null;
     });
-    if (done === null) return "NOTHING";
+    // N17 (spec §2.15.4): a committed erasure deletes the saved cards at once, whatever the plan's state (a failure here
+    // throws, so the sweep reports BILLING_ERASURE_SWEEP_PENDING; the daily card sweep revokes them with ERASURE anyway).
+    // An age-frozen account is not an erasure: its cards go with the plan, PLAN_ENDED, at the next daily sweep.
+    if (done !== null && done.committed && this.deps.custody !== undefined) await this.deps.custody.revokeForErasure(ownerRef, now);
+    if (done === null || done.kind === "NOTHING") return "NOTHING";
     if (done.kind === "RENEWAL_STOPPED") {
       this.deps.audit("billing.cancel", { source: "ACCOUNT_ERASURE" });
       return "RENEWAL_STOPPED";

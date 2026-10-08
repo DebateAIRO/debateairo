@@ -41,6 +41,7 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   bankDeclined: "true",
   confirmCard: "true",
   paymentAlert: "true",
+  cardExpiring: "true",
   endedPlan: "PRO",
   invoiceNumber: "DBAI 0042",
   quarter: "2026-Q4",
@@ -575,5 +576,13 @@ describe("P17 renderMail", () => {
       "At most one such email is sent an hour; the owner summary (pnpm billing:tax-summary) counts every kept message by day."
     ].join("\n\n"))).toBe(true);
     expect(Object.keys(MAIL_TEMPLATES.O4.params).sort()).toEqual(["chargeRef", "reasonCode", "receivedAt"]);
+  });
+
+  it("N17: M12 says which card is missing, in English and Romanian", () => {
+    const expiring = renderMail("M12", "en", paramsFor("M12"));
+    expect(expiring.text).toContain("The card we have expires before then.");
+    expect(expiring.text).not.toContain("We couldn't keep your card");
+    const missing = renderMail("M12", "ro", { ...paramsFor("M12"), cardExpiring: "false" });
+    expect(missing.text).toContain("Nu am putut păstra cardul de la ultima dumneavoastră plată.");
   });
 });

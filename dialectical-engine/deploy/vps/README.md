@@ -2673,7 +2673,11 @@ for a renewal's outcome; nothing changed), `billing.card.not_adopted` (a card ch
 could not become the plan's card; nothing changed and the person is asked to try again), `billing.cancel_link.sent`, `billing.reconcile.adopted` (the money check
 found the payment of a charge whose answer was lost), `billing.erasure.stopped` and `billing.age_frozen.stopped` (the
 plan of a deleted or age-frozen account ended), `billing.card.saved` (a saved card that arrived after its payment
-was decided became the plan's card), `billing.renewal.recovered_earlier` (an earlier attempt of a month NETOPIA now
+was decided became the plan's card), `billing.card.revoked` (saved cards the site no longer needs were deleted, with
+the reason and the count: replaced, their plan ended, never used, another system's, a test order's, or an account
+erasure), `billing.card.purged` (the daily delete of revoked cards a day after their revocation, and of NETOPIA's raw
+messages and the quarantine after 14 days), `billing.card.reminder` (a person was asked by email, M12, to add a card
+before a renewal), `billing.renewal.recovered_earlier` (an earlier attempt of a month NETOPIA now
 reports paid was sent to its check instead of a new retry), `billing.charge.closed` (an unpaid payment page, such as an
 upgrade the person left, was closed; a payment that still arrives for it is still applied, or refunded in full
 (`UPGRADE_CLOSED`) through the refund path), and `billing.tax_summary.queued` (the quarterly summary was queued).

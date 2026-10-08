@@ -91,6 +91,12 @@ export type BillingAuditEvent =
   | "billing.payment.owner_review"
   /** N10 (§2.15.2): a saved card that arrived after the decision was adopted (CARD_SAVED). The charge kind. */
   | "billing.card.saved"
+  /** N17 (spec §2.15.4): saved cards revoked by the sweep or an erasure. The reason and the count. */
+  | "billing.card.revoked"
+  /** N17 (spec §2.5.2): the daily purges. The counts of deleted tokens and short-lived rows. */
+  | "billing.card.purged"
+  /** N17 (spec §2.15.3): M12 was queued. Which line: EXPIRING or MISSING. */
+  | "billing.card.reminder"
   /** P11b: one line per maintenance pass whose visits failed; the count and the failures' distinct codes only. */
   | "billing.maintenance.report"
   /** D5 5i: xMoney refused our credentials (401/403). An operator alarm: nothing was charged, failed or emailed. */

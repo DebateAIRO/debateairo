@@ -23,8 +23,8 @@ export type AdoptionInput = Readonly<{
   deciding: boolean;
 }>;
 
-/** The states whose plan keeps a card (spec §2.15.4: ACTIVE, PAST_DUE, SUSPENDED). */
-const CARD_HOLDING: ReadonlySet<string> = new Set(["ACTIVE", "PAST_DUE", "SUSPENDED"]);
+/** The states whose plan keeps a card (spec §2.15.4: ACTIVE, PAST_DUE, SUSPENDED); N17's card custody reads it too. */
+export const CARD_HOLDING: ReadonlySet<string> = new Set(["ACTIVE", "PAST_DUE", "SUSPENDED"]);
 
 /** The source payment's time, else the row's own (spec §2.15.2 orders by `source_paid_at`). */
 const paidAt = (token: CardTokenRow): number => (token.sourcePaidAt ?? token.createdAt).getTime();

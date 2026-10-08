@@ -1,6 +1,7 @@
 import type { BillingJobQueries, BillingRepository } from "@debateai/db";
 import type { TaxAuthorities } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
+import type { CardCustody } from "./card-custody.js";
 import { emailJob } from "./email-job.js";
 import { DONE, enqueueOnce, type OutboxHandler } from "./outbox.js";
 import type { RefundDesk } from "./refunds.js";
@@ -48,6 +49,8 @@ export type OwnerJobsDeps = Readonly<{
   clock: () => Date;
   /** N14 (spec §2.12.2 item 3): the owner's refund reminders, run by the daily tick. Absent: none (billing off, tests). */
   refunds?: Pick<RefundDesk, "remindOwnerRefunds">;
+  /** N17 (spec §2.15.4): the daily card sweep, then both purges. Absent: none (billing off, tests). */
+  custody?: Pick<CardCustody, "sweep" | "purge">;
 }>;
 
 export class OwnerJobs {
@@ -75,9 +78,12 @@ export class OwnerJobs {
 
   private dailySteps(now: Date): ReadonlyArray<() => Promise<number>> {
     const refunds = this.deps.refunds;
+    const custody = this.deps.custody;
     return [
       () => this.queueTaxSummary(now),
-      ...(refunds === undefined ? [] : [() => refunds.remindOwnerRefunds(now)])
+      ...(refunds === undefined ? [] : [() => refunds.remindOwnerRefunds(now)]),
+      // N17: the sweep first, so a token it revokes today is purged one day later (0096's purge rule).
+      ...(custody === undefined ? [] : [async () => (await custody.sweep(now)).revoked, () => custody.purge(now)])
     ];
   }
 

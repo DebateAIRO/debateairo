@@ -12,6 +12,7 @@ import { DekAccountEmailReader, DekBillingRecipientReader } from "./account-emai
 import type { BillingAudit } from "./audit.js";
 import { CancelLinkService } from "./cancel-link.js";
 import { createCardCheckSettlement } from "./card-change.js";
+import { CardCustody } from "./card-custody.js";
 import { ChargeStatusReader } from "./charge-status.js";
 import { CheckoutService } from "./checkout.js";
 import type { BillingConnectors } from "./connectors.js";
@@ -171,10 +172,16 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       orderText: catalogueOrderText
     }
   });
+  // N17 (spec §2.15.3–2.15.4): the saved card's life — M12 from the look-ahead, the erasure commit's revocation, and the
+  // daily sweep and purges of the owner job.
+  const custody = new CardCustody({
+    repository, jobs, paymentEnvironment: deps.connectors.paymentEnvironment, publicAppUrl: deps.connectors.publicAppUrl,
+    audit: deps.audit
+  });
   const maintenance = new BillingMaintenance({
     repository, jobs, entitlements, renewal, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
     xmoneyEnvironment: deps.connectors.xmoneyEnvironment, paymentEnvironment: deps.connectors.paymentEnvironment,
-    audit: deps.audit, clock: deps.clock
+    audit: deps.audit, clock: deps.clock, custody
   });
   outbox.register("RENEWAL_NOTICE", createRenewalNoticeHandler({
     repository, jobs, renewal, policy: deps.policy, xmoneyEnvironment: deps.connectors.xmoneyEnvironment,
@@ -307,7 +314,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // reports BILLING_ERASURE_SWEEP_PENDING and the reconciler runs anyway; BILLING_RECONCILIATION_PENDING means only
   // that the reconciler failed. Both are tried again on the next 10-minute tick.
   const erasure = new BillingErasureHook({
-    billing: repository, jobs, entitlements, audit: deps.audit, clock: deps.clock
+    billing: repository, jobs, entitlements, audit: deps.audit, clock: deps.clock, custody
   });
   const reconcile = createCoalescingSingleFlight(
     reconcileWork({ erasure, reconciler, reportPending: deps.reportPending }),
@@ -316,7 +323,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P16c: the owner's quarterly tax summary (spec §2.5.9), queued once per quarter and sent as email O1.
   const ownerJobs = new OwnerJobs({
     billing: repository, jobs, taxAuthorities: required(deps.taxAuthorities, "taxAuthorities"),
-    audit: deps.audit, clock: deps.clock, refunds
+    audit: deps.audit, clock: deps.clock, custody, refunds
   });
   outbox.register("OWNER_TAX_SUMMARY", ownerJobs.taxSummary);
   const scheduleOwnerJobs = createCoalescingSingleFlight(

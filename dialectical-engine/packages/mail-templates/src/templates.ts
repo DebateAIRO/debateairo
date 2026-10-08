@@ -3,11 +3,11 @@
  * M8_RECEIVED (a withdrawal's acknowledgement of receipt) and O2_WITHDRAWAL (a withdrawal the owner settles by hand),
  * W12's (P2-I16) O3 (a legal document or an email that was never sent), and N9's O4 (NETOPIA's message about an open
  * charge could not be verified), and N14's O2_REFUND_DUE and O2_REFUND_REMINDER (a NETOPIA refund for the owner to make
- * in NETOPIA's admin, and the daily list of the open ones).
+ * in NETOPIA's admin, and the daily list of the open ones), and N17's M12 (a card is needed before a renewal).
  */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL",
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "M12", "O1", "O2", "O2_WITHDRAWAL",
   "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4"
 ] as const);
 
@@ -220,6 +220,17 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     catalogue: "mail", subject: "mail.M11_DUPLICATE.subject",
     paragraphs: ["mail.M11.duplicate"],
     params: { refundAmount: "amount" }
+  }),
+  // N17 (spec §2.15.3): ten days before a renewal of a plan with no usable card. `cardExpiring` "true": a card is held
+  // but expires before the renewal; otherwise the last payment's card could not be kept (no token, or it was revoked).
+  M12: define({
+    catalogue: "mail", subject: "mail.M12.subject",
+    paragraphs: [
+      "mail.M12.intro",
+      { ifParam: "cardExpiring", test: "true", then: "mail.M12.expiring", otherwise: "mail.M12.missing" },
+      "mail.M12.action"
+    ],
+    params: { plan: "plan", renewDate: "date", cardPageUrl: "url", cardExpiring: "flag" }
   }),
   O1: define({
     catalogue: "owner", subject: "owner.O1.subject",
