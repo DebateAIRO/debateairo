@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Go hachomair",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Bailímid an méid atá de dhíth ar chuntas agus an méid a roghnaíonn tú a chlóscríobh. Seoltar do cheisteanna chuig soláthraithe IS atá liostaithe inár gClár; ní úsáidtear iad chun samhlacha a oiliúint. Bíonn díospóireachtaí príobháideach mura bhfoilsíonn tú iad. Má scriosann tú do chuntas, scriostar na heochracha do do shonraí agus baintear anuas do dhíospóireachtaí foilsithe. Is féidir teagmháil a dhéanamh linn ag privacy@dezbatere.ro, agus is féidir le daoine a ainmnítear i ndíospóireacht a iarraidh go mbainfí í gan cuntas a bheith acu." }
+      { kind: "p", text: "Bailímid an méid atá de dhíth ar chuntas agus an méid a roghnaíonn tú a chlóscríobh. Seoltar do cheisteanna chuig soláthraithe IS atá liostaithe inár gClár; ní úsáidtear iad chun samhlacha a oiliúint. Bíonn díospóireachtaí príobháideach mura bhfoilsíonn tú iad. Scriosann scriosadh do chuntais na heochracha do do shonraí príobháideacha; nuair a sceidealaíonn tú é, roghnaíonn tú an mbainfear anuas do dhíospóireachtaí foilsithe freisin nó an bhfanfaidh siad poiblí faoi do sheanainm cleite. Is féidir teagmháil a dhéanamh linn ag privacy@dezbatere.ro, agus is féidir le daoine a ainmnítear i ndíospóireacht a iarraidh go mbainfí í gan cuntas a bheith acu." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Bíonn díospóireachtaí príobháideach go dtí go bhfoilsíonn tú iad. Is gníomh d'aon ghnó é foilsiú agus deimhnítear ar leithligh é. Taispeánann díospóireacht fhoilsithe d'ainm cleite, do cheist mar a scríobh tú í, crann na n-argóintí, na scóir, an breithiúnas agus an banda muiníne, agus bíonn lipéad infheicthe uirthi a deir gur ghin IS an t-ábhar. Ní thaispeánann sí do sheoladh ríomhphoist, do thaifid sheisiúin ná stair do chuntais riamh. Féadfaidh innill chuardaigh díospóireachtaí foilsithe a innéacsú." },
       { kind: "p", text: "Má dhífhoilsítear an díospóireacht, baintear ó Dialectical Engine í agus scriostar an eochair dár leagan poiblí. Tá cóipeanna atá déanta cheana ag léitheoirí, innill chuardaigh nó cartlanna lasmuigh dár smacht, agus ní féidir linn iad a aisghairm." },
-      { kind: "p", text: "Nuair a scriosann tú do chuntas, bainimid gach díospóireacht a d'fhoilsigh tú ó rochtain phoiblí gan moill mhíchuí agus laistigh de 30 lá ar a mhéad, mura gceanglaíonn an dlí orainn mír ar leith a choinneáil. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Nuair a sceidealaíonn tú scriosadh do chuntais, roghnaíonn tú cad a tharlóidh do na díospóireachtaí a d’fhoilsigh tú. Má chuireann tú tic le \"Scrios mo dhíospóireachtaí poiblí freisin\", bainimid gach ceann díobh den rochtain phoiblí agus scriosaimid eochair ár gcóipe poiblí nuair a dhéantar an scriosadh, mura gceanglaíonn an dlí orainn mír shonrach a choinneáil. Má fhágann tú an bosca gan tic, fanann siad poiblí faoi ainm cleite scortha." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Comharthaí riosca sínithe isteach agus athshlánaithe — 90 lá, arna fhorfheidhmiú ag an mbunachar sonraí — Glantar iad",
         "Rian iniúchóireachta slándála — Ar feadh saolré na seirbhíse — Ní féidir ach cur leis; is achoimrí aontreo iad an seoladh IP agus an gníomhaire úsáideora agus ní féidir iad a léamh ar ais",
         "Ábhar díospóireachta (príobháideach) — Fad atá an cuntas ann — Scriostar eochracha tráth dúnta, rud a fhágann nach féidir an t-ábhar a léamh",
-        "Ábhar díospóireachta (foilsithe) — Fad atá sé foilsithe agus fad atá an cuntas ann — Baintear ó rochtain phoiblí é nuair a dhífhoilsítear é nó nuair a dhúntar an cuntas; scriostar na heochracha",
+        "Ábhar díospóireachta (foilsithe) — Fad atá sé foilsithe; má dhúnann tú do chuntas agus má fhágann tú \"Scrios mo dhíospóireachtaí poiblí freisin\" gan tic, fanann díospóireacht fhoilsithe poiblí faoi do sheanainm cleite — Baintear ó rochtain phoiblí é agus scriostar a eochair nuair a dhífhoilsíonn tú é, nó ag dúnadh an chuntais má chuir tú tic le \"Scrios mo dhíospóireachtaí poiblí freisin\"",
         "Taifid den mhéid a thug soláthraithe IS ar ais agus tagairtí aisghabhála — Chomh fada leis an díospóireacht lena mbaineann siad — Mar an gcéanna",
         "Comhráite agus cásanna tacaíochta — [Until closed plus 12 months] — Scriostar na heochracha",
         "Taifid ghlactha agus toilithe — Saolré an chuntais móide 6 bliana — an tréimhse theorann is faide a bhfuil feidhm aici maidir linn — Scriostar iad",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Cúltacaí [pending] — [… days] tar éis don chóip bheo a bheith scriosta — Forscríobhtar iad"
         ]
       },
-      { kind: "p", text: "An méid a dhéanann scriosadh i ndáiríre. Criptítear do dhíospóireachtaí agus sonraí do chuntais faoi eochracha a bhaineann go sonrach le do chuntas agus le gach díospóireacht. Má scriostar do chuntas, scriostar na heochracha sin, agus ina dhiaidh sin ní féidir linne ná le haon duine eile na taifid chriptithe a léamh, agus scriosaimid taifead do chuntais. Tugaimid scriosadh air seo toisc gurb é sin a éifeacht, agus tá measúnú doiciméadaithe againn a thacaíonn leis; más mian leat tuilleadh eolais a fháil, cuir ceist orainn. Tá trí rud le tabhairt faoi deara: ní féidir ach cur leis an rian iniúchóireachta slándála agus ní scriostar é, ach níl aon aitheantóir inléite fút ann; tá líon beag díospóireachtaí níos sine ann a tháinig roimh ár scéim chriptithe reatha, agus má bhaineann sé sin le do chuntas insímid duit cad a dhéanann an dúnadh dóibh; agus tá cóipeanna sonraí a seoladh cheana chuig soláthraí IS faoi réir théarmaí coinneála an tsoláthraí sin sa Chlár, seachas faoinár scriosadh." },
+      { kind: "p", text: "An méid a dhéanann scriosadh i ndáiríre. Criptítear do dhíospóireachtaí príobháideacha agus sonraí do chuntais faoi eochracha a bhaineann go sonrach le do chuntas agus le gach díospóireacht. Má scriostar do chuntas, scriostar na heochracha sin, agus ina dhiaidh sin ní féidir linne ná le haon duine eile na taifid chriptithe a léamh, agus scriosaimid taifead do chuntais. Ní scriostar eochair na cóipe poiblí de dhíospóireacht fhoilsithe tráth scriosta ach amháin má chuir tú tic le \"Scrios mo dhíospóireachtaí poiblí freisin\" (alt 6). Tugaimid scriosadh air seo toisc gurb é sin a éifeacht, agus tá measúnú doiciméadaithe againn a thacaíonn leis; más mian leat tuilleadh eolais a fháil, cuir ceist orainn. Tá trí rud le tabhairt faoi deara: ní féidir ach cur leis an rian iniúchóireachta slándála agus ní scriostar é, ach níl aon aitheantóir inléite fút ann; tá líon beag díospóireachtaí níos sine ann a tháinig roimh ár scéim chriptithe reatha, agus má bhaineann sé sin le do chuntas insímid duit cad a dhéanann an dúnadh dóibh; agus tá cóipeanna sonraí a seoladh cheana chuig soláthraí IS faoi réir théarmaí coinneála an tsoláthraí sin sa Chlár, seachas faoinár scriosadh." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "152805f461e3b27c84ba7ab1cba0d8d1e4a23b13262187e1fcf9d4c9e5a7e46c",
+  sha256: "b4207e30e1964632c3d852a35235386b63be32d7119e01e780c23429750d70bf",
   eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.2 · I bhFEIDHM [DATE]",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",

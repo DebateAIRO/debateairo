@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Fil-qosor",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Niġbru dak li jeħtieġ kont u dak li tagħżel li tittajpja. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna; ma jintużawx għat-taħriġ tal-mudelli. Id-dibattiti huma privati sakemm ma tippubblikahomx. Meta tħassar il-kont tiegħek, jinqerdu ċ-ċwievet tad-data tiegħek u jitneħħew id-dibattiti li tkun ippubblikajt. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jitolbu t-tneħħija mingħajr kont." }
+      { kind: "p", text: "Niġbru dak li jeħtieġ kont u dak li tagħżel li tittajpja. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna; ma jintużawx għat-taħriġ tal-mudelli. Id-dibattiti huma privati sakemm ma tippubblikahomx. It-tħassir tal-kont tiegħek jeqred iċ-ċwievet tad-data privata tiegħek; meta tiskedah, tagħżel jekk id-dibattiti ppubblikati tiegħek jitneħħewx ukoll jew jibqgħux pubbliċi taħt il-psewdonimu preċedenti tiegħek. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jitolbu t-tneħħija mingħajr kont." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Id-dibattiti huma privati sakemm tippubblikahom. Il-pubblikazzjoni hija azzjoni intenzjonata u kkonfermata separatament. Dibattitu ppubblikat juri l-psewdonimu tiegħek, il-mistoqsija tiegħek kif ktibtha, is-siġra tal-argumenti, il-punteġġi, il-verdett u l-medda ta’ kunfidenza, u jkollu tikketta viżibbli li l-kontenut huwa ġġenerat mill-IA. Qatt ma juri l-indirizz elettroniku tiegħek, ir-rekords tas-sessjoni tiegħek jew l-istorja tal-kont tiegħek. Il-magni tat-tiftix jistgħu jindiċjaw id-dibattiti ppubblikati." },
       { kind: "p", text: "Meta tneħħi l-pubblikazzjoni, id-dibattitu jitneħħa minn Dialectical Engine u tinqered iċ-ċavetta tal-kopja pubblika tagħna. Kopji li jkunu diġà saru mill-qarrejja, mill-magni tat-tiftix jew mill-arkivji huma barra mill-kontroll tagħna, u ma nistgħux nirtirawhom." },
-      { kind: "p", text: "Meta tħassar il-kont tiegħek, inneħħu kull dibattitu li tkun ippubblikajt mill-aċċess pubbliku mingħajr dewmien żejjed u mhux aktar tard minn 30 jum, sakemm il-liġi ma titlobniex inżommu element speċifiku. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Meta tippjana t-tħassir tal-kont tiegħek, tagħżel x’jiġri mid-dibattiti li ppubblikajt. Jekk timmarka \"Ħassar ukoll id-dibattiti pubbliċi tiegħi\", inneħħu kull wieħed minnhom mill-aċċess pubbliku u neqirdu ċ-ċavetta tal-kopja pubblika tagħna meta jitwettaq it-tħassir, sakemm il-liġi ma titlobx li nżommu element partikolari. Jekk tħalli l-kaxxa mhux immarkata, id-dibattiti jibqgħu pubbliċi taħt psewdonimu rtirat." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Rekord tal-awditjar ta’ rifjut skont il-pajjiż tal-IP — Għall-ħajja kollha tas-servizz — Jiżdied miegħu biss; jirreġistra r-rotta, il-kodiċi tar-rifjut, il-pajjiż, il-perjodu ta’ żmien u t-tip ta’ evidenza “indirizz IP”; l-indirizz IP u l-aġent tal-utent jinżammu biss bħala diġests unidirezzjonali b’ċavetta",
         "Indirizz IP mhux ipproċessat għall-verifika tal-pajjiż waqt ir-reġistrazzjoni jew qabel dibattitu ġdid — Biss waqt it-talba korrispondenti — Din il-verifika ma taħżinx IP li jista’ jinqara; l-awditjar tar-rifjut iżomm l-indirizz IP u l-aġent tal-utent biss bħala diġests unidirezzjonali b’ċavetta, u l-pajjiż tal-IP jista’ jidher fir-rekord tal-verifika tal-età",
         "Kontenut tad-dibattitu (privat) — Sakemm jeżisti l-kont — Jinqerdu ċ-ċwievet mal-għeluq, u b’hekk il-kontenut ma jkunx jista’ jinqara",
-        "Kontenut tad-dibattitu (ippubblikat) — Sakemm ikun ippubblikat u sakemm jeżisti l-kont — Jitneħħa mill-aċċess pubbliku meta titneħħa l-pubblikazzjoni jew jingħalaq il-kont; jinqerdu ċ-ċwievet",
+        "Kontenut tad-dibattitu (ippubblikat) — Sakemm ikun ippubblikat; jekk tagħlaq il-kont u tħalli \"Ħassar ukoll id-dibattiti pubbliċi tiegħi\" mingħajr marka, dibattitu ppubblikat jibqa’ pubbliku taħt il-psewdonimu preċedenti tiegħek — Jitneħħa mill-aċċess pubbliku u ċ-ċavetta tiegħu tinqered meta tneħħi l-pubblikazzjoni, jew waqt l-għeluq jekk immarkajt \"Ħassar ukoll id-dibattiti pubbliċi tiegħi\"",
         "Rekords tat-tweġibiet tal-fornituri u referenzi tas-sorsi miġjuba — L-istess bħad-dibattitu li jappartjenu għalih — L-istess",
         "Konverżazzjonijiet u każijiet tal-appoġġ — [Until closed plus 12 months] — Jinqerdu ċ-ċwievet",
         "Rekords tal-aċċettazzjoni u tal-kunsens — Il-ħajja tal-kont flimkien ma’ 6 snin — l-itwal perjodu ta’ preskrizzjoni li japplika għalina — Jitħassru",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Kopji ta’ riżerva [pending] — [… days] wara li titħassar il-kopja attiva — Jinkitbu fuqhom"
         ]
       },
-      { kind: "p", text: "X’jagħmel fil-fatt it-tħassir. Id-dibattiti u d-data tal-kont tiegħek huma kriptati taħt ċwievet speċifiċi għall-kont tiegħek u għal kull dibattitu. Meta tħassar il-kont tiegħek jinqerdu dawk iċ-ċwievet, u wara dan ir-rekords kriptati ma jistgħux jinqraw minna jew minn ħaddieħor, u nħassru r-rekord tal-kont tiegħek. Niddeskrivu dan bħala tħassir għax dak huwa l-effett tiegħu, u għandna valutazzjoni dokumentata li ssostnih; jekk trid tkun taf aktar, staqsina. Hemm tliet affarijiet li għandek tkun taf: ir-reġistru tal-awditjar tas-sigurtà huwa wieħed li miegħu jiżdied biss u ma jitħassarx, iżda ma fih ebda identifikatur tiegħek li jista’ jinqara; għadd żgħir ta’ dibattiti antiki ġew qabel l-iskema ta’ kriptaġġ attwali tagħna, u jekk dan japplika għall-kont tiegħek ngħidulek x’jikseb għalihom l-għeluq; u l-kopji tad-data li jkunu diġà ntbagħtu lil fornitur tal-IA huma rregolati mit-termini taż-żamma ta’ dak il-fornitur fir-Reġistru, mhux mit-tħassir tagħna." },
+      { kind: "p", text: "X’jagħmel fil-fatt it-tħassir. Id-dibattiti privati u d-data tal-kont tiegħek huma kriptati taħt ċwievet speċifiċi għall-kont tiegħek u għal kull dibattitu. Meta tħassar il-kont tiegħek jinqerdu dawk iċ-ċwievet, u wara dan ir-rekords kriptati ma jistgħux jinqraw minna jew minn ħaddieħor, u nħassru r-rekord tal-kont tiegħek. Iċ-ċavetta tal-kopja pubblika ta’ dibattitu ppubblikat tinqered waqt it-tħassir biss jekk immarkajt \"Ħassar ukoll id-dibattiti pubbliċi tiegħi\" (taqsima 6). Niddeskrivu dan bħala tħassir għax dak huwa l-effett tiegħu, u għandna valutazzjoni dokumentata li ssostnih; jekk trid tkun taf aktar, staqsina. Hemm tliet affarijiet li għandek tkun taf: ir-reġistru tal-awditjar tas-sigurtà huwa wieħed li miegħu jiżdied biss u ma jitħassarx, iżda ma fih ebda identifikatur tiegħek li jista’ jinqara; għadd żgħir ta’ dibattiti antiki ġew qabel l-iskema ta’ kriptaġġ attwali tagħna, u jekk dan japplika għall-kont tiegħek ngħidulek x’jikseb għalihom l-għeluq; u l-kopji tad-data li jkunu diġà ntbagħtu lil fornitur tal-IA huma rregolati mit-termini taż-żamma ta’ dak il-fornitur fir-Reġistru, mhux mit-tħassir tagħna." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "c5daf566b44043e42752c0e9b58c3eecc5b9c5affe0e7c8d7346113bd07b8e1f",
+  sha256: "de65146cc702ee209f1620a490a62e1b04e88bd2c2b23259588d1f7d6e5e5430",
   eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.2 · EFFETTIVA [DATE]",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",

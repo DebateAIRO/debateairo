@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ringkasnya",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Kami mengumpulkan apa yang diperlukan akun dan apa yang Anda pilih untuk diketik. Pertanyaan Anda dikirim kepada penyedia AI yang tercantum dalam Daftar kami; pertanyaan tersebut tidak digunakan untuk melatih model. Debat bersifat privat kecuali Anda memublikasikannya. Menghapus akun Anda memusnahkan kunci data Anda dan menurunkan debat yang telah Anda publikasikan. Anda dapat menghubungi kami di privacy@dezbatere.ro, dan orang yang disebut dalam debat dapat meminta penghapusan tanpa memiliki akun." }
+      { kind: "p", text: "Kami mengumpulkan apa yang diperlukan akun dan apa yang Anda pilih untuk diketik. Pertanyaan Anda dikirim kepada penyedia AI yang tercantum dalam Daftar kami; pertanyaan tersebut tidak digunakan untuk melatih model. Debat bersifat privat kecuali Anda memublikasikannya. Penghapusan akun memusnahkan kunci data pribadi Anda; saat menjadwalkannya, Anda memilih apakah debat yang Anda publikasikan juga diturunkan atau tetap dapat diakses publik dengan nama samaran lama Anda. Anda dapat menghubungi kami di privacy@dezbatere.ro, dan orang yang disebut dalam debat dapat meminta penghapusan tanpa memiliki akun." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Debat bersifat privat sampai Anda memublikasikannya. Publikasi adalah tindakan yang disengaja dan dikonfirmasi secara terpisah. Debat yang dipublikasikan menampilkan nama samaran Anda, pertanyaan Anda sebagaimana ditulis, pohon argumen, skor, putusan, dan rentang keyakinan, serta memuat label yang terlihat bahwa konten dihasilkan AI. Debat tersebut tidak pernah menampilkan alamat email, catatan sesi, atau riwayat akun Anda. Mesin pencari dapat mengindeks debat yang dipublikasikan." },
       { kind: "p", text: "Membatalkan publikasi menghapus debat dari Dialectical Engine dan memusnahkan kunci salinan publik kami. Salinan yang telah dibuat oleh pembaca, mesin pencari, atau arsip berada di luar kendali kami, dan kami tidak dapat menariknya kembali." },
-      { kind: "p", text: "Ketika Anda menghapus akun, kami menghapus setiap debat yang Anda publikasikan dari akses publik tanpa penundaan yang tidak semestinya dan paling lambat dalam 30 hari, kecuali hukum mewajibkan kami menyimpan item tertentu. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Saat Anda menjadwalkan penghapusan akun, Anda memilih apa yang terjadi pada debat yang telah Anda publikasikan. Jika Anda mencentang \"Hapus juga debat publik saya\", kami menghapus masing-masing dari akses publik dan memusnahkan kunci salinan publik kami saat penghapusan dijalankan, kecuali jika hukum mewajibkan kami menyimpan item tertentu. Jika kotak dibiarkan tidak dicentang, debat tersebut tetap dapat diakses publik dengan nama samaran yang tidak lagi digunakan." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Catatan audit penolakan berdasarkan negara IP — Selama layanan beroperasi — Hanya dapat ditambah; mencatat rute, kode penolakan, negara, rentang waktu, dan jenis bukti “alamat IP”; alamat IP dan agen pengguna hanya berupa intisari satu arah dengan kunci",
         "Alamat IP asli untuk pemeriksaan negara saat pendaftaran atau debat baru — Hanya selama permintaan yang bersangkutan — Pemeriksaan ini tidak menyimpan IP yang dapat dibaca; audit penolakan menyimpan alamat IP dan agen pengguna hanya sebagai intisari satu arah dengan kunci, dan negara IP dapat tercatat dalam pemeriksaan usia",
         "Konten debat (privat) — Selama akun ada — Kunci dimusnahkan saat penutupan sehingga konten tidak dapat dibaca",
-        "Konten debat (dipublikasikan) — Selama dipublikasikan dan selama akun ada — Dihapus dari akses publik saat publikasi dibatalkan atau akun ditutup; kunci dimusnahkan",
+        "Konten debat (dipublikasikan) — Selama dipublikasikan; jika Anda menutup akun dan membiarkan \"Hapus juga debat publik saya\" tidak dicentang, debat yang dipublikasikan tetap tersedia untuk umum dengan nama samaran lama Anda — Dihapus dari akses publik dan kuncinya dimusnahkan saat Anda membatalkan publikasinya, atau pada penutupan akun jika Anda mencentang \"Hapus juga debat publik saya\"",
         "Catatan pengembalian penyedia dan referensi pengambilan — Sama dengan debat terkait — Sama",
         "Percakapan dan kasus dukungan — [Until closed plus 12 months] — Kunci dimusnahkan",
         "Catatan penerimaan dan persetujuan — Masa berlaku akun ditambah 6 tahun — periode pembatasan terpanjang yang berlaku bagi kami — Dihapus",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Cadangan [pending] — [… days] setelah salinan aktif dihapus — Ditimpa"
         ]
       },
-      { kind: "p", text: "Apa yang sebenarnya dilakukan penghapusan. Debat dan data akun Anda dienkripsi di bawah kunci yang khusus untuk akun Anda dan setiap debat. Menghapus akun Anda memusnahkan kunci tersebut, setelah itu catatan terenkripsi tidak dapat dibaca oleh kami atau siapa pun, dan kami menghapus catatan akun Anda. Kami menyebutnya penghapusan karena demikianlah akibatnya, dan kami memiliki penilaian terdokumentasi yang mendasarinya; jika Anda ingin mengetahui lebih lanjut, silakan bertanya. Tiga hal yang perlu diketahui: jejak audit keamanan hanya dapat ditambahi, bukan diubah atau dihapus; jejak tersebut tetap disimpan, tetapi tidak berisi pengenal Anda yang dapat dibaca; sejumlah kecil debat lama mendahului skema enkripsi kami saat ini, dan jika hal itu berlaku pada akun Anda, kami memberi tahu apa yang dicapai penutupan terhadapnya; dan salinan data yang telah dikirim kepada penyedia AI diatur oleh ketentuan retensi penyedia tersebut dalam Daftar, bukan oleh penghapusan kami." },
+      { kind: "p", text: "Apa yang sebenarnya dilakukan penghapusan. Debat privat dan data akun Anda dienkripsi di bawah kunci yang khusus untuk akun Anda dan setiap debat. Menghapus akun Anda memusnahkan kunci tersebut, setelah itu catatan terenkripsi tidak dapat dibaca oleh kami atau siapa pun, dan kami menghapus catatan akun Anda. Kunci salinan publik dari debat yang dipublikasikan dimusnahkan saat penghapusan hanya jika Anda mencentang \"Hapus juga debat publik saya\" (bagian 6). Kami menyebutnya penghapusan karena demikianlah akibatnya, dan kami memiliki penilaian terdokumentasi yang mendasarinya; jika Anda ingin mengetahui lebih lanjut, silakan bertanya. Tiga hal yang perlu diketahui: jejak audit keamanan hanya dapat ditambahi, bukan diubah atau dihapus; jejak tersebut tetap disimpan, tetapi tidak berisi pengenal Anda yang dapat dibaca; sejumlah kecil debat lama mendahului skema enkripsi kami saat ini, dan jika hal itu berlaku pada akun Anda, kami memberi tahu apa yang dicapai penutupan terhadapnya; dan salinan data yang telah dikirim kepada penyedia AI diatur oleh ketentuan retensi penyedia tersebut dalam Daftar, bukan oleh penghapusan kami." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "ea91ff836015181fe77d07e5b10f6b39827a77852a01551cddaeb9ead49eba16",
+  sha256: "a17f529f9ab78062e724454ab7b0c63a174febf789e4148ab82f599d8c74f246",
   eyebrow: "KEBIJAKAN PRIVASI · v3.2 · BERLAKU [DATE]",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",

@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Trumpai",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Renkame tai, ko reikia paskyrai, ir tai, ką nusprendžiate įvesti. Jūsų klausimai perduodami mūsų Registre išvardytiems DI paslaugų teikėjams; jie nenaudojami modeliams mokyti. Debatai yra privatūs, nebent juos paskelbiate. Ištrynus paskyrą sunaikinami jūsų duomenų raktai, o paskelbti debatai pašalinami. Su mumis galite susisiekti adresu privacy@dezbatere.ro, o debatuose paminėti asmenys gali prašyti pašalinti duomenis ir neturėdami paskyros." }
+      { kind: "p", text: "Renkame tai, ko reikia paskyrai, ir tai, ką nusprendžiate įvesti. Jūsų klausimai perduodami mūsų Registre išvardytiems DI paslaugų teikėjams; jie nenaudojami modeliams mokyti. Debatai yra privatūs, nebent juos paskelbiate. Ištrynus paskyrą sunaikinami jūsų privačių duomenų raktai; planuodami ištrynimą pasirenkate, ar bus pašalinti ir paskelbti debatai, ar jie liks vieši su jūsų ankstesniu slapyvardžiu. Su mumis galite susisiekti adresu privacy@dezbatere.ro, o debatuose paminėti asmenys gali prašyti pašalinti duomenis ir neturėdami paskyros." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Debatai yra privatūs, kol jų nepaskelbiate. Paskelbimas yra sąmoningas, atskirai patvirtinamas veiksmas. Paskelbtuose debatuose rodomas jūsų slapyvardis, jūsų klausimas toks, kokį jį parašėte, argumentų medis, įverčiai, verdiktas bei pasitikėjimo lygis ir aiškiai nurodoma, kad turinį sugeneravo DI. Juose niekada nerodomas jūsų el. pašto adresas, seansų įrašai ar paskyros istorija. Paieškos sistemos gali indeksuoti paskelbtus debatus." },
       { kind: "p", text: "Atšaukus paskelbimą debatai pašalinami iš Dialectical Engine ir sunaikinamas mūsų viešos kopijos raktas. Skaitytojų, paieškos sistemų ar archyvų jau padarytos kopijos nuo mūsų nepriklauso ir negalime jų atšaukti." },
-      { kind: "p", text: "Kai ištrinate paskyrą, nepagrįstai nedelsdami ir ne vėliau kaip per 30 dienų pašaliname iš viešos prieigos visus jūsų paskelbtus debatus, nebent pagal įstatymus privalome išsaugoti konkretų elementą. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Planuodami paskyros ištrynimą pasirenkate, kas nutiks jūsų paskelbtiems debatams. Jei pažymėsite „Taip pat ištrinti mano viešus debatus“, ištrynimo metu kiekvienus iš jų pašalinsime iš viešos prieigos ir sunaikinsime savo viešos kopijos raktą, nebent įstatymai įpareigoja išsaugoti konkretų elementą. Jei langelio nepažymėsite, debatai liks vieši su jūsų nebenaudojamu slapyvardžiu." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "IP šalies patikros atmetimo audito įrašas — Visą paslaugos gyvavimo laiką — Tik papildomas; įrašomas maršrutas, atmetimo kodas, šalis, laiko intervalas ir įrodymo rūšis „IP adresas“; IP adresas ir naudotojo agentas saugomi tik kaip vienkryptės santraukos, sudarytos naudojant raktą",
         "Neapdorotas IP adresas šalies patikrai registruojantis arba pradedant naujus debatus — Tik atitinkamos užklausos metu — Ši patikra nesaugo skaitomo IP; atmetimo audite IP adresas ir naudotojo agentas saugomi tik kaip vienkryptės santraukos, sudarytos naudojant raktą, o IP šalis gali būti amžiaus patikros įraše",
         "Debatų turinys (privatus) — Kol paskyra egzistuoja — Uždarius paskyrą raktai sunaikinami ir turinio perskaityti nebegalima",
-        "Debatų turinys (paskelbtas) — Kol yra paskelbtas ir kol paskyra egzistuoja — Atšaukus paskelbimą ar uždarius paskyrą pašalinamas iš viešos prieigos; raktai sunaikinami",
+        "Debatų turinys (paskelbtas) — Kol yra paskelbtas; jei uždarote paskyrą ir nepažymite „Taip pat ištrinti mano viešus debatus“, paskelbti debatai lieka vieši su jūsų ankstesniu slapyvardžiu — Pašalinamas iš viešos prieigos, o jo raktas sunaikinamas atšaukus paskelbimą arba uždarant paskyrą, jei pažymėjote „Taip pat ištrinti mano viešus debatus“",
         "Paslaugų teikėjų atsakymų įrašai ir paieškos nuorodos — Tiek pat, kiek saugomi debatai, kuriems jie priklauso — Tas pats",
         "Pagalbos pokalbiai ir atvejai — [Until closed plus 12 months] — Raktai sunaikinami",
         "Sutikimo su sąlygomis ir kitų sutikimų įrašai — Paskyros gyvavimo laiką ir dar 6 metus — ilgiausią mums taikomą senaties terminą — Ištrinami",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Atsarginės kopijos [pending] — [… days] po to, kai aktyvioji kopija ištrinama — Perrašomos"
         ]
       },
-      { kind: "p", text: "Ką ištrynimas iš tikrųjų reiškia. Jūsų debatų ir paskyros duomenys užšifruojami jūsų paskyrai ir kiekvieniems debatams būdingais raktais. Ištrynus paskyrą šie raktai sunaikinami, todėl nei mes, nei kas nors kitas nebegali perskaityti užšifruotų įrašų, be to, ištriname jūsų paskyros įrašą. Tai vadiname ištrynimu, nes toks yra šio veiksmo rezultatas, ir turime jį pagrindžiantį dokumentuotą vertinimą; jei norite sužinoti daugiau, klauskite. Svarbu žinoti tris dalykus: į saugumo audito žurnalą įrašai tik pridedami, esamų įrašų negalima keisti, o pats žurnalas neištrinamas, tačiau jame nėra perskaitomų jūsų identifikatorių; nedidelis skaičius senesnių debatų sukurtas anksčiau nei dabartinė šifravimo schema, ir jei tai taikoma jūsų paskyrai, paaiškinsime, ką jiems reiškia paskyros uždarymas; o DI paslaugų teikėjui jau išsiųstoms duomenų kopijoms taikomos to teikėjo Registre nurodytos saugojimo sąlygos, o ne mūsų atliekamas ištrynimas." },
+      { kind: "p", text: "Ką ištrynimas iš tikrųjų reiškia. Jūsų privačių debatų ir paskyros duomenys užšifruojami jūsų paskyrai ir kiekvieniems debatams būdingais raktais. Ištrynus paskyrą šie raktai sunaikinami, todėl nei mes, nei kas nors kitas nebegali perskaityti užšifruotų įrašų, be to, ištriname jūsų paskyros įrašą. Paskelbtų debatų viešos kopijos raktas ištrynimo metu sunaikinamas tik jei pažymėjote „Taip pat ištrinti mano viešus debatus“ (6 skyrius). Tai vadiname ištrynimu, nes toks yra šio veiksmo rezultatas, ir turime jį pagrindžiantį dokumentuotą vertinimą; jei norite sužinoti daugiau, klauskite. Svarbu žinoti tris dalykus: į saugumo audito žurnalą įrašai tik pridedami, esamų įrašų negalima keisti, o pats žurnalas neištrinamas, tačiau jame nėra perskaitomų jūsų identifikatorių; nedidelis skaičius senesnių debatų sukurtas anksčiau nei dabartinė šifravimo schema, ir jei tai taikoma jūsų paskyrai, paaiškinsime, ką jiems reiškia paskyros uždarymas; o DI paslaugų teikėjui jau išsiųstoms duomenų kopijoms taikomos to teikėjo Registre nurodytos saugojimo sąlygos, o ne mūsų atliekamas ištrynimas." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "c2dd64e7dffde72d5cdba7eadd413060c3d41c43a55b9b02b77332625ee9d4ca",
+  sha256: "32a3629e9cfb61c1128262e9f06b7dbe45b7efbb6b974eb593ac600b9c76ffc6",
   eyebrow: "PRIVATUMO POLITIKA · v3.2 · ĮSIGALIOJA [DATE]",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",

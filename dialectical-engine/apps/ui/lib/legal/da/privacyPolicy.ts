@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kort fortalt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Vi indsamler det, en konto har brug for, og det, du vælger at skrive. Dine spørgsmål sendes til AI-udbydere, der er anført i vores Register; de bruges ikke til at træne modeller. Debatter er private, medmindre du offentliggør dem. Når du sletter din konto, destrueres nøglerne til dine data, og dine offentliggjorte debatter fjernes. Du kan kontakte os på privacy@dezbatere.ro, og personer, som nævnes i en debat, kan anmode om fjernelse uden at have en konto." }
+      { kind: "p", text: "Vi indsamler det, en konto har brug for, og det, du vælger at skrive. Dine spørgsmål sendes til AI-udbydere, der er anført i vores Register; de bruges ikke til at træne modeller. Debatter er private, medmindre du offentliggør dem. Når du sletter din konto, destrueres nøglerne til dine private data; når du planlægger sletningen, vælger du, om dine offentliggjorte debatter også skal fjernes eller forblive offentlige under dit tidligere pseudonym. Du kan kontakte os på privacy@dezbatere.ro, og personer, som nævnes i en debat, kan anmode om fjernelse uden at have en konto." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Debatter er private, indtil du offentliggør dem. Offentliggørelse er en bevidst handling, der bekræftes særskilt. En offentliggjort debat viser dit pseudonym, dit spørgsmål, som du skrev det, argumenttræet, bedømmelserne, konklusionen og konfidensintervallet og bærer en synlig mærkning af, at indholdet er AI-genereret. Den viser aldrig din e-mailadresse, dine sessionsregistreringer eller din kontohistorik. Søgemaskiner kan indeksere offentliggjorte debatter." },
       { kind: "p", text: "Når offentliggørelsen ophæves, fjernes debatten fra Dialectical Engine, og nøglen til vores offentlige kopi destrueres. Kopier, som læsere, søgemaskiner eller arkiver allerede har fremstillet, er uden for vores kontrol, og vi kan ikke tilbagekalde dem." },
-      { kind: "p", text: "Når du sletter din konto, fjerner vi uden unødig forsinkelse og senest inden for 30 dage alle debatter, du har offentliggjort, fra offentlig adgang, medmindre loven kræver, at vi opbevarer et bestemt element. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Når du planlægger sletning af din konto, vælger du, hvad der skal ske med de debatter, du har offentliggjort. Hvis du markerer \"Slet også mine offentlige debatter\", fjerner vi hver af dem fra offentlig adgang og ødelægger nøglen til vores offentlige kopi, når sletningen gennemføres, medmindre loven kræver, at vi beholder et bestemt element. Hvis du lader feltet være umarkeret, forbliver de offentlige under et udfaset pseudonym." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Risikosignaler ved login og gendannelse — 90 dage, håndhævet af databasen — Renses",
         "Sikkerhedsrevisionsspor — I hele tjenestens levetid — Der kan kun tilføjes; IP-adresse og user-agent er envejs-hashes og kan ikke læses igen",
         "Debatindhold (privat) — Mens kontoen findes — Nøgler destrueres ved lukning, så indholdet bliver ulæseligt",
-        "Debatindhold (offentliggjort) — Mens det er offentliggjort, og mens kontoen findes — Fjernes fra offentlig adgang, når offentliggørelsen ophæves, eller kontoen lukkes; nøgler destrueres",
+        "Debatindhold (offentliggjort) — Mens det er offentliggjort; hvis du lukker din konto og lader „Slet også mine offentlige debatter“ være umarkeret, forbliver en offentliggjort debat offentlig under dit tidligere pseudonym — Fjernes fra offentlig adgang, og dens nøgle destrueres, når du ophæver offentliggørelsen, eller ved lukning, hvis du har markeret „Slet også mine offentlige debatter“",
         "Registreringer af udbydersvar og søgehenvisninger — Samme periode som den debat, de tilhører — Det samme",
         "Supportsamtaler og -sager — [Until closed plus 12 months] — Nøgler destrueres",
         "Registreringer af accept og samtykke — Kontoens levetid plus 6 år — den længste forældelsesfrist, der gælder for os — Slettes",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Sikkerhedskopier [pending] — [… days] efter at den aktive kopi er slettet — Overskrives"
         ]
       },
-      { kind: "p", text: "Hvad sletning faktisk gør. Dine debatter og kontodata er krypteret under nøgler, der er specifikke for din konto og for hver debat. Når din konto slettes, destrueres disse nøgler, hvorefter de krypterede registreringer ikke kan læses af os eller andre, og vi sletter din kontoregistrering. Vi beskriver dette som sletning, fordi det er virkningen, og vi har en dokumenteret vurdering, der underbygger det; spørg os, hvis du vil vide mere. Tre forhold bør fremhæves: Sikkerhedsrevisionssporet kan kun tilføjes til og slettes ikke, men indeholder ingen læsbare identifikatorer for dig; et mindre antal ældre debatter er fra før vores nuværende krypteringsordning, og hvis det gælder din konto, fortæller vi dig, hvad en lukning medfører for dem; og kopier af data, der allerede er sendt til en AI-udbyder, er underlagt den pågældende udbyders opbevaringsvilkår i Registret, ikke vores sletning." },
+      { kind: "p", text: "Hvad sletning faktisk gør. Dine private debatter og kontodata er krypteret under nøgler, der er specifikke for din konto og for hver debat. Når din konto slettes, destrueres disse nøgler, hvorefter de krypterede registreringer ikke kan læses af os eller andre, og vi sletter din kontoregistrering. Nøglen til en offentlig kopi af en offentliggjort debat destrueres ved sletning kun, hvis du har markeret „Slet også mine offentlige debatter“ (afsnit 6). Vi beskriver dette som sletning, fordi det er virkningen, og vi har en dokumenteret vurdering, der underbygger det; spørg os, hvis du vil vide mere. Tre forhold bør fremhæves: Sikkerhedsrevisionssporet kan kun tilføjes til og slettes ikke, men indeholder ingen læsbare identifikatorer for dig; et mindre antal ældre debatter er fra før vores nuværende krypteringsordning, og hvis det gælder din konto, fortæller vi dig, hvad en lukning medfører for dem; og kopier af data, der allerede er sendt til en AI-udbyder, er underlagt den pågældende udbyders opbevaringsvilkår i Registret, ikke vores sletning." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "44d5cab4d347ac2f58fffc58d2e1863bc68d6fae98c2445d2349f2f7a8aa0c09",
+  sha256: "821d39cd4fcd52234806cc7260e62e92d104cb8b946617fb45520aa8f93d2710",
   eyebrow: "PRIVATLIVSPOLITIK · v3.2 · GÆLDENDE FRA [DATE]",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",

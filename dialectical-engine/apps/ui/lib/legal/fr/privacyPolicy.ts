@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "En bref",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Nous collectons ce dont un compte a besoin et ce que vous choisissez de saisir. Vos questions sont transmises aux fournisseurs d'IA répertoriés dans notre Registre ; elles ne servent pas à entraîner des modèles. Les débats restent privés, sauf si vous les publiez. La suppression de votre compte détruit les clés de vos données et retire vos débats publiés. Vous pouvez nous contacter à l'adresse privacy@dezbatere.ro, et les personnes nommées dans un débat peuvent demander son retrait sans avoir de compte." }
+      { kind: "p", text: "Nous collectons ce dont un compte a besoin et ce que vous choisissez de saisir. Vos questions sont transmises aux fournisseurs d'IA répertoriés dans notre Registre ; elles ne servent pas à entraîner des modèles. Les débats restent privés, sauf si vous les publiez. La suppression de votre compte détruit les clés de vos données privées ; lorsque vous la programmez, vous choisissez si vos débats publiés sont aussi retirés ou restent publics sous votre ancien pseudonyme. Vous pouvez nous contacter à l'adresse privacy@dezbatere.ro, et les personnes nommées dans un débat peuvent demander son retrait sans avoir de compte." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Les débats sont privés jusqu'à ce que vous les publiiez. La publication est un acte délibéré, confirmé séparément. Un débat publié affiche votre pseudonyme, votre question telle que vous l'avez rédigée, l'arbre d'arguments, les scores, le verdict et la bande de confiance, et porte une mention visible indiquant que le contenu est généré par l'IA. Il n'affiche jamais votre adresse e-mail, vos données de session ni l'historique de votre compte. Les moteurs de recherche peuvent indexer les débats publiés." },
       { kind: "p", text: "Le retrait de la publication supprime le débat de Dialectical Engine et détruit la clé de notre copie publique. Les copies déjà réalisées par des lecteurs, des moteurs de recherche ou des services d'archivage échappent à notre contrôle et nous ne pouvons pas les rappeler." },
-      { kind: "p", text: "Lorsque vous supprimez votre compte, nous retirons de l'accès public chaque débat que vous avez publié, sans retard injustifié et dans un délai maximal de 30 jours, sauf si la loi nous impose de conserver un élément précis. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Lorsque vous programmez la suppression de votre compte, vous choisissez ce qu’il advient des débats que vous avez publiés. Si vous cochez « Supprimer aussi mes débats publics », nous retirons chacun d’eux de l’accès public et détruisons la clé de notre copie publique lors de la suppression, sauf si la loi nous impose de conserver un élément précis. Si vous laissez la case décochée, ils restent publics sous un pseudonyme retiré." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Signaux de risque liés à la connexion et à la récupération — 90 jours, durée appliquée par la base de données — Purgés",
         "Journal d'audit de sécurité — Pendant toute la durée de vie du service — Inaltérable ; l'adresse IP et le user-agent sont des condensés irréversibles qui ne peuvent pas être relus",
         "Contenu des débats (privé) — Tant que le compte existe — Clés détruites à la clôture, ce qui rend le contenu illisible",
-        "Contenu des débats (publié) — Tant qu'il reste publié et que le compte existe — Retiré de l'accès public lors du retrait de la publication ou de la clôture ; clés détruites",
+        "Contenu des débats (publié) — Tant qu’il est publié ; si vous clôturez votre compte en laissant « Supprimer aussi mes débats publics » décoché, un débat publié reste public sous votre ancien pseudonyme — Retiré de l’accès public, et sa clé détruite, lorsque vous retirez sa publication ou lors de la clôture si vous avez coché « Supprimer aussi mes débats publics »",
         "Enregistrements des réponses des fournisseurs et références de recherche — Aussi longtemps que le débat auquel ils se rapportent — Même traitement",
         "Conversations et dossiers d'assistance — [Until closed plus 12 months] — Clés détruites",
         "Preuves d'acceptation et de consentement — Durée de vie du compte plus 6 ans — le délai de prescription le plus long qui nous est applicable — Supprimées",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Sauvegardes [pending] — [… days] après la suppression de la copie active — Écrasées"
         ]
       },
-      { kind: "p", text: "Effet réel de la suppression. Vos débats et les données de votre compte sont chiffrés au moyen de clés propres à votre compte et à chaque débat. La suppression de votre compte détruit ces clés ; les enregistrements chiffrés ne peuvent alors plus être lus, ni par nous ni par quiconque, et nous supprimons l'enregistrement de votre compte. Nous qualifions cette opération de suppression parce que tel est son effet, et nous disposons d'une évaluation documentée à l'appui ; si vous souhaitez en savoir plus, demandez-nous. Trois choses sont à savoir : le journal d'audit de sécurité est inaltérable et n'est pas supprimé, mais il ne contient aucun identifiant lisible vous concernant ; un petit nombre de débats plus anciens sont antérieurs à notre système de chiffrement actuel et, si cela concerne votre compte, nous vous indiquons l'effet de sa clôture sur ces débats ; enfin, les copies des données déjà transmises à un fournisseur d'IA sont soumises aux conditions de conservation de ce fournisseur indiquées dans le Registre, et non à notre suppression." },
+      { kind: "p", text: "Effet réel de la suppression. Vos débats privés et les données de votre compte sont chiffrés au moyen de clés propres à votre compte et à chaque débat. La suppression de votre compte détruit ces clés ; les enregistrements chiffrés ne peuvent alors plus être lus, ni par nous ni par quiconque, et nous supprimons l'enregistrement de votre compte. La clé de la copie publique d’un débat publié n’est détruite lors de la suppression que si vous avez coché « Supprimer aussi mes débats publics » (section 6). Nous qualifions cette opération de suppression parce que tel est son effet, et nous disposons d'une évaluation documentée à l'appui ; si vous souhaitez en savoir plus, demandez-nous. Trois choses sont à savoir : le journal d'audit de sécurité est inaltérable et n'est pas supprimé, mais il ne contient aucun identifiant lisible vous concernant ; un petit nombre de débats plus anciens sont antérieurs à notre système de chiffrement actuel et, si cela concerne votre compte, nous vous indiquons l'effet de sa clôture sur ces débats ; enfin, les copies des données déjà transmises à un fournisseur d'IA sont soumises aux conditions de conservation de ce fournisseur indiquées dans le Registre, et non à notre suppression." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "27cc236819eeccbc64d599c59414f021769decf1421f420525d7e42425542f8f",
+  sha256: "a52cabdb43b1768ee75febdb8ba1629acc637bfd695cbcff0aaffb290483be76",
   eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.2 · EN VIGUEUR LE [DATE]",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",

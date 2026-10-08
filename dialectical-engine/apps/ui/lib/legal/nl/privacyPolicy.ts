@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "In het kort",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Wij verzamelen wat nodig is voor een account en wat u zelf invoert. Uw vragen gaan naar de AI-aanbieders die in ons Register staan en worden niet gebruikt om modellen te trainen. Debatten zijn privé, tenzij u ze publiceert. Wanneer u uw account verwijdert, worden de sleutels tot uw gegevens vernietigd en worden uw gepubliceerde debatten uit de openbare toegang verwijderd. U kunt ons bereiken via privacy@dezbatere.ro, en personen die in een debat worden genoemd, kunnen zonder account om verwijdering verzoeken." }
+      { kind: "p", text: "Wij verzamelen wat nodig is voor een account en wat u zelf invoert. Uw vragen gaan naar de AI-aanbieders die in ons Register staan en worden niet gebruikt om modellen te trainen. Debatten zijn privé, tenzij u ze publiceert. Wanneer u uw account verwijdert, worden de sleutels tot uw privégegevens vernietigd; bij het plannen kiest u of ook uw gepubliceerde debatten worden verwijderd of openbaar blijven onder uw vroegere pseudoniem. U kunt ons bereiken via privacy@dezbatere.ro, en personen die in een debat worden genoemd, kunnen zonder account om verwijdering verzoeken." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Debatten zijn privé totdat u ze publiceert. Publicatie is een bewuste handeling die afzonderlijk wordt bevestigd. Een gepubliceerd debat toont uw pseudoniem, uw vraag zoals u die hebt geschreven, de argumentboom, de scores, het oordeel en de zekerheidsband, en draagt een zichtbaar label dat de inhoud door AI is gegenereerd. Het toont nooit uw e-mailadres, sessiegegevens of accountgeschiedenis. Zoekmachines kunnen gepubliceerde debatten indexeren." },
       { kind: "p", text: "Door de publicatie in te trekken, wordt het debat uit Dialectical Engine verwijderd en wordt de sleutel tot onze openbare kopie vernietigd. Kopieën die reeds door lezers, zoekmachines of archieven zijn gemaakt, vallen buiten onze controle en kunnen wij niet terugroepen." },
-      { kind: "p", text: "Wanneer u uw account verwijdert, verwijderen wij elk door u gepubliceerd debat zonder onnodige vertraging en uiterlijk binnen 30 dagen uit de openbare toegang, tenzij de wet ons verplicht een specifiek item te bewaren. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Wanneer u de verwijdering van uw account plant, kiest u wat er met uw gepubliceerde debatten gebeurt. Als u „Ook mijn openbare debatten verwijderen” aanvinkt, verwijderen wij ze bij de verwijdering één voor één uit de openbare toegang en vernietigen wij de sleutel van onze openbare kopie, tenzij de wet ons verplicht een specifiek onderdeel te bewaren. Als u het vakje niet aanvinkt, blijven ze openbaar onder een uitgefaseerd pseudoniem." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Auditvastlegging van een weigering op basis van het IP-land — Gedurende de levensduur van de dienst — Alleen toevoegingen; route, weigeringscode, land, tijdvenster en bewijssoort ‘IP-adres’ worden vastgelegd; IP-adres en user-agent worden uitsluitend als eenrichtingsdigests met sleutel bewaard",
         "Onbewerkt IP-adres voor de landencontrole bij registratie of een nieuw debat — Alleen tijdens het betreffende verzoek — Deze controle bewaart geen leesbaar IP; de weigeringaudit bewaart het IP-adres en de user-agent uitsluitend als eenrichtingsdigests met sleutel, en het IP-land kan in de leeftijdscontrole worden vastgelegd",
         "Debatinhoud (privé) — Zolang het account bestaat — Sleutels worden bij sluiting vernietigd, waardoor de inhoud onleesbaar wordt",
-        "Debatinhoud (gepubliceerd) — Zolang deze is gepubliceerd en het account bestaat — Uit de openbare toegang verwijderd wanneer de publicatie wordt ingetrokken of het account wordt gesloten; sleutels vernietigd",
+        "Debatinhoud (gepubliceerd) — Zolang deze is gepubliceerd; als u uw account sluit en „Ook mijn openbare debatten verwijderen” niet aanvinkt, blijft een gepubliceerd debat openbaar onder uw vroegere pseudoniem — Uit de openbare toegang verwijderd en de sleutel vernietigd wanneer u de publicatie intrekt, of bij sluiting als u „Ook mijn openbare debatten verwijderen” hebt aangevinkt",
         "Door aanbieders geretourneerde gegevens en zoekreferenties — Even lang als het debat waartoe zij behoren — Hetzelfde",
         "Ondersteuningsgesprekken en ondersteuningsverzoeken — [Until closed plus 12 months] — Sleutels vernietigd",
         "Vastleggingen van aanvaarding en toestemming — Levensduur van het account plus 6 jaar — de langste verjaringstermijn die op ons van toepassing is — Verwijderd",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Back-ups [pending] — [… days] nadat de actuele kopie is verwijderd — Overschreven"
         ]
       },
-      { kind: "p", text: "Wat verwijdering daadwerkelijk doet. Uw debatten en accountgegevens zijn versleuteld met sleutels die specifiek zijn voor uw account en elk debat. Wanneer u uw account verwijdert, worden die sleutels vernietigd, waarna de versleutelde gegevens niet meer door ons of anderen kunnen worden gelezen, en verwijderen wij de vastlegging van uw account. Wij omschrijven dit als verwijdering omdat dit het effect ervan is, en wij beschikken over een gedocumenteerde beoordeling die dit onderbouwt; vraag het ons als u meer wilt weten. Drie zaken die u moet weten: het beveiligingsauditlogboek is uitsluitend voor toevoegingen bestemd en wordt niet verwijderd, maar bevat geen leesbare identificatoren van u; een klein aantal oudere debatten dateert van vóór ons huidige versleutelingsschema, en als dit voor uw account geldt, vertellen wij u wat sluiting voor die debatten bewerkstelligt; en kopieën van gegevens die reeds naar een AI-aanbieder zijn gestuurd, vallen onder de bewaarbepalingen van die aanbieder in het Register, niet onder onze verwijdering." },
+      { kind: "p", text: "Wat verwijdering daadwerkelijk doet. Uw privédebatten en accountgegevens zijn versleuteld met sleutels die specifiek zijn voor uw account en elk debat. Wanneer u uw account verwijdert, worden die sleutels vernietigd, waarna de versleutelde gegevens niet meer door ons of anderen kunnen worden gelezen, en verwijderen wij de vastlegging van uw account. De sleutel van de openbare kopie van een gepubliceerd debat wordt bij verwijdering alleen vernietigd als u „Ook mijn openbare debatten verwijderen” hebt aangevinkt (paragraaf 6). Wij omschrijven dit als verwijdering omdat dit het effect ervan is, en wij beschikken over een gedocumenteerde beoordeling die dit onderbouwt; vraag het ons als u meer wilt weten. Drie zaken die u moet weten: het beveiligingsauditlogboek is uitsluitend voor toevoegingen bestemd en wordt niet verwijderd, maar bevat geen leesbare identificatoren van u; een klein aantal oudere debatten dateert van vóór ons huidige versleutelingsschema, en als dit voor uw account geldt, vertellen wij u wat sluiting voor die debatten bewerkstelligt; en kopieën van gegevens die reeds naar een AI-aanbieder zijn gestuurd, vallen onder de bewaarbepalingen van die aanbieder in het Register, niet onder onze verwijdering." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "03915e0570b40bd19a5dd033971fe725594b09e9d22e254917d169586ae1b9a2",
+  sha256: "e79d891995c2ef2fb58dc26af4483d72ef6a801e7da79c11a06df9a57ea3368e",
   eyebrow: "PRIVACYBELEID · v3.2 · VAN KRACHT OP [DATE]",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",

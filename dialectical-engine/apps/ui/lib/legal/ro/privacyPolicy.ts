@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Pe scurt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Colectăm ceea ce este necesar unui cont și ceea ce alegeți să introduceți. Întrebările dumneavoastră sunt transmise furnizorilor de IA enumerați în Registrul furnizorilor de IA; acestea nu sunt folosite pentru antrenarea modelelor. Dezbaterile sunt private dacă nu le publicați. Ștergerea contului distruge cheile datelor dumneavoastră și elimină dezbaterile publicate. Ne puteți contacta la privacy@dezbatere.ro, iar persoanele menționate într-o dezbatere pot solicita eliminarea fără a avea cont." }
+      { kind: "p", text: "Colectăm ceea ce este necesar unui cont și ceea ce alegeți să introduceți. Întrebările dumneavoastră sunt transmise furnizorilor de IA enumerați în Registrul furnizorilor de IA; acestea nu sunt folosite pentru antrenarea modelelor. Dezbaterile sunt private dacă nu le publicați. Ștergerea contului distruge cheile datelor dumneavoastră private; când o programați, alegeți dacă dezbaterile publicate sunt și ele eliminate sau rămân publice sub fostul dumneavoastră pseudonim. Ne puteți contacta la privacy@dezbatere.ro, iar persoanele menționate într-o dezbatere pot solicita eliminarea fără a avea cont." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Dezbaterile sunt private până când le publicați. Publicarea este o acțiune deliberată, confirmată separat. O dezbatere publicată afișează pseudonimul dumneavoastră, întrebarea exact așa cum ați formulat-o, arborele argumentelor, punctajele, verdictul și intervalul de încredere și poartă o etichetă vizibilă care arată că materialul este generat de IA. Nu afișează niciodată adresa de e-mail, evidențele sesiunilor sau istoricul contului. Motoarele de căutare pot indexa dezbaterile publicate." },
       { kind: "p", text: "Retragerea publicării elimină dezbaterea din Dialectical Engine și distruge cheia copiei noastre publice. Copiile deja realizate de cititori, motoare de căutare sau arhive nu se află sub controlul nostru și nu le putem retrage." },
-      { kind: "p", text: "Când vă ștergeți contul, eliminăm din accesul public fiecare dezbatere publicată, fără întârzieri nejustificate și în cel mult 30 de zile, cu excepția cazului în care legea ne obligă să păstrăm un anumit element. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Când programați ștergerea contului, alegeți ce se întâmplă cu dezbaterile pe care le-ați publicat. Dacă bifați „Ștergeți și dezbaterile mele publice”, le eliminăm pe fiecare din accesul public și distrugem cheia copiei noastre publice când ștergerea se execută, cu excepția cazului în care legea ne obligă să păstrăm un anumit element. Dacă lăsați căsuța nebifată, dezbaterile rămân publice sub pseudonimul dumneavoastră retras." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Adresa IP folosită pentru stabilirea locală a țării la înregistrare și la începutul unei dezbateri noi — Numai pe durata prelucrării cererii — Nu este păstrată în clar pentru această verificare; refuzul este înregistrat doar agregat și prin amprenta descrisă mai jos",
         "Înregistrări agregate ale auditului refuzurilor pe baza țării IP — Pe durata de viață a serviciului — Înregistrarea păstrează codul refuzului, țara, mențiunea că adresa IP a fost proba și amprentele unidirecționale bazate pe cheie ale adresei IP și ale identificatorului browserului (user-agent); jurnalul permite doar adăugări.",
         "Conținutul dezbaterii (privat) — Cât timp există contul — Cheile sunt distruse la închidere, făcând conținutul ilizibil",
-        "Conținutul dezbaterii (publicat) — Cât timp este publicat și există contul — Eliminat din accesul public la retragerea publicării sau la închidere; cheile sunt distruse",
+        "Conținutul dezbaterii (publicat) — Cât timp este publicat; dacă închideți contul și lăsați „Ștergeți și dezbaterile mele publice” nebifată, o dezbatere publicată rămâne publică sub fostul dumneavoastră pseudonim — Eliminat din accesul public, iar cheia sa distrusă, când retrageți publicarea sau la închidere dacă ați bifat „Ștergeți și dezbaterile mele publice”",
         "Evidențele răspunsurilor furnizorilor și referințele de regăsire — La fel ca dezbaterea căreia îi aparțin — La fel",
         "Conversații și cazuri de asistență — [Until closed plus 12 months] — Cheile sunt distruse",
         "Evidențe privind acceptarea și consimțământul — Durata de viață a contului plus 6 ani — cel mai lung termen de prescripție care ni se aplică — Șterse",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Copii de siguranță [pending] — [… days] după ștergerea copiei active — Suprascrise"
         ]
       },
-      { kind: "p", text: "Ce produce efectiv ștergerea. Dezbaterile și datele contului sunt criptate cu chei specifice contului și fiecărei dezbateri. Ștergerea contului distruge aceste chei, după care înregistrările criptate nu mai pot fi citite de noi sau de altcineva, iar noi ștergem înregistrarea contului. Numim acest lucru ștergere deoarece acesta este efectul său și deținem o evaluare documentată care îl susține; dacă doriți mai multe informații, întrebați-ne. Trebuie cunoscute trei aspecte: jurnalul de audit al securității este exclusiv cu adăugare și nu se șterge, dar nu conține identificatori lizibili despre dumneavoastră; un număr mic de dezbateri mai vechi precedă schema noastră actuală de criptare, iar dacă aceasta este situația contului dumneavoastră vă explicăm ce efect are închiderea asupra lor; copiile datelor deja trimise unui furnizor de IA sunt guvernate de condițiile de păstrare ale furnizorului din Registru, nu de ștergerea efectuată de noi." },
+      { kind: "p", text: "Ce produce efectiv ștergerea. Dezbaterile private și datele contului sunt criptate cu chei specifice contului și fiecărei dezbateri. Ștergerea contului distruge aceste chei, după care înregistrările criptate nu mai pot fi citite de noi sau de altcineva, iar noi ștergem înregistrarea contului. Cheia copiei publice a unei dezbateri publicate este distrusă la ștergere numai dacă ați bifat „Ștergeți și dezbaterile mele publice” (secțiunea 6). Numim acest lucru ștergere deoarece acesta este efectul său și deținem o evaluare documentată care îl susține; dacă doriți mai multe informații, întrebați-ne. Trebuie cunoscute trei aspecte: jurnalul de audit al securității este exclusiv cu adăugare și nu se șterge, dar nu conține identificatori lizibili despre dumneavoastră; un număr mic de dezbateri mai vechi precedă schema noastră actuală de criptare, iar dacă aceasta este situația contului dumneavoastră vă explicăm ce efect are închiderea asupra lor; copiile datelor deja trimise unui furnizor de IA sunt guvernate de condițiile de păstrare ale furnizorului din Registru, nu de ștergerea efectuată de noi." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "416a6489ad36f2531f0353a0eadcd9ea9ac0011b543a26b2b1cdf48c7728ff62",
+  sha256: "a39f956c4553ef01ac41ad7173a0f5c7199feec6dec5a9efd20af497f11dc40c",
   eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.2 · ÎN VIGOARE DE LA [DATE]",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",
