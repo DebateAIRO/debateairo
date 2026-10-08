@@ -82,7 +82,7 @@ export type TestPaymentSystem = Readonly<{ provider: "netopia"; environment: "sa
 
 /**
  * CREATED then ACTIVATED for one owner: the smallest live subscription the fold accepts. CREATED names its payment
- * system (0096's CHECK, N7's fold); ACTIVATED carries the recurring net price the subscriber keeps (Terms §12) and, on
+ * system (0109's CHECK, N7's fold); ACTIVATED carries the recurring net price the subscriber keeps (Terms §12) and, on
  * NETOPIA, the saved card it adopted (a fixed uuid: no card_token row backs it, so only the fold reads it).
  */
 export function activeSubscriptionEvents(

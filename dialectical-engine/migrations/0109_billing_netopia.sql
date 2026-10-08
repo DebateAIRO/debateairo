@@ -1,5 +1,8 @@
--- 0096 — card payments through NETOPIA (spec 2026-10-05 §2.5; review finding SR-16): provider-neutral charge rows,
+-- 0109 — card payments through NETOPIA (spec 2026-10-05 §2.5; review finding SR-16): provider-neutral charge rows,
 -- NETOPIA's messages, saved cards, hosted payments, status reads and tool orders, their purges, 0093's contract again.
+-- PR-54: the forward step after dev's 0108 (migrations/lineage/README.md). Its manifest
+-- lineage/billing-netopia-forward109.json binds these bytes; lineage/verify-effective-capabilities-109.sql supersedes
+-- dev's sealed verifier once this step is applied.
 -- Forward-only and replayable: a rename runs only while the old column exists; a replaced CHECK is dropped IF EXISTS
 -- and added again; a key others depend on is added only when absent; tables and indexes are IF NOT EXISTS. xMoney-era
 -- rows (dev databases) stay as inert history, marked payment_provider = 'xmoney' (§2.5.4).
@@ -10,19 +13,19 @@
 -- request_names_its_target keep their rule as renamed; the others are replaced because their rule changes for NETOPIA.
 -- SR-16 (b): ACTIVATED needs its anchor only. SR-16 (c): new tables grant themselves; 0093's contract runs again.
 
-DO $billing_0096_requires$
+DO $billing_0109_requires$
 BEGIN
   IF pg_catalog.to_regprocedure('billing.reject_mutation_unless_retention_purge()') IS NULL
     OR pg_catalog.to_regprocedure('billing.enforce_refund_within_charge()') IS NULL
     OR pg_catalog.to_regrole('debateai_billing_runtime') IS NULL THEN
-    RAISE EXCEPTION 'BILLING_0096_REQUIRES_0093';
+    RAISE EXCEPTION 'BILLING_0109_REQUIRES_0093';
   END IF;
 END
-$billing_0096_requires$;
+$billing_0109_requires$;
 
 -- ---- 1. Provider-neutral charge columns (§2.5.1) ------------------------------------------------------------------
 
-DO $billing_0096_renames$
+DO $billing_0109_renames$
 DECLARE target text[];
 BEGIN
   FOREACH target SLICE 1 IN ARRAY ARRAY[
@@ -45,7 +48,7 @@ BEGIN
     END IF;
   END LOOP;
 END
-$billing_0096_renames$;
+$billing_0109_renames$;
 
 ALTER TABLE billing.charge ADD COLUMN IF NOT EXISTS payment_provider text NOT NULL DEFAULT 'xmoney';
 ALTER TABLE billing.charge ALTER COLUMN payment_provider DROP DEFAULT;
@@ -62,7 +65,7 @@ ALTER TABLE billing.charge
 -- new pair is added only when absent (billing.hosted_payment's foreign key depends on charge_system_key).
 ALTER TABLE billing.charge_event DROP CONSTRAINT IF EXISTS charge_event_same_environment_as_charge;
 ALTER TABLE billing.charge DROP CONSTRAINT IF EXISTS charge_environment_key;
-DO $billing_0096_charge_keys$
+DO $billing_0109_charge_keys$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint
                  WHERE conrelid = 'billing.charge'::regclass AND conname = 'charge_system_key') THEN
@@ -75,7 +78,7 @@ BEGIN
       REFERENCES billing.charge (charge_id, payment_provider, payment_environment);
   END IF;
 END
-$billing_0096_charge_keys$;
+$billing_0109_charge_keys$;
 ALTER TABLE billing.charge_event
   DROP CONSTRAINT IF EXISTS charge_event_xmoney_environment_check,
   DROP CONSTRAINT IF EXISTS charge_event_xmoney_transaction_id_check,
@@ -351,7 +354,7 @@ CREATE INDEX IF NOT EXISTS card_token_revocation_at_idx ON billing.card_token_re
 
 -- ---- 4. Guards and grants (§2.5.6): the API's billing role only -----------------------------------------------
 
-DO $billing_0096_guards$
+DO $billing_0109_guards$
 DECLARE target text;
 BEGIN
   FOREACH target IN ARRAY ARRAY[
@@ -369,7 +372,7 @@ BEGIN
     EXECUTE pg_catalog.format('GRANT SELECT, INSERT ON %s TO debateai_billing_runtime', target);
   END LOOP;
 END
-$billing_0096_guards$;
+$billing_0109_guards$;
 
 -- ---- 5. The sanctioned deletes (A15's guard; §2.5.2, §2.15.4) -------------------------------------------------
 
@@ -415,7 +418,7 @@ BEGIN
 END;
 $$;
 
--- 0087's ten-year purge (A15, R-13, R-36), replaced to cover 0096's tables in the order of §2.5.2: a hosted payment
+-- 0087's ten-year purge (A15, R-13, R-36), replaced to cover 0109's tables in the order of §2.5.2: a hosted payment
 -- and a status read before their charge, a message's outcomes and raw bytes before the message, then the tool's
 -- orders and the token revocations. Everything else is 0087's body, unchanged.
 CREATE OR REPLACE FUNCTION billing.purge_expired_records(p_now timestamptz)
@@ -493,7 +496,7 @@ BEGIN
   ) SELECT pg_catalog.count(*) INTO v_deleted FROM gone;
   v_total := v_total + v_deleted;
 
-  -- 0096: a charge's payment page and status reads.
+  -- 0109: a charge's payment page and status reads.
   WITH gone AS (DELETE FROM billing.hosted_payment AS hosted USING billing.charge AS charge
     WHERE hosted.charge_id = charge.charge_id AND charge.created_at < v_cutoff RETURNING 1)
   SELECT pg_catalog.count(*) INTO v_deleted FROM gone; v_total := v_total + v_deleted;
@@ -544,7 +547,7 @@ BEGIN
   ) SELECT pg_catalog.count(*) INTO v_deleted FROM gone;
   v_total := v_total + v_deleted;
 
-  -- 0096: NETOPIA's messages, their outcomes and raw bytes first.
+  -- 0109: NETOPIA's messages, their outcomes and raw bytes first.
   WITH gone AS (DELETE FROM billing.payment_notice_outcome AS outcome USING billing.payment_notice AS notice
     WHERE outcome.notice_id = notice.notice_id AND notice.received_at < v_cutoff RETURNING 1)
   SELECT pg_catalog.count(*) INTO v_deleted FROM gone; v_total := v_total + v_deleted;
@@ -574,7 +577,7 @@ BEGIN
   ) SELECT pg_catalog.count(*) INTO v_deleted FROM gone;
   v_total := v_total + v_deleted;
 
-  -- 0096: the tool's orders and the token revocations (the tokens themselves go a day after their revocation).
+  -- 0109: the tool's orders and the token revocations (the tokens themselves go a day after their revocation).
   WITH gone AS (DELETE FROM billing.tool_order AS ordered WHERE ordered.created_at < v_cutoff RETURNING 1)
   SELECT pg_catalog.count(*) INTO v_deleted FROM gone; v_total := v_total + v_deleted;
 
@@ -641,7 +644,7 @@ GRANT EXECUTE ON FUNCTION billing.purge_expired_records(timestamptz) TO debateai
 
 -- ---- 6. What this file claims, checked -------------------------------------------------------------------------
 
-DO $billing_0096_guard_contract$
+DO $billing_0109_guard_contract$
 BEGIN
   IF (
     SELECT pg_catalog.count(*) FROM pg_catalog.pg_trigger AS trigger
@@ -669,11 +672,11 @@ BEGIN
       AND (column_name IN ('xmoney_environment', 'xmoney_transaction_id', 'xmoney_created_at')
         OR (column_name = 'payment_provider' AND (column_default IS NOT NULL OR is_nullable <> 'NO')))
   ) THEN
-    RAISE EXCEPTION 'BILLING_0096_GUARD_INVALID';
+    RAISE EXCEPTION 'BILLING_0109_GUARD_INVALID';
   END IF;
 END
-$billing_0096_guard_contract$;
-DO $billing_0096_contract$
+$billing_0109_guard_contract$;
+DO $billing_0109_contract$
 DECLARE
   v_runtime_writes text;
   v_runtime_reads text;
@@ -685,7 +688,7 @@ BEGIN
     WHERE role.rolname = 'debateai_billing_runtime' AND NOT role.rolcanlogin AND role.rolinherit
       AND NOT role.rolsuper AND NOT role.rolcreaterole AND NOT role.rolcreatedb AND NOT role.rolbypassrls
   ) OR NOT pg_catalog.pg_has_role('debateai_billing_runtime', 'debateai_runtime', 'USAGE') THEN
-    RAISE EXCEPTION 'BILLING_0096_ROLE_INVALID';
+    RAISE EXCEPTION 'BILLING_0109_ROLE_INVALID';
   END IF;
 
   SELECT pg_catalog.string_agg(relation.relname, ',' ORDER BY relation.relname) INTO v_runtime_writes
@@ -700,7 +703,7 @@ BEGIN
         AND pg_catalog.has_sequence_privilege('debateai_runtime', relation.oid, 'USAGE,UPDATE')));
   IF v_runtime_writes IS NOT NULL
     OR pg_catalog.has_schema_privilege('debateai_runtime', 'billing', 'CREATE') THEN
-    RAISE EXCEPTION 'BILLING_0096_RUNTIME_WRITES %', v_runtime_writes;
+    RAISE EXCEPTION 'BILLING_0109_RUNTIME_WRITES %', v_runtime_writes;
   END IF;
 
   SELECT pg_catalog.string_agg(relation.relname, ',' ORDER BY relation.relname) INTO v_runtime_reads
@@ -709,22 +712,46 @@ BEGIN
   WHERE namespace.nspname = 'billing' AND relation.relkind IN ('r', 'p', 'v')
     AND pg_catalog.has_any_column_privilege('debateai_runtime', relation.oid, 'SELECT');
   IF v_runtime_reads IS DISTINCT FROM 'entitlement_event,person_windows_v,run_charge_scope' THEN
-    RAISE EXCEPTION 'BILLING_0096_RUNTIME_READS %', v_runtime_reads;
+    RAISE EXCEPTION 'BILLING_0109_RUNTIME_READS %', v_runtime_reads;
   END IF;
 
+  -- On dev's lineage the runtime also runs dev's eight internal-allowance entry points (the sealed verifier's closed
+  -- list, migrations/lineage/verify-effective-capabilities.sql); each is named with its exact arguments, and nothing
+  -- else in billing is callable by the runtime.
   SELECT pg_catalog.string_agg(procedure.proname, ',' ORDER BY procedure.proname) INTO v_runtime_functions
   FROM pg_catalog.pg_proc AS procedure
   JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
   WHERE namespace.nspname = 'billing'
     AND pg_catalog.has_function_privilege('debateai_runtime', procedure.oid, 'EXECUTE');
-  IF v_runtime_functions IS DISTINCT FROM 'entitlement_at' THEN
-    RAISE EXCEPTION 'BILLING_0096_RUNTIME_FUNCTIONS %', v_runtime_functions;
+  IF ARRAY(
+    SELECT procedure.oid FROM pg_catalog.pg_proc AS procedure
+    JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = procedure.pronamespace
+    WHERE namespace.nspname = 'billing'
+      AND pg_catalog.has_function_privilege('debateai_runtime', procedure.oid, 'EXECUTE')
+    ORDER BY procedure.oid
+  ) IS DISTINCT FROM ARRAY(
+    SELECT pg_catalog.to_regprocedure(signature)::oid FROM pg_catalog.unnest(ARRAY[
+      'billing.entitlement_at(uuid,timestamptz)',
+      'billing.read_internal_allowance(uuid,timestamptz)',
+      'billing.read_internal_allowance_for_run(uuid,timestamptz)',
+      'billing.read_internal_grant_commitments(uuid,uuid,uuid,uuid)',
+      'billing.read_internal_grant_spent(uuid,uuid,uuid,timestamptz,timestamptz,boolean)',
+      'billing.read_internal_run_state(uuid)',
+      'billing.read_run_funding_basis(uuid)',
+      'billing.reserve_internal_provider_call(uuid,uuid,bigint,text,text)',
+      'billing.settle_internal_provider_call(uuid,uuid,text,text,text,bigint,bigint,bigint,uuid)'
+    ]) AS signature ORDER BY 1
+  ) THEN
+    RAISE EXCEPTION 'BILLING_0109_RUNTIME_FUNCTIONS %', v_runtime_functions;
   END IF;
 
+  -- Dev's three internal-allowance tables are private to their owner (the sealed verifier refuses any grant on them to
+  -- the billing role); every other billing table and view is the billing role's, as 0093 requires.
   SELECT pg_catalog.string_agg(relation.relname, ',' ORDER BY relation.relname) INTO v_billing_missing
   FROM pg_catalog.pg_class AS relation
   JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = relation.relnamespace
   WHERE namespace.nspname = 'billing'
+    AND relation.relname NOT IN ('internal_grant', 'internal_grant_event', 'internal_provider_admission')
     AND ((relation.relkind IN ('r', 'p')
         AND (NOT pg_catalog.has_table_privilege('debateai_billing_runtime', relation.oid, 'SELECT')
           OR NOT pg_catalog.has_table_privilege('debateai_billing_runtime', relation.oid, 'INSERT')))
@@ -734,13 +761,13 @@ BEGIN
     OR NOT pg_catalog.has_column_privilege('debateai_billing_runtime', 'billing.outbox', 'done_at', 'UPDATE')
     OR NOT pg_catalog.has_column_privilege('debateai_billing_runtime', 'billing.outbox', 'not_before', 'UPDATE')
     OR pg_catalog.has_column_privilege('debateai_billing_runtime', 'billing.outbox', 'payload', 'UPDATE') THEN
-    RAISE EXCEPTION 'BILLING_0096_BILLING_ROLE_INCOMPLETE %', v_billing_missing;
+    RAISE EXCEPTION 'BILLING_0109_BILLING_ROLE_INCOMPLETE %', v_billing_missing;
   END IF;
 
   IF NOT pg_catalog.has_function_privilege('debateai_billing_runtime', 'billing.purge_short_lived(timestamptz)', 'EXECUTE')
     OR NOT pg_catalog.has_function_privilege('debateai_billing_runtime', 'billing.purge_revoked_card_tokens(timestamptz)', 'EXECUTE')
     OR NOT pg_catalog.has_function_privilege('debateai_billing_runtime', 'billing.purge_expired_records(timestamptz)', 'EXECUTE') THEN
-    RAISE EXCEPTION 'BILLING_0096_PURGE_GRANTS_INVALID';
+    RAISE EXCEPTION 'BILLING_0109_PURGE_GRANTS_INVALID';
   END IF;
 END
-$billing_0096_contract$;
+$billing_0109_contract$;

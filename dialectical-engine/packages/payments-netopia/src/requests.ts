@@ -17,7 +17,7 @@ export type RequestContext = Readonly<{ posSignature: string; now: Date }>;
 
 /** N-3: the indicator of a merchant-initiated payment, on saved-card charges only. */
 const SCA_EXEMPTION_MIT = "MIT";
-/** Our charge id (32 lower-case hex), or an N22 tool order (`t-` + 30 lower-case hex, 0096's CHECK). */
+/** Our charge id (32 lower-case hex), or an N22 tool order (`t-` + 30 lower-case hex, 0109's CHECK). */
 const ORDER_ID = /^(?:[0-9a-f]{32}|t-[0-9a-f]{30})$/u;
 const CLIENT_ID = /^[0-9a-f]{32}$/u;
 const E164 = /^\+[0-9]{8,15}$/u;

@@ -7,6 +7,8 @@ const root = fileURLToPath(new URL("../..", import.meta.url));
 const migration = "migrations/0095_registration_region.sql";
 const forwardContract = "migrations/0107_auth_dev_integration.sql";
 const verifier = "migrations/lineage/verify-effective-capabilities.sql";
+// PR-54: the verifier that supersedes the sealed one once forward step 0109 is applied keeps its checks unchanged.
+const supersedingVerifier = "migrations/lineage/verify-effective-capabilities-109.sql";
 const writer = "packages/db/src/identity.ts";
 const socialWriter = "packages/db/src/social-identity.ts";
 
@@ -24,10 +26,11 @@ function source(path: string): string {
 describe("registration region scope", () => {
   it("S1 keeps region writes in the two bounded account-creation paths and reads in the verifier", () => {
     const references = productionFiles().filter((path) => source(path).includes("registration_region"));
-    expect(references.sort()).toEqual([migration, forwardContract, verifier, writer, socialWriter]);
+    expect(references.sort()).toEqual([migration, forwardContract, verifier, supersedingVerifier, writer, socialWriter].sort());
 
     const contractSource = source(forwardContract);
     expect(source(verifier)).toContain("identity.record_registration_region(uuid,text,text)");
+    expect(source(supersedingVerifier)).toContain("identity.record_registration_region(uuid,text,text)");
     const socialHelper = /CREATE OR REPLACE FUNCTION identity\.record_social_registration_region\([\s\S]*?END \$\$;/i.exec(contractSource)?.[0];
     expect(socialHelper).toContain('INSERT INTO identity.registration_region(user_id,country_code,us_state)');
     expect(contractSource.replace(socialHelper!, '')).not.toMatch(/\b(?:FROM|JOIN|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+identity\.registration_region\b/i);

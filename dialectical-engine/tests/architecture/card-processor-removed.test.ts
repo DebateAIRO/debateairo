@@ -42,19 +42,21 @@ const HISTORY_PREFIXES: ReadonlyArray<string> = Object.freeze([
   // The go-live checklist, the final reviews' open items and the owner's sign-offs.
   "dialectical-engine/docs/missions/"
 ]);
-/** Applied migrations are never edited; 0096 supersedes their objects and names the old provider's value. */
+/** Applied migrations are never edited; 0109 supersedes their objects and names the old provider's value. */
 const MIGRATIONS: ReadonlyArray<string> = Object.freeze([
   "0084_billing_entitlement.sql", "0085_billing_customers_subscriptions.sql", "0086_billing_charges_invoices.sql",
   "0087_billing_outbox_cancel.sql", "0088_billing_withdrawal_step_up.sql", "0092_billing_query_indexes.sql",
-  "0093_billing_runtime_role.sql", "0096_billing_netopia.sql"
+  "0093_billing_runtime_role.sql", "0109_billing_netopia.sql"
 ].map((name) => `dialectical-engine/migrations/${name}`)).concat([
   // dev's auth lineage (merged at dedbb2d50): 0093's compatibility executable and the effective-capability verifier,
   // both bound by SHA-256 in migrations/lineage/auth-dev-20261006.json, list the billing tables 0085-0087 created.
   "dialectical-engine/migrations/compatibility/auth-dev-20261006/0093_billing_runtime_role.sql",
-  "dialectical-engine/migrations/lineage/verify-effective-capabilities.sql"
+  "dialectical-engine/migrations/lineage/verify-effective-capabilities.sql",
+  // PR-54: its successor once 0109 is applied, whose closed relation list still names those tables.
+  "dialectical-engine/migrations/lineage/verify-effective-capabilities-109.sql"
 ]);
 /**
- * The suites that seed rows of the old provider and prove 0096 keeps them inert, and (PR-33) the proof that a live boot
+ * The suites that seed rows of the old provider and prove 0109 keeps them inert, and (PR-33) the proof that a live boot
  * still counts that era's open rows as another payment system's (spec 2026-10-05 §2.5.4).
  */
 const HISTORY_TESTS: ReadonlyArray<string> = Object.freeze([
@@ -71,7 +73,7 @@ const UNTIL_RUNBOOK: ReadonlyArray<string> = Object.freeze([
 ]);
 /**
  * Code that names the old provider only to recognise what it left: the outbox kind and the provider value 0087 and
- * 0096 keep for old rows, an old CREATED's environment, the removed settings a boot warns about. Every line of these
+ * 0109 keep for old rows, an old CREATED's environment, the removed settings a boot warns about. Every line of these
  * files that names it must match its pattern.
  */
 const CODE_LINES: Readonly<Record<string, RegExp>> = Object.freeze({

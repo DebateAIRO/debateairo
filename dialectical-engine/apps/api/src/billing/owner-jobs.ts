@@ -82,7 +82,7 @@ export class OwnerJobs {
     return [
       () => this.queueTaxSummary(now),
       ...(refunds === undefined ? [] : [() => refunds.remindOwnerRefunds(now)]),
-      // N17: the sweep first, so a token it revokes today is purged one day later (0096's purge rule).
+      // N17: the sweep first, so a token it revokes today is purged one day later (0109's purge rule).
       ...(custody === undefined ? [] : [async () => (await custody.sweep(now)).revoked, () => custody.purge(now)])
     ];
   }

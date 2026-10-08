@@ -1,4 +1,5 @@
 import { applyForward108, base108Lineage } from "./migration-forward108.js";
+import { applyForwardChain, effectiveForwardVerifierSql } from "./migration-forward-chain.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
@@ -1095,8 +1096,12 @@ export async function migrate(pool: Pool): Promise<void> {
       const final = await lineageEvidence(client);
       await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[final,compat.logicalName]);
     }
-    await client.query(plan.effectiveCapabilityVerifierSql);
+    // PR-54: once a forward step after 0108 is applied, its verifier supersedes the sealed one (lineage/README.md).
+    const forwardVerifierSql = effectiveForwardVerifierSql(plan, appliedSet);
+    if (forwardVerifierSql === undefined) await client.query(plan.effectiveCapabilityVerifierSql);
+    else await client.query(forwardVerifierSql);
     await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
+    await applyForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]));
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");

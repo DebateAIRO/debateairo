@@ -1,16 +1,22 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
+import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
+import { seedDevLineage108 } from "../support/devLineage108.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * Spec 2026-10-05 §2.5 and review finding SR-16: 0096 applies on a database that already holds xMoney-era rows (the
- * dev-stack fakes leave them), keeps them as inert history, can run twice, and repeats 0093's grant contract.
+ * Spec 2026-10-05 §2.5 and review finding SR-16: 0109 applies on a database that already holds xMoney-era rows (the
+ * dev-stack fakes leave them), keeps them as inert history, can run twice, and repeats 0093's grant contract. PR-54
+ * (task N26n): it is the forward step after dev's 0108, applied once on a database dev's lineage left, with its own
+ * receipt and the verifier that supersedes dev's sealed one.
  */
 const MIGRATIONS = new URL("../../migrations/", import.meta.url);
-const NETOPIA_MIGRATION = "0096_billing_netopia.sql";
+const NETOPIA_MIGRATION = "0109_billing_netopia.sql";
+const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-109.sql";
+const SEALED_VERIFIER = "lineage/verify-effective-capabilities.sql";
 const KEY_ID = "0123456789abcdef";
 const SEALED = Buffer.from([1, 2, 3, 4]);
 const thisYear = new Date().getUTCFullYear();
@@ -32,28 +38,20 @@ const legacy = {
 } as const;
 const query = (sql: string, values: unknown[] = []) => database.pool.query(sql, values);
 
-/** Every migration before 0096, recorded as `migrate` records it, so `migrate` then applies 0096 alone. */
-async function applyMigrationsBefore(name: string): Promise<void> {
-  const files = (await readdir(MIGRATIONS)).filter((file) => /^\d+.*\.sql$/u.test(file)).sort();
-  const client = await database.pool.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query(`CREATE TABLE IF NOT EXISTS public.debateai_schema_migration (
-      name text PRIMARY KEY CHECK (length(btrim(name)) > 0), applied_at timestamptz NOT NULL)`);
-    for (const file of files.filter((candidate) => candidate < name)) {
-      await client.query(await readFile(new URL(file, MIGRATIONS), "utf8"));
-      await client.query("INSERT INTO public.debateai_schema_migration (name, applied_at) VALUES ($1, statement_timestamp())", [file]);
-    }
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+/** The private ledgers migrate() keeps, read as they are. */
+async function migrationLedgers(): Promise<Record<string, unknown>> {
+  const read = async (table: string, order: string) => (await query(`SELECT to_regclass($1) IS NOT NULL AS present`, [table])).rows[0].present
+    ? (await query(`SELECT * FROM ${table} ORDER BY ${order}`)).rows : null;
+  return {
+    ledger: await read("public.debateai_schema_migration", "name"),
+    resolutions: await read("public.debateai_schema_migration_resolution", "logical_name"),
+    forward108: await read("public.debateai_schema_migration_forward", "source_name"),
+    steps: await read("public.debateai_schema_migration_step", "source_name")
+  };
 }
+let ledgersBefore: Record<string, unknown>;
 
-/** What a 0095 database holds after a dev-stack xMoney plan, a card-check payment and a refund request. */
+/** What a dev-lineage database (dedbb2d50) holds after a dev-stack xMoney plan, a card-check payment and a refund request. */
 async function seedXMoneyEraRows(): Promise<void> {
   await query(`INSERT INTO billing.subscription_event (event_id, subscription_id, owner_ref, kind, at, plan_id, data)
     VALUES ($1, $2, $3, 'CREATED', $4, 'PLUS', jsonb_build_object('xmoney_environment', 'stage'))`,
@@ -80,8 +78,9 @@ async function seedXMoneyEraRows(): Promise<void> {
 
 beforeAll(async () => {
   database = await startTestDatabase();
-  await applyMigrationsBefore(NETOPIA_MIGRATION);
+  await seedDevLineage108(database.pool);
   await seedXMoneyEraRows();
+  ledgersBefore = await migrationLedgers();
   await migrate(database.pool);
 }, 600_000);
 afterAll(async () => { await database?.stop(); });
@@ -147,7 +146,7 @@ async function cardToken(input: Readonly<{ sourceChargeId?: string | null; toolO
   return tokenId;
 }
 
-describe("N6 — 0096 over an xMoney-era database (spec §2.5, §2.5.4)", () => {
+describe("N6 — 0109 over an xMoney-era database (spec §2.5, §2.5.4)", () => {
   it("keeps the xMoney-era rows as inert history: marked xmoney, renamed columns, the same values", async () => {
     expect((await query("SELECT payment_provider, payment_environment FROM billing.charge WHERE charge_id = $1", [legacy.chargeId])).rows)
       .toEqual([{ payment_provider: "xmoney", payment_environment: "stage" }]);
@@ -162,7 +161,7 @@ describe("N6 — 0096 over an xMoney-era database (spec §2.5, §2.5.4)", () => 
       [legacy.subscriptionId])).rows).toEqual([{ kind: "CREATED", card_token_id: null }, { kind: "ACTIVATED", card_token_id: null }]);
   });
   it("makes every new charge and charge event name its provider: no default, no old column (SR-16 (a))", async () => {
-    // 0096's own verify block also refuses a default or a NULL left on either column.
+    // 0109's own verify block also refuses a default or a NULL left on either column.
     expect((await query(`SELECT column_name FROM information_schema.columns WHERE table_schema = 'billing'
       AND table_name IN ('charge', 'charge_event') AND column_name LIKE 'xmoney%'`)).rows).toEqual([]);
     await expect(query(`INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start,
@@ -408,7 +407,7 @@ describe("N6 — the sanctioned deletes (A15, spec §2.5.2, §2.15.4)", () => {
   });
 });
 
-describe("N6 — 0096 runs twice and repeats 0093's contract (spec §2.2 rule 3, SR-16 (c), (d))", () => {
+describe("N6 — 0109 runs twice and repeats 0093's contract (spec §2.2 rule 3, SR-16 (c), (d))", () => {
   const catalogue = async (): Promise<string[]> => (await query(`
     SELECT 'c:' || conrelid::regclass::text || ':' || conname || ':' || pg_catalog.pg_get_constraintdef(oid) AS item
       FROM pg_catalog.pg_constraint WHERE connamespace = 'billing'::regnamespace OR conrelid = 'legal.acceptance'::regclass
@@ -440,17 +439,161 @@ describe("N6 — 0096 runs twice and repeats 0093's contract (spec §2.2 rule 3,
     expect(await catalogue()).toEqual(before);
     expect((await query("SELECT (SELECT count(*) FROM billing.charge) AS c, (SELECT count(*) FROM billing.charge_event) AS e")).rows).toEqual(counted);
   });
-  it("0096's contract refuses a billing role missing one grant, a shared role holding any, and a purge granted wrongly", async () => {
+  it("0109's contract refuses a billing role missing one grant, a shared role holding any, and a purge granted wrongly", async () => {
     const source = await readFile(new URL(NETOPIA_MIGRATION, MIGRATIONS), "utf8");
-    const contract = /DO \$billing_0096_contract\$[\s\S]*?\$billing_0096_contract\$;/u.exec(source)?.[0];
+    const contract = /DO \$billing_0109_contract\$[\s\S]*?\$billing_0109_contract\$;/u.exec(source)?.[0];
     expect(contract).toBeDefined();
     const replay = (drift: string) => inTransaction(`${drift};\n${contract!}`, false);
     expect(await replay("SELECT 1")).toBe("accepted");
-    expect(await replay("REVOKE INSERT ON billing.card_token FROM debateai_billing_runtime")).toMatch(/^BILLING_0096_BILLING_ROLE_INCOMPLETE card_token$/u);
-    expect(await replay("GRANT INSERT ON billing.status_read TO debateai_runtime")).toMatch(/^BILLING_0096_RUNTIME_WRITES/u);
-    expect(await replay("GRANT SELECT ON billing.payment_notice TO debateai_runtime")).toMatch(/^BILLING_0096_RUNTIME_READS /u);
-    expect(await replay("GRANT EXECUTE ON FUNCTION billing.purge_short_lived(timestamptz) TO debateai_runtime")).toMatch(/^BILLING_0096_RUNTIME_FUNCTIONS /u);
+    expect(await replay("REVOKE INSERT ON billing.card_token FROM debateai_billing_runtime")).toMatch(/^BILLING_0109_BILLING_ROLE_INCOMPLETE card_token$/u);
+    expect(await replay("GRANT INSERT ON billing.status_read TO debateai_runtime")).toMatch(/^BILLING_0109_RUNTIME_WRITES/u);
+    expect(await replay("GRANT SELECT ON billing.payment_notice TO debateai_runtime")).toMatch(/^BILLING_0109_RUNTIME_READS /u);
+    expect(await replay("GRANT EXECUTE ON FUNCTION billing.purge_short_lived(timestamptz) TO debateai_runtime")).toMatch(/^BILLING_0109_RUNTIME_FUNCTIONS /u);
     expect(await replay("REVOKE EXECUTE ON FUNCTION billing.purge_revoked_card_tokens(timestamptz) FROM debateai_billing_runtime"))
-      .toBe("BILLING_0096_PURGE_GRANTS_INVALID");
+      .toBe("BILLING_0109_PURGE_GRANTS_INVALID");
   });
+});
+
+describe("N26n — 0109 is the forward step after dev's 0108, with its receipt and its superseding verifier (PR-54)", () => {
+  const inTransaction = async (sql: string): Promise<string> => {
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(sql);
+      return "accepted";
+    } catch (error) {
+      return (error as Error).message;
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+  };
+  const verifier = async (path: string): Promise<string> => readFile(new URL(path, MIGRATIONS), "utf8");
+  const receiptOf = async (pool = database.pool) =>
+    (await pool.query("SELECT * FROM public.debateai_schema_migration_step ORDER BY source_name")).rows;
+
+  it("applies 0109 once over dev's 0108 lineage, records its ledger row and its receipt, and leaves 0108's alone", async () => {
+    const plan = await loadMigrationPlan();
+    const [step] = plan.forwardChain;
+    const before = ledgersBefore as { ledger: Array<{ name: string }>; forward108: unknown[]; steps: unknown };
+    expect(before.ledger.map((row) => row.name)).toEqual([...plan.manifest.order, plan.forward108.name].sort());
+    expect(before.steps).toBeNull();
+    const after = await migrationLedgers() as { ledger: Array<{ name: string }>; forward108: unknown[]; steps: Array<Record<string, unknown>> };
+    expect(after.ledger.map((row) => row.name)).toEqual([...before.ledger.map((row) => row.name), NETOPIA_MIGRATION].sort());
+    expect(after.ledger.filter((row) => row.name !== NETOPIA_MIGRATION)).toEqual(before.ledger);
+    expect(after.forward108).toEqual(before.forward108);
+    expect(after.steps).toHaveLength(1);
+    expect(after.steps[0]).toMatchObject({
+      source_name: NETOPIA_MIGRATION, base_recipe_sha256: plan.recipeSha256,
+      previous_manifest_sha256: plan.forward108.manifestSha256, forward_manifest_sha256: step!.manifestSha256,
+      source_sha256: step!.sourceSha256, verifier_sha256: step!.verifierSha256
+    });
+    // Private to the installer, as 0108's receipt is.
+    for (const role of ["debateai_runtime", "debateai_billing_runtime", "debateai_authorization_runtime"]) {
+      expect((await query("SELECT has_table_privilege($1, 'public.debateai_schema_migration_step', 'SELECT,INSERT,UPDATE,DELETE') AS any",
+        [role])).rows[0].any, role).toBe(false);
+    }
+  });
+
+  it("holds under the superseding verifier, which the sealed one cannot (NETOPIA's tables are outside its closed list)", async () => {
+    expect(await inTransaction(await verifier(SUPERSEDING_VERIFIER))).toBe("accepted");
+    expect(await inTransaction(await verifier(SEALED_VERIFIER))).toBe("AUTH_DEV_107_RELATION_INVENTORY");
+  });
+
+  it("a second migrate() is a no-op: same ledgers, same receipts, same billing catalogue", async () => {
+    const catalogue = async () => (await query(`
+      SELECT 'c:' || conrelid::regclass::text || ':' || conname || ':' || pg_catalog.pg_get_constraintdef(oid) AS item
+        FROM pg_catalog.pg_constraint WHERE connamespace = 'billing'::regnamespace
+      UNION ALL SELECT 'f:' || oid::regprocedure::text || ':' || md5(prosrc) FROM pg_catalog.pg_proc WHERE pronamespace = 'billing'::regnamespace
+      UNION ALL SELECT 'g:' || table_name || ':' || grantee || ':' || privilege_type FROM information_schema.role_table_grants
+        WHERE table_schema = 'billing'
+      ORDER BY 1`)).rows.map((row) => row.item as string);
+    const [ledgers, objects] = [await migrationLedgers(), await catalogue()];
+    await migrate(database.pool);
+    expect(await migrationLedgers()).toEqual(ledgers);
+    expect(await catalogue()).toEqual(objects);
+  });
+
+  it("the superseding verifier refuses a NETOPIA table or purge granted to a wrong role, and an unexpected billing function", async () => {
+    const sql = await verifier(SUPERSEDING_VERIFIER);
+    const drift = (change: string) => inTransaction(`${change};\n${sql}`);
+    expect(await drift("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime")).toBe("BILLING_NETOPIA_109_TABLE_PRIVILEGE card_token");
+    expect(await drift("GRANT SELECT (order_id) ON billing.tool_order TO debateai_replay")).toBe("BILLING_NETOPIA_109_TABLE_PRIVILEGE tool_order");
+    expect(await drift("GRANT SELECT ON billing.status_read TO debateai_billing_runtime WITH GRANT OPTION")).toBe("BILLING_NETOPIA_109_TABLE_PRIVILEGE status_read");
+    expect(await drift("GRANT UPDATE ON billing.hosted_payment TO debateai_billing_runtime")).toBe("MIGRATION_EFFECTIVE_CAPABILITY_DRIFT");
+    expect(await drift("GRANT SELECT ON billing.payment_notice TO debateai_runtime")).toBe("AUTH_DEV_107_RETAIL_RUNTIME_PRIVILEGE");
+    expect(await drift("GRANT EXECUTE ON FUNCTION billing.purge_short_lived(timestamptz) TO debateai_authorization_runtime"))
+      .toBe("BILLING_NETOPIA_109_FUNCTION_PRIVILEGE billing.purge_short_lived(timestamptz)");
+    expect(await drift("CREATE FUNCTION billing.unexpected_entry() RETURNS integer LANGUAGE sql AS 'SELECT 1'"))
+      .toBe("AUTH_DEV_107_RUNTIME_FUNCTION_INVENTORY");
+    expect(await drift(`CREATE FUNCTION billing.unexpected_entry() RETURNS integer LANGUAGE sql AS 'SELECT 1';
+      REVOKE ALL ON FUNCTION billing.unexpected_entry() FROM PUBLIC;
+      GRANT EXECUTE ON FUNCTION billing.unexpected_entry() TO debateai_billing_runtime`)).toBe("MIGRATION_EFFECTIVE_CAPABILITY_DRIFT");
+    expect(await drift("CREATE TABLE billing.unexpected_table (id integer)")).toBe("AUTH_DEV_107_RELATION_INVENTORY");
+  });
+
+  it("migrate() replays through the superseding verifier and 0109's receipt, refusing drift and keeping history", async () => {
+    await query("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime");
+    try {
+      await expect(migrate(database.pool)).rejects.toThrow("BILLING_NETOPIA_109_TABLE_PRIVILEGE card_token");
+    } finally {
+      await query("REVOKE SELECT ON billing.card_token FROM debateai_authorization_runtime");
+    }
+    const [receipt] = await receiptOf();
+    for (const field of ["source_sha256", "forward_manifest_sha256", "previous_manifest_sha256", "precondition_evidence_digest"]) {
+      await query(`UPDATE public.debateai_schema_migration_step SET ${field} = repeat('0', 64)`);
+      try {
+        await expect(migrate(database.pool), field).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_RECEIPT_BINDING_DRIFT ${NETOPIA_MIGRATION}`);
+      } finally {
+        await query(`UPDATE public.debateai_schema_migration_step SET ${field} = $1`, [receipt[field]]);
+      }
+    }
+    await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = repeat('0', 64)");
+    try {
+      await expect(migrate(database.pool)).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${NETOPIA_MIGRATION}`);
+    } finally {
+      await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = $1", [receipt.postcondition_evidence_digest]);
+    }
+    await query("DELETE FROM public.debateai_schema_migration_step");
+    try {
+      await expect(migrate(database.pool)).rejects.toThrow("MIGRATION_FORWARD_CHAIN_RECEIPT_BINDING_DRIFT");
+    } finally {
+      await query("INSERT INTO public.debateai_schema_migration_step VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", Object.values(receipt));
+    }
+    // 0109 recorded without 0108 is no lineage at all.
+    const ledger108 = (await query("DELETE FROM public.debateai_schema_migration WHERE name = '0108_preview_recovery_verified_bindings.sql' RETURNING name, applied_at")).rows[0];
+    try {
+      await expect(migrate(database.pool)).rejects.toThrow("MIGRATION_LINEAGE_REFUSED FORWARD_CHAIN_BASE");
+    } finally {
+      await query("INSERT INTO public.debateai_schema_migration VALUES ($1, $2)", [ledger108.name, ledger108.applied_at]);
+    }
+    await query("GRANT SELECT ON public.debateai_schema_migration_step TO debateai_authorization_runtime");
+    try {
+      await expect(migrate(database.pool)).rejects.toThrow("MIGRATION_FORWARD_CHAIN_RECEIPT_ACL_DRIFT");
+    } finally {
+      await query("REVOKE SELECT ON public.debateai_schema_migration_step FROM debateai_authorization_runtime");
+    }
+    await migrate(database.pool);
+    expect(await receiptOf()).toEqual([receipt]);
+  });
+
+  it("migrates a fresh database through 0108 and 0109, and a second migrate() is a no-op", async () => {
+    const fresh = await startTestDatabase();
+    try {
+      await migrate(fresh.pool);
+      const plan = await loadMigrationPlan();
+      const names = (await fresh.pool.query("SELECT name FROM public.debateai_schema_migration ORDER BY name")).rows.map((row) => row.name);
+      const resolved = (await fresh.pool.query("SELECT logical_name FROM public.debateai_schema_migration_resolution ORDER BY logical_name")).rows
+        .map((row) => row.logical_name);
+      expect([...names, ...resolved].sort()).toEqual([...plan.manifest.order, plan.forward108.name, NETOPIA_MIGRATION].sort());
+      const receipts = await receiptOf(fresh.pool);
+      expect(receipts.map((row) => row.source_name)).toEqual([NETOPIA_MIGRATION]);
+      const before = (await fresh.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
+      await migrate(fresh.pool);
+      expect((await fresh.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(before);
+      expect(await receiptOf(fresh.pool)).toEqual(receipts);
+    } finally {
+      await fresh.stop();
+    }
+  }, 600_000);
 });

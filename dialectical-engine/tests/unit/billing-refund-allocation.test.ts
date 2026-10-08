@@ -66,7 +66,7 @@ describe("P9b the refund split, newest transaction first (A4b)", () => {
       { kind: "REFUND_REQUESTED", providerPaymentId: "6", amountMicros: 24_200_000, errorCode: "DUPLICATE_PAYMENT" },
       { kind: "REFUNDED", providerPaymentId: "6", amountMicros: 24_200_000, errorCode: "DUPLICATE_PAYMENT" },
       // D5 5g: a withdrawal refund recorded as its own transaction "7", refunding payment "5" (the previous card
-      // processor's shape; 0096 keeps refunds_transaction_id NULL on NETOPIA rows, and old rows still read this way).
+      // processor's shape; 0109 keeps refunds_transaction_id NULL on NETOPIA rows, and old rows still read this way).
       { kind: "REFUND_REQUESTED", providerPaymentId: "5", amountMicros: 3_000_000, errorCode: "WITHDRAWAL" },
       { kind: "REFUNDED", providerPaymentId: "7", refundsTransactionId: "5", amountMicros: 3_000_000, errorCode: "WITHDRAWAL" }
     ])];

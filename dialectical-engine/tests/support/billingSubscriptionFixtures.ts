@@ -144,7 +144,7 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
     const base = { subscriptionId, ownerRef: input.ownerRef, planId: input.planId } as const;
     await billing.appendSubscriptionEvent(client, {
       ...base, eventId: randomUUID(), kind: "CREATED", at: checkoutAt, periodAnchorAt: null, cardTokenId: null,
-      // 0096 `subscription_event_created_names_payment_system`: a NETOPIA CREATED names both keys (spec §2.5.1).
+      // 0109 `subscription_event_created_names_payment_system`: a NETOPIA CREATED names both keys (spec §2.5.1).
       data: {
         country_confirmed: false, ip_country: input.taxCountry, quote_id: initialQuoteId,
         payment_provider: "netopia", payment_environment: environment

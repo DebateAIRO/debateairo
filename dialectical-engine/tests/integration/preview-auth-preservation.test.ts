@@ -1,7 +1,7 @@
 import { PostgresPasswordResetRepository } from '../../packages/db/src/password-reset.js';
 import { PostgresBackupEmailRepository,PostgresMfaRecoveryRepository } from '../../packages/db/src/email-mfa-recovery.js';
 import type { AuditContextHasher } from '@debateai/crypto';
-import { readFile,cp,mkdtemp,mkdir,writeFile,rm } from 'node:fs/promises';
+import { readFile,readdir,cp,mkdtemp,mkdir,writeFile,rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -274,7 +274,8 @@ it('source/manifest/old recipe drift refuses from a bounded source copy before a
  const root=await mkdtemp(join(tmpdir(),'preview-source-108-'));
  try{
   await mkdir(join(root,'packages/db/src'),{recursive:true});
-  for(const name of ['migration-lineage.ts','migration-forward108.ts'])await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
+  // PR-54: the lineage loader also loads the forward chain after 0108 (migration-forward-chain.ts and its steps).
+  for(const name of (await readdir(new URL('../../packages/db/src/',import.meta.url))).filter(entry=>/^migration-.*\.ts$/.test(entry)))await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
   await cp(new URL('../../migrations',import.meta.url),join(root,'migrations'),{recursive:true});
   const script=join(root,'probe.mts');await writeFile(script,`import {loadMigrationPlan} from './packages/db/src/migration-lineage.ts'; await loadMigrationPlan();`);
   const run=()=>promisify(execFile)(process.execPath,['--import','tsx',script],{cwd:process.cwd(),timeout:30000,maxBuffer:100000});

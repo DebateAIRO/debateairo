@@ -1,0 +1,17 @@
+{
+  "version": "billing-netopia-forward109-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0108_preview_recovery_verified_bindings.sql",
+    "manifestSha256": "cf892973f467aa1260aeb5acd17941b5a8e1ca11ff7c61282528b20c41295eba",
+    "verifierSha256": "efeddf3d398eef8f6b47e1b1c5820f9ee5f551a7404e65135b5a4e0c70157944"
+  },
+  "migration": {
+    "name": "0109_billing_netopia.sql",
+    "sha256": "67188a6bb9376efa2e920e0ec13a0bc64620d7c3deed4121d7271f640c3adb9d"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-109.sql",
+    "sha256": "919e4bd6e44460407fdbc40ba676f051582441f638b614a90709d26dd6895d6b"
+  }
+}

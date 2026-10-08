@@ -117,7 +117,7 @@ describe("N17 the daily sweep (spec §2.15.4)", () => {
         withdrew_at: withdrewAt.toISOString()
       }));
     });
-    // 0096's purge deletes a token one day after its revocation by the database's own clock (it never trusts a later
+    // 0109's purge deletes a token one day after its revocation by the database's own clock (it never trusts a later
     // `now`: LEAST(p_now, clock_timestamp())), so this sweep runs as of two days ago and the purge runs now.
     await custodyOf().sweep(new Date(Date.now() - 2 * DAY));
     expect(await revocation(seeded.cardTokenId)).toBe("PLAN_ENDED");
