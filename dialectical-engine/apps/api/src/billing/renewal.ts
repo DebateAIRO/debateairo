@@ -20,8 +20,7 @@ import { queuePaymentAlert } from "./payment-alert.js";
 import { taxRefusalDetail } from "./quote.js";
 import { openCardToken, openQuoteLocation, sealCardToken, sealQuoteLocation, type QuoteLocation } from "./records.js";
 import {
-  dunningProgress, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingMs,
-  renewalPendingUntil, unverifiedLookBackMs
+  dunningProgress, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingUntil
 } from "./renewal-rules.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "./rows.js";
 import type { ChargeSettlement } from "./settlement.js";

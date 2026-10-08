@@ -53,11 +53,3 @@ export const REFUND_REASONS_REFUSING_THE_PAYMENT: ReadonlySet<BillingRefundReaso
 ]);
 
 export type ChargeFailureCode = "PAYMENT_DECLINED" | "VOIDED" | "REBILL_REFUSED" | "NO_TRANSACTION";
-
-/**
- * `billing.payment_notice_outcome.outcome` (A21). `UNRECORDED_REFUND` (P9c): a second refund made elsewhere on a
- * payment that already holds one, which P1a's one-request-per-transaction key cannot record; handed to the owner.
- */
-export type NoticeOutcome =
-  | "APPLIED" | "DUPLICATE" | "MISMATCH" | "FAILED" | "REFUNDING" | "REFUNDED" | "CHARGEBACK" | "REPRESENTED"
-  | "UNRECORDED_REFUND";

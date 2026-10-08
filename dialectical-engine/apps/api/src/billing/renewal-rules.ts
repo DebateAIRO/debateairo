@@ -28,15 +28,6 @@ export function renewalPendingUntil(
 }
 
 /**
- * How far back the unverified-renewal pass looks for a period start: the 72 hours of Q-1 past a due instant that A7's
- * notice may have pushed `noticeBusinessDays` business days out (two calendar days per business day and a weekend
- * either side always covers it, with no holiday table, Q-6). `holdPending` decides the exact window per renewal.
- */
-export function unverifiedLookBackMs(noticeBusinessDays: number): number {
-  return renewalPendingMs() + (2 * noticeBusinessDays + 3) * 86_400_000;
-}
-
-/**
  * Where a subscription's dunning stands, read from the history, never from charge rows (Q-1: an attempt the tax
  * service could not price has none): when its first attempt failed (the latest PAST_DUE's `first_failed_at`, else the
  * fold's `pastDueSince`), when the latest attempt failed (that PAST_DUE's own `at`) and how many attempts failed (its

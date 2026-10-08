@@ -1604,13 +1604,4 @@ export class BillingRepository {
     const row = (await this.pool.query<{ purged: string }>("SELECT billing.purge_short_lived($1) AS purged", [now])).rows[0];
     return Number(row?.purged ?? "0");
   }
-
-  private async chargesById(chargeIds: readonly string[]): Promise<Array<ChargeRow & { events: ChargeEventRow[] }>> {
-    const charges: Array<ChargeRow & { events: ChargeEventRow[] }> = [];
-    for (const chargeId of chargeIds) {
-      const charge = await this.charge(chargeId);
-      if (charge !== null) charges.push(charge);
-    }
-    return charges;
-  }
 }
