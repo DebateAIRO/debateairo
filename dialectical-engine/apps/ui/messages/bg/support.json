@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Поверителност",
   "support.aiBanner": "Отговорите са генерирани от ИИ, обозначени са в машинночетим вид и може да са погрешни. По всяко време можете да поискате разговор с човек.",
   "support.cookiePreferences": "Бисквитките, които съхраняваме",
-  "support.recoverAccount": "Възстановете акаунта си"
+  "support.recoverAccount": "Възстановете акаунта си",
+  "support.countryUnavailable": "Dialectical Engine все още не е достъпен във вашата държава."
 }

@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "na díospóireachtaí",
   "INCIDENT_SURFACE_PUBLISHING": "an fhoilsitheoireacht",
   "INCIDENT_SURFACE_SIGN_IN": "an síniú isteach",
-  "INCIDENT_SURFACE_WHOLE_SITE": "an suíomh iomlán"
+  "INCIDENT_SURFACE_WHOLE_SITE": "an suíomh iomlán",
+  "COUNTRY_UNAVAILABLE": "Níl Dialectical Engine ar fáil i do thír fós."
 }

@@ -82,5 +82,6 @@
   "support.privacyPreferences": "गोपनीयता",
   "support.aiBanner": "उत्तर AI द्वारा जनरेट किए गए हैं, मशीन-पठनीय रूप में चिह्नित हैं और गलत हो सकते हैं। आप कभी भी किसी व्यक्ति से सहायता माँग सकते हैं।",
   "support.cookiePreferences": "हमारे द्वारा संग्रहीत कुकी",
-  "support.recoverAccount": "अपना खाता पुनः प्राप्त करें"
+  "support.recoverAccount": "अपना खाता पुनः प्राप्त करें",
+  "support.countryUnavailable": "Dialectical Engine अभी आपके देश में उपलब्ध नहीं है।"
 }

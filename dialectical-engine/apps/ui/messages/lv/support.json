@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Privātums",
   "support.aiBanner": "Atbildes ģenerē MI, tās ir mašīnlasāmi marķētas un var būt kļūdainas. Jebkurā brīdī varat lūgt cilvēka palīdzību.",
   "support.cookiePreferences": "Mūsu glabātās sīkdatnes",
-  "support.recoverAccount": "Atgūt kontu"
+  "support.recoverAccount": "Atgūt kontu",
+  "support.countryUnavailable": "Dialectical Engine jūsu valstī vēl nav pieejams."
 }

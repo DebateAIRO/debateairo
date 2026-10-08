@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "vitákat",
   "INCIDENT_SURFACE_PUBLISHING": "a közzétételt",
   "INCIDENT_SURFACE_SIGN_IN": "a bejelentkezést",
-  "INCIDENT_SURFACE_WHOLE_SITE": "a teljes webhelyet"
+  "INCIDENT_SURFACE_WHOLE_SITE": "a teljes webhelyet",
+  "COUNTRY_UNAVAILABLE": "A Dialectical Engine az Ön országában még nem érhető el."
 }

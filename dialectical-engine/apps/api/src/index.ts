@@ -1938,6 +1938,40 @@ function refreshedCookies(input: Readonly<{
   ]);
 }
 
+/** Paid plans G3a: the code sign-in and support answer where the service is not offered. */
+const COUNTRY_SERVICE_UNAVAILABLE = "COUNTRY_SERVICE_UNAVAILABLE";
+/** Every POST that can end in a new session. Cancel links ("this wasn't me") stay open everywhere. */
+const SIGN_IN_ROUTES: ReadonlySet<string> = new Set([
+  "/v1/auth/login",
+  "/v1/auth/passkeys/login/options",
+  "/v1/auth/passkeys/login/complete",
+  "/v1/auth/social/:provider/begin",
+  "/v1/auth/social/apple/callback",
+  "/v1/auth/social/login/status",
+  "/v1/auth/recovery/start",
+  "/v1/auth/recovery/prove",
+  "/v1/auth/recovery/enrollment/options",
+  "/v1/auth/recovery/enrollment/complete",
+  "/v1/auth/password-reset/start",
+  "/v1/auth/password-reset/exchange",
+  "/v1/auth/password-reset/complete",
+  "/v1/auth/mfa-recovery/start",
+  "/v1/auth/mfa-recovery/exchange"
+]);
+/**
+ * The onboarding steps after sign-up and recovery: without a session already held they end in a new
+ * one (an enrollment token, not a cookie, carries the caller), so they are sign-in doors too. With a
+ * session held they add a factor to it and stay open.
+ */
+const ONBOARDING_SIGN_IN_ROUTES: ReadonlySet<string> = new Set([
+  "/v1/auth/mfa/totp/begin",
+  "/v1/auth/mfa/totp/verify",
+  "/v1/auth/mfa/recovery-codes/generate",
+  "/v1/auth/mfa/recovery-codes/confirm",
+  "/v1/auth/passkeys/enrollment/options",
+  "/v1/auth/passkeys/enrollment/complete"
+]);
+
 export function buildApi(options: ApiOptions): FastifyInstance {
   const previewConfig=validatePreviewProviderTestConfig(options.previewProviderTestConfig);
   // Crisis check: compile its patterns now, not on the first question (about a second, once).
@@ -2206,6 +2240,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (request.method !== "POST" || !["/v1/auth/register","/v1/auth/social/signup/complete"].includes(request.routeOptions.url ?? "")) return;
     const countryRefusal = options.countryGate?.signup(sourceFor(request)) ?? null;
     if (countryRefusal !== null) return reply.status(403).send({ error: countryRefusal });
+  });
+  /**
+   * Paid plans G3a, sign-in: no new sign-in where the service is not offered (sign-up's rule — the
+   * address's switch, Tor, unknown). Every door that ends in a new session is closed there: password,
+   * passkey, social, account recovery, password reset, MFA recovery and onboarding without a session.
+   * A session already held, every
+   * read, and the "this wasn't me" cancel links are never gated. The answer is the code only.
+   */
+  api.addHook("preHandler", async (request, reply) => {
+    if (options.countryGate === undefined) return;
+    const route = request.routeOptions.url ?? "";
+    const isSignIn = request.method === "POST"
+      ? SIGN_IN_ROUTES.has(route) || (request.authenticatedSession === undefined && ONBOARDING_SIGN_IN_ROUTES.has(route))
+      : request.method === "GET" && route === "/v1/auth/social/:provider/callback";
+    if (!isSignIn || options.countryGate.service(sourceFor(request)) === null) return;
+    // A social callback is a browser navigation: the login page says why, in the visitor's language.
+    if (request.method === "GET" || route === "/v1/auth/social/apple/callback") return reply.redirect("/login", 303);
+    return reply.status(403).send({ error: COUNTRY_SERVICE_UNAVAILABLE });
   });
   /** Region picker S01 (SPEC R17, R18): parse the declared region after the IP gate and before age. */
   api.addHook("preHandler", async (request, reply) => {
@@ -3079,7 +3131,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // No gate composed (local mode, or hosted without countryPolicy): sign-up is open and payment is
     // not offered through this answer.
     return reply.send(GeoAvailabilityResponseSchema.parse(
-      options.countryGate?.availability(source.ip) ?? { signup: true, pay: false }
+      options.countryGate?.availability(source.ip) ?? { signup: true, pay: false, service: true }
     ));
   });
 
@@ -3636,7 +3688,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       || chargeAdmission(scope, route, key).allowed
   });
   installSupportRoutes(
-    api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport
+    api, options.support, (route: SupportRoutePath) => routePolicy(route), admitSupport,
+    // Paid plans G3a: no support assistant where the service is not offered (sign-up's rule).
+    (request) => (options.countryGate?.service(sourceFor(request)) ?? null) !== null
   );
   // Paid plans (R-3): the one billing routes module, always installed.
   const admitBilling: BillingAdmission = Object.freeze({

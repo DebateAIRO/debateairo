@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Gizlilik",
   "support.aiBanner": "Yanıtlar yapay zekâ tarafından üretilir, makinece okunabilir biçimde işaretlenir ve yanlış olabilir. İstediğiniz zaman bir insanla görüşmeyi talep edin.",
   "support.cookiePreferences": "Sakladığımız çerezler",
-  "support.recoverAccount": "Hesabınızı kurtarın"
+  "support.recoverAccount": "Hesabınızı kurtarın",
+  "support.countryUnavailable": "Dialectical Engine henüz ülkenizde kullanılamıyor."
 }

@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "dezbateri",
   "INCIDENT_SURFACE_PUBLISHING": "publicare",
   "INCIDENT_SURFACE_SIGN_IN": "autentificare",
-  "INCIDENT_SURFACE_WHOLE_SITE": "întregul site"
+  "INCIDENT_SURFACE_WHOLE_SITE": "întregul site",
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine nu este încă disponibil în țara dumneavoastră."
 }
