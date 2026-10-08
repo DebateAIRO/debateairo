@@ -10,7 +10,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { createSiteverifyRelay, fixedSiteverify, loadRelaySecret, relayConfiguration } from "../../deploy/turnstile/siteverify-relay.mjs";
+import { createSiteverifyRelay, fixedSiteverify, loadRelaySecret, relayConfiguration, relaySecretCustody } from "../../deploy/turnstile/siteverify-relay.mjs";
 const secret = "1x0000000000000000000000000000000AA";
 const response = { success: true, hostname: "v3-preview.dezbatere.ro", action: "signup", challenge_ts: new Date().toISOString(), "error-codes": [] };
 async function fixture(t, siteverify = async () => response) {
@@ -112,3 +112,38 @@ for (const [timestamp, now, expected] of [
 ]) test(`strict calendar validation of ${timestamp}`, () => {
   assert.equal(siteverifyOutcome({ ...response, challenge_ts: timestamp }, "signup", "v3-preview.dezbatere.ro", Date.parse(now)), expected);
 });
+
+function systemdCredentialMetadata() {
+  const entry = (tag, permissions, id = 4294967295) => ({ tag, permissions, id });
+  return {
+    uid: 978,
+    parent: { uid: 0, gid: 0, mode: 0o550, isDirectory: () => true, isSymbolicLink: () => false },
+    file: { uid: 0, gid: 0, mode: 0o440, nlink: 1, size: 64, isFile: () => true },
+    acl: { parent: { version: 2, entries: [entry(1,5),entry(2,5,978),entry(4,0),entry(16,5),entry(32,0)] },
+      file: { version: 2, entries: [entry(1,4),entry(2,4,978),entry(4,0),entry(16,4),entry(32,0)] } }
+  };
+}
+test("credential custody accepts the measured root-owned systemd ACL for only the service UID", () => {
+  const f = systemdCredentialMetadata();
+  assert.equal(relaySecretCustody(f.parent, f.file, f.uid, f.acl), "systemd");
+});
+test("credential custody keeps ordinary UID-owned 0700 directory and 0400 file support", () => {
+  const f = systemdCredentialMetadata();
+  assert.equal(relaySecretCustody({ ...f.parent, uid: f.uid, mode: 0o700 }, { ...f.file, uid: f.uid, mode: 0o400 }, f.uid), "owned");
+});
+for (const drift of ["extra-user", "extra-group", "wrong-user", "write", "group-read", "other-read", "version", "missing-mask", "parent-mode", "file-owner", "file-links"])
+  test(`systemd credential custody refuses ${drift}`, () => {
+    const f = systemdCredentialMetadata();
+    if (drift === "extra-user") f.acl.file.entries.push({ tag: 2, permissions: 4, id: 979 });
+    if (drift === "extra-group") f.acl.parent.entries.push({ tag: 8, permissions: 5, id: 969 });
+    if (drift === "wrong-user") f.acl.file.entries[1].id = 979;
+    if (drift === "write") f.acl.file.entries[1].permissions = 6;
+    if (drift === "group-read") f.acl.file.entries[2].permissions = 4;
+    if (drift === "other-read") f.acl.file.entries[4].permissions = 4;
+    if (drift === "version") f.acl.parent.version = 3;
+    if (drift === "missing-mask") f.acl.file.entries.splice(3, 1);
+    if (drift === "parent-mode") f.parent.mode = 0o570;
+    if (drift === "file-owner") f.file.uid = f.uid;
+    if (drift === "file-links") f.file.nlink = 2;
+    assert.throws(() => relaySecretCustody(f.parent, f.file, f.uid, f.acl), /TURNSTILE_SECRET_CUSTODY_INVALID/);
+  });
