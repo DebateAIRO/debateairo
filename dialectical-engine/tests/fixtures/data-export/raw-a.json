@@ -1,0 +1,410 @@
+{
+  "user": {
+    "pseudonym": "Ada",
+    "email_ciphertext": {
+      "sealed": "email"
+    },
+    "recovery_email_ciphertext": {
+      "sealed": "recovery"
+    },
+    "phone_ciphertext": {
+      "sealed": "phone"
+    },
+    "phone_source": "USER",
+    "phone_verification_status": "VERIFIED",
+    "state": "ACTIVE",
+    "created_at": "2026-10-01T00:00:00.000Z",
+    "adult_affirmed_at": null
+  },
+  "channels": [
+    {
+      "channel_type": "email",
+      "address_ciphertext": {
+        "sealed": "channel"
+      },
+      "state": "VERIFIED",
+      "verified_at": "2026-10-01T00:00:00.000Z"
+    },
+    {
+      "channel_type": "recovery_email",
+      "address_ciphertext": {
+        "sealed": "recovery-channel"
+      },
+      "state": "VERIFIED",
+      "verified_at": "2026-10-01T00:00:00.000Z"
+    }
+  ],
+  "registration_region": {
+    "country_code": "RO",
+    "us_state": null
+  },
+  "age_checks": [
+    {
+      "outcome": "PASS",
+      "min_age_applied": 18,
+      "rule_version": "v1",
+      "context": "SIGNUP",
+      "checked_at": "2026-10-01T00:00:00.000Z",
+      "country_code": "RO"
+    }
+  ],
+  "erasure_requests": [
+    {
+      "requested_at": "2026-10-01T00:00:00.000Z",
+      "execute_at": "2026-10-08T00:00:00.000Z",
+      "status": "CANCELLED"
+    }
+  ],
+  "mfa_factors": [
+    {
+      "factor_type": "TOTP",
+      "state": "ENABLED",
+      "created_at": "2026-10-01T00:00:00.000Z",
+      "verified_at": "2026-10-01T00:01:00.000Z",
+      "revoked_at": null,
+      "last_accepted_step": 5
+    }
+  ],
+  "passkey_credentials": [
+    {
+      "label": "Laptop",
+      "device_type": "PLATFORM",
+      "transports": [
+        "internal"
+      ],
+      "created_at": "2026-10-01T00:00:00.000Z",
+      "last_used_at": null
+    }
+  ],
+  "recovery_codes": {
+    "unused_count": 2,
+    "generated_at": "2026-10-01T00:00:00.000Z"
+  },
+  "sessions": [
+    {
+      "created_at": "2026-10-01T00:00:00.000Z",
+      "last_seen_at": "2026-10-02T00:00:00.000Z",
+      "idle_expires_at": "2026-10-03T00:00:00.000Z",
+      "absolute_expires_at": "2026-10-31T00:00:00.000Z",
+      "last_mfa_at": "2026-10-01T00:00:00.000Z",
+      "revoked_at": null
+    }
+  ],
+  "social_identities": [
+    {
+      "provider": "google",
+      "issuer": "accounts.google.com",
+      "subject": "external-subject",
+      "created_at": "2026-10-01T00:00:00.000Z",
+      "revoked_at": null
+    }
+  ],
+  "email_change_requests": [
+    {
+      "issued_at": "2026-10-02T00:00:00.000Z",
+      "new_email_ciphertext": {
+        "sealed": "new-email"
+      },
+      "outcome": "COMPLETE",
+      "closed_at": "2026-10-02T00:01:00.000Z"
+    }
+  ],
+  "recovery_email_requests": [
+    {
+      "issued_at": "2026-10-02T00:00:00.000Z",
+      "candidate_ciphertext": {
+        "sealed": "new-recovery"
+      },
+      "outcome": "COMPLETE",
+      "closed_at": "2026-10-02T00:01:00.000Z"
+    }
+  ],
+  "recovery_requests": [
+    {
+      "kind": "account_recovery",
+      "at": "2026-10-01T00:00:00.000Z",
+      "state": "COMPLETE"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "run-1",
+      "as_of": "2026-10-03T00:00:00.000Z",
+      "composition_budget_tier": "STANDARD",
+      "depth_params": {
+        "depth": 2
+      },
+      "plan_tier": "BASIC"
+    }
+  ],
+  "erasure_tombstones": [],
+  "visibility_events": [
+    {
+      "run_id": "run-1",
+      "state": "PRIVATE",
+      "occurred_at": "2026-10-03T00:00:00.000Z"
+    }
+  ],
+  "legal_acceptances": [
+    {
+      "acceptance_id": "acceptance-1",
+      "kind": "PRIVACY",
+      "document_version": "3.2",
+      "document_sha256": "sha",
+      "locale": "en",
+      "surface": "WEB",
+      "accepted_at": "2026-10-01T00:00:00.000Z",
+      "evidence_ciphertext": "Ynl0ZXM="
+    }
+  ],
+  "sensitive_data_consents": [
+    {
+      "notice_version": "1",
+      "locale": "en",
+      "consented_at": "2026-10-01T00:00:00.000Z"
+    }
+  ],
+  "billing": {
+    "customers": [
+      {
+        "customer_id": "customer-1",
+        "created_at": "2026-10-01T00:00:00.000Z",
+        "created_locale": "en"
+      }
+    ],
+    "customer_xmoney": [
+      {
+        "customer_id": "customer-1",
+        "environment": "test",
+        "xmoney_customer_id": "xc-1",
+        "at": "2026-10-01T00:00:00.000Z"
+      }
+    ],
+    "customer_profile_events": [
+      {
+        "customer_id": "customer-1",
+        "at": "2026-10-01T00:00:00.000Z",
+        "locale": "en",
+        "profile_ciphertext": "Ynl0ZXM="
+      }
+    ],
+    "quotes": [
+      {
+        "quote_id": "quote-1",
+        "plan_id": "basic",
+        "kind": "SUBSCRIPTION",
+        "net_micros": 1000000,
+        "tax_micros": 190000,
+        "total_micros": 1190000,
+        "tax_country": "RO",
+        "tax_region": null,
+        "tax_rate_bp": 1900,
+        "tax_status": "CALCULATED",
+        "tax_name": "VAT",
+        "quaderno_ref": "q-1",
+        "created_at": "2026-10-01T00:00:00.000Z",
+        "expires_at": "2026-10-02T00:00:00.000Z",
+        "location_ciphertext": "Ynl0ZXM=",
+        "recurring_total_micros": 1190000
+      }
+    ],
+    "subscription_events": [
+      {
+        "kind": "STARTED",
+        "at": "2026-10-01T00:00:00.000Z",
+        "plan_id": "basic",
+        "period_anchor_at": "2026-10-01T00:00:00.000Z",
+        "xmoney_order_id": "xo-1",
+        "xmoney_customer_id": "xc-1",
+        "card_ref": "1234",
+        "data": {}
+      }
+    ],
+    "entitlement_events": [
+      {
+        "plan_id": "basic",
+        "effective_at": "2026-10-01T00:00:00.000Z",
+        "period_anchor_at": "2026-10-01T00:00:00.000Z",
+        "cause": "PURCHASE",
+        "month_credit_override_micros": null,
+        "paid_through": "2026-11-01T00:00:00.000Z",
+        "recorded_at": "2026-10-01T00:00:00.000Z"
+      }
+    ],
+    "run_charge_scopes": [
+      {
+        "run_id": "run-1",
+        "plan_id": "basic",
+        "admitted_at": "2026-10-03T00:00:00.000Z",
+        "recorded_at": "2026-10-03T00:00:00.000Z",
+        "funding_kind": "PAID"
+      }
+    ],
+    "charges": [
+      {
+        "charge_id": "charge-1",
+        "kind": "SUBSCRIPTION",
+        "attempt": 1,
+        "period_start": "2026-10-01T00:00:00.000Z",
+        "period_end": "2026-11-01T00:00:00.000Z",
+        "net_micros": 1000000,
+        "tax_micros": 190000,
+        "total_micros": 1190000,
+        "currency": "EUR",
+        "created_at": "2026-10-01T00:00:00.000Z",
+        "xmoney_environment": "test"
+      }
+    ],
+    "internal_grants": [
+      {
+        "revision": 1,
+        "amount_micros": 1000000,
+        "day_micros": 100000,
+        "week_micros": 500000,
+        "starts_at": "2026-10-01T00:00:00.000Z",
+        "expires_at": "2026-11-01T00:00:00.000Z",
+        "funding_approval_ref": "approval-1",
+        "policy_register_version": "1",
+        "revoked_at": null,
+        "created_at": "2026-10-01T00:00:00.000Z"
+      }
+    ],
+    "withdrawal_owner_settlements": [
+      {
+        "dashboard_refund_micros": 0,
+        "settled_at": "2026-10-04T00:00:00.000Z"
+      }
+    ],
+    "charge_events": [
+      {
+        "charge_id": "charge-1",
+        "kind": "CAPTURED",
+        "at": "2026-10-01T00:00:00.000Z",
+        "xmoney_environment": "test",
+        "xmoney_transaction_id": "xt-1",
+        "refunds_transaction_id": null,
+        "amount_micros": 1190000,
+        "error_code": null,
+        "xmoney_created_at": "2026-10-01T00:00:00.000Z"
+      }
+    ],
+    "quote_uses": [
+      {
+        "used_at": "2026-10-01T00:00:00.000Z",
+        "charge_id": "charge-1"
+      }
+    ],
+    "invoice_intents": [
+      {
+        "charge_id": "charge-1",
+        "kind": "INVOICE",
+        "issuer": "QUADERNO",
+        "requested_at": "2026-10-01T00:00:00.000Z"
+      }
+    ],
+    "invoices": [
+      {
+        "charge_id": "charge-1",
+        "kind": "INVOICE",
+        "issuer": "QUADERNO",
+        "external_ref": "inv-1",
+        "series": "A",
+        "number": "1",
+        "url": "https://example.invalid/invoice",
+        "total_micros": 1190000,
+        "at": "2026-10-01T00:00:00.000Z"
+      }
+    ],
+    "location_evidence": [
+      {
+        "charge_id": "charge-1",
+        "ip_country": "RO",
+        "declared_country": "RO",
+        "card_country": "RO",
+        "verdict": "MATCH",
+        "ip_ciphertext": "Ynl0ZXM=",
+        "at": "2026-10-01T00:00:00.000Z"
+      }
+    ]
+  },
+  "support_sessions": [
+    {
+      "session_id": "support-1",
+      "language": "en",
+      "state": "CLOSED",
+      "created_at": "2026-10-04T00:00:00.000Z",
+      "consent_own_context_at": null,
+      "shredded_at": null
+    }
+  ],
+  "support_messages": [
+    {
+      "message_id": "message-1",
+      "session_id": "support-1",
+      "role": "USER",
+      "content_ciphertext": "Ynl0ZXM=",
+      "outcome": "COMPLETE",
+      "received_at": "2026-10-04T00:00:00.000Z",
+      "first_token_at": null,
+      "completed_at": null,
+      "rating": null
+    }
+  ],
+  "support_cases": [
+    {
+      "case_id": "case-1",
+      "session_id": "support-1",
+      "language": "en",
+      "created_at": "2026-10-04T00:00:00.000Z",
+      "state": "CLOSED",
+      "summary_at": null,
+      "shredded_at": null,
+      "transcript_snapshot_ciphertext": "Ynl0ZXM=",
+      "summary_ciphertext": "Ynl0ZXM="
+    }
+  ],
+  "support_case_events": [
+    {
+      "case_id": "case-1",
+      "from_state": "OPEN",
+      "to_state": "CLOSED",
+      "at": "2026-10-04T00:00:00.000Z"
+    }
+  ],
+  "support_case_messages": [
+    {
+      "case_message_id": "case-message-1",
+      "case_id": "case-1",
+      "role": "USER",
+      "content_ciphertext": "Ynl0ZXM=",
+      "at": "2026-10-04T00:00:00.000Z"
+    }
+  ],
+  "support_ratings": [
+    {
+      "message_id": "message-1",
+      "rating": 5,
+      "at": "2026-10-04T00:00:00.000Z"
+    }
+  ],
+  "support_key_states": [
+    {
+      "kind": "session",
+      "ref": "support-1",
+      "wrapped_key": "Ynl0ZXM=",
+      "destroyed_at": null
+    },
+    {
+      "kind": "case",
+      "ref": "case-1",
+      "wrapped_key": "Ynl0ZXM=",
+      "destroyed_at": null
+    }
+  ],
+  "audit_events": [
+    {
+      "event_type": "LOGIN",
+      "occurred_at": "2026-10-02T00:00:00.000Z"
+    }
+  ]
+}
