@@ -41,6 +41,7 @@ export function CardChangeFlow({
   const [details, setDetails] = useState<BillingDetails | null>(null);
   const [city, setCity] = useState("");
   const [total, setTotal] = useState<string | null>(null);
+  const [cancelRequested, setCancelRequested] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [messageKey, setMessageKey] = useState<string | null>(null);
@@ -59,6 +60,7 @@ export function CardChangeFlow({
         });
         setCity(read.city ?? "");
         setTotal(subscribed.subscription?.renewal_total ?? null);
+        setCancelRequested(subscribed.subscription?.cancel_requested ?? false);
       } catch (failure) {
         if (!active) return;
         if (sessionEnded(failure)) { navigate(`/login?next=${encodeURIComponent("/settings/card")}`); return; }
@@ -139,16 +141,23 @@ export function CardChangeFlow({
           </div>
           <p className="billingNote">{t(catalog, "billing.card.noHoldNote")}</p>
           {total !== null ? (
-            <label className="billingConsent">
-              <input id="card-agreement" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
-              <span>{t(catalog, "billing.consent.renewal", { total: formatUsd(locale, total) })}</span>
-            </label>
-          ) : null}
-          <div className="billingActions">
-            <button type="button" className="btn btnDark" disabled={!canStart} onClick={() => { void start(); }}>
-              {t(catalog, "billing.card.checkCard")}
-            </button>
-          </div>
+            <>
+              <label className="billingConsent">
+                <input id="card-agreement" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
+                <span>{t(catalog, "billing.consent.renewal", { total: formatUsd(locale, total) })}</span>
+              </label>
+              <div className="billingActions">
+                <button type="button" className="btn btnDark" disabled={!canStart} onClick={() => { void start(); }}>
+                  {t(catalog, "billing.card.checkCard")}
+                </button>
+              </div>
+            </>
+          ) : (
+            // No total, no agreement to give and no check to start: say why instead of a button that never enables.
+            cancelRequested
+              ? <p className="billingStatus" role="status">{t(catalog, "billing.subscription.wontRenew")}</p>
+              : <p className="billingError" role="alert">{t(catalog, "billing.checkout.genericError")}</p>
+          )}
         </>
       ) : null}
       {messageKey === null ? null : messageKey === "billing.checkout.reacceptRequired" ? (

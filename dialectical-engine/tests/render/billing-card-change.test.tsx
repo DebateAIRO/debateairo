@@ -91,6 +91,32 @@ describe("P20 the card change page (A11, A12)", () => {
     expect(goToPayment.mock.calls).toEqual([[PAGE]]);
   });
 
+  it("names why no check is offered when the read has no total, never a button that cannot enable", async () => {
+    for (const [subscription, sentence] of [
+      // A pending cancel: the plan is charged no more, so there is no agreement to give.
+      [{ renewal_total: null, cancel_requested: true }, EN["billing.subscription.wontRenew"]],
+      // Any other read without a total: a plain error, not a silent page.
+      [{ renewal_total: null, cancel_requested: false }, EN["billing.checkout.genericError"]]
+    ] as const) {
+      act(() => root.unmount());
+      root = createRoot(container);
+      const client = {
+        getBillingCardDetails: vi.fn(async () => DETAILS), getBillingSubscription: vi.fn(async () => ({ subscription })),
+        startCardChange: vi.fn(), getBillingCharge: vi.fn()
+      };
+      await act(async () => {
+        root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+          client={client as unknown as CardChangeClient} />);
+      });
+      await settle();
+      // Control: the details did load, so the sentence stands where the agreement and the button would.
+      expect(container.querySelector<HTMLInputElement>("#card-firstName")!.value).toBe("Ana");
+      expect(container.textContent).toContain(sentence);
+      expect(continueButton(container)).toBeUndefined();
+      expect(container.querySelector("#card-agreement")).toBeNull();
+    }
+  });
+
   it("says a check that saved no card asks for a card instead of a wallet (N13's CARD_NOT_SAVED)", async () => {
     const client = {
       getBillingCardDetails: vi.fn(), getBillingSubscription: vi.fn(), startCardChange: vi.fn(),

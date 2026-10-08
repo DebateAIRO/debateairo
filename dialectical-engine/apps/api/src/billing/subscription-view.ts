@@ -110,6 +110,9 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
   const renewsOn = state.status === "ACTIVE" && !state.cancelRequested
     ? state.renewalPostponedUntil ?? state.currentPeriodEnd
     : null;
+  // The card page names the total its agreement charges again (spec §2.18): a renewing ACTIVE plan's, and a PAST_DUE
+  // plan's whose renewal is still retried (a PAST_DUE cancel ends it at once). The fold holds one after ACTIVATED.
+  const chargedAgain = renewsOn !== null || (state.status === "PAST_DUE" && !state.cancelRequested);
   const withdrawal = openWithdrawal(input);
   return Object.freeze({
     plan_id: paidPlanOf(state.planId),
@@ -117,7 +120,7 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
     cancel_requested: state.cancelRequested,
     current_period_end: iso(state.currentPeriodEnd),
     renews_on: iso(renewsOn),
-    renewal_total: renewsOn === null || state.announcedTotalMicros === null
+    renewal_total: !chargedAgain || state.announcedTotalMicros === null
       ? null : microsToDecimal(state.announcedTotalMicros),
     scheduled_downgrade_plan_id: state.scheduledDowngradePlanId === null ? null : paidPlanOf(state.scheduledDowngradePlanId),
     withdrawal_open_until: iso(withdrawal?.closesAt ?? null),

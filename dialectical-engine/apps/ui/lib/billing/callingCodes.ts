@@ -32,3 +32,12 @@ export function phonePrefill(country: string, current: string): string {
   const code = callingCodeOf(country);
   return code === null ? current : `+${code} `;
 }
+
+/**
+ * A phone the person has typed, not the pre-filled calling code: the quote's schema refuses a value shorter than four
+ * characters (`BillingQuoteRequestSchema`'s phone) before any request leaves, so the page must not ask with one.
+ */
+export function phoneTyped(value: string): boolean {
+  const trimmed = value.trim();
+  return trimmed !== "" && !BARE_PREFIX.test(trimmed) && trimmed.length >= 4;
+}

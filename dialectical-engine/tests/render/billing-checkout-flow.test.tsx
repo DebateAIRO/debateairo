@@ -114,6 +114,8 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
       street: "Invalidenstrasse 1", city: "Berlin", postal_code: "10115"
     });
     expect(text()).toContain("Plus — $20.00 + $3.80 MwSt. (19%, Germany) = $23.80 per month.");
+    // Spec §2.18: the card-saving agreement names the monthly total (live once N20 adds {total} to the sentence).
+    expect(text()).toContain(EN["billing.consent.renewal"]!.replace("{total}", "$23.80"));
     expect(text()).toContain(EN["billing.checkout.cardNote"]);
     const next = button("billing.checkout.continueToCard")!;
     await click(checkbox(0));
@@ -189,6 +191,69 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     await click(button("billing.checkout.confirmCountryYes")!);
     await click(button("billing.checkout.continueToCard")!);
     expect(client.startBillingCheckout).toHaveBeenCalledWith(expect.objectContaining({ country_confirmed: true }));
+  });
+
+  it("keeps the price disabled while the phone holds only its calling code", async () => {
+    client.createBillingQuote.mockResolvedValue(quote({ address_required: true }));
+    await render();
+    await fill(input("checkout-firstName"), "Anna");
+    await fill(input("checkout-lastName"), "Schmidt");
+    await fill(input("checkout-street"), "Invalidenstrasse 1");
+    await fill(input("checkout-city"), "Berlin");
+    await fill(input("checkout-postalCode"), "10115");
+    // The quote's schema refuses "+49" before any request leaves, so the page never asks with it.
+    expect(input("checkout-phone").value).toBe("+49 ");
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    await fill(input("checkout-phone"), "+49 151 1234 5678");
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+  });
+
+  it("takes the price away after any edit, so the next price carries the corrected details", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    await render();
+    await fillDetails();
+    const priced = async (): Promise<void> => {
+      await click(button("billing.checkout.showPrice")!);
+      expect(button("billing.checkout.continueToCard")).toBeDefined();
+    };
+    await priced();
+    await fill(input("checkout-street"), "Unter den Linden 5");
+    expect(button("billing.checkout.continueToCard")).toBeUndefined();
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith(expect.objectContaining({ street: "Unter den Linden 5" }));
+    expect(button("billing.checkout.continueToCard")).toBeDefined();
+    await fill(input("checkout-city"), "Potsdam");
+    expect(button("billing.checkout.continueToCard")).toBeUndefined();
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith(expect.objectContaining({ city: "Potsdam" }));
+    await click(button("billing.checkout.companyToggle")!);
+    expect(button("billing.checkout.continueToCard")).toBeUndefined();
+    await fill(input("checkout-company-name"), "Acme GmbH");
+    await fill(input("checkout-company-vat"), "DE123456789");
+    await fill(input("checkout-company-address"), "1 Hauptstraße, Berlin");
+    await priced();
+    await fill(input("checkout-company-name"), "Acme Berlin GmbH");
+    expect(button("billing.checkout.continueToCard")).toBeUndefined();
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith(expect.objectContaining({
+      street: "Unter den Linden 5", city: "Potsdam",
+      company: { name: "Acme Berlin GmbH", vat_id: "DE123456789", address: "1 Hauptstraße, Berlin" }
+    }));
+    expect(button("billing.checkout.continueToCard")).toBeDefined();
+  });
+
+  it("drops a price that answers after an edit made while it was asked", async () => {
+    let answer: (value: ReturnType<typeof quote>) => void = () => undefined;
+    client.createBillingQuote.mockResolvedValueOnce(quote())
+      .mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+    await render();
+    await fillDetails();
+    await click(button("billing.checkout.showPrice")!);
+    await fill(input("checkout-street"), "Unter den Linden 5");
+    await act(async () => { answer(quote()); });
+    await settle();
+    expect(button("billing.checkout.continueToCard")).toBeUndefined();
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
   });
 
   it("refuses to price a half-filled company block", async () => {

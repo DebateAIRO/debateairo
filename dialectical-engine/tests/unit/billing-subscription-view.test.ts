@@ -49,6 +49,10 @@ describe("P12b the subscription as the person sees it", () => {
       renews_on: "2026-11-10T09:00:00.000Z", can_upgrade: false
     });
     expect(view({ status: "ENDED" })).toMatchObject({ renews_on: null, renewal_total: null });
+    // A plan behind on payment promises no date, but its card page names the total the retried renewal charges.
+    expect(view({ ...NETOPIA, status: "PAST_DUE", pastDueSince: PERIOD_END })).toMatchObject({
+      renews_on: null, renewal_total: "24.20", can_change_card: true
+    });
   });
 
   it("closes the withdrawal window at the end of the 14th calendar day, the consumer's time (R2 Q-6)", () => {

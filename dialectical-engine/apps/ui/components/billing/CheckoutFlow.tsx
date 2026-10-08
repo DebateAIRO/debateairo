@@ -7,7 +7,7 @@ import {
 } from "@debateai/contract";
 import { ageConfirmationHref } from "@/lib/ageConfirmation";
 import { contractClient } from "@/lib/api";
-import { phonePrefill } from "@/lib/billing/callingCodes";
+import { phonePrefill, phoneTyped } from "@/lib/billing/callingCodes";
 import { checkoutFailureKey } from "@/lib/billing/checkoutFailure";
 import { COUNTRY_CODES } from "@/lib/billing/countries";
 import { countryName, formatUsd, planName, renewDayLabel, taxLabel } from "@/lib/billing/format";
@@ -69,6 +69,8 @@ export function CheckoutFlow({
   const [busy, setBusy] = useState(false);
   const [messageKey, setMessageKey] = useState<string | null>(null);
   const started = useRef(false);
+  /** Bumped by every edit, so a price asked before an edit never shows for the edited details. */
+  const edits = useRef(0);
   const name = planName(catalog, planId);
   const romanian = country === "RO";
   const bucharest = romanian && region === BUCHAREST_COUNTY;
@@ -81,8 +83,10 @@ export function CheckoutFlow({
   );
   const filled = (value: string): string => value.trim();
   // Spec §2.6.1: NETOPIA's cardholder for everyone; SmartBill's county list and, in Bucharest, a sector (P2-M15).
+  // A phone still at its pre-filled calling code is not typed: the quote's schema would refuse it before sending.
   const addressComplete = country !== ""
-    && [details.firstName, details.lastName, details.phone, details.street, city].every((value) => filled(value) !== "")
+    && [details.firstName, details.lastName, details.street, city].every((value) => filled(value) !== "")
+    && phoneTyped(details.phone)
     && (postalOptional || filled(details.postalCode) !== "")
     && (!asksRegion || filled(region) !== "")
     && (!romanian || isRomanianInvoiceLocality(region, city));
@@ -90,6 +94,16 @@ export function CheckoutFlow({
   const companyFields = [companyName, vatId, companyAddress].map(filled);
   const companyComplete = companyFields.every((value) => value !== "");
   const companyIncomplete = companyOpen && companyFields.some((value) => value !== "") && !companyComplete;
+
+  /**
+   * The quote seals the payer and the buyer it was priced for (NETOPIA's payer, the stored profile and every invoice
+   * are taken from it), so any edit of a value the quote request sends takes the price away until it is asked again.
+   * Called in the handlers, never an effect: the connection's first quote runs changeCountry and must survive it.
+   */
+  function edited(): void {
+    edits.current += 1;
+    setQuote(null);
+  }
 
   function changeCountry(next: string): void {
     // A Romanian sector is no city elsewhere, and a city typed elsewhere is no Romanian locality.
@@ -111,6 +125,7 @@ export function CheckoutFlow({
     const company = companyOpen && companyComplete
       ? { name: companyFields[0]!, vat_id: companyFields[1]!, address: companyFields[2]! }
       : null;
+    const asked = edits.current;
     try {
       const answer = await client.createBillingQuote(fromConnection ? { plan_id: planId } : {
         plan_id: planId,
@@ -125,6 +140,8 @@ export function CheckoutFlow({
         ...(company === null ? {} : { company })
       });
       if (fromConnection) changeCountry(answer.country);
+      // The connection's first quote prices no payer, so an edit made while it loads leaves it standing.
+      else if (edits.current !== asked) return;
       setQuote(answer);
     } catch (failure) {
       if (sessionEnded(failure)) {
@@ -241,7 +258,7 @@ export function CheckoutFlow({
       <form onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (canQuote) void requestQuote(); }}>
         <div className="billingField">
           <label htmlFor="checkout-country">{t(catalog, "billing.checkout.country")}</label>
-          <select id="checkout-country" value={country} onChange={(event) => changeCountry(event.target.value)} required>
+          <select id="checkout-country" value={country} onChange={(event) => { edited(); changeCountry(event.target.value); }} required>
             <option value="" disabled>{t(catalog, "billing.checkout.country")}</option>
             {countries.map((entry) => <option key={entry.code} value={entry.code}>{entry.label}</option>)}
           </select>
@@ -249,7 +266,7 @@ export function CheckoutFlow({
         <h2 className="setSubtitle">{t(catalog, "billing.checkout.billingTitle")}</h2>
         <p className="billingNote">{t(catalog, "billing.checkout.billingNote")}</p>
         <BillingDetailsFields catalog={catalog} idPrefix="checkout" values={details} postalOptional={postalOptional}
-          onChange={(field, value) => setDetails((current) => ({ ...current, [field]: value }))} />
+          onChange={(field, value) => { edited(); setDetails((current) => ({ ...current, [field]: value })); }} />
         {asksRegion ? (
           <div className="billingField">
             <label htmlFor="checkout-region">{t(catalog, romanian ? "billing.checkout.county" : "billing.checkout.region")}</label>
@@ -258,29 +275,30 @@ export function CheckoutFlow({
                 const next = event.target.value;
                 // A sector is no city outside Bucharest, and a city is no sector inside it.
                 if ((next === BUCHAREST_COUNTY) !== (region === BUCHAREST_COUNTY)) setCity("");
+                edited();
                 setRegion(next);
               }} autoComplete="address-level1" required>
                 <option value="" disabled>{t(catalog, "billing.checkout.county")}</option>
                 {ROMANIA_COUNTIES.map((county) => <option key={county} value={county}>{county}</option>)}
               </select>
             ) : (
-              <input id="checkout-region" value={region} onChange={(event) => setRegion(event.target.value)} autoComplete="address-level1" required />
+              <input id="checkout-region" value={region} onChange={(event) => { edited(); setRegion(event.target.value); }} autoComplete="address-level1" required />
             )}
           </div>
         ) : null}
         <div className="billingField">
           <label htmlFor="checkout-city">{t(catalog, "billing.checkout.city")}</label>
           {bucharest ? (
-            <select id="checkout-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required>
+            <select id="checkout-city" value={city} onChange={(event) => { edited(); setCity(event.target.value); }} autoComplete="address-level2" required>
               <option value="">{t(catalog, "billing.checkout.city")}</option>
               {BUCHAREST_SECTORS.map((sector) => <option key={sector} value={sector}>{sector}</option>)}
             </select>
           ) : (
-            <input id="checkout-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required />
+            <input id="checkout-city" value={city} onChange={(event) => { edited(); setCity(event.target.value); }} autoComplete="address-level2" required />
           )}
         </div>
         <div className="billingActions">
-          <button type="button" className="setBtn" aria-expanded={companyOpen} onClick={() => setCompanyOpen(!companyOpen)}>
+          <button type="button" className="setBtn" aria-expanded={companyOpen} onClick={() => { edited(); setCompanyOpen(!companyOpen); }}>
             {t(catalog, "billing.checkout.companyToggle")}
           </button>
         </div>
@@ -288,15 +306,15 @@ export function CheckoutFlow({
           <>
             <div className="billingField">
               <label htmlFor="checkout-company-name">{t(catalog, "billing.checkout.companyName")}</label>
-              <input id="checkout-company-name" value={companyName} onChange={(event) => setCompanyName(event.target.value)} autoComplete="organization" />
+              <input id="checkout-company-name" value={companyName} onChange={(event) => { edited(); setCompanyName(event.target.value); }} autoComplete="organization" />
             </div>
             <div className="billingField">
               <label htmlFor="checkout-company-vat">{t(catalog, "billing.checkout.companyVatId")}</label>
-              <input id="checkout-company-vat" value={vatId} onChange={(event) => setVatId(event.target.value)} />
+              <input id="checkout-company-vat" value={vatId} onChange={(event) => { edited(); setVatId(event.target.value); }} />
             </div>
             <div className="billingField">
               <label htmlFor="checkout-company-address">{t(catalog, "billing.checkout.companyAddress")}</label>
-              <input id="checkout-company-address" value={companyAddress} onChange={(event) => setCompanyAddress(event.target.value)} autoComplete="street-address" />
+              <input id="checkout-company-address" value={companyAddress} onChange={(event) => { edited(); setCompanyAddress(event.target.value); }} autoComplete="street-address" />
             </div>
             {companyIncomplete ? <p className="billingNote" role="status">{t(catalog, "billing.checkout.companyIncomplete")}</p> : null}
           </>
