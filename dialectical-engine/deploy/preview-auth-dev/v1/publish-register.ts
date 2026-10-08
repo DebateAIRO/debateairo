@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
   canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256,
-  createPostgresRegisterPublicationPort, parseRegisterVersionText,
+  createPostgresRegisterPublicationPort, parseRegisterVersionText, buildConfiguredProviderSetSealedRow,
   PASSWORD_RESET_POLICY_REGISTER_ROW, BACKUP_EMAIL_POLICY_REGISTER_ROW, MFA_RECOVERY_POLICY_REGISTER_ROW,
   type BootstrapRegister, type RegisterPublicationRow
 } from '@debateai/register';
@@ -62,8 +62,14 @@ export function composePreviewSnapshot(input:Readonly<{sourceRows:readonly Regis
   for(const rows of [sourceMap,baseMap]){
     if(JSON.parse(rows.get('billingPolicy')?.valueJsonText??'null')?.enabled!==false)fail();
     const providers=JSON.parse(rows.get('configuredProviderSet')?.valueJsonText??'null');
-    if(!credentialFree(providers)||providers?.requiredDistinctMakers!==1||providers?.providers?.length!==2
-      ||providers.providers.some((p:any,i:number)=>Object.keys(p).sort().join(',')!=='adapterKind,maker,providerRef'||p.adapterKind!=='openai-compatible-http'||p.maker!=='Z.AI'||p.providerRef!==PREVIEW_GLM_PROVIDER_REFS[i]))fail();
+    if(!credentialFree(providers)||providers?.providers?.length!==2
+      ||providers.providers.some((p:any,i:number)=>Object.keys(p).sort().join(',')!=='adapterKind,maker,providerRef'||p.providerRef!==PREVIEW_GLM_PROVIDER_REFS[i]))fail();
+    if(rows===sourceMap){
+      if(providers.requiredDistinctMakers!==1||providers.providers.some((p:any)=>p.adapterKind!=='openai-compatible-http'||p.maker!=='Z.AI'))fail();
+    }else{
+      // The sealed predecessor may describe the historical two-maker fixture panel.
+      buildConfiguredProviderSetSealedRow({requiredDistinctMakers:providers.requiredDistinctMakers,providers:providers.providers},rows.get('configuredProviderSet')!.sourceRef);
+    }
   }
   const staff=baseMap.get('staffAccessPolicy')!,internal=baseMap.get('internalAllowancePolicy')!;
   staffAccessPolicyFromValue(JSON.parse(staff.valueJsonText),staff.sourceRef);
