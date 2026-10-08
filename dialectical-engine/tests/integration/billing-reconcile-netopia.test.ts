@@ -267,10 +267,12 @@ describe("N16 the reconciler's NETOPIA pass (spec §2.14)", () => {
     )).rows.map((row) => row.outcome);
     expect(outcomes).toEqual(["PAYMENT_PROVIDER_UNAVAILABLE"]);
     expect(kick).toHaveBeenCalled();
-    // Read once on its schedule: the next tick, ten minutes on, reads none of them again before they are due.
+    // Ten minutes on, only the card check whose 30-minute step has come is read again; NETOPIA still says
+    // AUTHORIZED, so it is queued again.
     clock.now = plus(now, 10 * MINUTE);
     const again = await reconciler.tick();
-    expect(again.statusChecks?.read ?? 0).toBeLessThanOrEqual(1);
+    expect(again.statusChecks).toEqual({ read: 1, queued: 1, closed: 0, failed: 0 });
+    expect(payments.statusReads.slice(4).map((read) => read.orderId)).toEqual([authorised]);
   });
 
   it("closes a card check unpaid after 24 hours and an upgrade past its quote's lifetime, never one on its way", async () => {
