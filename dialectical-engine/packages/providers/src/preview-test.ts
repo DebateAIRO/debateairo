@@ -179,8 +179,16 @@ export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig): P
       const request = httpRequest({ socketPath: config.budget_socket, path: "/complete", method: "POST",
         headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data) } }, response => {
         const chunks: Buffer[] = []; let bytes = 0;
-        response.on("data", (chunk: Buffer) => { bytes += chunk.length; if (bytes > 8 * 1024 * 1024) response.destroy(); else chunks.push(chunk); });
+        // A destroy without an error emits only 'close': settle first, so the call can never hang.
+        response.on("data", (chunk: Buffer) => {
+          bytes += chunk.length;
+          if (bytes <= 8 * 1024 * 1024) { chunks.push(chunk); return; }
+          reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response too large"));
+          response.destroy();
+        });
         response.on("error", () => reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response unavailable")));
+        // A reply that closes before its end is unreadable; after 'end' this reject is a no-op.
+        response.on("close", () => { if (!response.complete) reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response unavailable")); });
         response.on("end", () => {
           let result: unknown; try { result = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response invalid")); return; }
           const row = result as Record<string, unknown>;

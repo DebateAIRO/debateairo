@@ -5,7 +5,7 @@
 // lift); too many calls in flight is a transient provider failure (PROVIDER_CALL_FAILED, the
 // runner cools down and retries), never a money stop; every other refusal, and any body it
 // cannot read, keeps today's behaviour.
-import { createServer, type Server } from "node:http";
+import { createServer, type Server, type ServerResponse } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,6 +35,16 @@ afterEach(async () => {
 
 /** A stand-in gate on a real unix socket; it records each request it receives. */
 async function gate(reply: Reply): Promise<Readonly<{ port: ReturnType<typeof createPreviewBudgetRpcPort>; received: string[] }>> {
+  return answering((response) => {
+    response.writeHead(reply.status, { "content-type": "application/json" });
+    response.end(reply.body);
+  });
+}
+
+/** The same socket and protocol, with the answer written by `answer` once the request is read. */
+async function answering(
+  answer: (response: ServerResponse) => void
+): Promise<Readonly<{ port: ReturnType<typeof createPreviewBudgetRpcPort>; received: string[] }>> {
   const directory = await mkdtemp(join(tmpdir(), "pvg-"));
   directories.push(directory);
   const socket = join(directory, "gate.sock");
@@ -44,8 +54,7 @@ async function gate(reply: Reply): Promise<Readonly<{ port: ReturnType<typeof cr
     request.on("data", (chunk: Buffer) => chunks.push(chunk));
     request.on("end", () => {
       received.push(`${request.method} ${request.url} ${Buffer.concat(chunks).toString("utf8")}`);
-      response.writeHead(reply.status, { "content-type": "application/json" });
-      response.end(reply.body);
+      answer(response);
     });
   });
   servers.push(server);
@@ -150,5 +159,36 @@ describe("the preview spending gate's 409 refusal body", () => {
     const { port, received } = await gate({ status: 200, body: JSON.stringify({ status: 200, body: "{\"ok\":true}" }) });
     await expect(port.execute(execution)).resolves.toEqual({ status: 200, body: "{\"ok\":true}" });
     expect(received).toEqual([`POST /complete ${JSON.stringify({ scope_id: "fixture-scope", ...execution })}`]);
+  });
+});
+
+/** The port's promise, or a test failure if it has not settled within `ms`: a reply that never settles hangs a debate. */
+function settledWithin<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`test: the gate reply never settled within ${String(ms)} ms`)), ms);
+  });
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+}
+
+describe("the preview spending gate's reply always settles", () => {
+  it("a reply over 8 MB is refused and the call settles, instead of hanging", async () => {
+    const { port } = await answering((response) => {
+      response.on("error", () => undefined);
+      response.writeHead(200, { "content-type": "application/json" });
+      const megabyte = Buffer.alloc(1024 * 1024, 0x20);
+      for (let index = 0; index < 9; index += 1) response.write(megabyte);
+      response.end();
+    });
+    await expect(settledWithin(port.execute(execution), 5_000)).rejects.toMatchObject({ code: "PROVIDER_USAGE_UNREPORTED" });
+  });
+
+  it("a reply cut off before its end is refused and the call settles", async () => {
+    const { port } = await answering((response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.write("{\"status\":200,\"bo");
+      setTimeout(() => response.socket?.destroy(), 20);
+    });
+    await expect(settledWithin(port.execute(execution), 5_000)).rejects.toMatchObject({ code: "PROVIDER_USAGE_UNREPORTED" });
   });
 });
