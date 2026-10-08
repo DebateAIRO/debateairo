@@ -9,6 +9,7 @@
   "billing.checkout.county": "The Romanian judet (or Bucharest); in Romanian use 'Județ'.",
   "billing.subscription.upgradeQuote": "{recurringTotal} is the new plan's full monthly price with tax; keep it in the sentence.",
   "billing.subscription.upgradeConfirm": "This button places a paid order. Romanian should use the Terms §12 'obligation to pay' wording (e.g. 'Comandă cu obligație de plată'); elsewhere use the local legal wording for an order with an obligation to pay.",
+  "billing.subscription.upgradePay": "This button places a paid order ({amount} is the sum paid now). Romanian reads 'Comandă cu obligație de plată ({amount})' (Terms §12); elsewhere use the local legal wording for an order with an obligation to pay.",
   "billing.checkout.taxLabel": "{tax} is the tax amount, {taxName} its name (VAT, MwSt., TVA), {rate} a number: keep all four, in the order that reads naturally.",
   "billing.card.holdNote": "{amount} is the temporary card-check hold (today 1.00 USD); it is released and never charged.",
   "billing.checkout.doNotPayAgain": "Shown after the waiting screen gives up: the payment may still be in progress, so the person must not pay twice.",

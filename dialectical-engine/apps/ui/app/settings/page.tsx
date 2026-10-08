@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { currentDocument } from "@debateai/legal-manifest";
 import { SettingsPageClient } from "@/components/SettingsPageClient";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
@@ -11,5 +12,8 @@ export default async function SettingsPage() {
     loadNamespace(locale, "newDebate"),
     loadNamespace(locale, "billing")
   ]);
-  return <SettingsPageClient catalog={catalog} locale={locale} newDebateCatalog={newDebateCatalog} billingCatalog={billingCatalog} />;
+  return (
+    <SettingsPageClient catalog={catalog} locale={locale} newDebateCatalog={newDebateCatalog} billingCatalog={billingCatalog}
+      renewalConsent={currentDocument("CONSENT_RENEWAL", locale)} />
+  );
 }

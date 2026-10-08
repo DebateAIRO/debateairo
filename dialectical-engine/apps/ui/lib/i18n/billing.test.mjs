@@ -15,7 +15,8 @@ const ownedFiles = [
   "components/billing/ChargeStatusPoller.tsx", "components/billing/XMoneyCardForm.tsx",
   "components/billing/CheckoutFlow.tsx", "app/checkout/page.tsx", "app/checkout/return/page.tsx",
   "components/billing/SubscriptionControls.tsx", "components/billing/CardChangeFlow.tsx", "app/settings/card/page.tsx",
-  "components/billing/CancelFlow.tsx", "app/cancel/page.tsx", "app/withdraw/page.tsx"
+  "components/billing/CancelFlow.tsx", "app/cancel/page.tsx", "app/withdraw/page.tsx",
+  "components/billing/BillingDetailsFields.tsx"
 ];
 const source = (path) => readFileSync(join(root, path), "utf8");
 const englishPath = join(root, "messages/en/billing.json");
@@ -92,8 +93,12 @@ const REQUIRED = [
   "billing.pricing.faqLimitsAnswer", "billing.pricing.faqCancelQuestion", "billing.pricing.faqCancelAnswer",
   "billing.pricing.faqTaxQuestion", "billing.pricing.faqTaxAnswer", "billing.pricing.termsLink", "billing.pricing.privacyLink",
   "billing.checkout.eyebrow", "billing.checkout.title", "billing.checkout.country", "billing.checkout.region",
-  "billing.checkout.postalCode", "billing.checkout.fullName", "billing.checkout.city", "billing.checkout.county",
-  "billing.checkout.romaniaNote", "billing.checkout.companyToggle", "billing.checkout.companyName",
+  "billing.checkout.postalCode", "billing.checkout.city", "billing.checkout.county",
+  "billing.checkout.billingTitle", "billing.checkout.billingNote", "billing.checkout.firstName", "billing.checkout.lastName",
+  "billing.checkout.phone", "billing.checkout.street", "billing.checkout.postalCodeOptional", "billing.checkout.phoneInvalid",
+  "billing.checkout.detailsRequired", "billing.checkout.upgradeSucceeded", "billing.subscription.upgradePay",
+  "billing.card.checkCard", "billing.card.taxPlaceNote",
+  "billing.checkout.companyToggle", "billing.checkout.companyName",
   "billing.checkout.companyVatId", "billing.checkout.companyAddress", "billing.checkout.companyIncomplete",
   "billing.checkout.showPrice", "billing.checkout.quoting",
   "billing.checkout.countryUnavailable", "billing.checkout.confirmCountry", "billing.checkout.confirmCountryYes",

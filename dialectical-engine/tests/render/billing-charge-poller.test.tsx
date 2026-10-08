@@ -21,6 +21,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const REF = "0123456789abcdef0123456789abcdef";
+async function settle(): Promise<void> {
+  for (let hop = 0; hop < 6; hop += 1) await act(async () => { await Promise.resolve(); });
+}
+
 async function mount(getBillingCharge: ReturnType<typeof vi.fn>): Promise<void> {
   await act(async () => {
     root.render(
@@ -115,5 +120,24 @@ describe("P19 the waiting screen (B5)", () => {
       "We couldn't save your new card just now because a payment on your plan is still being confirmed. Your current card stays in use; please try again in an hour."
     );
     expect(container.textContent).not.toBe("PAID");
+  });
+
+  it("words an upgrade's confirmation from the charge's kind, and a card check that saved no card (N18, N13)", async () => {
+    const upgrade = vi.fn(async () => ({ state: "SUCCEEDED" as const, reason_code: null, kind: "UPGRADE" as const }));
+    await act(async () => {
+      root.render(<ChargeStatusPoller chargeRef={REF} catalog={billingEnglish} client={{ getBillingCharge: upgrade }}
+        successText="checkout success" upgradeSuccessText="upgrade success" failureText="failed" />);
+    });
+    await settle();
+    expect(container.textContent).toBe("upgrade success");
+    const notSaved = vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CARD_NOT_SAVED", kind: "CARD_CHECK" as const }));
+    act(() => root.unmount());
+    root = createRoot(container);
+    await act(async () => {
+      root.render(<ChargeStatusPoller chargeRef={REF} catalog={billingEnglish} client={{ getBillingCharge: notSaved }}
+        successText="saved" failureText="failed" />);
+    });
+    await settle();
+    expect(container.textContent).toBe((billingEnglish as Record<string, string>)["billing.card.notSaved"]);
   });
 });

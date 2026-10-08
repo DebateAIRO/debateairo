@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   session: null as string | null,
@@ -50,7 +50,6 @@ import CheckoutPage from "../../apps/ui/app/checkout/page.js";
 import CheckoutReturnPage from "../../apps/ui/app/checkout/return/page.js";
 import { readNotFoundCalls, readRedirects, resetNotFoundCalls, resetRedirects } from "./stubs/next-navigation.js";
 
-const originalOrigin = process.env.XMONEY_SDK_ORIGIN;
 beforeEach(() => {
   mocks.session = null;
   mocks.locale = "en";
@@ -64,11 +63,6 @@ beforeEach(() => {
   mocks.pollerProps = [];
   resetRedirects();
   resetNotFoundCalls();
-  process.env.XMONEY_SDK_ORIGIN = "https://secure-stage.xmoney.com";
-});
-afterEach(() => {
-  if (originalOrigin === undefined) delete process.env.XMONEY_SDK_ORIGIN;
-  else process.env.XMONEY_SDK_ORIGIN = originalOrigin;
 });
 
 describe("P19 /checkout and /checkout/return", () => {
@@ -87,7 +81,7 @@ describe("P19 /checkout and /checkout/return", () => {
     expect(mocks.flowProps).toHaveLength(0);
   });
 
-  it("hands the flow the plan, the consent pairs of the reader's locale, the SDK origin and the nonce", async () => {
+  it("hands the flow the plan and the consent pairs of the reader's locale, and nothing of a card form", async () => {
     mocks.session = "t".repeat(43);
     mocks.locale = "de";
     renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
@@ -95,8 +89,6 @@ describe("P19 /checkout and /checkout/return", () => {
     expect(mocks.flowProps[0]).toMatchObject({
       planId: "PLUS",
       locale: "de",
-      sdkOrigin: "https://secure-stage.xmoney.com",
-      nonce: "AAAAAAAAAAAAAAAAAAAAAA==",
       consents: {
         renewal: { version: "CONSENT_RENEWAL@de", sha256: "c".repeat(64) },
         immediateStart: { version: "CONSENT_IMMEDIATE_START@de", sha256: "c".repeat(64) }
@@ -104,6 +96,7 @@ describe("P19 /checkout and /checkout/return", () => {
     });
     // The country comes from the connection through P8b's first quote, never from the browser's language.
     expect(Object.keys(mocks.flowProps[0]!)).not.toContain("suggestedCountry");
+    expect(Object.keys(mocks.flowProps[0]!)).not.toContain("sdkOrigin");
   });
 
   it("is not found while billing is off, for the checkout and its return page alike", async () => {
@@ -131,13 +124,6 @@ describe("P19 /checkout and /checkout/return", () => {
     mocks.consentMissingFor = "de";
     renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
     expect(mocks.flowProps[0]).toMatchObject({ locale: "de", consents: null });
-  });
-
-  it("passes no SDK origin when XMONEY_SDK_ORIGIN is unset", async () => {
-    mocks.session = "t".repeat(43);
-    delete process.env.XMONEY_SDK_ORIGIN;
-    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "MAX" }) }));
-    expect(mocks.flowProps[0]).toMatchObject({ sdkOrigin: null });
   });
 
   it("sends an expired or revoked session to sign in, from the checkout and its return page alike (spec §2.10)", async () => {
@@ -176,6 +162,7 @@ describe("P19 /checkout and /checkout/return", () => {
     mocks.session = "t".repeat(43);
     renderToStaticMarkup(await CheckoutReturnPage({ searchParams: Promise.resolve({ charge: "0123456789abcdef0123456789abcdef" }) }));
     expect(mocks.pollerProps[0]).toMatchObject({ chargeRef: "0123456789abcdef0123456789abcdef" });
+    expect(mocks.pollerProps[0]).toMatchObject({ upgradeSuccessText: "Your upgrade is paid. Your new plan has started." });
     const bad = renderToStaticMarkup(await CheckoutReturnPage({ searchParams: Promise.resolve({ charge: "../x" }) }));
     expect(bad).toContain("Something went wrong. Please try again.");
     expect(mocks.pollerProps).toHaveLength(1);

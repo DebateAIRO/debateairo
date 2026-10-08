@@ -31,12 +31,15 @@ export function SettingsPageClient({
   catalog = settingsEnglish,
   locale = "en",
   newDebateCatalog = newDebateEnglish,
-  billingCatalog = billingEnglish
+  billingCatalog = billingEnglish,
+  renewalConsent = null
 }: SettingsI18nProps & {
   /** The locale's `newDebate` catalogue: the session gate's copy (review F2). */
   newDebateCatalog?: MessageCatalog;
   /** The locale's `billing` catalogue: the usage bars (paid-plans spec §2.10). */
   billingCatalog?: MessageCatalog;
+  /** Spec §2.18: the card-saving sentence's manifest pair for Settings' upgrade. */
+  renewalConsent?: Readonly<{ version: string; sha256: string }> | null;
 }) {
   // Turn 14: a link mailed by the change-email flow opens Settings with its
   // bearer in the fragment. It is spent without a session (the bearer is the
@@ -51,12 +54,17 @@ export function SettingsPageClient({
   }
   return (
     <AuthGate catalog={newDebateCatalog} legalGate={false}>
-      {() => <AccountSettingsScreen catalog={catalog} locale={locale} billingCatalog={billingCatalog} />}
+      {() => (
+        <AccountSettingsScreen catalog={catalog} locale={locale} billingCatalog={billingCatalog} renewalConsent={renewalConsent} />
+      )}
     </AuthGate>
   );
 }
 
-function AccountSettingsScreen({ catalog, locale, billingCatalog }: Required<SettingsI18nProps> & { billingCatalog: MessageCatalog }) {
+function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent }: Required<SettingsI18nProps> & {
+  billingCatalog: MessageCatalog;
+  renewalConsent: Readonly<{ version: string; sha256: string }> | null;
+}) {
   const [changingFrom, setChangingFrom] = useState<string | null>(null);
   const [emailNotice, setEmailNotice] = useState<string | null>(null);
   const identityRows = [
@@ -114,7 +122,7 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog }: Required<Set
               ))}
             </div>
           </div>
-          <SubscriptionControls catalog={billingCatalog} locale={locale} />
+          <SubscriptionControls catalog={billingCatalog} locale={locale} renewalConsent={renewalConsent} />
           <UsageBars catalog={billingCatalog} locale={locale} />
 
           <EmailSettingsCard
