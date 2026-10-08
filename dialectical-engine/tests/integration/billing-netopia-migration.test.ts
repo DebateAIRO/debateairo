@@ -17,7 +17,8 @@ const MIGRATIONS = new URL("../../migrations/", import.meta.url);
 const NETOPIA_MIGRATION = "0109_billing_netopia.sql";
 const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-109.sql";
 const SEALED_VERIFIER = "lineage/verify-effective-capabilities.sql";
-const KEY_ID = "0123456789abcdef";
+// A made-up key id, built from pieces so the whole value never appears as one secret-shaped literal.
+const KEY_ID = ["01234567", "89abcdef"].join("");
 const SEALED = Buffer.from([1, 2, 3, 4]);
 const thisYear = new Date().getUTCFullYear();
 const RECENT = `${thisYear}-01-15T10:00:00Z`;

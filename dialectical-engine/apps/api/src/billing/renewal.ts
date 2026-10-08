@@ -196,7 +196,7 @@ export function failureCode(error: unknown): string {
 
 /** Spec §2.9.2 step 4 and §2.9.4: the FAILED codes a NETOPIA renewal can end with. */
 export type RenewalFailureCode =
-  | "PAYMENT_DECLINED" | "REBILL_REFUSED" | "NO_TRANSACTION" | "CARD_NOT_SAVED" | "AUTHENTICATION_REQUIRED"
+  | "PAYMENT_DECLINED" | "NO_TRANSACTION" | "CARD_NOT_SAVED" | "AUTHENTICATION_REQUIRED"
   | "PAYMENT_FAILED" | "PAYMENT_EXPIRED" | "VOIDED";
 
 /**

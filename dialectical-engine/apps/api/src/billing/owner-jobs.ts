@@ -40,7 +40,7 @@ export function taxSummaryJobFor(now: Date): Readonly<{
 export type OwnerJobsDeps = Readonly<{
   billing: Pick<BillingRepository,
     | "withTransaction" | "enqueue" | "quarterSummaryRows" | "invoiceUnknownItems" | "deadRefunds"
-    | "unrecordedRefunds" | "withdrawalsAwaitingOwner" | "unfoldableSubscriptions" | "stuckRenewals"
+    | "withdrawalsAwaitingOwner" | "unfoldableSubscriptions" | "stuckRenewals"
     | "longUnsettledCharges" | "chargelessDunning" | "blockedRenewals" | "deadEmails" | "quarantineSince">;
   /** P7's queries: the job's once-only check, and P10b's e-Factura read. */
   jobs: Pick<BillingJobQueries, "outboxJobExists" | "smartBillDocumentsNotAccepted">;

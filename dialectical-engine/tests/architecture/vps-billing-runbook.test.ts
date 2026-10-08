@@ -298,7 +298,7 @@ describe("P22 the Billing runbook", () => {
     expect(failedMeans).not.toContain("CHARGE_REFUSED`:");
     // The codes the renewal can close a charge with, read from the code (renewal.ts): every code renewalFailureOf maps
     // NETOPIA's states to (its own body, so a sixth one is seen), and every literal code a renewal is refused with.
-    // The RenewalFailureCode union is not read: it still lists a code nothing writes.
+    // The RenewalFailureCode union is not read: only what the code writes counts.
     const renewal = read("apps/api/src/billing/renewal.ts");
     const failureOfStart = renewal.indexOf("export function renewalFailureOf(");
     expect(failureOfStart, "renewalFailureOf").toBeGreaterThanOrEqual(0);
@@ -487,7 +487,7 @@ describe("P22 the Billing runbook", () => {
       expect(start, from).toBeGreaterThan(0);
       return flat.slice(start, flat.indexOf(to, start));
     };
-    // C-6: a dashboard refund recorded with --amount is already subtracted; REFUND_UNRECORDED's "by hand" is not again.
+    // C-6: a dashboard refund recorded with --amount is already subtracted, so it is never taken off again by hand.
     const C6 = "A refund transaction of a payment whose dashboard-refund credit note is recorded is already in the figures: do not take it off again.";
     const amountBullet = between("- `--record` with `--amount`, for a `DASHBOARD_REFUND` line only", "- `--requeue` to let the site");
     expect(amountBullet).toContain(C6);

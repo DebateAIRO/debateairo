@@ -39,23 +39,21 @@ export type EFacturaCheckItem = Readonly<{
  * read (P2-I5's REFUND_NOT_REQUESTED, with C-7's REFUND_PAYLOAD_INVALID: nothing was sent, it is no refund to make, and
  * whoever runs the server checks who queued it); a
  * refund job of a payment of another payment system (P2-W4's REFUND_OTHER_SYSTEM: nothing was sent, nothing is owed on
- * this server); a second refund made elsewhere on one payment,
- * which our records cannot hold (P9c's REFUND_UNRECORDED: its amount is in no line of the summary); a withdrawal
- * handed to the owner; a renewal closed with its outcome unknown; a charge with no outcome after 30 days; R2 Q-1's
- * renewals with no charge (a dunning the tax service could not price, a plan such a dunning ended, a renewal a tax
- * refusal blocks); a subscription whose history does not fold (renewals skip it: what was its subscriber charged?).
+ * this server); a withdrawal handed to the owner; a renewal closed with its outcome unknown; a charge with no outcome
+ * after 30 days; R2 Q-1's renewals with no charge (a dunning the tax service could not price, a plan such a dunning
+ * ended, a renewal a tax refusal blocks); a subscription whose history does not fold (renewals skip it: what was its
+ * subscriber charged?).
  */
 export type PaymentCheck =
-  | "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_OTHER_SYSTEM" | "REFUND_UNRECORDED"
-  | "WITHDRAWAL_BY_OWNER"
+  | "REFUND_REFUSED" | "REFUND_OUTCOME_UNKNOWN" | "REFUND_NOT_REQUESTED" | "REFUND_OTHER_SYSTEM" | "WITHDRAWAL_BY_OWNER"
   | "RENEWAL_STUCK" | "PAYMENT_UNSETTLED" | "DUNNING_UNPRICED" | "ENDED_UNPRICED" | "RENEWAL_BLOCKED"
   | "SUBSCRIPTION_HISTORY_INVALID";
 export type PaymentToCheckItem = Readonly<{
   what: PaymentCheck;
   /**
-   * What the owner looks up: a charge ref; the refund transaction's payment id for REFUND_UNRECORDED; the owner ref
-   * that `pnpm billing:withdraw --owner` takes for WITHDRAWAL_BY_OWNER; the subscription id for DUNNING_UNPRICED,
-   * ENDED_UNPRICED, RENEWAL_BLOCKED and SUBSCRIPTION_HISTORY_INVALID.
+   * What the owner looks up: a charge ref; the owner ref that `pnpm billing:withdraw --owner` takes for
+   * WITHDRAWAL_BY_OWNER; the subscription id for DUNNING_UNPRICED, ENDED_UNPRICED, RENEWAL_BLOCKED and
+   * SUBSCRIPTION_HISTORY_INVALID.
    */
   ref: string;
   /**
@@ -187,7 +185,6 @@ export async function efacturaChecksFrom(
 
 /**
  * Every payment list the owner acts on, as the summary shows it (the CLI and O1 share it): dead refunds (P14a),
- * second refunds made elsewhere that P9c could not record (its dead REFUND_UNRECORDED checks) of the last 120 days,
  * withdrawals handed to the owner (P14c), stuck renewals of the last 120 days (as far back as A10's charge-back and
  * refund listings reach), charges with no outcome after 30 days (P14a), R2 Q-1's renewals with no charge (a dunning
  * still running, or ended in the same 120 days; a renewal a tax refusal blocks now), and subscriptions whose history
@@ -195,7 +192,7 @@ export async function efacturaChecksFrom(
  */
 export async function paymentsToCheckFrom(
   billing: Pick<BillingRepository,
-    | "deadRefunds" | "unrecordedRefunds" | "withdrawalsAwaitingOwner" | "stuckRenewals" | "longUnsettledCharges"
+    | "deadRefunds" | "withdrawalsAwaitingOwner" | "stuckRenewals" | "longUnsettledCharges"
     | "chargelessDunning" | "blockedRenewals" | "unfoldableSubscriptions">,
   now: Date
 ): Promise<PaymentToCheckItem[]> {
@@ -206,9 +203,6 @@ export async function paymentsToCheckFrom(
     const claimedOnly = what === "REFUND_NOT_REQUESTED" || what === "REFUND_OTHER_SYSTEM";
     return Object.freeze({ what, ref: item.chargeId, reason: claimedOnly ? null : item.reason, since: item.since });
   });
-  const unrecorded = (await billing.unrecordedRefunds(lookBack)).map((item): PaymentToCheckItem => Object.freeze({
-    what: "REFUND_UNRECORDED", ref: item.transactionId, reason: null, since: item.since
-  }));
   const withdrawals = (await billing.withdrawalsAwaitingOwner()).map((item): PaymentToCheckItem => Object.freeze({
     what: "WITHDRAWAL_BY_OWNER", ref: item.ownerRef, reason: null, since: item.since
   }));
@@ -228,7 +222,7 @@ export async function paymentsToCheckFrom(
   const unfoldable = (await billing.unfoldableSubscriptions()).map((item): PaymentToCheckItem => Object.freeze({
     what: "SUBSCRIPTION_HISTORY_INVALID", ref: item.subscriptionId, reason: null, since: item.since
   }));
-  return [...refunds, ...unrecorded, ...withdrawals, ...stuck, ...unsettled, ...chargeless, ...blocked, ...unfoldable];
+  return [...refunds, ...withdrawals, ...stuck, ...unsettled, ...chargeless, ...blocked, ...unfoldable];
 }
 
 /** W12 (P2-I16): the emails that died in the last 120 days (the same reach as the payment lists above). */
@@ -295,8 +289,6 @@ function deadRefundCheck(
 /** How a payment line names what the owner looks up. */
 function subjectOf(item: PaymentToCheckItem): string {
   switch (item.what) {
-    case "REFUND_UNRECORDED":
-      return `NETOPIA payment ${item.ref}`;
     case "WITHDRAWAL_BY_OWNER":
       return `owner ${item.ref}`;
     case "DUNNING_UNPRICED":
@@ -581,11 +573,8 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " (one never refunded is still owed);"
       + " REFUND_OTHER_SYSTEM: a refund job for a payment of another payment system (the previous card processor, or"
       + " NETOPIA's sandbox or live): nothing was sent, and nothing is owed on this server;"
-      + " REFUND_UNRECORDED: a second refund made in NETOPIA's admin on a payment that already had one, which our"
-      + " records cannot hold, so it is in no figure above: read its amount on that payment in NETOPIA's admin and"
-      + " take it off that country's net sales and tax by hand."
       // Part 4 final review C-6: P4-K's --amount credit note is already subtracted above (quarterSummaryRows).
-      + " A refund of a payment whose admin-refund credit note is recorded is already in the figures"
+      + " a refund of a payment whose admin-refund credit note is recorded is already in the figures"
       + " above: do not take it off again;"
       + " WITHDRAWAL_BY_OWNER: a withdrawal over a payment an admin refund touched, refund in NETOPIA's admin what the"
       + " command cannot take back, then settle it with pnpm billing:withdraw --owner <ref> --refund <amount>"

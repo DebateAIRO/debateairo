@@ -30,9 +30,9 @@ export type DunningAttempt = Readonly<{
    */
   reason: string | null;
   /**
-   * W10 (P2-I21): the failed charge's code (`PAYMENT_DECLINED`, `VOIDED`, `REBILL_REFUSED`, `NO_TRANSACTION`, and on
-   * NETOPIA `CARD_NOT_SAVED`, `AUTHENTICATION_REQUIRED`, `PAYMENT_FAILED`, `PAYMENT_EXPIRED`); null for a charge-less
-   * attempt. `AUTHENTICATION_REQUIRED` puts M5's "confirm your card" sentence in place of any bank sentence.
+   * W10 (P2-I21): the failed charge's code (`PAYMENT_DECLINED`, `VOIDED`, `NO_TRANSACTION`, `CARD_NOT_SAVED`,
+   * `AUTHENTICATION_REQUIRED`, `PAYMENT_FAILED`, `PAYMENT_EXPIRED`); null for a charge-less attempt.
+   * `AUTHENTICATION_REQUIRED` puts M5's "confirm your card" sentence in place of any bank sentence.
    */
   chargeErrorCode: string | null;
   /** Whether a bank refused this attempt's charge (W10; on NETOPIA, the report's `bankDeclined`). Only then M5 says so. */

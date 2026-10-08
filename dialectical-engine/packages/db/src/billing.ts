@@ -1433,27 +1433,6 @@ export class BillingRepository {
     return result.rows.map((row) => ({ chargeId: row.charge_id, since: row.since }));
   }
 
-  /**
-   * P16b (P9c's durable mark, D6a): second refunds made elsewhere on a payment that already holds a refund record,
-   * which P1a's one-request-per-transaction key cannot hold. P9c ended that refund transaction's VERIFY_PAYMENT job
-   * DEAD with REFUND_UNRECORDED (ref = the refund transaction's id); old jobs of the previous card processor's era
-   * still hold that code, so the jobs are grouped by ref, each listed from its first death if that is since `since`.
-   * The owner opens the payment in the processor's admin: its amount is known only there. Content-free: payment ids
-   * and times.
-   */
-  async unrecordedRefunds(since: Date): Promise<Array<{ transactionId: string; since: Date }>> {
-    const result = await this.pool.query<{ transaction_id: string; since: Date }>(`
-      SELECT outbox.ref AS transaction_id, min(outbox.dead_at) AS since
-      FROM billing.outbox AS outbox
-      WHERE outbox.kind = 'VERIFY_PAYMENT' AND outbox.dead_at IS NOT NULL
-        AND outbox.last_error_code = 'REFUND_UNRECORDED'
-      GROUP BY outbox.ref
-      HAVING min(outbox.dead_at) >= $1
-      ORDER BY since, transaction_id
-    `, [since]);
-    return result.rows.map((row) => ({ transactionId: row.transaction_id, since: row.since }));
-  }
-
   // ---- Spec 2026-10-05 §2.5.2: NETOPIA's messages, saved cards, hosted payments, status reads, tool orders ------
   /** §2.7.3: stored once per body; a repeat answers the stored id (`inserted: false`), read back in its own statement. */
   async insertPaymentNotice(c: PoolClient, n: PaymentNoticeInput): Promise<Readonly<{ noticeId: string; inserted: boolean }>> {

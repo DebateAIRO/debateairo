@@ -359,34 +359,6 @@ describe("P16b the summary reads our own rows", () => {
     await append("RENEWED", heldAt, new Date(now.getTime() + 30 * 86_400_000));
     expect(await blocked(now)).toEqual([]);
   });
-
-  it("lists a second refund made elsewhere that our records cannot hold, once per refund transaction (P9c's dead mark)", async () => {
-    const billing = new BillingRepository(database.pool);
-    const refundTransactionId = String(7_700_000_000 + Math.floor(Math.random() * 99_999_999));
-    const deadAt: Date[] = [];
-    // P9c ends the refund transaction's check DEAD with REFUND_UNRECORDED; a notice the previous card processor sent
-    // again made a new job of the same ref (one LIVE job per kind and ref), which died the same way.
-    for (let copy = 0; copy < 2; copy += 1) {
-      const jobId = await billing.withTransaction((client) => billing.enqueue(client, {
-        kind: "VERIFY_PAYMENT", ref: refundTransactionId, notBefore: new Date(0), payload: {}
-      }));
-      const at = new Date(Date.now() - (2 - copy) * 3_600_000);
-      deadAt.push(at);
-      expect(await billing.fail(jobId, "REFUND_UNRECORDED", null, at)).toBe(true);
-    }
-    // Another dead check, for another reason (P9b's CHARGE_NOT_FOUND), is not this list's.
-    const otherId = await billing.withTransaction((client) => billing.enqueue(client, {
-      kind: "VERIFY_PAYMENT", ref: String(Number(refundTransactionId) + 1), notBefore: new Date(0), payload: {}
-    }));
-    expect(await billing.fail(otherId, "CHARGE_NOT_FOUND", null, new Date())).toBe(true);
-    const listed = async (since: Date) => (await billing.unrecordedRefunds(since))
-      .filter((item) => item.transactionId === refundTransactionId || item.transactionId === String(Number(refundTransactionId) + 1));
-    expect(await listed(new Date(Date.now() - 120 * 86_400_000))).toEqual([
-      { transactionId: refundTransactionId, since: deadAt[0] }
-    ]);
-    // Outside the window the summary asks for, it is no longer listed.
-    expect(await listed(new Date(Date.now() + 60_000))).toEqual([]);
-  });
 });
 
 describe("W12 every dead legal document and every dead email reaches the owner's lists (P2-I16)", () => {

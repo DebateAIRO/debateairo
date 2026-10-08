@@ -84,7 +84,6 @@ describe("P16b the summary", () => {
       { what: "REFUND_OUTCOME_UNKNOWN", ref: "6".repeat(32), reason: "WITHDRAWAL", since: new Date("2026-11-09T00:00:00.000Z") },
       { what: "REFUND_NOT_REQUESTED", ref: "4".repeat(32), reason: null, since: new Date("2026-11-17T00:00:00.000Z") },
       { what: "REFUND_OTHER_SYSTEM", ref: "2".repeat(32), reason: null, since: new Date("2026-11-20T00:00:00.000Z") },
-      { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: new Date("2026-11-11T00:00:00.000Z") },
       { what: "WITHDRAWAL_BY_OWNER", ref: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", reason: null, since: new Date("2026-11-10T00:00:00.000Z") },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: new Date("2026-11-12T00:00:00.000Z") },
       { what: "PAYMENT_UNSETTLED", ref: "8".repeat(32), reason: null, since: new Date("2026-10-02T00:00:00.000Z") },
@@ -169,12 +168,11 @@ describe("P16b the summary", () => {
     expect(text).toContain("(REFUND_REFUSED: NETOPIA refused our refund, the money is still owed, refund it from NETOPIA's"
       + " admin; REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check NETOPIA's admin before refunding again;"
       + " a WITHDRAWAL refund is due within 14 days of the withdrawal; REFUND_NOT_REQUESTED:");
-    // P9c's second refund made elsewhere: named by the payment the owner opens in NETOPIA's admin.
-    expect(text).toContain("NETOPIA payment 9912345: REFUND_UNRECORDED, since 2026-11-11");
-    expect(text).toContain("REFUND_UNRECORDED: a second refund made in NETOPIA's admin");
+    // N26c (spec 2026-10-05 §2.19): the previous card processor's unrecorded second refund left with its only writer.
+    expect(text).not.toContain("REFUND_UNRECORDED");
     // Part 4 final review C-6: a refund transaction of a payment whose dashboard-refund credit note is recorded
     // (P4-K's --amount, which the figures already subtract) is never taken off a second time by hand.
-    expect(text).toContain("take it off that country's net sales and tax by hand. A refund of a payment whose"
+    expect(text).toContain("nothing is owed on this server; a refund of a payment whose"
       + " admin-refund credit note is recorded is already in the figures above: do not take it off again;");
     expect(text).toContain("owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93: WITHDRAWAL_BY_OWNER, since 2026-11-10");
     expect(text).toContain(`charge ${"5".repeat(32)}: RENEWAL_STUCK, since 2026-11-12`);
@@ -368,11 +366,6 @@ describe("P16b the summary", () => {
         // reason is never printed (REFUND_NOT_REQUESTED's legend sends the owner to the charge's own requests).
         { chargeId: "1".repeat(32), transactionId: "6", reason: "WITHDRAWAL", code: "REFUND_PAYLOAD_INVALID", since: now }
       ],
-      unrecordedRefunds: async (since) => {
-        // P9c's second refunds made elsewhere, as far back as A10's refund listing reaches.
-        expect(since).toEqual(new Date(now.getTime() - 120 * 86_400_000));
-        return [{ transactionId: "9912345", since: now }];
-      },
       withdrawalsAwaitingOwner: async () => [{ ownerRef: owner, subscriptionId: "s", planId: "PRO", since: now }],
       unfoldableSubscriptions: async () => [{ subscriptionId: "3c9d2b1a-5e4f-4a6b-8c7d-9e0f1a2b3c4d", since: now }],
       stuckRenewals: async (since) => {
@@ -405,7 +398,6 @@ describe("P16b the summary", () => {
       { what: "REFUND_NOT_REQUESTED", ref: "3".repeat(32), reason: null, since: now },
       { what: "REFUND_OTHER_SYSTEM", ref: "2".repeat(32), reason: null, since: now },
       { what: "REFUND_NOT_REQUESTED", ref: "1".repeat(32), reason: null, since: now },
-      { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: now },
       { what: "WITHDRAWAL_BY_OWNER", ref: owner, reason: null, since: now },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: now },
       { what: "PAYMENT_UNSETTLED", ref: "8".repeat(32), reason: null, since: new Date("2026-11-01T00:00:00.000Z") },

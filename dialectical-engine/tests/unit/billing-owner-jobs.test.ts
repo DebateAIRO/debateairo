@@ -30,7 +30,6 @@ function fakes(rows: TaxSummaryRow[] = []) {
       chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "PAYMENT_CONFIGURATION_REFUSED",
       since: new Date("2026-12-20T00:00:00.000Z")
     }],
-    unrecordedRefunds: async () => [],
     withdrawalsAwaitingOwner: async () => [],
     unfoldableSubscriptions: async () => [],
     stuckRenewals: async () => [],
