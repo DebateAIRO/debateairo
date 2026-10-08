@@ -6,7 +6,6 @@ import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/regis
 import type { AccountEmailReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
 import type { CancelLinkService } from "./cancel-link.js";
-import type { CheckoutService } from "./checkout.js";
 import type { ConsentKind, ConsentPair } from "./checkout.js";
 import type { BillingLegalGate } from "./index.js";
 import type { BillingOrderText } from "./order-text.js";
@@ -62,8 +61,6 @@ export type SubscriptionRouteDeps = Readonly<{
   ownerSpend: Readonly<{ readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> }>;
   /** P9b's single refund executor (R-32). */
   refunds: Pick<RefundDesk, "requestAll">;
-  /** P8c's CheckoutService: the one builder and signer of embedded xMoney orders (R-17). */
-  checkout: Pick<CheckoutService, "signEmbeddedOrder">;
   /** P8c's account email reader: the address the card form is opened for, as at checkout. */
   accountEmail: AccountEmailReader;
   /** P13 (A25): the emailed one-time cancel link, for the two public routes that need no session. */

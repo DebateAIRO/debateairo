@@ -5,9 +5,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { XMoneyNotice, XMoneyStatus, XMoneyTransaction } from "@debateai/payments-xmoney";
 import type { BillingPlans } from "@debateai/register";
 import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
-import {
-  CheckoutService, type CheckoutDeps, type ConsentKind, type EmbeddedOrderInput, type SignedEmbeddedOrder
-} from "../../apps/api/src/billing/checkout.js";
+import { CheckoutService, type CheckoutDeps, type ConsentKind } from "../../apps/api/src/billing/checkout.js";
 import {
   createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMail
 } from "../../apps/api/src/billing/email-job.js";
@@ -23,6 +21,7 @@ import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-r
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
 import { consentDocument } from "../../apps/ui/scripts/legal-consent-manifest.mjs";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
+import { StubCardPayments } from "./stub-card-payments.js";
 import {
   AdjustableTaxEngine, PROFILE_ADDRESS_ONLY, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy
 } from "./billingFixtures.js";
@@ -301,19 +300,9 @@ export class StubXMoney {
   }
 }
 
-/** P8c's checkout, reporting every order it signs to the stub: the order's customer is who pays it (A1). */
-class HarnessCheckout extends CheckoutService {
-  constructor(deps: CheckoutDeps, private readonly stub: StubXMoney) { super(deps); }
-
-  override signEmbeddedOrder(input: EmbeddedOrderInput): SignedEmbeddedOrder {
-    this.stub.signed(input.chargeId, input.customerIdentifier);
-    return super.signEmbeddedOrder(input);
-  }
-}
-
 export type Purchase = Readonly<{
   ownerRef: string; userId: string; quoteId: string; chargeId: string; subscriptionId: string;
-  totalDecimal: string; orderPayload: string; orderChecksum: string; reused: boolean;
+  totalDecimal: string; redirectUrl: string; reused: boolean;
 }>;
 
 export type BillingHarness = Readonly<{
@@ -397,14 +386,15 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   const quotes = new QuoteService({
     repository, tax, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy, plans: testBillingPlans, recordsKey, audit
   });
+  // N18: the checkout starts NETOPIA's page; N24 moves the rest of this harness onto NETOPIA.
+  const payments = new StubCardPayments();
   const checkoutDeps: CheckoutDeps = {
-    repository, jobs, acceptances, xmoney, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
+    repository, jobs, acceptances, payments, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
     accountEmail: { read: async (userId: string) => `buyer-${userId.slice(0, 8)}@example.test` },
-    consentDocuments: testConsentDocuments, recordsKey, xmoneyPrivateKey, xmoneyPublicKey: "pk_test_harness",
-    siteId: "site-test", publicAppUrl: TEST_PUBLIC_APP_URL, xmoneyEnvironment: "stage", audit
+    consentDocuments: testConsentDocuments, recordsKey, publicAppUrl: TEST_PUBLIC_APP_URL, audit
   };
   const checkoutWith = (overrides: Partial<CheckoutDeps>): CheckoutService =>
-    new HarnessCheckout({ ...checkoutDeps, ...overrides } as CheckoutDeps, xmoney);
+    new CheckoutService({ ...checkoutDeps, ...overrides } as CheckoutDeps);
   const checkout = checkoutWith({});
   const refunds = new RefundDesk({
     repository, jobs, xmoney, policy: testBillingPolicy, audit, clock: clock.read, xmoneyEnvironment: "stage"
@@ -474,13 +464,15 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       const ownerRef = input.ownerRef ?? randomUUID();
       const userId = input.userId ?? randomUUID();
       // A Romanian buyer carries the name, city and county SmartBill needs (R-15); a US or Canadian buyer the postal
-      // code Quaderno prices by (P2-M29; New York's and Ottawa's, where the fakes are not registered).
+      // code Quaderno prices by (P2-M29; New York's and Ottawa's, where the fakes are not registered); every buyer the
+      // full cardholder NETOPIA needs (spec 2026-10-05 §2.6.1).
       const country = input.country ?? "RO";
-      const postalCode = input.postalCode ?? (country === "US" ? "10001" : country === "CA" ? "K1A 0B1" : null);
+      const postalCode = input.postalCode
+        ?? ({ US: "10001", CA: "K1A 0B1", RO: "010011", DE: "10115" } as Readonly<Record<string, string>>)[country] ?? "00000";
       const quoted = await quotes.create({
-        ownerRef, ip: "198.51.100.7", planId: input.planId ?? "PLUS", country,
-        name: "Test Buyer", region: input.region ?? "Bucuresti", postalCode, city: "Sector 1", company: input.company ?? null,
-        now: clock.now
+        ownerRef, ip: "198.51.100.7", planId: input.planId ?? "PLUS", country, name: null, firstName: "Test",
+        lastName: "Buyer", phone: "+40712345678", street: "Strada Test 1", region: input.region ?? "Bucuresti",
+        postalCode, city: "Sector 1", company: input.company ?? null, now: clock.now
       });
       const chargeId = input.chargeId;
       const service = chargeId === undefined ? checkout : checkoutWith({ chargeIds: () => chargeId });
@@ -495,8 +487,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       if (charge === null) throw new Error("HARNESS_CHARGE_MISSING");
       return Object.freeze({
         ownerRef, userId, quoteId: quoted.quote.quoteId, chargeId: started.chargeId, subscriptionId: charge.subscriptionId,
-        totalDecimal: microsToDecimal(charge.totalMicros), orderPayload: started.orderPayload,
-        orderChecksum: started.orderChecksum, reused: started.reused
+        totalDecimal: microsToDecimal(charge.totalMicros), redirectUrl: started.redirectUrl, reused: started.reused
       });
     },
     refunds, verify, worker, notices, mail,

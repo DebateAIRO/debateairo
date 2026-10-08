@@ -6,6 +6,7 @@ import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } fro
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
 export * from "./crisis.js";
 export * from "./romania-address.js";
+export * from "./billing-address.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -330,8 +331,18 @@ export const BillingQuoteRequestSchema = z.object({
   plan_id: PlanIdSchema.exclude(["FREE"]),
   /** Absent: the country of the caller's address is used, and answered back as `country`. */
   country: BillingIso2Schema.optional(),
-  /** The buyer's own name; a Romanian invoice needs it (or the company's). */
+  /** Older pages' single name; the first and last name below replace it (spec 2026-10-05 §2.5.3). */
   name: z.string().trim().min(1).max(256).optional(),
+  /**
+   * Spec 2026-10-05 §2.6.1: NETOPIA's cardholder. Optional here so the page's first quote (the connection's country,
+   * its pre-fill) needs none; `address_required` stays true, and the checkout refuses 422 BILLING_ADDRESS_REQUIRED,
+   * until every field a paid checkout needs is given.
+   */
+  first_name: z.string().trim().min(1).max(120).optional(),
+  last_name: z.string().trim().min(1).max(120).optional(),
+  /** Any spelling of an international number; the server keeps it as E.164 (`e164Phone`) or refuses 422. */
+  phone: z.string().trim().min(4).max(32).optional(),
+  street: z.string().trim().min(1).max(256).optional(),
   /** The county (RO) or state (US/CA). */
   region: z.string().trim().min(1).max(64).optional(),
   postal_code: z.string().trim().min(1).max(16).optional(),
@@ -362,7 +373,10 @@ export const BillingQuoteResponseSchema = z.object({
   /** The connection's country; sentence G3 names it when `country_confirm_needed`. */
   ip_country: z.string().regex(/^[A-Z]{2}$/),
   country_confirm_needed: z.boolean(),
-  /** R-15: the invoice issuer needs the buyer's name, city and county before the checkout can start. */
+  /**
+   * Spec 2026-10-05 §2.6.1: NETOPIA's cardholder (names, phone, street, city, the postal code and, in the US, Canada
+   * and Romania, the region) and R-15's invoice fields must all be given before the checkout can start.
+   */
   address_required: z.boolean(),
   renews_on: z.iso.datetime(),
   /** Null where no withdrawal right applies (outside `withdrawalCountries`). */
@@ -385,32 +399,33 @@ export const BillingCheckoutRequestSchema = z.object({
 }).strict();
 export type BillingCheckoutRequest = z.infer<typeof BillingCheckoutRequestSchema>;
 
+/**
+ * Spec 2026-10-05 §2.6.2 step 7: NETOPIA's payment page for this checkout's charge. The page sends the browser there
+ * with a top-level navigation, never a frame or a fetch. The server stores and answers only an https URL on a NETOPIA
+ * host (the package's rule, §2.2 rule 10); http is accepted here only so the local fakes can serve one.
+ */
 export const BillingCheckoutResponseSchema = z.object({
-  public_key: z.string().min(1).max(256),
-  order_payload: z.string().min(1).max(16_384),
-  order_checksum: z.string().min(1).max(512),
+  redirect_url: z.url({ protocol: /^https?$/u }).max(2_048),
   charge_ref: z.string().regex(/^[0-9a-f]{32}$/),
-  sdk_environment: z.enum(["stage", "live"])
+  environment: z.enum(["sandbox", "live"])
 }).strict();
 export type BillingCheckoutResponse = z.infer<typeof BillingCheckoutResponseSchema>;
 
-/**
- * The 409 body the checkout answers while a payment for the person's open checkout is already on its way (a stored
- * notice, an open check or an xMoney transaction for that charge): the page waits on `charge_ref` instead of
- * mounting a second card form (D7 #5).
- */
+/** The 409 while the open checkout's payment is paid or almost, unreadable, or being opened (spec §2.6.3, D7 #5). */
 export const BillingCheckoutPendingErrorSchema = z.object({
   error: z.literal("CHECKOUT_PENDING"),
   message: z.literal("CHECKOUT_PENDING"),
   charge_ref: z.string().regex(/^[0-9a-f]{32}$/)
 }).strict();
-/** What `startBillingCheckout` resolves to for that 409, beside the signed order. */
+/** What `startBillingCheckout` resolves to for that 409, beside NETOPIA's page. */
 export type BillingCheckoutPendingResponse = Readonly<{ state: "PENDING"; charge_ref: string }>;
 
 /** NEEDS_ACTION: the bank declined and the person can try again; FAILED: refused or voided, final. */
 export const BillingChargeStatusResponseSchema = z.object({
   state: z.enum(["PENDING", "SUCCEEDED", "FAILED", "NEEDS_ACTION"]),
-  reason_code: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/).nullable()
+  reason_code: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/).nullable(),
+  /** Spec 2026-10-05 §2.6.5: so the one return page words an upgrade's confirmation. */
+  kind: z.enum(["INITIAL", "RENEWAL", "UPGRADE", "CARD_CHECK"])
 }).strict();
 export type BillingChargeStatusResponse = z.infer<typeof BillingChargeStatusResponseSchema>;
 

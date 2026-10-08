@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import { buildApi } from "@debateai/api";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import type { BillingRouteOptions } from "../../apps/api/src/billing/index.js";
-import { addressRequired, type QuoteResult, type QuoteServicePort } from "../../apps/api/src/billing/quote.js";
+import type { QuoteResult, QuoteServicePort } from "../../apps/api/src/billing/quote.js";
 import { BillingRefusal } from "../../apps/api/src/billing/refusal.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
-import { testBillingPlans, testBillingPolicy, unusedAskApplication } from "../support/billingFixtures.js";
+import { testBillingPlans, unusedAskApplication } from "../support/billingFixtures.js";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
 const OWNER = testHttpIdentity("billing-quote-owner");
@@ -105,19 +105,22 @@ describe("P8b POST /v1/billing/quote", () => {
   });
 });
 
-describe("P2-M29 a US or Canadian buyer gives the postal code (spec §1.3)", () => {
-  const at = (country: string, region: string | null, postalCode: string | null) => addressRequired({
-    name: null, firstName: null, lastName: null, phone: null, country, region, postalCode, city: null, street: null,
-    ip: null, ipCountry: country, company: null
-  }, country, testBillingPolicy);
-
-  it.each(["US", "CA"])("asks %s for the postal code even when a state is given, since Quaderno is sent no region", (country) => {
-    expect(at(country, null, null)).toBe(true);
-    expect(at(country, country === "US" ? "NY" : "ON", null)).toBe(true);
-    expect(at(country, null, country === "US" ? "10001" : "K1A 0B1")).toBe(false);
-  });
-
-  it("asks nothing of a buyer elsewhere outside Romania", () => {
-    expect(at("DE", null, null)).toBe(false);
+describe("N18 the quote route passes NETOPIA's cardholder fields through (spec §2.6.1)", () => {
+  it("maps first_name, last_name, phone and street, and keeps 422 BILLING_PHONE_INVALID", async () => {
+    const quotes = { create: vi.fn(async () => RESULT) };
+    const api = harness(quotes);
+    const response = await post(api, {
+      plan_id: "PLUS", country: "RO", first_name: "Ana", last_name: "Pop", phone: "+40 712 345 678",
+      street: "Strada Lipscani 1", city: "Sector 1", region: "Bucuresti", postal_code: "010101"
+    });
+    expect(response.statusCode).toBe(200);
+    expect(quotes.create).toHaveBeenCalledWith(expect.objectContaining({
+      firstName: "Ana", lastName: "Pop", phone: "+40 712 345 678", street: "Strada Lipscani 1", name: null
+    }));
+    await api.close();
+    const refused = harness({ create: async () => { throw new BillingRefusal(422, "BILLING_PHONE_INVALID"); } });
+    const answer = await post(refused, { plan_id: "PLUS", phone: "0712" });
+    expect([answer.statusCode, answer.json()]).toEqual([422, { error: "BILLING_PHONE_INVALID", message: "BILLING_PHONE_INVALID" }]);
+    await refused.close();
   });
 });

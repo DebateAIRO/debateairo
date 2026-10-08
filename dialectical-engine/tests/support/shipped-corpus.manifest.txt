@@ -668,6 +668,7 @@ packages/budget/src/model-spend.ts
 packages/budget/src/person-allowance.ts
 packages/budget/src/room.ts
 packages/budget/src/spend-lock.ts
+packages/contract/src/billing-address.ts
 packages/contract/src/client.ts
 packages/contract/src/crisis-lexicon/ar.ts
 packages/contract/src/crisis-lexicon/bg.ts

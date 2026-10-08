@@ -22,7 +22,11 @@ beforeAll(async () => { h = await startBillingHarness(); });
 afterAll(async () => { await h?.stop(); });
 
 const subscriptionKinds = async (subscriptionId: string) => (await h.repository.subscriptionEvents(subscriptionId)).map((event) => event.kind);
-const status = (chargeId: string, ownerRef: string) => new ChargeStatusReader(h.repository).read(chargeId, ownerRef);
+/** The waiting screen's state and reason (N18 adds the charge's kind, which these xMoney cases do not read). */
+const status = async (chargeId: string, ownerRef: string) => {
+  const answer = await new ChargeStatusReader({ repository: h.repository, jobs: h.jobs, clock: h.clock.read }).read(chargeId, ownerRef);
+  return answer === null ? null : { state: answer.state, reasonCode: answer.reasonCode };
+};
 /** A VERIFY_PAYMENT job as the worker hands it over, at a chosen attempt (7: the not-final schedule is spent). */
 const claimedCheck = (transactionId: string, attempts: number) => ({
   jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: transactionId, payload: {}, attempts, notBefore: h.clock.now,

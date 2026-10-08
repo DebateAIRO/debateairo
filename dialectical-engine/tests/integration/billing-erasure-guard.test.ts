@@ -40,8 +40,9 @@ async function scheduleErasure(pool: Pool, ownerRef: string): Promise<void> {
 }
 
 const quoteInput = (ownerRef: string) => ({
-  ownerRef, ip: IP, planId: "PLUS" as const, country: "RO", name: "Test Buyer", region: "Bucuresti", postalCode: null,
-  city: "Sector 1", company: null, now: h.clock.now
+  ownerRef, ip: IP, planId: "PLUS" as const, country: "RO", name: null, firstName: "Test", lastName: "Buyer",
+  phone: "+40712345678", street: "Strada Test 1", region: "Bucuresti", postalCode: "010011", city: "Sector 1",
+  company: null, now: h.clock.now
 });
 
 describe("P15 no new money while an account erasure is pending", () => {
@@ -65,7 +66,7 @@ describe("P15 no new money while an account erasure is pending", () => {
     const paid = await h.activate({ ownerRef: identity.authenticated.ownerRef });
     const deps = subscriptionDeps(h.database.pool, {
       recordsKey: h.recordsKey, tax: h.tax, xmoney: h.xmoney, geo: h.geo, clock: h.clock.read,
-      checkout: h.checkoutWith({}), accountEmail: { read: async () => "erasing@example.test" }
+      accountEmail: { read: async () => "erasing@example.test" }
     });
     const api = await mountSubscriptionRoutes(deps, identity);
     const headers = { "x-test-session": identity.rawSessionToken };

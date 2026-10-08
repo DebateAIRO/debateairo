@@ -31,8 +31,9 @@ const service = () => new QuoteService({
   recordsKey: KEY, audit: (event, fields) => { audit.push({ event, ...fields }); }
 });
 const input = (ownerRef: string, overrides: Partial<QuoteInput> = {}): QuoteInput => ({
-  ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", name: "Ana Pop", region: "Bucuresti", postalCode: "010101",
-  city: "Sector 1", company: null, now: NOW, ...overrides
+  ownerRef, ip: "198.51.100.7", planId: "PLUS", country: "RO", name: null, firstName: "Ana", lastName: "Pop",
+  phone: "+40712345678", street: "Strada Lipscani 1", region: "Bucuresti", postalCode: "010101", city: "Sector 1",
+  company: null, now: NOW, ...overrides
 });
 
 describe("P8b the quote", () => {
@@ -47,21 +48,22 @@ describe("P8b the quote", () => {
       taxCountry: "RO", taxRateBasisPoints: 2_100, taxStatus: "TAXABLE", expiresAt: new Date(NOW.getTime() + 1_800_000)
     });
     expect(openQuoteLocation(KEY, result.quote.quoteId, stored!.locationCiphertext)).toEqual({
-      name: "Ana Pop", firstName: null, lastName: null, phone: null, country: "RO", region: "Bucuresti",
-      postalCode: "010101", city: "Sector 1", street: null, ip: "198.51.100.7", ipCountry: "RO", company: null
+      name: "Ana Pop", firstName: "Ana", lastName: "Pop", phone: "+40712345678", country: "RO", region: "Bucuresti",
+      postalCode: "010101", city: "Sector 1", street: "Strada Lipscani 1", ip: "198.51.100.7", ipCountry: "RO", company: null
     });
     expect(await repository.quote(result.quote.quoteId, randomUUID())).toBeNull();
   });
 
   it("uses the connection's country when the page sends none", async () => {
     geo.country = "DE";
-    const result = await service().create(input(randomUUID(), { country: null, name: null, region: null, city: null }));
-    expect(result).toMatchObject({ declaredCountry: "DE", ipCountry: "DE", countryConfirmNeeded: false, addressRequired: false });
+    // The pre-fill quote names nobody yet: the checkout still needs the cardholder (spec 2026-10-05 §2.6.1).
+    const result = await service().create(input(randomUUID(), { country: null, firstName: null, lastName: null, region: null, city: null }));
+    expect(result).toMatchObject({ declaredCountry: "DE", ipCountry: "DE", countryConfirmNeeded: false, addressRequired: true });
     expect(result.quote).toMatchObject({ taxCountry: "DE", taxRateBasisPoints: 1_900, totalMicros: 23_800_000 });
   });
 
   it("asks for the name, city and county a Romanian invoice needs, and still prices without them (R-15)", async () => {
-    const result = await service().create(input(randomUUID(), { name: null, city: null }));
+    const result = await service().create(input(randomUUID(), { firstName: null, lastName: null, city: null }));
     expect(result).toMatchObject({ addressRequired: true, quote: { totalMicros: 24_200_000 } });
     const company = { name: "SC Test SRL", vatId: "RO123VALID", address: "Str. Test 1" };
     expect((await service().create(input(randomUUID(), { name: null, company }))).addressRequired).toBe(false);
@@ -82,15 +84,14 @@ describe("P8b the quote", () => {
       .toBe(true);
   });
 
-  it("asks a US or Canadian buyer for the postal code before the checkout: a state alone is not enough (spec §1.3, P2-M29)", async () => {
+  it("asks a US or Canadian buyer for the postal code and the state: a state alone is not enough (P2-M29, A31 (h))", async () => {
     geo.country = "US";
-    const bare = { country: "US", name: null, region: null, postalCode: null, city: null } as const;
-    expect(await service().create(input(randomUUID(), bare))).toMatchObject({ addressRequired: true, quote: { taxCountry: "US" } });
-    expect((await service().create(input(randomUUID(), { ...bare, postalCode: "10001" }))).addressRequired).toBe(false);
-    // Quaderno is never sent a region (P4), so a state alone would price the sale with no state at all.
-    expect((await service().create(input(randomUUID(), { ...bare, region: "NY" }))).addressRequired).toBe(true);
-    expect((await service().create(input(randomUUID(), { ...bare, region: "TX" }))).quote).toMatchObject({ taxMicros: 0, taxStatus: "NOT_REGISTERED" });
-    expect((await service().create(input(randomUUID(), { ...bare, postalCode: "75001" }))).quote)
+    const us = { country: "US", region: "NY", postalCode: "10001", city: "New York" } as const;
+    expect((await service().create(input(randomUUID(), us))).addressRequired).toBe(false);
+    expect(await service().create(input(randomUUID(), { ...us, postalCode: null }))).toMatchObject({ addressRequired: true, quote: { taxCountry: "US" } });
+    expect((await service().create(input(randomUUID(), { ...us, region: null }))).addressRequired).toBe(true);
+    // Quaderno is never sent a region (P4), so the postal code prices the sale.
+    expect((await service().create(input(randomUUID(), { ...us, postalCode: "75001", region: "TX", city: "Dallas" }))).quote)
       .toMatchObject({ taxMicros: 1_250_000, taxRegion: "TX", taxStatus: "TAXABLE" });
   });
 

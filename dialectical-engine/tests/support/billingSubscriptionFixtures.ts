@@ -12,7 +12,6 @@ import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { planById, type PlanId } from "@debateai/register";
 import type { BillingAudit, BillingAuditEvent, BillingAuditField } from "../../apps/api/src/billing/audit.js";
 import type { BillingAdmissionScope } from "../../apps/api/src/billing/index.js";
-import { CheckoutService } from "../../apps/api/src/billing/checkout.js";
 import type { ConsentKind } from "../../apps/api/src/billing/checkout.js";
 import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
 import { sealBillingProfile, sealCardToken, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
@@ -28,8 +27,6 @@ import { StubCardPayments } from "./stub-card-payments.js";
 export const TEST_RECORDS_KEY = Buffer.alloc(32, 7);
 /** Stands for PUBLIC_APP_URL (R-7) in every billing link a test reads. */
 export const TEST_PUBLIC_APP_URL = "https://dezbatere.test";
-/** A generated xMoney private key (A23: bytes); tests never hold a real one. */
-export const TEST_XMONEY_PRIVATE_KEY = Buffer.alloc(32, 9);
 
 const TEST_AGREEMENT_SHA256 = createHash("sha256").update("renewal agreement (test)", "utf8").digest("hex");
 /** 0080's `acceptance_document_version_shape`: a consent sentence's version is `sha256-` + its hash's first 12 hex. */
@@ -377,36 +374,6 @@ const unconfigured = async (): Promise<never> => {
 const UNCONFIGURED_XMONEY: Pick<XMoneyClient, "rebill" | "refund" | "getTransaction" | "listTransactions"> = Object.freeze({
   rebill: unconfigured, refund: unconfigured, getTransaction: unconfigured, listTransactions: unconfigured
 });
-/** The stand-in for the methods P8c's `CheckoutDeps.xmoney` picks (`listTransactions`, `getOrder`: D7 #5's look). */
-const UNCONFIGURED_XMONEY_CUSTOMERS: Pick<XMoneyClient, "createCustomer" | "listTransactions" | "getOrder"> = Object.freeze({
-  createCustomer: unconfigured, listTransactions: unconfigured, getOrder: unconfigured
-});
-
-/**
- * P8c's real CheckoutService over a real database, keyed with generated values. The ONE place the billing tests
- * name CheckoutDeps' members; the card change uses only its `signEmbeddedOrder` (R-17).
- */
-export function cardCheckoutFor(pool: Pool): CheckoutService {
-  return new CheckoutService({
-    repository: new BillingRepository(pool),
-    jobs: new BillingJobQueries(pool),
-    acceptances: new AcceptanceRepository(pool),
-    xmoney: UNCONFIGURED_XMONEY_CUSTOMERS,
-    accountEmail: { read: async () => "p12@example.test" },
-    geo: new StubGeo(),
-    countryPolicy: testCountryPolicy,
-    policy: testBillingPolicy,
-    consentDocuments: () => null,
-    recordsKey: TEST_RECORDS_KEY,
-    xmoneyPrivateKey: TEST_XMONEY_PRIVATE_KEY,
-    xmoneyPublicKey: "pk_test_p12",
-    siteId: "site-p12",
-    publicAppUrl: TEST_PUBLIC_APP_URL,
-    xmoneyEnvironment: "stage",
-    audit: recordingAudit()
-  });
-}
-
 /** The routes' dependencies over a real database, with fakes for every vendor. */
 export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRouteDeps> = {}): SubscriptionRouteDeps {
   const billing = overrides.billing ?? new BillingRepository(pool);
@@ -437,7 +404,6 @@ export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRout
     geo: new StubGeo(),
     kick: () => undefined,
     ownerSpend: { readOwnerSpentMicros: async () => 0 },
-    checkout: cardCheckoutFor(pool),
     accountEmail: { read: async () => "p12@example.test" },
     refunds: new RefundDesk({
       repository: billing, jobs, xmoney: UNCONFIGURED_XMONEY, policy: testBillingPolicy, audit, clock: () => new Date(),

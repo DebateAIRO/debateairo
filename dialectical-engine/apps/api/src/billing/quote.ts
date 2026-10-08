@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { computeWindows, invoiceIssuerFor, type TaxEngine } from "@debateai/billing-core";
-import { isRomanianInvoiceLocality } from "@debateai/contract";
+import { e164Phone, isRomanianInvoiceLocality, postcodeOptional } from "@debateai/contract";
 import type { BillingRepository, QuoteRow } from "@debateai/db";
 import type { GeoLookup } from "@debateai/geo";
 import { TypedDomainError } from "@debateai/kernel";
@@ -19,7 +19,13 @@ export type QuoteInput = Readonly<{
   planId: Exclude<PlanId, "FREE">;
   /** Null: the connection's country (P19's pre-fill). */
   country: string | null;
+  /** Older pages' single name; ignored when both firstName and lastName are given. */
   name: string | null;
+  /** Spec 2026-10-05 §2.6.1: NETOPIA's cardholder (names, phone as typed, street). */
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  street: string | null;
   region: string | null;
   postalCode: string | null;
   city: string | null;
@@ -60,20 +66,22 @@ export function taxRefusalDetail(error: unknown): string {
   return error instanceof TypedDomainError && /^QUADERNO_[A-Z0-9_]{1,48}$/.test(error.message) ? error.message : "UNKNOWN";
 }
 
+/** A31 (h), R-15: the countries whose region the invoice and the tax need (state, province, county). */
+const REGION_COUNTRIES: ReadonlySet<string> = new Set(["US", "CA", "RO"]);
+
 /**
- * R-15: the issuer the rules give this tax country (SmartBill for Romania) refuses an invoice without the buyer's
- * name, city and county. A company's name is the buyer's name. P2-M15: the county must be one SmartBill names and, in
- * Bucharest, the city a sector (`isRomanianInvoiceLocality`, the same lists the checkout offers), or SPV will not
- * validate the e-Factura. Spec §1.3: Quaderno prices the US and Canada by the postal code, and P4 never sends it a
- * region, so a buyer there gives the postal code (P2-M29); a state alone would be priced with no state at all. The
- * checkout page already requires it; the checkout's 422 BILLING_ADDRESS_REQUIRED holds a crafted request to it too.
+ * Spec 2026-10-05 §2.6.1: NETOPIA needs the full cardholder on every payment: names, phone, street, city, the postal code
+ * (optional only for `postcodeOptional`'s list) and the region in the US, Canada and Romania. R-15 / P2-M15 still hold
+ * for a Romanian invoice. The checkout's 422 BILLING_ADDRESS_REQUIRED holds a crafted request to the same rule.
  */
 export function addressRequired(location: QuoteLocation, taxCountry: string, policy: BillingPolicy): boolean {
-  if ((location.country === "US" || location.country === "CA") && location.postalCode === null) return true;
+  if (location.firstName === null || location.lastName === null || location.phone === null) return true;
+  if (location.street === null || location.city === null) return true;
+  if (location.postalCode === null && !postcodeOptional(location.country)) return true;
+  if (REGION_COUNTRIES.has(location.country) && location.region === null) return true;
   if (invoiceIssuerFor(taxCountry, policy.invoiceIssuerRules) !== "SMARTBILL") return false;
   const name = location.company?.name ?? location.name;
-  return name === null || location.city === null || location.region === null
-    || !isRomanianInvoiceLocality(location.region, location.city);
+  return name === null || location.region === null || !isRomanianInvoiceLocality(location.region, location.city);
 }
 
 export class QuoteService implements QuoteServicePort {
@@ -124,6 +132,9 @@ export class QuoteService implements QuoteServicePort {
       geo: this.deps.geo, policy: this.deps.countryPolicy, ip: input.ip, declaredCountry: input.country
     });
     if (place.kind === "REFUSE") throw this.refused(placeRefusal(place, this.deps.audit));
+    // Spec 2026-10-05 §2.6.1: the server keeps the phone as E.164; a number it cannot read is refused, never guessed.
+    const phone = input.phone === null ? null : e164Phone(input.phone);
+    if (input.phone !== null && phone === null) throw this.refused(new BillingRefusal(422, "BILLING_PHONE_INVALID"));
     let taxId: string | null = null;
     let company: QuoteLocation["company"] = null;
     if (input.company !== null) {
@@ -132,10 +143,12 @@ export class QuoteService implements QuoteServicePort {
       taxId = input.company.vatId;
       company = Object.freeze({ ...input.company, vatValidated: true });
     }
+    // Spec §2.5.3: `name` is "first + last" for the invoice issuers (R-15 reads it unchanged).
+    const name = input.firstName !== null && input.lastName !== null ? `${input.firstName} ${input.lastName}` : input.name;
     const validated: QuoteLocation = Object.freeze({
-      name: input.name, firstName: null, lastName: null, phone: null,
-      country: place.declaredCountry, region: input.region, postalCode: input.postalCode,
-      city: input.city, street: null, ip: input.ip === "unknown" ? null : input.ip, ipCountry: place.ipCountry, company
+      name, firstName: input.firstName, lastName: input.lastName, phone, country: place.declaredCountry,
+      region: input.region, postalCode: input.postalCode, city: input.city, street: input.street,
+      ip: input.ip === "unknown" ? null : input.ip, ipCountry: place.ipCountry, company
     });
     const taxQuote = await this.taxCall(this.deps.tax.quote({
       netMicros: plan.netPriceMicros, currency: "USD", location: taxLocationOf(validated), taxId,

@@ -17,21 +17,21 @@ import { refuse } from "./subscription-core.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 
 /**
- * Spec 2026-10-05 §2.6.3, §2.10, §2.11, §2.14: what every payment on NETOPIA's hosted page shares (the upgrade, N13's
- * card check, N16's reads): the start and what a failed start writes, the status read with its `billing.status_read`
+ * Spec 2026-10-05 §2.6.3, §2.10, §2.11, §2.14: what every payment on NETOPIA's hosted page shares (N18's checkout, the
+ * upgrade, N13's card check, N16's reads): the start and what a failed start writes, the status read with its `billing.status_read`
  * row, the two state tests, the close of an unpaid page, and the card-saving agreement. Nothing here logs a payer, a
  * URL or a token.
  */
 const ALMOST_PAID_STATUSES: ReadonlySet<string> = new Set(["6", "13", "14", "18"]);
 
 /** Spec §2.6.3's first row: PAID, AUTHORIZED, or PENDING with NETOPIA status 6, 13, 14 or 18. */
-export function paidOrAlmost(report: PaymentReport): boolean {
+export function paidOrAlmost(report: Pick<PaymentReport, "state" | "providerStatus">): boolean {
   return report.state === "PAID" || report.state === "AUTHORIZED"
     || (report.state === "PENDING" && ALMOST_PAID_STATUSES.has(report.providerStatus));
 }
 
 /** Spec §2.6.3's reusable page: untouched (status 1), declined (the person may retry), or at the bank's check (15). */
-export function stillPayable(report: PaymentReport): boolean {
+export function stillPayable(report: Pick<PaymentReport, "state" | "providerStatus">): boolean {
   return (report.state === "PENDING" && report.providerStatus === "1") || report.state === "DECLINED"
     || report.state === "ACTION_REQUIRED";
 }
@@ -87,7 +87,7 @@ export type HostedStartDeps = Readonly<{
 }>;
 
 /** The flow a hosted start belongs to, as its audit lines name it. */
-export type HostedChargeOperation = "upgrade" | "card_check";
+export type HostedChargeOperation = "checkout" | "upgrade" | "card_check";
 
 export function hostedStartDeps(
   deps: Pick<SubscriptionRouteDeps, "billing" | "jobs" | "payments" | "recordsKey" | "audit">, paymentEnvironment: "sandbox" | "live"
@@ -99,13 +99,13 @@ export function hostedStartDeps(
 
 /** The owner's next steps for a start NETOPIA refused (English only, owner-facing, content-free). */
 const START_STEPS: Readonly<Record<"CHARGE_CONFIGURATION_REFUSED" | "CHARGE_CREDENTIALS_REFUSED", string>> = Object.freeze({
-  CHARGE_CONFIGURATION_REFUSED: "NETOPIA refused to open its payment page for an upgrade or a card check because of our"
-    + " own setup (the merchant settings, or a code we do not know). Nothing was charged; the person was told the"
-    + " payment page could not be opened and may try again. Run pnpm billing:check, then fix the setting in NETOPIA's"
-    + " admin or ask NETOPIA about the code.",
-  CHARGE_CREDENTIALS_REFUSED: "NETOPIA refused our API key when opening a payment page for an upgrade or a card check."
-    + " Nothing was charged; the person was told the payment page could not be opened. Replace the key with the guided"
-    + " setup (deploy/vps/billing-setup.sh --replace netopia), restart the API, and run pnpm billing:check."
+  CHARGE_CONFIGURATION_REFUSED: "NETOPIA refused to open its payment page for a checkout, an upgrade or a card check"
+    + " because of our own setup (the merchant settings, or a code we do not know). Nothing was charged; the person was"
+    + " told the payment page could not be opened and may try again. Run pnpm billing:check, then fix the setting in"
+    + " NETOPIA's admin or ask NETOPIA about the code.",
+  CHARGE_CREDENTIALS_REFUSED: "NETOPIA refused our API key when opening a payment page for a checkout, an upgrade or a"
+    + " card check. Nothing was charged; the person was told the payment page could not be opened. Replace the key with"
+    + " the guided setup (deploy/vps/billing-setup.sh --replace netopia), restart the API, and run pnpm billing:check."
 });
 
 /**

@@ -494,10 +494,11 @@ export class BillingRepository {
   /**
    * The one customer row per owner, and the xMoney customer linked in `environment` — `null` when that environment
    * has none yet (a fresh start, or the first live checkout after stage), so the caller creates one there (R-14).
+   * `environment` null (NETOPIA, spec 2026-10-05 §2.6.2 step 2: no customer object there) reads no link; N23 removes it.
    */
   async ensureCustomer(
     c: PoolClient,
-    i: Readonly<{ ownerRef: string; locale: string; now: Date; environment: CustomerXMoneyEnvironment }>
+    i: Readonly<{ ownerRef: string; locale: string; now: Date; environment: CustomerXMoneyEnvironment | null }>
   ): Promise<{ customerId: string; xmoneyCustomerId: string | null }> {
     await c.query(`
       INSERT INTO billing.customer (customer_id, owner_ref, created_at, created_locale)
@@ -505,8 +506,9 @@ export class BillingRepository {
     `, [randomUUID(), i.ownerRef, i.now, i.locale]);
     const row = (await c.query<{ customer_id: string; xmoney_customer_id: string | null }>(`
       SELECT customer.customer_id,
-        (SELECT link.xmoney_customer_id FROM billing.customer_xmoney AS link
-          WHERE link.customer_id = customer.customer_id AND link.environment = $2) AS xmoney_customer_id
+        CASE WHEN $2::text IS NULL THEN NULL ELSE
+          (SELECT link.xmoney_customer_id FROM billing.customer_xmoney AS link
+            WHERE link.customer_id = customer.customer_id AND link.environment = $2::text) END AS xmoney_customer_id
       FROM billing.customer AS customer WHERE customer.owner_ref = $1
     `, [i.ownerRef, i.environment])).rows[0];
     if (row === undefined) throw new TypedDomainError("BILLING_CUSTOMER_UNRESOLVED", "the billing customer was not created");

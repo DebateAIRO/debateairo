@@ -287,8 +287,9 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       }
       const result = await quotes.create({
         ownerRef: authenticated.ownerRef, ip: source(request).ip, planId: body.plan_id, country: body.country ?? null,
-        name: body.name ?? null, region: body.region ?? null, postalCode: body.postal_code ?? null,
-        city: body.city ?? null,
+        name: body.name ?? null, firstName: body.first_name ?? null, lastName: body.last_name ?? null,
+        phone: body.phone ?? null, street: body.street ?? null, region: body.region ?? null,
+        postalCode: body.postal_code ?? null, city: body.city ?? null,
         company: body.company === undefined ? null
           : { name: body.company.name, vatId: body.company.vat_id, address: body.company.address },
         now: clock()
@@ -320,8 +321,7 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
         countryConfirmed: body.country_confirmed === true, now: clock()
       });
       return reply.send(BillingCheckoutResponseSchema.parse({
-        public_key: result.publicKey, order_payload: result.orderPayload, order_checksum: result.orderChecksum,
-        charge_ref: result.chargeId, sdk_environment: result.sdkEnvironment
+        redirect_url: result.redirectUrl, charge_ref: result.chargeId, environment: result.environment
       }));
     });
   });
@@ -333,7 +333,7 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
       const status = await charges.read(request.params.chargeRef, authenticated.ownerRef);
       if (status === null) return billingNotFound(reply);
-      return reply.send(BillingChargeStatusResponseSchema.parse({ state: status.state, reason_code: status.reasonCode }));
+      return reply.send(BillingChargeStatusResponseSchema.parse({ state: status.state, reason_code: status.reasonCode, kind: status.kind }));
     }
   );
 

@@ -75,7 +75,7 @@ export type BillingRuntimeDeps = Readonly<{
 
 export type BillingRuntime = Readonly<{
   outbox: BillingOutboxWorker;
-  /** P8c: the checkout; P12e signs its card-check order with `checkout.signEmbeddedOrder` (R-17). */
+  /** P8c / N18: the checkout (NETOPIA's hosted page). */
   checkout: CheckoutService;
   /** P8a onward: the billing routes' members this runtime composes (main.ts's `billingRouteOptions`). */
   routes: BillingRouteOptions;
@@ -229,13 +229,11 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     }));
   }
   const checkout = new CheckoutService({
-    repository, jobs, acceptances, xmoney: deps.connectors.xmoney,
+    repository, jobs, acceptances, payments: deps.connectors.payments,
     accountEmail: new DekAccountEmailReader(deps.pool, deps.dekStore), geo: deps.geo, countryPolicy: deps.countryPolicy,
     policy: deps.policy, consentDocuments: (kind, locale) => currentDocument(kind, locale),
-    recordsKey: deps.connectors.recordsKey, xmoneyPrivateKey: deps.connectors.xmoneyPrivateKey,
-    xmoneyPublicKey: deps.connectors.xmoneyPublicKey, siteId: deps.connectors.siteId,
-    publicAppUrl: deps.connectors.publicAppUrl, xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit,
-    // P17 (D6a F29): the order line in the buyer's locale, from the catalogue (englishOrderText until this task).
+    recordsKey: deps.connectors.recordsKey, publicAppUrl: deps.connectors.publicAppUrl, audit: deps.audit,
+    // P17 (D6a F29): the order line in the buyer's locale, from the catalogue.
     orderText: catalogueOrderText
   });
   // P13 (A25): the emailed one-time cancel link. P12d's `required` refuses a composition without either input.
@@ -275,8 +273,6 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     // P12d: the credit-used share of a withdrawal, and its refunds through the one executor (R-32).
     ownerSpend: required(deps.ownerSpend, "ownerSpend"),
     refunds,
-    // P12e (R-17): the card change's order is built and signed by the checkout, for the account's own address.
-    checkout,
     accountEmail: new DekAccountEmailReader(deps.pool, deps.dekStore),
     // P13: the two public cancel routes.
     cancelLinks
@@ -293,7 +289,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       repository, tax: deps.connectors.tax, geo: deps.geo, countryPolicy: deps.countryPolicy, policy: deps.policy,
       plans: deps.plans, recordsKey: deps.connectors.recordsKey, audit: deps.audit
     }),
-    checkout, charges: new ChargeStatusReader(repository),
+    checkout, charges: new ChargeStatusReader({ repository, jobs, clock: deps.clock }),
     // P9a: `drain` is declared below; the kick only runs once a notice arrives.
     notices: new NoticeIntake({
       repository, decrypt: (value) => decryptNotice(value, deps.connectors.xmoneyPrivateKey), audit: deps.audit,
