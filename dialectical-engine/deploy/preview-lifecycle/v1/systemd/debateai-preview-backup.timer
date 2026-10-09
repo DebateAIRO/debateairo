@@ -1,0 +1,14 @@
+# Install as /etc/systemd/system/debateai-preview-backup.timer, then:
+#   systemctl enable --now debateai-preview-backup.timer
+[Unit]
+Description=Nightly preview database dump at 03:15 Bucharest time
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 Europe/Bucharest
+# A server that was off at 03:15 makes the dump at the next boot.
+Persistent=true
+AccuracySec=1min
+Unit=debateai-preview-backup.service
+
+[Install]
+WantedBy=timers.target
