@@ -28,13 +28,26 @@ describe("approved current-password and verified-email clients", () => {
   });
   it("restricts later requests to the MFA scope with no password or ordinary authority", async () => {
     let init: RequestInit = {};
-    const client = createMfaRecoveryClient(async (_url, options) => { init = options!; return json({ status: "completed" }); }, "/api", () => "B".repeat(43));
-    await client.complete();
+    const client = createMfaRecoveryClient(async (_url, options) => { init = options!; return json({ status: "waiting", not_before: expires_at }); }, "/api", () => "B".repeat(43));
+    await expect(client.complete()).resolves.toEqual({ status: "waiting", not_before: expires_at });
     expect(init.body).toBe("{}");
     expect(new Headers(init.headers).get("x-mfa-recovery-csrf-token")).toBe("B".repeat(43));
     expect(new Headers(init.headers).get("x-csrf-token")).toBeNull();
-    await expect(createMfaRecoveryClient(async () => json({ status: "completed", session: "forged" })).complete()).rejects.toThrow();
+    await expect(createMfaRecoveryClient(async () => json({ status: "waiting", not_before: expires_at, session: "forged" })).complete()).rejects.toThrow();
+    await expect(createMfaRecoveryClient(async () => json({ status: "completed" })).complete()).rejects.toThrow();
     await expect(createMfaRecoveryClient(async () => json({ status: "ready", expires_at, secret: "forged" })).status()).rejects.toThrow();
+  });
+  it("reads and uses the emailed finish link with the current password and no recovery-session authority", async () => {
+    const requests: { url: string; init: RequestInit }[] = [];
+    const client = createMfaRecoveryClient(async (url, init) => { requests.push({ url: String(url), init: init! }); return String(url).endsWith("/finish/status") ? json({ status: "ready_to_finish", expires_at }) : json({ status: "completed" }); }, "/api", () => "B".repeat(43));
+    await expect(client.finishStatus("F".repeat(43))).resolves.toEqual({ status: "ready_to_finish", expires_at });
+    await expect(client.finish("F".repeat(43), "current password fixture")).resolves.toEqual({ status: "completed" });
+    expect(requests.map(r => r.url)).toEqual(["/api/v1/auth/mfa-recovery/finish/status", "/api/v1/auth/mfa-recovery/finish"]);
+    expect(requests.map(r => r.init.body)).toEqual([JSON.stringify({ token: "F".repeat(43) }), JSON.stringify({ token: "F".repeat(43), password: "current password fixture" })]);
+    expect(requests.every(r => new Headers(r.init.headers).get("x-mfa-recovery-csrf-token") === null)).toBe(true);
+    await expect(createMfaRecoveryClient(async () => json({ status: "waiting", not_before: expires_at })).finishStatus("F".repeat(43))).resolves.toEqual({ status: "waiting", not_before: expires_at });
+    await expect(createMfaRecoveryClient(async () => json({ status: "ready_to_finish", not_before: expires_at })).finishStatus("F".repeat(43))).rejects.toThrow();
+    await expect(createMfaRecoveryClient(async () => json({ error: "MFA_RECOVERY_TOO_EARLY" }, 409)).finish("F".repeat(43), "p")).rejects.toMatchObject({ status: 409, serverCode: "MFA_RECOVERY_TOO_EARLY" });
   });
   it("verifies only the bound backup address using ordinary password and current MFA proofs", async () => {
     const requests: { url: string; init: RequestInit }[] = [];
