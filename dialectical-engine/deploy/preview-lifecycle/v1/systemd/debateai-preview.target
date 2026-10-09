@@ -1,0 +1,13 @@
+# Install as /etc/systemd/system/debateai-preview.target, then: systemctl enable debateai-preview.target
+# Brings the whole private preview up at boot. The runner is deliberately NOT here (it stays masked).
+[Unit]
+Description=DebateAI V3 private preview (all services)
+Documentation=file:///opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/README.md
+Wants=network-online.target
+After=network-online.target
+Wants=debateai-preview-postgresql.service debateai-preview-hatchet.service debateai-preview-hatchet-gateway.service
+Wants=debateai-preview-capture.service debateai-preview-provider-budget.service debateai-preview-turnstile.service
+Wants=debateai-preview-api.service debateai-preview-ui.service
+
+[Install]
+WantedBy=multi-user.target

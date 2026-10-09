@@ -453,6 +453,7 @@ apps/ui/components/accountNavigation.source-test.mjs
 apps/ui/components/auth/EmailPendingScreen.tsx
 apps/ui/components/auth/EphemeralCodes.tsx
 apps/ui/components/auth/InlineFieldMessage.tsx
+apps/ui/components/auth/LockoutPrompt.tsx
 apps/ui/components/auth/OnboardingEvidence.tsx
 apps/ui/components/auth/PhoneField.tsx
 apps/ui/components/auth/RecoveryFlow.tsx

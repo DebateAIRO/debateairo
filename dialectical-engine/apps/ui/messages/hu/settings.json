@@ -168,10 +168,11 @@
   "settings.security.title": "Biztonság",
   "settings.phone.reveal": "Telefonszám megjelenítése",
   "settings.phone.change": "Telefonszám módosítása",
-  "settings.phone.required": "A folytatáshoz adja meg a telefonszámát. A kérdés és a beállítások megmaradnak.",
+  "settings.phone.purpose": "Később SMS-ben küldhetünk Önnek egy kódot, amely segít visszajutni a fiókjába, és ha segítséget kér tőlünk, felhívhatjuk, vagy SMS-t küldhetünk Önnek. Titkosítva tároljuk; soha nem adjuk ki, és nem használjuk marketingcélokra.",
   "settings.security.lastPath": "Az eltávolítás előtt adjon hozzá másik bejelentkezési módot.",
   "settings.security.remove": "Eltávolítás",
   "settings.security.codesRemaining": "Helyreállítási kódok: {count}",
   "settings.security.regenerate": "Új helyreállítási kódok létrehozása",
+  "settings.security.lockoutReminder": "Még nincsenek helyreállítási kódjai, és hozzáférési kulcsa sincs. Ha elveszíti a telefonját, ezekkel azonnal visszajut a fiókjába.",
   "settings.security.refreshFailed": "A biztonsági adatokat nem sikerült frissíteni. Töltse be újra az oldalt."
 }

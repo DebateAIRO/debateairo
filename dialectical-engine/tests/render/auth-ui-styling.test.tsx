@@ -21,6 +21,7 @@ import { EmailPendingScreen } from "../../apps/ui/components/auth/EmailPendingSc
 import { SecurityConfirmation } from "../../apps/ui/components/auth/SecurityConfirmation.js";
 import { SecurityEnrollment } from "../../apps/ui/components/auth/SecurityEnrollment.js";
 import { EphemeralCodes } from "../../apps/ui/components/auth/EphemeralCodes.js";
+import { LockoutPrompt } from "../../apps/ui/components/auth/LockoutPrompt.js";
 import { PasswordResetFlow } from "../../apps/ui/components/PasswordResetFlow.js";
 import { MfaRecoveryFlow } from "../../apps/ui/components/MfaRecoveryFlow.js";
 import { BackupEmailVerification } from "../../apps/ui/components/BackupEmailVerification.js";
@@ -188,6 +189,16 @@ describe("every auth screen styles its own controls", () => {
 
   it("recovery codes with Copy and Download", async () => {
     const host = await render(<EphemeralCodes catalog={auth} codes={["AAAA-BBBB", "CCCC-DDDD"]} />);
+    expect(unstyled(host)).toEqual([]);
+  });
+
+  it("the don't-get-locked-out card after set-up, and its fresh-proof check", async () => {
+    const client = { authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 0, available_step_up_methods: ["password_totp"], step_up_providers: [] }) } as never;
+    const host = await render(<LockoutPrompt catalog={auth} client={client} onDone={vi.fn()} />);
+    expect(host.textContent).toContain(auth["auth.lockout.title"]);
+    expect(unstyled(host)).toEqual([]);
+    await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === auth["auth.lockout.saveCodes"])!.click());
+    expect(host.querySelector(".authSecurityConfirmation")).not.toBeNull();
     expect(unstyled(host)).toEqual([]);
   });
 

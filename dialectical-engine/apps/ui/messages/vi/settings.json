@@ -167,10 +167,11 @@
   "settings.security.title": "Bảo mật",
   "settings.phone.reveal": "Hiện số điện thoại",
   "settings.phone.change": "Đổi số điện thoại",
-  "settings.phone.required": "Thêm số điện thoại để tiếp tục. Câu hỏi và tùy chọn của bạn được giữ lại.",
+  "settings.phone.purpose": "Sau này, chúng tôi có thể gửi mã qua tin nhắn SMS để giúp bạn vào lại tài khoản, và nếu bạn nhờ chúng tôi hỗ trợ, chúng tôi có thể gọi điện hoặc nhắn tin cho bạn. Được lưu trữ dưới dạng mã hóa; không bao giờ được chia sẻ hay dùng cho mục đích tiếp thị.",
   "settings.security.lastPath": "Thêm cách đăng nhập khác trước khi xóa cách này.",
   "settings.security.remove": "Xóa",
   "settings.security.codesRemaining": "Mã khôi phục: {count}",
   "settings.security.regenerate": "Tạo mã khôi phục mới",
+  "settings.security.lockoutReminder": "Bạn chưa có mã khôi phục hoặc khóa truy cập. Nếu bạn làm mất điện thoại, chúng giúp bạn vào lại ngay.",
   "settings.security.refreshFailed": "Không thể làm mới thông tin bảo mật. Hãy tải lại trang."
 }

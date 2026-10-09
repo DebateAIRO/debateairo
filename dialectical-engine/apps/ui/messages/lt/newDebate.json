@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "Atsijungimas nebaigtas. Bandykite dar kartą.",
   "newDebate.room.locationBlocked": "Iš dabartinės jūsų buvimo vietos negalima pradėti naujų debatų. Jūsų debatus ir toliau galima skaityti.",
   "newDebate.room.previewTeamOnly": "Šioje peržiūros versijoje debatai prieinami tik komandai.",
+  "newDebate.room.phoneRequired": "Pridėkite telefono numerį nustatymuose arba bandykite dar kartą po kelių minučių.",
   "newDebate.room.siteFull": "Šiandienos riba pasiekta. Vis tiek galite klausti — jūsų debatai prasidės patys, kai riba bus atnaujinta.",
   "newDebate.room.siteClose": "Artėjate prie šiandienos ribos. Šie debatai vis tiek vyks iki galo; vėlesniems gali tekti palaukti iki atnaujinimo.",
   "newDebate.room.alreadyWaiting": "Vienu metu laukti gali tik vienas klausimas. Jūsiškis prasidės {time}; šį klausimą užduokite po to.",

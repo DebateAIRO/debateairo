@@ -94,6 +94,8 @@ function settingsWith(
       effectiveRiskTier: askerRiskTier, tierSource: tierSource as never, tierProvenanceRef
     }),
     ...(billing === undefined ? {} : { billing }),
+    // The ask path once refused Free asks without a phone through this seam (removed
+    // 2026-10-09). A reader is still handed in so the tests can prove it is never consulted.
     ...(profile === undefined ? {} : {accountProfile:profile}),
     ...(room === undefined ? {} : { room })
   };
@@ -599,12 +601,14 @@ describe("the colleague's consent gate comes before the plan and the room (R3-6)
   });
 });
 
-describe("manual phone completion at the resolved funding seam",()=>{
- it("refuses a resolved Free ask before room quota, hold or run creation",async()=>{
+// Owner ruling 2026-10-09: the phone is optional. No ask is refused for lack of one, and the
+// ask path never reads the phone profile, even where a profile reader is wired.
+describe("no phone is needed to ask",()=>{
+ it("accepts a resolved Free ask from a person without a phone, without reading the phone profile",async()=>{
   const {billing}=billingFor("FREE"), {room,questions}=recordingRoom();
-  const {application,started}=arrange(billing,room,undefined,{hasPhone:async()=>false});
-  await expect(application.submit(ask(),serverSession,serverPrincipal)).rejects.toMatchObject({code:"ACCOUNT_PHONE_REQUIRED"});
-  expect(questions).toEqual([]);expect(started).toEqual([]);
+  let phoneReads=0;const {application,started}=arrange(billing,room,undefined,{hasPhone:async()=>{phoneReads++;return false;}});
+  expect((await application.submit(ask(),serverSession,serverPrincipal)).status).toBe("QUEUED");
+  expect(phoneReads).toBe(0);expect(questions).toHaveLength(2);expect(started).toHaveLength(1);
  });
  it("allows paid asks without phone even when the room uses Free models",async()=>{
   const {billing}=billingFor("PLUS",{spent:900000,limit:1000000},300000);
@@ -612,20 +616,20 @@ describe("manual phone completion at the resolved funding seam",()=>{
   const result=await application.submit(ask(),serverSession,serverPrincipal);
   expect(result.status).toBe("QUEUED");expect(started).toHaveLength(1);
  });
- it("allows a resolved Free ask once the manual phone is present",async()=>{
+ it("still accepts a resolved Free ask from a person with a phone",async()=>{
   const {billing}=billingFor("FREE"), {room}=recordingRoom();
   const {application,started}=arrange(billing,room,undefined,{hasPhone:async()=>true});
   expect((await application.submit(ask(),serverSession,serverPrincipal)).status).toBe("QUEUED");expect(started).toHaveLength(1);
  });
 });
 
-it("offers crisis support first for an owner missing phone without room, quota or run work",async()=>{
+it("offers crisis support first for an owner without a phone, then accepts an ordinary question",async()=>{
  const identity=testHttpIdentity("task3-phone-crisis"),{billing}=billingFor("FREE"),{room,questions}=recordingRoom();
  let phoneReads=0;const {application,started}=arrange(billing,room,undefined,{hasPhone:async()=>{phoneReads++;return false;}});
  const api=buildApi({application,sessions:testSessionApplication([identity]),allowedOrigin:TEST_APP_ORIGIN});
  try{const response=await api.inject({method:"POST",url:"/v1/asks",headers:testSessionHeaders(identity,true),payload:ask({question_line:"I want to kill myself"})});
  expect(response.statusCode).toBe(422);expect(response.json()).toMatchObject({error:"CRISIS_SUPPORT_OFFERED"});expect(phoneReads).toBe(0);expect(questions).toEqual([]);expect(started).toEqual([]);
  const ordinary=await api.inject({method:"POST",url:"/v1/asks",headers:testSessionHeaders(identity,true),payload:ask()});
- expect(ordinary.statusCode).toBe(422);expect(ordinary.json()).toMatchObject({error:"ACCOUNT_PHONE_REQUIRED"});expect(phoneReads).toBe(1);expect(questions).toEqual([]);expect(started).toEqual([]);
+ expect(ordinary.json()).not.toMatchObject({error:"ACCOUNT_PHONE_REQUIRED"});expect(ordinary.statusCode).toBe(202);expect(phoneReads).toBe(0);expect(questions).toHaveLength(2);expect(started).toHaveLength(1);
  }finally{await api.close();}
 });

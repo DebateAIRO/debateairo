@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "Izrakstīšanās netika pabeigta. Lūdzu, mēģiniet vēlreiz.",
   "newDebate.room.locationBlocked": "No jūsu pašreizējās atrašanās vietas nevar sākt jaunas debates. Jūsu debates joprojām ir pieejamas lasīšanai.",
   "newDebate.room.previewTeamOnly": "Šajā priekšskatījuma versijā debates ir pieejamas tikai komandai.",
+  "newDebate.room.phoneRequired": "Lūdzu, pievienojiet tālruņa numuru iestatījumos vai mēģiniet vēlreiz pēc dažām minūtēm.",
   "newDebate.room.siteFull": "Šodienas ierobežojums ir sasniegts. Jūs joprojām varat uzdot jautājumu — jūsu debates sāksies pašas, kad ierobežojums tiks atjaunots.",
   "newDebate.room.siteClose": "Jūs tuvojaties šodienas ierobežojumam. Šīs debates tik un tā notiks pilnībā; vēlākajām var nākties gaidīt līdz atjaunošanai.",
   "newDebate.room.alreadyWaiting": "Vienlaikus gaidīt var tikai viens jautājums. Jūsējais sāksies {time}; uzdodiet šo jautājumu pēc tam.",

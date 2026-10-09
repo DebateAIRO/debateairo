@@ -1,0 +1,21 @@
+# Install as /etc/systemd/system/debateai-preview-backup.service (started by the .timer).
+# Root: it opens the dump file in the root-only folder; pg_dump itself runs as postgres over
+# the local socket. No network, no DebateAI credential.
+[Unit]
+Description=DebateAI preview: nightly local database dump (keeps the 7 newest)
+After=debateai-preview-postgresql.service
+OnFailure=debateai-preview-alert@%n.service
+
+[Service]
+Type=oneshot
+# Root runs node through `env -i` with PATH only (like the prestart and the team unlock): nothing
+# from the service manager's environment (NODE_OPTIONS, NODE_PATH, ...) reaches it. pg_dump and
+# pg_restore run by absolute path as postgres through runuser and their own `env -i`.
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/backup.mjs
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=3600
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true

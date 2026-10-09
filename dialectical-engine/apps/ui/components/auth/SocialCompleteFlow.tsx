@@ -19,6 +19,7 @@ import type { TurnstilePublicConfig } from '@/lib/turnstile';
 import { TurnstileChallenge } from './TurnstileChallenge';
 import { EmailPendingScreen } from './EmailPendingScreen';
 import { SecurityEnrollment } from './SecurityEnrollment';
+import { LockoutPrompt } from './LockoutPrompt';
 import { PhoneField } from './PhoneField';
 import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
 import { EphemeralCodes } from './EphemeralCodes';
@@ -88,6 +89,9 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [stepUpStatus, setStepUpStatus] = useState<SocialStepUpStatusResponse | null>(null);
     const [flowExpiry, setFlowExpiry] = useState<string | null>(null);
     const [authenticated, setAuthenticated] = useState(false);
+    // Set once this flow's own MFA set-up has signed the person in: the "don't get locked out" card comes first,
+    // still under the set-up heading (the flow's kind is cleared by then).
+    const [secured, setSecured] = useState(false);
     const [privacyAccepted, setPrivacyAccepted] = useState(false);
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [policyOpen, setPolicyOpen] = useState(false);
@@ -198,7 +202,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         }, Math.max(0, Date.parse(flowExpiry) - Date.now()));
         return () => clearTimeout(timer);
     }, [flowExpiry, token, browser, catalog]);
-    function finish(result: AuthenticationResponse, sessionAlreadyAnnounced = false) {
+    function finish(result: AuthenticationResponse, sessionAlreadyAnnounced = false, enrolled = false) {
         if (result.status !== 'authenticated')
             return;
         if (!sessionAlreadyAnnounced) { clearStoredSupportConversation(); announceSessionChange(); }
@@ -208,6 +212,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         setAuthenticated(true);
         if (result.replacement_recovery_code)
             setBackup(result.replacement_recovery_code);
+        else if (enrolled)
+            setSecured(true);
         else
             navigateAuthenticated();
     }
@@ -372,7 +378,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         return <EmailPendingScreen email={pending} retryAfterSeconds={60} client={client} catalog={catalog} locale={uiLocale} turnstile={turnstile} onDifferentEmail={() => window.location.assign('/sign-up')}/>;
     const methods = kind === 'stepup' ? stepUpStatus?.available_methods ?? [] : loginStatus?.available_methods ?? [];
     const codeFormatError = !recoveryMode && (codeIncomplete || !readSixDigitCode(code).valid);
-    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
+    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' || secured ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
  {error ? <div className="authAlert" role="alert">{error}</div> : null}
  {returnToQuestion && !stepUpResult && !backup ? <a className="authPrimary" href="/new">{t(catalog, 'auth.continue')}</a> : null}
  {backup ? <div><EphemeralCodes codes={[backup]} catalog={catalog}/><button type="button" className="authPrimary" onClick={() => {
@@ -404,7 +410,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                     setProof(null);
                     setError(t(catalog, "auth.pending.proofUnavailable"));
                 }}/> : null}<button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button>{signupAnnouncer.region}</form> : null}
- {token && kind === 'enroll' ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'pending', token }} onAuthenticated={result => finish(result, true)}/> : null}
+ {token && kind === 'enroll' ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'pending', token }} onAuthenticated={result => finish(result, true, true)}/> : null}
+ {secured ? <LockoutPrompt catalog={catalog} client={client} onDone={navigateAuthenticated}/> : null}
  {token && (kind === 'login' || kind === 'stepup') ? <div>
  {methods.includes('passkey') ? <div className="authAltMethods"><button type="button" className="authSecondary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button></div> : null}
  {methods.includes('totp') || methods.includes('recovery_code') ? <><form className="authForm authMfaForm" method="post" action="/social/complete" noValidate onSubmit={e => {
@@ -446,7 +453,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                         attempt.current.edited();
                     }}>{recoveryMode ? t(catalog, "auth.login.useAuthenticatorCode") : t(catalog, "auth.login.useRecoveryCode")}</button> : null}</> : null}
  </div> : null}
- {!token && !stepUpResult && !backup && !busy ? <a href="/login">{t(catalog, "auth.login.backToSignIn")}</a> : null}
+ {!token && !stepUpResult && !backup && !busy && !secured ? <a href="/login">{t(catalog, "auth.login.backToSignIn")}</a> : null}
  {policyOpen ? <PrivacyPolicyModal open mode="consent" onClose={() => setPolicyOpen(false)} onAcknowledge={() => {
                 setPrivacyAccepted(true);
                 setPolicyOpen(false);
