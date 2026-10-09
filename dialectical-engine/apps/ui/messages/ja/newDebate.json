@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "サインアウトが完了しませんでした。もう一度お試しください。",
   "newDebate.room.locationBlocked": "現在の場所からは新しいディベートを開始できません。これまでのディベートは引き続きお読みいただけます。",
   "newDebate.room.previewTeamOnly": "このプレビュー版のディベートは、チームのみが利用できます。",
+  "newDebate.room.phoneRequired": "設定で電話番号を追加するか、数分後にもう一度お試しください。",
   "newDebate.room.siteFull": "本日の上限に達しました。質問はこのまま送れます。上限がリセットされると、ディベートは自動的に始まります。",
   "newDebate.room.siteClose": "本日の上限に近づいています。このディベートは最後まで行われますが、この後のディベートはリセットまで待つ場合があります。",
   "newDebate.room.alreadyWaiting": "待機できる質問は一度に一つだけです。お待ちの質問は{time}に始まります。この質問はその後に送ってください。",

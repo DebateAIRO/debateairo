@@ -168,10 +168,11 @@
   "settings.security.title": "Turvalisus",
   "settings.phone.reveal": "Näita telefoninumbrit",
   "settings.phone.change": "Muuda telefoninumbrit",
-  "settings.phone.required": "Jätkamiseks lisa telefoninumber. Küsimus ja valikud säilivad.",
+  "settings.phone.purpose": "Edaspidi võime saata teile SMS-iga koodi, mis aitab teil oma kontole tagasi pääseda, ja kui palute meilt abi, saame teile helistada või SMS-i saata. Salvestatakse krüpteeritult; seda ei jagata kunagi ega kasutata turunduseks.",
   "settings.security.lastPath": "Lisa enne selle eemaldamist teine sisselogimisviis.",
   "settings.security.remove": "Eemalda",
   "settings.security.codesRemaining": "Taastekoodid: {count}",
   "settings.security.regenerate": "Loo uued taastekoodid",
+  "settings.security.lockoutReminder": "Teil pole veel taastekoode ega pääsuvõtit. Kui kaotate telefoni, pääsete nendega kohe tagasi sisse.",
   "settings.security.refreshFailed": "Turbeandmeid ei saanud värskendada. Laadi leht uuesti."
 }

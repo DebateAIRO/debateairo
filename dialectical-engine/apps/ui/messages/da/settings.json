@@ -168,10 +168,11 @@
   "settings.security.title": "Sikkerhed",
   "settings.phone.reveal": "Vis telefonnummer",
   "settings.phone.change": "Skift telefonnummer",
-  "settings.phone.required": "Tilføj dit telefonnummer for at fortsætte. Dit spørgsmål og dine valg bevares.",
+  "settings.phone.purpose": "Senere sender vi dig måske en kode via sms, så du kan komme ind på din konto igen, og hvis du beder os om hjælp, kan vi ringe eller sende dig en sms. Gemmes krypteret; deles aldrig og bruges aldrig til markedsføring.",
   "settings.security.lastPath": "Tilføj en anden loginmetode, før du fjerner denne.",
   "settings.security.remove": "Fjern",
   "settings.security.codesRemaining": "Gendannelseskoder: {count}",
   "settings.security.regenerate": "Generér nye gendannelseskoder",
+  "settings.security.lockoutReminder": "Du har endnu ingen gendannelseskoder eller adgangsnøgle. Hvis du mister din telefon, kommer du ind igen med det samme med dem.",
   "settings.security.refreshFailed": "Sikkerhedsoplysningerne kunne ikke opdateres. Genindlæs siden."
 }

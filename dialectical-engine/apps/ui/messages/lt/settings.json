@@ -170,10 +170,11 @@
   "settings.security.title": "Saugumas",
   "settings.phone.reveal": "Rodyti telefoną",
   "settings.phone.change": "Keisti telefoną",
-  "settings.phone.required": "Norėdami tęsti pridėkite telefoną. Klausimas ir parinktys išsaugomi.",
+  "settings.phone.purpose": "Ateityje galime atsiųsti jums kodą SMS žinute, kad padėtume vėl patekti į paskyrą, o jei paprašysite mūsų pagalbos, galime jums paskambinti arba parašyti SMS žinutę. Saugoma užšifruota; niekada neperduodama kitiems ir nenaudojama rinkodarai.",
   "settings.security.lastPath": "Prieš pašalindami šį būdą pridėkite kitą prisijungimo būdą.",
   "settings.security.remove": "Pašalinti",
   "settings.security.codesRemaining": "Atkūrimo kodai: {count}",
   "settings.security.regenerate": "Generuoti naujus atkūrimo kodus",
+  "settings.security.lockoutReminder": "Dar neturite atkūrimo kodų ar prieigos rakto. Jei pamesite telefoną, su jais iškart vėl prisijungsite.",
   "settings.security.refreshFailed": "Nepavyko atnaujinti saugumo duomenų. Įkelkite puslapį iš naujo."
 }

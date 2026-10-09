@@ -2447,6 +2447,12 @@ a:focus-visible {
 }
 .authSetupKey .authSecondary { width: auto; padding-inline: 16px; }
 
+/* "Don't get locked out": the one-time card after MFA set-up (recovery codes or a passkey, or Later). */
+.authLockout { display: flex; flex-direction: column; gap: 12px; }
+.authLockout h2 { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.35; }
+.authLockout p { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.55; }
+.authLockoutActions { display: flex; flex-direction: column; gap: 8px; }
+
 /* Password reset and authenticator recovery panels. */
 .recoveryStatus { display: flex; flex-direction: column; gap: 12px; }
 .recoveryStatus p { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.55; }

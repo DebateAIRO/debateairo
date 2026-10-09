@@ -16,6 +16,7 @@ const ownedFiles = [
   "components/auth/SecurityEnrollment.tsx",
   "components/auth/OnboardingEvidence.tsx",
   "components/auth/EphemeralCodes.tsx",
+  "components/auth/LockoutPrompt.tsx",
   "components/auth/SecurityConfirmation.tsx",
   "components/auth/SecurityActionResume.tsx",
   "components/auth/SocialCompleteFlow.tsx",

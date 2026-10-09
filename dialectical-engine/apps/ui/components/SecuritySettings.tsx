@@ -142,6 +142,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         {returnToQuestion ? <p className="setListActions"><a className="setBtn setBtnPrimary" href="/new">{t(authCatalog, 'auth.continue')}</a></p> : null}
         <div className="setSectionHead"><h2 className="setSectionTitle">{t(authCatalog, 'auth.enroll.securityTitle')}</h2></div>
         <section className="setList">
+            {methods && methods.recovery_codes_remaining === 0 && !methods.methods.some(method => method.type === 'passkey') ? <p className="setStatus" data-lockout-reminder>{t(catalog, 'settings.security.lockoutReminder')}</p> : null}
             {(methods?.methods ?? []).map(method => <div key={method.factor_id} className="setSessionRow"><div className="setSessionMain"><span className="setSessionDevice">{method.label ?? t(authCatalog, method.type === 'passkey' ? 'auth.passkey.use' : 'auth.login.useAuthenticatorCode')}</span>{!method.removable ? <p className="setSessionSeen">{t(catalog, 'settings.security.lastPath')}</p> : null}</div><button type="button" className="setBtn setBtnRevoke" data-remove-factor disabled={busy || !method.removable} onClick={() => choose({ action: 'REMOVE_AUTH_METHOD', target_factor_id: method.factor_id })}>{t(catalog, 'settings.security.remove')}</button></div>)}
             <div className="setListActions">
                 <button type="button" className="setBtn" disabled={busy} onClick={() => choose({ action: 'ADD_PASSKEY' })}>{t(authCatalog, 'auth.passkey.create')}</button>

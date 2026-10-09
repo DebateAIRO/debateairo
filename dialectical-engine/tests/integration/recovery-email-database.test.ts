@@ -131,15 +131,17 @@ describe("0097 restricted profile and recovery capabilities", () => {
     });
   });
   it("encrypts normalized changes and rejects rotated session tokens and held accounts", async () => {
-    const a = await profileAccount(db.pool, null), s = profile();
-    expect(await s.hasPhone(a.ownerRef)).toBe(false);
+    // The repository's has-phone read, called directly: the ask path no longer consults it
+    // (owner ruling 2026-10-09), so AccountProfileService no longer forwards it.
+    const a = await profileAccount(db.pool, null), s = profile(), repository = new PostgresAccountProfileRepository(auth, profileAudit);
+    expect(await repository.hasPhone(a.ownerRef)).toBe(false);
     expect(await s.phoneProfile(a,profileSource)).toEqual({
       phone_present: false, phone_masked: null, phone_verified: false, updated_at: null
     });
     await s.updatePhoneProfile(a, {
       phone: "+40 733 123 456", grantToken: await profileGrant(db.pool, a, "CHANGE_PHONE_PROFILE")
     }, profileSource);
-    expect(await s.hasPhone(a.ownerRef)).toBe(true);
+    expect(await repository.hasPhone(a.ownerRef)).toBe(true);
     const row = (await db.pool.query('SELECT phone_ciphertext,phone_source,phone_verification_status FROM identity."user" WHERE user_id=$1', [a.userId])).rows[0];
     expect(decrypt(profileKeys.get(a.userId)!, row.phone_ciphertext, profileAad(a.userId, "user.phone_ciphertext")).toString()).toBe("+40733123456");
     expect(row).toMatchObject({

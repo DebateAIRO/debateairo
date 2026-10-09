@@ -169,10 +169,11 @@
   "settings.security.title": "Drošība",
   "settings.phone.reveal": "Rādīt tālruņa numuru",
   "settings.phone.change": "Mainīt tālruņa numuru",
-  "settings.phone.required": "Pievienojiet tālruņa numuru, lai turpinātu. Jautājums un izvēles tiks saglabātas.",
+  "settings.phone.purpose": "Nākotnē mēs varam nosūtīt jums kodu īsziņā, lai palīdzētu atgūt piekļuvi kontam, un, ja lūgsiet mums palīdzību, varam jums piezvanīt vai nosūtīt īsziņu. Tiek glabāts šifrētā veidā; nekad netiek kopīgots un netiek izmantots mārketingam.",
   "settings.security.lastPath": "Pirms šīs metodes noņemšanas pievienojiet citu pierakstīšanās metodi.",
   "settings.security.remove": "Noņemt",
   "settings.security.codesRemaining": "Atkopšanas kodi: {count}",
   "settings.security.regenerate": "Ģenerēt jaunus atkopšanas kodus",
+  "settings.security.lockoutReminder": "Jums vēl nav atkopšanas kodu vai piekļuves atslēgas. Ja pazaudēsiet tālruni, ar tiem uzreiz atgūsiet piekļuvi.",
   "settings.security.refreshFailed": "Drošības datus nevarēja atsvaidzināt. Pārlādējiet lapu."
 }

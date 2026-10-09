@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "Níor críochnaíodh an síniú amach. Bain triail eile as.",
   "newDebate.room.locationBlocked": "Ní féidir díospóireachtaí nua a thosú ón áit ina bhfuil tú faoi láthair. Tá do chuid díospóireachtaí fós ar fáil le léamh.",
   "newDebate.room.previewTeamOnly": "Níl na díospóireachtaí sa leagan réamhamhairc seo oscailte ach don fhoireann.",
+  "newDebate.room.phoneRequired": "Cuir uimhir theileafóin leis sna Socruithe, nó bain triail eile as i gceann cúpla nóiméad.",
   "newDebate.room.siteFull": "Tá teorainn an lae inniu sroichte. Is féidir leat ceist a chur fós — tosóidh do dhíospóireacht léi féin nuair a athshocrófar an teorainn.",
   "newDebate.room.siteClose": "Tá tú gar do theorainn an lae inniu. Rithfear an díospóireacht seo ina hiomláine fós; b’fhéidir go mbeidh ar dhíospóireachtaí níos déanaí fanacht go dtí an athshocrú.",
   "newDebate.room.alreadyWaiting": "Ní féidir ach le ceist amháin fanacht ag an am céanna. Tosóidh do cheannsa ag {time}; cuir an cheist seo ina dhiaidh sin.",
