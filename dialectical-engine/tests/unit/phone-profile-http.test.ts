@@ -42,7 +42,7 @@ describe("manual phone public signup boundary", () => {
     const { api, inputs } = harness();
     try {
       const { phone: _phone, ...withoutPhone } = body;
-      const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: withoutPhone });
+      const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: withoutPhone });
       expect(response.statusCode).toBe(202);
       expect(inputs).toEqual([{ email: body.email, password: body.password, phone: "", recoveryEmail: null, adultAffirmed: true }]);
     } finally { await api.close(); }

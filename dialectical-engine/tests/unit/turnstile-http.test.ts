@@ -34,7 +34,7 @@ describe("mandatory proof at the public identity boundary", () => {
   // Owner ruling 2026-10-09: the phone is optional, so a sign-up without one still passes the proof gate.
   it("accepts a sign-up without a phone, still behind the proof", async () => {
     const { api, work, proofs } = harness(); const { phone: _phone, ...payload } = signup;
-    try { const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload });
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload });
       expect(response.statusCode).toBe(202); expect(proofs).toHaveLength(1); expect(work).toHaveLength(1);
       expect((work[0] as { input: { phone: unknown } }).input.phone).toBe("");
     } finally { await api.close(); }

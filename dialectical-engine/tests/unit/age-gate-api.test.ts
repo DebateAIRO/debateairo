@@ -136,10 +136,10 @@ describe("POST /v1/auth/register behind the age gate", () => {
   it("registers a person who gives no phone, and the service receives no phone", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: TODAY });
     const { app, calls } = registrationSpy();
-    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app });
+    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app, allowedOrigin: TEST_APP_ORIGIN });
     try {
       const { phone: _omitted, ...withoutPhone } = body("1990-01-01");
-      const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: withoutPhone });
+      const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: withoutPhone });
       expect(response.statusCode).toBe(202);
       // "" is the S04 register mount's "no phone" (its bytes are pinned); the service stores none for it.
       expect(calls).toEqual([{ email: "alice@example.test", password: "password-123", phone: "", recoveryEmail: null, adultAffirmed: true }]);
@@ -151,13 +151,13 @@ describe("POST /v1/auth/register behind the age gate", () => {
   it("still normalizes a given phone and refuses a malformed one before the service", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: TODAY });
     const { app, calls } = registrationSpy();
-    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app });
+    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app, allowedOrigin: TEST_APP_ORIGIN });
     try {
-      const spaced = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...body("1990-01-01"), phone: "+40 722 123 456" } });
+      const spaced = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: { ...body("1990-01-01"), phone: "+40 722 123 456" } });
       expect(spaced.statusCode).toBe(202);
       expect(calls[0]).toMatchObject({ phone: "+40722123456" });
       for (const phone of ["0712345678", "   "]) {
-        const refused = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...body("1990-01-01"), phone } });
+        const refused = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: { ...body("1990-01-01"), phone } });
         expect(refused.statusCode).toBe(400);
         expect(refused.json()).toMatchObject({ error: "AUTH_INPUT_INVALID" });
       }
