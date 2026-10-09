@@ -5,12 +5,14 @@ import { clearStoredSupportConversation } from '../components/support/conversati
 export type EndSessionClient = Pick<ContractClient, 'logout'> & Partial<Pick<ContractClient, 'revokeAllSessions'>>;
 /**
  * The server answers a logout whose session it no longer has (expired, or revoked from another device)
- * with 401 SESSION_REQUIRED, 409 COOKIE_SESSION_REQUIRED or 404: the person is already signed out, so the
- * tab must say so instead of keeping the account menu (auth UI repair, 2026-10-09).
+ * with 401 SESSION_REQUIRED (the session check refused the cookie) or 409 COOKIE_SESSION_REQUIRED (no
+ * session on the request): the person is already signed out, so the tab must say so instead of keeping
+ * the account menu (auth UI repair, 2026-10-09). The logout route never answers 404: a 404 means the
+ * request did not reach it (routing or proxy fault) and the cookie may still be live, so it stays a failure.
  */
 function sessionAlreadyEnded(failure: unknown): boolean {
     return failure instanceof ContractHttpError
-        && (failure.status === 401 || failure.status === 404 || (failure.status === 409 && failure.serverCode === 'COOKIE_SESSION_REQUIRED'));
+        && (failure.status === 401 || (failure.status === 409 && failure.serverCode === 'COOKIE_SESSION_REQUIRED'));
 }
 const flights = new WeakMap<object, Partial<Record<'logout' | 'all', Promise<void>>>>();
 /** Called only after the server has ended the current session. Rotation uses the same legacy event without this detail. */
