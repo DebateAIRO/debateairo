@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import pg,{type Pool} from 'pg';
 import { migrate } from '@debateai/db';
-import { loadMigrationPlan } from '../../../packages/db/src/migration-lineage.js';
+import { loadMigrationPlan,type MigrationPlan } from '../../../packages/db/src/migration-lineage.js';
 import { PostgresPasswordResetRepository } from '../../../packages/db/src/password-reset.js';
 import { PostgresBackupEmailRepository,PostgresMfaRecoveryRepository } from '../../../packages/db/src/email-mfa-recovery.js';
 import type { AuditContextHasher } from '@debateai/crypto';
@@ -9,12 +9,34 @@ import { type RegisterPublicationReceipt } from '@debateai/register';
 import { readSealedSnapshot } from './publish-register.js';
 const hash=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fail=():never=>{throw new TypeError('PREVIEW_NATIVE_VERIFICATION_REFUSED');};
+/** Verify (and publish) found a forward step of this source that the database has not applied. Only apply-and-plan applies one. */
+export class NativeVerifyPendingForwardStepError extends Error {
+ readonly code='PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP';
+ readonly pending:readonly string[];
+ constructor(pending:readonly string[]){
+  super(`PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: ${pending.join(', ')}. Verify never applies a migration; run the native operator with operation apply-and-plan first.`);
+  this.name='NativeVerifyPendingForwardStepError';this.pending=Object.freeze([...pending]);
+ }
+}
+/** Every forward step of the source (plan.forwardChain, however long) whose name the ledger lacks, in chain order. */
+export function pendingForwardSteps(plan:Pick<MigrationPlan,'forwardChain'>,applied:ReadonlySet<string>):readonly string[]{
+ return plan.forwardChain.map(step=>step.name).filter(name=>!applied.has(name));
+}
+/** Read-only: one SELECT of the ledger names. Refuses before anything could apply a pending forward step. */
+export async function refusePendingForwardSteps(pool:Pool,plan?:MigrationPlan):Promise<void>{
+ const chain=plan??await loadMigrationPlan();
+ const applied=new Set((await pool.query<{name:string}>('SELECT name FROM public.debateai_schema_migration')).rows.map(row=>row.name));
+ const pending=pendingForwardSteps(chain,applied);
+ if(pending.length>0)throw new NativeVerifyPendingForwardStepError(pending);
+}
 export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevision:string;sourceTree:string;nativeSourceSha256:string;publication:RegisterPublicationReceipt}>) {
- // Verification is replay-only. Applying pending SQL is a separately explicit native operator operation.
+ // Verification is replay-only: a pending forward step is refused before migrate runs. Applying pending SQL is the
+ // separately explicit native operator operation apply-and-plan, with the owner's yes.
  const installed=(await pool.query("SELECT name FROM public.debateai_schema_migration WHERE name='0108_preview_recovery_verified_bindings.sql'")).rows;
  if(installed.length!==1)fail();
- await migrate(pool); // Authoritative current source: complete table/column/membership/owner/provenance checks.
  const plan=await loadMigrationPlan();
+ await refusePendingForwardSteps(pool,plan);
+ await migrate(pool); // Nothing left to apply: authoritative current source, complete table/column/membership/owner/provenance checks.
  const client=await pool.connect();let transaction=false,released=false;
  const release=()=>{if(!released){released=true;client.release();}};
  try{

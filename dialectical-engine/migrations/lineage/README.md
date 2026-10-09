@@ -15,6 +15,8 @@ A step after 0108 is added with new files only. Worked example: 0109; a later 01
 4. `packages/db/src/migration-forward110.ts`, in the style of `packages/db/src/migration-forward109.ts` (exact keys,
    fixed version and name, digests checked, `MIGRATION_FORWARD110_*` refusals, its postcondition evidence).
 5. One loader entry: append `loadForward110` to `STEPS` in `packages/db/src/migration-forward-chain.ts`.
+6. On the preview the step is applied only by the native operator's `apply-and-plan` (with the owner's yes); its `verify`,
+   `publish` and every start refuse while the step is pending (`deploy/preview-auth-dev/v1/README.md`).
 
 `migrate()` then runs the base recipe, 0108 and the sealed verifier as before, then each pending step in order: its SQL,
 its verifier, its ledger row and its receipt in `public.debateai_schema_migration_step`. On a later run the verifier of
