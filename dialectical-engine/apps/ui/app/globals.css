@@ -9840,9 +9840,17 @@ a:focus-visible {
   .topBar {
     min-width: 0;
   }
-  .topBarActions > .btn:not(.btnDark),
+  .topBarActions > .btn:not(.btnDark):not(.topBarSignIn),
   .topBarActions > .roleChip {
     display: none;
+  }
+  /* A signed-out visitor's only way to sign in from this bar: it stays,
+     compact and on one line, while "+ New debate" gives up width first. */
+  .topBarActions > .topBarSignIn {
+    display: inline-flex;
+    flex: 0 0 auto;
+    padding-inline: 10px;
+    white-space: nowrap;
   }
 
   /* Debate header: four controls sat in a three-column grid, so the
