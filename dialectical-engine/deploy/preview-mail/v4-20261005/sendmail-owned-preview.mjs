@@ -1,14 +1,19 @@
 #!/usr/local/bin/node
 import { createHash } from 'node:crypto';
-import { openSync, fstatSync, readSync, closeSync, constants } from 'node:fs';
-import bindings from './recipient-bindings.json' with {type:'json'};
+import { openSync, fstatSync, lstatSync, readSync, realpathSync, closeSync, constants } from 'node:fs';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { ACCOUNT_MAIL_BOUNDARY, ACCOUNT_MAIL_TEMPLATES, serializeAccountMail, normalizeMailDisplay, accountMailRuntime } from './account-mail-template.mjs';
 
 const FROM = 'noreply@dezbatere.ro';
 const digest = value => createHash('sha256').update(value).digest('hex');
+// The recipient allow-list is installation data, never source: only these alias names are public.
+const RECIPIENT_ALIASES = Object.freeze(['recovery-notice-secondary', 'verification-direct-and-recovery-proof', 'verification-forward-primary', 'verification-forward-secondary']);
 export function createRecipientPolicy(recipientSha256, verificationForwardTarget) {
+  if (!recipientSha256 || typeof recipientSha256 !== 'object' || Object.getPrototypeOf(recipientSha256) !== Object.prototype
+    || Object.keys(recipientSha256).sort().join(',') !== RECIPIENT_ALIASES.join(',')
+    || RECIPIENT_ALIASES.some(alias => typeof recipientSha256[alias] !== 'string' || !/^[0-9a-f]{64}$/.test(recipientSha256[alias]))) throw fail('INSTALLATION_CONFIG');
   if (typeof verificationForwardTarget !== 'string' || !/^[^\s@]+@[^\s@]+$/.test(verificationForwardTarget)
     || digest(verificationForwardTarget) !== recipientSha256['verification-forward-secondary']) throw fail('INSTALLATION_CONFIG');
   return function policy(template, recipient) {
@@ -25,24 +30,87 @@ export function createRecipientPolicy(recipientSha256, verificationForwardTarget
   throw fail('PURPOSE_RECIPIENT_REFUSED');
 }
 }
-function installedForwardRecipient() {
-  let fd;
+const INSTALLATION_PATH = '/etc/debateai/preview-mail-recipient-installation.json';
+// Sole recipient source: { recipientSha256: {four aliases: lowercase SHA-256 hex}, verificationForwardTarget }.
+export function recipientPolicyFromInstallation(input) {
+  if (!input || typeof input !== 'object' || Object.getPrototypeOf(input) !== Object.prototype
+    || Object.keys(input).sort().join(',') !== 'recipientSha256,verificationForwardTarget') throw fail('INSTALLATION_CONFIG');
+  return createRecipientPolicy(input.recipientSha256, input.verificationForwardTarget);
+}
+// JSON.parse keeps the last of two duplicate keys. Parse the grammar first and refuse ambiguity at every depth.
+// Same rule as preview-auth-dev/v1/custody.mjs strictJson, copied because this folder installs on its own.
+function strictInstallationJson(bytes) {
+  const refuse = () => { throw fail('INSTALLATION_CONFIG'); };
+  const text = new TextDecoder('utf8', { fatal: true, ignoreBOM: true }).decode(bytes);
+  if (text.startsWith('﻿')) refuse();
+  let i = 0;
+  const ws = () => { while (/[\x20\t\r\n]/.test(text[i] ?? '\0')) i++; };
+  const string = () => {
+    const start = i++;
+    while (i < text.length) {
+      const c = text[i++];
+      if (c === '"') return JSON.parse(text.slice(start, i));
+      if (c === '\\') i++;
+      else if (c.charCodeAt(0) < 32) refuse();
+    }
+    refuse();
+  };
+  const value = depth => {
+    if (depth > 4) refuse();
+    ws();
+    if (text[i] === '"') return string();
+    if (text[i] === '{') {
+      i++; ws(); const keys = new Set();
+      if (text[i] === '}') { i++; return; }
+      for (;;) {
+        ws(); if (text[i] !== '"') refuse(); const key = string();
+        if (keys.has(key) || key === '__proto__' || key === 'constructor' || key === 'prototype') refuse(); keys.add(key);
+        ws(); if (text[i++] !== ':') refuse(); value(depth + 1); ws();
+        const end = text[i++]; if (end === '}') return; if (end !== ',') refuse();
+      }
+    }
+    if (text[i] === '[') {
+      i++; ws(); if (text[i] === ']') { i++; return; }
+      for (;;) { value(depth + 1); ws(); const end = text[i++]; if (end === ']') return; if (end !== ',') refuse(); }
+    }
+    const token = /^(?:true|false|null|-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)/.exec(text.slice(i));
+    if (!token) refuse(); i += token[0].length;
+  };
+  value(0); ws(); if (i !== text.length) refuse();
+  return JSON.parse(text);
+}
+const sameFile = (a, b) => ['dev', 'ino', 'uid', 'gid', 'mode', 'size', 'nlink', 'mtimeMs', 'ctimeMs'].every(key => a[key] === b[key]);
+// Internal test seam only; the executable always reads the fixed root-owned path.
+// Custody as in preview-auth-dev/v1/custody.mjs withPrivateBytes: the parent directory is reached through no
+// symlink, is owned by the file's owner and is not group/other-writable; the file is a no-follow regular file
+// that does not change while it is read.
+export function readInstalledRecipientPolicy(path = INSTALLATION_PATH, ownerUid = 0) {
+  let fd, bytes;
   try {
-    fd = openSync('/etc/debateai/preview-mail-recipient-installation.json', constants.O_RDONLY | constants.O_NOFOLLOW);
+    const parent = dirname(path);
+    if (!isAbsolute(path) || resolve(path) !== path || realpathSync(parent) !== parent) throw fail('INSTALLATION_CONFIG');
+    const folder = lstatSync(parent);
+    if (!folder.isDirectory() || folder.uid !== ownerUid || (folder.mode & 0o022) !== 0) throw fail('INSTALLATION_CONFIG');
+    const beforePath = lstatSync(path);
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
     const st = fstatSync(fd);
-    if (!st.isFile() || st.uid !== 0 || (st.mode & 0o077) !== 0 || st.nlink !== 1 || st.size < 1 || st.size > 1024) throw fail('INSTALLATION_CONFIG');
-    const bytes = Buffer.alloc(1025);
-    const length = readSync(fd, bytes, 0, bytes.length, 0);
-    if (length !== st.size || length > 1024) throw fail('INSTALLATION_CONFIG');
-    let input;
-    try { input = JSON.parse(new TextDecoder('utf8', {fatal:true}).decode(bytes.subarray(0,length))); } finally { bytes.fill(0); }
-    if (!input || Object.keys(input).join(',') !== 'verificationForwardTarget') throw fail('INSTALLATION_CONFIG');
-    return input.verificationForwardTarget;
+    if (!st.isFile() || !sameFile(st, beforePath) || st.uid !== ownerUid || (st.mode & 0o077) !== 0
+      || st.nlink !== 1 || st.size < 1 || st.size > 1024) throw fail('INSTALLATION_CONFIG');
+    bytes = Buffer.alloc(1025);
+    let length = 0;
+    for (;;) {
+      const read = readSync(fd, bytes, length, bytes.length - length, length);
+      if (read === 0) break;
+      length += read;
+      if (length > 1024) throw fail('INSTALLATION_CONFIG');
+    }
+    if (length !== st.size || !sameFile(st, fstatSync(fd)) || !sameFile(st, lstatSync(path))) throw fail('INSTALLATION_CONFIG');
+    return recipientPolicyFromInstallation(strictInstallationJson(bytes.subarray(0, length)));
   } catch { throw fail('INSTALLATION_CONFIG'); }
-  finally { if (fd !== undefined) closeSync(fd); }
+  finally { bytes?.fill(0); if (fd !== undefined) closeSync(fd); }
 }
 export function recipientForPurpose(template, recipient) {
-  return createRecipientPolicy(bindings.recipientSha256, installedForwardRecipient())(template, recipient);
+  return readInstalledRecipientPolicy()(template, recipient);
 }
 const MAX_BYTES = 262144;
 const TOTAL_MS = 4500; // Reserve cleanup before Source's immutable 5000ms transport deadline.
@@ -161,7 +229,9 @@ export async function readBounded(stream, { deadline = Date.now() + TOTAL_MS } =
 // Stub seams are internal exports only; the executable has no configurable destination, MTA, timeouts or environment file.
 export async function submitVerification({ argv, message, ambient = {}, signal,
   deadline = Date.now() + TOTAL_MS, childTimeoutMs = CHILD_MS, killGraceMs = GRACE_MS,
-  recipientPolicy = recipientForPurpose, spawnImpl = spawn, killGroup = (pid, name) => process.kill(-pid, name) }) {
+  installationPath = INSTALLATION_PATH, installationOwnerUid = 0,
+  recipientPolicy = (template, recipient) => readInstalledRecipientPolicy(installationPath, installationOwnerUid)(template, recipient),
+  spawnImpl = spawn, killGroup = (pid, name) => process.kill(-pid, name) }) {
   validateInvocation(argv);
   const forwarded = ownedForwardingMessage(message, recipientPolicy);
   let child, timer, killTimer, forceTimer, reason;

@@ -130,7 +130,8 @@ it('refuses wrong existing column, index and constraint shapes in the read-only 
   const frozen=JSON.parse(await readFile(new URL('../fixtures/auth-release-ledger-names.json',import.meta.url),'utf8')) as string[];
   expect(frozen).toHaveLength(113);
   for(const name of frozen) await release.pool.query(await readFile(new URL(`../../migrations/${name}`,import.meta.url),'utf8'));
-  const verifier=await readFile('docs/operations/account-flow-release-2026-10-05/verify-catalog-shape.sql','utf8');
+  // Release catalog probe kept as a test fixture; the release evidence folder lives outside the public repo.
+  const verifier=await readFile(new URL('../fixtures/account-flow-verify-catalog-shape.sql',import.meta.url),'utf8');
   const verify=async()=>{const c=await release.pool.connect();try{await c.query('BEGIN READ ONLY');await c.query(verifier);}finally{await c.query('ROLLBACK');c.release();}};
   await verify();
   await release.pool.query('ALTER TABLE identity.consumer_passkey_subject ADD COLUMN task13_wrongshape text');
