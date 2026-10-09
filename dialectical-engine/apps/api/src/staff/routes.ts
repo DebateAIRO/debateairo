@@ -158,6 +158,9 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
                 catch (error) {
                     if (error instanceof StaffHttpRefusal)
                         return reply.code(error.status).send({ error: error.code });
+                    // Team tools are locked: no fresh independent alert readiness for this action (no destination exposed).
+                    if (error instanceof StaffAlertError && error.code === 'STAFF_ALERT_UNAVAILABLE')
+                        return reply.code(503).send({ error: 'STAFF_ALERT_UNAVAILABLE' });
                     if (error instanceof StaffAlertError || error instanceof Error && error.message === 'STAFF_UNAVAILABLE') {
                         return reply.code(503).send({ error: 'STAFF_UNAVAILABLE' });
                     }

@@ -227,16 +227,20 @@ export class RootStaffAlertConfiguration {
             throw new StaffAlertError('STAFF_ALERT_UNAVAILABLE');
         return stat;
     }
-    async read(): Promise<ProtectedStaffAlertConfiguration | null> {
+    async read(): Promise<ProtectedStaffAlertConfiguration | null> { return this.bounded(this.readProtected()); }
+    /** Startup custody only: root-owned file and executable, exact schema and an installed ACK route.
+     * A fresh ACK proof is NOT required here; every staff action still requires one through read(). */
+    async verifyCustody(): Promise<boolean> { return await this.bounded(this.readCustodied()) !== null; }
+    private async bounded<T>(work: Promise<T | null>): Promise<T | null> {
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {
-            return await Promise.race([this.readProtected(), new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), this.input.timeoutMs ?? 5000); })]);
+            return await Promise.race([work, new Promise<null>(resolve => { timer = setTimeout(() => resolve(null), this.input.timeoutMs ?? 5000); })]);
         }
         finally {
             clearTimeout(timer);
         }
     }
-    private async readProtected(): Promise<ProtectedStaffAlertConfiguration | null> {
+    private async readCustodied(): Promise<Readonly<{ config: RootStaffAlertConfig; hash: string; acknowledgement: StaffAlertAcknowledgementAdapter }> | null> {
         let file: Awaited<ReturnType<StaffAlertConfigFiles['open']>> | undefined;
         try {
             const before = await this.custody(this.input.path);
@@ -259,17 +263,29 @@ export class RootStaffAlertConfiguration {
             const acknowledgement = this.input.acknowledgements.get(config.ackAdapterId);
             if (!acknowledgement)
                 return null;
-            const evidence = await acknowledgement.evidence(config);
-            const hash = sha(body), now = Date.now();
-            if (!evidence || evidence.configSha256 !== hash || evidence.generation !== config.generation || !uuid(evidence.rehearsalId) || !(evidence.expiresAt instanceof Date) || evidence.expiresAt.getTime() <= now || evidence.expiresAt.getTime() > now + 300000)
-                return null;
-            return Object.freeze({ config: Object.freeze({ ...config }), binding: Object.freeze({ configSha256: hash, generation: config.generation }), evidence, acknowledgement });
+            return { config, hash: sha(body), acknowledgement };
         }
         catch {
             return null;
         }
         finally {
             await file?.close().catch(() => undefined);
+        }
+    }
+    private async readProtected(): Promise<ProtectedStaffAlertConfiguration | null> {
+        try {
+            const custodied = await this.readCustodied();
+            if (custodied === null)
+                return null;
+            const { config, hash, acknowledgement } = custodied;
+            const evidence = await acknowledgement.evidence(config);
+            const now = Date.now();
+            if (!evidence || evidence.configSha256 !== hash || evidence.generation !== config.generation || !uuid(evidence.rehearsalId) || !(evidence.expiresAt instanceof Date) || evidence.expiresAt.getTime() <= now || evidence.expiresAt.getTime() > now + 300000)
+                return null;
+            return Object.freeze({ config: Object.freeze({ ...config }), binding: Object.freeze({ configSha256: hash, generation: config.generation }), evidence, acknowledgement });
+        }
+        catch {
+            return null;
         }
     }
     async readIndependentAlertReadiness(): Promise<'READY' | 'UNAVAILABLE'> { return await this.read() === null ? 'UNAVAILABLE' : 'READY'; }

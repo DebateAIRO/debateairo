@@ -29,6 +29,17 @@ it('checks root custody, strict schema, known rehearsed evidence and rejects upl
  expect(await new alerts.RootStaffAlertConfiguration({path:'/operator/config.json',files:valid.files,acknowledgements:new Map([['capture-v1',expired]])}).readIndependentAlertReadiness()).toBe('UNAVAILABLE');
  expect(await new alerts.RootStaffAlertConfiguration({path:'/missing',acknowledgements:new Map()}).readIndependentAlertReadiness()).toBe('UNAVAILABLE');
 });
+it('verifies startup custody without a fresh ACK proof and still refuses broken custody or an unknown ACK route',async()=>{
+ const valid=configuration();
+ for(const evidence of [async()=>null,async()=>({configSha256:sha(valid.body),generation:config.generation,rehearsalId:uuid(),expiresAt:new Date(0)})]){
+  const loader=new alerts.RootStaffAlertConfiguration({path:'/operator/config.json',files:valid.files,acknowledgements:new Map([['capture-v1',{...valid.ack,evidence}]])});
+  expect(await loader.readIndependentAlertReadiness()).toBe('UNAVAILABLE');
+  expect(await loader.verifyCustody()).toBe(true);
+ }
+ for(const overrides of [{destination:'sentinel@example.invalid'},{recipient:'a@example.invalid\r\nBcc:other@example.invalid'},{ackAdapterId:'unknown'},{executable:'relative'}])expect(await configuration(overrides).loader.verifyCustody()).toBe(false);
+ for(const overrides of [{uid:1000},{mode:0o666},{isSymbolicLink:()=>true},{size:100000}])expect(await configuration({},overrides).loader.verifyCustody()).toBe(false);
+ expect(await new alerts.RootStaffAlertConfiguration({path:'/missing',acknowledgements:new Map()}).verifyCustody()).toBe(false);
+});
 it('produces bounded metadata, fresh nonce and purpose/user/operation-bound encryption without private body or invitation handle',async()=>{
  expect(alerts.StaffAlertIntentProducer).toBeTypeOf('function');
  const kek=loadKek(generateDek()),users=new FileUserDekStore(join(root,uuid()),kek),userId=uuid(),keyRef=uuid(),operationId=uuid(),actorStaffId=uuid(),subjectStaffId=uuid();
