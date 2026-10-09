@@ -75,7 +75,7 @@ describe('nightly preview database backup', () => {
   });
 
   it('never leaves fewer than two dumps, whatever the keep setting', async () => {
-    const names = ['debateai-preview-20261008T001500Z.dump', 'debateai-preview-20261009T001500Z.dump', 'debateai-preview-20261010T001500Z.dump'];
+    const names = ['debateai-preview-20261008T001500Z.dump', 'debateai-preview-20261009T001500Z.dump', 'debateai-preview-20261010T001500Z.dump'] as const;
     expect(backup.selectForDeletion(names, 1, names[2])).toEqual([names[0]]);
     expect(backup.selectForDeletion(names, 0)).toEqual([names[0]]);
     const layout = server([names[0]]);
