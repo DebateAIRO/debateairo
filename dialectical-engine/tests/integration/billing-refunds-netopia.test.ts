@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { computeWindows, foldSubscription, type CardPayments, type PaymentReport } from "@debateai/billing-core";
 import {
@@ -107,6 +108,89 @@ async function requestWhole(
     }, new Date());
   });
 }
+
+// Placed first in the file on purpose: the README's query counts the whole database, and this suite shares one.
+describe("F6b (ops-2): README §14.8's switch-off query open_owner_refunds, run exactly as the runbook writes it", () => {
+  const readmeQuery = async (): Promise<string> => {
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    const line = readme.split("\n")
+      .find((text) => text.startsWith("sudo -u postgres psql -d debateai -c \"SELECT count(*) AS open_owner_refunds")) ?? "";
+    expect(line.endsWith("\"")).toBe(true);
+    // The shell hands psql the text between -c " and the closing quote, with each \" read as ".
+    return line.slice(line.indexOf("-c \"") + 4, -1).replaceAll("\\\"", "\"");
+  };
+  const withdrawalPart = async (seeded: Awaited<ReturnType<typeof paidPlan>>, desk: RefundDesk, amountMicros: number, at: Date) => {
+    await repository.withTransaction(async (client) => {
+      await jobs.lockOwner(client, seeded.ownerRef);
+      const state = foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId, client));
+      await repository.appendSubscriptionEvent(client, subscriptionEvent(state, "WITHDRAWN", at, { withdrew_at: at.toISOString() }));
+      await desk.requestAll(client, {
+        ownerRef: seeded.ownerRef, reason: "WITHDRAWAL", at,
+        allocations: [{ chargeId: seeded.initialChargeId, transactionId: seeded.providerPaymentId, amountMicros }]
+      });
+    });
+  };
+  /** The owner mode hands the refund over: PAYMENT_REFUND ends DONE, and its O2_REFUND_DUE email is then sent. */
+  const handOver = async (seeded: Awaited<ReturnType<typeof paidPlan>>, desk: RefundDesk, now: Date) => {
+    const ref = `${seeded.initialChargeId}:${seeded.providerPaymentId}`;
+    const job = await claim("PAYMENT_REFUND", ref, now);
+    expect(await desk.handle(job, now)).toEqual({ kind: "DONE" });
+    expect(await repository.complete(job.jobId, now)).toBe(true); // as the outbox worker finishes a DONE job
+    const sent = await database.pool.query(
+      "UPDATE billing.outbox SET done_at = $2 WHERE kind = 'EMAIL' AND payload->>'template' = 'O2_REFUND_DUE'"
+        + " AND payload->>'param.chargeRef' = $1 AND done_at IS NULL", [seeded.initialChargeId, now]);
+    expect(sent.rowCount).toBe(1);
+    // So no open job of the refund is left for the second switch-off query to count.
+    expect((await database.pool.query(
+      "SELECT kind, ref, payload->>'template' AS template FROM billing.outbox WHERE done_at IS NULL AND dead_at IS NULL"
+        + " AND (ref = $1 OR payload->>'param.chargeRef' = $2)",
+      [ref, seeded.initialChargeId])).rows).toEqual([]);
+  };
+
+  it("counts a refund handed to the owner once O2_REFUND_DUE is sent, until its parts are recorded; a held one stays counted", async () => {
+    const sql = await readmeQuery();
+    const openOwnerRefunds = async (): Promise<number> =>
+      Number((await database.pool.query<{ open_owner_refunds: string }>(sql)).rows[0]!.open_owner_refunds);
+    expect(await openOwnerRefunds(), "this case runs on a database with no refund yet").toBe(0);
+
+    const seeded = await paidPlan("switch-off");
+    const clock = { now: new Date() };
+    const { refunds } = deskFor(new RefundPort(false), clock);
+    await withdrawalPart(seeded, refunds, 12_100_000, new Date(Date.now() - DAY));
+    await handOver(seeded, refunds, clock.now);
+    expect(await openOwnerRefunds()).toBe(1);
+    // A part recorded by the owner's command keeps the rest open; the last part closes it.
+    expect(await refunds.recordOwnerRefund(await refunds.planOwnerRefund(seeded.initialChargeId, 5_000_000), clock.now)).toBe("PART_RECORDED");
+    expect(await openOwnerRefunds()).toBe(1);
+    expect(await refunds.recordOwnerRefund(await refunds.planOwnerRefund(seeded.initialChargeId, 7_100_000), clock.now)).toBe("RECORDED");
+    expect(await openOwnerRefunds()).toBe(0);
+
+    // A refund a charge-back holds is still owed once the dispute ends for us, so the switch-off query counts it, although
+    // the reminder's own list (BillingRepository.openOwnerRefunds) leaves it out while the dispute lasts.
+    const held = await paidPlan("switch-off-held");
+    const port = new RefundPort(false);
+    const desk = deskFor(port, clock);
+    await withdrawalPart(held, desk.refunds, 12_100_000, new Date(Date.now() - DAY));
+    await handOver(held, desk.refunds, clock.now);
+    port.statuses.set(held.initialChargeId, report(held.initialChargeId, held.providerPaymentId, "CHARGEBACK_OPENED", held.totalMicros));
+    const verifyJob = { jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: held.initialChargeId, payload: {}, attempts: 1,
+      notBefore: clock.now, createdAt: clock.now, claimedBy: "f6b", claimedAt: clock.now } as unknown as OutboxJob;
+    expect(await desk.verify.handle(verifyJob, clock.now)).toEqual({ kind: "DONE" });
+    expect(heldByChargeback((await repository.charge(held.initialChargeId))!, held.providerPaymentId)).toBe(true);
+    expect((await repository.openOwnerRefunds("sandbox", ["WITHDRAWAL"])).map((row) => row.chargeId)).not.toContain(held.initialChargeId);
+    expect(await openOwnerRefunds()).toBe(1);
+  });
+
+  it("F6b (ops-5, ops-6): the runbook's two live-message queries run on the migrated schema as written", async () => {
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    for (const prefix of ["SELECT n.received_at, n.order_id AS charge_ref", "SELECT n.received_at, n.provider_status, o.outcome"]) {
+      const line = readme.split("\n").find((text) => text.startsWith(`sudo -u postgres psql -d debateai -c "${prefix}`)) ?? "";
+      expect(line.endsWith("\""), prefix).toBe(true);
+      const result = await database.pool.query(line.slice(line.indexOf("-c \"") + 4, -1));
+      expect(result.fields.length, prefix).toBeGreaterThanOrEqual(3);
+    }
+  });
+});
 
 describe("N14 refunds on NETOPIA: the owner mode", () => {
   it("queues PAYMENT_REFUND, emails the owner O2_REFUND_DUE with the whole amount and the command, and moves no money", async () => {

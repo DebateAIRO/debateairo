@@ -15,6 +15,9 @@ const billing = readme.slice(readme.indexOf("## 14. Billing (paid plans)"));
 /** §14.8's billing-on check (Part 4 final review C-10), exactly as its sh block holds it. */
 const WAITING_PREMIUM_QUERY_LINE = String.raw`sudo -u postgres psql -d debateai -c "SELECT count(*) AS waiting_premium, count(*) FILTER (WHERE account.state <> 'active') AS of_accounts_not_active FROM core.run_wait w JOIN core.run r ON r.run_id = w.run_id JOIN identity.\"user\" account ON account.owner_ref = COALESCE((SELECT e.owner_ref FROM core.run_ownership_event e WHERE e.run_id = w.run_id ORDER BY e.at_seq DESC LIMIT 1), CASE WHEN r.asker_id LIKE 'owner:%' THEN substr(r.asker_id, 7)::uuid END) WHERE r.plan_tier IS DISTINCT FROM 'free' AND NOT EXISTS (SELECT 1 FROM core.run_wait_start s WHERE s.run_id = w.run_id) AND NOT EXISTS (SELECT 1 FROM core.work_item f WHERE f.run_id = w.run_id AND f.state = 'FAILED') AND NOT EXISTS (SELECT 1 FROM serve.private_run_key_cleanup_intent i WHERE i.run_id = w.run_id) AND NOT EXISTS (SELECT 1 FROM serve.private_run_erasure_tombstone t WHERE t.run_id = w.run_id)"`;
 
+/** §14.8's fourth switch-off query (F6b, ops-2), the whole sh line. */
+const OPEN_OWNER_REFUNDS_LINE = /^sudo -u postgres psql -d debateai -c "SELECT count\(\*\) AS open_owner_refunds [^\n]*"$/mu;
+
 describe("P22 the Billing runbook", () => {
   it("exists as §14 and names every setting, key file and code an operator needs", () => {
     expect(readme).toContain("## 14. Billing (paid plans)");
@@ -395,10 +398,112 @@ describe("P22 the Billing runbook", () => {
       // The queries that show it: no live plan, no open billing job, no withdrawal still owed by hand.
       "AS live_subscriptions FROM billing.subscription_latest_v", "AS open_billing_jobs FROM billing.outbox WHERE done_at IS NULL AND dead_at IS NULL",
       "AS unsettled_owner_withdrawals",
-      "If any of them is not 0, do not switch billing off"
+      "If any of them is not 0, do not switch billing off",
+      // F6b (ops-2): a refund handed to the owner leaves the job list once its O2_REFUND_DUE is sent, so a fourth
+      // query counts the open owner refunds (tests/integration/billing-refunds-netopia.test.ts runs it as written).
+      "check that all four of these print 0", "AS open_owner_refunds", "Only when all four are 0",
+      "A refund handed to you leaves that list once its O2_REFUND_DUE email is sent",
+      "The fourth counts the refunds handed to you that are not recorded yet"
     ]) {
       expect(paragraph, needle).toContain(needle);
     }
+    expect(paragraph).not.toContain("all three");
+    // The fourth query mirrors BillingRepository.openOwnerRefunds without its charge-back hold: a held refund is open.
+    const query = OPEN_OWNER_REFUNDS_LINE.exec(billing)?.[0] ?? "";
+    for (const needle of [
+      "FROM billing.charge_event r WHERE r.kind = 'REFUND_REQUESTED' AND r.payment_provider = 'netopia' AND r.amount_micros > 0",
+      "d.charge_id = r.charge_id AND d.kind = 'REFUNDED' AND COALESCE(d.refunds_transaction_id, d.provider_payment_id) = r.provider_payment_id",
+      "< r.amount_micros"
+    ]) {
+      expect(query, needle).toContain(needle);
+    }
+    expect(query).not.toContain("CHARGEBACK");
+    expect(read("packages/db/src/billing.ts")).toContain(
+      "AND COALESCE(refunded.refunds_transaction_id, refunded.provider_payment_id) = requested.provider_payment_id");
+  });
+
+  it("F6b (ops-1): switching billing on asks for every go-live row from 13 to the checklist's last, the void rows excepted", () => {
+    const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
+    const numbered = [...checklist.matchAll(/^\| (\d+) \| (.*)$/gmu)].map((match) => [Number(match[1]), match[2]!] as const);
+    const last = Math.max(...numbered.map(([number]) => number));
+    expect(last).toBeGreaterThanOrEqual(73);
+    const voids = numbered.filter(([number, rest]) => number >= 13 && rest.startsWith("~~")).map(([number]) => number);
+    expect(voids.length).toBeGreaterThan(0);
+    const listed = voids.length === 1 ? String(voids[0]) : `${voids.slice(0, -1).join(", ")} and ${voids.at(-1)}`;
+    const flat = billing.replace(/\s+/gu, " ");
+    const from = flat.indexOf("**Switching billing on.**");
+    const on = flat.slice(from, flat.indexOf("**Going from NETOPIA's sandbox to live on the same host.**", from));
+    expect(from).toBeGreaterThan(0);
+    const range = /every row of the go-live checklist from 13 to (\d+) is proven/u.exec(on);
+    expect(range, "the switch-on range").not.toBeNull();
+    expect(Number(range![1]), "the range ends at the checklist's last row").toBe(last);
+    for (const needle of [
+      `the void rows (${listed}) excepted`,
+      "NETOPIA's written approval of the shop for AI subscriptions, with recurring payments switched on (go-live row 14)",
+      "the small live test, with billing off, passed on this host (§14.9, \"The small live test, with billing off\"; go-live row 69)",
+      "the sandbox run of §14.9 passed, on its own throwaway server, never on this host"
+    ]) {
+      expect(on, needle).toContain(needle);
+    }
+    expect(on).not.toContain("rows 13–54");
+  });
+
+  it("F6b (ops-5, ops-6, ops-8): the live checks read the real charge, accept a resent message, allow countryPolicy's cross", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    // ops-5: the first live payment's message is read on our own live charge, applied, so the small live test's tool
+    // orders (outcome TOOL_ORDER) never answer for it.
+    const firstPayment = /```sh\n(sudo -u postgres psql -d debateai -c "SELECT n\.received_at, n\.order_id AS charge_ref[^\n]*)\n```/u
+      .exec(billing)?.[1] ?? "";
+    for (const needle of ["JOIN billing.charge c ON c.charge_id = n.order_id", "c.payment_environment = 'live'",
+      "o.outcome = 'APPLIED'"]) {
+      expect(firstPayment, needle).toContain(needle);
+    }
+    expect(billing).not.toContain(
+      "FROM billing.payment_notice WHERE payment_environment = 'live' ORDER BY received_at DESC LIMIT 1");
+    expect(flat).toContain("The small live test's messages name tool orders, never one of our charges, so they never show here.");
+    // ops-6: a message NETOPIA sent again adds a DUPLICATE outcome to the same notice; the live test's query leaves it out.
+    const liveTest = /```sh\n(sudo -u postgres psql -d debateai -c "SELECT n\.received_at, n\.provider_status, o\.outcome FROM[^\n]*)\n```/u
+      .exec(billing)?.[1] ?? "";
+    expect(liveTest).toContain("WHERE n.payment_environment = 'live' AND o.outcome <> 'DUPLICATE'");
+    expect(flat).toContain("A message NETOPIA sent again adds a `DUPLICATE` row, which the query leaves out.");
+    // ops-8: before the switch-on publish, countryPolicy's line is the only cross allowed; the check runs again after it.
+    const readBack = flat.slice(flat.indexOf("**Read the settings back before switching on.**"),
+      flat.indexOf("**No paid question may be waiting when billing goes on.**"));
+    for (const needle of [
+      "Until the version that switches billing on is published, the one cross allowed is the `countryPolicy` line",
+      "run the check command again right after that publish, once its `REGISTER_VERSION=` line is in `api.env`",
+      "every line must then show a tick"
+    ]) {
+      expect(readBack, needle).toContain(needle);
+    }
+    expect(flat).toContain("after the last run every line must show a tick, apart from the one cross that **Read the settings back before switching on** allows");
+    const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md").replace(/\s+/gu, " ");
+    const row23 = /\| 23 \| [^\n]*?\| — \|/u.exec(checklist)?.[0] ?? "";
+    expect(row23).toContain("before the publish that switches billing on, the one cross allowed is the `countryPolicy` line");
+    expect(row23).toContain("the check is run again right after that publish, and then shows a tick on every line");
+    // The check reads the version api.env names, which is why it runs again once that line is in api.env.
+    expect(read("apps/api/src/billing/check-cli.ts")).toContain("const version = operator.REGISTER_VERSION;");
+  });
+
+  it("F6b (ops-9): no still-open item of Part 2's or Part 3's final review names the previous card processor unless voided", () => {
+    // Its name is built from pieces, as tests/architecture/card-processor-removed.test.ts does, so this file never names it.
+    const OLD_PROCESSOR = new RegExp(["x", "money"].join(""), "iu");
+    for (const path of ["docs/missions/paid-plans/PART2-FINAL-REVIEW-OPEN-ITEMS.md", "docs/missions/paid-plans/PART3-FINAL-REVIEW-OPEN-ITEMS.md"]) {
+      const rows = read(path).split("\n").filter((line) => line.startsWith("| ") && !line.startsWith("| Id ") && !line.startsWith("|---"))
+        .map((line) => line.slice(2, -2).split(" | "));
+      expect(rows.length, path).toBeGreaterThan(5);
+      for (const cells of rows) {
+        if (!(cells.at(-1) ?? "").startsWith("open")) continue;
+        const what = cells[1] ?? "";
+        const left = what.includes(" are left.") ? what.slice(what.indexOf(" are left.")) : what;
+        for (const item of left.split(/ \((?=\d+\) )/u)) {
+          if (OLD_PROCESSOR.test(item)) expect(item, `${path} ${cells[0]}`).toContain("void: card processor changed to NETOPIA");
+        }
+      }
+    }
+    const erasure = read("docs/missions/paid-plans/PART2-FINAL-REVIEW-OPEN-ITEMS.md").split("\n")
+      .find((line) => line.startsWith("| P2-I10 (owner, accountant) |")) ?? "";
+    expect(erasure).toContain("§14.8 gives the hand path (refund in NETOPIA's admin, confirm in the reply)");
   });
 
   it("P4-H fix round 1 (the P4-F judge's route (a)): no paid question waits in line when billing goes on", () => {
@@ -933,7 +1038,8 @@ describe("P22 the Billing runbook", () => {
       "Going from NETOPIA's sandbox to live on the same host", "BILLING_OTHER_SYSTEM_RECORDS_OPEN",
       "grep -E '^(NETOPIA_API_BASE_URL|NETOPIA_POS_SIGNATURE|QUADERNO_API_BASE_URL|SMARTBILL_API_BASE_URL)=' /etc/debateai/api.env",
       "stat -c '%y %U %a %n' /etc/debateai/api/billing/netopia-api-key /etc/debateai/api/billing/netopia-ipn-keys.pem",
-      "FROM billing.payment_notice WHERE payment_environment = 'live'",
+      // F6b (ops-5): the first live payment's message is read on our own live charge, never on the environment alone.
+      "FROM billing.payment_notice n JOIN billing.charge c ON c.charge_id = n.order_id",
       // §14.8: disputes are a status of the payment's own order.
       "NETOPIA reports a dispute as a status of the payment itself",
       "r.provider_payment_id = e.provider_payment_id",

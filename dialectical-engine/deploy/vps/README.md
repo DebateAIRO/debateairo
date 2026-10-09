@@ -147,6 +147,7 @@ process start: restart both units after either change.
 | `/etc/debateai/hatchet.pgpass` | `0600` | `root:root` | the `debateai_prod_hatchet` role's password, read once by `bootstrap.sql` (§4) |
 | `/etc/debateai/api/` | `0700` | `debateai-api` | `kek.bin`, `corpus-kek.bin`, `blind-index-key.bin`, `audit-source-ip-salt.bin`, `support-kek.bin` (the support chat's master key — the file name is checked and must be exactly this), `records-key.bin` (the records key, §9) |
 | `/etc/debateai/api/providers/` | `0700` | `debateai-api` | the API's own copy of each vendor credential (V-9, §11) |
+| `/etc/debateai/api/billing/` | `0700` | `debateai-api` | billing's key files, written only by the guided setup (§14.2): `netopia-api-key`, `quaderno-api-key`, `smartbill-credentials` and `owner-report-email` (`0600`, `debateai-api`), and NETOPIA's public key `netopia-ipn-keys.pem` (`0644`, owned by root). The setup refuses (`BILLING_SETUP_UNSAFE_FOLDER`) unless this folder and `/etc/debateai/api` are real folders, not links, owned by `debateai-api` |
 | `/etc/debateai/runner/` | `0700` | `debateai-runner` | `kek.bin` (the runner's own copy of the same bytes — a master-key rotation must replace this file too, §3 "Changing a master key") |
 | `/etc/debateai/runner/providers/` | `0700` | `debateai-runner` | the runner's own copy of each vendor credential (V-9, §11) |
 | `/etc/debateai/api-previous/`, `/etc/debateai/runner-previous/` | `0700` | `debateai-api`, `debateai-runner` | the previous master keys, **only during a changeover** (§3 "Changing a master key"); absent in the steady state |
@@ -2177,7 +2178,10 @@ never write it, because whoever could change it could forge payment messages. Th
 `/etc/debateai/api.env`, between the lines `# >>> billing settings (billing-setup.sh) >>>` and
 `# <<< billing settings <<<`. The script replaces only that block, keeps a dated copy of the file before it changes
 it, and turns any line outside the block that sets the same setting into a comment with a note, because systemd would
-use the later one. A key file that exists is never replaced unless you ask for its section by name with `--replace`:
+use the later one. Before its first question it refuses with `BILLING_SETUP_UNSAFE_FOLDER` unless `/etc/debateai/api`,
+and `/etc/debateai/api/billing` if it exists, is a real folder (not a link) owned by `debateai-api`, as §3 lays them
+out. Put them back as §3 says; a link there can be planted by the API's own user, so first find out how it got there.
+A key file that exists is never replaced unless you ask for its section by name with `--replace`:
 
 ```sh
 bash /opt/debateai/dialectical-engine/deploy/vps/billing-setup.sh --replace netopia
@@ -2404,7 +2408,12 @@ version the person accepted from there, even after the Terms change. The site li
 
 **Switching billing on.** Before this, make sure:
 
-- the go-live checklist's budget and billing rows are proven (rows 13–54);
+- every row of the go-live checklist from 13 to 73 is proven (its last column holds the proof), the void rows (20, 40
+  and 46) excepted;
+- among them, NETOPIA's written approval of the shop for AI subscriptions, with recurring payments switched on (go-live
+  row 14);
+- the small live test, with billing off, passed on this host (§14.9, "The small live test, with billing off"; go-live
+  row 69);
 - the sandbox run of §14.9 passed, on its own throwaway server, never on this host.
 
 **Going from NETOPIA's sandbox to live on the same host.** Skip this if this host never ran with the sandbox address
@@ -2461,7 +2470,8 @@ waiting.
    SmartBill section with `--replace smartbill` too. Each run of the setup ends with the check command. After the
    NETOPIA run alone, one line shows an expected cross, `BILLING_LIVE_SANDBOX_INVOICER_REFUSED` (Quaderno is still the
    sandbox), until the Quaderno run, and the SmartBill run when it is needed; after the last run every line must show a
-   tick. Pointed at live beside Quaderno's sandbox or a `.invalid` SmartBill address, the API refuses to start with
+   tick, apart from the one cross that **Read the settings back before switching on** allows. Pointed at live beside
+   Quaderno's sandbox or a `.invalid` SmartBill address, the API refuses to start with
    `BILLING_LIVE_SANDBOX_INVOICER_REFUSED`. With a sandbox key left in place, every checkout is refused
    (`billing.payment.credentials_refused` in the journal) or every price quote fails.
 
@@ -2503,7 +2513,10 @@ lines and the key files' dates on the day (go-live row 23). The NETOPIA address 
 NETOPIA's live admin shows it, and the invoicers' addresses the live ones. Each key file must have been written for
 live: after the host's last use of the sandbox, if it ever had one. The `grep` line prints the setting lines; the
 `stat` line prints each key file's last change, owner and mode, never its content; the check command must show a tick
-on every line:
+on every line, with one exception. Until the version that switches billing on is published, the one cross allowed is
+the `countryPolicy` line ("has no countryPolicy row"), when that member arrives with that version (below). Then run
+the check command again right after that publish, once its `REGISTER_VERSION=` line is in `api.env` (the check reads
+the version `api.env` names): every line must then show a tick.
 
 ```sh
 grep -E '^(NETOPIA_API_BASE_URL|NETOPIA_POS_SIGNATURE|QUADERNO_API_BASE_URL|SMARTBILL_API_BASE_URL)=' /etc/debateai/api.env
@@ -2569,12 +2582,15 @@ envelopes) is asked by both services. While a model scorecard is in force, the r
 over every configured model, because the runner never reads `billingPolicy`; with billing on, the API's start-up and
 the publish price Free on the Free plan's models only. So they can refuse a version that the runner starts with.
 
-After the first live payment, check that its message reached the site (go-live row 19). The newest row must say
-`live`; no row means NETOPIA's messages do not reach the site: check `PUBLIC_APP_URL` and the public key with the
+After the first live payment, check that its message reached the site (go-live row 19). The query lists the newest
+messages that named one of our own live charges and were applied (outcome `APPLIED`, which is written only with
+billing on); `charge_ref` is our charge reference. The newest row must be that payment's, dated when it was made. The
+small live test's messages name tool orders, never one of our charges, so they never show here. No row, or only rows
+older than that payment, means its message did not reach the site: check `PUBLIC_APP_URL` and the public key with the
 check command (§14.5):
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT received_at, provider_status, payment_environment FROM billing.payment_notice WHERE payment_environment = 'live' ORDER BY received_at DESC LIMIT 1"
+sudo -u postgres psql -d debateai -c "SELECT n.received_at, n.order_id AS charge_ref, n.provider_status, n.payment_environment, o.outcome FROM billing.payment_notice n JOIN billing.charge c ON c.charge_id = n.order_id JOIN billing.payment_notice_outcome o ON o.notice_id = n.notice_id WHERE c.payment_environment = 'live' AND o.outcome = 'APPLIED' ORDER BY n.received_at DESC LIMIT 5"
 ```
 
 **Stopping sales, and switching billing off.** These are two different things. Almost always, you want the first.
@@ -2590,7 +2606,7 @@ payment retries their plan ends and they move to Free.
 *To switch billing off* (`billingPolicy.enabled: false`): **Switching billing off once plans are live is not
 supported.** That is the owner's ruling of 3 October 2026 (P2-M41: unsupported, with a warning). Nothing in the code
 refuses it, so this runbook is the only guard. Do it only with no live plan and no open billing job. On the same day,
-check that all three of these print 0:
+check that all four of these print 0:
 
 ```sh
 sudo -u postgres psql -d debateai -c "SELECT count(*) AS live_subscriptions FROM billing.subscription_latest_v WHERE kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')"
@@ -2604,13 +2620,21 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_billing_jobs FROM 
 sudo -u postgres psql -d debateai -c "SELECT count(*) AS unsettled_owner_withdrawals FROM billing.subscription_event w WHERE w.kind = 'WITHDRAWN' AND jsonb_extract_path_text(w.data, 'refund_by_owner') = 'true' AND NOT EXISTS (SELECT 1 FROM billing.withdrawal_owner_settlement s WHERE s.subscription_id = w.subscription_id)"
 ```
 
+```sh
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_owner_refunds FROM billing.charge_event r WHERE r.kind = 'REFUND_REQUESTED' AND r.payment_provider = 'netopia' AND r.amount_micros > 0 AND COALESCE((SELECT sum(d.amount_micros) FROM billing.charge_event d WHERE d.charge_id = r.charge_id AND d.kind = 'REFUNDED' AND COALESCE(d.refunds_transaction_id, d.provider_payment_id) = r.provider_payment_id), 0) < r.amount_micros"
+```
+
 The first counts every subscription that is not over yet: created, active (a pending cancel included), past due and
-suspended. The second counts the refunds, invoices, credit notes, emails and payment checks still waiting. The third
+suspended. The second counts the refunds, invoices, credit notes, emails and payment checks still waiting. A refund
+handed to you leaves that list once its O2_REFUND_DUE email is sent (**A refund handed to you**, below). The third
 counts the withdrawals handed to you that you have not settled yet with `pnpm billing:withdraw --refund` (below): the
 first count leaves them out, because a withdrawn plan is over, but their refund is still owed, and the jobs your
-settlement writes would never run with billing off. Only when all three are 0, publish the version with
-`enabled: false`. If any of them is not 0, do not switch billing off: stop new sales instead (above), and check again
-later.
+settlement writes would never run with billing off. The fourth counts the refunds handed to you that are not recorded
+yet: a refund the site asked for on a NETOPIA payment whose recorded refunds do not add up to it yet. A refund a
+dispute holds counts too, because it is owed again if the dispute ends for us. With billing off, no reminder
+(O2_REFUND_REMINDER) and no status read would come for any of them. Only when all four are 0, publish the version
+with `enabled: false`. If any of them is not 0, do not switch billing off: stop new sales instead (above), and check
+again later.
 
 Why they must be 0: with billing off, every billing route answers 404, including NETOPIA's payment messages, cancel,
 the emailed cancel link and withdraw (a 14-day legal right), and no billing job runs. When billing comes back on, every
@@ -3307,10 +3331,11 @@ read -r ORDER && read -r PAYER_IP && systemd-run --pipe --wait --collect --uid=d
 Refund both payments in NETOPIA's live admin, and check that the site stored both messages:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT n.received_at, n.provider_status, o.outcome FROM billing.payment_notice n JOIN billing.payment_notice_outcome o ON o.notice_id = n.notice_id WHERE n.payment_environment = 'live' ORDER BY n.received_at DESC LIMIT 10"
+sudo -u postgres psql -d debateai -c "SELECT n.received_at, n.provider_status, o.outcome FROM billing.payment_notice n JOIN billing.payment_notice_outcome o ON o.notice_id = n.notice_id WHERE n.payment_environment = 'live' AND o.outcome <> 'DUPLICATE' ORDER BY n.received_at DESC LIMIT 10"
 ```
 
-Every row must say `TOOL_ORDER`. Write down what you saw for the go-live list. The card this test saved is revoked by
+Every row must say `TOOL_ORDER`. A message NETOPIA sent again adds a `DUPLICATE` row, which the query leaves out.
+Write down what you saw for the go-live list. The card this test saved is revoked by
 the daily cleanup once it is a day old (so make the charge above on the day you pay), and deleted a day after that.
 Then delete the live capture folder: it
 holds your own details, and nothing in it is committed:
