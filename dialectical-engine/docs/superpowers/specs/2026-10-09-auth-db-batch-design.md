@@ -35,6 +35,11 @@ owner, `SECURITY DEFINER` and `search_path=pg_catalog`; new ones get the owner o
 5. **Alert claim release.** `staff.release_alert_delivery(outbox, claim)` gives back a live claim without spending the
    attempt; `StaffAlertDispatcher.drain()` uses it when readiness lapses after the claim.
 
+**As built.** The Settings cancel follows the audited write protocol (`identity.consumer_security.RECOVERY_CANCELLED`).
+The recovery pages now load all 35 locales. Preview delivery needs new reviewed mail-wrapper versions on the server for
+`security-recovery-code-used-v1` (v4 wrapper is sealed) and for the WAITING/FINISH recovery mails (installed
+recovery106 helper); the repo-side hand-off (`deploy/preview-auth-dev/v1/mail-handoff.mjs`) already accepts them.
+
 **Risks.** A WAITING row blocks adding another authenticator (existing rule for pending-recovery factors) until it
 finishes or is cancelled. Any password, email, factor or security-epoch change during the wait voids it. A stolen
 session can cancel a pending recovery (cost: the existing 24 h cooldown). Peer auth means any root process can write
