@@ -8,11 +8,9 @@
 // parent folder's node_modules, so one there could be loaded instead of the release's own.
 import { lstat, realpath } from 'node:fs/promises';
 import { dirname, isAbsolute, join, normalize, relative, sep } from 'node:path';
-import { sha256 } from '../../preview-auth-dev/v1/custody.mjs';
 import { readPublicArtifact } from '../../preview-auth-dev/v1/launch-plan.mjs';
-import { verifySourceManifest } from '../../preview-auth-dev/v1/source-manifest.mjs';
+import { operatorManifestSha256, verifySourceManifest } from '../../preview-auth-dev/v1/source-manifest.mjs';
 
-const OPERATOR_PREFIX = 'dialectical-engine/deploy/preview-auth-dev/v1/';
 class ReleaseRefusal extends Error { constructor(code) { super(code); this.code = code; } }
 const refuse = code => { throw new ReleaseRefusal(code); };
 const absolute = path => typeof path === 'string' && isAbsolute(path) && normalize(path) === path && !path.includes('\0');
@@ -84,8 +82,7 @@ export async function verifyReleaseForImport({ plan, importPaths, rootUid = 0, c
     source = await readArtifact(plan.sourceManifest, 'source');
     if (source?.uid !== rootUid) refuse('RELEASE_UNVERIFIED');
     await verifyManifest(source, { sourceRevision: plan.sourceRevision, sourceTree: plan.sourceTree, sourceRoot: plan.sourceRoot, role: 'api', manifestSha256: plan.sourceManifest.sha256 });
-    const operator = source.files.filter(file => file.path.startsWith(OPERATOR_PREFIX));
-    if (sha256(JSON.stringify(operator)) !== plan.operatorManifestSha256) refuse('RELEASE_UNVERIFIED');
+    if (operatorManifestSha256(source) !== plan.operatorManifestSha256) refuse('RELEASE_UNVERIFIED');
   } catch { refuse('RELEASE_UNVERIFIED'); }
   if (!Array.isArray(importPaths) || importPaths.length < 1) refuse('RELEASE_PATH_NOT_ROOT_ONLY');
   for (const path of importPaths) await assertRootOnlyImport(path, { sourceRoot: plan.sourceRoot, rootUid, ceiling });

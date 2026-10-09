@@ -297,12 +297,28 @@ describe('release drop-in', () => {
     const text = prestart.renderReleaseDropin({ service: 'api', entry: lock.services.api, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
     const lines = text.split('\n').filter((line: string) => !line.startsWith('#') && line);
     // `+` runs as root but would inherit the service's Environment=/EnvironmentFile= (NODE_OPTIONS, secrets): env -i drops all of it.
-    expect(lines).toEqual(['[Service]', `WorkingDirectory=${root}/dialectical-engine`, 'ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/node/bin/node /opt/op/prestart.mjs --service api', 'ExecStart=',
+    // The restart settings come first and win over any older drop-in's Restart=no (it sorts before ten z).
+    expect(lines).toEqual(['[Unit]', 'StartLimitIntervalSec=900', 'StartLimitBurst=4', 'OnFailure=debateai-preview-alert@%n.service',
+      '[Service]', 'Restart=on-failure', 'RestartMode=direct', 'RestartSec=30', 'TimeoutStartSec=300', `WorkingDirectory=${root}/dialectical-engine`, 'ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/node/bin/node /opt/op/prestart.mjs --service api', 'ExecStart=',
       `ExecStart=/opt/node/bin/node ${root}/dialectical-engine/deploy/preview-auth-dev/v1/launch-api.mjs --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/api-launch.json`]);
     expect(prestart.RELEASE_DROPIN_NAME > 'zzzzzzzzz-auth-dev-task12-final.conf').toBe(true);
     const ui = prestart.renderReleaseDropin({ service: 'ui', entry: lock.services.ui, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
     expect(ui).toContain(`WorkingDirectory=${root}/dialectical-engine/apps/ui\n`);
     expect(ui).toContain('launch-ui.mjs --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/ui-launch.json');
+    expect(ui).toContain('\n[Service]\nRestart=on-failure\nRestartMode=direct\nRestartSec=30\nTimeoutStartSec=300\n');
+  });
+
+  it('wins over an older release drop-in that sets Restart=no (systemd: the last file in name order wins)', async () => {
+    const s = server();
+    const lock = await pinned(s);
+    const older = '[Service]\nRestart=no\nRestartSec=5\nTimeoutStartSec=90\n[Unit]\nStartLimitBurst=1\n';
+    const ours = prestart.renderReleaseDropin({ service: 'api', entry: lock.services.api, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
+    // A single-valued key takes the value of the last assignment across drop-ins sorted by file name.
+    const files = [['99-provider-high-v1.conf', older], ['zzzzzz-recovery106-v1.conf', older], [prestart.RELEASE_DROPIN_NAME, ours]].sort(([a], [b]) => (a < b ? -1 : 1));
+    const effective: Record<string, string> = {};
+    for (const [, text] of files) for (const line of text.split('\n')) { const at = line.indexOf('='); if (at > 0 && !line.startsWith('#')) effective[line.slice(0, at)] = line.slice(at + 1); }
+    expect(files.at(-1)![0]).toBe(prestart.RELEASE_DROPIN_NAME);
+    expect(effective).toMatchObject({ Restart: 'on-failure', RestartMode: 'direct', RestartSec: '30', TimeoutStartSec: '300', StartLimitIntervalSec: '900', StartLimitBurst: '4' });
   });
 });
 

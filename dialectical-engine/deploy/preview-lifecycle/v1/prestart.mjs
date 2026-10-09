@@ -257,6 +257,16 @@ export async function pinRelease({ planPath, layout = LAYOUT, deps = {}, now = D
 
 const UNIT_SAFE = /^\/[A-Za-z0-9/._-]+$/;
 const CLEAN_PATH = 'PATH=/usr/sbin:/usr/bin:/sbin:/bin';
+/**
+ * The restart settings of systemd/<api|ui>.service.d/50-lifecycle.conf, repeated in the release
+ * drop-in. Older release drop-ins on the server set `Restart=no` and sort after `50-`, so they
+ * would cancel the automatic restart; the ten-z drop-in sorts last, so these values win.
+ * tests/unit/preview-lifecycle-units.test.ts keeps them equal to both 50-lifecycle.conf files.
+ */
+export const LIFECYCLE_RESTART = Object.freeze({
+  unit: Object.freeze([['StartLimitIntervalSec', '900'], ['StartLimitBurst', '4'], ['OnFailure', 'debateai-preview-alert@%n.service']]),
+  service: Object.freeze([['Restart', 'on-failure'], ['RestartMode', 'direct'], ['RestartSec', '30'], ['TimeoutStartSec', '300']])
+});
 /** The release-specific drop-in. It sorts after every existing release drop-in so its ExecStart= reset wins. */
 export function renderReleaseDropin({ service, entry, lockSha256, nodePath, prestartPath, layout = LAYOUT }) {
   if (!SERVICES.includes(service) || ![nodePath, prestartPath, entry.sourceRoot, layout.currentDir, layout.env].every(path => UNIT_SAFE.test(path))) refuse('DROPIN_REFUSED');
@@ -266,7 +276,11 @@ export function renderReleaseDropin({ service, entry, lockSha256, nodePath, pres
     `# Release lock sha256 ${lockSha256}; source ${entry.sourceRevision}; register ${entry.publication.registerVersion}.`,
     `# Install as /etc/systemd/system/debateai-preview-${service}.service.d/${RELEASE_DROPIN_NAME}`,
     '# It sorts after zzzzzzzzz-auth-dev-task12-final.conf, so the ExecStart= reset below wins.',
+    '# It also repeats the restart settings of 50-lifecycle.conf: an older drop-in with Restart=no sorts after 50-.',
+    '[Unit]',
+    ...LIFECYCLE_RESTART.unit.map(([key, value]) => `${key}=${value}`),
     '[Service]',
+    ...LIFECYCLE_RESTART.service.map(([key, value]) => `${key}=${value}`),
     `WorkingDirectory=${service === 'ui' ? `${engine}/apps/ui` : engine}`,
     // `+` runs as root but would inherit the service's Environment=/EnvironmentFile= (NODE_OPTIONS,
     // secrets). env -i starts node with PATH only; prestart reads nothing else from the environment.
