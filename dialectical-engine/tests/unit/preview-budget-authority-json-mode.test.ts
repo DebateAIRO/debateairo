@@ -14,8 +14,10 @@ describe('production preview spending guard optional JSON mode', () => {
     expect(result.stderr).toContain('OK');
   });
   it('runs the v2 team daily pot, concurrency, halt and custody behaviors offline', () => {
-    const result = runPython('tests/unit/preview_budget_authority_v2_test.py', 30000);
-    expect(result.status, result.stderr).toBe(0);
+    // About 4 s locally (2026-10-09): the margin covers a loaded CI runner. On failure, show the
+    // END of the output (the failing test and its traceback) and any spawn error or signal.
+    const result = runPython('tests/unit/preview_budget_authority_v2_test.py', 90000);
+    expect(result.status, `${String(result.error ?? '')} signal=${result.signal}\n${result.stderr.slice(-6000)}`).toBe(0);
     expect(result.stderr).toContain('Ran 103 tests');
     expect(result.stderr).toContain('OK');
   });

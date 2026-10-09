@@ -1556,6 +1556,7 @@ from preview_budget_authority_fixture import HOST, load_bridge
 bridge = load_bridge()
 private, go, path = sys.argv[2:5]
 bridge.SOCKET_PATTERN = re.compile(re.escape(path))
+bridge.SERVE_POLL_SECONDS = 0.02  # A fast stop for the test; production keeps 0.5 s.
 bridge.serve(private, go, path, platform='linux', uid=0, host=HOST, owner_uid=os.getuid())
 """
 
@@ -1654,7 +1655,7 @@ class SignalStopTests(GateTest):
 
         def execute(_data, _uid, _cancelled, _on_reserved):
             started.set()
-            time.sleep(0.5)
+            time.sleep(0.2)
             finished.append(time.monotonic())
             return {'status': 200, 'body': '{}'}
         path, server, loop = self.serve_on(gate, execute)

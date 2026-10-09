@@ -40,7 +40,7 @@ const NOTICES = Object.freeze({
   }),
   'gate-addresses': code => ({
     subject: `Preview: spending gate address list needs an update (${code})`,
-    lead: 'The hourly address check of the spending gate failed. Usually the addresses of api.deepinfra.com no longer match the gate\'s allow-list, and paid calls can fail until it is updated; the journal lines below say which case it is (a "new" list of addresses, or another error such as an unreadable list). If they name new addresses, check that they are DeepInfra\'s, then run the one command below. It adds today\'s DNS answer to the list and restarts the gate.',
+    lead: 'The hourly address check of the spending gate failed. Usually the addresses of api.deepinfra.com no longer match the gate\'s allow-list, and paid calls can fail until it is updated; the journal lines below say which case it is (DEEPINFRA_ADDRESSES_CHANGED, or another error such as an unreadable list). This email blanks addresses; to see the new ones, run the journalctl line under "What to look at" and check that they are DeepInfra\'s. Then run the one command below. It adds today\'s DNS answer to the list and restarts the gate.',
     command: `/usr/bin/python3 -I ${GATE_FOLDER}/deepinfra_addresses.py update --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf && systemctl restart debateai-preview-provider-budget`,
     lookAt: ADDRESS_UNIT, journal: ADDRESS_UNIT
   })

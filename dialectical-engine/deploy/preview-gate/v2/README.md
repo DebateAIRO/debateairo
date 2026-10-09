@@ -441,7 +441,8 @@ Until step 2, calls refuse ("stopped"): the gate only spends under the GO it was
 
 **DeepInfra moved (the hourly check emailed, or a start refused with
 `DEEPINFRA_ADDRESSES_CHANGED`).**
-1. Check that the new addresses the email lists are DeepInfra's.
+1. See the new addresses (the email blanks them) with
+   `journalctl -u debateai-preview-gate-addresses -n 5 -o cat`, and check that they are DeepInfra's.
 2. Run the one command the email gives. It adds today's DNS answer to the list (refusing any
    address that is not public; nothing listed is dropped), reloads systemd, and restarts the
    gate. It prints what it added and which listed addresses DNS no longer gives ("stale"). To

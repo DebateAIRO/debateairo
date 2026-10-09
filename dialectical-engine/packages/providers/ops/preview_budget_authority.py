@@ -79,6 +79,7 @@ CALL_DEADLINE_SECONDS = 600
 REPLY_TIMEOUT_SECONDS = 630
 DRAIN_REPLY_SECONDS = 30  # Once stopping (or tripped), a reply must be taken this fast or the gate halts.
 STOP_SIGNALS = (signal.SIGTERM, signal.SIGINT)
+SERVE_POLL_SECONDS = 0.5  # How often the accept loop checks for a stop (bounds the stop's first step).
 MAX_IPC_BYTES = 1024 * 1024
 IPC_READ_TIMEOUT_SECONDS = 10  # Each header or body read on the 0666 socket.
 MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a thread.
@@ -992,7 +993,7 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None, own
 
         def loop():
             try:
-                server.serve_forever()
+                server.serve_forever(poll_interval=SERVE_POLL_SECONDS)
             except BaseException as error:  # noqa: BLE001 - reported by the main thread
                 failure.append(error)
                 os.kill(os.getpid(), signal.SIGTERM)  # Wakes the sigwait below.

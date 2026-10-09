@@ -362,7 +362,8 @@ describe('spending-gate notices', () => {
     expect(asked).toEqual(['debateai-preview-gate-addresses.service']);
     const mail = h.sent[0]!;
     expect(mail).toContain('Subject: Preview: spending gate address list needs an update (mismatch)');
-    expect(mail).toContain('38.101.151.31');
+    expect(mail).toContain('DEEPINFRA_ADDRESSES_CHANGED');
+    expect(mail).not.toContain('38.101.151.31'); // The alert blanks addresses; the email says how to see them.
     expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/deepinfra_addresses.py update --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf && systemctl restart debateai-preview-provider-budget');
   });
 
