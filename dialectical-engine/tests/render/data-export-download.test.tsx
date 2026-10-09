@@ -6,6 +6,7 @@ import { ContractHttpError, createContractClient } from "@debateai/contract";
 import { ExportDownloadClient } from "../../apps/ui/components/ExportDownloadClient.js";
 import { SocialCompleteFlow } from "../../apps/ui/components/auth/SocialCompleteFlow.js";
 import { PENDING_EXPORT_KEY } from "../../apps/ui/lib/dataExportPending.js";
+import { endSession, finishSessionCleanup } from "../../apps/ui/lib/endSession.js";
 import { safeReturnPath } from "../../apps/ui/lib/returnPath.js";
 import settings from "../../apps/ui/messages/en/settings.json" with { type: "json" };
 
@@ -33,7 +34,8 @@ afterEach(async () => { if (root) await act(async () => root!.unmount()); root =
 it("D-1 stashes the fragment token and strips it from browser history", async () => {
   window.history.replaceState(null, "", `/export#${token}`);
   const replace = vi.spyOn(window.history, "replaceState");
-  await mount(<ExportDownloadClient catalog={settings} client={stub() as never} />);
+  const pending = { downloadDataExport: vi.fn(() => new Promise<never>(() => {})) };
+  await mount(<ExportDownloadClient catalog={settings} client={pending as never} />);
   expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBe(token);
   expect(window.location.hash).toBe("");
   expect(replace).toHaveBeenCalledWith(null, "", "/export");
@@ -65,7 +67,24 @@ it("D-3 starts the ZIP download and the button downloads it again", async () => 
   await act(async () => button(settings["settings.export.download.button"]).click());
   expect(click).toHaveBeenCalledTimes(2);
   expect(client.downloadDataExport).toHaveBeenCalledWith(token);
+  expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBeNull();
   click.mockRestore();
+});
+it("FIX-UI U-N3 clears a pending link on completed sign-out but preserves it on failure", async () => {
+  sessionStorage.setItem(PENDING_EXPORT_KEY, token);
+  await expect(endSession({ logout: vi.fn(async () => { throw new Error("OFFLINE"); }) }, { redirectTo: null })).rejects.toThrow("OFFLINE");
+  expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBe(token);
+  await endSession({ logout: vi.fn(async () => {}) }, { redirectTo: null });
+  expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBeNull();
+  sessionStorage.setItem(PENDING_EXPORT_KEY, token);
+  await endSession({ logout: vi.fn(async () => {}), revokeAllSessions: vi.fn(async () => {}) }, { all: true, redirectTo: null });
+  expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBeNull();
+  sessionStorage.setItem(PENDING_EXPORT_KEY, token);
+  await endSession({ logout: vi.fn(async () => { throw new ContractHttpError("SESSION_REQUIRED", 401, "ended"); }) }, { redirectTo: null });
+  expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBeNull();
+  sessionStorage.setItem(PENDING_EXPORT_KEY, token);
+  finishSessionCleanup(null);
+  expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBeNull();
 });
 it("D-4 clears a wrong-account token and omits Back to Settings", async () => {
   sessionStorage.setItem(PENDING_EXPORT_KEY, token);

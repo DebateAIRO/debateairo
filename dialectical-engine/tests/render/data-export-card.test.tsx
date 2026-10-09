@@ -175,12 +175,41 @@ it("U-11 shows statusUnavailable after a failed status read", async () => {
   await mount(<DataExportCard catalog={settings} locale="en" client={stub as never} />);
   expect(host?.textContent).toContain(settings["settings.export.statusUnavailable"]);
 });
+it("FIX-UI U-N2 shows one state line when a SENT poll fails", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  let offline = false;
+  const stub = client(SENT);
+  stub.readDataExportStatus.mockImplementation(async () => { if (offline) throw new Error("OFFLINE"); return SENT; });
+  await mount(<DataExportCard catalog={settings} locale="en" client={stub as never} />);
+  expect(host!.querySelectorAll('[role="status"]')).toHaveLength(1);
+  offline = true;
+  await act(async () => { vi.advanceTimersByTime(5_000); });
+  await flush();
+  expect([...host!.querySelectorAll('[role="status"]')].map((line) => line.textContent)).toEqual([settings["settings.export.statusUnavailable"]]);
+  await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  const noMethod = client(); let noMethodOffline = false;
+  noMethod.authMethods.mockResolvedValue(methods([]) as never);
+  noMethod.readDataExportStatus.mockImplementation(async () => { if (noMethodOffline) throw new Error("OFFLINE"); return NONE; });
+  await mount(<DataExportCard catalog={settings} locale="en" client={noMethod as never} />);
+  await click(settings["settings.export.request"]); await flush();
+  noMethodOffline = true;
+  await act(async () => { vi.advanceTimersByTime(5_000); }); await flush();
+  expect([...host!.querySelectorAll('[role="status"]')].map((line) => line.textContent)).toEqual([settings["settings.export.statusUnavailable"]]);
+});
 it("U-12 has a Security link and no confirmation when no proof method exists", async () => {
   const stub = client(); stub.authMethods.mockResolvedValue(methods([]) as never);
   await mount(<DataExportCard catalog={settings} locale="en" client={stub as never} />); await click(settings["settings.export.request"]);
   expect(host?.textContent).toContain(settings["settings.export.noMethod"]);
   expect(host?.querySelector('a[href="/settings/security"]')).not.toBeNull();
+  expect(host?.querySelector('p.setStatus a[href="/settings/security"]')).toBeNull();
+  expect(host?.querySelector('.setCardRow a[href="/settings/security"]')).not.toBeNull();
   expect(host?.querySelector(".authSecurityConfirmation")).toBeNull();
+});
+it("FIX-UI U-N13 leaves Export data enabled while confirmation is open", async () => {
+  await mount(<DataExportCard catalog={settings} locale="en" client={client() as never} />);
+  await click(settings["settings.export.request"]); await flush();
+  expect(host?.querySelector(".authSecurityConfirmation")).not.toBeNull();
+  expect(button(settings["settings.export.request"]).disabled).toBe(false);
 });
 it("U-13 polls PREPARING into SENT on the second five-second tick", async () => {
   vi.useFakeTimers(); const stub = client(PREPARING); stub.readDataExportStatus.mockResolvedValueOnce(PREPARING as never).mockResolvedValue(SENT as never);

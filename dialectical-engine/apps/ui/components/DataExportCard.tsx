@@ -91,25 +91,25 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
       <p className="setCardHint">{t(catalog, "settings.export.hint")}</p>
       {status === null && !statusUnavailable ? <p className="setStatus" role="status">{t(catalog, "settings.export.checking")}</p> : null}
       {statusUnavailable ? <p className="setStatus" role="status">{t(catalog, "settings.export.statusUnavailable")}</p> : null}
-      {status?.status === "PREPARING" ? <p className="setStatus" role="status">{t(catalog, "settings.export.preparing", {
+      {!statusUnavailable && status?.status === "PREPARING" ? <p className="setStatus" role="status">{t(catalog, "settings.export.preparing", {
         time: formatDate(locale, status.requested_at, { dateStyle: "medium", timeStyle: "short" })
       })}</p> : null}
-      {status?.status === "SENT" ? <p className="setStatus" role="status">{t(catalog, "settings.export.sent", {
+      {!statusUnavailable && status?.status === "SENT" ? <p className="setStatus" role="status">{t(catalog, "settings.export.sent", {
         time: formatDate(locale, status.requested_at, { dateStyle: "medium", timeStyle: "short" }),
         expires: formatDate(locale, status.expires_at, { dateStyle: "medium", timeStyle: "short" })
       })}</p> : null}
-      {status?.status === "FAILED" ? <p className="setStatus" role="status">{t(catalog, "settings.export.failed")}</p> : null}
-      {noMethod ? <p className="setStatus" role="status">{t(catalog, "settings.export.noMethod")} <a className="setBtn" href="/settings/security">{t(catalog, "settings.security.title")}</a></p> : null}
-      {status !== null && (status.status === "NONE" || status.status === "FAILED" || status.status === "SENT") && !noMethod ? (
+      {!statusUnavailable && status?.status === "FAILED" ? <p className="setStatus" role="status">{t(catalog, "settings.export.failed")}</p> : null}
+      {noMethod && !statusUnavailable ? <><p className="setStatus" role="status">{t(catalog, "settings.export.noMethod")}</p><div className="setCardRow"><a className="setBtn" href="/settings/security">{t(catalog, "settings.security.title")}</a></div></> : null}
+      {status !== null && !statusUnavailable && (status.status === "NONE" || status.status === "FAILED" || status.status === "SENT") && !noMethod ? (
         <div className="setCardRow">
-          <button className="setBtn" type="button" disabled={requesting || confirming} onClick={() => { void beginConfirmation(); }}>
+          <button className="setBtn" type="button" disabled={requesting} onClick={() => { if (!confirming) void beginConfirmation(); }}>
             {requesting ? t(catalog, "settings.export.requesting")
               : status.status === "SENT" ? t(catalog, "settings.export.requestAgain")
               : t(catalog, "settings.export.request")}
           </button>
         </div>
       ) : null}
-      {status?.status === "SENT" ? <p className="setCardNote">{t(catalog, "settings.export.supersedes")}</p> : null}
+      {!statusUnavailable && status?.status === "SENT" ? <p className="setCardNote">{t(catalog, "settings.export.supersedes")}</p> : null}
       {confirming ? <SecurityConfirmation catalog={authCatalog} client={client} authorization={{ action: "EXPORT_DATA" }}
         onError={() => setMessage(t(catalog, "settings.export.notAuthorized"))}
         onConfirmed={(result) => request(result.step_up_grant.token)}
