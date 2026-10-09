@@ -73,7 +73,8 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
       }
     } catch (failure) {
       const code = failure instanceof ContractHttpError ? failure.serverCode : null;
-      if (mounted.current) setError(code === "EMAIL_INVALID" ? "auth.emailUndeliverable" : "auth.pending.unavailable");
+      if (mounted.current) setError(code === "EMAIL_INVALID" ? "auth.emailUndeliverable"
+        : code === "MAIL_DAILY_LIMIT" ? "auth.mailDailyLimit" : "auth.pending.unavailable");
     } finally {
       inFlight.current = false;
       if (mounted.current) { setBusy(false); setResetKey(value => value + 1); }

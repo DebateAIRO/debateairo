@@ -191,6 +191,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             }
             const code = failure instanceof ContractHttpError ? failure.serverCode ?? '' : '';
             setError(code === 'EMAIL_INVALID' ? t(catalog, "auth.emailUndeliverable")
+                : code === 'MAIL_DAILY_LIMIT' ? t(catalog, "auth.mailDailyLimit")
                 : code === 'STATE_SIGNUP_UNAVAILABLE' ? t(catalog, "auth.signUp.stateUnavailable")
                 : ['COUNTRY_SIGNUP_UNAVAILABLE', 'COUNTRY_UNKNOWN', 'TOR_REFUSED'].includes(code) ? t(catalog, "auth.signUp.countryUnavailable") : t(catalog, "auth.signUp.creationFailed"));
         }

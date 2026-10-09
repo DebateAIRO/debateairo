@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SendmailMailSender } from "../../apps/api/src/mail-channel.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 
 const executable = resolve("deploy/dev-auth/sendmail-capture.mjs");
 const captureEnvironmentKey = "DEBATEAI_DEV_MAIL_CAPTURE_DIR";
@@ -62,7 +63,7 @@ describe("DEV-06 local sendmail-compatible capture", { concurrent: false }, () =
     const spool = join(root, "mail");
     process.env[captureEnvironmentKey] = spool;
     try {
-      const sender = new SendmailMailSender({
+      const sender = new SendmailMailSender({ gate: testOutboundMailGate(),
         executable,
         from: "noreply@localhost.test",
         publicAppUrl: "https://localhost:3000",

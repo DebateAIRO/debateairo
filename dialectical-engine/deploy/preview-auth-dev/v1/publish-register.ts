@@ -13,7 +13,8 @@ import { staffAccessPolicyFromValue } from '../../../packages/register/src/staff
 import { internalAllowancePolicyFromValue } from '../../../packages/register/src/internal-allowance-policy.js';
 const hash = (value:string) => createHash('sha256').update(value).digest('hex');
 const fail = ():never => { throw new TypeError('PREVIEW_REGISTER_SNAPSHOT_REFUSED'); };
-const additions = ['consumerRecoveryPolicy','publicationCheckPolicy','taxAuthorities'] as const;
+// outboundMailPolicy: open sign-up mail PR 3 (owner decision G2, 2026-10-09), the daily account-mail budget the API reads at boot.
+const additions = ['consumerRecoveryPolicy','outboundMailPolicy','publicationCheckPolicy','taxAuthorities'] as const;
 const preserved = ['internalAllowancePolicy','staffAccessPolicy'] as const;
 export type RuntimeObservation = Readonly<{nodeVersion:string;pnpmVersion:string;sourceRevision:string;sourceTree:string;operatorSha256:string;observedAt:string}>;
 export async function buildPreviewSourceRows(bootstrap:BootstrapRegister, runtime:RuntimeObservation):Promise<readonly RegisterPublicationRow[]> {
@@ -30,7 +31,7 @@ export async function buildPreviewSourceRows(bootstrap:BootstrapRegister, runtim
     nodeRuntimeVersion:`preview-auth-dev-v1 actual Node ${runtime.nodeVersion}; measured ${runtime.observedAt}; source ${runtime.sourceRevision}/${runtime.sourceTree}; operator sha256:${runtime.operatorSha256}`}};
   const rows=[...await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_GLM_PROVIDER_REFS[0],evaluatorRoleRef:PREVIEW_GLM_PROVIDER_REFS[1]},'local'),
     ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
-  if(rows.length!==66)fail(); // Reviewed source closure; allocator result is never assumed from this count.
+  if(rows.length!==67)fail(); // Reviewed source closure; allocator result is never assumed from this count.
   return Object.freeze(rows.map(row=>Object.freeze(row)));
 }
 function canonicalRows(rows:readonly RegisterPublicationRow[]):RegisterPublicationRow[] {
@@ -52,7 +53,7 @@ export type SnapshotDelta = Readonly<{rowKey:string;oldValueSha256:string;newVal
 export function composePreviewSnapshot(input:Readonly<{sourceRows:readonly RegisterPublicationRow[];baseRows:readonly RegisterPublicationRow[];baseRegisterVersion:string;baseSnapshotSha256:string}>) {
   const source=canonicalRows(input.sourceRows),base=canonicalRows(input.baseRows);
   const baseRegisterVersion=parseRegisterVersionText(input.baseRegisterVersion);
-  if(computeRegisterSnapshotSha256(base)!==input.baseSnapshotSha256||source.length!==66||base.length!==65)fail();
+  if(computeRegisterSnapshotSha256(base)!==input.baseSnapshotSha256||source.length!==67||base.length!==65)fail();
   const sourceMap=new Map(source.map(row=>[row.rowKey,row])),baseMap=new Map(base.map(row=>[row.rowKey,row]));
   if(source.some(row=>['supportActivation','modelScorecard',...preserved].includes(row.rowKey))
     ||base.some(row=>['supportActivation','modelScorecard',...additions].includes(row.rowKey))

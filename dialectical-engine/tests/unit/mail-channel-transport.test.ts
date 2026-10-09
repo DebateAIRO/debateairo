@@ -10,6 +10,7 @@ vi.mock("node:child_process", async (original) => ({
   ...await original<typeof import("node:child_process")>(), spawn: transport.spawn
 }));
 import { SendmailMailSender, SendmailSecurityNotificationSender, SendmailEmailChangeMailSender, SendmailRecoveryEmailMailSender } from "../../apps/api/src/mail-channel.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 
 const recipient = "candidate@example.test";
 const token = "t".repeat(43);
@@ -17,17 +18,17 @@ const expiresAt = new Date("2026-10-05T12:00:00.000Z");
 const options = { executable: "/controlled/sendmail", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 25 };
 const senders = [
   { name: "verification", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
-    send: (overrides: Partial<typeof options> = {}) => new SendmailMailSender({ ...options, ...overrides }).sendVerification({ attemptId: "opaque", recipient, token, expiresAt }) },
+    send: (overrides: Partial<typeof options> = {}) => new SendmailMailSender({ gate: testOutboundMailGate(), ...options, ...overrides }).sendVerification({ attemptId: "opaque", recipient, token, expiresAt }) },
   { name: "security notification", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
-    send: (overrides: Partial<typeof options> = {}) => new SendmailSecurityNotificationSender({ ...options, ...overrides }).sendSecurityNotification({ messageId: "11111111-1111-4111-8111-111111111111", recipient, eventKind: "SCHEDULED", executeAt: expiresAt }) },
+    send: (overrides: Partial<typeof options> = {}) => new SendmailSecurityNotificationSender({ gate: testOutboundMailGate(), ...options, ...overrides }).sendSecurityNotification({ messageId: "11111111-1111-4111-8111-111111111111", recipient, eventKind: "SCHEDULED", executeAt: expiresAt }) },
   {
     name: "email change", exitCode: "SENDMAIL_EXIT_42", signalCode: "SENDMAIL_SIGNAL_SIGTERM",
-    send: (overrides: Partial<typeof options> = {}) => new SendmailEmailChangeMailSender({ ...options, ...overrides })
+    send: (overrides: Partial<typeof options> = {}) => new SendmailEmailChangeMailSender({ gate: testOutboundMailGate(), ...options, ...overrides })
       .sendEmailChange({ kind: "confirmation", recipient, token, expiresAt })
   },
   {
     name: "recovery email", exitCode: "SENDMAIL_EXIT_FAILED", signalCode: "SENDMAIL_EXIT_FAILED",
-    send: (overrides: Partial<typeof options> = {}) => new SendmailRecoveryEmailMailSender({ ...options, ...overrides })
+    send: (overrides: Partial<typeof options> = {}) => new SendmailRecoveryEmailMailSender({ gate: testOutboundMailGate(), ...options, ...overrides })
       .sendRecoveryEmail({ kind: "confirmation", recipient, token, expiresAt })
   }
 ];
@@ -40,6 +41,15 @@ function controlledChild() {
   });
   transport.spawn.mockReturnValue(child);
   return child;
+}
+
+/**
+ * Open sign-up mail PR 3: each sender now awaits the outbound mail gate before it spawns, so the child exists only
+ * a few microtasks after send() is called. Events are emitted once it does, exactly as the OS would order them.
+ */
+async function spawned(): Promise<void> {
+  for (let turn = 0; turn < 100 && transport.spawn.mock.calls.length === 0; turn += 1) await Promise.resolve();
+  expect(transport.spawn).toHaveBeenCalledTimes(1);
 }
 
 afterEach(() => {
@@ -56,6 +66,7 @@ describe.each(senders)("shared transport via $name", sender => {
     vi.useFakeTimers();
     const child = controlledChild();
     const result = sender.send().catch(error => error);
+    await spawned();
     child.emit("error", new Error("controlled exec failure"));
     expect(await result).toMatchObject({ operatorCode: "SENDMAIL_EXEC_FAILED" });
     expect(vi.getTimerCount()).toBe(0);
@@ -74,6 +85,7 @@ describe.each(senders)("shared transport via $name", sender => {
     vi.useFakeTimers();
     const child = controlledChild();
     const result = sender.send().catch(error => error);
+    await spawned();
     child.stdin.emit("error", new Error("controlled stdin failure"));
     expect(await result).toMatchObject({ operatorCode: "SENDMAIL_STDIN_FAILED" });
     expect(vi.getTimerCount()).toBe(0);
@@ -93,6 +105,7 @@ describe.each(senders)("shared transport via $name", sender => {
     vi.useFakeTimers();
     const child = controlledChild();
     const result = sender.send().catch(error => error);
+    await spawned();
     child.emit("exit", null, "SIGTERM");
     expect(await result).toMatchObject({ operatorCode: sender.signalCode });
     expect(vi.getTimerCount()).toBe(0);
@@ -104,6 +117,7 @@ describe.each(senders)("shared transport via $name", sender => {
     // A controlled immediate exit also probes re-entrant settlement during kill.
     child.kill.mockImplementation(() => { child.emit("exit", 0, null); return true; });
     const result = sender.send().catch(error => error);
+    await spawned();
     await vi.advanceTimersByTimeAsync(24);
     expect(child.kill).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -117,6 +131,7 @@ describe.each(senders)("shared transport via $name", sender => {
     vi.useFakeTimers();
     const child = controlledChild();
     const result = sender.send();
+    await spawned();
     child.emit("exit", 0, null);
     await expect(result).resolves.toBeUndefined();
     expect(vi.getTimerCount()).toBe(0);

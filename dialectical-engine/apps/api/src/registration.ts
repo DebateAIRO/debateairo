@@ -145,7 +145,9 @@ export class AuthFlowError extends Error {
     | "MFA_RATE_LIMITED"
     | "LEGAL_DOCUMENT_STALE"
     /** Open sign-up mail (2026-10-09): the one address rule, or a domain that takes no mail. Same code as email change. */
-    | "EMAIL_INVALID",
+    | "EMAIL_INVALID"
+    /** Open sign-up mail PR 3 (G2): today's account-mail budget is spent; "try again later". */
+    | "MAIL_DAILY_LIMIT",
     options?: ErrorOptions
   ) {
     super(code, options);
@@ -159,7 +161,7 @@ export class AuthFlowError extends Error {
       : this.code === "MFA_FIRST_STEP_UNAVAILABLE" || this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED"
         || this.code === "LEGAL_DOCUMENT_STALE" ? 409
       : this.code === "AUTH_REGISTRATION_FAILED" || this.code === "AUTH_MAIL_BUSY"
-        || this.code === "AUTH_TEMPORARILY_UNAVAILABLE" ? 503 : 400;
+        || this.code === "AUTH_TEMPORARILY_UNAVAILABLE" || this.code === "MAIL_DAILY_LIMIT" ? 503 : 400;
   }
 }
 
@@ -803,6 +805,13 @@ export class RegistrationService implements RegistrationApplication {
      * through (fail open). Absent, no DNS question is asked (tests, and compositions that predate it).
      */
     readonly mailDomainCheck?: MailDomainCheck;
+    /**
+     * Open sign-up mail PR 3 (owner decision G2): the outbound mail gate's "is there room today for one more
+     * sign-up mail?". Asked after the limiter and before any account work, for password sign-up and resend; a no
+     * refuses with MAIL_DAILY_LIMIT. It depends on the day's count alone, never on whether an account exists.
+     * The send itself is still gated in the sender. Absent, nothing is asked.
+     */
+    readonly outboundMail?: Readonly<{ hasCapacity(purposeClass: "standard"): Promise<boolean> }>;
   }) {
     this.clock = dependencies.clock ?? (() => new Date());
     this.sleep = dependencies.sleep ?? (async (milliseconds) => {
@@ -1637,6 +1646,15 @@ export class RegistrationService implements RegistrationApplication {
     }
   }
 
+  /** G2: at the day's cap for sign-up mail, refuse before any account work. A gate that cannot answer lets it through. */
+  private async assertMailBudget(): Promise<void> {
+    const budget = this.dependencies.outboundMail;
+    if (budget === undefined) return;
+    let room: boolean;
+    try { room = await budget.hasCapacity("standard"); } catch { return; }
+    if (!room) throw new AuthFlowError("MAIL_DAILY_LIMIT");
+  }
+
   async register(input: RegisterInput, rawSource: RegistrationSource, admission?: AuthSourceAdmission): Promise<typeof REGISTRATION_PUBLIC_RESPONSE> {
     const result = await this.registerFlow(input,rawSource,admission);
     if(!('message' in result)) throw new AuthFlowError('AUTH_REGISTRATION_FAILED');
@@ -1698,6 +1716,7 @@ export class RegistrationService implements RegistrationApplication {
           for (const address of recoveryEmail === null ? [email] : [email, recoveryEmail]) {
             if (await mailDomainRefused(this.dependencies.mailDomainCheck, address)) throw new AuthFlowError("EMAIL_INVALID");
           }
+          await this.assertMailBudget();
         }
 
         let passwordHash: string | null = null;
@@ -1907,6 +1926,7 @@ export class RegistrationService implements RegistrationApplication {
           persistAfter: floorResponse()
         });
       }
+      await this.assertMailBudget();
       releaseMailDispatch = await this.reserveMailDispatch(correlationId);
       const token = this.dependencies.verificationTokenFactory?.() ?? generateVerificationToken();
       const expiresAt = new Date(now.getTime() + this.dependencies.policy.verification.tokenTtlMs);

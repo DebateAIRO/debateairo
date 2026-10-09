@@ -27,6 +27,7 @@ import {
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
   readPublicationCheckPolicy,
+  readOutboundMailPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -460,6 +461,8 @@ describe("DEV-05 complete development deployment register", () => {
     ]);
     expect(callTokenCeilings).toEqual({ judge: 2048, synthesizer: 2048, evaluator: 2048 });
     expect(publicationCheck).toEqual({ deadlineMs: 60_000 });
+    // Open sign-up mail (G2, 2026-10-09): the API's "outbound-mail-policy" boot stage reads the sealed budget back.
+    await expect(readOutboundMailPolicy(database.pool, registerVersion)).resolves.toEqual({ dailyCap: 2_000, reservedForSecurityPct: 20, alertAtPct: 50 });
     expect(auth.channel.structuralMaximumConcurrentRegistrations).toBe(103);
     expect(auth.verification).toMatchObject({ resendCooldownMs: 60_000, outboundSendWindowMs: 3_600_000,
       outboundSendMax: 3, outboundSendMechanism: "atomic_rolling_reservation_ledger" });

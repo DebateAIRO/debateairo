@@ -74,7 +74,7 @@ describe('isolated PG18 native preview publication (source evidence, not Linux s
     await migrate(pool);
     expect((await pool.query('SELECT name,applied_at FROM public.debateai_schema_migration WHERE name=ANY($1::text[]) ORDER BY name',[history.map(row=>row.name)])).rows).toEqual(history);
     const source=await buildPreviewSourceRows(await loadBootstrapRegister(),observation);
-    const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+    const base=[...source.filter(row=>!['consumerRecoveryPolicy','outboundMailPolicy','publicationCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
     // Historical import is synthetic fixture setup only; the operator never seeds development/bootstrap.
     await createPostgresRegisterPublicationPort(pool).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
     const sealedBefore=await readSealedSnapshot(pool,'4');
@@ -82,7 +82,7 @@ describe('isolated PG18 native preview publication (source evidence, not Linux s
     const approval={baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256};
     const input={publicationId:randomUUID(),sourceRef:'isolated native preview operator fixture',snapshot,approval};
     const receipt=await publishPreviewRegister(pool,input);
-    expect(receipt.registerVersion).toBe('5');expect(receipt.rowCount).toBe(68);expect(receipt.publicationKind).toBe('GENERAL');expect(receipt.requestSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(receipt.registerVersion).toBe('5');expect(receipt.rowCount).toBe(69);expect(receipt.publicationKind).toBe('GENERAL');expect(receipt.requestSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(await publishPreviewRegister(pool,input)).toEqual(receipt);
     const singleConnection=new pg.Pool({connectionString:db.connectionString,options:'-c role=debateai_prod_migrator',max:1,connectionTimeoutMillis:5000});
     await native.withGuardedPool(singleConnection,async(c:any)=>{acquisitions++;await native.assertNativeConnection(c,target,plan.manifest.cohorts.auth106);},async(verifierPool:any)=>{

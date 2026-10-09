@@ -74,6 +74,7 @@ import {
   readMfaPolicy,
   readProductRolePolicy,
   readPublicationCheckPolicy,
+  readOutboundMailPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStructuralCeilingPolicyInputs,
@@ -141,6 +142,7 @@ import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
 import { systemMailDomainCheck } from "./mail-domain-check.js";
+import { InMemoryOutboundMailStore, OutboundMailGate, consoleOutboundMailReport } from "./outbound-mail-gate.js";
 import { EmailChangeService } from "./email-change.js";
 import { billingMailAttachmentResolvers } from "./mail-attachments.js";
 import {
@@ -741,6 +743,19 @@ const socialProviders = (()=>{try{return new SocialProviders(socialConfiguration
 const socialRepository = new PostgresSocialIdentityRepository(authorizationPool,auditContextHasher,pool);
 // Open sign-up mail (owner decision G5, 2026-10-09): the DNS question at the three entry points, 2 s, fail open.
 const mailDomainCheck = systemMailDomainCheck();
+// Open sign-up mail PR 3 (owner decisions G1-G3): every account-mail sender below asks this one gate just before it
+// starts MAIL_SENDMAIL_PATH (address rule, suppression, daily budget). The budget is the register's
+// outboundMailPolicy row (a version without it refuses here, OUTBOUND_MAIL_POLICY_UNRESOLVED). The day's count is
+// in-process until its migration lands: PREVIEW-ONLY (docs/superpowers/specs/2026-10-09-outbound-mail-gate.md).
+const outboundMailPolicy = await boot.run("outbound-mail-policy", () => readOutboundMailPolicy(pool, environment.REGISTER_VERSION));
+const outboundMailStore = new InMemoryOutboundMailStore();
+const outboundMailGate = new OutboundMailGate({
+  policy: outboundMailPolicy,
+  blindIndexKey,
+  ledger: outboundMailStore,
+  suppression: outboundMailStore,
+  report: consoleOutboundMailReport
+});
 const registration = new RegistrationService({
   repository: identityRepository,
   socialRepository,
@@ -748,7 +763,8 @@ const registration = new RegistrationService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   dekStore,
   blindIndexKey,
@@ -761,7 +777,9 @@ const registration = new RegistrationService({
   argon2: argon2Pool,
   // Paid plans L3b: the acceptance record's evidence is sealed under the records key (L1).
   legalAcceptance: { recordsKey },
-  mailDomainCheck
+  mailDomainCheck,
+  // At the cap, sign-up and resend answer MAIL_DAILY_LIMIT before any account work (G2).
+  outboundMail: outboundMailGate
 });
 // Paid plans L4: re-acceptance of the Terms and the Privacy Policy, over the acceptance record.
 // Hosted: an account with no record owes both documents (it must accept before it can pay).
@@ -788,14 +806,14 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   blindIndexKey
 }));
 const socialAuth = new SocialAuthService(socialRepository,socialProviders,sessions.consumerProducer(),{registration,security:new PostgresConsumerSecurityRepository(authorizationPool,auditContextHasher),authPolicy,blindIndexKey});
-const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL});
+const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL,gate:outboundMailGate});
 const consumerRecovery=new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy,authPolicy,policy:consumerRecoveryPolicy,blindIndexKey,mail:consumerAccountMail,onMailFailure:()=>console.error('[CONSUMER_RECOVERY_MAIL_FAILED]')});
 const onboardingEvidence=new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),recordsKey);
 const consumerSecurityNotices=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(authorizationPool),dekStore,consumerAccountMail);
 const passwordResetRepository=passwordResetPolicy?new PostgresPasswordResetRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
 if(passwordResetRepository)await boot.run("password-reset-role",()=>passwordResetRepository.assertRole());
 const passwordReset=passwordResetRepository&&passwordResetPolicy?new PasswordResetService({repository:passwordResetRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,passwordResetPolicy,blindIndexKey,reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
-const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
+const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
 const triggerPasswordResetReconciliation=passwordResetNotices?createSingleFlightErasureReconciler(()=>passwordResetNotices.reconcile(100),()=>console.error("[PASSWORD_RESET_RECONCILIATION_PENDING]")):undefined;
 let passwordResetTimer:ReturnType<typeof setInterval>|undefined;
 const backupEmailRepository=backupEmailPolicy?new PostgresBackupEmailRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
@@ -804,7 +822,7 @@ if(backupEmailRepository)await boot.run("backup-email-role",()=>backupEmailRepos
 if(mfaRecoveryRepository)await boot.run("mfa-recovery-role",()=>mfaRecoveryRepository.assertRole());
 const backupEmail=backupEmailRepository&&backupEmailPolicy?new BackupEmailService({repository:backupEmailRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:backupEmailPolicy}):undefined;
 const mfaRecovery=mfaRecoveryRepository&&mfaRecoveryPolicy?new MfaRecoveryService({repository:mfaRecoveryRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:mfaRecoveryPolicy,blindIndexKey}):undefined;
-const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs});
+const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate});
 const emailRecoveryWorkers=[...(backupEmailRepository?[new EmailRecoveryNotificationWorker({flow:"backup_email",repository:backupEmailRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(mfaRecoveryRepository?[new EmailRecoveryNotificationWorker({flow:"mfa_recovery",repository:mfaRecoveryRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[])];
 const triggerEmailRecoveryReconciliation=emailRecoveryWorkers.length?createSingleFlightErasureReconciler(async()=>{for(const worker of emailRecoveryWorkers)await worker.reconcile(100);},()=>console.error("[EMAIL_RECOVERY_RECONCILIATION_PENDING]")):undefined;
 let emailRecoveryTimer:ReturnType<typeof setInterval>|undefined;
@@ -849,7 +867,8 @@ const recoveryEmail = new RecoveryEmailService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   mailDomainCheck
 });
@@ -861,7 +880,8 @@ const emailChange = new EmailChangeService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   mailDomainCheck
 });
@@ -974,7 +994,8 @@ const erasureNotifications = new AccountErasureNotificationReconciler(
   accountErasureRepository,dekStore,new SendmailSecurityNotificationSender({
     executable:environment.MAIL_SENDMAIL_PATH,
     from:environment.MAIL_FROM,
-    timeoutMs:authPolicy.channel.transportTimeoutMs
+    timeoutMs:authPolicy.channel.transportTimeoutMs,
+    gate:outboundMailGate
   })
 );
 const reconciliationSource = () => Object.freeze({
@@ -1291,7 +1312,8 @@ const billingRuntime = billingConnectors === null
         sender: new TemplatedMailSender({
           executable: environment.MAIL_SENDMAIL_PATH,
           from: environment.MAIL_FROM,
-          timeoutMs: authPolicy.channel.transportTimeoutMs
+          timeoutMs: authPolicy.channel.transportTimeoutMs,
+          gate: outboundMailGate
         }),
         attachments: billingMailAttachmentResolvers({ audit: consoleBillingAudit })
       },

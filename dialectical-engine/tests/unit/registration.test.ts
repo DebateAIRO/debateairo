@@ -47,6 +47,7 @@ import { channelBinding, mfaFactor } from "../../packages/db/src/schema.js";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { currentDocument } from "@debateai/legal-manifest";
 import type { MailDomainCheck } from "../../apps/api/src/mail-domain-check.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 
 type TestAuthRoute = "register" | "verify" | "resend";
 const execFileAsync = promisify(execFile);
@@ -1357,7 +1358,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
     const executable = join(root, "slow-sendmail");
     await writeFile(executable, "#!/bin/sh\nsleep 1\nexit 0\n", "utf8");
     await chmod(executable, 0o700);
-    const mail = new SendmailMailSender({
+    const mail = new SendmailMailSender({ gate: testOutboundMailGate(),
       executable,
       from: "noreply@debateai.test",
       publicAppUrl: "https://debateai.test",
@@ -1380,7 +1381,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
   });
 
   it("rejects malformed and CRLF recipients before invoking sendmail", async () => {
-    const mail = new SendmailMailSender({
+    const mail = new SendmailMailSender({ gate: testOutboundMailGate(),
       executable: "/definitely/not/a/sendmail-binary",
       from: "noreply@debateai.test",
       publicAppUrl: "https://debateai.test",
@@ -1417,7 +1418,7 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       "utf8"
     );
     await chmod(executable, 0o700);
-    const mail = new SendmailMailSender({
+    const mail = new SendmailMailSender({ gate: testOutboundMailGate(),
       executable,
       from: "noreply@debateai.test",
       publicAppUrl: "https://debateai.test",
@@ -1780,6 +1781,7 @@ function rework7Harness(options: {
   readonly deferHash?: boolean;
   readonly legalAcceptance?: boolean;
   readonly mailDomainCheck?: MailDomainCheck;
+  readonly outboundMail?: Readonly<{ hasCapacity(purposeClass: "standard"): Promise<boolean> }>;
 } = {}): Rework7Harness {
   const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
   const policy = Object.freeze({
@@ -1936,7 +1938,8 @@ function rework7Harness(options: {
       return "r7".padEnd(43, "T");
     },
     ...(options.legalAcceptance === true ? { legalAcceptance: { recordsKey: Buffer.alloc(32, 0x7d) } } : {}),
-    ...(options.mailDomainCheck === undefined ? {} : { mailDomainCheck: options.mailDomainCheck })
+    ...(options.mailDomainCheck === undefined ? {} : { mailDomainCheck: options.mailDomainCheck }),
+    ...(options.outboundMail === undefined ? {} : { outboundMail: options.outboundMail })
   });
 
   interface Rework7Inspected {
@@ -2091,6 +2094,51 @@ describe("open sign-up mail: the domain question at sign-up (G5)", () => {
         .rejects.toMatchObject({ code: "EMAIL_INVALID" });
       expect(asked).toEqual(["example.test", "gone.test"]);
       expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
+  });
+});
+
+describe("open sign-up mail: the daily budget at sign-up and resend (G2)", () => {
+  const input = { phone: "+40722123456", email: "budget@example.test", recoveryEmail: null, password: REWORK7_PASSWORD, adultAffirmed: true };
+  const source = (requestId: string) => ({ ip: "81.196.1.10", userAgent: "test/1", requestId });
+  const budget = (room: boolean, asked: string[] = []) => ({ hasCapacity: async (purposeClass: "standard") => { asked.push(purposeClass); return room; } });
+  it("sign-up at the cap answers MAIL_DAILY_LIMIT (503) after the limiter, before any hash or account", async () => {
+    const asked: string[] = [];
+    const harness = rework7Harness({ outboundMail: budget(false, asked) });
+    try {
+      const refusal = await harness.service.register(input, source("budget-full")).then(() => null, (error: unknown) => error);
+      expect(refusal).toBeInstanceOf(AuthFlowError);
+      expect(refusal).toMatchObject({ code: "MAIL_DAILY_LIMIT", statusCode: 503 });
+      expect(asked).toEqual(["standard"]);
+      expect(harness.counters.limiterConsume).toBe(1);
+      expect(harness.counters.passwordHash).toBe(0);
+      expect(harness.counters.mailReservation).toBe(0);
+      expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
+  });
+  it("resend at the cap answers MAIL_DAILY_LIMIT before any mail reservation", async () => {
+    const harness = rework7Harness({ outboundMail: budget(false) });
+    try {
+      await expect(harness.resend(0)).rejects.toMatchObject({ code: "MAIL_DAILY_LIMIT" });
+      expect(harness.counters.mailReservation).toBe(0);
+      expect(harness.counters.tokenMint).toBe(0);
+    } finally { harness.restore(); }
+  });
+  it("with room left, sign-up and resend go on as before", async () => {
+    const harness = rework7Harness({ outboundMail: budget(true) });
+    try {
+      await harness.service.register(input, source("budget-room"));
+      expect(harness.createdInputs).toHaveLength(1);
+      await harness.resend(1);
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+  it("a budget that cannot answer lets the request through (the sender still gates the send)", async () => {
+    const harness = rework7Harness({ outboundMail: { hasCapacity: async () => { throw new Error("BUDGET_DOWN"); } } });
+    try {
+      await harness.service.register(input, source("budget-broken"));
+      expect(harness.createdInputs).toHaveLength(1);
+      await harness.service.drainMailDispatches();
     } finally { harness.restore(); }
   });
 });

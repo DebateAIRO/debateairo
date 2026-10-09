@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { recoveryEmailLink, SendmailRecoveryEmailMailSender } from "../../apps/api/src/mail-channel.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 describe("recovery email confirmation link", () => {
   it("carries only the confirmation bearer in the fragment", () => {
     const link = new URL(recoveryEmailLink("https://dezbatere.ro", "t".repeat(43)));
@@ -21,7 +22,7 @@ it("sends a purpose-limited fragment link through stdin without recipient argv",
     mode: 0o700
   });
   try {
-    const sender = new SendmailRecoveryEmailMailSender({
+    const sender = new SendmailRecoveryEmailMailSender({ gate: testOutboundMailGate(),
       executable, from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 30000
     });
     await sender.sendRecoveryEmail({

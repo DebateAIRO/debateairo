@@ -10,6 +10,7 @@ import {
   TemplatedMailSender,
   type TemplatedMail
 } from "../../apps/api/src/mail-channel.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 
 // P7 declared its port before this package existed; these lines stop compiling the day the two drift apart.
 type SameIds = [BillingMailTemplateId] extends [MailTemplateId]
@@ -49,7 +50,7 @@ describe("P17 TemplatedMailSender over the dev sendmail capture", { concurrent: 
     const root = mkdtempSync(join(tmpdir(), "debateai-templated-mail-"));
     process.env[CAPTURE_DIR] = join(root, "mail");
     try {
-      await new TemplatedMailSender({ executable: CAPTURE, from: "noreply@localhost.test", timeoutMs: 10_000 })
+      await new TemplatedMailSender({ gate: testOutboundMailGate(), executable: CAPTURE, from: "noreply@localhost.test", timeoutMs: 10_000 })
         .sendTemplated(M1);
       const files = readdirSync(join(root, "mail")).filter((name) => name.endsWith(".eml"));
       expect(files).toHaveLength(1);
@@ -79,7 +80,7 @@ describe("P17 TemplatedMailSender over the dev sendmail capture", { concurrent: 
     const root = mkdtempSync(join(tmpdir(), "debateai-templated-mail-uk-"));
     process.env[CAPTURE_DIR] = join(root, "mail");
     try {
-      await new TemplatedMailSender({ executable: CAPTURE, from: "noreply@localhost.test", timeoutMs: 10_000 })
+      await new TemplatedMailSender({ gate: testOutboundMailGate(), executable: CAPTURE, from: "noreply@localhost.test", timeoutMs: 10_000 })
         .sendTemplated({ ...M1, locale: "uk" });
       const [file] = readdirSync(join(root, "mail")).filter((name) => name.endsWith(".eml"));
       expect(readFileSync(join(root, "mail", file!), "utf8")).toMatch(/\r\nSubject: =\?UTF-8\?B\?/);
@@ -95,7 +96,7 @@ describe("P17 TemplatedMailSender over the dev sendmail capture", { concurrent: 
     writeFileSync(executable, `#!/bin/sh\nprintf '%s\\n' "$@" > '${argumentsFile}'\ncat >/dev/null\n`, { mode: 0o700 });
     chmodSync(executable, 0o700);
     try {
-      await new TemplatedMailSender({ executable, from: "noreply@debateai.test", timeoutMs: 30_000 }).sendTemplated(M1);
+      await new TemplatedMailSender({ gate: testOutboundMailGate(), executable, from: "noreply@debateai.test", timeoutMs: 30_000 }).sendTemplated(M1);
       expect(readFileSync(argumentsFile, "utf8").trim().split("\n")).toEqual(["-i", "-t", "-f", "noreply@debateai.test"]);
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -103,7 +104,7 @@ describe("P17 TemplatedMailSender over the dev sendmail capture", { concurrent: 
   });
 
   it("refuses a fan-out recipient and a bad template before any process starts", async () => {
-    const sender = new TemplatedMailSender({
+    const sender = new TemplatedMailSender({ gate: testOutboundMailGate(),
       executable: "/definitely/not/a/sendmail-binary", from: "noreply@debateai.test", timeoutMs: 1_000
     });
     await expect(sender.sendTemplated({ ...M1, to: "person@example.test,attacker@example.test" }))
@@ -129,7 +130,7 @@ describe("P17 TemplatedMailSender over the dev sendmail capture", { concurrent: 
     const memory = new MemoryTemplatedMailSender();
     const ports: BillingMailPort[] = [
       memory,
-      new TemplatedMailSender({ executable: CAPTURE, from: "noreply@localhost.test", timeoutMs: 10_000 })
+      new TemplatedMailSender({ gate: testOutboundMailGate(), executable: CAPTURE, from: "noreply@localhost.test", timeoutMs: 10_000 })
     ];
     const job: BillingMail = Object.freeze({
       messageId: "33333333-3333-4333-8333-333333333333", to: "person@example.test", templateId: "M10",

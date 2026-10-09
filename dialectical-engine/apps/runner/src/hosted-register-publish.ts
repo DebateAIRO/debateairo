@@ -29,7 +29,9 @@
  *    band must carry it (ruling C7, `ASK_ROOM_ADMISSION_UNSEALED`). Likewise optional, the
  *    `publicationCheckPolicy` (the pre-publish check's deadline, owner's ruling 2026-10-04,
  *    checked by the register's own parser); without the member the seeder's code-owned row is
- *    sealed as it is.
+ *    sealed as it is. Likewise optional, the `outboundMailPolicy` (the daily account-mail budget,
+ *    owner decision G2 of 2026-10-09; the live site carries 10 000 a day); without the member the
+ *    seeder's code-owned row (2 000 a day) is sealed as it is.
  *  - optionally, ONE ADDITIVE operator row, `modelScorecard` (A19), read from its
  *    own `--scorecard` file: the owners' approved document, sealed as it is,
  *    under the scorecard's own 64 KiB bound (`MODEL_SCORECARD_MAX_BYTES`, owner
@@ -89,6 +91,7 @@ import {
   MODEL_SCORECARD_MAX_BYTES,
   MODEL_SCORECARD_ROW_KEY,
   PUBLICATION_CHECK_POLICY_ROW_KEY,
+  OUTBOUND_MAIL_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   TAX_AUTHORITIES_ROW_KEY,
   admissionPolicyFromValue,
@@ -116,6 +119,7 @@ import {
   persistBootstrapRegister,
   planCapMicros,
   publicationCheckPolicyFromValue,
+  outboundMailPolicyFromValue,
   readAdmissionPolicy,
   readAuthPolicy,
   readBillingPlans,
@@ -130,6 +134,7 @@ import {
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
   readPublicationCheckPolicy,
+  readOutboundMailPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
   readStoryPolicy,
@@ -192,7 +197,10 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // code-owned admissionPolicy row is sealed as it is; required with the budget band (ruling C7).
   "askRoomReads",
   // hate-speech S02 (owner, 2026-10-04): OPTIONAL. Left out, the code-owned publicationCheckPolicy row is sealed as it is.
-  "publicationCheckPolicy"
+  "publicationCheckPolicy",
+  // Open sign-up mail (owner decision G2, 2026-10-09): OPTIONAL. Left out, the code-owned outboundMailPolicy row
+  // (the preview's 2 000 a day) is sealed as it is; the live site's file carries its own (10 000 a day).
+  "outboundMailPolicy"
 ] as const);
 const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
 
@@ -380,6 +388,8 @@ export type HostedRegisterFile = Readonly<{
   askRoomReads?: unknown;
   /** Optional (2026-10-04): the pre-publish check's deadline; absent = the code-owned row. */
   publicationCheckPolicy?: unknown;
+  /** Optional (2026-10-09): the daily account-mail budget; absent = the code-owned row. */
+  outboundMailPolicy?: unknown;
 }>;
 
 /**
@@ -439,7 +449,8 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null,
     ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {}),
     ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
-    ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {})
+    ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {}),
+    ...(Object.hasOwn(record, "outboundMailPolicy") ? { outboundMailPolicy: record.outboundMailPolicy } : {})
   });
 }
 
@@ -761,6 +772,9 @@ export async function planHostedRegisterPublication(
   // hate-speech S02: the operator's deadline, by the register's own parser (PUBLICATION_CHECK_POLICY_INVALID).
   // Absent member = the code-owned row, sealed as it is.
   if (file.publicationCheckPolicy !== undefined) publicationCheckPolicyFromValue(file.publicationCheckPolicy, file.sourceRef);
+  // Open sign-up mail: the operator's daily mail budget, by the register's own parser (OUTBOUND_MAIL_POLICY_INVALID).
+  // Absent member = the code-owned row, sealed as it is.
+  if (file.outboundMailPolicy !== undefined) outboundMailPolicyFromValue(file.outboundMailPolicy, file.sourceRef);
   // Paid plans (spec 2026-09-29 §2.5.1): a supplied billing row is checked by
   // the register's own parser, so its refusal keeps its own code.
   if (file.billingPlans !== null) billingPlansFromValue(file.billingPlans.value, file.sourceRef);
@@ -860,6 +874,13 @@ export async function planHostedRegisterPublication(
     operatorRows.set(PUBLICATION_CHECK_POLICY_ROW_KEY, Object.freeze({
       rowKey: PUBLICATION_CHECK_POLICY_ROW_KEY,
       valueJsonText: canonicalRowValue(file.publicationCheckPolicy),
+      sourceRef: file.sourceRef
+    }));
+  }
+  if (file.outboundMailPolicy !== undefined) {
+    operatorRows.set(OUTBOUND_MAIL_POLICY_ROW_KEY, Object.freeze({
+      rowKey: OUTBOUND_MAIL_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.outboundMailPolicy),
       sourceRef: file.sourceRef
     }));
   }
@@ -1213,6 +1234,8 @@ export async function verifyHostedRegisterBootReadiness(
   await readDeploymentRiskTier(pool, version);
   // hate-speech S02: main.ts's publication-check-policy stage (the pre-publish check's deadline).
   await readPublicationCheckPolicy(pool, version);
+  // Open sign-up mail: main.ts's outbound-mail-policy stage (the daily account-mail budget).
+  await readOutboundMailPolicy(pool, version);
   // A19: the scorecard is optional — ABSENT keeps the plan rosters — but a
   // sealed one the API would refuse at start-up is refused here, by its reason.
   const modelScorecard = await readModelScorecard(pool, version, await readEngineVersion());

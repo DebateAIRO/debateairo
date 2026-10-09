@@ -43,6 +43,7 @@ import {
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
   readPublicationCheckPolicy,
+  readOutboundMailPolicy,
   readCountryPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
@@ -196,6 +197,8 @@ describe("Task 14b · hosted register publication on PostgreSQL", () => {
     // Owner's ruling 2026-10-04: the API's "publication-check-policy" stage; the file carries no member, so the
     // code-owned deadline is what was sealed.
     await expect(readPublicationCheckPolicy(database.pool, version)).resolves.toEqual({ deadlineMs: 60_000 });
+    // Open sign-up mail (G2): the API's "outbound-mail-policy" stage; no member, so the code-owned budget was sealed.
+    await expect(readOutboundMailPolicy(database.pool, version)).resolves.toEqual({ dailyCap: 2_000, reservedForSecurityPct: 20, alertAtPct: 50 });
     await readDevelopmentRunnerPolicy(database.pool, version);
     const targets = parseProviderDiscoveryTargets(
       JSON.stringify(file.providerTargets), makers.configuredProviders
