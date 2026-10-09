@@ -70,6 +70,7 @@ const CAPABILITY_ROLES = [
   "debateai_authorization_runtime",
   "debateai_billing_runtime",
   "debateai_content_provision",
+  "debateai_data_export_worker",
   "debateai_erasure_runtime",
   "debateai_evaluator_api",
   "debateai_evaluator_reader",
@@ -395,7 +396,7 @@ afterAll(async () => {
 });
 
 describe("P3-02 production database LOGIN principal provisioning", () => {
-  it("creates and idempotently reuses eighteen pairwise-distinct actual LOGIN principals", async () => {
+  it("creates and idempotently reuses nineteen pairwise-distinct actual LOGIN principals", async () => {
     const envelope = credentialEnvelope();
     const first = await provisionProductionDatabasePrincipals({
       adminPool,
@@ -405,8 +406,8 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       supportConfigCredentialFilePath
     });
     expect(first).toMatchObject({
-      principalCount: 18,
-      createdCount: 14,
+      principalCount: 19,
+      createdCount: 15,
       supportConfigCredentialFilePath
     });
     expect(first.humanCredentialExpiresAtByPrincipal).toEqual({
@@ -455,7 +456,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       WHERE rolname=ANY($1::text[])
       ORDER BY rolname
     `,[roleNames]);
-    expect(catalog.rows).toHaveLength(18);
+    expect(catalog.rows).toHaveLength(19);
     expect(catalog.rows.every((role) => role.rolcanlogin
       && !role.rolsuper
       && !role.rolcreatedb
@@ -666,7 +667,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       manifest,
       credentialEnvelope: envelope,
       supportConfigCredentialFilePath
-    })).resolves.toMatchObject({ principalCount: 18, createdCount: 0 });
+    })).resolves.toMatchObject({ principalCount: 19, createdCount: 0 });
 
     const repaired = (await adminPool.query<{
       rolinherit: boolean;
@@ -755,7 +756,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
         manifest,
         credentialEnvelope: envelope,
         supportConfigCredentialFilePath
-      })).resolves.toMatchObject({ principalCount: 18, createdCount: 0 });
+      })).resolves.toMatchObject({ principalCount: 19, createdCount: 0 });
 
       const direct = (await adminPool.query<{
         databaseAclCount: number;
@@ -3287,7 +3288,7 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       expect(output).not.toContain(new URL(databaseUrl).password);
       expect(output).not.toContain(decodeURIComponent(new URL(databaseUrl).password));
     }
-    expect(outcome.stdout).toBe("PRODUCTION_DATABASE_PRINCIPALS_READY=18\n");
+    expect(outcome.stdout).toBe("PRODUCTION_DATABASE_PRINCIPALS_READY=19\n");
   }, 120_000);
 
   // Go-live row 41 (Part 2's final review P2-I5, part 3): the billing tables are written by the API

@@ -16,7 +16,8 @@ function versioned(value: string): string {
 }
 
 export class PostgresDataExportRepository implements DataExportRepository {
-  constructor(private readonly pool: Pool, private readonly auditContext: Pick<AuditContextHasher, "hashSourceIp" | "hashUserAgent">) {}
+  constructor(private readonly pool: Pool, private readonly workerPool: Pool,
+    private readonly auditContext: Pick<AuditContextHasher, "hashSourceIp" | "hashUserAgent">) {}
 
   private async sourceContext(source: AuthSourceContext): Promise<string> {
     const ipArgon2id = versioned(await this.auditContext.hashSourceIp(normalized(source?.ip, 64)));
@@ -24,8 +25,8 @@ export class PostgresDataExportRepository implements DataExportRepository {
     return JSON.stringify({ ipArgon2id, userAgentArgon2id });
   }
 
-  private async transaction<T>(attempt: boolean, operation: (client: PoolClient) => Promise<T>): Promise<T> {
-    const client = await this.pool.connect();
+  private async transaction<T>(pool: Pool, attempt: boolean, operation: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await pool.connect();
     try {
       await client.query("BEGIN");
       if (attempt) await client.query("SELECT identity.begin_runtime_audit_attempt()");
@@ -41,7 +42,7 @@ export class PostgresDataExportRepository implements DataExportRepository {
   async request(input: Parameters<DataExportRepository["request"]>[0]): Promise<RequestOutcome> {
     const source = await this.sourceContext(input.source);
     try {
-      const row = await this.transaction(true, async client => (await client.query<{
+      const row = await this.transaction(this.pool, true, async client => (await client.query<{
         result_status: RequestOutcome["kind"]; result_requested_at: Date | null; result_retry_after_seconds: number | null;
       }>("SELECT * FROM identity.request_data_export($1,$2,$3,$4,$5,$6::jsonb)",
         [input.userId, input.sessionId, input.grantTokenHash, input.exportId, input.locale, source])).rows[0]!);
@@ -64,35 +65,35 @@ export class PostgresDataExportRepository implements DataExportRepository {
   }
 
   async claim(workerId: string, leaseSeconds: number): Promise<ExportClaim | null> {
-    const row = (await this.pool.query("SELECT * FROM identity.claim_data_export($1,$2)", [workerId, leaseSeconds])).rows[0];
+    const row = (await this.workerPool.query("SELECT * FROM identity.claim_data_export($1,$2)", [workerId, leaseSeconds])).rows[0];
     return row == null ? null : { exportId: row.export_id, userId: row.user_id, sessionId: row.session_id,
       ownerRef: row.owner_ref, locale: row.locale, requestedAt: row.requested_at, attempt: row.attempt };
   }
 
   async renewLease(exportId: string, workerId: string, leaseSeconds: number): Promise<boolean> {
-    return (await this.pool.query("SELECT identity.renew_data_export_lease($1,$2,$3) ok", [exportId, workerId, leaseSeconds])).rows[0]!.ok;
+    return (await this.workerPool.query("SELECT identity.renew_data_export_lease($1,$2,$3) ok", [exportId, workerId, leaseSeconds])).rows[0]!.ok;
   }
 
   async complete(input: Parameters<DataExportRepository["complete"]>[0]): Promise<boolean> {
-    return this.transaction(false, async client => (await client.query(
+    return this.transaction(this.workerPool, false, async client => (await client.query(
       "SELECT identity.complete_data_export($1,$2,$3,$4,$5,$6) ok",
       [input.exportId, input.workerId, input.linkTokenHash, input.archiveSha256, input.archiveBytes, input.sentAt])).rows[0]!.ok);
   }
 
   async fail(exportId: string, workerId: string, reason: "BUILD" | "MAIL" | "ATTEMPTS"): Promise<void> {
-    await this.transaction(false, async client => { await client.query("SELECT identity.fail_data_export($1,$2,$3)", [exportId, workerId, reason]); });
+    await this.transaction(this.workerPool, false, async client => { await client.query("SELECT identity.fail_data_export($1,$2,$3)", [exportId, workerId, reason]); });
   }
 
   async sweep(): Promise<readonly { exportId: string; userId: string }[]> {
-    return (await this.pool.query("SELECT * FROM identity.sweep_data_exports()")).rows.map(row => ({ exportId: row.export_id, userId: row.user_id }));
+    return (await this.workerPool.query("SELECT * FROM identity.sweep_data_exports()")).rows.map(row => ({ exportId: row.export_id, userId: row.user_id }));
   }
 
   async markKeyDestroyed(exportId: string): Promise<void> {
-    await this.pool.query("SELECT identity.mark_data_export_key_destroyed($1)", [exportId]);
+    await this.workerPool.query("SELECT identity.mark_data_export_key_destroyed($1)", [exportId]);
   }
 
   async liveIds(ids: readonly string[]): Promise<readonly string[]> {
-    return (await this.pool.query("SELECT identity.live_data_export_ids($1::uuid[]) ids", [ids])).rows[0]!.ids;
+    return (await this.workerPool.query("SELECT identity.live_data_export_ids($1::uuid[]) ids", [ids])).rows[0]!.ids;
   }
 
   async openLink(userId: string, linkTokenHash: string): Promise<LinkOutcome> {
@@ -103,8 +104,53 @@ export class PostgresDataExportRepository implements DataExportRepository {
 
   async recordDownload(exportId: string, userId: string, source: AuthSourceContext): Promise<void> {
     const prepared = await this.sourceContext(source);
-    await this.transaction(true, async client => { await client.query(
+    await this.transaction(this.pool, true, async client => { await client.query(
       "SELECT identity.record_data_export_download($1,$2,$3::jsonb)", [exportId, userId, prepared]); });
+  }
+}
+
+const REQUEST_FUNCTIONS = [
+  "identity.request_data_export(uuid,uuid,text,uuid,text,jsonb)",
+  "identity.read_data_export_status(uuid)",
+  "identity.open_data_export_link(uuid,text)",
+  "identity.record_data_export_download(uuid,uuid,jsonb)"
+] as const;
+const WORKER_FUNCTIONS = [
+  "identity.claim_data_export(uuid,integer)",
+  "identity.renew_data_export_lease(uuid,uuid,integer)",
+  "identity.read_data_export_snapshot(uuid,uuid)",
+  "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
+  "identity.fail_data_export(uuid,uuid,text)",
+  "identity.sweep_data_exports()",
+  "identity.mark_data_export_key_destroyed(uuid)",
+  "identity.live_data_export_ids(uuid[])"
+] as const;
+
+async function roleWitness(pool: Pool) {
+  const row = (await pool.query<{
+    principal: string; authorization_member: boolean; worker_member: boolean;
+    request_count: number; worker_count: number; privileged: boolean;
+  }>(`SELECT current_user principal,
+      pg_has_role(current_user,'debateai_authorization_runtime','MEMBER') authorization_member,
+      pg_has_role(current_user,'debateai_data_export_worker','MEMBER') worker_member,
+      (SELECT count(*)::int FROM unnest($1::text[]) signature WHERE has_function_privilege(current_user,signature,'EXECUTE')) request_count,
+      (SELECT count(*)::int FROM unnest($2::text[]) signature WHERE has_function_privilege(current_user,signature,'EXECUTE')) worker_count,
+      (rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolreplication) privileged
+    FROM pg_roles WHERE rolname=current_user`, [REQUEST_FUNCTIONS, WORKER_FUNCTIONS])).rows[0];
+  return row;
+}
+
+export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPool: Pool): Promise<void> {
+  try {
+    const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
+    if (request === undefined || worker === undefined || request.principal === worker.principal
+      || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 8
+      || request.privileged || worker.privileged) {
+      throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    }
+  } catch {
+    throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
   }
 }
 

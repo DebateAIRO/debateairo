@@ -6,11 +6,11 @@
   "chainManifestSha256": "aab6bee30ee55b07116c21a25701af9af33f715caf5103a0b5c82f1fd77999d2",
   "migration": {
     "name": "0111_data_export.sql",
-    "sha256": "bbec720fd5b273912cf9b6712b550601b712b1be9e9b9dbe3d1529d2791b2fc9"
+    "sha256": "e46f0cde1c86a69ab1816a4a47219c2302c1daca7bc07762023f30227962ff29"
   },
   "verifier": {
     "path": "lineage/verify-dx111-data-export.sql",
-    "sha256": "1e3d9bae50c3a8635a0ac9447b9afaa0695eea9ed3fba8971abd0c7c1614b544"
+    "sha256": "13d66e6710a227c14eb219b1268e82f06cb742c621318470a816c973d8834981"
   },
   "functions": [
     {
@@ -20,6 +20,7 @@
       "language": "plpgsql",
       "volatility": "v",
       "runtimeExecute": false,
+      "workerExecute": false,
       "originalSource": "0107_auth_dev_integration.sql",
       "originalBodySha256": "728977e0a52dc1820f26fe07dca72a99775f4295039cf7a4ad04bda1a9935c3b",
       "currentBodySha256": "b2f831a4f96dfe0e3d5d756ad97d0a213611f8cf6b0a555f337dfa375592ee77"
@@ -31,6 +32,7 @@
       "language": "sql",
       "volatility": "i",
       "runtimeExecute": false,
+      "workerExecute": false,
       "originalSource": "0107_auth_dev_integration.sql",
       "originalBodySha256": "cb189f5f59917b30668216415f89226f65377a4237856dfeb363a8fb50f8352b",
       "currentBodySha256": "f9bd5d2295f1a436e1786a21d163fdfa0efc65881534fee2ed53dc31904f5a6e"
@@ -42,6 +44,7 @@
       "language": "plpgsql",
       "volatility": "v",
       "runtimeExecute": true,
+      "workerExecute": false,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "d4ac189b6cf23c41f929e77ec5ecf11c2e7120785060935958bcb7ca9e9a5510"
@@ -53,6 +56,7 @@
       "language": "plpgsql",
       "volatility": "s",
       "runtimeExecute": true,
+      "workerExecute": false,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "e50fd83c6e56d51abd2da5bf81eaee4ef55745b82b8c98d67ba49758f9af832c"
@@ -63,7 +67,8 @@
       "result": "",
       "language": "plpgsql",
       "volatility": "v",
-      "runtimeExecute": true,
+      "runtimeExecute": false,
+      "workerExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "dbd1efd050fd6bfa20e954688f233e685cdf120f423297c78ff88a83228f0df8"
@@ -74,7 +79,8 @@
       "result": "",
       "language": "plpgsql",
       "volatility": "v",
-      "runtimeExecute": true,
+      "runtimeExecute": false,
+      "workerExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "b3399dde63370b3b1bcc586474ea4422d4b4cf7d05ae4f44022612efbb17fed0"
@@ -85,7 +91,8 @@
       "result": "",
       "language": "plpgsql",
       "volatility": "s",
-      "runtimeExecute": true,
+      "runtimeExecute": false,
+      "workerExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "2e472b32145629a3fd7931f336a1c9e287823b7ad8bfe3fcf5de423a12c04a05"
@@ -96,7 +103,8 @@
       "result": "",
       "language": "plpgsql",
       "volatility": "v",
-      "runtimeExecute": true,
+      "runtimeExecute": false,
+      "workerExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "833112a900e2d704f0d6f3a79251eac6746625b3fd04b922eeaade83e636759a"
@@ -107,7 +115,8 @@
       "result": "",
       "language": "plpgsql",
       "volatility": "v",
-      "runtimeExecute": true,
+      "runtimeExecute": false,
+      "workerExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "06b174549bb3a585759f58b7e3039d875355d3615b6350fd16169f299836890f"
@@ -118,7 +127,8 @@
       "result": "",
       "language": "plpgsql",
       "volatility": "v",
-      "runtimeExecute": true,
+      "runtimeExecute": false,
+      "workerExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "8dfeedf81a2c974e5919b1855dcec8c18c8d83a438d9b62b011c6b0031f6b632"
@@ -129,7 +139,8 @@
       "result": "",
       "language": "plpgsql",
       "volatility": "v",
-      "runtimeExecute": true,
+      "runtimeExecute": false,
+      "workerExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "81c4237008ab41e6a39f5843390c703c1908191f8bc01f6fb69f0802bab57a1e"
@@ -140,7 +151,8 @@
       "result": "",
       "language": "sql",
       "volatility": "s",
-      "runtimeExecute": true,
+      "runtimeExecute": false,
+      "workerExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "52cd3fee0cf130ac0bb34f7ca719d667c300b1758f5d665572b0f2ae2ce8542c"
@@ -152,6 +164,7 @@
       "language": "plpgsql",
       "volatility": "s",
       "runtimeExecute": true,
+      "workerExecute": false,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "22d0f54bfebf9c6ecd39290bd389319f7f8f1cf1635c05d989cf26dd4d48456a"
@@ -163,6 +176,7 @@
       "language": "plpgsql",
       "volatility": "v",
       "runtimeExecute": true,
+      "workerExecute": false,
       "originalSource": null,
       "originalBodySha256": null,
       "currentBodySha256": "49441a77cdc007ce42873da8de94b880f7c52b67e0ad1a30c4dbf8144d1689e4"

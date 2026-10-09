@@ -358,6 +358,14 @@ LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  OR (a->>'action' IN ('LINK_PROVIDER','UNLINK_PROVIDER') AND core.jsonb_has_exact_keys(a,ARRAY['action','target_provider']) AND a->>'target_provider' IN ('google','apple','facebook','x')),false)
 $$;
 
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='debateai_data_export_worker') THEN
+    CREATE ROLE debateai_data_export_worker NOLOGIN NOINHERIT;
+  END IF;
+END $$;
+GRANT USAGE ON SCHEMA identity TO debateai_data_export_worker;
+REVOKE ALL ON identity.data_export FROM debateai_data_export_worker;
+
 DO $$DECLARE o name; f text; BEGIN
   SELECT pg_get_userbyid(proowner) INTO o FROM pg_proc
     WHERE oid='identity.read_email_settings(uuid,uuid)'::regprocedure;
@@ -377,7 +385,26 @@ DO $$DECLARE o name; f text; BEGIN
     'record_data_export_download(uuid,uuid,jsonb)'
   ] LOOP
     EXECUTE format('ALTER FUNCTION identity.%s OWNER TO %I',f,o);
-    EXECUTE format('REVOKE ALL ON FUNCTION identity.%s FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay',f);
+    EXECUTE format('REVOKE ALL ON FUNCTION identity.%s FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker',f);
+  END LOOP;
+  FOREACH f IN ARRAY ARRAY[
+    'request_data_export(uuid,uuid,text,uuid,text,jsonb)',
+    'read_data_export_status(uuid)',
+    'open_data_export_link(uuid,text)',
+    'record_data_export_download(uuid,uuid,jsonb)'
+  ] LOOP
     EXECUTE format('GRANT EXECUTE ON FUNCTION identity.%s TO debateai_authorization_runtime',f);
+  END LOOP;
+  FOREACH f IN ARRAY ARRAY[
+    'claim_data_export(uuid,integer)',
+    'renew_data_export_lease(uuid,uuid,integer)',
+    'read_data_export_snapshot(uuid,uuid)',
+    'complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)',
+    'fail_data_export(uuid,uuid,text)',
+    'sweep_data_exports()',
+    'mark_data_export_key_destroyed(uuid)',
+    'live_data_export_ids(uuid[])'
+  ] LOOP
+    EXECUTE format('GRANT EXECUTE ON FUNCTION identity.%s TO debateai_data_export_worker',f);
   END LOOP;
 END $$;

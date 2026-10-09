@@ -14,6 +14,7 @@
       "api-authorization",
       "api-publication-cleanup",
       "api-support",
+      "api-data-export",
       "runner-runtime",
       "scheduler-replay",
       "scheduler-liveness",
@@ -64,6 +65,11 @@
     },
     {
       "principalId": "api-support",
+      "state": "SPECIFIED_NOT_PROVISIONED",
+      "source": null
+    },
+    {
+      "principalId": "api-data-export",
       "state": "SPECIFIED_NOT_PROVISIONED",
       "source": null
     },
@@ -167,6 +173,12 @@
     },
     {
       "roleName": "debateai_content_provision",
+      "login": false,
+      "inherit": false,
+      "directMemberships": []
+    },
+    {
+      "roleName": "debateai_data_export_worker",
       "login": false,
       "inherit": false,
       "directMemberships": []
@@ -429,7 +441,31 @@
       "bypassRls": false,
       "directMemberships": [],
       "effectiveMemberships": [],
-      "forbiddenMemberships": [],
+      "forbiddenMemberships": [
+        "debateai_authorization_runtime",
+        "debateai_billing_runtime",
+        "debateai_content_provision",
+        "debateai_data_export_worker",
+        "debateai_erasure_runtime",
+        "debateai_evaluator_api",
+        "debateai_evaluator_ddl",
+        "debateai_evaluator_reader",
+        "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
+        "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
+        "debateai_prod_*",
+        "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
+        "debateai_replay",
+        "debateai_runtime",
+        "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
+        "debateai_support",
+        "debateai_support_config_operator",
+        "pg_*"
+      ],
       "ownsDatabases": [
         "debateai"
       ],
@@ -529,6 +565,7 @@
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -628,6 +665,7 @@
       "forbiddenMemberships": [
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -689,6 +727,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
@@ -742,6 +781,7 @@
       "forbiddenMemberships": [
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -795,6 +835,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -849,6 +890,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -895,6 +937,61 @@
       ]
     },
     {
+      "id": "api-data-export",
+      "roleName": "debateai_prod_api_data_export",
+      "kind": "SERVICE",
+      "database": "debateai",
+      "login": true,
+      "inherit": true,
+      "superuser": false,
+      "createDatabase": false,
+      "createRole": false,
+      "replication": false,
+      "bypassRls": false,
+      "directMemberships": [
+        "debateai_data_export_worker"
+      ],
+      "effectiveMemberships": [
+        "debateai_data_export_worker"
+      ],
+      "forbiddenMemberships": [
+        "debateai_authorization_runtime",
+        "debateai_billing_runtime",
+        "debateai_content_provision",
+        "debateai_erasure_runtime",
+        "debateai_evaluator_api",
+        "debateai_evaluator_ddl",
+        "debateai_evaluator_reader",
+        "debateai_evaluator_worker",
+        "debateai_obs_stats_owner",
+        "debateai_obs_view_owner",
+        "debateai_password_recovery_owner",
+        "debateai_prod_*",
+        "debateai_publication_cleanup",
+        "debateai_register_publication_owner",
+        "debateai_replay",
+        "debateai_runtime",
+        "debateai_settlement_watch",
+        "debateai_staff_recovery",
+        "debateai_staff_security_owner",
+        "debateai_support",
+        "debateai_support_config_operator",
+        "pg_*"
+      ],
+      "ownsDatabases": [],
+      "ownsSchemas": [],
+      "connectionPurposes": [
+        {
+          "component": "apps/api",
+          "sourceFile": "apps/api/src/main.ts",
+          "environmentKey": "DATA_EXPORT_DATABASE_URL",
+          "purpose": "DATA_EXPORT_WORKER",
+          "binding": "WIRED_WHEN_ENABLED",
+          "condition": "DATA_EXPORT_STORE_PATH set"
+        }
+      ]
+    },
+    {
       "id": "runner-runtime",
       "roleName": "debateai_prod_runner_runtime",
       "kind": "SERVICE",
@@ -916,6 +1013,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -977,6 +1075,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1030,6 +1129,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1083,6 +1183,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1136,6 +1237,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1188,6 +1290,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_ddl",
         "debateai_evaluator_reader",
@@ -1240,6 +1343,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1288,6 +1392,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1337,6 +1442,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1386,6 +1492,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1435,6 +1542,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1484,6 +1592,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1534,6 +1643,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1588,6 +1698,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1641,6 +1752,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1695,6 +1807,7 @@
         "debateai_authorization_runtime",
         "debateai_billing_runtime",
         "debateai_content_provision",
+        "debateai_data_export_worker",
         "debateai_erasure_runtime",
         "debateai_evaluator_api",
         "debateai_evaluator_ddl",
@@ -1796,6 +1909,13 @@
     {
       "memberRole": "debateai_prod_api_support",
       "grantedRole": "debateai_support",
+      "adminOption": false,
+      "inheritOption": true,
+      "setOption": true
+    },
+    {
+      "memberRole": "debateai_prod_api_data_export",
+      "grantedRole": "debateai_data_export_worker",
       "adminOption": false,
       "inheritOption": true,
       "setOption": true
@@ -1904,6 +2024,12 @@
     {
       "principalId": "api-support",
       "credentialId": "credential:api-support",
+      "lifecycle": "ROTATED_SERVICE",
+      "ownerTicket": "P3-02"
+    },
+    {
+      "principalId": "api-data-export",
+      "credentialId": "credential:api-data-export",
       "lifecycle": "ROTATED_SERVICE",
       "ownerTicket": "P3-02"
     },

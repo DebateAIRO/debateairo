@@ -159,6 +159,7 @@ describe("DEV-09 private local API environment", () => {
     expect(environment.get("AUTHORIZATION_DATABASE_URL"))
       .not.toBe(environment.get("DATABASE_URL"));
     expect(environment.get("ERASURE_DATABASE_URL")).toContain("debateai_dev_erasure");
+    expect(environment.get("DATA_EXPORT_DATABASE_URL")).toContain("debateai_dev_data_export");
     expect(environment.get("HATCHET_TENANT_ID")).toBe("11111111-1111-4111-8111-111111111111");
     expect(environment.get("HATCHET_CLIENT_TOKEN")).toBe(testToken());
     expect(environment.get("PUBLIC_APP_URL")).toBe("https://localhost:3000");

@@ -172,7 +172,8 @@ describe("FileDataExportStore", () => {
     const without = parseApiEnvironment(apiSource());
     expect(without.DATA_EXPORT_STORE_PATH).toBeUndefined();
     const path = "/tmp/dx-custody/data-exports";
-    expect(parseApiEnvironment({ ...apiSource(), DATA_EXPORT_STORE_PATH: path }).DATA_EXPORT_STORE_PATH).toBe(path);
+    expect(parseApiEnvironment({ ...apiSource(), DATA_EXPORT_STORE_PATH: path,
+      DATA_EXPORT_DATABASE_URL: "postgresql://localhost/data-export" }).DATA_EXPORT_STORE_PATH).toBe(path);
     expect(DEVELOPMENT_API_ENVIRONMENT_KEYS).toContain("DATA_EXPORT_STORE_PATH");
 
     const profile = DEFAULT_DEVELOPMENT_AUTH_STACK_PROFILE;

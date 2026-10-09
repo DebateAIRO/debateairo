@@ -19,7 +19,7 @@ REVOKE CONNECT ON DATABASE hatchet FROM PUBLIC;
 GRANT CONNECT ON DATABASE hatchet TO debateai_prod_hatchet;
 GRANT CONNECT ON DATABASE debateai TO debateai_prod_migrator;
 GRANT CONNECT ON DATABASE debateai TO
-  debateai_runtime, debateai_content_provision, debateai_erasure_runtime,
+  debateai_runtime, debateai_content_provision, debateai_erasure_runtime, debateai_data_export_worker,
   debateai_authorization_runtime, debateai_billing_runtime, debateai_publication_cleanup, debateai_replay,
   debateai_settlement_watch, debateai_evaluator_worker, debateai_evaluator_api,
   debateai_evaluator_reader;

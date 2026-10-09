@@ -114,6 +114,14 @@ describe("data export forward111", () => {
     try { await expect(migrate(db.pool)).rejects.toThrow("MIGRATION_FORWARD111_POSTCONDITION_DRIFT"); }
     finally { await db.pool.query("UPDATE public.debateai_schema_migration_forward111 SET postcondition_evidence_digest=$1", [original]); }
     await migrate(db.pool);
+    await db.pool.query("GRANT EXECUTE ON FUNCTION identity.claim_data_export(uuid,integer) TO debateai_authorization_runtime");
+    try { await expect(migrate(db.pool)).rejects.toThrow("MIGRATION_FORWARD111_FUNCTION_DRIFT"); }
+    finally { await db.pool.query("REVOKE EXECUTE ON FUNCTION identity.claim_data_export(uuid,integer) FROM debateai_authorization_runtime"); }
+    await migrate(db.pool);
+    await db.pool.query("REVOKE USAGE ON SCHEMA identity FROM debateai_data_export_worker");
+    try { await expect(migrate(db.pool)).rejects.toThrow("MIGRATION_FORWARD111_POSTCONDITION_DRIFT"); }
+    finally { await db.pool.query("GRANT USAGE ON SCHEMA identity TO debateai_data_export_worker"); }
+    await migrate(db.pool);
   });
 
   it("F5 checks the pinned 110 receipt inside applyForward111", async () => {
