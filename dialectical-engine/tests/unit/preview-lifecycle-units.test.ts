@@ -23,11 +23,15 @@ const NODE = '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node';
 const SUPPORTING = ['debateai-preview-postgresql.service', 'debateai-preview-hatchet.service', 'debateai-preview-hatchet-gateway.service', 'debateai-preview-capture.service', 'debateai-preview-provider-budget.service', 'debateai-preview-turnstile.service'];
 
 describe('preview lifecycle systemd templates', () => {
-  it.each(['debateai-preview-api.service.d', 'debateai-preview-ui.service.d', 'debateai-preview-postgresql.service.d'])('%s/50-lifecycle.conf restarts on failure within a start limit and alerts when it gives up', folderName => {
+  // systemd >= 254 runs OnFailure= on EVERY failed attempt unless RestartMode=direct: without it a
+  // crash that heals itself would still email "gave up". direct = OnFailure only when it gives up.
+  it.each([
+    ['debateai-preview-api.service.d', '30'], ['debateai-preview-ui.service.d', '30'], ['debateai-preview-postgresql.service.d', '10']
+  ])('%s/50-lifecycle.conf restarts directly (RestartMode=direct), so OnFailure fires only when the start limit gives up', (folderName, restartSec) => {
     const value = parse(unit(`${folderName}/50-lifecycle.conf`));
     expect(value).toMatchObject({
       '[Unit]StartLimitIntervalSec': ['900'], '[Unit]StartLimitBurst': ['4'], '[Unit]OnFailure': ['debateai-preview-alert@%n.service'],
-      '[Service]Restart': ['on-failure'], '[Service]RestartSec': ['10'], '[Service]TimeoutStartSec': ['300']
+      '[Service]Restart': ['on-failure'], '[Service]RestartMode': ['direct'], '[Service]RestartSec': [restartSec], '[Service]TimeoutStartSec': ['300']
     });
     expect(Object.keys(value).filter(key => /ExecStart|Requires|BindsTo|Requisite/.test(key))).toEqual([]);
   });

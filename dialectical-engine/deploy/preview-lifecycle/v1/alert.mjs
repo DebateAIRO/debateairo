@@ -1,8 +1,11 @@
 // debateai-preview-alert@<unit>.service: one plain email to the owner when a preview unit
 // has failed and systemd stopped restarting it.
 //
-// Plain words: the owner gets "Preview: <unit> failed to restart", the time in UTC and in
-// Bucharest, and the last 20 log lines with anything that looks like a secret blanked out.
+// Plain words: the alert first asks systemd how the unit is doing (Result, NRestarts, state).
+// If systemd gave up, the owner gets "Preview: <unit> gave up after N restarts", the time in UTC
+// and in Bucharest, and the last 20 log lines with anything that looks like a secret blanked out.
+// If systemd is still restarting it after a crash, no email (unless the owner asked for one after
+// N crashes with --crash-alert-after N). An unreadable state still emails: an alert is never lost.
 // At most one email per unit per 30 minutes. If mail itself fails, the reason goes to the
 // journal and the alert exits quietly (an alert must never break anything else).
 import { readFile, lstat } from 'node:fs/promises';
@@ -57,18 +60,70 @@ export function redactLine(line) {
   return text.slice(0, 300);
 }
 
+const STATE_KEYS = { Result: 'result', NRestarts: 'nRestarts', ActiveState: 'activeState', SubState: 'subState' };
+/** `systemctl show` for the four fields that tell "gave up" from "restarting"; argv only, no shell. null when unreadable. */
+export async function readUnitState(unit, { layout = LAYOUT, run = runBounded } = {}) {
+  const result = await run([layout.systemctl, 'show', unit, '--property=Result,NRestarts,ActiveState,SubState', '--no-pager'], { env: {}, timeoutMs: 5000, maxOutputBytes: 4096 });
+  if (result.timedOut || result.overflow || result.error || result.code !== 0) return null;
+  const state = {};
+  for (const line of result.stdout.toString('utf8').split('\n').filter(Boolean)) {
+    const at = line.indexOf('='), key = STATE_KEYS[line.slice(0, at)], value = line.slice(at + 1);
+    if (!key || key in state) return null;
+    if (key === 'nRestarts') { if (!/^\d{1,6}$/.test(value)) return null; state[key] = Number(value); }
+    else if (/^[a-z][a-z-]{0,39}$/.test(value)) state[key] = value;
+    else return null;
+  }
+  return Object.keys(state).length === 4 ? { result: state.result, nRestarts: state.nRestarts, activeState: state.activeState, subState: state.subState } : null;
+}
+
+const STILL_COMING_BACK = new Set(['activating', 'active', 'reloading']);
+/**
+ * gave-up: failed, or the start limit was hit -> always email.
+ * restarting: systemd is bringing it back by itself -> email only from crashAlertAfter restarts on.
+ * unknown: state unreadable or unusual -> email (fail safe).
+ */
+export function classifyFailure(state, { crashAlertAfter = null } = {}) {
+  if (!state) return { kind: 'unknown', send: true, restarts: null };
+  const { result, nRestarts: restarts } = state;
+  if (result === 'start-limit-hit' || state.activeState === 'failed') return { kind: 'gave-up', send: true, restarts, result };
+  if (state.subState === 'auto-restart' || STILL_COMING_BACK.has(state.activeState)) {
+    return { kind: 'restarting', send: Number.isSafeInteger(crashAlertAfter) && crashAlertAfter > 0 && restarts >= crashAlertAfter, restarts };
+  }
+  return { kind: 'unknown', send: true, restarts, result };
+}
+
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
+function wording(unit, failure) {
+  if (failure.kind === 'test') return {
+    subject: 'Preview: test alert (nothing failed)',
+    lead: `This is a test of the preview failure email, sent by hand with alert.mjs --test (unit name ${unit} is a placeholder). Nothing failed.`
+  };
+  if (failure.kind === 'restarting') return {
+    subject: `Preview: ${unit} is restarting after a crash`,
+    lead: `The private preview service ${unit} crashed and systemd is restarting it by itself (${plural(failure.restarts, 'automatic restart')} so far). Nothing is needed unless it gives up; that sends its own email.`
+  };
+  if (failure.kind === 'gave-up') {
+    const why = failure.result === 'start-limit-hit' ? 'start limit reached' : `result: ${failure.result}`;
+    return failure.restarts > 0
+      ? { subject: `Preview: ${unit} gave up after ${plural(failure.restarts, 'restart')}`, lead: `The private preview service ${unit} stopped, and systemd gave up after ${plural(failure.restarts, 'automatic restart')} (${why}).` }
+      : { subject: `Preview: ${unit} failed and stayed down`, lead: `The private preview service ${unit} failed and was not restarted automatically (${why}).` };
+  }
+  return { subject: `Preview: ${unit} failed`, lead: `The private preview service ${unit} failed. Its current state could not be read, so check it on the server.` };
+}
+
 function bucharest(at) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Bucharest', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZoneName: 'short' })
     .formatToParts(at).map(part => [part.type, part.value]));
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second} ${parts.timeZoneName ?? ''}`.trim();
 }
 
-export function composeAlert({ unit, at, lines, from, to }) {
+export function composeAlert({ unit, at, lines, from, to, failure = { kind: 'unknown', send: true, restarts: null } }) {
   if (!UNIT.test(unit) || !ADDRESS.test(to) || !ADDRESS.test(from)) refuse('MESSAGE_REFUSED');
-  const head = [`From: ${from}`, `To: ${to}`, `Subject: Preview: ${unit} failed to restart`, `Date: ${at.toUTCString()}`, 'MIME-Version: 1.0',
+  const { subject, lead } = wording(unit, failure);
+  const head = [`From: ${from}`, `To: ${to}`, `Subject: ${subject}`, `Date: ${at.toUTCString()}`, 'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: 8bit', 'Auto-Submitted: auto-generated'];
   const body = [
-    `The private preview service ${unit} stopped, and systemd has given up restarting it.`, '',
+    lead, '',
     `Unit: ${unit}`, `Time (UTC): ${at.toISOString().slice(0, 19).replace('T', ' ')} UTC`, `Time (Bucharest): ${bucharest(at)}`, '',
     'What to look at on the server:', `  systemctl status ${unit}`, `  journalctl -u ${unit} -n 100`, '',
     `Last ${lines.length} journal lines (anything secret-looking replaced):`, ...lines.map(line => `  ${line}`), '',
@@ -110,12 +165,25 @@ export async function readJournalTail(unit, { layout = LAYOUT, run = runBounded 
   return result.stdout.toString('utf8').split('\n').filter(Boolean).slice(-20);
 }
 
-export async function runAlert({ unit, layout = LAYOUT, deps = {} }) {
+export const TEST_UNIT = 'debateai-preview-alert-test.service';
+/** `--unit <unit> [--crash-alert-after N]` (systemd) or `--test` (README test send); anything else is null. */
+export function parseAlertArgs(argv) {
+  if (argv.length === 1 && argv[0] === '--test') return { unit: TEST_UNIT, crashAlertAfter: null, test: true };
+  if (argv[0] !== '--unit' || typeof argv[1] !== 'string') return null;
+  if (argv.length === 2) return { unit: argv[1], crashAlertAfter: null, test: false };
+  if (argv.length === 4 && argv[2] === '--crash-alert-after' && /^[1-9][0-9]?$/.test(argv[3])) return { unit: argv[1], crashAlertAfter: Number(argv[3]), test: false };
+  return null;
+}
+
+export async function runAlert({ unit, layout = LAYOUT, deps = {}, crashAlertAfter = null, test = false }) {
   const log = deps.log ?? (event => logLine(process.stdout, event));
   const now = deps.now ?? Date.now;
   const done = event => { log(event); return event; };
   try {
     if (typeof unit !== 'string' || !UNIT.test(unit)) refuse('UNIT_REFUSED');
+    const failure = test ? { kind: 'test', send: true, restarts: null }
+      : classifyFailure(await Promise.resolve().then(() => (deps.readUnitState ?? (name => readUnitState(name, { layout })))(unit)).catch(() => null), { crashAlertAfter });
+    if (!failure.send) return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SKIPPED', unit, state: failure.kind, restarts: failure.restarts });
     const at = now();
     const lastSentAt = await readLastSent(layout, unit);
     if (!shouldSend(lastSentAt, at)) return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SUPPRESSED', unit, lastSentAt: new Date(lastSentAt).toISOString() });
@@ -123,7 +191,7 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {} }) {
     const to = await withPrivateBytes(layout.alertRecipientPath, { root: dirname(layout.alertRecipientPath), uid: layout.ownerUid ?? 0, gid: layout.ownerGid ?? 0, mode: 0o600, maxBytes: 512 }, raw => parseRecipient(raw, approved))
       .catch(() => refuse('RECIPIENT_REFUSED'));
     const lines = (await (deps.readJournal ?? (name => readJournalTail(name, { layout })))(unit)).map(redactLine);
-    const message = composeAlert({ unit, at: new Date(at), lines, from: layout.mailFrom, to });
+    const message = composeAlert({ unit, at: new Date(at), lines, from: layout.mailFrom, to, failure });
     try { await (deps.sendmail ?? (bytes => submitMail(bytes, { layout })))(message); } catch { refuse('MAIL_FAILED'); }
     await recordSent(layout, unit, at).catch(() => undefined);
     return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SENT', unit });
@@ -133,8 +201,8 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {} }) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [flag, unit, ...rest] = process.argv.slice(2);
-  if (process.platform !== 'linux' || process.getuid?.() !== 0 || flag !== '--unit' || rest.length) logLine(process.stdout, { event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit: null, reason: 'ACTOR_REFUSED' });
-  else await runAlert({ unit });
+  const args = parseAlertArgs(process.argv.slice(2));
+  if (process.platform !== 'linux' || process.getuid?.() !== 0 || !args) logLine(process.stdout, { event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit: null, reason: 'ACTOR_REFUSED' });
+  else await runAlert(args);
   // Quiet by design: the alert unit itself never fails and never triggers another alert.
 }

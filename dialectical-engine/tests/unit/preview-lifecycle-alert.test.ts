@@ -19,11 +19,13 @@ function server(recipient = `${owner}\n`, mode = 0o600) {
   writeFileSync(layout.alertRecipientPath, recipient); chmodSync(layout.alertRecipientPath, mode);
   return layout;
 }
+const gaveUp = { result: 'start-limit-hit', nRestarts: 3, activeState: 'failed', subState: 'failed' };
+const restarting = { result: 'exit-code', nRestarts: 1, activeState: 'activating', subState: 'auto-restart' };
 function harness(layout: any, overrides: Record<string, unknown> = {}) {
   const sent: string[] = [], logged: any[] = [];
   let clock = Date.parse('2026-10-09T10:00:00Z');
   const deps = {
-    now: () => clock, allowedDigests: allowed,
+    now: () => clock, allowedDigests: allowed, readUnitState: async () => gaveUp,
     readJournal: async () => ['2026-10-09T09:59:58+0000 host node[1]: PREVIEW_API_STARTUP_REFUSED', '2026-10-09T09:59:59+0000 host systemd[1]: debateai-preview-api.service: Failed with result exit-code.'],
     sendmail: async (message: Buffer) => { sent.push(message.toString('utf8')); },
     log: (event: unknown) => logged.push(event), ...overrides
@@ -38,7 +40,8 @@ describe('failure alert', () => {
     await alert.runAlert({ unit, layout, deps: h.deps });
     expect(h.sent).toHaveLength(1);
     const mail = h.sent[0]!, split = mail.indexOf('\r\n\r\n'), head = mail.slice(0, split), body = mail.slice(split + 4);
-    expect(head.split('\r\n')).toEqual(expect.arrayContaining([`To: ${owner}`, 'From: noreply@dezbatere.ro', `Subject: Preview: ${unit} failed to restart`, 'Content-Type: text/plain; charset=UTF-8', 'Auto-Submitted: auto-generated']));
+    expect(head.split('\r\n')).toEqual(expect.arrayContaining([`To: ${owner}`, 'From: noreply@dezbatere.ro', `Subject: Preview: ${unit} gave up after 3 restarts`, 'Content-Type: text/plain; charset=UTF-8', 'Auto-Submitted: auto-generated']));
+    expect(body).toContain('systemd gave up after 3 automatic restarts (start limit reached)');
     expect(body).toContain(`Unit: ${unit}`);
     expect(body).toContain('Time (UTC): 2026-10-09 10:00:00 UTC');
     expect(body).toContain('Time (Bucharest): 2026-10-09 13:00:00');
@@ -48,6 +51,67 @@ describe('failure alert', () => {
     const state = readdirSync(join(layout.stateDir, 'alert-state'));
     expect(state).toHaveLength(1);
     expect(statSync(join(layout.stateDir, 'alert-state', state[0]!)).mode & 0o777).toBe(0o600);
+  });
+
+  it('reads the failed unit\'s Result, NRestarts and state with systemctl show, argv only, no shell', async () => {
+    const seen: any[] = [];
+    const run = async (argv: string[], options: any) => { seen.push({ argv, options }); return { code: 0, timedOut: false, overflow: false, stdout: Buffer.from('Result=start-limit-hit\nNRestarts=3\nActiveState=failed\nSubState=failed\n'), stderr: Buffer.alloc(0) }; };
+    await expect(alert.readUnitState(unit, { layout: common.LAYOUT, run })).resolves.toEqual(gaveUp);
+    expect(seen[0].argv).toEqual(['/usr/bin/systemctl', 'show', unit, '--property=Result,NRestarts,ActiveState,SubState', '--no-pager']);
+    expect(seen[0].options.env).toEqual({});
+    const odd = async () => ({ code: 0, timedOut: false, overflow: false, stdout: Buffer.from('Result=x y\nNRestarts=3\n'), stderr: Buffer.alloc(0) });
+    await expect(alert.readUnitState(unit, { layout: common.LAYOUT, run: odd })).resolves.toBeNull();
+    await expect(alert.readUnitState(unit, { layout: common.LAYOUT, run: async () => ({ code: 1, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }) })).resolves.toBeNull();
+  });
+
+  it('does not email while systemd is still restarting the unit after a crash, and does not use up the 30 minutes', async () => {
+    const layout = server();
+    const h = harness(layout, { readUnitState: async () => restarting });
+    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_SKIPPED', unit, state: 'restarting', restarts: 1 });
+    expect(h.sent).toEqual([]);
+    expect(existsSync(join(layout.stateDir, 'alert-state'))).toBe(false);
+  });
+
+  it('emails "restarting after a crash" once crashes repeat, when the owner asked for that', async () => {
+    const layout = server();
+    const h = harness(layout, { readUnitState: async () => ({ ...restarting, nRestarts: 2 }) });
+    await alert.runAlert({ unit, layout, deps: h.deps, crashAlertAfter: 3 });
+    expect(h.sent).toEqual([]);
+    await alert.runAlert({ unit, layout, deps: h.deps, crashAlertAfter: 2 });
+    expect(h.sent).toHaveLength(1);
+    expect(h.sent[0]).toContain(`Subject: Preview: ${unit} is restarting after a crash`);
+    expect(h.sent[0]).toContain('systemd is restarting it by itself (2 automatic restarts so far)');
+    expect(h.sent[0]).not.toContain('gave up');
+  });
+
+  it('still emails when the unit state cannot be read (an alert must not be lost)', async () => {
+    const layout = server();
+    const h = harness(layout, { readUnitState: async () => null });
+    await alert.runAlert({ unit, layout, deps: h.deps });
+    expect(h.sent).toHaveLength(1);
+    expect(h.sent[0]).toContain(`Subject: Preview: ${unit} failed`);
+    expect(h.sent[0]).toContain('could not be read');
+  });
+
+  it('words a unit that fails with no automatic restart (backup, team unlock) plainly', () => {
+    expect(alert.classifyFailure({ result: 'exit-code', nRestarts: 0, activeState: 'failed', subState: 'failed' })).toEqual({ kind: 'gave-up', send: true, restarts: 0, result: 'exit-code' });
+    const text = alert.composeAlert({ unit: 'debateai-preview-backup.service', at: new Date('2026-01-15T10:00:00Z'), lines: [], from: 'noreply@dezbatere.ro', to: owner, failure: { kind: 'gave-up', send: true, restarts: 0, result: 'exit-code' } }).toString();
+    expect(text).toContain('Subject: Preview: debateai-preview-backup.service failed and stayed down');
+    expect(text).toContain('result: exit-code');
+  });
+
+  it('takes the unit, an optional repeated-crash threshold, or a test send from the command line, nothing else', () => {
+    expect(alert.parseAlertArgs(['--unit', unit])).toEqual({ unit, crashAlertAfter: null, test: false });
+    expect(alert.parseAlertArgs(['--unit', unit, '--crash-alert-after', '3'])).toEqual({ unit, crashAlertAfter: 3, test: false });
+    expect(alert.parseAlertArgs(['--test'])).toEqual({ unit: 'debateai-preview-alert-test.service', crashAlertAfter: null, test: true });
+    for (const argv of [[], ['--unit'], ['--unit', unit, '--crash-alert-after', '0'], ['--unit', unit, '--crash-alert-after', 'x'], ['--unit', unit, '--extra'], ['--test', '--unit', unit]]) expect(alert.parseAlertArgs(argv)).toBeNull();
+  });
+
+  it('a test send ignores the unit state and says plainly that nothing failed', async () => {
+    const layout = server();
+    const h = harness(layout, { readUnitState: async () => { throw new Error('must not be asked'); } });
+    await expect(alert.runAlert({ unit: 'debateai-preview-alert-test.service', test: true, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_SENT', unit: 'debateai-preview-alert-test.service' });
+    expect(h.sent[0]).toContain('Subject: Preview: test alert (nothing failed)');
   });
 
   it('uses winter time for Bucharest outside daylight saving', () => {
