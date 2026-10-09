@@ -4,6 +4,7 @@ import { renderMail } from "@debateai/mail-templates";
 import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue } from "@debateai/register";
 import { OwnerJobs, taxSummaryJobFor } from "../../apps/api/src/billing/owner-jobs.js";
 import { recordingAudit } from "../support/billingSubscriptionFixtures.js";
+import { BARE_BILLING_COMMAND, ON_HOST } from "../support/runbookHostCommands.js";
 
 const authorities = taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, "test");
 const job = (kind: OutboxJob["kind"], ref: string): OutboxJob =>
@@ -24,11 +25,12 @@ function fakes(rows: TaxSummaryRow[] = []) {
       ref: `M3:${"5".repeat(32)}`, template: "M3", recipient: "CUSTOMER", code: "OUTBOX_HANDLER_FAILED",
       since: new Date("2026-12-21T00:00:00.000Z")
     }]),
+    // N9: the quarantined NETOPIA messages the summary counts by day.
+    quarantineSince: vi.fn(async (_client: unknown, _since: Date) => []),
     deadRefunds: async () => [{
-      chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "XMONEY_REFUSED",
+      chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "PAYMENT_CONFIGURATION_REFUSED",
       since: new Date("2026-12-20T00:00:00.000Z")
     }],
-    unrecordedRefunds: async () => [],
     withdrawalsAwaitingOwner: async () => [],
     unfoldableSubscriptions: async () => [],
     stuckRenewals: async () => [],
@@ -70,8 +72,8 @@ describe("P16c the owner's tax-summary job", () => {
     });
     expect(await owner.taxSummary(job("OWNER_TAX_SUMMARY", "tax-summary:2026-Q4"), new Date("2027-01-05T06:00:00.000Z")))
       .toEqual({ kind: "DONE" });
-    // The live xMoney system only (a sandbox payment is never a sale), and P10b's e-Factura read of the same quarter.
-    expect(billing.quarterSummaryRows).toHaveBeenCalledWith(new Date("2026-10-01T00:00:00.000Z"), new Date("2027-01-01T00:00:00.000Z"), "live");
+    // NETOPIA's live system only (a sandbox payment is never a sale), and P10b's e-Factura read of the same quarter.
+    expect(billing.quarterSummaryRows).toHaveBeenCalledWith(new Date("2026-10-01T00:00:00.000Z"), new Date("2027-01-01T00:00:00.000Z"), { provider: "netopia", environment: "live" });
     expect(jobs.smartBillDocumentsNotAccepted).toHaveBeenCalledWith(new Date("2027-01-01T00:00:00.000Z"));
     const o1 = enqueued.find((entry) => entry.kind === "EMAIL");
     expect(o1).toMatchObject({ ref: "O1:2026-Q4", payload: { template: "O1", recipient: "OWNER", "param.quarter": "2026-Q4" } });
@@ -104,7 +106,7 @@ describe("P16c the owner's tax-summary job", () => {
         code: "MAIL_RELAY_UNAVAILABLE", since: new Date("2026-12-21T00:00:00.000Z")
       }))),
       deadRefunds: async () => Array.from({ length: 300 }, (_, index) => ({
-        chargeId: hex(index), transactionId: String(index), reason: "WITHDRAWAL", code: "XMONEY_REFUSED",
+        chargeId: hex(index), transactionId: String(index), reason: "WITHDRAWAL", code: "PAYMENT_CONFIGURATION_REFUSED",
         since: new Date("2026-12-20T00:00:00.000Z")
       }))
     };
@@ -119,14 +121,17 @@ describe("P16c the owner's tax-summary job", () => {
     // The mail renderer takes it: the send would not throw on the block's limit.
     expect(() => renderMail("O1", "en", { quarter: "2026-Q4", summaryText: text })).not.toThrow();
     // Each list shows its first 40 lines, then says how many more there are and where the whole list is.
-    expect(text).toContain("  - and 360 more: run pnpm billing:tax-summary --quarter 2026-Q4 on the host for the whole list");
-    expect(text).toContain("  - and 260 more: run pnpm billing:tax-summary --quarter 2026-Q4 on the host for the whole list");
+    // The command is README §14.8's host form, on its own line (a bare `pnpm billing:…` fails in a root shell).
+    const whole = `run the command below as root on the server for the whole list\n    ${ON_HOST} billing:tax-summary --quarter 2026-Q4\n`;
+    expect(text).toContain(`  - and 360 more: ${whole}`);
+    expect(text).toContain(`  - and 260 more: ${whole}`);
+    expect(text).not.toMatch(BARE_BILLING_COMMAND);
     // What to do is said once per job kind and code, not on every line.
     expect(text.split("SmartBill never confirmed it").length - 1).toBe(1);
     expect(text).toContain(`charge ${hex(0)}: QUADERNO_RECORD_SALE (TAX_SERVICE_UNAVAILABLE), since 2026-11-04\n`);
     expect(text).not.toContain(`charge ${hex(40)}: QUADERNO_RECORD_SALE`);
     expect(text).toContain("Romanian e-Factura documents to confirm");
-    expect(text).toContain("Payments to check by hand in xMoney");
+    expect(text).toContain("Payments to check by hand in NETOPIA's admin");
   });
 
   it("queues O1 at most once per quarter: a re-run after the quarter's O1 exists mails nobody and audits nothing", async () => {

@@ -29,19 +29,25 @@ launchers still re-check every byte exactly as before.
 - **Timing.** prestart runs the verifier (about 12 s) as the *last* step before `ExecStart`, so
   when the launcher reads the receipt its age is only the launcher's own re-hash time. prestart
   refuses if the receipt is already older than 60 s when written. The 180 s rule is unchanged.
-- **Alerts go only to an already-approved address.** The recipient file must hold one of the four
-  addresses the preview mail is already allowed to reach. The alert checks it by fingerprint
-  against the preview mail's own allow-list, which lives **only on the server** in
-  `/etc/debateai/preview-mail-recipient-installation.json` (field `recipientSha256`; installed with
-  the preview mail, see `deploy/preview-mail/v4-20261005/README.md`). Git holds no address and no
-  fingerprint. The alert reads that file the same careful way as every other root file (root-owned,
-  mode 0600 or 0400, one link, no symlink, its folder root-owned and not writable by group or
-  others) and checks it with the mail wrapper's own schema check. If the file is missing or wrong,
-  **no email goes out** and the journal shows `PREVIEW_LIFECYCLE_ALERT_FAILED` with
-  `"reason":"RECIPIENT_ALLOW_LIST_UNAVAILABLE"`. Mail goes through the server's local
-  `sendmail -t` as `noreply@dezbatere.ro`; the address never appears in a process list. If the
-  owner wants a new address, that is a reviewed change to the server allow-list, not a lifecycle
-  config edit.
+- **Alerts go only to the owner, checked against the alert's own owner list.** The address is in
+  the root-only file `alert-recipient`. A second root-only file,
+  `/etc/debateai-v3-preview/lifecycle/owner-alert-digests.json`, holds exactly one SHA-256
+  fingerprint, of the one owner address (`{"version":1,"ownerSha256":["<hex>"]}`), built on the server by
+  `alert.mjs --install-owner-list` from the address already in `alert-recipient` (install step 2).
+  The alert sends only if the address's fingerprint is on that list, so a later change to
+  `alert-recipient` alone (a stray edit, a restored backup) fails closed instead of mailing a
+  stranger; changing the address is two deliberate root steps. This is a guard against
+  accidents, not against root: root can rewrite both files, and the list does not catch a typo
+  made when it is built (the test send does). Git holds no
+  address and no fingerprint, and neither is ever printed. The alert reads the list the same
+  careful way as every other root file (root:root, mode 0600 or 0400, one link, no symlink, at most
+  1 KiB, its folder root-owned and not writable by group or others). If the list is missing or
+  wrong, **no email goes out** and the journal shows `PREVIEW_LIFECYCLE_ALERT_FAILED` with
+  `"reason":"OWNER_ALERT_LIST_UNAVAILABLE"`; an address not on the list gives
+  `"reason":"RECIPIENT_REFUSED"`. The alert no longer reads the preview mail's account allow-list
+  (`/etc/debateai/preview-mail-recipient-installation.json`), which is being retired. Mail goes
+  through the server's local `sendmail -t` as `noreply@dezbatere.ro`; the address never appears in
+  a process list.
 - **Team unlock writes the "ready" row as its own password-less database login, from its own
   OS user.** The auth DB batch step adds `debateai_staff_readiness_writer`: a database login
   with **no password at all**, allowed to do exactly two things (write the ready row, withdraw
@@ -177,8 +183,7 @@ systemd/fallback/50-interim-recovery-login.conf   (fallback only; not installed 
 ```
 
 prestart, alert and backup use Node built-ins plus the reviewed `deploy/preview-auth-dev/v1`
-helpers (custody reader, launch-plan and attestation validators); the alert also uses the
-preview mail wrapper's allow-list schema check from `deploy/preview-mail/v4-20261005`. The unlock and its three actors
+helpers (custody reader, launch-plan and attestation validators). The unlock and its three actors
 load `pg`, `tsx`, the staff alert code and `native-peer.mjs` from the **pinned release** itself
 (the readiness child loads only `pg`), and only after `release-guard.mjs` has verified that
 release (see the decisions above).
@@ -199,10 +204,11 @@ unit files before installing; nothing else names them.
    chmod 0600 /root/preview-archive/systemd-before-lifecycle-*.tar.gz
    ```
 
-1. **Operator folder.** From a clean checkout of the reviewed commit, copy these three folders,
+1. **Operator folder.** From a clean checkout of the reviewed commit, copy these two folders,
    keeping their relative layout, to `/opt/debateai-v3-preview/operator/lifecycle-v1/`:
-   `dialectical-engine/deploy/preview-lifecycle`, `dialectical-engine/deploy/preview-auth-dev`,
-   `dialectical-engine/deploy/preview-mail`. Then make everything root-owned and read-only:
+   `dialectical-engine/deploy/preview-lifecycle` and `dialectical-engine/deploy/preview-auth-dev`
+   (the lifecycle no longer needs `deploy/preview-mail`). Then make everything root-owned and
+   read-only:
 
    ```sh
    chown -R root:root /opt/debateai-v3-preview/operator/lifecycle-v1
@@ -210,10 +216,27 @@ unit files before installing; nothing else names them.
    find /opt/debateai-v3-preview/operator/lifecycle-v1 -type f -exec chmod 0644 {} +
    ```
 
-2. **Root config folder, state folder and alert recipient.** Put exactly one approved address in
-   the file (type it; do not paste it into any command line that is logged):
+   When updating an installed operator folder (for example to pick up a fix), copy both
+   folders from the same commit, never one alone: the lifecycle files import shared functions
+   from `preview-auth-dev` (for example `release-guard.mjs` imports `operatorManifestSha256`
+   from `source-manifest.mjs`), so a mix of commits refuses to load.
+
+2. **Root config folder, state folder, alert recipient and owner list.**
+
+   In plain words: the failure email goes to one address. You type it once, into a root-only
+   file on the server. Then one command turns that address into a fingerprint (a one-way code)
+   and saves it in a second root-only file, the owner list. The alert only sends when the address
+   in the first file matches a fingerprint in the owner list, so if the first file is later
+   changed by mistake, the alert refuses instead of mailing someone else. The command never
+   prints the address or the fingerprint. Neither is ever in Git. A typo in the address is caught
+   by the test send at the end of this step, not by the list.
+
+   First the folders and the address. Type the address in the editor; do not paste it into any
+   command line (the shell history would keep it). `umask 077` first, so any file the editor
+   creates is private from the start:
 
    ```sh
+   umask 077
    install -d -o root -g root -m 0755 /etc/debateai-v3-preview/lifecycle
    [ -d /var/lib/debateai-v3-preview ] || install -d -o root -g root -m 0755 /var/lib/debateai-v3-preview
    install -o root -g root -m 0600 /dev/null /etc/debateai-v3-preview/lifecycle/alert-recipient
@@ -224,16 +247,53 @@ unit files before installing; nothing else names them.
    The last line must print `600 root:root`. Many editors save by writing a new file and renaming
    it over the old one; the new file gets the editor's default mode (often 0644), not 0600. The
    alert then refuses with `RECIPIENT_FILE_MODE_REFUSED` and names the mode it found. Fix it with
-   `chmod 0600` and `chown root:root` on the file.
+   `chmod 0600` and `chown root:root` on the file. Some editors leave a backup copy that also holds
+   the address (`alert-recipient~`, `#alert-recipient#`, `.alert-recipient.swp`): check with
+   `ls -la /etc/debateai-v3-preview/lifecycle/` and remove any such copy by its exact name.
 
-   The alert also needs the preview mail's allow-list file. This must print `600 root:root`
-   (or `400 root:root`):
+   The one-link rule below relies on the kernel stopping ordinary users from hard-linking root's
+   files. This must print `fs.protected_hardlinks = 1` (if not, stop and ask):
 
    ```sh
-   stat -c '%a %U:%G' /etc/debateai/preview-mail-recipient-installation.json
+   sysctl fs.protected_hardlinks
    ```
 
-   If it is missing, stop: installing it is the preview mail's own reviewed step, not this one.
+   Then the owner list, built from that file:
+
+   ```sh
+   /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --install-owner-list
+   stat -c '%a %U:%G %h' /etc/debateai-v3-preview/lifecycle/owner-alert-digests.json
+   ```
+
+   The first must print exactly `{"event":"PREVIEW_LIFECYCLE_OWNER_LIST_INSTALLED","mode":"0600"}`
+   (or `PREVIEW_LIFECYCLE_OWNER_LIST_ALREADY_INSTALLED` if the list already holds this address);
+   the second must print `600 root:root 1`. Anything else is a
+   `PREVIEW_LIFECYCLE_OWNER_LIST_FAILED` line. Except for the last row, nothing was written:
+
+   | `reason` | What to do |
+   |---|---|
+   | `RECIPIENT_FILE_MODE_REFUSED` | Fix the recipient file's mode as above, run again. |
+   | `RECIPIENT_REFUSED` | The recipient file must hold exactly one address on one line. |
+   | `OWNER_ALERT_LIST_EXISTS` | A list for a different address is already there. See "Changing the address" below. |
+   | `OWNER_ALERT_LIST_UNAVAILABLE` | Something unexpected is at the list's path (wrong mode, a link). Look with `ls -la /etc/debateai-v3-preview/lifecycle/` and ask. |
+   | `OWNER_ALERT_LIST_WRITE_REFUSED` | The folder is not root-owned 0755 (first command above). |
+   | `OWNER_ALERT_LIST_INSTALLED_CLEANUP_FAILED` | The list was written but a leftover temporary name remains, so the alert refuses it. `ls -la /etc/debateai-v3-preview/lifecycle/`, remove the file named `.owner-alert-digests.json.<letters>.tmp` by its exact name, then run the `stat` line again (it must end in ` 1`). |
+
+   **Changing the address later** is the same two steps, after deliberately removing the old list
+   (until the new list is in place, alerts are refused and logged, never sent elsewhere):
+
+   ```sh
+   umask 077
+   rm /etc/debateai-v3-preview/lifecycle/owner-alert-digests.json
+   install -o root -g root -m 0600 /dev/null /etc/debateai-v3-preview/lifecycle/alert-recipient
+   editor /etc/debateai-v3-preview/lifecycle/alert-recipient
+   stat -c '%a %U:%G' /etc/debateai-v3-preview/lifecycle/alert-recipient
+   ```
+
+   (`install … /dev/null` empties the recipient file and resets it to root:root 0600 before you
+   type the new address.) Check for editor backup copies as above.
+
+   then the two owner-list commands above, then the test send below.
 
    **Test send.** Use the built-in test name, never the API unit (a real API alert in the next
    30 minutes would otherwise be suppressed):
@@ -243,9 +303,14 @@ unit files before installing; nothing else names them.
    ```
 
    Expect `PREVIEW_LIFECYCLE_ALERT_SENT` for `debateai-preview-alert-test.service` and an email
-   "Preview: test alert (nothing failed)". `PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED` means the local
+   "Preview: test alert (nothing failed)". `OWNER_ALERT_LIST_UNAVAILABLE` means the owner list is
+   missing or wrong (run the owner-list commands above); `RECIPIENT_REFUSED` means the address in
+   `alert-recipient` is not the one the list was built from. `PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED` means the local
    sendmail refused it (exit code in the line): check what `/usr/sbin/sendmail` is on the server
    (`readlink -f /usr/sbin/sendmail`) and whether it accepts `-odi` before going on.
+
+   Last, back to the usual default for the later steps (files they copy must stay readable):
+   `umask 022`.
 
 3. **Check the native plan is verify-only.** `prestart` and `pin` refuse anything else:
    `grep -o '"operation":"[a-z-]*"' /etc/debateai-v3-preview/auth-dev-v1/native-plan.json`
@@ -322,6 +387,21 @@ unit files before installing; nothing else names them.
    so its `ExecStart=` reset and new `ExecStart=` win, and its `ExecStartPre=+…prestart.mjs`
    is the last pre-step. The existing release drop-ins stay in place (they still carry
    User/Group/sandboxing); only their ExecStart is superseded.
+
+   The generated drop-in also repeats the restart settings of `50-lifecycle.conf`
+   (`Restart=on-failure`, `RestartMode=direct`, `RestartSec=30`, `TimeoutStartSec=300`,
+   `StartLimitIntervalSec=900`, `StartLimitBurst=4`, `OnFailure=debateai-preview-alert@%n.service`).
+   Plain words: several older drop-ins on the server say `Restart=no`, and they sort after `50-`,
+   so on their own they would switch the automatic restart off again. The ten-z drop-in sorts
+   last, so its copy wins. `tests/unit/preview-lifecycle-units.test.ts` keeps the two lists equal.
+
+   Exactly these keys are set by the generated drop-in, nothing else: `[Unit]`
+   `StartLimitIntervalSec`, `StartLimitBurst`, `OnFailure` (added to the list); `[Service]`
+   `Restart`, `RestartMode`, `RestartSec`, `TimeoutStartSec`, `WorkingDirectory`, one more
+   `ExecStartPre` (appended last), and `ExecStart` (reset, then set). It sets or resets no
+   sandbox or identity key, so whatever the older drop-ins set for `User`, `Group`, `ProcSubset`,
+   `RestrictAddressFamilies` (for example `AF_NETLINK`), `RestrictSUIDSGID`, `SystemCallFilter`,
+   `Environment`/`EnvironmentFile` and the rest stays in effect exactly as it was.
 
 7. **Soften the API's hard dependencies.** systemd cannot remove a `Requires=` from a drop-in.
    Find where it is declared and change it there (keep a root-only copy of the original):
@@ -497,8 +577,17 @@ unit files before installing; nothing else names them.
    `OnFailure=debateai-preview-alert@…`, the prestart as the **last** `ExecStartPre` (run through
    `/usr/bin/env -i PATH=…`, so it inherits none of the service's environment or secrets), and
    `--plan /opt/debateai-v3-preview/artifacts/lifecycle-current/…`.
-   If an older drop-in still sets `Restart=no` (it would win over `50-`), move that one setting
-   out of it. If `ExecStartPre` lists older one-time steps, review whether they should run on every
+   If `Restart` still shows `no`, the ten-z drop-in is missing or stale: regenerate it with
+   `dropin` (step 6) and `daemon-reload`. Do not edit the older drop-ins for this.
+   Older drop-ins could still set restart keys the release drop-in does not repeat. Check them:
+
+   ```sh
+   systemctl show -p RestartPreventExitStatus,RestartForceExitStatus,SuccessExitStatus,StartLimitAction,RestartSteps,RestartMaxDelayUSec debateai-preview-api debateai-preview-ui
+   ```
+
+   Expect the exit-status lists empty, `StartLimitAction=none`, `RestartSteps=0`; anything else
+   came from an older drop-in: show it to the owner before going on.
+   If `ExecStartPre` lists older one-time steps, review whether they should run on every
    restart; to drop them, add `ExecStartPre=` (empty) as the first `ExecStartPre` line of the
    generated release drop-in. Then:
 

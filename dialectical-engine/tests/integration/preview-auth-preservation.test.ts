@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 import { randomUUID,randomBytes,createHash } from 'node:crypto';
 import { beforeAll,afterAll } from 'vitest';
 import { migrate,createPool,type Pool } from '@debateai/db';
+import { loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
 import { encrypt,hashToken } from '@debateai/crypto';
 import { MFA_RECOVERY_POLICY_REGISTER_ROW,RECOVERY_POLICY_REGISTER_ROW,PASSWORD_RESET_POLICY_REGISTER_ROW } from '@debateai/register';
 import { seedInstalledAuth106 } from '../support/auth106.js';
@@ -18,7 +19,6 @@ import { importHistoricalRegisterFixture,registerFixtureRow } from '../support/r
 import { describe, expect, it } from 'vitest';
 import { contractInventory } from '@debateai/contract';
 import { AUTH_DB_BATCH_MIGRATION } from '../../packages/db/src/migration-forward-auth-db-batch.js';
-import { loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
 // Losing schema/route inventories silently removes strict generated recovery contracts.
 describe('combined current authentication and preview recovery contract',()=>{
  it('inventories strict recovery schemas beside current authentication routes',()=>{
@@ -255,14 +255,11 @@ describe('closed original107 append and native atomicity',()=>{
    await Promise.all([migrate(db.pool),migrate(second)]);
    expect((await db.pool.query("SELECT count(*)::int n FROM public.debateai_schema_migration WHERE name='0108_preview_recovery_verified_bindings.sql'")).rows[0].n).toBe(1);
    expect((await db.pool.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n).toBe(1);
-   // The forward chain after 0108 (migrations/lineage/README.md) is appended exactly once too, each step with its own
-   // receipt. Other branches' steps may precede the auth DB batch; it is present and the chain's last step here.
-   const plan=await loadMigrationPlan(),chain=plan.forwardChain.map(step=>step.name);expect(chain.at(-1)).toBe(AUTH_DB_BATCH_MIGRATION);
-   // dev's 0110 (PR #101) is applied after 0108 as its own forward110, outside the chain, when the plan has one.
-   const separate=['0108_preview_recovery_verified_bindings.sql',...[(plan as unknown as {forward110?:{name:string}}).forward110?.name].filter((name):name is string=>typeof name==='string')];
-   expect((await db.pool.query('SELECT name,count(*)::int n FROM public.debateai_schema_migration WHERE name=ANY($1::text[]) GROUP BY name ORDER BY name',[chain])).rows).toEqual(chain.map(name=>({name,n:1})));
-   expect((await db.pool.query('SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name')).rows).toEqual(chain.map(source_name=>({source_name})));
-   expect((await db.pool.query('SELECT * FROM public.debateai_schema_migration WHERE NOT name=ANY($1::text[]) ORDER BY name',[[...separate,...chain]])).rows).toEqual(before);
+   // PR-54, PR-58: migrate() also appends 0110 and the forward chain after it (0111 today); each step exactly once, with one step receipt each.
+   const chain=(await loadMigrationPlan()).forwardChain.map(step=>step.name);expect(chain.length).toBeGreaterThan(0);expect(chain.at(-1)).toBe(AUTH_DB_BATCH_MIGRATION);
+   expect((await db.pool.query('SELECT name,count(*)::int n FROM public.debateai_schema_migration WHERE name=ANY($1) GROUP BY name ORDER BY name',[chain])).rows).toEqual([...chain].sort().map(name=>({name,n:1})));
+   expect((await db.pool.query('SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name')).rows).toEqual([...chain].sort().map(source_name=>({source_name})));
+   expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name NOT IN ('0108_preview_recovery_verified_bindings.sql','0110_account_erasure_public_debates.sql') AND NOT name=ANY($1) ORDER BY name",[chain])).rows).toEqual(before);
   }finally{await second.end();await db.stop();}
  },120000);
  it('a late108 refusal rolls the function replacement/ledger/receipt back atomically',async()=>{
@@ -283,8 +280,8 @@ it('source/manifest/old recipe drift refuses from a bounded source copy before a
  const root=await mkdtemp(join(tmpdir(),'preview-source-108-'));
  try{
   await mkdir(join(root,'packages/db/src'),{recursive:true});
-  // Every lineage module (the forward chain after 0108 included) is part of the bounded source copy.
-  for(const name of (await readdir(new URL('../../packages/db/src/',import.meta.url))).filter(entry=>/^migration-.*\.ts$/u.test(entry)))await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
+  // PR-54: the lineage loader also loads 0110 (migration-forward110.ts) and the forward chain (migration-forward-chain.ts and its steps).
+  for(const name of (await readdir(new URL('../../packages/db/src/',import.meta.url))).filter(entry=>/^migration-.*\.ts$/.test(entry)))await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
   await cp(new URL('../../migrations',import.meta.url),join(root,'migrations'),{recursive:true});
   const script=join(root,'probe.mts');await writeFile(script,`import {loadMigrationPlan} from './packages/db/src/migration-lineage.ts'; await loadMigrationPlan();`);
   const run=()=>promisify(execFile)(process.execPath,['--import','tsx',script],{cwd:process.cwd(),timeout:30000,maxBuffer:100000});

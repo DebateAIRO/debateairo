@@ -1376,7 +1376,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
   { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
   { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
-  { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" },
+  // N9 (spec 2026-10-05 §2.7.1): NETOPIA's signed message; no session, no CSRF, verified by its own signature.
+  { route: "POST /v1/billing/netopia/notify", auth: "public", resource: "billing", action: "notify" },
   // P12: the subscriber's own subscription. Every mutation carries the CSRF pair like any user route.
   { route: "GET /v1/billing/subscription", auth: "user", resource: "billing", action: "read-subscription" },
   { route: "GET /v1/billing/invoices", auth: "user", resource: "billing", action: "list-invoices" },
@@ -1388,7 +1389,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
   // P12d: the step-up grant rides in the body, like DELETE /v1/account's.
   { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
-  // P12e (A12): the card change's signed authorization order; the CSRF pair like any user mutation.
+  // P12e / N13 (spec §2.11): the card page's details and NETOPIA's 0 check.
+  { route: "GET /v1/billing/subscription/card", auth: "user", resource: "billing", action: "read-card-details" },
   { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
   // P13: cancel without signing in (Terms §12). First-party Origin only; never a session.
   { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },
@@ -2526,7 +2528,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   void api.register(async apple=>{
     // Replace the inherited billing-only parser in this callback's encapsulated scope.
-    // The parent still refuses form bodies on all routes except the xMoney notification.
+    // The parent registers no form-body parser (its one extra parser is NETOPIA's notify route's), so form bodies
+    // stay refused everywhere else.
     if (apple.hasContentTypeParser('application/x-www-form-urlencoded')) apple.removeContentTypeParser('application/x-www-form-urlencoded');
     apple.addContentTypeParser('application/x-www-form-urlencoded',{parseAs:'string',bodyLimit:8192},(_request,body,done)=>{
       try {const form=new URLSearchParams(body as string);const value:Record<string,string>={};for(const [key,member] of form){if(Object.hasOwn(value,key)||!['state','code','error','error_description','user'].includes(key))throw new SocialAuthError('SOCIAL_PROOF_INVALID');value[key]=member;}done(null,value);}catch{done(new SocialAuthError('SOCIAL_PROOF_INVALID'));}
@@ -2760,7 +2763,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       return reply.status(503).send({ error:"ACCOUNT_ERASURE_UNAVAILABLE" });
     }
     const scheduled=await options.accountErasure.schedule({
-      authenticated,grantToken:input.step_up_grant
+      authenticated,grantToken:input.step_up_grant,
+      ...(input.delete_public_debates === true ? { deletePublicDebates:true } : {})
     });
     if (scheduled==="NOTIFICATION_CHANNEL_REQUIRED") {
       return reply.status(409).send({ error:"ACCOUNT_NOTIFICATION_CHANNEL_REQUIRED" });
@@ -2778,7 +2782,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     return reply.status(202).send(AccountErasureStatusSchema.parse({
       status:scheduled.status,execute_at:scheduled.executeAt.toISOString(),
-      cancellation_ref:scheduled.cancellationRef
+      cancellation_ref:scheduled.cancellationRef,
+      delete_public_debates:scheduled.deletePublicDebates === true
     }));
   });
   api.get("/v1/account/erasure",routePolicy("GET /v1/account/erasure"),async (request,reply)=>{
@@ -2793,7 +2798,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     return reply.send(AccountErasureStatusSchema.parse(current.status==="NONE"
       ? { status:"NONE" }
       : { status:current.status,execute_at:current.executeAt!.toISOString(),
-          cancellation_ref:current.cancellationRef! }
+          cancellation_ref:current.cancellationRef!,
+          delete_public_debates:current.deletePublicDebates === true }
     ));
   });
   api.post(

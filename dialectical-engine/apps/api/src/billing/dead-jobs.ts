@@ -1,5 +1,7 @@
 import type { BillingRepository, OutboxJob } from "@debateai/db";
 import { emailJob } from "./email-job.js";
+import { otherSystemCode } from "./outbox.js";
+import { hostCommand } from "./refunds.js";
 
 /**
  * W12 (P2-I16, P2-I17; the controller's rulings of 2 October 2026): what the owner is told about a legal document or
@@ -36,25 +38,35 @@ export function chargeOfDocumentJob(ref: string): string {
  * Dead-letter codes that mean our records do not back the job, so there is nothing to issue, record or re-queue:
  * CREDIT_NOTE_REFUND_MISSING (P2-I5 (2): no REFUNDED row of the sale backs this credit note; the W4 judge's forward,
  * progress.md: never offered to `--record` or `--requeue`), CREDIT_NOTE_PAYLOAD_INVALID (a malformed job),
- * INVOICE_CHARGE_NOT_PAID (no payment is recorded for the charge) and OTHER_XMONEY_SYSTEM (P2-I4: a payment of the
- * other xMoney system, which owes no document here). `pnpm billing:invoice` refuses each of them.
+ * INVOICE_CHARGE_NOT_PAID (no payment is recorded for the charge) and OTHER_PAYMENT_SYSTEM (P2-I4: a payment of
+ * another payment system, which owes no document here; the code the previous card processor's era stored reads the
+ * same, `otherSystemCode`). `pnpm billing:invoice` refuses each of them.
  */
 const UNBACKED_DOCUMENT_CODES: ReadonlySet<string> = new Set([
-  "CREDIT_NOTE_REFUND_MISSING", "CREDIT_NOTE_PAYLOAD_INVALID", "INVOICE_CHARGE_NOT_PAID", "OTHER_XMONEY_SYSTEM"
+  "CREDIT_NOTE_REFUND_MISSING", "CREDIT_NOTE_PAYLOAD_INVALID", "INVOICE_CHARGE_NOT_PAID", "OTHER_PAYMENT_SYSTEM"
 ]);
 
 export function unbackedDocumentCode(code: string): boolean {
-  return UNBACKED_DOCUMENT_CODES.has(code);
+  return UNBACKED_DOCUMENT_CODES.has(code) || otherSystemCode(code);
+}
+
+/**
+ * The steps, then each owner command they name on its own line, in README §14.8's host form (F8's rule, ruling PR-56):
+ * a bare `pnpm billing:…` has none of the API's settings in a root shell.
+ */
+function withCommands(steps: string, ...commands: readonly string[]): string {
+  const run = commands.length === 1 ? "run the command as root on the server:" : "run the commands as root on the server:";
+  return [`${steps}; ${run}`, ...commands.map((command) => `  ${command}`)].join("\n");
 }
 
 /**
  * What the owner does about one dead document job (or P9c's DASHBOARD_REFUND and REFUNDED_BEFORE_START lines, which
- * have no job). The command lines name the charge and the document kind, ready to copy. An if chain, not a switch: the
- * codes are an open set.
+ * have no job). The command lines name the charge and the document kind, ready to copy, each on its own line after the
+ * steps. An if chain, not a switch: the codes are an open set.
  */
 export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: string; code: string }>): string {
   if (item.jobKind === "REFUNDED_BEFORE_START") {
-    // Part 4 final review C-5 (the controller's ruling): P9c's never-verified path (a payment xMoney refunded before we
+    // Part 4 final review C-5 (the controller's ruling): P9c's never-verified path (a payment NETOPIA refunded before we
     // ever saw it paid, for a checkout, an upgrade or a renewal) queues no invoice; A29 (q) owes no invoice and no
     // credit note for it. The quarter still counts its SALE (its refund is listed nowhere else: buildTaxSummary keeps
     // it out of the 'amount unknown' list), so the owner takes both out by hand; the summary prints this line in the
@@ -66,19 +78,20 @@ export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: st
     // P4-K (P2-W12, the owner's ruling of 3 October 2026, option (b)): P9c queued no job for this refund, so the
     // owner issues the credit note by hand and records it with its amount (`--amount`, at most what the payment held).
     // One credit note per charge (0086's invoice_one_per_intent): the command refuses a second one.
-    return "a refund made in the xMoney dashboard, whose amount only the dashboard shows: issue its credit note by hand"
-      + " in SmartBill (a Romanian sale) or Quaderno, then record it with its amount: pnpm billing:invoice --charge"
-      + ` ${item.chargeId} --kind CREDIT_NOTE --record <series>-<number> (SmartBill) or <Quaderno id> --amount <the amount`
-      + " refunded, for example 12.10>, at most what the payment held; the line then leaves this list and the quarter's"
-      + " tax summary subtracts that amount; the command refuses a second credit note of one charge, so give that one to"
-      + " the accountant";
+    return withCommands("a refund made in NETOPIA's admin, whose amount only the admin shows: issue its credit note by"
+      + " hand in SmartBill (a Romanian sale) or Quaderno, then record it with its amount with the command below, with the"
+      + " SmartBill <series>-<number> or the Quaderno id in place of <document> and the amount refunded (for example"
+      + " 12.10) in place of <amount>, at most what the payment held; the line then leaves this list and the quarter's tax"
+      + " summary subtracts that amount; the command refuses a second credit note of one charge, so give that one to the"
+      + " accountant",
+    hostCommand(`billing:invoice --charge ${item.chargeId} --kind CREDIT_NOTE --record <document> --amount <amount>`));
   }
   if (item.code === "CREDIT_NOTE_REFUND_MISSING") {
     return "no refund is recorded for this sale: nothing to issue or re-queue; tell whoever runs the server";
   }
-  if (item.code === "OTHER_XMONEY_SYSTEM") {
-    return "a payment of the other xMoney system (sandbox or live), which owes no document here: nothing to issue or"
-      + " re-queue";
+  if (otherSystemCode(item.code)) {
+    return "a payment of another payment system (the previous card processor, or NETOPIA's sandbox or live), which owes"
+      + " no document here: nothing to issue or re-queue";
   }
   if (unbackedDocumentCode(item.code) || !isDocumentJobKind(item.jobKind)) {
     return "our records do not back this job (no payment is recorded, or the job is malformed): nothing to issue or"
@@ -87,46 +100,52 @@ export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: st
   const kind = documentOfJob(item.jobKind);
   const smartbill = issuerOfJob(item.jobKind) === "SMARTBILL";
   const issuer = smartbill ? "SmartBill" : "Quaderno";
-  const command = `pnpm billing:invoice --charge ${item.chargeId} --kind ${kind}`;
-  const record = `${command} --record ${smartbill ? "<series>-<number>" : "<Quaderno id>"}`;
+  const command = hostCommand(`billing:invoice --charge ${item.chargeId} --kind ${kind}`);
+  const recordLine = `${command} --record ${smartbill ? "<series>-<number>" : "<Quaderno id>"}`;
+  const record = "record it with the --record command below";
   // SmartBill has no lookup (X1 row 8): a re-queued SmartBill job issues a new document, so only after the owner
   // checked. Quaderno looks for a document with the payment's id first (P4), so a re-run never issues twice.
+  const requeueLine = smartbill ? `${command} --requeue --confirm-not-issued` : `${command} --requeue`;
   const requeue = smartbill
-    ? `once you have checked in SmartBill that nothing was issued, re-queue it with ${command} --requeue --confirm-not-issued`
-    : `re-queue it with ${command} --requeue (Quaderno looks for an existing document first, so it is never issued twice)`;
-  const byHand = `or issue it by hand in ${issuer} and record it with ${record}`;
+    ? "once you have checked in SmartBill that nothing was issued, re-queue it with the --requeue command below"
+    : "re-queue it with the --requeue command below (Quaderno looks for an existing document first, so it is never"
+      + " issued twice)";
+  const byHand = `or issue it by hand in ${issuer} and ${record}`;
   if (item.code === "INVOICE_UNKNOWN") {
-    return `${issuer} never confirmed it: look for it in ${issuer}; if it is there, record it with ${record};`
-      + ` if it is not, ${requeue}`;
+    return withCommands(`${issuer} never confirmed it: look for it in ${issuer}; if it is there, ${record};`
+      + ` if it is not, ${requeue}`, recordLine, requeueLine);
   }
   if (item.code === "INVOICE_SERVICE_REFUSED" || item.code === "INVOICE_SERVICE_UNAVAILABLE") {
-    return `SmartBill never issued it: once SmartBill takes it again, ${requeue}; ${byHand}`;
+    return withCommands(`SmartBill never issued it: once SmartBill takes it again, ${requeue}; ${byHand}`, requeueLine, recordLine);
   }
   if (item.code === "TAX_SERVICE_REFUSED") {
-    return `Quaderno refused it (a wrong or revoked key, or a request it rejects): fix the key or the request, then ${requeue}`;
+    return withCommands("Quaderno refused it (a wrong or revoked key, or a request it rejects): fix the key or the"
+      + ` request, then ${requeue}`, requeueLine);
   }
   if (item.code === "TAX_SERVICE_UNAVAILABLE") {
-    return `Quaderno did not answer through every retry: once it answers, ${requeue}`;
+    return withCommands(`Quaderno did not answer through every retry: once it answers, ${requeue}`, requeueLine);
   }
   if (item.code === "INVOICE_ORIGINAL_MISSING") {
-    return "this credit note waits for the charge's invoice, which is not recorded: settle the invoice first (its own"
-      + ` line), then ${requeue}`;
+    return withCommands("this credit note waits for the charge's invoice, which is not recorded: settle the invoice"
+      + ` first (its own line), then ${requeue}`, requeueLine);
   }
   if (item.code === "CREDIT_NOTE_MANUAL") {
-    // F5: a refund made in the dashboard of unknown amount has no job; its line is DASHBOARD_REFUND, above (P4-K's
+    // F5: a refund made in NETOPIA's admin of unknown amount has no job; its line is DASHBOARD_REFUND, above (P4-K's
     // `--amount` records its credit note).
-    return `a credit note ${issuer} cannot make by itself (a partial refund, or a second refund of one charge): issue it`
-      + ` by hand in ${issuer} and record it with ${record}; the command refuses a second credit note of one charge, so`
-      + " give that one to the accountant";
+    return withCommands(`a credit note ${issuer} cannot make by itself (a partial refund, or a second refund of one`
+      + ` charge): issue it by hand in ${issuer} and ${record}; the command refuses a second credit note of one charge,`
+      + " so give that one to the accountant", recordLine);
   }
-  return `the job failed on our side: tell whoever runs the server; once the cause is fixed, ${requeue}; ${byHand}`;
+  return withCommands(`the job failed on our side: tell whoever runs the server; once the cause is fixed, ${requeue};`
+    + ` ${byHand}`, requeueLine, recordLine);
 }
 
 /** What a lost email means, and what the owner does about it. An if chain: templates are read from the job. */
 export function deadEmailAction(template: string | null, recipient: string | null): string {
   if (recipient === "OWNER") {
-    return "an email to you never went out: check the owner address (the file OWNER_REPORT_EMAIL_PATH names in the API's"
-      + " settings) and the mail relay; this summary (pnpm billing:tax-summary) shows the same lists";
+    return withCommands("an email to you never went out: check the owner address (the file OWNER_REPORT_EMAIL_PATH"
+      + " names in the API's settings) and the mail relay; the tax summary, printed by the command below with the quarter"
+      + " in place of <quarter> (for example 2026-Q4), shows the same lists", hostCommand("billing:tax-summary --quarter <quarter>"));
   }
   const address = "ask whoever runs the server for the account's address";
   if (template === "M1") {

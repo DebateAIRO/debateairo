@@ -43,7 +43,7 @@ import {
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
+import { AcceptanceRepository, AccountErasureCoordinator, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportCaseRepository, PostgresSupportCaseSummaryRepository, PostgresSupportMessageRepository, PostgresSupportRelayReservationRepository, PostgresSupportSessionRepository, PostgresSupportStatusRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository } from "@debateai/db";
 import { PLAN_TIER_ROSTERS, askQuestionMaxBytes, type AskRequest } from "@debateai/contract";
 import { TypedDomainError, type RiskTier } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
@@ -57,8 +57,10 @@ import {
   readBillingPlans,
   readBillingPolicy,
   readBillingEnvironmentGroup,
+  readNetopiaEnvironmentGroup,
   type BillingPolicy,
   loadApiEnvironment,
+  loadRetiredBillingSettings,
   createSupportConfigurationPort,
   readDeploymentRiskTier,
   computeStructuralCeilingBasis,
@@ -115,16 +117,19 @@ import type { AskBilling } from "./ask-billing.js";
 import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
 import { consoleBillingAudit } from "./billing/audit.js";
+import { NetopiaNoticeIntake } from "./billing/netopia-intake.js";
+import { createProviderOnlyJobs } from "./billing/provider-only-jobs.js";
 import { createBillingRuntime } from "./billing/runtime.js";
 import {
-  StageShiftedXMoneyClient,
   assertLiveInvoicersAreLive,
   assertStageInvoicersAreSandboxes,
   billingClock
 } from "./billing/stage-clock.js";
+import { TimeShiftedCardPayments } from "./billing/time-shifted-payments.js";
 import { createRetentionPurge } from "./retention-purge.js";
 import {
-  assertNoRecordsDatedAhead, assertStageRecordsClosed, billingCustodyPaths, loadBillingConnectors, type BillingConnectors
+  assertNoRecordsDatedAhead, assertOtherSystemRecordsClosed, assertProviderOnlyNotifySealed, billingCustodyPaths,
+  billingModeOf, incompleteNetopiaKey, loadBillingConnectors, loadNetopiaConnectors, type BillingConnectors, type BillingMode, type NetopiaConnectors
 } from "./billing/connectors.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
@@ -177,6 +182,8 @@ import { SupportRelayQueue } from "./support/queue.js";
 import { SupportDegradedState } from "./support/degraded.js";
 
 const environment = loadApiEnvironment();
+// NETOPIA spec 2026-10-05 §2.17.1: a removed card-processor setting still in api.env is named once, never its value.
+for (const key of loadRetiredBillingSettings()) console.warn(JSON.stringify({ event: "billing.setting.retired", key }));
 const previewConfig = environment.PREVIEW_PROVIDER_TEST_CONFIG;
 if (previewConfig !== undefined && environment.PUBLIC_APP_URL !== "https://v3-preview.dezbatere.ro") {
   throw new TypeError("PREVIEW_PROVIDER_ORIGIN_INVALID");
@@ -674,24 +681,74 @@ if (billingPolicy?.enabled === true) {
     });
   });
 }
-const billingConnectors: BillingConnectors | null = billingPolicy?.enabled === true
+/**
+ * NETOPIA (spec 2026-10-05 §2.7.3, ruling C-9): which billing exists. ON is the whole of it; PROVIDER_ONLY (hosted,
+ * billing off, NETOPIA's four settings all set) builds the NETOPIA connector alone, over which N9 serves NETOPIA's
+ * message for the owner's test tool's orders; OFF builds nothing. A NETOPIA group set only in part, with billing off,
+ * is one content-free line naming the first missing key, never its value.
+ */
+const billingMode: BillingMode = billingModeOf({
+  hosted: environment.DEPLOYMENT_MODE === "hosted", billingEnabled: billingPolicy?.enabled === true, environment
+});
+const billingConnectors: BillingConnectors | null = billingMode === "ON"
   ? boot.runSync("billing-connectors", () => loadBillingConnectors({
       environment: readBillingEnvironmentGroup(environment),
       // RULINGS-R3 R3-4: SmartBill's CIF is built from the legal notice's facts (COMPANY, mirrored), never a setting.
       company: SELLER_COMPANY,
-      recordsKey,
-      hold: (resource) => boot.hold(resource)
+      recordsKey
     }))
   : null;
-// Stage and live are two xMoney systems: going live with sandbox subscriptions still open would leave them ACTIVE
-// for ever (the live renewal pass never rebills a stage order). The runbook's switch-on step closes them first.
-if (billingConnectors?.xmoneyEnvironment === "live") {
-  await boot.run("billing-stage-records", async () => {
-    assertStageRecordsClosed(await new BillingRepository(pool).openRecordCounts("stage"));
+const providerOnlyConnectors: NetopiaConnectors | null = billingMode === "PROVIDER_ONLY"
+  ? boot.runSync("billing-netopia-connectors", () => {
+      assertProviderOnlyNotifySealed(admissionPolicy);
+      return loadNetopiaConnectors({ environment: readNetopiaEnvironmentGroup(environment), recordsKey });
+    })
+  : null;
+if (environment.DEPLOYMENT_MODE === "hosted" && billingMode === "OFF") {
+  const missing = incompleteNetopiaKey(environment);
+  if (missing !== null) console.error(JSON.stringify({ event: "billing.provider_only.incomplete", missing }));
+}
+/**
+ * N9 (spec 2026-10-05 §2.7.3, ruling C-9): in the provider-only mode NETOPIA's message is the one billing route served.
+ * The intake keeps the owner's test-tool orders' cards; every other verified message is stored as BILLING_OFF, with no
+ * card, no job and no email. Nothing drains an outbox here, so the kick does nothing.
+ */
+const providerOnlyIntake = providerOnlyConnectors === null ? undefined : new NetopiaNoticeIntake({
+  repository: new BillingRepository(pool), jobs: new BillingJobQueries(pool), trust: providerOnlyConnectors.noticeTrust,
+  recordsKey: providerOnlyConnectors.recordsKey, paymentEnvironment: providerOnlyConnectors.paymentEnvironment,
+  mode: "PROVIDER_ONLY", audit: consoleBillingAudit, kick: () => undefined
+});
+/**
+ * F7 (final review data-1): the intake above keeps the owner's test-tool cards and every message's raw bytes, so the
+ * provider-only mode runs the daily owner job's card steps alone (the tool cards revoked once a day old and purged a
+ * day later, raw messages and the quarantine purged after 14 days), started with the API like the billing runtime.
+ */
+const providerOnlyJobs = providerOnlyConnectors === null ? undefined : createProviderOnlyJobs({
+  pool, paymentEnvironment: providerOnlyConnectors.paymentEnvironment,
+  publicAppUrl: providerOnlyConnectors.publicAppUrl, audit: consoleBillingAudit, clock: () => new Date(),
+  reportPending: (code) => console.error(`[${code}]`)
+});
+// A live boot refuses while rows of another payment system (NETOPIA's sandbox, or the previous card processor) are
+// open: the live renewal pass never renews them, so they would stay ACTIVE for ever. The runbook's switch-on step
+// closes them first.
+if (billingConnectors?.paymentEnvironment === "live") {
+  await boot.run("billing-other-system-records", async () => {
+    assertOtherSystemRecordsClosed(await new BillingRepository(pool).openOtherSystemRecordCounts({
+      paymentProvider: "netopia", paymentEnvironment: "live"
+    }));
   });
-  // W14 (P2-I19): nor while billing rows or open jobs are dated more than a day ahead (a moved stage clock's leftovers).
+  // W14 (P2-I19): nor while billing rows or open jobs are dated more than a day ahead (a moved sandbox clock's leftovers).
   await boot.run("billing-records-dated-ahead", async () => {
     assertNoRecordsDatedAhead(await new BillingRepository(pool).recordsDatedAhead(new Date()));
+  });
+}
+// F7 (final review data-2): the reverse direction, which the runbook never takes: a sandbox boot refuses while live
+// NETOPIA plans are open, so a sandbox API never runs over live customers' plans and cards.
+if (billingConnectors?.paymentEnvironment === "sandbox") {
+  await boot.run("billing-live-records-on-sandbox", async () => {
+    assertOtherSystemRecordsClosed({
+      subscriptions: await new BillingRepository(pool).openNetopiaSubscriptionCount("live"), charges: 0, jobs: 0
+    });
   });
 }
 const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
@@ -1244,7 +1301,8 @@ const billingRuntime = billingConnectors === null
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingCheckout admission scope");
     }
-    // Paid plans P9a: xMoney's notices charge the source-keyed billingNotify budget (contract §2: 120 a minute).
+    // Paid plans P9a, NETOPIA spec §2.7.1: an unverified payment message charges the source-keyed billingNotify budget
+    // (contract §2: 120 a minute).
     if (admissionPolicy.billingNotify === null) {
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingNotify admission scope");
@@ -1254,28 +1312,29 @@ const billingRuntime = billingConnectors === null
       throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
         "Billing is on, so the register must seal the billingCancelLink admission scope");
     }
-    // A stage payment never reaches a live invoicing service (SmartBill has no sandbox), offset or not.
+    // A sandbox payment never reaches a live invoicing service (SmartBill has no sandbox), offset or not.
     assertStageInvoicersAreSandboxes({
-      xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
+      paymentEnvironment: billingConnectors.paymentEnvironment,
       quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
       smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
     });
     // ... and a live payment never meets a sandbox invoicer (exactly one legal invoice per charge).
     assertLiveInvoicersAreLive({
-      xmoneyApiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
+      paymentEnvironment: billingConnectors.paymentEnvironment,
       quadernoApiBaseUrl: environment.QUADERNO_API_BASE_URL ?? null,
       smartbillApiBaseUrl: environment.SMARTBILL_API_BASE_URL ?? null
     });
+    const stageOffsetDays = environment.BILLING_STAGE_CLOCK_OFFSET_DAYS ?? null;
     const stageClock = billingClock({
-      apiBaseUrl: environment.XMONEY_API_BASE_URL ?? null,
-      offsetDays: environment.BILLING_STAGE_CLOCK_OFFSET_DAYS ?? null
+      paymentEnvironment: billingConnectors.paymentEnvironment,
+      offsetDays: stageOffsetDays
     });
-    // One moved clock for everything the runtime records and decides; real time wherever it talks to xMoney.
-    const runtimeConnectors = stageClock.offsetMs === 0
+    // One moved clock for everything the runtime records and decides; real time wherever it talks to NETOPIA.
+    const runtimeConnectors = stageClock.offsetMs === 0 || stageOffsetDays === null
       ? billingConnectors
       : Object.freeze({
         ...billingConnectors,
-        xmoney: new StageShiftedXMoneyClient(billingConnectors.xmoney, () => stageClock.offsetMs)
+        payments: new TimeShiftedCardPayments(billingConnectors.payments, stageOffsetDays)
       });
     return createBillingRuntime({
       pool, connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
@@ -1296,7 +1355,7 @@ const billingRuntime = billingConnectors === null
       identities: identityRepository,
       // P16c (R-35): the owner's quarterly tax summary (email O1) names where and when each tax is paid.
       taxAuthorities,
-      audit: consoleBillingAudit, clock: stageClock.clock,
+      audit: consoleBillingAudit, clock: stageClock.clock, clockOffsetMs: stageClock.offsetMs,
       reportPending: (code) => console.error(`[${code}]`)
     });
   });
@@ -1315,11 +1374,12 @@ const billingUsageReader = askRoomComposition === undefined || askRoomCompositio
       spend: askRoomComposition.spend
     });
 const billingRouteOptions: BillingRouteOptions | undefined =
-  billingUsageReader === undefined && billingRuntime === undefined
+  billingUsageReader === undefined && billingRuntime === undefined && providerOnlyIntake === undefined
     ? undefined
     : Object.freeze({
         ...(billingUsageReader === undefined ? {} : { usage: billingUsageReader }),
-        ...(billingRuntime === undefined ? {} : billingRuntime.routes)
+        ...(billingRuntime === undefined ? {} : billingRuntime.routes),
+        ...(providerOnlyIntake === undefined ? {} : { netopiaNotices: providerOnlyIntake })
       });
 const api = buildApi({
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
@@ -1412,6 +1472,7 @@ if (publicationCleanupTimer !== undefined) {
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => billingRuntime?.stop());
+api.addHook("onClose",async () => providerOnlyJobs?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
 api.addHook("onClose",async () => askWaker?.stop());
@@ -1452,9 +1513,7 @@ const startup = installStartupResourceOwner({
     // Paid plans G3a: the country lookup is closed with the process (close only sets a flag, so twice is harmless).
     { end: async () => { geoLookup?.close(); } },
     // L1: the records key outlives the boot ledger; it is zeroed after every pool has closed.
-    { end: async () => { recordsKey.fill(0); } },
-    // P6a: the xMoney private key outlives the boot ledger too; P7/P8 consume the connectors.
-    ...(billingConnectors === null ? [] : [{ end: async () => { billingConnectors.xmoneyPrivateKey.fill(0); } }])
+    { end: async () => { recordsKey.fill(0); } }
   ],
   // L2-F7: zeroed after every pool that borrows from them has closed. A
   // changeover's PREVIOUS keys are in this list for the same reason the current
@@ -1497,6 +1556,16 @@ triggerErasureReconciliation();
 triggerAuthenticationRiskCleanup();
 triggerRetentionPurge();
 billingRuntime?.start();
+providerOnlyJobs?.start();
+// N9 (spec 2026-10-05 §2.7.4 step 2): the trusted keys were read at this start, so every quarantined NETOPIA message is
+// verified again with them, and one that now verifies is stored as if it had just arrived. In the background: a slow
+// database never holds the listening API; a failure is one content-free line, and the next start tries again.
+const netopiaIntake = billingRuntime?.netopiaNotices ?? providerOnlyIntake;
+if (netopiaIntake !== undefined) {
+  void netopiaIntake.recheckQuarantine(new Date()).catch(() => {
+    consoleBillingAudit("billing.notice.recheck", { code: "BILLING_NOTICE_RECHECK_FAILED" });
+  });
+}
 if (askRoom !== undefined) {
   triggerAskWake();
   askWaker = everyWholeMinute(triggerAskWake);

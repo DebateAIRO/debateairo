@@ -1,8 +1,10 @@
 import type { BillingJobQueries, BillingRepository } from "@debateai/db";
 import type { TaxAuthorities } from "@debateai/register";
 import type { BillingAudit } from "./audit.js";
+import type { CardCustody } from "./card-custody.js";
 import { emailJob } from "./email-job.js";
 import { DONE, enqueueOnce, type OutboxHandler } from "./outbox.js";
+import type { RefundDesk } from "./refunds.js";
 import {
   buildTaxSummary,
   deadEmailsFrom,
@@ -12,6 +14,7 @@ import {
   parseTaxQuarter,
   paymentsToCheckFrom,
   renderTaxSummary,
+  unverifiedNoticeDaysFrom,
   type TaxQuarter,
   type TaxSummaryLimit
 } from "./tax-summary.js";
@@ -37,21 +40,67 @@ export function taxSummaryJobFor(now: Date): Readonly<{
 export type OwnerJobsDeps = Readonly<{
   billing: Pick<BillingRepository,
     | "withTransaction" | "enqueue" | "quarterSummaryRows" | "invoiceUnknownItems" | "deadRefunds"
-    | "unrecordedRefunds" | "withdrawalsAwaitingOwner" | "unfoldableSubscriptions" | "stuckRenewals"
-    | "longUnsettledCharges" | "chargelessDunning" | "blockedRenewals" | "deadEmails">;
+    | "withdrawalsAwaitingOwner" | "unfoldableSubscriptions" | "stuckRenewals"
+    | "longUnsettledCharges" | "chargelessDunning" | "blockedRenewals" | "deadEmails" | "quarantineSince">;
   /** P7's queries: the job's once-only check, and P10b's e-Factura read. */
   jobs: Pick<BillingJobQueries, "outboxJobExists" | "smartBillDocumentsNotAccepted">;
   taxAuthorities: TaxAuthorities;
   audit: BillingAudit;
   clock: () => Date;
+  /** N14 (spec §2.12.2 item 3): the owner's refund reminders, run by the daily tick. Absent: none (billing off, tests). */
+  refunds?: Pick<RefundDesk, "remindOwnerRefunds">;
+  /** N17 (spec §2.15.4): the daily card sweep, then both purges. Absent: none (billing off, tests). */
+  custody?: Pick<CardCustody, "sweep" | "purge">;
 }>;
+
+type DailyStep = () => Promise<number>;
+
+/**
+ * The daily owner job's steps, each isolated: one failing never skips the others; the first failure is thrown at the
+ * end, so the single-flight reports BILLING_OWNER_JOBS_PENDING. Returns the steps' counts added up.
+ */
+async function runIsolated(steps: ReadonlyArray<DailyStep>): Promise<number> {
+  let done = 0;
+  let failure: unknown = undefined;
+  for (const step of steps) {
+    try {
+      done += await step();
+    } catch (error) {
+      failure ??= error;
+    }
+  }
+  if (failure !== undefined) throw failure;
+  return done;
+}
+
+/** N17: the sweep first, so a token it revokes today is purged one day later (0111's purge rule), then both purges. */
+function custodySteps(custody: Pick<CardCustody, "sweep" | "purge">, now: Date): ReadonlyArray<DailyStep> {
+  return [async () => (await custody.sweep(now)).revoked, () => custody.purge(now)];
+}
 
 export class OwnerJobs {
   constructor(private readonly deps: OwnerJobsDeps) {}
 
-  /** The daily tick: the quarter's job exists once, whatever state an earlier copy is in. */
+  /**
+   * The daily owner job: the quarter's tax summary queued once (whatever state an earlier copy is in), then each later
+   * daily step (N14's refund reminders, N17's card custody). Each step is isolated (`runIsolated`).
+   */
   async schedule(): Promise<number> {
-    const summary = taxSummaryJobFor(this.deps.clock());
+    return runIsolated(this.dailySteps(this.deps.clock()));
+  }
+
+  private dailySteps(now: Date): ReadonlyArray<DailyStep> {
+    const refunds = this.deps.refunds;
+    const custody = this.deps.custody;
+    return [
+      () => this.queueTaxSummary(now),
+      ...(refunds === undefined ? [] : [() => refunds.remindOwnerRefunds(now)]),
+      ...(custody === undefined ? [] : custodySteps(custody, now))
+    ];
+  }
+
+  private async queueTaxSummary(now: Date): Promise<number> {
+    const summary = taxSummaryJobFor(now);
     const written = await this.deps.billing.withTransaction((client) => enqueueOnce(
       { repository: this.deps.billing, jobs: this.deps.jobs }, client,
       { kind: summary.kind, ref: summary.ref, notBefore: summary.notBefore, payload: { quarter: summary.quarter.label } }
@@ -73,6 +122,7 @@ export class OwnerJobs {
       efactura: await efacturaChecksFrom(this.deps.jobs, quarter.to),
       paymentsToCheck: await paymentsToCheckFrom(this.deps.billing, now),
       deadEmails: await deadEmailsFrom(this.deps.billing, now),
+      unverifiedNotices: await unverifiedNoticeDaysFrom(this.deps.billing, now),
       authorities: this.deps.taxAuthorities
     }), O1_LIMIT);
     // O1 is queued at most once per quarter, whatever state an earlier O1 is in (a re-run after it was sent mails nobody).
@@ -86,4 +136,18 @@ export class OwnerJobs {
     if (queued) this.deps.audit("billing.tax_summary.queued", { quarter: quarter.label });
     return DONE;
   };
+}
+
+/**
+ * F7 (final review data-1): the daily owner job of the provider-only mode (billing off, NETOPIA set). The intake still
+ * keeps the owner's test-tool cards and every verified message's raw bytes there, so the card custody's steps run
+ * alone, isolated as in mode ON: tool-order tokens revoked once a day old, revoked tokens purged a day later, raw
+ * messages and the quarantine purged after 14 days (spec §2.5.2, §2.15.4). Nothing else of billing runs.
+ */
+export class ProviderOnlyOwnerJobs {
+  constructor(private readonly deps: Readonly<{ custody: Pick<CardCustody, "sweep" | "purge">; clock: () => Date }>) {}
+
+  async schedule(): Promise<number> {
+    return runIsolated(custodySteps(this.deps.custody, this.deps.clock()));
+  }
 }

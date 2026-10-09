@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Pris och betalning",
   "legal.notice.s04.body": "{product} är kostnadsfri. Avgiftsbelagda abonnemang finns inte ännu. Innan ett avgiftsbelagt abonnemang införs kommer det här avsnittet att ange priset (inklusive skatt), hur och när du betalar, när tjänsten börjar, hur förnyelsen fungerar och hur du säger upp abonnemanget.",
   "legal.notice.s04.bodyPaid": "De avgiftsbelagda abonnemangen och deras månadspriser finns på prissidan. Priserna där är exklusive skatt; innan du betalar visar kassan hela priset med ditt lands skatt. Du betalar med kort, varje månad i förskott. Ett abonnemang börjar så snart din bank bekräftar betalningen och förnyas varje månad tills du säger upp det. Du kan säga upp det när som helst under Inställningar, eller på uppsägningssidan utan att logga in.",
-  "legal.notice.s04.payments": "Kortbetalningar hanteras av xMoney. Vi ser och sparar aldrig ditt kortnummer.",
+  "legal.notice.s04.payments": "Kortbetalningar hanteras av NETOPIA Payments. Vi ser och sparar aldrig ditt kortnummer.",
   "legal.notice.s04.pricingLink": "Se abonnemang och priser",
   "legal.notice.s04.cancelLink": "Säg upp ett abonnemang",
   "legal.notice.s05.title": "Ångerrätt och återbetalning",

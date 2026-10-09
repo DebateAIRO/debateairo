@@ -1,4 +1,5 @@
 import { loadForward108, type Forward108Plan } from "./migration-forward108.js";
+import { loadForward110, type Forward110Plan } from "./migration-forward110.js";
 import { appliedForwardSteps, loadForwardChain, type ForwardStepPlan } from "./migration-forward-chain.js";
 import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
@@ -22,7 +23,8 @@ export type MigrationPlan = Readonly<{
   transactionBodySql: ReadonlyMap<string, string>;
   effectiveCapabilityVerifierSql: string;
   forward108: Forward108Plan;
-  /** PR-54: the forward steps after 0108, in order (0109 first); migrations/lineage/README.md. */
+  forward110: Forward110Plan;
+  /** PR-54, PR-58: the forward steps after dev's 0110, in order (0111 first); migrations/lineage/README.md. */
   forwardChain: readonly ForwardStepPlan[];
 }>;
 
@@ -39,10 +41,13 @@ export async function loadMigrationPlan(): Promise<MigrationPlan> {
   if (manifest.version !== "auth-dev-20261006-v2") fail("RECIPE_VERSION");
   const discovered = (await readdir(migrationsDirectory)).filter((name) => /^\d+.*\.sql$/.test(name)).sort();
   const forward108=await loadForward108(sha256(recipeBytes),manifest.effectiveCapabilityVerifier.executableSha256);
-  const forwardChain = await loadForwardChain({ baseRecipeSha256: sha256(recipeBytes), previousName: forward108.name,
-    previousManifestSha256: forward108.manifestSha256, previousVerifierSha256: manifest.effectiveCapabilityVerifier.executableSha256 });
+  const forward110=await loadForward110(sha256(recipeBytes),manifest.effectiveCapabilityVerifier.executableSha256,forward108.manifestSha256);
+  // PR-58: the chain is anchored after dev's 0110. 0110 runs the sealed effective-capability verifier after its SQL
+  // (applyForward110) and its manifest binds that verifier as its base, so the sealed one is in force after 0110.
+  const forwardChain = await loadForwardChain({ baseRecipeSha256: sha256(recipeBytes), previousName: forward110.name,
+    previousManifestSha256: forward110.manifestSha256, previousVerifierSha256: manifest.effectiveCapabilityVerifier.executableSha256 });
   const declared = manifest.sources.map(({ name }) => name);
-  if (!sameSet(discovered, [...declared,forward108.name,...forwardChain.map(({ name }) => name)]) || new Set(declared).size !== declared.length
+  if (!sameSet(discovered, [...declared,forward108.name,forward110.name,...forwardChain.map(({ name }) => name)]) || new Set(declared).size !== declared.length
     || !sameSet(manifest.order, declared) || new Set(manifest.order).size !== manifest.order.length) {
     fail("SOURCE_INVENTORY");
   }
@@ -87,7 +92,7 @@ export async function loadMigrationPlan(): Promise<MigrationPlan> {
   }
   return { manifest, recipeSha256: sha256(recipeBytes), sources,
     compatibilitySql: compatibilityBytes.toString("utf8"), transactionBodySql,
-    effectiveCapabilityVerifierSql: verifierBytes.toString("utf8"),forward108,forwardChain };
+    effectiveCapabilityVerifierSql: verifierBytes.toString("utf8"),forward108,forward110,forwardChain };
 }
 
 export type Lineage = "fresh" | "auth94" | "auth103" | "auth106" | "dev95" | "integrated-original" | "integrated-compatibility" | "integrated-fresh-resolutions" | "integrated-original-108" | "integrated-compatibility-108" | "integrated-fresh-resolutions-108";
@@ -105,16 +110,22 @@ export function compatibilityPreconditionDigest(plan: MigrationPlan, cohort: "au
   return sha256(JSON.stringify({ lineage: cohort, applied, source: plan.sources.get(name)!.sha256 }));
 }
 export function identifyLineage(plan: MigrationPlan, ledger: readonly string[], resolutionNames: readonly string[]): Lineage {
-  // PR-54: the forward steps after 0108 are an applied prefix of the chain on top of a complete 108 lineage; the base
-  // lineage is identified without them.
+  // PR-54, PR-58: the forward steps are an applied prefix of the chain on top of dev's 0110 applied (which dev admits
+  // only beside a complete 108 lineage); the base lineage is identified without them.
   const steps = appliedForwardSteps(plan, new Set(ledger)).map(({ name }) => name);
   const applied = ledger.filter((name) => !steps.includes(name));
   const lineage = identifyBaseLineage(plan, applied, resolutionNames);
-  if (steps.length > 0 && !lineage.endsWith("-108")) fail("FORWARD_CHAIN_BASE");
+  if (steps.length > 0 && (!lineage.endsWith("-108") || !applied.includes(plan.forward110.name))) fail("FORWARD_CHAIN_BASE");
   return lineage;
 }
 function identifyBaseLineage(plan: MigrationPlan, applied: readonly string[], resolutionNames: readonly string[]): Lineage {
-  if (applied.length !== new Set(applied).size || applied.some((name) => !plan.sources.has(name)&&name!==plan.forward108.name)) fail("UNKNOWN_APPLIED_NAME");
+  if (applied.length !== new Set(applied).size || applied.some((name) => !plan.sources.has(name)&&name!==plan.forward108.name&&name!==plan.forward110.name)) fail("UNKNOWN_APPLIED_NAME");
+  // 0110 (forward110) is admitted only beside its chain 0108: the lineage is the one of the ledger without it, and must be a -108 one.
+  const lineage=identifyLineage108(plan,applied.filter((name)=>name!==plan.forward110.name),resolutionNames);
+  if (applied.includes(plan.forward110.name) && lineage!=="integrated-original-108" && lineage!=="integrated-compatibility-108" && lineage!=="integrated-fresh-resolutions-108") fail("UNKNOWN_MIXED_LINEAGE");
+  return lineage;
+}
+function identifyLineage108(plan: MigrationPlan, applied: readonly string[], resolutionNames: readonly string[]): Lineage {
   if (applied.length === 0 && resolutionNames.length === 0) return "fresh";
   for (const cohort of ["auth94", "auth103", "auth106", "dev95"] as const) {
     if (resolutionNames.length === 0 && sameSet(applied, plan.manifest.cohorts[cohort] ?? [])) return cohort;

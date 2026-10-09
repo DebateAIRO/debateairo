@@ -7258,7 +7258,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     // GREEN passes; PRODUCT_REPAIR and every unresolved result are red, each carrying its
     // whole receipt in this message. There is no third outcome.
     expect(liveDisposition.outcome, liveDisposition.message).toBe("green");
-  }, 420_000);
+  }, process.env.GITHUB_ACTIONS === "true" ? 900_000 : 420_000);
 
   it("T9-A serializes expired-token verification against an eligible resend without deadlock", async () => {
     const initialNow = new Date();

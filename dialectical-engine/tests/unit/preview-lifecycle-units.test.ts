@@ -40,6 +40,15 @@ describe('preview lifecycle systemd templates', () => {
     expect(Object.keys(value).filter(key => /ExecStart|Requires|BindsTo|Requisite/.test(key))).toEqual([]);
   });
 
+  it.each(['debateai-preview-api.service.d', 'debateai-preview-ui.service.d'])('%s: the release drop-in repeats exactly the restart settings of 50-lifecycle.conf', async folderName => {
+    const { LIFECYCLE_RESTART } = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.mjs');
+    const value = parse(unit(`${folderName}/50-lifecycle.conf`));
+    const restartKeys = Object.keys(value).filter(key => /^\[(Unit|Service)\](Restart|StartLimit|OnFailure|TimeoutStart)/.test(key));
+    const repeated = [...LIFECYCLE_RESTART.unit.map(([key, v]: string[]) => [`[Unit]${key}`, v]), ...LIFECYCLE_RESTART.service.map(([key, v]: string[]) => [`[Service]${key}`, v])];
+    expect(repeated.map(([key]) => key).sort()).toEqual(restartKeys.sort());
+    for (const [key, v] of repeated) expect(value[key!]).toEqual([v]);
+  });
+
   it('API: hard dependencies become soft (Wants + After), never Requires', () => {
     const value = parse(unit('debateai-preview-api.service.d/50-lifecycle.conf'));
     expect(value['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual([...SUPPORTING].sort());
@@ -118,6 +127,7 @@ describe('preview lifecycle systemd templates', () => {
   it.each([
     ['unlock-team-tools.mjs', ['reset'], 1, 'stderr', { event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false }],
     ['alert.mjs', ['--unit', 'debateai-preview-api.service'], 0, 'stdout', { event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', reason: 'ACTOR_REFUSED' }],
+    ['alert.mjs', ['--install-owner-list'], 1, 'stdout', { event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: 'ACTOR_REFUSED' }],
     ['backup.mjs', [], 1, 'stderr', { event: 'PREVIEW_BACKUP_FAILED', reason: 'ACTOR_REFUSED' }]
   ] as const)('%s loads and refuses cleanly with no environment but PATH', (script, args, status, stream, event) => {
     const result = spawnSync('/usr/bin/env', ['-i', 'PATH=/usr/sbin:/usr/bin:/sbin:/bin', process.execPath, join(folder, script), ...args], { encoding: 'utf8' });

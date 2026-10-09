@@ -28,7 +28,7 @@ import { createOwnerRecoveryMaterial, parseOwnerRecoveryBundle } from '../../app
 import { PosixOwnerRecoveryLock } from '../../apps/runner/src/owner-recovery-custody.js';
 import { bootstrapOwner, recoverOwner, prepareOwnerCommand, type OwnerPrivateInput } from '../../apps/runner/src/owner-command.js';
 import { RootStaffAlertConfiguration } from '../../apps/api/src/staff/alerts.js';
-import { syntheticOwnerCustody, syntheticAlertFiles } from './ownerRecoveryCustody.js';
+import { syntheticOwnerCustody, syntheticAlertFiles, systemPython3 } from './ownerRecoveryCustody.js';
 import { RegistrationService, InProcessAuthRateLimiter } from '../../apps/api/src/registration.js';
 import { MfaEnrollmentService } from '../../apps/api/src/mfa.js';
 import { MemoryMailSender } from '../../apps/api/src/mail-channel.js';
@@ -167,7 +167,7 @@ async function possession(api:ReturnType<typeof buildApi>,a:Account,commandId:st
  return selectedSet(receipts);
 }
 
- const root=await realpath(await mkdtemp(join(tmpdir(),'task9-journey-custody-'))),custody=syntheticOwnerCustody(root),lock=new PosixOwnerRecoveryLock(custody,{pythonPath:'/usr/bin/python3',helperPath:await realpath(resolve('apps/runner/src/owner-recovery-lock.py'))});
+ const root=await realpath(await mkdtemp(join(tmpdir(),'task9-journey-custody-'))),custody=syntheticOwnerCustody(root),lock=new PosixOwnerRecoveryLock(custody,{pythonPath:systemPython3(),helperPath:await realpath(resolve('apps/runner/src/owner-recovery-lock.py'))});
  let jit:Pool|undefined;const errorLog=vi.spyOn(console,'error').mockImplementation((...args)=>applicationLogs.push(args));
  let api=composition().api;
  try {

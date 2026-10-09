@@ -1,5 +1,5 @@
 -- Supplemental verifier of the auth database batch (design note docs/superpowers/specs/2026-10-09-auth-db-batch-design.md).
--- Runs after the step is applied and on every later migrate() while it is the chain's last step. It raises on any
+-- Runs after the step is applied and on every later migrate(), whichever step is last (replayVerifierSql). It raises on any
 -- drift of the security properties the step promises; the exact catalog state is bound by its postcondition digest.
 DO $auth_db_batch$
 DECLARE v_name text;p pg_proc%ROWTYPE;v_actual text[];

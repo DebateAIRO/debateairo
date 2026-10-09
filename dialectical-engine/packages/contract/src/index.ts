@@ -18,6 +18,7 @@ import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } fro
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
 export * from "./crisis.js";
 export * from "./romania-address.js";
+export * from "./billing-address.js";
 
 export const RiskTierSchema = z.enum(["casual", "standard", "high-stakes"]);
 export const TierSourceSchema = z.enum(TIER_SOURCES);
@@ -362,8 +363,18 @@ export const BillingQuoteRequestSchema = z.object({
   plan_id: PlanIdSchema.exclude(["FREE"]),
   /** Absent: the country of the caller's address is used, and answered back as `country`. */
   country: BillingIso2Schema.optional(),
-  /** The buyer's own name; a Romanian invoice needs it (or the company's). */
+  /** Older pages' single name; the first and last name below replace it (spec 2026-10-05 §2.5.3). */
   name: z.string().trim().min(1).max(256).optional(),
+  /**
+   * Spec 2026-10-05 §2.6.1: NETOPIA's cardholder. Optional here so the page's first quote (the connection's country,
+   * its pre-fill) needs none; `address_required` stays true, and the checkout refuses 422 BILLING_ADDRESS_REQUIRED,
+   * until every field a paid checkout needs is given.
+   */
+  first_name: z.string().trim().min(1).max(120).optional(),
+  last_name: z.string().trim().min(1).max(120).optional(),
+  /** Any spelling of an international number; the server keeps it as E.164 (`e164Phone`) or refuses 422. */
+  phone: z.string().trim().min(4).max(32).optional(),
+  street: z.string().trim().min(1).max(256).optional(),
   /** The county (RO) or state (US/CA). */
   region: z.string().trim().min(1).max(64).optional(),
   postal_code: z.string().trim().min(1).max(16).optional(),
@@ -394,7 +405,10 @@ export const BillingQuoteResponseSchema = z.object({
   /** The connection's country; sentence G3 names it when `country_confirm_needed`. */
   ip_country: z.string().regex(/^[A-Z]{2}$/),
   country_confirm_needed: z.boolean(),
-  /** R-15: the invoice issuer needs the buyer's name, city and county before the checkout can start. */
+  /**
+   * Spec 2026-10-05 §2.6.1: NETOPIA's cardholder (names, phone, street, city, the postal code and, in the US, Canada
+   * and Romania, the region) and R-15's invoice fields must all be given before the checkout can start.
+   */
   address_required: z.boolean(),
   renews_on: z.iso.datetime(),
   /** Null where no withdrawal right applies (outside `withdrawalCountries`). */
@@ -417,32 +431,33 @@ export const BillingCheckoutRequestSchema = z.object({
 }).strict();
 export type BillingCheckoutRequest = z.infer<typeof BillingCheckoutRequestSchema>;
 
+/**
+ * Spec 2026-10-05 §2.6.2 step 7: NETOPIA's payment page for this checkout's charge. The page sends the browser there
+ * with a top-level navigation, never a frame or a fetch. The server stores and answers only an https URL on a NETOPIA
+ * host (the package's rule, §2.2 rule 10); http is accepted here only so the local fakes can serve one.
+ */
 export const BillingCheckoutResponseSchema = z.object({
-  public_key: z.string().min(1).max(256),
-  order_payload: z.string().min(1).max(16_384),
-  order_checksum: z.string().min(1).max(512),
+  redirect_url: z.url({ protocol: /^https?$/u }).max(2_048),
   charge_ref: z.string().regex(/^[0-9a-f]{32}$/),
-  sdk_environment: z.enum(["stage", "live"])
+  environment: z.enum(["sandbox", "live"])
 }).strict();
 export type BillingCheckoutResponse = z.infer<typeof BillingCheckoutResponseSchema>;
 
-/**
- * The 409 body the checkout answers while a payment for the person's open checkout is already on its way (a stored
- * notice, an open check or an xMoney transaction for that charge): the page waits on `charge_ref` instead of
- * mounting a second card form (D7 #5).
- */
+/** The 409 while the open checkout's payment is paid or almost, unreadable, or being opened (spec §2.6.3, D7 #5). */
 export const BillingCheckoutPendingErrorSchema = z.object({
   error: z.literal("CHECKOUT_PENDING"),
   message: z.literal("CHECKOUT_PENDING"),
   charge_ref: z.string().regex(/^[0-9a-f]{32}$/)
 }).strict();
-/** What `startBillingCheckout` resolves to for that 409, beside the signed order. */
+/** What `startBillingCheckout` resolves to for that 409, beside NETOPIA's page. */
 export type BillingCheckoutPendingResponse = Readonly<{ state: "PENDING"; charge_ref: string }>;
 
 /** NEEDS_ACTION: the bank declined and the person can try again; FAILED: refused or voided, final. */
 export const BillingChargeStatusResponseSchema = z.object({
   state: z.enum(["PENDING", "SUCCEEDED", "FAILED", "NEEDS_ACTION"]),
-  reason_code: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/).nullable()
+  reason_code: z.string().regex(/^[A-Z][A-Z0-9_]{1,63}$/).nullable(),
+  /** Spec 2026-10-05 §2.6.5: so the one return page words an upgrade's confirmation. */
+  kind: z.enum(["INITIAL", "RENEWAL", "UPGRADE", "CARD_CHECK"])
 }).strict();
 export type BillingChargeStatusResponse = z.infer<typeof BillingChargeStatusResponseSchema>;
 
@@ -507,27 +522,64 @@ export const BillingUpgradeQuoteResponseSchema = z.object({
   expires_at: z.iso.datetime()
 }).strict();
 export type BillingUpgradeQuoteResponse = z.infer<typeof BillingUpgradeQuoteResponseSchema>;
-export const BillingUpgradeRequestSchema = z.object({ plan_id: z.enum(["PRO", "MAX"]), quote_ref: z.uuid() }).strict();
-/** P12c: the upgrade charge's state; the plan changes only once VERIFY_PAYMENT confirms the payment. */
+/** N12 (spec §2.10, §2.18): the quote, and the card-saving agreement the page showed (recorded, surface UPGRADE). */
+export const BillingUpgradeRequestSchema = z.object({
+  plan_id: z.enum(["PRO", "MAX"]),
+  quote_ref: z.uuid(),
+  locale: z.string().regex(/^[a-z]{2}$/),
+  renewal_terms: BillingDocumentPairSchema
+}).strict();
+export type BillingUpgradeRequest = z.infer<typeof BillingUpgradeRequestSchema>;
+/** N12: NETOPIA's page for the prorated total; the plan changes only once NETOPIA confirms the payment (VERIFY_PAYMENT). */
 export const BillingUpgradeResponseSchema = z.object({
-  charge_ref: z.string().regex(/^[0-9a-f]{32}$/u),
-  state: z.enum(["PENDING", "SUCCEEDED", "FAILED"]),
-  reason_code: z.enum(["PAYMENT_DECLINED", "VOIDED", "REBILL_REFUSED", "NO_TRANSACTION"]).nullable()
+  redirect_url: z.url({ protocol: /^https?$/u }).max(2_048),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/u)
 }).strict();
 export type BillingUpgradeResponse = z.infer<typeof BillingUpgradeResponseSchema>;
+/** N12: the 409 body while an upgrade of this subscription is paid or on its way; the page waits on `charge_ref`. */
+export const BillingUpgradePendingErrorSchema = z.object({
+  error: z.literal("UPGRADE_PENDING"),
+  message: z.literal("UPGRADE_PENDING"),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/u)
+}).strict();
+/** What `upgradeSubscription` resolves to for that 409, beside NETOPIA's page. */
+export type BillingUpgradePendingResponse = Readonly<{ state: "PENDING"; charge_ref: string }>;
 /** P12d: the step-up grant for WITHDRAW_SUBSCRIPTION (the same 43-character token every step-up grant is). */
 export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
 /**
- * `refund`: what goes back to the card. Null when a refund made in the xMoney dashboard already touched a payment:
+ * `refund`: what goes back to the card. Null when a refund made in NETOPIA's admin already touched a payment:
  * the plan has ended, and the owner settles what is still due and writes (P14c; M8 follows).
  */
 export const BillingWithdrawResponseSchema = z.object({ refund: BillingDecimalMoneySchema.nullable() }).strict();
 export type BillingWithdrawResponse = z.infer<typeof BillingWithdrawResponseSchema>;
-/**
- * P12e (A12): the card form's signed order, as checkout's, plus the hold the server signed — the amount the page
- * names before "Save card" ("1.00" today, "0.00" if X0 shows `auth` takes a zero amount).
- */
-export const BillingCardChangeResponseSchema = BillingCheckoutResponseSchema.extend({
+/** N13 (spec §2.11): the billing details the card page pre-fills; country and region are the tax location (read-only). */
+export const BillingCardDetailsResponseSchema = z.object({
+  country: BillingIso2Schema,
+  region: z.string().max(64).nullable(),
+  first_name: z.string().max(128).nullable(),
+  last_name: z.string().max(128).nullable(),
+  phone: z.string().max(16).nullable(),
+  street: z.string().max(256).nullable(),
+  city: z.string().max(128).nullable(),
+  postal_code: z.string().max(16).nullable()
+}).strict();
+export type BillingCardDetailsResponse = z.infer<typeof BillingCardDetailsResponseSchema>;
+/** N13: the card-saving agreement and the corrected payer (spec §2.5.3: the country and the region are never sent). */
+export const BillingCardChangeRequestSchema = z.object({
+  locale: z.string().regex(/^[a-z]{2}$/),
+  renewal_terms: BillingDocumentPairSchema,
+  first_name: z.string().trim().min(1).max(128),
+  last_name: z.string().trim().min(1).max(128),
+  phone: z.string().trim().min(8).max(20),
+  street: z.string().trim().min(1).max(256),
+  city: z.string().trim().min(1).max(128),
+  postal_code: z.string().trim().min(1).max(16).optional()
+}).strict();
+export type BillingCardChangeRequest = z.infer<typeof BillingCardChangeRequestSchema>;
+/** N13: NETOPIA's page for the 0 check; `hold_amount` is what the page names ("0.00": nothing is held). */
+export const BillingCardChangeResponseSchema = z.object({
+  redirect_url: z.url({ protocol: /^https?$/u }).max(2_048),
+  charge_ref: z.string().regex(/^[0-9a-f]{32}$/),
   hold_amount: BillingDecimalMoneySchema
 }).strict();
 export type BillingCardChangeResponse = z.infer<typeof BillingCardChangeResponseSchema>;
@@ -763,14 +815,16 @@ export const UnpublishDebateRequestSchema = z.object({
 const StepUpGrantTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 export const AccountErasureScheduleRequestSchema = z.object({
   confirmation: z.literal("DELETE MY ACCOUNT"),
-  step_up_grant: StepUpGrantTokenSchema
+  step_up_grant: StepUpGrantTokenSchema,
+  delete_public_debates: z.boolean().optional()
 }).strict();
 export const AccountErasureStatusSchema = z.discriminatedUnion("status", [
   z.object({ status:z.literal("NONE") }).strict(),
   z.object({
     status:z.enum(["SCHEDULED","DUE","PROCESSING"]),
     execute_at:z.iso.datetime(),
-    cancellation_ref:z.uuid()
+    cancellation_ref:z.uuid(),
+    delete_public_debates:z.boolean()
   }).strict()
 ]);
 export const AccountErasureCancelRequestSchema = z.object({
@@ -1442,7 +1496,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/quote",
     "POST /v1/billing/checkout",
     "GET /v1/billing/charges/{chargeRef}",
-    "POST /v1/billing/xmoney/notify",
+    "POST /v1/billing/netopia/notify",
     "GET /v1/billing/subscription",
     "GET /v1/billing/invoices",
     "POST /v1/billing/subscription/downgrade",
@@ -1451,6 +1505,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/billing/subscription/upgrade-quote",
     "POST /v1/billing/subscription/upgrade",
     "POST /v1/billing/subscription/withdraw",
+    "GET /v1/billing/subscription/card",
     "POST /v1/billing/subscription/card",
     "POST /v1/billing/cancel-link",
     "POST /v1/billing/cancel-by-token"
@@ -1490,8 +1545,8 @@ export const contractInventory = Object.freeze({
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,
     BillingUpgradeQuoteRequestSchema, BillingUpgradeQuoteResponseSchema, BillingUpgradeRequestSchema,
-    BillingUpgradeResponseSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema,
-    BillingCardChangeResponseSchema, BillingCancelLinkRequestSchema, BillingCancelLinkAcceptedSchema,
+    BillingUpgradeResponseSchema, BillingUpgradePendingErrorSchema, BillingWithdrawRequestSchema, BillingWithdrawResponseSchema,
+    BillingCardDetailsResponseSchema, BillingCardChangeRequestSchema, BillingCardChangeResponseSchema, BillingCancelLinkRequestSchema, BillingCancelLinkAcceptedSchema,
     BillingCancelByTokenRequestSchema
   })
 });

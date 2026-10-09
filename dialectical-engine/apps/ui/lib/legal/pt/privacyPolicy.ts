@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Em resumo",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Recolhemos o que é necessário para uma conta e o que decide escrever. As suas perguntas são enviadas aos fornecedores de IA indicados no nosso Registo; não são utilizadas para treinar modelos. Os debates são privados, salvo se os publicar. A eliminação da conta destrói as chaves dos seus dados e retira do ar os debates que publicou. Pode contactar-nos através de privacy@dezbatere.ro, e as pessoas mencionadas num debate podem pedir a remoção sem terem uma conta." }
+      { kind: "p", text: "Recolhemos o que é necessário para uma conta e o que decide escrever. As suas perguntas são enviadas aos fornecedores de IA indicados no nosso Registo; não são utilizadas para treinar modelos. Os debates são privados, salvo se os publicar. A eliminação da conta destrói as chaves dos seus dados privados; ao programá-la, escolhe se os debates que publicou também são retirados ou se continuam públicos sob o seu pseudónimo desativado. Pode contactar-nos através de privacy@dezbatere.ro, e as pessoas mencionadas num debate podem pedir a remoção sem terem uma conta." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Os debates são privados até que os publique. A publicação é uma ação deliberada e confirmada separadamente. Um debate publicado mostra o seu pseudónimo, a sua pergunta tal como a escreveu, a árvore de argumentos, as pontuações, o veredito e a faixa de confiança, e apresenta uma indicação visível de que o conteúdo foi gerado por IA. Nunca mostra o seu endereço de correio eletrónico, os registos das suas sessões ou o histórico da sua conta. Os motores de pesquisa podem indexar debates publicados." },
       { kind: "p", text: "Cancelar a publicação remove o debate da Dialectical Engine e destrói a chave da nossa cópia pública. As cópias já feitas por leitores, motores de pesquisa ou arquivos estão fora do nosso controlo e não podemos recolhê-las." },
-      { kind: "p", text: "Quando elimina a conta, removemos do acesso público todos os debates que publicou, sem demora injustificada e no prazo máximo de 30 dias, salvo se a lei nos obrigar a conservar um elemento específico. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Quando agenda a eliminação da sua conta, escolhe o que acontece aos debates que publicou. Se assinalar «Eliminar também os meus debates públicos», removemos cada um deles do acesso público e destruímos a chave da nossa cópia pública quando a eliminação for executada, salvo se a lei exigir a conservação de um elemento específico. Se deixar a caixa por assinalar, os debates continuam públicos sob o seu pseudónimo desativado." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Endereço IP usado para determinar localmente o país no registo e no início de cada novo debate — Apenas durante o processamento do pedido — Não é conservado em texto simples para esta verificação; a recusa é registada apenas de forma agregada e no resumo abaixo",
         "Registos agregados de auditoria de recusas pelo país do IP — Durante a vida útil do serviço — O registo contém o código de recusa, o país, a indicação de que o IP foi a prova e resumos unidirecionais baseados numa chave do IP e do identificador do navegador (user-agent); apenas se acrescentam registos.",
         "Conteúdo do debate (privado) — Enquanto a conta existir — As chaves são destruídas no encerramento, tornando o conteúdo ilegível",
-        "Conteúdo do debate (publicado) — Enquanto estiver publicado e a conta existir — É removido do acesso público quando a publicação é cancelada ou a conta encerrada; as chaves são destruídas",
+        "Conteúdo do debate (publicado) — Enquanto estiver publicado; se encerrar a conta e deixar «Eliminar também os meus debates públicos» por selecionar, um debate publicado permanece público sob o seu pseudónimo desativado — É removido do acesso público e a sua chave é destruída quando cancela a publicação, ou no encerramento se tiver selecionado «Eliminar também os meus debates públicos»",
         "Registos de respostas dos fornecedores e referências de pesquisa — O mesmo período que o debate a que pertencem — O mesmo",
         "Conversas e casos de apoio — [Until closed plus 12 months] — As chaves são destruídas",
         "Registos de aceitação e consentimento — Vida útil da conta acrescida de 6 anos — o prazo de prescrição mais longo que nos é aplicável — São eliminados",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Cópias de segurança [pending] — [… days] após a eliminação da cópia ativa — São substituídas"
         ]
       },
-      { kind: "p", text: "O que a eliminação efetivamente faz. Os seus debates e os dados da sua conta são cifrados com chaves específicas da sua conta e de cada debate. A eliminação da conta destrói essas chaves, após o que os registos cifrados não podem ser lidos por nós nem por qualquer outra pessoa, e eliminamos o registo da sua conta. Descrevemo-lo como eliminação porque esse é o seu efeito, e dispomos de uma avaliação documentada que o fundamenta; se quiser saber mais, pergunte-nos. Deve saber três coisas: o registo de auditoria de segurança é exclusivamente aditivo e não é eliminado, mas não contém identificadores legíveis a seu respeito; um pequeno número de debates antigos é anterior ao nosso atual sistema de cifragem e, se isso se aplicar à sua conta, informamo-lo sobre o efeito que o encerramento terá sobre eles; e as cópias de dados já enviadas a um fornecedor de IA são regidas pelas condições de conservação desse fornecedor constantes do Registo, e não pela nossa eliminação." },
+      { kind: "p", text: "O que a eliminação efetivamente faz. Os seus debates privados e os dados da sua conta são cifrados com chaves específicas da sua conta e de cada debate. A eliminação da conta destrói essas chaves, após o que os registos cifrados não podem ser lidos por nós nem por qualquer outra pessoa, e eliminamos o registo da sua conta. A chave da cópia pública de um debate publicado só é destruída na eliminação se tiver selecionado «Eliminar também os meus debates públicos» (secção 6). Descrevemo-lo como eliminação porque esse é o seu efeito, e dispomos de uma avaliação documentada que o fundamenta; se quiser saber mais, pergunte-nos. Deve saber três coisas: o registo de auditoria de segurança é exclusivamente aditivo e não é eliminado, mas não contém identificadores legíveis a seu respeito; um pequeno número de debates antigos é anterior ao nosso atual sistema de cifragem e, se isso se aplicar à sua conta, informamo-lo sobre o efeito que o encerramento terá sobre eles; e as cópias de dados já enviadas a um fornecedor de IA são regidas pelas condições de conservação desse fornecedor constantes do Registo, e não pela nossa eliminação." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "8bce5e985d2a2965e2d00f743b92ff586e593c031cb737141acba98b1ed370c2",
+  sha256: "ebb7860bcc53f842b2d16e0dc3f0029d41321e835798db4fc714699a4fbd42e6",
   eyebrow: "POLÍTICA DE PRIVACIDADE · v3.2 · EM VIGOR DESDE [DATE]",
   title: "O que armazenamos e porquê",
   lede: "Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.",

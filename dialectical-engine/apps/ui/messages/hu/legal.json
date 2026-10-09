@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Ár és fizetés",
   "legal.notice.s04.body": "A {product} ingyenes. Fizetős csomagok még nem érhetők el. Mielőtt bármely fizetős csomag elindul, ez a szakasz feltünteti az árat (adóval együtt), azt, hogyan és mikor kell fizetni, mikor indul a szolgáltatás, hogyan működik a megújítás, és hogyan lehet lemondani.",
   "legal.notice.s04.bodyPaid": "A fizetős csomagok és havi áraik az árak oldalon találhatók. Az ottani árak adó nélkül értendők; fizetés előtt a pénztár a teljes árat mutatja az Ön országának adójával. Kártyával fizet, minden hónapban előre. A csomag azonnal elindul, amint a bankja visszaigazolja a fizetést, és havonta megújul, amíg le nem mondja. Bármikor lemondhatja a Beállításokban, vagy bejelentkezés nélkül a lemondási oldalon.",
-  "legal.notice.s04.payments": "A kártyás fizetéseket az xMoney dolgozza fel. A kártyaszámát soha nem látjuk és nem tároljuk.",
+  "legal.notice.s04.payments": "A kártyás fizetéseket a NETOPIA Payments dolgozza fel. A kártyaszámát soha nem látjuk és nem tároljuk.",
   "legal.notice.s04.pricingLink": "Csomagok és árak megtekintése",
   "legal.notice.s04.cancelLink": "Csomag lemondása",
   "legal.notice.s05.title": "Elállás és visszatérítés",

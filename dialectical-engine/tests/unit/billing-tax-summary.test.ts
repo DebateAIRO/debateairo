@@ -9,8 +9,12 @@ import {
   liveQuarterSummaryRows,
   parseTaxQuarter,
   paymentsToCheckFrom,
-  renderTaxSummary
+  renderTaxSummary,
+  unverifiedNoticeDaysFrom
 } from "../../apps/api/src/billing/tax-summary.js";
+import {
+  asRunbookLine, BARE_BILLING_COMMAND, ON_HOST, printedHostCommands, runbookBillingCommands
+} from "../support/runbookHostCommands.js";
 
 const authorities = taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, "test");
 const Q4 = parseTaxQuarter("2026-Q4");
@@ -83,7 +87,6 @@ describe("P16b the summary", () => {
       { what: "REFUND_OUTCOME_UNKNOWN", ref: "6".repeat(32), reason: "WITHDRAWAL", since: new Date("2026-11-09T00:00:00.000Z") },
       { what: "REFUND_NOT_REQUESTED", ref: "4".repeat(32), reason: null, since: new Date("2026-11-17T00:00:00.000Z") },
       { what: "REFUND_OTHER_SYSTEM", ref: "2".repeat(32), reason: null, since: new Date("2026-11-20T00:00:00.000Z") },
-      { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: new Date("2026-11-11T00:00:00.000Z") },
       { what: "WITHDRAWAL_BY_OWNER", ref: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", reason: null, since: new Date("2026-11-10T00:00:00.000Z") },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: new Date("2026-11-12T00:00:00.000Z") },
       { what: "PAYMENT_UNSETTLED", ref: "8".repeat(32), reason: null, since: new Date("2026-10-02T00:00:00.000Z") },
@@ -138,10 +141,13 @@ describe("P16b the summary", () => {
     expect(text).toContain(`charge ${"f".repeat(32)}: QUADERNO_RECORD_REFUND (CREDIT_NOTE_REFUND_MISSING), since 2026-11-10\n`);
     expect(text).toContain("where <charge> stands for the line's charge");
     expect(text).toContain("  What to do:\n  * SMARTBILL_INVOICE (INVOICE_UNKNOWN): SmartBill never confirmed it: look for it in"
-      + " SmartBill; if it is there, record it with pnpm billing:invoice --charge <charge> --kind INVOICE --record"
-      + " <series>-<number>;");
+      + " SmartBill; if it is there, record it with the --record command below;");
+    // Each command on its own line under its kind and code, as README §14.8 runs it on the host.
+    expect(text).toContain("run the commands as root on the server:\n"
+      + `    ${ON_HOST} billing:invoice --charge <charge> --kind INVOICE --record <series>-<number>\n`
+      + `    ${ON_HOST} billing:invoice --charge <charge> --kind INVOICE --requeue --confirm-not-issued\n`);
     expect(text).toContain("  * QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED): Quaderno refused it");
-    expect(text).toContain("pnpm billing:invoice --charge <charge> --kind INVOICE --requeue");
+    expect(text).toContain(`\n    ${ON_HOST} billing:invoice --charge <charge> --kind INVOICE --requeue\n`);
     expect(text).toContain("  * QUADERNO_RECORD_REFUND (CREDIT_NOTE_REFUND_MISSING): no refund is recorded for this sale:"
       + " nothing to issue or re-queue; tell whoever runs the server");
     // F4: the job itself is not tried again; only M3 is sent again, by the renewal.
@@ -157,24 +163,23 @@ describe("P16b the summary", () => {
     // P2-I5: a refund job the charge records no request for moved no money; the help text says it is no refund to make.
     expect(text).toContain(`charge ${"4".repeat(32)}: REFUND_NOT_REQUESTED, since 2026-11-17`);
     expect(text).toContain("REFUND_NOT_REQUESTED: a refund job that matches no refund request our records hold for this"
-      + " payment, so nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to"
-      + " the billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
+      + " payment, so nothing was sent to NETOPIA and it is no refund to make; do not refund it: something able to write"
+      + " to the billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
       + " (one never refunded is still owed);");
-    // P2-W4: a refund job of the other xMoney system sent nothing and is owed nothing on this server (C2's legend).
+    // P2-W4: a refund job of another payment system sent nothing and is owed nothing on this server (C2's legend).
     expect(text).toContain(`charge ${"2".repeat(32)}: REFUND_OTHER_SYSTEM, since 2026-11-20`);
-    expect(text).toContain("REFUND_OTHER_SYSTEM: a refund job for a payment of the other xMoney system (sandbox or live):"
-      + " nothing was sent, and nothing is owed on this server;");
+    expect(text).toContain("REFUND_OTHER_SYSTEM: a refund job for a payment of another payment system (the previous card"
+      + " processor, or NETOPIA's sandbox or live): nothing was sent, and nothing is owed on this server;");
     // The two real dead ends keep their own words.
-    expect(text).toContain("(REFUND_REFUSED: xMoney refused our refund, the money is still owed, refund it from the dashboard;"
-      + " REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check the dashboard before refunding again;"
+    expect(text).toContain("(REFUND_REFUSED: NETOPIA refused our refund, the money is still owed, refund it from NETOPIA's"
+      + " admin; REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check NETOPIA's admin before refunding again;"
       + " a WITHDRAWAL refund is due within 14 days of the withdrawal; REFUND_NOT_REQUESTED:");
-    // P9c's second refund made elsewhere: named by the xMoney transaction the owner opens in the dashboard.
-    expect(text).toContain("xMoney transaction 9912345: REFUND_UNRECORDED, since 2026-11-11");
-    expect(text).toContain("REFUND_UNRECORDED: a second refund made in the xMoney dashboard");
+    // N26c (spec 2026-10-05 §2.19): the previous card processor's unrecorded second refund left with its only writer.
+    expect(text).not.toContain("REFUND_UNRECORDED");
     // Part 4 final review C-6: a refund transaction of a payment whose dashboard-refund credit note is recorded
     // (P4-K's --amount, which the figures already subtract) is never taken off a second time by hand.
-    expect(text).toContain("take it off that country's net sales and tax by hand. A refund transaction of a payment whose"
-      + " dashboard-refund credit note is recorded is already in the figures above: do not take it off again;");
+    expect(text).toContain("nothing is owed on this server; a refund of a payment whose"
+      + " admin-refund credit note is recorded is already in the figures above: do not take it off again;");
     expect(text).toContain("owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93: WITHDRAWAL_BY_OWNER, since 2026-11-10");
     expect(text).toContain(`charge ${"5".repeat(32)}: RENEWAL_STUCK, since 2026-11-12`);
     expect(text).toContain(`charge ${"8".repeat(32)}: PAYMENT_UNSETTLED, since 2026-10-02`);
@@ -190,9 +195,15 @@ describe("P16b the summary", () => {
       + " ends after its last retry day unless a later retry prices at the announced total again; there is nothing to fix"
       + " in the tax service, and the person can subscribe again at the new price;");
     expect(text).toContain("subscription 7d0a3b4c-5e6f-4a7b-8c8d-9e0f1a2b3c4d: RENEWAL_BLOCKED, since 2026-11-16");
-    expect(text).toContain("pnpm billing:withdraw --owner <ref> --refund <amount>");
+    expect(text).toContain("WITHDRAWAL_BY_OWNER: a withdrawal over a payment an admin refund touched, refund in NETOPIA's"
+      + " admin what the command cannot take back, then settle it with the withdraw command under this list, run as root on"
+      + " the server with the line's owner ref in place of <ref>;");
+    expect(text).toContain(`, since 2026-11-13\n  ${ON_HOST} billing:withdraw --owner <ref> --refund <amount>`
+      + " --dashboard <amount refunded in NETOPIA's admin>\n");
     expect(text).toContain("Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV");
-    expect(text).toContain("pnpm billing:efactura-status --invoice <series>-<number> --status ACCEPTED|REJECTED");
+    expect(text).toContain("record ANAF's answer with the command under this list, run as root on the server):");
+    expect(text).toContain(`issued 2026-11-04: last status SENT_BY_ACCOUNT_SETTING\n`
+      + `  ${ON_HOST} billing:efactura-status --invoice <series>-<number> --status <ACCEPTED or REJECTED>\n`);
     expect(text).toContain(`invoice DBAI-0042 (charge ${"a".repeat(32)}), issued 2026-11-03: no status recorded`);
     expect(text).toContain(`credit note DBAI-0043 (charge ${"b".repeat(32)}), issued 2026-11-04: last status SENT_BY_ACCOUNT_SETTING`);
     expect(text).not.toMatch(/@/);
@@ -213,14 +224,15 @@ describe("P16b the summary", () => {
     }]);
     const text = renderTaxSummary(alone);
     expect(text).toContain("Net sales 20.00 USD, tax collected 4.20 USD, from 1 sale and 0 refunds.");
-    expect(text).toContain("Not subtracted: 1 refund made in the xMoney dashboard, amount unknown (listed below).");
-    expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown (not subtracted above;");
+    expect(text).toContain("Not subtracted: 1 refund made in NETOPIA's admin, amount unknown (listed below).");
+    expect(text).toContain("Refunds made in NETOPIA's admin, amount unknown (not subtracted above;");
     // P4-K (P2-W12): the owner records the hand-made credit note with its amount, and the summary then subtracts it.
-    expect(text).toContain("issue its credit note by hand and record it with its amount (pnpm billing:invoice --amount, as"
-      + " its line under the invoices and credit notes to check by hand says), and the summary then subtracts it at that"
-      + " amount; until then, adjust that country's net sales and tax by hand, at most the amount shown):");
+    expect(text).toContain("issue its credit note by hand and record it with its amount (with the command its line under"
+      + " the invoices and credit notes to check by hand gives), and the summary then subtracts it at that amount; until"
+      + " then, adjust that country's net sales and tax by hand, at most the amount shown):");
+    expect(text).not.toMatch(BARE_BILLING_COMMAND);
     expect(text).toContain(`charge ${"a".repeat(32)}, RO, up to 24.20 USD, on 2026-11-20`);
-    // A refund whose amount is known (ours, or one xMoney reported as its own transaction) is still subtracted.
+    // A refund whose amount is known (ours, or an old one recorded as its own transaction) is still subtracted.
     const known = row({ chargeId: "a".repeat(32), type: "REFUND", amountMicros: 12_100_000, amountKnown: true });
     const both = buildTaxSummary({
       quarter: Q4, rows: [sale, unknown, known], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: []
@@ -251,7 +263,7 @@ describe("P16b the summary", () => {
     expect(text).toContain(`charge ${charge}: REFUNDED_BEFORE_START (NO_DOCUMENT_OWED), since 2026-11-20`);
     expect(text).toContain("  * REFUNDED_BEFORE_START (NO_DOCUMENT_OWED): Refunded before it started: no invoice or credit"
       + " note is owed. Take this sale and its refund out of the quarter's figures by hand.");
-    expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown: none.");
+    expect(text).toContain("Refunds made in NETOPIA's admin, amount unknown: none.");
     expect(text).not.toContain("Not subtracted:");
     expect(text).not.toContain(`charge ${charge}, RO, up to`);
 
@@ -265,7 +277,7 @@ describe("P16b the summary", () => {
     }]);
     expect(dashboard.lines.find((line) => line.taxCountry === "RO")).toMatchObject({ unknownRefunds: 1 });
     const dashboardText = renderTaxSummary(dashboard);
-    expect(dashboardText).toContain("Not subtracted: 1 refund made in the xMoney dashboard, amount unknown (listed below).");
+    expect(dashboardText).toContain("Not subtracted: 1 refund made in NETOPIA's admin, amount unknown (listed below).");
     expect(dashboardText).toContain(`charge ${charge}, RO, up to 24.20 USD, on 2026-11-20`);
     expect(dashboardText).toContain(`charge ${charge}: DASHBOARD_REFUND (CREDIT_NOTE_MANUAL), since 2026-11-20`);
   });
@@ -319,17 +331,51 @@ describe("P16b the summary", () => {
 
   it("caps each list and cuts the whole text at a line boundary only when a limit is given (O1; W12 fix I-1)", () => {
     const full = renderTaxSummary(summary);
-    expect(full).not.toContain("more: run pnpm billing:tax-summary");
+    expect(full).not.toContain("more: run the command below");
     const capped = renderTaxSummary(summary, { itemsPerSection: 2, maxChars: 1_000_000 });
     expect(capped).toContain(`charge ${"b".repeat(32)}: SMARTBILL_STORNO (CREDIT_NOTE_MANUAL), since 2026-11-05\n`
-      + "  - and 4 more: run pnpm billing:tax-summary --quarter 2026-Q4 on the host for the whole list\n  What to do:");
+      + "  - and 4 more: run the command below as root on the server for the whole list\n"
+      + `    ${ON_HOST} billing:tax-summary --quarter 2026-Q4\n  What to do:`);
+    expect(capped).not.toMatch(BARE_BILLING_COMMAND);
     // The legend names only what the printed lines need.
     expect(capped).not.toContain("  * QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED):");
     const cut = renderTaxSummary(summary, { itemsPerSection: 40, maxChars: 2_000 });
     expect(cut.length).toBeLessThanOrEqual(2_000);
-    expect(cut.endsWith("The summary is cut here: it is longer than one email holds. Run pnpm billing:tax-summary --quarter"
-      + " 2026-Q4 on the host for the whole of it.\n")).toBe(true);
+    expect(cut.endsWith("The summary is cut here: it is longer than one email holds. Run the command below as root on the"
+      + ` server for the whole of it.\n  ${ON_HOST} billing:tax-summary --quarter 2026-Q4\n`)).toBe(true);
+    expect(cut).not.toMatch(BARE_BILLING_COMMAND);
     expect(full.startsWith(cut.slice(0, cut.lastIndexOf("\nThe summary is cut here")))).toBe(true);
+  });
+
+  // F8's rule (ruling PR-56): every owner command the summary prints (the CLI's text and the quarterly O1 email) is
+  // README §14.8's host form on its own line; a bare `pnpm billing:…` fails in a root shell (no settings).
+  it("prints every owner command as the runbook runs it on the host, each on its own line", () => {
+    const text = renderTaxSummary({
+      ...summary,
+      deadEmails: [...summary.deadEmails,
+        { ref: "O1:2026-Q3", template: "O1", recipient: "OWNER", code: "MAIL_RELAY_REFUSED", since: new Date("2026-11-21T00:00:00.000Z") }],
+      unverifiedNotices: [{ day: "2026-12-20", count: 1 }]
+    // Five lines a list: the sixth dead document overflows, and WITHDRAWAL_BY_OWNER (the fifth payment) is still shown.
+    }, { itemsPerSection: 5, maxChars: 1_000_000 });
+    expect(text).not.toMatch(BARE_BILLING_COMMAND);
+    const commands = printedHostCommands(text);
+    // Invoice (record, re-queue, admin refund), tax summary (overflow, owner email), withdraw, check, e-Factura.
+    for (const name of ["billing:invoice", "billing:tax-summary", "billing:withdraw", "billing:check", "billing:efactura-status"]) {
+      expect(commands.some((command) => command.startsWith(`${ON_HOST} ${name} `) || command === `${ON_HOST} ${name}`), name).toBe(true);
+    }
+    const runbook = runbookBillingCommands();
+    for (const command of commands) {
+      const line = asRunbookLine(command, [
+        ["--charge <charge>", '--charge "$CHARGE_REF"'], ["--record <series>-<number>", '--record "$DOCUMENT"'],
+        ["--record <Quaderno id>", '--record "$DOCUMENT"'], ["--record <document>", '--record "$DOCUMENT"'],
+        ["--amount <amount>", '--amount "$AMOUNT"'], ["--owner <ref>", '--owner "$OWNER_REF"'], ["--refund <amount>", '--refund "$REFUND"'],
+        ["--dashboard <amount refunded in NETOPIA's admin>", '--dashboard "$DASHBOARD"'],
+        ["--invoice <series>-<number>", '--invoice "$INVOICE"'], ["--status <ACCEPTED or REJECTED>", '--status "$STATUS"'],
+        ["--quarter <quarter>", "--quarter 2026-Q4"]
+      ]);
+      // README §14.8 names the kind as read in, except for the admin refund's credit note (always CREDIT_NOTE).
+      expect(runbook, command).toContain(line.includes("--amount ") ? line : line.replace(/--kind (?:INVOICE|CREDIT_NOTE)/u, '--kind "$KIND"'));
+    }
   });
 
   it("prints the fallback for a country the row does not cover, and says when there is nothing to list", () => {
@@ -342,11 +388,11 @@ describe("P16b the summary", () => {
     expect(text).toContain("Charges with conflicting location evidence: none.");
     expect(text).toContain("Sales where we are not registered: none.");
     expect(text).toContain("Charge-backs this quarter: none.");
-    expect(text).toContain("Refunds made in the xMoney dashboard, amount unknown: none.");
+    expect(text).toContain("Refunds made in NETOPIA's admin, amount unknown: none.");
     expect(text).toContain("Invoices and credit notes to check by hand: none.");
     expect(text).toContain("Emails that never went out: none.");
     expect(text).toContain("Romanian e-Factura documents to confirm: none.");
-    expect(text).toContain("Payments to check by hand in xMoney: none.");
+    expect(text).toContain("Payments to check by hand in NETOPIA's admin: none.");
   });
 
   it("gathers the payments to check from every list the owner must act on", async () => {
@@ -354,24 +400,19 @@ describe("P16b the summary", () => {
     const owner = "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93";
     const items = await paymentsToCheckFrom({
       deadRefunds: async () => [
-        { chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "XMONEY_REFUSED", since: now },
+        { chargeId: "7".repeat(32), transactionId: "1", reason: "WITHDRAWAL", code: "PAYMENT_CONFIGURATION_REFUSED", since: now },
         { chargeId: "6".repeat(32), transactionId: "2", reason: "WITHDRAWAL", code: "REFUND_OUTCOME_UNKNOWN", since: now },
         // P2-I5: a forged job's payload reason is only its claim, so the line carries none.
         { chargeId: "4".repeat(32), transactionId: "3", reason: "CARD_CHECK_RELEASE", code: "REFUND_NOT_REQUESTED", since: now },
-        // P2-W4: neither reached xMoney, so neither is a refund xMoney refused. A job naming a charge we do not have is
-        // no refund to make; a job of the other xMoney system is owed nothing here. Neither payload reason is verified.
+        // P2-W4: neither reached NETOPIA, so neither is a refund NETOPIA refused. A job naming a charge we do not have
+        // is no refund to make; a job of another payment system is owed nothing here. Neither payload reason is verified.
         { chargeId: "3".repeat(32), transactionId: "4", reason: "WITHDRAWAL", code: "REFUND_CHARGE_MISSING", since: now },
-        { chargeId: "2".repeat(32), transactionId: "5", reason: "WITHDRAWAL", code: "OTHER_XMONEY_SYSTEM", since: now },
-        // Part 4 final review C-7: an unreadable payload ended before any xMoney call, and only a row written by
-        // something else holds one, so it is listed like the claimed-only codes: no refund xMoney refused, and its
+        { chargeId: "2".repeat(32), transactionId: "5", reason: "WITHDRAWAL", code: "OTHER_PAYMENT_SYSTEM", since: now },
+        // Part 4 final review C-7: an unreadable payload ended before any call to NETOPIA, and only a row written by
+        // something else holds one, so it is listed like the claimed-only codes: no refund NETOPIA refused, and its
         // reason is never printed (REFUND_NOT_REQUESTED's legend sends the owner to the charge's own requests).
         { chargeId: "1".repeat(32), transactionId: "6", reason: "WITHDRAWAL", code: "REFUND_PAYLOAD_INVALID", since: now }
       ],
-      unrecordedRefunds: async (since) => {
-        // P9c's second refunds made elsewhere, as far back as A10's refund listing reaches.
-        expect(since).toEqual(new Date(now.getTime() - 120 * 86_400_000));
-        return [{ transactionId: "9912345", since: now }];
-      },
       withdrawalsAwaitingOwner: async () => [{ ownerRef: owner, subscriptionId: "s", planId: "PRO", since: now }],
       unfoldableSubscriptions: async () => [{ subscriptionId: "3c9d2b1a-5e4f-4a6b-8c7d-9e0f1a2b3c4d", since: now }],
       stuckRenewals: async (since) => {
@@ -404,7 +445,6 @@ describe("P16b the summary", () => {
       { what: "REFUND_NOT_REQUESTED", ref: "3".repeat(32), reason: null, since: now },
       { what: "REFUND_OTHER_SYSTEM", ref: "2".repeat(32), reason: null, since: now },
       { what: "REFUND_NOT_REQUESTED", ref: "1".repeat(32), reason: null, since: now },
-      { what: "REFUND_UNRECORDED", ref: "9912345", reason: null, since: now },
       { what: "WITHDRAWAL_BY_OWNER", ref: owner, reason: null, since: now },
       { what: "RENEWAL_STUCK", ref: "5".repeat(32), reason: null, since: now },
       { what: "PAYMENT_UNSETTLED", ref: "8".repeat(32), reason: null, since: new Date("2026-11-01T00:00:00.000Z") },
@@ -414,13 +454,42 @@ describe("P16b the summary", () => {
       { what: "SUBSCRIPTION_HISTORY_INVALID", ref: "3c9d2b1a-5e4f-4a6b-8c7d-9e0f1a2b3c4d", reason: null, since: now }
     ]);
   });
+
+  it("N9: counts the NETOPIA messages kept in quarantine by day, and prints nothing when there are none", async () => {
+    const empty = renderTaxSummary(buildTaxSummary({
+      quarter: Q4, rows: [], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: []
+    }));
+    expect(empty).not.toContain("NETOPIA messages");
+    const since: Date[] = [];
+    const billing = {
+      withTransaction: async <T>(work: (client: never) => Promise<T>) => work({} as never),
+      quarantineSince: async (_client: unknown, from: Date) => {
+        since.push(from);
+        return [
+          { receivedAt: new Date("2026-12-20T23:59:00.000Z") }, { receivedAt: new Date("2026-12-21T00:01:00.000Z") },
+          { receivedAt: new Date("2026-12-21T09:00:00.000Z") }
+        ];
+      }
+    } as unknown as Parameters<typeof unverifiedNoticeDaysFrom>[0];
+    const days = await unverifiedNoticeDaysFrom(billing, new Date("2026-12-22T06:00:00.000Z"));
+    expect(since).toEqual([new Date("2026-12-08T06:00:00.000Z")]);
+    expect(days).toEqual([{ day: "2026-12-20", count: 1 }, { day: "2026-12-21", count: 2 }]);
+    const text = renderTaxSummary(buildTaxSummary({
+      quarter: Q4, rows: [], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: [], unverifiedNotices: days
+    }));
+    expect(text).toContain("NETOPIA messages that could not be verified (kept 14 days and checked again at every API start;"
+      + " check the NETOPIA key with the command under this list, run as root on the server):");
+    expect(text).toContain("  2026-12-20: 1 message\n  2026-12-21: 2 messages\n"
+      + `  ${ON_HOST} billing:check\n`);
+    expect(text).not.toMatch(BARE_BILLING_COMMAND);
+  });
 });
 
 describe("P16b the rows it reads", () => {
-  it("reads only the live xMoney system's rows: a sandbox payment is never a sale (D5's third argument)", async () => {
+  it("reads only the live NETOPIA system's rows: a sandbox payment is never a sale (ruling PR-21)", async () => {
     const quarterSummaryRows = vi.fn(async () => [row({})]);
     expect(await liveQuarterSummaryRows({ quarterSummaryRows }, Q4.from, Q4.to)).toHaveLength(1);
-    expect(quarterSummaryRows).toHaveBeenCalledWith(Q4.from, Q4.to, "live");
+    expect(quarterSummaryRows).toHaveBeenCalledWith(Q4.from, Q4.to, { provider: "netopia", environment: "live" });
   });
 
   it("names each e-Factura document P10b lists by its printed series and number", async () => {

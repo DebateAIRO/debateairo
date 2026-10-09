@@ -1,15 +1,16 @@
-# Auth database batch (one forward step after 0108) — design
+# Auth database batch (the forward step after NETOPIA's 0111) — design
 
-Owner-approved 2026-10-09. One forward migration, `migrations/0109_auth_db_batch.sql` (renumbered at merge, see the end), joins the chain after the
-sealed 0108 the way `migrations/lineage/README.md` describes (same chain code as the NETOPIA branch). Sealed files and
+Owner-approved 2026-10-09. One forward migration, `migrations/0112_auth_db_batch.sql` (written as 0109, renumbered at
+merge, see the end), joins the forward chain after NETOPIA's 0111 (itself after the sealed 0108 and dev's 0110) the way
+`migrations/lineage/README.md` describes (one chain module, NETOPIA's, plus the replay lines of item 10). Sealed files and
 the five functions 0108's receipt pins (`password_reset_prepare/start`, `mfa_recovery_prepare_exchange/exchange`,
 `start_account_recovery`) are not touched; neither are `mfa_recovery_eligible`, `password_recovery_rules`,
 `valid_consumer_authorization_internal` (pinned by lineage evidence). Every replaced function keeps its signature,
 owner and `SECURITY DEFINER`; new ones get the owner of their family and explicit REVOKE/GRANT. Every function the step
 creates or replaces (and `staff.publish/revoke/read_independent_alert_readiness`, `staff.claim_alert_delivery`) searches
 `pg_catalog, pg_temp` — pg_temp last, so a temporary type cannot shadow `timestamptz`/`uuid`/`jsonb` inside a definer —
-except `identity.create_social_account`, whose exact `search_path=pg_catalog` the sealed effective-capability verifier
-pins (the step keeps that verifier). Item 6 covers it and every older definer.
+except `identity.create_social_account`, whose exact `search_path=pg_catalog` the effective-capability verifier pins
+(the sealed one and 0111's copy, which the step keeps). Item 6 covers it and every older definer.
 
 1. **Phone optional at sign-up.** `create_pending_account_base_internal` accepts an all-NULL phone (stores no phone
    columns); a given phone keeps today's checks. `create_social_account` passes source/status/time only with a phone.
@@ -57,10 +58,11 @@ do anyway. The preview's release files and socket folder must be readable by tha
 The full preview stage (`stage-runtime.mjs`) can no longer complete an authenticator recovery (it cannot wait a day):
 it proves the wait started and that the old session and authenticator keep working.
 
-**Renumbering (planned: 0112, after PR #101's 0110 — a separate `forward110` on dev — and NETOPIA's 0111).** The number lives in: the SQL file name;
+**Renumbering (done at merge: 0112, after PR #101's 0110 — a separate `forward110` on dev — and NETOPIA's 0111).** The number lives in: the SQL file name;
 `NAME` and `PREVIOUS` in `packages/db/src/migration-forward-auth-db-batch.ts`; `migration.name`, `previous` and
 `verifier` in `migrations/lineage/auth-db-batch-forward.json`; the order of `STEPS` in `migration-forward-chain.ts`.
-Tests read the name from the loader and only require the batch to be the chain's last step. The full recipe (conflicts
+Most tests read the name from the loader and require the batch to be the chain's last step; the exact-chain tests
+(NETOPIA's and the preview guard's) name the whole sequence 0110, 0111, 0112. The full recipe (conflicts
 to expect, the other branches' exact-chain tests, "check the preview's applied steps first") is in
 `migrations/lineage/README.md`.
 

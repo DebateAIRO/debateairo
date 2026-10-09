@@ -10,7 +10,7 @@ import { AUTH_DB_BATCH_MIGRATION } from "../../packages/db/src/migration-forward
 
 /**
  * The auth database batch (design note docs/superpowers/specs/2026-10-09-auth-db-batch-design.md) joins the forward
- * chain after dev's sealed 0108 with new files only. Its number lives in one constant (AUTH_DB_BATCH_MIGRATION) so a
+ * chain after NETOPIA's 0111 (itself after dev's sealed 0108 and dev's 0110) with new files only. Its number lives in one constant (AUTH_DB_BATCH_MIGRATION) so a
  * renumber is cheap; it does not supersede the effective-capability verifier (it adds no billing objects) and carries
  * its own supplemental verifier.
  */
@@ -31,7 +31,7 @@ const SEALED: Readonly<Record<string, string>> = Object.freeze({
   "compatibility/auth-dev-20261006/0093_billing_runtime_role.sql": "253d188697be7f16054c047834819f9f15dfaddbee32556a3e2c4c10696cbe68"
 });
 
-describe("auth database batch: a forward step after dev's sealed 0108", () => {
+describe("auth database batch: the forward step after NETOPIA's 0111", () => {
   it("keeps every sealed byte of dev's lineage, its recipe's sources included", async () => {
     for (const [path, digest] of Object.entries(SEALED)) expect(sha256(await bytesOf(path)), path).toBe(digest);
     const recipe = JSON.parse((await bytesOf("lineage/auth-dev-20261006.json")).toString("utf8")) as {
@@ -40,11 +40,20 @@ describe("auth database batch: a forward step after dev's sealed 0108", () => {
     for (const source of recipe.sources) expect(sha256(await bytesOf(source.name)), source.name).toBe(source.sha256);
   });
 
-  it("is the chain's step after 0108, bound to the recipe, 0108's manifest and the verifier it keeps", async () => {
+  it("is the chain's last step, after 0111, bound to the recipe, 0111's manifest and the verifier it keeps (0111's)", async () => {
     expect(AUTH_DB_BATCH_MIGRATION).toMatch(/^\d{4}_auth_db_batch\.sql$/u);
     const plan = await loadMigrationPlan();
     expect(plan.forwardChain.map((step) => step.name)).toContain(AUTH_DB_BATCH_MIGRATION);
     const step = plan.forwardChain.find((entry) => entry.name === AUTH_DB_BATCH_MIGRATION)!;
+    expect(AUTH_DB_BATCH_MIGRATION).toBe("0112_auth_db_batch.sql");
+    expect(plan.forwardChain.at(-1)).toBe(step);
+    const netopia = plan.forwardChain.find((entry) => entry.name === "0111_billing_netopia.sql")!;
+    expect(plan.forwardChain.indexOf(step)).toBe(plan.forwardChain.indexOf(netopia) + 1);
+    expect(step.previousName).toBe(netopia.name);
+    expect(step.previousManifestSha256).toBe(sha256(await bytesOf("lineage/billing-netopia-forward111.json")));
+    expect(step.previousVerifierSha256).toBe(netopia.verifierSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-111.sql");
+    expect(step.verifierSql).toBe(netopia.verifierSql);
     const manifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
     expect(manifest).toEqual({
       version: "auth-db-batch-forward-v1",
@@ -59,7 +68,8 @@ describe("auth database batch: a forward step after dev's sealed 0108", () => {
     expect(step.verifierSha256).toBe(step.previousVerifierSha256);
     expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/auth-db-batch-forward.json")));
     const files = (await readdir(MIGRATIONS)).filter((name) => /^\d+.*\.sql$/u.test(name)).sort();
-    expect(files).toEqual([...plan.manifest.order, plan.forward108.name, ...plan.forwardChain.map((entry) => entry.name)].sort());
+    expect(files).toEqual([...plan.manifest.order, plan.forward108.name, plan.forward110.name, ...plan.forwardChain.map((entry) => entry.name)].sort());
+    expect(files).not.toContain("0109_auth_db_batch.sql");
   });
 
   it("documents how a renumber and the next step touch the chain", async () => {

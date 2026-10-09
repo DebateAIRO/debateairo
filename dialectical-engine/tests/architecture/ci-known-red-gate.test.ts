@@ -9,13 +9,14 @@ import { describe, expect, it } from "vitest";
 const productRoot = resolve(import.meta.dirname, "../..");
 const allowlistPath = resolve(productRoot, "tests/ci-known-red.txt");
 
-type Decision = { newFailures: string[]; knownFailures: string[]; stale: string[]; exitCode: number };
+type Decision = { newFailures: string[]; knownFailures: string[]; flakyFailures?: string[]; stale: string[]; exitCode: number };
 type GateModule = {
-  decide: (input: { failed: string[]; allowlist: string[]; ran?: string[] }) => Decision;
+  decide: (input: { failed: string[]; allowlist: string[]; ran?: string[]; flaky?: string[] }) => Decision;
   parseAllowlist: (text: string) => { entries: string[]; invalid: string[] };
   failedNamesFromReport: (report: unknown, rootDir: string) => { failed: string[]; passed: string[]; ran: string[]; messages: Record<string, string> };
   summary: (decision: Pick<Decision, "newFailures" | "knownFailures" | "stale">) => string;
   rerunTargets: (stale: string[]) => string[];
+  expandTargets: (args: string[], readText?: (path: string) => string, exists?: (path: string) => boolean) => { targets: string[]; invalid: string[] };
   confirmStale: (input: { stale: string[]; rerunPasses: string[][] }) => { confirmed: string[]; cleared: string[] };
   gateExitCode: (input: { newFailures: string[]; confirmedStale: string[] }) => number;
   STALE_CONFIRMATION_RERUNS: number;
@@ -186,5 +187,63 @@ describe("CI known-red gate — a confirmed stale entry fails (V-4)", () => {
     expect(gate.gateExitCode({ newFailures: [], confirmedStale: [fixed] })).toBe(1);
     expect(gate.gateExitCode({ newFailures: [brandNew], confirmedStale: [] })).toBe(1);
     expect(gate.gateExitCode({ newFailures: [brandNew], confirmedStale: [fixed] })).toBe(1);
+  });
+});
+
+describe("curated test lists (@file targets, 2026-10-09)", () => {
+  const lists: Record<string, string> = {
+    "tests/list.txt": "# comment\n\ntests/integration/a.test.ts\n  tests/integration/b.test.ts  \ntests/integration/a.test.ts\n",
+    "tests/bad.txt": "tests/integration/missing.test.ts\nnot-a-test.md\ntests/integration/a.test.ts\n"
+  };
+  const present = new Set(["tests/integration/a.test.ts", "tests/integration/b.test.ts"]);
+  const expand = (args: string[]) => gate.expandTargets(args, (path) => lists[path]!, (path) => present.has(path));
+
+  it("expands a list file into its test files, ignoring comments and duplicates, and keeps plain directories", () => {
+    expect(expand(["@tests/list.txt", "tests/unit"])).toEqual({
+      targets: ["tests/integration/a.test.ts", "tests/integration/b.test.ts", "tests/unit"], invalid: []
+    });
+  });
+
+  it("reports a listed path that is missing or not a test file instead of dropping it", () => {
+    expect(expand(["@tests/bad.txt"])).toEqual({
+      targets: ["tests/integration/a.test.ts"], invalid: ["tests/integration/missing.test.ts", "not-a-test.md"]
+    });
+  });
+});
+
+describe("host-sensitive list tests/ci-flaky.txt (2026-10-09)", () => {
+  const flakyPath = resolve(productRoot, "tests/ci-flaky.txt");
+
+  it("reports a flaky failure without failing the gate, and never calls a flaky pass stale", () => {
+    const flaky = ["tests/integration/r.test.ts > suite > rss tripwire"];
+    const failing = gate.decide({ failed: [...flaky, "tests/unit/c.test.ts > suite > brand new"], allowlist: [], flaky });
+    expect(failing.flakyFailures).toEqual(flaky);
+    expect(failing.newFailures).toEqual(["tests/unit/c.test.ts > suite > brand new"]);
+    const only = gate.decide({ failed: [...flaky], allowlist: [], flaky });
+    expect(only.newFailures).toEqual([]);
+    expect(only.exitCode).toBe(0);
+    const passing = gate.decide({ failed: [], allowlist: [], flaky, ran: flaky });
+    expect(passing.stale).toEqual([]);
+    expect(passing.exitCode).toBe(0);
+  });
+
+  it("names real tests, each with a source comment, none also on the known-red list", () => {
+    const text = readFileSync(flakyPath, "utf8");
+    const { entries, invalid } = gate.parseAllowlist(text);
+    expect(invalid).toEqual([]);
+    expect(entries.length).toBeGreaterThan(0);
+    const known = gate.parseAllowlist(readFileSync(allowlistPath, "utf8")).entries;
+    for (const entry of entries) {
+      const file = entry.split(" > ")[0] ?? "";
+      expect(existsSync(resolve(productRoot, file)), entry).toBe(true);
+      expect(readFileSync(resolve(productRoot, file), "utf8"), entry).toContain(entry.split(" > ").at(-1)!);
+      expect(known, entry).not.toContain(entry);
+    }
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = (lines[i] ?? "").trim();
+      if (line === "" || line.startsWith("#")) continue;
+      expect((lines[i + 1] ?? "").trim(), `no source comment under: ${line}`).toMatch(/^#\s+source:/);
+    }
   });
 });

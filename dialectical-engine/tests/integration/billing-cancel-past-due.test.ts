@@ -20,7 +20,7 @@ async function pastDue(ownerRef: string) {
   const paid = await h.activate({ ownerRef });
   h.clock.now = new Date((await h.periodEndOf(paid.subscriptionId)).getTime() + MINUTE);
   const failedAt = h.clock.now;
-  h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_PAYMENT_FAILED");
+  h.payments.failNextCharge(paid.subscriptionId, "DECLINED");
   await h.renewal.runOnce();
   expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).status).toBe("PAST_DUE");
   return { paid, failedAt };
@@ -54,13 +54,13 @@ describe("P12b a cancel while PAST_DUE ends the plan and every retry", () => {
       // The access ended at once: "ended on", and no undo is offered (D7's `canUndo`).
       payload: expect.objectContaining({ "param.accessEndDate": cancelledAt.toISOString().slice(0, 10), "param.canUndo": "false" })
     })]);
-    const rebills = h.xmoney.rebillsFor(paid.transaction.orderId);
+    const rebills = h.payments.chargesFor(paid.subscriptionId);
     for (const day of [1, 3, 8]) {
       h.clock.now = new Date(failedAt.getTime() + day * DAY + MINUTE);
       await h.maintenance.runOnce();
     }
     expect(await renewals(paid.subscriptionId)).toEqual([1]);
-    expect(h.xmoney.rebillsFor(paid.transaction.orderId)).toBe(rebills);
+    expect(h.payments.chargesFor(paid.subscriptionId)).toBe(rebills);
   });
 
   it("never retries a PAST_DUE subscription with a cancel pending, however the cancel got there (P11b's guard)", async () => {

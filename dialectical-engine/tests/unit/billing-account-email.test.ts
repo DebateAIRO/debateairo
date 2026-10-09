@@ -16,7 +16,7 @@ function reader(email: string, aadUser = USER) {
   return new DekAccountEmailReader(pool, users);
 }
 
-describe("P8c the account email for the xMoney customer", () => {
+describe("P8c the account email for NETOPIA's payer", () => {
   it("decrypts the account address with the person's DEK and the registration AAD", async () => {
     expect(await reader("person@example.test").read(USER)).toBe("person@example.test");
   });

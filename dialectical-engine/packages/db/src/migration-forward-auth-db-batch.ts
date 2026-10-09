@@ -4,14 +4,15 @@ import type { PoolClient } from 'pg';
 import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
 
 /**
- * The auth database batch as a forward step after dev's 0108 (design note
+ * The auth database batch as the forward step after NETOPIA's 0111 (design note
  * docs/superpowers/specs/2026-10-09-auth-db-batch-design.md; migrations/lineage/README.md). Its migration number lives
  * in NAME and its predecessor in PREVIOUS: a renumber edits these two constants, the manifest and the file name only.
  * It adds no billing object, so it keeps the effective-capability verifier of the step before it (the manifest names
- * that file) and checks its own objects with a supplemental verifier, run inside its postcondition evidence.
+ * that file: 0111's) and checks its own objects with a supplemental verifier, run inside its postcondition evidence
+ * and on every later replay (replayVerifierSql).
  */
-const NAME='0109_auth_db_batch.sql';
-const PREVIOUS='0108_preview_recovery_verified_bindings.sql';
+const NAME='0112_auth_db_batch.sql';
+const PREVIOUS='0111_billing_netopia.sql';
 const VERSION='auth-db-batch-forward-v1';
 const MANIFEST_PATH='lineage/auth-db-batch-forward.json';
 const SUPPLEMENTAL_PATH='lineage/verify-auth-db-batch.sql';

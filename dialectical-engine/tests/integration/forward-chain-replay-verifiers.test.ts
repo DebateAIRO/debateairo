@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
 import { loadMigrationPlan, type MigrationPlan } from "../../packages/db/src/migration-lineage.js";
-import { applyForwardChain, type ForwardStepPlan } from "../../packages/db/src/migration-forward-chain.js";
+import { applyForwardChain, effectiveForwardVerifierSql, type ForwardStepPlan } from "../../packages/db/src/migration-forward-chain.js";
 import { AUTH_DB_BATCH_MIGRATION } from "../../packages/db/src/migration-forward-auth-db-batch.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
@@ -13,6 +13,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  */
 let db: TestDatabase;
 beforeAll(async () => { db = await startTestDatabase(); await migrate(db.pool); }, 300_000);
+const NETOPIA = "0111_billing_netopia.sql";
 afterAll(async () => { await db?.stop(); });
 
 const READINESS_PUBLISH = "staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)";
@@ -42,6 +43,26 @@ async function run(extended: MigrationPlan): Promise<void> {
 }
 const runtimeMayPublish = async (): Promise<boolean> =>
   (await db.pool.query<{ allowed: boolean }>("SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS allowed", [READINESS_PUBLISH])).rows[0]!.allowed;
+
+it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch (0112) is appended after it", async () => {
+  // First in this file: the probe steps below add ledger rows that the real migrate() would refuse as unknown.
+  const real = await loadMigrationPlan();
+  expect(real.forwardChain.map((step) => step.name)).toEqual([NETOPIA, AUTH_DB_BATCH_MIGRATION]);
+  const [netopia, batch] = real.forwardChain;
+  const applied = new Set(await ledger());
+  expect(applied.has(NETOPIA) && applied.has(AUTH_DB_BATCH_MIGRATION)).toBe(true);
+  // The batch keeps 0111's effective-capability verifier: with 0112 last, the verifier in force is 0111's, byte for byte.
+  expect(batch!.verifierSha256).toBe(netopia!.verifierSha256);
+  expect(effectiveForwardVerifierSql(real, applied)).toBe(netopia!.verifierSql);
+  // A drift only 0111's verifier knows (a NETOPIA table granted to a wrong role) is refused by migrate() with 0112 last.
+  await db.pool.query("GRANT SELECT ON billing.card_token TO debateai_authorization_runtime");
+  try {
+    await expect(migrate(db.pool)).rejects.toThrow("BILLING_NETOPIA_111_TABLE_PRIVILEGE card_token");
+  } finally {
+    await db.pool.query("REVOKE SELECT ON billing.card_token FROM debateai_authorization_runtime");
+  }
+  await migrate(db.pool);
+}, 300_000);
 
 it("re-runs every applied step's own verifier on replay, not only the last step's", async () => {
   plan = await loadMigrationPlan();

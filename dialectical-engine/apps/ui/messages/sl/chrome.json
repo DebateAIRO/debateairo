@@ -65,6 +65,7 @@
   "chrome.footer.cancel": "Preklic paketa",
   "chrome.footer.withdraw": "Odstop od paketa",
   "chrome.footer.paymentMarks": "Kartice, ki jih sprejemamo",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

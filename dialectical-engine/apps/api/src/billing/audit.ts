@@ -1,4 +1,4 @@
-import { TypedDomainError } from "@debateai/kernel";
+import { paymentErrorCode } from "@debateai/billing-core";
 
 /**
  * Spec §2.7 "Audit events (content-free)". One structured line per event, the same shape as
@@ -11,15 +11,12 @@ export type BillingAuditEvent =
   | "billing.payment.verified"
   | "billing.payment.failed"
   | "billing.payment.mismatch"
-  /** P9b: a second successful payment on an order already paid; it is refunded in full. */
-  | "billing.payment.duplicate"
   | "billing.refund"
   | "billing.refund.refused"
   /** P9b (A4c): a partial refund whose earlier call may have moved the money; handed to the owner, never re-sent. */
   | "billing.refund.outcome_unknown"
   | "billing.chargeback"
   | "billing.country.refused"
-  | "billing.notice.undecryptable"
   | "billing.outbox.dead"
   /**
    * W12 (P2-I16): a job died but the owner's alert (O3) could not be queued (the dead-letter hook threw); the job stays
@@ -27,10 +24,10 @@ export type BillingAuditEvent =
    */
   | "billing.outbox.alert_failed"
   /**
-   * P2-I4 (D5 5h): a refund, invoice or credit-note job, or a payment check naming its own charge, whose charge was
-   * paid in the other xMoney system (a sandbox record after the same-host switch to live, README §14.8), or
-   * (P2-W3 (b)) a RENEWAL_NOTICE whose plan belongs to the other system (the subscription's `xmoneyEnvironment`, not a
-   * charge's), ended DEAD before any vendor call or quote. The job kind and the code OTHER_XMONEY_SYSTEM only.
+   * P2-I4 (D5 5h), NETOPIA spec §2.5.4: a refund, invoice or credit-note job, a payment check naming its own charge, or
+   * a RENEWAL_NOTICE of a plan, that belongs to another payment system (NETOPIA's sandbox or live, or the previous card
+   * processor), or a job kind only that processor queued, ended DEAD before any vendor call or quote. The job kind and
+   * the code OTHER_PAYMENT_SYSTEM only.
    */
   | "billing.outbox.other_system"
   /**
@@ -41,12 +38,12 @@ export type BillingAuditEvent =
   | "billing.outbox.settle_failed"
   | "billing.renewal.unknown"
   /**
-   * P11a (A2, Q-1): a renewal whose rebill never reached xMoney, or whose outcome stayed unknown, past its window;
+   * P11a (A2, Q-1): a renewal whose charge never reached NETOPIA, or whose outcome stayed unknown, past its window;
    * closed FAILED(NO_TRANSACTION) for the owner to check, and the dunning starts.
    */
   | "billing.renewal.stuck"
   /**
-   * P11a (Q-1): an outage (the tax service, xMoney, an unknown rebill) keeps the plan at the renewal: one
+   * P11a (Q-1): an outage (the tax service, NETOPIA, an unknown charge) keeps the plan at the renewal: one
    * RENEWAL_PENDING entitlement extends paid access up to 72 hours past the due instant. The code only.
    */
   | "billing.renewal.pending"
@@ -72,14 +69,54 @@ export type BillingAuditEvent =
   | "billing.renewal.history_invalid"
   /** P11a: a subscription whose recurring net price was never recorded; it is not charged at a guessed price. */
   | "billing.renewal.price_missing"
+  /** N11 (spec §2.9.3, §2.9.4): a NETOPIA renewal's outcome is still open past its window; O3 was queued. The attempt. */
+  | "billing.renewal.outcome_open"
+  /** N11 (spec §2.9.3 step 5): a dunning retry was not made this pass; the code (EARLIER_ATTEMPT_PAID, _PENDING or _UNREADABLE). */
+  | "billing.renewal.retry_held"
+  /** N11: an earlier attempt of the period read PAID before a retry; its check was queued. The attempt. */
+  | "billing.renewal.recovered_earlier"
+  /**
+   * F2 (ruling PR-55): NETOPIA reported a renewal's payment refunded before the site saw it paid; it was recorded paid
+   * and refunded with no customer email, and either its plan ended (still renewing that month) or, when the plan was no
+   * longer renewing that month (ended, paused by a dispute, or renewed by another payment), no plan changed, the owner's
+   * O3 RENEWAL_REFUNDED_BEFORE_SEEN saying which. The attempt.
+   */
+  | "billing.renewal.refunded_before_seen"
+  /**
+   * N11 (spec §2.4.3, ruling PR-11): NETOPIA answered a renewal's FIRST send with 56 (the orderID was already used), an
+   * anomaly; O3 ORDER_REUSED was queued. Our own order id (the charge id) only.
+   */
+  | "billing.payment.order_reused"
+  /** D5 5i: NETOPIA refused our API key (401/403). An operator alarm: nothing was charged, failed or emailed. */
+  | "billing.payment.credentials_refused"
+  /** NETOPIA spec §2.3: an answer of NETOPIA's the package could not read (PAYMENT_RESPONSE_INVALID); the operation and code only. */
+  | "billing.payment.answer_rejected"
+  /** N10 (§2.4.4): NETOPIA reported a status whose meaning it has not confirmed (UNCLEAR). The status number only. */
+  | "billing.payment.status_unexpected"
+  /** N10 (§2.8, ruling C-7): a payment was handed to the owner with nothing recorded. The PaymentState. */
+  | "billing.payment.owner_review"
+  /** N10 (§2.15.2): a saved card that arrived after the decision was adopted (CARD_SAVED). The charge kind. */
+  | "billing.card.saved"
+  /** N17 (spec §2.15.4): saved cards revoked by the sweep or an erasure. The reason and the count. */
+  | "billing.card.revoked"
+  /** N17 (spec §2.5.2): the daily purges. The counts of deleted tokens and short-lived rows. */
+  | "billing.card.purged"
+  /** N17 (spec §2.15.3): M12 was queued. Which line: EXPIRING or MISSING. */
+  | "billing.card.reminder"
   /** P11b: one line per maintenance pass whose visits failed; the count and the failures' distinct codes only. */
   | "billing.maintenance.report"
-  /** D5 5i: xMoney refused our credentials (401/403). An operator alarm: nothing was charged, failed or emailed. */
-  | "billing.xmoney.credentials_refused"
-  /** D5 5i: listed xMoney rows the parser refused and skipped (`onRejected`); the count and code only. */
-  | "billing.xmoney.row_rejected"
-  /** P9c: a second refund made at xMoney on a transaction that already holds one; the owner records it by hand. */
-  | "billing.refund.unrecorded"
+  /** N14 (spec §2.12.2): a NETOPIA refund was handed to the owner (O2_REFUND_DUE). The reason. */
+  | "billing.refund.owner_due"
+  /** N14 (spec §2.12.4): NETOPIA reports a refund on a PARTIAL request; nothing recorded until the owner's command. */
+  | "billing.refund.seen_partial"
+  /** N14 (spec §2.12.2 item 4): the owner recorded a refund with `pnpm billing:refund-done`. The reason. */
+  | "billing.refund.recorded_by_owner"
+  /**
+   * N15b (ruling PR-41, spec §2.13): a charge-back arrived on a payment with an open owner refund, or a refund was
+   * asked for on a payment already under a dispute; the refund is held while the dispute lasts and the owner got O3
+   * REFUND_HELD_BY_CHARGEBACK. Once per payment (written only when that O3 is queued). The refund's reason.
+   */
+  | "billing.refund.held_by_chargeback"
   | "billing.invoice.unknown"
   /** P12b: a cancel request was written; the field is its source (SETTINGS or EMAIL_LINK). */
   | "billing.cancel"
@@ -87,12 +124,16 @@ export type BillingAuditEvent =
   | "billing.cancel.revoked"
   /** P12b: a downgrade to a lower plan was scheduled for the next renewal; the field is the plan id. */
   | "billing.downgrade.scheduled"
-  /** P12c: an upgrade charge was written and its rebill is about to be sent; the field is the plan id. */
+  /** P12c/N12: an upgrade charge was written and NETOPIA's page is about to be opened for it; the field is the plan id. */
   | "billing.upgrade.requested"
+  /** N12 (spec §2.6.2 step 8): NETOPIA's page could not be opened; the fields are the operation and the payment code. */
+  | "billing.payment.start_failed"
+  /** N12/N16: an unpaid hosted charge was closed FAILED(NO_TRANSACTION); the field is the charge kind. */
+  | "billing.charge.closed"
   /** P12d: a withdrawal was recorded; the fields are the number of refund intents written and its source. */
   | "billing.withdrawal"
   /**
-   * P12d (D6a F20(c)): a withdrawal whose refund the owner settles by hand (a refund made in the xMoney dashboard
+   * P12d (D6a F20(c)): a withdrawal whose refund the owner settles by hand (a refund made in NETOPIA's admin
    * touched a payment, or a transaction already held a refund request); the field is its source.
    */
   | "billing.withdrawal.owner_review"
@@ -101,40 +142,33 @@ export type BillingAuditEvent =
    * is the number of refund intents written through RefundDesk.
    */
   | "billing.withdrawal.settled"
-  /** P12e (A12): a card change's CARD_CHECK charge was written and its order signed; the field is the plan status. */
+  /** P12e/N13: a card change's CARD_CHECK charge was written and NETOPIA's page is about to be opened; the field is the plan status. */
   | "billing.card.change.started"
   /** P12e: a new card from an always-blocked country was refused; the field is its ISO country code. */
   | "billing.card.refused"
   /** P12e (A2): a card change's hold was paid while a renewal's outcome was unknown; nothing changed. No field. */
   | "billing.card.change.deferred"
+  /** N13: a card check was paid and its card stored, but no stored card could be adopted; nothing changed. No field. */
+  | "billing.card.not_adopted"
   /** P13 (A25): an emailed one-time cancel link (M9) was sent. No field: never the address, the owner or the token. */
   | "billing.cancel_link.sent"
-  /** P14a (A2): the reconciler adopted the transaction of an unknown submit; the field is the charge kind. */
-  | "billing.reconcile.adopted"
-  /** P14a: a charge that never reached xMoney was settled FAILED(NO_TRANSACTION); the field is the charge kind. */
-  | "billing.reconcile.no_transaction"
   /** P14a: UPGRADE/RENEWAL charges still without an outcome after 30 days, no longer looked up; the count only. */
   | "billing.reconcile.expired"
-  /** P14a (D5 5i): listed rows the parser refused in one pass; the count and the pass (LISTING or ADOPTION) only. */
-  | "billing.reconcile.rows_rejected"
-  /**
-   * W13 (P2-I18): one of A10's daily listings failed (xMoney refused its `dateType`, an outage, a refused key); the
-   * other listings and the rest of the pass went on, and this one is tried again alone an hour later. The listing
-   * (`creation`, `charge-back` or `refund`) and its code only.
-   */
-  | "billing.reconcile.listing_failed"
   /**
    * P14a: charges one reconcile loop could not handle (a history that does not fold, an owner lock that timed out),
-   * skipped so the pass goes on for every other charge. The pass (FREQUENT, DAILY or CHECKOUT), the count and the
-   * distinct codes only.
+   * skipped so the pass goes on for every other charge. The pass (N16's STATUS), the count and the distinct codes
+   * only.
    */
   | "billing.reconcile.errors"
+  /** N16 (spec §2.14): one NETOPIA status read failed; the pass went on. The field is the payment code only. */
+  | "billing.reconcile.status_failed"
   /**
-   * P14a: dead XMONEY_REFUND jobs with no REFUNDED since, whatever their code (`deadRefunds()`). Not every one is
-   * owed: the owner summary reads each code. REFUND_NOT_REQUESTED, REFUND_CHARGE_MISSING and OTHER_XMONEY_SYSTEM owe
-   * nothing on this server; REFUND_PAYLOAD_INVALID is listed as REFUND_NOT_REQUESTED (Part 4 final review C-7: nothing
-   * was sent, and the charge's own refund requests say whether money is owed); REFUND_OUTCOME_UNKNOWN is checked in the
-   * dashboard; every other code is still owed. The count only.
+   * P14a: dead refund jobs (PAYMENT_REFUND, and the previous card processor's) with no REFUNDED since, whatever their
+   * code (`deadRefunds()`). Not every one is owed: the owner summary reads each code. REFUND_NOT_REQUESTED,
+   * REFUND_CHARGE_MISSING and OTHER_PAYMENT_SYSTEM (or the code that era stored) owe nothing on this server;
+   * REFUND_PAYLOAD_INVALID is listed as REFUND_NOT_REQUESTED (Part 4 final review C-7: nothing was sent, and the
+   * charge's own refund requests say whether money is owed); REFUND_OUTCOME_UNKNOWN is checked in NETOPIA's admin;
+   * every other code is still owed. The count only.
    */
   | "billing.refund.dead"
   /** P15: an account erasure stopped the owner's plan (ERASURE_STOPPED and the FREE entitlement). No field. */
@@ -146,6 +180,16 @@ export type BillingAuditEvent =
   | "billing.age_frozen.stopped"
   /** P16c: the quarter's tax summary was queued as email O1 to the owner; the field is the quarter label only. */
   | "billing.tax_summary.queued"
+  /** N9 (spec 2026-10-05 §2.7.4): NETOPIA's message failed verification; the reason code only. */
+  | "billing.notice.unverified"
+  /** N9 (§2.7.3 step 2): a verified message names no charge and no tool order of ours. No field. */
+  | "billing.notice.unknown_order"
+  /** N9 (§2.7.3 step 1): a verified message whose body cannot be read; stored, the owner told (O3). No field. */
+  | "billing.notice.parse_failed"
+  /** N9 (§2.7.2): a message could not be stored, so NETOPIA was asked to send it again. No field. */
+  | "billing.notice.store_failed"
+  /** N9 (§2.7.4 step 2): the start's re-check of the quarantine; the counts only, or the failure's code. */
+  | "billing.notice.recheck"
   /**
    * P17 (Q-3): M1's accepted-Terms attachment was not attached. The fields are the attachment kind and a code
    * (MAIL_TERMS_NOT_RECORDED or MAIL_TERMS_NOT_ARCHIVED) only, never a hash, a locale or an address.
@@ -160,28 +204,21 @@ export const consoleBillingAudit: BillingAudit = (event, fields) => {
 };
 
 /**
- * D5 5i: `XMONEY_CREDENTIALS_REFUSED` (401/403) means xMoney processed nothing and our key is wrong or revoked. It is
+ * D5 5i: `PAYMENT_CREDENTIALS_REFUSED` (401/403) means NETOPIA processed nothing and our key is wrong or revoked. It is
  * never a payment failure: the caller leaves its charge or job open, and this writes the one operator alarm.
  */
 export function credentialsRefused(audit: BillingAudit, error: unknown, operation: string): boolean {
-  if (!(error instanceof TypedDomainError) || error.code !== "XMONEY_CREDENTIALS_REFUSED") return false;
-  audit("billing.xmoney.credentials_refused", { operation });
+  if (paymentErrorCode(error) !== "PAYMENT_CREDENTIALS_REFUSED") return false;
+  audit("billing.payment.credentials_refused", { operation });
   return true;
 }
 
 /**
- * D5 5i: the `onRejected` of one `listTransactions` call, counting the rows the parser skipped, and `report()`, which
- * writes one content-free line when any were (never the ids).
+ * NETOPIA spec §2.3: `PAYMENT_RESPONSE_INVALID` is an answer of an unexpected shape. The caller treats it as its own
+ * code says (a read is retried, a write's outcome is unknown); this writes the one content-free line.
  */
-export function rejectedRows(audit: BillingAudit, operation: string): Readonly<{
-  onRejected: (transactionId: string | null) => void;
-  report: () => void;
-}> {
-  let count = 0;
-  return Object.freeze({
-    onRejected: () => { count += 1; },
-    report: () => {
-      if (count > 0) audit("billing.xmoney.row_rejected", { operation, count, code: "XMONEY_ROW_REJECTED" });
-    }
-  });
+export function answerRejected(audit: BillingAudit, error: unknown, operation: string): boolean {
+  if (paymentErrorCode(error) !== "PAYMENT_RESPONSE_INVALID") return false;
+  audit("billing.payment.answer_rejected", { operation, code: "PAYMENT_RESPONSE_INVALID" });
+  return true;
 }

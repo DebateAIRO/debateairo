@@ -278,18 +278,18 @@ describe('canonical native verifier invocation', () => {
     ['any stderr', { code: 0, stdout: Buffer.from('{}'), stderr: Buffer.from('warning') }, 'NATIVE_VERIFY_REFUSED'],
     ['a timeout', { code: null, timedOut: true, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }, 'NATIVE_VERIFY_TIMEOUT'],
     ['ambiguous JSON', { code: 0, stdout: Buffer.from('{"a":1,"a":2}'), stderr: Buffer.alloc(0) }, 'NATIVE_VERIFY_REFUSED'],
-    ['a pending-step line with an exit of zero', { code: 0, stdout: Buffer.from('{}'), stderr: Buffer.from('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: 0110_auth_db_batch.sql. Verify never applies a migration; run the native operator with operation apply-and-plan first.\n') }, 'NATIVE_VERIFY_REFUSED'],
-    ['a pending-step line followed by more output', { code: 1, stdout: Buffer.alloc(0), stderr: Buffer.from('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: 0110_auth_db_batch.sql. Verify never applies a migration; run the native operator with operation apply-and-plan first.\nmore\n') }, 'NATIVE_VERIFY_REFUSED']
+    ['a pending-step line with an exit of zero', { code: 0, stdout: Buffer.from('{}'), stderr: Buffer.from('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: 0112_auth_db_batch.sql. Verify never applies a migration; run the native operator with operation apply-and-plan first.\n') }, 'NATIVE_VERIFY_REFUSED'],
+    ['a pending-step line followed by more output', { code: 1, stdout: Buffer.alloc(0), stderr: Buffer.from('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: 0112_auth_db_batch.sql. Verify never applies a migration; run the native operator with operation apply-and-plan first.\nmore\n') }, 'NATIVE_VERIFY_REFUSED']
   ])('refuses %s', async (_name, outcome, code) => {
     const run = async () => ({ timedOut: false, overflow: false, ...outcome });
     await expect(prestart.runNativeVerify({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root, run, timeoutMs: 1000 })).rejects.toMatchObject({ code });
   });
 
   it('names a pending forward step: verify never applies one, the operator runs apply-and-plan', async () => {
-    const stderr = Buffer.from('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: 0109_billing_netopia.sql, 0110_auth_db_batch.sql. Verify never applies a migration; run the native operator with operation apply-and-plan first.\n');
+    const stderr = Buffer.from('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: 0111_billing_netopia.sql, 0112_auth_db_batch.sql. Verify never applies a migration; run the native operator with operation apply-and-plan first.\n');
     const run = async () => ({ code: 1, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr });
     await expect(prestart.runNativeVerify({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root, run, timeoutMs: 1000 }))
-      .rejects.toMatchObject({ code: 'NATIVE_VERIFY_PENDING_FORWARD_STEP', fields: { next: 'apply-and-plan', pending: ['0109_billing_netopia.sql', '0110_auth_db_batch.sql'] } });
+      .rejects.toMatchObject({ code: 'NATIVE_VERIFY_PENDING_FORWARD_STEP', fields: { next: 'apply-and-plan', pending: ['0111_billing_netopia.sql', '0112_auth_db_batch.sql'] } });
   });
 
   it('refuses a source root outside the reviewed release folders', async () => {
@@ -304,11 +304,27 @@ describe('release drop-in', () => {
     const text = prestart.renderReleaseDropin({ service: 'api', entry: lock.services.api, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
     const lines = text.split('\n').filter((line: string) => !line.startsWith('#') && line);
     // `+` runs as root but would inherit the service's Environment=/EnvironmentFile= (NODE_OPTIONS, secrets): env -i drops all of it.
-    expect(lines).toEqual(['[Service]', `WorkingDirectory=${root}/dialectical-engine`, 'ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/node/bin/node /opt/op/prestart.mjs --service api', 'ExecStart=',
+    // The restart settings come first and win over any older drop-in's Restart=no (it sorts before ten z).
+    expect(lines).toEqual(['[Unit]', 'StartLimitIntervalSec=900', 'StartLimitBurst=4', 'OnFailure=debateai-preview-alert@%n.service',
+      '[Service]', 'Restart=on-failure', 'RestartMode=direct', 'RestartSec=30', 'TimeoutStartSec=300', `WorkingDirectory=${root}/dialectical-engine`, 'ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/node/bin/node /opt/op/prestart.mjs --service api', 'ExecStart=',
       `ExecStart=/opt/node/bin/node ${root}/dialectical-engine/deploy/preview-auth-dev/v1/launch-api.mjs --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/api-launch.json`]);
     expect(prestart.RELEASE_DROPIN_NAME > 'zzzzzzzzz-auth-dev-task12-final.conf').toBe(true);
     const ui = prestart.renderReleaseDropin({ service: 'ui', entry: lock.services.ui, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
     expect(ui).toContain(`WorkingDirectory=${root}/dialectical-engine/apps/ui\n`);
     expect(ui).toContain('launch-ui.mjs --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/ui-launch.json');
+    expect(ui).toContain('\n[Service]\nRestart=on-failure\nRestartMode=direct\nRestartSec=30\nTimeoutStartSec=300\n');
+  });
+
+  it('wins over an older release drop-in that sets Restart=no (systemd: the last file in name order wins)', async () => {
+    const s = server();
+    const lock = await pinned(s);
+    const older = '[Service]\nRestart=no\nRestartSec=5\nTimeoutStartSec=90\n[Unit]\nStartLimitBurst=1\n';
+    const ours = prestart.renderReleaseDropin({ service: 'api', entry: lock.services.api, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
+    // A single-valued key takes the value of the last assignment across drop-ins sorted by file name.
+    const files = [['99-provider-high-v1.conf', older], ['zzzzzz-recovery106-v1.conf', older], [prestart.RELEASE_DROPIN_NAME, ours]].sort(([a], [b]) => (a < b ? -1 : 1));
+    const effective: Record<string, string> = {};
+    for (const [, text] of files) for (const line of text.split('\n')) { const at = line.indexOf('='); if (at > 0 && !line.startsWith('#')) effective[line.slice(0, at)] = line.slice(at + 1); }
+    expect(files.at(-1)![0]).toBe(prestart.RELEASE_DROPIN_NAME);
+    expect(effective).toMatchObject({ Restart: 'on-failure', RestartMode: 'direct', RestartSec: '30', TimeoutStartSec: '300', StartLimitIntervalSec: '900', StartLimitBurst: '4' });
   });
 });

@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Fiyat ve ödeme",
   "legal.notice.s04.body": "{product} ücretsizdir. Ücretli planlar henüz sunulmuyor. Herhangi bir ücretli plan başlamadan önce bu bölümde fiyat (vergiler dahil), ödemenin nasıl ve ne zaman yapılacağı, hizmetin ne zaman başlayacağı, yenilemenin nasıl işleyeceği ve aboneliğin nasıl iptal edileceği yer alacaktır.",
   "legal.notice.s04.bodyPaid": "Ücretli planlar ve aylık fiyatları fiyatlar sayfasındadır. Oradaki fiyatlar vergi hariçtir; ödeme yapmadan önce ödeme sayfası, ülkenizin vergisiyle birlikte tam fiyatı gösterir. Kartla, her ay peşin ödersiniz. Bir plan, bankanız ödemeyi onaylar onaylamaz başlar ve siz iptal edene kadar her ay yenilenir. Planı istediğiniz zaman Ayarlar'dan ya da oturum açmadan iptal sayfasından iptal edebilirsiniz.",
-  "legal.notice.s04.payments": "Kartla ödemeler xMoney tarafından işlenir. Kart numaranızı hiçbir zaman görmez ve saklamayız.",
+  "legal.notice.s04.payments": "Kartla ödemeler NETOPIA Payments tarafından işlenir. Kart numaranızı hiçbir zaman görmez ve saklamayız.",
   "legal.notice.s04.pricingLink": "Planları ve fiyatları görün",
   "legal.notice.s04.cancelLink": "Plan iptali",
   "legal.notice.s05.title": "Cayma ve iadeler",

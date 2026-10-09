@@ -33,7 +33,7 @@ const page = async (render: () => Promise<JSX.Element>): Promise<Document> =>
 const LEGAL_PAGE_RENDERS = [LegalNoticePage, () => TermsPage({}), TermsVersionsPage, () => PrivacyPage({}), HealthPage, CookiesPage, ProvidersPage];
 const BILLING_LINKS = ["/pricing", "/cancel", "/withdraw"];
 
-describe("P21 the pages xMoney requires, on the colleague's legal pages (R3-4)", () => {
+describe("P21 the pages the card processor requires, on the colleague's legal pages (R3-4)", () => {
   beforeEach(() => { mocks.locale = "en"; mocks.billingOn = true; });
 
   it("/withdraw and /cancel are not found while billing is off, and carry the full footer with billing on", async () => {
@@ -66,7 +66,7 @@ describe("P21 the pages xMoney requires, on the colleague's legal pages (R3-4)",
     mocks.billingOn = false;
     const notice = (await page(LegalNoticePage)).querySelector(".legalMain")!;
     expect(notice.textContent).toContain("Paid plans are not available yet.");
-    expect(notice.textContent).not.toContain("xMoney");
+    expect(notice.textContent).not.toContain("NETOPIA");
     for (const href of BILLING_LINKS) expect(notice.querySelector(`a[href="${href}"]`), href).toBeNull();
   });
 
@@ -75,7 +75,7 @@ describe("P21 the pages xMoney requires, on the colleague's legal pages (R3-4)",
     const text = notice.textContent ?? "";
     expect(text).not.toContain("Paid plans are not available yet.");
     expect(text).toContain(`${COMPANY.legalName} is also the seller of the paid plans`);
-    expect(text).toContain("Card payments are processed by xMoney. We never see or store your card number.");
+    expect(text).toContain("Card payments are processed by NETOPIA Payments. We never see or store your card number.");
     expect(text).toContain("renews every month until you cancel");
     expect(text).toContain("within 14 days of subscribing");
     for (const href of [...BILLING_LINKS, "/terms#legal-section-13"]) {
