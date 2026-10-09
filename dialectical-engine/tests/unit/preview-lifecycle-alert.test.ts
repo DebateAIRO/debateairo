@@ -37,7 +37,7 @@ describe('failure alert', () => {
     const h = harness(layout);
     await alert.runAlert({ unit, layout, deps: h.deps });
     expect(h.sent).toHaveLength(1);
-    const split = h.sent[0].indexOf('\r\n\r\n'), head = h.sent[0].slice(0, split), body = h.sent[0].slice(split + 4);
+    const mail = h.sent[0]!, split = mail.indexOf('\r\n\r\n'), head = mail.slice(0, split), body = mail.slice(split + 4);
     expect(head.split('\r\n')).toEqual(expect.arrayContaining([`To: ${owner}`, 'From: noreply@dezbatere.ro', `Subject: Preview: ${unit} failed to restart`, 'Content-Type: text/plain; charset=UTF-8', 'Auto-Submitted: auto-generated']));
     expect(body).toContain(`Unit: ${unit}`);
     expect(body).toContain('Time (UTC): 2026-10-09 10:00:00 UTC');
@@ -47,7 +47,7 @@ describe('failure alert', () => {
     expect(JSON.stringify(h.logged)).not.toContain(owner);
     const state = readdirSync(join(layout.stateDir, 'alert-state'));
     expect(state).toHaveLength(1);
-    expect(statSync(join(layout.stateDir, 'alert-state', state[0])).mode & 0o777).toBe(0o600);
+    expect(statSync(join(layout.stateDir, 'alert-state', state[0]!)).mode & 0o777).toBe(0o600);
   });
 
   it('uses winter time for Bucharest outside daylight saving', () => {

@@ -81,7 +81,7 @@ describe('preview lifecycle systemd templates', () => {
 
   it('every script a template names exists in this folder', () => {
     const all = ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service'].map(unit).join('\n');
-    const scripts = [...all.matchAll(/deploy\/preview-lifecycle\/v1\/([a-z-]+\.mjs)/g)].map(match => match[1]);
+    const scripts = [...all.matchAll(/deploy\/preview-lifecycle\/v1\/([a-z-]+\.mjs)/g)].map(match => match[1]!);
     expect(scripts.length).toBeGreaterThanOrEqual(4);
     for (const script of scripts) expect(existsSync(join(folder, script))).toBe(true);
   });

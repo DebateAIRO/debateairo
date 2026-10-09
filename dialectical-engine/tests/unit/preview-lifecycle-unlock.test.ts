@@ -59,7 +59,7 @@ describe('team tools unlock window', () => {
       expect(lease.until - lease.at).toBeLessThanOrEqual(4 * MINUTE);
       expect(lease.until).toBeLessThanOrEqual(start + 60 * MINUTE);
     }
-    const gaps = h.leases.slice(1).map((lease, index) => lease.at - h.leases[index].at);
+    const gaps = h.leases.slice(1).map((lease, index) => lease.at - h.leases[index]!.at);
     expect(Math.max(...gaps)).toBeLessThanOrEqual(2 * MINUTE + 10_000);
   });
 
@@ -153,7 +153,7 @@ describe('interim writer: the existing recovery login, opened just in time', () 
     await h.writer.open({ validUntil });
     expect(h.creator).toEqual([{ control: { mode: 'open', validUntil: validUntil.toISOString() }, secret: '07'.repeat(32) }]);
     expect(h.pools).toEqual(['07'.repeat(32)]);
-    expect(JSON.stringify(h.creator[0].control)).not.toContain('0707');
+    expect(JSON.stringify(h.creator[0]!.control)).not.toContain('0707');
   });
 
   it('extends only the expiry and forgets the password when closing', async () => {
@@ -230,8 +230,8 @@ describe('ACK evidence refresh', () => {
     expect(statSync(f.path).mode & 0o777).toBe(0o640);
     const archived = readdirSync(f.archive);
     expect(archived).toHaveLength(1);
-    expect(JSON.parse(readFileSync(join(f.archive, archived[0]), 'utf8')).rehearsalId).toBe(uuid(1));
-    expect(statSync(join(f.archive, archived[0])).mode & 0o777).toBe(0o600);
+    expect(JSON.parse(readFileSync(join(f.archive, archived[0]!), 'utf8')).rehearsalId).toBe(uuid(1));
+    expect(statSync(join(f.archive, archived[0]!)).mode & 0o777).toBe(0o600);
   });
 
   it.each([
