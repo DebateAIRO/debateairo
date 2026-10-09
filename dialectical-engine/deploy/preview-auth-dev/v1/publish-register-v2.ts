@@ -32,7 +32,10 @@ import { publishPreviewRegister, type RuntimeObservation, type PreviewSnapshot }
 export { readSealedSnapshot } from './publish-register.js';
 
 const hash = (value:string) => createHash('sha256').update(value).digest('hex');
-const fail = ():never => { throw new TypeError('PREVIEW_REGISTER_SNAPSHOT_REFUSED'); };
+const fail = (rule?:string):never => { throw new TypeError(rule?`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`:'PREVIEW_REGISTER_SNAPSHOT_REFUSED'); };
+/** The one register refusal the native operator prints in words: the operator can act on it (plan again from the newest publication). */
+export const BASE_NOT_CURRENT = 'PREVIEW_REGISTER_BASE_NOT_CURRENT: a sealed register version exists above the selected base; plan again from the newest publication' as const;
+export class PreviewRegisterBaseNotCurrentError extends TypeError { readonly code='PREVIEW_REGISTER_BASE_NOT_CURRENT'; constructor(){ super(BASE_NOT_CURRENT); } }
 const COMPOSER = 'preview-register-composer-v2' as const;
 /** Base-owned rows: never built from source, carried from the base version unchanged. */
 export const PREVIEW_BASE_OWNED_KEYS = Object.freeze(['internalAllowancePolicy','staffAccessPolicy'] as const);
@@ -74,7 +77,7 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
     nodeRuntimeVersion:`preview-auth-dev-v1 actual Node ${runtime.nodeVersion}; measured ${runtime.observedAt}; source ${runtime.sourceRevision}/${runtime.sourceTree}; operator sha256:${runtime.operatorSha256}`}};
   const rows=[...await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_GLM_PROVIDER_REFS[0],evaluatorRoleRef:PREVIEW_GLM_PROVIDER_REFS[1]},'local'),
     ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
-  if(!sameKeys(rows.map(row=>row.rowKey),PREVIEW_SOURCE_ROW_KEYS_V2))fail();
+  if(!sameKeys(rows.map(row=>row.rowKey),PREVIEW_SOURCE_ROW_KEYS_V2))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze(row)));
 }
 
@@ -123,15 +126,16 @@ export const previewDeltaSha256V2 = (delta:readonly SnapshotDeltaV2[]) => hash(J
 export function composePreviewSnapshotV2(input:Readonly<{sourceRows:readonly RegisterPublicationRow[];baseRows:readonly RegisterPublicationRow[];baseRegisterVersion:string;baseSnapshotSha256:string}>) {
   const source=canonicalRows(input.sourceRows),base=canonicalRows(input.baseRows);
   const baseRegisterVersion=parseRegisterVersionText(input.baseRegisterVersion);
-  if(computeRegisterSnapshotSha256(base)!==input.baseSnapshotSha256)fail();
-  if(!sameKeys(source.map(row=>row.rowKey),PREVIEW_SOURCE_ROW_KEYS_V2))fail();
+  if(computeRegisterSnapshotSha256(base)!==input.baseSnapshotSha256)fail('base-snapshot');
   const sourceMap=new Map(source.map(row=>[row.rowKey,row])),baseMap=new Map(base.map(row=>[row.rowKey,row]));
   const owned=PREVIEW_BASE_OWNED_KEYS as readonly string[];
-  if([...sourceMap.keys(),...baseMap.keys()].some(key=>FORBIDDEN_KEYS.includes(key))
-    ||source.some(row=>owned.includes(row.rowKey))
-    ||owned.some(key=>!baseMap.has(key))
-    // A base row the source no longer builds is never dropped silently.
-    ||base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)))fail();
+  // Each rule refuses on its own, before the key list, so every one is separately observable.
+  if([...sourceMap.keys(),...baseMap.keys()].some(key=>FORBIDDEN_KEYS.includes(key)))fail('support-or-scorecard-row');
+  if(source.some(row=>owned.includes(row.rowKey)))fail('base-owned-row-in-source');
+  if(owned.some(key=>!baseMap.has(key)))fail('base-owned-row-missing');
+  if(!sameKeys(source.map(row=>row.rowKey),PREVIEW_SOURCE_ROW_KEYS_V2))fail('source-key-list');
+  // A base row the source no longer builds is never dropped silently.
+  if(base.some(row=>!sourceMap.has(row.rowKey)&&!owned.includes(row.rowKey)))fail('base-row-dropped');
   assertProviderRows(sourceMap,'source');
   assertProviderRows(baseMap,'base');
   const staff=baseMap.get('staffAccessPolicy')!,internal=baseMap.get('internalAllowancePolicy')!;
@@ -167,12 +171,16 @@ export async function assertBaseIsCurrent(pool:Pool,baseRegisterVersion:string,p
   const base=parseRegisterVersionText(baseRegisterVersion);
   const result=await pool.query<{register_version:string;publication_id:string|null}>(
     'SELECT register_version::text,publication_id::text FROM register.register_version WHERE register_version>$1 ORDER BY register_version',[base]);
-  if(!Array.isArray(result.rows)||result.rows.length>1||result.rows.some(row=>row.publication_id!==publicationId))fail();
+  if(!Array.isArray(result.rows)||result.rows.length>1||result.rows.some(row=>row.publication_id!==publicationId))throw new PreviewRegisterBaseNotCurrentError();
 }
 
 /** v1's publication path unchanged (approval must equal the recomposed snapshot; base re-read; receipt re-read), after the currency check. */
 export async function publishPreviewRegisterV2(pool:Pool,input:Readonly<{publicationId:string;sourceRef:string;snapshot:PreviewSnapshotV2;approval:Readonly<{baseRegisterVersion:string;baseSnapshotSha256:string;snapshotSha256:string;deltaSha256:string}>}>) {
   if(input.snapshot?.composer!==COMPOSER)fail();
   await assertBaseIsCurrent(pool,input.snapshot.baseRegisterVersion,input.publicationId);
-  return publishPreviewRegister(pool,{...input,snapshot:input.snapshot as unknown as PreviewSnapshot});
+  const receipt=await publishPreviewRegister(pool,{...input,snapshot:input.snapshot as unknown as PreviewSnapshot});
+  // The SQL accepts any sealed base and the check above ran outside its lock: after the write, the new
+  // version must still be the only one above the base (a concurrent publication is reported, not hidden).
+  await assertBaseIsCurrent(pool,input.snapshot.baseRegisterVersion,input.publicationId);
+  return receipt;
 }

@@ -53,8 +53,11 @@ export async function runNativeOperator() {
 }
 /** The exact refusal verify-native.ts gives a database that lacks a forward step of this source (any number of steps). */
 const PENDING_FORWARD_STEP=/^PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: \d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63}\. Verify never applies a migration; run the native operator with operation apply-and-plan first\.$/;
-/** Every failure stays opaque except a pending forward step, whose one line tells the operator to run apply-and-plan. */
+/** Fixed text of publish-register-v2.ts BASE_NOT_CURRENT (that module is loaded lazily through tsx; a unit test pins the two equal). */
+export const BASE_NOT_CURRENT_LINE='PREVIEW_REGISTER_BASE_NOT_CURRENT: a sealed register version exists above the selected base; plan again from the newest publication';
+/** Every failure stays opaque except a pending forward step (its line says to run apply-and-plan) or a stale register base (its line says to plan again). */
 export function operatorRefusalLine(error){
+ if(error?.code==='PREVIEW_REGISTER_BASE_NOT_CURRENT'&&error.message===BASE_NOT_CURRENT_LINE)return `${error.message}\n`;
  return error?.code==='PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP'&&typeof error.message==='string'&&PENDING_FORWARD_STEP.test(error.message)?`${error.message}\n`:'PREVIEW_NATIVE_OPERATION_REFUSED\n';
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{process.stdout.write(`${JSON.stringify(await runNativeOperator())}\n`);}catch(error){process.stderr.write(operatorRefusalLine(error));process.exitCode=1;}}

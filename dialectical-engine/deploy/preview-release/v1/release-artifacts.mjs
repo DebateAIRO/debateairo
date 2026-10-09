@@ -14,7 +14,8 @@
 //   release-artifacts.mjs launch-plan --service api|ui|runner --from <existing plan> --root <release root>
 //       --source-manifest <file> [--ui-build <file>] --native-attestation <file> [--publication <publish output>] --out <file>
 //   release-artifacts.mjs native-plan --operation apply-and-plan|plan|publish|verify --from <existing native plan>
-//       --source-manifest <candidate api source manifest> [--proposal <plan output>] [--publication <publish output>] --out <file>
+//       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
+//       [--publication <publish output>] --out <file>
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -75,7 +76,7 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--publication'] }
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication'] }
 });
 
 export class Refusal extends Error {
@@ -328,6 +329,10 @@ export function proposalApproval(proposal, plan) {
   if (!sameList(proposal.addedKeys, delta.filter(entry => entry.change === 'added').map(entry => entry.rowKey))
     || !sameList(proposal.changedKeys, delta.filter(entry => entry.change === 'changed').map(entry => entry.rowKey))
     || sha256(JSON.stringify(delta)) !== proposal.deltaSha256) bad();
+  // The runtime time is the one measured into nodeRuntimeVersion's source reference (publish-register-v2.ts buildPreviewSourceRowsV2):
+  // a time edited after review would refuse only at the operator, mid-downtime; refuse it here.
+  const runtimeEntry = delta.find(entry => entry.rowKey === 'nodeRuntimeVersion');
+  if (runtimeEntry && !runtimeEntry.newSourceRef.includes(`; measured ${proposal.runtimeObservedAt}; source ${proposal.sourceRevision}/${proposal.sourceTree}; operator sha256:${proposal.operatorManifestSha256}`)) bad();
   return {
     runtimeObservedAt: proposal.runtimeObservedAt, baseRegisterVersion: proposal.baseRegisterVersion, baseSnapshotSha256: proposal.baseSnapshotSha256,
     snapshotSha256: proposal.snapshotSha256, deltaSha256: proposal.deltaSha256
@@ -348,6 +353,8 @@ async function nativePlanCommand(options, { layout, deps }) {
   const operation = options['--operation'];
   if (!['apply-and-plan', 'plan', 'publish', 'verify'].includes(operation)) refuse('ARGUMENTS_REFUSED', ['--operation']);
   if ((operation === 'publish') !== (options['--proposal'] !== undefined)) refuse('ARGUMENTS_REFUSED', ['--proposal']);
+  // The owner's yes names the delta they read; a re-run plan (new runtime time, new hash) needs a new yes.
+  if ((operation === 'publish') !== (options['--approved-delta-sha256'] !== undefined) || (operation === 'publish' && !HEX64.test(options['--approved-delta-sha256']))) refuse('ARGUMENTS_REFUSED', ['--approved-delta-sha256']);
   if (options['--publication'] !== undefined && operation !== 'verify') refuse('ARGUMENTS_REFUSED', ['--publication']);
   await assertOutputFree(options['--out'], { layout });
   // Lazy: native-operator.mjs loads tsx and pg, which exist only in an installed release root.
@@ -377,6 +384,7 @@ async function nativePlanCommand(options, { layout, deps }) {
       || from.value.sourceManifest?.sha256 !== source.sha256 || from.value.operatorManifestSha256 !== operatorDigest) refuse('PROPOSAL_MISMATCH');
     const proposal = await readJson(options['--proposal'], { layout, flag: '--proposal', maxBytes: MAX_PUBLIC_ARTIFACT_BYTES });
     approval = proposalApproval(proposal.value, from.value);
+    if (approval.deltaSha256 !== options['--approved-delta-sha256']) refuse('PROPOSAL_NOT_APPROVED');
     publicationId = (deps.randomUUID ?? randomUUID)();
   } else if (operation === 'verify' && options['--publication'] !== undefined) {
     // After a publish: verify the publication that plan wrote (and only that one).

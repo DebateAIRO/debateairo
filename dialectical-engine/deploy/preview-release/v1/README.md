@@ -238,8 +238,8 @@ cp -a "$NP" "$S/native-plan.before.json"
    - `countryPolicy`: gains `us_states.TN`;
    - `nodeRuntimeVersion`: its source reference only.
 
-   Anything else means stop and ask. Record the owner's yes together with the printed
-   `deltaSha256`.
+   Anything else means stop and ask. The owner's yes names the printed `deltaSha256`; keep it as
+   `YES=<that hash>`. Re-running `plan` gives a new time, so a new hash, and needs a new yes.
 
 3. **Downtime, then publish.** Choose a moment when no debate is writing its answer: run the
    `unfinished` count of `deploy/vps/README.md` §"Upgrading to the answer-writer prompt v2 release"
@@ -247,10 +247,11 @@ cp -a "$NP" "$S/native-plan.before.json"
    attempts. Then stop the API and the UI, exactly as the release runbook's downtime step does:
 
    ```sh
-   rel native-plan --operation publish --from "$ART/native-plan-plan.json" --proposal "$ART/register-proposal.json" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-publish.json"
+   rel native-plan --operation publish --from "$ART/native-plan-plan.json" --proposal "$ART/register-proposal.json" --approved-delta-sha256 "$YES" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-publish.json"
    ```
 
-   It prints the approval it wrote. Its `deltaSha256` must be the one the owner said yes to. Then:
+   It refuses with `PROPOSAL_NOT_APPROVED` unless the proposal's `deltaSha256` is `$YES`, and it
+   prints the approval it wrote. Then:
 
    ```sh
    put "$ART/native-plan-publish.json" && nat "$ART/register-published.json"
@@ -258,7 +259,15 @@ cp -a "$NP" "$S/native-plan.before.json"
    ```
 
    Re-running `nat` with the same publish plan after a crash replays the same version. It never
-   makes a second one.
+   makes a second one. Never make a second publish plan for a run that may have committed: a fresh
+   `publicationId` meets the version already written and refuses.
+
+   **If `nat` refuses here**, nothing was written:
+   - put the verify plan back with `put "$S/native-plan.before.json"`;
+   - start the old release unchanged;
+   - read the refusal line.
+   `PREVIEW_REGISTER_BASE_NOT_CURRENT: …` means a version newer than the plan's base exists: plan
+   again (step 1) from the verify plan that names the newest publication.
 
 4. **Verify the new publication and make launch plans that carry it:**
 
@@ -287,7 +296,12 @@ cp -a "$NP" "$S/native-plan.before.json"
    step 4. The API refuses to start if `REGISTER_VERSION` differs from the pinned publication.
 
 **Rolling back.** Re-install the archived `$S/native-plan.before.json`, set `REGISTER_VERSION` back
-to the old version, and re-pin the old launch plans. The new version stays sealed, unused. A
+to the old version, and re-pin the old launch plans. The new version stays sealed, unused. Later
+publications must then be based on that newest version, not on the one running after the
+rollback, because `plan` and `publish` refuse a base with a newer version above it. So run the next
+`plan` with `--from` set to the kept `$ART/native-plan-verify.json` of step 4, which names it. The
+proposal's delta is then measured against that unused version, not against the running one: the
+owner reviews it knowing that. A
 fallback release built before kit v2 cannot verify on a base above 65 rows. Roll back to it only
 together with its own old native plan.
 

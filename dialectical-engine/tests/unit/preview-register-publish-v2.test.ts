@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJson, computeRegisterSnapshotSha256 } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import {
   buildPreviewSourceRowsV2, composePreviewSnapshotV2, assertBaseIsCurrent, publishPreviewRegisterV2, previewDeltaSha256V2,
-  PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS
+  PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError
 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
 
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
@@ -103,23 +105,34 @@ describe('publish kit v2: composing from the current version', () => {
     const value = JSON.parse(row.valueJsonText); edit(value); return { ...row, valueJsonText: canonical(value) };
   });
   it.each([
-    ['a base row the source no longer builds (silent drop)', (f: any) => ({ base: [...f.v9, { rowKey: 'retiredRow', valueJsonText: 'false', sourceRef: 'fixture' }] })],
-    ['a base lacking a base-owned policy', (f: any) => ({ base: f.v9.filter((row: Row) => row.rowKey !== 'staffAccessPolicy') })],
-    ['a source carrying a base-owned policy', (f: any) => ({ source: [...f.source, owned()[0]] })],
-    ['a source key outside the reviewed list', (f: any) => ({ source: [...f.source, { rowKey: 'outboundMailPolicy', valueJsonText: '{}', sourceRef: 'fixture' }] })],
-    ['a source missing a reviewed key', (f: any) => ({ source: f.source.filter((row: Row) => row.rowKey !== 'countryPolicy') })],
+    ['a base row the source no longer builds (silent drop)', (f: any) => ({ base: [...f.v9, { rowKey: 'retiredRow', valueJsonText: 'false', sourceRef: 'fixture' }] }), 'base-row-dropped'],
+    ['a base lacking a base-owned policy', (f: any) => ({ base: f.v9.filter((row: Row) => row.rowKey !== 'staffAccessPolicy') }), 'base-owned-row-missing'],
+    ['a source carrying a base-owned policy', (f: any) => ({ source: [...f.source, owned()[0]] }), 'base-owned-row-in-source'],
+    ['a source key outside the reviewed list', (f: any) => ({ source: [...f.source, { rowKey: 'outboundMailPolicy', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'source-key-list'],
+    ['a source missing a reviewed key', (f: any) => ({ source: f.source.filter((row: Row) => row.rowKey !== 'countryPolicy') }), 'source-key-list'],
+    ['a support row in the source', (f: any) => ({ source: [...f.source, { rowKey: 'supportActivation', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'support-or-scorecard-row'],
+    ['a scorecard row in the base', (f: any) => ({ base: [...f.v9, { rowKey: 'modelScorecard', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'support-or-scorecard-row'],
+    ['a scorecard row in the source', (f: any) => ({ source: [...f.source, { rowKey: 'modelScorecard', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'support-or-scorecard-row']
+  ])('refuses %s, by its own rule', async (_name, change, rule) => {
+    const f = await fixture();
+    const { source = f.source, base = f.v9 } = change(f) as { source?: Row[]; base?: Row[] };
+    expect(() => compose(source, base)).toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
+  });
+  it.each([
     ['a duplicate source row', (f: any) => ({ source: [...f.source, f.source[0]] })],
-    ['a support row in the base', (f: any) => ({ base: [...f.v9, { rowKey: 'supportActivation', valueJsonText: '{}', sourceRef: 'fixture' }] })],
-    ['a scorecard row in the base', (f: any) => ({ base: [...f.v9, { rowKey: 'modelScorecard', valueJsonText: '{}', sourceRef: 'fixture' }] })],
     ['billing switched on in the base', (f: any) => ({ base: patchValue(f.v9, 'billingPolicy', v => { v.enabled = true; }) })],
     ['billing switched on in the source', (f: any) => ({ source: patchValue(f.source, 'billingPolicy', v => { v.enabled = true; }) })],
     ['a credential in the source provider set', (f: any) => ({ source: patchValue(f.source, 'configuredProviderSet', v => { v.providers[0].authorization = 'secret'; }) })],
-    ['another provider ref in the base', (f: any) => ({ base: patchValue(f.v9, 'configuredProviderSet', v => { v.providers[0].providerRef = 'unexpected'; }) })],
-    ['an invalid base staff policy', (f: any) => ({ base: patchValue(f.v9, 'staffAccessPolicy', v => { v.unexpected = true; }) })]
+    ['another provider ref in the base', (f: any) => ({ base: patchValue(f.v9, 'configuredProviderSet', v => { v.providers[0].providerRef = 'unexpected'; }) })]
   ])('refuses %s', async (_name, change) => {
     const f = await fixture();
     const { source = f.source, base = f.v9 } = change(f) as { source?: Row[]; base?: Row[] };
-    expect(() => compose(source, base)).toThrow();
+    expect(() => compose(source, base)).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+  });
+  it('refuses an invalid base staff policy (the policy parser\'s own refusal)', async () => {
+    const f = await fixture();
+    expect(() => compose(f.source, f.v9)).not.toThrow();
+    expect(() => compose(f.source, patchValue(f.v9, 'staffAccessPolicy', v => { v.unexpected = true; }))).toThrow();
   });
   it('refuses a base whose snapshot hash is not the one selected', async () => {
     const f = await fixture();
@@ -143,14 +156,24 @@ describe('publish kit v2: the base must be the current version', () => {
     ['a newer historical version', [{ register_version: '10', publication_id: null }]],
     ['two newer versions', [{ register_version: '10', publication_id: id }, { register_version: '11', publication_id: id }]]
   ])('refuses %s', async (_name, above) => {
-    await expect(assertBaseIsCurrent(fakePool(above).pool, '9', id)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+    await expect(assertBaseIsCurrent(fakePool(above).pool, '9', id)).rejects.toThrow(BASE_NOT_CURRENT);
+  });
+  it('the native operator prints the stale-base refusal in words, and checks currency before planning', async () => {
+    const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+    expect(operator.BASE_NOT_CURRENT_LINE).toBe(BASE_NOT_CURRENT);
+    expect(operator.operatorRefusalLine(new PreviewRegisterBaseNotCurrentError())).toBe(`${BASE_NOT_CURRENT}\n`);
+    expect(operator.operatorRefusalLine(new TypeError(BASE_NOT_CURRENT))).toBe('PREVIEW_NATIVE_OPERATION_REFUSED\n');
+    const text = readFileSync(resolve('deploy/preview-auth-dev/v1/native-operator.mjs'), 'utf8');
+    const check = text.indexOf("if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);");
+    expect(check).toBeGreaterThan(-1);
+    expect(check).toBeLessThan(text.indexOf("if(plan.operation==='plan'||plan.operation==='apply-and-plan')return metadata;"));
   });
   it('publish refuses a stale base and a mismatching approval before any publication statement', async () => {
     const f = await fixture();
     const snapshot = compose(f.source, f.v9);
     const approval = { baseRegisterVersion: snapshot.baseRegisterVersion, baseSnapshotSha256: snapshot.baseSnapshotSha256, snapshotSha256: snapshot.snapshotSha256, deltaSha256: snapshot.deltaSha256 };
     const stale = fakePool([{ register_version: '10', publication_id: '22222222-2222-4222-8222-222222222222' }]);
-    await expect(publishPreviewRegisterV2(stale.pool, { publicationId: id, sourceRef: 'fixture', snapshot, approval })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+    await expect(publishPreviewRegisterV2(stale.pool, { publicationId: id, sourceRef: 'fixture', snapshot, approval })).rejects.toThrow(BASE_NOT_CURRENT);
     expect(stale.statements).toHaveLength(1);
     for (const key of ['baseRegisterVersion', 'baseSnapshotSha256', 'snapshotSha256', 'deltaSha256'] as const) {
       const current = fakePool([]);

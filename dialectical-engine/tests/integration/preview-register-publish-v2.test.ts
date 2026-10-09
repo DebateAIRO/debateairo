@@ -47,7 +47,7 @@ describe('publish kit v2 on PostgreSQL 18 (source evidence, not the Linux operat
       for (const row of v6Rows) if (row.rowKey !== 'composerContractHash') expect(row).toEqual(current.rows.find(old => old.rowKey === row.rowKey));
 
       // 3. A plan made on v5 is stale once v6 exists, even with a matching approval.
-      await expect(publishPreviewRegisterV2(pool, { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: second, approval: approvalOf(second) })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+      await expect(publishPreviewRegisterV2(pool, { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: second, approval: approvalOf(second) })).rejects.toThrow('PREVIEW_REGISTER_BASE_NOT_CURRENT');
       // Sealed versions were never edited.
       expect(await readSealedSnapshot(pool, '4')).toEqual(v4);
       expect(await readSealedSnapshot(pool, '5')).toEqual(current);

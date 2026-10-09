@@ -28,7 +28,8 @@ The proposal emits each changed key, comparable old/new canonical value and sour
 - `plan` and `publish` also refuse a base with any sealed version above it, other than this publication's own replay.
 - The proposal schema is `preview-auth-dev-snapshot-proposal-v2`. `deltaSha256` hashes the full delta, values included.
 - Every v1 rule stays: billing off, no support, scorecard or credential rows, the exact preview provider refs, a parsed base staff policy, the base snapshot re-read, the approval equal to the recomposed snapshot, and the receipt re-read.
-- From a 65-row base, v2 produces v1's snapshot byte for byte.
+- From a 65-row base, v2 produces v1's snapshot byte for byte. Its delta format differs, and so does `deltaSha256`, so a v1 publish plan that was never run cannot be run by a v2 release.
+- A stale base is refused as `PREVIEW_REGISTER_BASE_NOT_CURRENT`, the one register refusal the native operator prints in words. The check runs again after the write, so a concurrent publication is reported.
 - The release tool's `native-plan --operation plan|publish` and `verify --publication` derive these plans; see `deploy/preview-release/v1/README.md`.
 
 `verifyNativeState` refuses a target lacking108, invokes the authoritative source replay verification, and hashes actual ledger/resolution/forward/catalog facts with measured owner/capability/cohort counts. Native and staff evidence are separate. The product's current `createStaffRuntime` continues to require protected configuration, fresh independent acknowledgement/publication, completed owner installation and funding readiness; do not relabel old staff evidence or bypass these gates. Refresh native evidence within180s of launch (clock lead≤5s).
