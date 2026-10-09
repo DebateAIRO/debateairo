@@ -25,6 +25,7 @@ const fundingValue = { enabled: true, funding_policy_version: 1, currency: "USD"
   maximum_day_micros: 100000, maximum_week_micros: 500000, maximum_lifetime_ms: 2678400000, finish_allowance_bp: 10000 };
 const fundingPolicy = internalAllowancePolicyFromValue(fundingValue, "test:staff-boot-funding");
 if (!fundingPolicy.enabled) throw Error("Enabled synthetic funding policy required");
+const enabledFundingPolicy = fundingPolicy;
 const fundedStaffValue = { ...(STAFF_ACCESS_POLICY_REGISTER_ROW.value as Record<string, unknown>), funding_policy_version: 1,
   active_capabilities: [...(STAFF_ACCESS_POLICY_REGISTER_ROW.value as { active_capabilities: string[] }).active_capabilities, "ALLOWANCE_WRITE"] };
 type DatabaseState = { installation: unknown; published: boolean; authorized: string[]; funded: boolean;
@@ -67,13 +68,13 @@ async function until(done: () => boolean, ms = 3000): Promise<void> {
   for (const deadline = Date.now() + ms; !done(); await new Promise(r => setTimeout(r, 20))) if (Date.now() > deadline) throw Error("TIMED_OUT");
 }
 /** Internal funding selected: hosted USD billing, one priced target, the sealed funding policy. */
-function fundedActivation(f: Awaited<ReturnType<typeof fixture>>, deploymentMode: "hosted" | "local") {
+const fundedActivation = (f: Awaited<ReturnType<typeof fixture>>, deploymentMode: "hosted" | "local") => {
   f.state.funded = true;
-  return { ...f.activation, environment: { ...f.activation.environment, internalAllowancePolicy: fundingPolicy }, deploymentMode,
+  return { ...f.activation, environment: { ...f.activation.environment, internalAllowancePolicy: enabledFundingPolicy }, deploymentMode,
     billingPlans: billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, "test:staff-boot-billing"),
     providerTargets: [{ providerRef: "fixture-provider", maker: "fixture-maker", baseUrl: "https://provider.example.test/v1", model: "fixture-model",
       inputPriceMicrosPerMillionTokens: 1, outputPriceMicrosPerMillionTokens: 1 }] };
-}
+};
 const lockedLine = (reason: string) => JSON.stringify({ event: "api.staff.tools_locked", reason });
 const waitingLine = JSON.stringify({ event: "api.staff.alerts_waiting", reason: "READINESS_STALE" });
 
