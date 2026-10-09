@@ -518,7 +518,7 @@ async function frozenRelease() {
 describe('release check before any import from the release tree', () => {
   it('accepts the pinned, untouched release with root-only import paths', async () => {
     const r = await frozenRelease();
-    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid, readArtifact: r.readArtifact })).resolves.toMatchObject({ sourceRoot: r.root, role: 'api' });
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid, ceiling: r.base, readArtifact: r.readArtifact })).resolves.toMatchObject({ sourceRoot: r.root, role: 'api' });
   });
 
   it.each([
@@ -530,12 +530,12 @@ describe('release check before any import from the release tree', () => {
   ])('refuses %s before anything is imported', async (_name, tamper) => {
     const r = await frozenRelease();
     tamper(r);
-    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid, readArtifact: r.readArtifact })).rejects.toMatchObject({ code: 'RELEASE_UNVERIFIED' });
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid, ceiling: r.base, readArtifact: r.readArtifact })).rejects.toMatchObject({ code: 'RELEASE_UNVERIFIED' });
   });
 
   it('refuses a source manifest that is not owned by the root identity', async () => {
     const r = await frozenRelease();
-    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid + 1, readArtifact: r.readArtifact })).rejects.toMatchObject({ code: 'RELEASE_UNVERIFIED' });
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid + 1, ceiling: r.base, readArtifact: r.readArtifact })).rejects.toMatchObject({ code: 'RELEASE_UNVERIFIED' });
   });
 
   // The path check stands on its own: here the manifest check is stubbed to pass.
@@ -549,7 +549,7 @@ describe('release check before any import from the release tree', () => {
   ])('refuses an import path with %s', async (_name, damage) => {
     const r = await frozenRelease();
     damage(r);
-    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid, readArtifact: r.readArtifact, verifyManifest: passing })).rejects.toMatchObject({ code: 'RELEASE_PATH_NOT_ROOT_ONLY' });
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid, ceiling: r.base, readArtifact: r.readArtifact, verifyManifest: passing })).rejects.toMatchObject({ code: 'RELEASE_PATH_NOT_ROOT_ONLY' });
   });
 
   it('follows a package link inside the release (pnpm layout) and checks where it lands', async () => {
@@ -558,9 +558,48 @@ describe('release check before any import from the release tree', () => {
     writeFileSync(join(r.engine, 'node_modules/.pnpm/pg@8/node_modules/pg/lib/index.js'), 'module.exports = 1;\n', { mode: 0o644 });
     symlinkSync('.pnpm/pg@8/node_modules/pg', join(r.engine, 'node_modules/pg'));
     const path = join(r.engine, 'node_modules/pg/lib/index.js');
-    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: [path], rootUid: me.uid, readArtifact: r.readArtifact, verifyManifest: passing })).resolves.toBeTruthy();
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: [path], rootUid: me.uid, ceiling: r.base, readArtifact: r.readArtifact, verifyManifest: passing })).resolves.toBeTruthy();
     chmodSync(join(r.engine, 'node_modules/.pnpm/pg@8/node_modules/pg/lib'), 0o777);
-    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: [path], rootUid: me.uid, readArtifact: r.readArtifact, verifyManifest: passing })).rejects.toMatchObject({ code: 'RELEASE_PATH_NOT_ROOT_ONLY' });
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: [path], rootUid: me.uid, ceiling: r.base, readArtifact: r.readArtifact, verifyManifest: passing })).rejects.toMatchObject({ code: 'RELEASE_PATH_NOT_ROOT_ONLY' });
+  });
+
+  /** base/opt/releases/rel/dialectical-engine/x.mjs, all owned by the test user; `base` stands in for `/`. */
+  function nestedRelease() {
+    const base = realpathSync(mkdtempSync(join(tmpdir(), 'lifecycle-ancestors-')));
+    const sourceRoot = join(base, 'opt', 'releases', 'rel'), path = join(sourceRoot, 'dialectical-engine', 'x.mjs');
+    mkdirSync(join(sourceRoot, 'dialectical-engine', 'node_modules'), { recursive: true, mode: 0o755 });
+    for (const folder of [base, join(base, 'opt'), join(base, 'opt', 'releases')]) chmodSync(folder, 0o755);
+    writeFileSync(path, 'export {};\n', { mode: 0o644 });
+    return { base, sourceRoot, path, check: (options: Record<string, unknown> = {}) => guard.assertRootOnlyImport(path, { sourceRoot, rootUid: me.uid, ceiling: base, ...options }) };
+  }
+
+  it('checks every folder above the release root too: root-only, and no node_modules there (inside the release is fine)', async () => {
+    await expect(nestedRelease().check()).resolves.toBeUndefined();
+  });
+
+  it.each([['0777', 0o777], ['1777', 0o1777], ['0775', 0o775]])('refuses a folder above the release root with mode %s (no sticky /tmp exception)', async (_name, mode) => {
+    const r = nestedRelease();
+    chmodSync(join(r.base, 'opt'), mode);
+    await expect(r.check()).rejects.toMatchObject({ code: 'RELEASE_ANCESTOR_NOT_ROOT_ONLY' });
+  });
+
+  it.each([
+    ['folder', (at: string) => mkdirSync(at)],
+    ['file', (at: string) => writeFileSync(at, '')],
+    ['link', (at: string) => symlinkSync('/nonexistent', at)]
+  ])('refuses a node_modules %s in any folder above the release root (Node would climb into it)', async (_kind, make) => {
+    for (const above of ['opt/releases', 'opt', '.']) {
+      const r = nestedRelease();
+      make(join(r.base, above, 'node_modules'));
+      await expect(r.check()).rejects.toMatchObject({ code: 'RELEASE_ANCESTOR_NODE_MODULES' });
+    }
+  });
+
+  it('walks all the way to / unless a test names another top (this temp folder sits under folders root owns, or under a world-writable /tmp)', async () => {
+    const r = nestedRelease();
+    await expect(guard.assertRootOnlyImport(r.path, { sourceRoot: r.sourceRoot, rootUid: me.uid })).rejects.toMatchObject({ code: 'RELEASE_ANCESTOR_NOT_ROOT_ONLY' });
+    await expect(r.check({ ceiling: r.sourceRoot })).rejects.toMatchObject({ code: 'RELEASE_PATH_NOT_ROOT_ONLY' });
+    await expect(r.check({ ceiling: join(r.base, 'elsewhere') })).rejects.toMatchObject({ code: 'RELEASE_PATH_NOT_ROOT_ONLY' });
   });
 
   it('root unlock: imports nothing when the release check refuses, and checks every module it would load', async () => {

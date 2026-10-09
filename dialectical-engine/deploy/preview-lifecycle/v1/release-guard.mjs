@@ -3,9 +3,11 @@
 //
 // Plain words: root (or postgres) only loads release code after proving that every file of that
 // release is still byte-for-byte what was reviewed and pinned, and that nobody but root could
-// have changed the files it is about to load, or any folder above them up to the release root.
+// have changed the files it is about to load, or any folder above them all the way up to `/`.
+// Above the release root there must be no node_modules either: Node looks for packages in every
+// parent folder's node_modules, so one there could be loaded instead of the release's own.
 import { lstat, realpath } from 'node:fs/promises';
-import { dirname, isAbsolute, normalize, relative, sep } from 'node:path';
+import { dirname, isAbsolute, join, normalize, relative, sep } from 'node:path';
 import { sha256 } from '../../preview-auth-dev/v1/custody.mjs';
 import { readPublicArtifact } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { verifySourceManifest } from '../../preview-auth-dev/v1/source-manifest.mjs';
@@ -30,8 +32,28 @@ async function checkDirectory(directory, sourceRoot, rootUid) {
   if (!stat.isDirectory() || !rootOnly(stat, rootUid)) refuse('RELEASE_PATH_NOT_ROOT_ONLY');
 }
 
-/** The file, every folder of its named path and of its resolved path, up to and including the release root. */
-export async function assertRootOnlyImport(path, { sourceRoot, rootUid = 0 }) {
+/**
+ * Every folder above the release root, up to and including `ceiling` (always `/` on the server:
+ * only tests name a throwaway top). Root-only, with no exception for a sticky world-writable
+ * folder, and with no node_modules entry of any kind (folder, file or link).
+ */
+async function checkAncestors(sourceRoot, rootUid, ceiling) {
+  if (!absolute(ceiling) || !within(ceiling, sourceRoot) || ceiling === sourceRoot) refuse('RELEASE_PATH_NOT_ROOT_ONLY');
+  for (let directory = dirname(sourceRoot); ; directory = dirname(directory)) {
+    const stat = await lstat(directory);
+    if (stat.isSymbolicLink() || !stat.isDirectory() || !rootOnly(stat, rootUid)) refuse('RELEASE_ANCESTOR_NOT_ROOT_ONLY');
+    const modules = await lstat(join(directory, 'node_modules')).then(() => true, error => (error?.code === 'ENOENT' ? false : refuse('RELEASE_ANCESTOR_NODE_MODULES')));
+    if (modules) refuse('RELEASE_ANCESTOR_NODE_MODULES');
+    if (directory === ceiling) return;
+    if (directory === dirname(directory)) refuse('RELEASE_PATH_NOT_ROOT_ONLY');
+  }
+}
+
+/**
+ * The file, every folder of its named path and of its resolved path up to and including the
+ * release root, and every folder above the release root up to `/` (`ceiling` is a test seam).
+ */
+export async function assertRootOnlyImport(path, { sourceRoot, rootUid = 0, ceiling = '/' }) {
   try {
     if (!absolute(path) || !absolute(sourceRoot) || !within(sourceRoot, path) || path === sourceRoot) refuse('RELEASE_PATH_NOT_ROOT_ONLY');
     if (await realpath(sourceRoot) !== sourceRoot) refuse('RELEASE_PATH_NOT_ROOT_ONLY');
@@ -46,7 +68,8 @@ export async function assertRootOnlyImport(path, { sourceRoot, rootUid = 0 }) {
         if (directory === dirname(directory)) refuse('RELEASE_PATH_NOT_ROOT_ONLY');
       }
     }
-  } catch { refuse('RELEASE_PATH_NOT_ROOT_ONLY'); }
+    await checkAncestors(sourceRoot, rootUid, ceiling);
+  } catch (error) { refuse(error instanceof ReleaseRefusal ? error.code : 'RELEASE_PATH_NOT_ROOT_ONLY'); }
 }
 
 /**
@@ -55,7 +78,7 @@ export async function assertRootOnlyImport(path, { sourceRoot, rootUid = 0 }) {
  * manifest, read through the launcher's reader (root-owned, hash-checked), verified as role
  * "api" against the release tree, plus the operator digest. Then each import path is root-only.
  */
-export async function verifyReleaseForImport({ plan, importPaths, rootUid = 0, readArtifact = readPublicArtifact, verifyManifest = verifySourceManifest }) {
+export async function verifyReleaseForImport({ plan, importPaths, rootUid = 0, ceiling = '/', readArtifact = readPublicArtifact, verifyManifest = verifySourceManifest }) {
   let source;
   try {
     source = await readArtifact(plan.sourceManifest, 'source');
@@ -65,6 +88,6 @@ export async function verifyReleaseForImport({ plan, importPaths, rootUid = 0, r
     if (sha256(JSON.stringify(operator)) !== plan.operatorManifestSha256) refuse('RELEASE_UNVERIFIED');
   } catch { refuse('RELEASE_UNVERIFIED'); }
   if (!Array.isArray(importPaths) || importPaths.length < 1) refuse('RELEASE_PATH_NOT_ROOT_ONLY');
-  for (const path of importPaths) await assertRootOnlyImport(path, { sourceRoot: plan.sourceRoot, rootUid });
+  for (const path of importPaths) await assertRootOnlyImport(path, { sourceRoot: plan.sourceRoot, rootUid, ceiling });
   return source;
 }

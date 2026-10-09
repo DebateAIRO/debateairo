@@ -69,8 +69,11 @@ launchers still re-check every byte exactly as before.
   unlock (root) and its database actor (the `postgres` OS user) load code from the pinned API
   release. Before the first import, `release-guard.mjs` runs the launchers' own check (the
   pinned source manifest, read as the launchers read it, verified against the whole release
-  tree, plus the operator digest), and requires every file it loads, and every folder above it up
-  to the release root, to be root-owned and not writable by group or others. The database actor
+  tree, plus the operator digest), and requires every file it loads, and every folder above it
+  **all the way up to `/`**, to be root-owned and not writable by group or others (no exception
+  for a sticky folder like `/tmp`). It also refuses if any folder above the release root holds a
+  `node_modules` entry, because Node looks for packages in every parent folder and could load
+  one from there (`RELEASE_ANCESTOR_NOT_ROOT_ONLY` / `RELEASE_ANCESTOR_NODE_MODULES`). The database actor
   repeats that full check on every call (open, every 2-minute renewal, close, reset), about 30
   times per unlocked hour. It deliberately keeps no "already verified" result between calls: each
   call is a new process, and a cached result (or a cheap "nothing changed" check on file times)
@@ -211,6 +214,18 @@ unit files before installing; nothing else names them.
    ```
 
    Each prints one `PREVIEW_LIFECYCLE_RELEASE_PINNED` line. The lock is root:root 0644.
+
+   Check the folders **above** the pinned API release, which the team unlock also requires to be
+   root-only and free of `node_modules` (`<release>` is the folder name in the api plan's
+   `sourceRoot`):
+
+   ```sh
+   namei -l /opt/debateai-v3-preview/releases/<release>
+   ls -d /node_modules /opt/node_modules /opt/debateai-v3-preview/node_modules /opt/debateai-v3-preview/releases/node_modules
+   ```
+
+   Every line of the first must show `root root` and no `w` in the group or other places; the
+   second must say "No such file or directory" four times.
 
 5. **Dry run** (safe while the services run; it only writes the lifecycle-current files):
    `$N $L/prestart.mjs --service api` then `--service ui`. Expect
