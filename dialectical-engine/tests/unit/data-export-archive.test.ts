@@ -57,6 +57,21 @@ describe("data export archive", () => {
         expect(row.records).toBe(values.reduce((sum: number, value) => sum + (Array.isArray(value) ? value.length : value === null ? 0 : 1), 0));
       } else expect(row.records).toBeNull();
     }
+    const presentCount = (name: string): number => manifest.entries.find((entry: { name: string }) => entry.name === name).records;
+    expect(presentCount("account.json")).toBe(2);
+    expect(presentCount("security.json")).toBe(1);
+    const nullSnapshot = {
+      ...snapshotA,
+      account: { ...snapshotA.account, registration_region: null },
+      security: { ...snapshotA.security, recovery_codes: null }
+    };
+    const nullFiles = readZip(buildArchive(nullSnapshot, loadArchiveCatalog("en")).zip);
+    const nullManifest = JSON.parse(nullFiles.find((entry) => entry.name === "manifest.json")!.bytes.toString());
+    const nullCount = (name: string): number => nullManifest.entries.find((entry: { name: string }) => entry.name === name).records;
+    expect(nullCount("account.json")).toBe(1);
+    expect(nullCount("security.json")).toBe(0);
+    expect(JSON.parse(nullFiles.find((entry) => entry.name === "account.json")!.bytes.toString()).registration_region).toBeNull();
+    expect(JSON.parse(nullFiles.find((entry) => entry.name === "security.json")!.bytes.toString()).recovery_codes).toBeNull();
   });
   it("A-5 keeps empty billing and support arrays", () => {
     for (const entry of archive().filter((item) => ["billing.json", "support.json"].includes(item.name))) {
