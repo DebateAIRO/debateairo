@@ -171,9 +171,11 @@
   "settings.security.title": "Slándáil",
   "settings.phone.reveal": "Taispeáin an fón",
   "settings.phone.change": "Athraigh an fón",
-  "settings.phone.required": "Cuir d’uimhir fóin leis chun leanúint ar aghaidh. Coinneofar do cheist agus do roghanna.",
+  "settings.phone.purpose": "Níos déanaí, b’fhéidir go seolfaimis cód chugat i dteachtaireacht téacs chun cabhrú leat filleadh ar do chuntas, agus má iarrann tú cabhair orainn, is féidir linn glaoch ort nó téacs a chur chugat. Stóráilte go criptithe; ní roinntear riamh é agus ní úsáidtear riamh é le haghaidh margaíochta.",
   "settings.security.lastPath": "Cuir modh eile sínithe isteach leis sula mbainfidh tú an ceann seo.",
+  "settings.security.remove": "Bain",
   "settings.security.codesRemaining": "Cóid aisghabhála: {count}",
   "settings.security.regenerate": "Gin cóid aisghabhála nua",
+  "settings.security.lockoutReminder": "Níl cóid aisghabhála ná eochair rochtana agat fós. Má chailleann tú d’fhón, ligeann siad duit filleadh isteach láithreach.",
   "settings.security.refreshFailed": "Níorbh fhéidir na sonraí slándála a athnuachan. Athlódáil an leathanach."
 }

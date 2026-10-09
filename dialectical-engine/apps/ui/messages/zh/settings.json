@@ -167,9 +167,11 @@
   "settings.security.title": "安全",
   "settings.phone.reveal": "显示电话号码",
   "settings.phone.change": "更改电话号码",
-  "settings.phone.required": "添加电话号码后继续。你的问题和选项会保留。",
+  "settings.phone.purpose": "日后我们可能会通过短信向您发送验证码，帮助您重新进入账户；如果您向我们求助，我们可以给您打电话或发短信。号码经加密存储，绝不会被共享，也绝不会用于营销。",
   "settings.security.lastPath": "删除此方式前，请添加其他登录方式。",
+  "settings.security.remove": "移除",
   "settings.security.codesRemaining": "恢复代码：{count}",
   "settings.security.regenerate": "生成新的恢复代码",
+  "settings.security.lockoutReminder": "您还没有恢复代码或通行密钥。如果您丢失了手机，有了它们即可立即重新登录。",
   "settings.security.refreshFailed": "无法刷新安全信息。请重新加载页面。"
 }

@@ -169,9 +169,11 @@
   "settings.security.title": "Sigurnost",
   "settings.phone.reveal": "Prikaži telefon",
   "settings.phone.change": "Promijeni telefon",
-  "settings.phone.required": "Dodajte telefon za nastavak. Pitanje i opcije ostaju spremljeni.",
+  "settings.phone.purpose": "Ubuduće vam možda pošaljemo kod SMS-om kako bismo vam pomogli da se vratite u svoj račun, a ako nas zamolite za pomoć, možemo vas nazvati ili vam poslati SMS. Pohranjuje se šifrirano; nikad se ne dijeli niti koristi za marketing.",
   "settings.security.lastPath": "Dodajte drugi način prijave prije uklanjanja ovoga.",
+  "settings.security.remove": "Ukloni",
   "settings.security.codesRemaining": "Kodovi za oporavak: {count}",
   "settings.security.regenerate": "Generiraj nove kodove za oporavak",
+  "settings.security.lockoutReminder": "Još nemate kodove za oporavak ni pristupni ključ. Ako izgubite telefon, s njima se odmah vraćate u račun.",
   "settings.security.refreshFailed": "Sigurnosni podaci nisu osvježeni. Ponovno učitajte stranicu."
 }

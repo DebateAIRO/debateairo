@@ -6,15 +6,19 @@ import { contractClient } from '@/lib/api';
 import { endSession, type EndSessionClient } from '@/lib/endSession';
 import { useChromeI18n } from '@/lib/i18n/I18nProvider';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
-export function AccountMenu({ authenticated, catalog: provided, client = contractClient, redirectTo = '/login' }: {
+export function AccountMenu({ authenticated, catalog: provided, client = contractClient, redirectTo = '/login', signInHref, signInClassName = 'btn' }: {
     authenticated?: boolean;
     catalog?: MessageCatalog;
     client?: EndSessionClient & Partial<Pick<ContractClient, 'readSession'>>;
     redirectTo?: string | null;
+    /** When set, a visitor known to be signed out sees a "Log in" link here instead of nothing. */
+    signInHref?: string;
+    signInClassName?: string;
 }) {
     const { catalog: context } = useChromeI18n();
     const catalog = provided ?? context;
-    const [signedIn, setSignedIn] = useState(authenticated ?? false);
+    // null = the session check has not answered yet: show nothing, so a signed-in visitor never sees "Log in" flash.
+    const [signedIn, setSignedIn] = useState<boolean | null>(authenticated ?? null);
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(false);
@@ -53,7 +57,7 @@ export function AccountMenu({ authenticated, catalog: provided, client = contrac
         catch { setError(true); }
         finally { flight.current = false; setBusy(false); }
     }
-    if (!signedIn) return null;
+    if (signedIn !== true) return signedIn === false && signInHref ? <a className={signInClassName} href={signInHref}>{t(catalog, 'chrome.logIn')}</a> : null;
     return <div className="accountMenu" ref={root} onBlur={event => { if (open && event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node) && !panel.current?.contains(event.relatedTarget as Node)) close(false); }} onKeyDown={event => {
         if (event.key === 'Escape') { event.preventDefault(); close(); return; }
         if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;

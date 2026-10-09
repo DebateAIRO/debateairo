@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "Wylogowanie nie zostało dokończone. Spróbuj jeszcze raz.",
   "newDebate.room.locationBlocked": "Z Twojej obecnej lokalizacji nie można rozpoczynać nowych debat. Twoje debaty pozostają dostępne do czytania.",
   "newDebate.room.previewTeamOnly": "Debaty w tej wersji zapoznawczej są dostępne tylko dla zespołu.",
+  "newDebate.room.phoneRequired": "Dodaj numer telefonu w Ustawieniach albo spróbuj ponownie za kilka minut.",
   "newDebate.room.siteFull": "Dzisiejszy limit został osiągnięty. Nadal możesz zadać pytanie — Twoja debata rozpocznie się sama, gdy limit się odnowi.",
   "newDebate.room.siteClose": "Zbliżasz się do dzisiejszego limitu. Ta debata i tak odbędzie się w całości; kolejne mogą poczekać do odnowienia limitu.",
   "newDebate.room.alreadyWaiting": "Naraz może czekać tylko jedno pytanie. Twoje rozpocznie się {time}; zadaj to pytanie później.",

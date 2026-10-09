@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Kolačići koje pohranjujemo",
   "chrome.security": "Sigurnost",
   "chrome.logout": "Odjava",
+  "chrome.logIn": "Prijava",
   "chrome.accountError": "Nije uspjelo. Ponovno učitajte stranicu i pokušajte ponovno.",
   "chrome.footer.pricing": "Cijene",
   "chrome.footer.cancel": "Otkazivanje plana",

@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "ملفات تعريف الارتباط التي نخزّنها",
   "chrome.security": "الأمان",
   "chrome.logout": "تسجيل الخروج",
+  "chrome.logIn": "تسجيل الدخول",
   "chrome.accountError": "لم ينجح ذلك. أعد تحميل الصفحة وحاول مجددًا.",
   "chrome.footer.pricing": "الأسعار",
   "chrome.footer.cancel": "إلغاء خطة",

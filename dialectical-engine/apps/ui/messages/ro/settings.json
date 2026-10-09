@@ -167,11 +167,13 @@
   "settings.emailLink.continue": "Accesați Setările",
   "settings.account.title": "Cont",
   "settings.security.title": "Securitate",
-  "settings.phone.reveal": "Arată numărul",
-  "settings.phone.change": "Schimbă numărul",
-  "settings.phone.required": "Adaugă numărul de telefon pentru a continua. Întrebarea și opțiunile se păstrează.",
-  "settings.security.lastPath": "Adaugă o altă metodă de autentificare înainte de a o elimina pe aceasta.",
+  "settings.phone.reveal": "Afișați numărul",
+  "settings.phone.change": "Schimbați numărul",
+  "settings.phone.purpose": "Pe viitor, este posibil să vă trimitem prin SMS un cod care să vă ajute să reveniți în contul dumneavoastră, iar dacă ne cereți ajutorul, vă putem suna sau vă putem trimite un SMS. Numărul este stocat criptat; nu este niciodată partajat și nu este folosit pentru marketing.",
+  "settings.security.lastPath": "Adăugați o altă metodă de autentificare înainte de a o elimina pe aceasta.",
+  "settings.security.remove": "Eliminați",
   "settings.security.codesRemaining": "Coduri de recuperare: {count}",
-  "settings.security.regenerate": "Generează coduri noi de recuperare",
-  "settings.security.refreshFailed": "Detaliile de securitate nu au putut fi reîmprospătate. Reîncarcă pagina."
+  "settings.security.regenerate": "Generați coduri noi de recuperare",
+  "settings.security.lockoutReminder": "Încă nu aveți coduri de recuperare sau o cheie de acces. Dacă vă pierdeți telefonul, acestea vă permit să reveniți imediat în contul dumneavoastră.",
+  "settings.security.refreshFailed": "Detaliile de securitate nu au putut fi reîmprospătate. Reîncărcați pagina."
 }

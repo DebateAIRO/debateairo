@@ -172,9 +172,11 @@
   "settings.security.title": "الأمان",
   "settings.phone.reveal": "إظهار رقم الهاتف",
   "settings.phone.change": "تغيير رقم الهاتف",
-  "settings.phone.required": "أضف رقم هاتفك للمتابعة. سيتم الاحتفاظ بسؤالك وخياراتك.",
+  "settings.phone.purpose": "قد نرسل إليك لاحقًا رمزًا برسالة نصية لمساعدتك على العودة إلى حسابك، وإذا طلبت منا المساعدة يمكننا الاتصال بك أو مراسلتك برسالة نصية. يُحفظ مشفّرًا، ولا نشاركه مع أحد ولا نستخدمه للتسويق أبدًا.",
   "settings.security.lastPath": "أضف طريقة أخرى لتسجيل الدخول قبل إزالة هذه الطريقة.",
+  "settings.security.remove": "إزالة",
   "settings.security.codesRemaining": "رموز الاسترداد: {count}",
   "settings.security.regenerate": "إنشاء رموز استرداد جديدة",
+  "settings.security.lockoutReminder": "ليس لديك بعد رموز استرداد أو مفتاح مرور. إذا فقدت هاتفك، فإنها تتيح لك العودة إلى حسابك فورًا.",
   "settings.security.refreshFailed": "تعذر تحديث تفاصيل الأمان. أعد تحميل الصفحة."
 }

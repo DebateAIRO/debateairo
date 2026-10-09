@@ -33,13 +33,15 @@ describe('consumer admission before repository and cryptographic work', () => {
         expect(f.work).toBe(5);
         expect(f.refusals).toBe(1);
     });
-    it('refuses capacity before ceremony work and keeps its refusal audit bounded across new sources', async () => {
+    // Auth API hardening 2026-10-09: a full table used to refuse every new key, so a flood of
+    // distinct keys locked every newcomer out. It now evicts the least-evidenced key instead.
+    it('admits new sources at capacity by eviction instead of refusing them', async () => {
         const f = await fixture({ capacity: 2 });
         await expect(f.service.beginPasskeyLogin({}, f.source)).rejects.toThrow('REPOSITORY_REACHED');
         for (let n = 0; n < 8; n++)
-            await expect(f.service.beginPasskeyLogin({ continuation_token: token() }, { ...f.source, ip: '192.0.2.' + (60 + n) })).rejects.toThrow('MFA_RATE_LIMITED');
-        expect(f.work).toBe(1);
-        expect(f.refusals).toBe(1);
+            await expect(f.service.beginPasskeyLogin({ continuation_token: token() }, { ...f.source, ip: '192.0.2.' + (60 + n) })).rejects.toThrow('REPOSITORY_REACHED');
+        expect(f.work).toBe(9);
+        expect(f.refusals).toBe(0);
     });
 });
 import { PostgresConsumerAuthRepository } from '@debateai/db';

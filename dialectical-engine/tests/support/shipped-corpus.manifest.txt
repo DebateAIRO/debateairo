@@ -443,6 +443,7 @@ apps/ui/components/accountNavigation.source-test.mjs
 apps/ui/components/auth/EmailPendingScreen.tsx
 apps/ui/components/auth/EphemeralCodes.tsx
 apps/ui/components/auth/InlineFieldMessage.tsx
+apps/ui/components/auth/LockoutPrompt.tsx
 apps/ui/components/auth/OnboardingEvidence.tsx
 apps/ui/components/auth/PhoneField.tsx
 apps/ui/components/auth/RecoveryFlow.tsx
@@ -452,6 +453,7 @@ apps/ui/components/auth/SecurityEnrollment.tsx
 apps/ui/components/auth/SocialCompleteFlow.tsx
 apps/ui/components/auth/SocialProviderButtons.tsx
 apps/ui/components/auth/TurnstileChallenge.tsx
+apps/ui/components/auth/VerificationResend.tsx
 apps/ui/components/authRoutes.source-test.mjs
 apps/ui/components/billing/CancelFlow.tsx
 apps/ui/components/billing/CardChangeFlow.tsx
@@ -679,6 +681,7 @@ apps/ui/lib/securityConfirmation.ts
 apps/ui/lib/serverApi.test.mjs
 apps/ui/lib/serverApi.ts
 apps/ui/lib/sessionProxy.test.mjs
+apps/ui/lib/sixDigitCode.ts
 apps/ui/lib/socialStepUpHandoff.ts
 apps/ui/lib/staffApi.ts
 apps/ui/lib/staffWebAuthn.ts

@@ -16,7 +16,7 @@ export interface PhoneProfile {
 export const phoneProfileAad = (id: string) => ["identity", "user.phone_ciphertext", id, "run:none", id, `user-dek:${id}`, "1"] as const;
 export class AccountProfileService {
   constructor(private readonly dependencies: {
-    readonly repository: Pick<PostgresAccountProfileRepository, "read" | "use" | "hasPhone">;
+    readonly repository: Pick<PostgresAccountProfileRepository, "read" | "use">;
     readonly users: ReadableUserDekStore;
   }) {
   }
@@ -63,9 +63,6 @@ export class AccountProfileService {
     if (record === null)
       throw new AccountProfileError("STEP_UP_REQUIRED");
     return this.mask(session.userId, record);
-  }
-  hasPhone(ownerRef: string): Promise<boolean> {
-    return this.dependencies.repository.hasPhone(ownerRef);
   }
   private grantHash(token: unknown): string {
     if (typeof token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(token))

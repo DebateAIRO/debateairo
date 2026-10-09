@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "A kijelentkezés nem fejeződött be. Kérjük, próbálja újra.",
   "newDebate.room.locationBlocked": "Jelenlegi tartózkodási helyéről nem indíthat új vitákat. A vitái továbbra is olvashatók.",
   "newDebate.room.previewTeamOnly": "Ebben az előzetes verzióban a viták csak a csapat számára érhetők el.",
+  "newDebate.room.phoneRequired": "Kérjük, adjon meg egy telefonszámot a Beállításokban, vagy próbálja újra néhány perc múlva.",
   "newDebate.room.siteFull": "A mai korlát betelt. Így is felteheti a kérdését — a vitája magától elindul, amikor a korlát visszaáll.",
   "newDebate.room.siteClose": "Közel jár a mai korláthoz. Ez a vita így is teljes egészében lefut; a későbbiek várhatnak a visszaállásig.",
   "newDebate.room.alreadyWaiting": "Egyszerre csak egy kérdés várakozhat. Az Öné ekkor indul: {time}; ezt a kérdést azután tegye fel.",

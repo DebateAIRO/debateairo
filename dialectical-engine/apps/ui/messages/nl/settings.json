@@ -168,9 +168,11 @@
   "settings.security.title": "Beveiliging",
   "settings.phone.reveal": "Telefoonnummer tonen",
   "settings.phone.change": "Telefoonnummer wijzigen",
-  "settings.phone.required": "Voeg je telefoonnummer toe om door te gaan. Je vraag en opties blijven bewaard.",
+  "settings.phone.purpose": "Later sturen we u mogelijk een code per sms om u te helpen weer in uw account te komen, en als u ons om hulp vraagt, kunnen we u bellen of een sms sturen. Versleuteld opgeslagen; nooit gedeeld en nooit gebruikt voor marketing.",
   "settings.security.lastPath": "Voeg een andere aanmeldmethode toe voordat je deze verwijdert.",
+  "settings.security.remove": "Verwijderen",
   "settings.security.codesRemaining": "Herstelcodes: {count}",
   "settings.security.regenerate": "Nieuwe herstelcodes genereren",
+  "settings.security.lockoutReminder": "U hebt nog geen herstelcodes of passkey. Als u uw telefoon kwijtraakt, komt u daarmee meteen weer binnen.",
   "settings.security.refreshFailed": "De beveiligingsgegevens konden niet worden vernieuwd. Laad de pagina opnieuw."
 }

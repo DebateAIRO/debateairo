@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Piškotki, ki jih shranjujemo",
   "chrome.security": "Varnost",
   "chrome.logout": "Odjava",
+  "chrome.logIn": "Prijava",
   "chrome.accountError": "Ni uspelo. Znova naložite stran in poskusite ponovno.",
   "chrome.footer.pricing": "Cene",
   "chrome.footer.cancel": "Preklic paketa",

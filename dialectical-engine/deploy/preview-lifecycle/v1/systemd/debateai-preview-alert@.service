@@ -1,0 +1,22 @@
+# Install as /etc/systemd/system/debateai-preview-alert@.service
+# Started by OnFailure=debateai-preview-alert@%n.service of the preview units. It asks systemd for
+# the unit's Result/NRestarts/state first: "gave up" emails; "still restarting after a crash" does
+# not. With RestartMode=direct, systemd does not start this unit at all for a crash it heals by
+# itself: those show only in the journal and in NRestarts (README "One email only when ...").
+# One email per unit per 30 minutes; a mail failure is logged and never fails this unit (so it
+# never alerts itself).
+[Unit]
+Description=DebateAI preview: email the owner that %i failed
+CollectMode=inactive-or-failed
+
+[Service]
+Type=oneshot
+# Root runs node through `env -i` with PATH only (like the prestart and the team unlock): nothing
+# from the service manager's environment (NODE_OPTIONS, NODE_PATH, ...) reaches it. systemctl,
+# journalctl and sendmail are called by absolute path with their own explicit environment.
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --unit %i
+TimeoutStartSec=60
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true

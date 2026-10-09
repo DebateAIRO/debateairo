@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "Udlogningen blev ikke fuldført. Prøv igen.",
   "newDebate.room.locationBlocked": "Nye debatter kan ikke startes fra din nuværende placering. Dine debatter kan stadig læses.",
   "newDebate.room.previewTeamOnly": "Debatter i denne forhåndsversion er kun åbne for teamet.",
+  "newDebate.room.phoneRequired": "Tilføj et telefonnummer under Indstillinger, eller prøv igen om et par minutter.",
   "newDebate.room.siteFull": "Dagens grænse er nået. Du kan stadig stille dit spørgsmål — din debat starter af sig selv, når grænsen nulstilles.",
   "newDebate.room.siteClose": "Du er tæt på dagens grænse. Denne debat kører stadig fuldt ud; senere debatter kan komme til at vente til nulstillingen.",
   "newDebate.room.alreadyWaiting": "Kun ét spørgsmål kan vente ad gangen. Dit starter {time}; stil dette spørgsmål derefter.",

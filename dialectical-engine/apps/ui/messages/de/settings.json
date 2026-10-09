@@ -168,9 +168,11 @@
   "settings.security.title": "Sicherheit",
   "settings.phone.reveal": "Telefonnummer anzeigen",
   "settings.phone.change": "Telefonnummer ändern",
-  "settings.phone.required": "Füge deine Telefonnummer hinzu, um fortzufahren. Deine Frage und Optionen bleiben erhalten.",
+  "settings.phone.purpose": "Künftig senden wir Ihnen möglicherweise einen Code per SMS, damit Sie wieder in Ihr Konto gelangen, und wenn Sie uns um Hilfe bitten, können wir Sie anrufen oder Ihnen eine SMS schicken. Verschlüsselt gespeichert; wird nie weitergegeben und nie für Marketingzwecke verwendet.",
   "settings.security.lastPath": "Füge eine andere Anmeldemethode hinzu, bevor du diese entfernst.",
+  "settings.security.remove": "Entfernen",
   "settings.security.codesRemaining": "Wiederherstellungscodes: {count}",
   "settings.security.regenerate": "Neue Wiederherstellungscodes erstellen",
+  "settings.security.lockoutReminder": "Sie haben noch keine Wiederherstellungscodes und keinen Passkey. Wenn Sie Ihr Telefon verlieren, kommen Sie damit sofort wieder in Ihr Konto.",
   "settings.security.refreshFailed": "Die Sicherheitsdetails konnten nicht aktualisiert werden. Lade die Seite neu."
 }

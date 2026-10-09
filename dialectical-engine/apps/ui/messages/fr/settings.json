@@ -169,9 +169,11 @@
   "settings.security.title": "Sécurité",
   "settings.phone.reveal": "Afficher le téléphone",
   "settings.phone.change": "Modifier le téléphone",
-  "settings.phone.required": "Ajoutez votre téléphone pour continuer. Votre question et vos options sont conservées.",
+  "settings.phone.purpose": "Plus tard, nous pourrions vous envoyer un code par SMS pour vous aider à retrouver l’accès à votre compte et, si vous nous demandez de l’aide, nous pouvons vous appeler ou vous envoyer un SMS. Stocké de façon chiffrée ; jamais partagé ni utilisé à des fins marketing.",
   "settings.security.lastPath": "Ajoutez une autre méthode de connexion avant de supprimer celle-ci.",
+  "settings.security.remove": "Retirer",
   "settings.security.codesRemaining": "Codes de récupération : {count}",
   "settings.security.regenerate": "Générer de nouveaux codes de récupération",
+  "settings.security.lockoutReminder": "Vous n’avez encore ni codes de récupération ni clé d’accès. Si vous perdez votre téléphone, ils vous permettent de revenir aussitôt dans votre compte.",
   "settings.security.refreshFailed": "Les informations de sécurité n’ont pas pu être actualisées. Rechargez la page."
 }

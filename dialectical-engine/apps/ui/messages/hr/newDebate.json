@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "Odjava nije dovršena. Pokušajte ponovno.",
   "newDebate.room.locationBlocked": "S vaše trenutačne lokacije nije moguće pokrenuti nove rasprave. Vaše rasprave i dalje su dostupne za čitanje.",
   "newDebate.room.previewTeamOnly": "Rasprave u ovoj probnoj verziji otvorene su samo za tim.",
+  "newDebate.room.phoneRequired": "Dodajte broj telefona u Postavkama ili pokušajte ponovno za nekoliko minuta.",
   "newDebate.room.siteFull": "Današnje ograničenje je dosegnuto. I dalje možete postaviti pitanje — vaša će rasprava započeti sama kad se ograničenje obnovi.",
   "newDebate.room.siteClose": "Blizu ste današnjeg ograničenja. Ova će se rasprava ipak odvijati u cijelosti; kasnije će možda morati čekati do obnove.",
   "newDebate.room.alreadyWaiting": "Samo jedno pitanje može čekati u isto vrijeme. Vaše će započeti u {time}; ovo postavite nakon toga.",
