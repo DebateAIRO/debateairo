@@ -43,7 +43,8 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
   ]);
   return {
     judgeContractHash: "e7f7e4b0e7066fb2b873c4435b2bd593a0a399f8de506604c35b92222fdb1365",
-    composerContractHash: "d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866",
+    // serve.synthesizer.v2 (2026-10-09); the v1 value d96e7cc9…c866 is history.
+    composerContractHash: "340e11a6ec58453a607114f1c31263ddfc92beb8698f70093c75b89472368b70",
     // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints
     // the EVALUATOR prompt alone; its own words are still the 2026-09-04 text.
     conformanceContractHash: "f205421cc088ff2f3b4981bfffbfaa09224c2d0ec974c2852ad4b2138e929dcc",

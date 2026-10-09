@@ -10,7 +10,9 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -311,7 +313,8 @@ class PhaseTests(GateTest):
         for name, flags in opened:
             self.assertEqual(flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC), 0, name)
         self.assertEqual(result, {
-            'state': 'active', 'reason': None, 'open_until_utc': '2026-10-15T09:00:00+00:00', 'window_open': True,
+            'state': 'active', 'reason': None, 'halted_at': None, 'unsent_streak': 0,
+            'open_until_utc': '2026-10-15T09:00:00+00:00', 'window_open': True,
             'today': '2026-10-08', 'daily_budget_usd': '5.00', 'today_spend_usd': '0.05',
             'remaining_today_usd': '4.95', 'today_posts': 1, 'max_paid_posts_per_day': 500, 'in_flight': 0,
             'today_uncertain': 0, 'halts': [], 'halts_dropped': 0})
@@ -800,13 +803,28 @@ class HaltTests(GateTest):
                               ({'uid': 994}, '/run/debateai-v3-preview/budget.sock'),
                               ({'host': 'other-host'}, '/run/debateai-v3-preview/budget.sock'),
                               ({}, '/tmp/budget.sock'), ({}, '/run/debateai-v3-preview/Budget.sock'),
-                              ({}, '/run/debateai-v3-preview/../budget.sock')):
+                              ({}, '/run/debateai-v3-preview/../budget.sock'),
+                              ({}, '/run/debateai-v3-preview/provider-budget.sock')):  # v1's retired name
             with self.subTest(changes=changes, path=path), self.refused('ROOT_IPC_CUSTODY_REQUIRED'):
                 bridge.serve(gate.private, gate.go_path, path, **{**good, **changes})
+        # These refusals need no state: nothing in the private folder was touched.
+        self.assertFalse((gate.private / 'team-serve.lock').exists())
+        # A regular file where the socket goes (in an otherwise safe folder) is never removed.
         with patch.object(bridge, 'SOCKET_PATTERN', re.compile(re.escape(str(existing)))), \
                 self.refused('ROOT_IPC_CUSTODY_REQUIRED'):
-            bridge.serve(gate.private, gate.go_path, existing, **good)
-        self.assertFalse((gate.private / 'team-serve.lock').exists())
+            bridge.serve(gate.private, gate.go_path, existing, owner_uid=os.getuid(), **good)
+        self.assertEqual(existing.read_text(), '')
+        self.assertEqual(gate.status()['state'], 'active')
+
+    def test_serve_without_a_socket_name_refuses_there_is_no_built_in_name(self):
+        gate = self.gate().ready()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = bridge.main(['serve', '--private', str(gate.private), '--go', str(gate.go_path)])
+        self.assertEqual((code, json.loads(out.getvalue())),
+                         (2, {'status': 'refused', 'error_class': 'SafetyError', 'error': 'ROOT_SOCKET_REQUIRED'}))
+        self.assertNotIn("default=Path('/run", SOURCE.read_text())
+        self.assertEqual(bridge.RETIRED_SOCKET_NAMES, frozenset({'provider-budget.sock'}))
 
     def test_only_one_server_may_hold_the_authority(self):
         gate = self.gate().ready()
@@ -1210,6 +1228,498 @@ class IpcTests(GateTest):
         with self.refused('AUTHORITY_STOPPED'):
             gate.call('op-2', dispatch=lambda *args: dispatched.append(args))
         self.assertEqual(dispatched, [])
+
+
+class UnsentCallTests(GateTest):
+    """A call is provably unsent only when the TCP connect or TLS handshake failed before any
+    request byte was written: its hold is released and only it fails. Five in a row halt."""
+    ENTRY = 'preview-test:' + SCOPE + ':op-1'
+
+    @staticmethod
+    def unsent(_body, _key):
+        raise bridge.helper.RequestNotSent('request_not_sent')
+
+    def call_unsent(self, gate, operation_id='op-1'):
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call(operation_id, dispatch=self.unsent)
+
+    def transport_with(self, steps, **connection_behaviour):
+        class Response:
+            status = 200
+
+            def __init__(self):
+                self.chunks = [b'{"model": "m"}']
+
+            def read(self, _size):
+                return self.chunks.pop() if self.chunks else b''
+
+        class Connection:
+            def __init__(self, host, timeout, context):
+                self.sock = None
+                steps.append(('timeout', timeout))
+
+            def connect(self):
+                steps.append('connect')
+                if 'connect' in connection_behaviour:
+                    raise connection_behaviour['connect']
+
+            def request(self, method, path, body, headers):
+                steps.append('request')
+                if 'request' in connection_behaviour:
+                    raise connection_behaviour['request']
+
+            def getresponse(self):
+                steps.append('getresponse')
+                if 'getresponse' in connection_behaviour:
+                    raise connection_behaviour['getresponse']
+                return Response()
+
+            def close(self):
+                steps.append('close')
+        return Connection
+
+    def test_transport_marks_only_connect_and_handshake_failures_as_not_sent(self):
+        import ssl
+        for name, failure in (('tcp_refused', ConnectionRefusedError()), ('egress_blocked', PermissionError(1, 'EPERM')),
+                              ('dns', OSError('name resolution')), ('tls_handshake', ssl.SSLError('handshake')),
+                              ('tls_certificate', ssl.SSLCertVerificationError('bad certificate')),
+                              ('connect_timeout', TimeoutError('timed out'))):
+            with self.subTest(name):
+                steps = []
+                with patch.object(bridge.helper.http.client, 'HTTPSConnection', self.transport_with(steps, connect=failure)), \
+                        self.assertRaises(bridge.helper.RequestNotSent):
+                    REAL_TRANSPORT(timeout=600)(b'{}', KEY)
+                self.assertEqual(steps, [('timeout', 15), 'connect', 'close'])  # No request was ever asked for.
+
+    def test_deadline_passing_during_the_connect_is_not_sent(self):
+        steps = []
+        clock = iter([0.0, 10.0])  # The deadline, then the check right after the connect.
+        with patch.object(bridge.helper.http.client, 'HTTPSConnection', self.transport_with(steps)), \
+                patch.object(bridge.helper.time, 'monotonic', lambda: next(clock)), \
+                self.assertRaises(bridge.helper.RequestNotSent):
+            REAL_TRANSPORT(timeout=5)(b'{}', KEY)
+        self.assertEqual(steps, [('timeout', 5), 'connect', 'close'])
+
+    def test_failures_once_the_request_may_have_been_written_are_never_not_sent(self):
+        for stage in ('request', 'getresponse'):
+            with self.subTest(stage):
+                steps = []
+                connection = self.transport_with(steps, **{stage: ConnectionResetError('reset')})
+                with patch.object(bridge.helper.http.client, 'HTTPSConnection', connection), \
+                        self.assertRaises(ConnectionResetError):
+                    REAL_TRANSPORT(timeout=5)(b'{}', KEY)
+                self.assertIn('request', steps)
+        self.assertFalse(issubclass(bridge.helper.ResponseTooLarge, bridge.helper.RequestNotSent))
+
+    def test_unsent_call_releases_its_hold_fails_alone_and_does_not_halt(self):
+        gate = self.gate().ready()
+        self.call_unsent(gate)
+        status = gate.status()
+        self.assertEqual((status['state'], status['in_flight'], status['today_posts'], status['today_spend_usd'],
+                          status['unsent_streak']), ('active', 0, 0, '0', 1))
+        self.assertEqual(gate.day('2026-10-08')['entries'], {})
+        self.assertEqual(gate.call('op-1')['status'], 200)  # The same operation may be tried again.
+        self.assertEqual(gate.status()['unsent_streak'], 0)  # A settled reply resets the streak.
+        self.assertIn('"status": "not_sent"', self.out.getvalue())
+        self.assertNotIn(KEY, self.out.getvalue())
+
+    def test_five_unsent_in_a_row_halt_with_provider_unreachable(self):
+        gate = self.gate().ready()
+        for number in range(1, 5):
+            self.call_unsent(gate, 'op-%d' % number)
+            self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', number))
+        self.call_unsent(gate, 'op-5')
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason'], status['in_flight'], status['today_posts']),
+                         ('halted', 'provider_unreachable', 0, 0))
+        self.assertEqual(status['halts'][-1]['entry_id'], 'preview-test:' + SCOPE + ':op-5')
+        with self.refused('AUTHORITY_STOPPED'):
+            gate.call('op-6')
+        self.assertEqual(bridge.UNSENT_HALT_STREAK, 5)
+
+    def test_any_settled_reply_resets_the_streak(self):
+        gate = self.gate().ready()
+        for number in range(4):
+            self.call_unsent(gate, 'a-%d' % number)
+        gate.call('ok-1')
+        for number in range(4):
+            self.call_unsent(gate, 'b-%d' % number)
+        self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', 4))
+
+    def test_streak_survives_a_restart_and_activation_resets_it(self):
+        gate = self.gate().ready()
+        for number in range(4):
+            self.call_unsent(gate, 'a-%d' % number)
+        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 0, 'unrecorded_uncertain': 0})
+        self.assertEqual(gate.status()['unsent_streak'], 4)
+        self.call_unsent(gate, 'a-4')
+        self.assertEqual(gate.status()['reason'], 'provider_unreachable')
+        gate.activate()
+        self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', 0))
+        self.call_unsent(gate, 'b-0')
+        self.assertEqual(gate.status()['state'], 'active')
+
+    def test_a_hold_that_cannot_be_released_is_uncertain_and_halts(self):
+        gate = self.gate().ready()
+
+        def broken_release(*_args):
+            raise SafetyError('ledger_lock_timeout')
+        with patch.object(bridge, 'release_unsent', broken_release), self.refused('NEW_CHARGE_UNCERTAIN'):
+            gate.call('op-1', dispatch=self.unsent)
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason']), ('halted', 'uncertain_charge'))
+        entry = gate.day('2026-10-08')['entries'][self.ENTRY]
+        self.assertEqual((entry['state'], Decimal(entry['held_usd']), entry['reason']), ('uncertain', RESERVED, 'release_failure'))
+
+    def test_death_during_the_release_fails_closed_or_drops_a_never_sent_hold(self):
+        for writes_before_death, expected in ((0, ('halted', 'interrupted_call_uncertain')),
+                                              (1, ('halted', 'interrupted_call_uncertain')),
+                                              (2, ('active', None))):
+            with self.subTest(writes_before_death=writes_before_death):
+                gate = self.gate().ready()
+                real, written = bridge.helper.write_bytes, []
+
+                def dying(dir_fd, name, data):
+                    if len(written) >= writes_before_death:
+                        raise Crash()
+                    written.append(name)
+                    return real(dir_fd, name, data)
+                death = patch.object(bridge.helper, 'write_bytes', dying)
+
+                def dispatch(_body, _key):
+                    death.start()
+                    raise bridge.helper.RequestNotSent('request_not_sent')
+                try:
+                    with self.assertRaises(SafetyError):
+                        gate.call('op-1', dispatch=dispatch)
+                finally:
+                    death.stop()
+                bridge.recover_interrupted(gate.private, now=gate.clock)
+                status = gate.status()
+                self.assertEqual((status['state'], status['reason']), expected)
+                self.assertEqual(status['in_flight'], 0)
+
+    def test_ipc_does_not_halt_for_an_unsent_call(self):
+        gate = self.gate().ready()
+        line, payload = IpcTests.exchange(self, gate, lambda _client: self.unsent)
+        self.assertEqual((line, json.loads(payload)), (b'HTTP/1.0 409 Conflict', {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'}))
+        self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', 1))
+
+
+class StaleSocketTests(GateTest):
+    """serve start removes a left-over socket only when it is provably stale; anything else refuses
+    and is left exactly as it was. The tests run as the developer, so owner_uid is the developer."""
+
+    def folder(self):
+        gate = self.gate()
+        folder = gate.root / 'run'
+        folder.mkdir(mode=0o755)
+        os.chmod(folder, 0o755)
+        return folder
+
+    @staticmethod
+    def stale_socket(path):
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(str(path))
+        server.close()  # Like a killed server: the file stays and no one listens.
+        return path
+
+    def clear(self, path, **kwargs):
+        return bridge.clear_stale_socket(path, owner_uid=os.getuid(), **kwargs)
+
+    def test_free_path_is_left_alone(self):
+        path = self.folder() / 'gate.sock'
+        self.assertFalse(self.clear(path))
+        self.assertFalse(path.exists())
+
+    def test_stale_socket_is_removed(self):
+        path = self.stale_socket(self.folder() / 'gate.sock')
+        self.assertTrue(self.clear(path))
+        self.assertFalse(os.path.lexists(path))
+
+    def test_socket_with_a_listener_is_in_use_and_kept(self):
+        path = self.folder() / 'gate.sock'
+        live = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(live.close)
+        live.bind(str(path))
+        live.listen(8)
+        with self.refused('IPC_SOCKET_IN_USE'):
+            self.clear(path)
+        self.assertTrue(path.exists())
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(client.close)
+        client.connect(str(path))  # Still the live server's socket.
+
+    def test_connect_that_neither_answers_nor_is_refused_counts_as_in_use(self):
+        path = self.stale_socket(self.folder() / 'gate.sock')
+
+        class Silent:
+            def __init__(self, *_args):
+                pass
+
+            def settimeout(self, seconds):
+                self.seconds = seconds
+
+            def connect(self, _address):
+                raise TimeoutError('timed out')  # A live server whose backlog is full.
+
+            def close(self):
+                pass
+        with patch.object(bridge.socket, 'socket', Silent), self.refused('IPC_SOCKET_IN_USE'):
+            self.clear(path)
+        self.assertTrue(os.path.lexists(path))
+        self.assertEqual(bridge.STALE_PROBE_SECONDS, 2)
+
+    def test_anything_but_a_lone_stale_socket_is_refused_and_kept(self):
+        def regular_file(folder):
+            (folder / 'gate.sock').write_text('x')
+
+        def plain_folder(folder):
+            (folder / 'gate.sock').mkdir()
+
+        def symlink_to_stale_socket(folder):
+            self.stale_socket(folder / 'elsewhere.sock')
+            (folder / 'gate.sock').symlink_to(folder / 'elsewhere.sock')
+
+        def dangling_symlink(folder):
+            (folder / 'gate.sock').symlink_to(folder / 'missing.sock')
+
+        def hard_linked_socket(folder):
+            self.stale_socket(folder / 'gate.sock')
+            try:
+                os.link(folder / 'gate.sock', folder / 'second-name.sock')
+            except OSError:
+                self.skipTest('this file system cannot hard-link a socket')
+        for name, spoil in (('regular_file', regular_file), ('plain_folder', plain_folder),
+                            ('symlink_to_stale_socket', symlink_to_stale_socket),
+                            ('dangling_symlink', dangling_symlink), ('hard_linked_socket', hard_linked_socket)):
+            with self.subTest(name):
+                folder = self.folder()
+                spoil(folder)
+                before = sorted((p.name, os.lstat(p).st_ino) for p in folder.iterdir())
+                with self.refused('ROOT_IPC_CUSTODY_REQUIRED'):
+                    self.clear(folder / 'gate.sock')
+                self.assertEqual(sorted((p.name, os.lstat(p).st_ino) for p in folder.iterdir()), before)
+
+    def test_unsafe_folder_or_other_owner_is_refused_and_kept(self):
+        for name in ('group_writable', 'other_writable', 'folder_is_a_symlink', 'owned_by_someone_else'):
+            with self.subTest(name):
+                folder = self.folder()
+                path = self.stale_socket(folder / 'gate.sock')
+                owner = os.getuid()
+                if name == 'group_writable':
+                    os.chmod(folder, 0o775)
+                elif name == 'other_writable':
+                    os.chmod(folder, 0o757)
+                elif name == 'folder_is_a_symlink':
+                    link = folder.parent / 'run-link'
+                    link.symlink_to(folder)
+                    path = link / 'gate.sock'
+                else:
+                    owner = os.getuid() + 1
+                with self.refused('ROOT_IPC_CUSTODY_REQUIRED'):
+                    bridge.clear_stale_socket(path, owner_uid=owner)
+                self.assertTrue(os.path.lexists(folder / 'gate.sock'))
+
+    def test_entry_swapped_during_the_probe_is_not_removed(self):
+        folder = self.folder()
+        path = self.stale_socket(folder / 'gate.sock')
+        real_socket = socket.socket
+
+        class Swapping:
+            def __init__(self, *_args):
+                pass
+
+            def settimeout(self, _seconds):
+                pass
+
+            def connect(self, _address):
+                os.rename(path, folder / 'checked.sock')
+                fresh = real_socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                fresh.bind(str(path))  # Someone else's socket now has the name.
+                fresh.close()
+                raise ConnectionRefusedError()
+
+            def close(self):
+                pass
+        with patch.object(bridge.socket, 'socket', Swapping), self.refused('ROOT_IPC_CUSTODY_REQUIRED'):
+            self.clear(path)
+        self.assertTrue(os.path.lexists(path))
+        self.assertTrue(os.path.lexists(folder / 'checked.sock'))
+
+
+SERVE_SCRIPT = r"""
+import os, re, sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[1])
+from preview_budget_authority_fixture import HOST, load_bridge
+bridge = load_bridge()
+private, go, path = sys.argv[2:5]
+bridge.SOCKET_PATTERN = re.compile(re.escape(path))
+bridge.SERVE_POLL_SECONDS = 0.02  # A fast stop for the test; production keeps 0.5 s.
+bridge.serve(private, go, path, platform='linux', uid=0, host=HOST, owner_uid=os.getuid())
+"""
+
+
+class ServeLifecycleTests(GateTest):
+    """A real serve process: SIGTERM stops it cleanly, SIGKILL leaves a stale socket that the next
+    start removes. Synthetic state only; no request reaches execution."""
+
+    def start(self, gate, path):
+        process = subprocess.Popen([sys.executable, '-I', '-c', SERVE_SCRIPT, str(Path(__file__).resolve().parent),
+                                    str(gate.private), str(gate.go_path), str(path)],
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.addCleanup(process.stderr.close)
+        self.addCleanup(process.stdout.close)
+        self.addCleanup(lambda: process.poll() is None and (process.kill(), process.wait(10)))
+        line = process.stdout.readline()
+        self.assertTrue(line, process.stderr.read() if process.poll() is not None else 'no serving line')
+        return process, json.loads(line)
+
+    def test_sigterm_stops_cleanly_and_sigkill_leftover_is_removed_on_the_next_start(self):
+        gate = self.gate().ready()
+        folder = gate.root / 'run'
+        folder.mkdir(mode=0o755)
+        os.chmod(folder, 0o755)
+        path = folder / 'gate.sock'
+
+        process, serving = self.start(gate, path)
+        self.assertEqual((serving['status'], serving['stale_socket_removed']), ('serving', False))
+        self.assertEqual(os.stat(path).st_mode & 0o777, 0o666)
+        process.send_signal(signal.SIGKILL)
+        process.wait(10)
+        self.assertTrue(os.path.lexists(path))  # What a crash leaves behind.
+
+        process, serving = self.start(gate, path)
+        self.assertEqual((serving['status'], serving['stale_socket_removed'], serving['interrupted_calls_found']),
+                         ('serving', True, 0))
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        client.connect(str(path))  # The new server listens on the reclaimed name.
+        client.close()
+        process.send_signal(signal.SIGTERM)
+        self.assertEqual(process.wait(10), 0)
+        self.assertEqual([json.loads(line)['status'] for line in process.stdout.read().splitlines()], ['stopped'])
+        self.assertFalse(os.path.lexists(path))
+        self.assertEqual(gate.status()['state'], 'active')
+
+    def test_a_second_serve_on_a_live_socket_refuses_and_leaves_it(self):
+        gate = self.gate().ready()
+        folder = gate.root / 'run'
+        folder.mkdir(mode=0o755)
+        os.chmod(folder, 0o755)
+        path = folder / 'gate.sock'
+        process, _ = self.start(gate, path)
+        with patch.object(bridge, 'SOCKET_PATTERN', re.compile(re.escape(str(path)))), \
+                self.refused('SERVE_ALREADY_RUNNING'):
+            bridge.serve(gate.private, gate.go_path, path, platform='linux', uid=0, host=HOST, owner_uid=os.getuid())
+        other = self.gate().ready()
+        with patch.object(bridge, 'SOCKET_PATTERN', re.compile(re.escape(str(path)))), \
+                self.refused('IPC_SOCKET_IN_USE'):
+            bridge.serve(other.private, other.go_path, path, platform='linux', uid=0, host=HOST, owner_uid=os.getuid())
+        process.send_signal(signal.SIGTERM)
+        self.assertEqual(process.wait(10), 0)
+
+
+class SignalStopTests(GateTest):
+    def serve_on(self, gate, execute, **server_options):
+        path = gate.root / 's.sock'
+        handler = bridge.make_handler(gate.private, [PEER], execute, gate.slots, peer_uid_of=lambda _c: PEER,
+                                      now=gate.clock)
+        server = bridge.UnixThreadingServer(str(path), handler, **server_options)
+        loop = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': 0.05}, daemon=True)
+        loop.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(lambda: loop.is_alive() and server.shutdown())  # A failing test must not hang the run.
+        return path, server, loop
+
+    def post(self, path):
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(client.close)
+        client.connect(str(path))
+        client.sendall(b'POST /complete HTTP/1.0\r\nContent-Length: 2\r\n\r\n{}')
+        return client
+
+    @staticmethod
+    def read_all(client):
+        client.settimeout(5)
+        reply = b''
+        while True:
+            chunk = client.recv(65536)
+            if not chunk:
+                return reply
+            reply += chunk
+
+    def test_stop_lets_the_call_in_flight_finish_and_be_delivered(self):
+        gate = self.gate().ready()
+        started, finished = threading.Event(), []
+
+        def execute(_data, _uid, _cancelled, _on_reserved):
+            started.set()
+            time.sleep(0.2)
+            finished.append(time.monotonic())
+            return {'status': 200, 'body': '{}'}
+        path, server, loop = self.serve_on(gate, execute)
+        client = self.post(path)
+        self.assertTrue(started.wait(5))
+        bridge.begin_stop(server, gate.slots)
+        loop.join(5)
+        self.assertFalse(loop.is_alive())
+        server.server_close()  # Waits for the call in flight.
+        self.assertTrue(finished and finished[0] <= time.monotonic())
+        reply = self.read_all(client)
+        self.assertTrue(reply.startswith(b'HTTP/1.0 200'), reply[:40])
+
+    def test_after_stop_nothing_new_is_reserved(self):
+        gate = self.gate().ready()
+        bridge.begin_stop(types.SimpleNamespace(shutdown=lambda: None), gate.slots)
+        dispatched = []
+        with self.refused('AUTHORITY_STOPPED'):
+            gate.call('op-1', dispatch=lambda *args: dispatched.append(args))
+        self.assertEqual((dispatched, gate.status()['today_posts'], gate.status()['state']), ([], 0, 'active'))
+
+    def test_while_stopping_a_reply_gets_the_short_drain_timeout(self):
+        gate = self.gate().ready()
+        seen = []
+
+        def execute(_data, _uid, _cancelled, _on_reserved):
+            gate.slots.trip()  # The stop arrives while this call runs.
+            return {'status': 200, 'body': '{}'}
+        path, server, loop = self.serve_on(gate, execute)
+        real_reply = None
+
+        def record_timeout(handler, code, payload):
+            result = real_reply(handler, code, payload)
+            seen.append(handler.connection.gettimeout())
+            return result
+        handler_class = server.RequestHandlerClass
+        real_reply = handler_class.reply
+        with patch.object(handler_class, 'reply', record_timeout):
+            reply = self.read_all(self.post(path))
+        self.assertTrue(reply.startswith(b'HTTP/1.0 200'), reply[:40])
+        self.assertEqual((seen, bridge.DRAIN_REPLY_SECONDS), ([30], 30))
+
+    def test_a_peer_outside_the_allowed_uids_is_closed_before_it_gets_a_thread(self):
+        gate = self.gate().ready()
+
+        def execute(*_args):
+            raise AssertionError('never reached')
+        path, server, loop = self.serve_on(gate, execute, allowed_uids=frozenset({PEER}), peer_uid_of=lambda _r: 7)
+        with patch.object(server, 'process_request', side_effect=AssertionError('no thread for a stranger')):
+            client = self.post(path)
+            client.settimeout(5)
+            # Closed without one reply byte. Linux answers a close with unread request bytes by a
+            # reset (ECONNRESET); macOS by a plain end of stream. Both mean "closed, no reply";
+            # any byte received before either one still fails the test.
+            reply = b''
+            try:
+                while chunk := client.recv(65536):
+                    reply += chunk
+            except ConnectionResetError:
+                pass
+            self.assertEqual(reply, b'')
+        broken = bridge.UnixThreadingServer.__new__(bridge.UnixThreadingServer)
+        broken.allowed_uids, broken.peer_uid_of = frozenset({PEER}), lambda _r: 1 / 0
+        self.assertFalse(broken.verify_request(None, None))
 
 
 class SocketServerTests(GateTest):

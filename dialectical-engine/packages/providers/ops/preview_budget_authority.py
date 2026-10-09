@@ -12,7 +12,22 @@ reservation halts every new call until Root re-activates; calls already in fligh
 settle. A halt is written before the ledger entry it explains, and serve start halts on any
 call a crash interrupted. If a settlement or a halt cannot be written, the running server
 reserves nothing more until it is restarted.
-The retired v1 ledger (budget-ledger.json) is never opened.
+The retired v1 ledger (budget-ledger.json) is never opened, and serve refuses the retired v1
+socket name (provider-budget.sock): v2 always serves on its own, explicitly named socket.
+
+Stopping and restarting serve: SIGTERM (systemctl stop) closes the socket at once, reserves
+nothing more, lets the calls already in flight finish and settle (a reply that cannot be written
+within DRAIN_REPLY_SECONDS halts, as any lost reply does), removes the socket file and exits 0.
+If serve dies without
+that (SIGKILL, a crash), the next serve start removes the left-over socket file only when it is
+provably stale: a socket owned by root, in a root-owned folder no one else can write, that no
+process is listening on (a connect is refused). Anything else at that path refuses serve start.
+
+Provably unsent calls (by design): if the TCP connect or the TLS handshake fails before any request
+byte is written, nothing billable reached the provider. That call's hold is released and only it
+fails; the gate does not halt. UNSENT_HALT_STREAK such failures in a row (kept in the control
+file, so a restart does not reset them) halt with provider_unreachable. Any settled reply or an
+activation resets the streak. Anything after the connect stays uncertain and halts as before.
 
 Day boundary (by design): a call is charged to the Bucharest day on which it was reserved, even
 when it settles after midnight. So the real upstream charges made within one calendar day can
@@ -26,6 +41,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import socket
 import stat
 import struct
@@ -61,9 +77,13 @@ SLOT_WAIT_SECONDS = 60
 # caller's 630 s timeout (preview-test.ts: PREVIEW_GLM_DEADLINE_MS + 30 s).
 CALL_DEADLINE_SECONDS = 600
 REPLY_TIMEOUT_SECONDS = 630
+DRAIN_REPLY_SECONDS = 30  # Once stopping (or tripped), a reply must be taken this fast or the gate halts.
+STOP_SIGNALS = (signal.SIGTERM, signal.SIGINT)
+SERVE_POLL_SECONDS = 0.5  # How often the accept loop checks for a stop (bounds the stop's first step).
 MAX_IPC_BYTES = 1024 * 1024
 IPC_READ_TIMEOUT_SECONDS = 10  # Each header or body read on the 0666 socket.
 MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a thread.
+UNSENT_HALT_STREAK = 5  # Provably unsent calls in a row before the gate halts (provider_unreachable).
 STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
 PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED'})
 GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'model', 'requested_effort',
@@ -72,6 +92,8 @@ GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_
 GO_OPTIONAL = frozenset({'predecessor_ledger_sha256'})
 DAY_PATTERN = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}')
 SOCKET_PATTERN = re.compile(r'/run/debateai-v3-preview/[a-z0-9-]+\.sock')
+RETIRED_SOCKET_NAMES = frozenset({'provider-budget.sock'})  # v1's name: old clients must never reach v2.
+STALE_PROBE_SECONDS = 2
 ENTRY_STATES = ('pending', 'settled', 'uncertain')
 
 
@@ -335,7 +357,8 @@ def _halt(control, reason, moment, entry_id=None):
 def day_summary(control, ledger, moment):
     budget, spend = Decimal(control['limits']['daily_budget_usd']), day_spend(ledger)
     open_until = control.get('open_until_utc')
-    return {'state': control['state'], 'reason': control['reason'], 'open_until_utc': open_until,
+    return {'state': control['state'], 'reason': control['reason'], 'halted_at': control.get('halted_at'),
+            'unsent_streak': control.get('unsent_streak', 0), 'open_until_utc': open_until,
             'window_open': control['state'] == 'active' and moment < datetime.fromisoformat(open_until),
             'today': ledger['day'], 'daily_budget_usd': control['limits']['daily_budget_usd'],
             'today_spend_usd': str(spend), 'remaining_today_usd': str(max(Decimal(0), budget - spend)),
@@ -376,7 +399,7 @@ def activate(private, go_path, host=None, platform=None, now=None):
         control.update(state='active', last_halt_reason=control['reason'], reason=None, go_sha256=go_sha,
                        limits=limits_of(go), target_host=go['target_host'], active_host=host,
                        activated_at=iso(moment), open_until_utc=iso(moment + timedelta(days=go['open_days'])),
-                       activations=control['activations'] + 1)
+                       activations=control['activations'] + 1, unsent_streak=0)
         store.save_control(control)
         return day_summary(control, store.ledger(bucharest_day(moment)), moment)
 
@@ -507,6 +530,8 @@ def record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
             store.save_control(control)
             raise SafetyError('SETTLEMENT_STATE_INVALID')
         entry.update(changes, reconciled_at=iso(moment))
+        if entry['state'] == 'settled':
+            control['unsent_streak'] = 0  # The provider answered with accountable usage.
         if halt_reason is None and day_spend(ledger) > budget:
             halt_reason = 'charge_overrun'
         if halt_reason is not None:
@@ -516,6 +541,39 @@ def record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
         control['in_flight'].pop(entry_id, None)
         store.save_control(control)
         return {'authority': control['state'], 'day_held_usd': str(day_spend(ledger))}
+
+
+class CallNotSent(SafetyError):
+    """This call failed before any request byte was written, and its hold was released. The IPC
+    handler does not halt for it: nothing paid can have been lost."""
+
+
+def release_unsent(private, entry_id, day, now):
+    """Lock, count one provably unsent call (halting at UNSENT_HALT_STREAK in a row), drop its
+    pending hold from the day ledger, clear it from in flight, unlock.
+
+    Write order as for a settlement: the control file (streak, and any halt) first, then the
+    ledger, then in flight is cleared. Dying after the first write leaves a pending entry in flight
+    (serve start halts on it: fail closed); after the second, an in-flight id without an entry,
+    which serve start drops as never dispatched.
+    """
+    with TeamStore(private) as store:
+        control = store.control()
+        moment = current(now)
+        ledger = store.ledger(day)
+        entry = ledger['entries'].get(entry_id)
+        if entry is None or entry['state'] != 'pending' or control['in_flight'].get(entry_id) != day:
+            raise SafetyError('SETTLEMENT_STATE_INVALID')
+        streak = control.get('unsent_streak', 0) + 1
+        control['unsent_streak'] = streak
+        if streak >= UNSENT_HALT_STREAK:
+            _halt(control, 'provider_unreachable', moment, entry_id)
+        store.save_control(control)
+        del ledger['entries'][entry_id]
+        store.save_ledger(ledger)
+        control['in_flight'].pop(entry_id, None)
+        store.save_control(control)
+        return {'authority': control['state'], 'unsent_streak': streak}
 
 
 def settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots):
@@ -588,6 +646,18 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             send = dispatch or helper.HttpsTransport(timeout=max(1.0, CALL_DEADLINE_SECONDS - (time.monotonic() - accepted)))
             status, response = send(outgoing, key)
             response = helper.redact(response if isinstance(response, dict) else {}, key)
+        except helper.RequestNotSent:
+            try:
+                outcome = release_unsent(private, entry_id, day, now)
+            except BaseException:
+                # The hold could not be released: treat it exactly like an uncertain call.
+                outcome = settle_or_halt(private, entry_id, day, {
+                    'state': 'uncertain', 'held_usd': str(reserved), 'reason': 'release_failure',
+                    'elapsed_seconds': round(time.monotonic() - started, 6)}, 'uncertain_charge', budget, now, slots)
+                log_event({**event, 'status': 'uncertain', **outcome})
+                raise SafetyError('NEW_CHARGE_UNCERTAIN') from None
+            log_event({**event, 'status': 'not_sent', **outcome})
+            raise CallNotSent('PROVIDER_NOT_REACHED') from None
         except BaseException as error:
             outcome = settle_or_halt(private, entry_id, day, {
                 'state': 'uncertain', 'held_usd': str(reserved), 'reason': 'transport_failure',
@@ -723,6 +793,9 @@ def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_u
             pass
 
         def reply(self, code, payload):
+            if slots.tripped:
+                # Stopping (or tripped): a reply must not hold the stop for the full reply timeout.
+                self.connection.settimeout(DRAIN_REPLY_SECONDS)
             self.send_response(code)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Content-Length', str(len(payload)))
@@ -748,8 +821,9 @@ def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_u
                 result = execute(data, uid, lambda: caller_canceled(self.connection), reserved.append)
                 encoded = json.dumps(result, ensure_ascii=True).encode('ascii')
             except BaseException as error:
-                if reserved:
+                if reserved and not isinstance(error, CallNotSent):
                     # Once a hold exists, any failure may lose a paid reply: halt, as for a lost reply.
+                    # A provably unsent call released its hold already; nothing paid can be lost.
                     self.stop_gate(reserved[0])
                 try:
                     self.reply(409, refusal_body(error))
@@ -770,9 +844,20 @@ class UnixThreadingServer(ThreadingMixIn, HTTPServer):
     daemon_threads = False
     max_connections = MAX_IPC_CONNECTIONS
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, allowed_uids=None, peer_uid_of=None, **kwargs):
         self.connection_slots = threading.BoundedSemaphore(self.max_connections)
+        # With allowed_uids, a peer outside them is closed before it gets a thread or a slot, so it
+        # cannot hold connections (or a stop) open by sending headers slowly.
+        self.allowed_uids, self.peer_uid_of = allowed_uids, peer_uid_of or linux_peer_uid
         super().__init__(*args, **kwargs)
+
+    def verify_request(self, request, client_address):
+        if self.allowed_uids is None:
+            return True
+        try:
+            return self.peer_uid_of(request) in self.allowed_uids
+        except Exception:  # noqa: BLE001 - an unreadable peer is refused, never fatal to the loop
+            return False
 
     def process_request(self, request, client_address):
         if not self.connection_slots.acquire(blocking=False):
@@ -796,33 +881,143 @@ class UnixThreadingServer(ThreadingMixIn, HTTPServer):
         self.server_port = 0
 
 
-def serve(private, go_path, socket_path, platform=None, uid=None, host=None):
+def clear_stale_socket(socket_path, owner_uid=0, probe_seconds=None):
+    """Before serve binds: True if a provably stale socket file was removed, False if the path was
+    free. Anything else refuses, and the path is left exactly as it was.
+
+    Stale means all of: the folder is a real folder (not a symlink) owned by owner_uid (root) that
+    group and others cannot write, so no one but root can create, swap or remove what is in it;
+    the entry is a socket (not a symlink, file or folder) owned by owner_uid with one link; and a
+    connect to it is refused (ECONNREFUSED: no process is listening). A listener, a full backlog,
+    a timeout or any other connect error refuses with IPC_SOCKET_IN_USE. The entry is unlinked
+    relative to the checked folder only if it is still the same inode that was checked. Callers
+    hold the serve lock, so no other serve on this state can race this.
+    """
+    probe_seconds = STALE_PROBE_SECONDS if probe_seconds is None else probe_seconds
+    path = Path(socket_path)
+    try:
+        dir_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
+        raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED') from None
+    try:
+        folder = os.fstat(dir_fd)
+        if folder.st_uid != owner_uid or folder.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED')
+        try:
+            entry = os.stat(path.name, dir_fd=dir_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED') from None
+        if not stat.S_ISSOCK(entry.st_mode) or entry.st_uid != owner_uid or entry.st_nlink != 1:
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED')
+        probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            probe.settimeout(probe_seconds)
+            probe.connect(str(path))
+        except ConnectionRefusedError:
+            # Nothing listens: the file is what a killed server left behind. (On Linux, the only
+            # platform serve runs on, a live listener with a full backlog answers EAGAIN instead,
+            # which refuses below. A socket another root process has bound but not yet put into
+            # listen also answers ECONNREFUSED; only root can do that in this folder.)
+            pass
+        except OSError:
+            raise SafetyError('IPC_SOCKET_IN_USE') from None
+        else:
+            raise SafetyError('IPC_SOCKET_IN_USE')
+        finally:
+            probe.close()
+        try:
+            again = os.stat(path.name, dir_fd=dir_fd, follow_symlinks=False)
+        except OSError:
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED') from None
+        if (again.st_dev, again.st_ino, again.st_mode, again.st_uid) != (entry.st_dev, entry.st_ino, entry.st_mode, entry.st_uid):
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED')
+        try:
+            os.unlink(path.name, dir_fd=dir_fd)
+        except OSError:
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED') from None
+        return True
+    finally:
+        os.close(dir_fd)
+
+
+def socket_path_allowed(socket_path):
+    text = str(socket_path)
+    return bool(SOCKET_PATTERN.fullmatch(text)) and Path(text).name not in RETIRED_SOCKET_NAMES
+
+
+def begin_stop(server, slots):
+    """Stop: nothing more is reserved (the trip), and serve_forever returns. Calls already running
+    finish and settle; server_close then waits for them."""
+    slots.trip()
+    server.shutdown()
+
+
+def remove_own_socket(socket_path, bound):
+    """Unlink the socket file only if it is still the one this server bound."""
+    try:
+        now = os.stat(socket_path, follow_symlinks=False)
+    except OSError:
+        return
+    if (now.st_dev, now.st_ino) == bound:
+        os.unlink(socket_path)
+
+
+def serve(private, go_path, socket_path, platform=None, uid=None, host=None, owner_uid=0):
     go = read_go(go_path)
     platform = platform or sys.platform
     uid = os.getuid() if uid is None else uid
     host = host or socket.gethostname()
-    if platform != 'linux' or uid != 0 or host != go['target_host'] \
-            or not SOCKET_PATTERN.fullmatch(str(socket_path)) or Path(socket_path).exists():
+    if platform != 'linux' or uid != 0 or host != go['target_host'] or not socket_path_allowed(socket_path):
         raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED')
     bucharest_day(helper.utc_now())  # Fail fast without the time zone database.
     serve_lock = hold_serve_lock(private)
     try:
+        # Under the serve lock: no other serve on this state can be clearing or binding meanwhile.
+        stale_removed = clear_stale_socket(socket_path, owner_uid=owner_uid)
         recovered = recover_interrupted(private)
         slots = CallSlots(go['max_concurrent_calls'])
 
         def execute(data, uid, cancelled, on_reserved):
             return execute_request(private, go_path, data, peer_uid=uid, slots=slots, cancelled=cancelled,
                                    on_reserved=on_reserved)
-        server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots))
-        os.chmod(socket_path, 0o666)
-        emit({'status': 'serving', 'socket': str(socket_path), 'max_concurrent_calls': slots.limit,
-              'interrupted_calls_found': recovered['interrupted'],
-              'unrecorded_uncertain_found': recovered['unrecorded_uncertain']})
+        # Stop signals are blocked before any thread exists, so every thread inherits the block and
+        # this (main) thread takes them with sigwait: no Python signal handler runs at all. A stop
+        # signal that came earlier ended the process the default way (the next start recovers).
+        signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
+        server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots),
+                                     allowed_uids=frozenset(go['allowed_peer_uids']))
+        info = os.stat(socket_path, follow_symlinks=False)
+        bound, failure = (info.st_dev, info.st_ino), []
+
+        def loop():
+            try:
+                server.serve_forever(poll_interval=SERVE_POLL_SECONDS)
+            except BaseException as error:  # noqa: BLE001 - reported by the main thread
+                failure.append(error)
+                os.kill(os.getpid(), signal.SIGTERM)  # Wakes the sigwait below.
+        runner = threading.Thread(target=loop, name='serve-loop')
         try:
-            server.serve_forever()
+            os.chmod(socket_path, 0o666)
+            runner.start()
+            emit({'status': 'serving', 'socket': str(socket_path), 'max_concurrent_calls': slots.limit,
+                  'stale_socket_removed': stale_removed, 'interrupted_calls_found': recovered['interrupted'],
+                  'unrecorded_uncertain_found': recovered['unrecorded_uncertain']})
+            signal.sigwait(STOP_SIGNALS)
+            begin_stop(server, slots)
+            runner.join()
         finally:
+            slots.trip()
+            if runner.is_alive():  # Only if something above failed before the stop.
+                server.shutdown()
+                runner.join()
+            # Closes the listening socket first, then waits for in-flight calls to finish and settle.
             server.server_close()
-            Path(socket_path).unlink(missing_ok=True)
+            remove_own_socket(socket_path, bound)
+        if failure:
+            raise failure[0]
+        log_event({'status': 'stopped', 'socket': str(socket_path)})
     finally:
         os.close(serve_lock)
 
@@ -832,7 +1027,7 @@ def main(argv=None):
     parser.add_argument('phase', choices=('init', 'activate', 'serve', 'stop', 'status'))
     parser.add_argument('--private', type=Path, required=True)
     parser.add_argument('--go', type=Path)
-    parser.add_argument('--socket', type=Path, default=Path('/run/debateai-v3-preview/provider-budget.sock'))
+    parser.add_argument('--socket', type=Path)  # serve only, and required there: no built-in name.
     args = parser.parse_args(argv)
     try:
         uses_go = args.phase in ('init', 'activate', 'serve')
@@ -849,6 +1044,8 @@ def main(argv=None):
         elif args.phase == 'status':
             result = status(args.private)
         else:
+            if args.socket is None:
+                raise SafetyError('ROOT_SOCKET_REQUIRED')
             serve(args.private, args.go, args.socket)
             return 0
         emit(result)

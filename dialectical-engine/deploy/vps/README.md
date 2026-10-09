@@ -933,6 +933,25 @@ If the 0093 steps above have already run on this host, the API's login already h
 moment the migration commits. If both migrations are pending, one pass through the 0093 steps covers both. The check is the same: one `retention.purged` line at the API's first purge
 check, and a test sign-up that succeeds. **Rolling back** the code needs nothing, for the same reason as 0093.
 
+### Upgrading to the answer-writer prompt v2 release (serve.synthesizer.v2)
+
+This release supersedes the answer writer's sealed prompt `serve.synthesizer.v1` with `serve.synthesizer.v2`, which
+also tells the model the exact name of the one served-number slot (`number:final-strength`) and the identifier form
+the runner accepts. Its fingerprint is the code-owned row `composerContractHash`, so it moves. No migration.
+
+- **Publish a new hosted register version** from the new checkout with `pnpm register:publish-hosted` and the same
+  `/etc/debateai/register/hosted-register.json` (§11), pin it in both `EnvironmentFile`s and restart both units.
+  Until then the runner sends the v2 prompt but records answer-writing calls under the v1 fingerprint the pinned
+  version carries. Do this before any later `pnpm hosted:publish-provider-set`, for the reason given in the
+  publication-check section above.
+- **Restart once, with no debate writing its answer.** The fingerprint is also the key under which the runner
+  finds a debate's earlier answer-writing attempts. A debate that is writing its answer when the new version is
+  pinned no longer sees those attempts: it may ask its writer again (extra paid calls) and its writer-seat
+  continuity starts over. So put the checkout in place, publish, pin, and restart both units in one step, at a
+  moment when `unfinished` from the command in the verdict-story section above is 0 (or accept that rare repeat).
+- Versions already sealed keep the v1 fingerprint; nothing is edited. **Rolling back** the code means pinning the
+  register version the older code was running on again.
+
 ### Upgrading an existing host (paid plans Part 1a)
 
 This release keeps a record of which Terms of Service and Privacy Policy each person accepted,

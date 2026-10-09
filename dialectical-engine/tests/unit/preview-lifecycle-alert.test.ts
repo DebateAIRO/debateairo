@@ -529,3 +529,52 @@ describe('owner list install helper (alert.mjs --install-owner-list)', () => {
     expect(h.sent).toEqual([]);
   });
 });
+
+describe('spending-gate notices', () => {
+  const halted = 'debateai-preview-notice@gate-halted-provider_unreachable.service';
+  const mismatch = 'debateai-preview-notice@gate-addresses-mismatch.service';
+  const notMe = { readUnitState: async () => { throw new Error('a notice never asks systemd for a unit state'); } };
+
+  it('takes only the two notice kinds with a lowercase code', () => {
+    expect(alert.parseAlertArgs(['--notice', 'gate-halted-provider_unreachable'])).toEqual({ unit: halted, test: false, notice: { kind: 'gate-halted', code: 'provider_unreachable', unit: halted } });
+    expect(alert.parseAlertArgs(['--notice', 'gate-addresses-mismatch'])).toMatchObject({ unit: mismatch, notice: { kind: 'gate-addresses', code: 'mismatch' } });
+    for (const argv of [['--notice'], ['--notice', 'gate-halted-'], ['--notice', 'gate-halted-PROVIDER'], ['--notice', 'gate-halted-a b'], ['--notice', 'gate-halted-x.service'],
+      ['--notice', 'other-kind-x'], ['--notice', 'gate-halted-x', '--unit', unit], ['--notice', `gate-halted-${'x'.repeat(65)}`]]) expect(alert.parseAlertArgs(argv)).toBeNull();
+  });
+
+  it('a halt notice names the reason and the one command that re-opens the gate, with no journal lines or amounts', async () => {
+    const layout = server();
+    const h = harness(layout, { ...notMe, readJournal: async () => { throw new Error('a halt notice reads no journal'); } });
+    const args = alert.parseAlertArgs(['--notice', 'gate-halted-provider_unreachable']);
+    await expect(alert.runAlert({ ...args, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_SENT', unit: halted });
+    const mail = h.sent[0]!;
+    expect(mail).toContain('Subject: Preview: spending gate stopped: provider_unreachable');
+    expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-team-authority-v2 --go /etc/debateai-v3-preview/provider-team-go-v2.json');
+    expect(mail).toContain('systemctl status debateai-preview-provider-budget.service');
+    expect(mail).not.toContain('journal lines');
+    expect(mail).not.toMatch(/\$|usd/i);
+  });
+
+  it('an address notice carries the address check journal and the one command that updates the list', async () => {
+    const layout = server();
+    const asked: string[] = [];
+    const h = harness(layout, { ...notMe, readJournal: async (name: string) => { asked.push(name); return ['{"status": "refused", "error": "DEEPINFRA_ADDRESSES_CHANGED", "new": ["38.101.151.31"]}']; } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'gate-addresses-mismatch']), layout, deps: h.deps });
+    expect(asked).toEqual(['debateai-preview-gate-addresses.service']);
+    const mail = h.sent[0]!;
+    expect(mail).toContain('Subject: Preview: spending gate address list needs an update (mismatch)');
+    expect(mail).toContain('DEEPINFRA_ADDRESSES_CHANGED');
+    expect(mail).not.toContain('38.101.151.31'); // The alert blanks addresses; the email says how to see them.
+    expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/deepinfra_addresses.py update --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf && systemctl restart debateai-preview-provider-budget');
+  });
+
+  it('refuses a notice whose unit name does not match it, and rate-limits each notice name on its own', async () => {
+    const layout = server();
+    const h = harness(layout, notMe);
+    await expect(alert.runAlert({ unit, notice: { kind: 'gate-halted', code: 'x' }, layout, deps: h.deps })).resolves.toMatchObject({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', reason: 'NOTICE_REFUSED' });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'gate-halted-provider_unreachable']), layout, deps: h.deps });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'gate-halted-provider_unreachable']), layout, deps: h.deps });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'gate-halted-uncertain_charge']), layout, deps: h.deps });
+    expect(h.sent.map(mail => mail.match(/^Subject: (.*)$/m)![1])).toEqual(['Preview: spending gate stopped: provider_unreachable', 'Preview: spending gate stopped: uncertain_charge']);
+  });
+});
