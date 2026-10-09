@@ -1,0 +1,37 @@
+# Install as /etc/systemd/system/debateai-preview-gate-addresses.service (root:root 0644).
+# Started hourly by debateai-preview-gate-addresses.timer. It runs the same check the gate runs
+# before every start, so a DeepInfra address change is noticed while the gate is running, not
+# only at its next start. A refusal fails this unit, and the preview alert emails the owner.
+# It reads only DNS (through the local resolver) and the drop-in; no key, no gate state.
+[Unit]
+Description=DebateAI preview: check the spending gate's DeepInfra allow-list against DNS
+OnFailure=debateai-preview-alert@%n.service
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/deepinfra_addresses.py check --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf
+TimeoutStartSec=60
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+InaccessiblePaths=-/etc/debateai-v3-preview -/var/lib/debateai-v3-preview -/var/lib/postgresql -/etc/postfix
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost

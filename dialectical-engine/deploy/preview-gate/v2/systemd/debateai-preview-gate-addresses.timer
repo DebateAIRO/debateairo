@@ -1,0 +1,12 @@
+# Install as /etc/systemd/system/debateai-preview-gate-addresses.timer (root:root 0644), then:
+# systemctl enable --now debateai-preview-gate-addresses.timer
+[Unit]
+Description=DebateAI preview: hourly check of the spending gate's DeepInfra allow-list
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

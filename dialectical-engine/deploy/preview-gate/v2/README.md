@@ -1,0 +1,386 @@
+# Preview spending gate v2: install and daily use
+
+## In plain words
+
+The spending gate is the only program on the preview server that holds the DeepInfra key. In the
+owner's words, it:
+
+- keeps the key away from the website;
+- sets aside each call's maximum cost before calling;
+- is locked to one model (GLM-5.3-Flash, effort "high").
+
+The website (API) and the runner ask the gate for each model call through a local socket file.
+The gate checks the team's money for today, makes the call, records what it really cost, and
+answers. All calls share ONE team pot of $5 per day. The day resets at midnight Bucharest time.
+At most 4 calls run at the same time.
+
+If anything about a call is unclear (no cost reported, a provider error, a lost reply), the gate
+stops taking new calls. It stays stopped ("halted") until root opens it again with `activate`.
+A restart never re-opens it.
+
+This folder holds:
+
+| File | What it is |
+|---|---|
+| `systemd/debateai-preview-provider-budget.service` | The gate's service file. It replaces the old v1 file of the same name. |
+| `systemd/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf` | The list of DeepInfra internet addresses the gate may reach (measured 2026-10-09). |
+| `deepinfra_addresses.py` | Checks that list against DeepInfra's current addresses, and writes a fresh list. |
+| `systemd/debateai-preview-gate-addresses.{service,timer}` | Optional: runs that check every hour and emails the owner if DeepInfra moved. |
+
+The gate's own code is not here. It is `packages/providers/ops/preview_budget_authority.py` and
+`preview_budget_helper.py`, installed from the reviewed release.
+
+## Decisions you should know about
+
+- **Why this folder.** The unit belongs to gate v2, not to the lifecycle tooling, so it lives
+  next to its own version (`deploy/preview-gate/v2`), like `preview-auth-dev/v1` and
+  `preview-mail/v4-…`. The lifecycle target and the API drop-in only name the unit
+  (`Wants=debateai-preview-provider-budget.service`); they do not care which version it is.
+- **A fresh socket name.** v2 serves on `/run/debateai-v3-preview/team-budget-v2.sock`. The gate
+  has no built-in socket name any more: `serve` without `--socket` refuses with
+  `ROOT_SOCKET_REQUIRED`. It also refuses v1's name `provider-budget.sock`, so an old client
+  configured for v1 can never reach v2. Old clients get "connection refused" and fail closed.
+  The left-over v1 socket file on the server is harmless. It disappears at the next reboot
+  (`/run` is in memory).
+- **The gate's fingerprint.** These changes alter the gate's bytes, so its sha256 differs from
+  the one in the old runbook (`f74481cd…`). That is fine: the GO's `bridge_sha256` and
+  `helper_sha256` are computed on the server at install time (step 4) from the files actually
+  installed, never copied from git.
+- **DeepInfra's addresses.** systemd can only allow internet addresses, not host names. So the
+  gate may reach exactly the addresses in `50-deepinfra-addresses.conf`, and nothing else
+  (`IPAddressDeny=any`). If DeepInfra moves, calls would fail. Three things make that visible
+  instead of silent:
+  1. Before every start, the gate unit runs `deepinfra_addresses.py check`. If DNS gives any
+     address that is not listed, the gate does not start: `DEEPINFRA_ADDRESSES_CHANGED`, with
+     the new addresses named. Retries are harmless, and after 4 tries the owner gets an email.
+  2. The optional hourly timer runs the same check while the gate is running, and emails the
+     owner when it fails.
+  3. The list is never hand-edited. `render` writes it from DNS, and you compare it before
+     installing (see "DeepInfra moved").
+
+  Other options were weighed. A wider range (for example all of `38.101.151.0/24`) would also
+  break if DeepInfra moved elsewhere, and it would allow addresses DeepInfra may not own. No
+  systemd feature allows by host name. A firewall that follows DNS (nftables sets filled by a
+  resolver hook) is a bigger, separate change. The check is cheap, exact and testable.
+- **A crash leaves a socket file behind; the gate now cleans it up safely.** Before, a socket
+  left by a killed gate blocked every new start until root deleted it by hand. Even a normal
+  `systemctl stop` left one, because the gate did not handle SIGTERM. That is measured: the v1
+  socket file is still on the server while v1 is stopped. Now:
+  - `systemctl stop` (SIGTERM) closes the socket at once and lets calls in flight finish and be
+    paid for. Then it removes the socket file and exits cleanly.
+  - After a hard kill or crash, the next start removes the left-over file only when ALL of
+    these hold:
+    - it is a socket (not a link, file or folder);
+    - root owns it, and it has one name;
+    - it sits in a root-owned folder that no one else can write (`/run/debateai-v3-preview` is
+      `755 root:root`, measured);
+    - connecting to it is refused, so no program is listening.
+
+    Anything else refuses with `ROOT_IPC_CUSTODY_REQUIRED` or `IPC_SOCKET_IN_USE`, and the
+    file is left untouched.
+  - Why this is safe:
+    - Only root can create, swap or delete files in that folder, so no other account can trick
+      the clean-up.
+    - The file is checked without following links, and it is deleted only if it is still the
+      same file that was checked.
+    - The gate holds its "only one gate" lock while it does this.
+
+  A manual `rm` by a person at 3 a.m. checks none of this.
+- **Restart after a crash: yes (`Restart=on-failure`, 30 s pause, at most 4 tries in 15 min,
+  then one email).** A restart cannot spend more:
+  - the pot, the ledger and any halt are on disk;
+  - a call that the crash interrupted halts the gate at the next start;
+  - only `activate` (root) re-opens a halted gate.
+
+  So a restart only brings the socket back. A clean stop exits 0 and is not restarted.
+- **Stop can take up to about 11 minutes.** A call may run up to 600 s, so `TimeoutStopSec=700`.
+  If systemd has to kill it after that, the next start halts on the interrupted call (fail
+  closed).
+- **The key never leaves root.** Only the owner (or the owner saying yes to the exact command)
+  puts the key in place. No agent runs that step, and no agent reads the key file. Nothing the
+  gate logs contains the key: it logs fixed codes, amounts and operation ids only, and blanks
+  the key out of provider replies before using them.
+
+## Names
+
+| What | Where |
+|---|---|
+| Gate folder (code, root-owned, read-only) | `/opt/debateai-v3-preview/operator/team-budget-v2/` |
+| Private state (key, ledger; root only, `700`) | `/var/lib/debateai-v3-preview/provider-team-authority-v2/` |
+| GO (the owner's limits) | `/etc/debateai-v3-preview/provider-team-go-v2.json` |
+| Socket | `/run/debateai-v3-preview/team-budget-v2.sock` |
+| Unit | `/etc/systemd/system/debateai-preview-provider-budget.service` |
+| Address list | `/etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf` |
+
+## Install (operator, as root: `sudo -i`, in this order)
+
+Do all of this BEFORE `systemctl enable debateai-preview.target` (lifecycle README step 9).
+The target pulls in this unit name at every boot. With the v1 file still there, it would start
+the old v1 gate.
+
+**0. Check the starting point.** The first command must print `disabled` or `not-found`, and the
+second `inactive` (systemd 254 or newer is needed for `RestartMode=direct`; the server has 259).
+
+```sh
+systemctl is-enabled debateai-preview.target
+systemctl is-active debateai-preview-provider-budget
+systemctl --version | head -1
+```
+
+**1. Gate folder.** Copy the three files from the reviewed release tree. Set `R` to that release's
+`dialectical-engine` folder on the server.
+
+```sh
+R=/opt/debateai-v3-preview/releases/<reviewed-release>/dialectical-engine
+G=/opt/debateai-v3-preview/operator/team-budget-v2
+install -d -o root -g root -m 0755 $G
+install -o root -g root -m 0644 $R/packages/providers/ops/preview_budget_authority.py $R/packages/providers/ops/preview_budget_helper.py $R/deploy/preview-gate/v2/deepinfra_addresses.py $R/deploy/preview-gate/v2/README.md $G/
+sha256sum $G/*.py
+namei -l $G/preview_budget_authority.py
+```
+
+`namei` must show `root root` on every line, with no `w` for group or others. The hashes must
+equal `sha256sum` of the same three files in a trusted checkout of the reviewed commit.
+
+**2. Private state folder.** The second command must print `700 root:root`.
+
+```sh
+install -d -o root -g root -m 0700 /var/lib/debateai-v3-preview/provider-team-authority-v2
+stat -c '%a %U:%G' /var/lib/debateai-v3-preview/provider-team-authority-v2
+```
+
+**3. The DeepInfra key. The OWNER runs this (an agent never does).** Pick one option.
+
+Option A: reuse the key already on the server. This is a root-to-root copy, and the key is
+never shown.
+
+```sh
+install -o root -g root -m 0600 /var/lib/debateai-v3-preview/provider-test-authority/api-key.txt /var/lib/debateai-v3-preview/provider-team-authority-v2/api-key.txt
+```
+
+Option B: type a new key. Nothing is shown while you type; press Enter at the end. The key goes
+to no history, no process list and no other file (`printf` is a bash built-in, and `set -C`
+refuses to overwrite an existing file).
+
+```sh
+bash -c 'set -C; umask 077; IFS= read -rs K; printf "%s" "$K" > /var/lib/debateai-v3-preview/provider-team-authority-v2/api-key.txt; unset K'
+```
+
+Check it without reading it. Expect `600 root:root 1` followed by a size between 16 and 512.
+
+```sh
+stat -c '%a %U:%G %h %s' /var/lib/debateai-v3-preview/provider-team-authority-v2/api-key.txt
+```
+
+**4. The GO (the owner's limits; it holds no secret).** Recommended values:
+
+| Field | Value | Why |
+|---|---|---|
+| `scope_id` | `preview-team-v2-20261009` | New name for the new pot. The API's and runner's `PREVIEW_PROVIDER_TEST_CONFIG_JSON` must carry the same `scope_id`. |
+| `target_host` | `vps-a156d797` | The server's host name (measured). The gate refuses to run anywhere else. |
+| `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), measured with `id`. No one else may ask. |
+| `daily_budget_usd` | `"5.00"` | The owner's team pot. A string with two decimals. |
+| `max_paid_posts_per_day` | `400` | A second fuse. Each call first sets aside about $0.08, so $5 is reached long before 400. |
+| `max_concurrent_calls` | `4` | Owner ruling. |
+| `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
+| `predecessor_ledger_sha256` | v1 ledger hash | Optional. Records which v1 ledger this pot follows. |
+
+The other fields are fixed: `schema`, `allow_paid_calls` true, `model`, `requested_effort`
+"high", and the two file hashes, computed here from the installed files.
+
+```sh
+G=/opt/debateai-v3-preview/operator/team-budget-v2
+BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
+PRED=$(sha256sum /var/lib/debateai-v3-preview/provider-test-authority/budget-ledger.json | cut -d' ' -f1)
+umask 077
+jq -n --arg b "$BR" --arg h "$HE" --arg p "$PRED" '{schema:"preview-provider-budget-go-v2",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,model:"zai-org/GLM-5.3-Flash",requested_effort:"high",scope_id:"preview-team-v2-20261009",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"5.00",max_paid_posts_per_day:400,max_concurrent_calls:4,open_days:31,predecessor_ledger_sha256:$p}' > /root/preview-archive/provider-team-go-v2.json
+install -o root -g root -m 0600 /root/preview-archive/provider-team-go-v2.json /etc/debateai-v3-preview/provider-team-go-v2.json
+jq -c . /etc/debateai-v3-preview/provider-team-go-v2.json
+```
+
+**5. init, then activate (this opens the paid window).**
+
+```sh
+P=/var/lib/debateai-v3-preview/provider-team-authority-v2; GO=/etc/debateai-v3-preview/provider-team-go-v2.json; A=/opt/debateai-v3-preview/operator/team-budget-v2/preview_budget_authority.py
+/usr/bin/python3 -I $A init --private $P --go $GO
+/usr/bin/python3 -I $A activate --private $P --go $GO
+```
+
+What to expect:
+- `init` prints one line with `"state": "initialized"`.
+- `activate` prints a summary with `"state": "active"`, `"window_open": true` and
+  `"daily_budget_usd": "5.00"`.
+- A refusal is one line `{"status": "refused", "error": "<CODE>"}`. For example,
+  `HELPER_CUSTODY_INVALID` (file owners or modes), `ROOT_GO_INVALID` (a GO field or hash) or
+  `ACTIVATION_REFUSED` (wrong host or state).
+
+**6. The DeepInfra address list.** Write it from today's DNS, then compare it with the reviewed
+copy. Each step below is one command in the block that follows.
+
+1. Write the list from today's DNS.
+2. Compare it with the reviewed copy.
+3. Install it.
+4. Run the check.
+
+If the comparison prints nothing, nothing changed. If it shows lines, DeepInfra's addresses
+differ from 2026-10-09. Look at them (they should still be DeepInfra's) before installing.
+The check must print `"status": "ok"`.
+
+```sh
+G=/opt/debateai-v3-preview/operator/team-budget-v2; R=/opt/debateai-v3-preview/releases/<reviewed-release>/dialectical-engine
+/usr/bin/python3 -I $G/deepinfra_addresses.py render > /root/preview-archive/50-deepinfra-addresses.conf
+diff $R/deploy/preview-gate/v2/systemd/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf /root/preview-archive/50-deepinfra-addresses.conf
+install -d -o root -g root -m 0755 /etc/systemd/system/debateai-preview-provider-budget.service.d
+install -o root -g root -m 0644 /root/preview-archive/50-deepinfra-addresses.conf /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf
+/usr/bin/python3 -I $G/deepinfra_addresses.py check --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf
+```
+
+**7. Replace the v1 unit file (same name).** Keep a copy of v1, then install v2 and check.
+
+```sh
+R=/opt/debateai-v3-preview/releases/<reviewed-release>/dialectical-engine
+cp -p /etc/systemd/system/debateai-preview-provider-budget.service /root/preview-archive/debateai-preview-provider-budget.service.v1
+install -o root -g root -m 0644 $R/deploy/preview-gate/v2/systemd/debateai-preview-provider-budget.service /etc/systemd/system/debateai-preview-provider-budget.service
+systemctl daemon-reload
+systemd-analyze verify /etc/systemd/system/debateai-preview-provider-budget.service
+systemctl show -p ExecStart,Restart,RestartMode,TimeoutStopUSec,IPAddressDeny,IPAddressAllow debateai-preview-provider-budget
+```
+
+What to expect:
+- `verify` prints nothing about this unit. A note that `debateai-preview-alert@` is missing only
+  means the lifecycle alert is not installed yet.
+- `ExecStart` names `team-budget-v2.sock`.
+- `Restart=on-failure` and `RestartMode=direct`.
+- `IPAddressAllow` lists the localhost ranges plus exactly the addresses from step 6.
+
+**8. Point the API and the runner at the new socket.** Their `PREVIEW_PROVIDER_TEST_CONFIG_JSON`
+must have these two values:
+- `"budget_socket": "/run/debateai-v3-preview/team-budget-v2.sock"`;
+- the `scope_id` from step 4.
+
+That edit belongs to the API and runner env steps of the runbook, not to this README.
+
+**9. Start and check.**
+
+```sh
+systemctl start debateai-preview-provider-budget
+systemctl is-active debateai-preview-provider-budget
+journalctl -u debateai-preview-provider-budget -n 5 -o cat
+stat -c '%a %U:%G %F' /run/debateai-v3-preview/team-budget-v2.sock
+/usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-team-authority-v2
+```
+
+What to expect:
+- `active`.
+- The journal shows the check's `"status": "ok"` line, then `"status": "serving"` with
+  `"max_concurrent_calls": 4`, `"stale_socket_removed": false` and
+  `"interrupted_calls_found": 0`.
+- The socket is `666 root:root socket`. Anyone may connect, but the gate answers only uids 994
+  and 992.
+- `status` shows `"state": "active"`, `"window_open": true` and `"in_flight": 0`.
+
+**10. Optional, recommended: the hourly address check.** This is a lasting change, so it needs
+its own yes.
+
+```sh
+R=/opt/debateai-v3-preview/releases/<reviewed-release>/dialectical-engine
+install -o root -g root -m 0644 $R/deploy/preview-gate/v2/systemd/debateai-preview-gate-addresses.service $R/deploy/preview-gate/v2/systemd/debateai-preview-gate-addresses.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl start debateai-preview-gate-addresses.service && journalctl -u debateai-preview-gate-addresses -n 3 -o cat
+systemctl enable --now debateai-preview-gate-addresses.timer
+```
+
+The check run should print `"status": "ok"`. The email on failure uses the lifecycle alert
+(`debateai-preview-alert@.service`); until that is installed, a failure shows only in the
+journal.
+
+Only now may the lifecycle target be enabled.
+
+**Rollback.**
+1. Run `systemctl stop debateai-preview-provider-budget`.
+2. Copy the `.v1` file back from `/root/preview-archive/`.
+3. Remove the `.service.d/50-deepinfra-addresses.conf` drop-in by moving it to
+   `/root/preview-archive/`.
+4. Run `systemctl daemon-reload`.
+
+The v1 gate stays unusable anyway: its GO has expired. Debates then fail closed with "authority
+unavailable".
+
+## Daily operations
+
+**How much did we spend today? Is the gate open?** This only reads; it writes nothing. Look at:
+- `today_spend_usd` and `remaining_today_usd` (the day is the Bucharest day);
+- `state` and `reason`;
+- `halts`;
+- `window_open` and `open_until_utc`.
+
+```sh
+/usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-team-authority-v2
+```
+
+**Re-open after a halt (or after the 31 days).**
+1. Read `reason` and `halts` in `status` first.
+2. If a call was uncertain (`uncertain_charge`, `interrupted_call_uncertain`), check the
+   DeepInfra billing page for that time before re-opening. Its full worst-case cost stays
+   counted in that day's pot.
+3. Then run this (owner's yes):
+
+```sh
+/usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-team-authority-v2 --go /etc/debateai-v3-preview/provider-team-go-v2.json
+```
+
+The running gate picks this up on the next call. No restart is needed.
+
+**Emergency off.** There are two levels. They can be combined.
+- Level 1 is instant: no new paid call starts. Calls already running finish and are recorded.
+  The service keeps running and answers "stopped". Re-open with `activate`.
+- Level 2: the service stops and its socket closes. This waits for running calls, up to about
+  11 minutes. Start it again with `systemctl start debateai-preview-provider-budget`.
+
+Level 1:
+
+```sh
+/usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/preview_budget_authority.py stop --private /var/lib/debateai-v3-preview/provider-team-authority-v2
+```
+
+Level 2:
+
+```sh
+systemctl stop debateai-preview-provider-budget
+```
+
+**Change the daily budget or another limit.**
+1. Write the new GO (step 4, same `scope_id`).
+2. Run `stop`, then `activate`.
+3. If `max_concurrent_calls` changed, also restart the service. Calls refuse with
+   `SERVE_RESTART_REQUIRED` until you do.
+
+Until step 2, calls refuse ("stopped"): the gate only spends under the GO it was activated with.
+
+**DeepInfra moved (the start refused with `DEEPINFRA_ADDRESSES_CHANGED`, or the hourly check
+emailed).** Run step 6 again, then restart the gate:
+
+```sh
+systemctl daemon-reload
+systemctl restart debateai-preview-provider-budget
+```
+
+If a call failed in the meantime, the gate halted on it. Re-open it as above once the restart
+is clean.
+
+**A start refused with `IPC_SOCKET_IN_USE`.** Some program is listening on the gate's socket
+name. Do not delete the file. Find out which program it is:
+
+```sh
+ss -xlp | grep team-budget-v2
+```
+
+## What only the server can prove
+
+- `systemd-analyze verify` passes, and the sandbox starts with the extra `-` InaccessiblePaths.
+- DNS works inside the sandbox. The check and the model probe pass through
+  `IPAddressDeny=any` + `localhost` (the resolver is `127.0.0.53`, measured).
+- A real call reaches DeepInfra through the address list.
+- `systemctl stop` exits 0 and removes the socket.
+- `systemctl kill -s SIGKILL debateai-preview-provider-budget` leaves the socket, and the
+  automatic restart 30 s later logs `"stale_socket_removed": true`.
