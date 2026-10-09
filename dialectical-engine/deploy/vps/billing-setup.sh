@@ -7,21 +7,34 @@
 #   bash deploy/vps/billing-setup.sh --replace netopia    # that section, replacing its existing key files
 #
 # Each section asks its values one at a time and says where to find each one. Secrets are read with
-# systemd-ask-password (never shown, never on a command line or in shell history) and written as custody files: 0600,
-# owned by debateai-api, in the 0700 directory /etc/debateai/api/billing, each through a temporary file in the same
-# directory and one rename. Every file is first staged (written, given its mode and owner, under a temporary name in
-# its own directory) and renamed into place only once every question has been answered, right before api.env's block
-# is rewritten: a run that stops early (a wrong answer, Ctrl-C, a lost connection) leaves every key file as it was and
-# removes what it staged. An existing key file is kept unless --replace names its section. NETOPIA's public-key file
-# is root's, 0644, never writable by the API's user. The plain values go into ONE block of /etc/debateai/api.env,
-# between the two marker lines below: only that block is rewritten, a dated copy of the file is kept beside it with
-# its mode and owner, and a line outside the block that sets one of the block's keys is commented out with a note
-# (systemd would use the later one). It ends with pnpm billing:check, run as the API. It never prints an answer.
+# systemd-ask-password (never shown, never on a command line or in shell history).
+#
+# /etc/debateai/api belongs to debateai-api, a user the design does not trust (it may plant a link there at any time),
+# so root never writes through a path in that folder and never sets a mode or owner in it. Before the first question
+# the script refuses (BILLING_SETUP_UNSAFE_FOLDER) unless /etc/debateai/api, and /etc/debateai/api/billing if it
+# exists, is a real folder (not a link) owned by debateai-api. Then each file is written this way:
+# - The 0700 folder /etc/debateai/api/billing and the four custody files (0600, owned by debateai-api) are written AS
+#   debateai-api, by as_api: runuser runs one fixed sh body under umask 077, with the paths as arguments and the secret
+#   on standard input. Each file is staged under a temporary name in that folder and later renamed onto its final name.
+# - NETOPIA's public-key file is root's, 0644, never writable by the API's user (the boot refuses any other owner). Root
+#   builds it and sets its mode in its own 0700 work folder under /etc/debateai. commit_trusted_keys, the one
+#   exception, then moves it in: it changes into the billing folder, checks the folder it stands in ('.', owned by
+#   debateai-api, on the work folder's filesystem) and makes one rename onto the bare file name. A rename never follows
+#   its final name, and the folder it stands in cannot be swapped under it.
+# - A kept public-key file is read through as_api (at most 64 KiB, the boot's own limit) to print its fingerprints.
+# Nothing is renamed into place until every question has been answered, right before api.env's block is rewritten: a
+# run that stops early (a wrong answer, Ctrl-C, a lost connection) leaves every key file as it was and removes what it
+# staged (the API's temporary files through as_api). An existing key file is kept unless --replace names its section.
+# The plain values go into ONE block of /etc/debateai/api.env (root's, written by root as before), between the two
+# marker lines below: only that block is rewritten, a dated copy of the file is kept beside it with its mode and owner,
+# and a line outside the block that sets one of the block's keys is commented out with a note (systemd would use the
+# later one). It ends with pnpm billing:check, run as the API. It never prints an answer.
 #
 # --test-root <dir> exists for tests/unit/billing-setup-script.test.ts only: every path moves under <dir>, answers
-# come from standard input, owners are written to <dir>/.billing-setup-owners instead of being set, and the check is
-# not run. It is refused as root, and for any directory that is not inside the system's temporary directory or does
-# not hold the marker file .billing-setup-test-root.
+# come from standard input, as_api runs its body as the current user, owners are written to <dir>/.billing-setup-owners
+# instead of being set (and a folder's owner is the one recorded there), and the check is not run. It is refused as
+# root, and for any directory that is not inside the system's temporary directory or does not hold the marker file
+# .billing-setup-test-root.
 set -euo pipefail
 umask 077
 
@@ -50,20 +63,22 @@ SECTIONS=""
 REPLACE=" "
 WORK=""
 PENDING=""
-STAGED_TMP=""
+KEYS_STAGED=0
 TAB="$(printf '\t')"
 ANSWER=""
 VALUE=""
+UNSAFE_FOLDER="BILLING_SETUP_UNSAFE_FOLDER: /etc/debateai/api and /etc/debateai/api/billing must be real folders (not links) owned by debateai-api (README §3)"
 
 refuse() { printf '%s\n' "$1" >&2; exit "${2:-1}"; }
 say() { printf '%s\n' "$*" >&2; }
-# On every exit (bash also runs this trap on INT, TERM and HUP): the staged files not yet renamed, then the work folder.
+# On every exit (bash also runs this trap on INT, TERM and HUP): the API's staged files not yet renamed (removed as
+# the API's user), then the work folder (root's, which also holds the public-key file if it was never renamed).
 cleanup() {
-  local staged
+  local kind staged
   if [ -n "$PENDING" ]; then rm -f "$PENDING"; fi
   if [ -n "$WORK" ] && [ -f "$WORK/staged" ]; then
-    while IFS="$TAB" read -r staged _; do
-      if [ -n "$staged" ]; then rm -f "$staged"; fi
+    while IFS="$TAB" read -r kind staged _; do
+      if [ "$kind" = api ] && [ -n "$staged" ]; then as_api remove "$staged" < /dev/null || true; fi
     done < "$WORK/staged"
   fi
   if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
@@ -98,13 +113,32 @@ if [ "$TEST_MODE" = 1 ]; then
 else
   [ "$(id -u)" = 0 ] || refuse "BILLING_SETUP_NOT_ROOT: run it as root (sudo bash deploy/vps/billing-setup.sh)" 2
   command -v systemd-ask-password >/dev/null 2>&1 || refuse "BILLING_SETUP_REFUSED: systemd-ask-password is not installed"
+  command -v runuser >/dev/null 2>&1 || refuse "BILLING_SETUP_REFUSED: runuser (util-linux) is not installed"
 fi
 
 API_ENV="$ROOT/etc/debateai/api.env"
-BILLING_DIR="$ROOT/etc/debateai/api/billing"
+API_DIR="$ROOT/etc/debateai/api"
+BILLING_DIR="$API_DIR/billing"
 KEYS_FILE="$BILLING_DIR/netopia-ipn-keys.pem"
+
+# A path's owning user: GNU stat on the server; under the test root, the owner last recorded for it (see record_owner).
+owner_of() { # <path>
+  if [ "$TEST_MODE" = 1 ]; then
+    [ -f "$ROOT/.billing-setup-owners" ] || return 0
+    awk -v p="${1#"$ROOT"/}" '$2 == p { o = $1 } END { sub(/:.*/, "", o); print o }' "$ROOT/.billing-setup-owners"
+  else
+    stat -c %U -- "$1"
+  fi
+}
+# Root only looks at the API's folders here (metadata, never through a link): a real folder owned by debateai-api.
+api_folder_safe() { # <path>
+  [ ! -L "$1" ] && [ -d "$1" ] && [ "$(owner_of "$1")" = debateai-api ]
+}
+
 [ -f "$API_ENV" ] || refuse "BILLING_SETUP_REFUSED: /etc/debateai/api.env does not exist; install the API first (README §5)"
-[ -d "$(dirname "$BILLING_DIR")" ] || refuse "BILLING_SETUP_REFUSED: /etc/debateai/api does not exist; set up the API's key files first (README §3)"
+[ -L "$API_DIR" ] || [ -d "$API_DIR" ] || refuse "BILLING_SETUP_REFUSED: /etc/debateai/api does not exist; set up the API's key files first (README §3)"
+api_folder_safe "$API_DIR" || refuse "$UNSAFE_FOLDER"
+if [ -L "$BILLING_DIR" ] || [ -e "$BILLING_DIR" ]; then api_folder_safe "$BILLING_DIR" || refuse "$UNSAFE_FOLDER"; fi
 [ -f "$PUBLISHED_KEY" ] || refuse "BILLING_SETUP_REFUSED: deploy/vps/netopia/published-ipn-key.pem is missing from the checkout"
 
 # The block must be absent, or one begin line followed by one end line; anything else is the owner's to repair.
@@ -117,33 +151,93 @@ awk -v b="$BEGIN_MARK" -v e="$END_MARK" '$0 == b { f = 1; next } $0 == e { f = 0
 
 server_path() { printf '%s' "${1#"$ROOT"}"; }
 
-# The owner of a file being written: set on the server, recorded under the test root.
-set_owner() { # <owner:group> <the file now> <its final path>
+# The owner a file is given: on the server its writer is its owner (as_api writes as debateai-api, root writes the
+# public-key file), so nothing is set; under the test root it is recorded.
+record_owner() { # <owner:group> <its final path>
+  [ "$TEST_MODE" = 1 ] || return 0
+  printf '%s %s\n' "$1" "${2#"$ROOT"/}" >> "$ROOT/.billing-setup-owners"
+}
+
+# The only function that writes inside /etc/debateai/api. On the server it runs AS debateai-api (runuser), so a link
+# that user planted can lead only where it may already write; under the test root the same body runs as the current
+# user. The body is fixed text: the paths arrive as positional arguments and a secret on standard input.
+#   as_api dir <folder>          creates it 0700, or sets 0700 on the one that exists
+#   as_api stage <folder>        standard input into a new temporary file there, 0600; prints the file's path
+#   as_api rename <from> <to>    one rename onto the final name
+#   as_api remove <path>         removes a staged file that was never renamed
+#   as_api read <path>           at most the first 65,536 bytes (the boot's TRUSTED_KEYS_MAX_BYTES) on standard output
+as_api() { # <action> <path>...
+  local body
+  read -r -d '' body <<'SH' || true
+umask 077
+# Every path is absolute (so none can be read as an option; macOS chmod takes no "--" after its mode).
+for p in "${2:-}" "${3:-/}"; do case "$p" in /*) ;; *) exit 2 ;; esac; done
+case "$1" in
+  dir)
+    if [ ! -d "$2" ]; then mkdir -m 0700 -- "$2" || exit 1; fi
+    chmod 0700 "$2" ;;
+  stage)
+    t=""
+    trap '[ -z "$t" ] || rm -f -- "$t"; exit 1' HUP INT TERM
+    t="$(mktemp "$2/.billing-setup.XXXXXXXX")" || exit 1
+    if chmod 0600 "$t" && cat > "$t"; then printf '%s\n' "$t"; else rm -f -- "$t"; exit 1; fi ;;
+  rename) mv -f -- "$2" "$3" ;;
+  remove) rm -f -- "$2" ;;
+  read) head -c 65536 -- "$2" ;;
+  *) exit 2 ;;
+esac
+SH
   if [ "$TEST_MODE" = 1 ]; then
-    printf '%s %s\n' "$1" "${3#"$ROOT"/}" >> "$ROOT/.billing-setup-owners"
+    sh -c "$body" sh "$@"
   else
-    chown "$1" "$2"
+    runuser -u debateai-api -- sh -c "$body" sh "$@"
   fi
 }
 
-# Stages standard input for <path>: a temporary file in the same directory, with its final mode and owner, recorded
-# (with the line to print once it is saved) in $WORK/staged. Sets STAGED_TMP. commit_staged renames it into place.
-stage_file() { # <path> <mode> <owner:group> <the line to print once saved>
-  local path="$1" tmp
-  tmp="$(mktemp "$(dirname "$path")/.billing-setup.XXXXXXXX")"
-  printf '%s%s%s%s%s\n' "$tmp" "$TAB" "$path" "$TAB" "$4" >> "$WORK/staged"
-  cat > "$tmp"
-  chmod "$2" "$tmp"
-  set_owner "$3" "$tmp" "$path"
-  STAGED_TMP="$tmp"
+# Stages standard input for <path> as the API's user: a temporary file in the billing folder, recorded (with the line
+# to print once it is saved) in $WORK/staged. commit_staged renames it into place.
+stage_secret() { # <path> <the line to print once saved>
+  local tmp name
+  tmp="$(as_api stage "$BILLING_DIR")" || exit 1
+  # The name comes back from a process the API's user runs: it must be exactly what mktemp makes, one line, no tab.
+  name="${tmp#"$BILLING_DIR/.billing-setup."}"
+  { [ "$name" != "$tmp" ] && [[ $name =~ ^[A-Za-z0-9]{8}$ ]]; } || refuse "$UNSAFE_FOLDER"
+  printf 'api%s%s%s%s%s%s\n' "$TAB" "$tmp" "$TAB" "$1" "$TAB" "$2" >> "$WORK/staged"
+  record_owner debateai-api:debateai-api "$1"
+}
+
+# Root's one act inside the API's folder: the public-key file, built and given its mode in $WORK, renamed in by its
+# bare name from inside the folder, once '.' is proven to be the API user's own folder on the work folder's filesystem
+# (so no root-owned place can be reached and mv cannot fall back to copying). rename(2) never follows its final name,
+# and the folder the subshell stands in is held, so a link planted after the checks cannot redirect the file.
+commit_trusted_keys() { # <the staged copy's number>
+  [[ $1 =~ ^[0-9]+$ ]] || refuse "$UNSAFE_FOLDER"
+  (
+    cd -P -- "$BILLING_DIR" || refuse "$UNSAFE_FOLDER"
+    if [ "$TEST_MODE" = 1 ]; then
+      { [ . -ef "$BILLING_DIR" ] && [ "$(owner_of "$BILLING_DIR")" = debateai-api ]; } || refuse "$UNSAFE_FOLDER"
+    else
+      [ "$(stat -c %U .)" = debateai-api ] || refuse "$UNSAFE_FOLDER"
+      [ "$(stat -c %d .)" = "$(stat -c %d -- "$WORK")" ] || refuse "$UNSAFE_FOLDER"
+    fi
+    if [ "$TEST_MODE" = 1 ]; then
+      mv -f -- "$WORK/netopia-ipn-keys.$1" netopia-ipn-keys.pem || exit 1 # BSD mv (macOS) has no -T
+    else
+      mv -fT -- "$WORK/netopia-ipn-keys.$1" netopia-ipn-keys.pem || exit 1
+    fi
+  ) || exit 1
 }
 
 # Renames every staged file onto its final path, in the order staged; asks nothing.
 commit_staged() {
-  local tmp path line
+  local kind tmp path line
   [ -f "$WORK/staged" ] || return 0
-  while IFS="$TAB" read -r tmp path line; do
-    mv -f "$tmp" "$path"
+  while IFS="$TAB" read -r kind tmp path line; do
+    if [ "$kind" = root ]; then
+      commit_trusted_keys "$tmp"
+    else
+      as_api rename "$tmp" "$path" < /dev/null || exit 1
+    fi
     say ""
     say "$line"
   done < "$WORK/staged"
@@ -151,9 +245,8 @@ commit_staged() {
 }
 
 ensure_billing_dir() {
-  [ -d "$BILLING_DIR" ] || mkdir "$BILLING_DIR"
-  chmod 0700 "$BILLING_DIR"
-  set_owner debateai-api:debateai-api "$BILLING_DIR" "$BILLING_DIR"
+  as_api dir "$BILLING_DIR" < /dev/null || exit 1
+  record_owner debateai-api:debateai-api "$BILLING_DIR"
 }
 
 block_value() { awk -v k="$1" 'index($0, k "=") == 1 { print substr($0, length(k) + 2); exit }' "$WORK/entries"; }
@@ -222,7 +315,7 @@ kept() { # <path> <section>: true (and says so) when the file stays as it is
 }
 
 save_secret() { # <path>; the secret in ANSWER, staged as "<prefix><ANSWER>"
-  stage_file "$1" 0600 debateai-api:debateai-api "Saved $(basename "$1") (mode 0600, owned by debateai-api)." \
+  stage_secret "$1" "Saved $(basename "$1") (mode 0600, owned by debateai-api)." \
     < <(printf '%s%s\n' "${2:-}" "$ANSWER")
   ANSWER=""
 }
@@ -270,7 +363,13 @@ pem_well_formed() { # <file>: one or more PUBLIC KEY or CERTIFICATE blocks of ba
 
 trusted_keys() {
   local tries=0
-  if kept "$KEYS_FILE" netopia; then print_fingerprints "$KEYS_FILE"; return 0; fi
+  if kept "$KEYS_FILE" netopia; then
+    # Read as the API's user and capped: a link planted there must not make root read, or copy without end, what it
+    # points to.
+    as_api read "$KEYS_FILE" < /dev/null > "$WORK/kept-keys.pem" || true
+    print_fingerprints "$WORK/kept-keys.pem"
+    return 0
+  fi
   say ""
   say "NETOPIA's public key proves that NETOPIA's payment messages are genuine. Type 1 to use the key NETOPIA publishes in its own shop plugins (confirm with NETOPIA first that its SHA-256 fingerprint is $(published_fingerprint)), or 2 to paste the key or keys NETOPIA gave you."
   while :; do
@@ -291,9 +390,14 @@ trusted_keys() {
     tries=$((tries + 1))
     too_many "$tries" NETOPIA_IPN_KEYS
   done
-  stage_file "$KEYS_FILE" 0644 root:root \
-    "Saved netopia-ipn-keys.pem (mode 0644, owned by root, not writable by the API's user)." < "$WORK/keys.pem"
-  print_fingerprints "$STAGED_TMP"
+  # Staged in root's own work folder, where root sets its mode; commit_trusted_keys renames it in.
+  KEYS_STAGED=$((KEYS_STAGED + 1))
+  mv -f "$WORK/keys.pem" "$WORK/netopia-ipn-keys.$KEYS_STAGED"
+  chmod 0644 "$WORK/netopia-ipn-keys.$KEYS_STAGED"
+  printf 'root%s%s%s%s%s%s\n' "$TAB" "$KEYS_STAGED" "$TAB" "-" "$TAB" \
+    "Saved netopia-ipn-keys.pem (mode 0644, owned by root, not writable by the API's user)." >> "$WORK/staged"
+  record_owner root:root "$KEYS_FILE"
+  print_fingerprints "$WORK/netopia-ipn-keys.$KEYS_STAGED"
 }
 
 section_netopia() {
