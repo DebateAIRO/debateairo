@@ -7,6 +7,8 @@ import type { AuthenticationResponse, ContractClient, TotpEnrollmentResponse } f
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
+import { readSixDigitCode } from '@/lib/sixDigitCode';
+import { InlineFieldMessage } from './InlineFieldMessage';
 import { totpQrMatrix } from '@/lib/totpQr';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import authEnglish from '@/messages/en/auth.json';
@@ -43,6 +45,13 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [code, setCode] = useState('');
+    const [codeError, setCodeError] = useState<string | null>(null);
+    const codeField = useRef<HTMLInputElement>(null);
+    const [refocusCode, setRefocusCode] = useState(0);
+    useEffect(() => {
+        if (refocusCode)
+            codeField.current?.focus();
+    }, [refocusCode]);
     const [showKey, setShowKey] = useState(false);
     const [expired, setExpired] = useState(false);
     const [enrolled, setEnrolled] = useState(false);
@@ -62,6 +71,7 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         setBusy(false);
         setTotp(null);
         setCode('');
+        setCodeError(null);
         setShowKey(false);
         attempt.current.edited();
     }
@@ -190,8 +200,12 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         }
         catch (failure) {
             if (dispatched.current && authority.kind !== 'grant' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
-            if (owner === sequence.current)
+            if (owner === sequence.current) {
                 setError(t(catalog, "auth.login.authenticationCodeRejected"));
+                setCode('');
+                attempt.current.edited();
+                setRefocusCode(n => n + 1);
+            }
         }
         finally {
             if (owner === sequence.current) {
@@ -228,15 +242,17 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
                 void submitCode(code);
             }}>
         <div className="authField"><label htmlFor="enrollment-code">{t(catalog, "auth.enroll.currentSixDigitCode")}</label>
-        <input id="enrollment-code" name="code" value={code} autoComplete="one-time-code" inputMode="numeric" maxLength={6} disabled={busy} onChange={e => {
-                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                if (value !== code)
+        <input ref={codeField} id="enrollment-code" name="code" value={code} autoComplete="one-time-code" inputMode="numeric" disabled={busy} aria-invalid={!!codeError || undefined} aria-describedby={codeError ? 'enrollment-code-error' : undefined} onChange={e => {
+                const typed = readSixDigitCode(e.target.value);
+                const shown = typed.valid ? typed.digits : e.target.value;
+                if (shown !== code)
                     attempt.current.edited();
-                setCode(value);
-                if (value.length === 6)
-                    void submitCode(value);
-            }}/></div>
-        <button type="submit" className="authPrimary" disabled={busy || code.length !== 6}>{t(catalog, "auth.continue")}</button>
+                setCode(shown);
+                setCodeError(typed.valid ? null : t(catalog, "auth.login.codeFormat"));
+                if (typed.complete)
+                    void submitCode(typed.digits);
+            }}/><InlineFieldMessage id="enrollment-code-error" message={codeError}/></div>
+        <button type="submit" className="authPrimary" disabled={busy || !readSixDigitCode(code).complete}>{t(catalog, "auth.continue")}</button>
       </form>
     </div> : null}
   </section>;

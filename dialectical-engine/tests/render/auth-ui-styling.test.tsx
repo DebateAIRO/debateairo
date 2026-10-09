@@ -26,6 +26,9 @@ import { MfaRecoveryFlow } from "../../apps/ui/components/MfaRecoveryFlow.js";
 import { BackupEmailVerification } from "../../apps/ui/components/BackupEmailVerification.js";
 import { SecuritySettings } from "../../apps/ui/components/SecuritySettings.js";
 import { SecurityActionResume } from "../../apps/ui/components/auth/SecurityActionResume.js";
+import { OnboardingEvidence } from "../../apps/ui/components/auth/OnboardingEvidence.js";
+import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
+import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { mount, unmount, input } from "./task11-harness.js";
 
 vi.mock("@/lib/consumerWebAuthn", () => ({
@@ -136,6 +139,14 @@ describe("every auth screen styles its own controls", () => {
     const key = [...host.querySelectorAll("button")].find((button) => button.textContent === auth["auth.enroll.useSetupKey"])!;
     await act(async () => key.click());
     expect(host.querySelector("#enrollment-code")).not.toBeNull();
+    expect(unstyled(host)).toEqual([]);
+  });
+
+  it("onboarding: date of birth and the two documents", async () => {
+    const requirements = { status: "pending_mfa", country: "RO", age_confirmation_required: true, legal_acceptance_required: true, terms: { locale: "en", version: TERMS_OF_SERVICE.version, sha256: TERMS_OF_SERVICE.sha256, url: "/terms?lang=en" }, privacy: { locale: "en", version: PRIVACY_POLICY.version, sha256: PRIVACY_POLICY.sha256, url: "/privacy?lang=en" } };
+    const client = { pendingOnboardingStatus: vi.fn().mockResolvedValue(requirements), completePendingOnboarding: vi.fn() } as never;
+    const host = await render(<OnboardingEvidence authority={{ kind: "pending", token }} locale="en" catalog={auth} client={client} onReady={vi.fn()} />);
+    expect(host.querySelector("form")).not.toBeNull();
     expect(unstyled(host)).toEqual([]);
   });
 

@@ -14,6 +14,7 @@ import { ageConfirmationHref, ageConfirmationRequired } from '@/lib/ageConfirmat
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
+import { readSixDigitCode } from '@/lib/sixDigitCode';
 import { emailShape } from '@/lib/authFormValidation';
 import { setRecoveryAcknowledgementPending } from '@/lib/authNavigationGuard';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
@@ -48,6 +49,10 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [code, setCode] = useState('');
+    const [codeError, setCodeError] = useState<string | null>(null);
+    const codeField = useRef<HTMLInputElement>(null);
+    // Bumped after a refused code: once the field is enabled again, focus goes back to it.
+    const [refocusCode, setRefocusCode] = useState(0);
     const [emailError, setEmailError] = useState<string | null>(null);
     const [passwordError, setPasswordError] = useState<string | null>(null);
     const [signUpHref, setSignUpHref] = useState('/sign-up');
@@ -90,6 +95,10 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         else
             void onAuthenticated();
     }
+    useEffect(() => {
+        if (refocusCode)
+            codeField.current?.focus();
+    }, [refocusCode]);
     useEffect(() => {
         const next = new URLSearchParams(window.location.search).get('next');
         if (next !== null)
@@ -247,10 +256,15 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         catch (failure) {
             const credentialRefused = failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500;
             if (!credentialRefused) clearStoredSupportConversation();
-            if (owner === sequence.current) setError(failure instanceof ContractHttpError && failure.status === 429
-                ? t(catalog, "auth.login.tooManyAttempts")
-                : !credentialRefused ? t(catalog, "auth.login.verificationFailed")
-                : method === 'recovery_code' ? t(catalog, "auth.login.recoveryCodeRejected") : t(catalog, "auth.login.authenticationCodeRejected"));
+            if (owner === sequence.current) {
+                setError(failure instanceof ContractHttpError && failure.status === 429
+                    ? t(catalog, "auth.login.tooManyAttempts")
+                    : !credentialRefused ? t(catalog, "auth.login.verificationFailed")
+                    : method === 'recovery_code' ? t(catalog, "auth.login.recoveryCodeRejected") : t(catalog, "auth.login.authenticationCodeRejected"));
+                setCode('');
+                attempt.current.edited();
+                setRefocusCode(n => n + 1);
+            }
         }
         finally {
             if (owner === sequence.current) {
@@ -285,18 +299,33 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
  {offered.includes('passkey') ? <div className="authAltMethods"><button type="button" className="authSecondary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.signIn")}</button></div> : null}
  {offered.includes('totp') || offered.includes('recovery_code') ? <form className="authForm authMfaForm" noValidate method="post" action="/login" onSubmit={e => {
                     e.preventDefault();
-                    void submitCode(code);
+                    if (method === 'totp' && !readSixDigitCode(code).complete) {
+                        setCodeError(t(catalog, "auth.login.codeFormat"));
+                        codeField.current?.focus();
+                        return;
+                    }
+                    void submitCode(method === 'totp' ? readSixDigitCode(code).digits : code);
                 }} aria-busy={busy}>
  <div className="authField">
  <label htmlFor="login-code">{method === 'totp' ? t(catalog, "auth.login.authenticationCodeLabel") : t(catalog, "auth.login.recoveryCodeLabel")}</label>
- <input className={method === 'totp' ? undefined : 'authRecoveryInput'} aria-describedby={method === 'totp' ? 'login-code-help' : undefined} id="login-code" name="code" value={code} autoComplete="one-time-code" inputMode={method === 'totp' ? 'numeric' : 'text'} maxLength={method === 'totp' ? 6 : 128} disabled={busy} autoFocus onChange={e => {
-                    const value = method === 'totp' ? e.target.value.replace(/\D/g, '').slice(0, 6) : e.target.value;
-                    if (value !== code)
+ <input ref={codeField} className={method === 'totp' ? undefined : 'authRecoveryInput'} aria-invalid={!!codeError || undefined} aria-describedby={[method === 'totp' ? 'login-code-help' : '', codeError ? 'login-code-error' : ''].filter(Boolean).join(' ') || undefined} id="login-code" name="code" value={code} autoComplete="one-time-code" inputMode={method === 'totp' ? 'numeric' : 'text'} maxLength={method === 'totp' ? undefined : 128} disabled={busy} autoFocus onChange={e => {
+                    if (method !== 'totp') {
+                        if (e.target.value !== code)
+                            attempt.current.edited();
+                        setCode(e.target.value);
+                        return;
+                    }
+                    // No maxLength here: a browser would silently cut a pasted 8-digit string to 6 digits.
+                    const typed = readSixDigitCode(e.target.value);
+                    const shown = typed.valid ? typed.digits : e.target.value;
+                    if (shown !== code)
                         attempt.current.edited();
-                    setCode(value);
-                    if (method === 'totp' && value.length === 6)
-                        void submitCode(value);
+                    setCode(shown);
+                    setCodeError(typed.valid ? null : t(catalog, "auth.login.codeFormat"));
+                    if (typed.complete)
+                        void submitCode(typed.digits);
                 }}/>
+ <InlineFieldMessage id="login-code-error" message={codeError}/>
  <p className="authFieldHint" id="login-code-help" hidden={method !== 'totp'}>{t(catalog, "auth.login.authenticatorInstruction")}</p>
  </div>
  <button className="authPrimary" type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button>
@@ -308,6 +337,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                         flight.current = false;
                         setBusy(false);
                         setMethod('recovery_code');
+                        setCodeError(null);
                         setCode('');
                         attempt.current.edited();
                     }}>{t(catalog, "auth.login.useRecoveryCode")}</button> : null}
@@ -317,6 +347,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                         flight.current = false;
                         setBusy(false);
                         setMethod('totp');
+                        setCodeError(null);
                         setCode('');
                         attempt.current.edited();
                     }}>{t(catalog, "auth.login.useAuthenticatorCode")}</button> : null}
@@ -325,6 +356,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 setContinuation(null);
                 setCode('');
                 setError(null);
+                setCodeError(null);
             }}>{t(catalog, "auth.login.backToSignIn")}</button>
  </div>
  </div> : <>

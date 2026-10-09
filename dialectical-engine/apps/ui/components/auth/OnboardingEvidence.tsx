@@ -85,8 +85,8 @@ export function OnboardingEvidence({ authority, client = contractClient, locale,
             }
         }
         if (requirements.legal_acceptance_required && (!accepted.terms || !accepted.privacy)) {
-            setError(t(catalog, "auth.signUp.termsRequired"));
-            form.querySelector<HTMLElement>('button[data-document]')?.focus();
+            setError(t(catalog, "auth.onboarding.consentRequired"));
+            form.querySelector<HTMLElement>(!accepted.privacy ? '#onboarding-privacy' : '#onboarding-terms')?.focus();
             return;
         }
         flight.current = true;
@@ -113,7 +113,7 @@ export function OnboardingEvidence({ authority, client = contractClient, locale,
         }
     }
     return <section>{error ? <div><p className="authFieldError" role="alert">{error}</p><button type="button" className="authSecondary" onClick={() => setReload(n => n + 1)}>{t(catalog, "auth.onboarding.tryAgain")}</button></div> : null}
- {!requirements || !documents ? <p role="status">{t(catalog, "auth.enroll.verifyingEmail")}</p> : <form method="post" action="/enroll-mfa" noValidate onSubmit={e => {
+ {!requirements || !documents ? <p role="status">{t(catalog, "auth.enroll.verifyingEmail")}</p> : <form className="authForm" method="post" action="/enroll-mfa" noValidate onSubmit={e => {
                 e.preventDefault();
                 void submit(e.currentTarget);
             }}>
@@ -121,8 +121,15 @@ export function OnboardingEvidence({ authority, client = contractClient, locale,
                     setBirth(value);
                     setBirthError(null);
                 }} error={birthError} minimumAgeMessage={t(catalog, "auth.dob.underAge")} disabled={busy}/> : null}
- {requirements.legal_acceptance_required ? <div><button type="button" data-document="privacy" onClick={() => setOpen('privacy')}>{t(catalog, "auth.signUp.privacyPolicy")}</button><input type="checkbox" readOnly checked={accepted.privacy} aria-label={t(catalog, "auth.signUp.privacyPolicy")}/><button type="button" data-document="terms" onClick={() => setOpen('terms')}>{t(catalog, "auth.signUp.termsOfService")}</button><input type="checkbox" readOnly checked={accepted.terms} aria-label={t(catalog, "auth.signUp.termsOfService")}/></div> : null}
- <button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form>}
+ {/* Each box has a visible label (auth UI repair, 2026-10-09). A box ticks only through its document's
+     "I have read it"; ticking an empty box opens the document, unticking a ticked one just unticks it. */}
+ {requirements.legal_acceptance_required ? <div className="consentGroup">{(['privacy', 'terms'] as const).map(name => <div className="consentRow" key={name}><input className="consentBox" id={`onboarding-${name}`} type="checkbox" checked={accepted[name]} disabled={busy} onChange={() => {
+                        if (accepted[name])
+                            setAccepted(x => ({ ...x, [name]: false }));
+                        else
+                            setOpen(name);
+                    }}/><label className="consentText" htmlFor={`onboarding-${name}`}>{t(catalog, name === 'privacy' ? "auth.signUp.privacyAgreementPrefix" : "auth.signUp.termsAgreementPrefix")} <button type="button" className="consentPolicyLink" data-document={name} onClick={() => setOpen(name)}>{t(catalog, name === 'privacy' ? "auth.signUp.privacyPolicy" : "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</label></div>)}</div> : null}
+ <button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button></form>}
  {open && documents ? <LegalDocumentModal document={documents[open]} open mode="consent" onClose={() => setOpen(null)} onAcknowledge={() => {
                 setAccepted(x => ({ ...x, [open]: true }));
                 setOpen(null);

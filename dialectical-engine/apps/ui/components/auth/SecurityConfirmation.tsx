@@ -5,6 +5,8 @@ import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { matchingSecurityGrant, type ConfirmedSecurityAction } from '@/lib/securityConfirmation';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
+import { readSixDigitCode } from '@/lib/sixDigitCode';
+import { InlineFieldMessage } from './InlineFieldMessage';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { EphemeralCodes } from './EphemeralCodes';
 export type SecurityConfirmationClient = Partial<Pick<ContractClient, 'authMethods' | 'beginPasskeyStepUp' | 'completePasskeyStepUp' | 'stepUp' | 'beginSocialStepUp'>>;
@@ -36,6 +38,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     const [methods, setMethods] = useState<AuthMethodsResponse | null>(null);
     const [password, setPassword] = useState('');
     const [code, setCode] = useState('');
+    const [codeError, setCodeError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [backup, setBackup] = useState<string | null>(null);
@@ -209,21 +212,23 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
  {methods?.available_step_up_methods.includes('password_totp') && passwordMode ? <form className="authForm" method="post" action="/settings/security" noValidate onSubmit={e => {
                         e.preventDefault();
                         const data = new FormData(e.currentTarget);
-                        void passwordProof(String(data.get('security-code') ?? ''), String(data.get('security-password') ?? ''));
+                        void passwordProof(readSixDigitCode(String(data.get('security-code') ?? '')).digits, String(data.get('security-password') ?? ''));
                     }}>
  <div className="authField"><label htmlFor={`${id}-password`}>{t(catalog, "auth.password")}</label><input id={`${id}-password`} name="security-password" type="password" autoComplete="current-password" value={password} disabled={busy || disabled} onChange={e => {
                         setPassword(e.target.value);
                         attempt.current.edited();
                     }}/></div>
- <div className="authField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" maxLength={6} value={code} disabled={busy || disabled} onChange={e => {
-                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                        if (value !== code)
+ <div className="authField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" value={code} disabled={busy || disabled} aria-invalid={!!codeError || undefined} aria-describedby={codeError ? `${id}-code-error` : undefined} onChange={e => {
+                        const typed = readSixDigitCode(e.target.value);
+                        const shown = typed.valid ? typed.digits : e.target.value;
+                        if (shown !== code)
                             attempt.current.edited();
-                        setCode(value);
-                        if (value.length === 6)
-                            void passwordProof(value, String(e.currentTarget.form ? new FormData(e.currentTarget.form).get('security-password') ?? '' : password));
-                    }}/></div>
- <button type="submit" className="authPrimary" disabled={busy || disabled || !password || code.length !== 6}>{t(catalog, "auth.security.confirm")}</button>
+                        setCode(shown);
+                        setCodeError(typed.valid ? null : t(catalog, "auth.login.codeFormat"));
+                        if (typed.complete)
+                            void passwordProof(typed.digits, String(e.currentTarget.form ? new FormData(e.currentTarget.form).get('security-password') ?? '' : password));
+                    }}/><InlineFieldMessage id={`${id}-code-error`} message={codeError}/></div>
+ <button type="submit" className="authPrimary" disabled={busy || disabled || !password || !readSixDigitCode(code).complete}>{t(catalog, "auth.security.confirm")}</button>
  </form> : null}
  {!methods && !error ? <p role="status">{t(catalog, "auth.login.checking")}</p> : null}
  </>}
