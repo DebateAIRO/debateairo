@@ -36,7 +36,7 @@ export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevisi
  if(installed.length!==1)fail();
  const plan=await loadMigrationPlan();
  await refusePendingForwardSteps(pool,plan);
- await migrate(pool); // Nothing left to apply: authoritative current source, complete table/column/membership/owner/provenance checks.
+ await migrate(pool); // Authoritative current source: complete table/column/membership/owner/provenance checks.
  const client=await pool.connect();let transaction=false,released=false;
  const release=()=>{if(!released){released=true;client.release();}};
  try{
