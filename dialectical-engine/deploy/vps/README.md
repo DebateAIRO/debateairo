@@ -2482,11 +2482,15 @@ systemctl restart debateai-api
 ```
 
 The API checks this itself at start-up: pointed at live while a sandbox plan, charge or queued job is still open, it
-refuses to start and prints `BILLING_OTHER_SYSTEM_RECORDS_OPEN` with the three counts. It also refuses the other way
-round: pointed at the sandbox, with billing on, while a live plan has not ended, it prints the same code with the
-number of live plans (never run the sandbox over live customers). The first query can count a
+refuses to start and prints `BILLING_OTHER_SYSTEM_RECORDS_OPEN` with the three counts. The first query can count a
 cancelled plan that had a later event (a card change, say) as open; the start-up check has the last word. If it
 refuses, put the sandbox values back (`--replace netopia` again), restart, close what is left, and try again.
+
+It also refuses the other way round: pointed at the sandbox, with billing on, while a live plan has not ended, it
+prints the same code, with the number of live plans after `subscriptions=`. Never cancel or end those plans to get
+past it: they are live customers. Put the live values back (the NETOPIA section with `--replace netopia`, choosing
+live, and the Quaderno and SmartBill sections too if you changed them), restart, and run the sandbox only on its own
+server (§14.9).
 
 The sandbox plans and charges stay in the database, but they never count as sales:
 the quarterly tax summary and its email read only live charges.

@@ -315,7 +315,7 @@ describe("F7 the provider-only mode's daily card job (final review data-1)", () 
     expect(steps).toEqual(["sweep", "purge"]);
   });
 
-  it("starts at once and daily, and reports a failed run as BILLING_OWNER_JOBS_PENDING", async () => {
+  it("runs once at start and reports a failed run once as BILLING_OWNER_JOBS_PENDING (the daily interval is pinned in billing-boot-wiring)", async () => {
     const down = {
       connect: async () => { throw new Error("the database is unreachable"); },
       query: async () => { throw new Error("the database is unreachable"); }
