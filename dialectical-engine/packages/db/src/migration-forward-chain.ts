@@ -156,5 +156,8 @@ export async function applyForwardChain(client:PoolClient,plan:MigrationPlan,app
   await client.query(`INSERT INTO public.debateai_schema_migration_step(source_name,base_recipe_sha256,previous_manifest_sha256,forward_manifest_sha256,source_sha256,verifier_sha256,precondition_evidence_digest,postcondition_evidence_digest,executed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())`,
    [step.name,plan.recipeSha256,step.previousManifestSha256,step.manifestSha256,step.sourceSha256,step.verifierSha256,preconditionDigest(plan,step,owner),post]);
  }
+ // A step applied in THIS run must keep every earlier step's rules too: all applied steps' own checks run again here,
+ // before the caller commits, so a breaking step is rolled back instead of caught on the next migrate().
+ if(plan.forwardChain.length>done.length)for(const step of plan.forwardChain)if(step.replayVerifierSql!==undefined)await client.query(step.replayVerifierSql);
  await assertReceiptAcl(client,owner);
 }
