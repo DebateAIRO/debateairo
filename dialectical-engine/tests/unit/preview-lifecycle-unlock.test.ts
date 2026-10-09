@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash, createHmac } from 'node:crypto';
@@ -6,7 +7,9 @@ import { createRequire } from 'node:module';
 import { createServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 const unlock = await import('../../deploy/' + 'preview-lifecycle/v1/unlock-team-tools.mjs');
+const actor = await import('../../deploy/' + 'preview-lifecycle/v1/readiness-writer-actor.mjs');
 const creator = await import('../../deploy/' + 'preview-lifecycle/v1/jit-creator-actor.mjs');
 const capture = await import('../../deploy/' + 'preview-lifecycle/v1/self-capture-actor.mjs');
 const guard = await import('../../deploy/' + 'preview-lifecycle/v1/release-guard.mjs');
@@ -287,10 +290,16 @@ describe('where the unlock connects as the recovery login', () => {
 
 const PEER = 'peer-readiness-writer';
 const PEER_ROLE = 'debateai_staff_readiness_writer';
-/** What the identity query returns when the peer connection is exactly the readiness writer on the preview socket. */
+const OS_USER = 'debateai-readiness';
+const ENGINE = '/opt/debateai-v3-preview/releases/auth-dev-candidate-v1/dialectical-engine';
+const PG_PATH = `${ENGINE}/node_modules/.pnpm/pg@8/node_modules/pg/lib/index.js`;
+const SOCKET = '/run/debateai-v3-preview/postgresql';
+const RESULT_SCHEMA = 'preview-lifecycle-readiness-v1';
+const refusal = (code: string) => Object.assign(new Error(code), { code });
+/** What the identity query returns when the connection is exactly the readiness writer on the preview socket. */
 const peerRow = () => ({ session: PEER_ROLE, role: PEER_ROLE, database: 'debateai', port: 5434, unix_socket: true, can_login: true, no_elevated_powers: true, memberships: 0 });
 const interimRow = () => ({ session: 'debateai_prod_staff_recovery', role: 'debateai_prod_staff_recovery', database: 'debateai', port: 5434, bounded: true, no_elevated_powers: true });
-/** A stand-in for pg.Pool: records its options and every query, answers the identity query with `rows`. */
+/** A stand-in for pg.Pool (the interim writer only): records its options and every query, answers the identity query with `rows`. */
 function fakePool(answer: () => Promise<{ rows: unknown[] }>, made: { options: any; sql: string[]; ended: number }[] = []) {
   return class {
     record: { options: any; sql: string[]; ended: number };
@@ -299,16 +308,25 @@ function fakePool(answer: () => Promise<{ rows: unknown[] }>, made: { options: a
     async end() { this.record.ended++; }
   };
 }
+type ClientRecord = { options: any; sql: string[]; params: unknown[][]; connected: number; ended: number };
+/** A stand-in for pg.Client (the readiness child): one per connection; identity rows from `identity`, every write answers `value`. */
+function fakeClient(identity: () => Promise<{ rows: unknown[] }>, made: ClientRecord[] = [], { value = true as unknown, connectError = null as unknown } = {}) {
+  return class {
+    record: ClientRecord;
+    constructor(options: any) { this.record = { options, sql: [], params: [], connected: 0, ended: 0 }; made.push(this.record); }
+    async connect() { this.record.connected++; if (connectError) throw connectError; }
+    async query(sql: string, params: unknown[] = []) { this.record.sql.push(sql); this.record.params.push(params); return /session_user/.test(sql) ? identity() : { rows: [{ value }] }; }
+    async end() { this.record.ended++; }
+  };
+}
 
-describe('peer writer: the dedicated password-less readiness role (migration 0109)', () => {
-  function peerHarness(overrides: Record<string, unknown> = {}) {
-    const calls: string[] = [];
+describe('peer writer: the dedicated password-less readiness role, one child process per database call', () => {
+  function peerHarness(answer: (op: string, fields: any) => Promise<unknown> = async () => true) {
+    const calls: string[] = [], fields: unknown[] = [];
     const writer = unlock.createPeerReadinessWriter({
-      createPool: async (...args: unknown[]) => { calls.push(`pool:${args.length}`); return { end: async () => { calls.push('end'); } }; },
-      createPublisher: () => ({ publish: async () => { calls.push('publish'); return true; }, revoke: async (generation: string) => { calls.push(`revoke:${generation}`); return true; } }),
-      ...overrides
+      runActor: async (op: string, input: any) => { calls.push(op === 'revoke' ? `revoke:${input.generation}` : op); fields.push(input); return answer(op, input); }
     });
-    return { writer, calls };
+    return { writer, calls, fields };
   }
 
   it('is chosen by default; the interim login only when it is named exactly', () => {
@@ -322,15 +340,23 @@ describe('peer writer: the dedicated password-less readiness role (migration 010
     expect(() => unlock.resolveStaffWriterKind(value)).toThrow(/STAFF_WRITER_REFUSED/);
   });
 
-  it('opens one pool given nothing (no password), extends nothing, publishes and revokes through the publisher, then ends the pool', async () => {
+  it('opens with an identity check that writes nothing, extends nothing, publishes and revokes through the child, then has no connection left', async () => {
     const h = peerHarness();
     expect(h.writer.kind).toBe(PEER);
     await h.writer.open({ validUntil: new Date(start + 4 * MINUTE) });
     await h.writer.extend({ validUntil: new Date(start + 4 * MINUTE) });
     expect(await h.writer.publish(ready(start + MINUTE))).toBe(true);
     expect(await h.writer.revoke(uuid(9))).toBe(true);
-    expect(await h.writer.close()).toEqual({ poolClosed: true });
-    expect(h.calls).toEqual(['pool:0', 'publish', `revoke:${uuid(9)}`, 'end']);
+    expect(await h.writer.close()).toEqual({ connectionsClosed: true });
+    expect(h.calls).toEqual(['check', 'publish', `revoke:${uuid(9)}`]);
+    // Only plain fields cross to the child; the expiry as its exact ISO string.
+    expect(h.fields).toEqual([{}, { configSha256: 'a'.repeat(64), generation: uuid(9), ackAdapterId: 'capture', rehearsalId: uuid(1), evidenceExpiresAt: new Date(start + MINUTE).toISOString() }, { generation: uuid(9) }]);
+  });
+
+  it('counts only an exact `true` from the database as published', async () => {
+    const h = peerHarness(async op => (op === 'publish' ? 'true' : true));
+    await h.writer.open({ validUntil: new Date(start + MINUTE) });
+    expect(await h.writer.publish(ready(start + MINUTE))).toBe(false);
   });
 
   it('refuses to publish before it is open and after it closed', async () => {
@@ -340,15 +366,20 @@ describe('peer writer: the dedicated password-less readiness role (migration 010
     await h.writer.close();
     await expect(h.writer.publish(ready(start + MINUTE))).rejects.toMatchObject({ code: 'STAFF_READINESS_NOT_OPEN' });
     expect(await h.writer.revoke(uuid(9))).toBe(false);
+    expect(h.calls).toEqual(['check']);
   });
 
-  it('does not claim the pool closed when ending it throws', async () => {
-    const h = peerHarness({ createPool: async () => ({ end: async () => { throw new Error('socket'); } }) });
+  it('does not claim every connection closed while a call is still running', async () => {
+    let release: (value: boolean) => void = () => undefined;
+    const h = peerHarness(async op => (op === 'publish' ? new Promise<boolean>(resolve => { release = resolve; }) : true));
     await h.writer.open({ validUntil: new Date(start + MINUTE) });
-    expect(await h.writer.close()).toEqual({ poolClosed: false });
+    const pending = h.writer.publish(ready(start + MINUTE));
+    expect(await h.writer.close()).toEqual({ connectionsClosed: false });
+    release(true);
+    await pending;
   });
 
-  it('has nothing to reset: reset opens nothing and says so', async () => {
+  it('has nothing to reset: reset starts nothing and says so', async () => {
     const h = peerHarness();
     expect(await h.writer.reset()).toEqual({ nothingToReset: true });
     expect(h.calls).toEqual([]);
@@ -361,22 +392,20 @@ describe('peer writer: the dedicated password-less readiness role (migration 010
     expect(result).toEqual({ outcome: 'WINDOW_ENDED', publishes: 60, locked: true });
     expect(h.logs[0]).toEqual({ event: 'PREVIEW_TEAM_TOOLS_UNLOCKED', until: '2026-10-09T10:10:00.000Z', writer: PEER, windowMinutes: 10 });
     expect(h.logs[1]).toEqual({ event: 'PREVIEW_TEAM_TOOLS_LOCKED', outcome: 'WINDOW_ENDED', publishes: 60, locked: true, at: '2026-10-09T10:10:00.000Z' });
-    expect(p.calls.slice(-2)).toEqual([`revoke:${uuid(9)}`, 'end']);
+    expect(p.calls[0]).toBe('check');
+    expect(p.calls.at(-1)).toBe(`revoke:${uuid(9)}`);
   });
 
-  it('a window whose open failed is still locked (nothing stayed open) and names the reason', async () => {
+  it('a window whose identity check failed is still locked (nothing stayed open) and names the reason', async () => {
     const h = harness();
-    const p = peerHarness({ createPool: async () => { throw Object.assign(new Error('STAFF_READINESS_IDENTITY_REFUSED'), { code: 'STAFF_READINESS_IDENTITY_REFUSED' }); } });
+    const p = peerHarness(async () => { throw refusal('STAFF_READINESS_IDENTITY_REFUSED'); });
     const result = await unlock.runUnlockWindow({ writer: p.writer, evidence: h.evidence, deps: h.deps, windowMs: 10 * MINUTE });
     expect(result).toEqual({ outcome: 'FAILED', reason: 'STAFF_READINESS_IDENTITY_REFUSED', publishes: 0, locked: true });
+    expect(p.calls).toEqual(['check']);
   });
 
-  it('a window whose pool would not close reports locked: false, so the unit fails and the alert runs', async () => {
-    const h = harness();
-    const p = peerHarness({ createPool: async () => ({ end: async () => { throw new Error('socket'); } }) });
-    const result = await unlock.runUnlockWindow({ writer: p.writer, evidence: h.evidence, deps: h.deps, windowMs: MINUTE });
-    expect(result).toEqual({ outcome: 'WINDOW_ENDED', publishes: 6, locked: false });
-    expect(await unlock.runCommand('run', { platform: 'linux', uid: 0, runServer: async () => result, log: () => undefined })).toBe(1);
+  it('a window that is not locked again exits non-zero, so the unit fails and the alert runs', async () => {
+    expect(await unlock.runCommand('run', { platform: 'linux', uid: 0, runServer: async () => ({ outcome: 'WINDOW_ENDED', publishes: 6, locked: false }), log: () => undefined })).toBe(1);
   });
 
   it('exit codes: a locked peer window exits 0 unless it FAILED; a peer reset with nothing to reset exits 0', async () => {
@@ -402,65 +431,206 @@ describe('peer writer: the dedicated password-less readiness role (migration 010
   });
 });
 
-describe('peer writer connection: the preview socket, no password, exactly the readiness role', () => {
+describe('the dedicated OS user the readiness child runs as (debateai-readiness, never root)', () => {
+  const entry = (overrides: Partial<Record<'name' | 'uid' | 'gid' | 'home' | 'shell', string>> = {}) => {
+    const e = { name: OS_USER, uid: '998', gid: '997', home: '/nonexistent', shell: '/usr/sbin/nologin', ...overrides };
+    return `${e.name}:x:${e.uid}:${e.gid}::${e.home}:${e.shell}\n`;
+  };
+  function getent(stdout: string, extra: Record<string, unknown> = {}) {
+    const seen: any[] = [];
+    return { seen, run: async (argv: string[], options: any) => { seen.push({ argv, options }); return { code: 0, timedOut: false, overflow: false, stdout: Buffer.from(stdout), stderr: Buffer.alloc(0), ...extra }; } };
+  }
+
+  it('reads exactly that user with getent, given an empty environment', async () => {
+    const g = getent(entry());
+    await expect(unlock.lookupReadinessUser({ run: g.run })).resolves.toEqual({ name: OS_USER, uid: 998, gid: 997 });
+    expect(g.seen).toEqual([{ argv: ['/usr/bin/getent', 'passwd', OS_USER], options: expect.objectContaining({ env: {} }) }]);
+    for (const shell of ['/sbin/nologin', '/bin/false', '/usr/bin/false']) {
+      await expect(unlock.lookupReadinessUser({ run: getent(entry({ shell })).run })).resolves.toMatchObject({ uid: 998, gid: 997 });
+    }
+  });
+
+  it('names a missing user as missing (README step 7 creates it)', async () => {
+    await expect(unlock.lookupReadinessUser({ run: getent('', { code: 2 }).run })).rejects.toMatchObject({ code: 'STAFF_READINESS_USER_MISSING' });
+  });
+
+  it.each([
+    ['uid 0 (root)', entry({ uid: '0' })],
+    ['gid 0 (the root group)', entry({ gid: '0' })],
+    ['the shared nobody uid', entry({ uid: '65534' })],
+    ['a login shell', entry({ shell: '/bin/bash' })],
+    ['a plain sh', entry({ shell: '/bin/sh' })],
+    ['an empty shell (which means /bin/sh)', entry({ shell: '' })],
+    ['another name', entry({ name: 'debateai-readines' })],
+    ['two entries', entry() + entry()],
+    ['a short entry', 'debateai-readiness:x:998\n'],
+    ['a uid that is not a number', entry({ uid: '99a' })]
+  ])('refuses %s', async (_name, text) => {
+    await expect(unlock.lookupReadinessUser({ run: getent(text).run })).rejects.toMatchObject({ code: 'STAFF_READINESS_USER_REFUSED' });
+  });
+
+  it.each([
+    ['getent failing another way', { code: 1 }],
+    ['getent timing out', { code: null, timedOut: true }],
+    ['getent writing to stderr', { stderr: Buffer.from('x') }]
+  ])('refuses %s', async (_name, extra) => {
+    await expect(unlock.lookupReadinessUser({ run: getent(entry(), extra).run })).rejects.toMatchObject({ code: 'STAFF_READINESS_USER_REFUSED' });
+  });
+});
+
+describe('the readiness child: spawned as the dedicated user with an empty environment, never as root', () => {
+  const user = { name: OS_USER, uid: 998, gid: 997 };
+  type ChildResult = { code: number | null; timedOut: boolean; overflow: boolean; stdout: Buffer; stderr: Buffer };
+  const answer = (value: unknown, code = 0, stderr = ''): (() => Promise<ChildResult>) => async () => ({ code, timedOut: false, overflow: false, stdout: Buffer.from(`${JSON.stringify(value)}\n`), stderr: Buffer.from(stderr) });
+  function runner(result: () => Promise<ChildResult> = answer({ schema: RESULT_SCHEMA, ok: true, value: true })) {
+    const seen: any[] = [];
+    const run = async (argv: string[], options: any) => { seen.push({ argv, options: { ...options, stdin: JSON.parse(Buffer.from(options.stdin).toString()) } }); return result(); };
+    return { seen, call: unlock.readinessActorRunner({ user, host: SOCKET, engine: ENGINE, pgPath: PG_PATH, nodePath: '/opt/node/bin/node', run }) };
+  }
+
+  it('drops to that uid and gid with setpriv (no groups, no capabilities, no new privileges) and starts node through env -i with nothing set', async () => {
+    const r = runner();
+    await expect(r.call('check', {})).resolves.toBe(true);
+    const { argv, options } = r.seen[0];
+    expect(argv).toEqual(['/usr/bin/setpriv', '--reuid=998', '--regid=997', '--clear-groups', '--inh-caps=-all', '--no-new-privs', '--', '/usr/bin/env', '-i', '/opt/node/bin/node', expect.stringMatching(/\/deploy\/preview-lifecycle\/v1\/readiness-writer-actor\.mjs$/)]);
+    expect(options).toMatchObject({ cwd: '/', env: {}, timeoutMs: unlock.READINESS_ACTOR_TIMEOUT_MS });
+    expect(options.stdin).toEqual({ op: 'check', engine: ENGINE, pgPath: PG_PATH, host: SOCKET });
+    expect(argv.join(' ')).not.toMatch(/--reuid=0\b|--regid=0\b|runuser|postgres|PATH=/);
+  });
+
+  it('one fresh child per call; the call\'s fields travel on stdin only', async () => {
+    const r = runner();
+    const fields = { configSha256: 'a'.repeat(64), generation: uuid(9), ackAdapterId: 'capture', rehearsalId: uuid(1), evidenceExpiresAt: '2026-10-09T10:05:00.000Z' };
+    await r.call('publish', fields);
+    await r.call('revoke', { generation: uuid(9) });
+    expect(r.seen).toHaveLength(2);
+    expect(r.seen[0].options.stdin).toEqual({ op: 'publish', engine: ENGINE, pgPath: PG_PATH, host: SOCKET, ...fields });
+    expect(r.seen[1].options.stdin).toEqual({ op: 'revoke', engine: ENGINE, pgPath: PG_PATH, host: SOCKET, generation: uuid(9) });
+    for (const { argv } of r.seen) expect(JSON.stringify(argv)).not.toContain(uuid(9));
+  });
+
+  it.each([['uid 0', { ...user, uid: 0 }], ['gid 0', { ...user, gid: 0 }], ['no uid', { name: OS_USER, gid: 997 }], ['another name', { ...user, name: 'root' }]])('never starts anything for a user with %s', (_name, bad) => {
+    let ran = 0;
+    const run = async () => { ran++; return answer({ schema: RESULT_SCHEMA, ok: true, value: true })(); };
+    expect(() => unlock.readinessActorRunner({ user: bad, host: SOCKET, engine: ENGINE, pgPath: PG_PATH, nodePath: '/opt/node/bin/node', run })).toThrow(/STAFF_READINESS_USER_REFUSED/);
+    expect(ran).toBe(0);
+  });
+
+  it('passes the child\'s own refusal on by name', async () => {
+    const r = runner(answer({ schema: RESULT_SCHEMA, ok: false, code: 'STAFF_READINESS_PEER_AUTH_REFUSED' }, 1));
+    await expect(r.call('check', {})).rejects.toMatchObject({ code: 'STAFF_READINESS_PEER_AUTH_REFUSED' });
+  });
+
+  it('returns a false write as false', async () => {
+    const r = runner(answer({ schema: RESULT_SCHEMA, ok: true, value: false }));
+    await expect(r.call('revoke', { generation: uuid(9) })).resolves.toBe(false);
+  });
+
+  it.each([
+    ['anything on stderr', answer({ schema: RESULT_SCHEMA, ok: true, value: true }, 0, 'warning')],
+    ['a timeout', async () => ({ code: null, timedOut: true, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) })],
+    ['too much output', async () => ({ code: 0, timedOut: false, overflow: true, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) })],
+    ['another schema', answer({ schema: 'x', ok: true, value: true })],
+    ['an extra key', answer({ schema: RESULT_SCHEMA, ok: true, value: true, extra: 1 })],
+    ['a value that is not a boolean', answer({ schema: RESULT_SCHEMA, ok: true, value: 'true' })],
+    ['a success with a non-zero exit', answer({ schema: RESULT_SCHEMA, ok: true, value: true }, 1)],
+    ['a refusal with exit 0', answer({ schema: RESULT_SCHEMA, ok: false, code: 'STAFF_READINESS_IDENTITY_REFUSED' }, 0)],
+    ['a refusal code from outside the readiness family', answer({ schema: RESULT_SCHEMA, ok: false, code: 'RELEASE_UNVERIFIED' }, 1)],
+    ['output that is not JSON', async () => ({ code: 0, timedOut: false, overflow: false, stdout: Buffer.from('ok\n'), stderr: Buffer.alloc(0) })]
+  ])('refuses %s as STAFF_READINESS_ACTOR_REFUSED', async (_name, result) => {
+    await expect(runner(result).call('check', {})).rejects.toMatchObject({ code: 'STAFF_READINESS_ACTOR_REFUSED' });
+  });
+});
+
+describe('the readiness child: every connection proves who it is before it writes', () => {
+  const control = (op: string, fields: Record<string, unknown> = {}) => ({ op, host: SOCKET, ...fields });
+  const publish = { configSha256: 'a'.repeat(64), generation: uuid(9), ackAdapterId: 'capture', rehearsalId: uuid(1), evidenceExpiresAt: '2026-10-09T10:05:00.000Z' };
+
   it('connects on the preview socket as the readiness role, and its password is a refusal, never a string', () => {
-    const options = unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(undefined) });
-    expect(options).toMatchObject({ host: '/run/debateai-v3-preview/postgresql', port: 5434, database: 'debateai', user: PEER_ROLE, ssl: false, max: 1, application_name: 'preview-team-unlock' });
+    const options = actor.readinessClientOptions({ host: SOCKET });
+    expect(options).toMatchObject({ host: SOCKET, port: 5434, database: 'debateai', user: PEER_ROLE, ssl: false, application_name: 'preview-team-unlock' });
     expect(typeof options.password).toBe('function');
     expect(() => options.password()).toThrow(/STAFF_READINESS_PASSWORD_REQUESTED/);
-    expect(unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost('/run/other/postgresql') }).host).toBe('/run/other/postgresql');
   });
 
-  it('refuses loopback TCP: peer authentication exists only on the Unix socket', () => {
-    expect(() => unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost('127.0.0.1') })).toThrow(/STAFF_DB_HOST_REFUSED/);
+  it.each(['127.0.0.1', '::1', 'localhost', 'run/postgresql', '/run/../tmp', '/run/x y'])('refuses the host %j (peer logins exist only on the socket)', host => {
+    expect(() => actor.readinessClientOptions({ host })).toThrow(/STAFF_DB_HOST_REFUSED/);
   });
 
-  it('accepts the exact identity and keeps the pool', async () => {
-    const made: any[] = [];
-    const options = unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(undefined) });
-    const pool = await unlock.openPeerReadinessPool({ Pool: fakePool(async () => ({ rows: [peerRow()] }), made), options });
-    expect(pool).toBeTruthy();
-    expect(made).toHaveLength(1);
-    expect(made[0].options).toBe(options);
-    expect(made[0].sql[0]).toMatch(/session_user/);
-    expect(made[0].ended).toBe(0);
+  it('a fresh connection per call: the identity check first on each, then exactly one call, then the connection ends', async () => {
+    const made: ClientRecord[] = [];
+    const Client = fakeClient(async () => ({ rows: [peerRow()] }), made);
+    await expect(actor.runReadinessOperation({ Client, control: control('check') })).resolves.toBe(true);
+    await expect(actor.runReadinessOperation({ Client, control: control('publish', publish) })).resolves.toBe(true);
+    await expect(actor.runReadinessOperation({ Client, control: control('revoke', { generation: uuid(9) }) })).resolves.toBe(true);
+    expect(made).toHaveLength(3);
+    for (const record of made) {
+      expect(record).toMatchObject({ connected: 1, ended: 1 });
+      expect(record.options.user).toBe(PEER_ROLE);
+      expect(record.sql[0]).toMatch(/session_user/);
+    }
+    expect(made[0]!.sql).toHaveLength(1);
+    expect(made[1]!.sql.slice(1)).toEqual(['SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5) AS value']);
+    expect(made[1]!.params[1]).toEqual(['a'.repeat(64), uuid(9), 'capture', uuid(1), '2026-10-09T10:05:00.000Z']);
+    expect(made[2]!.sql.slice(1)).toEqual(['SELECT staff.revoke_independent_alert_readiness($1) AS value']);
+    expect(made[2]!.params[1]).toEqual([uuid(9)]);
+  });
+
+  it('checks again on every connection: a later connection that is someone else is refused and writes nothing', async () => {
+    const made: ClientRecord[] = [];
+    let n = 0;
+    const Client = fakeClient(async () => ({ rows: [n++ === 0 ? peerRow() : { ...peerRow(), session: 'postgres', role: 'postgres' }] }), made);
+    await expect(actor.runReadinessOperation({ Client, control: control('publish', publish) })).resolves.toBe(true);
+    await expect(actor.runReadinessOperation({ Client, control: control('publish', publish) })).rejects.toMatchObject({ code: 'STAFF_READINESS_IDENTITY_REFUSED' });
+    expect(made[1]!.sql).toHaveLength(1);
+    expect(made[1]!.ended).toBe(1);
   });
 
   it.each([
     ['another login', (row: any) => ({ ...row, session: 'debateai_prod_staff_recovery', role: 'debateai_prod_staff_recovery' })],
-    ['a SET ROLE away from the login', (row: any) => ({ ...row, role: 'debateai_staff_recovery' })],
+    ['a SET ROLE away from the login (current_user)', (row: any) => ({ ...row, role: 'debateai_staff_recovery' })],
+    ['another session user under the same current role', (row: any) => ({ ...row, session: 'postgres' })],
     ['another database', (row: any) => ({ ...row, database: 'postgres' })],
     ['another cluster port', (row: any) => ({ ...row, port: 5432 })],
     ['a TCP connection', (row: any) => ({ ...row, unix_socket: false })],
     ['a role that cannot log in', (row: any) => ({ ...row, can_login: false })],
     ['an elevated attribute', (row: any) => ({ ...row, no_elevated_powers: false })],
     ['a role membership', (row: any) => ({ ...row, memberships: 1 })]
-  ])('refuses %s and ends the pool', async (_name, mutate) => {
-    const made: any[] = [];
-    const options = unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(undefined) });
-    await expect(unlock.openPeerReadinessPool({ Pool: fakePool(async () => ({ rows: [mutate(peerRow())] }), made), options })).rejects.toMatchObject({ code: 'STAFF_READINESS_IDENTITY_REFUSED' });
-    expect(made[0].ended).toBe(1);
+  ])('refuses %s, writes nothing and ends the connection', async (_name, mutate) => {
+    const made: ClientRecord[] = [];
+    const Client = fakeClient(async () => ({ rows: [mutate(peerRow())] }), made);
+    await expect(actor.runReadinessOperation({ Client, control: control('publish', publish) })).rejects.toMatchObject({ code: 'STAFF_READINESS_IDENTITY_REFUSED' });
+    expect(made[0]!.sql).toHaveLength(1);
+    expect(made[0]!.ended).toBe(1);
   });
 
   it('refuses no row or two rows', async () => {
-    const options = unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(undefined) });
     for (const rows of [[], [peerRow(), peerRow()]]) {
-      await expect(unlock.openPeerReadinessPool({ Pool: fakePool(async () => ({ rows })), options })).rejects.toMatchObject({ code: 'STAFF_READINESS_IDENTITY_REFUSED' });
+      await expect(actor.runReadinessOperation({ Client: fakeClient(async () => ({ rows })), control: control('check') })).rejects.toMatchObject({ code: 'STAFF_READINESS_IDENTITY_REFUSED' });
     }
   });
 
-  it('names a peer authentication refusal (pg_ident/pg_hba lines missing) in plain terms', async () => {
-    const made: any[] = [];
-    const options = unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(undefined) });
-    const Pool = fakePool(async () => { throw Object.assign(new Error('Peer authentication failed for user "debateai_staff_readiness_writer"'), { code: '28000' }); }, made);
-    await expect(unlock.openPeerReadinessPool({ Pool, options })).rejects.toMatchObject({ code: 'STAFF_READINESS_PEER_AUTH_REFUSED' });
-    expect(made[0].ended).toBe(1);
+  it('answers a write the database refused as false, not as a refusal', async () => {
+    const Client = fakeClient(async () => ({ rows: [peerRow()] }), [], { value: false });
+    await expect(actor.runReadinessOperation({ Client, control: control('revoke', { generation: uuid(9) }) })).resolves.toBe(false);
+  });
+
+  it('names a peer authentication refusal (the pg_ident/pg_hba lines missing, or the wrong OS user) in plain terms', async () => {
+    const made: ClientRecord[] = [];
+    const Client = fakeClient(async () => ({ rows: [peerRow()] }), made, { connectError: refusal('28000') });
+    await expect(actor.runReadinessOperation({ Client, control: control('check') })).rejects.toMatchObject({ code: 'STAFF_READINESS_PEER_AUTH_REFUSED' });
+    expect(made[0]!.sql).toEqual([]);
+  });
+
+  it('names any other failure to connect as the database being unavailable', async () => {
+    const Client = fakeClient(async () => ({ rows: [peerRow()] }), [], { connectError: refusal('ECONNREFUSED') });
+    await expect(actor.runReadinessOperation({ Client, control: control('check') })).rejects.toMatchObject({ code: 'STAFF_READINESS_DATABASE_UNAVAILABLE' });
   });
 
   /**
    * The real pg driver against a stand-in server on a Unix socket that asks for a password (as a
    * server would whose pg_hba still sends this role to a scram/password line): the driver sends
-   * nothing back but its startup message, and the open fails with a named refusal.
+   * nothing back but its startup message, and the call fails with a named refusal.
    */
   it.each([['cleartext', 3], ['SCRAM-SHA-256', 10]])('with the real pg driver: a server that asks for a %s password gets none', async (_name, authCode) => {
     const pg = createRequire(import.meta.url)('pg');
@@ -478,8 +648,7 @@ describe('peer writer connection: the preview socket, no password, exactly the r
     });
     await new Promise<void>(done => server.listen(join(dir, '.s.PGSQL.5434'), done));
     try {
-      const options = { ...unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(dir) }), connectionTimeoutMillis: 2000 };
-      await expect(unlock.openPeerReadinessPool({ Pool: pg.Pool, options })).rejects.toMatchObject({ code: 'STAFF_READINESS_PASSWORD_REQUESTED' });
+      await expect(actor.runReadinessOperation({ Client: pg.Client, control: { op: 'check', host: dir } })).rejects.toMatchObject({ code: 'STAFF_READINESS_PASSWORD_REQUESTED' });
       const bytes = Buffer.concat(received);
       const startupLength = bytes.readInt32BE(0);
       const startup = bytes.subarray(0, startupLength).toString('latin1');
@@ -495,44 +664,115 @@ describe('peer writer connection: the preview socket, no password, exactly the r
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  const input = (value: unknown) => Buffer.from(JSON.stringify(value));
+  const base = { engine: ENGINE, pgPath: PG_PATH, host: SOCKET };
+  it('accepts exactly the three calls and their fields', () => {
+    expect(actor.parseReadinessControl(input({ op: 'check', ...base }))).toEqual({ op: 'check', ...base });
+    expect(actor.parseReadinessControl(input({ op: 'publish', ...base, ...publish }))).toEqual({ op: 'publish', ...base, ...publish });
+    expect(actor.parseReadinessControl(input({ op: 'revoke', ...base, generation: uuid(9) }))).toEqual({ op: 'revoke', ...base, generation: uuid(9) });
+  });
+
+  it.each([
+    ['an unknown call', { op: 'grant', ...base }],
+    ['an extra key', { op: 'check', ...base, role: 'postgres' }],
+    ['a missing field', { op: 'revoke', ...base }],
+    ['an engine outside the releases', { op: 'check', ...base, engine: '/tmp/dialectical-engine' }],
+    ['a pg path outside the engine', { op: 'check', ...base, pgPath: '/tmp/pg/lib/index.js' }],
+    ['a pg path that climbs out', { op: 'check', ...base, pgPath: `${ENGINE}/node_modules/../../x.js` }],
+    ['a TCP host', { op: 'check', ...base, host: '127.0.0.1' }],
+    ['a bad hash', { op: 'publish', ...base, ...publish, configSha256: 'x' }],
+    ['a bad generation', { op: 'revoke', ...base, generation: 'not-a-uuid' }],
+    ['an expiry that is not an exact time', { op: 'publish', ...base, ...publish, evidenceExpiresAt: 'tomorrow' }],
+    ['an adapter id with a newline', { op: 'publish', ...base, ...publish, ackAdapterId: 'a\nb' }]
+  ])('refuses %s', (_name, value) => {
+    expect(() => actor.parseReadinessControl(input(value))).toThrow(/STAFF_READINESS_INPUT_REFUSED/);
+  });
+
+  it('names a release pg the dedicated user cannot read (it has no groups), instead of a bare failure', () => {
+    expect(() => actor.requirePg(`${ENGINE}/node_modules/pg/lib/index.js`)).toThrow(/STAFF_READINESS_RELEASE_UNREADABLE/);
+    expect(actor.requirePg(PG_PATH, () => ({ Client: 'C' }))).toEqual({ Client: 'C' });
+  });
+
+  it('the child itself refuses to run off the server, as root or with any environment, and says so in its one line', () => {
+    const script = join(dirname(fileURLToPath(import.meta.url)), '../../deploy/preview-lifecycle/v1/readiness-writer-actor.mjs');
+    for (const env of [{}, { PATH: '/usr/bin:/bin' }]) {
+      const result = spawnSync(process.execPath, [script], { env, input: JSON.stringify({ op: 'check', ...base }), encoding: 'utf8' });
+      expect(result.status).toBe(1);
+      expect(result.stderr).toBe('');
+      expect(JSON.parse(result.stdout)).toEqual({ schema: RESULT_SCHEMA, ok: false, code: 'STAFF_READINESS_ACTOR_REFUSED' });
+    }
+  });
 });
 
 describe('which writer the unlock builds (PREVIEW_LIFECYCLE_STAFF_WRITER, from the unit\'s own env -i line only)', () => {
   const publisher = () => ({ publish: async () => true, revoke: async () => true });
-  function spies() {
-    const seen = { creator: [] as unknown[], random: 0, ca: 0 };
+  /** peer: what the dedicated-user path does today ('works', the user 'missing', or the child 'refused'). */
+  function spies(peer: 'works' | 'missing' | 'refused' = 'missing') {
+    const seen = { creator: [] as unknown[], random: 0, ca: 0, lookups: 0, children: [] as any[] };
     return {
       seen,
       runCreator: async (control: { mode: string }) => { seen.creator.push(control); return control.mode === 'open' ? { existingRoleOpened: true } : { passwordNull: true, expiredMinusInfinity: true, noSessions: true }; },
       randomBytes: (n: number) => { seen.random++; return Buffer.alloc(n, 7); },
-      readCa: async () => { seen.ca++; return 'CA'; }
+      readCa: async () => { seen.ca++; return 'CA'; },
+      lookupReadinessUser: async () => { seen.lookups++; if (peer === 'missing') throw refusal('STAFF_READINESS_USER_MISSING'); return { name: OS_USER, uid: 998, gid: 997 }; },
+      readinessRunner: ({ user, host }: { user: unknown; host: string }) => async (op: string, fields: unknown) => {
+        seen.children.push({ user, host, op, fields });
+        if (peer === 'refused') throw refusal('STAFF_READINESS_PEER_AUTH_REFUSED');
+        return true;
+      }
     };
   }
 
-  it('by default builds the peer writer, which never runs the creator actor, never draws a password and never hands the driver one', async () => {
-    const s = spies(), made: any[] = [];
-    const writer = await unlock.buildStaffWriter({ env: {}, Pool: fakePool(async () => ({ rows: [peerRow()] }), made), createPublisher: publisher, runCreator: s.runCreator, randomBytes: s.randomBytes, readCa: s.readCa });
+  it('by default builds the peer writer: every database call is a child as the dedicated user; root opens no pool, runs no creator, draws no password', async () => {
+    const s = spies('works'), made: any[] = [];
+    const writer = await unlock.buildStaffWriter({ env: {}, Pool: fakePool(async () => ({ rows: [peerRow()] }), made), createPublisher: publisher, ...s });
     expect(writer.kind).toBe(PEER);
     const h = harness();
     const result = await unlock.runUnlockWindow({ writer, evidence: h.evidence, deps: h.deps, windowMs: 10 * MINUTE });
     expect(result).toEqual({ outcome: 'WINDOW_ENDED', publishes: 60, locked: true });
     expect(await writer.reset()).toEqual({ nothingToReset: true });
-    expect(s.seen).toEqual({ creator: [], random: 0, ca: 0 });
-    expect(made).toHaveLength(1);
-    expect(made[0].options).toMatchObject({ user: PEER_ROLE, host: '/run/debateai-v3-preview/postgresql', ssl: false });
-    expect(typeof made[0].options.password).toBe('function');
-    expect(made[0].ended).toBe(1);
+    expect(s.seen).toMatchObject({ creator: [], random: 0, ca: 0, lookups: 1 });
+    expect(made).toEqual([]);
+    expect(s.seen.children.map((child: any) => child.op)).toEqual(['check', ...Array(60).fill('publish'), 'revoke']);
+    for (const child of s.seen.children) expect(child).toMatchObject({ user: { name: OS_USER, uid: 998, gid: 997 }, host: SOCKET });
   });
 
-  it('builds the interim recovery-login writer only when the unit names it, with its identity check unchanged', async () => {
-    const s = spies(), made: any[] = [];
-    const writer = await unlock.buildStaffWriter({ env: { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login' }, Pool: fakePool(async () => ({ rows: [interimRow()] }), made), createPublisher: publisher, runCreator: s.runCreator, randomBytes: s.randomBytes, readCa: s.readCa, now: () => start });
+  it('the default stops before any child or pool when the dedicated user is missing', async () => {
+    const s = spies('missing'), made: any[] = [];
+    await expect(unlock.buildStaffWriter({ env: {}, Pool: fakePool(async () => ({ rows: [] }), made), createPublisher: publisher, ...s })).rejects.toMatchObject({ code: 'STAFF_READINESS_USER_MISSING' });
+    expect(s.seen.children).toEqual([]);
+    expect(made).toEqual([]);
+  });
+
+  it.each([['missing', 0], ['refused', 1]] as const)('builds the interim recovery-login writer when it is named and the peer path is %s, with its identity check unchanged', async (peer, probes) => {
+    const s = spies(peer), made: any[] = [];
+    const writer = await unlock.buildStaffWriter({ env: { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login' }, Pool: fakePool(async () => ({ rows: [interimRow()] }), made), createPublisher: publisher, ...s, now: () => start });
     expect(writer.kind).toBe('interim-recovery-login');
+    expect(s.seen.children.map((child: any) => [child.op, child.host])).toEqual(Array(probes).fill(['check', SOCKET]));
     await writer.open({ validUntil: new Date(start + 4 * MINUTE) });
     expect(s.seen.creator).toEqual([{ mode: 'open', validUntil: new Date(start + 4 * MINUTE).toISOString() }]);
     expect(made[0].options).toMatchObject({ user: 'debateai_prod_staff_recovery', password: '07'.repeat(32), ssl: false });
     expect(made[0].sql[0]).toMatch(/rolvaliduntil/);
     await expect(writer.close()).resolves.toMatchObject({ passwordNull: true, expiredMinusInfinity: true });
+  });
+
+  it('refuses the fallback when the peer writer already works (STAFF_WRITER_FALLBACK_NOT_NEEDED), before opening anything', async () => {
+    const s = spies('works'), made: any[] = [];
+    await expect(unlock.buildStaffWriter({ env: { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login' }, Pool: fakePool(async () => ({ rows: [interimRow()] }), made), createPublisher: publisher, ...s })).rejects.toMatchObject({ code: 'STAFF_WRITER_FALLBACK_NOT_NEEDED' });
+    expect(s.seen).toMatchObject({ creator: [], random: 0, ca: 0 });
+    expect(s.seen.children.map((child: any) => [child.op, child.host])).toEqual([['check', SOCKET]]);
+    expect(made).toEqual([]);
+  });
+
+  it('a fallback pointed at loopback TLS still probes the peer writer on the preview socket', async () => {
+    const env = { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login', PREVIEW_LIFECYCLE_STAFF_DB_HOST: '127.0.0.1' };
+    const works = spies('works');
+    await expect(unlock.buildStaffWriter({ env, Pool: fakePool(async () => ({ rows: [] })), createPublisher: publisher, ...works })).rejects.toMatchObject({ code: 'STAFF_WRITER_FALLBACK_NOT_NEEDED' });
+    expect(works.seen.children.map((child: any) => child.host)).toEqual([SOCKET]);
+    const missing = spies('missing');
+    await unlock.buildStaffWriter({ env, Pool: fakePool(async () => ({ rows: [] })), createPublisher: publisher, ...missing });
+    expect(missing.seen.ca).toBe(1);
   });
 
   it.each([
@@ -542,25 +782,19 @@ describe('which writer the unlock builds (PREVIEW_LIFECYCLE_STAFF_WRITER, from t
     ['another port', (row: any) => ({ ...row, port: 5432 })]
   ])('the interim writer still refuses %s', async (_name, mutate) => {
     const s = spies(), made: any[] = [];
-    const writer = await unlock.buildStaffWriter({ env: { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login' }, Pool: fakePool(async () => ({ rows: [mutate(interimRow())] }), made), createPublisher: publisher, runCreator: s.runCreator, randomBytes: s.randomBytes, readCa: s.readCa, now: () => start });
+    const writer = await unlock.buildStaffWriter({ env: { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login' }, Pool: fakePool(async () => ({ rows: [mutate(interimRow())] }), made), createPublisher: publisher, ...s, now: () => start });
     await expect(writer.open({ validUntil: new Date(start + 4 * MINUTE) })).rejects.toMatchObject({ code: 'STAFF_JIT_IDENTITY_REFUSED' });
     expect(made[0].ended).toBe(1);
-  });
-
-  it('reads the preview CA only for the interim writer over loopback TLS', async () => {
-    const s = spies();
-    await unlock.buildStaffWriter({ env: { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login', PREVIEW_LIFECYCLE_STAFF_DB_HOST: '127.0.0.1' }, Pool: fakePool(async () => ({ rows: [] })), createPublisher: publisher, runCreator: s.runCreator, readCa: s.readCa });
-    expect(s.seen.ca).toBe(1);
   });
 
   it.each([
     ['an unknown writer', { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim' }, 'STAFF_WRITER_REFUSED'],
     ['the peer writer over TCP', { PREVIEW_LIFECYCLE_STAFF_DB_HOST: '127.0.0.1' }, 'STAFF_DB_HOST_REFUSED']
   ])('refuses %s before building anything', async (_name, env, code) => {
-    const s = spies(), made: any[] = [];
-    await expect(unlock.buildStaffWriter({ env, Pool: fakePool(async () => ({ rows: [] }), made), createPublisher: publisher, runCreator: s.runCreator, readCa: s.readCa })).rejects.toMatchObject({ code });
+    const s = spies('works'), made: any[] = [];
+    await expect(unlock.buildStaffWriter({ env, Pool: fakePool(async () => ({ rows: [] }), made), createPublisher: publisher, ...s })).rejects.toMatchObject({ code });
     expect(made).toEqual([]);
-    expect(s.seen).toEqual({ creator: [], random: 0, ca: 0 });
+    expect(s.seen).toEqual({ creator: [], random: 0, ca: 0, lookups: 0, children: [] });
   });
 });
 
@@ -891,6 +1125,9 @@ describe('release check before any import from the release tree', () => {
     expect(loaded).toEqual([]);
     expect(checked[0].importPaths).toEqual([`${engine}/node_modules/tsx/dist/esm/api/index.mjs`, `${engine}/packages/db/src/index.ts`, `${engine}/apps/api/src/staff/alerts.ts`, `${engine}/apps/api/src/staff/runtime.ts`, `${engine}/node_modules/.pnpm/pg@8/node_modules/pg/lib/index.js`]);
     expect(checked[0].plan).toEqual({ sourceRoot: 'x' });
+    // After the check, the verified pg path is handed on: the readiness child requires exactly that file.
+    const pgPath = `${engine}/node_modules/.pnpm/pg@8/node_modules/pg/lib/index.js`;
+    await expect(unlock.loadReleaseModules({ plan: { sourceRoot: 'x' }, engine, resolvePg: () => pgPath, guard: async () => true, load: async () => ({ pg: 'PG' }) })).resolves.toEqual({ pg: 'PG', pgPath });
   });
 
   it('postgres creator actor: verifies the pinned API release itself and refuses another engine before importing', async () => {

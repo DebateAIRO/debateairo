@@ -14,8 +14,10 @@ Type=simple
 # service manager's or this unit's environment (NODE_OPTIONS, NODE_PATH, ...) reaches it, so an
 # Environment= line here has no effect.
 # Writer: this line names none, so the unlock writes the ready row as debateai_staff_readiness_writer
-# (migration 0109; no password, peer authentication on the preview's local socket; README step 7).
-# Fallback until the server has 0109 and the pg_ident/pg_hba lines: the drop-in
+# (the auth DB batch step; no password, peer authentication on the preview's local socket). Root
+# never connects as it: each database call is a child started as the dedicated no-login OS user
+# debateai-readiness, the only OS user the preview's pg_ident maps to it (README step 7).
+# Fallback until the server has that step, the user and the pg_ident/pg_hba lines: the drop-in
 # fallback/50-interim-recovery-login.conf, which re-states this line with
 # PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login after PATH=... (the old recovery login
 # with a temporary password). Only with that fallback may PREVIEW_LIFECYCLE_STAFF_DB_HOST=127.0.0.1

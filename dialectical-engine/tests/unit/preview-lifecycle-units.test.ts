@@ -169,14 +169,39 @@ describe('preview lifecycle systemd templates', () => {
     expect(seen).toEqual({ env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login' }, execArgv: [] });
   });
 
-  it('the README installs the fallback drop-in by its real name and documents the peer lines exactly as the templates', () => {
+  it('the README installs the fallback drop-in by its real name', () => {
     const readme = readFileSync(join(folder, 'README.md'), 'utf8');
     expect(readme).toContain(`systemd/${FALLBACK}`);
     expect(readme).toContain('/etc/systemd/system/debateai-preview-team-unlock.service.d/50-interim-recovery-login.conf');
-    const collapsed = readme.replace(/[ \t]+/g, ' ');
-    expect(collapsed).toContain('local debateai debateai_staff_readiness_writer peer map=readiness');
-    expect(collapsed).toContain('readiness root debateai_staff_readiness_writer');
     expect(readme).toMatch(/CONNECTION LIMIT 2/);
+  });
+
+  /**
+   * The readiness login is reached by peer authentication from ONE dedicated OS user, never root:
+   * any process the kernel reports as uid 0 (a root container on the same socket, say) would
+   * otherwise get in. The production templates (deploy/postgres) carry no such line; the preview's
+   * lines live only in this README.
+   */
+  it('the README creates the dedicated no-login OS user and maps only it (never root), with the pg_hba line first', () => {
+    const readme = readFileSync(join(folder, 'README.md'), 'utf8');
+    const collapsed = readme.replace(/[ \t]+/g, ' ');
+    expect(readme).toContain('useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin debateai-readiness');
+    expect(collapsed).toContain('readiness debateai-readiness debateai_staff_readiness_writer');
+    expect(collapsed).toContain('local debateai debateai_staff_readiness_writer peer map=readiness');
+    expect(collapsed).not.toMatch(/readiness root debateai_staff_readiness_writer/);
+    // The scripted edits: the pg_ident line names the dedicated user; the pg_hba line goes in as line 1.
+    expect(readme).toContain("printf '%s\\n' 'readiness  debateai-readiness  debateai_staff_readiness_writer' >> \"$IDENT\"");
+    expect(readme).toContain("sed -i '1i local  debateai  debateai_staff_readiness_writer  peer  map=readiness' \"$HBA\"");
+    // Verification: the dedicated user gets in; root, the same command, does not.
+    expect(readme).toContain("runuser -u debateai-readiness -- /usr/bin/env -i /usr/lib/postgresql/18/bin/psql -w --host=/run/debateai-v3-preview/postgresql --port=5434 --username=debateai_staff_readiness_writer -d debateai -XAtc 'SELECT session_user, current_user'");
+    expect(readme).toContain("/usr/bin/env -i /usr/lib/postgresql/18/bin/psql -w --host=/run/debateai-v3-preview/postgresql --port=5434 --username=debateai_staff_readiness_writer -d debateai -XAtc 'SELECT session_user'");
+    expect(readme).toContain('STAFF_WRITER_FALLBACK_NOT_NEEDED');
+  });
+
+  it('names the batch step by what it is, never by a migration number that may still change', () => {
+    for (const text of [unit('debateai-preview-team-unlock.service'), unit(FALLBACK), readFileSync(join(folder, 'README.md'), 'utf8'), readFileSync(join(folder, 'unlock-team-tools.mjs'), 'utf8'), readFileSync(join(folder, 'readiness-writer-actor.mjs'), 'utf8')]) {
+      expect(text).not.toMatch(/\b0109\b/);
+    }
   });
 
   it('every script a template names exists in this folder', () => {

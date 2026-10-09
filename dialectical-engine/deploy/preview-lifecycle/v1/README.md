@@ -18,7 +18,7 @@ launchers still re-check every byte exactly as before.
 | systemd files | Restart after a crash (30 s pause for the API and website, 10 s for the database, at most 4 tries in 15 min), start everything at boot, email the owner when a service gives up. |
 | `alert.mjs` | That email: "Preview: <unit> gave up after N restarts", the time in UTC and Bucharest, the last 20 log lines with secrets blanked. A crash that systemd is still fixing by itself sends nothing. At most one per service per 30 minutes. |
 | `backup.mjs` | A checked copy of the preview database every night at 03:15 Bucharest time; the 7 newest are kept. A local safety net, not an off-site backup. |
-| `unlock-team-tools.mjs` | `systemctl start debateai-preview-team-unlock` turns team (staff) tools on for one hour, then they lock again by themselves. It writes as a database login that has no password (migration 0109, step 7). |
+| `unlock-team-tools.mjs` | `systemctl start debateai-preview-team-unlock` turns team (staff) tools on for one hour, then they lock again by themselves. It writes as a database login that has no password, reached only from one dedicated no-login OS user (the auth DB batch step; step 7). |
 
 ## Decisions you should know about
 
@@ -42,21 +42,36 @@ launchers still re-check every byte exactly as before.
   `sendmail -t` as `noreply@dezbatere.ro`; the address never appears in a process list. If the
   owner wants a new address, that is a reviewed change to the server allow-list, not a lifecycle
   config edit.
-- **Team unlock writes the "ready" row as its own password-less database login.** Migration 0109
-  adds `debateai_staff_readiness_writer`: a database login with **no password at all**, allowed
-  to do exactly two things (write the ready row, withdraw it), at most 2 connections at once
-  (`CONNECTION LIMIT 2`), no other powers. It gets in one way only: root on this machine, over
-  the preview's local socket. PostgreSQL asks the operating system who is calling ("peer"
-  login) and one `pg_ident` line maps root to that login; one `pg_hba` line allows it (step 7).
-  So the unlock no longer makes up a temporary password, renews nothing and has nothing to
-  reset; at the end it withdraws the row and closes its connection. Its journal lines say
-  `"writer":"peer-readiness-writer"` and, at the end, `"locked":true`.
-- **The old way stays as a fallback, switched on by hand.** Until the server has migration 0109
-  and the two lines, the operator installs one drop-in (step 7) that names
-  `PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login` on the unit's own `env -i` line. Any
-  other value is refused (`STAFF_WRITER_REFUSED`). Then the unlock opens the existing recovery
-  login with a temporary password, as before, and its lines say
-  `"writer":"interim-recovery-login"` and `"roleReset":true`.
+- **Team unlock writes the "ready" row as its own password-less database login, from its own
+  OS user.** The auth DB batch step adds `debateai_staff_readiness_writer`: a database login
+  with **no password at all**, allowed to do exactly two things (write the ready row, withdraw
+  it), at most 2 connections at once (`CONNECTION LIMIT 2`), no other powers. PostgreSQL lets it
+  in by asking the operating system who is calling ("peer" login) on the preview's local socket.
+  One `pg_ident` line maps **one** OS user to it: `debateai-readiness`, a system user made only
+  for this, with no login shell and no home (step 7). **Not root**: PostgreSQL only sees a
+  number for the caller, and every process that runs as uid 0, including a root process inside
+  a container that can reach the socket, would count as root. So the unlock (root) never
+  connects as that login itself. For each database call it starts `readiness-writer-actor.mjs`
+  as `debateai-readiness` (`setpriv`: that user's uid and gid, no extra groups, no capabilities,
+  no new privileges, an empty environment). The child opens one fresh connection, checks on that
+  connection who it is (below), runs the one call (check, write or withdraw) and exits; nothing is
+  kept open between calls. The unlock refuses to start any child as uid or gid 0, and refuses a
+  `debateai-readiness` that is missing (`STAFF_READINESS_USER_MISSING`), is uid or gid 0, is the
+  shared `nobody`, or has a login shell (`STAFF_READINESS_USER_REFUSED`). It makes up no
+  temporary password, renews nothing and has nothing to reset; at the end it withdraws the row.
+  Its journal lines say `"writer":"peer-readiness-writer"` and, at the end, `"locked":true`.
+- **These two lines are preview-only.** The production templates in `deploy/postgres/` carry no
+  readiness line and no `pg_ident` map: production has no team-unlock helper, so there the
+  login exists but cannot log in. The lines below (step 7) are the only place they are written.
+- **The old way stays as a fallback, switched on by hand.** Until the server has the auth DB
+  batch step, the dedicated user and the two lines, the operator installs one drop-in (step 7)
+  that names `PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login` on the unit's own `env -i`
+  line. Any other value is refused (`STAFF_WRITER_REFUSED`). Then the unlock opens the existing
+  recovery login with a temporary password, as before, and its lines say
+  `"writer":"interim-recovery-login"` and `"roleReset":true`. Before it does, it tries the
+  dedicated-user path once (a check that writes nothing). If that already works, the fallback
+  **refuses to start** (`STAFF_WRITER_FALLBACK_NOT_NEEDED`, the unit fails and emails): it would
+  hand out a temporary password for nothing. Remove the drop-in (step 7 f).
 - **Fallback and the 5-minute database rule.** Migration 0088 only accepts the recovery login
   while its expiry is at most 5 minutes away. So the fallback does not set one expiry an hour
   ahead; it keeps the expiry rolling at most 4 minutes ahead (renewed every 2 minutes) and never
@@ -85,8 +100,9 @@ launchers still re-check every byte exactly as before.
   exits). A failed submission logs its own `PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED` line with the
   exit code. Install step 2 includes a test send.
 - **No release code runs as root (or as the database superuser) before it is checked.** The team
-  unlock (root) and its database actor (the `postgres` OS user) load code from the pinned API
-  release. Before the first import, `release-guard.mjs` runs the launchers' own check (the
+  unlock (root), its database actor (the `postgres` OS user) and its readiness child
+  (`debateai-readiness`, which loads only `pg`, from the exact file root verified) load code from
+  the pinned API release. Before the first import, `release-guard.mjs` runs the launchers' own check (the
   pinned source manifest, read as the launchers read it, verified against the whole release
   tree, plus the operator digest), and requires every file it loads, and every folder above it
   **all the way up to `/`**, to be root-owned and not writable by group or others (no exception
@@ -101,14 +117,16 @@ launchers still re-check every byte exactly as before.
   renewal. The cost is the release re-hash (about the verifier's 12 s) on each call, so each call
   may take up to 120 s and the unit's `TimeoutStopSec=150` leaves room for one call when stopping.
   Install step 5 measures it.
-- **The default writer can never send a password.** Its database driver is given a "password"
-  that refuses to be read: if the server asks for one (the `pg_hba` line is missing or below a
-  broader rule), the unlock fails with `STAFF_READINESS_PASSWORD_REQUESTED` and nothing is sent.
-  A refused peer login shows `STAFF_READINESS_PEER_AUTH_REFUSED` (usually the `pg_ident` line).
-  Once in, it checks who it really is: exactly `debateai_staff_readiness_writer` (no switched
-  role), on the local socket, in the preview database and port, no special powers, no role
-  memberships; anything else ends with `STAFF_READINESS_IDENTITY_REFUSED`. Peer logins exist only
-  on the socket, so loopback TCP is refused for this writer (`STAFF_DB_HOST_REFUSED`).
+- **The default writer can never send a password.** The readiness child's database driver is
+  given a "password" that refuses to be read: if the server asks for one (the `pg_hba` line is
+  missing or below a broader rule), the unlock fails with `STAFF_READINESS_PASSWORD_REQUESTED`
+  and nothing is sent. A refused peer login shows `STAFF_READINESS_PEER_AUTH_REFUSED` (usually
+  the `pg_ident` line, or the child not running as `debateai-readiness`). On **every**
+  connection, before anything else, the child checks who it really is: exactly
+  `debateai_staff_readiness_writer` as both session and current user (no switched role), on the
+  local socket, in the preview database and port, no special powers, no role memberships;
+  anything else ends with `STAFF_READINESS_IDENTITY_REFUSED` and nothing is written. Peer logins
+  exist only on the socket, so loopback TCP is refused for this writer (`STAFF_DB_HOST_REFUSED`).
 - **The fallback login's password never reaches SQL.** The database actor turns it into a
   SCRAM-SHA-256 verifier (random salt, 4096 rounds) and sends only that in `ALTER ROLE`, so the
   password is never in a statement, a server log or `pg_stat_activity`. The unlock then logs in
@@ -149,7 +167,7 @@ launchers still re-check every byte exactly as before.
 
 ```text
 prestart.mjs  common.mjs  alert.mjs  backup.mjs  release-guard.mjs
-unlock-team-tools.mjs  jit-creator-actor.mjs  self-capture-actor.mjs
+unlock-team-tools.mjs  jit-creator-actor.mjs  self-capture-actor.mjs  readiness-writer-actor.mjs
 systemd/debateai-preview.target
 systemd/debateai-preview-{api,ui,postgresql}.service.d/50-lifecycle.conf
 systemd/debateai-preview-alert@.service
@@ -160,9 +178,10 @@ systemd/fallback/50-interim-recovery-login.conf   (fallback only; not installed 
 
 prestart, alert and backup use Node built-ins plus the reviewed `deploy/preview-auth-dev/v1`
 helpers (custody reader, launch-plan and attestation validators); the alert also uses the
-preview mail wrapper's allow-list schema check from `deploy/preview-mail/v4-20261005`. The unlock and its two actors
-load `pg`, `tsx`, the staff alert code and `native-peer.mjs` from the **pinned release** itself,
-and only after `release-guard.mjs` has verified that release (see the decisions above).
+preview mail wrapper's allow-list schema check from `deploy/preview-mail/v4-20261005`. The unlock and its three actors
+load `pg`, `tsx`, the staff alert code and `native-peer.mjs` from the **pinned release** itself
+(the readiness child loads only `pg`), and only after `release-guard.mjs` has verified that
+release (see the decisions above).
 
 ## Install (operator, root, in this order)
 
@@ -321,24 +340,51 @@ unit files before installing; nothing else names them.
 
    **Give the team unlock its database login.** The unlock writes its "ready" row as
    `debateai_staff_readiness_writer` (see the decisions above: no password, two functions only,
-   `CONNECTION LIMIT 2`, root over the local socket only). Four checks and one change:
+   `CONNECTION LIMIT 2`), reached only from the dedicated OS user `debateai-readiness` over the
+   local socket, **never from root**. Five checks and two changes:
 
-   a. **Is migration 0109 applied?** Applying it is its own reviewed step, not part of this
-      install. This must print `debateai_staff_readiness_writer|t|t|2` (it can log in, has no
+   a. **Is the auth DB batch step applied?** Applying it is its own reviewed step, not part of
+      this install. This must print `debateai_staff_readiness_writer|t|t|2` (it can log in, has no
       password, at most 2 connections):
 
       ```sh
       runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "SELECT rolname, rolcanlogin, rolpassword IS NULL, rolconnlimit FROM pg_authid WHERE rolname = 'debateai_staff_readiness_writer'"
       ```
 
-      If it prints nothing, 0109 is not applied yet: use the fallback (e) for now.
+      If it prints nothing, the step is not applied yet: use the fallback (f) for now.
 
-   b. **Add the two lines and reload.** This copies both files to `/root/preview-archive/`
-      first, adds each line only if it is not there yet, and puts the `pg_hba` line **first** in
-      the file, so no broader rule can catch this login before it. The lines are exactly the ones
-      in `deploy/postgres/pg_ident.conf.template` and `deploy/postgres/pg_hba.conf.template`:
-      `readiness  root  debateai_staff_readiness_writer` and
-      `local  debateai  debateai_staff_readiness_writer  peer  map=readiness`.
+   b. **Create the dedicated OS user** (skip the `useradd` if `getent` already prints a line). A
+      system user with its own group, no home folder and a shell that refuses every login:
+
+      ```sh
+      getent passwd debateai-readiness || useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin debateai-readiness
+      getent passwd debateai-readiness
+      id debateai-readiness
+      ```
+
+      The second line must end in `:/usr/sbin/nologin` and its third field (the uid) must not be
+      `0`. `id` must show the user's own group only (`groups=` lists one name,
+      `debateai-readiness`). The unlock checks the same and refuses otherwise.
+
+      Then check that this user can start the readiness child (node and the operator files are
+      readable to it) and that the child accepts who it is. It connects to nothing: it refuses
+      the empty input.
+
+      ```sh
+      runuser -u debateai-readiness -- /usr/bin/env -i /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/readiness-writer-actor.mjs < /dev/null
+      ```
+
+      Expect `{"schema":"preview-lifecycle-readiness-v1","ok":false,"code":"STAFF_READINESS_INPUT_REFUSED"}`.
+      `STAFF_READINESS_ACTOR_REFUSED` means it did not run as exactly that user with an empty
+      environment; `Permission denied` means node or the operator folder is not readable to others.
+
+   c. **Add the two lines and reload.** This copies both files to `/root/preview-archive/`
+      first, removes any `readiness` line that maps root (an earlier draft of this step did),
+      adds each line only if it is not there yet, and puts the `pg_hba` line **first** in the
+      file, so no broader rule can catch this login before it. These lines exist only here, never
+      in the production templates (`deploy/postgres/`):
+      `readiness  debateai-readiness  debateai_staff_readiness_writer` (pg_ident) and
+      `local  debateai  debateai_staff_readiness_writer  peer  map=readiness` (pg_hba).
 
       ```sh
       HBA=$(runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc 'SHOW hba_file')
@@ -346,8 +392,9 @@ unit files before installing; nothing else names them.
       STAMP=$(date -u +%Y%m%dT%H%M%SZ)
       cp -p "$HBA" "/root/preview-archive/pg_hba.conf.before-readiness-$STAMP"
       cp -p "$IDENT" "/root/preview-archive/pg_ident.conf.before-readiness-$STAMP"
+      sed -i '/^readiness[[:space:]]\+root[[:space:]]/d' "$IDENT"
       grep -Eq '^local[[:space:]]+debateai[[:space:]]+debateai_staff_readiness_writer[[:space:]]+peer[[:space:]]+map=readiness[[:space:]]*$' "$HBA" || sed -i '1i local  debateai  debateai_staff_readiness_writer  peer  map=readiness' "$HBA"
-      grep -Eq '^readiness[[:space:]]+root[[:space:]]+debateai_staff_readiness_writer[[:space:]]*$' "$IDENT" || printf '%s\n' 'readiness  root  debateai_staff_readiness_writer' >> "$IDENT"
+      grep -Eq '^readiness[[:space:]]+debateai-readiness[[:space:]]+debateai_staff_readiness_writer[[:space:]]*$' "$IDENT" || printf '%s\n' 'readiness  debateai-readiness  debateai_staff_readiness_writer' >> "$IDENT"
       stat -c '%a %U:%G %n' "$HBA" "$IDENT" /root/preview-archive/pg_hba.conf.before-readiness-"$STAMP" /root/preview-archive/pg_ident.conf.before-readiness-"$STAMP"
       runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc 'SELECT pg_reload_conf()'
       ```
@@ -356,30 +403,44 @@ unit files before installing; nothing else names them.
       `640 postgres:postgres`); the reload prints `t`. To undo: copy the two archived files back
       over `$HBA` and `$IDENT` and run the reload line again.
 
-   c. **Did PostgreSQL accept both files, in the right order?**
+   d. **Did PostgreSQL accept both files, in the right order?**
 
       ```sh
       runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAt -c "SELECT 'hba error', line_number, error FROM pg_hba_file_rules WHERE error IS NOT NULL" -c "SELECT 'ident', line_number, map_name, sys_name, pg_username, error FROM pg_ident_file_mappings WHERE map_name = 'readiness' OR error IS NOT NULL" -c "SELECT 'first rule', line_number, type, database, user_name, auth_method, options FROM pg_hba_file_rules ORDER BY line_number LIMIT 1"
       ```
 
-      Expect no `hba error` line, one line `ident|…|readiness|root|debateai_staff_readiness_writer|`
-      (empty error), and the first rule
+      Expect no `hba error` line, exactly one `ident` line,
+      `ident|…|readiness|debateai-readiness|debateai_staff_readiness_writer|` (empty error; a
+      second one naming `root` means c did not run), and the first rule
       `first rule|1|local|{debateai}|{debateai_staff_readiness_writer}|peer|{map=readiness}`.
 
-   d. **The one-line check, as root.** `-w` means psql never sends a password:
+   e. **Two one-line checks: the dedicated user gets in, root does not.** `-w` means psql never
+      sends a password; `env -i` gives it no environment. First as `debateai-readiness`:
 
       ```sh
-      /usr/bin/env -i PATH=/usr/bin:/bin /usr/lib/postgresql/18/bin/psql -w --host=/run/debateai-v3-preview/postgresql --port=5434 --username=debateai_staff_readiness_writer -d debateai -XAtc 'SELECT session_user, current_user'
+      runuser -u debateai-readiness -- /usr/bin/env -i /usr/lib/postgresql/18/bin/psql -w --host=/run/debateai-v3-preview/postgresql --port=5434 --username=debateai_staff_readiness_writer -d debateai -XAtc 'SELECT session_user, current_user'
       ```
 
       Expect `debateai_staff_readiness_writer|debateai_staff_readiness_writer`. If not:
-      `no password supplied`: the `pg_hba` line is missing, not first, or not reloaded (b).
-      `Peer authentication failed`: the `pg_ident` line is missing or misspelled (b).
-      `permission denied for database`: 0109 grants this login CONNECT; check (a).
-      `role … does not exist`: 0109 is not applied (a).
+      `no password supplied`: the `pg_hba` line is missing, not first, or not reloaded (c).
+      `Peer authentication failed`: the `pg_ident` line is missing or misspelled (c).
+      `Permission denied` on the socket file: the socket folder does not let this user in; stop
+      and ask (the API's own user reaches it, so compare `namei -l` of the socket for both).
+      `permission denied for database`: the batch step grants this login CONNECT; check (a).
+      `role … does not exist`: the batch step is not applied (a).
       `too many connections for role`: its 2 connections are in use; is an unlock running?
 
-   e. **Fallback, only while a–d cannot pass yet.** Install the drop-in that switches the unlock
+      Then the same login **as root**, which must be refused:
+
+      ```sh
+      /usr/bin/env -i /usr/lib/postgresql/18/bin/psql -w --host=/run/debateai-v3-preview/postgresql --port=5434 --username=debateai_staff_readiness_writer -d debateai -XAtc 'SELECT session_user'
+      ```
+
+      Expect `Peer authentication failed for user "debateai_staff_readiness_writer"` and no
+      output row. If it prints `debateai_staff_readiness_writer`, root is still mapped: stop,
+      redo c, and do not start the unlock until this check refuses.
+
+   f. **Fallback, only while a–e cannot pass yet.** Install the drop-in that switches the unlock
       back to the old recovery login with a temporary password:
 
       ```sh
@@ -400,7 +461,10 @@ unit files before installing; nothing else names them.
       column that covers `debateai`) on a lower line number than any `reject` row that would match
       it. If it is missing, stop: adding it is a reviewed pg_hba change, not part of this install.
 
-      **Back to the default** as soon as a–d pass (move the drop-in out, reload):
+      The fallback **refuses to start** once a–e pass: each start first tries the dedicated-user
+      path (a check that writes nothing), and if that works the run ends at once with
+      `STAFF_WRITER_FALLBACK_NOT_NEEDED` (the unit is `failed` and the alert emails).
+      **Back to the default** as soon as a–e pass (move the drop-in out, reload):
 
       ```sh
       mv /etc/systemd/system/debateai-preview-team-unlock.service.d/50-interim-recovery-login.conf /root/preview-archive/
@@ -486,7 +550,10 @@ inert without the drop-ins.
    `PREVIEW_TEAM_TOOLS_RESET` with `"roleReset":true`. A reset that fails logs
    `PREVIEW_TEAM_TOOLS_RESET_FAILED` with a reason, leaves the unit `failed` and sends the alert. As postgres, the recovery login must read back as
    `rolpassword IS NULL` and `rolvaliduntil = '-infinity'` in `pg_authid`, and
-   `debateai_staff_readiness_writer` as `rolpassword IS NULL` (it never has one).
+   `debateai_staff_readiness_writer` as `rolpassword IS NULL` (it never has one). Step 7 e's
+   root check must still be refused afterwards (only `debateai-readiness` gets in). If the unlock
+   instead logs `STAFF_READINESS_RELEASE_UNREADABLE`, the dedicated user (which has no groups)
+   cannot read the pinned release's `pg` files: stop and ask; do not add it to any group.
 6. **Backup.** `systemctl start debateai-preview-backup` logs `PREVIEW_BACKUP_OK`; the folder
    `/var/backups/debateai-v3-preview` is 0700 and each dump 0600. The nightly check is
    `pg_restore --list`: it proves the file is a readable archive with a table of contents, **not**
