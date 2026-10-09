@@ -64,6 +64,26 @@ describe('nightly preview database backup', () => {
     expect(readdirSync(layout.backupDir).sort()).toEqual(old);
   });
 
+  it('never deletes the dump it just wrote, even when older-looking than the rest (clock went back)', async () => {
+    const future = Array.from({ length: 7 }, (_, i) => `debateai-preview-2026110${i + 1}T001500Z.dump`);
+    const layout = server(future);
+    const event = await backup.runBackup({ layout, deps: okDeps() });
+    const name = 'debateai-preview-20261010T001500Z.dump';
+    expect(readdirSync(layout.backupDir)).toContain(name);
+    expect(event.removed).toEqual([future[0]]);
+    expect(backup.selectForDeletion([...future, name], 7, name)).toEqual([future[0]]);
+  });
+
+  it('never leaves fewer than two dumps, whatever the keep setting', async () => {
+    const names = ['debateai-preview-20261008T001500Z.dump', 'debateai-preview-20261009T001500Z.dump', 'debateai-preview-20261010T001500Z.dump'];
+    expect(backup.selectForDeletion(names, 1, names[2])).toEqual([names[0]]);
+    expect(backup.selectForDeletion(names, 0)).toEqual([names[0]]);
+    const layout = server([names[0]]);
+    const event = await backup.runBackup({ layout, deps: okDeps(), keep: 1 });
+    expect(event).toMatchObject({ kept: 2, removed: [] });
+    expect(readdirSync(layout.backupDir).sort()).toEqual([names[0], names[2]]);
+  });
+
   it('removes a partial file left by an earlier crash', async () => {
     const layout = server(['.debateai-preview-20261009T001500Z.dump.partial']);
     await backup.runBackup({ layout, deps: okDeps() });

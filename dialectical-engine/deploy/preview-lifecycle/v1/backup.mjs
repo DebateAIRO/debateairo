@@ -1,8 +1,10 @@
 // debateai-preview-backup.service (timer: nightly 03:15 Europe/Bucharest).
 //
 // Plain words: a nightly copy of the preview database, made by the postgres user over the
-// server's own socket, kept in a root-only folder. Each copy is checked with pg_restore before
-// it counts; only after a good new copy are older ones removed, keeping the seven newest.
+// server's own socket, kept in a root-only folder. Each copy is checked with pg_restore --list
+// before it counts (that reads the archive's table of contents only; it does not restore the
+// data); only after a good new copy are older ones removed, keeping the seven newest. The copy
+// just written is never removed, and at least two copies always stay.
 // This is a local safety net (for a bad change or a mistaken delete), not an off-site backup.
 import { constants, createReadStream } from 'node:fs';
 import { lstat, open, readdir, rename, unlink } from 'node:fs/promises';
@@ -12,6 +14,8 @@ import { pathToFileURL } from 'node:url';
 import { LAYOUT, ensureDirectory, logLine, runBounded } from './common.mjs';
 
 export const KEEP = 7;
+/** Whatever `keep` says, retention never leaves fewer copies than this. */
+export const MIN_KEPT = 2;
 const DUMP = /^debateai-preview-\d{8}T\d{6}Z\.dump$/;
 const PARTIAL = /^\.debateai-preview-\d{8}T\d{6}Z\.dump\.partial$/;
 
@@ -22,9 +26,15 @@ export function backupFileName(at) {
   return `debateai-preview-${at.toISOString().slice(0, 19).replace(/[-:]/g, '')}Z.dump`;
 }
 
-/** Names sort by their UTC stamp; everything past the newest `keep` goes. Unknown names are never touched. */
-export function selectForDeletion(names, keep) {
-  return names.filter(name => DUMP.test(name)).sort().reverse().slice(keep).sort();
+/**
+ * Names sort by their UTC stamp; everything past the newest `keep` (at least MIN_KEPT) goes.
+ * `protect` (the dump just written) always counts as kept, even if a clock that went back made
+ * its name sort as the oldest. Unknown names are never touched.
+ */
+export function selectForDeletion(names, keep, protect) {
+  const dumps = names.filter(name => DUMP.test(name));
+  const kept = Math.max(Number.isSafeInteger(keep) ? keep : KEEP, MIN_KEPT) - (dumps.includes(protect) ? 1 : 0);
+  return dumps.filter(name => name !== protect).sort().reverse().slice(Math.max(0, kept)).sort();
 }
 
 const asPostgres = layout => [layout.runuser, '-u', 'postgres', '--', layout.env, '-i', 'PATH=/usr/bin:/bin', 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC'];
@@ -71,6 +81,7 @@ export async function runBackup({ layout = LAYOUT, deps = {}, keep = KEEP }) {
     const bytes = (await handle.stat()).size;
     await handle.close(); handle = undefined;
     if (bytes < 1) refuse('DUMP_FAILED');
+    // pg_restore --list proves a readable archive with a table of contents, not restorable data.
     let toc;
     try { toc = await list(partialPath); } catch { refuse('VERIFY_FAILED'); }
     const entries = toc.split('\n').filter(line => line && !line.startsWith(';'));
@@ -82,7 +93,7 @@ export async function runBackup({ layout = LAYOUT, deps = {}, keep = KEEP }) {
     const sha256 = await fileSha256(finalPath);
     // Retention only after a verified new dump: a failing night never reduces the good copies.
     const dumps = (await readdir(layout.backupDir, { withFileTypes: true })).filter(entry => entry.isFile() && DUMP.test(entry.name)).map(entry => entry.name);
-    const removed = selectForDeletion(dumps, keep);
+    const removed = selectForDeletion(dumps, keep, name);
     for (const old of removed) await unlink(join(layout.backupDir, old));
     return { event: 'PREVIEW_BACKUP_OK', file: name, bytes, sha256, kept: dumps.length - removed.length, removed };
   } catch (error) {
