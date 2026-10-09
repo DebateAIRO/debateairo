@@ -41,6 +41,7 @@ export const AUTH_DB_BATCH_FUNCTIONS=Object.freeze([
  'identity.mfa_recovery_finish(text,text,text,jsonb)',
  'identity.mfa_recovery_pending_read(jsonb)',
  'identity.mfa_recovery_pending_cancel(jsonb,jsonb)',
+ 'identity.append_consumer_security_audit_internal(uuid,text,jsonb)',
  'staff.require_alert_readiness_jit()',
  'staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)',
  'staff.revoke_independent_alert_readiness(uuid)',

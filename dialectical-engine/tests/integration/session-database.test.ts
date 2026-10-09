@@ -402,8 +402,7 @@ describe("S5 sessions on real PostgreSQL", () => {
     } as const;
     await expect(repository.completeTotpLogin({ ...sessionInput, acceptedStep: 11 })).resolves.toBe(false);
     await expect(repository.completeRecoveryLogin({
-      ...sessionInput, recoveryCodeId,
-      replacementHash: hashVerificationToken("locked-recovery-replacement-material")
+      ...sessionInput, recoveryCodeId
     })).resolves.toBe(false);
 
     const sessions = await database.pool.query<{ count: string }>(
@@ -465,7 +464,6 @@ describe("S5 sessions on real PostgreSQL", () => {
     await expect(repository.completeRecoveryLogin({
       ...common,
       recoveryCodeId,
-      replacementHash: hashVerificationToken(`replacement-${randomUUID()}`),
       sessionId: randomUUID(),
       sessionTokenHash: hashToken("session", `recovery-session-${randomUUID()}`),
       csrfTokenHash: hashToken("csrf", `recovery-csrf-${randomUUID()}`)

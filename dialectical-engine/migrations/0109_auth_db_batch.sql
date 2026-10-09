@@ -282,10 +282,14 @@ END $$;
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_pending_cancel(p_input jsonb,p_source jsonb) RETURNS text
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE u uuid:=(p_input->>'userId')::uuid;id uuid;c identity.mfa_recovery_control%ROWTYPE;BEGIN
+ -- Same audited write protocol as the other Settings security writes (remove_consumer_auth_method).
+ PERFORM identity.consume_runtime_audit_attempt();
  IF identity.assert_session_current(u,(p_input->>'sessionId')::uuid,p_input->>'tokenHash') IS DISTINCT FROM true THEN RAISE EXCEPTION 'CONSUMER_SECURITY_INVALID';END IF;
  SELECT challenge_id INTO id FROM identity.mfa_recovery_control WHERE user_id=u AND stage='WAITING';
  c:=identity.mfa_recovery_waiting_current(id);IF c.challenge_id IS NULL THEN RETURN 'INVALID';END IF;
- PERFORM identity.mfa_recovery_close(c.challenge_id,'CANCELLED');RETURN 'CANCELLED';
+ PERFORM identity.mfa_recovery_close(c.challenge_id,'CANCELLED');
+ PERFORM identity.append_consumer_security_audit_internal((SELECT audit_token FROM identity."user" WHERE user_id=u),'RECOVERY_CANCELLED',p_source);
+ RETURN 'CANCELLED';
 END $$;
 
 -- The immediate completion is retired: it refuses whoever calls it, and the runtime loses its grant.
@@ -325,6 +329,18 @@ END $$;
 GRANT EXECUTE ON FUNCTION identity.mfa_recovery_prepare_wait(text),identity.mfa_recovery_begin_wait(text,text,text,text,jsonb,jsonb),identity.mfa_recovery_prepare_finish(text),identity.mfa_recovery_finish(text,text,text,jsonb) TO debateai_mfa_recovery_runtime;
 GRANT EXECUTE ON FUNCTION identity.mfa_recovery_pending_read(jsonb),identity.mfa_recovery_pending_cancel(jsonb,jsonb) TO debateai_authorization_runtime;
 GRANT EXECUTE ON FUNCTION identity.assert_session_current(uuid,uuid,text) TO debateai_mfa_recovery_owner;
+
+-- A signed-in cancel of a waiting replacement is audited like the other consumer security writes.
+CREATE OR REPLACE FUNCTION identity.append_consumer_security_audit_internal(p_actor uuid,p_purpose text,p_source jsonb) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+ IF p_actor IS NULL OR p_purpose IS NULL OR p_purpose NOT IN ('STEP_UP','REMOVE_AUTH_METHOD','REGENERATE_RECOVERY_CODES','RECOVERY_STARTED','RECOVERY_PROVED','RECOVERY_ENROLLMENT_STARTED','RECOVERY_COMPLETED','ONBOARDING_COMPLETED','RECOVERY_CANCELLED')
+ OR jsonb_typeof(p_source) IS DISTINCT FROM 'object'
+ OR p_source<>jsonb_build_object('ipArgon2id',p_source->>'ipArgon2id','userAgentArgon2id',p_source->>'userAgentArgon2id')
+ OR COALESCE(p_source->>'ipArgon2id','') !~ '^argon2id-audit:v1:[0-9a-f]{64}$' OR COALESCE(p_source->>'userAgentArgon2id','') !~ '^argon2id-audit:v1:[0-9a-f]{64}$' THEN RAISE EXCEPTION 'CONSUMER_SECURITY_AUDIT_INVALID';END IF;
+ PERFORM identity.append_audit_event_internal(gen_random_uuid(),p_actor::text,'identity.consumer_security.'||p_purpose,'identity.consumer_security',gen_random_uuid()::text,clock_timestamp(),p_source,'ALLOW',true,NULL);
+END $$;
+GRANT EXECUTE ON FUNCTION identity.consume_runtime_audit_attempt(),identity.append_consumer_security_audit_internal(uuid,text,jsonb) TO debateai_mfa_recovery_owner;
 
 -- 3. Recovery codes stop refilling. Using one consumes it and notifies every verified email (RECOVERY_CODE_USED);
 -- the replacement-hash argument stays in each signature and is ignored.

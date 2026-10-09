@@ -16,6 +16,7 @@ BEGIN
   'identity.mfa_recovery_claim_notice(integer)','identity.mfa_recovery_waiting_current(uuid)','identity.mfa_recovery_prepare_wait(text)',
   'identity.mfa_recovery_begin_wait(text,text,text,text,jsonb,jsonb)','identity.mfa_recovery_prepare_finish(text)',
   'identity.mfa_recovery_finish(text,text,text,jsonb)','identity.mfa_recovery_pending_read(jsonb)','identity.mfa_recovery_pending_cancel(jsonb,jsonb)',
+  'identity.append_consumer_security_audit_internal(uuid,text,jsonb)',
   'staff.require_alert_readiness_jit()','staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)',
   'staff.revoke_independent_alert_readiness(uuid)','staff.release_alert_delivery(uuid,uuid)'] LOOP
   SELECT * INTO p FROM pg_proc WHERE oid=to_regprocedure(v_name);
