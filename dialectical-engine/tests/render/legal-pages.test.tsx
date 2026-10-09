@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
 import legalEnglish from "../../apps/ui/messages/en/legal.json" with { type: "json" };
 import { CONSENT_KEY, subscribeToPreferenceRequests } from "../../apps/ui/lib/consent.js";
@@ -470,10 +470,25 @@ describe("the model providers page lists the model families the product runs", (
   });
 
   it("renders one register entry per provider, the support chat's model last", () => {
+    // This suite's build has no preview GLM flag, as the real site's has none: DeepInfra is not listed.
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
     expect(headings).toEqual([...MODEL_PROVIDERS.map(({ provider }) => provider), "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
+  });
+
+  it("on the private preview's GLM build, lists DeepInfra just before the support chat's model", async () => {
+    vi.stubEnv("NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON", "[\"zai-org/GLM-5.3-Flash\"]");
+    vi.resetModules();
+    try {
+      const preview = await import("../../apps/ui/components/legal/LegalBodies.js");
+      const view = render(<preview.LegalProvidersBody legalCatalog={legalEnglish} />);
+      const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
+      expect(headings).toEqual([...MODEL_PROVIDERS.map(({ provider }) => provider), "DeepInfra", "Support chat model"]);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
   });
 
   it("states the Privacy Policy's Register facts for every provider (PP §5, Japan and Korea)", () => {

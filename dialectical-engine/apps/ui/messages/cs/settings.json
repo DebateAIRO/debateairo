@@ -174,9 +174,11 @@
   "settings.security.title": "Zabezpečení",
   "settings.phone.reveal": "Zobrazit telefon",
   "settings.phone.change": "Změnit telefon",
-  "settings.phone.required": "Pro pokračování přidejte telefon. Otázka a možnosti zůstanou zachovány.",
+  "settings.phone.purpose": "V budoucnu vám můžeme poslat kód v SMS, který vám pomůže znovu se dostat do účtu, a pokud nás požádáte o pomoc, můžeme vám zavolat nebo napsat SMS. Uloženo šifrovaně; nikdy se nesdílí ani nepoužívá k marketingu.",
   "settings.security.lastPath": "Před odebráním této metody přidejte jiný způsob přihlášení.",
+  "settings.security.remove": "Odebrat",
   "settings.security.codesRemaining": "Obnovovací kódy: {count}",
   "settings.security.regenerate": "Vygenerovat nové obnovovací kódy",
+  "settings.security.lockoutReminder": "Zatím nemáte žádné obnovovací kódy ani přístupový klíč. Pokud ztratíte telefon, díky nim se do účtu hned znovu dostanete.",
   "settings.security.refreshFailed": "Podrobnosti zabezpečení se nepodařilo obnovit. Načtěte stránku znovu."
 }

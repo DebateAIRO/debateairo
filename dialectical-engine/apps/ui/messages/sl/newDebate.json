@@ -110,6 +110,8 @@
   "newDebate.legalGate.signOut": "Odjava",
   "newDebate.legalGate.signOutFailed": "Odjava ni bila dokončana. Poskusite znova.",
   "newDebate.room.locationBlocked": "Z vaše trenutne lokacije ni mogoče začeti novih razprav. Vaše razprave ostajajo na voljo za branje.",
+  "newDebate.room.previewTeamOnly": "Razprave v tej predogledni različici so na voljo samo ekipi.",
+  "newDebate.room.phoneRequired": "Dodajte telefonsko številko v Nastavitvah ali poskusite znova čez nekaj minut.",
   "newDebate.room.siteFull": "Današnja omejitev je dosežena. Vprašanje lahko še vedno zastavite — vaša razprava se bo začela sama, ko se omejitev ponastavi.",
   "newDebate.room.siteClose": "Blizu ste današnje omejitve. Ta razprava bo kljub temu potekala v celoti; poznejše bodo morda morale počakati do ponastavitve.",
   "newDebate.room.alreadyWaiting": "Hkrati lahko čaka le eno vprašanje. Vaše se bo začelo ob {time}; to vprašanje zastavite potem.",

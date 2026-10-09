@@ -1068,6 +1068,7 @@ export {
   COUNTRY_POLICY_ROW_KEY,
   countryPolicyFromValue,
   countryRule,
+  declaredRegionRule,
   readCountryPolicy,
   type CountryPolicy,
   type CountryPolicyValue,

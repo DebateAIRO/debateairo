@@ -175,9 +175,11 @@
   "settings.security.title": "Sigurtà",
   "settings.phone.reveal": "Uri n-numru tat-telefon",
   "settings.phone.change": "Ibdel in-numru tat-telefon",
-  "settings.phone.required": "Żid it-telefon biex tkompli. Il-mistoqsija u l-għażliet tiegħek jinżammu.",
+  "settings.phone.purpose": "Aktar ’il quddiem, jista’ jkun li nibagħtulek kodiċi b’SMS biex ngħinuk terġa’ tidħol fil-kont tiegħek, u jekk titlobna l-għajnuna, nistgħu nċemplulek jew nibagħtulek SMS. Maħżun f’forma kriptata; qatt ma jinqasam ma’ ħaddieħor u qatt ma jintuża għall-marketing.",
   "settings.security.lastPath": "Żid metodu ieħor ta’ dħul qabel tneħħi dan.",
+  "settings.security.remove": "Neħħi",
   "settings.security.codesRemaining": "Kodiċijiet ta’ rkupru: {count}",
   "settings.security.regenerate": "Iġġenera kodiċijiet ġodda ta’ rkupru",
+  "settings.security.lockoutReminder": "Għad m’għandek l-ebda kodiċi ta’ rkupru jew ċavetta tal-aċċess. Jekk titlef it-telefon tiegħek, b’dawn terġa’ tidħol minnufih.",
   "settings.security.refreshFailed": "Id-dettalji tas-sigurtà ma setgħux jiġu aġġornati. Erġa’ tella’ l-paġna."
 }

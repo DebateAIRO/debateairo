@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Een debatengine nodigt uit tot vragen over politiek, religie, gezondheid, seksualiteit en levensovertuiging. Dit zijn bijzondere categorieën van gegevens krachtens artikel 9 GDPR, en zij kunnen in uw vragen voorkomen, ongeacht of wij van plan zijn ze te verzamelen." },
-      { kind: "p", text: "Over u. Vóór uw eerste debat geeft u op een afzonderlijk scherm uitdrukkelijk toestemming voor onze verwerking van gevoelige informatie die u in uw eigen vragen wenst op te nemen, met als doel uw debatten uit te voeren. Wij leggen de versie van de tekst waarmee u hebt ingestemd, uw taal en het tijdstip vast. Zonder deze toestemming kunt u geen debat starten. U kunt die toestemming te allen tijde intrekken door te schrijven naar privacy@dezbatere.ro. U kunt dergelijke informatie ook weglaten of een debat verwijderen waarin zij voorkomt. Wat u over uzelf publiceert, zijn gegevens die u zelf bewust openbaar hebt gemaakt." },
+      { kind: "p", text: "Over u. Vóór uw eerste debat geeft u op een afzonderlijk scherm uitdrukkelijk toestemming voor onze verwerking van gevoelige informatie die u in uw eigen vragen wenst op te nemen, met als doel uw debatten uit te voeren. Wij leggen de versie van de tekst waarmee u hebt ingestemd, uw taal en het tijdstip vast. Zonder deze toestemming kunt u geen debat starten. U kunt die toestemming te allen tijde intrekken door uw account via Instellingen te sluiten. U kunt dergelijke informatie ook weglaten of een debat verwijderen waarin zij voorkomt. Wat u over uzelf publiceert, zijn gegevens die u zelf bewust openbaar hebt gemaakt." },
       { kind: "p", text: "Over andere personen. Geen enkele rechtsgrond staat ons toe gevoelige gegevens te verwerken over een derde die u in een vraag noemt, en geen van onze AI-aanbieders beschikt over een dergelijke rechtsgrond. Daarom verbieden de Voorwaarden dit, beperken wij tot een minimum wat wij versturen en verwijderen wij dergelijke inhoud op verzoek snel — hoofdstuk 11." },
       { kind: "p", text: "Gezondheidsinformatie. Sommige landen behandelen gezondheidsgerelateerde gegevens, met inbegrip van afleidingen, op grond van specifieke wetgeving. Als u in [the State of Washington] woont, is een afzonderlijke [Consumer Health Data Privacy Notice] van toepassing." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Beperking (Art. 18) — Vraag ons de verwerking van bepaalde gegevens stop te zetten terwijl een geschil daarover wordt beslecht",
         "Bezwaar (Art. 21) — Maak bezwaar tegen verwerking op grond van gerechtvaardigde belangen — de beveiligings- en auditverwerking in hoofdstuk 4 — en wij stoppen tenzij wij dwingende gronden kunnen aantonen. Maak op elk moment bezwaar tegen marketing en wij stoppen",
         "Overdraagbaarheid (Art. 20) — Uw debatten en accountgegevens in een gangbaar, machineleesbaar formaat. [Pending: same export as Access.] Niet-persoonlijke inhoud die u hebt gemaakt, zoals uw vragen, wordt op uw verzoek aan u teruggegeven wanneer de overeenkomst eindigt",
-        "Toestemming intrekken (Art. 7(3)) — Trek uw marketingtoestemming in via een e-mail of Instellingen; trek toestemming voor gevoelige gegevens in door te schrijven naar privacy@dezbatere.ro (u kunt dergelijke gegevens ook weglaten of een debat verwijderen waarin zij voorkomen). Intrekking laat reeds uitgevoerde verwerking onverlet",
+        "Toestemming intrekken (Art. 7(3)) — Trek uw marketingtoestemming in via een e-mail of Instellingen; trek toestemming voor gevoelige gegevens in door uw account via Instellingen te sluiten (u kunt dergelijke gegevens ook weglaten of een debat verwijderen waarin zij voorkomen). Intrekking laat reeds uitgevoerde verwerking onverlet",
         "Klacht indienen — Bij de Roemeense toezichthoudende autoriteit, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Boekarest, anspdcp@dataprotection.ro, of bij de autoriteit in het land waar u woont. Wij horen echter liever eerst van u"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "60d06c1d7ac46a3f90540cafe066f791187da5b4ff98c1e1a79b7f19692aa144",
+  sha256: "bde7acdbd243c9bc7b83317dcc7c163cee1da5abee11239e9a01a178f3b41e99",
   eyebrow: "PRIVACYBELEID · v3.2 · VAN KRACHT OP [DATE]",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",

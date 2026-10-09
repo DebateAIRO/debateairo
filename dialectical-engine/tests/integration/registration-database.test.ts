@@ -5498,7 +5498,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         url: "/v1/auth/resend-verification",
         payload: { ...canonicalResend, email },
         remoteAddress: ip,
-        headers: { "user-agent": "vitest-t9" }
+        headers: { origin: enrollmentOrigin, "user-agent": "vitest-t9" }
       });
       return Object.freeze({
         arm, index, ip,
@@ -5573,7 +5573,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
         url: "/v1/auth/verify-email",
         payload: { token },
         remoteAddress: ip,
-        headers: { "user-agent": "vitest-t9" }
+        headers: { origin: enrollmentOrigin, "user-agent": "vitest-t9" }
       });
       return Object.freeze({
         index, ip,
@@ -5622,7 +5622,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
           country: "RO", date_of_birth: "1990-01-01"
         },
         remoteAddress: ip,
-        headers: { "user-agent": "vitest-t9" }
+        headers: { origin: enrollmentOrigin, "user-agent": "vitest-t9" }
       });
       return Object.freeze({
         index, ip,
@@ -5939,7 +5939,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date();
     const mail = new GatedVerificationMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const observedDeliveryErrors: string[] = [];
     const shippedRecordDelivery = flow.repository.recordVerificationDelivery
       .bind(flow.repository);
@@ -6209,7 +6209,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     try {
       const registered = await registerAccount(flow.service, "t9-verify-vs-resend");
       const ownerToken = mail.messages[0]!.token;
@@ -6303,7 +6303,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     try {
       const registered = await registerAccount(flow.service, "t9-single-send-race");
       expect(mail.messages).toHaveLength(1);
@@ -6990,7 +6990,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
       const namespace = `t9-rework9-r${replicate + 1}-${order.toLowerCase()}`;
       const mail = new MemoryMailSender();
       const flow = buildService({ mail, initialNow });
-      const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+      const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
       try {
         const registered = await registerAccount(flow.service, `${namespace}-existing`);
         await flow.service.drainMailDispatches();
@@ -7246,7 +7246,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const gate = await database.pool.connect();
     const monitor = await database.pool.connect();
     const prober = await database.pool.connect();
@@ -7364,7 +7364,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const monitor = await database.pool.connect();
     let monitorReleased=false;const releaseMonitor=()=>{if(!monitorReleased){monitorReleased=true;monitor.release();}};
     onTestFinished(releaseMonitor);
@@ -7473,7 +7473,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const monitor = await database.pool.connect();
     let barrier: QueryBarrier | undefined;
     try {
@@ -7563,7 +7563,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const monitor = await database.pool.connect();
     let barrier: QueryBarrier | undefined;
     try {
@@ -7644,7 +7644,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     const gate = await database.pool.connect();
     const monitor = await database.pool.connect();
     const prober = await database.pool.connect();
@@ -7729,7 +7729,7 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     const initialNow = new Date();
     const mail = new MemoryMailSender();
     const flow = buildService({ mail, initialNow });
-    const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: flow.service });
     try {
       const registered = await registerAccount(flow.service, "t9-d-siblings");
       const channelBindingId = await emailChannelOf(registered.user.user_id);
@@ -7847,7 +7847,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       argon2: lifecycleArgon2,
       clock: () => initialNow
     });
-    const api = buildApi({ application: fixtureAskApplication(), registration: service });
+    const api = buildApi({ allowedOrigin: enrollmentOrigin, application: fixtureAskApplication(), registration: service });
     const lifecycleProcess = new LifecycleTestProcess();
     const logger = { error: vi.fn() };
     const auditDrain = vi.spyOn(service, "drainRateLimitAuditFlushes");
@@ -7877,13 +7877,13 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       const first = await api.inject({
         method: "POST",
         url: "/v1/auth/verify-email",
-        headers: { "user-agent": "t3-real-lifecycle" },
+        headers: { origin: enrollmentOrigin, "user-agent": "t3-real-lifecycle" },
         payload: { token }
       });
       const refused = await api.inject({
         method: "POST",
         url: "/v1/auth/verify-email",
-        headers: { "user-agent": "t3-real-lifecycle" },
+        headers: { origin: enrollmentOrigin, "user-agent": "t3-real-lifecycle" },
         payload: { token }
       });
       expect(first).toMatchObject({ statusCode: 400 });

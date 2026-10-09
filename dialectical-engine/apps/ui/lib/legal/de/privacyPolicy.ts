@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Eine Debattenplattform lädt zu Fragen über Politik, Religion, Gesundheit, Sexualität und Überzeugungen ein. Dabei handelt es sich gemäß Artikel 9 DSGVO um besondere Kategorien personenbezogener Daten, die in Ihren Fragen enthalten sein können, unabhängig davon, ob wir sie erheben wollen." },
-      { kind: "p", text: "Über Sie. Vor Ihrer ersten Debatte willigen Sie auf einem gesonderten Bildschirm ausdrücklich ein, dass wir sensible Informationen, die Sie nach eigener Wahl in Ihre eigenen Fragen aufnehmen, zur Durchführung Ihrer Debatten verarbeiten. Wir speichern die Fassung des Wortlauts, der Sie zugestimmt haben, sowie Ihre Sprache und den Zeitpunkt. Ohne diese Einwilligung können Sie keine Debatte beginnen. Sie können diese Einwilligung jederzeit per E-Mail an privacy@dezbatere.ro widerrufen. Sie können solche Informationen auch weglassen oder eine Debatte löschen, die sie enthält. Informationen über sich selbst, die Sie veröffentlichen, sind Daten, die Sie selbst öffentlich gemacht haben." },
+      { kind: "p", text: "Über Sie. Vor Ihrer ersten Debatte willigen Sie auf einem gesonderten Bildschirm ausdrücklich ein, dass wir sensible Informationen, die Sie nach eigener Wahl in Ihre eigenen Fragen aufnehmen, zur Durchführung Ihrer Debatten verarbeiten. Wir speichern die Fassung des Wortlauts, der Sie zugestimmt haben, sowie Ihre Sprache und den Zeitpunkt. Ohne diese Einwilligung können Sie keine Debatte beginnen. Sie können diese Einwilligung jederzeit durch Schließen Ihres Kontos in den Einstellungen widerrufen. Sie können solche Informationen auch weglassen oder eine Debatte löschen, die sie enthält. Informationen über sich selbst, die Sie veröffentlichen, sind Daten, die Sie selbst öffentlich gemacht haben." },
       { kind: "p", text: "Über andere Personen. Keine gesetzliche Ausnahme erlaubt uns, sensible Daten einer von Ihnen in einer Frage genannten dritten Person zu verarbeiten; das gilt auch für jeden unserer KI-Anbieter. Deshalb untersagen die Nutzungsbedingungen dies, deshalb minimieren wir die übermittelten Daten und deshalb entfernen wir solche Inhalte auf Anfrage unverzüglich – Abschnitt 11." },
       { kind: "p", text: "Gesundheitsinformationen. In einigen Ländern unterliegen gesundheitsbezogene Daten einschließlich Schlussfolgerungen besonderen Gesetzen. Wenn Sie in [the State of Washington] leben, gilt eine gesonderte [Consumer Health Data Privacy Notice]." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Einschränkung (Art. 18) — Verlangen Sie, dass wir die Verarbeitung bestimmter Daten aussetzen, solange eine Streitigkeit darüber geklärt wird",
         "Widerspruch (Art. 21) — Widersprechen Sie einer Verarbeitung auf Grundlage berechtigter Interessen, nämlich der Sicherheits- und Prüfverarbeitung in Abschnitt 4; wir stellen sie ein, sofern wir keine zwingenden Gründe nachweisen können. Der Werbung können Sie jederzeit widersprechen; wir stellen sie ein",
         "Datenübertragbarkeit (Art. 20) — Ihre Debatten und Kontodaten in einem gängigen, maschinenlesbaren Format. [Pending: same export as Access.] Von Ihnen erstellte nicht personenbezogene Inhalte, etwa Ihre Fragen, werden Ihnen auf Antrag bei Vertragsende herausgegeben",
-        "Einwilligung widerrufen (Art. 7(3)) — Widerrufen Sie die Einwilligung in den Erhalt von Werbung über jede E-Mail oder die Einstellungen; widerrufen Sie die Einwilligung zu sensiblen Daten per E-Mail an privacy@dezbatere.ro (Sie können diese Daten auch weglassen oder eine Debatte löschen, die sie enthält). Der Widerruf berührt bereits erfolgte Verarbeitungen nicht",
+        "Einwilligung widerrufen (Art. 7(3)) — Widerrufen Sie die Einwilligung in den Erhalt von Werbung über jede E-Mail oder die Einstellungen; widerrufen Sie die Einwilligung zu sensiblen Daten durch Schließen Ihres Kontos in den Einstellungen (Sie können diese Daten auch weglassen oder eine Debatte löschen, die sie enthält). Der Widerruf berührt bereits erfolgte Verarbeitungen nicht",
         "Beschwerde — Bei der rumänischen Aufsichtsbehörde ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, oder bei der Behörde in Ihrem Wohnsitzland. Wir würden es vorziehen, zunächst von Ihnen zu hören"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "a1ab9725eda7c375d50ce392b74f3b5d731a93348f6a98c05529db42ddb0ed8b",
+  sha256: "942be2e671ea829949a365c82603ebb41717b07f4cf9e1a03f6f1bab59862b92",
   eyebrow: "DATENSCHUTZERKLÄRUNG · v3.2 · GÜLTIG AB [DATE]",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",

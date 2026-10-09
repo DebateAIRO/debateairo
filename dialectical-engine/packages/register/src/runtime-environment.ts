@@ -1,4 +1,4 @@
-import { parsePreviewProviderTestConfig } from "@debateai/providers";
+import { parsePreviewProviderTestConfig, parsePreviewTeamUserIds } from "@debateai/providers";
 import { isAbsolute } from "node:path";
 import { internalAllowancePolicyFromValue } from "./internal-allowance-policy.js";
 import type { StaffAccessEnvironment } from "@debateai/kernel";
@@ -380,6 +380,8 @@ const hatchetShape = {
 
 const apiEnvironmentShape = {
     PREVIEW_PROVIDER_TEST_CONFIG_JSON: z.string().min(1).max(8192).optional(),
+    /** Step 1: the preview's team (identity user ids); parsed with the preview configuration below. */
+    PREVIEW_TEAM_USER_IDS_JSON: z.string().max(4096).optional(),
     KEK_PATH: kekPath,
     SUPPORT_KEK_PATH: kekPath,
     /**
@@ -445,6 +447,18 @@ const apiEnvironmentShape = {
     SOCIAL_SOCKET_PATH: z.string().max(103).optional(),
     SOCIAL_PROVIDERS_JSON: z.string().max(8192).optional(),
     TURNSTILE_SOCKET_PATH: z.string().max(103).regex(/^\/(?!.*(?:^|\/)\.\.?(?:\/|$))[^\0]*\.sock$/u).optional(),
+    /**
+     * Auth API hardening 2026-10-09. Sign-up and resend always require a Turnstile proof. These two
+     * settings extend it, each OFF by default so the deployed UI (which has no widget there yet)
+     * keeps working; switch one on in the same release that ships its widget:
+     *   TURNSTILE_LOGIN_REQUIRED=true    — POST /v1/auth/login (email + password step), action "login".
+     *   TURNSTILE_RECOVERY_REQUIRED=true — password-reset/start, mfa-recovery/start and recovery/start,
+     *                                      actions "password-reset", "mfa-recovery", "account-recovery".
+     * On, they fail closed like sign-up, and need TURNSTILE_SOCKET_PATH (the API refuses to start
+     * without it). The relay must be the 2026-10-09 build, which knows the new actions.
+     */
+    TURNSTILE_LOGIN_REQUIRED: z.enum(["true", "false"]).default("false"),
+    TURNSTILE_RECOVERY_REQUIRED: z.enum(["true", "false"]).default("false"),
     DATABASE_URL: z.string().url(),
     SUPPORT_DATABASE_URL: z.string().url(),
     API_HOST: z.string().min(1), API_PORT: positiveInteger,
@@ -636,6 +650,14 @@ function validateApiEnvironment(
     && (environment.GEOIP_COUNTRY_DB_PATH === undefined || environment.TOR_EXIT_LIST_PATH === undefined)) {
     throw new TypeError("GEOIP_PATHS_REQUIRED");
   }
+  // Auth API hardening 2026-10-09: hosted sign-up, resend and social sign-up need the Turnstile relay.
+  // Without its address every proof fails closed (TURNSTILE_UNAVAILABLE), a silent sign-up outage, so a
+  // hosted API refuses to start instead. Local mode keeps it optional.
+  const turnstileBeyondSignup = environment.TURNSTILE_LOGIN_REQUIRED === "true"
+    || environment.TURNSTILE_RECOVERY_REQUIRED === "true";
+  if ((deploymentMode === "hosted" || turnstileBeyondSignup) && environment.TURNSTILE_SOCKET_PATH === undefined) {
+    throw new TypeError("TURNSTILE_SOCKET_PATH_REQUIRED");
+  }
   return { ...environment, DEPLOYMENT_MODE: deploymentMode };
 }
 
@@ -643,8 +665,10 @@ export function parseApiEnvironment(
   source: Readonly<Record<string, string | undefined>>
 ) {
   const staffAccess = parseStaffAccessEnvironment(source);
-  return { ...validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source)), STAFF_ACCESS: staffAccess,
-    PREVIEW_PROVIDER_TEST_CONFIG: parsePreviewProviderTestConfig(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON) };
+  const environment = validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
+  const previewConfig = parsePreviewProviderTestConfig(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
+  return { ...environment, STAFF_ACCESS: staffAccess, PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
+    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, previewConfig !== undefined) };
 }
 
 /** Paid plans: the ten keys of the billing group, in the order a missing one is reported. */

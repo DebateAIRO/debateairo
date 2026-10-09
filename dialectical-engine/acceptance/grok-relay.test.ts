@@ -326,7 +326,7 @@ describe("GROK-01 Grok Build CLI relay", () => {
 
 describe("D10 Grok relay binary resolution", () => {
   it("carries no compiled-in path: this maker is found by the NAME `grok`", () => {
-    // REPEALS the 2026-08 pin on "/Users/vladmihaimiron/.grok/bin/grok" —
+    // REPEALS the 2026-08 pin on one developer's "~/.grok/bin/grok" —
     // see claude-relay.test.ts for the rule this states once.
     expect(GROK_BINARY_NAME).toBe("grok");
     expect(() => resolveGrokBinary({}))

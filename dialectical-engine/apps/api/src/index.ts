@@ -1,4 +1,4 @@
-import { validatePreviewProviderTestConfig, previewPlanTierRosters, type PreviewProviderTestConfig } from "@debateai/providers";
+import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
@@ -1268,9 +1268,12 @@ export const authorizationPolicyInventory = Object.freeze([
   {route:'POST /v1/account/social/unlink',auth:'user',origin:'trusted',resource:'identity',action:'social-unlink'},
   // Age gate (Turn 8): the browser-only pre-register check, like login held to the exact Origin.
   { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
-  { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
-  { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
-  { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
+  // Auth API hardening 2026-10-09: the four public account routes the site's own pages call with
+  // fetch POST (verify-email included — the mailed link opens a page that posts the token) take the
+  // same exact-Origin rule as login, so a browser on another site cannot drive them.
+  { route: "POST /v1/auth/register", auth: "public", origin: "trusted", resource: "identity", action: "register" },
+  { route: "POST /v1/auth/verify-email", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
+  { route: "POST /v1/auth/resend-verification", auth: "public", origin: "trusted", resource: "identity", action: "resend-verification" },
   { route:"POST /v1/auth/recovery/prove",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/recovery/enrollment/options",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/recovery/enrollment/complete",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
@@ -1278,7 +1281,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route:"POST /v1/auth/recovery/enrollment/complete-evidence",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/onboarding/status",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/onboarding/complete",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
-  { route: "POST /v1/auth/recovery/start", auth: "public", resource: "identity", action: "start-recovery" },
+  { route: "POST /v1/auth/recovery/start", auth: "public", origin: "trusted", resource: "identity", action: "start-recovery" },
   { route: "POST /v1/auth/mfa/totp/begin", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "begin-totp" },
   { route: "POST /v1/auth/mfa/totp/verify", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "verify-totp" },
   { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },
@@ -1586,10 +1589,29 @@ const EMAIL_CHANGE_STATUS: Readonly<Record<EmailChangeErrorCode, number>> = Obje
 
 export interface ApiOptions {
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
+  /**
+   * Step 1 (owner, 2026-10-08): the identity user ids that may start debates on the private
+   * preview. Read only with `previewProviderTestConfig`; absent there, nobody may.
+   */
+  readonly previewTeamUserIds?: readonly string[];
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
   /** Mandatory for signup and resend; absent configuration fails closed. */
   readonly turnstile?: TurnstileVerifier;
+  /**
+   * Auth API hardening 2026-10-09 (server setting TURNSTILE_LOGIN_REQUIRED, default off): the
+   * email + password step of POST /v1/auth/login requires a single-use Turnstile proof with the
+   * action "login". Off until the UI ships the sign-in widget; when on it fails closed exactly like
+   * sign-up. The second step (challenge + code) is bound to the first and needs no new proof.
+   */
+  readonly turnstileLoginRequired?: boolean;
+  /**
+   * Same, for the three public recovery starts (TURNSTILE_RECOVERY_REQUIRED, default off):
+   * password-reset/start ("password-reset"), mfa-recovery/start ("mfa-recovery") and
+   * recovery/start ("account-recovery"). Each mails an address anyone can type, so each is a
+   * bot target; the proof is checked after the per-source admission, before any mail work.
+   */
+  readonly turnstileRecoveryRequired?: boolean;
   readonly recovery?: RecoveryApplication;
   readonly passwordReset?: PasswordResetApplication;
   readonly backupEmail?: BackupEmailApplication;
@@ -1737,8 +1759,10 @@ export interface EvaluatorDevMenuApplication {
  * resets — so a caller waits the right amount of time instead of hammering the
  * surface or giving up on a debate it could still have.
  */
-export function askRefusalStatus(code: string): 401 | 422 | 429 {
+export function askRefusalStatus(code: string): 401 | 403 | 422 | 429 {
   if (code === ASK_SIGN_IN_REQUIRED) return 401;
+  // Step 1: the same 403 the route answers when it refuses a person outside the preview's team.
+  if (code === PREVIEW_TEAM_ONLY) return 403;
   return code === "DAILY_COST_ENVELOPE_REACHED" ? 429 : 422;
 }
 
@@ -1837,6 +1861,13 @@ function exactCookie(raw: unknown, name: string): string | null {
     if (member.slice(0, index).trim() === name) matches.push(member.slice(index + 1).trim());
   }
   return matches.length === 1 && /^[A-Za-z0-9_-]{43}$/.test(matches[0]!) ? matches[0]! : null;
+}
+
+/** The submitted Turnstile proof of a JSON body; anything but a string is the empty (refused) proof. */
+function turnstileTokenOf(body: unknown): string {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return "";
+  const token = (body as Record<string, unknown>).turnstile_token;
+  return typeof token === "string" ? token : "";
 }
 
 function exactOrigin(value: unknown, allowedOrigin: string | undefined): boolean {
@@ -2092,6 +2123,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       .send({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" });
     return false;
   };
+  /**
+   * Auth API hardening 2026-10-09: the Turnstile proof of a public recovery start, asked only while
+   * TURNSTILE_RECOVERY_REQUIRED is on. It answers the refusal itself (the start routes map thrown
+   * errors to their own unavailable code) and returns false, like admitOrRefuse.
+   */
+  const recoveryStartProofOrRefuse = async (
+    reply: FastifyReply, body: unknown, action: "password-reset" | "mfa-recovery" | "account-recovery"
+  ): Promise<boolean> => {
+    if (options.turnstileRecoveryRequired !== true) return true;
+    try {
+      await requireTurnstileProof(options.turnstile, { token: turnstileTokenOf(body), action });
+      return true;
+    } catch (error) {
+      if (!(error instanceof TurnstileGateError)) throw error;
+      void reply.status(error.statusCode).send({ error: error.code, message: error.code });
+      return false;
+    }
+  };
   const ownershipFor = (request: Readonly<{
     session: Session;
     authenticatedSession?: AuthenticatedSession;
@@ -2266,9 +2315,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       ? request.body as Record<string, unknown> : null;
     const region = body === null ? null : parseDeclaredRegion(body);
     if (region === null) throw new AuthFlowError("AUTH_INPUT_INVALID");
-    if (options.countryGate?.declaredSignupRefusal(region.country) === "COUNTRY_SIGNUP_UNAVAILABLE") {
-      return reply.status(403).send({ error: "COUNTRY_SIGNUP_UNAVAILABLE" });
-    }
+    const declaredRefusal = options.countryGate?.declaredSignupRefusal(region) ?? null;
+    if (declaredRefusal !== null) return reply.status(403).send({ error: declaredRefusal });
     registerDeclaredRegions.set(request, region);
   });
   /**
@@ -2561,10 +2609,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         }, sourceFor(request));
         return completeAuthenticatedResponse(reply,result);
       }
+      // Auth API hardening 2026-10-09: with TURNSTILE_LOGIN_REQUIRED on, the password step carries a
+      // single-use proof (action "login"). The service asks it after the per-source budget and before
+      // the per-account budget, so proof-less bots can neither reach the password check nor spend the
+      // account's sign-in budget (lock its owner out).
+      const proof = options.turnstileLoginRequired === true
+        ? () => requireTurnstileProof(options.turnstile, { token: turnstileTokenOf(body), action: "login" })
+        : undefined;
       const result = await options.sessions!.beginLogin({
         email: typeof body.email === "string" ? body.email : "",
         password: typeof body.password === "string" ? body.password : ""
-      }, sourceFor(request));
+      }, sourceFor(request), proof);
       return reply.status(202).send(LoginContinuationResponseSchema.parse({ status: result.status, challenge_token: result.challengeToken, available_methods:result.availableMethods??["totp"] }));
     });
     api.post("/v1/auth/logout", credentialRoutePolicy("POST /v1/auth/logout"), async (request, reply) => {
@@ -3138,8 +3193,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     ));
   });
 
-  if (options.passwordReset) registerPasswordResetRoutes(api,{service:options.passwordReset,policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/password-reset/start",sourceFor(request).ip)});
-  registerEmailMfaRoutes(api,{...(options.backupEmail?{backup:options.backupEmail}:{}),...(options.mfaRecovery?{mfa:options.mfaRecovery}:{}),policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/mfa-recovery/start",sourceFor(request).ip)});
+  if (options.passwordReset) registerPasswordResetRoutes(api,{service:options.passwordReset,policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/password-reset/start",clientIpNetworkScope(sourceFor(request).ip))&&await recoveryStartProofOrRefuse(reply,request.body,"password-reset")});
+  registerEmailMfaRoutes(api,{...(options.backupEmail?{backup:options.backupEmail}:{}),...(options.mfaRecovery?{mfa:options.mfaRecovery}:{}),policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/mfa-recovery/start",clientIpNetworkScope(sourceFor(request).ip))&&await recoveryStartProofOrRefuse(reply,request.body,"mfa-recovery")});
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
       // L1-F3: this route had no per-source admission control at all — only a
@@ -3148,9 +3203,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // The budget is charged to the SOURCE and never to the address, so the
       // refusal is identical whether or not the account exists: it adds no
       // enumeration oracle to a route whose whole design is generic.
-      if (!admitOrRefuse(reply, "recoveryStart", "POST /v1/auth/recovery/start", sourceFor(request).ip)) {
+      if (!admitOrRefuse(reply, "recoveryStart", "POST /v1/auth/recovery/start", clientIpNetworkScope(sourceFor(request).ip))) {
         return reply;
       }
+      if (!await recoveryStartProofOrRefuse(reply, request.body, "account-recovery")) return reply;
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
@@ -3268,6 +3324,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           error: SENSITIVE_DATA_CONSENT_REQUIRED, message: SENSITIVE_DATA_CONSENT_REQUIRED
         });
       }
+    }
+    // Step 1 (owner, 2026-10-08): the private preview spends the company's money on every
+    // model call, so only its team starts debates there. Third, after the crisis and consent
+    // checks; before the quota, the country rule, admission and its paid discovery probe, so a
+    // refusal here spends nothing. Off the preview there is no team rule.
+    if (!previewTeamAdmits(previewConfig, options.previewTeamUserIds, request.authenticatedSession?.userId)) {
+      return reply.status(403).send({ error: PREVIEW_TEAM_ONLY });
     }
     if (!admitOrRefuse(reply, "asks", "POST /v1/asks",
       request.authenticatedSession?.ownerRef ?? request.session.asker_id)) return reply;
@@ -3749,6 +3812,8 @@ export class HatchetDispatcher implements Dispatcher {
 
 export interface RunCreationSettings {
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
+  /** Step 1: the preview's team; `submit` refuses everyone else (the route refuses them first). */
+  readonly previewTeamUserIds?: readonly string[];
   readonly strangerSampleRate: number;
   readonly registerVersion: number;
   readonly batteryVersion: string;
@@ -3782,7 +3847,6 @@ export interface RunCreationSettings {
    * signed-in owner (ASK_SIGN_IN_REQUIRED). Absent means today's ask exactly.
    */
   readonly billing?: AskBilling;
-  readonly accountProfile?: Pick<AccountProfileService,"hasPhone">;
   /** Budget spec §2.7 (B7b): the line the waker drains. main.ts supplies the room itself. */
   readonly waitingLine?: AskWaitingLinePort;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
@@ -4263,6 +4327,9 @@ export type WaitingLineTick = Readonly<{
  */
 const STALLED_START_SECONDS = 300;
 
+/** Step 1: the preview runs with no team listed; the waiting line starts and hands over nothing. */
+const PREVIEW_TEAM_UNSET = Symbol("PREVIEW_TEAM_UNSET");
+
 /** Private SSE snapshot reads have only a local peer/revocation cancellation seam.
  * Destroy the dedicated client on abort, including a blocked PostgreSQL query;
  * do not change pool/global settings or impose the authority-check deadline on content reads. */
@@ -4326,6 +4393,12 @@ export class PostgresAskApplication implements AskApplication {
     } else if (session.ownership_provenance === "server_session" || session.asker_id !== principal.legacyAskerId) {
       throw new TypedDomainError("RUN_PRINCIPAL_SESSION_MISMATCH", "Legacy scope is valid only for an exact legacy session");
     }
+    // Step 1, defense in depth: the route refuses a person outside the preview's team first;
+    // any other caller of submit is refused here, before billing, admission or any probe.
+    if (!previewTeamAdmits(validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig),
+      this.settings.previewTeamUserIds, principal.kind === "server" ? principal.userId : undefined)) {
+      markAskRefusal(new TypedDomainError(PREVIEW_TEAM_ONLY, PREVIEW_TEAM_ONLY));
+    }
     // Paid plans (spec 2026-09-29 §2.3.4, §2.6 item 7; R1 A5; ruling R-28).
     // With billing on, the SERVER decides the ask. Every later step reads `ask`
     // — B6b's room branch and B6a's `runSettingsClassOfAsk` included — so each
@@ -4344,12 +4417,6 @@ export class PostgresAskApplication implements AskApplication {
       }
       const now = billing.clock();
       const resolved = await resolveBillingAsk(requestedAsk, principal.ownerRef, billing, now);
-      // The resolved plan governs completion. Paid/internal questions remain
-      // usable even when coarse fit later chooses the Free provider roster.
-      if (resolved.planId === "FREE" && this.settings.accountProfile !== undefined
-        && !await this.settings.accountProfile.hasPhone(principal.ownerRef)) {
-        markAskRefusal(new TypedDomainError("ACCOUNT_PHONE_REQUIRED", "Complete your phone profile before asking a free question"));
-      }
       fundingBasis = resolved.fundingBasis;
       ask = resolved.ask;
       plannedAsk = resolved.ask;
@@ -4359,7 +4426,7 @@ export class PostgresAskApplication implements AskApplication {
       // of `evaluateAskAdmission`), so the interim roster swap — which would also put a
       // paid person under the Free cap — never runs on the picker path.
       const pickerPlans = this.settings.modelPicker?.scorecard.state === "VALID";
-      if (!pickerPlans && await coarseFitFor(ask, principal.ownerRef, billing, now) === "FREE_ROSTER") {
+      if (!pickerPlans && await coarseFitFor(ask, principal.ownerRef, billing, now, this.settings.previewProviderTestConfig) === "FREE_ROSTER") {
         ask = Object.freeze({ ...ask, plan_tier: "free" as const });
         substitutedAt = now;
       }
@@ -4502,7 +4569,7 @@ export class PostgresAskApplication implements AskApplication {
    * most likely the same outage — the run keeps reading QUEUED, so the one
    * line that names it goes to the operator's log (ids and codes only).
    */
-  async #recordRunSetupFailure(runId: string, step: RunSetupStep | "FUNDING_ENDED"): Promise<void> {
+  async #recordRunSetupFailure(runId: string, step: RunSetupStep | "FUNDING_ENDED" | typeof PREVIEW_TEAM_ONLY): Promise<void> {
     const reason = `RUN_SETUP_FAILED:${step}`;
     try {
       await this.#work.recordSetupFailure({ runId, ...firstRunJob(runId), reason });
@@ -4783,7 +4850,10 @@ export class PostgresAskApplication implements AskApplication {
    * start that throws wrote nothing and stays in line for the next tick. Then
    * (final review Part 1b, Important 4) the started runs whose first job was
    * never handed to a runner are handed over again (`#redispatchStalledStarts`).
-   * Ids and counts only.
+   * On the private preview (Step 1) both start or hand over only the team's runs
+   * (`#previewTeamRuns`): an outsider's is recorded FAILED
+   * (`RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY`) and counted failed; with no team listed
+   * nothing is started, handed over or failed. Ids and counts only.
    */
   async wakeWaitingRuns(): Promise<WaitingLineTick> {
     const line = this.settings.waitingLine;
@@ -4801,9 +4871,20 @@ export class PostgresAskApplication implements AskApplication {
     while (!stopped) {
       const page = await line.wakeCandidates({ after, everyPerson });
       if (page.length === 0) break;
+      const team = await this.#previewTeamRuns(page.map((run) => run.runId));
       for (const run of page) {
         after = Object.freeze({ waitingSince: run.waitingSince, runId: run.runId });
         waiting += 1;
+        // Step 1: on the preview only the team's runs start; an outsider's leaves the line FAILED.
+        if (team === PREVIEW_TEAM_UNSET) {
+          skipped += 1;
+          continue;
+        }
+        if (team !== null && !team.has(run.runId)) {
+          failed += 1;
+          await this.#refusePreviewOutsider(run.runId);
+          continue;
+        }
         const person = run.ownerRef === null ? `legacy:${run.legacyAskerId ?? ""}` : `owner:${run.ownerRef}`;
         if (persons.has(person)) {
           skipped += 1;
@@ -4880,7 +4961,14 @@ export class PostgresAskApplication implements AskApplication {
       if (!listed.has(workItemId)) this.#redispatchedAt.delete(workItemId);
     }
     let redispatched = 0;
+    const team = stalled.length === 0 ? null : await this.#previewTeamRuns(stalled.map((job) => job.runId));
     for (const job of stalled) {
+      // Step 1: on the preview an outsider's job is never handed over; it is recorded FAILED.
+      if (team === PREVIEW_TEAM_UNSET) continue;
+      if (team !== null && !team.has(job.runId)) {
+        await this.#refusePreviewOutsider(job.runId);
+        continue;
+      }
       const nowMs = Date.now();
       const last = this.#redispatchedAt.get(job.workItemId);
       if (last !== undefined && nowMs - last < STALLED_START_SECONDS * 1_000) continue;
@@ -4897,6 +4985,48 @@ export class PostgresAskApplication implements AskApplication {
       console.info(JSON.stringify(Object.freeze({ event: "api.wait.redispatched", runId: job.runId })));
     }
     return redispatched;
+  }
+
+  /**
+   * Step 1 review fix (2026-10-08) — THE TEAM RULE FOR RUNS ALREADY IN THE SYSTEM. The
+   * waker and the stalled-start re-dispatch start or hand over existing runs without
+   * passing POST /v1/asks, so on the private preview each asks this first. Off the
+   * preview: `null`, no rule and no read (nothing changes). An empty team: UNSET, and the
+   * callers start and hand over nothing but fail nothing either, so a team list the
+   * operator forgot never destroys the team's own runs. Otherwise the ids of the runs a
+   * team member owns: the owner is the run's latest ownership event, else its `owner:`
+   * asker id (core.run_waiting_v's rule); a legacy asker's run has none and is never the
+   * team's. One read per call, on the runtime pool, which already resolves owner refs.
+   */
+  async #previewTeamRuns(runIds: readonly string[]): Promise<ReadonlySet<string> | typeof PREVIEW_TEAM_UNSET | null> {
+    if (validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig) === undefined) return null;
+    const teamUserIds = this.settings.previewTeamUserIds ?? [];
+    if (teamUserIds.length === 0) return PREVIEW_TEAM_UNSET;
+    if (runIds.length === 0) return new Set();
+    const result = await this.pool.query<{ run_id: string }>(
+      `SELECT run.run_id::text AS run_id
+       FROM core.run AS run
+       LEFT JOIN LATERAL (
+         SELECT event.owner_ref
+         FROM core.run_ownership_event AS event
+         WHERE event.run_id = run.run_id
+         ORDER BY event.at_seq DESC
+         LIMIT 1
+       ) AS latest ON true
+       JOIN identity."user" AS account
+         ON account.user_id = ANY($2::uuid[])
+        AND (account.owner_ref = latest.owner_ref
+          OR (latest.owner_ref IS NULL AND run.asker_id = 'owner:' || account.owner_ref::text))
+       WHERE run.run_id = ANY($1::uuid[])`,
+      [[...runIds], [...teamUserIds]]
+    );
+    return new Set(result.rows.map((row) => row.run_id));
+  }
+
+  /** Step 1: an outsider's existing run on the preview is recorded FAILED and never dispatched (ids and codes only). */
+  async #refusePreviewOutsider(runId: string): Promise<void> {
+    console.info(JSON.stringify(Object.freeze({ event: "api.wait.preview_team_only", runId })));
+    await this.#recordRunSetupFailure(runId, PREVIEW_TEAM_ONLY);
   }
 
   readAnswer(answerId: string, _session: Session, version: number | undefined, ownership: RunOwnershipAccess): Promise<Answer | null> {

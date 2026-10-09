@@ -110,6 +110,8 @@
   "newDebate.legalGate.signOut": "Afmelden",
   "newDebate.legalGate.signOutFailed": "Het afmelden is niet voltooid. Probeer het opnieuw.",
   "newDebate.room.locationBlocked": "Vanaf uw huidige locatie kunnen geen nieuwe debatten worden gestart. Uw debatten blijven beschikbaar om te lezen.",
+  "newDebate.room.previewTeamOnly": "Debatten in deze previewversie zijn alleen toegankelijk voor het team.",
+  "newDebate.room.phoneRequired": "Voeg een telefoonnummer toe in Instellingen, of probeer het over een paar minuten opnieuw.",
   "newDebate.room.siteFull": "De limiet van vandaag is bereikt. U kunt toch een vraag stellen — uw debat start vanzelf zodra de limiet wordt teruggezet.",
   "newDebate.room.siteClose": "U zit dicht bij de limiet van vandaag. Dit debat wordt toch volledig gevoerd; latere debatten moeten mogelijk wachten tot de limiet is teruggezet.",
   "newDebate.room.alreadyWaiting": "Er kan maar één vraag tegelijk wachten. De uwe start om {time}; stel deze vraag daarna.",

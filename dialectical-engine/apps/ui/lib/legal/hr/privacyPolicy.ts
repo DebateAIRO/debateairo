@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Sustav za rasprave potiče pitanja o politici, vjeri, zdravlju, seksualnosti i uvjerenjima. To su posebne kategorije podataka prema članku 9. GDPR-a i mogu se pojaviti u vašim pitanjima neovisno o tome namjeravamo li ih prikupljati." },
-      { kind: "p", text: "O vama. Prije svoje prve rasprave na zasebnom zaslonu dajete izričitu privolu za našu obradu osjetljivih informacija koje odlučite uključiti u vlastita pitanja radi vođenja vaših rasprava. Bilježimo verziju teksta na koji ste pristali, vaš jezik i vrijeme. Bez te privole ne možete započeti raspravu. Možete je povući u bilo kojem trenutku pisanjem na privacy@dezbatere.ro. Takve informacije možete i izostaviti ili izbrisati raspravu koja ih sadržava. Ono što objavite o sebi podaci su koje ste odlučili učiniti javnima." },
+      { kind: "p", text: "O vama. Prije svoje prve rasprave na zasebnom zaslonu dajete izričitu privolu za našu obradu osjetljivih informacija koje odlučite uključiti u vlastita pitanja radi vođenja vaših rasprava. Bilježimo verziju teksta na koji ste pristali, vaš jezik i vrijeme. Bez te privole ne možete započeti raspravu. Možete je povući u bilo kojem trenutku zatvaranjem računa u Postavkama. Takve informacije možete i izostaviti ili izbrisati raspravu koja ih sadržava. Ono što objavite o sebi podaci su koje ste odlučili učiniti javnima." },
       { kind: "p", text: "O drugim osobama. Nijedan pravni uvjet ne dopušta nam obradu osjetljivih podataka o trećoj osobi koju imenujete u pitanju, a takav uvjet nema ni jedan od naših pružatelja usluga umjetne inteligencije. Zato je to zabranjeno Uvjetima, zato svodimo na najmanju mjeru ono što šaljemo i zato takav sadržaj brzo uklanjamo na zahtjev — odjeljak 11." },
       { kind: "p", text: "Zdravstvene informacije. Neke države podatke povezane sa zdravljem, uključujući zaključke, uređuju posebnim zakonima. Ako živite u [the State of Washington], primjenjuje se zasebna [Consumer Health Data Privacy Notice]." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Ograničenje (Art. 18) — Zatražite da prestanemo obrađivati određene podatke dok se ne riješi spor o njima",
         "Prigovor (Art. 21) — Uložite prigovor na obradu koja se temelji na legitimnim interesima — sigurnosnu i revizijsku obradu iz odjeljka 4 — i prestat ćemo osim ako možemo dokazati uvjerljive razloge. Uložite prigovor na marketing u bilo kojem trenutku i prestat ćemo",
         "Prenosivost (Art. 20) — Vaše rasprave i podaci o računu u uobičajenom, strojno čitljivom formatu. [Pending: same export as Access.] Neosobni sadržaj koji ste stvorili, kao što su vaša pitanja, vraća vam se na zahtjev nakon prestanka ugovora",
-        "Povlačenje privole (Art. 7(3)) — Povucite privolu za marketing iz bilo koje poruke e-pošte ili u Postavkama; povucite privolu za osjetljive podatke pisanjem na privacy@dezbatere.ro (takve podatke možete i izostaviti ili izbrisati raspravu koja ih sadržava). Povlačenje ne utječe na obradu koja je već provedena",
+        "Povlačenje privole (Art. 7(3)) — Povucite privolu za marketing iz bilo koje poruke e-pošte ili u Postavkama; povucite privolu za osjetljive podatke zatvaranjem računa u Postavkama (takve podatke možete i izostaviti ili izbrisati raspravu koja ih sadržava). Povlačenje ne utječe na obradu koja je već provedena",
         "Pritužba — Rumunjskom nadzornom tijelu, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukurešt, anspdcp@dataprotection.ro, ili tijelu u državi u kojoj živite. Radije bismo da nam se prvo obratite"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "f7309a0c25873e93bd990bd6edfb32be13d54a5a1d70c3d24826b10a7c98c12f",
+  sha256: "f9720064babedf19dc26e7d1b8b5b74e9e59776796141200b2a33f167e91e7aa",
   eyebrow: "PRAVILA O PRIVATNOSTI · v3.2 · NA SNAZI OD [DATE]",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",

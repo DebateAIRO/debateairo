@@ -1824,8 +1824,10 @@ describe("S1-1 · the depth bound has a single source", () => {
     expect(controls).toHaveLength(1);
     const attributes = Object.fromEntries(controls[0]!.attributes.properties.filter(ts.isJsxAttribute)
       .map(attribute => [attribute.name.getText(file), attribute.initializer?.getText(file)]));
+    // Auth UI repair (2026-10-09): no maxLength on the six-digit field, because a browser cuts a pasted
+    // 8-digit string to 6 before the page sees it; the page refuses anything but exactly six digits instead.
     expect(attributes).toMatchObject({ value: "{code}", autoComplete: '"one-time-code"',
-      inputMode: "{method === 'totp' ? 'numeric' : 'text'}", maxLength: "{method === 'totp' ? 6 : 128}" });
+      inputMode: "{method === 'totp' ? 'numeric' : 'text'}", maxLength: "{method === 'totp' ? undefined : 128}" });
     expect(domainSites(path, source)).toEqual([]);
     const planted = source + "\nconst plantedDepthChoices = [1,2,3,4,5];\n";
     expect(domainSites(path, planted)).toEqual([{ kind: "DOMAIN_ENUMERATION", line: source.split("\n").length + 1, text: "const plantedDepthChoices = [1,2,3,4,5];" }]);

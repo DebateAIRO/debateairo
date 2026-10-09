@@ -172,9 +172,11 @@
   "settings.security.title": "Säkerhet",
   "settings.phone.reveal": "Visa telefonnummer",
   "settings.phone.change": "Ändra telefonnummer",
-  "settings.phone.required": "Lägg till ditt telefonnummer för att fortsätta. Din fråga och dina val sparas.",
+  "settings.phone.purpose": "Längre fram kan vi komma att skicka en kod via sms för att hjälpa dig tillbaka in på ditt konto, och om du ber oss om hjälp kan vi ringa eller sms:a dig. Lagras krypterat; delas aldrig och används aldrig för marknadsföring.",
   "settings.security.lastPath": "Lägg till en annan inloggningsmetod innan du tar bort den här.",
+  "settings.security.remove": "Ta bort",
   "settings.security.codesRemaining": "Återställningskoder: {count}",
   "settings.security.regenerate": "Skapa nya återställningskoder",
+  "settings.security.lockoutReminder": "Du har inga återställningskoder eller någon nyckel ännu. Om du tappar bort telefonen tar de dig tillbaka in direkt.",
   "settings.security.refreshFailed": "Säkerhetsuppgifterna kunde inte uppdateras. Ladda om sidan."
 }

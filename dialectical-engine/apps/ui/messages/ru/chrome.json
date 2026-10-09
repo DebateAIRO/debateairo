@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Файлы cookie, которые мы храним",
   "chrome.security": "Безопасность",
   "chrome.logout": "Выйти",
+  "chrome.logIn": "Войти",
   "chrome.accountError": "Не получилось. Перезагрузите страницу и повторите попытку.",
   "chrome.footer.pricing": "Цены",
   "chrome.footer.cancel": "Отменить тариф",

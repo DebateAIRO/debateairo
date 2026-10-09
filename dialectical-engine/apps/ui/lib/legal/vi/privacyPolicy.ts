@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Một công cụ tranh luận khuyến khích các câu hỏi về chính trị, tôn giáo, sức khỏe, tình dục và niềm tin. Đây là các loại dữ liệu đặc biệt theo Điều 9 GDPR và chúng có thể xuất hiện trong câu hỏi của bạn dù chúng tôi có chủ định thu thập hay không." },
-      { kind: "p", text: "Về bạn. Trước cuộc tranh luận đầu tiên, trên một màn hình riêng biệt, bạn đồng ý rõ ràng cho phép chúng tôi xử lý thông tin nhạy cảm mà bạn lựa chọn đưa vào câu hỏi của mình nhằm vận hành các cuộc tranh luận. Chúng tôi ghi lại phiên bản câu chữ mà bạn đã đồng ý, ngôn ngữ của bạn và thời điểm đồng ý. Nếu không có sự đồng ý này, bạn không thể bắt đầu một cuộc tranh luận. Bạn có thể rút lại sự đồng ý bất cứ lúc nào bằng cách viết tới privacy@dezbatere.ro. Bạn cũng có thể không đưa thông tin đó vào hoặc xóa cuộc tranh luận chứa thông tin đó. Nội dung bạn công khai về bản thân là dữ liệu mà bạn đã lựa chọn công khai." },
+      { kind: "p", text: "Về bạn. Trước cuộc tranh luận đầu tiên, trên một màn hình riêng biệt, bạn đồng ý rõ ràng cho phép chúng tôi xử lý thông tin nhạy cảm mà bạn lựa chọn đưa vào câu hỏi của mình nhằm vận hành các cuộc tranh luận. Chúng tôi ghi lại phiên bản câu chữ mà bạn đã đồng ý, ngôn ngữ của bạn và thời điểm đồng ý. Nếu không có sự đồng ý này, bạn không thể bắt đầu một cuộc tranh luận. Bạn có thể rút lại sự đồng ý bất cứ lúc nào bằng cách đóng tài khoản của bạn trong phần Cài đặt. Bạn cũng có thể không đưa thông tin đó vào hoặc xóa cuộc tranh luận chứa thông tin đó. Nội dung bạn công khai về bản thân là dữ liệu mà bạn đã lựa chọn công khai." },
       { kind: "p", text: "Về người khác. Không có điều kiện pháp lý nào cho phép chúng tôi xử lý dữ liệu nhạy cảm về một bên thứ ba mà bạn nêu tên trong câu hỏi, và các nhà cung cấp AI của chúng tôi cũng không có điều kiện đó. Đây là lý do Điều khoản nghiêm cấm việc này, chúng tôi giảm thiểu dữ liệu gửi đi và nhanh chóng gỡ nội dung đó khi có yêu cầu — mục 11." },
       { kind: "p", text: "Thông tin sức khỏe. Một số quốc gia áp dụng luật cụ thể đối với dữ liệu liên quan đến sức khỏe, bao gồm cả các suy luận. Nếu bạn sống tại [the State of Washington], một [Consumer Health Data Privacy Notice] riêng sẽ được áp dụng." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Hạn chế (Art. 18) — Yêu cầu chúng tôi ngừng xử lý dữ liệu cụ thể trong khi tranh chấp liên quan đến dữ liệu đó được giải quyết",
         "Phản đối (Art. 21) — Phản đối việc xử lý dựa trên lợi ích hợp pháp — hoạt động xử lý bảo mật và kiểm toán tại mục 4 — và chúng tôi sẽ dừng trừ khi có thể chứng minh lý do thuyết phục. Phản đối tiếp thị bất cứ lúc nào và chúng tôi sẽ dừng",
         "Khả năng di chuyển dữ liệu (Art. 20) — Các cuộc tranh luận và dữ liệu tài khoản của bạn ở định dạng thông dụng, máy có thể đọc được. [Pending: same export as Access.] Nội dung không phải dữ liệu cá nhân do bạn tạo, chẳng hạn câu hỏi của bạn, sẽ được trả lại theo yêu cầu khi hợp đồng chấm dứt",
-        "Rút lại sự đồng ý (Art. 7(3)) — Rút lại sự đồng ý tiếp thị từ bất kỳ email nào hoặc trong phần Cài đặt; rút lại sự đồng ý về dữ liệu nhạy cảm bằng cách viết tới privacy@dezbatere.ro (bạn cũng có thể không đưa dữ liệu đó vào hoặc xóa cuộc tranh luận chứa dữ liệu đó). Việc rút lại không ảnh hưởng đến hoạt động xử lý đã diễn ra",
+        "Rút lại sự đồng ý (Art. 7(3)) — Rút lại sự đồng ý tiếp thị từ bất kỳ email nào hoặc trong phần Cài đặt; rút lại sự đồng ý về dữ liệu nhạy cảm bằng cách đóng tài khoản của bạn trong phần Cài đặt (bạn cũng có thể không đưa dữ liệu đó vào hoặc xóa cuộc tranh luận chứa dữ liệu đó). Việc rút lại không ảnh hưởng đến hoạt động xử lý đã diễn ra",
         "Khiếu nại — Gửi đến cơ quan giám sát Romania, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, anspdcp@dataprotection.ro, hoặc đến cơ quan tại quốc gia nơi bạn sinh sống. Chúng tôi mong bạn liên hệ với chúng tôi trước"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "380ce8adad1ea0f20896c8a60deb47e2d74d54f810a34931e9b637b53e5d9a6a",
+  sha256: "57daa3848f8e53a10c89e7601c429862e834e6830917b5aaf8851e5ddfa2c1d4",
   eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.2 · CÓ HIỆU LỰC [DATE]",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",

@@ -328,3 +328,44 @@ it('exposes strict direct TOTP enrollment and secure available-method continuati
   expect(contract.TotpEnrollmentResponseSchema.safeParse({status:'recovery_codes_required'}).success).toBe(false);
   expect(contract.LoginContinuationResponseSchema.safeParse({status:'mfa_required',challenge_token:'l'.repeat(43),available_methods:[]}).success).toBe(false);
 });
+
+// Auth API hardening 2026-10-09: the sign-in and recovery-start proofs travel like the sign-up one.
+it('sends a sign-in or recovery-start proof only when the widget gave one', async () => {
+  const requests: Array<{ path: string; body: unknown }> = [];
+  const fetcher = (async (input: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(input), 'https://debate.test').pathname; requests.push({ path, body: JSON.parse(String(init?.body)) });
+    return path.endsWith('/login') ? Response.json({ status: 'mfa_required', challenge_token: 'l'.repeat(43), available_methods: ['totp'] })
+      : Response.json({ message: RECOVERY_START_MESSAGE }, { status: 202 });
+  }) as typeof fetch;
+  const client = createContractClient('https://debate.test', fetcher);
+  await client.beginLogin('person@example.test', 'password');
+  await client.beginLogin('person@example.test', 'password', 'login-proof');
+  await client.startRecovery('person@example.test');
+  await client.startRecovery('person@example.test', 'recovery-proof');
+  await contract.createPasswordResetClient(fetcher, '/api', () => undefined).start('person@example.test', 'reset-proof');
+  await contract.createMfaRecoveryClient(fetcher, '/api').start('person@example.test', 'primary', 'mfa-proof');
+  expect(requests.map(request => request.body)).toEqual([
+    { email: 'person@example.test', password: 'password' },
+    { email: 'person@example.test', password: 'password', turnstile_token: 'login-proof' },
+    { email: 'person@example.test' },
+    { email: 'person@example.test', turnstile_token: 'recovery-proof' },
+    { email: 'person@example.test', turnstile_token: 'reset-proof' },
+    { email: 'person@example.test', destination: 'primary', turnstile_token: 'mfa-proof' }
+  ]);
+});
+
+it('publishes the optional sign-in and recovery-start proof fields, bounded like the sign-up proof', () => {
+  for (const schema of [contract.LoginBeginRequestSchema, contract.RecoveryStartRequestSchema, contract.PasswordResetStartRequestSchema]) {
+    expect(schema.safeParse({ email: 'person@example.test', ...(schema === contract.LoginBeginRequestSchema ? { password: 'p' } : {}) }).success).toBe(true);
+    for (const token of ['', ' ', 'x'.repeat(2049)]) {
+      expect(schema.safeParse({ email: 'person@example.test', password: 'p', turnstile_token: token }).success).toBe(false);
+    }
+  }
+  expect(contract.MfaRecoveryStartRequestSchema.safeParse({ email: 'person@example.test', destination: 'primary', turnstile_token: 'proof' }).success).toBe(true);
+  expect(contract.LoginCompleteRequestSchema.safeParse({ challenge_token: 'l'.repeat(43), code: '123456', turnstile_token: 'proof' }).success).toBe(false);
+  const login = (openapi as Record<string, any>).paths['/v1/auth/login'].post;
+  expect(login.requestBody.content['application/json'].schema.anyOf.map((entry: { $ref: string }) => entry.$ref)).toEqual([
+    '#/components/schemas/LoginBeginRequestSchema', '#/components/schemas/LoginCompleteRequestSchema'
+  ]);
+  expect((openapi as Record<string, any>).components.schemas.LoginBeginRequestSchema.required).not.toContain('turnstile_token');
+});

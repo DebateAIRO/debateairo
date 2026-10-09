@@ -49,6 +49,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Zasebnost in varstvo podatkov — privacy@dezbatere.ro",
         "Prijava nezakonite vsebine — [abuse@dezbatere.ro] — glejte razdelek 10",
         "Kontaktna točka za organe — [dsa@dezbatere.ro] — v romunščini in angleščini",
+        "Odredbe o odstranitvi teroristične vsebine (Uredba (EU) 2021/784) — [dsa@dezbatere.ro] — naša kontaktna točka za te odredbe; v romunščini in angleščini; glejte razdelek 10",
         "Predstavniki v drugih državah — Navedeni so v Prilogi A za regije, v katerih smo jih imenovali"
         ]
       },
@@ -60,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kje ponujamo DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI ponujamo osebam, ki živijo v [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
+      { kind: "p", text: "DebateAI ponujamo osebam, ki živijo v [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
     ]
   },
   {
@@ -166,9 +167,11 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Odločitve o moderiranju vsebine in računov. Odstranitev ali omejitev objavljene razprave oziroma začasna onemogočitev ali zaprtje računa je odločitev, ki jo sprejmemo na podlagi teh Pogojev ali zakona. Pri vsaki taki odločitvi, ki vpliva na vaš račun, sodeluje oseba. Razlogi so opisani v razdelku 11."
         ]
       },
-      { kind: "p", text: "Obrazložitev. Kadar koli odstranimo ali omejimo vidnost vaše vsebine oziroma začasno onemogočimo ali ukinemo vaš račun, vam zagotovimo obrazložitev: kaj smo storili in kakšen je obseg ukrepa, dejstva, na katera smo se oprli, in ali izvirajo iz prijave ali naših preverjanj, ali so bila uporabljena avtomatizirana sredstva, pravna ali pogodbena podlaga ter način izpodbijanja odločitve." },
+      { kind: "p", text: "Obrazložitev. Kadar koli odstranimo ali omejimo vidnost vaše vsebine oziroma začasno onemogočimo ali ukinemo vaš račun, vam zagotovimo obrazložitev: kaj smo storili in kakšen je obseg ukrepa, dejstva, na katera smo se oprli, in ali izvirajo iz prijave ali naših preverjanj, ali so bila uporabljena avtomatizirana sredstva, pravna ali pogodbena podlaga ter način izpodbijanja odločitve: prek našega pritožbenega postopka spodaj, prek organa za izvensodno reševanje sporov, certificiranega v skladu z Aktom EU o digitalnih storitvah, ali na sodišču." },
       { kind: "p", text: "Pritožba zoper odločitev. Če se z odločitvijo o moderiranju ne strinjate, odgovorite na obrazložitev ali v šestih mesecih pišite na [appeals@dezbatere.ro]. Odločitev pregleda oseba, ki pri prvotni odločitvi ni sodelovala, mi pa vas o izidu obvestimo skupaj z razlogi. To ne vpliva na vašo pravico do sodnega postopka ali uporabe alternativnega reševanja sporov po razdelku 18. Pritožbeni postopek sprejema tudi pritožbe, da nismo ukrepali na podlagi prijave, da je bila vsebina neupravičeno odstranjena, da je bil račun neupravičeno omejen ali da je avtomatizirano orodje neupravičeno vplivalo na vašo vsebino." },
+      { kind: "p", text: "Izvensodno reševanje sporov. Če ste v Evropski uniji, lahko spor glede ene od naših odločitev o moderiranju predložite organu za izvensodno reševanje sporov, certificiranemu v skladu s členom 21 Akta EU o digitalnih storitvah (Uredbe (EU) 2022/2065). To velja za odločitev o vaši vsebini ali vašem računu ter za našo odločitev o prijavi, ki ste jo podali. Organ izberete s seznama, ki ga objavlja Evropska komisija na naslovu digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, in vam pred tem ni treba uporabiti našega pritožbenega postopka. V postopku sodelujemo v dobri veri, sodelovanje pa zavrnemo samo, če je bil isti spor glede iste vsebine in iz istih razlogov že rešen. Odločitev organa ne zavezuje ne vas ne nas, pravico do sodnega postopka pa obdržite. Organ vam lahko zaračuna majhno pristojbino ali pa nič. Če odloči v vašo korist, plačamo njegove pristojbine in povrnemo vaše razumne stroške; če odloči v našo korist, ne plačate naših pristojbin ali stroškov, razen če organ ugotovi, da ste ravnali očitno v slabi veri." },
       { kind: "p", text: "Stik z osebo. Naš pomočnik za podporo je sistem umetne inteligence in je kot tak označen. Kadar koli lahko zahtevate pogovor z osebo in vsak pogovor s podporo ponuja to možnost. Pri sporazumevanju z vami se ne zanašamo samo na avtomatizirana orodja." },
+      { kind: "p", text: "Teroristična vsebina. Teroristična vsebina je nezakonita in na DebateAI ni dovoljena (razdelek 7). Pristojni organi v Evropski uniji nam lahko pošljejo odredbe o odstranitvi na podlagi Uredbe (EU) 2021/784 na kontaktno točko iz razdelka 1. Ko prejmemo tako odredbo, vsebino odstranimo ali onemogočimo dostop do nje v vseh državah EU v eni uri. Osebo, ki je vsebino objavila, obvestimo, da je bila odstranjena, in na njeno zahtevo tudi zakaj in kako lahko odredbo izpodbija, razen če organ odloči, da moramo zaradi javne varnosti za omejeno obdobje molčati. Kot zahteva Uredba, odstranjeno vsebino in povezane podatke hranimo šest mesecev, da je mogoče odstranitev pregledati in jo, če je bila napačna, razveljaviti. Oseba, ki je vsebino objavila, lahko odredbo izpodbija pred sodišči države, katere organ jo je izdal, in lahko uporabi tudi naš pritožbeni postopek. Noben organ od nas ni zahteval sprejetja posebnih ukrepov zoper teroristično vsebino na podlagi Uredbe; če to stori, bomo te ukrepe opisali tukaj, vključno z morebitnimi avtomatiziranimi orodji." },
       { kind: "p", text: "Resno tveganje za življenje ali varnost. Če izvemo za informacije, ki kažejo na kaznivo dejanje, povezano z grožnjo življenju ali varnosti osebe, obvestimo pristojne organe." }
     ]
   },
@@ -177,7 +180,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Začasna onemogočitev in prenehanje",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Z vaše strani. Račun lahko kadar koli zaprete v Nastavitvah, kot je opisano v razdelku 6. Razloga ne potrebujete." },
+      { kind: "p", text: "Z vaše strani. Račun lahko kadar koli zaprete v Nastavitvah, kot je opisano v razdelku 6. Razloga ne potrebujete. Z zaprtjem računa ti Pogoji prenehajo veljati. Prenehajo veljati, ko zaprtje začne učinkovati, po izteku 7-dnevnega obdobja odloga; razdelki, navedeni na koncu tega razdelka, ostanejo v veljavi tudi potem." },
       { kind: "p", text: "Z naše strani. Vaš račun lahko začasno onemogočimo ali zapremo oziroma odstranimo ali omejimo vašo vsebino, kadar: bistveno kršite te Pogoje, zlasti razdelek 7; je vaša vsebina nezakonita ali zakon, sodišče ali organ od nas zahteva ukrepanje; vaša uporaba ogroža varnost, celovitost ali razpoložljivost storitve ali pravice drugih; vaš račun ni bil dejaven [24 months] in smo vas o tem obvestili; ali prenehamo zagotavljati storitev oziroma jo prenehamo zagotavljati v vaši državi." },
       { kind: "p", text: "Razen kadar je kršitev resna, zakon zahteva takojšnje ukrepanje ali bi odlašanje povzročilo škodo, vam pojasnimo težavo in damo razumno možnost, da jo odpravite, preden račun začasno onemogočimo ali zapremo. Vedno vam zagotovimo obrazložitev po razdelku 10, odločitev pa lahko izpodbijate." },
       { kind: "p", text: "Če storitev v celoti ukinemo ali jo umaknemo iz vaše države, vas obvestimo najmanj 30 dni vnaprej, vrnemo vse vnaprej plačane zneske za obdobje po ukinitvi in vam pred tem omogočimo izvoz razprav." },
@@ -274,7 +277,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ločljivost. Če se ugotovi, da katere koli določbe teh Pogojev ni mogoče izvršiti, se ta določba ne uporablja, preostali Pogoji pa ostanejo v veljavi." },
       { kind: "p", text: "Brez odpovedi pravicam. Če pogoja ne uveljavimo takoj, s tem ne izgubimo pravice, da ga uveljavimo pozneje." },
       { kind: "p", text: "Celoten dogovor. Ti Pogoji skupaj s Pravilnikom o piškotkih in Registrom ponudnikov umetne inteligence pomenijo celoten dogovor med nami o storitvi. Zaveze, ki jih sprejmemo v Pravilniku o zasebnosti, so za nas zavezujoče. Nič v tem odstavku ne izključuje odgovornosti za goljufivo zavajanje." },
-      { kind: "p", text: "Jezik. Ti Pogoji so objavljeni v angleščini [and Romanian]. [State which version prevails for which users; Annex A notes where a local language is required.]" },
+      { kind: "p", text: "Jezik. Ti Pogoji so objavljeni v vseh jezikih, ki jih ponuja spletno mesto. Pogodba je sklenjena v jeziku, v katerem ste se registrirali: v jeziku različice, ki ste jo sprejeli in ki jo hrani naš zapis o sprejetju. Če pozneje sprejmete novo različico v drugem jeziku, se pogodba nadaljuje v tem jeziku. Druge jezikovne različice so prevodi. Kadar pravo države, v kateri živite, določa, da prevlada različica v njenem lastnem jeziku, prevlada ta različica. Če se dve jezikovni različici razlikujeta, uporabimo pomen, ki je za vas ugodnejši." },
       { kind: "p", text: "Kontakt. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bukarešta, Romunija." }
     ]
   },
@@ -307,6 +310,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Združene države Amerike (samo če so navedene v razdelku 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. DebateAI ne ponujamo osebam, ki živijo v Tennesseeju." },
       { kind: "p", text: "Arbitražni sporazum in odpoved skupinski tožbi. Če živite v Združenih državah Amerike, se vi in DebateAIRO strinjate, da boste vsak spor, ki izhaja iz teh Pogojev ali storitve, namesto na sodišču reševali z zavezujočo posamično arbitražo, ki jo vodi [the American Arbitration Association / JAMS] po svojih pravilih za potrošnike, pri čemer lahko vsak od naju vloži posamični zahtevek pri sodišču za spore majhne vrednosti. Sodelovanje lahko zavrnete tako, da v 30 dneh od prvega sprejetja teh Pogojev pošljete e-poštno sporočilo na [address]. Ta sporazum ureja zvezni zakon o arbitraži. Plačamo pristojbine za vložitev arbitražnega postopka. Skupinske, kolektivne in zastopniške tožbe so izključene v obsegu, ki ga dovoljuje zakon. Ta razdelek velja samo za naprej in ne velja za zahtevke, ki so nastali, preden ste ga sprejeli." },
       { kind: "p", text: "Obvestila in odstranitve. Intimne posnetke brez privolitve je mogoče brez računa prijaviti na [URL], odstranijo pa se v 48 urah od veljavne zahteve. Pritožbe glede avtorskih pravic se naslovijo na našega imenovanega zastopnika iz razdelka 16." },
       { kind: "p", text: "Posebnosti zveznih držav. Kalifornija: veljajo pogoji samodejnega podaljšanja iz razdelka 12; prek spleta lahko kadar koli prekličete; vašo privolitev v pogoje podaljšanja hranimo najmanj tri leta. New York: v 14 dneh od vsake bremenitve po zvišani ceni lahko prekličete in prejmete sorazmerno vračilo. Teksas in Nebraska: občutljivih osebnih podatkov ne prodajamo. Washington: za zdravstvene podatke velja naše Obvestilo o zasebnosti zdravstvenih podatkov potrošnikov na [URL]. Kolorado: nič v storitvi ne sprejema odločitev z znatnimi posledicami za vas. Vaše podatke in vaše pravice glede zasebnosti po zakonodaji vaše zvezne države ureja naš Pravilnik o zasebnosti, Priloga B.3." }
@@ -381,7 +385,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "dc01f51a1b53061ad527f2eb3c68109a59efd201d70900b89660b361174ceee6",
+  sha256: "1cd216c10904c06be8da825b6c270e38ebe2fc9ecdfb32d789dd8a3ab2f2c434",
   eyebrow: "POGOJI UPORABE · v2.1 · VELJAVNI OD [DATE]",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DebateAIRO S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",

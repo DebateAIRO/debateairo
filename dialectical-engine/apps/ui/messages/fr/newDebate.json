@@ -110,6 +110,8 @@
   "newDebate.legalGate.signOut": "Se déconnecter",
   "newDebate.legalGate.signOutFailed": "La déconnexion n’a pas abouti. Veuillez réessayer.",
   "newDebate.room.locationBlocked": "Il n’est pas possible de lancer de nouveaux débats depuis votre emplacement actuel. Vos débats restent disponibles en lecture.",
+  "newDebate.room.previewTeamOnly": "Les débats de cette version de prévisualisation sont réservés à l’équipe.",
+  "newDebate.room.phoneRequired": "Ajoutez un numéro de téléphone dans les Paramètres, ou réessayez dans quelques minutes.",
   "newDebate.room.siteFull": "La limite du jour est atteinte. Vous pouvez tout de même poser votre question — votre débat démarrera de lui-même lorsque la limite sera réinitialisée.",
   "newDebate.room.siteClose": "Vous approchez de la limite du jour. Ce débat se déroulera tout de même en entier ; les suivants pourraient attendre la réinitialisation.",
   "newDebate.room.alreadyWaiting": "Une seule question peut attendre à la fois. La vôtre démarrera à {time} ; posez celle-ci ensuite.",

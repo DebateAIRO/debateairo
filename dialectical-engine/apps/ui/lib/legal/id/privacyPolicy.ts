@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Mesin debat mendorong pertanyaan tentang politik, agama, kesehatan, seksualitas, dan keyakinan. Hal-hal tersebut merupakan kategori data khusus berdasarkan Pasal 9 GDPR, dan dapat muncul dalam pertanyaan Anda baik kami bermaksud mengumpulkannya maupun tidak." },
-      { kind: "p", text: "Tentang Anda. Sebelum debat pertama Anda, pada layar terpisah Anda memberikan persetujuan tegas agar kami memproses informasi sensitif yang Anda pilih untuk disertakan dalam pertanyaan Anda sendiri, untuk tujuan menjalankan debat Anda. Kami mencatat versi redaksi yang Anda setujui, bahasa Anda, dan waktunya. Tanpa persetujuan ini, Anda tidak dapat memulai debat. Anda dapat menarik persetujuan ini kapan saja dengan menulis ke privacy@dezbatere.ro. Anda juga dapat tidak menyertakan informasi tersebut atau menghapus debat yang memuatnya. Apa yang Anda publikasikan tentang diri sendiri adalah data yang telah Anda pilih untuk dijadikan publik." },
+      { kind: "p", text: "Tentang Anda. Sebelum debat pertama Anda, pada layar terpisah Anda memberikan persetujuan tegas agar kami memproses informasi sensitif yang Anda pilih untuk disertakan dalam pertanyaan Anda sendiri, untuk tujuan menjalankan debat Anda. Kami mencatat versi redaksi yang Anda setujui, bahasa Anda, dan waktunya. Tanpa persetujuan ini, Anda tidak dapat memulai debat. Anda dapat menarik persetujuan ini kapan saja dengan menutup akun Anda dari Pengaturan. Anda juga dapat tidak menyertakan informasi tersebut atau menghapus debat yang memuatnya. Apa yang Anda publikasikan tentang diri sendiri adalah data yang telah Anda pilih untuk dijadikan publik." },
       { kind: "p", text: "Tentang orang lain. Tidak ada ketentuan hukum yang mengizinkan kami memproses data sensitif tentang pihak ketiga yang Anda sebut dalam pertanyaan, dan tidak satu pun penyedia AI kami memiliki dasar tersebut. Itulah sebabnya Ketentuan melarangnya, kami meminimalkan apa yang dikirim, dan kami segera menghapus konten tersebut atas permintaan — bagian 11." },
       { kind: "p", text: "Informasi kesehatan. Beberapa negara memperlakukan data terkait kesehatan, termasuk inferensi, berdasarkan undang-undang khusus. Jika Anda tinggal di [the State of Washington], [Consumer Health Data Privacy Notice] yang terpisah berlaku." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Pembatasan (Art. 18) — Minta kami berhenti memproses data tertentu sementara perselisihan mengenainya diselesaikan",
         "Keberatan (Art. 21) — Ajukan keberatan terhadap pemrosesan berdasarkan kepentingan yang sah — pemrosesan keamanan dan audit dalam bagian 4 — dan kami berhenti kecuali dapat menunjukkan alasan kuat. Ajukan keberatan terhadap pemasaran kapan saja, dan kami berhenti",
         "Portabilitas (Art. 20) — Debat dan data akun Anda dalam format yang umum digunakan serta dapat dibaca mesin. [Pending: same export as Access.] Konten nonpribadi yang Anda buat, seperti pertanyaan Anda, dikembalikan kepada Anda atas permintaan ketika kontrak berakhir",
-        "Menarik persetujuan (Art. 7(3)) — Tarik persetujuan pemasaran dari email mana pun atau Pengaturan; tarik persetujuan data sensitif dengan menulis ke privacy@dezbatere.ro (Anda juga dapat tidak menyertakan data tersebut atau menghapus debat yang memuatnya). Penarikan tidak memengaruhi pemrosesan yang telah terjadi",
+        "Menarik persetujuan (Art. 7(3)) — Tarik persetujuan pemasaran dari email mana pun atau Pengaturan; tarik persetujuan data sensitif dengan menutup akun Anda dari Pengaturan (Anda juga dapat tidak menyertakan data tersebut atau menghapus debat yang memuatnya). Penarikan tidak memengaruhi pemrosesan yang telah terjadi",
         "Mengadu — Kepada otoritas pengawas Rumania, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukares, anspdcp@dataprotection.ro, atau kepada otoritas di negara tempat Anda tinggal. Kami lebih memilih Anda menghubungi kami terlebih dahulu"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "9c41f5177ca9a4aa8ab46563f6f394f56dd7c391f953bc427ab69b8a5a37e400",
+  sha256: "1ced56cef0dd6edb50f347449f9c3c858e5296cd5829ee04ee0ae72c508b6372",
   eyebrow: "KEBIJAKAN PRIVASI · v3.2 · BERLAKU [DATE]",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",

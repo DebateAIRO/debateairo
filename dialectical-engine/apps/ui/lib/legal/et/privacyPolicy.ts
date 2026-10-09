@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Väitlusmootor ajendab esitama küsimusi poliitika, religiooni, tervise, seksuaalsuse ja veendumuste kohta. Need on GDPR-i artikli 9 kohaselt eriliiki andmed ning võivad sisalduda teie küsimustes olenemata sellest, kas kavatseme neid koguda." },
-      { kind: "p", text: "Teie kohta. Enne oma esimest väitlust annate eraldi ekraanikuval selgesõnalise nõusoleku, et töötleme tundlikku teavet, mille otsustate lisada oma küsimustesse, teie väitluste läbiviimise eesmärgil. Salvestame selle sõnastuse versiooni, millega nõustusite, teie keele ja ajahetke. Ilma selle nõusolekuta ei saa te väitlust alustada. Võite nõusoleku igal ajal tagasi võtta, kirjutades aadressile privacy@dezbatere.ro. Samuti võite sellise teabe välja jätta või kustutada väitluse, mis seda sisaldab. Enda kohta avaldatud andmed olete ise otsustanud avalikustada." },
+      { kind: "p", text: "Teie kohta. Enne oma esimest väitlust annate eraldi ekraanikuval selgesõnalise nõusoleku, et töötleme tundlikku teavet, mille otsustate lisada oma küsimustesse, teie väitluste läbiviimise eesmärgil. Salvestame selle sõnastuse versiooni, millega nõustusite, teie keele ja ajahetke. Ilma selle nõusolekuta ei saa te väitlust alustada. Võite nõusoleku igal ajal tagasi võtta, sulgedes konto seadetes. Samuti võite sellise teabe välja jätta või kustutada väitluse, mis seda sisaldab. Enda kohta avaldatud andmed olete ise otsustanud avalikustada." },
       { kind: "p", text: "Teiste inimeste kohta. Ükski õiguslik tingimus ei luba meil töödelda küsimuses nimetatud kolmanda isiku tundlikke andmeid ning ka ühelgi meie tehisintellekti pakkujal ei ole selleks alust. Seepärast on see Tingimustes keelatud, seepärast minimeerime saadetavaid andmeid ja seepärast eemaldame sellise sisu taotluse korral kiiresti — jaotis 11." },
       { kind: "p", text: "Terviseandmed. Mõnes riigis reguleerivad terviseandmeid, sealhulgas järeldusi, eriseadused. Kui elate piirkonnas [the State of Washington], kohaldatakse eraldi teadet [Consumer Health Data Privacy Notice]." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Piiramine (Art. 18) — Paluge meil peatada konkreetsete andmete töötlemine, kuni neid puudutav vaidlus lahendatakse",
         "Vastuväide (Art. 21) — Esitage vastuväide õigustatud huvidel põhinevale töötlemisele — jaotises 4 kirjeldatud turbe- ja audititöötlusele — ning lõpetame selle, kui me ei suuda tõendada ülekaalukaid põhjuseid. Esitage igal ajal vastuväide turundusele ja lõpetame selle",
         "Andmete ülekantavus (Art. 20) — Teie väitlused ja kontoandmed üldkasutatavas masinloetavas vormingus. [Pending: same export as Access.] Teie loodud mitteisiklik sisu, näiteks küsimused, tagastatakse teile taotluse korral lepingu lõppemisel",
-        "Nõusoleku tagasivõtmine (Art. 7(3)) — Võtke turundusnõusolek tagasi mis tahes e-kirja kaudu või seadetes; võtke tundlike andmete nõusolek tagasi, kirjutades aadressile privacy@dezbatere.ro (võite need andmed ka välja jätta või kustutada neid sisaldava väitluse). Tagasivõtmine ei mõjuta juba toimunud töötlemist",
+        "Nõusoleku tagasivõtmine (Art. 7(3)) — Võtke turundusnõusolek tagasi mis tahes e-kirja kaudu või seadetes; võtke tundlike andmete nõusolek tagasi, sulgedes konto seadetes (võite need andmed ka välja jätta või kustutada neid sisaldava väitluse). Tagasivõtmine ei mõjuta juba toimunud töötlemist",
         "Kaebuse esitamine — Rumeenia järelevalveasutusele ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, või teie elukohariigi asutusele. Eelistaksime siiski, et pöörduksite esmalt meie poole"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "7d816a63eface898805f3d61a7f17affe90442bb219242eedb5a0111c307b0be",
+  sha256: "b3c1f6155ca3ae815c7191ce392add4e2a43bb692b76573c473def2206153ceb",
   eyebrow: "PRIVAATSUSPOLIITIKA · v3.2 · KEHTIB ALATES [DATE]",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",

@@ -818,14 +818,16 @@ const mfa = new MfaEnrollmentService({
 // Explicit v2 composition retains current-state checks and refuses unavailable operator readiness.
 const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
   ? new StaffAccessService(new PostgresStaffRepository(pool), sessions) : undefined;
-// Explicit protected adapters plus installation/policy/current publication are startup-only gates.
+// Explicit protected adapters, config custody, installation and policy are startup-only gates. A stale ACK
+// proof or readiness publication never blocks boot: Team tools start locked (one api.staff.tools_locked line)
+// and each staff action re-checks readiness, so an operator unlock needs no restart.
 const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
   ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
-  intents: staffAlerts.intents,
+  intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
 };
@@ -861,7 +863,7 @@ const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
 const application = new PostgresAskApplication(pool, dispatcher, {
-  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig }),
+  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   registerVersion: environment.REGISTER_VERSION,
   batteryVersion: environment.BATTERY_VERSION,
@@ -876,7 +878,6 @@ const application = new PostgresAskApplication(pool, dispatcher, {
         assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
       }),
   ...(askBilling === undefined ? {} : { billing: askBilling }),
-  accountProfile,
   resolveDiscoveredPanel: resolveProviderPanel,
   // A20: the per-role model picker (built above, under the boot ledger).
   modelPicker,
@@ -1321,7 +1322,7 @@ const billingRouteOptions: BillingRouteOptions | undefined =
         ...(billingRuntime === undefined ? {} : billingRuntime.routes)
       });
 const api = buildApi({
-  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig }),
+  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   application,
   stories: new RepositoryAnswerStoryApplication(storyRepository),
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
@@ -1335,6 +1336,9 @@ const api = buildApi({
   socialAuth,
   socialStepUp:new SocialStepUpService(socialRepository,socialProviders,sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy}),
   turnstile: new UnixTurnstileVerifier({ publicAppUrl: environment.PUBLIC_APP_URL, ...(environment.TURNSTILE_SOCKET_PATH === undefined ? {} : { socketPath: environment.TURNSTILE_SOCKET_PATH }) }),
+  // Auth API hardening 2026-10-09: sign-in and recovery-start proofs, each off until its UI widget ships.
+  turnstileLoginRequired: environment.TURNSTILE_LOGIN_REQUIRED === "true",
+  turnstileRecoveryRequired: environment.TURNSTILE_RECOVERY_REQUIRED === "true",
   recovery,
   ...(passwordReset?{passwordReset}:{}),
   ...(backupEmail?{backupEmail}:{}),

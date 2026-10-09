@@ -49,6 +49,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Privatnost i zaštita podataka — privacy@dezbatere.ro",
         "Prijava nezakonitog sadržaja — [abuse@dezbatere.ro] — vidjeti odjeljak 10.",
         "Kontaktna točka za nadležna tijela — [dsa@dezbatere.ro] — rumunjski i engleski",
+        "Nalozi za uklanjanje terorističkog sadržaja (Uredba (EU) 2021/784) — [dsa@dezbatere.ro] — naša kontaktna točka za te naloge; rumunjski i engleski; vidjeti odjeljak 10.",
         "Predstavnici u drugim državama — Navedeni su u Prilogu A za regije u kojima smo imenovali predstavnika"
         ]
       },
@@ -60,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Gdje nudimo DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI nudimo osobama koje žive u [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu." }
+      { kind: "p", text: "DebateAI nudimo osobama koje žive u [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu." }
     ]
   },
   {
@@ -166,9 +167,11 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Odluke o moderiranju sadržaja i računa. Uklanjanje ili ograničavanje objavljene rasprave te suspenzija ili zatvaranje računa odluke su koje donosimo na temelju ovih Uvjeta ili zakona. U svakoj takvoj odluci koja utječe na vaš račun sudjeluje osoba. Odjeljak 11. opisuje osnove."
         ]
       },
-      { kind: "p", text: "Obrazloženje. Kad god uklonimo vaš sadržaj ili ograničimo njegovu vidljivost, odnosno suspendiramo ili zatvorimo vaš račun, dajemo vam obrazloženje: što smo učinili i koliki je doseg mjere, činjenice na koje smo se oslonili i jesu li proizašle iz prijave ili naših provjera, jesu li upotrijebljena automatizirana sredstva, pravnu ili ugovornu osnovu te način na koji možete osporiti odluku." },
+      { kind: "p", text: "Obrazloženje. Kad god uklonimo vaš sadržaj ili ograničimo njegovu vidljivost, odnosno suspendiramo ili zatvorimo vaš račun, dajemo vam obrazloženje: što smo učinili i koliki je doseg mjere, činjenice na koje smo se oslonili i jesu li proizašle iz prijave ili naših provjera, jesu li upotrijebljena automatizirana sredstva, pravnu ili ugovornu osnovu te način na koji možete osporiti odluku: putem našeg postupka za pritužbe u nastavku, putem tijela za izvansudsko rješavanje sporova certificiranog prema Aktu EU-a o digitalnim uslugama ili na sudu." },
       { kind: "p", text: "Pritužba na odluku. Ako se ne slažete s odlukom o moderiranju, odgovorite na obrazloženje ili pišite na [appeals@dezbatere.ro] u roku od šest mjeseci. Odluku preispituje osoba koja nije sudjelovala u njezinu prvotnom donošenju, a mi vam priopćujemo obrazloženi ishod. To ne utječe na vaše pravo da se obratite sudu ili upotrijebite alternativno rješavanje sporova prema odjeljku 18. Postupak za pritužbe prihvaća i pritužbe da nismo postupili po prijavi, da je sadržaj pogrešno uklonjen, da je račun pogrešno ograničen ili da je automatizirani alat pogrešno utjecao na vaš sadržaj." },
+      { kind: "p", text: "Izvansudsko rješavanje sporova. Ako se nalazite u Europskoj uniji, spor o jednoj od naših odluka o moderiranju možete uputiti tijelu za izvansudsko rješavanje sporova certificiranom prema članku 21. Akta EU-a o digitalnim uslugama (Uredbe (EU) 2022/2065). To obuhvaća odluku o vašem sadržaju ili vašem računu, kao i našu odluku o prijavi koju ste podnijeli. Tijelo birate s popisa koji objavljuje Europska komisija na adresi digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, a ne morate prije toga iskoristiti naš postupak za pritužbe. U postupku sudjelujemo u dobroj vjeri i odbijamo sudjelovati samo ako je već riješen isti spor o istom sadržaju i iz istih razloga. Odluka tijela ne obvezuje nijednu od strana i zadržavate svoje pravo obratiti se sudu. Tijelo vam može naplatiti malu naknadu ili ništa. Ako odluči u vašu korist, plaćamo njegove naknade i nadoknađujemo vam razumne troškove; ako odluči u našu korist, ne plaćate naše pristojbe ni troškove, osim ako tijelo utvrdi da ste očito postupali u zloj vjeri." },
       { kind: "p", text: "Kontakt s osobom. Naš pomoćnik za podršku sustav je umjetne inteligencije i tako se predstavlja. U bilo kojem trenutku možete zatražiti razgovor s osobom i svaki razgovor s podrškom nudi tu mogućnost. U komunikaciji s vama ne oslanjamo se samo na automatizirane alate." },
+      { kind: "p", text: "Teroristički sadržaj. Teroristički sadržaj nezakonit je i nije dopušten na DebateAI-ju (odjeljak 7.). Nadležna tijela u Europskoj uniji mogu nam slati naloge za uklanjanje prema Uredbi (EU) 2021/784 na kontaktnu točku navedenu u odjeljku 1. Kada primimo takav nalog, uklanjamo sadržaj ili onemogućujemo pristup tom sadržaju u svim državama EU-a u roku od jednog sata. Osobu koja je sadržaj objavila obavještavamo da je uklonjen te, na njezin zahtjev, zašto i kako može osporiti nalog, osim ako tijelo odluči da javna sigurnost zahtijeva šutnju tijekom ograničenog razdoblja. Kako Uredba zahtijeva, uklonjeni sadržaj i povezane podatke čuvamo šest mjeseci, kako bi uklanjanje moglo biti preispitano i, ako je bilo pogrešno, poništeno. Osoba koja je sadržaj objavila može osporiti nalog pred sudovima države čije ga je tijelo izdalo, a može se i koristiti našim postupkom za pritužbe. Nijedno tijelo od nas nije zahtijevalo poduzimanje posebnih mjera protiv terorističkog sadržaja na temelju Uredbe; ako to učini, te ćemo mjere ovdje opisati, uključujući sve automatizirane alate." },
       { kind: "p", text: "Ozbiljna opasnost za život ili sigurnost. Ako saznamo za informacije koje upućuju na kazneno djelo koje uključuje prijetnju nečijem životu ili sigurnosti, obavještavamo nadležna tijela." }
     ]
   },
@@ -177,7 +180,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Suspenzija i prestanak",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "S vaše strane. Račun možete zatvoriti u bilo kojem trenutku putem Postavki, kako je opisano u odjeljku 6. Ne morate navesti razlog." },
+      { kind: "p", text: "S vaše strane. Račun možete zatvoriti u bilo kojem trenutku putem Postavki, kako je opisano u odjeljku 6. Ne morate navesti razlog. Zatvaranjem računa ovi Uvjeti prestaju vrijediti. Prestaju vrijediti u trenutku kada zatvaranje stupi na snagu, nakon razdoblja odgode od 7 dana; odjeljci navedeni na kraju ovog odjeljka nastavljaju se primjenjivati i nakon toga." },
       { kind: "p", text: "S naše strane. Vaš račun možemo suspendirati ili zatvoriti, odnosno ukloniti ili ograničiti vaš sadržaj, ako: bitno prekršite ove Uvjete, osobito odjeljak 7.; vaš je sadržaj nezakonit ili zakon, sud ili nadležno tijelo zahtijeva naše postupanje; vaša uporaba ugrožava sigurnost, cjelovitost ili dostupnost usluge ili prava drugih osoba; vaš račun nije bio aktivan [24 months] i o tome smo vas obavijestili; ili prestanemo pružati uslugu u cijelosti ili u vašoj državi." },
       { kind: "p", text: "Osim ako je povreda ozbiljna, zakon zahtijeva neposredno postupanje ili bi odgoda prouzročila štetu, obavijestit ćemo vas o problemu i dati vam razumnu priliku da ga otklonite prije suspenzije ili zatvaranja računa. Uvijek dajemo obrazloženje u skladu s odjeljkom 10., a vi možete osporiti odluku." },
       { kind: "p", text: "Ako u cijelosti ukinemo uslugu ili je povučemo iz vaše države, obavijestit ćemo vas najmanje 30 dana unaprijed, vratiti svaki unaprijed plaćeni iznos za razdoblje nakon ukidanja i najprije omogućiti izvoz vaših rasprava." },
@@ -274,7 +277,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Odvojivost. Ako se utvrdi da je bilo koja odredba ovih Uvjeta neizvršiva, ta se odredba ne primjenjuje, a ostatak Uvjeta ostaje na snazi." },
       { kind: "p", text: "Neodricanje. Ako neku odredbu ne provedemo odmah, ne gubimo pravo provesti je poslije." },
       { kind: "p", text: "Cjelokupan ugovor. Ovi Uvjeti, zajedno s Pravilima o kolačićima i Registrom pružatelja usluga umjetne inteligencije, čine cjelokupan sporazum između nas o usluzi. Obvezuju nas obveze koje preuzmemo u Pravilima o privatnosti. Ništa u ovom stavku ne isključuje odgovornost za prijevarno lažno prikazivanje." },
-      { kind: "p", text: "Jezik. Ovi su Uvjeti objavljeni na engleskom jeziku [and Romanian]. [State which version prevails for which users; Annex A notes where a local language is required.]" },
+      { kind: "p", text: "Jezik. Ovi Uvjeti objavljeni su na svim jezicima koje nudi mrežno mjesto. Ugovor je sklopljen na jeziku na kojem ste se registrirali: jeziku verzije koju ste prihvatili, a koji bilježi naš zapis o prihvaćanju. Ako kasnije prihvatite novu verziju na drugom jeziku, ugovor se nastavlja na tom jeziku. Druge jezične verzije prijevodi su. Kada pravo države u kojoj živite propisuje da prevladava verzija na njezinu vlastitom jeziku, prevladava ta verzija. Ako se dvije jezične verzije razlikuju, primjenjujemo značenje koje je za vas povoljnije." },
       { kind: "p", text: "Kontakt. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bukurešt, Rumunjska." }
     ]
   },
@@ -307,6 +310,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Sjedinjene Američke Države (samo ako su navedene u odjeljku 2.)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Ne nudimo DebateAI osobama koje žive u Tennesseeju." },
       { kind: "p", text: "Sporazum o arbitraži i odricanje od skupne tužbe. Ako živite u Sjedinjenim Američkim Državama, vi i DebateAIRO suglasni ste da ćete svaki spor koji proizlazi iz ovih Uvjeta ili usluge rješavati obvezujućom pojedinačnom arbitražom koju vodi [the American Arbitration Association / JAMS] prema svojim pravilima za potrošače, umjesto pred sudom, osim što svatko od nas može podnijeti pojedinačni zahtjev sudu za sporove male vrijednosti. Možete se izuzeti slanjem e-poruke na [address] u roku od 30 dana od prvog prihvaćanja ovih Uvjeta. Ovaj je sporazum uređen Saveznim zakonom o arbitraži. Mi plaćamo pristojbe za pokretanje arbitraže. Skupne, kolektivne i predstavničke tužbe isključene su u mjeri dopuštenoj zakonom. Ovaj se odjeljak primjenjuje samo ubuduće i ne primjenjuje se na zahtjeve nastale prije nego što ste ga prihvatili." },
       { kind: "p", text: "Obavijesti i uklanjanja. Intimne snimke objavljene bez privole mogu se prijaviti na [URL] bez računa i uklanjaju se u roku od 48 sati od valjanog zahtjeva. Pritužbe zbog autorskih prava upućuju se našem imenovanom zastupniku navedenom u odjeljku 16." },
       { kind: "p", text: "Posebno po saveznim državama. Kalifornija: primjenjuju se uvjeti automatskog obnavljanja iz odjeljka 12.; u bilo kojem trenutku možete otkazati putem interneta; vašu privolu na uvjete obnavljanja čuvamo najmanje tri godine. New York: možete otkazati u roku od 14 dana od svakog terećenja po povećanoj cijeni i dobiti razmjerni povrat. Teksas i Nebraska: ne prodajemo osjetljive osobne podatke. Washington: na zdravstvene podatke primjenjuje se naša Obavijest o privatnosti zdravstvenih podataka potrošača na [URL]. Colorado: ništa u usluzi ne donosi odluke koje imaju znatan učinak na vas. Vaše podatke i vaša prava na privatnost prema zakonima vaše savezne države uređuje Prilog B.3 naših Pravila o privatnosti." }
@@ -381,7 +385,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "5a07a4b5220bee1b57b0427797daf22941931e91323cc10eb80c469919493742",
+  sha256: "fa90e67657dfbeade4c5ef227dff863a1fb649a1eea859b98246ceb59952965d",
   eyebrow: "UVJETI KORIŠTENJA · v2.1 · NA SNAZI OD [DATE]",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DebateAIRO S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",

@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Um motor de debate convida a perguntas sobre política, religião, saúde, sexualidade e crenças. Estas são categorias especiais de dados nos termos do artigo 9.º do RGPD e podem surgir nas suas perguntas, quer tenhamos ou não intenção de as recolher." },
-      { kind: "p", text: "Sobre si. Antes do seu primeiro debate, presta consentimento explícito, num ecrã separado, para tratarmos as informações sensíveis que decida incluir nas suas próprias perguntas, com a finalidade de executar os seus debates. Registamos a versão do texto que aceitou, o seu idioma e o momento em que o fez. Sem este consentimento, não pode iniciar um debate. Pode retirá-lo a qualquer momento escrevendo para privacy@dezbatere.ro. Também pode omitir essas informações ou eliminar um debate que as contenha. Aquilo que publica sobre si são dados que decidiu tornar públicos." },
+      { kind: "p", text: "Sobre si. Antes do seu primeiro debate, presta consentimento explícito, num ecrã separado, para tratarmos as informações sensíveis que decida incluir nas suas próprias perguntas, com a finalidade de executar os seus debates. Registamos a versão do texto que aceitou, o seu idioma e o momento em que o fez. Sem este consentimento, não pode iniciar um debate. Pode retirá-lo a qualquer momento encerrando a sua conta nas Definições. Também pode omitir essas informações ou eliminar um debate que as contenha. Aquilo que publica sobre si são dados que decidiu tornar públicos." },
       { kind: "p", text: "Sobre outras pessoas. Nenhuma condição legal nos permite tratar dados sensíveis de um terceiro que mencione numa pergunta, e nenhum dos nossos fornecedores de IA dispõe igualmente de tal condição. É por isso que os Termos o proíbem, que minimizamos o que enviamos e que removemos rapidamente esse conteúdo mediante pedido — secção 11." },
       { kind: "p", text: "Informações de saúde. Alguns países tratam os dados relacionados com a saúde, incluindo inferências, ao abrigo de legislação específica. Se residir em [the State of Washington], aplica-se uma [Consumer Health Data Privacy Notice] separada." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Limitação (Art. 18) — Peça-nos que suspendamos o tratamento de determinados dados enquanto é resolvido um litígio relativo a esses dados",
         "Oposição (Art. 21) — Oponha-se ao tratamento baseado em interesses legítimos — o tratamento de segurança e auditoria da secção 4 — e cessaremos esse tratamento, salvo se demonstrarmos motivos imperiosos. Oponha-se ao marketing a qualquer momento, e cessá-lo-emos",
         "Portabilidade (Art. 20) — Os seus debates e dados da conta num formato de uso corrente e de leitura automática. [Pending: same export as Access.] O conteúdo não pessoal que criou, como as suas perguntas, é-lhe devolvido mediante pedido quando o contrato terminar",
-        "Retirada do consentimento (Art. 7(3)) — Retire o consentimento para marketing a partir de qualquer mensagem de correio eletrónico ou das Definições; retire o consentimento para dados sensíveis escrevendo para privacy@dezbatere.ro (também pode omitir esses dados ou eliminar um debate que os contenha). A retirada não afeta o tratamento que já ocorreu",
+        "Retirada do consentimento (Art. 7(3)) — Retire o consentimento para marketing a partir de qualquer mensagem de correio eletrónico ou das Definições; retire o consentimento para dados sensíveis encerrando a sua conta nas Definições (também pode omitir esses dados ou eliminar um debate que os contenha). A retirada não afeta o tratamento que já ocorreu",
         "Reclamação — À autoridade de controlo romena, a ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucareste, anspdcp@dataprotection.ro, ou à autoridade do país onde reside. Preferimos que nos contacte primeiro"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "ae6c3719c99af13795d5252513dff1706fa94c20aa79be0024e99251c8e4edd4",
+  sha256: "ebb7860bcc53f842b2d16e0dc3f0029d41321e835798db4fc714699a4fbd42e6",
   eyebrow: "POLÍTICA DE PRIVACIDADE · v3.2 · EM VIGOR DESDE [DATE]",
   title: "O que armazenamos e porquê",
   lede: "Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.",

@@ -9,14 +9,14 @@ import { DateOfBirthField, EMPTY_DOB } from '@/components/DateOfBirthField';
 import { EmailPendingScreen } from '@/components/auth/EmailPendingScreen';
 import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
 import { PhoneField } from '@/components/auth/PhoneField';
-import { InlineFieldMessage } from '@/components/auth/InlineFieldMessage';
+import { InlineFieldMessage, useFormAnnouncer } from '@/components/auth/InlineFieldMessage';
 import { TurnstileChallenge } from '@/components/auth/TurnstileChallenge';
 import { PrivacyPolicyModal } from '@/components/consent/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '@/components/consent/TermsOfServiceModal';
 import { useLegalDocument } from '@/components/consent/useLegalDocument';
 import { contractClient } from '@/lib/api';
 import { validateSignup, type SignupFieldErrors } from '@/lib/authFormValidation';
-import { resolveDobLocale, type DobLocale } from '@/lib/dob/dobLocale';
+import { dobErrorMessage, resolveDobLocale, type DobLocale } from '@/lib/dob/dobLocale';
 import { useChromeI18n } from '@/lib/i18n/I18nProvider';
 import { catalogLocale } from '@/lib/i18n/locales';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
@@ -104,6 +104,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     const privacyInputRef = useRef<HTMLInputElement | null>(null);
     const termsInputRef = useRef<HTMLInputElement | null>(null);
     const flight = useRef(false);
+    const announcer = useFormAnnouncer();
     const { locale } = useChromeI18n();
     const termsDocument = useLegalDocument('terms');
     const privacyDocument = useLegalDocument('privacy');
@@ -137,6 +138,9 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         if (Object.keys(checked).length) {
             const selector = checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : checked.password ? '[name=password]' : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy-accepted]' : '[name=terms-accepted]';
             form.querySelector<HTMLElement>(selector)?.focus();
+            // The first error, in the order focus takes; a date of birth says what its own field says.
+            const first = checked.email ?? checked.phone ?? checked.password ?? (checked.dateOfBirth === undefined ? checked.privacy ?? checked.terms : undefined);
+            announcer.announce(first !== undefined ? t(catalog, first) : dateCheck.code !== 'ok' ? dobErrorMessage(catalog, dateCheck.code, dobLocale.order) : t(catalog, "auth.dob.underAge"));
             return;
         }
         if (declaredRegion === null) return;
@@ -185,7 +189,9 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 setError(t(catalog, "auth.signUp.documentsUpdated"));
                 return;
             }
-            setError(failure instanceof ContractHttpError && ['COUNTRY_SIGNUP_UNAVAILABLE', 'COUNTRY_UNKNOWN', 'TOR_REFUSED'].includes(failure.serverCode ?? '') ? t(catalog, "auth.signUp.countryUnavailable") : t(catalog, "auth.signUp.creationFailed"));
+            const code = failure instanceof ContractHttpError ? failure.serverCode ?? '' : '';
+            setError(code === 'STATE_SIGNUP_UNAVAILABLE' ? t(catalog, "auth.signUp.stateUnavailable")
+                : ['COUNTRY_SIGNUP_UNAVAILABLE', 'COUNTRY_UNKNOWN', 'TOR_REFUSED'].includes(code) ? t(catalog, "auth.signUp.countryUnavailable") : t(catalog, "auth.signUp.creationFailed"));
         }
         finally {
             setProof(null);
@@ -210,13 +216,17 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         setTermsOpen(false);
         edit('terms');
     }
+    const submitHint = [
+        ...(declaredRegion === null ? [t(catalog, "auth.signUp.regionHint")] : []),
+        ...(!privacyAccepted || !termsAccepted ? [t(catalog, "auth.signUp.consentHint")] : [])
+    ];
     if (refused)
         return <AgeRefusal catalog={catalog}/>;
     if (submittedEmail !== null)
         return <EmailPendingScreen email={submittedEmail} retryAfterSeconds={retryAfterSeconds} client={{ resendVerification: client.resendVerification ?? contractClient.resendVerification }} catalog={catalog} locale={locale} turnstile={turnstile} onDifferentEmail={() => setSubmittedEmail(null)}/>;
     return <AuthShell eyebrow={t(catalog, "auth.signUp.eyebrow")} title={t(catalog, "auth.signUp.title")} description={t(catalog, "auth.signUp.description")} footer={null}>
- {error ? <div className="authAlert" role="alert">{error}</div> : null}{documentsStale ? <button type="button" onClick={reloadPage}>{t(catalog, "auth.signUp.reloadDocuments")}</button> : null}
- <SocialProviderButtons client={client} catalog={catalog}/>
+ {error ? <div className="authAlert" role="alert">{error}</div> : null}{documentsStale ? <button type="button" className="authSecondary" onClick={reloadPage}>{t(catalog, "auth.signUp.reloadDocuments")}</button> : null}
+ <div className="authAltMethods"><SocialProviderButtons client={client} catalog={catalog}/></div>
  <form className="authForm" data-form="signup" noValidate method="post" action="/sign-up" aria-busy={busy} onSubmit={submitRegistration}>
  <div className="authField"><label htmlFor="signup-email">{t(catalog, "auth.email")}</label><input id="signup-email" name="email" type="email" autoComplete="username" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={e => {
             setEmail(e.target.value);
@@ -226,10 +236,10 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             setPhone(raw);
             edit('phone');
         }} error={fieldError('phone')} disabled={busy}/>
- <div className="authField"><label htmlFor="signup-password">{t(catalog, "auth.password")}</label><input id="signup-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={password} onChange={e => {
+ <div className="authField"><label htmlFor="signup-password">{t(catalog, "auth.password")}</label><div className="authInputRow"><input id="signup-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={password} onChange={e => {
             setPassword(e.target.value);
             edit('password');
-        }} required disabled={busy} aria-invalid={!!errors.password || undefined} aria-describedby={errors.password ? 'signup-password-error' : 'signup-password-hint'}/><button type="button" aria-controls="signup-password" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? t(catalog, "auth.password.hide") : t(catalog, "auth.password.show")}</button><p id="signup-password-hint">{t(catalog, "auth.signUp.passwordInvalid")}</p><InlineFieldMessage id="signup-password-error" message={fieldError('password')}/></div>
+        }} required disabled={busy} aria-invalid={!!errors.password || undefined} aria-describedby={errors.password ? 'signup-password-error' : 'signup-password-hint'}/><button type="button" className="authInlineToggle" aria-controls="signup-password" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? t(catalog, "auth.password.hide") : t(catalog, "auth.password.show")}</button></div><p className="authFieldHint" id="signup-password-hint">{t(catalog, "auth.signUp.passwordInvalid")}</p><InlineFieldMessage id="signup-password-error" message={fieldError('password')}/></div>
  <RegionField catalog={catalog} locale={locale} value={region} onChange={setRegion} disabled={busy}/>
  <div className="authField"><DateOfBirthField catalog={catalog} locale={dobLocale} value={dateOfBirth} error={dateOfBirthError} onChange={next => {
             setDateOfBirth(next);
@@ -244,8 +254,12 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 setProof(null);
                 setError(t(catalog, "auth.pending.proofUnavailable"));
             }}/> : null}
- <button className="authPrimary" type="submit" disabled={busy || declaredRegion === null || !privacyAccepted || !termsAccepted || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth))}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
+ {/* Owner ruling V-18 (R17) keeps Create account disabled until a region is chosen and both boxes are
+     ticked; the hint says which of those is still missing (auth UI repair, 2026-10-09). */}
+ <button className="authPrimary" type="submit" aria-describedby={submitHint.length ? 'signup-submit-hint' : undefined} disabled={busy || declaredRegion === null || !privacyAccepted || !termsAccepted || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth))}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
+ {submitHint.length ? <p className="authFieldHint" id="signup-submit-hint">{submitHint.join(' ')}</p> : null}
  <p className="authPanelFooter">{t(catalog, "auth.signUp.alreadyHaveOne")} <a href={loginHref}>{t(catalog, "auth.signUp.logIn")}</a></p>
+ {announcer.region}
  </form>
  {policyOpen ? <PrivacyPolicyModal open mode="consent" onClose={() => {
                 setPrivacyAccepted(privacyInputRef.current?.checked ?? false);

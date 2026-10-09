@@ -13,17 +13,19 @@ import { retainSocialStepUp } from '@/lib/socialStepUpHandoff';
 import { safeSocialReturnPath } from '@/lib/returnPath';
 import { takeFragmentToken } from '@/lib/mfaEnrollment';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
+import { readSixDigitCode, sixDigitCodeToSend } from '@/lib/sixDigitCode';
 import { validateSignup, type SignupFieldErrors } from '@/lib/authFormValidation';
 import type { TurnstilePublicConfig } from '@/lib/turnstile';
 import { TurnstileChallenge } from './TurnstileChallenge';
 import { EmailPendingScreen } from './EmailPendingScreen';
 import { SecurityEnrollment } from './SecurityEnrollment';
+import { LockoutPrompt } from './LockoutPrompt';
 import { PhoneField } from './PhoneField';
-import { InlineFieldMessage } from './InlineFieldMessage';
+import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
 import { EphemeralCodes } from './EphemeralCodes';
 import { RegionField, EMPTY_REGION_PICK, type RegionPick } from '../RegionField';
 import { DateOfBirthField, EMPTY_DOB } from '../DateOfBirthField';
-import { resolveDobLocale } from '@/lib/dob/dobLocale';
+import { dobErrorMessage, resolveDobLocale } from '@/lib/dob/dobLocale';
 import { AuthShell } from '../AuthShell';
 import authEnglish from '@/messages/en/auth.json';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
@@ -72,6 +74,12 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [busy, setBusy] = useState(true);
     const [code, setCode] = useState('');
     const [recoveryMode, setRecoveryMode] = useState(false);
+    // Set by a submit that did not hold exactly six digits; any edit clears it.
+    const [codeIncomplete, setCodeIncomplete] = useState(false);
+    const codeField = useRef<HTMLInputElement>(null);
+    // One live region per form: says the first error of a failed submit (review fix, 2026-10-09).
+    const signupAnnouncer = useFormAnnouncer();
+    const codeAnnouncer = useFormAnnouncer();
     const [proof, setProof] = useState<string | null>(null);
     const [reset, setReset] = useState(0);
     const [pending, setPending] = useState<string | null>(null);
@@ -81,6 +89,9 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [stepUpStatus, setStepUpStatus] = useState<SocialStepUpStatusResponse | null>(null);
     const [flowExpiry, setFlowExpiry] = useState<string | null>(null);
     const [authenticated, setAuthenticated] = useState(false);
+    // Set once this flow's own MFA set-up has signed the person in: the "don't get locked out" card comes first,
+    // still under the set-up heading (the flow's kind is cleared by then).
+    const [secured, setSecured] = useState(false);
     const [privacyAccepted, setPrivacyAccepted] = useState(false);
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [policyOpen, setPolicyOpen] = useState(false);
@@ -191,7 +202,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         }, Math.max(0, Date.parse(flowExpiry) - Date.now()));
         return () => clearTimeout(timer);
     }, [flowExpiry, token, browser, catalog]);
-    function finish(result: AuthenticationResponse, sessionAlreadyAnnounced = false) {
+    function finish(result: AuthenticationResponse, sessionAlreadyAnnounced = false, enrolled = false) {
         if (result.status !== 'authenticated')
             return;
         if (!sessionAlreadyAnnounced) { clearStoredSupportConversation(); announceSessionChange(); }
@@ -201,6 +212,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         setAuthenticated(true);
         if (result.replacement_recovery_code)
             setBackup(result.replacement_recovery_code);
+        else if (enrolled)
+            setSecured(true);
         else
             navigateAuthenticated();
     }
@@ -228,6 +241,9 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         setErrors(checked);
         if (Object.keys(checked).length) {
             form.querySelector<HTMLElement>(checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy]' : '[name=terms]')?.focus();
+            // The first error, in the order focus takes; the date of birth says what its own field says.
+            const first = checked.email ?? checked.phone ?? (checked.dateOfBirth === undefined ? checked.privacy ?? checked.terms : undefined);
+            signupAnnouncer.announce(first !== undefined ? t(catalog, first) : dobErrorMessage(catalog, 'incomplete', resolveDobLocale(uiLocale).order));
             return;
         }
         if (declaredRegion === null) return;
@@ -264,7 +280,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         catch (failure) {
             if (dispatched.current && ownedKind !== 'stepup' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             if (owns(owner, ownedToken, ownedKind))
-                setError(t(catalog, "auth.signUp.creationFailed"));
+                setError(failure instanceof ContractHttpError && failure.serverCode === 'STATE_SIGNUP_UNAVAILABLE'
+                    ? t(catalog, "auth.signUp.stateUnavailable") : t(catalog, "auth.signUp.creationFailed"));
         }
         finally {
             if (owner === sequence.current) {
@@ -360,15 +377,16 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     if (pending)
         return <EmailPendingScreen email={pending} retryAfterSeconds={60} client={client} catalog={catalog} locale={uiLocale} turnstile={turnstile} onDifferentEmail={() => window.location.assign('/sign-up')}/>;
     const methods = kind === 'stepup' ? stepUpStatus?.available_methods ?? [] : loginStatus?.available_methods ?? [];
-    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
- {error ? <p role="alert">{error}</p> : null}
- {returnToQuestion && !stepUpResult && !backup ? <a href="/new">{t(catalog, 'auth.continue')}</a> : null}
- {backup ? <div><EphemeralCodes codes={[backup]} catalog={catalog}/><button type="button" onClick={() => {
+    const codeFormatError = !recoveryMode && (codeIncomplete || !readSixDigitCode(code).valid);
+    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' || secured ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
+ {error ? <div className="authAlert" role="alert">{error}</div> : null}
+ {returnToQuestion && !stepUpResult && !backup ? <a className="authPrimary" href="/new">{t(catalog, 'auth.continue')}</a> : null}
+ {backup ? <div><EphemeralCodes codes={[backup]} catalog={catalog}/><button type="button" className="authPrimary" onClick={() => {
                 setBackup(null);
                 if (authenticated)
                     navigateAuthenticated();
             }}>{t(catalog, "auth.continue")}</button></div> : null}
- {stepUpResult && !backup ? <div><p>{t(catalog, "auth.security.complete")}</p><button type="button" onClick={() => {
+ {stepUpResult && !backup ? <div className="recoveryStatus"><p>{t(catalog, "auth.security.complete")}</p><button type="button" className="authPrimary" onClick={() => {
                 const result = stepUpResult;
                 setStepUpResult(null);
                 if (onStepUp)
@@ -382,30 +400,44 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                 e.preventDefault();
                 void submitSignup(e.currentTarget);
             }} aria-busy={busy}>
- <label htmlFor="social-email">{t(catalog, "auth.email")}</label><input id="social-email" name="email" type="email" autoComplete="email" value={email} disabled={busy} onChange={e => setEmail(e.target.value)} aria-invalid={!!errors.email || undefined} aria-describedby={errors.email ? 'social-email-error' : undefined}/><InlineFieldMessage id="social-email-error" message={fieldError('email')}/>
+ <div className="authField"><label htmlFor="social-email">{t(catalog, "auth.email")}</label><input id="social-email" name="email" type="email" autoComplete="email" value={email} disabled={busy} onChange={e => setEmail(e.target.value)} aria-invalid={!!errors.email || undefined} aria-describedby={errors.email ? 'social-email-error' : undefined}/><InlineFieldMessage id="social-email-error" message={fieldError('email')}/></div>
  <PhoneField id="social-phone" catalog={catalog} value={phone} onChange={setPhone} error={fieldError('phone')} disabled={busy}/>
  <RegionField catalog={catalog} locale={chrome.locale} value={region} onChange={setRegion} disabled={busy}/>
  <DateOfBirthField catalog={catalog} locale={resolveDobLocale(uiLocale)} value={birth} onChange={setBirth} error={errors.dateOfBirth ? 'incomplete' : null} disabled={busy} minimumAgeMessage={t(catalog, "auth.dob.underAge")}/>
- <div><input name="privacy" type="checkbox" checked={privacyAccepted} disabled={busy} aria-labelledby="social-privacy-label" aria-invalid={!!errors.privacy || undefined} aria-describedby={errors.privacy ? "social-privacy-error" : undefined} onChange={() => privacyAccepted ? setPrivacyAccepted(false) : setPolicyOpen(true)}/><span id="social-privacy-label">{t(catalog, "auth.signUp.privacyAgreementPrefix")} <button type="button" onClick={() => setPolicyOpen(true)}>{t(catalog, "auth.signUp.privacyPolicy")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span><InlineFieldMessage id="social-privacy-error" message={fieldError('privacy')}/></div>
- <div><input name="terms" type="checkbox" checked={termsAccepted} disabled={busy} aria-labelledby="social-terms-label" aria-invalid={!!errors.terms || undefined} aria-describedby={errors.terms ? "social-terms-error" : undefined} onChange={() => termsAccepted ? setTermsAccepted(false) : setTermsOpen(true)}/><span id="social-terms-label">{t(catalog, "auth.signUp.termsAgreementPrefix")} <button type="button" onClick={() => setTermsOpen(true)}>{t(catalog, "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span><InlineFieldMessage id="social-terms-error" message={fieldError('terms')}/></div>
+ <div className="consentGroup"><div className="consentRow"><input className="consentBox" name="privacy" type="checkbox" checked={privacyAccepted} disabled={busy} aria-labelledby="social-privacy-label" aria-invalid={!!errors.privacy || undefined} aria-describedby={errors.privacy ? "social-privacy-error" : undefined} onChange={() => privacyAccepted ? setPrivacyAccepted(false) : setPolicyOpen(true)}/><span className="consentText" id="social-privacy-label">{t(catalog, "auth.signUp.privacyAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={() => setPolicyOpen(true)}>{t(catalog, "auth.signUp.privacyPolicy")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="social-privacy-error" message={fieldError('privacy')}/>
+ <div className="consentRow"><input className="consentBox" name="terms" type="checkbox" checked={termsAccepted} disabled={busy} aria-labelledby="social-terms-label" aria-invalid={!!errors.terms || undefined} aria-describedby={errors.terms ? "social-terms-error" : undefined} onChange={() => termsAccepted ? setTermsAccepted(false) : setTermsOpen(true)}/><span className="consentText" id="social-terms-label">{t(catalog, "auth.signUp.termsAgreementPrefix")} <button type="button" className="consentPolicyLink" onClick={() => setTermsOpen(true)}>{t(catalog, "auth.signUp.termsOfService")}</button>{t(catalog, "auth.signUp.privacyAgreementSuffix")}</span></div><InlineFieldMessage id="social-terms-error" message={fieldError('terms')}/></div>
  {turnstile ? <TurnstileChallenge siteKey={turnstile.siteKey} nonce={turnstile.nonce} action="signup" locale={uiLocale} resetKey={reset} onToken={setProof} onError={() => {
                     setProof(null);
                     setError(t(catalog, "auth.pending.proofUnavailable"));
-                }}/> : null}<button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form> : null}
- {token && kind === 'enroll' ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'pending', token }} onAuthenticated={result => finish(result, true)}/> : null}
+                }}/> : null}<button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button>{signupAnnouncer.region}</form> : null}
+ {token && kind === 'enroll' ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'pending', token }} onAuthenticated={result => finish(result, true, true)}/> : null}
+ {secured ? <LockoutPrompt catalog={catalog} client={client} onDone={navigateAuthenticated}/> : null}
  {token && (kind === 'login' || kind === 'stepup') ? <div>
- {methods.includes('passkey') ? <button type="button" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button> : null}
- {methods.includes('totp') || methods.includes('recovery_code') ? <><form method="post" action="/social/complete" noValidate onSubmit={e => {
+ {methods.includes('passkey') ? <div className="authAltMethods"><button type="button" className="authSecondary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button></div> : null}
+ {methods.includes('totp') || methods.includes('recovery_code') ? <><form className="authForm authMfaForm" method="post" action="/social/complete" noValidate onSubmit={e => {
                     e.preventDefault();
-                    void submitCode(code);
-                }}><label htmlFor="social-code">{recoveryMode ? t(catalog, "auth.login.recoveryCodeLabel") : t(catalog, "auth.login.authenticationCodeLabel")}</label>{!recoveryMode ? <p id="social-code-help">{t(catalog, 'auth.login.authenticatorInstruction')}</p> : null}<input aria-describedby={!recoveryMode ? 'social-code-help' : undefined} id="social-code" name="code" autoComplete="one-time-code" inputMode={recoveryMode ? 'text' : 'numeric'} maxLength={recoveryMode ? 128 : 6} value={code} disabled={busy} onChange={e => {
-                    const value = recoveryMode ? e.target.value : e.target.value.replace(/\D/g, '').slice(0, 6);
+                    const digits = recoveryMode ? code : sixDigitCodeToSend(code);
+                    if (digits === null) {
+                        setCodeIncomplete(true);
+                        codeField.current?.focus();
+                        codeAnnouncer.announce(t(catalog, "auth.login.codeFormat"));
+                        return;
+                    }
+                    void submitCode(digits);
+                }}><div className="authField"><label htmlFor="social-code">{recoveryMode ? t(catalog, "auth.login.recoveryCodeLabel") : t(catalog, "auth.login.authenticationCodeLabel")}</label>{!recoveryMode ? <p className="authFieldHint" id="social-code-help">{t(catalog, 'auth.login.authenticatorInstruction')}</p> : null}<input ref={codeField} className={recoveryMode ? 'authRecoveryInput' : undefined} aria-invalid={codeFormatError || undefined} aria-describedby={[!recoveryMode ? 'social-code-help' : '', codeFormatError ? 'social-code-error' : ''].filter(Boolean).join(' ') || undefined} id="social-code" name="code" autoComplete="one-time-code" inputMode={recoveryMode ? 'text' : 'numeric'} maxLength={recoveryMode ? 128 : undefined} value={code} disabled={busy} onChange={e => {
+                    // Exactly six digits (spaces and dashes ignored); a longer paste is shown and refused, never cut.
+                    const typed = readSixDigitCode(e.target.value);
+                    const value = recoveryMode || !typed.valid ? e.target.value : typed.digits;
                     if (value !== code)
                         attempt.current.edited();
                     setCode(value);
-                    if (!recoveryMode && value.length === 6)
-                        void submitCode(value);
-                }}/><button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form>{methods.includes('recovery_code') && methods.includes('totp') ? <button type="button" disabled={completing} onClick={() => {
+                    setCodeIncomplete(false);
+                    // Said once when the field turns invalid (a letter typed), not on every further key.
+                    if (!recoveryMode && !typed.valid && !codeFormatError)
+                        codeAnnouncer.announce(t(catalog, "auth.login.codeFormat"));
+                    if (!recoveryMode && typed.complete)
+                        void submitCode(typed.digits);
+                }}/><InlineFieldMessage id="social-code-error" message={codeFormatError ? t(catalog, "auth.login.codeFormat") : null}/></div><button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button>{codeAnnouncer.region}</form>{methods.includes('recovery_code') && methods.includes('totp') ? <button type="button" className="authTextButton" disabled={completing} onClick={() => {
                         if (dispatched.current) return;
                         sequence.current++;
                         browser.cancel();
@@ -417,10 +449,11 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                         setError(null);
                         setRecoveryMode(!recoveryMode);
                         setCode('');
+                        setCodeIncomplete(false);
                         attempt.current.edited();
                     }}>{recoveryMode ? t(catalog, "auth.login.useAuthenticatorCode") : t(catalog, "auth.login.useRecoveryCode")}</button> : null}</> : null}
  </div> : null}
- {!token && !stepUpResult && !backup && !busy ? <a href="/login">{t(catalog, "auth.login.backToSignIn")}</a> : null}
+ {!token && !stepUpResult && !backup && !busy && !secured ? <a href="/login">{t(catalog, "auth.login.backToSignIn")}</a> : null}
  {policyOpen ? <PrivacyPolicyModal open mode="consent" onClose={() => setPolicyOpen(false)} onAcknowledge={() => {
                 setPrivacyAccepted(true);
                 setPolicyOpen(false);

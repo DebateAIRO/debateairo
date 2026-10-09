@@ -110,6 +110,8 @@
   "newDebate.legalGate.signOut": "Oħroġ mill-kont",
   "newDebate.legalGate.signOutFailed": "Il-ħruġ mill-kont ma tlestiex. Jekk jogħġbok erġa’ pprova.",
   "newDebate.room.locationBlocked": "Ma jistgħux jinbdew dibattiti ġodda mill-post fejn tinsab bħalissa. Id-dibattiti tiegħek jibqgħu disponibbli biex taqrahom.",
+  "newDebate.room.previewTeamOnly": "Id-dibattiti f’din il-verżjoni preliminari huma miftuħa għat-tim biss.",
+  "newDebate.room.phoneRequired": "Jekk jogħġbok, żid numru tat-telefon fl-Issettjar, jew erġa’ pprova fi ftit minuti.",
   "newDebate.room.siteFull": "Il-limitu tal-lum intlaħaq. Xorta tista’ tistaqsi — id-dibattitu tiegħek jibda waħdu meta l-limitu jerġa’ jibda.",
   "newDebate.room.siteClose": "Qed toqrob il-limitu tal-lum. Dan id-dibattitu xorta jsir kollu; dawk ta’ wara jistgħu jistennew sakemm il-limitu jerġa’ jibda.",
   "newDebate.room.alreadyWaiting": "Mistoqsija waħda biss tista’ tistenna kull darba. Tiegħek tibda fi {time}; staqsi din wara dak il-ħin.",

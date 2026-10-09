@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Systém na debaty podnecuje otázky o politike, náboženstve, zdraví, sexualite a presvedčení. Podľa článku 9 GDPR ide o osobitné kategórie údajov, ktoré sa môžu objaviť vo vašich otázkach bez ohľadu na to, či ich zamýšľame zhromažďovať." },
-      { kind: "p", text: "O vás. Pred svojou prvou debatou udeľujete na samostatnej obrazovke výslovný súhlas so spracúvaním citlivých informácií, ktoré sa rozhodnete uviesť vo vlastných otázkach, na účely uskutočnenia vašich debát. Zaznamenávame verziu znenia, s ktorým ste súhlasili, váš jazyk a čas. Bez tohto súhlasu nemôžete začať debatu. Súhlas môžete kedykoľvek odvolať napísaním na privacy@dezbatere.ro. Takéto informácie môžete tiež neuviesť alebo odstrániť debatu, ktorá ich obsahuje. Informácie, ktoré o sebe zverejníte, sú údaje, ktoré ste sa rozhodli sprístupniť verejnosti." },
+      { kind: "p", text: "O vás. Pred svojou prvou debatou udeľujete na samostatnej obrazovke výslovný súhlas so spracúvaním citlivých informácií, ktoré sa rozhodnete uviesť vo vlastných otázkach, na účely uskutočnenia vašich debát. Zaznamenávame verziu znenia, s ktorým ste súhlasili, váš jazyk a čas. Bez tohto súhlasu nemôžete začať debatu. Súhlas môžete kedykoľvek odvolať odstránením účtu v Nastaveniach. Takéto informácie môžete tiež neuviesť alebo odstrániť debatu, ktorá ich obsahuje. Informácie, ktoré o sebe zverejníte, sú údaje, ktoré ste sa rozhodli sprístupniť verejnosti." },
       { kind: "p", text: "O iných osobách. Žiadna právna podmienka nám neumožňuje spracúvať citlivé údaje o tretej osobe, ktorú uvediete v otázke, a takú podmienku nemá ani žiadny z našich poskytovateľov umelej inteligencie. Preto to podmienky zakazujú, preto minimalizujeme odosielané údaje a preto takýto obsah na požiadanie rýchlo odstránime — pozri časť 11." },
       { kind: "p", text: "Informácie o zdraví. Niektoré krajiny upravujú údaje súvisiace so zdravím vrátane odvodených záverov osobitnými zákonmi. Ak žijete v [the State of Washington], uplatňuje sa samostatné [Consumer Health Data Privacy Notice]." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Obmedzenie (Art. 18) — Môžete nás požiadať, aby sme prestali spracúvať konkrétne údaje, kým sa nevyrieši spor o ne",
         "Námietka (Art. 21) — Môžete namietať proti spracúvaniu založenému na oprávnených záujmoch — bezpečnostnému a auditnému spracúvaniu podľa časti 4 — a my ho zastavíme, ak nepreukážeme závažné dôvody. Proti marketingu môžete namietať kedykoľvek a my ho zastavíme",
         "Prenosnosť (Art. 20) — Vaše debaty a údaje účtu v bežne používanom, strojovo čitateľnom formáte. [Pending: same export as Access.] Neosobný obsah, ktorý ste vytvorili, napríklad vaše otázky, vám na požiadanie vrátime po skončení zmluvy",
-        "Odvolanie súhlasu (Art. 7(3)) — Marketingový súhlas môžete odvolať v ktoromkoľvek e-maile alebo v Nastaveniach; súhlas s citlivými údajmi odvoláte napísaním na privacy@dezbatere.ro (také údaje tiež nemusíte uviesť alebo môžete odstrániť debatu, ktorá ich obsahuje). Odvolanie nemá vplyv na spracúvanie, ktoré sa už uskutočnilo",
+        "Odvolanie súhlasu (Art. 7(3)) — Marketingový súhlas môžete odvolať v ktoromkoľvek e-maile alebo v Nastaveniach; súhlas s citlivými údajmi odvoláte odstránením účtu v Nastaveniach (také údaje tiež nemusíte uviesť alebo môžete odstrániť debatu, ktorá ich obsahuje). Odvolanie nemá vplyv na spracúvanie, ktoré sa už uskutočnilo",
         "Sťažnosť — Rumunskému dozornému orgánu ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukurešť, anspdcp@dataprotection.ro, alebo orgánu v krajine, v ktorej žijete. Uprednostňujeme, aby ste sa najskôr obrátili na nás"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "70834ed1ea96833efc5861923a207d916cb049c2564dbc2c98c5e817fa4b1994",
+  sha256: "b3f25b035919fbace0c8e48abc3979c7f07509e8cb978537f8c38d31fd754dd4",
   eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.2 · ÚČINNÉ OD [DATE]",
   title: "Čo uchovávame a prečo",
   lede: "Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.",

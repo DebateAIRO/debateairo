@@ -29,6 +29,7 @@ aa15f4e9e63d2fab63b6c8d103802b42051b41d3:dialectical-engine/tests/unit/billing-c
 01c65bdcf0936adddf3d0c0c81c8eb1b30674a29:dialectical-engine/tests/support/auth106.ts:generic-api-key:6
 # non-secret immutable migration SHA256 guard; Current hashes map entry for 0106_known_password_mfa_recovery.sql equals SHA256 of current tracked SQL bytes; seedInstalledAuth106 computes SHA256 and refuses source drift. No credential consumer.
 01c65bdcf0936adddf3d0c0c81c8eb1b30674a29:dialectical-engine/tests/support/auth106.ts:generic-api-key:8
+# The 14 fingerprints below cover files moved out of the repo on 2026-10-09; they can be dropped after the planned history rewrite.
 # non-secret session-duration prose; Redacted finding context is optional recovery, passkey-or-TOTP,[REDACTED] sessions, Turnstile. Current line54 is prose describing14-day idle/30-day absolute session lifetimes; no credential literal or assignment.
 39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/final-report.md:generic-api-key:54
 # non-secret source-file SHA256 inventory; Current sourceFiles map key packages/contract/src/consumer-auth.ts has a64-hex digest. It differs from current file bytes; this diagnosis does not treat the historical profile as current. Timing/cause of the difference was not established; no historical blob was read.
@@ -59,3 +60,11 @@ aa15f4e9e63d2fab63b6c8d103802b42051b41d3:dialectical-engine/tests/unit/billing-c
 39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:143
 # non-secret TypeScript variable assignment; Redacted finding context is let previousToken=firstToken,[REDACTED] mfa.beginTotp({enro... . Current line4259 assigns runtime fixture variables and awaits mfa.beginTotp; it has no string literal or embedded credential. Reported historical line4262 is not the current line.
 39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/tests/integration/registration-database.test.ts:generic-api-key:4262
+# 2026-10-09 — preview spending gate v2 tests (PR #86): generic-api-key matched the made-up fixture value written
+# as a test key; not a key. Owner's ruling on PR #86. The fixture now builds the value from pieces, so later edits
+# do not raise the same match.
+40f0edba2f2275cbd677d0677105540afd06065d:dialectical-engine/tests/unit/preview_budget_authority_fixture.py:generic-api-key:23
+# 2026-10-09 — preview lifecycle alert redaction tests (PR #97): generic-api-key matched the made-up token the
+# test builds to prove a secret cut at the examined-length limit is never shown. A made-up value, not a key.
+# Owner's ruling on PR #97. The test now builds the value from pieces, so later edits do not raise the same match.
+6b4484dbab1d74e7e613513bb44a44b4ae060cc2:dialectical-engine/tests/unit/preview-lifecycle-alert.test.ts:generic-api-key:246

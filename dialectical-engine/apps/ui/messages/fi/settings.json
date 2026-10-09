@@ -172,9 +172,11 @@
   "settings.security.title": "Turvallisuus",
   "settings.phone.reveal": "Näytä puhelinnumero",
   "settings.phone.change": "Vaihda puhelinnumero",
-  "settings.phone.required": "Lisää puhelinnumerosi jatkaaksesi. Kysymyksesi ja valintasi säilyvät.",
+  "settings.phone.purpose": "Myöhemmin voimme lähettää sinulle tekstiviestillä koodin, joka auttaa sinua pääsemään takaisin tilillesi, ja jos pyydät meiltä apua, voimme soittaa sinulle tai lähettää tekstiviestin. Tallennetaan salattuna; numeroa ei koskaan jaeta eikä käytetä markkinointiin.",
   "settings.security.lastPath": "Lisää toinen kirjautumistapa ennen tämän poistamista.",
+  "settings.security.remove": "Poista",
   "settings.security.codesRemaining": "Palautuskoodit: {count}",
   "settings.security.regenerate": "Luo uudet palautuskoodit",
+  "settings.security.lockoutReminder": "Sinulla ei ole vielä palautuskoodeja eikä pääsyavainta. Jos kadotat puhelimesi, pääset niiden avulla heti takaisin sisään.",
   "settings.security.refreshFailed": "Turvallisuustietoja ei voitu päivittää. Lataa sivu uudelleen."
 }

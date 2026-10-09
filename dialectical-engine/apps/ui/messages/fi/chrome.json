@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Tallentamamme evästeet",
   "chrome.security": "Turvallisuus",
   "chrome.logout": "Kirjaudu ulos",
+  "chrome.logIn": "Kirjaudu sisään",
   "chrome.accountError": "Toiminto epäonnistui. Lataa sivu uudelleen ja yritä uudestaan.",
   "chrome.footer.pricing": "Hinnat",
   "chrome.footer.cancel": "Peruuta tilaus",

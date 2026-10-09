@@ -49,6 +49,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Súkromie a ochrana osobných údajov — privacy@dezbatere.ro",
         "Hlásenie nezákonného obsahu — [abuse@dezbatere.ro] — pozri časť 10",
         "Kontaktné miesto pre orgány verejnej moci — [dsa@dezbatere.ro] — rumunčina a angličtina",
+        "Príkazy na odstránenie teroristického obsahu (nariadenie (EÚ) 2021/784) — [dsa@dezbatere.ro] — naše kontaktné miesto pre tieto príkazy; rumunčina a angličtina; pozri časť 10",
         "Zástupcovia v iných krajinách — Uvedení v prílohe A pre regióny, v ktorých sme zástupcu vymenovali"
         ]
       },
@@ -60,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kde službu DebateAI ponúkame",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Službu DebateAI ponúkame osobám, ktoré žijú v [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
+      { kind: "p", text: "Službu DebateAI ponúkame osobám, ktoré žijú v [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
     ]
   },
   {
@@ -166,9 +167,11 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Moderátorské rozhodnutia o obsahu a účtoch. Odstránenie alebo obmedzenie zverejnenej debaty či pozastavenie alebo odstránenie účtu je rozhodnutie, ktoré prijímame na základe týchto Podmienok alebo zákona. Na každom takomto rozhodnutí ovplyvňujúcom váš účet sa podieľa človek. Dôvody opisuje časť 11."
         ]
       },
-      { kind: "p", text: "Odôvodnenie. Vždy, keď odstránime váš obsah alebo obmedzíme jeho viditeľnosť či pozastavíme alebo odstránime váš účet, poskytneme vám odôvodnenie: čo sme urobili a v akom rozsahu, z akých skutočností sme vychádzali a či pochádzali z hlásenia alebo z našich vlastných kontrol, či boli použité automatizované prostriedky, aký bol právny alebo zmluvný dôvod a ako môžete rozhodnutie napadnúť." },
+      { kind: "p", text: "Odôvodnenie. Vždy, keď odstránime váš obsah alebo obmedzíme jeho viditeľnosť či pozastavíme alebo odstránime váš účet, poskytneme vám odôvodnenie: čo sme urobili a v akom rozsahu, z akých skutočností sme vychádzali a či pochádzali z hlásenia alebo z našich vlastných kontrol, či boli použité automatizované prostriedky, aký bol právny alebo zmluvný dôvod a ako môžete rozhodnutie napadnúť: prostredníctvom nášho postupu vybavovania sťažností nižšie, prostredníctvom orgánu mimosúdneho riešenia sporov certifikovaného podľa aktu EÚ o digitálnych službách alebo na súde." },
       { kind: "p", text: "Sťažnosť proti rozhodnutiu. Ak nesúhlasíte s moderátorským rozhodnutím, odpovedzte na odôvodnenie alebo napíšte na [appeals@dezbatere.ro] do šiestich mesiacov. Rozhodnutie preskúma osoba, ktorá sa na pôvodnom rozhodnutí nepodieľala, a výsledok vám oznámime s odôvodnením. Tým nie je dotknuté vaše právo obrátiť sa na súd alebo využiť alternatívne riešenie sporov podľa časti 18. Postup vybavovania sťažností prijíma aj sťažnosti na to, že sme hlásenie nevybavili, že bol obsah odstránený nesprávne, že bol účet nesprávne obmedzený alebo že automatizovaný nástroj nesprávne ovplyvnil váš obsah." },
+      { kind: "p", text: "Mimosúdne riešenie sporov. Ak sa nachádzate v Európskej únii, spor týkajúci sa niektorého z našich moderátorských rozhodnutí môžete predložiť orgánu mimosúdneho riešenia sporov certifikovanému podľa článku 21 aktu EÚ o digitálnych službách (nariadenie (EÚ) 2022/2065). Vzťahuje sa to na rozhodnutie o vašom obsahu alebo vašom účte, ako aj na naše rozhodnutie o hlásení, ktoré ste podali. Orgán si vyberiete zo zoznamu, ktorý zverejňuje Európska komisia na adrese digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, a nemusíte najprv využiť náš postup vybavovania sťažností. Na riešení sporu sa zúčastňujeme v dobrej viere a účasť odmietneme iba vtedy, ak sa už vyriešil ten istý spor týkajúci sa toho istého obsahu a založený na rovnakých dôvodoch. Rozhodnutie orgánu nie je záväzné pre žiadnu zo strán a právo obrátiť sa na súd vám zostáva zachované. Orgán vám môže účtovať nízky poplatok alebo žiadny. Ak rozhodne vo váš prospech, uhradíme jeho poplatky a nahradíme vaše primerané výdavky; ak rozhodne v náš prospech, neplatíte naše poplatky ani výdavky, pokiaľ orgán nezistí, že ste konali zjavne v zlej viere." },
       { kind: "p", text: "Kontakt s človekom. Náš asistent podpory je systém umelej inteligencie a túto skutočnosť uvádza. Kedykoľvek môžete požiadať o rozhovor s človekom a každý rozhovor s podporou túto možnosť ponúka. Pri komunikácii s vami sa nespoliehame výlučne na automatizované nástroje." },
+      { kind: "p", text: "Teroristický obsah. Teroristický obsah je nezákonný a na DebateAI nie je povolený (časť 7). Príslušné orgány v Európskej únii nám môžu zasielať príkazy na odstránenie podľa nariadenia (EÚ) 2021/784 na kontaktné miesto uvedené v časti 1. Keď príkaz dostaneme, obsah odstránime alebo k nemu znemožníme prístup vo všetkých krajinách EÚ do jednej hodiny. Osobu, ktorá obsah zverejnila, informujeme, že bol odstránený, a na jej žiadosť aj prečo a ako môže príkaz napadnúť, pokiaľ orgán nerozhodne, že verejná bezpečnosť vyžaduje, aby sme na obmedzený čas mlčali. Ako nariadenie vyžaduje, odstránený obsah a súvisiace údaje uchovávame počas šiestich mesiacov, aby bolo možné odstránenie preskúmať a, ak bolo chybné, zvrátiť. Osoba, ktorá obsah zverejnila, môže príkaz napadnúť na súdoch krajiny, ktorej orgán ho vydal, a môže tiež využiť náš postup vybavovania sťažností. Žiadny orgán nám doteraz neuložil prijať osobitné opatrenia proti teroristickému obsahu podľa tohto nariadenia; ak k tomu dôjde, tieto opatrenia tu opíšeme, vrátane prípadných automatizovaných nástrojov." },
       { kind: "p", text: "Vážne ohrozenie života alebo bezpečnosti. Ak sa dozvieme informácie nasvedčujúce trestnému činu spojenému s ohrozením života alebo bezpečnosti určitej osoby, informujeme príslušné orgány." }
     ]
   },
@@ -177,7 +180,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Pozastavenie a ukončenie",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Z vašej strany. Svoj účet môžete kedykoľvek odstrániť v Nastaveniach, ako opisuje časť 6. Nemusíte uvádzať dôvod." },
+      { kind: "p", text: "Z vašej strany. Svoj účet môžete kedykoľvek odstrániť v Nastaveniach, ako opisuje časť 6. Nemusíte uvádzať dôvod. Odstránením účtu tieto Podmienky zanikajú. Zanikajú vo chvíli, keď odstránenie nadobudne účinnosť, po uplynutí sedemdňovej ochrannej lehoty; časti uvedené na konci tejto časti zostávajú v platnosti aj potom." },
       { kind: "p", text: "Z našej strany. Váš účet môžeme pozastaviť alebo odstrániť či váš obsah odstrániť alebo obmedziť, ak: podstatne porušíte tieto Podmienky, najmä časť 7; je váš obsah nezákonný alebo nám zákon, súd či orgán ukladá konať; vaše používanie ohrozuje bezpečnosť, integritu alebo dostupnosť služby či práva iných osôb; váš účet nebol aktívny počas [24 months] a upozornili sme vás; alebo prestaneme službu poskytovať či ju prestaneme poskytovať vo vašej krajine." },
       { kind: "p", text: "S výnimkou prípadov, keď je porušenie závažné, zákon vyžaduje okamžité konanie alebo by omeškanie spôsobilo ujmu, vám oznámime, v čom problém spočíva, a pred pozastavením alebo odstránením účtu vám poskytneme primeranú príležitosť na nápravu. Vždy poskytneme odôvodnenie podľa časti 10 a rozhodnutie môžete napadnúť." },
       { kind: "p", text: "Ak službu úplne ukončíme alebo ju prestaneme poskytovať vo vašej krajine, upozorníme vás najmenej 30 dní vopred, vrátime vám prípadnú predplatenú sumu za obdobie po ukončení a predtým vám umožníme exportovať debaty." },
@@ -274,7 +277,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Oddeliteľnosť. Ak sa niektoré ustanovenie týchto Podmienok vyhlási za nevymáhateľné, toto ustanovenie sa neuplatní a ostatné Podmienky zostávajú v platnosti." },
       { kind: "p", text: "Nevzdanie sa práva. Ak určitú podmienku nevymáhame okamžite, nestrácame právo vymáhať ju neskôr." },
       { kind: "p", text: "Úplná dohoda. Tieto Podmienky spolu so Zásadami používania súborov cookie a Registrom poskytovateľov umelej inteligencie predstavujú úplnú dohodu medzi nami o službe. Záväzky, ktoré prijímame v Zásadách ochrany osobných údajov, sú pre nás záväzné. Nič v tomto odseku nevylučuje zodpovednosť za podvodné uvedenie do omylu." },
-      { kind: "p", text: "Jazyk. Tieto Podmienky sú zverejnené v angličtine [and Romanian]. [State which version prevails for which users; Annex A notes where a local language is required.]" },
+      { kind: "p", text: "Jazyk. Tieto Podmienky sú zverejnené v každom jazyku, ktorý stránka ponúka. Jazykom zmluvy je jazyk, v ktorom ste sa zaregistrovali: jazyk verzie, ktorú ste prijali a ktorý eviduje náš záznam o prijatí. Ak neskôr prijmete novú verziu v inom jazyku, zmluva pokračuje v tomto jazyku. Ostatné jazykové verzie sú preklady. Ak právo krajiny, v ktorej žijete, stanovuje, že má prednosť verzia v jej vlastnom jazyku, má prednosť táto verzia. Ak sa dve jazykové verzie líšia, uplatníme výklad, ktorý je pre vás výhodnejší." },
       { kind: "p", text: "Kontakt. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bukurešť, Rumunsko." }
     ]
   },
@@ -307,6 +310,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Spojené štáty (iba ak sú uvedené v časti 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. DebateAI neponúkame osobám, ktoré žijú v Tennessee." },
       { kind: "p", text: "Rozhodcovská zmluva a vzdanie sa práva na hromadnú žalobu. Ak žijete v Spojených štátoch, vy a DebateAIRO súhlasíte s riešením všetkých sporov vyplývajúcich z týchto Podmienok alebo služby záväzným individuálnym rozhodcovským konaním vedeným [the American Arbitration Association / JAMS] podľa jej spotrebiteľských pravidiel namiesto súdu; každý z nás však môže uplatniť individuálny nárok na súde pre drobné nároky. Rozhodcovskú zmluvu môžete odmietnuť zaslaním e-mailu na [address] do 30 dní od prvého prijatia týchto Podmienok. Táto dohoda sa riadi Federal Arbitration Act. Hradíme poplatky za začatie rozhodcovského konania. Vy aj DebateAIRO sa v rozsahu povolenom zákonom vzdávate práva na hromadné, kolektívne a zastupiteľské žaloby. Táto časť sa uplatňuje iba do budúcnosti a nevzťahuje sa na nároky, ktoré vznikli pred jej prijatím." },
       { kind: "p", text: "Oznámenia a odstraňovanie. Intímne snímky zdieľané bez súhlasu možno bez účtu nahlásiť na adrese [URL] a budú odstránené do 48 hodín od platnej žiadosti. Sťažnosti týkajúce sa autorských práv sa zasielajú nášmu určenému zástupcovi uvedenému v časti 16." },
       { kind: "p", text: "Ustanovenia pre jednotlivé štáty. Kalifornia: uplatnia sa podmienky automatického obnovovania podľa časti 12; predplatné môžete kedykoľvek zrušiť online; váš súhlas s podmienkami obnovovania uchovávame najmenej tri roky. New York: do 14 dní od akejkoľvek platby so zvýšenou cenou môžete predplatné zrušiť a získať pomerné vrátenie peňazí. Texas a Nebraska: citlivé osobné údaje nepredávame. Washington: na informácie súvisiace so zdravím sa vzťahuje naše Oznámenie o ochrane údajov o zdraví spotrebiteľov na adrese [URL]. Colorado: nič v službe o vás neprijíma rozhodnutia so závažnými dôsledkami. Vaše údaje a vaše práva na ochranu súkromia podľa práva vášho štátu upravuje príloha B.3 našich Zásady ochrany osobných údajov." }
@@ -381,7 +385,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "81036db049256bcb5752a026727e2f9a4e90a6c4455890a5510c89a955667ff5",
+  sha256: "4e41f7e03b91216decbbb185801a8cd1fddbf9ce7bf31964cde501f932dd243d",
   eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.1 · ÚČINNÉ OD [DATE]",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DebateAIRO S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",

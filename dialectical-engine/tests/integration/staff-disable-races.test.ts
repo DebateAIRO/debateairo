@@ -1,6 +1,5 @@
 import { authorizeStaffAlertFixture } from '../support/staffAlertReadiness.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, it, expect } from 'vitest';
 import { createPool, migrate, PostgresStaffRepository, type Pool } from '@debateai/db';
 import { StaffWebAuthnService } from '../../apps/api/src/staff/webauthn.js';
@@ -64,7 +63,6 @@ describe('Task4 guards and actual disable races', () => {
             expect(row.prosecdef).toBe(true);
             expect(row.proconfig).toEqual(['search_path=pg_catalog']);
         }
-        await writeFile('/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/logs/task4-catalog-acl.json', JSON.stringify(rows, null, 2) + '\n');
     });
     it('rejects caller time after a final blocking challenge lock rather than minting an expired TOTP session', async () => {
         const a = await staff(), challenge = randomUUID(), challengeHash = digest(challenge), now = new Date();
@@ -299,13 +297,11 @@ it('captures every Task4 new/replaced definer, unchanged secret-column floor and
     expect(columns.filter(c => c.relation === 'identity.mfa_factor' && c.runtime).map(c => c.attname).sort()).toEqual(['mfa_factor_id', 'user_id', 'factor_type', 'state', 'created_at', 'secret_ciphertext', 'last_accepted_step'].sort());
     for (const [relation, column] of [['identity.mfa_factor', 'public_key'], ['identity.mfa_factor', 'secret_ciphertext'], ['identity.session', 'token_hash'], ['identity."user"', 'password_hash']])
         expect(columns.find(c => c.relation === relation && c.attname === column)?.staff_owner).toBe(false);
-    const roles = (await database.pool.query(`SELECT rolname,rolcanlogin,rolinherit,rolvaliduntil FROM pg_roles WHERE rolname IN('debateai_runtime','debateai_authorization_runtime','debateai_staff_security_owner','debateai_staff_recovery','debateai_prod_staff_recovery') ORDER BY rolname`)).rows;
     const memberships = (await database.pool.query(`SELECT pg_get_userbyid(m.member) AS member,pg_get_userbyid(m.roleid) AS role,m.admin_option,m.inherit_option,m.set_option FROM pg_auth_members m WHERE pg_get_userbyid(m.member) IN('debateai_runtime','debateai_authorization_runtime','debateai_staff_security_owner','debateai_prod_staff_recovery','task4_test_runtime') ORDER BY member,role`)).rows;
     expect(memberships.filter(m => m.member === 'debateai_staff_security_owner')).toEqual([]);
     expect(memberships.filter(m => m.member === 'debateai_prod_staff_recovery').map(m => m.role)).toEqual(['debateai_staff_recovery']);
     const triggers = (await database.pool.query("SELECT tgname,tgrelid::regclass::text AS relation,pg_get_triggerdef(oid) AS definition FROM pg_trigger WHERE tgname LIKE 'staff_notify_%' ORDER BY tgname")).rows;
     expect(triggers).toHaveLength(5);
-    await writeFile('/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/logs/task4-full-catalog-acl.json', JSON.stringify({ functions, columns, roles, memberships, triggers }, null, 2) + '\n');
 });
 it('invalidates current privilege and owned proofs after grant revision changes while preserving ordinary credentials', async () => {
     const owner = await staff(true), o = await elevation(owner), target = await staff(), t = await elevation(target);

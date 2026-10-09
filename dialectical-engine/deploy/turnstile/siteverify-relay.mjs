@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { spawnSync } from "node:child_process";
-import { deploymentHostname, siteverifyOutcome, validProof, validSocketPath } from "./siteverify-response.mjs";
+import { createProofMemory, deploymentHostname, siteverifyOutcome, validProof, validSocketPath } from "./siteverify-response.mjs";
 
 const SITEVERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const REJECTED = Object.freeze({ success: false, "error-codes": ["invalid-input-response"] });
@@ -31,7 +31,7 @@ export function fixedSiteverify(secret, token, signal, requestImplementation = h
   });
 }
 export function createSiteverifyRelay({ secret, publicAppUrl, siteverify = fixedSiteverify }) {
-  const hostname = deploymentHostname(publicAppUrl); const used = new Map(); let active = 0;
+  const hostname = deploymentHostname(publicAppUrl); const proofs = createProofMemory(); let active = 0;
   const server = createServer({ maxHeaderSize: 4096, requestTimeout: 5000, headersTimeout: 5000 }, async (request, response) => {
     const send = (status, body) => { if (!response.destroyed && !response.writableEnded) { response.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" }); response.end(JSON.stringify(body)); } };
     if (request.method !== "POST" || request.url !== "/siteverify") { request.resume(); send(404, { error: "TURNSTILE_OPERATION_INVALID" }); return; }
@@ -46,16 +46,23 @@ export function createSiteverifyRelay({ secret, publicAppUrl, siteverify = fixed
       for await (const chunk of request) { bytes += chunk.length; if (bytes > 8192) { send(413, { error: "TURNSTILE_INPUT_INVALID" }); return; } chunks.push(chunk); }
       let input; try { input = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { send(400, { error: "TURNSTILE_INPUT_INVALID" }); return; }
       if (!validProof(input) || Array.isArray(input) || Object.keys(input).length !== 2 || !Object.hasOwn(input,"token") || !Object.hasOwn(input,"action")) { send(400, { error: "TURNSTILE_INPUT_INVALID" }); return; }
-      const now = Date.now(); for (const [digest, until] of used) if (until <= now) used.delete(digest);
       const digest = createHash("sha256").update(input.token).digest("hex");
-      if (used.has(digest)) { send(200, REJECTED); return; }
-      if (used.size >= 10_000) { send(503, { error: "TURNSTILE_UNAVAILABLE" }); return; }
-      used.set(digest, now + 300_000);
-      const result = await siteverify(secret, input.token, controller.signal);
-      const outcome = siteverifyOutcome(result, input.action, hostname);
-      if (outcome === "unavailable") send(503, { error: "TURNSTILE_UNAVAILABLE" });
-      else if (outcome === "rejected") send(200, REJECTED);
-      else send(200, { success: true, hostname: result.hostname, action: result.action, challenge_ts: result.challenge_ts, "error-codes": [] });
+      // Capped per action family (sign-up, sign-in, recovery) since 2026-10-09.
+      const reservation = proofs.reserve(digest, input.action, Date.now());
+      if (reservation === "held") { send(200, REJECTED); return; }
+      if (reservation === "full") { send(503, { error: "TURNSTILE_UNAVAILABLE" }); return; }
+      let outcome = "unavailable";
+      try {
+        const result = await siteverify(secret, input.token, controller.signal);
+        outcome = siteverifyOutcome(result, input.action, hostname);
+        if (outcome === "unavailable") send(503, { error: "TURNSTILE_UNAVAILABLE" });
+        else if (outcome === "rejected") send(200, REJECTED);
+        else send(200, { success: true, hostname: result.hostname, action: result.action, challenge_ts: result.challenge_ts, "error-codes": [] });
+      } finally {
+        // Only a passed proof stays held: a refused one was never accepted (Cloudflare refuses its
+        // reuse itself), and holding it let 10,000 garbage proofs refuse every real one (2026-10-09).
+        if (outcome !== "passed") proofs.release(digest, input.action);
+      }
     } catch { send(503, { error: "TURNSTILE_UNAVAILABLE" }); }
     finally { clearTimeout(deadline); active--; }
   });

@@ -174,9 +174,11 @@
   "settings.security.title": "Varnost",
   "settings.phone.reveal": "Prikaži telefon",
   "settings.phone.change": "Spremeni telefon",
-  "settings.phone.required": "Za nadaljevanje dodajte telefon. Vprašanje in možnosti se ohranijo.",
+  "settings.phone.purpose": "V prihodnje vam bomo morda poslali kodo po SMS-u, ki vam bo pomagala znova dostopati do računa, in če nas prosite za pomoč, vas lahko pokličemo ali vam pošljemo SMS. Shranjeno šifrirano; nikoli ni deljeno z drugimi ali uporabljeno za trženje.",
   "settings.security.lastPath": "Pred odstranitvijo tega načina dodajte drug način prijave.",
+  "settings.security.remove": "Odstrani",
   "settings.security.codesRemaining": "Obnovitvene kode: {count}",
   "settings.security.regenerate": "Ustvari nove obnovitvene kode",
+  "settings.security.lockoutReminder": "Še nimate obnovitvenih kod ali ključa za dostop. Če izgubite telefon, se z njimi takoj vrnete v račun.",
   "settings.security.refreshFailed": "Varnostnih podatkov ni bilo mogoče osvežiti. Znova naložite stran."
 }

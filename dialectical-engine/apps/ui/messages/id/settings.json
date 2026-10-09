@@ -171,9 +171,11 @@
   "settings.security.title": "Keamanan",
   "settings.phone.reveal": "Tampilkan telepon",
   "settings.phone.change": "Ubah telepon",
-  "settings.phone.required": "Tambahkan telepon untuk melanjutkan. Pertanyaan dan opsi Anda tetap tersimpan.",
+  "settings.phone.purpose": "Nanti kami mungkin mengirimkan kode lewat SMS untuk membantu Anda masuk kembali ke akun Anda, dan jika Anda meminta bantuan kepada kami, kami dapat menelepon atau mengirim SMS kepada Anda. Disimpan dalam bentuk terenkripsi; tidak pernah dibagikan atau digunakan untuk pemasaran.",
   "settings.security.lastPath": "Tambahkan metode masuk lain sebelum menghapus yang ini.",
+  "settings.security.remove": "Hapus",
   "settings.security.codesRemaining": "Kode pemulihan: {count}",
   "settings.security.regenerate": "Buat kode pemulihan baru",
+  "settings.security.lockoutReminder": "Anda belum memiliki kode pemulihan atau kunci sandi. Jika telepon Anda hilang, keduanya memungkinkan Anda langsung masuk kembali.",
   "settings.security.refreshFailed": "Detail keamanan tidak dapat diperbarui. Muat ulang halaman."
 }
