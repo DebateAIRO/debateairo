@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Wo wir DebateAI anbieten",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wir bieten DebateAI Personen an, die in [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
+      { kind: "p", text: "Wir bieten DebateAI Personen an, die in der Europäischen Union (27 Staaten) und im Europäischen Wirtschaftsraum (Norwegen, Island und Liechtenstein), in der Schweiz, in der Republik Moldau, in den Vereinigten Staaten (außer Tennessee), in Kanada, Australien, Neuseeland, Singapur, Japan, Südkorea und Taiwan leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Zustimmung zu diesen Nutzungsbedingungen",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Sie stimmen diesen Nutzungsbedingungen zu, indem Sie das Kästchen „Ich akzeptiere nach Kenntnisnahme die Nutzungsbedingungen“ markieren und auf Konto erstellen klicken. Dadurch kommt ein Vertrag zwischen Ihnen und DebateAIRO S.R.L. zustande. Zu den Nutzungsbedingungen gehören die Regeln zur zulässigen Nutzung in Abschnitt 7, die Regeln zur Veröffentlichung in Abschnitt 9, die Haftungsbestimmungen in Abschnitt 15, die Bestimmungen zum anwendbaren Recht und zu Streitigkeiten in Abschnitt 18 sowie, falls Sie in den Vereinigten Staaten leben, die Schiedsvereinbarung in Anhang A.3. Wie in unserer Datenschutzerklärung erläutert, halten wir fest, welcher Fassung Sie wann zugestimmt haben." },
+      { kind: "p", text: "Sie stimmen diesen Nutzungsbedingungen zu, indem Sie das Kästchen „Ich akzeptiere nach Kenntnisnahme die Nutzungsbedingungen“ markieren und auf Konto erstellen klicken. Dadurch kommt ein Vertrag zwischen Ihnen und DebateAIRO S.R.L. zustande. Zu den Nutzungsbedingungen gehören die Regeln zur zulässigen Nutzung in Abschnitt 7, die Regeln zur Veröffentlichung in Abschnitt 9, die Haftungsbestimmungen in Abschnitt 15, die Bestimmungen zum anwendbaren Recht und zu Streitigkeiten in Abschnitt 18 sowie, falls Sie in den Vereinigten Staaten leben, die Schiedsvereinbarung in Anhang A.2. Wie in unserer Datenschutzerklärung erläutert, halten wir fest, welcher Fassung Sie wann zugestimmt haben." },
       { kind: "p", text: "Unsere Datenschutzerklärung unter [dezbatere.ro/privacy] erläutert, wie wir personenbezogene Daten verarbeiten. Dabei handelt es sich um Informationen, die wir Ihnen schulden, nicht um einen Vertrag, dem Sie zustimmen, und nichts in diesen Nutzungsbedingungen macht daraus eine Einwilligung in die Verarbeitung. Unsere Cookie-Richtlinie unter [dezbatere.ro/cookies] und unser Verzeichnis der KI-Anbieter unter [dezbatere.ro/providers] werden durch Verweis Bestandteil dieser Nutzungsbedingungen." },
       { kind: "p", text: "Bevor Sie elektronisch einen Vertrag mit uns schließen, zeigt Ihnen die Benutzeroberfläche die einzelnen Schritte, ermöglicht Ihnen, Ihre Eingaben vor dem Absenden zu überprüfen und zu berichtigen, und nennt Ihnen die Sprachen, in denen der Vertrag geschlossen werden kann. Diese Nutzungsbedingungen stehen in einer Form zur Verfügung, die Sie speichern und ausdrucken können; wenn Sie einen kostenpflichtigen Tarif kaufen, senden wir Ihnen die von Ihnen angenommene Fassung per E-Mail, und Sie können jederzeit eine Kopie anfordern. Nichts in diesen Nutzungsbedingungen beschränkt Rechte nach rumänischem oder EU-Verbraucherrecht oder nach dem Recht des Landes, in dem Sie leben, die vertraglich nicht beschränkt werden können." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Ihr Widerrufsrecht",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Wenn Sie in der EU, im EWR oder im Vereinigten Königreich leben, können Sie ein kostenpflichtiges Abonnement innerhalb von 14 Tagen nach Abschluss ohne Angabe von Gründen widerrufen. Verwenden Sie die Seite Vertrag widerrufen unter [dezbatere.ro/withdraw], das Musterformular in der Bestätigungs-E-Mail oder schreiben Sie an [support@dezbatere.ro]; wir bestätigen den Eingang auf einem dauerhaften Datenträger." },
+      { kind: "p", text: "Wenn Sie in der EU oder im EWR leben, können Sie ein kostenpflichtiges Abonnement innerhalb von 14 Tagen nach Abschluss ohne Angabe von Gründen widerrufen. Verwenden Sie die Seite Vertrag widerrufen unter [dezbatere.ro/withdraw], das Musterformular in der Bestätigungs-E-Mail oder schreiben Sie an [support@dezbatere.ro]; wir bestätigen den Eingang auf einem dauerhaften Datenträger." },
       { kind: "p", text: "Wenn Sie uns – durch Markieren des Kästchens beim Bezahlvorgang – aufgefordert haben, sofort mit der Leistung zu beginnen, und anschließend widerrufen, zahlen Sie für den bis zum Tag des Widerrufs erbrachten Teil des Dienstes, anteilig berechnet anhand des Preises für den Abrechnungszeitraum; den Rest erstatten wir. Sie verlieren das Widerrufsrecht nicht dadurch, dass Sie den Dienst während der 14 Tage nutzen." },
       { kind: "p", text: "Wenn Sie anderswo leben, nennt Anhang A das in Ihrer Region gegebenenfalls geltende Widerrufs- oder Rücktrittsrecht und andernfalls unsere Erstattungsrichtlinie. Gesetzliche Rechte in Ihrem Land gehen stets vor." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Anwendbares Recht. Diese Nutzungsbedingungen sowie alle daraus oder aus ihrem Gegenstand entstehenden Streitigkeiten oder Ansprüche, einschließlich außervertraglicher Ansprüche, unterliegen dem Recht Rumäniens." },
-      { kind: "p", text: "Ihre örtlichen Schutzrechte bleiben unberührt. Wenn Sie Verbraucher sind, entzieht Ihnen die Wahl rumänischen Rechts nicht den Schutz zwingender Verbraucherschutzvorschriften des Landes Ihres gewöhnlichen Aufenthalts – beispielsweise Vorschriften über missbräuchliche Klauseln, Widerrufs- und Kündigungsrechte oder Gewährleistungen –, soweit diese Vorschriften unabhängig von der Rechtswahl gelten, einschließlich nach Artikel 6 Absatz 2 der Verordnung (EG) Nr. 593/2008, wenn Sie in der EU leben, oder nach den entsprechenden Vorschriften des Vereinigten Königreichs. Sie können sich zusätzlich zum rumänischen Recht auf diese Vorschriften berufen." },
-      { kind: "p", text: "Gerichte, wenn Sie in der EU, im EWR oder im Vereinigten Königreich leben. Sie können uns entweder vor den Gerichten Rumäniens oder vor den Gerichten des Landes verklagen, in dem Sie leben. Wir können Sie ausschließlich vor den Gerichten des Landes verklagen, in dem Sie leben." },
-      { kind: "p", text: "Verbraucher in anderen Ländern. Wenn Sie außerhalb der EU, des EWR und des Vereinigten Königreichs leben, beschränkt nichts in diesen Nutzungsbedingungen Ihr nach dem Recht Ihres Landes bestehendes Recht, einen Anspruch vor dessen Gerichten geltend zu machen, oder ein Recht nach diesem Recht, auf das nicht verzichtet werden kann – einschließlich, wenn Sie in Australien oder Neuseeland leben, Ihrer Rechte aus Verbrauchergarantien; wenn Sie in Brasilien leben, des Código de Defesa do Consumidor; und wenn Sie in den Vereinigten Staaten leben, der Verbraucherschutzgesetze Ihres Bundesstaats." },
-      { kind: "p", text: "Einwohner der Vereinigten Staaten. Anhang A.3 enthält eine Schiedsvereinbarung und einen Verzicht auf Sammelklagen, die dem Federal Arbitration Act unterliegen. Sie gelten nur für Einwohner der Vereinigten Staaten und nur, soweit sie durchsetzbar sind. Sie gelten nicht für Verbraucher in der EU, im EWR oder im Vereinigten Königreich." },
+      { kind: "p", text: "Ihre örtlichen Schutzrechte bleiben unberührt. Wenn Sie Verbraucher sind, entzieht Ihnen die Wahl rumänischen Rechts nicht den Schutz zwingender Verbraucherschutzvorschriften des Landes Ihres gewöhnlichen Aufenthalts – beispielsweise Vorschriften über missbräuchliche Klauseln, Widerrufs- und Kündigungsrechte oder Gewährleistungen –, soweit diese Vorschriften unabhängig von der Rechtswahl gelten, einschließlich nach Artikel 6 Absatz 2 der Verordnung (EG) Nr. 593/2008, wenn Sie in der EU leben. Sie können sich zusätzlich zum rumänischen Recht auf diese Vorschriften berufen." },
+      { kind: "p", text: "Gerichte, wenn Sie in der EU oder im EWR leben. Sie können uns entweder vor den Gerichten Rumäniens oder vor den Gerichten des Landes verklagen, in dem Sie leben. Wir können Sie ausschließlich vor den Gerichten des Landes verklagen, in dem Sie leben." },
+      { kind: "p", text: "Verbraucher in anderen Ländern. Wenn Sie außerhalb der EU und des EWR leben, beschränkt nichts in diesen Nutzungsbedingungen Ihr nach dem Recht Ihres Landes bestehendes Recht, einen Anspruch vor dessen Gerichten geltend zu machen, oder ein Recht nach diesem Recht, auf das nicht verzichtet werden kann – einschließlich, wenn Sie in Australien oder Neuseeland leben, Ihrer Rechte aus Verbrauchergarantien; wenn Sie in Brasilien leben, des Código de Defesa do Consumidor; und wenn Sie in den Vereinigten Staaten leben, der Verbraucherschutzgesetze Ihres Bundesstaats." },
+      { kind: "p", text: "Einwohner der Vereinigten Staaten. Anhang A.2 enthält eine Schiedsvereinbarung und einen Verzicht auf Sammelklagen, die dem Federal Arbitration Act unterliegen. Sie gelten nur für Einwohner der Vereinigten Staaten und nur, soweit sie durchsetzbar sind. Sie gelten nicht für Verbraucher in der EU oder im EWR." },
       { kind: "p", text: "Vor Anrufung eines Gerichts. Kontaktieren Sie uns unter [legal@dezbatere.ro]; die meisten Probleme lassen sich beheben, und wir bemühen uns um eine Antwort innerhalb von [5] Werktagen. Wenn Sie Verbraucher in Rumänien oder der EU sind, können Sie die alternative Streitbeilegung über [the ANPC – named SAL entity, website] nutzen; wir verpflichten uns [do / do not], an diesem Verfahren teilzunehmen. Für Beschwerden über Moderationsentscheidungen gilt der gesonderte Weg nach Abschnitt 10." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Anhang A – Regionale Bestimmungen",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Jeder Eintrag gilt nur, wenn seine Region in Abschnitt 2 aufgeführt ist, und nennt ausschließlich Abweichungen vom allgemeinen Teil. Widersprechen sich ein Eintrag und der allgemeine Teil, gilt für Personen in dieser Region der Eintrag." }
+      { kind: "p", text: "Jeder Eintrag gilt für Personen, die in seiner Region leben, und nennt ausschließlich Abweichungen vom allgemeinen Teil. Widersprechen sich ein Eintrag und der allgemeine Teil, gilt für Personen in dieser Region der Eintrag." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Vereinigtes Königreich (nur wenn in Abschnitt 2 aufgeführt)",
+    title: "Vereinigte Staaten",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Unser Vertreter im Vereinigten Königreich nach Artikel 27 UK GDPR ist [name, address, email]. Der Consumer Rights Act 2015 gilt für Sie, und nichts in diesen Nutzungsbedingungen beschränkt Ihre Rechte daraus; sobald die Abonnementvorschriften des Digital Markets, Competition and Consumers Act 2024 in Kraft treten (voraussichtlich 2027), gelten sie für kostenpflichtige Tarife, einschließlich eines Rücktrittsrechts nach Verlängerungen und nach kostenlosen Testzeiträumen. Wie wir nutzende Personen vor rechtswidrigen Inhalten schützen: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Von uns eingesetzte proaktive Technologie: [describe, or \"none\"]. Altersprüfung: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Das Beschwerdeverfahren nach Abschnitt 10 erfasst Beschwerden über rechtswidrige Inhalte, die unrechtmäßige Entfernung Ihrer Inhalte, Beschränkungen Ihres Kontos, den Einsatz automatisierter Werkzeuge mit Auswirkungen auf Ihre Inhalte und jede Altersprüfung, durch die Sie zu Unrecht gesperrt werden. Es steht auch Personen offen, die von Inhalten betroffen sind, ohne den Dienst selbst zu nutzen. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.2." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Vereinigte Staaten (nur wenn in Abschnitt 2 aufgeführt)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. Wir bieten DebateAI Personen, die in Tennessee leben, nicht an." },
       { kind: "p", text: "Schiedsvereinbarung und Verzicht auf Sammelklagen. Wenn Sie in den Vereinigten Staaten leben, vereinbaren Sie und DebateAIRO, alle Streitigkeiten aus diesen Nutzungsbedingungen oder dem Dienst durch ein verbindliches individuelles Schiedsverfahren beizulegen, das von [the American Arbitration Association / JAMS] nach deren Verbraucherschiedsordnung durchgeführt wird, statt vor Gericht; beide Parteien dürfen jedoch einen individuellen Anspruch vor einem Gericht für geringfügige Forderungen geltend machen. Sie können widersprechen, indem Sie innerhalb von 30 Tagen nach der erstmaligen Annahme dieser Nutzungsbedingungen eine E-Mail an [address] senden. Diese Vereinbarung unterliegt dem Federal Arbitration Act. Wir tragen die Anmeldegebühren des Schiedsverfahrens. Auf Sammel-, Kollektiv- und Verbandsklagen wird im gesetzlich zulässigen Umfang verzichtet. Dieser Abschnitt gilt nur für die Zukunft und nicht für Ansprüche, die vor seiner Annahme entstanden sind." },
       { kind: "p", text: "Mitteilungen und Entfernung. Intime Abbildungen, die ohne Einwilligung veröffentlicht wurden, können ohne Konto unter [URL] gemeldet werden und werden innerhalb von 48 Stunden nach Eingang eines wirksamen Antrags entfernt. Urheberrechtsbeschwerden sind an unseren in Abschnitt 16 genannten Beauftragten zu richten." },
-      { kind: "p", text: "Bundesstaatsspezifische Regelungen. Kalifornien: Es gelten die Bestimmungen zur automatischen Verlängerung in Abschnitt 12; Sie können jederzeit online kündigen; wir bewahren Ihre Zustimmung zu den Verlängerungsbedingungen mindestens drei Jahre lang auf. New York: Sie können innerhalb von 14 Tagen nach jeder Abbuchung zu einem erhöhten Preis kündigen und eine anteilige Erstattung erhalten. Texas und Nebraska: Wir verkaufen keine sensiblen personenbezogenen Daten. Washington: Unser Datenschutzhinweis zu Verbrauchergesundheitsdaten unter [URL] gilt für gesundheitsbezogene Informationen. Colorado: Der Dienst trifft keine Entscheidungen mit erheblichen Folgen über Sie. Für Ihre Daten und Ihre Datenschutzrechte nach dem Recht der Bundesstaaten gilt unsere Datenschutzerklärung, Anhang B.3." }
+      { kind: "p", text: "Bundesstaatsspezifische Regelungen. Kalifornien: Es gelten die Bestimmungen zur automatischen Verlängerung in Abschnitt 12; Sie können jederzeit online kündigen; wir bewahren Ihre Zustimmung zu den Verlängerungsbedingungen mindestens drei Jahre lang auf. New York: Sie können innerhalb von 14 Tagen nach jeder Abbuchung zu einem erhöhten Preis kündigen und eine anteilige Erstattung erhalten. Texas und Nebraska: Wir verkaufen keine sensiblen personenbezogenen Daten. Washington: Unser Datenschutzhinweis zu Verbrauchergesundheitsdaten unter [URL] gilt für gesundheitsbezogene Informationen. Colorado: Der Dienst trifft keine Entscheidungen mit erheblichen Folgen über Sie. Für Ihre Daten und Ihre Datenschutzrechte nach dem Recht der Bundesstaaten gilt unsere Datenschutzerklärung, Anhang B.2." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Kanada und Quebec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist [name], privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.3. Quebec: Diese Nutzungsbedingungen sind auf Französisch verfügbar; wählen Sie Französisch über die Sprachauswahl; die Einstellungen, mit denen Ihre Debatten privat bleiben, sind standardmäßig aktiviert; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen; eine Schiedsvereinbarung oder ein Verzicht auf Sammelklagen gilt für Sie nicht." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanada und Quebec (nur wenn aufgeführt)",
+    title: "Australien und Neuseeland",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist [name], privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.4. Quebec: Diese Nutzungsbedingungen sind auf Französisch verfügbar; wählen Sie Französisch über die Sprachauswahl; die Einstellungen, mit denen Ihre Debatten privat bleiben, sind standardmäßig aktiviert; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen; eine Schiedsvereinbarung oder ein Verzicht auf Sammelklagen gilt für Sie nicht." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Australien und Neuseeland (nur wenn aufgeführt)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Für unsere Dienste gelten Garantien, die nach dem australischen Verbraucherrecht nicht ausgeschlossen werden können. Bei wesentlichen Leistungsstörungen sind Sie berechtigt, zu kündigen und eine Erstattung für den ungenutzten Anteil oder einen Ausgleich für den geminderten Wert zu erhalten; Sie haben außerdem Anspruch auf Ersatz aller anderen vernünftigerweise vorhersehbaren Verluste oder Schäden. Stellt die Leistungsstörung keine wesentliche Leistungsstörung dar, haben Sie Anspruch auf Behebung der Probleme mit dem Dienst innerhalb angemessener Zeit und, falls dies nicht geschieht, auf Kündigung und Erstattung. Soweit Abschnitt 64A dies zulässt, ist unsere Haftung für die Verletzung einer Garantie auf die erneute Erbringung des Dienstes oder die Zahlung der dafür anfallenden Kosten beschränkt. Über die Rechte aus Abschnitt 12 hinaus besteht für den kostenpflichtigen Tarif kein Rücktrittsrecht; unsere Erstattungsrichtlinie lautet […]. Neuseeland: Der Consumer Guarantees Act 1993 gilt, und nichts in diesen Nutzungsbedingungen schließt ihn aus; schädliche digitale Kommunikation kann uns nach Abschnitt 10 oder Netsafe gemeldet werden." }
     ]
   },
   {
+    no: "A.5",
+    title: "Schweiz",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "Für Ihre Daten gilt das Schweizer Bundesgesetz über den Datenschutz (Datenschutzerklärung, Anhang B.5). Sie können vor den Gerichten des Ortes in der Schweiz klagen, an dem Sie leben. Für den kostenpflichtigen Tarif besteht kein gesetzliches Widerrufsrecht; unsere Erstattungsrichtlinie lautet […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Schweiz (nur wenn aufgeführt)",
+    title: "Moldau",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Für Ihre Daten gilt das Schweizer Bundesgesetz über den Datenschutz (Datenschutzerklärung, Anhang B.6). Sie können vor den Gerichten des Ortes in der Schweiz klagen, an dem Sie leben. Für den kostenpflichtigen Tarif besteht kein gesetzliches Widerrufsrecht; unsere Erstattungsrichtlinie lautet […]." }
+      { kind: "p", text: "Sie haben nach diesen Nutzungsbedingungen dieselben Rechte wie Verbraucher in der Europäischen Union, einschließlich des 14-tägigen Widerrufsrechts nach Abschnitt 13. Sie können vor den Gerichten der Republik Moldau klagen. Für Ihre Daten gilt das moldauische Gesetz Nr. 195/2024 über den Schutz personenbezogener Daten (Datenschutzerklärung, Anhang B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldau (nur wenn aufgeführt)",
+    title: "Asien-Pazifik",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Sie haben nach diesen Nutzungsbedingungen dieselben Rechte wie Verbraucher in der Europäischen Union, einschließlich des 14-tägigen Widerrufsrechts nach Abschnitt 13. Sie können vor den Gerichten der Republik Moldau klagen. Für Ihre Daten gilt das moldauische Gesetz Nr. 195/2024 über den Schutz personenbezogener Daten (Datenschutzerklärung, Anhang B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukraine (nur wenn aufgeführt)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Wir bieten DebateAI in der Ukraine an, ausgenommen die Gebiete, die nicht von der ukrainischen Regierung kontrolliert werden. Das Produkt und diese Nutzungsbedingungen sind auf Ukrainisch verfügbar. Für Ihre Daten gilt das Gesetz der Ukraine „Über den Schutz personenbezogener Daten“ (Datenschutzerklärung, Anhang B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israel (nur wenn aufgeführt)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Sie können einen kostenpflichtigen Tarif kündigen, wie es das Consumer Protection Law, 5741-1981, zulässt [state the cancellation terms]. Diese Nutzungsbedingungen und unsere Datenschutzerklärung sind auf Hebräisch verfügbar. Für Ihre Daten gilt das israelische Protection of Privacy Law (Datenschutzerklärung, Anhang B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Asien-Pazifik (nur die Zeilen für aufgeführte Regionen)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapur: Unser Datenschutzbeauftragter ist [name, email]; Übermittlungen beruhen auf vertraglichen Schutzvorkehrungen, die mit dem PDPA vergleichbar sind; für den kostenpflichtigen Tarif besteht kein gesetzliches Rücktrittsrecht, und unsere Erstattungsrichtlinie lautet […]. Japan: Die gesetzliche Offenlegung nach dem Specified Commercial Transactions Act ist unter [URL] verfügbar; für Online-Abonnements besteht kein allgemeines Rücktrittsrecht, und unsere Erstattungsrichtlinie lautet […]; wir senden Ihre Inhalte an KI-Anbieter in den Vereinigten Staaten und der Europäischen Union, jeweils auf Grundlage eines Vertrags, der einen dem japanischen Act on the Protection of Personal Information gleichwertigen Schutz verlangt, und teilen Ihnen auf Anfrage mit, welche Maßnahmen dies sind. Südkorea: Einwilligungen in optionale Verarbeitung und Werbung werden getrennt von den Angaben eingeholt, die für den Betrieb des Dienstes erforderlich sind; unser Datenschutzbeauftragter ist [name], privacy@dezbatere.ro; Sie können einen kostenpflichtigen Tarif nach Maßgabe des E-Commerce Act innerhalb von 7 Tagen nach Abschluss widerrufen; vor jeder wiederkehrenden Preiserhöhung oder Umwandlung eines kostenlosen in einen kostenpflichtigen Tarif holen wir erneut Ihre Einwilligung ein; der Dienst nutzt generative KI, wir weisen Sie vor der Nutzung darauf hin, und wir kennzeichnen KI-generierte Ergebnisse. Taiwan: Sie können einen kostenpflichtigen Tarif nach Maßgabe des Consumer Protection Act innerhalb von 7 Tagen nach Abschluss widerrufen; für Ihre Daten gilt der taiwanische Personal Data Protection Act (Datenschutzerklärung, Anhang B.10). Thailand: Unser Vertreter in Thailand ist [name] [if appointed]. Philippinen: Unsere Unternehmensidentifikation und unser Beschwerdemechanismus nach dem Internet Transactions Act sind unter [URL] verfügbar; Beschwerden können bei der National Privacy Commission eingereicht werden." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Vorbehalten",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Die Türkei, Brasilien und Indonesien erfordern jeweils einen Anhang in der Landessprache, einen Vertreter oder eine Registrierung sowie Einreichungen. Diese Länder sind hier nicht ausgearbeitet und liegen außerhalb von Abschnitt 2, bis sie ausdrücklich aufgenommen werden. In China, Vietnam und Russland wird der Dienst nicht angeboten." }
+      { kind: "p", text: "Singapur: Unser Datenschutzbeauftragter ist [name, email]; Übermittlungen beruhen auf vertraglichen Schutzvorkehrungen, die mit dem PDPA vergleichbar sind; für den kostenpflichtigen Tarif besteht kein gesetzliches Rücktrittsrecht, und unsere Erstattungsrichtlinie lautet […]. Japan: Die gesetzliche Offenlegung nach dem Specified Commercial Transactions Act ist unter [URL] verfügbar; für Online-Abonnements besteht kein allgemeines Rücktrittsrecht, und unsere Erstattungsrichtlinie lautet […]; wir senden Ihre Inhalte an KI-Anbieter in den Vereinigten Staaten und der Europäischen Union, jeweils auf Grundlage eines Vertrags, der einen dem japanischen Act on the Protection of Personal Information gleichwertigen Schutz verlangt, und teilen Ihnen auf Anfrage mit, welche Maßnahmen dies sind. Südkorea: Einwilligungen in optionale Verarbeitung und Werbung werden getrennt von den Angaben eingeholt, die für den Betrieb des Dienstes erforderlich sind; unser Datenschutzbeauftragter ist [name], privacy@dezbatere.ro; Sie können einen kostenpflichtigen Tarif nach Maßgabe des E-Commerce Act innerhalb von 7 Tagen nach Abschluss widerrufen; vor jeder wiederkehrenden Preiserhöhung oder Umwandlung eines kostenlosen in einen kostenpflichtigen Tarif holen wir erneut Ihre Einwilligung ein; der Dienst nutzt generative KI, wir weisen Sie vor der Nutzung darauf hin, und wir kennzeichnen KI-generierte Ergebnisse. Taiwan: Sie können einen kostenpflichtigen Tarif nach Maßgabe des Consumer Protection Act innerhalb von 7 Tagen nach Abschluss widerrufen; für Ihre Daten gilt der taiwanische Personal Data Protection Act (Datenschutzerklärung, Anhang B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "1836ca9ffc6cb0f665ade132e6b9a4077261d98ce76fd9f3a5fa7b7f6d7e1900",
-  eyebrow: "NUTZUNGSBEDINGUNGEN · v2.1 · GÜLTIG AB [DATE]",
+  version: "2.2",
+  sha256: "dd3d29fac682ff25c0c2b1d002ced588a32914ee5808324d824a535f4546759e",
+  eyebrow: "NUTZUNGSBEDINGUNGEN · v2.2 · GÜLTIG AB [DATE]",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DebateAIRO S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",
-  endMarker: "ENDE DER NUTZUNGSBEDINGUNGEN · v2.1",
+  endMarker: "ENDE DER NUTZUNGSBEDINGUNGEN · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Text der Nutzungsbedingungen",
   sectionIdPrefix: "terms-section-",

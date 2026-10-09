@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Allegato B — Condizioni regionali sulla privacy",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Ciascuna voce si applica soltanto se la relativa regione è elencata nella sezione 2 delle Condizioni e indica esclusivamente gli aspetti che differiscono dal corpo della presente informativa." }
+      { kind: "p", text: "Ciascuna voce si applica alle persone che vivono nella regione interessata e indica esclusivamente gli aspetti che differiscono dal corpo della presente informativa." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Regno Unito (solo se elencato)",
+    title: "Stati Uniti",
     accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Il nostro rappresentante nel Regno Unito ai sensi dell'Articolo 27 UK GDPR è [name, address, email]; puoi contattarlo per qualsiasi questione relativa alla presente informativa. L'autorità di controllo è l'Information Commissioner's Office, ico.org.uk. Per presentarci un reclamo, scrivi a privacy@dezbatere.ro; confermeremo la ricezione del tuo reclamo entro 30 giorni. I trasferimenti dei tuoi dati dal Regno Unito ai fornitori di IA negli Stati Uniti si basano sull'estensione del Regno Unito al Data Privacy Framework UE-USA quando il fornitore è certificato e, negli altri casi, sull'International Data Transfer Addendum del Regno Unito alle clausole contrattuali tipo dell'UE, con il supporto di una valutazione del rischio di trasferimento; il Registro indica lo strumento utilizzato per ciascun fornitore. Notifichiamo una violazione dei dati personali all'ICO entro 72 ore quando la legge lo richiede e te ne informiamo senza ingiustificato ritardo se ti espone a un rischio elevato. Se in futuro impostassimo cookie analitici, nel Regno Unito sarebbero soggetti a opt-out anziché a consenso; attualmente non ne impostiamo. Se hai meno di 18 anni e accedi al servizio nonostante la nostra regola sull'età, al modo in cui trattiamo i tuoi dati si applicano gli standard del Codice per i minori dell'ICO." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Stati Uniti (solo se elencati)",
-    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Informativa al momento della raccolta. La tabella nella sezione 2 elenca le categorie di informazioni personali che raccogliamo e le relative fonti; le finalità del trattamento sono nella sezione 4 e i periodi di conservazione nella sezione 7. Raccogliamo le seguenti categorie di informazioni personali sensibili solo quando le includi nelle domande che poni su di te: salute, convinzioni religiose o filosofiche, vita sessuale od orientamento sessuale, opinioni politiche, appartenenza sindacale e origine razziale o etnica. Le utilizziamo esclusivamente per svolgere i tuoi dibattiti, e solo dopo il consenso separato di cui alla sezione 3. Non vendiamo né condividiamo informazioni personali e non lo abbiamo fatto nei dodici mesi precedenti. Non utilizziamo informazioni personali per pubblicità mirata e non utilizziamo informazioni personali sensibili per finalità diverse dalla fornitura del servizio da te richiesto. Segnali di preferenza di opt-out: Poiché attualmente non vendiamo né condividiamo informazioni personali e non le utilizziamo per pubblicità mirata, non vi è nulla rispetto a cui esercitare l’opt-out. Se in futuro iniziassimo a venderle o condividerle, rispetteremo i segnali Global Privacy Control come richiesta di opt-out. I tuoi diritti: conoscere, cancellare, correggere, esercitare l'opt-out, limitare l'uso delle informazioni personali sensibili e non subire discriminazioni per averli esercitati; presenta una richiesta a privacy@dezbatere.ro. Incentivi finanziari: non ne offriamo; le nostre finalità e tutele sono le stesse nei piani gratuiti e a pagamento. La conservazione è descritta nella sezione 7. Violazioni: informiamo i residenti e le autorità statali come richiesto dalla legge sulle violazioni dei dati di ciascuno Stato. La presente informativa è aggiornata almeno ogni dodici mesi; ultimo aggiornamento [date]." },
       { kind: "p", text: "Connecticut: trattiamo dati sensibili solo con il tuo consenso esplicito (opt-in), prestato nella schermata separata prima del tuo primo dibattito (sezione 3); non utilizziamo i tuoi dati personali per addestrare modelli di IA. Washington: la nostra Informativa sulla privacy dei dati sanitari dei consumatori disponibile su [URL] è un documento distinto applicabile a tutte le informazioni relative alla salute, comprese le inferenze. Texas e Nebraska: non vendiamo dati personali sensibili. Colorado, Connecticut, Virginia e altri Stati dotati di leggi organiche sulla privacy: i diritti sopra indicati ti spettano laddove la legge si applichi a noi. Se rigettiamo una richiesta, puoi presentare ricorso rispondendo alla nostra risposta all'indirizzo privacy@dezbatere.ro; se rigettiamo il ricorso, puoi rivolgerti all'Attorney General del tuo Stato." }
     ]
   },
   {
-    no: "B.4",
-    title: "Canada e Québec (solo se elencati)",
-    accent: "--gold",
+    no: "B.3",
+    title: "Canada e Québec",
+    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Il nostro responsabile della privacy, e in Québec la persona responsabile della protezione delle informazioni personali, è [name], privacy@dezbatere.ro. Rispondiamo alle richieste entro 30 giorni. Restiamo responsabili delle informazioni personali che trasferiamo a fornitori di IA al di fuori del Canada e utilizziamo contratti per esigere una protezione comparabile; tali fornitori possono essere soggetti alle leggi dei Paesi in cui operano, compreso l'accesso lecito da parte delle autorità. Le email di marketing sono inviate esclusivamente con il tuo consenso esplicito ai sensi della CASL. Segnaliamo all'Office of the Privacy Commissioner of Canada e a te ogni violazione delle misure di sicurezza che comporti un rischio reale di danno significativo per te, e conserviamo una registrazione di ogni violazione per 24 mesi. Québec: prima di comunicare informazioni personali al di fuori del Québec effettuiamo una valutazione d'impatto sulla privacy; segnaliamo alla Commission d'accès à l'information e a te ogni incidente di riservatezza che presenti un rischio di grave pregiudizio e teniamo un registro degli incidenti; le impostazioni che mantengono privati i tuoi dibattiti sono attive per impostazione predefinita; puoi chiederci di deindicizzare le informazioni personali che ti riguardano o di cessarne la diffusione; puoi richiedere i tuoi dati in un formato strutturato e di uso comune; la sezione 8 descrive il nostro trattamento automatizzato." }
     ]
   },
   {
-    no: "B.5",
-    title: "Australia e Nuova Zelanda (solo se elencate)",
-    accent: "--reasoning",
+    no: "B.4",
+    title: "Australia e Nuova Zelanda",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Australia. I destinatari esteri delle tue informazioni personali sono i fornitori di IA e i responsabili del trattamento elencati nel Registro, situati in [the United States and the European Union]; adottiamo misure ragionevoli per garantire che le trattino in conformità ai Principi australiani sulla privacy. Decisioni automatizzate: dal 10 dicembre 2026 la presente informativa identifica i tipi di decisioni adottate da programmi informatici che incidono significativamente sui tuoi diritti o interessi — non ve ne sono; i punteggi e i verdetti riguardano argomentazioni, non te — e le informazioni personali utilizzate per tali decisioni. È possibile presentare reclamo all'Office of the Australian Information Commissioner. Nuova Zelanda. Il nostro responsabile della privacy è [name]. Quando raccogliamo informazioni personali che ti riguardano indirettamente — perché un altro utente le ha incluse in una domanda — la presente informativa e la sezione 11 costituiscono l'informativa che ti forniamo. Comunichiamo i dati ai fornitori di IA indicati nel Registro in qualità di nostri agenti, in base a contratti che impongono garanzie comparabili. È possibile presentare reclamo all'Office of the Privacy Commissioner." }
     ]
   },
   {
-    no: "B.6",
-    title: "Svizzera (solo se elencata)",
-    accent: "--con",
+    no: "B.5",
+    title: "Svizzera",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Si applica la Legge federale svizzera sulla protezione dei dati (LPD). L'autorità di controllo è l'Incaricato federale della protezione dei dati e della trasparenza (IFPDT), edoeb.admin.ch. I tuoi dati sono trasferiti nei Paesi indicati nel Registro: Paesi dell'UE e Stati Uniti. Per gli Stati Uniti ci basiamo sullo Swiss–US Data Privacy Framework quando il fornitore è certificato e, negli altri casi, su clausole contrattuali tipo riconosciute dall'IFPDT. Notifichiamo il prima possibile all'IFPDT una violazione dei dati che possa esporti a un rischio elevato. Abbiamo valutato di non aver bisogno di un rappresentante in Svizzera (Art. 14 LPD). Riesaminiamo questa valutazione ogni anno." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldova (solo se elencata)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Si applica la Legge n. 195/2024 della Moldova sulla protezione dei dati personali. Essa si ispira al GDPR, e il corpo della presente informativa descrive i diritti che ti riconosce. L'autorità di controllo è il Centro nazionale per la protezione dei dati personali (CNPDCP). Non abbiamo bisogno di un rappresentante in Moldova, poiché siamo stabiliti nello Spazio economico europeo (Art. 27(2)(c) della Legge n. 195/2024). Riesaminiamo questo aspetto ogni anno. I trasferimenti dei tuoi dati verso gli Stati Uniti si basano sul meccanismo indicato nel Registro per ciascun fornitore. Notifichiamo una violazione dei dati personali al CNPDCP entro 72 ore quando la legge lo richiede." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ucraina (solo se elencata)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Asia-Pacifico",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Si applica la Legge dell'Ucraina \"Sulla protezione dei dati personali\". Non offriamo Dialectical Engine nelle aree dell'Ucraina non controllate dal suo governo. I tuoi dati sono trasferiti verso Paesi dell'UE e gli Stati Uniti (vedi il Registro). Puoi presentare reclamo al Commissario per i diritti umani del Parlamento ucraino." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Israele (solo se elencato)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Si applica la Legge israeliana sulla protezione della privacy. Il titolare del trattamento è DebateAIRO S.R.L.; le modalità per contattarci sono indicate nella sezione 1. Non hai alcun obbligo legale di fornirci i tuoi dati; senza i dati dell'account non possiamo aprirti un account. Utilizziamo i tuoi dati per le finalità indicate nella sezione 4 e li comunichiamo ai destinatari indicati nella sezione 5. Puoi chiedere di consultarli e di correggerli (sezione 10). L'autorità di controllo è la Privacy Protection Authority." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Asia-Pacifico (solo le righe relative alle regioni elencate)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapore: il nostro Responsabile della protezione dei dati è [name, email]; i trasferimenti si basano su obblighi contrattuali che garantiscono una protezione comparabile a quella del PDPA; notifichiamo al PDPC le violazioni soggette a notifica entro 3 giorni. Giappone: utilizziamo le tue informazioni personali per le finalità indicate nella sezione 4 e per nessun'altra. Le comunichiamo ai fornitori di IA e di hosting indicati nel Registro, situati negli Stati Uniti e in Paesi dell'UE, in base a contratti che impongono loro di proteggerle secondo lo standard della Legge giapponese sulla protezione delle informazioni personali; su richiesta, ti comunichiamo quali misure adottano per proteggerle e ti informiamo sul sistema di tutela della privacy del loro Paese. Le tue convinzioni, comprese quelle religiose e politiche, e la tua salute sono informazioni personali che richiedono particolare attenzione; le raccogliamo solo con il tuo consenso preventivo (sezione 3). La nostra denominazione e il nostro indirizzo sono DebateAIRO S.R.L., [address], Romania, e il nostro rappresentante è [name], amministratore; le modalità per presentare una richiesta sono descritte nella sezione 10, le nostre misure di sicurezza nella sezione 9, e i reclami vanno inviati a privacy@dezbatere.ro. Notifichiamo le violazioni alla Personal Information Protection Commission come richiesto dalla Legge. Corea del Sud: il nostro responsabile della privacy è [name], amministratore, privacy@dezbatere.ro. Trasferiamo informazioni personali all'estero perché lo svolgimento dei tuoi dibattiti, in base al nostro contratto con te, lo richiede: ogni volta che si svolge un dibattito, inviamo la tua domanda e gli interventi del dibattito, e nella chat di assistenza i tuoi messaggi, tramite una connessione cifrata ai fornitori di IA e di hosting indicati nel Registro, che riporta per ciascun destinatario il Paese, il contatto, la finalità e il periodo di conservazione dei dati. Puoi rifiutare il trasferimento non avviando dibattiti o cancellando il tuo account; in tal caso non possiamo svolgere dibattiti per te. Le opinioni politiche, le convinzioni e la salute sono informazioni sensibili; le trattiamo solo con il tuo consenso separato (sezione 3). Non adottiamo decisioni interamente automatizzate che ti riguardano (sezione 8). Rispondiamo alle richieste entro [10] giorni e notifichiamo le violazioni alla Personal Information Protection Commission e a te come richiesto dal Personal Information Protection Act. Taiwan: si applica il Personal Data Protection Act di Taiwan. Conserviamo i tuoi dati per i periodi indicati nella sezione 7; sono utilizzati in Romania, in altri Paesi dell'UE e negli Stati Uniti (vedi il Registro); i destinatari sono indicati nella sezione 5; i nostri sistemi e modelli di IA li trattano in modo automatizzato per svolgere i tuoi dibattiti. Puoi chiederci quali dati deteniamo, consultarli, ottenerne una copia, correggerli, chiederci di smettere di utilizzarli e di cancellarli (sezione 10). Fornirci i dati dell'account è una tua scelta, ma senza di essi non possiamo aprirti un account. Rispondiamo alle richieste di consultazione o di copia dei tuoi dati entro 15 giorni; se ci occorre più tempo, possiamo prorogare questo termine una sola volta di 15 giorni al massimo, comunicandotene per iscritto i motivi. Filippine: il nostro DPO è [name]; i reclami possono essere presentati alla National Privacy Commission; la sezione 8 descrive il nostro trattamento automatizzato. Thailandia: il nostro rappresentante è [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Riservato",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Turchia, Brasile e Indonesia richiedono ciascuno un'informativa nella lingua locale, un rappresentante o una registrazione e adempimenti formali, e non sono trattati nella presente bozza. Cina, Vietnam e Russia non rientrano nell'offerta." }
+      { kind: "p", text: "Singapore: il nostro Responsabile della protezione dei dati è [name, email]; i trasferimenti si basano su obblighi contrattuali che garantiscono una protezione comparabile a quella del PDPA; notifichiamo al PDPC le violazioni soggette a notifica entro 3 giorni. Giappone: utilizziamo le tue informazioni personali per le finalità indicate nella sezione 4 e per nessun'altra. Le comunichiamo ai fornitori di IA e di hosting indicati nel Registro, situati negli Stati Uniti e in Paesi dell'UE, in base a contratti che impongono loro di proteggerle secondo lo standard della Legge giapponese sulla protezione delle informazioni personali; su richiesta, ti comunichiamo quali misure adottano per proteggerle e ti informiamo sul sistema di tutela della privacy del loro Paese. Le tue convinzioni, comprese quelle religiose e politiche, e la tua salute sono informazioni personali che richiedono particolare attenzione; le raccogliamo solo con il tuo consenso preventivo (sezione 3). La nostra denominazione e il nostro indirizzo sono DebateAIRO S.R.L., [address], Romania, e il nostro rappresentante è [name], amministratore; le modalità per presentare una richiesta sono descritte nella sezione 10, le nostre misure di sicurezza nella sezione 9, e i reclami vanno inviati a privacy@dezbatere.ro. Notifichiamo le violazioni alla Personal Information Protection Commission come richiesto dalla Legge. Corea del Sud: il nostro responsabile della privacy è [name], amministratore, privacy@dezbatere.ro. Trasferiamo informazioni personali all'estero perché lo svolgimento dei tuoi dibattiti, in base al nostro contratto con te, lo richiede: ogni volta che si svolge un dibattito, inviamo la tua domanda e gli interventi del dibattito, e nella chat di assistenza i tuoi messaggi, tramite una connessione cifrata ai fornitori di IA e di hosting indicati nel Registro, che riporta per ciascun destinatario il Paese, il contatto, la finalità e il periodo di conservazione dei dati. Puoi rifiutare il trasferimento non avviando dibattiti o cancellando il tuo account; in tal caso non possiamo svolgere dibattiti per te. Le opinioni politiche, le convinzioni e la salute sono informazioni sensibili; le trattiamo solo con il tuo consenso separato (sezione 3). Non adottiamo decisioni interamente automatizzate che ti riguardano (sezione 8). Rispondiamo alle richieste entro 10 giorni e notifichiamo le violazioni alla Personal Information Protection Commission e a te come richiesto dal Personal Information Protection Act. Taiwan: si applica il Personal Data Protection Act di Taiwan. Conserviamo i tuoi dati per i periodi indicati nella sezione 7; sono utilizzati in Romania, in altri Paesi dell'UE e negli Stati Uniti (vedi il Registro); i destinatari sono indicati nella sezione 5; i nostri sistemi e modelli di IA li trattano in modo automatizzato per svolgere i tuoi dibattiti. Puoi chiederci quali dati deteniamo, consultarli, ottenerne una copia, correggerli, chiederci di smettere di utilizzarli e di cancellarli (sezione 10). Fornirci i dati dell'account è una tua scelta, ma senza di essi non possiamo aprirti un account. Rispondiamo alle richieste di consultazione o di copia dei tuoi dati entro 15 giorni; se ci occorre più tempo, possiamo prorogare questo termine una sola volta di 15 giorni al massimo, comunicandotene per iscritto i motivi." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "124425939ab69f473542cc2797c96be5830b8a98397f73a162047c4ccdbb4303",
-  eyebrow: "INFORMATIVA SULLA PRIVACY · v3.2 · IN VIGORE DAL [DATE]",
+  version: "3.3",
+  sha256: "59a16f2a3658d5808d004dfbac0dc1cba50cc7a3d0da6e8b7dc1296ac62c0e92",
+  eyebrow: "INFORMATIVA SULLA PRIVACY · v3.3 · IN VIGORE DAL [DATE]",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",
-  endMarker: "FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "FINE DELL'INFORMATIVA · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Testo dell'Informativa sulla privacy",
   sectionIdPrefix: "policy-section-",

@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Príloha B — Regionálne podmienky ochrany osobných údajov",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Každá položka sa uplatňuje iba vtedy, ak je jej región uvedený v časti 2 podmienok, a uvádza iba odchýlky od hlavnej časti týchto zásad." }
+      { kind: "p", text: "Každá položka sa uplatňuje na osoby, ktoré žijú v jej regióne, a uvádza iba odchýlky od hlavnej časti týchto zásad." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Spojené kráľovstvo (iba ak je uvedené)",
+    title: "Spojené štáty",
     accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Naším zástupcom v Spojenom kráľovstve podľa článku 27 UK GDPR je [name, address, email]; môžete ho kontaktovať vo všetkých záležitostiach týkajúcich sa týchto zásad. Dozorným orgánom je Úrad komisára pre informácie (ICO), ico.org.uk. Ak nám chcete podať sťažnosť, napíšte na privacy@dezbatere.ro; prijatie vašej sťažnosti potvrdíme do 30 dní. Prenosy vašich údajov zo Spojeného kráľovstva poskytovateľom umelej inteligencie v Spojených štátoch sa zakladajú na britskom rozšírení rámca EÚ – USA na ochranu osobných údajov, ak je poskytovateľ certifikovaný, inak na britskom dodatku o medzinárodnom prenose údajov k štandardným zmluvným doložkám EÚ a podporuje ich posúdenie rizika prenosu; register pri každom poskytovateľovi uvádza použitý nástroj. Porušenie ochrany osobných údajov hlásime ICO do 72 hodín, ak to vyžaduje zákon, a ak vám z neho hrozí vysoké riziko, bez zbytočného odkladu vás o ňom informujeme. Ak by sme niekedy nastavili analytické súbory cookie, v Spojenom kráľovstve by podliehali možnosti odmietnutia namiesto súhlasu; v súčasnosti ich nenastavujeme. Ak máte menej ako 18 rokov a napriek nášmu vekovému pravidlu získate prístup k službe, na naše zaobchádzanie s vašimi údajmi sa vzťahujú štandardy kódexu ICO pre deti." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Spojené štáty (iba ak sú uvedené)",
-    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Oznámenie pri zhromažďovaní. Tabuľka v časti 2 uvádza kategórie osobných údajov, ktoré zhromažďujeme, a ich zdroje. Účely a právne základy spracúvania sú v časti 4 a doby uchovávania v časti 7. Tieto kategórie citlivých osobných informácií zhromažďujeme iba vtedy, keď ich uvediete vo vlastných otázkach o sebe: zdravie, náboženské alebo filozofické presvedčenie, sexuálny život alebo sexuálna orientácia, politické názory, členstvo v odboroch a rasový alebo etnický pôvod. Používame ich iba na uskutočnenie vašich debát, a to až po samostatnom súhlase podľa časti 3. Osobné informácie nepredávame ani nezdieľame a neurobili sme tak ani počas predchádzajúcich dvanástich mesiacov. Osobné informácie nepoužívame na cielenú reklamu a citlivé osobné informácie nepoužívame na žiadny účel nad rámec poskytovania požadovanej služby. Signály preferencie odmietnutia: keďže osobné informácie nepredávame ani nezdieľame a nepoužívame ich na cielenú reklamu, nie je čo odmietnuť. Ak by sme ich niekedy začali predávať alebo zdieľať, budeme signály Global Privacy Control rešpektovať ako odmietnutie. Vaše práva: vedieť, vymazať, opraviť, odmietnuť, obmedziť používanie citlivých osobných informácií a nebyť diskriminovaný za ich uplatnenie; žiadosť podajte na privacy@dezbatere.ro. Finančné stimuly: neposkytujeme žiadne; naše účely a ochrana sú pri bezplatných aj platených programoch rovnaké. Uchovávanie je uvedené v časti 7. Porušenia ochrany údajov: obyvateľov a štátne orgány informujeme tak, ako to vyžaduje zákon o porušení ochrany údajov každého štátu. Toto oznámenie sa aktualizuje aspoň každých dvanásť mesiacov; naposledy bolo aktualizované [date]." },
       { kind: "p", text: "Connecticut: citlivé údaje spracúvame iba s vaším výslovným súhlasom udeleným na samostatnej obrazovke pred vašou prvou debatou (časť 3); vaše osobné údaje nepoužívame na trénovanie modelov umelej inteligencie. Washington: naše Oznámenie o ochrane údajov o zdraví spotrebiteľov na [URL] je samostatný dokument vzťahujúci sa na všetky informácie súvisiace so zdravím vrátane odvodených záverov. Texas a Nebraska: citlivé osobné údaje nepredávame. Colorado, Connecticut, Virgínia a ďalšie štáty s komplexnými zákonmi o ochrane súkromia: uvedené práva sa na vás vzťahujú, ak sa na nás vzťahuje príslušný zákon. Ak žiadosť zamietneme, môžete sa odvolať tak, že odpoviete na našu odpoveď na privacy@dezbatere.ro; ak zamietneme aj odvolanie, môžete sa obrátiť na generálneho prokurátora (Attorney General) svojho štátu." }
     ]
   },
   {
-    no: "B.4",
-    title: "Kanada a Quebec (iba ak sú uvedené)",
-    accent: "--gold",
+    no: "B.3",
+    title: "Kanada a Quebec",
+    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je [name], privacy@dezbatere.ro. Na žiadosti odpovedáme do 30 dní. Naďalej zodpovedáme za osobné informácie, ktoré prenášame poskytovateľom umelej inteligencie mimo Kanady, a zmluvami vyžadujeme porovnateľnú ochranu; títo poskytovatelia môžu podliehať zákonom krajín, v ktorých pôsobia, vrátane zákonného prístupu orgánov. Marketingové e-maily zasielame iba s vaším výslovným súhlasom podľa CASL. Porušenie bezpečnostných opatrení, ktoré pre vás vytvára skutočné riziko závažnej ujmy, hlásime Úradu komisára pre ochranu súkromia Kanady a vám a o každom porušení vedieme záznam 24 mesiacov. Quebec: pred oznámením osobných informácií mimo Quebecu vykonáme posúdenie vplyvu na súkromie; incident dôvernosti, ktorý predstavuje riziko vážnej ujmy, hlásime Commission d'accès à l'information a vám a vedieme register incidentov; nastavenia zachovávajúce súkromie vašich debát sú predvolene zapnuté; môžete nás požiadať o vyradenie z indexu alebo zastavenie šírenia vašich osobných informácií; môžete požiadať o svoje údaje v štruktúrovanom, bežne používanom formáte; časť 8 opisuje naše automatizované spracúvanie." }
     ]
   },
   {
-    no: "B.5",
-    title: "Austrália a Nový Zéland (iba ak sú uvedené)",
-    accent: "--reasoning",
+    no: "B.4",
+    title: "Austrália a Nový Zéland",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Austrália. Zahraničnými príjemcami vašich osobných informácií sú poskytovatelia umelej inteligencie a sprostredkovatelia uvedení v registri so sídlom v [the United States and the European Union]; prijímame primerané opatrenia, aby s nimi zaobchádzali v súlade s austrálskymi zásadami ochrany súkromia. Automatizované rozhodnutia: od 10. decembra 2026 tieto zásady identifikujú druhy rozhodnutí prijímaných počítačovými programami, ktoré významne ovplyvňujú vaše práva alebo záujmy — žiadne také nie sú; hodnotenia a verdikty sa týkajú argumentov, nie vás — a osobné informácie, ktoré sa pri nich používajú. Sťažnosti možno podať Úradu austrálskeho komisára pre informácie. Nový Zéland. Našou zodpovednou osobou pre ochranu osobných údajov je [name]. Ak o vás zhromažďujeme osobné informácie nepriamo — pretože ich iný používateľ uviedol v otázke — tieto zásady a časť 11 predstavujú oznámenie, ktoré vám poskytujeme. Poskytovateľom umelej inteligencie uvedeným v registri ich poskytujeme ako našim zástupcom na základe zmlúv vyžadujúcich porovnateľné záruky. Sťažnosti možno podať Úradu komisára pre ochranu súkromia." }
     ]
   },
   {
-    no: "B.6",
-    title: "Švajčiarsko (iba ak je uvedené)",
-    accent: "--con",
+    no: "B.5",
+    title: "Švajčiarsko",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Uplatňuje sa švajčiarsky spolkový zákon o ochrane údajov (FADP). Dozorným orgánom je Spolkový komisár pre ochranu údajov a informácií (FDPIC), edoeb.admin.ch. Vaše údaje smerujú do krajín uvedených v registri — do krajín EÚ a do Spojených štátov. Pri Spojených štátoch sa opierame o rámec Švajčiarsko – USA na ochranu osobných údajov, ak je poskytovateľ certifikovaný, inak o štandardné zmluvné doložky uznané FDPIC. Porušenie ochrany údajov, ktoré vám pravdepodobne spôsobí vysoké riziko, hlásime FDPIC čo najskôr. Posúdili sme, že zástupcu vo Švajčiarsku nepotrebujeme (Art. 14 FADP). Toto posúdenie každoročne preskúmavame." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldavsko (iba ak je uvedené)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldavsko",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Uplatňuje sa moldavský zákon č. 195/2024 o ochrane osobných údajov. Vychádza z GDPR a hlavná časť týchto zásad opisuje vaše práva podľa neho. Dozorným orgánom je Národné centrum pre ochranu osobných údajov (CNPDCP). Zástupcu v Moldavsku nepotrebujeme, pretože sme usadení v Európskom hospodárskom priestore (Art. 27(2)(c) zákona č. 195/2024). Toto posúdenie každoročne preskúmavame. Prenosy vašich údajov do Spojených štátov sa zakladajú na mechanizme, ktorý register uvádza pri každom poskytovateľovi. Porušenie ochrany osobných údajov hlásime CNPDCP do 72 hodín, ak to vyžaduje zákon." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukrajina (iba ak je uvedená)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Ázia a Tichomorie",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Uplatňuje sa zákon Ukrajiny „O ochrane osobných údajov“. Dialectical Engine neponúkame v oblastiach Ukrajiny, ktoré nekontroluje jej vláda. Vaše údaje smerujú do krajín EÚ a do Spojených štátov (pozri register). Sťažnosť môžete podať Komisárovi Najvyššej rady Ukrajiny pre ľudské práva." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Izrael (iba ak je uvedený)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Uplatňuje sa izraelský zákon o ochrane súkromia. Prevádzkovateľom je DebateAIRO S.R.L.; ako nás kontaktovať, sa uvádza v časti 1. Nemáte zákonnú povinnosť poskytnúť nám svoje údaje; bez údajov účtu vám však nemôžeme zriadiť účet. Vaše údaje používame na účely uvedené v časti 4 a poskytujeme ich príjemcom uvedeným v časti 5. Môžete požiadať o nahliadnutie do nich a o ich opravu (časť 10). Dozorným orgánom je Úrad na ochranu súkromia." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Ázia a Tichomorie (iba riadky pre uvedené regióny)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapur: našou zodpovednou osobou pre ochranu osobných údajov je [name, email]; prenosy sa zakladajú na zmluvných povinnostiach poskytujúcich ochranu porovnateľnú s PDPA; porušenia podliehajúce oznámeniu hlásime PDPC do 3 dní. Japonsko: vaše osobné informácie používame na účely uvedené v časti 4 a na žiadne iné. Poskytujeme ich poskytovateľom umelej inteligencie a hostingu uvedeným v registri so sídlom v Spojených štátoch a krajinách EÚ na základe zmlúv, ktoré od nich vyžadujú, aby ich chránili na úrovni japonského zákona o ochrane osobných informácií; na požiadanie vám povieme, čo robia na ich ochranu, a informujeme vás o systéme ochrany súkromia v ich krajine. Vaše presvedčenie vrátane náboženského a politického presvedčenia a vaše zdravie sú osobnými informáciami vyžadujúcimi osobitnú starostlivosť; zhromažďujeme ich iba s vaším predchádzajúcim súhlasom (časť 3). Naše meno a adresa sú DebateAIRO S.R.L., [address], Rumunsko, a naším zástupcom je [name], konateľ; ako podať žiadosť, je uvedené v časti 10, naše bezpečnostné opatrenia v časti 9 a sťažnosti posielajte na privacy@dezbatere.ro. Porušenia hlásime Komisii na ochranu osobných informácií, ako to vyžaduje zákon. Južná Kórea: našou zodpovednou osobou pre ochranu osobných údajov je [name], konateľ, privacy@dezbatere.ro. Osobné informácie prenášame do zahraničia, pretože to vyžaduje uskutočňovanie vašich debát podľa našej zmluvy s vami: pri každom spustení debaty posielame vašu otázku a tvrdenia debaty a v chate podpory vaše správy cez šifrované spojenie poskytovateľom umelej inteligencie a hostingu uvedeným v registri, ktorý pri každom príjemcovi uvádza jeho krajinu, kontakt, účel a dobu uchovávania údajov. Prenos môžete odmietnuť tak, že nebudete spúšťať debaty alebo vymažete svoj účet; potom pre vás nemôžeme uskutočňovať debaty. Politické názory, presvedčenie a zdravie sú citlivými informáciami; spracúvame ich iba s vaším samostatným súhlasom (časť 3). O vás neprijímame žiadne plne automatizované rozhodnutia (časť 8). Na žiadosti odpovedáme do [10] dní a porušenia hlásime Komisii na ochranu osobných informácií a vám, ako to vyžaduje zákon o ochrane osobných informácií. Taiwan: uplatňuje sa taiwanský zákon o ochrane osobných údajov. Vaše údaje uchovávame počas lehôt uvedených v časti 7; používajú sa v Rumunsku, ďalších krajinách EÚ a v Spojených štátoch (pozri register); príjemcovia sú uvedení v časti 5; naše systémy a modely umelej inteligencie ich spracúvajú automatizovane na uskutočnenie vašich debát. Môžete požiadať o informáciu, aké údaje o vás máme, nahliadnuť do nich, získať ich kópiu, opraviť ich, zastaviť ich používanie a vymazať ich (časť 10). Poskytnutie údajov účtu je na vašom rozhodnutí, bez nich vám však nemôžeme zriadiť účet. Na žiadosť o nahliadnutie do vašich údajov alebo o ich kópiu odpovedáme do 15 dní; ak potrebujeme viac času, môžeme túto lehotu jedenkrát predĺžiť najviac o 15 dní a písomne vám oznámime dôvod. Filipíny: našou zodpovednou osobou pre ochranu osobných údajov je [name]; sťažnosti možno podať Národnej komisii pre ochranu súkromia; časť 8 opisuje automatizované spracúvanie. Thajsko: naším zástupcom je [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Vyhradené",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Turecko, Brazília a Indonézia vyžadujú oznámenie v miestnom jazyku, zástupcu alebo registráciu a podania; podmienky pre tieto krajiny tu nie sú vypracované. V Číne, Vietname a Rusku sa služba neposkytuje." }
+      { kind: "p", text: "Singapur: našou zodpovednou osobou pre ochranu osobných údajov je [name, email]; prenosy sa zakladajú na zmluvných povinnostiach poskytujúcich ochranu porovnateľnú s PDPA; porušenia podliehajúce oznámeniu hlásime PDPC do 3 dní. Japonsko: vaše osobné informácie používame na účely uvedené v časti 4 a na žiadne iné. Poskytujeme ich poskytovateľom umelej inteligencie a hostingu uvedeným v registri so sídlom v Spojených štátoch a krajinách EÚ na základe zmlúv, ktoré od nich vyžadujú, aby ich chránili na úrovni japonského zákona o ochrane osobných informácií; na požiadanie vám povieme, čo robia na ich ochranu, a informujeme vás o systéme ochrany súkromia v ich krajine. Vaše presvedčenie vrátane náboženského a politického presvedčenia a vaše zdravie sú osobnými informáciami vyžadujúcimi osobitnú starostlivosť; zhromažďujeme ich iba s vaším predchádzajúcim súhlasom (časť 3). Naše meno a adresa sú DebateAIRO S.R.L., [address], Rumunsko, a naším zástupcom je [name], konateľ; ako podať žiadosť, je uvedené v časti 10, naše bezpečnostné opatrenia v časti 9 a sťažnosti posielajte na privacy@dezbatere.ro. Porušenia hlásime Komisii na ochranu osobných informácií, ako to vyžaduje zákon. Južná Kórea: našou zodpovednou osobou pre ochranu osobných údajov je [name], konateľ, privacy@dezbatere.ro. Osobné informácie prenášame do zahraničia, pretože to vyžaduje uskutočňovanie vašich debát podľa našej zmluvy s vami: pri každom spustení debaty posielame vašu otázku a tvrdenia debaty a v chate podpory vaše správy cez šifrované spojenie poskytovateľom umelej inteligencie a hostingu uvedeným v registri, ktorý pri každom príjemcovi uvádza jeho krajinu, kontakt, účel a dobu uchovávania údajov. Prenos môžete odmietnuť tak, že nebudete spúšťať debaty alebo vymažete svoj účet; potom pre vás nemôžeme uskutočňovať debaty. Politické názory, presvedčenie a zdravie sú citlivými informáciami; spracúvame ich iba s vaším samostatným súhlasom (časť 3). O vás neprijímame žiadne plne automatizované rozhodnutia (časť 8). Na žiadosti odpovedáme do 10 dní a porušenia hlásime Komisii na ochranu osobných informácií a vám, ako to vyžaduje zákon o ochrane osobných informácií. Taiwan: uplatňuje sa taiwanský zákon o ochrane osobných údajov. Vaše údaje uchovávame počas lehôt uvedených v časti 7; používajú sa v Rumunsku, ďalších krajinách EÚ a v Spojených štátoch (pozri register); príjemcovia sú uvedení v časti 5; naše systémy a modely umelej inteligencie ich spracúvajú automatizovane na uskutočnenie vašich debát. Môžete požiadať o informáciu, aké údaje o vás máme, nahliadnuť do nich, získať ich kópiu, opraviť ich, zastaviť ich používanie a vymazať ich (časť 10). Poskytnutie údajov účtu je na vašom rozhodnutí, bez nich vám však nemôžeme zriadiť účet. Na žiadosť o nahliadnutie do vašich údajov alebo o ich kópiu odpovedáme do 15 dní; ak potrebujeme viac času, môžeme túto lehotu jedenkrát predĺžiť najviac o 15 dní a písomne vám oznámime dôvod." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "b3f25b035919fbace0c8e48abc3979c7f07509e8cb978537f8c38d31fd754dd4",
-  eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.2 · ÚČINNÉ OD [DATE]",
+  version: "3.3",
+  sha256: "7c708e7479fbc6e320c8e50c7bc3fb620d273314f3440199dfbfbb418c6093b0",
+  eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.3 · ÚČINNÉ OD [DATE]",
   title: "Čo uchovávame a prečo",
   lede: "Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.",
-  endMarker: "KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "KONIEC ZÁSAD · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Text zásad ochrany osobných údajov",
   sectionIdPrefix: "policy-section-",

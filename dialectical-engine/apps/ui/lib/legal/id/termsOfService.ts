@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Tempat kami menawarkan DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Kami menawarkan DebateAI kepada orang yang tinggal di [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani." }
+      { kind: "p", text: "Kami menawarkan DebateAI kepada orang yang tinggal di Uni Eropa (27 negara) dan Wilayah Ekonomi Eropa (Norwegia, Islandia, dan Liechtenstein), Swiss, Moldova, Amerika Serikat (kecuali Tennessee), Kanada, Australia, Selandia Baru, Singapura, Jepang, Korea Selatan, dan Taiwan. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Menerima Ketentuan ini",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Anda menerima Ketentuan ini dengan mencentang kotak bertuliskan \"Saya telah membaca dan menyetujui Ketentuan Layanan\" dan mengeklik Buat akun. Tindakan tersebut membentuk kontrak antara Anda dan DebateAIRO S.R.L. Ketentuan ini mencakup aturan penggunaan yang dapat diterima dalam bagian 7, aturan publikasi dalam bagian 9, ketentuan tanggung jawab dalam bagian 15, ketentuan mengenai hukum yang berlaku dan sengketa dalam bagian 18 serta, jika Anda tinggal di Amerika Serikat, perjanjian arbitrase dalam Lampiran A.3. Kami menyimpan catatan mengenai versi yang Anda terima dan waktu penerimaannya, sebagaimana dijelaskan dalam Kebijakan Privasi kami." },
+      { kind: "p", text: "Anda menerima Ketentuan ini dengan mencentang kotak bertuliskan \"Saya telah membaca dan menyetujui Ketentuan Layanan\" dan mengeklik Buat akun. Tindakan tersebut membentuk kontrak antara Anda dan DebateAIRO S.R.L. Ketentuan ini mencakup aturan penggunaan yang dapat diterima dalam bagian 7, aturan publikasi dalam bagian 9, ketentuan tanggung jawab dalam bagian 15, ketentuan mengenai hukum yang berlaku dan sengketa dalam bagian 18 serta, jika Anda tinggal di Amerika Serikat, perjanjian arbitrase dalam Lampiran A.2. Kami menyimpan catatan mengenai versi yang Anda terima dan waktu penerimaannya, sebagaimana dijelaskan dalam Kebijakan Privasi kami." },
       { kind: "p", text: "Kebijakan Privasi kami di [dezbatere.ro/privacy] menjelaskan cara kami menangani data pribadi. Kebijakan tersebut merupakan informasi yang wajib kami berikan kepada Anda, bukan kontrak yang Anda setujui, dan tidak ada hal dalam Ketentuan ini yang mengubahnya menjadi persetujuan atas pemrosesan. Kebijakan Kuki kami di [dezbatere.ro/cookies] dan Daftar Penyedia AI kami di [dezbatere.ro/providers] menjadi bagian dari Ketentuan ini melalui pengacuan." },
       { kind: "p", text: "Sebelum Anda membuat kontrak apa pun dengan kami secara elektronik, antarmuka menunjukkan langkah-langkah yang diperlukan, memungkinkan Anda meninjau dan memperbaiki hal yang telah dimasukkan sebelum mengirimkannya, dan memberi tahu Anda bahasa yang dapat digunakan untuk membuat kontrak. Ketentuan ini tersedia dalam bentuk yang dapat Anda simpan dan cetak, saat Anda membeli paket berbayar, kami mengirimkan versi yang Anda terima melalui email, dan Anda dapat meminta salinannya kapan saja. Tidak ada hal dalam Ketentuan ini yang membatasi hak Anda berdasarkan hukum konsumen Rumania atau Uni Eropa, atau hukum negara tempat Anda tinggal, yang tidak dapat dibatasi melalui kontrak." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hak Anda untuk menarik diri",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Jika Anda tinggal di Uni Eropa, EEA, atau Britania Raya, Anda dapat menarik diri dari langganan berbayar dalam waktu 14 hari sejak berlangganan, tanpa memberikan alasan. Gunakan halaman Tarik diri dari kontrak di [dezbatere.ro/withdraw], formulir contoh dalam email konfirmasi, atau kirim surat ke [support@dezbatere.ro]; kami mengonfirmasi penerimaannya pada media tahan lama." },
+      { kind: "p", text: "Jika Anda tinggal di Uni Eropa atau EEA, Anda dapat menarik diri dari langganan berbayar dalam waktu 14 hari sejak berlangganan, tanpa memberikan alasan. Gunakan halaman Tarik diri dari kontrak di [dezbatere.ro/withdraw], formulir contoh dalam email konfirmasi, atau kirim surat ke [support@dezbatere.ro]; kami mengonfirmasi penerimaannya pada media tahan lama." },
       { kind: "p", text: "Jika Anda meminta kami segera memulai layanan — dengan mencentang kotak saat pembayaran — lalu menarik diri, Anda membayar bagian layanan yang telah diberikan hingga hari Anda menarik diri, dihitung secara prorata dari harga untuk periode penagihan, dan kami mengembalikan sisanya. Anda tidak kehilangan hak penarikan diri karena menggunakan layanan selama 14 hari tersebut." },
       { kind: "p", text: "Jika Anda tinggal di tempat lain, Lampiran A menyatakan hak penarikan diri atau masa tenang yang berlaku di wilayah Anda, jika ada, dan jika tidak, kebijakan pengembalian dana kami. Hak berdasarkan undang-undang di negara Anda selalu didahulukan." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Hukum yang berlaku. Ketentuan ini, serta setiap sengketa atau klaim yang timbul darinya maupun pokok bahasannya, termasuk klaim nonkontraktual, diatur oleh hukum Rumania." },
-      { kind: "p", text: "Perlindungan setempat Anda tidak terpengaruh. Jika Anda seorang konsumen, pilihan hukum Rumania tidak menghilangkan perlindungan berdasarkan aturan perlindungan konsumen wajib di negara tempat Anda biasanya tinggal — misalnya aturan tentang ketentuan yang tidak adil, hak penarikan diri dan pembatalan, atau jaminan — apabila aturan tersebut berlaku terlepas dari pilihan ini, termasuk berdasarkan Pasal 6(2) Peraturan (EC) No 593/2008 jika Anda tinggal di Uni Eropa, atau aturan setara di Britania Raya. Anda dapat mengandalkan aturan tersebut selain hukum Rumania." },
-      { kind: "p", text: "Pengadilan, jika Anda tinggal di Uni Eropa, EEA, atau Britania Raya. Anda dapat mengajukan perkara terhadap kami di pengadilan Rumania atau di pengadilan negara tempat Anda tinggal. Kami hanya dapat mengajukan perkara terhadap Anda di pengadilan negara tempat Anda tinggal." },
-      { kind: "p", text: "Konsumen di tempat lain. Jika Anda tinggal di luar Uni Eropa, EEA, dan Britania Raya, tidak ada hal dalam Ketentuan ini yang membatasi hak Anda berdasarkan hukum negara Anda untuk mengajukan klaim di pengadilannya, atau hak apa pun berdasarkan hukum tersebut yang tidak dapat dikesampingkan — termasuk hak jaminan konsumen jika Anda tinggal di Australia atau Selandia Baru; Código de Defesa do Consumidor jika Anda tinggal di Brasil; dan hukum perlindungan konsumen negara bagian Anda jika Anda tinggal di Amerika Serikat." },
-      { kind: "p", text: "Penduduk Amerika Serikat. Lampiran A.3 memuat perjanjian arbitrase dan pengesampingan gugatan kelompok yang diatur oleh Federal Arbitration Act. Ketentuan tersebut hanya berlaku bagi penduduk Amerika Serikat dan hanya sejauh dapat diberlakukan. Ketentuan tersebut tidak berlaku bagi konsumen di Uni Eropa, EEA, atau Britania Raya." },
+      { kind: "p", text: "Perlindungan setempat Anda tidak terpengaruh. Jika Anda seorang konsumen, pilihan hukum Rumania tidak menghilangkan perlindungan berdasarkan aturan perlindungan konsumen wajib di negara tempat Anda biasanya tinggal — misalnya aturan tentang ketentuan yang tidak adil, hak penarikan diri dan pembatalan, atau jaminan — apabila aturan tersebut berlaku terlepas dari pilihan ini, termasuk berdasarkan Pasal 6(2) Peraturan (EC) No 593/2008 jika Anda tinggal di Uni Eropa. Anda dapat mengandalkan aturan tersebut selain hukum Rumania." },
+      { kind: "p", text: "Pengadilan, jika Anda tinggal di Uni Eropa atau EEA. Anda dapat mengajukan perkara terhadap kami di pengadilan Rumania atau di pengadilan negara tempat Anda tinggal. Kami hanya dapat mengajukan perkara terhadap Anda di pengadilan negara tempat Anda tinggal." },
+      { kind: "p", text: "Konsumen di tempat lain. Jika Anda tinggal di luar Uni Eropa dan EEA, tidak ada hal dalam Ketentuan ini yang membatasi hak Anda berdasarkan hukum negara Anda untuk mengajukan klaim di pengadilannya, atau hak apa pun berdasarkan hukum tersebut yang tidak dapat dikesampingkan — termasuk hak jaminan konsumen jika Anda tinggal di Australia atau Selandia Baru; Código de Defesa do Consumidor jika Anda tinggal di Brasil; dan hukum perlindungan konsumen negara bagian Anda jika Anda tinggal di Amerika Serikat." },
+      { kind: "p", text: "Penduduk Amerika Serikat. Lampiran A.2 memuat perjanjian arbitrase dan pengesampingan gugatan kelompok yang diatur oleh Federal Arbitration Act. Ketentuan tersebut hanya berlaku bagi penduduk Amerika Serikat dan hanya sejauh dapat diberlakukan. Ketentuan tersebut tidak berlaku bagi konsumen di Uni Eropa atau EEA." },
       { kind: "p", text: "Sebelum mengajukan perkara ke pengadilan. Hubungi kami di [legal@dezbatere.ro]; sebagian besar masalah dapat diperbaiki, dan kami berupaya menjawab dalam waktu [5] hari kerja. Jika Anda seorang konsumen di Rumania atau Uni Eropa, Anda dapat menggunakan penyelesaian sengketa alternatif melalui [the ANPC – named SAL entity, website]; kami [do / do not] berkomitmen untuk berpartisipasi dalam prosedur tersebut. Pengaduan mengenai keputusan moderasi mengikuti bagian 10, yang merupakan jalur terpisah." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Lampiran A — Ketentuan regional",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Setiap entri hanya berlaku jika wilayahnya tercantum dalam bagian 2, dan hanya menyatakan hal yang berbeda dari bagian utama. Jika suatu entri bertentangan dengan bagian utama, entri tersebut berlaku bagi orang-orang di wilayah itu." }
+      { kind: "p", text: "Setiap entri berlaku bagi orang yang tinggal di wilayahnya, dan hanya menyatakan hal yang berbeda dari bagian utama. Jika suatu entri bertentangan dengan bagian utama, entri tersebut berlaku bagi orang-orang di wilayah itu." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Britania Raya (hanya jika tercantum dalam bagian 2)",
+    title: "Amerika Serikat",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Perwakilan kami di Britania Raya berdasarkan Pasal 27 UK GDPR adalah [name, address, email]. Consumer Rights Act 2015 berlaku bagi Anda dan tidak ada hal dalam Ketentuan ini yang membatasi hak Anda berdasarkan undang-undang tersebut; ketika aturan langganan dalam Digital Markets, Competition and Consumers Act 2024 mulai berlaku (diperkirakan pada tahun 2027), aturan tersebut berlaku atas paket berbayar, termasuk masa tenang setelah perpanjangan dan setelah uji coba gratis. Cara kami melindungi pengguna dari konten ilegal: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Teknologi proaktif yang kami gunakan: [describe, or \"none\"]. Penjaminan usia: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Prosedur pengaduan dalam bagian 10 menerima pengaduan mengenai konten ilegal, penghapusan konten Anda secara keliru, pembatasan akun Anda, penggunaan alat otomatis yang memengaruhi konten Anda, dan setiap penilaian usia yang secara keliru memblokir Anda. Prosedur tersebut terbuka bagi orang yang terdampak oleh konten meskipun bukan pengguna. Kebijakan Privasi kami, Lampiran B.2, mencakup data Anda." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Amerika Serikat (hanya jika tercantum dalam bagian 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. Kami tidak menawarkan DebateAI kepada orang yang tinggal di Tennessee." },
       { kind: "p", text: "Perjanjian arbitrase dan pengesampingan gugatan kelompok. Jika Anda tinggal di Amerika Serikat, Anda dan DebateAIRO sepakat untuk menyelesaikan setiap sengketa yang timbul dari Ketentuan ini atau layanan melalui arbitrase individual yang mengikat dan diselenggarakan oleh [the American Arbitration Association / JAMS] berdasarkan aturan konsumennya, bukan di pengadilan, kecuali bahwa salah satu pihak dapat mengajukan klaim individual di pengadilan gugatan kecil. Anda dapat memilih untuk tidak ikut serta dengan mengirim email ke [address] dalam waktu 30 hari sejak pertama kali menerima Ketentuan ini. Perjanjian ini diatur oleh Federal Arbitration Act. Kami membayar biaya pengajuan arbitrase. Gugatan kelompok, kolektif, dan perwakilan dikesampingkan sejauh diizinkan hukum. Bagian ini hanya berlaku secara prospektif dan tidak berlaku atas klaim yang timbul sebelum Anda menerimanya." },
       { kind: "p", text: "Pemberitahuan dan penurunan konten. Gambar intim tanpa persetujuan dapat dilaporkan di [URL] tanpa akun dan dihapus dalam waktu 48 jam sejak permintaan yang sah. Pengaduan hak cipta diajukan kepada agen yang kami tunjuk sebagaimana disebutkan dalam bagian 16." },
-      { kind: "p", text: "Khusus negara bagian. California: ketentuan perpanjangan otomatis dalam bagian 12 berlaku; Anda dapat membatalkan secara daring kapan saja; kami menyimpan persetujuan Anda terhadap ketentuan perpanjangan selama sekurang-kurangnya tiga tahun. New York: Anda dapat membatalkan dalam waktu 14 hari sejak setiap tagihan dengan harga yang dinaikkan dan menerima pengembalian dana prorata. Texas dan Nebraska: kami tidak menjual data pribadi sensitif. Washington: Pemberitahuan Privasi Data Kesehatan Konsumen kami di [URL] berlaku atas informasi terkait kesehatan. Colorado: tidak ada hal dalam layanan yang mengambil keputusan berkonsekuensi mengenai Anda. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda dan hak privasi negara bagian Anda." }
+      { kind: "p", text: "Khusus negara bagian. California: ketentuan perpanjangan otomatis dalam bagian 12 berlaku; Anda dapat membatalkan secara daring kapan saja; kami menyimpan persetujuan Anda terhadap ketentuan perpanjangan selama sekurang-kurangnya tiga tahun. New York: Anda dapat membatalkan dalam waktu 14 hari sejak setiap tagihan dengan harga yang dinaikkan dan menerima pengembalian dana prorata. Texas dan Nebraska: kami tidak menjual data pribadi sensitif. Washington: Pemberitahuan Privasi Data Kesehatan Konsumen kami di [URL] berlaku atas informasi terkait kesehatan. Colorado: tidak ada hal dalam layanan yang mengambil keputusan berkonsekuensi mengenai Anda. Kebijakan Privasi kami, Lampiran B.2, mencakup data Anda dan hak privasi negara bagian Anda." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Kanada dan Quebec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah [name], privacy@dezbatere.ro. Kebijakan Privasi kami, Lampiran B.3, mencakup data Anda. Quebec: Ketentuan ini tersedia dalam bahasa Prancis; pilih bahasa Prancis melalui pengalih bahasa; pengaturan yang menjaga debat Anda tetap privat diaktifkan secara bawaan; Anda dapat meminta agar informasi pribadi tentang Anda tidak lagi diindeks; tidak ada perjanjian arbitrase atau pengesampingan gugatan kelompok yang berlaku bagi Anda." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanada dan Quebec (hanya jika tercantum)",
+    title: "Australia dan Selandia Baru",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah [name], privacy@dezbatere.ro. Kebijakan Privasi kami, Lampiran B.4, mencakup data Anda. Quebec: Ketentuan ini tersedia dalam bahasa Prancis; pilih bahasa Prancis melalui pengalih bahasa; pengaturan yang menjaga debat Anda tetap privat diaktifkan secara bawaan; Anda dapat meminta agar informasi pribadi tentang Anda tidak lagi diindeks; tidak ada perjanjian arbitrase atau pengesampingan gugatan kelompok yang berlaku bagi Anda." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Australia dan Selandia Baru (hanya jika tercantum)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Layanan kami disertai jaminan yang tidak dapat dikecualikan berdasarkan Australian Consumer Law. Untuk kegagalan besar pada layanan, Anda berhak membatalkan dan menerima pengembalian dana untuk bagian yang tidak digunakan, atau menerima ganti rugi atas penurunan nilainya; Anda juga berhak menerima ganti rugi atas kerugian atau kerusakan lain yang secara wajar dapat diperkirakan. Jika kegagalan tersebut bukan merupakan kegagalan besar, Anda berhak agar masalah pada layanan diperbaiki dalam waktu yang wajar dan, jika hal itu tidak dilakukan, membatalkan serta menerima pengembalian dana. Sejauh diizinkan bagian 64A, tanggung jawab kami atas pelanggaran jaminan dibatasi pada penyediaan ulang layanan atau pembayaran biaya untuk melakukannya. Tidak ada hak masa tenang yang berlaku atas paket berbayar selain yang diberikan bagian 12; kebijakan pengembalian dana kami adalah […]. Selandia Baru: Consumer Guarantees Act 1993 berlaku dan tidak ada hal dalam Ketentuan ini yang mengecualikannya; komunikasi digital yang berbahaya dapat dilaporkan kepada kami berdasarkan bagian 10 atau kepada Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "Swiss",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "Undang-Undang Federal Swiss tentang Perlindungan Data berlaku atas data Anda (Kebijakan Privasi, Lampiran B.5). Anda dapat mengajukan perkara di pengadilan tempat Anda tinggal di Swiss. Tidak ada hak penarikan diri berdasarkan undang-undang yang berlaku atas paket berbayar; kebijakan pengembalian dana kami adalah […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Swiss (hanya jika tercantum)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Undang-Undang Federal Swiss tentang Perlindungan Data berlaku atas data Anda (Kebijakan Privasi, Lampiran B.6). Anda dapat mengajukan perkara di pengadilan tempat Anda tinggal di Swiss. Tidak ada hak penarikan diri berdasarkan undang-undang yang berlaku atas paket berbayar; kebijakan pengembalian dana kami adalah […]." }
+      { kind: "p", text: "Anda memiliki hak yang sama berdasarkan Ketentuan ini seperti konsumen di Uni Eropa, termasuk hak penarikan diri 14 hari dalam bagian 13. Anda dapat mengajukan perkara di pengadilan Moldova. Undang-Undang Moldova No. 195/2024 tentang perlindungan data pribadi berlaku atas data Anda (Kebijakan Privasi, Lampiran B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (hanya jika tercantum)",
+    title: "Asia-Pasifik",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Anda memiliki hak yang sama berdasarkan Ketentuan ini seperti konsumen di Uni Eropa, termasuk hak penarikan diri 14 hari dalam bagian 13. Anda dapat mengajukan perkara di pengadilan Moldova. Undang-Undang Moldova No. 195/2024 tentang perlindungan data pribadi berlaku atas data Anda (Kebijakan Privasi, Lampiran B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukraina (hanya jika tercantum)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Kami menawarkan DebateAI di Ukraina kecuali di wilayah yang tidak dikendalikan oleh pemerintah Ukraina. Produk dan Ketentuan ini tersedia dalam bahasa Ukraina. Undang-Undang Ukraina \"Tentang Perlindungan Data Pribadi\" berlaku atas data Anda (Kebijakan Privasi, Lampiran B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israel (hanya jika tercantum)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Anda dapat membatalkan paket berbayar sebagaimana diizinkan oleh Consumer Protection Law, 5741-1981 [state the cancellation terms]. Ketentuan ini dan Kebijakan Privasi kami tersedia dalam bahasa Ibrani. Undang-Undang Perlindungan Privasi Israel berlaku atas data Anda (Kebijakan Privasi, Lampiran B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Asia-Pasifik (hanya baris untuk wilayah yang tercantum)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapura: Petugas Perlindungan Data kami adalah [name, email]; transfer berlandaskan perlindungan kontraktual yang sebanding dengan PDPA; tidak ada masa tenang berdasarkan undang-undang yang berlaku atas paket berbayar dan kebijakan pengembalian dana kami adalah […]. Jepang: pengungkapan berdasarkan undang-undang menurut Specified Commercial Transactions Act tersedia di [URL]; tidak ada masa tenang umum yang berlaku atas langganan daring, dan kebijakan pengembalian dana kami adalah […]; kami mengirimkan konten Anda kepada penyedia AI di Amerika Serikat dan Uni Eropa, masing-masing berdasarkan kontrak yang mewajibkan perlindungan yang setara dengan Act on the Protection of Personal Information Jepang, dan atas permintaan kami memberi tahu Anda langkah-langkah tersebut. Korea Selatan: persetujuan atas pemrosesan opsional dan pemasaran dikumpulkan secara terpisah dari hal yang diperlukan untuk menjalankan layanan; petugas privasi kami adalah [name], privacy@dezbatere.ro; Anda dapat menarik diri dari paket berbayar dalam waktu 7 hari sejak berlangganan dengan tunduk pada E-Commerce Act; kami memperoleh persetujuan baru Anda sebelum setiap kenaikan harga berulang atau perubahan dari gratis menjadi berbayar; layanan ini menggunakan AI generatif, kami memberi tahu Anda hal tersebut sebelum Anda menggunakannya, dan kami memberi label pada keluaran yang dihasilkan AI. Taiwan: Anda dapat menarik diri dari paket berbayar dalam waktu 7 hari sejak berlangganan, berdasarkan Consumer Protection Act; Personal Data Protection Act Taiwan berlaku atas data Anda (Kebijakan Privasi, Lampiran B.10). Thailand: perwakilan kami di Thailand adalah [name] [if appointed]. Filipina: identifikasi usaha dan mekanisme pemulihan kami berdasarkan Internet Transactions Act tersedia di [URL]; pengaduan dapat diajukan kepada National Privacy Commission." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Dicadangkan",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Turki, Brasil, dan Indonesia masing-masing memerlukan lampiran berbahasa lokal, perwakilan atau pendaftaran, serta pengajuan. Ketentuan tersebut belum disusun di sini dan berada di luar bagian 2 sampai dimasukkan secara sengaja. Tiongkok, Vietnam, dan Rusia tidak ditawarkan." }
+      { kind: "p", text: "Singapura: Petugas Perlindungan Data kami adalah [name, email]; transfer berlandaskan perlindungan kontraktual yang sebanding dengan PDPA; tidak ada masa tenang berdasarkan undang-undang yang berlaku atas paket berbayar dan kebijakan pengembalian dana kami adalah […]. Jepang: pengungkapan berdasarkan undang-undang menurut Specified Commercial Transactions Act tersedia di [URL]; tidak ada masa tenang umum yang berlaku atas langganan daring, dan kebijakan pengembalian dana kami adalah […]; kami mengirimkan konten Anda kepada penyedia AI di Amerika Serikat dan Uni Eropa, masing-masing berdasarkan kontrak yang mewajibkan perlindungan yang setara dengan Act on the Protection of Personal Information Jepang, dan atas permintaan kami memberi tahu Anda langkah-langkah tersebut. Korea Selatan: persetujuan atas pemrosesan opsional dan pemasaran dikumpulkan secara terpisah dari hal yang diperlukan untuk menjalankan layanan; petugas privasi kami adalah [name], privacy@dezbatere.ro; Anda dapat menarik diri dari paket berbayar dalam waktu 7 hari sejak berlangganan dengan tunduk pada E-Commerce Act; kami memperoleh persetujuan baru Anda sebelum setiap kenaikan harga berulang atau perubahan dari gratis menjadi berbayar; layanan ini menggunakan AI generatif, kami memberi tahu Anda hal tersebut sebelum Anda menggunakannya, dan kami memberi label pada keluaran yang dihasilkan AI. Taiwan: Anda dapat menarik diri dari paket berbayar dalam waktu 7 hari sejak berlangganan, berdasarkan Consumer Protection Act; Personal Data Protection Act Taiwan berlaku atas data Anda (Kebijakan Privasi, Lampiran B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "3478cb9be29af42f00b534dd58a6e5133cf15da1b16da794ed5bdafdd7b45686",
-  eyebrow: "KETENTUAN LAYANAN · v2.1 · BERLAKU [DATE]",
+  version: "2.2",
+  sha256: "9571bd0a3a0dc06987e86538d199b35c6448977263e764f27e9caafbf8749059",
+  eyebrow: "KETENTUAN LAYANAN · v2.2 · BERLAKU [DATE]",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DebateAIRO S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",
-  endMarker: "AKHIR KETENTUAN · v2.1",
+  endMarker: "AKHIR KETENTUAN · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Teks Ketentuan Layanan",
   sectionIdPrefix: "terms-section-",

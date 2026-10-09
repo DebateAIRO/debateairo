@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur mēs piedāvājam DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Mēs piedāvājam DebateAI personām, kuras dzīvo [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu." }
+      { kind: "p", text: "Mēs piedāvājam DebateAI personām, kuras dzīvo Eiropas Savienībā (27 valstis) un Eiropas Ekonomikas zonā (Norvēģijā, Islandē un Lihtenšteinā), Šveicē, Moldovā, Amerikas Savienotajās Valstīs (izņemot Tenesī), Kanādā, Austrālijā, Jaunzēlandē, Singapūrā, Japānā, Dienvidkorejā un Taivānā. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Piekrišana šiem Noteikumiem",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Jūs piekrītat šiem Noteikumiem, atzīmējot izvēles rūtiņu „Esmu izlasījis(-usi) un piekrītu Pakalpojuma noteikumiem” un noklikšķinot uz Izveidot kontu. Tādējādi starp jums un DebateAIRO S.R.L. tiek noslēgts līgums. Noteikumos ietverti pieņemamas lietošanas noteikumi 7. sadaļā, publicēšanas noteikumi 9. sadaļā, atbildības noteikumi 15. sadaļā, piemērojamo tiesību aktu un strīdu noteikumi 18. sadaļā un, ja dzīvojat Amerikas Savienotajās Valstīs, šķīrējtiesas līgums A pielikuma A.3 sadaļā. Mēs glabājam informāciju par to, kurai versijai un kad piekritāt, kā paskaidrots mūsu Privātuma politikā." },
+      { kind: "p", text: "Jūs piekrītat šiem Noteikumiem, atzīmējot izvēles rūtiņu „Esmu izlasījis(-usi) un piekrītu Pakalpojuma noteikumiem” un noklikšķinot uz Izveidot kontu. Tādējādi starp jums un DebateAIRO S.R.L. tiek noslēgts līgums. Noteikumos ietverti pieņemamas lietošanas noteikumi 7. sadaļā, publicēšanas noteikumi 9. sadaļā, atbildības noteikumi 15. sadaļā, piemērojamo tiesību aktu un strīdu noteikumi 18. sadaļā un, ja dzīvojat Amerikas Savienotajās Valstīs, šķīrējtiesas līgums A pielikuma A.2 sadaļā. Mēs glabājam informāciju par to, kurai versijai un kad piekritāt, kā paskaidrots mūsu Privātuma politikā." },
       { kind: "p", text: "Mūsu Privātuma politikā vietnē [dezbatere.ro/privacy] paskaidrots, kā mēs rīkojamies ar personas datiem. Tā ir informācija, kas mums jums jāsniedz, nevis līgums, kuram jūs piekrītat, un nekas šajos Noteikumos to nepārvērš par piekrišanu apstrādei. Mūsu Sīkdatņu politika vietnē [dezbatere.ro/cookies] un mūsu MI pakalpojumu sniedzēju reģistrs vietnē [dezbatere.ro/providers] ar atsauci ir šo Noteikumu sastāvdaļa." },
       { kind: "p", text: "Pirms elektroniski noslēdzat ar mums līgumu, saskarne parāda veicamās darbības, ļauj pirms iesniegšanas pārskatīt un izlabot ievadīto informāciju un informē par valodām, kurās līgumu var noslēgt. Šie Noteikumi ir pieejami formā, ko varat saglabāt un izdrukāt, iegādājoties maksas plānu, mēs pa e-pastu nosūtām jums versiju, kurai piekritāt, un jūs jebkurā laikā varat pieprasīt kopiju. Nekas šajos Noteikumos neierobežo tādas jūsu tiesības saskaņā ar Rumānijas vai ES patērētāju tiesībām vai jūsu dzīvesvietas valsts tiesībām, kuras nevar ierobežot ar līgumu." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Jūsu atteikuma tiesības",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Ja dzīvojat ES, EEZ vai Apvienotajā Karalistē, varat 14 dienu laikā pēc maksas abonementa noformēšanas atteikties no tā, nenorādot iemeslu. Izmantojiet lapu Atteikties no līguma vietnē [dezbatere.ro/withdraw], apstiprinājuma e-pastā pieejamo parauga veidlapu vai rakstiet uz [support@dezbatere.ro]; mēs apstiprināsim saņemšanu pastāvīgā informācijas nesējā." },
+      { kind: "p", text: "Ja dzīvojat ES vai EEZ, varat 14 dienu laikā pēc maksas abonementa noformēšanas atteikties no tā, nenorādot iemeslu. Izmantojiet lapu Atteikties no līguma vietnē [dezbatere.ro/withdraw], apstiprinājuma e-pastā pieejamo parauga veidlapu vai rakstiet uz [support@dezbatere.ro]; mēs apstiprināsim saņemšanu pastāvīgā informācijas nesējā." },
       { kind: "p", text: "Ja lūdzāt mums sākt sniegt pakalpojumu nekavējoties — norēķinu laikā atzīmējot izvēles rūtiņu — un pēc tam atsakāties, jūs maksājat par līdz atteikuma dienai sniegto pakalpojuma daļu, ko aprēķina proporcionāli norēķinu perioda cenai, un mēs atmaksājam atlikušo summu. Lietojot pakalpojumu 14 dienu laikā, jūs nezaudējat atteikuma tiesības." },
       { kind: "p", text: "Ja dzīvojat citviet, A pielikumā norādītas jūsu reģionā piemērojamās atteikuma vai pārdomu perioda tiesības, ja tādas ir, un citos gadījumos mūsu atmaksas politika. Jūsu valstī likumā noteiktajām tiesībām vienmēr ir priekšroka." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Piemērojamie tiesību akti. Šiem Noteikumiem un jebkuram no tiem vai to priekšmeta izrietošam strīdam vai prasījumam, tostarp ārpuslīgumiskiem prasījumiem, piemēro Rumānijas tiesību aktus." },
-      { kind: "p", text: "Jūsu vietējā aizsardzība netiek ietekmēta. Ja esat patērētājs, Rumānijas tiesību aktu izvēle neatņem jums aizsardzību, ko sniedz jūsu pastāvīgās dzīvesvietas valsts obligātie patērētāju aizsardzības noteikumi — piemēram, noteikumi par netaisnīgiem līguma noteikumiem, atteikuma un atcelšanas tiesībām vai garantijām —, ja šie noteikumi ir piemērojami neatkarīgi no šīs izvēles, tostarp saskaņā ar Regulas (EK) Nr. 593/2008 6. panta 2. punktu, ja dzīvojat ES, vai līdzvērtīgiem Apvienotās Karalistes noteikumiem. Uz šiem noteikumiem varat atsaukties papildus Rumānijas tiesību aktiem." },
-      { kind: "p", text: "Tiesas, ja dzīvojat ES, EEZ vai Apvienotajā Karalistē. Jūs varat celt prasību pret mums Rumānijas tiesās vai savas dzīvesvietas valsts tiesās. Mēs varam celt prasību pret jums tikai jūsu dzīvesvietas valsts tiesās." },
-      { kind: "p", text: "Patērētāji citviet. Ja dzīvojat ārpus ES, EEZ un Apvienotās Karalistes, nekas šajos Noteikumos neierobežo jūsu tiesības saskaņā ar savas valsts tiesību aktiem celt prasību tās tiesās vai tādas tiesības saskaņā ar šiem tiesību aktiem, no kurām nevar atteikties, — tostarp, ja dzīvojat Austrālijā vai Jaunzēlandē, jūsu patērētāja garantiju tiesības; ja dzīvojat Brazīlijā, Código de Defesa do Consumidor; un, ja dzīvojat Amerikas Savienotajās Valstīs, jūsu štata patērētāju aizsardzības tiesību aktus." },
-      { kind: "p", text: "Amerikas Savienoto Valstu iedzīvotāji. A pielikuma A.3 sadaļā ietverts šķīrējtiesas līgums un atteikšanās no kolektīvas prasības, ko reglamentē Federal Arbitration Act. Tas attiecas tikai uz Amerikas Savienoto Valstu iedzīvotājiem un tikai tiktāl, cik tas ir izpildāms. Tas neattiecas uz patērētājiem ES, EEZ vai Apvienotajā Karalistē." },
+      { kind: "p", text: "Jūsu vietējā aizsardzība netiek ietekmēta. Ja esat patērētājs, Rumānijas tiesību aktu izvēle neatņem jums aizsardzību, ko sniedz jūsu pastāvīgās dzīvesvietas valsts obligātie patērētāju aizsardzības noteikumi — piemēram, noteikumi par netaisnīgiem līguma noteikumiem, atteikuma un atcelšanas tiesībām vai garantijām —, ja šie noteikumi ir piemērojami neatkarīgi no šīs izvēles, tostarp saskaņā ar Regulas (EK) Nr. 593/2008 6. panta 2. punktu, ja dzīvojat ES. Uz šiem noteikumiem varat atsaukties papildus Rumānijas tiesību aktiem." },
+      { kind: "p", text: "Tiesas, ja dzīvojat ES vai EEZ. Jūs varat celt prasību pret mums Rumānijas tiesās vai savas dzīvesvietas valsts tiesās. Mēs varam celt prasību pret jums tikai jūsu dzīvesvietas valsts tiesās." },
+      { kind: "p", text: "Patērētāji citviet. Ja dzīvojat ārpus ES un EEZ, nekas šajos Noteikumos neierobežo jūsu tiesības saskaņā ar savas valsts tiesību aktiem celt prasību tās tiesās vai tādas tiesības saskaņā ar šiem tiesību aktiem, no kurām nevar atteikties, — tostarp, ja dzīvojat Austrālijā vai Jaunzēlandē, jūsu patērētāja garantiju tiesības; ja dzīvojat Brazīlijā, Código de Defesa do Consumidor; un, ja dzīvojat Amerikas Savienotajās Valstīs, jūsu štata patērētāju aizsardzības tiesību aktus." },
+      { kind: "p", text: "Amerikas Savienoto Valstu iedzīvotāji. A pielikuma A.2 sadaļā ietverts šķīrējtiesas līgums un atteikšanās no kolektīvas prasības, ko reglamentē Federal Arbitration Act. Tas attiecas tikai uz Amerikas Savienoto Valstu iedzīvotājiem un tikai tiktāl, cik tas ir izpildāms. Tas neattiecas uz patērētājiem ES vai EEZ." },
       { kind: "p", text: "Pirms vēršanās tiesā. Sazinieties ar mums pa [legal@dezbatere.ro]; lielāko daļu jautājumu var atrisināt, un mūsu mērķis ir atbildēt [5] darbdienu laikā. Ja esat patērētājs Rumānijā vai ES, varat izmantot alternatīvu strīdu izšķiršanu ar [the ANPC – named SAL entity, website] starpniecību; mēs [do / do not] apņemamies piedalīties šajā procedūrā. Sūdzības par moderēšanas lēmumiem izskata saskaņā ar 10. sadaļu, kas ir atsevišķa kārtība." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "A pielikums — Reģionālie noteikumi",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Katrs ieraksts ir piemērojams tikai tad, ja tā reģions ir norādīts 2. sadaļā, un tajā norādītas tikai atšķirības no vispārīgās daļas. Ja ieraksts ir pretrunā vispārīgajai daļai, attiecīgā reģiona personām piemēro ierakstu." }
+      { kind: "p", text: "Katrs ieraksts ir piemērojams personām, kuras dzīvo attiecīgajā reģionā, un tajā norādītas tikai atšķirības no vispārīgās daļas. Ja ieraksts ir pretrunā vispārīgajai daļai, attiecīgā reģiona personām piemēro ierakstu." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Apvienotā Karaliste (tikai tad, ja norādīta 2. sadaļā)",
+    title: "Amerikas Savienotās Valstis",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Mūsu pārstāvis Apvienotajā Karalistē saskaņā ar UK GDPR 27. pantu ir [name, address, email]. Jums piemēro Consumer Rights Act 2015, un nekas šajos Noteikumos neierobežo jūsu tiesības saskaņā ar to; kad stāsies spēkā Digital Markets, Competition and Consumers Act 2024 abonementu noteikumi (paredzams 2027. gadā), tos piemēros maksas plāniem, tostarp pārdomu periodu pēc atjaunošanas un pēc bezmaksas izmēģinājuma. Kā mēs aizsargājam lietotājus no nelikumīga satura: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Mūsu izmantotā proaktīvā tehnoloģija: [describe, or \"none\"]. Vecuma pārbaude: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. 10. sadaļā noteiktā sūdzību procedūra pieņem sūdzības par nelikumīgu saturu, nepamatotu jūsu satura noņemšanu, jūsu konta ierobežojumiem, automatizētu rīku lietošanu, kas ietekmē jūsu saturu, un jebkādu vecuma novērtējumu, kas jūs nepamatoti bloķē. Tā ir pieejama arī satura skartajām personām, kuras nav lietotāji. Jūsu datiem piemēro mūsu Privātuma politikas B.2 pielikumu." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Amerikas Savienotās Valstis (tikai tad, ja norādītas 2. sadaļā)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tenesī. Mēs nepiedāvājam DebateAI personām, kuras dzīvo Tenesī." },
       { kind: "p", text: "Šķīrējtiesas līgums un atteikšanās no kolektīvas prasības. Ja dzīvojat Amerikas Savienotajās Valstīs, jūs un DebateAIRO vienojaties jebkuru no šiem Noteikumiem vai pakalpojuma izrietošu strīdu izšķirt saistošā individuālā šķīrējtiesā, ko pārvalda [the American Arbitration Association / JAMS] saskaņā ar tās patērētāju noteikumiem, nevis tiesā, izņemot to, ka ikviena puse var celt individuālu prasību maza apmēra prasību tiesā. Jūs varat atteikties, nosūtot e-pasta ziņojumu uz [address] 30 dienu laikā pēc pirmās piekrišanas šiem Noteikumiem. Šo līgumu reglamentē Federal Arbitration Act. Mēs sedzam šķīrējtiesas iesniegšanas nodevas. Kolektīvas, kopīgas un pārstāvības prasības tiek izslēgtas tiktāl, cik to atļauj tiesību akti. Šī sadaļa attiecas tikai uz nākotni un neattiecas uz prasījumiem, kas radušies pirms tās pieņemšanas." },
       { kind: "p", text: "Paziņojumi un noņemšana. Par bez piekrišanas kopīgotiem intīmiem attēliem var ziņot vietnē [URL] bez konta, un pēc derīga pieprasījuma tie tiek noņemti 48 stundu laikā. Autortiesību sūdzības tiek nosūtītas mūsu 16. sadaļā norādītajai pilnvarotajai personai." },
-      { kind: "p", text: "Štatu īpašie noteikumi. Kalifornija: piemēro 12. sadaļā noteiktos automātiskās atjaunošanas noteikumus; jūs jebkurā laikā varat atcelt abonementu tiešsaistē; mēs glabājam jūsu piekrišanu atjaunošanas noteikumiem vismaz trīs gadus. Ņujorka: varat atcelt abonementu 14 dienu laikā pēc jebkura maksājuma par paaugstinātu cenu un saņemt proporcionālu atmaksu. Teksasa un Nebraska: mēs nepārdodam sensitīvus personas datus. Vašingtona: mūsu Patērētāju veselības datu privātuma paziņojums vietnē [URL] attiecas uz informāciju par veselību. Kolorādo: nekas pakalpojumā nepieņem par jums lēmumus ar būtiskām sekām. Jūsu datiem un jūsu štata privātuma tiesībām piemēro mūsu Privātuma politikas B.3 pielikumu." }
+      { kind: "p", text: "Štatu īpašie noteikumi. Kalifornija: piemēro 12. sadaļā noteiktos automātiskās atjaunošanas noteikumus; jūs jebkurā laikā varat atcelt abonementu tiešsaistē; mēs glabājam jūsu piekrišanu atjaunošanas noteikumiem vismaz trīs gadus. Ņujorka: varat atcelt abonementu 14 dienu laikā pēc jebkura maksājuma par paaugstinātu cenu un saņemt proporcionālu atmaksu. Teksasa un Nebraska: mēs nepārdodam sensitīvus personas datus. Vašingtona: mūsu Patērētāju veselības datu privātuma paziņojums vietnē [URL] attiecas uz informāciju par veselību. Kolorādo: nekas pakalpojumā nepieņem par jums lēmumus ar būtiskām sekām. Jūsu datiem un jūsu štata privātuma tiesībām piemēro mūsu Privātuma politikas B.2 pielikumu." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Kanāda un Kvebeka",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir [name], privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.3 pielikumu. Kvebeka: šie Noteikumi ir pieejami franču valodā; izvēlieties franču valodu ar valodas pārslēgu; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem; uz jums neattiecas šķīrējtiesas līgums un atteikšanās no kolektīvas prasības." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanāda un Kvebeka (tikai tad, ja norādītas)",
+    title: "Austrālija un Jaunzēlande",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir [name], privacy@dezbatere.ro. Jūsu datiem piemēro mūsu Privātuma politikas B.4 pielikumu. Kvebeka: šie Noteikumi ir pieejami franču valodā; izvēlieties franču valodu ar valodas pārslēgu; iestatījumi, kas saglabā jūsu debates privātas, ir ieslēgti pēc noklusējuma; jūs varat pieprasīt par jums esošās personas informācijas izņemšanu no indeksiem; uz jums neattiecas šķīrējtiesas līgums un atteikšanās no kolektīvas prasības." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Austrālija un Jaunzēlande (tikai tad, ja norādītas)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Mūsu pakalpojumiem ir garantijas, ko nevar izslēgt saskaņā ar Austrālijas Patērētāju tiesību aktiem. Būtisku pakalpojuma trūkumu gadījumā jums ir tiesības atcelt līgumu un saņemt atmaksu par neizmantoto daļu vai kompensāciju par pakalpojuma vērtības samazinājumu; jums ir tiesības arī uz kompensāciju par citiem saprātīgi paredzamiem zaudējumiem vai kaitējumu. Ja trūkums nav būtisks, jums ir tiesības saprātīgā laikā saņemt pakalpojuma problēmu novēršanu un, ja tas netiek izdarīts, atcelt līgumu un saņemt atmaksu. Ciktāl to atļauj 64A sadaļa, mūsu atbildība par garantijas pārkāpumu aprobežojas ar atkārtotu pakalpojuma sniegšanu vai ar tās izmaksu segšanu. Maksas plānam nav cita pārdomu perioda kā vien 12. sadaļā jums piešķirtais; mūsu atmaksas politika ir […]. Jaunzēlande: piemēro Consumer Guarantees Act 1993, un nekas šajos Noteikumos to neizslēdz; par kaitīgu digitālo saziņu var ziņot mums saskaņā ar 10. sadaļu vai organizācijai Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "Šveice",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "Jūsu datiem piemēro Šveices Federālo datu aizsardzības likumu (Privātuma politikas B.5 pielikums). Jūs varat celt prasību tās vietas tiesās Šveicē, kur dzīvojat. Maksas plānam nav likumā noteiktu atteikuma tiesību; mūsu atmaksas politika ir […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Šveice (tikai tad, ja norādīta)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Jūsu datiem piemēro Šveices Federālo datu aizsardzības likumu (Privātuma politikas B.6 pielikums). Jūs varat celt prasību tās vietas tiesās Šveicē, kur dzīvojat. Maksas plānam nav likumā noteiktu atteikuma tiesību; mūsu atmaksas politika ir […]." }
+      { kind: "p", text: "Jums ir tādas pašas tiesības saskaņā ar šiem Noteikumiem kā patērētājam Eiropas Savienībā, tostarp 13. sadaļā noteiktās 14 dienu atteikuma tiesības. Jūs varat celt prasību Moldovas tiesās. Jūsu datiem piemēro Moldovas Likumu Nr. 195/2024 par personas datu aizsardzību (Privātuma politikas B.6 pielikums)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (tikai tad, ja norādīta)",
+    title: "Āzijas un Klusā okeāna reģions",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Jums ir tādas pašas tiesības saskaņā ar šiem Noteikumiem kā patērētājam Eiropas Savienībā, tostarp 13. sadaļā noteiktās 14 dienu atteikuma tiesības. Jūs varat celt prasību Moldovas tiesās. Jūsu datiem piemēro Moldovas Likumu Nr. 195/2024 par personas datu aizsardzību (Privātuma politikas B.7 pielikums)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukraina (tikai tad, ja norādīta)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Mēs piedāvājam DebateAI Ukrainā, izņemot teritorijas, kuras nekontrolē Ukrainas valdība. Produkts un šie Noteikumi ir pieejami ukraiņu valodā. Jūsu datiem piemēro Ukrainas likumu „Par personas datu aizsardzību” (Privātuma politikas B.8 pielikums)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Izraēla (tikai tad, ja norādīta)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Jūs varat atcelt maksas plānu, kā to atļauj Patērētāju aizsardzības likums, 5741-1981 [state the cancellation terms]. Šie Noteikumi un mūsu Privātuma politika ir pieejami ivritā. Jūsu datiem piemēro Izraēlas Privātuma aizsardzības likumu (Privātuma politikas B.9 pielikums)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Āzijas un Klusā okeāna reģions (tikai norādīto reģionu rindas)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapūra: mūsu datu aizsardzības speciālists ir [name, email]; nosūtīšana balstās uz līgumiskiem aizsardzības pasākumiem, kas pielīdzināmi PDPA; maksas plānam nav likumā noteikta pārdomu perioda, un mūsu atmaksas politika ir […]. Japāna: Specified Commercial Transactions Act paredzētā informācija ir pieejama vietnē [URL]; tiešsaistes abonementiem nav vispārēja pārdomu perioda, un mūsu atmaksas politika ir […]; mēs nosūtām jūsu saturu MI pakalpojumu sniedzējiem Amerikas Savienotajās Valstīs un Eiropas Savienībā, katram saskaņā ar līgumu, kas prasa aizsardzību, kura ir līdzvērtīga Japānas Act on the Protection of Personal Information prasībām, un pēc pieprasījuma mēs jums pastāstām, kādi ir šie pasākumi. Dienvidkoreja: piekrišanas neobligātai apstrādei un tirgvedībai tiek iegūtas atsevišķi no pakalpojuma darbībai nepieciešamajiem elementiem; mūsu privātuma speciālists ir [name], privacy@dezbatere.ro; saskaņā ar E-Commerce Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; pirms katra regulāra cenas paaugstinājuma vai bezmaksas plāna pārvēršanas maksas plānā mēs no jauna saņemam jūsu piekrišanu; pakalpojumā tiek izmantots ģeneratīvais MI, mēs jūs par to informējam, pirms to izmantojat, un marķējam MI ģenerētos rezultātus. Taivāna: saskaņā ar Consumer Protection Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; jūsu datiem piemēro Taivānas Personal Data Protection Act (Privātuma politikas B.10 pielikums). Taizeme: mūsu pārstāvis Taizemē ir [name] [if appointed]. Filipīnas: mūsu uzņēmuma identifikācijas informācija un tiesiskās aizsardzības mehānisms saskaņā ar Internet Transactions Act ir pieejami vietnē [URL]; sūdzības var iesniegt National Privacy Commission." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Rezervēts",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Katrā no šīm valstīm — Turcijā, Brazīlijā un Indonēzijā — ir vajadzīgs pielikums vietējā valodā, pārstāvis vai reģistrācija un dokumentu iesniegšana. Šīs valstis šeit nav aplūkotas un neietilpst 2. sadaļā, kamēr tās netiek apzināti pievienotas. Ķīnā, Vjetnamā un Krievijā pakalpojums netiek piedāvāts." }
+      { kind: "p", text: "Singapūra: mūsu datu aizsardzības speciālists ir [name, email]; nosūtīšana balstās uz līgumiskiem aizsardzības pasākumiem, kas pielīdzināmi PDPA; maksas plānam nav likumā noteikta pārdomu perioda, un mūsu atmaksas politika ir […]. Japāna: Specified Commercial Transactions Act paredzētā informācija ir pieejama vietnē [URL]; tiešsaistes abonementiem nav vispārēja pārdomu perioda, un mūsu atmaksas politika ir […]; mēs nosūtām jūsu saturu MI pakalpojumu sniedzējiem Amerikas Savienotajās Valstīs un Eiropas Savienībā, katram saskaņā ar līgumu, kas prasa aizsardzību, kura ir līdzvērtīga Japānas Act on the Protection of Personal Information prasībām, un pēc pieprasījuma mēs jums pastāstām, kādi ir šie pasākumi. Dienvidkoreja: piekrišanas neobligātai apstrādei un tirgvedībai tiek iegūtas atsevišķi no pakalpojuma darbībai nepieciešamajiem elementiem; mūsu privātuma speciālists ir [name], privacy@dezbatere.ro; saskaņā ar E-Commerce Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; pirms katra regulāra cenas paaugstinājuma vai bezmaksas plāna pārvēršanas maksas plānā mēs no jauna saņemam jūsu piekrišanu; pakalpojumā tiek izmantots ģeneratīvais MI, mēs jūs par to informējam, pirms to izmantojat, un marķējam MI ģenerētos rezultātus. Taivāna: saskaņā ar Consumer Protection Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; jūsu datiem piemēro Taivānas Personal Data Protection Act (Privātuma politikas B.7 pielikums)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "36b10f3db2edda3715f73ac90978866e725ca04c23cd956735885d9768e472e2",
-  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.1 · SPĒKĀ NO [DATE]",
+  version: "2.2",
+  sha256: "730ae085fd67d66e3d5fb558a786685f368cde49172f1bf6f69094183641b2d5",
+  eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.2 · SPĒKĀ NO [DATE]",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DebateAIRO S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",
-  endMarker: "NOTEIKUMU BEIGAS · v2.1",
+  endMarker: "NOTEIKUMU BEIGAS · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Pakalpojuma noteikumu teksts",
   sectionIdPrefix: "terms-section-",

@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Anhang B – Regionale Datenschutzbestimmungen",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Jeder Eintrag gilt nur, wenn seine Region in Abschnitt 2 der Nutzungsbedingungen aufgeführt ist, und nennt ausschließlich Abweichungen vom Hauptteil dieser Datenschutzerklärung." }
+      { kind: "p", text: "Jeder Eintrag gilt für Personen, die in seiner Region leben, und nennt ausschließlich Abweichungen vom Hauptteil dieser Datenschutzerklärung." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Vereinigtes Königreich (nur wenn aufgeführt)",
+    title: "Vereinigte Staaten",
     accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Unser Vertreter im Vereinigten Königreich gemäß Artikel 27 UK GDPR ist [name, address, email]; Sie können ihn zu allen Fragen dieser Datenschutzerklärung kontaktieren. Aufsichtsbehörde ist das Information Commissioner's Office (ICO), ico.org.uk. Um sich bei uns zu beschweren, schreiben Sie an privacy@dezbatere.ro; wir bestätigen den Eingang Ihrer Beschwerde innerhalb von 30 Tagen. Übermittlungen Ihrer Daten aus dem Vereinigten Königreich an KI-Anbieter in den Vereinigten Staaten beruhen auf der UK Extension to the EU–US Data Privacy Framework, sofern der Anbieter zertifiziert ist, und andernfalls auf dem UK International Data Transfer Addendum zu den EU-Standardvertragsklauseln, unterstützt durch eine Risikobewertung der Übermittlung; das Verzeichnis nennt für jeden Anbieter das verwendete Instrument. Eine Verletzung des Schutzes personenbezogener Daten melden wir dem ICO innerhalb von 72 Stunden, soweit das Gesetz dies verlangt, und benachrichtigen Sie unverzüglich, wenn sie für Sie ein hohes Risiko mit sich bringt. Sollten wir jemals Analyse-Cookies setzen, unterlägen diese im Vereinigten Königreich einem Opt-out statt einer Einwilligung; derzeit setzen wir keine. Falls Sie unter 18 Jahre alt sind und trotz unserer Altersregel Zugang zum Dienst erhalten, gelten für unseren Umgang mit Ihren Daten die Standards des Children's Code (Age Appropriate Design Code) des ICO." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Vereinigte Staaten (nur wenn aufgeführt)",
-    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Hinweis bei der Erhebung. Die Tabelle in Abschnitt 2 nennt die Kategorien personenbezogener Daten, die wir erheben, und ihre Quellen. Die Zwecke und Rechtsgrundlagen der Verarbeitung stehen in Abschnitt 4, die Aufbewahrungsfristen in Abschnitt 7. Folgende Kategorien sensibler personenbezogener Informationen erheben wir nur, wenn Sie sie in Ihre eigenen Fragen über sich selbst aufnehmen: Gesundheit, religiöse oder weltanschauliche Überzeugungen, Sexualleben oder sexuelle Orientierung, politische Ansichten, Gewerkschaftszugehörigkeit sowie rassische oder ethnische Herkunft. Wir verwenden sie ausschließlich zur Durchführung Ihrer Debatten und erst nach der gesonderten Einwilligung gemäß Abschnitt 3. Wir verkaufen personenbezogene Informationen nicht und geben sie nicht weiter; dies haben wir auch in den vorangegangenen zwölf Monaten nicht getan. Wir verwenden personenbezogene Informationen nicht für zielgerichtete Werbung, und wir verwenden sensible personenbezogene Informationen ausschließlich zur Erbringung des von Ihnen angeforderten Dienstes. Opt-out-Präferenzsignale: Derzeit gibt es nichts, dem Sie widersprechen müssten, da wir personenbezogene Informationen weder verkaufen noch weitergeben. Sollten wir künftig damit beginnen, beachten wir Global-Privacy-Control-Signale als Widerspruch. Ihre Rechte: Auskunft, Löschung, Berichtigung, Opt-out, Beschränkung der Verwendung sensibler personenbezogener Informationen sowie Schutz vor Benachteiligung wegen der Ausübung dieser Rechte; stellen Sie einen Antrag unter privacy@dezbatere.ro. Finanzielle Anreize: Wir bieten keine; unsere Zwecke und Schutzmaßnahmen sind im kostenlosen und im kostenpflichtigen Tarif dieselben. Speicherdauer siehe Abschnitt 7. Datenschutzverletzungen: Wir benachrichtigen Einwohner und Behörden der Bundesstaaten, wie es das jeweilige bundesstaatliche Gesetz über Datenschutzverletzungen verlangt. Dieser Hinweis wird mindestens alle zwölf Monate aktualisiert; zuletzt aktualisiert am [date]." },
       { kind: "p", text: "Connecticut: Sensible Daten verarbeiten wir nur mit Ihrer ausdrücklichen Opt-in-Einwilligung, die Sie auf dem gesonderten Bildschirm vor Ihrer ersten Debatte erteilen (Abschnitt 3); wir verwenden Ihre personenbezogenen Daten nicht zum Trainieren von KI-Modellen. Washington: Unser gesonderter Datenschutzhinweis zu Verbrauchergesundheitsdaten unter [URL] gilt für alle gesundheitsbezogenen Informationen einschließlich Schlussfolgerungen. Texas und Nebraska: Wir verkaufen keine sensiblen personenbezogenen Daten. Colorado, Connecticut, Virginia und andere Bundesstaaten mit umfassenden Datenschutzgesetzen: Die vorstehenden Rechte stehen Ihnen zu, soweit das jeweilige Recht auf uns Anwendung findet. Lehnen wir einen Antrag ab, können Sie Einspruch einlegen, indem Sie unter privacy@dezbatere.ro auf unsere Antwort antworten; lehnen wir auch den Einspruch ab, können Sie sich an den Attorney General Ihres Bundesstaates wenden." }
     ]
   },
   {
-    no: "B.4",
-    title: "Kanada und Quebec (nur wenn aufgeführt)",
-    accent: "--gold",
+    no: "B.3",
+    title: "Kanada und Quebec",
+    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist [name], privacy@dezbatere.ro. Wir beantworten Anträge innerhalb von 30 Tagen. Wir bleiben für personenbezogene Informationen verantwortlich, die wir an KI-Anbieter außerhalb Kanadas übermitteln, und verpflichten sie vertraglich zu einem vergleichbaren Schutz; diese Anbieter können den Gesetzen ihrer jeweiligen Tätigkeitsländer unterliegen, einschließlich des rechtmäßigen Behördenzugriffs. Werbe-E-Mails werden gemäß CASL nur mit Ihrer ausdrücklichen Einwilligung versandt. Eine Verletzung der Sicherheitsvorkehrungen, die ein tatsächliches Risiko eines erheblichen Schadens für Sie begründet, melden wir dem Office of the Privacy Commissioner of Canada und Ihnen, und wir bewahren Aufzeichnungen über jede Verletzung 24 Monate lang auf. Quebec: Vor der Übermittlung personenbezogener Informationen außerhalb Quebecs führen wir eine Datenschutz-Folgenabschätzung durch; einen Vertraulichkeitsvorfall, der ein Risiko einer ernsthaften Schädigung birgt, melden wir der Commission d'accès à l'information und Ihnen, und wir führen ein Register der Vorfälle; die Einstellungen, die Ihre Debatten privat halten, sind standardmäßig aktiviert; Sie können verlangen, dass wir personenbezogene Informationen über Sie aus Suchindizes entfernen oder ihre Verbreitung einstellen; Sie können Ihre Daten in einem strukturierten, gängigen Format anfordern; Abschnitt 8 beschreibt unsere automatisierte Verarbeitung." }
     ]
   },
   {
-    no: "B.5",
-    title: "Australien und Neuseeland (nur wenn aufgeführt)",
-    accent: "--reasoning",
+    no: "B.4",
+    title: "Australien und Neuseeland",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Australien. Empfänger Ihrer personenbezogenen Informationen im Ausland sind die im Verzeichnis aufgeführten KI-Anbieter und Auftragsverarbeiter mit Sitz in [the United States and the European Union]; wir ergreifen angemessene Maßnahmen, damit sie diese im Einklang mit den australischen Datenschutzgrundsätzen behandeln. Automatisierte Entscheidungen: Ab dem 10. Dezember 2026 nennt diese Datenschutzerklärung die Arten von Entscheidungen, die durch Computerprogramme getroffen werden und Ihre Rechte oder Interessen erheblich beeinträchtigen – solche gibt es nicht; Bewertungen und Urteile betreffen Argumente, nicht Sie –, sowie die dabei verwendeten personenbezogenen Informationen. Beschwerden können beim Office of the Australian Information Commissioner (OAIC) eingereicht werden. Neuseeland. Unser Datenschutzbeauftragter ist [name]. Wenn wir personenbezogene Informationen über Sie mittelbar erheben – weil eine andere Person sie in eine Frage aufgenommen hat –, bilden diese Datenschutzerklärung und Abschnitt 11 die Ihnen erteilte Information. Wir legen Daten gegenüber den KI-Anbietern im Verzeichnis als unseren Beauftragten auf Grundlage von Verträgen offen, die vergleichbare Garantien verlangen. Beschwerden können beim Office of the Privacy Commissioner (Neuseeland) eingereicht werden." }
     ]
   },
   {
-    no: "B.6",
-    title: "Schweiz (nur wenn aufgeführt)",
-    accent: "--con",
+    no: "B.5",
+    title: "Schweiz",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Es gilt das Schweizer Bundesgesetz über den Datenschutz (DSG). Aufsichtsbehörde ist der Eidgenössische Datenschutz- und Öffentlichkeitsbeauftragte (EDÖB), edoeb.admin.ch. Ihre Daten gelangen in die im Verzeichnis genannten Länder – EU-Staaten und die Vereinigten Staaten. Für die Vereinigten Staaten stützen wir uns auf das Swiss–US Data Privacy Framework, sofern der Anbieter zertifiziert ist, und andernfalls auf vom EDÖB anerkannte Standardvertragsklauseln. Eine Datenschutzverletzung, die voraussichtlich zu einem hohen Risiko für Sie führt, melden wir dem EDÖB so rasch wie möglich. Nach unserer Prüfung benötigen wir keine Vertretung in der Schweiz (Art. 14 DSG). Wir überprüfen dies jährlich." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldau (nur wenn aufgeführt)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldau",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Es gilt das moldauische Gesetz Nr. 195/2024 über den Schutz personenbezogener Daten. Es folgt der DSGVO, und der Hauptteil dieser Datenschutzerklärung beschreibt Ihre Rechte danach. Aufsichtsbehörde ist das Nationale Zentrum für den Schutz personenbezogener Daten (CNPDCP). Eine Vertretung in Moldau benötigen wir nicht, da wir im Europäischen Wirtschaftsraum niedergelassen sind (Art. 27(2)(c) des Gesetzes Nr. 195/2024). Wir überprüfen dies jährlich. Übermittlungen Ihrer Daten in die Vereinigten Staaten beruhen auf dem Mechanismus, der im Verzeichnis für den jeweiligen Anbieter genannt ist. Eine Verletzung des Schutzes personenbezogener Daten melden wir dem CNPDCP innerhalb von 72 Stunden, soweit das Gesetz dies verlangt." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukraine (nur wenn aufgeführt)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Asien-Pazifik",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Es gilt das Gesetz der Ukraine „Über den Schutz personenbezogener Daten“. In den Gebieten der Ukraine, die nicht von ihrer Regierung kontrolliert werden, bieten wir Dialectical Engine nicht an. Ihre Daten gelangen in EU-Staaten und die Vereinigten Staaten (siehe Verzeichnis). Sie können sich beim Menschenrechtsbeauftragten des ukrainischen Parlaments beschweren." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Israel (nur wenn aufgeführt)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Es gilt das israelische Protection of Privacy Law. Verantwortlicher ist die DebateAIRO S.R.L.; wie Sie uns erreichen, ist in Abschnitt 1 angegeben. Sie sind gesetzlich nicht verpflichtet, uns Ihre Daten zu geben; ohne die Kontodaten können wir kein Konto für Sie eröffnen. Wir verwenden Ihre Daten für die in Abschnitt 4 genannten Zwecke und geben sie an die in Abschnitt 5 genannten Empfänger weiter. Sie können verlangen, sie einzusehen und zu berichtigen (Abschnitt 10). Aufsichtsbehörde ist die israelische Datenschutzbehörde (Privacy Protection Authority)." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Asien-Pazifik (nur die Zeilen für aufgeführte Regionen)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapur: Unser Datenschutzbeauftragter ist [name, email]; Übermittlungen beruhen auf vertraglichen Pflichten, die einen mit dem PDPA vergleichbaren Schutz gewähren; wir melden dem PDPC meldepflichtige Verletzungen innerhalb von 3 Tagen. Japan: Wir verwenden Ihre personenbezogenen Informationen für die in Abschnitt 4 genannten Zwecke und keine anderen. Wir geben sie an die im Verzeichnis aufgeführten KI-Anbieter und Hosting-Anbieter mit Sitz in den Vereinigten Staaten und in EU-Staaten weiter, auf Grundlage von Verträgen, die sie verpflichten, sie nach dem Standard des japanischen Act on the Protection of Personal Information zu schützen; auf Anfrage teilen wir Ihnen mit, was sie zu ihrem Schutz unternehmen, und informieren Sie über das Datenschutzsystem ihres Landes. Ihre Überzeugungen, einschließlich religiöser und politischer Überzeugungen, und Ihre Gesundheit sind besonders schutzbedürftige personenbezogene Informationen; wir erheben sie nur mit Ihrer vorherigen Einwilligung (Abschnitt 3). Unser Name und unsere Anschrift lauten DebateAIRO S.R.L., [address], Rumänien, und unser Vertreter ist [name], Geschäftsführer; wie Sie einen Antrag stellen, steht in Abschnitt 10, unsere Sicherheitsmaßnahmen in Abschnitt 9, und Beschwerden richten Sie an privacy@dezbatere.ro. Datenschutzverletzungen melden wir der Personal Information Protection Commission, wie es das Gesetz verlangt. Südkorea: Unser Datenschutzbeauftragter ist [name], Geschäftsführer, privacy@dezbatere.ro. Wir übermitteln personenbezogene Informationen ins Ausland, weil die Durchführung Ihrer Debatten im Rahmen unseres Vertrags mit Ihnen dies erfordert: Bei jeder Debatte senden wir Ihre Frage und die Aussagen der Debatte, im Support-Chat Ihre Nachrichten, über eine verschlüsselte Verbindung an die im Verzeichnis aufgeführten KI-Anbieter und Hosting-Anbieter; das Verzeichnis nennt jeden Empfänger, sein Land, seine Kontaktdaten, den Zweck und die Dauer, für die er die Daten aufbewahrt. Sie können die Übermittlung ablehnen, indem Sie keine Debatten starten oder Ihr Konto löschen; dann können wir keine Debatten für Sie durchführen. Politische Ansichten, Überzeugungen und Gesundheit sind sensible Informationen; wir verarbeiten sie nur mit Ihrer gesonderten Einwilligung (Abschnitt 3). Wir treffen keine vollständig automatisierten Entscheidungen über Sie (Abschnitt 8). Wir beantworten Anträge innerhalb von [10] Tagen und melden Datenschutzverletzungen der Personal Information Protection Commission und Ihnen, wie es der Personal Information Protection Act verlangt. Taiwan: Es gilt der taiwanische Personal Data Protection Act. Wir bewahren Ihre Daten für die in Abschnitt 7 genannten Zeiträume auf; sie werden in Rumänien, anderen EU-Staaten und den Vereinigten Staaten verwendet (siehe Verzeichnis); die Empfänger sind in Abschnitt 5 aufgeführt; unsere Systeme und KI-Modelle verarbeiten sie automatisiert, um Ihre Debatten durchzuführen. Sie können verlangen, zu erfahren, welche Daten wir über Sie haben, sie einzusehen, eine Kopie zu erhalten, sie zu berichtigen, ihre Verwendung einzustellen und sie zu löschen (Abschnitt 10). Die Angabe der Kontodaten ist freiwillig, aber ohne sie können wir kein Konto für Sie eröffnen. Anträge auf Einsicht in Ihre Daten oder auf eine Kopie davon beantworten wir innerhalb von 15 Tagen; benötigen wir länger, können wir diese Frist einmalig um bis zu 15 Tage verlängern und teilen Ihnen die Gründe schriftlich mit. Philippinen: Unser Datenschutzbeauftragter ist [name]; Beschwerden können bei der National Privacy Commission eingereicht werden; Abschnitt 8 beschreibt die automatisierte Verarbeitung. Thailand: Unser Vertreter ist [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Vorbehalten",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Die Türkei, Brasilien und Indonesien erfordern jeweils eine Mitteilung in der Landessprache, einen Vertreter oder eine Registrierung sowie Einreichungen; diese Länder sind hier nicht ausgearbeitet. In China, Vietnam und Russland wird der Dienst nicht angeboten." }
+      { kind: "p", text: "Singapur: Unser Datenschutzbeauftragter ist [name, email]; Übermittlungen beruhen auf vertraglichen Pflichten, die einen mit dem PDPA vergleichbaren Schutz gewähren; wir melden dem PDPC meldepflichtige Verletzungen innerhalb von 3 Tagen. Japan: Wir verwenden Ihre personenbezogenen Informationen für die in Abschnitt 4 genannten Zwecke und keine anderen. Wir geben sie an die im Verzeichnis aufgeführten KI-Anbieter und Hosting-Anbieter mit Sitz in den Vereinigten Staaten und in EU-Staaten weiter, auf Grundlage von Verträgen, die sie verpflichten, sie nach dem Standard des japanischen Act on the Protection of Personal Information zu schützen; auf Anfrage teilen wir Ihnen mit, was sie zu ihrem Schutz unternehmen, und informieren Sie über das Datenschutzsystem ihres Landes. Ihre Überzeugungen, einschließlich religiöser und politischer Überzeugungen, und Ihre Gesundheit sind besonders schutzbedürftige personenbezogene Informationen; wir erheben sie nur mit Ihrer vorherigen Einwilligung (Abschnitt 3). Unser Name und unsere Anschrift lauten DebateAIRO S.R.L., [address], Rumänien, und unser Vertreter ist [name], Geschäftsführer; wie Sie einen Antrag stellen, steht in Abschnitt 10, unsere Sicherheitsmaßnahmen in Abschnitt 9, und Beschwerden richten Sie an privacy@dezbatere.ro. Datenschutzverletzungen melden wir der Personal Information Protection Commission, wie es das Gesetz verlangt. Südkorea: Unser Datenschutzbeauftragter ist [name], Geschäftsführer, privacy@dezbatere.ro. Wir übermitteln personenbezogene Informationen ins Ausland, weil die Durchführung Ihrer Debatten im Rahmen unseres Vertrags mit Ihnen dies erfordert: Bei jeder Debatte senden wir Ihre Frage und die Aussagen der Debatte, im Support-Chat Ihre Nachrichten, über eine verschlüsselte Verbindung an die im Verzeichnis aufgeführten KI-Anbieter und Hosting-Anbieter; das Verzeichnis nennt jeden Empfänger, sein Land, seine Kontaktdaten, den Zweck und die Dauer, für die er die Daten aufbewahrt. Sie können die Übermittlung ablehnen, indem Sie keine Debatten starten oder Ihr Konto löschen; dann können wir keine Debatten für Sie durchführen. Politische Ansichten, Überzeugungen und Gesundheit sind sensible Informationen; wir verarbeiten sie nur mit Ihrer gesonderten Einwilligung (Abschnitt 3). Wir treffen keine vollständig automatisierten Entscheidungen über Sie (Abschnitt 8). Wir beantworten Anträge innerhalb von 10 Tagen und melden Datenschutzverletzungen der Personal Information Protection Commission und Ihnen, wie es der Personal Information Protection Act verlangt. Taiwan: Es gilt der taiwanische Personal Data Protection Act. Wir bewahren Ihre Daten für die in Abschnitt 7 genannten Zeiträume auf; sie werden in Rumänien, anderen EU-Staaten und den Vereinigten Staaten verwendet (siehe Verzeichnis); die Empfänger sind in Abschnitt 5 aufgeführt; unsere Systeme und KI-Modelle verarbeiten sie automatisiert, um Ihre Debatten durchzuführen. Sie können verlangen, zu erfahren, welche Daten wir über Sie haben, sie einzusehen, eine Kopie zu erhalten, sie zu berichtigen, ihre Verwendung einzustellen und sie zu löschen (Abschnitt 10). Die Angabe der Kontodaten ist freiwillig, aber ohne sie können wir kein Konto für Sie eröffnen. Anträge auf Einsicht in Ihre Daten oder auf eine Kopie davon beantworten wir innerhalb von 15 Tagen; benötigen wir länger, können wir diese Frist einmalig um bis zu 15 Tage verlängern und teilen Ihnen die Gründe schriftlich mit." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "942be2e671ea829949a365c82603ebb41717b07f4cf9e1a03f6f1bab59862b92",
-  eyebrow: "DATENSCHUTZERKLÄRUNG · v3.2 · GÜLTIG AB [DATE]",
+  version: "3.3",
+  sha256: "20abc973bee3bf847e4f9dcb0e031af81ffe298782368ff744546b554b8e19a7",
+  eyebrow: "DATENSCHUTZERKLÄRUNG · v3.3 · GÜLTIG AB [DATE]",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",
-  endMarker: "ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.2",
+  endMarker: "ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Text der Datenschutzerklärung",
   sectionIdPrefix: "policy-section-",
