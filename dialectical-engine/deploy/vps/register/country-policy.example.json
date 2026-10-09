@@ -70,6 +70,9 @@
       "VE": { "signup": false, "pay": false, "reason": "PROVIDER_UNSUPPORTED", "blocked": true },
       "VN": { "signup": false, "pay": false, "reason": "PROVIDER_UNSUPPORTED", "blocked": true }
     },
+    "us_states": {
+      "TN": { "signup": false, "pay": false, "reason": "TERMS_EXCLUDED" }
+    },
     "unknown_ip": "REFUSE",
     "tor": "REFUSE"
   }

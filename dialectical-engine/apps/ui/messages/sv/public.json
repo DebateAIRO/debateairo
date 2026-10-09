@@ -126,7 +126,7 @@
   "public.report.models": "Modeller som deltog: {models}",
   "public.report.modelsNotRecorded": "Modeller som deltog: inte registrerade",
   "public.report.disclosure": "Den här rapporten skrevs av AI-modeller utifrån debattens argument.",
-  "public.report.notAdvice": "AI-genererad rapport. Den utgör inte medicinsk, juridisk, finansiell eller annan professionell rådgivning.",
+  "public.report.notAdvice": "AI-genererad rapport. Den utgör inte medicinsk, psykologisk, juridisk, finansiell eller annan professionell rådgivning.",
   "public.report.title.inShort": "I korthet",
   "public.report.title.story": "Hela berättelsen",
   "public.report.title.why": "Varför detta svar",

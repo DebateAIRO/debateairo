@@ -126,7 +126,7 @@ describe("terms of service modal — rendered", () => {
     await render(<TermsOfServiceModal open mode="consent" onClose={vi.fn()} />);
 
     expect(dialog().querySelector(".policyEyebrow")!.textContent).toBe(
-      "TERMS OF SERVICE · v2.0 · EFFECTIVE [DATE]"
+      "TERMS OF SERVICE · v2.1 · EFFECTIVE [DATE]"
     );
     expect(dialog().querySelector(".policyTitle")!.textContent).toBe("What you agree to");
     expect(dialog().querySelector(".policyLede")!.textContent).toBe(
@@ -145,7 +145,7 @@ describe("terms of service modal — rendered", () => {
     expect(contacts.length).toBeGreaterThanOrEqual(1);
 
     const last = dialog().querySelector(".policyBody")!.lastElementChild!;
-    expect(last.textContent).toBe("END OF TERMS · v2.0");
+    expect(last.textContent).toBe("END OF TERMS · v2.1");
 
     const pdf = [...dialog().querySelectorAll("*")].filter(
       (element) => element.textContent?.trim() === "Download PDF"
@@ -202,7 +202,7 @@ describe("terms of service modal — rendered", () => {
       expect(number.dataset.accent).toBe(token);
       expect(number.style.getPropertyValue("--accent")).toBe(`var(${token})`);
     }
-    expect(dialog().querySelectorAll(".policyText").length).toBe(107);
+    expect(dialog().querySelectorAll(".policyText").length).toBe(108);
     expect(dialog().querySelectorAll(".policyItem").length).toBe(12);
   });
 

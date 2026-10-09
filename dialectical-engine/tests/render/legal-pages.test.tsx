@@ -306,14 +306,15 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 });
 
 describe("the terms versions page lists only versions that exist", () => {
-  it("names the version the terms document itself carries, and only it", () => {
-    expect(TERMS_VERSIONS).toHaveLength(1);
+  it("names the current and previous versions, linking each to its text", () => {
+    expect(TERMS_VERSIONS).toHaveLength(2);
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(2);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
-    expect(view.querySelector(".legalVersionsNone")?.textContent).toBe(legalEnglish["legal.versions.none"]);
+    expect(rows[1]?.querySelector("a")?.getAttribute("href")).toBe(TERMS_VERSIONS[1]?.href);
+    expect(view.querySelector(".legalVersionsNone")).toBeNull();
   });
 });
 

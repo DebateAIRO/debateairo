@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "debat",
   "INCIDENT_SURFACE_PUBLISHING": "penerbitan",
   "INCIDENT_SURFACE_SIGN_IN": "proses masuk",
-  "INCIDENT_SURFACE_WHOLE_SITE": "seluruh situs"
+  "INCIDENT_SURFACE_WHOLE_SITE": "seluruh situs",
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine belum tersedia di negara Anda."
 }

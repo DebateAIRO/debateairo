@@ -24,5 +24,6 @@
   "INCIDENT_SURFACE_DEBATES": "diskusie",
   "INCIDENT_SURFACE_PUBLISHING": "publikovanie",
   "INCIDENT_SURFACE_SIGN_IN": "prihlásenie",
-  "INCIDENT_SURFACE_WHOLE_SITE": "celú lokalitu"
+  "INCIDENT_SURFACE_WHOLE_SITE": "celú lokalitu",
+  "COUNTRY_UNAVAILABLE": "Dialectical Engine zatiaľ nie je vo vašej krajine dostupný."
 }

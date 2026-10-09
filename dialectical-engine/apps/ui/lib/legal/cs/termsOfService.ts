@@ -60,7 +60,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kde službu DebateAI nabízíme",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Službu DebateAI nabízíme osobám, které žijí v [the European Union and the European Economic Area] [and: the United States / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Jinde ji nenabízíme. Pokud žijete mimo tyto země, můžete mít k webu přístup, službu však na vás nezaměřujeme, nepřijímáme od vás platby a tyto Podmínky ani naše Zásady ochrany osobních údajů nejsou přizpůsobeny právu vaší země. Příloha A stanoví, co platí v jednotlivých regionech, v nichž službu poskytujeme." }
+      { kind: "p", text: "Službu DebateAI nabízíme osobám, které žijí v [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Jinde ji nenabízíme. Pokud žijete mimo tyto země, můžete mít k webu přístup, službu však na vás nezaměřujeme, nepřijímáme od vás platby a tyto Podmínky ani naše Zásady ochrany osobních údajů nejsou přizpůsobeny právu vaší země. Příloha A stanoví, co platí v jednotlivých regionech, v nichž službu poskytujeme." }
     ]
   },
   {
@@ -70,7 +70,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Tyto Podmínky přijímáte zaškrtnutím políčka „Přečetl(a) jsem si a souhlasím s podmínkami poskytování služby.“ a kliknutím na Vytvořit účet. Tím mezi vámi a DebateAIRO S.R.L. vzniká smlouva. Podmínky zahrnují pravidla přijatelného užívání v oddílu 7, pravidla zveřejňování v oddílu 9, ustanovení o odpovědnosti v oddílu 15, ustanovení o rozhodném právu a řešení sporů v oddílu 18 a, pokud žijete ve Spojených státech, rozhodčí smlouvu v příloze A.3. V souladu s našimi Zásadami ochrany osobních údajů uchováváme záznam o tom, kterou verzi jste přijali a kdy." },
       { kind: "p", text: "Naše Zásady ochrany osobních údajů na adrese [dezbatere.ro/privacy] vysvětlují, jak nakládáme s osobními údaji. Jde o informace, které jsme povinni vám poskytnout, nikoli o smlouvu, s níž souhlasíte, a nic v těchto Podmínkách z nich nečiní souhlas se zpracováním. Naše Zásady používání souborů cookie na adrese [dezbatere.ro/cookies] a náš Registr poskytovatelů AI na adrese [dezbatere.ro/providers] jsou do těchto Podmínek začleněny odkazem." },
-      { kind: "p", text: "Než s námi elektronicky uzavřete smlouvu, rozhraní vám zobrazí jednotlivé kroky, umožní vám před odesláním zkontrolovat a opravit zadané údaje a sdělí vám jazyky, v nichž lze smlouvu uzavřít. Tyto Podmínky jsou dostupné ve formě, kterou můžete uložit a vytisknout, přijatou verzi vám zašleme e-mailem a kdykoli můžete požádat o její kopii. Nic v těchto Podmínkách neomezuje práva, která máte podle rumunského či unijního spotřebitelského práva nebo práva země, v níž žijete, pokud je nelze smluvně omezit." }
+      { kind: "p", text: "Než s námi elektronicky uzavřete smlouvu, rozhraní vám zobrazí jednotlivé kroky, umožní vám před odesláním zkontrolovat a opravit zadané údaje a sdělí vám jazyky, v nichž lze smlouvu uzavřít. Tyto Podmínky jsou dostupné ve formě, kterou můžete uložit a vytisknout. Při koupi placeného tarifu vám e-mailem zašleme verzi, kterou jste přijali. O kopii můžete požádat kdykoli. Nic v těchto Podmínkách neomezuje práva, která máte podle rumunského či unijního spotřebitelského práva nebo práva země, v níž žijete, pokud je nelze smluvně omezit." }
     ]
   },
   {
@@ -100,7 +100,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Váš účet",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Registrujete se pomocí e-mailové adresy, hesla, e-mailové adresy pro obnovení a dvoufaktorového ověřování, které je povinné. Zvolíte si pseudonym, tedy jméno zobrazované u všeho, co zveřejníte; jednou nastavený pseudonym nelze změnit. Své heslo, ověřovací aplikaci a kódy pro obnovení uchovávejte v bezpečí. Odpovídáte za činnost prováděnou prostřednictvím svého účtu, ledaže je důsledkem našeho pochybení." },
+      { kind: "p", text: "Registrujete se pomocí e-mailové adresy, hesla, e-mailové adresy pro obnovení a dvoufaktorového ověřování, které je povinné. Přidělíme vám náhodný pseudonym, který se zobrazí u všeho, co zveřejníte. Nelze jej změnit. Své heslo, ověřovací aplikaci a kódy pro obnovení uchovávejte v bezpečí. Odpovídáte za činnost prováděnou prostřednictvím svého účtu, ledaže je důsledkem našeho pochybení." },
       { kind: "p", text: "Pokud se nedohodneme jinak, smíte mít jeden účet. Účet nesdílejte, neprodávejte ani nepřevádějte." },
       { kind: "p", text: "Ztratíte-li přístup, obnovení účtu probíhá podle postupu zveřejněného v produktu, který zahrnuje čekací doby ztěžující převzetí účtu. Žádost o obnovení můžeme odmítnout, pokud nedokážeme přiměřeně ověřit, že pochází od vás." },
       { kind: "p", text: "Svůj účet můžete kdykoli uzavřít v nabídce Nastavení → Účet. Uzavření nabude účinku po sedmidenní ochranné lhůtě, během níž je můžete zrušit, a upozorníme vás prostřednictvím každého z vašich registrovaných kanálů. Oddíl 11 vysvětluje, co se při uzavření vymaže a co nikoli." }
@@ -116,7 +116,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Vaše vlastní citlivé informace. Otázky, které pokládáte, se mohou týkat vašeho zdraví, přesvědčení, politických názorů nebo jiných citlivých záležitostí. Souhlas s tím vyslovujete na samostatné obrazovce před svou první debatou. Pokud žijete v místě se zvláštními pravidly pro údaje o zdravotním stavu, může vás příloha A odkázat na samostatné oznámení." },
       { kind: "p", text: "Nezadávejte ani nezveřejňujte nezákonný obsah, včetně obsahu, který je pomlouvačný, podněcuje k násilí nebo nenávisti, obtěžuje či vyhrožuje, představuje intimní snímky sdílené bez souhlasu, porušuje práva duševního vlastnictví nebo důvěrnost, vyzrazuje obchodní tajemství, představuje materiál zobrazující sexuální zneužívání dětí nebo porušuje sankce či pravidla kontroly vývozu." },
       { kind: "p", text: "Nepoužívejte DebateAI ke klamání. Nevydávejte vygenerovaný výstup za text napsaný člověkem, pokud by to bylo zavádějící, neodstraňujte z něj označení, že jej vytvořila AI, a nepoužívejte jej k vytváření zdání konsenzu, falešných důkazů nebo k vydávání se za jinou osobu." },
-      { kind: "p", text: "Nenapadejte službu. Není dovoleno automatizovaně přistupovat ke zveřejněným debatám ani je stahovat, procházet či hromadně vytěžovat nad rámec toho, co dovoluje náš soubor robots; obcházet omezení četnosti požadavků, ověřování nebo kontrolní mechanismy zveřejňování; pokoušet se získat prompty nebo systémové pokyny; používat prompt injection s cílem přimět systém, aby ignoroval svá omezení; ani bez našeho písemného svolení provádět průzkumné či zátěžové testy." },
+      { kind: "p", text: "Nenapadejte službu. Běžné indexování zveřejněných debat vyhledávači je dovoleno. Jiný automatizovaný přístup, stahování, procházení či hromadné vytěžování těchto debat vyžaduje náš písemný souhlas. Nesmíte obcházet omezení četnosti požadavků, ověřování ani kontrolní mechanismy zveřejňování; pokoušet se získat prompty nebo systémové pokyny; používat prompt injection s cílem přimět systém ignorovat svá omezení; ani bez našeho písemného svolení provádět průzkumné či zátěžové testy." },
       { kind: "p", text: "Službu dále neprodávejte ani neuvádějte pod jinou značkou a bez naší písemné dohody ji nepoužívejte k vytvoření konkurenčního systému, včetně použití výstupů jako trénovacích dat." },
       { kind: "p", text: "Nepoužívejte DebateAI k rozhodování o zdraví, bezpečnosti, právních nárocích, zaměstnání, úvěru, bydlení nebo imigračním statusu určité osoby. Služba k tomu není určena a její výstupy nejsou pro taková rozhodnutí bezpečným základem." },
       { kind: "p", text: "Místní právo v místě zveřejnění. Odpovídáte za to, že vše, co zveřejníte, je v souladu s právem země, v níž se nacházíte. V některých regionech můžeme zveřejňování určitých témat omezit." },
@@ -143,7 +143,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Debaty jsou ve výchozím nastavení soukromé. Nic z toho, co vytvoříte, není viditelné nikomu jinému, dokud to nezveřejníte." },
-      { kind: "p", text: "Co zveřejnění způsobí. Zveřejnění je úmyslný, samostatně potvrzený úkon. Při zveřejnění pořídíme neměnný snímek debaty a zpřístupníme jej komukoli ke čtení bez účtu. [Search engines may index it. / Published debates are not indexed by search engines unless you choose to allow it.] Snímek zobrazuje váš pseudonym, otázku tak, jak jste ji napsali, strom argumentů, hodnocení, závěr a interval spolehlivosti a nese viditelné označení, že obsah vytvořila AI. Nezobrazuje vaši e-mailovou adresu, záznamy relací ani historii účtu." },
+      { kind: "p", text: "Co zveřejnění způsobí. Zveřejnění je úmyslný, samostatně potvrzený úkon. Při zveřejnění pořídíme neměnný snímek debaty a zpřístupníme jej komukoli ke čtení bez účtu. Vyhledávače ji mohou indexovat. Snímek zobrazuje váš pseudonym, otázku tak, jak jste ji napsali, strom argumentů, hodnocení, závěr a interval spolehlivosti a nese viditelné označení, že obsah vytvořila AI. Nezobrazuje vaši e-mailovou adresu, záznamy relací ani historii účtu." },
       { kind: "p", text: "Zveřejnění je v praxi fakticky nevratné. Jakmile je debata veřejná, jiné osoby ji mohou číst, citovat, pořizovat snímky obrazovky, archivovat a ukládat do mezipaměti. Zrušení zveřejnění odstraní debatu z DebateAI a zničí klíč k naší kopii, nedosáhne však na kopie, které již existují jinde. Nezveřejňujte nic, co byste nechtěli mít trvale spojeno se svým pseudonymem." },
       { kind: "p", text: "Zveřejněné debaty při uzavření účtu. Po uzavření účtu odstraníme každou vámi zveřejněnou debatu z veřejného přístupu bez zbytečného odkladu a v každém případě do 30 dnů, pokud nám zákon neukládá jednat rychleji nebo konkrétní položku uchovat. Kopie vytvořené jinými osobami před odstraněním jsou mimo naši kontrolu. Chcete-li, aby debata zůstala po vašem odchodu dostupná, nejprve si ji stáhněte. [This is Option B from the earlier drafts, as recommended in the second-opinion review. It is a product change to implement, not a description of the current system, which keeps published snapshots readable after erasure.]" },
       { kind: "p", text: "Zveřejněný obsah můžeme vždy odstranit. Zveřejněnou debatu můžeme odstranit nebo k ní omezit přístup, vyžaduje-li to zákon, nařídí-li to soud nebo příslušný orgán, nebo porušuje-li tyto Podmínky či je nezákonná. Nic v tomto oddílu nám nebrání jednat na základě platného oznámení podle oddílu 10 a nic v něm nepředstavuje příslib, že zveřejněná debata zůstane dostupná." },
@@ -307,6 +307,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Spojené státy (pouze jsou-li uvedeny v oddílu 2)",
     accent: "--muted",
     blocks: [
+      { kind: "p", text: "Tennessee. Službu DebateAI nenabízíme osobám, které žijí v Tennessee." },
       { kind: "p", text: "Rozhodčí smlouva a vzdání se práva na hromadnou žalobu. Žijete-li ve Spojených státech, vy a DebateAIRO souhlasíte s řešením veškerých sporů vyplývajících z těchto Podmínek nebo služby závazným individuálním rozhodčím řízením vedeným [the American Arbitration Association / JAMS] podle jejích spotřebitelských pravidel, namísto u soudu; každý z nás však může uplatnit individuální nárok u soudu pro drobné nároky. Můžete se odhlásit zasláním e-mailu na [address] do 30 dnů od prvního přijetí těchto Podmínek. Tato dohoda se řídí Federal Arbitration Act. Hradíme poplatky za zahájení rozhodčího řízení. Práva na hromadné, kolektivní a zastupitelské žaloby se vzdáváte v rozsahu dovoleném zákonem. Tento oddíl se použije pouze do budoucna a nevztahuje se na nároky vzniklé před jeho přijetím." },
       { kind: "p", text: "Oznámení a odstraňování. Intimní snímky bez souhlasu lze bez účtu nahlásit na adrese [URL] a budou odstraněny do 48 hodin od platné žádosti. Stížnosti týkající se autorských práv se zasílají našemu určenému zástupci uvedenému v oddílu 16." },
       { kind: "p", text: "Ustanovení pro jednotlivé státy. Kalifornie: použijí se podmínky automatického obnovování podle oddílu 12; předplatné můžete kdykoli zrušit online; váš souhlas s podmínkami obnovování uchováváme nejméně tři roky. New York: do 14 dnů od jakékoli platby se zvýšenou cenou můžete předplatné zrušit a získat poměrné vrácení peněz. Texas a Nebraska: citlivé osobní údaje neprodáváme. Washington: na informace související se zdravím se vztahuje naše Oznámení o ochraně údajů o zdraví spotřebitelů na adrese [URL]. Colorado: nic ve službě o vás nečiní rozhodnutí s následky. Na vaše údaje a vaše práva na ochranu soukromí podle práva jednotlivých států se vztahují naše Zásady ochrany osobních údajů, příloha B.3." }
@@ -380,12 +381,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.0",
-  sha256: "f285fafd66a7d195292d26cdaa218b87355c55e56e92ec06f9d68fb9e106dece",
-  eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.0 · ÚČINNÉ OD [DATE]",
+  version: "2.1",
+  sha256: "2d178be8825c84a5609dd63451438d66fd7e77835a438ccb92bc09034ef6d309",
+  eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.1 · ÚČINNÉ OD [DATE]",
   title: "S čím souhlasíte",
   lede: "Smlouva mezi vámi a DebateAIRO S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.",
-  endMarker: "KONEC PODMÍNEK · v2.0",
+  endMarker: "KONEC PODMÍNEK · v2.1",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Text Podmínek poskytování služby",
   sectionIdPrefix: "terms-section-",

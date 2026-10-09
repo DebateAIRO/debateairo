@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Prywatność",
   "support.aiBanner": "Odpowiedzi są generowane przez AI, oznaczone w sposób możliwy do odczytu maszynowego i mogą być błędne. W każdej chwili możesz poprosić o kontakt z człowiekiem.",
   "support.cookiePreferences": "Przechowywane pliki cookie",
-  "support.recoverAccount": "Odzyskaj konto"
+  "support.recoverAccount": "Odzyskaj konto",
+  "support.countryUnavailable": "Dialectical Engine nie jest jeszcze dostępny w Twoim kraju."
 }

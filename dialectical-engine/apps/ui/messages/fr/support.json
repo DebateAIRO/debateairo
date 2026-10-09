@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Confidentialité",
   "support.aiBanner": "Les réponses sont générées par l’IA, signalées dans un format lisible par machine et peuvent être erronées. Demandez l’intervention d’une personne à tout moment.",
   "support.cookiePreferences": "Les cookies que nous stockons",
-  "support.recoverAccount": "Récupérer votre compte"
+  "support.recoverAccount": "Récupérer votre compte",
+  "support.countryUnavailable": "Dialectical Engine n’est pas encore disponible dans votre pays."
 }

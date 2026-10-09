@@ -46,7 +46,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Konts — E-pasta adrese un atkopšanas e-pasta adrese (glabātas šifrētā veidā, izmantojot ar atslēgu aizsargātu indeksu, lai mēs varētu atrast kontu, nelasot adresi); parole (glabāta kā jaucējvērtība, nekad ne atklātā tekstā); jūsu divfaktoru autentifikācijas slepenā atslēga (šifrēta); desmit atkopšanas kodi (glabāti kā jaucējvērtības); jūsu pseidonīms; laiks, kad apstiprinājāt, ka esat vismaz 18 gadus vecs — Jūs, reģistrācijas laikā",
+        "Konts — E-pasta adrese un atkopšanas e-pasta adrese (glabātas šifrētā veidā, izmantojot ar atslēgu aizsargātu indeksu, lai mēs varētu atrast kontu, nelasot adresi); parole (glabāta kā jaucējvērtība, nekad ne atklātā tekstā); jūsu divfaktoru autentifikācijas slepenā atslēga (šifrēta); desmit atkopšanas kodi (glabāti kā jaucējvērtības); jūsu pseidonīms — Jūs un pakalpojums, reģistrācijas laikā",
+        "IP adreses valsts pārbaude reģistrējoties un sākot jaunas debates — Reģistrējoties IP adreses valsti un Tor izejas mezglus lokāli pārbaudām ar DB-IP Lite un Tor sarakstu. Pirms katrām jaunām debatēm IP adreses valsti lokāli pārbaudām vēlreiz un debates atsakām, ja valsts ir vienmēr bloķēto valstu sarakstā. Reģistrāciju no neapkalpotām valstīm, Tor vai IP adresēm, kuru valsti nevaram noteikt atsakām; IP adresi trešajām personām nesūtām. Atteikumus apkopo pēc maršruta, koda, valsts un laika intervāla; IP adresi un lietotāja aģentu glabā tikai kā ar atslēgu veidotus vienvirziena īssavilkumus. Pierādījuma veids ir norādīts kā “IP adrese”. — Jūsu savienojums",
+        "Vecuma pārbaude — Jūs ievadāt dzimšanas datumu, taču mēs to neglabājam. Veiksmīgas reģistrācijas gadījumā reģistrējam pozitīvu rezultātu; esoša konta pārbaudes rezultāts var būt pozitīvs vai negatīvs. Ierakstā ir minimālais vecums, IP adreses valsts, ja zināma, noteikuma versija, pārbaudes konteksts un laiks — Jūs un reģistrācijas sistēma",
+        "Deklarētā dzīvesvieta — Reģistrējoties izvēlētā dzīvesvietas valsts un, ja tā ir ASV, štats — Jūs",
         "Sesijas un drošība — Sesijas pilnvara jaucējvērtības veidā; ar atslēgu aizsargāta jūsu pārlūkprogrammas user-agent virknes jaucējvērtība, ko izmanto, lai pamanītu sesijas pāreju uz citu pārlūkprogrammu; izveides, pēdējās izmantošanas un termiņa beigu laikspiedoli. Mēs neglabājam jūsu IP adresi, ierīces nosaukumu vai pārlūkprogrammas informāciju kopā ar sesiju, un sesiju sarakstā, ko redzat Iestatījumos, ir norādīti tikai laikspiedoli — Jūsu pārlūkprogramma",
         "Drošības audita pieraksts — Tikai papildināms drošībai nozīmīgu notikumu žurnāls — reģistrācija, verifikācija, pierakstīšanās mēģinājumi, atkopšana, publicēšana, dzēšana. Katra notikuma IP adrese un user-agent tiek glabāti tikai kā vienvirziena ar atslēgu aizsargāti īssavilkumi (Argon2id), tādēļ tos nevar atkal nolasīt, bet noteiktā laikposmā var salīdzināt. Pierakstīšanās un atkopšanas riska signāli tiek glabāti šifrētā veidā 90 dienu — Jūsu pārlūkprogramma katra notikuma laikā",
         "Debašu saturs — Jūsu ievadītais jautājums; jūsu iestatītās vadības piezīmes; dzinēja ģenerētie apgalvojumi, kritika, pierādījumu atsauces, vērtējumi un spriedumi; katra MI pakalpojumu sniedzēja atbildes precīzs ieraksts; izguves vaicājumi un avotu atsauces. Tas viss tiek glabāts šifrētā veidā, izmantojot tieši jūsu kontam paredzētu atslēgu — Jūs un MI modeļi, kas apstrādā jūsu jautājumu",
@@ -56,6 +59,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Personas, kuras nav mūsu lietotāji — Personas dati par citām personām, kurus iekļaujat jautājumā vai kurus dzinējs ģenerē, uz to atbildot. Mēs lūdzam jūs tā nerīkoties; 11. sadaļā ir paskaidrots, ko mēs darām, ja tas tomēr notiek — Jūs, netieši"
         ]
       },
+      { kind: "p", text: "Reģistrējoties pārbaudām IP adreses valsti un vecumu. Dzimšanas datumu nosūta tikai pārbaudei, un tas netiek glabāts. IP pārbaude notiek lokāli, nenosūtot adresi trešajai personai. Pirms katrām jaunām debatēm lokāli pārbaudām arī IP adreses valsti; debates atsakām, ja valsts vienmēr ir bloķēta." },
       { kind: "p", text: "Mēs nevācam analītikas vai telemetrijas datus par to, kā izmantojat produktu, un šādam nolūkam neiestatām sīkdatnes. Ja tas mainīsies, vispirms tiks mainītas šī politika un Sīkdatņu politika un jums tiks lūgta piekrišana." }
     ]
   },
@@ -65,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Debašu dzinējs rosina uzdot jautājumus par politiku, reliģiju, veselību, seksualitāti un pārliecību. Tās ir īpašas datu kategorijas saskaņā ar GDPR 9. pantu, un tās var parādīties jūsu jautājumos neatkarīgi no tā, vai mēs tās plānojam vākt." },
-      { kind: "p", text: "Par jums. Pirms savām pirmajām debatēm jūs atsevišķā ekrānā sniedzat nepārprotamu piekrišanu tam, ka mēs apstrādājam sensitīvu informāciju, kuru izvēlaties iekļaut savos jautājumos, lai vadītu jūsu debates. Mēs fiksējam formulējuma versiju, kurai piekritāt, jūsu valodu un laiku. Bez šīs piekrišanas jūs nevarat sākt debates. Jūs jebkurā laikā varat piekrišanu atsaukt, neiekļaujot šādu informāciju vai dzēšot debates. Informācija, ko publicējat par sevi, ir dati, kurus esat izvēlējies publiskot." },
+      { kind: "p", text: "Par jums. Pirms savām pirmajām debatēm jūs atsevišķā ekrānā sniedzat nepārprotamu piekrišanu tam, ka mēs apstrādājam sensitīvu informāciju, kuru izvēlaties iekļaut savos jautājumos, lai vadītu jūsu debates. Mēs fiksējam formulējuma versiju, kurai piekritāt, jūsu valodu un laiku. Bez šīs piekrišanas jūs nevarat sākt debates. Jūs jebkurā laikā varat šo piekrišanu atsaukt, rakstot uz privacy@dezbatere.ro. Jūs varat arī neiekļaut šādu informāciju vai dzēst debates, kurās tā ir. Informācija, ko publicējat par sevi, ir dati, kurus esat izvēlējies publiskot." },
       { kind: "p", text: "Par citām personām. Neviens juridiskais nosacījums mums neļauj apstrādāt sensitīvus datus par trešo personu, kuru minat jautājumā, un šāda nosacījuma nav arī nevienam mūsu MI pakalpojumu sniedzējam. Tādēļ Noteikumi to aizliedz, mēs samazinām nosūtāmās informācijas apjomu un pēc pieprasījuma šādu saturu ātri noņemam — 11. sadaļa." },
       { kind: "p", text: "Veselības informācija. Dažās valstīs uz veselības datiem, tostarp secinājumiem, attiecas īpaši tiesību akti. Ja dzīvojat [the State of Washington], ir piemērojams atsevišķs [Consumer Health Data Privacy Notice]." }
     ]
@@ -75,11 +79,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kāpēc mēs izmantojam jūsu datus un uz kāda pamata",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Katram nolūkam ir viens tiesiskais pamats saskaņā ar GDPR 6. panta 1. punktu, un mēs vienam nolūkam savāktos datus atkārtoti neizmantojam citam nolūkam." },
+      { kind: "p", text: "Tālāk norādām katram nolūkam piemērojamos tiesiskos pamatus saskaņā ar GDPR 6. panta 1. punktu. Vienam nolūkam savāktos datus atkārtoti neizmantojam citam nolūkam." },
       {
         kind: "list",
         items: [
         "Jūsu konta izveide un darbības nodrošināšana, jūsu autentificēšana, jūsu debašu vadīšana un glabāšana, lai jūs tās varētu atkārtoti atvērt un atskaņot — Konts, sesijas, debašu saturs — Līgums — GDPR 6. panta 1. punkta b) apakšpunkts (Art. 6(1)(b))",
+        "IP valsts un Tor pārbaude reģistrējoties, lai atteiktu adreses no neapkalpotām valstīm vai IP adreses, kuru valsti nevaram noteikt, un IP valsts pārbaude pirms katrām jaunām debatēm, lai atteiktu vienmēr bloķētās valstis — IP pārbaude un atteikumu audits — Leģitīmās intereses — Art. 6(1)(f), drošs un tiesisks pakalpojums; juridisks pienākums — Art. 6(1)(c), ja piemērojami ierobežojumi",
+        "Vecuma pārbaude reģistrējoties vai esošam kontam — Vecuma pārbaudes rezultāts; dzimšanas datums tikai pārbaudes laikā — Līgums — Art. 6(1)(b); leģitīmās intereses — Art. 6(1)(f), nepilngadīgo aizsardzība",
+        "Dzīvesvietai atbilstošu patērētāju, privātuma un nodokļu noteikumu piemērošana — Deklarētā valsts un ASV štats — Līgums — Art. 6(1)(b); juridisks pienākums — Art. 6(1)(c)",
         "Jūsu jautājuma un dzinēja apgalvojumu nosūtīšana MI pakalpojumu sniedzējiem, lai ģenerētu debates — Debašu saturs — Līgums — GDPR 6. panta 1. punkta b) apakšpunkts (Art. 6(1)(b))",
         "Pakalpojuma drošības uzturēšana, ļaunprātīgas izmantošanas atklāšana, iespēja jums pamanīt pierakstīšanos, ko neesat veicis, audita pieraksta glabāšana — Sesijas, drošības audita pieraksts, atbalsta sistēmas ļaunprātīgas izmantošanas jaucējvērtības — Leģitīmās intereses — GDPR 6. panta 1. punkta f) apakšpunkts (Art. 6(1)(f)): mūsu un jūsu interese par drošu pakalpojumu. Jūs varat iebilst; 10. sadaļa",
         "Pierādīšana, ka akceptējāt Noteikumus un sniedzāt vai atsaucāt piekrišanu — Piekrišanas un akceptēšanas ieraksti — Juridisks pienākums — GDPR 6. panta 1. punkta c) apakšpunkts (Art. 6(1)(c)), mūsu pienākums pierādīt piekrišanu saskaņā ar 7. panta 1. punktu (Art. 7(1)) — un leģitīmās intereses apliecināt līgumu",
@@ -112,7 +119,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Publicēšana un redzamība",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Debates ir privātas līdz brīdim, kad tās publicējat. Publicēšana ir apzināta, atsevišķi apstiprināta darbība. Publicētās debatēs tiek parādīts jūsu pseidonīms, jūsu jautājums tieši tādā veidā, kā to uzrakstījāt, argumentu koks, vērtējumi, spriedums un ticamības pakāpe, kā arī redzams marķējums, ka saturu ir ģenerējis MI. Tajās nekad netiek parādīta jūsu e-pasta adrese, sesiju ieraksti vai konta vēsture. [Published debates are / are not] indeksētas meklētājprogrammās [unless you choose]." },
+      { kind: "p", text: "Debates ir privātas līdz brīdim, kad tās publicējat. Publicēšana ir apzināta, atsevišķi apstiprināta darbība. Publicētās debatēs tiek parādīts jūsu pseidonīms, jūsu jautājums tieši tādā veidā, kā to uzrakstījāt, argumentu koks, vērtējumi, spriedums un ticamības pakāpe, kā arī redzams marķējums, ka saturu ir ģenerējis MI. Tajās nekad netiek parādīta jūsu e-pasta adrese, sesiju ieraksti vai konta vēsture. Meklētājprogrammas var indeksēt publicētās debates." },
       { kind: "p", text: "Publikācijas atcelšana noņem debates no Dialectical Engine un iznīcina mūsu publiskās kopijas atslēgu. Kopijas, kuras jau ir izveidojuši lasītāji, meklētājprogrammas vai arhīvi, nav mūsu kontrolē, un mēs nevaram tās atsaukt." },
       { kind: "p", text: "Kad dzēšat savu kontu, mēs bez nepamatotas kavēšanās un ne vēlāk kā 30 dienu laikā liedzam publisku piekļuvi visām jūsu publicētajām debatēm, ja vien tiesību akti neprasa mums saglabāt konkrētu vienumu. [Option B — a product change; see the Terms, section 9.]" }
     ]
@@ -126,10 +133,14 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         kind: "list",
         items: [
         "Konts — Kamēr konts pastāv, kā arī 7 dienu labvēlības periods pēc tam, kad lūdzat to slēgt — Atslēgas tiek iznīcinātas; ieraksts tiek dzēsts",
+        "Vecuma pārbaudes rezultāts un konteksts — Kamēr konts pastāv — Dzēsts kopā ar kontu",
+        "Deklarētā dzīvesvietas valsts un ASV štats — Kamēr konts pastāv — Dzēsti kopā ar kontu",
         "Sesiju ieraksti — 14 dienu pēc pēdējās izmantošanas vai 90 dienu pēc izveides atkarībā no tā, kurš termiņš iestājas pirmais — Tiek dzēsti",
         "E-pasta verifikācijas saites — 24 stundas — Tiek dzēstas",
         "Pierakstīšanās un atkopšanas riska signāli — 90 dienu; šo termiņu nodrošina datubāze — Tiek neatgriezeniski dzēsti",
         "Drošības audita pieraksts — Visu pakalpojuma darbības laiku — Tikai papildināms; IP un user-agent ir vienvirziena īssavilkumi, un tos nevar atkal nolasīt",
+        "IP valsts pārbaudes atteikuma audita ieraksts — Visu pakalpojuma darbības laiku — Tikai papildināms; reģistrē maršrutu, atteikuma kodu, valsti, laika intervālu un pierādījuma veidu “IP adrese”; IP adresi un lietotāja aģentu glabā tikai kā ar atslēgu veidotus vienvirziena īssavilkumus",
+        "Neapstrādāta IP adrese valsts pārbaudei reģistrējoties vai sākot jaunas debates — Tikai attiecīgā pieprasījuma laikā — Šī pārbaude neglabā nolasāmu IP; atteikuma auditā IP adresi un lietotāja aģentu glabā tikai kā ar atslēgu veidotus vienvirziena īssavilkumus, bet IP valsts var būt vecuma pārbaudes ierakstā",
         "Debašu saturs (privāts) — Kamēr konts pastāv — Slēgšanas brīdī atslēgas tiek iznīcinātas, padarot saturu nenolasāmu",
         "Debašu saturs (publicēts) — Kamēr tas ir publicēts un kamēr konts pastāv — Atceļot publikāciju vai slēdzot kontu, tam tiek liegta publiska piekļuve; atslēgas tiek iznīcinātas",
         "Pakalpojumu sniedzēju atbilžu ieraksti un izguves atsauces — Tikpat ilgi kā debates, uz kurām tie attiecas — Tas pats",
@@ -176,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Ierobežošana (GDPR 18. pants; Art. 18) — Pieprasījums mums pārtraukt konkrētu datu apstrādi, kamēr tiek atrisināts strīds par tiem",
         "Iebildums (GDPR 21. pants; Art. 21) — Iebildums pret apstrādi, kas balstīta uz leģitīmām interesēm — 4. sadaļā minēto drošības un audita apstrādi —, un mēs to pārtrauksim, ja vien nevarēsim pierādīt pārliecinošu pamatojumu. Jebkurā laikā varat iebilst pret tirgvedību, un mēs to pārtrauksim",
         "Pārnesamība (GDPR 20. pants; Art. 20) — Jūsu debates un konta dati plaši izmantotā, mašīnlasāmā formātā. [Pending: same export as Access.] Jūsu radītais saturs, kas nav personas dati, piemēram, jūsu jautājumi, pēc pieprasījuma tiek jums atdots, beidzoties līgumam",
-        "Piekrišanas atsaukšana (GDPR 7. panta 3. punkts; Art. 7(3)) — Tirgvedības piekrišanas atsaukšana jebkurā e-pasta ziņojumā vai Iestatījumos; piekrišanas sensitīvu datu apstrādei atsaukšana, neiekļaujot šādus datus vai dzēšot debates. Atsaukšana neietekmē jau notikušu apstrādi",
+        "Piekrišanas atsaukšana (GDPR 7. panta 3. punkts; Art. 7(3)) — Tirgvedības piekrišanas atsaukšana jebkurā e-pasta ziņojumā vai Iestatījumos; piekrišanas sensitīvu datu apstrādei atsaukšana, rakstot uz privacy@dezbatere.ro (šādus datus var arī neiekļaut vai dzēst debates, kurās tie ir). Atsaukšana neietekmē jau notikušu apstrādi",
         "Sūdzība — Rumānijas uzraudzības iestādei ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukareste, anspdcp@dataprotection.ro, vai jūsu dzīvesvietas valsts uzraudzības iestādei. Mēs vēlētos, lai jūs vispirms sazinātos ar mums"
         ]
       },
@@ -241,7 +252,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē [dezbatere.ro/privacy/versions]. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju." },
-      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta [date]. Versija 3.0 aizstāja versiju 2.1, kurā sesiju dati, glabāšanas termiņi, analītika, eksportēšana un dzēšanas ietekme uz publicētajām debatēm bija aprakstīti veidā, kas vairs neatspoguļoja pakalpojumu." }
+      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta [date]. Versija 3.2 aizstāja versiju 2.1, kurā sesiju dati, glabāšanas termiņi, analītika, eksportēšana un dzēšanas ietekme uz publicētajām debatēm bija aprakstīti veidā, kas vairs neatspoguļoja pakalpojumu." }
     ]
   },
   {
@@ -273,7 +284,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Amerikas Savienotās Valstis (tikai tad, ja norādītas)",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Paziņojums datu vākšanas brīdī. 2. sadaļas tabulā ir norādīta katra mūsu vāktās personas informācijas kategorija, tās nolūks un glabāšanas ilgums (7. sadaļa). Mēs vācam šādas sensitīvas personas informācijas kategorijas tikai tad, ja tās iekļaujat savos jautājumos par sevi: veselība, reliģiskā vai filozofiskā pārliecība, dzimumdzīve vai seksuālā orientācija, politiskie uzskati, dalība arodbiedrībā un rasiskā vai etniskā izcelsme. Mēs tās izmantojam tikai jūsu debašu vadīšanai un tikai pēc 3. sadaļā minētās atsevišķās piekrišanas. Mēs nepārdodam un nekopīgojam personas informāciju un neesam to darījuši iepriekšējos divpadsmit mēnešos. Mēs neizmantojam personas informāciju mērķētai reklāmai un neizmantojam sensitīvu personas informāciju nekādiem nolūkiem, izņemot jūsu pieprasītā pakalpojuma sniegšanu. Atteikšanās izvēles signāli: tā kā mēs nepārdodam un nekopīgojam personas informāciju un neizmantojam to mērķētai reklāmai, nav nekā, no kā atteikties, un Global Privacy Control signāls neko nemaina. Jūsu tiesības: zināt, dzēst, labot, atteikties, ierobežot sensitīvas personas informācijas izmantošanu un netikt diskriminētam šo tiesību izmantošanas dēļ; iesniedziet pieprasījumu, rakstot uz privacy@dezbatere.ro. Finansiāli stimuli: mēs tādus nepiedāvājam; bezmaksas un maksas plānos mūsu nolūki un aizsardzības pasākumi ir vienādi. Glabāšana ir aprakstīta 7. sadaļā. Pārkāpumi: mēs informējam iedzīvotājus un štatu iestādes, kā to prasa katra štata tiesību akti par datu aizsardzības pārkāpumiem. Šis paziņojums tiek atjaunināts vismaz reizi divpadsmit mēnešos; pēdējo reizi atjaunināts [date]." },
+      { kind: "p", text: "Paziņojums datu vākšanas brīdī. 2. sadaļas tabulā norādītas mūsu vāktās personas informācijas kategorijas un to avoti; apstrādes nolūki ir aprakstīti 4. sadaļā, bet glabāšanas termiņi — 7. sadaļā. Mēs vācam šādas sensitīvas personas informācijas kategorijas tikai tad, ja tās iekļaujat savos jautājumos par sevi: veselība, reliģiskā vai filozofiskā pārliecība, dzimumdzīve vai seksuālā orientācija, politiskie uzskati, dalība arodbiedrībā un rasiskā vai etniskā izcelsme. Mēs tās izmantojam tikai jūsu debašu vadīšanai un tikai pēc 3. sadaļā minētās atsevišķās piekrišanas. Mēs nepārdodam un nekopīgojam personas informāciju un neesam to darījuši iepriekšējos divpadsmit mēnešos. Mēs neizmantojam personas informāciju mērķētai reklāmai un neizmantojam sensitīvu personas informāciju nekādiem nolūkiem, izņemot jūsu pieprasītā pakalpojuma sniegšanu. Atteikšanās izvēles signāli: Tā kā pašlaik nepārdodam un nekopīgojam personas informāciju un neizmantojam to mērķētai reklāmai, nav no kā atteikties. Ja nākotnē sāksim to pārdot vai kopīgot, ievērosim Global Privacy Control signālus kā atteikšanās pieprasījumus. Jūsu tiesības: zināt, dzēst, labot, atteikties, ierobežot sensitīvas personas informācijas izmantošanu un netikt diskriminētam šo tiesību izmantošanas dēļ; iesniedziet pieprasījumu, rakstot uz privacy@dezbatere.ro. Finansiāli stimuli: mēs tādus nepiedāvājam; bezmaksas un maksas plānos mūsu nolūki un aizsardzības pasākumi ir vienādi. Glabāšana ir aprakstīta 7. sadaļā. Pārkāpumi: mēs informējam iedzīvotājus un štatu iestādes, kā to prasa katra štata tiesību akti par datu aizsardzības pārkāpumiem. Šis paziņojums tiek atjaunināts vismaz reizi divpadsmit mēnešos; pēdējo reizi atjaunināts [date]." },
       { kind: "p", text: "Konektikuta: mēs apstrādājam sensitīvus datus tikai ar jūsu aktīvi sniegtu piekrišanu, ko sniedzat atsevišķā ekrānā pirms savām pirmajām debatēm (3. sadaļa); mēs neizmantojam jūsu personas datus MI modeļu apmācībai. Vašingtona: mūsu atsevišķais dokuments Patērētāju veselības datu privātuma paziņojums vietnē [URL] attiecas uz jebkādu ar veselību saistītu informāciju, tostarp secinājumiem. Teksasa un Nebraska: mēs nepārdodam sensitīvus personas datus. Kolorādo, Konektikuta, Virdžīnija un citi štati ar visaptverošiem privātuma tiesību aktiem: iepriekš minētās tiesības jums ir piemērojamas, ja attiecīgie tiesību akti ir piemērojami mums. Ja mēs atsakāmies izpildīt pieprasījumu, varat to pārsūdzēt, atbildot uz mūsu atbildi adresē privacy@dezbatere.ro; ja mēs pārsūdzību noraidām, varat vērsties sava štata ģenerālprokurorā (Attorney General)." }
     ]
   },
@@ -345,12 +356,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.1",
-  sha256: "7966685393ea2b12933ef4b3fa4eebb4e98c12a4a6a85e7f21a5ee0a29582a3c",
-  eyebrow: "PRIVĀTUMA POLITIKA · v3.1 · SPĒKĀ NO [DATE]",
+  version: "3.2",
+  sha256: "1db871fd2177ad52a624e086047ee89c784775c01e97bfd88a9e41ea7763a537",
+  eyebrow: "PRIVĀTUMA POLITIKA · v3.2 · SPĒKĀ NO [DATE]",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",
-  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.1",
+  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.2",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privātuma politikas teksts",
   sectionIdPrefix: "policy-section-",

@@ -264,7 +264,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         catch (failure) {
             if (dispatched.current && ownedKind !== 'stepup' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
             if (owns(owner, ownedToken, ownedKind))
-                setError(t(catalog, "auth.signUp.creationFailed"));
+                setError(failure instanceof ContractHttpError && failure.serverCode === 'STATE_SIGNUP_UNAVAILABLE'
+                    ? t(catalog, "auth.signUp.stateUnavailable") : t(catalog, "auth.signUp.creationFailed"));
         }
         finally {
             if (owner === sequence.current) {

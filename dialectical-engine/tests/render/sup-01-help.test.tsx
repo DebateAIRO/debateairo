@@ -958,7 +958,9 @@ describe("SUP-01 /help assistant", () => {
     await render(<Assistant client={supportAssistantClient} signedIn={false} />);
     await submit("My code 123456 failed");
 
+    // Paid plans G3a: the panel asks once, on mount, whether support is offered at this address.
     expect(calls.map(({ url }) => url)).toEqual([
+      "/api/v1/geo/availability",
       "/api/v1/support/sessions",
       "/api/v1/support/sessions/session-a/messages",
       "/api/v1/support/sessions",
@@ -968,7 +970,7 @@ describe("SUP-01 /help assistant", () => {
       { text: "My [REDACTED_SECRET_LIKE] failed" },
       { text: "My [REDACTED_SECRET_LIKE] failed" }
     ]);
-    expect(calls.map(({ token }) => token)).toEqual([null,"token-a",null,"token-b"]);
+    expect(calls.map(({ token }) => token)).toEqual([null,null,"token-a",null,"token-b"]);
     expect(document.querySelectorAll('[data-role="user"]')).toHaveLength(1);
     expect(document.body.textContent).toContain("Fresh answer.");
     const stored = sessionStorage.getItem(SUPPORT_CONVERSATION_STORAGE_KEY)!;
@@ -999,6 +1001,7 @@ describe("SUP-01 /help assistant", () => {
     await submit("question");
 
     expect(urls).toEqual([
+      "/api/v1/geo/availability",
       "/api/v1/support/sessions",
       "/api/v1/support/sessions/session-a/messages",
       "/api/v1/support/sessions",
@@ -1012,7 +1015,7 @@ describe("SUP-01 /help assistant", () => {
 
     // No session is held after the second mismatch: the next turn mints a new one.
     await submit("again");
-    expect(urls.slice(4,5)).toEqual(["/api/v1/support/sessions"]);
+    expect(urls.slice(5,6)).toEqual(["/api/v1/support/sessions"]);
   });
 
   it.each([
@@ -1035,6 +1038,7 @@ describe("SUP-01 /help assistant", () => {
     await submit("question");
 
     expect(urls).toEqual([
+      "/api/v1/geo/availability",
       "/api/v1/support/sessions",
       "/api/v1/support/sessions/session-a/messages"
     ]);
@@ -1063,6 +1067,7 @@ describe("SUP-01 /help assistant", () => {
     await submit(request);
 
     expect(urls).toEqual([
+      "/api/v1/geo/availability",
       "/api/v1/support/sessions",
       "/api/v1/support/sessions/recovery-session/messages"
     ]);

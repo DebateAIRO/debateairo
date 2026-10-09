@@ -5,6 +5,7 @@ import { chmod, lstat, open } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 import { deploymentHostname, siteverifyOutcome, validProof, validSocketPath } from "./siteverify-response.mjs";
 
 const SITEVERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -70,17 +71,83 @@ export function relayConfiguration(source) {
   deploymentHostname(source.PUBLIC_APP_URL);
   return Object.freeze({ publicAppUrl: source.PUBLIC_APP_URL, socketPath: source.TURNSTILE_SOCKET_PATH, secretPath: join(source.CREDENTIALS_DIRECTORY, "turnstile-secret") });
 }
-export async function loadRelaySecret(path, nodeEnv = "production") {
-  const parent = await lstat(join(path, ".."));
-  if (!parent.isDirectory() || parent.isSymbolicLink() || (parent.mode & 0o077) !== 0 || parent.uid !== process.getuid?.()) throw new TypeError("TURNSTILE_SECRET_CUSTODY_INVALID");
-  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+const custodyFailure = () => { throw new TypeError("TURNSTILE_SECRET_CUSTODY_INVALID"); };
+function exactCredentialAcl(acl, uid, permissions) {
+  if (!acl || Object.keys(acl).sort().join(",") !== "entries,version" || acl.version !== 2 || !Array.isArray(acl.entries) || acl.entries.length !== 5) return false;
+  const expected = [[1,permissions,4294967295],[2,permissions,uid],[4,0,4294967295],[16,permissions,4294967295],[32,0,4294967295]];
+  return acl.entries.every((entry, i) => entry && Object.keys(entry).sort().join(",") === "id,permissions,tag"
+    && entry.tag === expected[i][0] && entry.permissions === expected[i][1] && entry.id === expected[i][2]);
+}
+/** Existing private owned files and the exact systemd root-owned named-user ACL. */
+export function relaySecretCustody(parent, metadata, uid, acl = null) {
+  if (!Number.isSafeInteger(uid) || uid < 0 || !parent.isDirectory() || parent.isSymbolicLink() || !metadata.isFile()
+    || metadata.nlink !== 1 || metadata.size < 1 || metadata.size > 2048) custodyFailure();
+  if (parent.uid === uid && metadata.uid === uid && (parent.mode & 0o077) === 0 && (metadata.mode & 0o077) === 0) return "owned";
+  if (uid > 0 && parent.uid === 0 && parent.gid === 0 && (parent.mode & 0o7777) === 0o550
+    && metadata.uid === 0 && metadata.gid === 0 && (metadata.mode & 0o7777) === 0o440
+    && acl && Object.keys(acl).sort().join(",") === "file,parent" && exactCredentialAcl(acl.parent, uid, 5) && exactCredentialAcl(acl.file, uid, 4)) return "systemd";
+  custodyFailure();
+}
+const ACL_METADATA_PROGRAM = `import os,struct,json
+result={}
+for name,fd in (("parent",3),("file",4)):
+ raw=os.getxattr(fd,"system.posix_acl_access")
+ if len(raw)!=44:raise ValueError()
+ result[name]={"version":struct.unpack("<I",raw[:4])[0],"entries":[dict(zip(("tag","permissions","id"),struct.unpack("<HHI",raw[i:i+8]))) for i in range(4,44,8)]}
+print(json.dumps(result,separators=(",",":")))
+`;
+function credentialAclMetadata(parentFd, fileFd) {
+  let result;
   try {
+    if (process.platform !== "linux") custodyFailure();
+    result = spawnSync("/usr/bin/python3", ["-I", "-S", "-c", ACL_METADATA_PROGRAM], {
+      env: {}, timeout: 1000, maxBuffer: 2048, stdio: ["ignore", "pipe", "pipe", parentFd, fileFd]
+    });
+    if (result.error || result.signal || result.status !== 0 || result.stderr?.length || !result.stdout?.length || result.stdout.length > 2048) custodyFailure();
+    return JSON.parse(result.stdout.toString("utf8"));
+  } catch { custodyFailure(); }
+  finally { result?.stdout?.fill(0); result?.stderr?.fill(0); }
+}
+function sameCredentialMetadata(a, b) {
+  return ["dev","ino","uid","gid","mode","nlink","size","mtimeMs","ctimeMs"].every(key => a[key] === b[key]);
+}
+export async function loadRelaySecret(path, nodeEnv = "production") {
+  const parentPath = join(path, "..");
+  const parent = await lstat(parentPath);
+  if (!parent.isDirectory() || parent.isSymbolicLink()) custodyFailure();
+  const parentHandle = await open(parentPath, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+  let handle, bytes;
+  try {
+    if (!sameCredentialMetadata(parent, await parentHandle.stat())) custodyFailure();
+    const named = await lstat(path);
+    if (!named.isFile() || named.isSymbolicLink()) custodyFailure();
+    handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
     const metadata = await handle.stat();
-    if (!metadata.isFile() || metadata.uid !== process.getuid?.() || (metadata.mode & 0o077) !== 0 || metadata.size < 1 || metadata.size > 2048) throw new TypeError("TURNSTILE_SECRET_CUSTODY_INVALID");
-    const secret = (await handle.readFile("utf8")).trim();
+    if (!sameCredentialMetadata(named, metadata)) custodyFailure();
+    const uid = process.getuid?.();
+    const systemd = parent.uid === 0 && metadata.uid === 0 && uid !== 0;
+    const acl = systemd ? credentialAclMetadata(parentHandle.fd, handle.fd) : null;
+    relaySecretCustody(parent, metadata, uid, acl);
+    if (!sameCredentialMetadata(metadata, await handle.stat()) || !sameCredentialMetadata(metadata, await lstat(path))
+      || !sameCredentialMetadata(parent, await parentHandle.stat()) || !sameCredentialMetadata(parent, await lstat(parentPath))) custodyFailure();
+    bytes = Buffer.alloc(2049); let length = 0;
+    for (;;) {
+      const { bytesRead } = await handle.read(bytes, length, bytes.length - length, length);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+      if (length >= bytes.length) custodyFailure();
+    }
+    if (length !== metadata.size || !sameCredentialMetadata(metadata, await handle.stat()) || !sameCredentialMetadata(metadata, await lstat(path))
+      || !sameCredentialMetadata(parent, await parentHandle.stat()) || !sameCredentialMetadata(parent, await lstat(parentPath))) custodyFailure();
+    if (systemd) {
+      relaySecretCustody(parent, metadata, uid, credentialAclMetadata(parentHandle.fd, handle.fd));
+      if (!sameCredentialMetadata(metadata, await handle.stat()) || !sameCredentialMetadata(metadata, await lstat(path))
+        || !sameCredentialMetadata(parent, await parentHandle.stat()) || !sameCredentialMetadata(parent, await lstat(parentPath))) custodyFailure();
+    }
+    const secret = bytes.subarray(0, length).toString("utf8").trim();
     if (!/^[A-Za-z0-9_-]{20,2048}$/u.test(secret) || (nodeEnv === "production" && /^[123]x0{30,}/u.test(secret))) throw new TypeError("TURNSTILE_SECRET_INVALID");
     return secret;
-  } finally { await handle.close(); }
+  } finally { bytes?.fill(0); await handle?.close(); await parentHandle.close(); }
 }
 async function main() {
   const config = relayConfiguration(process.env);

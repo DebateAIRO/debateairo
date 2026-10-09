@@ -1,7 +1,7 @@
 {
   "newDebate.eyebrow": "NAUJAS KLAUSIMAS",
   "newDebate.title": "Apie ką turėtume diskutuoti?",
-  "newDebate.aiNotice": "Viską, ką sukuria šie debatai — argumentus, peržiūras, įverčius ir verdiktą — generuoja DI modeliai; turinys pažymėtas kompiuterio skaitoma žyma ir gali būti netikslus.",
+  "newDebate.aiNotice": "Viską, ką sukuria šie debatai — argumentus, peržiūras, įverčius ir verdiktą — generuoja DI modeliai; turinys pažymėtas kompiuterio skaitoma žyma ir gali būti netikslus. Tai nėra medicininė, psichologinė, teisinė, finansinė ar kitokia profesinė konsultacija.",
   "newDebate.planTier": "Plano lygis",
   "newDebate.free": "Nemokamas",
   "newDebate.freePromise": "Visi parametrai fiksuoti. Klausimas priklauso jums.",

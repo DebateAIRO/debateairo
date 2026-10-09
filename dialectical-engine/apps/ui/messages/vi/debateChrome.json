@@ -1,5 +1,5 @@
 {
-  "debateChrome.aiNotice": "Mọi nội dung trong cuộc tranh luận này — lập luận, đánh giá, điểm số và phán quyết — đều do các mô hình AI tạo ra, được đánh dấu để máy đọc và có thể không chính xác.",
+  "debateChrome.aiNotice": "Mọi nội dung trong cuộc tranh luận này — lập luận, đánh giá, điểm số và phán quyết — đều do các mô hình AI tạo ra, được đánh dấu để máy đọc và có thể không chính xác. Đây không phải là tư vấn y tế, tâm lý, pháp lý hoặc tài chính, hay bất kỳ tư vấn chuyên môn nào khác.",
   "debateChrome.status.waiting": "Đang chờ bắt đầu. Cuộc tranh luận của bạn sẽ tự bắt đầu lúc {time}.",
   "debateChrome.status.waitingOwnDebates": "Hiện các cuộc tranh luận khác của bạn đang dùng phần còn lại của giới hạn. Cuộc tranh luận này sẽ tự bắt đầu ngay khi một trong số đó kết thúc.",
   "debateChrome.backToLibrary": "← Quay lại thư viện",

@@ -30,6 +30,7 @@ vi.mock("next/headers", () => ({
 import SignUpPage from "../../apps/ui/app/sign-up/page.js";
 
 const G1 = "Dialectical Engine isn't available in your country yet.";
+const STATE_REFUSED = "Dialectical Engine isn't available in the state where you live.";
 let root: Root | null = null;
 
 async function mount(element: ReactElement): Promise<void> {
@@ -54,19 +55,17 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
   });
 
   it("shows G1 and no form when sign-up is closed for this visitor", async () => {
-    mocks.availability.mockResolvedValue({ signup: false, pay: false });
+    mocks.availability.mockResolvedValue({ signup: false, pay: false, service: false });
     await mount(await SignUpPage());
     expect(document.body.textContent).toContain(G1);
     expect(document.querySelector('form[data-form="signup"]')).toBeNull();
-    // G1 is said once, and signing in stays reachable (spec §2.3.3, §1.5).
+    // G1 is said once. Sign-in is closed at the same addresses (G3a, sign-in), so no link leads there.
     expect(document.body.textContent!.split(G1).length - 1).toBe(1);
-    const logIn = document.querySelector<HTMLAnchorElement>('a[href="/login"]');
-    expect(logIn).not.toBeNull();
-    expect(logIn!.textContent).toBe("Log in");
+    expect(document.querySelector('a[href="/login"]')).toBeNull();
   });
 
   it("shows the form when sign-up is open, and when the check itself fails", async () => {
-    mocks.availability.mockResolvedValue({ signup: true, pay: false });
+    mocks.availability.mockResolvedValue({ signup: true, pay: false, service: true });
     await mount(await SignUpPage());
     expect(document.querySelector('form[data-form="signup"]')).not.toBeNull();
     await act(async () => root!.unmount());
@@ -79,7 +78,7 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
     // Hosted mode: without the address every visitor looks like the loopback SSR hop, which the
     // country gate reads as unknown (COUNTRY_UNKNOWN), so everyone would see G1 and no form.
     vi.stubEnv("DIALECTICAL_UI_EDGE", "server.mjs");
-    mocks.availability.mockResolvedValue({ signup: true, pay: false });
+    mocks.availability.mockResolvedValue({ signup: true, pay: false, service: true });
     await SignUpPage();
     expect(mocks.clientArgs).toHaveLength(1);
     expect(mocks.clientArgs[0]![1]).toBeUndefined();
@@ -94,7 +93,7 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
 
   it("keeps the age lockout first: while it lasts the refusal is all the browser sees, and nothing is asked (8j)", async () => {
     mocks.cookies.set(AGE_REFUSAL_COOKIE_NAME, AGE_REFUSAL_COOKIE_VALUE);
-    mocks.availability.mockResolvedValue({ signup: false, pay: false });
+    mocks.availability.mockResolvedValue({ signup: false, pay: false, service: false });
     await mount(await SignUpPage());
     expect(mocks.availability).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain(G1);
@@ -127,5 +126,33 @@ describe("sign-up says the country is not open, instead of the form (paid plans 
     await act(async () => { await Promise.resolve(); });
     expect(register).toHaveBeenCalledTimes(1);
     expect(document.querySelector('[role="alert"]')?.textContent).toBe(G1);
+  });
+
+  it("says the state where you live is closed when the declared US state is Tennessee", async () => {
+    const register = vi.fn().mockRejectedValue(
+      new ContractHttpError("FORBIDDEN", 403, "STATE_SIGNUP_UNAVAILABLE", "STATE_SIGNUP_UNAVAILABLE")
+    );
+    const checkAge = vi.fn().mockResolvedValue({ outcome: "allowed" });
+    await mount(<SignUpFlow turnstile={{siteKey:"test-site",nonce:"test-nonce"}} client={{ register, checkAge }} />);
+    const field = (name: string) => document.querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
+    // The age gate's date is React state: typed first, through the value setter and an `input` event.
+    for (const [name, value] of [["dob-d", "01"], ["dob-m", "01"], ["dob-y", "1990"]] as const) {
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field(name), value);
+        field(name).dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+    await pickRegion("US", "TN");
+    field("email").value = "person@example.test";
+    field("phone").value = "+40712345678";
+    field("password").value = "Correct horse 7!";
+    for (const box of ["privacy-accepted", "terms-accepted"]) field(box).checked = true;
+    await act(async () => {
+      document.querySelector<HTMLFormElement>('form[data-form="signup"]')!
+        .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(register).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[role="alert"]')?.textContent).toBe(STATE_REFUSED);
   });
 });

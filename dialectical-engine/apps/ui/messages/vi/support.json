@@ -82,5 +82,6 @@
   "support.privacyPreferences": "Quyền riêng tư",
   "support.aiBanner": "Phản hồi do AI tạo, có dấu hiệu máy có thể đọc và có thể sai. Bạn có thể yêu cầu gặp người hỗ trợ bất cứ lúc nào.",
   "support.cookiePreferences": "Các cookie chúng tôi lưu",
-  "support.recoverAccount": "Khôi phục tài khoản"
+  "support.recoverAccount": "Khôi phục tài khoản",
+  "support.countryUnavailable": "Dialectical Engine hiện chưa có tại quốc gia của bạn."
 }
