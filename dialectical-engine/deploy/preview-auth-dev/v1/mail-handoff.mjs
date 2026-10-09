@@ -4,8 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { tsImport } from 'tsx/esm/api';
 import { exactKeys, refuse, sha256, strictJson, withPrivateBytes } from './custody.mjs';
 import { PREVIEW_ORIGIN } from './turnstile-custody.mjs';
-import { ownedForwardingMessage, createRecipientPolicy, submitVerification, validateInvocation, readBounded, cleanSubmissionEnvironment } from '../../preview-mail/v4-20261005/sendmail-owned-preview.mjs';
-import bindings from '../../preview-mail/v4-20261005/recipient-bindings.json' with {type:'json'};
+import { ownedForwardingMessage, recipientPolicyFromInstallation, submitVerification, validateInvocation, readBounded, cleanSubmissionEnvironment } from '../../preview-mail/v4-20261005/sendmail-owned-preview.mjs';
 const EXTERNAL='/opt/debateai-v3-preview/operator/recovery106-v1/sendmail-two-owned-preview-recovery106.mjs';
 const PINS=Object.freeze({
  'sendmail-two-owned-preview-recovery106.mjs':'67df14bcc4a05e92bd7aad74f82a498ba6c1f3290cbae54dc62cb72ddab5eb89',
@@ -53,8 +52,8 @@ export async function submitComposite({message,argv,options,submitExternal,submi
 export async function readRecipientPolicy({path,root,clientGid}) {
  if(path!=='/etc/debateai-v3-preview/auth-dev-v1/mail-recipient.json'||root!=='/etc/debateai-v3-preview/auth-dev-v1'||!Number.isSafeInteger(clientGid)||clientGid<1)refuse('PREVIEW_MAIL_REFUSED');
  return withPrivateBytes(path,{root,uid:0,gid:clientGid,mode:0o640,parentUid:0,maxBytes:1024},raw=>{
-  const input=exactKeys(strictJson(raw),['verificationForwardTarget']);
-  return createRecipientPolicy(bindings.recipientSha256,input.verificationForwardTarget);
+  // The recipient allow-list exists only in this root-owned installation input, never in source.
+  return recipientPolicyFromInstallation(exactKeys(strictJson(raw),['recipientSha256','verificationForwardTarget']));
  });
 }
 export async function assertExternalHelperHashes() {

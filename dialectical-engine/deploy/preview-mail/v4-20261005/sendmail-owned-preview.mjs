@@ -1,14 +1,18 @@
 #!/usr/local/bin/node
 import { createHash } from 'node:crypto';
 import { openSync, fstatSync, readSync, closeSync, constants } from 'node:fs';
-import bindings from './recipient-bindings.json' with {type:'json'};
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { ACCOUNT_MAIL_BOUNDARY, ACCOUNT_MAIL_TEMPLATES, serializeAccountMail, normalizeMailDisplay, accountMailRuntime } from './account-mail-template.mjs';
 
 const FROM = 'noreply@dezbatere.ro';
 const digest = value => createHash('sha256').update(value).digest('hex');
+// The recipient allow-list is installation data, never source: only these alias names are public.
+const RECIPIENT_ALIASES = Object.freeze(['recovery-notice-secondary', 'verification-direct-and-recovery-proof', 'verification-forward-primary', 'verification-forward-secondary']);
 export function createRecipientPolicy(recipientSha256, verificationForwardTarget) {
+  if (!recipientSha256 || typeof recipientSha256 !== 'object' || Object.getPrototypeOf(recipientSha256) !== Object.prototype
+    || Object.keys(recipientSha256).sort().join(',') !== RECIPIENT_ALIASES.join(',')
+    || RECIPIENT_ALIASES.some(alias => typeof recipientSha256[alias] !== 'string' || !/^[0-9a-f]{64}$/.test(recipientSha256[alias]))) throw fail('INSTALLATION_CONFIG');
   if (typeof verificationForwardTarget !== 'string' || !/^[^\s@]+@[^\s@]+$/.test(verificationForwardTarget)
     || digest(verificationForwardTarget) !== recipientSha256['verification-forward-secondary']) throw fail('INSTALLATION_CONFIG');
   return function policy(template, recipient) {
@@ -25,24 +29,31 @@ export function createRecipientPolicy(recipientSha256, verificationForwardTarget
   throw fail('PURPOSE_RECIPIENT_REFUSED');
 }
 }
-function installedForwardRecipient() {
+const INSTALLATION_PATH = '/etc/debateai/preview-mail-recipient-installation.json';
+// Sole recipient source: { recipientSha256: {four aliases: lowercase SHA-256 hex}, verificationForwardTarget }.
+export function recipientPolicyFromInstallation(input) {
+  if (!input || typeof input !== 'object' || Object.getPrototypeOf(input) !== Object.prototype
+    || Object.keys(input).sort().join(',') !== 'recipientSha256,verificationForwardTarget') throw fail('INSTALLATION_CONFIG');
+  return createRecipientPolicy(input.recipientSha256, input.verificationForwardTarget);
+}
+// Internal test seam only; the executable always reads the fixed root-owned path.
+export function readInstalledRecipientPolicy(path = INSTALLATION_PATH, ownerUid = 0) {
   let fd;
   try {
-    fd = openSync('/etc/debateai/preview-mail-recipient-installation.json', constants.O_RDONLY | constants.O_NOFOLLOW);
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
     const st = fstatSync(fd);
-    if (!st.isFile() || st.uid !== 0 || (st.mode & 0o077) !== 0 || st.nlink !== 1 || st.size < 1 || st.size > 1024) throw fail('INSTALLATION_CONFIG');
+    if (!st.isFile() || st.uid !== ownerUid || (st.mode & 0o077) !== 0 || st.nlink !== 1 || st.size < 1 || st.size > 1024) throw fail('INSTALLATION_CONFIG');
     const bytes = Buffer.alloc(1025);
     const length = readSync(fd, bytes, 0, bytes.length, 0);
     if (length !== st.size || length > 1024) throw fail('INSTALLATION_CONFIG');
     let input;
     try { input = JSON.parse(new TextDecoder('utf8', {fatal:true}).decode(bytes.subarray(0,length))); } finally { bytes.fill(0); }
-    if (!input || Object.keys(input).join(',') !== 'verificationForwardTarget') throw fail('INSTALLATION_CONFIG');
-    return input.verificationForwardTarget;
+    return recipientPolicyFromInstallation(input);
   } catch { throw fail('INSTALLATION_CONFIG'); }
   finally { if (fd !== undefined) closeSync(fd); }
 }
 export function recipientForPurpose(template, recipient) {
-  return createRecipientPolicy(bindings.recipientSha256, installedForwardRecipient())(template, recipient);
+  return readInstalledRecipientPolicy()(template, recipient);
 }
 const MAX_BYTES = 262144;
 const TOTAL_MS = 4500; // Reserve cleanup before Source's immutable 5000ms transport deadline.
