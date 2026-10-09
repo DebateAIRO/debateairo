@@ -289,7 +289,11 @@ describe("0065 TRUNCATE and mutation guards discovered from the catalog (DL5-F2)
     expect(result.rows.map((row) => row.relation)).toEqual([]);
   });
 
-  it("grants TRUNCATE to no application role in any application schema", async () => {
+  // Split 2026-10-09 (review of PR #82): since e7db678bf the private tables are OWNED by NOLOGIN private roles, and a
+  // table owner holds TRUNCATE implicitly (acldefault), so this ACL scan cannot say "no application role" any more.
+  // It now pins exactly that exception — the owner of its own private table, nobody else — and the next test proves
+  // no application role or owner path can actually TRUNCATE an append-only (audit/ledger) table.
+  it("grants TRUNCATE to no application role except a private table's own NOLOGIN owner", async () => {
     expect(await privateBoundaryProblems(database.pool)).toEqual([]);
     const result = await database.pool.query<{ relation: string; grantee: string; is_owner: boolean }>(`
       SELECT namespace.nspname || '.' || relation.relname AS relation, grantee.rolname AS grantee,acl.grantee=relation.relowner AS is_owner
@@ -306,6 +310,74 @@ describe("0065 TRUNCATE and mutation guards discovered from the catalog (DL5-F2)
       ORDER BY 1, 2
     `, [[...APPLICATION_SCHEMAS]]);
     expect(result.rows.filter((row) => !row.is_owner || PRIVATE_TABLE_OWNERS[row.relation] !== row.grantee)).toEqual([]);
+  });
+
+  it("lets no application role, owner or definer path TRUNCATE an append-only audit or ledger table", async () => {
+    // Append-only = every application base table that is not a named mutable exception (the discovery test above
+    // proves each carries an enabled BEFORE TRUNCATE guard). Audit and ledger tables are all in it.
+    const tables = (await database.pool.query<{ relation: string; owner: string }>(`
+      SELECT n.nspname||'.'||c.relname AS relation, pg_get_userbyid(c.relowner) AS owner
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE c.relkind IN ('r','p') AND n.nspname=ANY($1::text[]) ORDER BY 1`, [[...APPLICATION_SCHEMAS]])).rows
+      .filter((row) => MUTABLE_UNGUARDED_RELATIONS[row.relation] === undefined);
+    const names = tables.map((row) => row.relation);
+    for (const audit of ["staff.audit_event", "staff.grant_event", "billing.internal_grant_event", "identity.audit_event", "support.shred_audit"])
+      expect(names, audit).toContain(audit);
+    expect(names.filter((name) => name.startsWith("ledger.")).length).toBeGreaterThan(0);
+
+    // 1. Effective privilege (ACL + every membership chain): no debateai_* role other than the table's owner has it.
+    const effective = await database.pool.query<{ relation: string; role: string }>(`
+      SELECT n.nspname||'.'||c.relname AS relation, r.rolname AS role
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace CROSS JOIN pg_roles r
+      WHERE n.nspname||'.'||c.relname=ANY($1::text[]) AND r.rolname LIKE 'debateai\\_%' AND r.oid<>c.relowner
+        AND has_table_privilege(r.oid, c.oid, 'TRUNCATE')
+      ORDER BY 1, 2`, [names]);
+    expect(effective.rows).toEqual([]);
+
+    // 2. Owners: an application-named owner must be a private NOLOGIN role nobody can become.
+    const reachableOwners = await database.pool.query<{ owner: string }>(`
+      SELECT DISTINCT r.rolname AS owner FROM pg_roles r
+      WHERE r.rolname=ANY($1::text[]) AND r.rolname LIKE 'debateai\\_%'
+        AND (r.rolcanlogin OR r.rolsuper OR r.rolbypassrls OR EXISTS(SELECT 1 FROM pg_auth_members m WHERE m.roleid=r.oid))
+      ORDER BY 1`, [[...new Set(tables.map((row) => row.owner))]]);
+    expect(reachableOwners.rows).toEqual([]);
+
+    // 3. Definer path: no SECURITY DEFINER function an application role can call carries TRUNCATE or switches the
+    //    guard off (DISABLE TRIGGER, session_replication_role) — the only way to act as a NOLOGIN owner.
+    const definers = await database.pool.query<{ fn: string }>(`
+      SELECT p.oid::regprocedure::text AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname=ANY($1::text[]) AND p.prosecdef
+        AND p.prosrc ~* '(\\mtruncate\\M|disable\\s+trigger|session_replication_role)'
+      ORDER BY 1`, [[...APPLICATION_SCHEMAS]]);
+    expect(definers.rows).toEqual([]);
+
+    // 4. Behaviour: acting AS each owner (the strongest holder of the implicit grant), TRUNCATE is refused —
+    //    55000 is the table's own guard; 42501 means the cascade reached a table that role may not truncate at all.
+    //    Neither CASCADE nor ONLY may ever succeed, and the guard itself must fire on at least the audit tables.
+    const refusals: Record<string, string> = {};
+    await withRolledBackTransaction(async (client) => {
+      for (const { relation, owner } of tables) {
+        for (const statement of [`TRUNCATE ${relation} CASCADE`, `TRUNCATE ONLY ${relation}`]) {
+          await client.query(`SET LOCAL ROLE ${JSON.stringify(owner)}`);
+          const failure = await failureOf(client, statement);
+          await client.query("RESET ROLE");
+          expect(failure, `${owner}: ${statement} succeeded`).toBeDefined();
+          refusals[`${statement} as ${owner}`] = sqlState(failure) ?? messageOf(failure);
+        }
+      }
+    });
+    // 0A000 (ONLY on a table other tables reference) is also a refusal; anything else is a broken probe.
+    expect(Object.entries(refusals).filter(([, state]) => !["55000", "42501", "0A000"].includes(state))).toEqual([]);
+    // The guard itself, for identities that DO hold the privilege: the creator/superuser this database runs as
+    // (stronger than any owner) is refused by the table's BEFORE TRUNCATE trigger, not by a missing grant.
+    await withRolledBackTransaction(async (client) => {
+      for (const audit of ["staff.audit_event", "staff.grant_event", "billing.internal_grant_event", "identity.audit_event", "support.shred_audit"]) {
+        const failure = await failureOf(client, `TRUNCATE ${audit} CASCADE`);
+        expect(sqlState(failure), `${audit} TRUNCATE as the database superuser`).toBe("55000");
+        // core.reject_mutation()/core's TRUNCATE guard, or the staff schema's own immutability trigger (0085+).
+        expect(messageOf(failure)).toMatch(/TRUNCATE_REJECTED|rejects TRUNCATE|STAFF_RECORD_IMMUTABLE/u);
+      }
+    });
   });
 
   it("keeps all six legacy103 owner tables guarded instead of treating them as mutable", async () => {
