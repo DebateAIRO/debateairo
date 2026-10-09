@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 const unlock = await import('../../deploy/' + 'preview-lifecycle/v1/unlock-team-tools.mjs');
 const creator = await import('../../deploy/' + 'preview-lifecycle/v1/jit-creator-actor.mjs');
 const capture = await import('../../deploy/' + 'preview-lifecycle/v1/self-capture-actor.mjs');
+const guard = await import('../../deploy/' + 'preview-lifecycle/v1/release-guard.mjs');
+const sourceManifest = await import('../../deploy/' + 'preview-auth-dev/v1/source-manifest.mjs');
+const launchPlan = await import('../../deploy/' + 'preview-auth-dev/v1/launch-plan.mjs');
+const custody = await import('../../deploy/' + 'preview-auth-dev/v1/custody.mjs');
+const sha = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
+const me = { uid: process.getuid!(), gid: process.getgid!() };
 
 const MINUTE = 60_000;
 const start = Date.parse('2026-10-09T10:00:00Z');
@@ -296,5 +303,119 @@ describe('self-capture actor input', () => {
     const config = { schema: 'staff-independent-alert-config-v1', generation: uuid(9), executable: '/opt/x/capture-sendmail.mjs', from: 'noreply@dezbatere.ro', recipient: 'preview-security@capture.invalid', ackAdapterId: 'capture' };
     expect(capture.assertLocalCaptureConfig(config)).toBe(config);
     expect(() => capture.assertLocalCaptureConfig({ ...config, recipient: 'owner@example.test' })).toThrow(/SELF_CAPTURE_NOT_LOCAL/);
+  });
+});
+
+/**
+ * A small release frozen exactly like a real one (same manifest schema, same verifier), owned by the
+ * test user instead of root. The launcher's reader insists on uid 0, so the test reader is the same
+ * custody read with the test user's uid.
+ */
+async function frozenRelease() {
+  const base = realpathSync(mkdtempSync(join(tmpdir(), 'lifecycle-release-')));
+  const root = join(base, 'release'), artifacts = join(base, 'artifacts'), engine = join(root, 'dialectical-engine');
+  mkdirSync(root, { mode: 0o755 }); mkdirSync(artifacts, { mode: 0o755 });
+  const files: Record<string, string> = {
+    'package.json': '{"private":true}', 'tsconfig.json': '{}',
+    'packages/contract/package.json': '{"type":"module"}', 'packages/contract/src/generate.ts': '// fixture producer\n',
+    'packages/contract/generated/client.ts': '{}', 'packages/contract/generated/field-inventory.json': '{}', 'packages/contract/generated/openapi.json': '{}',
+    'node_modules/tsx/dist/loader.mjs': 'export {};\n', 'node_modules/tsx/dist/esm/api/index.mjs': 'export const tsImport = () => { throw new Error("fixture"); };\n',
+    'packages/db/src/index.ts': 'export const db = 1;\n', 'apps/api/src/staff/alerts.ts': 'export const alerts = 1;\n',
+    'deploy/preview-auth-dev/v1/launch-api.mjs': '// fixture launcher\n'
+  };
+  for (const [rel, text] of Object.entries(files)) { mkdirSync(dirname(join(engine, rel)), { recursive: true, mode: 0o755 }); writeFileSync(join(engine, rel), text, { mode: 0o644 }); }
+  const generatedDir = 'dialectical-engine/packages/contract/generated';
+  const tracked = await sourceManifest.buildInventory(root, me.uid, { excludedDirectories: [generatedDir] });
+  const dependencyInventory = [{ path: 'dialectical-engine/node_modules', files: await sourceManifest.buildInventory(join(engine, 'node_modules'), me.uid, { dependencies: true, allowedRoot: root }) }];
+  const generated = (await sourceManifest.buildInventory(join(root, generatedDir), me.uid, { complete: true })).map((file: any) => ({ ...file, path: `${generatedDir}/${file.path}` }));
+  const executable = realpathSync(process.execPath), node = lstatSync(executable);
+  const runtime = { nodeVersion: process.version, pnpmVersion: '11.20.0', platform: process.platform, arch: process.arch, nodeExecutable: executable,
+    nodeIdentitySha256: sha(JSON.stringify([node.dev, node.ino, node.uid, node.gid, node.mode, node.nlink, node.size, node.mtimeMs, node.ctimeMs])), tsxLoader: 'dialectical-engine/node_modules/tsx/dist/loader.mjs' };
+  const outputSha256 = sha(JSON.stringify(generated));
+  const manifest = {
+    schema: 'preview-auth-dev-source-v3', sourceRevision: 'a'.repeat(40), sourceTree: 'b'.repeat(40), sourceRoot: root, role: 'api', uid: me.uid, nodeVersion: process.version, pnpmVersion: '11.20.0',
+    files: tracked, packageLinks: [], dependencyInventory,
+    generatedContract: { schema: 'preview-auth-dev-generated-contract-v1', producer: 'dialectical-engine/packages/contract/src/generate.ts', files: generated, runtime,
+      inputSha256: sha(JSON.stringify({ producer: 'dialectical-engine/packages/contract/src/generate.ts', files: tracked, dependencies: dependencyInventory, packageLinks: [], runtime })), outputSha256, reproductions: [outputSha256, outputSha256] },
+    nativeSha256: '9'.repeat(64), contractSha256: outputSha256, promptStoryProviderSha256: 'e'.repeat(64), packageLockSha256: 'f'.repeat(64)
+  };
+  const bytes = JSON.stringify(manifest), manifestPath = join(artifacts, 'source.json');
+  writeFileSync(manifestPath, bytes, { mode: 0o644 });
+  const plan = { sourceRoot: root, sourceRevision: manifest.sourceRevision, sourceTree: manifest.sourceTree, sourceManifest: { path: manifestPath, sha256: sha(bytes) },
+    operatorManifestSha256: sha(JSON.stringify(tracked.filter((file: any) => file.path.startsWith('dialectical-engine/deploy/preview-auth-dev/v1/')))) };
+  const readArtifact = (file: { path: string; sha256: string }, kind: string) => custody.withPrivateBytes(file.path, { root: dirname(file.path), uid: me.uid, mode: 0o644, maxBytes: 16777216 },
+    (raw: Uint8Array) => { if (sha(Buffer.from(raw)) !== file.sha256) throw new Error('hash'); return launchPlan.parsePublicArtifactBytes(raw, kind); });
+  const importPaths = [join(engine, 'node_modules/tsx/dist/esm/api/index.mjs'), join(engine, 'packages/db/src/index.ts'), join(engine, 'apps/api/src/staff/alerts.ts')];
+  return { base, root, engine, plan, readArtifact, importPaths };
+}
+
+describe('release check before any import from the release tree', () => {
+  it('accepts the pinned, untouched release with root-only import paths', async () => {
+    const r = await frozenRelease();
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid, readArtifact: r.readArtifact })).resolves.toMatchObject({ sourceRoot: r.root, role: 'api' });
+  });
+
+  it.each([
+    ['a changed source file', (r: any) => writeFileSync(join(r.engine, 'packages/db/src/index.ts'), 'export const db = 2; // tampered\n')],
+    ['a planted extra file', (r: any) => writeFileSync(join(r.engine, 'apps/api/src/staff/injected.ts'), 'process.exit(0);\n', { mode: 0o644 })],
+    ['a changed dependency (the tsx loader root imports first)', (r: any) => writeFileSync(join(r.engine, 'node_modules/tsx/dist/esm/api/index.mjs'), 'export const tsImport = 1;\n')],
+    ['a different operator digest', (r: any) => { r.plan.operatorManifestSha256 = '0'.repeat(64); }],
+    ['a source manifest the pin does not name', (r: any) => { r.plan.sourceManifest.sha256 = '0'.repeat(64); }]
+  ])('refuses %s before anything is imported', async (_name, tamper) => {
+    const r = await frozenRelease();
+    tamper(r);
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid, readArtifact: r.readArtifact })).rejects.toMatchObject({ code: 'RELEASE_UNVERIFIED' });
+  });
+
+  it('refuses a source manifest that is not owned by the root identity', async () => {
+    const r = await frozenRelease();
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid + 1, readArtifact: r.readArtifact })).rejects.toMatchObject({ code: 'RELEASE_UNVERIFIED' });
+  });
+
+  // The path check stands on its own: here the manifest check is stubbed to pass.
+  const passing = async () => true;
+  it.each([
+    ['a directory others can write', (r: any) => chmodSync(join(r.engine, 'packages/db/src'), 0o777)],
+    ['a group-writable import file', (r: any) => chmodSync(join(r.engine, 'packages/db/src/index.ts'), 0o664)],
+    ['a group-writable release root', (r: any) => chmodSync(r.root, 0o775)],
+    ['a link that leaves the release', (r: any) => { const outside = join(r.base, 'outside.ts'); writeFileSync(outside, 'x', { mode: 0o644 }); const path = join(r.engine, 'apps/api/src/staff/alerts.ts'); rmSync(path); symlinkSync(outside, path); }],
+    ['a path outside the release', (r: any) => { r.importPaths.push(join(r.base, 'artifacts/source.json')); }]
+  ])('refuses an import path with %s', async (_name, damage) => {
+    const r = await frozenRelease();
+    damage(r);
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: r.importPaths, rootUid: me.uid, readArtifact: r.readArtifact, verifyManifest: passing })).rejects.toMatchObject({ code: 'RELEASE_PATH_NOT_ROOT_ONLY' });
+  });
+
+  it('follows a package link inside the release (pnpm layout) and checks where it lands', async () => {
+    const r = await frozenRelease();
+    mkdirSync(join(r.engine, 'node_modules/.pnpm/pg@8/node_modules/pg/lib'), { recursive: true, mode: 0o755 });
+    writeFileSync(join(r.engine, 'node_modules/.pnpm/pg@8/node_modules/pg/lib/index.js'), 'module.exports = 1;\n', { mode: 0o644 });
+    symlinkSync('.pnpm/pg@8/node_modules/pg', join(r.engine, 'node_modules/pg'));
+    const path = join(r.engine, 'node_modules/pg/lib/index.js');
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: [path], rootUid: me.uid, readArtifact: r.readArtifact, verifyManifest: passing })).resolves.toBeTruthy();
+    chmodSync(join(r.engine, 'node_modules/.pnpm/pg@8/node_modules/pg/lib'), 0o777);
+    await expect(guard.verifyReleaseForImport({ plan: r.plan, importPaths: [path], rootUid: me.uid, readArtifact: r.readArtifact, verifyManifest: passing })).rejects.toMatchObject({ code: 'RELEASE_PATH_NOT_ROOT_ONLY' });
+  });
+
+  it('root unlock: imports nothing when the release check refuses, and checks every module it would load', async () => {
+    const loaded: string[][] = [], checked: any[] = [];
+    const refuse = async (input: any) => { checked.push(input); throw Object.assign(new Error('RELEASE_UNVERIFIED'), { code: 'RELEASE_UNVERIFIED' }); };
+    const engine = '/opt/debateai-v3-preview/releases/auth-dev-candidate-v1/dialectical-engine';
+    await expect(unlock.loadReleaseModules({ plan: { sourceRoot: 'x' }, engine, resolvePg: () => `${engine}/node_modules/.pnpm/pg@8/node_modules/pg/lib/index.js`, guard: refuse, load: async (paths: string[]) => { loaded.push(paths); } })).rejects.toMatchObject({ code: 'RELEASE_UNVERIFIED' });
+    expect(loaded).toEqual([]);
+    expect(checked[0].importPaths).toEqual([`${engine}/node_modules/tsx/dist/esm/api/index.mjs`, `${engine}/packages/db/src/index.ts`, `${engine}/apps/api/src/staff/alerts.ts`, `${engine}/apps/api/src/staff/runtime.ts`, `${engine}/node_modules/.pnpm/pg@8/node_modules/pg/lib/index.js`]);
+    expect(checked[0].plan).toEqual({ sourceRoot: 'x' });
+  });
+
+  it('postgres creator actor: verifies the pinned API release itself and refuses another engine before importing', async () => {
+    const entry = { sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-candidate-v1' }, plan = { sourceRoot: entry.sourceRoot };
+    const checked: any[] = [];
+    const deps = { loadPinned: async () => ({ entry, plan }), guard: async (input: any) => { checked.push(input); return true; } };
+    await expect(creator.verifyCreatorRelease({ engine: '/opt/debateai-v3-preview/releases/auth-dev-candidate-v2/dialectical-engine', ...deps })).rejects.toMatchObject({ code: 'STAFF_JIT_RELEASE_REFUSED' });
+    expect(checked).toEqual([]);
+    const engine = `${entry.sourceRoot}/dialectical-engine`;
+    await expect(creator.verifyCreatorRelease({ engine, ...deps })).resolves.toEqual([`${engine}/node_modules/tsx/dist/esm/api/index.mjs`, `${engine}/packages/db/src/migration-lineage.ts`, `${engine}/deploy/preview-auth-dev/v1/native-peer.mjs`]);
+    expect(checked[0]).toEqual({ plan, importPaths: [`${engine}/node_modules/tsx/dist/esm/api/index.mjs`, `${engine}/packages/db/src/migration-lineage.ts`, `${engine}/deploy/preview-auth-dev/v1/native-peer.mjs`] });
+    await expect(creator.verifyCreatorRelease({ engine, ...deps, guard: async () => { throw Object.assign(new Error('RELEASE_UNVERIFIED'), { code: 'RELEASE_UNVERIFIED' }); } })).rejects.toMatchObject({ code: 'STAFF_JIT_RELEASE_REFUSED' });
   });
 });

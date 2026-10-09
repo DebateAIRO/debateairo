@@ -9,6 +9,8 @@ import { userInfo } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { exactKeys, strictJson } from '../../preview-auth-dev/v1/custody.mjs';
 import { LAYOUT } from './common.mjs';
+import { loadPinnedRelease } from './prestart.mjs';
+import { verifyReleaseForImport } from './release-guard.mjs';
 
 const ENGINE = /^\/opt\/debateai-v3-preview\/releases\/auth-dev-(candidate|fallback)-[a-z0-9-]{1,80}\/dialectical-engine$/;
 const LIMIT_MS = 5 * 60 * 1000;
@@ -37,6 +39,26 @@ export function parseCreatorInput(bytes, now = Date.now()) {
     } else if (rest.length !== 0) throw new Error('secret');
     return { mode, validUntil, engine: header.engine, password };
   } catch { return refuse('STAFF_JIT_INPUT_REFUSED'); }
+}
+
+/** The three release modules this actor loads, in load order. */
+export function creatorImportPaths(engine) {
+  return [`${engine}/node_modules/tsx/dist/esm/api/index.mjs`, `${engine}/packages/db/src/migration-lineage.ts`, `${engine}/deploy/preview-auth-dev/v1/native-peer.mjs`];
+}
+
+/**
+ * This actor is the database superuser's OS identity, so it does not take the release on the
+ * caller's word: it reads the pinned API release itself, requires the engine it was handed to be
+ * exactly that release, and runs the launchers' source check before importing anything from it.
+ */
+export async function verifyCreatorRelease({ engine, loadPinned = () => loadPinnedRelease({ service: 'api' }), guard = verifyReleaseForImport }) {
+  try {
+    const { entry, plan } = await loadPinned();
+    if (engine !== `${entry.sourceRoot}/dialectical-engine`) refuse('STAFF_JIT_RELEASE_REFUSED');
+    const importPaths = creatorImportPaths(engine);
+    await guard({ plan, importPaths });
+    return importPaths;
+  } catch { return refuse('STAFF_JIT_RELEASE_REFUSED'); }
 }
 
 async function originalCreator(client) {
@@ -132,10 +154,11 @@ async function main() {
   let input;
   try { input = parseCreatorInput(raw); } finally { raw.fill(0); }
   try {
-    const { tsImport } = await import(pathToFileURL(`${input.engine}/node_modules/tsx/dist/esm/api/index.mjs`).href);
-    const lineage = await tsImport(`${input.engine}/packages/db/src/migration-lineage.ts`, import.meta.url);
+    const [tsxPath, lineagePath, peerPath] = await verifyCreatorRelease({ engine: input.engine });
+    const { tsImport } = await import(pathToFileURL(tsxPath).href);
+    const lineage = await tsImport(lineagePath, import.meta.url);
     const migration = await lineage.loadMigrationPlan();
-    const { withActiveNativePool } = await import(pathToFileURL(`${input.engine}/deploy/preview-auth-dev/v1/native-peer.mjs`).href);
+    const { withActiveNativePool } = await import(pathToFileURL(peerPath).href);
     const result = await withActiveNativePool({ publicPeerModule: LAYOUT.peerModule, auth106Names: migration.manifest.cohorts.auth106 }, async pool => {
       const client = await pool.connect();
       try {

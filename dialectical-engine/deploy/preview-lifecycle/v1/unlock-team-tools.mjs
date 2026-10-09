@@ -23,6 +23,7 @@ import { exactKeys, strictJson, withPrivateBytes } from '../../preview-auth-dev/
 import { readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
 import { LAYOUT, atomicWrite, ensureDirectory, logLine, peerShimArgv, runBounded } from './common.mjs';
 import { loadPinnedRelease, readLock } from './prestart.mjs';
+import { verifyReleaseForImport } from './release-guard.mjs';
 
 export const WINDOW_MS = 60 * 60 * 1000;
 export const PUBLISH_EVERY_MS = 10_000;
@@ -214,6 +215,27 @@ export function createSelfCaptureEvidence({ readWrapperText, runSelfCapture, rea
   };
 }
 
+/** Every release module root loads, in load order: tsx, the db package, the staff alert code, pg. */
+export function unlockImportPaths(engine, pgPath) {
+  return [`${engine}/node_modules/tsx/dist/esm/api/index.mjs`, `${engine}/packages/db/src/index.ts`, `${engine}/apps/api/src/staff/alerts.ts`, `${engine}/apps/api/src/staff/runtime.ts`, pgPath];
+}
+
+async function importReleaseModules([tsxPath, dbPath, alertsPath, runtimePath, pgPath], engine) {
+  const { tsImport } = await import(pathToFileURL(tsxPath).href);
+  const [db, alerts, runtime] = await Promise.all([tsImport(dbPath, import.meta.url), tsImport(alertsPath, import.meta.url), tsImport(runtimePath, import.meta.url)]);
+  return { db, alerts, runtime, pg: createRequire(`${engine}/package.json`)(pgPath) };
+}
+
+/**
+ * Root runs release code here, so the release is verified first (the launchers' own source check
+ * plus root-only import paths). `resolve` only reads package.json files; nothing runs before the check.
+ */
+export async function loadReleaseModules({ plan, engine, resolvePg = () => createRequire(`${engine}/package.json`).resolve('pg'), guard = verifyReleaseForImport, load = importReleaseModules }) {
+  const paths = unlockImportPaths(engine, resolvePg());
+  await guard({ plan, importPaths: paths });
+  return load(paths, engine);
+}
+
 // ---------------------------------------------------------------------------------------------
 // Server wiring below: not reachable from tests (needs the server, root, the release package).
 
@@ -269,12 +291,10 @@ async function serverDeps() {
 
 async function runServer() {
   const { plan, engine, nodePath, staff } = await serverDeps();
-  const { tsImport } = await import(pathToFileURL(`${engine}/node_modules/tsx/dist/esm/api/index.mjs`).href);
-  const [db, alerts, runtime] = await Promise.all([tsImport(`${engine}/packages/db/src/index.ts`, import.meta.url), tsImport(`${engine}/apps/api/src/staff/alerts.ts`, import.meta.url), tsImport(`${engine}/apps/api/src/staff/runtime.ts`, import.meta.url)]);
+  const { db, alerts, runtime, pg } = await loadReleaseModules({ plan, engine });
   const operator = await runtime.loadStaffAlertOperator({ path: staff.operatorPath, sha256: staff.operatorSha256 });
   try {
     const configuration = new alerts.RootStaffAlertConfiguration({ path: staff.configPath, acknowledgements: operator.acknowledgements, timeoutMs: 2000 });
-    const pg = createRequire(`${engine}/package.json`)('pg');
     const ca = await readCa();
     const writer = createInterimLoginWriter({
       runCreator: creatorRunner({ engine, nodePath }),
