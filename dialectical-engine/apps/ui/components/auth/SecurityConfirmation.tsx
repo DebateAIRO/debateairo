@@ -8,6 +8,7 @@ import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode } from '@/lib/sixDigitCode';
 import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
+import { safeReturnPath } from '@/lib/returnPath';
 import { EphemeralCodes } from './EphemeralCodes';
 export type SecurityConfirmationClient = Partial<Pick<ContractClient, 'authMethods' | 'beginPasskeyStepUp' | 'completePasskeyStepUp' | 'stepUp' | 'beginSocialStepUp'>>;
 export interface SecurityConfirmationProps {
@@ -41,6 +42,8 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     const [codeError, setCodeError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // Set when the session behind this check has ended: the sign-in link that brings the person back here.
+    const [signInAgain, setSignInAgain] = useState<string | null>(null);
     const [backup, setBackup] = useState<string | null>(null);
     const [held, setHeld] = useState<ConfirmedSecurityAction | null>(null);
     const [passwordMode, setPasswordMode] = useState(false);
@@ -84,6 +87,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
         flight.current = true;
         setBusy(true);
         setError(null);
+        setSignInAgain(null);
         const owner = sequence.current;
         browser.cancel();
         try {
@@ -120,6 +124,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
         flight.current = true;
         setBusy(true);
         setError(null);
+        setSignInAgain(null);
         const owner = sequence.current;
         try {
             const result = await (client.stepUp ?? contractClient.stepUp)(secret, value, authorization);
@@ -130,6 +135,11 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
             if (owner === sequence.current) {
                 if (onError)
                     onError(failure);
+                else if (failure instanceof ContractHttpError && (failure.serverCode === 'SESSION_REQUIRED' || failure.serverCode === 'COOKIE_SESSION_REQUIRED')) {
+                    // The session itself ended (401 SESSION_REQUIRED, or 409 with no session cookie left): no password helps here.
+                    setError(t(catalog, "auth.security.sessionExpired"));
+                    setSignInAgain(`/login?next=${encodeURIComponent(safeReturnPath(window.location.pathname))}`);
+                }
                 else
                     // The server answers 401 for a wrong password or code (it never says which) and 429 while rate-limited.
                     setError(t(catalog, failure instanceof ContractHttpError && failure.status === 401 ? "auth.security.wrongPassword"
@@ -152,6 +162,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
         browser.cancel();
         setBusy(true);
         setError(null);
+        setSignInAgain(null);
         try {
             const isCurrent = () => owner === sequence.current && requestedAuthorization === authorizationKey.current && enabled.current;
             const prepared = onBeforeProviderRedirect ? await onBeforeProviderRedirect({authorization, isCurrent}) : undefined;
@@ -174,7 +185,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
         }
     }
     return <section className="authSecurityConfirmation" aria-label={t(catalog, "auth.security.title")}>
- {error ? <p className="authFieldError" role="alert">{error}</p> : null}
+ {error ? <p className="authFieldError" role="alert">{error}{signInAgain ? <> <a href={signInAgain}>{t(catalog, "auth.signUp.logIn")}</a></> : null}</p> : null}
  {backup ? <EphemeralCodes codes={[backup]} catalog={catalog}/> : null}
  {held || initialProof ? <button type="button" className="setBtn setBtnPrimary" disabled={busy || disabled} onClick={async () => {
                 const result = held ?? initialProof!;
@@ -243,6 +254,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                 flight.current = false;
                 setBusy(false);
                 setError(null);
+                setSignInAgain(null);
                 setPassword('');
                 setCode('');
                 setBackup(null);

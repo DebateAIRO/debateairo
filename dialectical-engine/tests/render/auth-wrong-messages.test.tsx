@@ -97,6 +97,22 @@ describe("the security check names the actual problem", () => {
   it("too many attempts", async () => {
     expect(await proveWith(new ContractHttpError("RATE_LIMITED", 429, "MFA_RATE_LIMITED", "MFA_RATE_LIMITED"))).toBe("Too many attempts. Please wait a few minutes, then try again.");
   });
+  // Review fix (2026-10-09): an expired session also answers 401, with SESSION_REQUIRED (or 409
+  // COOKIE_SESSION_REQUIRED when no session cookie is left); "wrong password or code" sent people retyping
+  // a correct password. They are told to sign in again, with a link that brings them back here.
+  it.each([
+    new ContractHttpError("SESSION_REQUIRED", 401, "SESSION_REQUIRED", "SESSION_REQUIRED"),
+    new ContractHttpError("SERVER_FAILURE", 409, "COOKIE_SESSION_REQUIRED", "COOKIE_SESSION_REQUIRED")
+  ])("an expired session (%s) says so and offers sign-in", async (failure) => {
+    window.history.replaceState(null, "", "/settings/security");
+    try {
+      const alert = await proveWith(failure);
+      expect(alert).toContain("Your session expired. Please sign in again.");
+      expect(alert).not.toContain(auth["auth.security.wrongPassword"]);
+      const link = [...document.querySelectorAll<HTMLAnchorElement>("[role=alert] a")][0];
+      expect(link?.getAttribute("href")).toBe("/login?next=%2Fsettings%2Fsecurity");
+    } finally { window.history.replaceState(null, "", "/"); }
+  });
   it("anything else keeps the general message", async () => {
     expect(await proveWith(new ContractHttpError("SERVER_FAILURE", 503, "AUTH_TEMPORARILY_UNAVAILABLE", "AUTH_TEMPORARILY_UNAVAILABLE"))).toBe(auth["auth.security.unavailable"]);
   });
