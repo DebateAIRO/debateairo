@@ -137,7 +137,34 @@ describe("a pasted code is taken only as exactly six digits", () => {
   });
 });
 
+describe("full-width digits from a Japanese or Chinese keyboard count as digits", () => {
+  it("１２３４５６ is accepted as 123456", async () => {
+    const completeLogin = vi.fn().mockResolvedValue({ status: "authenticated", csrf_token: "c".repeat(43) });
+    const { host } = await toCodeStep(completeLogin);
+    await input(host, "[name=code]", "１２３　４５６");
+    expect(completeLogin).toHaveBeenCalledWith(token, "123456");
+  });
+});
+
 describe("a pasted code after a provider sign-in", () => {
+  // Review fix (2026-10-09): Enter handed whatever the field held to the submit, which dropped anything but
+  // six digits without a word. The submit now applies the sign-in screen's exactly-six-digits check: nothing
+  // is sent, and the field says why.
+  it.each(["12345678", "12345"])("%j pasted, then Enter: nothing is sent and the field says why", async (pasted) => {
+    window.history.replaceState(null, "", `/social/complete#kind=login&token=${token}`);
+    const completeLogin = vi.fn();
+    try {
+      const host = await render(<SocialCompleteFlow client={{ socialLoginStatus: vi.fn().mockResolvedValue({ expires_at: new Date(Date.now() + 300_000).toISOString(), available_methods: ["totp"] }), completeLogin } as never} />);
+      const code = host.querySelector<HTMLInputElement>("#social-code")!;
+      code.focus();
+      await input(host, "#social-code", pasted);
+      await act(async () => code.form!.requestSubmit());
+      expect(completeLogin).not.toHaveBeenCalled();
+      expect(code.getAttribute("aria-invalid")).toBe("true");
+      expect(describedText(code)).toContain("6 digits");
+    } finally { window.history.replaceState(null, "", "/"); }
+  });
+
   it("is refused unless it is exactly six digits", async () => {
     window.history.replaceState(null, "", `/social/complete#kind=login&token=${token}`);
     const completeLogin = vi.fn();

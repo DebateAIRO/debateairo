@@ -14,7 +14,7 @@ import { ageConfirmationHref, ageConfirmationRequired } from '@/lib/ageConfirmat
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
-import { readSixDigitCode } from '@/lib/sixDigitCode';
+import { readSixDigitCode, sixDigitCodeToSend } from '@/lib/sixDigitCode';
 import { emailShape } from '@/lib/authFormValidation';
 import { setRecoveryAcknowledgementPending } from '@/lib/authNavigationGuard';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
@@ -299,12 +299,13 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
  {offered.includes('passkey') ? <div className="authAltMethods"><button type="button" className="authSecondary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.signIn")}</button></div> : null}
  {offered.includes('totp') || offered.includes('recovery_code') ? <form className="authForm authMfaForm" noValidate method="post" action="/login" onSubmit={e => {
                     e.preventDefault();
-                    if (method === 'totp' && !readSixDigitCode(code).complete) {
+                    const digits = method === 'totp' ? sixDigitCodeToSend(code) : code;
+                    if (digits === null) {
                         setCodeError(t(catalog, "auth.login.codeFormat"));
                         codeField.current?.focus();
                         return;
                     }
-                    void submitCode(method === 'totp' ? readSixDigitCode(code).digits : code);
+                    void submitCode(digits);
                 }} aria-busy={busy}>
  <div className="authField">
  <label htmlFor="login-code">{method === 'totp' ? t(catalog, "auth.login.authenticationCodeLabel") : t(catalog, "auth.login.recoveryCodeLabel")}</label>

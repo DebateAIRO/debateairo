@@ -13,7 +13,7 @@ import { retainSocialStepUp } from '@/lib/socialStepUpHandoff';
 import { safeSocialReturnPath } from '@/lib/returnPath';
 import { takeFragmentToken } from '@/lib/mfaEnrollment';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
-import { readSixDigitCode } from '@/lib/sixDigitCode';
+import { readSixDigitCode, sixDigitCodeToSend } from '@/lib/sixDigitCode';
 import { validateSignup, type SignupFieldErrors } from '@/lib/authFormValidation';
 import type { TurnstilePublicConfig } from '@/lib/turnstile';
 import { TurnstileChallenge } from './TurnstileChallenge';
@@ -73,6 +73,9 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [busy, setBusy] = useState(true);
     const [code, setCode] = useState('');
     const [recoveryMode, setRecoveryMode] = useState(false);
+    // Set by a submit that did not hold exactly six digits; any edit clears it.
+    const [codeIncomplete, setCodeIncomplete] = useState(false);
+    const codeField = useRef<HTMLInputElement>(null);
     const [proof, setProof] = useState<string | null>(null);
     const [reset, setReset] = useState(0);
     const [pending, setPending] = useState<string | null>(null);
@@ -362,6 +365,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     if (pending)
         return <EmailPendingScreen email={pending} retryAfterSeconds={60} client={client} catalog={catalog} locale={uiLocale} turnstile={turnstile} onDifferentEmail={() => window.location.assign('/sign-up')}/>;
     const methods = kind === 'stepup' ? stepUpStatus?.available_methods ?? [] : loginStatus?.available_methods ?? [];
+    const codeFormatError = !recoveryMode && (codeIncomplete || !readSixDigitCode(code).valid);
     return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
  {error ? <div className="authAlert" role="alert">{error}</div> : null}
  {returnToQuestion && !stepUpResult && !backup ? <a className="authPrimary" href="/new">{t(catalog, 'auth.continue')}</a> : null}
@@ -399,17 +403,24 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
  {methods.includes('passkey') ? <div className="authAltMethods"><button type="button" className="authSecondary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button></div> : null}
  {methods.includes('totp') || methods.includes('recovery_code') ? <><form className="authForm authMfaForm" method="post" action="/social/complete" noValidate onSubmit={e => {
                     e.preventDefault();
-                    void submitCode(code);
-                }}><div className="authField"><label htmlFor="social-code">{recoveryMode ? t(catalog, "auth.login.recoveryCodeLabel") : t(catalog, "auth.login.authenticationCodeLabel")}</label>{!recoveryMode ? <p className="authFieldHint" id="social-code-help">{t(catalog, 'auth.login.authenticatorInstruction')}</p> : null}<input className={recoveryMode ? 'authRecoveryInput' : undefined} aria-invalid={!recoveryMode && !readSixDigitCode(code).valid || undefined} aria-describedby={[!recoveryMode ? 'social-code-help' : '', !recoveryMode && !readSixDigitCode(code).valid ? 'social-code-error' : ''].filter(Boolean).join(' ') || undefined} id="social-code" name="code" autoComplete="one-time-code" inputMode={recoveryMode ? 'text' : 'numeric'} maxLength={recoveryMode ? 128 : undefined} value={code} disabled={busy} onChange={e => {
+                    const digits = recoveryMode ? code : sixDigitCodeToSend(code);
+                    if (digits === null) {
+                        setCodeIncomplete(true);
+                        codeField.current?.focus();
+                        return;
+                    }
+                    void submitCode(digits);
+                }}><div className="authField"><label htmlFor="social-code">{recoveryMode ? t(catalog, "auth.login.recoveryCodeLabel") : t(catalog, "auth.login.authenticationCodeLabel")}</label>{!recoveryMode ? <p className="authFieldHint" id="social-code-help">{t(catalog, 'auth.login.authenticatorInstruction')}</p> : null}<input ref={codeField} className={recoveryMode ? 'authRecoveryInput' : undefined} aria-invalid={codeFormatError || undefined} aria-describedby={[!recoveryMode ? 'social-code-help' : '', codeFormatError ? 'social-code-error' : ''].filter(Boolean).join(' ') || undefined} id="social-code" name="code" autoComplete="one-time-code" inputMode={recoveryMode ? 'text' : 'numeric'} maxLength={recoveryMode ? 128 : undefined} value={code} disabled={busy} onChange={e => {
                     // Exactly six digits (spaces and dashes ignored); a longer paste is shown and refused, never cut.
                     const typed = readSixDigitCode(e.target.value);
                     const value = recoveryMode || !typed.valid ? e.target.value : typed.digits;
                     if (value !== code)
                         attempt.current.edited();
                     setCode(value);
+                    setCodeIncomplete(false);
                     if (!recoveryMode && typed.complete)
                         void submitCode(typed.digits);
-                }}/><InlineFieldMessage id="social-code-error" message={!recoveryMode && !readSixDigitCode(code).valid ? t(catalog, "auth.login.codeFormat") : null}/></div><button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button></form>{methods.includes('recovery_code') && methods.includes('totp') ? <button type="button" className="authTextButton" disabled={completing} onClick={() => {
+                }}/><InlineFieldMessage id="social-code-error" message={codeFormatError ? t(catalog, "auth.login.codeFormat") : null}/></div><button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button></form>{methods.includes('recovery_code') && methods.includes('totp') ? <button type="button" className="authTextButton" disabled={completing} onClick={() => {
                         if (dispatched.current) return;
                         sequence.current++;
                         browser.cancel();
@@ -421,6 +432,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                         setError(null);
                         setRecoveryMode(!recoveryMode);
                         setCode('');
+                        setCodeIncomplete(false);
                         attempt.current.edited();
                     }}>{recoveryMode ? t(catalog, "auth.login.useAuthenticatorCode") : t(catalog, "auth.login.useRecoveryCode")}</button> : null}</> : null}
  </div> : null}
