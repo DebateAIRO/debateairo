@@ -1295,6 +1295,9 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "GET /v1/account/auth-methods", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/account/auth-methods/remove", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/account/recovery-codes/regenerate", auth:"user",resource:"session-self",action:"consumer-security" },
+  // Owner ruling 2026-10-09: an authenticator recovery waiting its 24 hours, read and cancelled from Settings → Security.
+  { route: "GET /v1/account/mfa-recovery", auth:"user",resource:"session-self",action:"consumer-security" },
+  { route: "POST /v1/account/mfa-recovery/cancel", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/passkeys/step-up/options", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/passkeys/step-up/complete", auth:"user",resource:"session-self",action:"consumer-security" },
   { route: "POST /v1/auth/step-up", auth: "user", resource: "session-self", action: "step-up" },
@@ -2531,6 +2534,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const security=options.consumerSecurity;
     api.get('/v1/account/auth-methods',routePolicy('GET /v1/account/auth-methods'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/auth-methods',sourceFor(request).ip))return reply;return reply.send(await security.authMethods(request.authenticatedSession!));});
     api.post('/v1/account/auth-methods/remove',credentialRoutePolicy('POST /v1/account/auth-methods/remove'),async(request,reply)=>{await security.removeAuthMethod(request.body,request.authenticatedSession!,sourceFor(request));return reply.status(204).send();});
+    api.get('/v1/account/mfa-recovery',routePolicy('GET /v1/account/mfa-recovery'),async(request,reply)=>{if(!admitOrRefuse(reply,'publicReads','GET /v1/account/mfa-recovery',sourceFor(request).ip))return reply;return reply.send(await security.pendingMfaRecovery(request.authenticatedSession!));});
+    api.post('/v1/account/mfa-recovery/cancel',credentialRoutePolicy('POST /v1/account/mfa-recovery/cancel'),async(request,reply)=>reply.send(await security.cancelPendingMfaRecovery(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/account/recovery-codes/regenerate',credentialRoutePolicy('POST /v1/account/recovery-codes/regenerate'),async(request,reply)=>reply.send(await security.regenerateRecoveryCodes(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/auth/passkeys/step-up/options',credentialRoutePolicy('POST /v1/auth/passkeys/step-up/options'),async(request,reply)=>reply.send(await security.beginPasskeyStepUp(request.body,request.authenticatedSession!,sourceFor(request))));
     api.post('/v1/auth/passkeys/step-up/complete',{...credentialRoutePolicy('POST /v1/auth/passkeys/step-up/complete'),bodyLimit:32768},async(request,reply)=>{

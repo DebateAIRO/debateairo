@@ -55,7 +55,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   ...['recovery/prove','recovery/enrollment/options','recovery/enrollment/complete','recovery/enrollment/status','recovery/enrollment/complete-evidence','onboarding/status','onboarding/complete'].map(path=>({route:`POST /v1/auth/${path}`,auth:'public',origin:'trusted',resource:'identity',action:'restricted-onboarding'})),
   ...['options','complete'].map(step=>({route:`POST /v1/auth/passkeys/enrollment/${step}`,auth:'public',origin:'trusted',session:'optional',resource:'identity',action:`passkey-enrollment-${step}`})),
   ...['options','complete'].map(step=>({route:`POST /v1/auth/passkeys/login/${step}`,auth:'public',origin:'trusted',resource:'identity',action:`passkey-login-${step}`})),
-  ...['GET /v1/account/auth-methods','POST /v1/account/auth-methods/remove','POST /v1/account/recovery-codes/regenerate','POST /v1/auth/passkeys/step-up/options','POST /v1/auth/passkeys/step-up/complete'].map(route=>({route,auth:'user',resource:'session-self',action:'consumer-security'})),
+  ...['GET /v1/account/auth-methods','POST /v1/account/auth-methods/remove','POST /v1/account/recovery-codes/regenerate','GET /v1/account/mfa-recovery','POST /v1/account/mfa-recovery/cancel','POST /v1/auth/passkeys/step-up/options','POST /v1/auth/passkeys/step-up/complete'].map(route=>({route,auth:'user',resource:'session-self',action:'consumer-security'})),
   { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
   { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
@@ -283,7 +283,7 @@ describe("S7 deny-by-default authorization", () => {
     expect(staffContractInventory.routes).toHaveLength(18);
     // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one.
-    expect(contractInventory.routes).toHaveLength(160);
+    expect(contractInventory.routes).toHaveLength(162);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

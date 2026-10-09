@@ -716,7 +716,12 @@ export type AuthMethodsResponse = z.infer<typeof AuthMethodsResponseSchema>;
 export const RemoveAuthMethodRequestSchema = z.object({factor_id:z.uuid(),step_up_grant:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
 export const RegenerateRecoveryCodesRequestSchema = z.object({step_up_grant:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
 export const RecoveryCodesResponseSchema = z.object({codes:z.array(z.string()).length(10)}).strict();
-export const consumerSecurityContractSchemas=Object.freeze({StepUpAuthorizationRequestSchema,StepUpResponseSchema,BeginPasskeyStepUpRequestSchema,CompletePasskeyStepUpRequestSchema,AuthMethodsResponseSchema,RemoveAuthMethodRequestSchema,RegenerateRecoveryCodesRequestSchema,RecoveryCodesResponseSchema});
+// Owner ruling 2026-10-09: an authenticator recovery waiting its 24 hours, as Settings → Security shows it, and its cancel.
+export const MfaRecoveryPendingResponseSchema = z.object({pending:z.object({not_before:z.iso.datetime(),started_at:z.iso.datetime()}).strict().nullable()}).strict();
+export type MfaRecoveryPendingResponse = z.infer<typeof MfaRecoveryPendingResponseSchema>;
+export const MfaRecoveryPendingCancelRequestSchema = z.object({}).strict();
+export const MfaRecoveryPendingCancelledSchema = z.object({status:z.literal("cancelled")}).strict();
+export const consumerSecurityContractSchemas=Object.freeze({StepUpAuthorizationRequestSchema,StepUpResponseSchema,BeginPasskeyStepUpRequestSchema,CompletePasskeyStepUpRequestSchema,AuthMethodsResponseSchema,RemoveAuthMethodRequestSchema,RegenerateRecoveryCodesRequestSchema,RecoveryCodesResponseSchema,MfaRecoveryPendingResponseSchema,MfaRecoveryPendingCancelRequestSchema,MfaRecoveryPendingCancelledSchema});
 
 export const PUBLICATION_PART_KINDS = ["QUESTION", "SUMMARY", "ARGUMENTS", "REVIEWS", "STORY"] as const;
 export const PublicationPartKindSchema = z.enum(PUBLICATION_PART_KINDS);
@@ -1357,6 +1362,8 @@ export const contractInventory = Object.freeze({
     "GET /v1/account/auth-methods",
     "POST /v1/account/auth-methods/remove",
     "POST /v1/account/recovery-codes/regenerate",
+    "GET /v1/account/mfa-recovery",
+    "POST /v1/account/mfa-recovery/cancel",
 
     "POST /v1/auth/mfa/totp/begin",
     "POST /v1/auth/mfa/totp/verify",
@@ -1463,7 +1470,7 @@ export const contractInventory = Object.freeze({
     LegalStatusResponseSchema, LegalAcceptRequestSchema, GeoAvailabilityResponseSchema,
     SensitiveDataConsentRequestSchema, SensitiveDataConsentStatusSchema,
     RunTargetedGrantActionSchema,
-    BeginSocialStepUpRequestSchema,SocialStepUpStatusRequestSchema,SocialStepUpStatusResponseSchema,CompleteSocialStepUpRequestSchema,StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema,
+    BeginSocialStepUpRequestSchema,SocialStepUpStatusRequestSchema,SocialStepUpStatusResponseSchema,CompleteSocialStepUpRequestSchema,StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema, MfaRecoveryPendingResponseSchema, MfaRecoveryPendingCancelRequestSchema, MfaRecoveryPendingCancelledSchema,
     PublishDebateRequestSchema, UnpublishDebateRequestSchema,
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,

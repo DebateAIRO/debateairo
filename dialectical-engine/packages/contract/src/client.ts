@@ -3,7 +3,7 @@ import { SocialStepUpStatusResponseSchema,type SocialStepUpStatusResponse,type C
 import { SocialLoginStatusResponseSchema, type SocialLoginStatusResponse, AuthProvidersResponseSchema, BeginSocialLoginResponseSchema, SocialSignupStatusResponseSchema, CompleteSocialSignupResponseSchema, SocialLinksResponseSchema, type AuthProvidersResponse, type SocialSignupStatusResponse, type CompleteSocialSignupRequest, type CompleteSocialSignupResponse, type SocialLinksResponse } from './social-auth.js';
 import {ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentOptionsResponseSchema,OnboardingRequirementsResponseSchema,
  type ConsumerRecoveryProveRequest,type ConsumerRecoveryProofResponse,type RecoveryEnrollmentBeginRequest,type RecoveryEnrollmentCompleteRequest,type RecoveryEnrollmentOptionsResponse,type PendingOnboardingStatusRequest,type PendingOnboardingCompleteRequest,type RecoveryEvidenceStatusRequest,type RecoveryEvidenceCompleteRequest,type OnboardingRequirementsResponse} from './consumer-auth.js';
-import {AuthMethodsResponseSchema,RecoveryCodesResponseSchema,type AuthMethodsResponse} from "./index.js";
+import {AuthMethodsResponseSchema,RecoveryCodesResponseSchema,MfaRecoveryPendingResponseSchema,MfaRecoveryPendingCancelledSchema,type AuthMethodsResponse,type MfaRecoveryPendingResponse} from "./index.js";
 import type {ConsumerAuthenticationCredential} from "./consumer-auth.js";
 import type { StepUpAuthorizationRequest, StepUpResponse } from "./index.js";
 import {PasskeyRegistrationOptionsResponseSchema, PasskeyAuthenticationOptionsResponseSchema, PasskeyEnrollmentResponseSchema,
@@ -350,6 +350,8 @@ export interface ContractClient {
   recoveryEnrollmentStatus(input:RecoveryEvidenceStatusRequest):Promise<OnboardingRequirementsResponse>;
   completeRecoveryEvidence(input:RecoveryEvidenceCompleteRequest):Promise<void>;
   authMethods():Promise<AuthMethodsResponse>;
+  pendingMfaRecovery():Promise<MfaRecoveryPendingResponse>;
+  cancelPendingMfaRecovery():Promise<{status:"cancelled"}>;
   removeAuthMethod(factorId:string,grant:string):Promise<void>;
   regenerateRecoveryCodes(grant:string):Promise<{codes:string[]}>;
   beginPasskeyStepUp(authorization:StepUpAuthorizationRequest):Promise<PasskeyAuthenticationOptionsResponse>;
@@ -599,6 +601,8 @@ export function createContractClient(
     recoveryEnrollmentStatus:(input:RecoveryEvidenceStatusRequest)=>request('/v1/auth/recovery/enrollment/status',OnboardingRequirementsResponseSchema,{method:'POST',body:JSON.stringify(input)}),
     completeRecoveryEvidence:(input:RecoveryEvidenceCompleteRequest)=>requestNoContent(root.href,fetchImplementation,'/v1/auth/recovery/enrollment/complete-evidence',{method:'POST',body:JSON.stringify(input)},auth),
     authMethods:()=>request('/v1/account/auth-methods',AuthMethodsResponseSchema),
+    pendingMfaRecovery:()=>request('/v1/account/mfa-recovery',MfaRecoveryPendingResponseSchema),
+    cancelPendingMfaRecovery:()=>request('/v1/account/mfa-recovery/cancel',MfaRecoveryPendingCancelledSchema,{method:'POST',body:'{}'}),
     removeAuthMethod:(factorId:string,grant:string)=>requestNoContent(root.href,fetchImplementation,'/v1/account/auth-methods/remove',{method:'POST',body:JSON.stringify({factor_id:factorId,step_up_grant:grant})},auth),
     regenerateRecoveryCodes:(grant:string)=>request('/v1/account/recovery-codes/regenerate',RecoveryCodesResponseSchema,{method:'POST',body:JSON.stringify({step_up_grant:grant})}),
     beginPasskeyStepUp:(authorization:StepUpAuthorizationRequest)=>request('/v1/auth/passkeys/step-up/options',PasskeyAuthenticationOptionsResponseSchema,{method:'POST',body:JSON.stringify({authorization})}),
