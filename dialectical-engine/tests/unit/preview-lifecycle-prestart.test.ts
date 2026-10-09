@@ -260,7 +260,8 @@ describe('release drop-in', () => {
     const lock = await pinned(s);
     const text = prestart.renderReleaseDropin({ service: 'api', entry: lock.services.api, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
     const lines = text.split('\n').filter((line: string) => !line.startsWith('#') && line);
-    expect(lines).toEqual(['[Service]', `WorkingDirectory=${root}/dialectical-engine`, 'ExecStartPre=+/opt/node/bin/node /opt/op/prestart.mjs --service api', 'ExecStart=',
+    // `+` runs as root but would inherit the service's Environment=/EnvironmentFile= (NODE_OPTIONS, secrets): env -i drops all of it.
+    expect(lines).toEqual(['[Service]', `WorkingDirectory=${root}/dialectical-engine`, 'ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/node/bin/node /opt/op/prestart.mjs --service api', 'ExecStart=',
       `ExecStart=/opt/node/bin/node ${root}/dialectical-engine/deploy/preview-auth-dev/v1/launch-api.mjs --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/api-launch.json`]);
     expect(prestart.RELEASE_DROPIN_NAME > 'zzzzzzzzz-auth-dev-task12-final.conf').toBe(true);
     const ui = prestart.renderReleaseDropin({ service: 'ui', entry: lock.services.ui, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
