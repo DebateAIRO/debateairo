@@ -136,10 +136,10 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
             }
         }
     }
-    return <section><p>{warning}</p>{isRun ? <a href={`/debate/${grant.target_run_id}`}>{grant.target_run_id}</a> : null}
- {destructive ? <label><input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)}/>{t(publicCatalog, action === 'PUBLISH' ? 'public.publication.acknowledgePublish' : action === 'UNPUBLISH' ? 'public.publication.acknowledgeUnpublish' : 'public.publication.deleteAcknowledgement')}</label> : null}
- {action === 'DELETE_ACCOUNT' ? <label>{t(settingsCatalog, "settings.erasure.typeConfirmation", { confirmation: t(settingsCatalog, "settings.erasure.confirmationPhrase") })}<input value={phrase} onChange={e => setPhrase(e.target.value)} autoComplete="off"/></label> : null}
- {action === 'CHANGE_EMAIL' ? <label>{t(settingsCatalog, "settings.emailChange.newLabel")}<input type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email"/></label> : null}
+    return <section className="authSecurityConfirmation"><p>{warning}</p>{isRun ? <a href={`/debate/${grant.target_run_id}`}>{t(catalog, "auth.security.returnToDebate")}</a> : null}
+ {destructive ? <label className="authCheck"><input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)}/>{t(publicCatalog, action === 'PUBLISH' ? 'public.publication.acknowledgePublish' : action === 'UNPUBLISH' ? 'public.publication.acknowledgeUnpublish' : 'public.publication.deleteAcknowledgement')}</label> : null}
+ {action === 'DELETE_ACCOUNT' ? <div className="authField"><label htmlFor="resume-erasure-phrase">{t(settingsCatalog, "settings.erasure.typeConfirmation", { confirmation: t(settingsCatalog, "settings.erasure.confirmationPhrase") })}</label><input id="resume-erasure-phrase" value={phrase} onChange={e => setPhrase(e.target.value)} autoComplete="off"/></div> : null}
+ {action === 'CHANGE_EMAIL' ? <div className="authField"><label htmlFor="resume-new-email">{t(settingsCatalog, "settings.emailChange.newLabel")}</label><input id="resume-new-email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email"/></div> : null}
  {backup ? <EphemeralCodes catalog={catalog} codes={[backup]}/> : null}
  <SecurityConfirmation catalog={catalog} client={client} authorization={authorization} initialProof={proof} disabled={!allowed} onConfirmed={confirm} onCancel={() => {
             consumed.current = true;

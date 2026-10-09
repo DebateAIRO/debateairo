@@ -25,6 +25,7 @@ import { PasswordResetFlow } from "../../apps/ui/components/PasswordResetFlow.js
 import { MfaRecoveryFlow } from "../../apps/ui/components/MfaRecoveryFlow.js";
 import { BackupEmailVerification } from "../../apps/ui/components/BackupEmailVerification.js";
 import { SecuritySettings } from "../../apps/ui/components/SecuritySettings.js";
+import { SecurityActionResume } from "../../apps/ui/components/auth/SecurityActionResume.js";
 import { mount, unmount, input } from "./task11-harness.js";
 
 vi.mock("@/lib/consumerWebAuthn", () => ({
@@ -156,6 +157,18 @@ describe("every auth screen styles its own controls", () => {
     const client = { status: vi.fn().mockResolvedValue({ status: "pending", email: "b***@example.test" }) } as never;
     const host = await render(<BackupEmailVerification client={client} />);
     expect(host.querySelector("#backup-current-password")).not.toBeNull();
+    expect(unstyled(host)).toEqual([]);
+  });
+
+  it.each([
+    ["PUBLISH", { target_run_id: "33333333-3333-4333-8333-333333333333" }],
+    ["DELETE_ACCOUNT", {}],
+    ["CHANGE_EMAIL", {}]
+  ])("a resumed %s action after a provider check", async (action, target) => {
+    const proof = { status: "step_up_complete", csrf_token: "c".repeat(43), step_up_grant: { action, ...target, token: "g".repeat(43), expires_at: new Date(Date.now() + 300_000).toISOString() } };
+    const client = { authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["passkey"], step_up_providers: [] }) } as never;
+    const host = await render(<SecurityActionResume catalog={auth} settingsCatalog={settings} publicCatalog={publicCatalog} locale="en" client={client} takeProof={() => proof as never} />);
+    expect(host.querySelector("input")).not.toBeNull();
     expect(unstyled(host)).toEqual([]);
   });
 
