@@ -5,7 +5,7 @@ import { isSingleDeliverableRecipient, SendmailMailSender } from "../../apps/api
 import { AuthFlowError, RegistrationService } from "../../apps/api/src/registration.js";
 import { EmailChangeError, EmailChangeService, normalizedAddress } from "../../apps/api/src/email-change.js";
 import { RecoveryEmailService } from "../../apps/api/src/recovery-email.js";
-import { createMailDomainCheck, limitMailDomainCheck, mailDomainRefused, type MailDomainResolver } from "../../apps/api/src/mail-domain-check.js";
+import { createMailDomainCheck, limitMailDomainCheck, mailDomainRefused, systemMailDomainCheck, type MailDomainResolver } from "../../apps/api/src/mail-domain-check.js";
 import { emailShape, signInEmailShape } from "../../apps/ui/lib/authFormValidation.js";
 import { normalizeEmailForBlindIndex } from "@debateai/crypto";
 import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows } from "../../packages/register/src/auth-policy.js";
@@ -30,6 +30,8 @@ const GOOD: ReadonlyArray<readonly [string, string]> = [
   ["24-letter top-level domain", `person@example.${"a".repeat(24)}`],
   ["two-letter top-level domain", "person@example.ro"],
   ["IDN in its ASCII form below the top level", "person@xn--bcher-kva.de"],
+  ["IDN top-level domain in its ASCII form (.рф)", "person@example.xn--p1ai"],
+  ["IDN top-level domain, both in ASCII form", "person@xn--d1acufc.xn--p1ai"],
   ["SES simulator: success", "success@simulator.amazonses.com"],
   ["SES simulator: bounce", "bounce@simulator.amazonses.com"],
   ["SES simulator: ooto", "ooto@simulator.amazonses.com"],
@@ -47,7 +49,9 @@ const BAD: ReadonlyArray<readonly [string, unknown]> = [
   ["numeric top-level domain", "person@example.123"],
   ["one-letter top-level domain", "person@example.c"],
   ["25-letter top-level domain", `person@example.${"a".repeat(25)}`],
-  ["IDN top-level domain in ASCII form", "person@example.xn--p1ai"],
+  ["IDN top-level domain in ASCII form too short", "person@example.xn--a"],
+  ["IDN top-level domain in ASCII form ending with a hyphen", "person@example.xn--p1ai-"],
+  ["IDN-looking top-level domain without the xn-- prefix", "person@example.x1--p1ai"],
   ["IDN domain in Unicode", "person@bücher.de"],
   ["Unicode local part", "pérson@example.com"],
   ["full-width characters", "ｐerson@example.com"],
@@ -275,6 +279,16 @@ describe("the DNS question at the entry points (fails open)", () => {
     for (const done of gates.splice(0)) done();
     expect(await fresh).toBe("UNDELIVERABLE");
     expect(asked).toBe(4);
+  });
+  it("outside local mode the special-use endings are refused without asking DNS (ruling 2026-10-09)", async () => {
+    let asked = 0;
+    const check = createMailDomainCheck(resolver({ resolveMx: async () => { asked += 1; return [{ exchange: "mx.example.com", priority: 10 }]; } }), 2_000, "REFUSE");
+    for (const domain of ["example.test", "mail.example", "x.invalid", "Host.LOCALHOST"]) expect(await check(domain)).toBe("UNDELIVERABLE");
+    expect(asked).toBe(0);
+    expect(await check("example.com")).toBe("DELIVERABLE");
+    // The running API's check, by deployment mode: decided before any DNS, so no network is touched here.
+    expect(await mailDomainRefused(systemMailDomainCheck("hosted"), "person@example.test")).toBe(true);
+    expect(await mailDomainRefused(systemMailDomainCheck("local"), "person@example.test")).toBe(false);
   });
   it("is asked about the lower-cased domain, never the address", async () => {
     const asked: string[] = [];

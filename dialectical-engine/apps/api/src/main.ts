@@ -740,7 +740,8 @@ if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
 const socialProviders = (()=>{try{return new SocialProviders(socialConfigurations(environment.SOCIAL_PROVIDERS_JSON,environment.PUBLIC_APP_URL),environment.SOCIAL_SOCKET_PATH===undefined?undefined:new UnixSocialTransport(environment.SOCIAL_SOCKET_PATH));}catch{console.error('[SOCIAL_CONFIGURATION_INVALID]');return new SocialProviders([]);}})();
 const socialRepository = new PostgresSocialIdentityRepository(authorizationPool,auditContextHasher,pool);
 // Open sign-up mail (owner decision G5, 2026-10-09): the DNS question at the three entry points, 2 s, fail open.
-const mailDomainCheck = systemMailDomainCheck();
+// Ruling 2026-10-09: outside local mode the special-use endings (.test .example .invalid .localhost) are refused.
+const mailDomainCheck = systemMailDomainCheck(environment.DEPLOYMENT_MODE);
 const registration = new RegistrationService({
   repository: identityRepository,
   socialRepository,

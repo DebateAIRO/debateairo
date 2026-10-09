@@ -37,8 +37,9 @@ const MAIL_DOMAIN_CHECK_MAX_IN_FLIGHT = 8;
 const MAIL_DOMAIN_CHECK_MAX_PER_MINUTE = 120;
 const MINUTE_MS = 60_000;
 /**
- * Special-use names (RFC 2606, RFC 6761) are never asked about: they never resolve, they are what the test suites
- * and the development stack sign up with, and a DNS answer would make the same input pass offline and fail online.
+ * Special-use names (RFC 2606, RFC 6761) are never asked about: they never resolve. In LOCAL mode they are what the
+ * test suites and the development stack sign up with, so they pass; anywhere else (ruling 2026-10-09) they are
+ * refused outright, so a hosted site can never store an address that cannot receive mail.
  */
 const SPECIAL_USE_TOP_LEVEL = new Set(["test", "example", "invalid", "localhost"]);
 
@@ -74,11 +75,14 @@ async function lookUp(resolver: MailDomainResolver, domain: string, expired: () 
 
 export function createMailDomainCheck(
   resolver: MailDomainResolver,
-  timeoutMs: number = MAIL_DOMAIN_CHECK_TIMEOUT_MS
+  timeoutMs: number = MAIL_DOMAIN_CHECK_TIMEOUT_MS,
+  specialUse: "ALLOW" | "REFUSE" = "ALLOW"
 ): MailDomainCheck {
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1) throw new TypeError("MAIL_DOMAIN_CHECK_CONFIGURATION_INVALID");
   return async (domain: string): Promise<MailDomainVerdict> => {
-    if (SPECIAL_USE_TOP_LEVEL.has(domain.slice(domain.lastIndexOf(".") + 1).toLowerCase())) return "UNKNOWN";
+    if (SPECIAL_USE_TOP_LEVEL.has(domain.slice(domain.lastIndexOf(".") + 1).toLowerCase())) {
+      return specialUse === "REFUSE" ? "UNDELIVERABLE" : "UNKNOWN";
+    }
     let timer: ReturnType<typeof setTimeout> | undefined;
     let expired = false;
     const deadline = new Promise<MailDomainVerdict>((resolve) => {
@@ -124,16 +128,20 @@ export function limitMailDomainCheck(
  * The running API's resolver: the system's DNS servers, one try each, bounded by the same deadline. One Resolver
  * per question, because `cancel()` abandons every query of its Resolver and must not cut another visitor's check.
  */
-export function systemMailDomainCheck(): MailDomainCheck {
-  return limitMailDomainCheck((domain: string) => {
+export function systemMailDomainCheck(deploymentMode: "local" | "hosted"): MailDomainCheck {
+  const specialUse = deploymentMode === "local" ? "ALLOW" as const : "REFUSE" as const;
+  const limited = limitMailDomainCheck((domain: string) => {
     const resolver = new Resolver({ timeout: MAIL_DOMAIN_CHECK_TIMEOUT_MS, tries: 1 });
     return createMailDomainCheck({
       resolveMx: (name) => resolver.resolveMx(name),
       resolve4: (name) => resolver.resolve4(name),
       resolve6: (name) => resolver.resolve6(name),
       cancel: () => resolver.cancel()
-    })(domain);
+    }, MAIL_DOMAIN_CHECK_TIMEOUT_MS, specialUse)(domain);
   });
+  // A special-use name is decided without DNS, so the brakes never turn a hosted refusal into a pass.
+  return async (domain: string) => specialUse === "REFUSE" && SPECIAL_USE_TOP_LEVEL.has(domain.slice(domain.lastIndexOf(".") + 1).toLowerCase())
+    ? "UNDELIVERABLE" : limited(domain);
 }
 
 /**
