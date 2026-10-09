@@ -248,10 +248,13 @@ async function lockedHttp(options: Readonly<{ funded?: boolean }> = {}) {
   const writes: Array<{ kind: string; operationId: string; event: string }> = [];
   const alertIntents: Array<{ event: string; operationId: string; envelope: unknown }> = [];
   const receipt = (operationId: string) => ({ operationId, outcome: "COMPLETED", recordedAt: new Date() });
+  // Simulates the guarded SQL refusing the write at COMMIT (e.g. readiness lapsed after the request-time checks).
+  let commitFault: (() => Error) | undefined;
+  const failCommit = (fault: (() => Error) | undefined) => { commitFault = fault; };
   const repository = {
     readMutationTarget: async () => targetUser,
     invite: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "invite", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); },
-    grant: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "grant", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); },
+    grant: async (input: { operationId: string; alertIntent: { event: string } }) => { if (commitFault) throw commitFault(); writes.push({ kind: "grant", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); },
     disable: async (input: { operationId: string; alertIntent: { event: string; operationId: string; envelope: unknown } }) => {
       writes.push({ kind: "disable", operationId: input.operationId, event: input.alertIntent.event }); alertIntents.push(input.alertIntent); return receipt(input.operationId); },
     readIssuedInvitation: async () => ({ invitationId: randomUUID(), expiresAt: new Date(Date.now() + 86400000) }),
@@ -290,7 +293,7 @@ async function lockedHttp(options: Readonly<{ funded?: boolean }> = {}) {
   const registrationOptions = (body: unknown) => post("/v1/admin/webauthn/registration/options", body);
   const registrationVerify = () => post("/v1/admin/webauthn/registration/verify", { challenge_handle: handle("a"), credential: registrationCredential });
   const close = async () => { await api.close(); await runtime.close(); };
-  return { f, runtime, writes, alertIntents, ceremonies, invite, grant, disable, post, actionOptions, actionVerify, acceptOptions, acceptVerify, accept,
+  return { f, runtime, writes, alertIntents, ceremonies, failCommit, invite, grant, disable, post, actionOptions, actionVerify, acceptOptions, acceptVerify, accept,
     registrationOptions, registrationVerify, close };
 }
 
@@ -356,6 +359,24 @@ describe("locked Team tools at request time", () => {
     expect(response.json()).toEqual({ error: "STAFF_ALERT_UNAVAILABLE" });
   };
   const mutationIntent = { expected_revision: 0, reason: { code: "GRANT_CHANGE" } };
+
+  it("answers the locked refusal when the database's readiness guard refuses at COMMIT; other database refusals stay 403", async () => {
+    const h = await lockedHttp();
+    try {
+      await h.f.unlock();
+      // staff.require_alert_operation: RAISE EXCEPTION 'STAFF_ALERT_UNAVAILABLE' (default SQLSTATE P0001).
+      h.failCommit(() => Object.assign(new Error("STAFF_ALERT_UNAVAILABLE"), { code: "P0001" }));
+      lockedRefusal(await h.grant());
+      for (const other of [Object.assign(new Error("STAFF_GRANT_REVISION_STALE"), { code: "P0001" }),
+        Object.assign(new Error("STAFF_ALERT_UNAVAILABLE"), { code: "42501" }), new Error("STAFF_ALERT_UNAVAILABLE")]) {
+        h.failCommit(() => other);
+        const refused = await h.grant();
+        expect(refused.statusCode).toBe(403);
+        expect(refused.json()).toEqual({ error: "STAFF_REQUEST_REFUSED" });
+      }
+      expect(h.writes).toEqual([]);
+    } finally { await h.close(); }
+  });
 
   it("refuses invite and grant key ceremonies while locked before issuing a challenge; disable ceremonies still start", async () => {
     const h = await lockedHttp();

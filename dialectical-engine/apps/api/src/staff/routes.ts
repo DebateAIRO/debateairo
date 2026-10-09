@@ -59,6 +59,12 @@ class StaffHttpRefusal extends Error {
     constructor(readonly status: number, readonly code: string) { super(code); }
 }
 function refuse(): never { throw new StaffHttpRefusal(403, 'STAFF_REQUEST_REFUSED'); }
+/** The database's own readiness refusal: staff.require_alert_operation RAISEs exactly this message with
+ * the default SQLSTATE P0001 (row guard or the deferred COMMIT guard), e.g. readiness lapsed after the
+ * request-time checks. It means "Team tools are locked", not a refused request. */
+function lockedByDatabaseGuard(error: unknown): boolean {
+    return error instanceof Error && (error as { code?: unknown }).code === 'P0001' && error.message === 'STAFF_ALERT_UNAVAILABLE';
+}
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
     const result = schema.safeParse(value);
     if (!result.success)
@@ -170,7 +176,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
                     if (error instanceof StaffHttpRefusal)
                         return reply.code(error.status).send({ error: error.code });
                     // Team tools are locked: no fresh independent alert readiness for this action (no destination exposed).
-                    if (error instanceof StaffAlertError && error.code === 'STAFF_ALERT_UNAVAILABLE')
+                    if ((error instanceof StaffAlertError && error.code === 'STAFF_ALERT_UNAVAILABLE') || lockedByDatabaseGuard(error))
                         return reply.code(503).send({ error: 'STAFF_ALERT_UNAVAILABLE' });
                     if (error instanceof StaffAlertError || error instanceof Error && error.message === 'STAFF_UNAVAILABLE') {
                         return reply.code(503).send({ error: 'STAFF_UNAVAILABLE' });
