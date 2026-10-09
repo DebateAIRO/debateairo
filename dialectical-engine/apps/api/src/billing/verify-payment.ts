@@ -23,8 +23,8 @@ import {
 import { queuePaymentAlert } from "./payment-alert.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
 import {
-  heldByChargeback, openOwnRequest, queueRefundHeldAlert, refundedAlready, refundedMicros, wholePaymentOpen, type RefundDesk,
-  type RefundIntent
+  heldByChargeback, openOwnRequest, PAUSED_EMAIL_SENTENCE, queueRefundHeldAlert, refundedAlready, refundedMicros,
+  wholePaymentOpen, type RefundDesk, type RefundIntent
 } from "./refunds.js";
 import { retiredVerifyJob } from "./retired-jobs.js";
 import { chargeEvent, subscriptionEvent } from "./rows.js";
@@ -581,11 +581,7 @@ export class VerifyPaymentHandler {
           errorCode: boughtNothing ? "DUPLICATE_PAYMENT" : null
         }));
         written = inserted === "INSERTED";
-        const open = written ? openOwnRequest(current, paymentId) : null;
-        if (open !== null && open.openMicros > 0
-          && await queueRefundHeldAlert({ repository: this.deps.repository, jobs: this.deps.netopia.jobs }, charge, open, now, client)) {
-          held = open.intent;
-        }
+        let pausedEmailQueued = false;
         if (written && !boughtNothing) {
           const { subscription } = await this.context(client, charge, owner, now);
           if (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE") {
@@ -598,7 +594,15 @@ export class VerifyPaymentHandler {
               template: "M10", recipient: { kind: "CUSTOMER", customerId: owner.customerId }, dedupeRef: charge.chargeId,
               params: { plan: subscription.planId }, notBefore: now
             });
+            pausedEmailQueued = true;
           }
+        }
+        // F6a (ui-3): after the M10 decision, so the owner's O3 says what the customer was told.
+        const open = written ? openOwnRequest(current, paymentId) : null;
+        if (open !== null && open.openMicros > 0 && await queueRefundHeldAlert(
+          { repository: this.deps.repository, jobs: this.deps.netopia.jobs }, charge, open, now, client, pausedEmailQueued
+        )) {
+          held = open.intent;
         }
       }
       if (stage === "REPRESENTED"
@@ -624,8 +628,9 @@ export class VerifyPaymentHandler {
       code: "OWNER_REVIEW", reference: `charge ${charge.chargeId}`, dedupeRef: `${charge.chargeId}:CHARGEBACK_LOST`, now,
       nextSteps: `NETOPIA reports the dispute on this payment (NETOPIA payment ${paymentId}) as lost: status 10,`
         + " \"chargeback accepted\"."
+        // F6a (ui-3): SUSPENDED is written only with the customer's M10 (above), so a paused plan's customer was told.
         + (paused
-          ? " The paid features are paused."
+          ? ` The paid features are paused. ${PAUSED_EMAIL_SENTENCE}`
           : " No plan was paused for it: the payment bought nothing, or its plan was not active.")
         + " NETOPIA has not confirmed what this status means, so"
         + " nothing ends by itself. Once you have checked it in NETOPIA's admin, record the outcome with"

@@ -17,6 +17,11 @@ import {
   type MailTemplateId
 } from "@debateai/mail-templates";
 
+/** README §14.8's own form of the refund-done command on the host (F6a, ops-4): as the API's user, with its EnvironmentFile. */
+const HOST_REFUND_DONE = "systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api"
+  + " --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine"
+  + " /usr/bin/pnpm billing:refund-done --charge 0123456789abcdef0123456789abcdef --amount 12.10";
+
 const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   plan: "PLUS",
   totalAmount: "24.20",
@@ -58,9 +63,9 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   paymentRef: "ntp-1234567890",
   currency: "USD",
   whole: "true",
-  doneCommand: "pnpm billing:refund-done --charge 0123456789abcdef0123456789abcdef --amount 12.10 --confirm",
+  doneCommand: HOST_REFUND_DONE,
   refundCount: "2",
-  refundList: "- charge 0123456789abcdef0123456789abcdef, NETOPIA payment ntp-1: refund 12.10 USD (part of the payment)\n  pnpm billing:refund-done --charge 0123456789abcdef0123456789abcdef --amount 12.10 --confirm",
+  refundList: `- charge 0123456789abcdef0123456789abcdef, NETOPIA payment ntp-1: refund 12.10 USD (part of the payment)\n  ${HOST_REFUND_DONE}`,
   nextSteps: "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with pnpm billing:invoice"
     + " --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>"
 });
@@ -554,10 +559,44 @@ describe("P17 renderMail", () => {
       nextSteps: "Report the code.", paymentAlert: "true"
     });
     expect(owner.subject).toBe("Billing needs your attention (NOTICE_PARSE_FAILED)");
-    expect(owner.text).toContain("A payment needs your attention. Nothing more was charged, and the customer was not emailed about it.");
+    // F6a (ui-3): a charge-back's O3 is queued together with the customer's M10, so the intro no longer claims silence.
+    expect(owner.text).toContain("A payment needs your attention. Nothing more was charged. The steps below say what the customer was told, if anything.");
+    expect(owner.text).not.toContain("not emailed");
     expect(owner.text).toContain("This email is sent once for this reference and reason within the hour.");
     expect(owner.text).not.toContain("A job that issues an invoice");
     expect(Object.keys(MAIL_TEMPLATES.O3.optional ?? {})).toEqual(["paymentAlert"]);
+  });
+
+  it("F6a (ops-3, ops-4): both O2 refund emails say look in NETOPIA's admin first, and give the host's command, preview first", () => {
+    const LOOK_FIRST = "First look at the payment in NETOPIA's admin. If it already shows a refund of this amount, do not"
+      + " refund it again: only run the command below.";
+    const PREVIEW_THEN_CONFIRM = "once to see what it records, then again with --confirm added at the end to record it.";
+    const paragraphs = (text: string) => text.split("\n\n");
+    const whole = renderMail("O2_REFUND_DUE", "en", paramsFor("O2_REFUND_DUE"));
+    const part = renderMail("O2_REFUND_DUE", "en", { ...paramsFor("O2_REFUND_DUE"), whole: "false" });
+    const reminder = renderMail("O2_REFUND_REMINDER", "en", paramsFor("O2_REFUND_REMINDER"));
+    for (const [name, mail] of [["whole", whole], ["part", part], ["reminder", reminder]] as const) {
+      expect(paragraphs(mail.text).filter((paragraph) => paragraph.startsWith(LOOK_FIRST)), name).toHaveLength(1);
+      expect(mail.text, name).toContain(PREVIEW_THEN_CONFIRM);
+      expect(mail.text, name).not.toMatch(/not yet recorded\.|the next day|--confirm\n|--confirm$/mu);
+    }
+    expect(paragraphs(whole.text)).toContain(`${LOOK_FIRST} If it shows none, refund exactly this amount on this payment in`
+      + " NETOPIA's admin, in one refund.");
+    expect(paragraphs(whole.text)).toContain("Once NETOPIA reports the refund, the site records it by itself, and the customer's"
+      + " email and the credit note follow. If it is still open in the site's next reminder, record it yourself with the"
+      + ` command below, run as root on the server: run it ${PREVIEW_THEN_CONFIRM}`);
+    expect(paragraphs(part.text)).toContain("Once it is done, record it with the command below, run as root on the server (the"
+      + ` site cannot tell a partial refund from a whole one): run it ${PREVIEW_THEN_CONFIRM}`);
+    // The command is a paragraph of its own (a block: it is longer than a text param's 200 characters), copied whole.
+    for (const mail of [whole, part]) {
+      expect(paragraphs(mail.text)).toContain(HOST_REFUND_DONE);
+      expect(mail.html).toContain(`<pre style="white-space:pre-wrap;font-family:monospace">${HOST_REFUND_DONE}</pre>`);
+    }
+    expect(paragraphs(reminder.text)[1]).toBe(`${LOOK_FIRST} Do this for each refund listed here: each is owed, and not yet`
+      + " recorded on the site. If its payment shows no such refund, make it in NETOPIA's admin exactly as listed, in one"
+      + ` refund. Then run the command under it as root on the server: ${PREVIEW_THEN_CONFIRM}`);
+    expect(reminder.text).toContain(`  ${HOST_REFUND_DONE}`);
+    expect(MAIL_TEMPLATES.O2_REFUND_DUE.params.doneCommand).toBe("block");
   });
 
   it("N9: tells the owner at once that NETOPIA's message about an open charge could not be verified (O4)", () => {

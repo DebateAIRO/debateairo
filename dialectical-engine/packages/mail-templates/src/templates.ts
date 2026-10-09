@@ -278,7 +278,9 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   // N14 (spec §2.12.2, ruling C-3): while NETOPIA's refund call is unconfirmed, RefundDesk hands each NETOPIA refund to
   // the owner at once: our charge id, NETOPIA's payment number, the exact amount and currency, whether it is the whole
   // payment, the reason, a withdrawal's legal deadline, and the exact command that records it. Never a customer's name,
-  // email or card.
+  // email or card. F6a (final review ops-3, ops-4): the steps say to look at the payment in NETOPIA's admin first, and the
+  // command is README §14.8's host form (systemd-run as the API's user), longer than a text param's 200 characters, so it
+  // is a block: a paragraph of its own, copied whole.
   O2_REFUND_DUE: define({
     catalogue: "owner", subject: "owner.O2_REFUND_DUE.subject",
     paragraphs: [
@@ -288,11 +290,12 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
       { ifParam: "refundDeadline", test: "present", then: "owner.O2_REFUND_DUE.deadline", otherwise: null },
       "owner.O2_REFUND_DUE.next",
       { ifParam: "whole", test: "true", then: "owner.O2_REFUND_DUE.recordedBySite", otherwise: "owner.O2_REFUND_DUE.command" },
+      { block: "doneCommand" },
       "owner.O2_REFUND_DUE.reminded"
     ],
     params: {
       chargeRef: "text", paymentRef: "text", refundAmount: "amount", currency: "text", refundReason: "text", whole: "flag",
-      doneCommand: "text"
+      doneCommand: "block"
     },
     optional: { refundDeadline: "date" }
   }),

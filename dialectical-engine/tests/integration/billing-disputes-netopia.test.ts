@@ -102,7 +102,9 @@ describe("N15 charge-backs on NETOPIA's statuses (spec §2.13)", () => {
     expect(alerts).toHaveLength(1);
     expect(alerts[0]).toMatchObject({ "param.reasonCode": "OWNER_REVIEW", "param.paymentAlert": "true" });
     expect(alerts[0]!["param.nextSteps"]).toContain(`pnpm billing:dispute --charge ${seeded.initialChargeId} --outcome lost`);
-    expect(alerts[0]!["param.nextSteps"]).toContain("The paid features are paused.");
+    // F6a (ui-3): the M10 queued with the pause is named, since O3's intro leaves what the customer was told to the steps.
+    expect(alerts[0]!["param.nextSteps"]).toContain("The paid features are paused. The customer was emailed that the plan is paused (M10).");
+    expect(await m10(seeded.initialChargeId)).toBe(1);
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "lost" })).toBe("ENDED_DISPUTE");
     expect(await status(seeded.subscriptionId)).toBe("ENDED");
   });
@@ -213,6 +215,7 @@ describe("N15 charge-backs on NETOPIA's statuses (spec §2.13)", () => {
     expect(alerts).toHaveLength(1);
     expect(alerts[0]!["param.nextSteps"]).toContain("No plan was paused");
     expect(alerts[0]!["param.nextSteps"]).not.toContain("The paid features are paused");
+    expect(alerts[0]!["param.nextSteps"]).not.toContain("(M10)");
     expect(await recordDisputeOutcome(stores(), { chargeRef: upgrade, outcome: "lost" })).toBe("SECOND_PAYMENT");
     expect(await status(seeded.subscriptionId)).toBe("ACTIVE");
   });

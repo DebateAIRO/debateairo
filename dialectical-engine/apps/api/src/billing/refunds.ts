@@ -190,6 +190,9 @@ export function heldByChargeback(charge: Readonly<{ events: ReadonlyArray<Charge
     && !charge.events.some((event) => event.kind === "CHARGEBACK_RESOLVED" && event.providerPaymentId === paymentId);
 }
 
+/** F6a (final review ui-3): an O3's steps when a charge-back's VERIFY_PAYMENT queued the customer's M10 with it. */
+export const PAUSED_EMAIL_SENTENCE = "The customer was emailed that the plan is paused (M10).";
+
 /**
  * N15b (ruling PR-41): the owner's one O3 REFUND_HELD_BY_CHARGEBACK for an open owner refund (`open`, from
  * `openOwnRequest`) that a charge-back on its payment holds (`heldByChargeback`). Once per payment ever, whichever path
@@ -197,14 +200,17 @@ export function heldByChargeback(charge: Readonly<{ events: ReadonlyArray<Charge
  * that transaction through `client`), or the PAYMENT_REFUND job of a request made on a payment already under a
  * dispute (`RefundDesk`, owner and API mode). `amount` is the open amount, as the reminder and
  * `pnpm billing:refund-done` print it. Returns `queuePaymentAlert`'s answer: false when that payment's O3 was queued
- * before, so the caller's audit line billing.refund.held_by_chargeback stays once per payment too.
+ * before, so the caller's audit line billing.refund.held_by_chargeback stays once per payment too. F6a (final review
+ * ui-3): `pausedEmailQueued` is true when the same transaction queued the customer's M10 (the plan paused for this
+ * charge-back); the steps then say so, since O3's payment intro leaves what the customer was told to the steps.
  */
 export async function queueRefundHeldAlert(
   deps: Parameters<typeof queuePaymentAlert>[0],
   charge: Pick<ChargeRow, "chargeId" | "currency">,
   open: Readonly<{ intent: RefundIntent; openMicros: number }>,
   now: Date,
-  client?: PoolClient
+  client?: PoolClient,
+  pausedEmailQueued = false
 ): Promise<boolean> {
   const { chargeId, currency } = charge;
   const paymentId = open.intent.transactionId;
@@ -213,7 +219,8 @@ export async function queueRefundHeldAlert(
     code: "REFUND_HELD_BY_CHARGEBACK", reference: `charge ${chargeId}`, dedupeRef: `${chargeId}:REFUND_HELD:${paymentId}`, now,
     nextSteps: `A refund of ${amount} ${currency} (reason ${open.intent.reason}) was due on this payment`
       + ` (NETOPIA payment ${paymentId}), and NETOPIA now reports a charge-back on it: the person's bank is taking the`
-      + " money back. Do not refund it in NETOPIA's admin; the site no longer lists it as due. If the dispute ends for"
+      + ` money back.${pausedEmailQueued ? ` ${PAUSED_EMAIL_SENTENCE}` : ""}`
+      + " Do not refund it in NETOPIA's admin; the site no longer lists it as due. If the dispute ends for"
       + ` us, record that with pnpm billing:dispute --charge ${chargeId} --outcome won: the refund is then due`
       + " again and comes back into the reminder. If it ends for the person, nothing is left to refund. If you had"
       + " already refunded it in NETOPIA's admin before the dispute, record that refund with"
@@ -256,9 +263,20 @@ export function refundMailOf(reason: RequestedRefundReason): "M8" | "M11" | "M11
   }
 }
 
-/** Spec §2.12.2: the exact command the owner runs once a NETOPIA refund is made. */
+/**
+ * README §14.8's own form of an owner command on the host (F6a, final review ops-4): run as root, it runs pnpm as the
+ * API's user with the API's EnvironmentFile, the only place the command's settings are. The runbook's paths exactly.
+ */
+const ON_HOST = "systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api"
+  + " --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm";
+
+/**
+ * Spec §2.12.2: the exact command the owner runs once a NETOPIA refund is made, as README §14.8 runs it. Without
+ * `--confirm` (F6a, ops-4): run as given it only shows what it would record; the emails say to run it again with
+ * `--confirm` added at the end to record it.
+ */
 export function refundDoneCommand(chargeId: string, amountMicros: number): string {
-  return `pnpm billing:refund-done --charge ${chargeId} --amount ${microsToDecimal(amountMicros)} --confirm`;
+  return `${ON_HOST} billing:refund-done --charge ${chargeId} --amount ${microsToDecimal(amountMicros)}`;
 }
 
 /** One open owner refund, as the reminder lists it (owner-facing English; our ids, no customer data). */

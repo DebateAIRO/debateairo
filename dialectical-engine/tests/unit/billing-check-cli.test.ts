@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SELLER_COMPANY, type SellerCompany } from "@debateai/billing-core";
-import { createNetopiaPayments, NETOPIA_FACTS } from "@debateai/payments-netopia";
+import { createNetopiaPayments, NETOPIA_FACTS, netopiaNoticeAnswer } from "@debateai/payments-netopia";
 import { BILLING_CHECK_ENVIRONMENT_KEYS, readBillingCheckEnvironment } from "@debateai/register";
 import {
   renderCheckLines, runBillingCheck, runBillingCheckCli, type BillingCheckDeps, type RegisterFacts
@@ -60,6 +60,11 @@ async function stage(): Promise<Record<string, string>> {
 const json = (body: unknown, status = 200): Response =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const NOT_FOUND = () => json({ error: { code: NETOPIA_FACTS.notFoundCodes[0]!, message: "order not found" } });
+/** F6a (ops-7): the notify route's own answer to a message with no Verification-token, as apps/api/src/billing/index.ts sends it. */
+const UNVERIFIED = () => {
+  const answer = netopiaNoticeAnswer("NOTICE_HEADER_MISSING");
+  return new Response(answer.body, { status: answer.status, headers: { "content-type": "application/json" } });
+};
 const OFF: RegisterFacts = Object.freeze({ registerVersion: 7, billingEnabled: false, planCurrency: "USD", countryPolicy: true });
 
 function depsFor(environment: Record<string, string>, script: Partial<{
@@ -71,8 +76,10 @@ function depsFor(environment: Record<string, string>, script: Partial<{
     return (script.status ?? NOT_FOUND)();
   }) as typeof fetch;
   const probe = (async (url: unknown, init?: RequestInit) => {
-    requests.push(`${init?.method ?? "GET"} ${String(url)} redirect=${String(init?.redirect)}`);
-    return (script.notify ?? (() => json({ error: "NOT_FOUND" }, 404)))();
+    const headers = new Headers(init?.headers);
+    requests.push(`${init?.method ?? "GET"} ${String(url)} redirect=${String(init?.redirect)} body=${JSON.stringify(init?.body)}`
+      + ` token=${String(headers.has("verification-token"))}`);
+    return (script.notify ?? UNVERIFIED)();
   }) as typeof fetch;
   return {
     environment, company: script.company ?? COMPANY, trustedKeyOwners: { ownerUid: process.getuid!(), apiUid: -1 },
@@ -104,7 +111,7 @@ describe("N21 pnpm billing:check", () => {
       "✓ NETOPIA_IPN_KEYS_PATH: 1 trusted key, in a file owned by root and not writable by the API's user.",
       `✓ Key 1: RSA 2048 bits, SHA-256 ${FINGERPRINT}, not NETOPIA's published plugin key: confirm this fingerprint with NETOPIA.`,
       "✓ NETOPIA accepted the API key (it answered that our made-up order does not exist; nothing was charged).",
-      "✓ https://dezbatere.test/api/v1/billing/netopia/notify answers a GET without a redirect (HTTP 404), so NETOPIA's messages can reach it.",
+      "✓ https://dezbatere.test/api/v1/billing/netopia/notify gives the notify route's own answer to an unsigned message (HTTP 503, \"retry\"), with no redirect, so NETOPIA's messages can reach it.",
       "✓ Billing is off in register version 7: with NETOPIA's four settings complete, the API serves only NETOPIA's message (the provider-only mode).",
       "✓ The plans of register version 7 are priced in USD.",
       "✓ Register version 7 carries countryPolicy.",
@@ -114,7 +121,7 @@ describe("N21 pnpm billing:check", () => {
     for (const secret of SECRETS) expect(text).not.toContain(secret);
     expect(deps.requests).toEqual([
       "POST https://secure-sandbox.netopia-payments.com/operation/status",
-      "GET https://dezbatere.test/api/v1/billing/netopia/notify redirect=manual"
+      "POST https://dezbatere.test/api/v1/billing/netopia/notify redirect=manual body=\"\" token=false"
     ]);
     expect(`/api${NETOPIA_NOTIFY_PATH}`).toBe("/api/v1/billing/netopia/notify");
   });
@@ -191,12 +198,51 @@ describe("N21 pnpm billing:check", () => {
     const address = "https://dezbatere.test/api/v1/billing/netopia/notify";
     const notifyAnswer = async (notify: () => Response) => (await runBillingCheck(depsFor(environment, { notify })))
       .filter((line) => line.text.startsWith(address));
-    expect(await notifyAnswer(() => json({ error: "API_UPSTREAM_UNREACHABLE" }, 502))).toEqual([{
-      ok: false,
-      text: `${address} answered HTTP 502: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start debateai-api, then run the check again).`
+    const apiDown = `${address} answered HTTP 502: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start debateai-api, then run the check again).`;
+    expect(await notifyAnswer(() => json({ error: "API_UPSTREAM_UNREACHABLE" }, 502))).toEqual([{ ok: false, text: apiDown }]);
+    // A 503 that is not the route's own "retry" (a proxy's own page, say) is the API not answering too.
+    expect(await notifyAnswer(() => new Response("Service Unavailable", { status: 503 }))).toEqual([{
+      ok: false, text: apiDown.replace("HTTP 502", "HTTP 503")
     }]);
+  });
+
+  it("F6a (ops-7): ticks only the notify route's own answer to an unsigned message; a 404, a redirect or any other answer is a cross", async () => {
+    const environment = await stage();
+    const address = "https://dezbatere.test/api/v1/billing/netopia/notify";
+    const notifyAnswer = async (notify: () => Response) => (await runBillingCheck(depsFor(environment, { notify })))
+      .filter((line) => line.text.startsWith(address));
+    expect(await notifyAnswer(UNVERIFIED)).toEqual([{
+      ok: true,
+      text: `${address} gives the notify route's own answer to an unsigned message (HTTP 503, "retry"), with no redirect, so NETOPIA's messages can reach it.`
+    }]);
+    // Billing off without NETOPIA's four settings, or the API not yet restarted after the setup: no route, Fastify's 404.
     expect(await notifyAnswer(() => json({ error: "NOT_FOUND" }, 404))).toEqual([{
-      ok: true, text: `${address} answers a GET without a redirect (HTTP 404), so NETOPIA's messages can reach it.`
+      ok: false,
+      text: `${address} answered HTTP 404: the API does not serve NETOPIA's notify route, so NETOPIA's messages cannot reach it.`
+        + " The API serves it only with NETOPIA's four settings complete, and reads them only when it starts: after the setup,"
+        + " restart it (systemctl restart debateai-api), then run the check again."
+    }]);
+    for (const status of [301, 302, 307, 308]) {
+      expect(await notifyAnswer(() => new Response(null, { status, headers: { location: "https://www.dezbatere.test/" } }))).toEqual([{
+        ok: false,
+        text: `${address} answers with a redirect (HTTP ${String(status)}): NETOPIA does not follow redirects, so PUBLIC_APP_URL must be the site's exact public address.`
+      }]);
+    }
+    expect(await notifyAnswer(() => json({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" }, 429))).toEqual([{
+      ok: false, text: `${address} answered HTTP 429: too many messages reached it just now; run the check again in a few minutes.`
+    }]);
+    const notTheRoute = (status: number) => `${address} answered HTTP ${String(status)}, which is not the notify route's answer to an`
+      + " unsigned message (HTTP 503, \"retry\"): check that PUBLIC_APP_URL is this site's public address and that the site"
+      + " passes /api to the API.";
+    expect(await notifyAnswer(() => json({ ok: true }))).toEqual([{ ok: false, text: notTheRoute(200) }]);
+    expect(await notifyAnswer(() => json({ error: "METHOD_NOT_ALLOWED" }, 405))).toEqual([{ ok: false, text: notTheRoute(405) }]);
+    // The route's 503 with another body (a verified message whose store failed answers errorCode 1): still not the probe's answer.
+    expect(await notifyAnswer(() => {
+      const failed = netopiaNoticeAnswer("STORE_FAILED");
+      return new Response(failed.body, { status: failed.status, headers: { "content-type": "application/json" } });
+    })).toEqual([{
+      ok: false,
+      text: `${address} answered HTTP 503: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start debateai-api, then run the check again).`
     }]);
   });
 

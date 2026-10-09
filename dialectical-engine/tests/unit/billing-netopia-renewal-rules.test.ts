@@ -113,7 +113,7 @@ describe("N11 O3 for a payment that needs the owner (paymentAlert)", () => {
       nextSteps: "Check the order in NETOPIA's admin.", paymentAlert: "true"
     });
     expect(owner.subject).toBe("Billing needs your attention (RENEWAL_OUTCOME_OPEN)");
-    expect(owner.text).toContain("A payment needs your attention. Nothing more was charged, and the customer was not emailed about it.");
+    expect(owner.text).toContain("A payment needs your attention. Nothing more was charged. The steps below say what the customer was told, if anything.");
     expect(owner.text).toContain("Reason code: RENEWAL_OUTCOME_OPEN");
     expect(owner.text).not.toContain("A job that issues an invoice");
     expect(owner.text).toContain("This email is sent once for this reference and reason within the hour.");

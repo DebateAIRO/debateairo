@@ -16,8 +16,8 @@ import { paymentErrorCode, SELLER_COMPANY, type CardPayments, type SellerCompany
 import { readCustodyAuthorizationHeader } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  createNetopiaPayments, isNetopiaPosSignature, loadTrustedKeys, netopiaEnvironmentOf, publishedIpnKeyFingerprint,
-  type NetopiaConfig, type TrustedKey
+  createNetopiaPayments, isNetopiaPosSignature, loadTrustedKeys, netopiaEnvironmentOf, netopiaNoticeAnswer,
+  publishedIpnKeyFingerprint, type NetopiaConfig, type TrustedKey
 } from "@debateai/payments-netopia";
 import {
   loadBillingCheckEnvironment, loadBillingOperatorEnvironment, readBillingEnvironmentGroup, readBillingPlans,
@@ -38,7 +38,7 @@ export type BillingCheckDeps = Readonly<{
   environment: BillingCheckEnvironment;
   company: SellerCompany;
   trustedKeyOwners: TrustedKeyFileOwners;
-  /** The probe of the notify address (redirects never followed). */
+  /** The probe of the notify address: one POST of an empty body, no Verification-token, redirects never followed. */
   fetch: typeof fetch;
   payments: (config: NetopiaConfig) => CardPayments;
   randomOrderId: () => string;
@@ -50,6 +50,14 @@ export type OpenBillingCheck = () => Promise<BillingCheckDeps & Readonly<{ close
 /** N9's NETOPIA_NOTIFY_PATH as the public site serves it (the UI proxies /api to the API). */
 const NOTIFY_ADDRESS_PATH = "/api/v1/billing/netopia/notify";
 const PROBE_TIMEOUT_MS = 10_000;
+/**
+ * F6a (final review ops-7): what the notify route answers a message with no Verification-token (NOTICE_HEADER_MISSING:
+ * HTTP 503 and NETOPIA's "retry" body, apps/api/src/billing/index.ts). Only the route itself gives it: a route not
+ * served answers 404, a proxy whose API is down its own 5xx.
+ */
+const UNVERIFIED_ANSWER = netopiaNoticeAnswer("NOTICE_HEADER_MISSING");
+/** The route's answers are a few dozen bytes; a body longer than this is not one of them and is not read further. */
+const PROBE_BODY_MAX_BYTES = 1_024;
 const PRINTABLE_CODE = /^[A-Z][A-Z0-9_]{2,95}(:[A-Za-z0-9_.-]{1,64})?$/u;
 const CUSTODY_KEYS = Object.freeze([
   "NETOPIA_API_KEY_PATH", "QUADERNO_API_KEY_PATH", "SMARTBILL_CREDENTIALS_PATH", "OWNER_REPORT_EMAIL_PATH"
@@ -227,23 +235,78 @@ async function apiKeyLine(deps: BillingCheckDeps): Promise<CheckLine> {
   }
 }
 
+/** At most PROBE_BODY_MAX_BYTES of an answer's body (null when it is longer); the rest is never read. */
+async function boundedBody(response: Response): Promise<string | null> {
+  const reader = response.body?.getReader();
+  if (reader === undefined) return "";
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > PROBE_BODY_MAX_BYTES) {
+      await reader.cancel().catch(() => undefined);
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+/** Whether the probe's answer is the notify route's own to an unsigned message: its status and its exact JSON body. */
+function isUnverifiedAnswer(status: number, body: string | null): boolean {
+  if (status !== UNVERIFIED_ANSWER.status || body === null) return false;
+  try {
+    const got = JSON.parse(body) as unknown;
+    const want = JSON.parse(UNVERIFIED_ANSWER.body) as Record<string, unknown>;
+    return typeof got === "object" && got !== null && !Array.isArray(got)
+      && Object.keys(got).length === Object.keys(want).length
+      && Object.entries(want).every(([name, value]) => (got as Record<string, unknown>)[name] === value);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The notify address as NETOPIA reaches it: one POST of an empty body with no Verification-token. A tick only for the
+ * route's own "try again" to an unsigned message (which it answers without storing anything; the API's journal shows
+ * one `billing.notice.unverified` line with NOTICE_HEADER_MISSING); every other answer is a cross with what it means.
+ */
 async function notifyLine(deps: BillingCheckDeps, publicAppUrl: string): Promise<CheckLine> {
   const address = `${new URL(publicAppUrl).origin}${NOTIFY_ADDRESS_PATH}`;
   let response: Response;
+  let body: string | null = null;
   try {
-    response = await deps.fetch(address, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    response = await deps.fetch(address, {
+      method: "POST", body: "", redirect: "manual", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS)
+    });
+    if (response.status === UNVERIFIED_ANSWER.status) body = await boundedBody(response);
   } catch (error) {
     return cross(`${address} could not be reached (${codeOf(error)}).`);
   }
-  await response.body?.cancel().catch(() => undefined);
-  if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
-    const status = response.status === 0 ? "a redirect" : `HTTP ${String(response.status)}`;
-    return cross(`${address} answers with a redirect (${status}): NETOPIA does not follow redirects, so PUBLIC_APP_URL must be the site's exact public address.`);
+  if (body === null) await response.body?.cancel().catch(() => undefined);
+  const status = response.status;
+  if (response.type === "opaqueredirect" || (status >= 300 && status < 400)) {
+    const shown = status === 0 ? "a redirect" : `HTTP ${String(status)}`;
+    return cross(`${address} answers with a redirect (${shown}): NETOPIA does not follow redirects, so PUBLIC_APP_URL must be the site's exact public address.`);
   }
-  if (response.status >= 500) {
-    return cross(`${address} answered HTTP ${String(response.status)}: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start debateai-api, then run the check again).`);
+  if (isUnverifiedAnswer(status, body)) {
+    return tick(`${address} gives the notify route's own answer to an unsigned message (HTTP 503, "retry"), with no redirect, so NETOPIA's messages can reach it.`);
   }
-  return tick(`${address} answers a GET without a redirect (HTTP ${String(response.status)}), so NETOPIA's messages can reach it.`);
+  if (status >= 500) {
+    return cross(`${address} answered HTTP ${String(status)}: the site answered, but the API behind it did not, so NETOPIA's messages cannot reach it now (start debateai-api, then run the check again).`);
+  }
+  if (status === 404) {
+    return cross(`${address} answered HTTP 404: the API does not serve NETOPIA's notify route, so NETOPIA's messages cannot reach it.`
+      + " The API serves it only with NETOPIA's four settings complete, and reads them only when it starts: after the setup,"
+      + " restart it (systemctl restart debateai-api), then run the check again.");
+  }
+  if (status === 429) {
+    return cross(`${address} answered HTTP 429: too many messages reached it just now; run the check again in a few minutes.`);
+  }
+  return cross(`${address} answered HTTP ${String(status)}, which is not the notify route's answer to an unsigned message`
+    + " (HTTP 503, \"retry\"): check that PUBLIC_APP_URL is this site's public address and that the site passes /api to the API.");
 }
 
 async function registerLines(deps: BillingCheckDeps): Promise<CheckLine[]> {

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { parseBillingRefundDoneEnvironment } from "@debateai/register";
 import {
@@ -8,6 +10,9 @@ import {
 } from "../../apps/api/src/billing/refunds.js";
 
 const REF = "a".repeat(32);
+/** F6a (ops-4): README §14.8's own form of an owner command on the host, as the API's user with the API's EnvironmentFile. */
+const ON_HOST = "systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api"
+  + " --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm";
 const DAY = 86_400_000;
 const output = () => {
   const lines = { out: "", err: "" };
@@ -143,11 +148,22 @@ describe("N14 the owner's refund reminders (spec §2.12.2 item 3)", () => {
     ];
     expect(renderOwnerRefundList(lines)).toBe([
       `- charge ${REF}, NETOPIA payment ntp-1: refund 12.10 USD (part of the payment), reason WITHDRAWAL, open since 2026-10-01, withdrawal deadline 2026-10-15T09:00:00.000Z, NETOPIA shows a refund: only the command is missing`,
-      `  pnpm billing:refund-done --charge ${REF} --amount 12.10 --confirm`,
+      `  ${ON_HOST} billing:refund-done --charge ${REF} --amount 12.10`,
       `- charge ${"b".repeat(32)}, NETOPIA payment ntp-2: refund 24.20 USD (the whole payment), reason SUBSCRIPTION_ENDED, open since 2026-10-01`,
-      `  pnpm billing:refund-done --charge ${"b".repeat(32)} --amount 24.20 --confirm`
+      `  ${ON_HOST} billing:refund-done --charge ${"b".repeat(32)} --amount 24.20`
     ].join("\n"));
-    expect(refundDoneCommand(REF, 5_000_000)).toBe(`pnpm billing:refund-done --charge ${REF} --amount 5.00 --confirm`);
+    expect(refundDoneCommand(REF, 5_000_000)).toBe(`${ON_HOST} billing:refund-done --charge ${REF} --amount 5.00`);
+  });
+
+  it("F6a (ops-4): gives the runbook's own host command, without --confirm, so the owner sees the preview first", () => {
+    const command = refundDoneCommand(REF, 12_100_000);
+    expect(command).toBe("systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api"
+      + " --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine"
+      + ` /usr/bin/pnpm billing:refund-done --charge ${REF} --amount 12.10`);
+    expect(command).not.toContain("--confirm");
+    // The same form, paths included, as README §14.8's preview line (its read-in values in place of ours).
+    const runbook = readFileSync(fileURLToPath(new URL("../../deploy/vps/README.md", import.meta.url)), "utf8");
+    expect(runbook).toContain(`${command.replace(`--charge ${REF} --amount 12.10`, '--charge "$CHARGE_REF" --amount "$AMOUNT"')}\n`);
   });
 
   it("names the customer's follow-up email of each reason, and none for a card check", () => {

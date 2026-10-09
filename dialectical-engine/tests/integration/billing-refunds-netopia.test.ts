@@ -127,7 +127,10 @@ describe("N14 refunds on NETOPIA: the owner mode", () => {
     expect(due).toMatchObject({
       "param.chargeRef": seeded.initialChargeId, "param.paymentRef": seeded.providerPaymentId, "param.whole": "true",
       "param.currency": "USD", "param.refundReason": "SUBSCRIPTION_ENDED",
-      "param.doneCommand": `pnpm billing:refund-done --charge ${seeded.initialChargeId} --amount ${(seeded.totalMicros / 1_000_000).toFixed(2)} --confirm`
+      // F6a (ops-4): README §14.8's host form, without --confirm (the email says to preview it first).
+      "param.doneCommand": "systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api"
+        + " --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm"
+        + ` billing:refund-done --charge ${seeded.initialChargeId} --amount ${(seeded.totalMicros / 1_000_000).toFixed(2)}`
     });
     expect(due!["param.refundDeadline"]).toBeUndefined();
     expect(audit.events).toContainEqual({ event: "billing.refund.owner_due", fields: { reason: "SUBSCRIPTION_ENDED" } });
@@ -558,6 +561,10 @@ describe("N15b an owner refund waits while the bank disputes the payment (ruling
     chargedBack(port, seeded);
     expect(await verify.handle(verifyJob(chargeId, clock.now), clock.now)).toEqual({ kind: "DONE" });
     expect(await heldAlerts(chargeId)).toHaveLength(1);
+    // F6a (ui-3): the plan was live, so the same VERIFY_PAYMENT paused it and queued the customer's M10; the O3 says so.
+    const [paused] = await heldAlerts(chargeId);
+    expect(paused!.payload["param.nextSteps"]).toBe(heldSteps(chargeId, seeded.providerPaymentId, "12.10").replace(
+      "the money back. ", "the money back. The customer was emailed that the plan is paused (M10). "));
     const job = await claim("PAYMENT_REFUND", `${chargeId}:${seeded.providerPaymentId}`, clock.now);
     expect(await refunds.handle(job, clock.now)).toEqual({ kind: "DONE" });
     expect(await stageOf(job.jobId)).toBeNull();
