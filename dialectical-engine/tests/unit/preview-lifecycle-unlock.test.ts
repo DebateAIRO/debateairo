@@ -281,6 +281,24 @@ describe('ACK evidence refresh', () => {
   });
 
   it.each([
+    ['a folder others can write', (f: ReturnType<typeof evidenceFiles>) => { chmodSync(dirname(f.path), 0o777); return f.path; }],
+    ['a path through a linked folder', (f: ReturnType<typeof evidenceFiles>) => { symlinkSync(dirname(f.path), join(f.base, 'alias')); return join(f.base, 'alias', 'capture-evidence.json'); }],
+    ['a linked evidence file', (f: ReturnType<typeof evidenceFiles>) => { const real = join(f.base, 'etc', 'real.json'); writeFileSync(real, readFileSync(f.path)); chmodSync(real, 0o640); const link = join(f.base, 'etc', 'linked.json'); symlinkSync(real, link); return link; }],
+    ['a group-writable evidence file', (f: ReturnType<typeof evidenceFiles>) => { chmodSync(f.path, 0o660); return f.path; }]
+  ])('refuses to read or rewrite an evidence file in %s', async (_name, arrange) => {
+    const f = evidenceFiles();
+    const path = arrange(f);
+    const now = Date.now();
+    let captured = 0;
+    const evidence = unlock.createSelfCaptureEvidence({
+      readWrapperText: async () => wrapper(path), runSelfCapture: async () => { captured++; return proof(now); }, readCurrent: async () => null,
+      archiveDir: f.archive, owner: { uid: process.getuid!(), gid: process.getgid!() }, now: () => now
+    });
+    await expect(evidence.refresh()).rejects.toThrow(/EVIDENCE_FILE_REFUSED/);
+    expect(captured).toBe(0);
+  });
+
+  it.each([
     ['an expiry beyond five minutes', (p: any, now: number) => ({ ...p, expiresAt: new Date(now + 6 * MINUTE).toISOString() })],
     ['an expired proof', (p: any, now: number) => ({ ...p, expiresAt: new Date(now - 1).toISOString() })],
     ['an extra field', (p: any) => ({ ...p, recipient: 'x' })],

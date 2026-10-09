@@ -13,8 +13,7 @@
 //
 //   unlock-team-tools.mjs run     the one-hour window (systemd ExecStart)
 //   unlock-team-tools.mjs reset   reset the login only (systemd ExecStopPost; safe to repeat)
-import { constants } from 'node:fs';
-import { lstat, open, readFile } from 'node:fs/promises';
+import { lstat } from 'node:fs/promises';
 import { randomBytes as cryptoRandomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { basename, dirname, isAbsolute, join, normalize } from 'node:path';
@@ -186,14 +185,20 @@ function validProof(proof, at) {
   } catch { return refuse('SELF_CAPTURE_REFUSED'); }
 }
 
+const EVIDENCE_MODES = [0o400, 0o440, 0o444, 0o600, 0o640, 0o644];
+/**
+ * Through the reviewed custody reader: no-follow open, the same file before and after the read,
+ * one link, owner, exact mode, and its folder owned by the same owner, not group/other-writable,
+ * reached without any link (so the later in-place rewrite lands where the wrapper reads).
+ */
 async function readExistingProof(path, owner) {
   try {
-    const stat = await lstat(path);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== owner.uid || (stat.mode & 0o022) !== 0 || stat.nlink !== 1 || stat.size > 4096) throw new Error('custody');
-    const bytes = await readFile(path);
-    const value = strictJson(bytes);
-    if (typeof value?.schema !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value.schema)) throw new Error('schema');
-    return { bytes, schema: value.schema, custody: { uid: stat.uid, gid: stat.gid, mode: stat.mode & 0o777 } };
+    return await withPrivateBytes(path, { root: dirname(path), uid: owner.uid, mode: EVIDENCE_MODES, maxBytes: 4096 }, async raw => {
+      const value = strictJson(raw);
+      if (typeof value?.schema !== 'string' || !/^[A-Za-z0-9._:-]{1,128}$/.test(value.schema)) throw new Error('schema');
+      const stat = await lstat(path);
+      return { bytes: Buffer.from(raw), schema: value.schema, custody: { uid: stat.uid, gid: stat.gid, mode: stat.mode & 0o777 } };
+    });
   } catch { return refuse('EVIDENCE_FILE_REFUSED'); }
 }
 
