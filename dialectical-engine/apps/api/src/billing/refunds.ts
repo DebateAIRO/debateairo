@@ -81,6 +81,17 @@ export function refundedMicros(charge: Readonly<{ events: ReadonlyArray<ChargeEv
 }
 
 /**
+ * The one rule for when a refund request is recorded: what the REFUNDED rows of payment `paymentId` (P1a's target:
+ * `refundTarget`) add up to, a missing amount counting 0, so a refund recorded in parts adds up. A request is recorded
+ * once this covers what it asked back. Shared by RefundDesk's follow-ups (the M8/M11 mails and the credit note, through
+ * `openOwnRequest`) and the waiting and return pages (F4: `chargeStatusOf`'s REFUND_PENDING), so the page never says
+ * "refunded" while the desk still counts the request open, nor the reverse.
+ */
+export function refundedFrom(events: ReadonlyArray<ChargeEventRow>, paymentId: string): number {
+  return sumOf(events, "REFUNDED", paymentId);
+}
+
+/**
  * A4(b): what each paid transaction since `since` took and what already went back. Per transaction the larger of
  * "asked" (REFUND_REQUESTED) and "reported" (REFUNDED) counts, as P1a's refund-sum guard does; an old REFUNDED row of
  * a separate refund transaction counts against the payment it names (D5 5g). A CARD_CHECK hold is not a
@@ -162,8 +173,7 @@ export function openOwnRequest(
   const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.providerPaymentId === paymentId);
   const intent = requested === undefined ? null : refundIntentOf(charge, requested);
   if (intent === null) return null;
-  const refunded = charge.events.filter((event) => event.kind === "REFUNDED" && refundTarget(event) === paymentId)
-    .reduce((total, event) => total + (event.amountMicros ?? 0), 0);
+  const refunded = refundedFrom(charge.events, paymentId);
   return Object.freeze({ intent, openMicros: Math.max(intent.amountMicros - refunded, 0) });
 }
 

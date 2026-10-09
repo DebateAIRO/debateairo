@@ -1,7 +1,7 @@
 import type { BillingJobQueries, BillingRepository, ChargeEventRow, ChargeKind, ChargeRow } from "@debateai/db";
 import { REFUND_REASONS_REFUSING_THE_PAYMENT, type BillingRefundReason } from "./codes.js";
+import { refundedFrom } from "./refunds.js";
 import { queueVerifyNow } from "./renewal.js";
-import { refundTarget } from "./rows.js";
 
 export type ChargeState = "PENDING" | "SUCCEEDED" | "FAILED" | "NEEDS_ACTION";
 export type ChargeStatus = Readonly<{ state: ChargeState; reasonCode: string | null }>;
@@ -19,12 +19,10 @@ const REFUSALS_SAID_REFUNDED: ReadonlySet<string> = new Set<BillingRefundReason>
   "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "UPGRADE_CLOSED"
 ]);
 
-/** Whether REFUNDED rows naming the request's payment (P1a's refund target) add up to what it asked back. */
+/** Whether REFUNDED rows naming the request's payment add up to what it asked back (`refundedFrom`, the one rule). */
 function refundRecorded(events: ReadonlyArray<ChargeEventRow>, request: ChargeEventRow): boolean {
   if (request.providerPaymentId === null || request.amountMicros === null) return false;
-  const refunded = events.filter((event) => event.kind === "REFUNDED" && refundTarget(event) === request.providerPaymentId)
-    .reduce((total, event) => total + (event.amountMicros ?? 0), 0);
-  return refunded >= request.amountMicros;
+  return refundedFrom(events, request.providerPaymentId) >= request.amountMicros;
 }
 
 /**
