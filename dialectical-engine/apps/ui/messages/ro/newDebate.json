@@ -110,6 +110,7 @@
   "newDebate.legalGate.signOut": "Deconectați-vă",
   "newDebate.legalGate.signOutFailed": "Deconectarea nu s-a finalizat. Încercați din nou.",
   "newDebate.room.locationBlocked": "Nu se pot începe dezbateri noi din locația dvs. actuală. Dezbaterile dvs. rămân disponibile pentru citire.",
+  "newDebate.room.previewTeamOnly": "Dezbaterile din această versiune de previzualizare sunt deschise doar echipei.",
   "newDebate.room.siteFull": "Limita de azi a fost atinsă. Puteți întreba în continuare — dezbaterea dvs. va porni singură când limita se resetează.",
   "newDebate.room.siteClose": "Sunteți aproape de limita de azi. Această dezbatere va rula în întregime; următoarele ar putea aștepta până la resetare.",
   "newDebate.room.alreadyWaiting": "O singură întrebare poate aștepta o dată. A dvs. va porni la {time}; puneți-o pe aceasta după aceea.",

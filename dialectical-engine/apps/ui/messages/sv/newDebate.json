@@ -110,6 +110,7 @@
   "newDebate.legalGate.signOut": "Logga ut",
   "newDebate.legalGate.signOutFailed": "Utloggningen slutfördes inte. Försök igen.",
   "newDebate.room.locationBlocked": "Nya debatter kan inte startas från din nuvarande plats. Dina debatter finns kvar att läsa.",
+  "newDebate.room.previewTeamOnly": "Debatter i den här förhandsversionen är bara öppna för teamet.",
   "newDebate.room.siteFull": "Dagens gräns är nådd. Du kan ändå ställa din fråga — din debatt startar av sig själv när gränsen återställs.",
   "newDebate.room.siteClose": "Du är nära dagens gräns. Den här debatten genomförs ändå i sin helhet; senare debatter kan få vänta tills gränsen återställs.",
   "newDebate.room.alreadyWaiting": "Bara en fråga kan vänta åt gången. Din startar {time}; ställ den här frågan efter det.",

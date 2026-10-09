@@ -649,6 +649,8 @@ apps/ui/lib/observability/logger.ts
 apps/ui/lib/observability/suspiciousScoring.ts
 apps/ui/lib/phoneCompletionDraft.ts
 apps/ui/lib/previewAskProxyCeiling.ts
+apps/ui/lib/previewPlanRoster.test.mjs
+apps/ui/lib/previewPlanRoster.ts
 apps/ui/lib/privacyPolicy.ts
 apps/ui/lib/publicDebatePresentation.test.mjs
 apps/ui/lib/publicDebatePresentation.ts
