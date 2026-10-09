@@ -10,6 +10,15 @@ describe('consumer recovery and security mail purposes', () => {
         expect(mail.text).not.toContain('Confirm recovery email');
         expect(serializeAccountMail(input, 'noreply@dezbatere.ro')).toContain('X-Account-Template: consumer-recovery-v1');
     });
+    // Design note 2026-10-09 item 3: every verified email is told when a recovery code is used; codes are not refilled.
+    it('tells the owner in plain words that a recovery code was just used to sign in, with no link and no code', () => {
+        const input = { template: 'security-recovery-code-used-v1', recipient, expiresAt, messageId: '11111111-1111-4111-8111-111111111111' } as AccountMailInput;
+        const mail = renderAccountEmail(input);
+        expect(mail.text).toContain('One of your recovery codes was just used to sign in.');
+        expect(mail.text).toContain("If this wasn't you,");
+        expect(mail.text).not.toMatch(/https?:\/\//u);
+        expect(serializeAccountMail(input, 'noreply@dezbatere.ro')).toContain('X-Account-Template: security-recovery-code-used-v1');
+    });
     it('marks actual English prose as English and only localized date fragments with their own language', () => {
         const mail = renderAccountEmail({ template: 'verification-v1', recipient, expiresAt, url: new URL('https://preview.dezbatere.ro/verify-email#token=' + 'a'.repeat(43)), display: { locale: 'ro', timeZone: 'Europe/Bucharest' } });
         expect(mail.html).toContain('<html lang="en">');

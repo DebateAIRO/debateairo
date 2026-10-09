@@ -2,7 +2,7 @@
 // is reviewed beside the preview wrapper; it never imports mutable app/config code.
 export const ACCOUNT_MAIL_BOUNDARY = 'dialectical-account-v1';
 export const ACCOUNT_MAIL_LOCALES = Object.freeze(['bg','hr','cs','da','nl','en','et','fi','fr','de','el','hu','ga','it','lv','lt','mt','pl','pt','ro','ru','sk','sl','es','sv','uk','zh','hi','id','ja','ko','vi','ar','he','tr','en-US','en-GB']);
-export const ACCOUNT_MAIL_TEMPLATES = Object.freeze(['verification-v1','recovery-v1','security-scheduled-v1','security-cancelled-v1','security-completion-v1','email-change-confirm-v1','email-change-notice-v1','email-change-unavailable-v1','consumer-recovery-v1','security-method-changed-v1','security-codes-regenerated-v1','security-recovery-proved-v1','security-recovery-completed-v1']);
+export const ACCOUNT_MAIL_TEMPLATES = Object.freeze(['verification-v1','recovery-v1','security-scheduled-v1','security-cancelled-v1','security-completion-v1','email-change-confirm-v1','email-change-notice-v1','email-change-unavailable-v1','consumer-recovery-v1','security-method-changed-v1','security-codes-regenerated-v1','security-recovery-proved-v1','security-recovery-completed-v1','security-recovery-code-used-v1']);
 const invalid = () => { throw new TypeError('MAIL_INPUT_INVALID'); };
 export function singleRecipient(value) {
   return typeof value === 'string' && value.length <= 254 && /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?$/.test(value) && !/[,;\u0000-\u001f\u007f]/.test(value);
@@ -64,6 +64,11 @@ export function renderAccountEmail(input) {
     case 'security-recovery-proved-v1':
       subject = 'Your Dialectical Engine account recovery started';
       paragraphs = [`Both recovery proofs were accepted at ${expiry}.`, 'Existing sessions have ended. Normal sign-in remains blocked until a replacement security method is verified.', 'If you did not begin recovery, contact the site operator immediately.'];
+      break;
+    case 'security-recovery-code-used-v1':
+      // 2026-10-09: a used recovery code is not refilled; every verified email is told when one is used.
+      subject = 'A Dialectical Engine recovery code was used';
+      paragraphs = ['One of your recovery codes was just used to sign in.', `This happened at ${expiry}. Each code works only once.`, "If this wasn't you, contact the site operator immediately, then change your password and create new recovery codes in Settings."];
       break;
     case 'security-recovery-completed-v1':
       subject = 'Your Dialectical Engine account recovery completed';
