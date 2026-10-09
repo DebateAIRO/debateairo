@@ -26,6 +26,9 @@ const ENTRY_KEYS = ['basePlan', 'nativePlanSha256', 'sourceRoot', 'sourceRevisio
 /** A fresh proof must still be young when the launcher reads it after its source re-hash. */
 export const MAX_ATTESTATION_AGE_AT_WRITE_MS = 60_000;
 export const NATIVE_VERIFY_TIMEOUT_MS = 150_000;
+/** After a reboot the API/UI can start before PostgreSQL accepts connections; wait at most this long. */
+export const POSTGRES_WAIT_MS = 60_000;
+const POSTGRES_POLL_MS = 2000;
 
 class Refusal extends Error {
   constructor(code, fields) { super(code); this.code = code; if (fields) this.fields = fields; }
@@ -113,6 +116,22 @@ export async function runNativeVerify({ layout, nodePath, sourceRoot, run = runB
   try { return strictJson(result.stdout); } catch { return refuse('NATIVE_VERIFY_REFUSED'); }
 }
 
+/** pg_isready on the preview's own socket: no login, no password, no shell, empty environment. */
+export function pgReadyArgv(layout) {
+  return [`${layout.pgBin}/pg_isready`, `--host=${layout.pgSocketDir}`, `--port=${layout.pgPort}`, `--dbname=${layout.database}`, '--timeout=2', '--quiet'];
+}
+
+/** Bounded: polls every 2 s and refuses with POSTGRES_NOT_READY once 60 s would be exceeded. */
+export async function waitForPostgres({ layout = LAYOUT, run = runBounded, now = Date.now, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), timeoutMs = POSTGRES_WAIT_MS, intervalMs = POSTGRES_POLL_MS } = {}) {
+  const startedAt = now();
+  for (let attempts = 1; ; attempts++) {
+    const result = await run(pgReadyArgv(layout), { env: {}, timeoutMs: 5000, maxOutputBytes: 4096 });
+    if (!result.timedOut && !result.overflow && !result.error && result.code === 0) return { waitedMs: now() - startedAt, attempts };
+    if (now() - startedAt + intervalMs > timeoutMs) refuse('POSTGRES_NOT_READY');
+    await sleep(intervalMs);
+  }
+}
+
 /** Lock -> pinned base plan (hash-checked, schema-checked, field-for-field equal to the lock). */
 export async function loadPinnedRelease({ service, layout = LAYOUT, validateLaunchPlan: validatePlan = reviewedValidateLaunchPlan }) {
   if (!SERVICES.includes(service)) refuse('SERVICE_REFUSED');
@@ -129,7 +148,8 @@ export async function loadPinnedRelease({ service, layout = LAYOUT, validateLaun
 
 /**
  * The ExecStartPre body. Order matters: every cheap gate runs before the database is touched;
- * the slow verifier runs last so the proof is as young as possible when ExecStart begins.
+ * then a bounded wait for PostgreSQL (after a reboot it may still be starting); the slow
+ * verifier runs last so the proof is as young as possible when ExecStart begins.
  */
 export async function runPrestart({ service, layout = LAYOUT, deps = {} }) {
   const now = deps.now ?? Date.now;
@@ -142,6 +162,8 @@ export async function runPrestart({ service, layout = LAYOUT, deps = {} }) {
   if (nativeProblems.length) refuse('NATIVE_PLAN_MISMATCH', nativeProblems);
   let nativeSourceSha256;
   try { nativeSourceSha256 = await (deps.readSourceNativeSha256 ?? (async plan => (await readPublicArtifact(plan.sourceManifest, 'source')).nativeSha256))(basePlan); } catch { refuse('SOURCE_MANIFEST_UNREADABLE'); }
+
+  const postgres = await (deps.waitForPostgres ?? (() => waitForPostgres({ layout })))();
 
   const verifyStartedAt = now();
   const proof = await (deps.verifyNative ?? (input => runNativeVerify({ layout, nodePath: process.execPath, ...input })))({ sourceRoot: nativePlan.value.sourceRoot });
@@ -168,7 +190,7 @@ export async function runPrestart({ service, layout = LAYOUT, deps = {} }) {
   return {
     event: 'PREVIEW_LIFECYCLE_PRESTART_READY', service, registerVersion: entry.publication.registerVersion, sourceRevision: entry.sourceRevision,
     lockSha256, planSha256: sha256(planBytes), attestationSha256: plan.nativeAttestation.sha256,
-    verifyMs: verifiedAt - verifyStartedAt, totalMs: now() - startedAt, attestationAgeMs
+    postgresWaitMs: postgres.waitedMs, verifyMs: verifiedAt - verifyStartedAt, totalMs: now() - startedAt, attestationAgeMs
   };
 }
 

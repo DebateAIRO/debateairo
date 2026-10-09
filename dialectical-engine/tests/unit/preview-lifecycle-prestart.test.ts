@@ -65,6 +65,7 @@ function deps(s: ReturnType<typeof server>, overrides: Record<string, unknown> =
     deps: {
       validateLaunchPlan: realValidator(s.layout),
       readSourceNativeSha256: async () => '9'.repeat(64),
+      waitForPostgres: async () => ({ waitedMs: 0, attempts: 1 }),
       verifyNative: async ({ sourceRoot }: { sourceRoot: string }) => { calls.push(sourceRoot); clock += 12000; return attestation(new Date(clock).toISOString()); },
       now: () => clock,
       ...overrides
@@ -224,6 +225,39 @@ describe('prestart', () => {
     const { calls, deps: d } = deps(s);
     await expect(prestart.runPrestart({ service: 'api', layout: s.layout, deps: d })).rejects.toMatchObject({ code: expect.stringMatching(/^RELEASE_LOCK_(UNREADABLE|INVALID)$/) });
     expect(calls).toEqual([]);
+  });
+});
+
+describe('waiting for PostgreSQL after a boot', () => {
+  const answer = (code: number) => ({ code, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) });
+  it('asks pg_isready on the local socket (no shell, empty environment) until the database accepts connections', async () => {
+    let clock = 0;
+    const seen: any[] = [];
+    const run = async (argv: string[], options: any) => { seen.push({ argv, options }); return answer(seen.length < 4 ? 2 : 0); };
+    const result = await prestart.waitForPostgres({ layout: common.LAYOUT, run, now: () => clock, sleep: async (ms: number) => { clock += ms; } });
+    expect(result).toEqual({ waitedMs: 6000, attempts: 4 });
+    expect(seen[0].argv).toEqual(['/usr/lib/postgresql/18/bin/pg_isready', '--host=/run/debateai-v3-preview/postgresql', '--port=5434', '--dbname=debateai', '--timeout=2', '--quiet']);
+    expect(seen[0].options.env).toEqual({});
+  });
+
+  it('gives up after at most 60 seconds with POSTGRES_NOT_READY', async () => {
+    let clock = 0;
+    const run = async () => answer(2);
+    await expect(prestart.waitForPostgres({ layout: common.LAYOUT, run, now: () => clock, sleep: async (ms: number) => { clock += ms; } })).rejects.toMatchObject({ code: 'POSTGRES_NOT_READY' });
+    expect(clock).toBeLessThanOrEqual(60_000);
+    expect(clock).toBeGreaterThanOrEqual(56_000);
+  });
+
+  it('waits after the cheap checks and before the verifier, and never runs the verifier if the database stays down', async () => {
+    const s = server();
+    await pinned(s);
+    const order: string[] = [];
+    const ok = deps(s, { waitForPostgres: async () => { order.push('wait'); return { waitedMs: 4000, attempts: 3 }; }, verifyNative: async () => { order.push('verify'); return attestation('2026-10-09T10:00:00.000Z'); } });
+    await expect(prestart.runPrestart({ service: 'api', layout: s.layout, deps: ok.deps })).resolves.toMatchObject({ postgresWaitMs: 4000 });
+    expect(order).toEqual(['wait', 'verify']);
+    const down = deps(s, { waitForPostgres: async () => { throw Object.assign(new Error('POSTGRES_NOT_READY'), { code: 'POSTGRES_NOT_READY' }); } });
+    await expect(prestart.runPrestart({ service: 'api', layout: s.layout, deps: down.deps })).rejects.toMatchObject({ code: 'POSTGRES_NOT_READY' });
+    expect(down.calls).toEqual([]);
   });
 });
 
