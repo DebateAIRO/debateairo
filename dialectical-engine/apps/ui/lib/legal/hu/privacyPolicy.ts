@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Röviden",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "A fiók működéséhez szükséges és az Ön által megadni választott adatokat gyűjtjük. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk; azokat nem használják modellek betanítására. A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti az adataihoz tartozó kulcsokat, és eltávolítja közzétett vitáit. A privacy@dezbatere.ro címen érhet el bennünket, és a vitában megnevezett személyek fiók nélkül is kérhetik az eltávolítást." }
+      { kind: "p", text: "A fiók működéséhez szükséges és az Ön által megadni választott adatokat gyűjtjük. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk; azokat nem használják modellek betanítására. A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti magánjellegű adatainak kulcsait; a törlés ütemezésekor Ön dönt arról, hogy közzétett vitáit is eltávolítsuk-e, vagy azok visszavont álneve alatt nyilvánosak maradjanak. A privacy@dezbatere.ro címen érhet el bennünket, és a vitában megnevezett személyek fiók nélkül is kérhetik az eltávolítást." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "A viták mindaddig magánjellegűek, amíg Ön közzé nem teszi őket. A közzététel szándékos, külön megerősítést igénylő művelet. Egy közzétett vita megjeleníti az Ön álnevét, az Ön által megfogalmazott kérdést, az érvelési fát, a pontszámokat, a döntést és a megbízhatósági sávot, továbbá látható címkével jelzi, hogy a tartalmat MI hozta létre. Soha nem jeleníti meg e-mail-címét, munkamenet-nyilvántartásait vagy fiókelőzményeit. A keresőmotorok indexelhetik a közzétett vitákat." },
       { kind: "p", text: "A közzététel visszavonása eltávolítja a vitát a Dialectical Engine felületéről, és megsemmisíti a nyilvános példányunk kulcsát. Az olvasók, keresőmotorok vagy archívumok által már elkészített másolatok nem állnak ellenőrzésünk alatt, és nem tudjuk azokat visszahívni." },
-      { kind: "p", text: "Fiókja törlésekor az Ön által közzétett minden vitát indokolatlan késedelem nélkül, de legfeljebb 30 napon belül eltávolítunk a nyilvános hozzáférésből, kivéve, ha a jogszabály egy konkrét elem megőrzésére kötelez bennünket. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Amikor ütemezi fiókja törlését, Ön választja meg, mi történjen a közzétett vitáival. Ha bejelöli a „Töröljék a nyilvános vitáimat is” négyzetet, a törlés végrehajtásakor mindegyiket eltávolítjuk a nyilvános hozzáférésből, és megsemmisítjük a nyilvános másolatunk kulcsát, kivéve ha a jogszabály egy meghatározott elem megőrzését írja elő. Ha nem jelöli be a négyzetet, a viták nyilvánosak maradnak a visszavont álneve alatt." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "IP-cím országa szerinti elutasítás auditbejegyzése — A szolgáltatás teljes élettartama alatt — Csak hozzáfűzhető; rögzíti az útvonalat, az elutasítás kódját, az országot, az időablakot és az „IP-cím” bizonyítéktípust; az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel",
         "Nyers IP-cím a regisztrációs vagy új vita előtti országellenőrzéshez — Csak az adott kérés ideje alatt — Az ellenőrzés nem tárol olvasható IP-címet; az elutasítás auditjában az IP-cím és a felhasználói ügynök csak egyirányú, kulcsos kivonatként szerepel, az IP országa pedig az életkor-ellenőrzésben szerepelhet",
         "Vitatartalom (magánjellegű) — A fiók fennállásáig — Megszüntetéskor megsemmisítjük a kulcsokat, így a tartalom olvashatatlanná válik",
-        "Vitatartalom (közzétett) — A közzététel és a fiók fennállásáig — A közzététel visszavonásakor vagy megszüntetéskor eltávolítjuk a nyilvános hozzáférésből; a kulcsokat megsemmisítjük",
+        "Vitatartalom (közzétett) — A közzététel idején; ha megszünteti fiókját, és nem jelöli be a „Töröljék a nyilvános vitáimat is” lehetőséget, a közzétett vita visszavont álneve alatt nyilvános marad — A nyilvános hozzáférésből eltávolítjuk, és kulcsát megsemmisítjük a közzététel visszavonásakor vagy a fiók megszüntetésekor, ha bejelölte a „Töröljék a nyilvános vitáimat is” lehetőséget",
         "Szolgáltatói válasznyilvántartások és visszakeresési hivatkozások — Ugyanaddig, mint a vita, amelyhez tartoznak — Ugyanaz",
         "Támogatási beszélgetések és ügyek — [Until closed plus 12 months] — A kulcsokat megsemmisítjük",
         "Elfogadási és hozzájárulási nyilvántartások — A fiók élettartama plusz 6 év — a ránk alkalmazandó leghosszabb elévülési idő — Töröljük",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Biztonsági mentések [pending] — [… days] az élő példány törlése után — Felülírjuk"
         ]
       },
-      { kind: "p", text: "Mit tesz valójában a törlés. Vitáit és fiókadatait a fiókjára és minden egyes vitára jellemző kulcsokkal titkosítjuk. Fiókja törlése megsemmisíti ezeket a kulcsokat, ami után a titkosított rekordokat sem mi, sem más nem tudja elolvasni, továbbá töröljük fiókrekordját. Ezt azért nevezzük törlésnek, mert ez a hatása, és ezt dokumentált értékeléssel támasztjuk alá; ha többet szeretne tudni, kérdezzen bennünket. Három dolgot fontos tudni: a biztonsági auditnapló csak hozzáfűzhető és nem törlődik, de nem tartalmaz Önről olvasható azonosítókat; néhány régebbi vita a jelenlegi titkosítási rendszerünk előtti időből származik, és ha ez az Ön fiókjára vonatkozik, közöljük, hogy a megszüntetés mit eredményez náluk; továbbá a már MI-szolgáltatónak küldött adatmásolatokra az adott szolgáltató Nyilvántartásban szereplő megőrzési feltételei vonatkoznak, nem a mi törlésünk." },
+      { kind: "p", text: "Mit tesz valójában a törlés. Magánjellegű vitáit és fiókadatait a fiókjára és minden egyes vitára jellemző kulcsokkal titkosítjuk. Fiókja törlése megsemmisíti ezeket a kulcsokat, ami után a titkosított rekordokat sem mi, sem más nem tudja elolvasni, továbbá töröljük fiókrekordját. A közzétett vita nyilvános másolatának kulcsa a törléskor csak akkor semmisül meg, ha bejelölte a „Töröljék a nyilvános vitáimat is” lehetőséget (6. szakasz). Ezt azért nevezzük törlésnek, mert ez a hatása, és ezt dokumentált értékeléssel támasztjuk alá; ha többet szeretne tudni, kérdezzen bennünket. Három dolgot fontos tudni: a biztonsági auditnapló csak hozzáfűzhető és nem törlődik, de nem tartalmaz Önről olvasható azonosítókat; néhány régebbi vita a jelenlegi titkosítási rendszerünk előtti időből származik, és ha ez az Ön fiókjára vonatkozik, közöljük, hogy a megszüntetés mit eredményez náluk; továbbá a már MI-szolgáltatónak küldött adatmásolatokra az adott szolgáltató Nyilvántartásban szereplő megőrzési feltételei vonatkoznak, nem a mi törlésünk." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "3462f98d058cd1bc4bbe4d014aee0dd58bfbcd1e354a845a0a9327d7a7267d5c",
+  sha256: "de1da86b83032aaacb8f70f8731dcf671cb3cc62d9e1541c4a527c38f560d66b",
   eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.2 · HATÁLYOS [DATE]",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",

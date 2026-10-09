@@ -1,4 +1,5 @@
 import { applyForward108, base108Lineage } from "./migration-forward108.js";
+import { applyForward110 } from "./migration-forward110.js";
 import { applyForwardChain, effectiveForwardVerifierSql } from "./migration-forward-chain.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
@@ -1101,6 +1102,7 @@ export async function migrate(pool: Pool): Promise<void> {
     if (forwardVerifierSql === undefined) await client.query(plan.effectiveCapabilityVerifierSql);
     else await client.query(forwardVerifierSql);
     await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
+    await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
     await applyForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]));
     await client.query("COMMIT");
   } catch (error) {

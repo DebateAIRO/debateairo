@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Tóm tắt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Chúng tôi thu thập những gì cần thiết để tài khoản hoạt động và những gì bạn lựa chọn nhập. Câu hỏi của bạn được gửi đến các nhà cung cấp AI nêu trong Sổ đăng ký của chúng tôi; chúng không được dùng để huấn luyện mô hình. Các cuộc tranh luận là riêng tư trừ khi bạn công khai chúng. Việc xóa tài khoản sẽ hủy các khóa bảo vệ dữ liệu của bạn và gỡ các cuộc tranh luận đã công khai. Bạn có thể liên hệ với chúng tôi tại privacy@dezbatere.ro, và người được nêu tên trong một cuộc tranh luận có thể yêu cầu gỡ bỏ mà không cần tài khoản." }
+      { kind: "p", text: "Chúng tôi thu thập những gì cần thiết để tài khoản hoạt động và những gì bạn lựa chọn nhập. Câu hỏi của bạn được gửi đến các nhà cung cấp AI nêu trong Sổ đăng ký của chúng tôi; chúng không được dùng để huấn luyện mô hình. Các cuộc tranh luận là riêng tư trừ khi bạn công khai chúng. Việc xóa tài khoản sẽ hủy khóa của dữ liệu riêng tư; khi lên lịch xóa, bạn chọn gỡ cả các cuộc tranh luận đã công khai hoặc để chúng tiếp tục công khai dưới bút danh đã ngừng sử dụng. Bạn có thể liên hệ với chúng tôi tại privacy@dezbatere.ro, và người được nêu tên trong một cuộc tranh luận có thể yêu cầu gỡ bỏ mà không cần tài khoản." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Các cuộc tranh luận là riêng tư cho đến khi bạn công khai chúng. Việc công khai là một hành động có chủ ý và được xác nhận riêng. Một cuộc tranh luận đã công khai hiển thị bí danh của bạn, câu hỏi đúng như bạn đã viết, cây lập luận, điểm số, phán quyết và dải độ tin cậy, đồng thời mang nhãn hiển thị rõ ràng rằng nội dung do AI tạo ra. Cuộc tranh luận không bao giờ hiển thị địa chỉ email, hồ sơ phiên hoặc lịch sử tài khoản của bạn. Công cụ tìm kiếm có thể lập chỉ mục các cuộc tranh luận đã công bố." },
       { kind: "p", text: "Việc hủy công khai sẽ gỡ cuộc tranh luận khỏi Dialectical Engine và hủy khóa của bản sao công khai do chúng tôi nắm giữ. Các bản sao mà độc giả, công cụ tìm kiếm hoặc kho lưu trữ đã tạo nằm ngoài tầm kiểm soát của chúng tôi và chúng tôi không thể thu hồi chúng." },
-      { kind: "p", text: "Khi bạn xóa tài khoản, chúng tôi gỡ mọi cuộc tranh luận bạn đã công khai khỏi quyền truy cập công cộng mà không chậm trễ quá mức và chậm nhất trong vòng 30 ngày, trừ khi pháp luật yêu cầu chúng tôi lưu giữ một mục cụ thể. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Khi lên lịch xóa tài khoản, bạn chọn điều gì xảy ra với các cuộc tranh luận mình đã công khai. Nếu đánh dấu \"Xóa cả các cuộc tranh luận công khai của tôi\", chúng tôi gỡ từng cuộc khỏi truy cập công cộng và hủy khóa của bản sao công khai do chúng tôi giữ khi việc xóa diễn ra, trừ khi pháp luật buộc chúng tôi lưu giữ một mục cụ thể. Nếu không đánh dấu ô này, các cuộc tranh luận vẫn công khai dưới bút danh đã ngừng sử dụng của bạn." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Địa chỉ IP dùng để xác định quốc gia tại chỗ khi đăng ký và bắt đầu cuộc tranh luận mới — Chỉ trong thời gian xử lý yêu cầu — Không lưu ở dạng đọc được cho bước kiểm tra này; việc từ chối chỉ được ghi tổng hợp và dưới dạng mã băm nêu dưới đây",
         "Bản ghi kiểm toán tổng hợp về việc từ chối theo quốc gia IP — Trong suốt thời gian dịch vụ hoạt động — Bản ghi chứa mã từ chối, quốc gia, nhãn cho biết IP là căn cứ và mã băm một chiều có khóa của địa chỉ IP cùng chuỗi user-agent; nhật ký chỉ cho phép ghi thêm.",
         "Nội dung tranh luận (riêng tư) — Trong thời gian tài khoản tồn tại — Khóa bị hủy khi đóng, khiến nội dung không thể đọc được",
-        "Nội dung tranh luận (đã công khai) — Trong thời gian được công khai và tài khoản còn tồn tại — Bị gỡ khỏi quyền truy cập công cộng khi hủy công khai hoặc đóng tài khoản; khóa bị hủy",
+        "Nội dung tranh luận (đã công khai) — Trong thời gian công khai; nếu bạn đóng tài khoản và không chọn \"Xóa cả các cuộc tranh luận công khai của tôi\", một cuộc tranh luận đã công khai vẫn công khai dưới bút danh đã ngừng sử dụng của bạn — Bị gỡ khỏi quyền truy cập công cộng và khóa của nó bị hủy khi bạn hủy công khai, hoặc khi đóng tài khoản nếu bạn chọn \"Xóa cả các cuộc tranh luận công khai của tôi\"",
         "Hồ sơ phản hồi của nhà cung cấp và tham chiếu truy xuất — Giống cuộc tranh luận tương ứng — Như trên",
         "Cuộc trò chuyện và vụ việc hỗ trợ — [Until closed plus 12 months] — Khóa bị hủy",
         "Hồ sơ chấp nhận và đồng ý — Vòng đời tài khoản cộng 6 năm — thời hiệu dài nhất áp dụng cho chúng tôi — Bị xóa",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Bản sao lưu [pending] — [… days] sau khi bản đang hoạt động bị xóa — Bị ghi đè"
         ]
       },
-      { kind: "p", text: "Việc xóa thực sự có tác dụng gì. Các cuộc tranh luận và dữ liệu tài khoản của bạn được mã hóa bằng các khóa dành riêng cho tài khoản và từng cuộc tranh luận. Việc xóa tài khoản sẽ hủy các khóa đó, sau đó chúng tôi và bất kỳ ai khác đều không thể đọc được các hồ sơ đã mã hóa, đồng thời chúng tôi xóa hồ sơ tài khoản của bạn. Chúng tôi gọi đây là xóa vì đó chính là tác dụng của việc này và chúng tôi lưu giữ bản đánh giá được lập thành văn bản làm căn cứ; nếu bạn muốn biết thêm, hãy hỏi. Có ba điều cần biết: dấu vết kiểm toán bảo mật chỉ được phép ghi nối tiếp và không bị xóa, nhưng không chứa mã định danh nào của bạn có thể đọc được; một số ít cuộc tranh luận cũ có trước cơ chế mã hóa hiện tại của chúng tôi, và nếu điều đó áp dụng cho tài khoản của bạn, chúng tôi sẽ cho bạn biết việc đóng tài khoản có tác dụng gì đối với chúng; và các bản sao dữ liệu đã được gửi đến nhà cung cấp AI chịu sự điều chỉnh của điều khoản lưu giữ của nhà cung cấp đó trong Sổ đăng ký, chứ không phải việc xóa của chúng tôi." },
+      { kind: "p", text: "Việc xóa thực sự có tác dụng gì. Các cuộc tranh luận riêng tư và dữ liệu tài khoản của bạn được mã hóa bằng các khóa dành riêng cho tài khoản và từng cuộc tranh luận. Việc xóa tài khoản sẽ hủy các khóa đó, sau đó chúng tôi và bất kỳ ai khác đều không thể đọc được các hồ sơ đã mã hóa, đồng thời chúng tôi xóa hồ sơ tài khoản của bạn. Khóa của bản sao công khai một cuộc tranh luận đã công khai chỉ bị hủy khi xóa tài khoản nếu bạn chọn \"Xóa cả các cuộc tranh luận công khai của tôi\" (mục 6). Chúng tôi gọi đây là xóa vì đó chính là tác dụng của việc này và chúng tôi lưu giữ bản đánh giá được lập thành văn bản làm căn cứ; nếu bạn muốn biết thêm, hãy hỏi. Có ba điều cần biết: dấu vết kiểm toán bảo mật chỉ được phép ghi nối tiếp và không bị xóa, nhưng không chứa mã định danh nào của bạn có thể đọc được; một số ít cuộc tranh luận cũ có trước cơ chế mã hóa hiện tại của chúng tôi, và nếu điều đó áp dụng cho tài khoản của bạn, chúng tôi sẽ cho bạn biết việc đóng tài khoản có tác dụng gì đối với chúng; và các bản sao dữ liệu đã được gửi đến nhà cung cấp AI chịu sự điều chỉnh của điều khoản lưu giữ của nhà cung cấp đó trong Sổ đăng ký, chứ không phải việc xóa của chúng tôi." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "4de9571a9bfbf00fbbc0be62d2868ef39b18739ba09a1801ed3b317b60bb13be",
+  sha256: "57daa3848f8e53a10c89e7601c429862e834e6830917b5aaf8851e5ddfa2c1d4",
   eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.2 · CÓ HIỆU LỰC [DATE]",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",

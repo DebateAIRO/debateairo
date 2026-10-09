@@ -258,7 +258,7 @@ describe('closed original107 append and native atomicity',()=>{
    const chain=(await loadMigrationPlan()).forwardChain.map(step=>step.name);expect(chain.length).toBeGreaterThan(0);
    expect((await db.pool.query('SELECT name,count(*)::int n FROM public.debateai_schema_migration WHERE name=ANY($1) GROUP BY name ORDER BY name',[chain])).rows).toEqual([...chain].sort().map(name=>({name,n:1})));
    expect((await db.pool.query('SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name')).rows).toEqual([...chain].sort().map(source_name=>({source_name})));
-   expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name<>'0108_preview_recovery_verified_bindings.sql' AND NOT name=ANY($1) ORDER BY name",[chain])).rows).toEqual(before);
+   expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name NOT IN ('0108_preview_recovery_verified_bindings.sql','0110_account_erasure_public_debates.sql') AND NOT name=ANY($1) ORDER BY name",[chain])).rows).toEqual(before);
   }finally{await second.end();await db.stop();}
  },120000);
  it('a late108 refusal rolls the function replacement/ledger/receipt back atomically',async()=>{
@@ -279,7 +279,7 @@ it('source/manifest/old recipe drift refuses from a bounded source copy before a
  const root=await mkdtemp(join(tmpdir(),'preview-source-108-'));
  try{
   await mkdir(join(root,'packages/db/src'),{recursive:true});
-  // PR-54: the lineage loader also loads the forward chain after 0108 (migration-forward-chain.ts and its steps).
+  // PR-54: the lineage loader also loads 0110 (migration-forward110.ts) and the forward chain (migration-forward-chain.ts and its steps).
   for(const name of (await readdir(new URL('../../packages/db/src/',import.meta.url))).filter(entry=>/^migration-.*\.ts$/.test(entry)))await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
   await cp(new URL('../../migrations',import.meta.url),join(root,'migrations'),{recursive:true});
   const script=join(root,'probe.mts');await writeFile(script,`import {loadMigrationPlan} from './packages/db/src/migration-lineage.ts'; await loadMigrationPlan();`);

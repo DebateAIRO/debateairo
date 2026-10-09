@@ -639,9 +639,10 @@ function constraintHasReplayGuard(source: string, index: number, name: string): 
 export type NativeMigrationReplayContext = Readonly<{ plan: MigrationPlan; migrateSource: string }>;
 const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2";
 // Finite reviewed executable module: comments/strings/dead code cannot stand in for its controls.
-// N26m/N26n (PR-54): the reviewed module after the NETOPIA branch merged dev (its billing exports) and added the
-// forward chain after 0108 (migrate() runs the superseding verifier and applyForwardChain; migrations/lineage/README.md).
-const NATIVE_MIGRATE_MODULE_SHA256 = "66cbe0ce0a89929d4b03c735f4beebe94dff5f9bba0e8db0cea4919fcbf5fac3";
+// N26m/N26n (PR-54): the reviewed module after the NETOPIA branch merged dev (its billing exports and #101's
+// applyForward110) and added the forward chain (migrate() runs the superseding verifier, applyForward110, then
+// applyForwardChain; migrations/lineage/README.md).
+const NATIVE_MIGRATE_MODULE_SHA256 = "24794cb070295a356b41c18d2d03c357d789eb3a0655c84147c0b1f169976426";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"
@@ -671,7 +672,7 @@ function assertNativeReplayBinding(name: string, source: string, { plan, migrate
     "for (const name of plan.manifest.order)", "if (appliedSet.has(name) || resolvedSet.has(name)) continue;",
     "await client.query(plan.sources.get(name)!.sql);",
     "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
-    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,",
+    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,", "await applyForward110(client,plan,lineage,",
     "await applyForwardChain(client,plan,",
     'await client.query("COMMIT")', "} catch (error) {", 'await client.query("ROLLBACK")',
     "throw error;", "} finally {", "client.release();"
