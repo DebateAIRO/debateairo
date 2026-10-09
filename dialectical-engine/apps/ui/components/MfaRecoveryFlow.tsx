@@ -5,6 +5,7 @@ import { AuthShell } from "@/components/AuthShell";
 import { API_BASE } from "@/lib/api";
 import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
 import { totpQrMatrix } from "@/lib/totpQr";
+import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import english from "@/messages/en/mfa-recovery.json";
 const browserClient = createMfaRecoveryClient(fetch, API_BASE);
@@ -16,7 +17,7 @@ function SetupQr({ uri, label, fallback }: { uri: string; label: string; fallbac
   const size = matrix.length + 8, path = matrix.flatMap((row, y) => row.flatMap((dark, x) => dark ? [`M${x + 4} ${y + 4}h1v1h-1z`] : [])).join("");
   return <svg className="mfaQr" width="170" height="170" viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label}><rect width={size} height={size} fill="var(--qr-paper)" /><path d={path} fill="var(--qr-ink)" /></svg>;
 }
-export function MfaRecoveryFlow({ catalog = english, locale = "en", client = browserClient }: Readonly<{ catalog?: MessageCatalog; locale?: "en" | "ro"; client?: MfaRecoveryClient }>) {
+export function MfaRecoveryFlow({ catalog = english, locale = "en", client = browserClient }: Readonly<{ catalog?: MessageCatalog; locale?: LocaleCode; client?: MfaRecoveryClient }>) {
   const [phase, setPhase] = useState<Phase>("request"), [email, setEmail] = useState(""), [destination, setDestination] = useState<"primary" | "backup">("primary"), [password, setPassword] = useState(""), [ready, setReady] = useState(false), [code, setCode] = useState(""), [secret, setSecret] = useState(""), [uri, setUri] = useState(""), [label, setLabel] = useState(""), [codes, setCodes] = useState<string[]>([]), [ack, setAck] = useState(""), [expires, setExpires] = useState<string | null>(null), [notBefore, setNotBefore] = useState<string | null>(null), [busy, setBusy] = useState(false), [unknown, setUnknown] = useState(false), [error, setError] = useState<string | null>(null), [notice, setNotice] = useState<string | null>(null), [switchConfirm, setSwitchConfirm] = useState(false);
   const link = useRef<string | null>(null), cancellation = useRef<string | null>(null), finishing = useRef<string | null>(null), mounted = useRef(true), inFlight = useRef(false), switching = useRef(false);
   const text = (key: string) => t(catalog, key);
@@ -67,14 +68,16 @@ export function MfaRecoveryFlow({ catalog = english, locale = "en", client = bro
     catch (failure) { if (failure instanceof ContractHttpError && failure.serverCode === "MFA_RECOVERY_TOO_EARLY") { setPassword(""); await loadFinish(); return; } throw failure; }
     if (mounted.current) { clear(); setPhase("completed"); }
   }
-  const when = (value: string) => new Intl.DateTimeFormat(locale === "ro" ? "ro-RO" : "en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  // Dates follow the reader's locale; plain English and Romanian keep the formats they always had.
+  const dateLocale = locale === "en" ? "en-GB" : locale === "ro" ? "ro-RO" : locale;
+  const when = (value: string) => new Intl.DateTimeFormat(dateLocale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
   const submit = (operation: () => Promise<void>) => (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (phase === "email_link" && !ready) return; void perform(operation); };
   function showConfirmedCancellation() { clear(); switching.current = false; setPhase("cancelled"); setUnknown(false); setSwitchConfirm(false); setNotice(text("cancel.pause")); }
   const prefix = phase === "email_link" ? "link" : phase === "cancel_link" ? "cancel" : phase === "factor_required" ? "factor" : phase === "totp_required" ? "totp" : phase === "codes_required" || phase === "ack_required" ? "codes" : phase === "completed" ? "done" : phase === "finish_link" ? "finishCheck" : phase === "finish_wait" ? "finishWait" : phase === "finish_ready" ? "finish" : phase;
   const disabled = busy || unknown;
   function download() { const value = new Blob([codes.join("\n") + "\n"], { type: "text/plain;charset=utf-8" }); const url = URL.createObjectURL(value); const a = document.createElement("a"); a.href = url; a.download = "recovery-codes.txt"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
   return <AuthShell lang={locale} eyebrow={text("eyebrow")} title={text(`${prefix}.title`)} description={text(`${prefix}.description`)} footer={<><p><a href="/login" onClick={clear}>{text("login")}</a></p>{active ? <p><button className="authTextButton" type="button" disabled={disabled} onClick={() => setSwitchConfirm(true)}>{text("saved.link")}</button></p> : !unknown && phase !== "cancelled" && <p><a href="/recover" onClick={clear}>{text("saved.link")}</a><span className="authFieldHint">{text("saved.hint")}</span></p>}</>}>
-    {active && expires && <p className="authFieldHint">{text("deadline")} <time dateTime={expires}>{new Intl.DateTimeFormat(locale === "ro" ? "ro-RO" : "en-GB", { hour: "2-digit", minute: "2-digit" }).format(new Date(expires))}</time></p>}
+    {active && expires && <p className="authFieldHint">{text("deadline")} <time dateTime={expires}>{new Intl.DateTimeFormat(dateLocale, { hour: "2-digit", minute: "2-digit" }).format(new Date(expires))}</time></p>}
     {error && <div className="authAlert" role="alert">{error}</div>}{notice && <p className="authFieldHint" role="status">{notice}</p>}
     {unknown && finishing.current !== null && <button className="authSecondary recoveryCancel" type="button" disabled={busy} onClick={() => void perform(loadFinish, true)}>{text("check.state")}</button>}
     {unknown && finishing.current === null && <button className="authSecondary recoveryCancel" type="button" disabled={busy} onClick={() => void perform(async () => { const state = await client.status(); if (!mounted.current) return; if (switching.current && state.status === "cancelled") { showConfirmedCancellation(); return; } if (state.status === "refused") { switching.current = false; setSwitchConfirm(false); apply(state); return; } apply(state); if (switching.current && !["completed", "cancelled", "refused"].includes(state.status)) { await client.cancelCurrent(); if (mounted.current) showConfirmedCancellation(); } }, true)}>{text("check.state")}</button>}

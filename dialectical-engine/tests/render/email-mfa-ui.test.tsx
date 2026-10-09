@@ -13,6 +13,8 @@ import authCatalog from "../../apps/ui/messages/en/auth.json";
 import { createContractClient } from "../../packages/contract/src/client.js";
 import en from "../../apps/ui/messages/en/mfa-recovery.json";
 import ro from "../../apps/ui/messages/ro/mfa-recovery.json";
+import ja from "../../apps/ui/messages/ja/mfa-recovery.json";
+import type { LocaleCode } from "../../apps/ui/lib/i18n/locales.js";
 let host: HTMLDivElement, root: Root;
 const TOKEN = "A".repeat(43), SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
 const codes = Array.from({ length: 10 }, (_, i) => `SYNTHETIC-CODE-${i}-FIXTURE`);
@@ -188,7 +190,7 @@ describe("the 24-hour wait and the finish link", () => {
     const client = createMfaRecoveryClient(async (url, init) => { const path = String(url).split("/mfa-recovery/")[1]!; requests.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null }); if (path === "finish/status") return json(states.length > 1 ? states.shift() : states[0]); if (path === "finish") return finish(); if (path === "cancel") return json({ status: "cancelled" }); return json({ error: "MFA_RECOVERY_INVALID" }, 401); }, "/api", () => "B".repeat(43));
     return { client, requests };
   }
-  async function open(f: ReturnType<typeof finishFixture>, catalog = en, locale: "en" | "ro" = "en") { history.replaceState({}, "", `/recover-authenticator#finish=${FINISH}`); await act(async () => root.render(<StrictMode><MfaRecoveryFlow client={f.client} catalog={catalog} locale={locale} /></StrictMode>)); }
+  async function open(f: ReturnType<typeof finishFixture>, catalog: Record<string, string> = en, locale: LocaleCode = "en") { history.replaceState({}, "", `/recover-authenticator#finish=${FINISH}`); await act(async () => root.render(<StrictMode><MfaRecoveryFlow client={f.client} catalog={catalog} locale={locale} /></StrictMode>)); }
   it("uses the owner's words for the wait, the finish link and the cancel", () => {
     expect(en["waiting.title"]).toBe("For your safety, this finishes in 24 hours.");
     expect(en["waiting.description"]).toBe("We've emailed you a link to cancel if this wasn't you.");
@@ -237,5 +239,12 @@ describe("the 24-hour wait and the finish link", () => {
     const f = finishFixture([{ status: "ready_to_finish", expires_at }]); await open(f, ro, "ro");
     expect(host.textContent).toContain(ro["finish.title"]); expect(ro["finish.title"]).not.toBe(en["finish.title"]);
     expect(host.textContent).toContain(ro["finish.button"]);
+  });
+  // Owner requirement 2026-10-09: the wait screens are "clear plain screens in all 35 locales".
+  it("shows the wait in the reader's language and date format (ja)", async () => {
+    const f = finishFixture([{ status: "waiting", not_before }]); await open(f, ja, "ja");
+    expect(host.querySelector("main")?.getAttribute("lang")).toBe("ja");
+    expect(host.textContent).toContain(ja["finishWait.title"]); expect(ja["finishWait.title"]).not.toBe(en["finishWait.title"]);
+    expect(host.querySelector("time")?.textContent).toBe(new Intl.DateTimeFormat("ja", { dateStyle: "medium", timeStyle: "short" }).format(new Date(not_before)));
   });
 });
