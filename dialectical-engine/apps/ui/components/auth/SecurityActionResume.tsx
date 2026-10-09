@@ -56,7 +56,7 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
             return;
         const timer = setTimeout(() => {
             setProof(null);
-            setStatus(t(catalog, "auth.enroll.expired"));
+            setStatus(t(catalog, "auth.security.expired"));
         }, Math.max(0, Date.parse(proof.step_up_grant.expires_at) - Date.now()));
         return () => clearTimeout(timer);
     }, [proof, catalog]);

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import type { ContractClient, OnboardingRequirementsResponse } from '@debateai/contract';
+import { ContractHttpError, type ContractClient, type OnboardingRequirementsResponse } from '@debateai/contract';
 import { contractClient } from '@/lib/api';
 import { catalogLocale, type LocaleCode } from '@/lib/i18n/locales';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
@@ -63,9 +63,10 @@ export function OnboardingEvidence({ authority, client = contractClient, locale,
                     throw new Error('LEGAL_DOCUMENT_STALE');
                 setDocuments({ terms, privacy });
             }
-            catch {
+            catch (failure) {
+                // Only a document that changed since it was shown is "updated while you were reading".
                 if (active)
-                    setError(t(catalog, "auth.signUp.documentsUpdated"));
+                    setError(t(catalog, failure instanceof Error && failure.message === 'LEGAL_DOCUMENT_STALE' ? "auth.signUp.documentsUpdated" : "auth.onboarding.loadFailed"));
             }
         })();
         return () => {
@@ -100,16 +101,18 @@ export function OnboardingEvidence({ authority, client = contractClient, locale,
             setBirth(EMPTY_DOB);
             ready.current();
         }
-        catch {
-            setAccepted({ terms: false, privacy: false });
-            setError(t(catalog, "auth.signUp.documentsUpdated"));
+        catch (failure) {
+            const stale = failure instanceof ContractHttpError && failure.serverCode === 'LEGAL_DOCUMENT_STALE';
+            if (stale)
+                setAccepted({ terms: false, privacy: false });
+            setError(t(catalog, stale ? "auth.signUp.documentsUpdated" : "auth.onboarding.saveFailed"));
         }
         finally {
             flight.current = false;
             setBusy(false);
         }
     }
-    return <section>{error ? <div><p role="alert">{error}</p><button type="button" onClick={() => setReload(n => n + 1)}>{t(catalog, "auth.signUp.reloadDocuments")}</button></div> : null}
+    return <section>{error ? <div><p className="authFieldError" role="alert">{error}</p><button type="button" className="authSecondary" onClick={() => setReload(n => n + 1)}>{t(catalog, "auth.onboarding.tryAgain")}</button></div> : null}
  {!requirements || !documents ? <p role="status">{t(catalog, "auth.enroll.verifyingEmail")}</p> : <form method="post" action="/enroll-mfa" noValidate onSubmit={e => {
                 e.preventDefault();
                 void submit(e.currentTarget);

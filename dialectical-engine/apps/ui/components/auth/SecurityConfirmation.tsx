@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useId, useRef, useState } from 'react';
-import type { AuthMethodsResponse, ContractClient, StepUpAuthorizationRequest, StepUpResponse } from '@debateai/contract';
+import { ContractHttpError, type AuthMethodsResponse, type ContractClient, type StepUpAuthorizationRequest, type StepUpResponse } from '@debateai/contract';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { matchingSecurityGrant, type ConfirmedSecurityAction } from '@/lib/securityConfirmation';
@@ -98,7 +98,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                 if (onError)
                     onError(failure);
                 else
-                    setError(t(catalog, "auth.security.unavailable"));
+                    setError(t(catalog, "auth.passkey.cancelled"));
             }
         }
         finally {
@@ -127,7 +127,9 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                 if (onError)
                     onError(failure);
                 else
-                    setError(t(catalog, "auth.security.unavailable"));
+                    // The server answers 401 for a wrong password or code (it never says which) and 429 while rate-limited.
+                    setError(t(catalog, failure instanceof ContractHttpError && failure.status === 401 ? "auth.security.wrongPassword"
+                        : failure instanceof ContractHttpError && failure.status === 429 ? "auth.security.tooManyAttempts" : "auth.security.unavailable"));
             }
         }
         finally {

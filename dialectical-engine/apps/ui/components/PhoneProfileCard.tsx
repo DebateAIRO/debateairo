@@ -66,7 +66,7 @@ export function PhoneProfileCard({ client = contractClient, catalog, authCatalog
     }, [full, revealUntil]);
     useEffect(() => {
         if (!held) return;
-        const timer = setTimeout(() => { setHeld(null); setAction(null); setFull(null); setError(t(authCatalog, 'auth.enroll.expired')); }, Math.max(0, Date.parse(held.step_up_grant.expires_at) - Date.now()));
+        const timer = setTimeout(() => { setHeld(null); setAction(null); setFull(null); setError(t(authCatalog, 'auth.security.expired')); }, Math.max(0, Date.parse(held.step_up_grant.expires_at) - Date.now()));
         return () => clearTimeout(timer);
     }, [held, authCatalog]);
     function cancel() { sequence.current++; flight.current = false; setBusy(false); setFull(null); setPhone(''); setHeld(null); setAction(null); setError(null); setPhoneError(undefined); onCancel?.(); }

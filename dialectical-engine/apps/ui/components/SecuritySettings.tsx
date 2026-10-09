@@ -68,7 +68,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     useEffect(() => {
         const deadline = held?.step_up_grant.expires_at ?? enrollment?.expiresAt;
         if (!deadline) return;
-        const timer = setTimeout(() => { cancel(); setError(t(authCatalog, 'auth.enroll.expired')); }, Math.max(0, Date.parse(deadline) - Date.now()));
+        const timer = setTimeout(() => { cancel(); setError(t(authCatalog, 'auth.security.expired')); }, Math.max(0, Date.parse(deadline) - Date.now()));
         return () => clearTimeout(timer);
     }, [held, enrollment, authCatalog]);
     useEffect(() => {
@@ -149,7 +149,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
             </div>
             {methods ? <p className="setStatus">{t(catalog, 'settings.security.codesRemaining', { count: methods.recovery_codes_remaining })}</p> : null}
             <div className="setListActions"><button type="button" className="setBtn" disabled={busy || !methods} onClick={() => choose({ action: 'REGENERATE_RECOVERY_CODES' })}>{t(catalog, 'settings.security.regenerate')}</button></div>
-            {codes ? <EphemeralCodes catalog={authCatalog} codes={codes}/> : null}
+            {codes ? <EphemeralCodes kind="new" catalog={authCatalog} codes={codes}/> : null}
         </section>
         <div className="setSectionHead"><h2 className="setSectionTitle">{t(authCatalog, 'auth.recovery.emailTitle')}</h2></div>
         <section className="setList">
