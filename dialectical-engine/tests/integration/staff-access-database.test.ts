@@ -1,7 +1,8 @@
 import { initializeOwnerRecoveryFixture, prepareOwnerRecoveryFixture } from '../support/staffOwnerRecoveryFixture.js';
 import { authorizeStaffAlertFixture } from '../support/staffAlertReadiness.js';
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, rm, readFile, readdir } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { applyRecordedMigrations, authBranchCohort, authBranchMigrationsBefore } from "../support/authBranchLineage.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileUserDekStore, generateDek, loadKek, destroyKek, encrypt, decrypt, type AeadAad, type AuditContextHasher } from "@debateai/crypto";
@@ -64,8 +65,8 @@ async function pending(operation:Promise<unknown>) {
 beforeAll(async()=>{
   database=await startTestDatabase();
   // Apply the historical chain once on this private fixture and retain exact owner/ACL witnesses.
-  const files=(await readdir('migrations')).filter(name=>/^\d+.*\.sql$/.test(name)).sort();
-  const historical=files.filter(name=>name<'0085_staff_access_foundation.sql');expect(historical).toHaveLength(92);
+  // The auth branch's own chain (tests/support/authBranchLineage.ts): dev's same-numbered files are not part of it.
+  const historical=await authBranchMigrationsBefore('0085_staff_access_foundation.sql');expect(historical).toHaveLength(92);
   const client=await database.pool.connect();
   try {
     await client.query('BEGIN');
@@ -75,14 +76,20 @@ beforeAll(async()=>{
   } catch(error){await client.query('ROLLBACK');throw error;} finally {client.release();}
   const guardedFunctions=["identity.lock_account_t9_internal", "identity.lock_mfa_enrollment_bearer_internal", "identity.record_verification_delivery_with_audit", "identity.prepare_account_erasure", "identity.finalize_account_erasure", "core.append_run_ownership_event", "identity.audit_publication_preflight_denial", "core.transition_run_publication", "core.prepare_run_key_provision", "core.lock_run_key_provision_for_commit", "serve.prepare_publication_key_provision", "serve.abandon_publication_key_provision", "identity.create_pending_account_with_audit", "identity.consume_verification_with_audit", "identity.prepare_verification_resend_with_audit", "identity.reserve_publication_event_refs", "core.prepare_private_run_erasure", "core.resume_private_run_erasure", "core.finalize_private_run_erasure", "identity.schedule_account_erasure", "identity.cancel_current_account_erasure", "core.claim_legacy_runs"];
   const identityWitness=async()=>(await database.pool.query(`SELECT p.oid::regprocedure::text AS signature,pg_get_userbyid(p.proowner) AS owner,p.proacl::text AS acl,encode(sha256(convert_to(pg_get_functiondef(p.oid),'UTF8')),'hex') AS definition_sha256 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname||'.'||p.proname=ANY($1::text[]) ORDER BY signature`,[guardedFunctions])).rows;
-  const before=await identityWitness();expect(before).toHaveLength(22);await migrate(database.pool);await initializeOwnerRecoveryFixture(database.pool,database.connectionString);const after=await identityWitness();
+  const before=await identityWitness();expect(before).toHaveLength(22);
+  // Finish the auth branch's cohort as it shipped, so migrate() upgrades a recognised lineage (auth94).
+  await applyRecordedMigrations(database.pool,(await authBranchCohort()).filter(name=>!historical.includes(name)));await migrate(database.pool);await initializeOwnerRecoveryFixture(database.pool,database.connectionString);const after=await identityWitness();
   const phoneSignature='identity.create_pending_account_with_audit(uuid,bytea,jsonb,jsonb,text,text,timestamp with time zone,timestamp with time zone,text,timestamp with time zone,jsonb,jsonb,text,text,timestamp with time zone)';
-  const historicalAfter=after.filter(row=>row.signature!==phoneSignature);
+  // 0110 (delete-public-debates, applied once by migration-forward110.ts) adds a second overload of a guarded name: the
+  // account-erasure schedule that also records the owner's choice for published debates. The 4-argument original stays.
+  const choiceScheduleSignature='identity.schedule_account_erasure(uuid,uuid,uuid,text,boolean)';
+  const originalScheduleSignature='identity.schedule_account_erasure(uuid,uuid,uuid,text)';
+  const historicalAfter=after.filter(row=>row.signature!==phoneSignature&&row.signature!==choiceScheduleSignature);
   const reservedSignature='identity.create_pending_account_reserved_with_audit(uuid,bytea,jsonb,jsonb,text,text,timestamptz,timestamptz,text,bigint,jsonb,jsonb,text,text,timestamptz)';
   const retiredResendSignature='identity.prepare_verification_resend_with_audit(bytea,text,timestamp with time zone,timestamp with time zone,bigint,jsonb)';
   const can=async(role:string,signature:string)=>(await database.pool.query("SELECT has_function_privilege($1,$2,'EXECUTE') AS allowed",[role,signature])).rows[0].allowed as boolean;
 
-  expect(after).toHaveLength(23);
+  expect(after).toHaveLength(24);
   expect(historicalAfter.map(({signature,owner})=>({signature,owner}))).toEqual(before.map(({signature,owner})=>({signature,owner})));
   const oldConstructor=before.find(row=>row.signature.startsWith('identity.create_pending_account_with_audit('))!;
   expect(after.find(row=>row.signature===phoneSignature)!.owner).toBe(oldConstructor.owner);
@@ -96,6 +103,14 @@ beforeAll(async()=>{
   }
   for(const role of ['debateai_runtime','debateai_authorization_runtime','debateai_replay','public'])expect(await can(role,phoneSignature),`${role}:${phoneSignature}`).toBe(false);
   expect(await can(oldConstructor.owner,phoneSignature)).toBe(true);
+  // The choice overload has the original's definer owner and exactly its ACL: EXECUTE for the erasure runtime only.
+  const originalSchedule=before.find(row=>row.signature===originalScheduleSignature)!,choiceSchedule=after.find(row=>row.signature===choiceScheduleSignature)!;
+  expect(choiceSchedule.owner).toBe(originalSchedule.owner);
+  expect(choiceSchedule.acl).toBe(originalSchedule.acl);
+  expect((await database.pool.query("SELECT coalesce(r.rolname,'PUBLIC') AS grantee,a.privilege_type,a.is_grantable FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid=a.grantee WHERE p.oid=$1::regprocedure AND a.grantee<>p.proowner",[choiceScheduleSignature])).rows).toEqual([{grantee:'debateai_erasure_runtime',privilege_type:'EXECUTE',is_grantable:false}]);
+  expect(await can('debateai_erasure_runtime',choiceScheduleSignature)).toBe(true);
+  for(const role of ['debateai_runtime','debateai_authorization_runtime','debateai_replay','public'])expect(await can(role,choiceScheduleSignature),`${role}:${choiceScheduleSignature}`).toBe(false);
+  expect(await can(choiceSchedule.owner,choiceScheduleSignature)).toBe(true);
   const reserved=(await database.pool.query("SELECT pg_get_userbyid(proowner) AS owner,proconfig FROM pg_proc WHERE oid=$1::regprocedure",[reservedSignature])).rows[0];
   expect(reserved).toEqual({owner:oldConstructor.owner,proconfig:['search_path=pg_catalog']});
   expect(await can('debateai_runtime',reservedSignature)).toBe(true);
