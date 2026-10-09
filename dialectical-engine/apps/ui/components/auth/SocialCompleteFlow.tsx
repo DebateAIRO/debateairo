@@ -22,7 +22,6 @@ import { SecurityEnrollment } from './SecurityEnrollment';
 import { LockoutPrompt } from './LockoutPrompt';
 import { PhoneField } from './PhoneField';
 import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
-import { EphemeralCodes } from './EphemeralCodes';
 import { RegionField, EMPTY_REGION_PICK, type RegionPick } from '../RegionField';
 import { DateOfBirthField, EMPTY_DOB } from '../DateOfBirthField';
 import { dobErrorMessage, resolveDobLocale } from '@/lib/dob/dobLocale';
@@ -83,12 +82,10 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [proof, setProof] = useState<string | null>(null);
     const [reset, setReset] = useState(0);
     const [pending, setPending] = useState<string | null>(null);
-    const [backup, setBackup] = useState<string | null>(null);
     const [stepUpResult, setStepUpResult] = useState<StepUpResponse | null>(null);
     const [loginStatus, setLoginStatus] = useState<SocialLoginStatusResponse | null>(null);
     const [stepUpStatus, setStepUpStatus] = useState<SocialStepUpStatusResponse | null>(null);
     const [flowExpiry, setFlowExpiry] = useState<string | null>(null);
-    const [authenticated, setAuthenticated] = useState(false);
     // Set once this flow's own MFA set-up has signed the person in: the "don't get locked out" card comes first,
     // still under the set-up heading (the flow's kind is cleared by then).
     const [secured, setSecured] = useState(false);
@@ -209,10 +206,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         startup.current = null;
         replaceAuthority('', null);
         setCode('');
-        setAuthenticated(true);
-        if (result.replacement_recovery_code)
-            setBackup(result.replacement_recovery_code);
-        else if (enrolled)
+        // 2026-10-09: a used recovery code is never refilled, so there is no replacement code to show first.
+        if (enrolled)
             setSecured(true);
         else
             navigateAuthenticated();
@@ -223,8 +218,6 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         replaceAuthority('', null);
         setCode('');
         setStepUpResult(result);
-        if (result.replacement_recovery_code)
-            setBackup(result.replacement_recovery_code);
     }
     function fieldError(field: keyof SignupFieldErrors) {
         return errors[field] ? t(catalog, errors[field]!) : undefined;
@@ -380,13 +373,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const codeFormatError = !recoveryMode && (codeIncomplete || !readSixDigitCode(code).valid);
     return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' || secured ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
  {error ? <div className="authAlert" role="alert">{error}</div> : null}
- {returnToQuestion && !stepUpResult && !backup ? <a className="authPrimary" href="/new">{t(catalog, 'auth.continue')}</a> : null}
- {backup ? <div><EphemeralCodes codes={[backup]} catalog={catalog}/><button type="button" className="authPrimary" onClick={() => {
-                setBackup(null);
-                if (authenticated)
-                    navigateAuthenticated();
-            }}>{t(catalog, "auth.continue")}</button></div> : null}
- {stepUpResult && !backup ? <div className="recoveryStatus"><p>{t(catalog, "auth.security.complete")}</p><button type="button" className="authPrimary" onClick={() => {
+ {returnToQuestion && !stepUpResult ? <a className="authPrimary" href="/new">{t(catalog, 'auth.continue')}</a> : null}
+ {stepUpResult ? <div className="recoveryStatus"><p>{t(catalog, "auth.security.complete")}</p><button type="button" className="authPrimary" onClick={() => {
                 const result = stepUpResult;
                 setStepUpResult(null);
                 if (onStepUp)
@@ -453,7 +441,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                         attempt.current.edited();
                     }}>{recoveryMode ? t(catalog, "auth.login.useAuthenticatorCode") : t(catalog, "auth.login.useRecoveryCode")}</button> : null}</> : null}
  </div> : null}
- {!token && !stepUpResult && !backup && !busy && !secured ? <a href="/login">{t(catalog, "auth.login.backToSignIn")}</a> : null}
+ {!token && !stepUpResult && !busy && !secured ? <a href="/login">{t(catalog, "auth.login.backToSignIn")}</a> : null}
  {policyOpen ? <PrivacyPolicyModal open mode="consent" onClose={() => setPolicyOpen(false)} onAcknowledge={() => {
                 setPrivacyAccepted(true);
                 setPolicyOpen(false);

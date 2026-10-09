@@ -11,6 +11,7 @@ const read = (path) => {
 };
 
 const login = read("./LoginFlow.tsx");
+const mfaRecovery = read("./MfaRecoveryFlow.tsx");
 const loginPage = read("../app/login/page.tsx");
 const signUp = read("./SignUpFlow.tsx");
 const shell = read("./AuthShell.tsx");
@@ -174,9 +175,12 @@ test("mailed-token enrollment has no native form that could submit secrets befor
   assert.doesNotMatch(verifyEmail, /<form\b/);
 });
 
-test("replacement recovery-code custody synchronously blocks only home navigation", () => {
-  assert.match(login, /setRecoveryAcknowledgementPending\(true\)/);
-  assert.match(login, /setRecoveryAcknowledgementPending\(false\)[\s\S]*?onAuthenticated\(\)/);
+// Review M4 2026-10-09: a used recovery code is never refilled, so sign-in shows no replacement code; the custody guard
+// now covers the ten new codes shown during authenticator recovery.
+test("new recovery-code custody synchronously blocks only home navigation", () => {
+  assert.doesNotMatch(login, /replacement_recovery_code|EphemeralCodes|setRecoveryAcknowledgementPending\(true\)/);
+  assert.match(mfaRecovery, /setRecoveryAcknowledgementPending\(true\)/);
+  assert.match(mfaRecovery, /setRecoveryAcknowledgementPending\(false\)/);
   assert.match(topBar, /useRecoveryAcknowledgementPending\(\)/);
   assert.match(topBar, /homeNavigationAvailable=\{!recoveryAcknowledgementPending\}/);
   assert.match(topBar, /aria-disabled="true"/);

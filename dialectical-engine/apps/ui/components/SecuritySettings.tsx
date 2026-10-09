@@ -189,7 +189,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
             </div>
             {methods ? <p className="setStatus">{t(catalog, 'settings.security.codesRemaining', { count: methods.recovery_codes_remaining })}</p> : null}
             <div className="setListActions"><button type="button" className="setBtn" disabled={busy || !methods} onClick={() => choose({ action: 'REGENERATE_RECOVERY_CODES' })}>{t(catalog, 'settings.security.regenerate')}</button></div>
-            {codes ? <EphemeralCodes kind="new" catalog={authCatalog} codes={codes}/> : null}
+            {codes ? <EphemeralCodes catalog={authCatalog} codes={codes}/> : null}
         </section>
         <div className="setSectionHead"><h2 className="setSectionTitle">{t(authCatalog, 'auth.recovery.emailTitle')}</h2></div>
         <section className="setList">

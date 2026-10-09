@@ -44,11 +44,11 @@ export const ResendVerificationAckSchema = z.object({
 export const VerificationAckSchema = z.union([RegistrationVerificationAckSchema, ResendVerificationAckSchema]);
 export type VerificationAck = z.infer<typeof VerificationAckSchema>;
 
+// Design note 2026-10-09 item 3: a used recovery code is never refilled; the strict shape refuses a replacement code.
 export const AuthenticationResponseSchema = z.object({
   status: z.literal("authenticated"),
   csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
-  session: SessionSchema,
-  replacement_recovery_code: z.string().min(1).max(1024).optional()
+  session: SessionSchema
 }).strict();
 export type AuthenticationResponse = z.infer<typeof AuthenticationResponseSchema>;
 
@@ -184,7 +184,7 @@ export type PasskeyEnrollmentResponse=z.infer<typeof PasskeyEnrollmentResponseSc
 
 
 export const ConsumerRecoveryProveRequestSchema=z.object({token:HandleSchema,recovery_code:z.string().min(1).max(128),method:z.enum(['passkey','totp'])}).strict();
-export const ConsumerRecoveryProofResponseSchema=z.object({status:z.literal('RECOVERY_ENROLL_ONLY'),available_methods:z.array(z.enum(['passkey','totp'])).min(1).max(2),totp_unavailable_reason:z.literal('PASSWORD_UNAVAILABLE').nullable(),recovery_capability:HandleSchema,replacement_recovery_code:z.string().min(1).max(128).optional(),expires_at:z.iso.datetime()}).strict();
+export const ConsumerRecoveryProofResponseSchema=z.object({status:z.literal('RECOVERY_ENROLL_ONLY'),available_methods:z.array(z.enum(['passkey','totp'])).min(1).max(2),totp_unavailable_reason:z.literal('PASSWORD_UNAVAILABLE').nullable(),recovery_capability:HandleSchema,expires_at:z.iso.datetime()}).strict();
 export const RecoveryEnrollmentBeginRequestSchema=z.object({recovery_capability:HandleSchema,method:z.enum(['passkey','totp'])}).strict();
 export const RecoveryEnrollmentCompleteRequestSchema=z.union([
  z.object({recovery_capability:HandleSchema,challenge_handle:HandleSchema,credential:ConsumerRegistrationCredentialSchema,label:z.string().trim().min(1).max(128).optional()}).strict(),

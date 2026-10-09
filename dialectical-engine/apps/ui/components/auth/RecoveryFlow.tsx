@@ -13,7 +13,6 @@ import resetRo from '@/messages/ro/password-reset.json';
 import { AuthShell } from '../AuthShell';
 import { OnboardingEvidence } from './OnboardingEvidence';
 import { SecurityEnrollment } from './SecurityEnrollment';
-import { EphemeralCodes } from './EphemeralCodes';
 import { clearStoredSupportConversation } from '../support/conversation';
 export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthenticated = () => window.location.assign(safeReturnPath(new URLSearchParams(window.location.search).get('next'))) }: {
     catalog: MessageCatalog;
@@ -27,7 +26,6 @@ export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthe
     const [email, setEmail] = useState('');
     const [code, setCode] = useState('');
     const [proof, setProof] = useState<ConsumerRecoveryProofResponse | null>(null);
-    const [backup, setBackup] = useState<string | null>(null);
     const [ready, setReady] = useState(false);
     const [expired, setExpired] = useState(false);
     const [sent, setSent] = useState(false);
@@ -98,9 +96,8 @@ export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthe
             const result = await client.recoveryProve({ token, recovery_code: savedCode, method: 'passkey' });
             setToken('');
             setCode('');
+            // Since 2026-10-09 a used code is never refilled: the proof carries no replacement code (the contract refuses one).
             setProof(result);
-            // Since 2026-10-09 a used code is never refilled, so the API sends no replacement; an older API still might.
-            setBackup(result.replacement_recovery_code ?? null);
             clearStoredSupportConversation();
             window.dispatchEvent(new Event('debateai:staff-session-ended'));
         }
@@ -113,11 +110,10 @@ export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthe
         }
     }
     return <AuthShell eyebrow={t(catalog, "auth.login.recoveryAccess")} title={t(catalog, "auth.recovery.title")} description={t(catalog, "auth.recovery.description")} footer={!proof&&!token?<p><a href="/reset-password">{t(locale==='ro'?resetRo:resetEn,"request.title")}</a> · <KnownPasswordRecoveryLink/></p>:null}>
- {error ? <div className="authAlert" role="alert">{error}</div> : null}{backup ? <EphemeralCodes codes={[backup]} catalog={catalog}/> : null}
+ {error ? <div className="authAlert" role="alert">{error}</div> : null}
  {expired ? <div className="authAlert" role="alert">{t(catalog, "auth.recovery.restart")}</div> : null}
  {proof ? ready ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'recovery', token: proof.recovery_capability, expiresAt: proof.expires_at, availableMethods: proof.available_methods, totpUnavailableReason: proof.totp_unavailable_reason }} onAuthenticated={() => {
                 setProof(null);
-                setBackup(null);
                 onAuthenticated();
             }} onExpired={() => {
                 setProof(null);

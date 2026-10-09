@@ -694,8 +694,8 @@ const StepUpGrantResponseSchema = z.discriminatedUnion("action", [
     expires_at: z.iso.datetime()
   }).strict()
 ]);
+// Design note 2026-10-09 item 3: a used recovery code is never refilled; the strict shape refuses a replacement code.
 export const StepUpResponseSchema = z.object({
-  replacement_recovery_code:z.string().min(1).max(1024).optional(),
   status: z.literal("step_up_complete"),
   csrf_token: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   step_up_grant: StepUpGrantResponseSchema.optional()
