@@ -37,8 +37,22 @@ function hbaLines(text: string): string[] {
   return configLines(text).map((line) => line.replace(/\s+/g, " "));
 }
 
-/** Migration 0109's password-less readiness writer: root, peer, one ident map (collapsed whitespace). */
-const READINESS_PEER_LINE = "local debateai debateai_staff_readiness_writer peer map=readiness";
+/** The auth DB batch step's password-less staff readiness writer. Preview-only peer login; production names it nowhere. */
+const READINESS_WRITER = "debateai_staff_readiness_writer";
+
+/** hardening.sql with every `DO $$ ... $$;` block cut out: what runs unconditionally on any database. */
+function unguardedSql(sql: string): string {
+  return sqlStatements(sql).replace(/DO\s+\$\$[\s\S]*?\$\$;/g, "");
+}
+
+/** Each `DO $$ ... $$;` block of hardening.sql: the role its existence guard names, and what it runs when that role exists. */
+function guardedBlocks(sql: string): Array<{ role: string | null; body: string; block: string }> {
+  return [...sqlStatements(sql).matchAll(/DO\s+\$\$([\s\S]*?)\$\$;/g)].map((match) => {
+    const block = match[1] ?? "";
+    const guard = /^\s*BEGIN\s+IF\s+EXISTS\s*\(\s*SELECT\s+1\s+FROM\s+pg_catalog\.pg_roles\s+WHERE\s+rolname\s*=\s*'([a-z_]+)'\s*\)\s+THEN\s+([\s\S]*?)\s+END\s+IF;\s*END\s*$/i.exec(block);
+    return { role: guard?.[1] ?? null, body: guard?.[2] ?? "", block };
+  });
+}
 
 function publishedPorts(compose: string): string[] {
   const ports: string[] = [];
@@ -115,8 +129,6 @@ describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => 
     const lines = hbaLines(read("deploy/postgres/pg_hba.conf.template"));
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) {
-      // The one option anywhere is the readiness writer's ident map (pinned in the next test).
-      if (line === READINESS_PEER_LINE) continue;
       expect(line, line).toMatch(/^(local|hostssl|host)\s+\S+\s+\S+(\s+\S+)?\s+(scram-sha-256|peer|reject)$/);
       expect(line, line).not.toMatch(/\b(trust|md5|password|ident|hostnossl)\b/);
     }
@@ -128,7 +140,7 @@ describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => 
       expect(socketLine, `${principal.roleName} needs a local scram-sha-256 line on ${principal.database}`).toBeDefined();
     }
     for (const line of local) {
-      if (!/\s+postgres\s+peer$/.test(line) && line !== READINESS_PEER_LINE) expect(line, line).toMatch(/scram-sha-256$/);
+      if (!/\s+postgres\s+peer$/.test(line)) expect(line, line).toMatch(/scram-sha-256$/);
     }
     for (const line of hostssl) {
       expect(line, line).toMatch(/\s(127\.0\.0\.1\/32|::1\/128)\s+scram-sha-256$/);
@@ -145,23 +157,28 @@ describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => 
   });
 
   /**
-   * Migration 0109: debateai_staff_readiness_writer has PASSWORD NULL and may only publish and
-   * revoke the staff readiness row. Root reaches it by peer on the socket, through one ident map:
-   * no other OS user, no other principal, no password line, nothing earlier that could match it.
+   * The staff readiness writer (the auth DB batch step) has PASSWORD NULL and is reached by peer
+   * authentication only on the PREVIEW, from one dedicated no-login OS user, through lines that
+   * live only in deploy/preview-lifecycle/v1/README.md. Production has no team-unlock helper, so
+   * its templates admit that login nowhere and map no OS user to any role: a peer map from root
+   * would let any process the kernel reports as uid 0 that reaches the socket (a root container
+   * through the compose bind mount, say) log in as it.
    */
-  it("pg_hba + pg_ident: the staff readiness writer is admitted only by peer on the socket, mapped from root (0109)", () => {
+  it("pg_hba + pg_ident (production): no line admits the staff readiness writer, no OS user is mapped to any role", () => {
     const lines = hbaLines(read("deploy/postgres/pg_hba.conf.template"));
-    expect(lines.filter((line) => line.includes("debateai_staff_readiness_writer"))).toEqual([READINESS_PEER_LINE]);
-    expect(lines.filter((line) => /\speer(\s|$)/.test(line))).toEqual(["local all postgres peer", READINESS_PEER_LINE]);
-    expect(lines.filter((line) => line.includes("map="))).toEqual([READINESS_PEER_LINE]);
-    const at = lines.indexOf(READINESS_PEER_LINE);
-    const broader = lines.slice(0, at).filter((line) => /^local\s+(all|debateai)\s+all\s/.test(line));
-    expect(broader).toEqual([]);
-    expect(hbaLines(read("deploy/postgres/pg_ident.conf.template"))).toEqual(["readiness root debateai_staff_readiness_writer"]);
-    // The VPS bring-up installs the ident map next to pg_hba, or the peer line can never match.
+    expect(lines.filter((line) => line.includes(READINESS_WRITER))).toEqual([]);
+    expect(lines.filter((line) => /\speer(\s|$)/.test(line))).toEqual(["local all postgres peer"]);
+    expect(lines.filter((line) => line.includes("map="))).toEqual([]);
+    expect(lines.filter((line) => /^local\s+\S+\s+all\s/.test(line))).toEqual([]);
+    expect(hbaLines(read("deploy/postgres/pg_ident.conf.template"))).toEqual([]);
+    for (const file of ["deploy/postgres/pg_hba.conf.template", "deploy/postgres/pg_ident.conf.template"]) {
+      expect(read(file), file).toContain("deploy/preview-lifecycle/v1/README.md");
+    }
+    // The bring-up still installs the (map-less) ident file, so no stale map survives on the VPS.
     const readme = read("deploy/vps/README.md");
     expect(readme).toContain("install -m 0640 -o postgres -g postgres deploy/postgres/pg_ident.conf.template \\\n  /etc/postgresql/18/main/pg_ident.conf");
     expect(readme.indexOf("deploy/postgres/pg_ident.conf.template")).toBeLessThan(readme.indexOf("systemctl restart postgresql"));
+    expect(readme).not.toMatch(/maps only root|peer map=readiness/);
   });
 
   it("postgresql.hardening.conf: loopback listen, TLS 1.3, SCRAM, connection logs, no statement text (L5-F11)", () => {
@@ -203,6 +220,7 @@ describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => 
       "ALTER DATABASE debateai SET search_path = pg_catalog;",
       "ALTER DATABASE debateai SET statement_timeout = '30s';",
       "REVOKE CONNECT ON DATABASE debateai FROM PUBLIC;",
+      "REVOKE TEMPORARY ON DATABASE debateai FROM PUBLIC;",
       "REVOKE CONNECT ON DATABASE hatchet FROM PUBLIC;",
       "GRANT CONNECT ON DATABASE hatchet TO debateai_prod_hatchet;"
     ]) expect(sql, needle).toContain(needle);
@@ -236,8 +254,9 @@ describe("VPS baseline: hardening.sql re-opens CONNECT for every manifest role (
     return grantees;
   }
 
-  it("grants CONNECT on debateai to every capability role and every migration-minted principal", () => {
-    const grantees = connectGrantees(read("deploy/postgres/hardening.sql"));
+  it("grants CONNECT on debateai to every capability role and every migration-minted principal, unconditionally", () => {
+    // Unguarded: these roles predate the auth DB batch step, so a missing one must stop the file, not be skipped.
+    const grantees = connectGrantees(unguardedSql(read("deploy/postgres/hardening.sql")));
     const migrationMinted = new Set(fullManifest.principalProvisioning
       .filter(({ state }) => state === "MIGRATION_PROVISIONED_UNMANAGED_CREDENTIAL")
       .map(({ principalId }) => principalId));
@@ -252,8 +271,26 @@ describe("VPS baseline: hardening.sql re-opens CONNECT for every manifest role (
     expect(expected.filter((role) => !grantees.has(role))).toEqual([]);
   });
 
-  it("restates CONNECT for the staff readiness writer that migration 0109 mints with its own LOGIN", () => {
-    expect(connectGrantees(read("deploy/postgres/hardening.sql")).has("debateai_staff_readiness_writer")).toBe(true);
+  /**
+   * hardening.sql is re-run on databases that predate the auth DB batch step. Its role does not
+   * exist there, and an unguarded GRANT would stop the file (ON_ERROR_STOP) before the database
+   * defaults and `REVOKE CREATE ON SCHEMA public`. So that grant runs only inside a DO block whose
+   * guard names exactly the role it grants to, and nothing outside such a block names the role.
+   */
+  it("restates CONNECT for the staff readiness writer only behind an existence check, so older databases run the whole file", () => {
+    const sql = read("deploy/postgres/hardening.sql");
+    expect(connectGrantees(sql).has(READINESS_WRITER)).toBe(true);
+    expect(unguardedSql(sql)).not.toContain(READINESS_WRITER);
+    const blocks = guardedBlocks(sql);
+    expect(blocks.map(({ role }) => role)).toEqual([READINESS_WRITER]);
+    for (const { role, body } of blocks) {
+      expect(body.replace(/\s+/g, " ").trim()).toBe(`GRANT CONNECT ON DATABASE debateai TO ${role};`);
+    }
+    // The defaults and the schema lock come after it, and the file still reaches them.
+    const at = sql.indexOf("DO $$");
+    for (const needle of ["ALTER DATABASE debateai SET search_path = pg_catalog;", "REVOKE CREATE ON SCHEMA public FROM PUBLIC;"]) {
+      expect(sql.indexOf(needle), needle).toBeGreaterThan(at);
+    }
   });
 });
 
@@ -300,6 +337,10 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
     expect(compose).toContain("SERVER_TLS_CERT_FILE:");
     expect(compose).toContain("SERVER_TLS_KEY_FILE:");
     expect(compose).toContain(":/config");
+    // The socket bind mount: PostgreSQL's peer check sees the container process's host uid, so the
+    // comment may not claim the uid is irrelevant; it names which uids peer admits.
+    expect(compose).not.toMatch(/uid is irrelevant/);
+    expect(compose).toMatch(/host uid/);
     const pins = read("deploy/IMAGE-PINS.md");
     const digest = /hatchet-lite:latest@(sha256:[0-9a-f]{64})/.exec(pins)?.[1];
     expect(digest).toBeDefined();

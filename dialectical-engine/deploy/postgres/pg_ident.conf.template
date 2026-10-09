@@ -1,9 +1,13 @@
 # deploy/postgres/pg_ident.conf.template
 # Rendered verbatim to /etc/postgresql/18/main/pg_ident.conf on the VPS, next to pg_hba.conf.
-# One map, used by exactly one pg_hba line (`local debateai debateai_staff_readiness_writer peer
-# map=readiness`): the OS user root may log in as the password-less staff readiness writer of
-# migration 0109, and nothing else. No other OS user, no other database role. No trailing
-# comments: tests/architecture/vps-deployment-baseline.test.ts parses every non-comment line.
+# PRODUCTION MAPS NO OS USER TO ANY DATABASE ROLE. This file is installed so that no map from
+# an earlier copy survives; it must stay without a single active line.
+#
+# WARNING: the `readiness` map for debateai_staff_readiness_writer (the auth DB batch step) is
+# PREVIEW-ONLY. The preview writes it itself, mapping the dedicated no-login OS user
+# debateai-readiness (never root), exactly as deploy/preview-lifecycle/v1/README.md step 7 says.
+# Do not copy it here: production has no team-unlock helper, and a map from root would let any
+# process the kernel reports as uid 0 that reaches the socket log in as that role.
+# tests/architecture/vps-deployment-baseline.test.ts fails on any non-comment line.
 #
 # MAPNAME     SYSTEM-USERNAME   PG-USERNAME
-readiness     root              debateai_staff_readiness_writer

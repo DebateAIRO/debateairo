@@ -143,9 +143,10 @@ const externalRecoveryRoles = [
   "debateai_password_reset_owner", "debateai_password_reset_runtime"
 ] as const;
 
-// 0109 (design note 2026-10-09 item 4): the password-less staff readiness writer. A LOGIN admitted only by peer
-// authentication on the local socket (deploy/postgres/pg_hba.conf.template + pg_ident.conf.template), so it is not
-// a SCRAM principal of the P3-01 provisioner manifest.
+// The auth DB batch step (design note 2026-10-09 item 4): the password-less staff readiness writer. A LOGIN admitted
+// only on the private preview, by peer authentication on its local socket from the dedicated no-login OS user
+// debateai-readiness (deploy/preview-lifecycle/v1/README.md step 7); production's pg_hba names it nowhere. So it is
+// not a SCRAM principal of the P3-01 provisioner manifest.
 const peerReadinessRoles = ["debateai_staff_readiness_writer"] as const;
 
 // V-29 removed the one exception (the observation agent's pg_monitor login): no
