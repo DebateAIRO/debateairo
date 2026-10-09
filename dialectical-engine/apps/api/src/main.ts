@@ -1335,6 +1335,9 @@ const api = buildApi({
   socialAuth,
   socialStepUp:new SocialStepUpService(socialRepository,socialProviders,sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy}),
   turnstile: new UnixTurnstileVerifier({ publicAppUrl: environment.PUBLIC_APP_URL, ...(environment.TURNSTILE_SOCKET_PATH === undefined ? {} : { socketPath: environment.TURNSTILE_SOCKET_PATH }) }),
+  // Auth API hardening 2026-10-09: sign-in and recovery-start proofs, each off until its UI widget ships.
+  turnstileLoginRequired: environment.TURNSTILE_LOGIN_REQUIRED === "true",
+  turnstileRecoveryRequired: environment.TURNSTILE_RECOVERY_REQUIRED === "true",
   recovery,
   ...(passwordReset?{passwordReset}:{}),
   ...(backupEmail?{backupEmail}:{}),

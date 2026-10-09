@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { request } from "node:http";
 import { deploymentHostname, siteverifyOutcome, validProof, validSocketPath } from "../../../deploy/turnstile/siteverify-response.mjs";
 
-export type TurnstileAction = "signup" | "resend-verification";
+/** Sign-up and resend; sign-in and the three public recovery starts since 2026-10-09 (each behind its own setting). */
+export type TurnstileAction = "signup" | "resend-verification" | "login" | "password-reset" | "mfa-recovery" | "account-recovery";
 export type TurnstileProof = Readonly<{ token: string; action: TurnstileAction }>;
 export type TurnstileOutcome = "passed" | "rejected" | "unavailable";
 export interface TurnstileVerifier { verify(input: TurnstileProof): Promise<TurnstileOutcome>; }

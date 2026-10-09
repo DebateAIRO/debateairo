@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ContractHttpError } from "./http-error.js";
+import { TurnstileTokenSchema } from "./auth-shared.js";
 
 const bearer = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 export const PasswordResetStateSchema = z.object({
@@ -9,7 +10,8 @@ export const PasswordResetStateSchema = z.object({
   password_max_length: z.number().int().positive().nullable().optional()
 }).strict();
 export const PasswordResetExchangeSchema = PasswordResetStateSchema.extend({ status: z.literal("password_required") });
-export const PasswordResetStartRequestSchema = z.object({ email: z.string().min(1).max(320) }).strict();
+/** `turnstile_token` (action "password-reset") is required by the server only while TURNSTILE_RECOVERY_REQUIRED is on. */
+export const PasswordResetStartRequestSchema = z.object({ email: z.string().min(1).max(320), turnstile_token: TurnstileTokenSchema.optional() }).strict();
 export const PasswordResetStartSchema = z.object({ message: z.literal("If this account can be recovered, instructions will arrive through an eligible channel.") }).strict();
 export const PasswordResetLinkRequestSchema = z.object({ token: bearer }).strict();
 export const PasswordResetCompleteRequestSchema = z.object({ password: z.string().min(1).max(1024), code: z.string().regex(/^[0-9]{6}$/) }).strict();
@@ -64,7 +66,7 @@ export function createPasswordResetClient(fetcher: typeof fetch = fetch, base = 
     return parsed.data;
   }
   return {
-    start: (email: string) => request("start", PasswordResetStartSchema, { email }, false, 202),
+    start: (email: string, turnstileToken?: string) => request("start", PasswordResetStartSchema, { email, ...(turnstileToken === undefined ? {} : { turnstile_token: turnstileToken }) }, false, 202),
     exchange: (token: string) => request("exchange", PasswordResetExchangeSchema, { token }, false),
     status: () => request("status", PasswordResetStateSchema),
     complete: (password: string, code: string) => request("complete", PasswordResetCompletedSchema, { password, code }),

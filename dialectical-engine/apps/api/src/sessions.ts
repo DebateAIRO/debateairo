@@ -97,7 +97,11 @@ export interface SessionApplication {
   authenticateErasureStatus?(sessionToken:string,source:AuthSourceContext):
     Promise<AuthenticatedSession|null>;
   verifyCsrf(session: AuthenticatedSession, suppliedToken: string): boolean;
-  beginLogin(input: Readonly<{ email: string; password: string }>, source: AuthSourceContext): Promise<Readonly<{
+  /**
+   * `proof` (TURNSTILE_LOGIN_REQUIRED) runs after the per-source budget and before the
+   * per-account budget and the password check; whatever it throws is the answer.
+   */
+  beginLogin(input: Readonly<{ email: string; password: string }>, source: AuthSourceContext, proof?: () => Promise<void>): Promise<Readonly<{
     status: "mfa_required";
     challengeToken: string;
     availableMethods?: readonly ("passkey"|"totp"|"recovery_code")[];
@@ -347,8 +351,14 @@ export class SessionService implements SessionApplication {
     return rateLimitSourceScope((ip === "" ? "unknown" : ip).slice(0, 64));
   }
 
-  private async requireRateBudget(key: string, source: AuthSourceContext, now: Date, family: SessionRateFamily): Promise<void> {
-    const decision = this.limiter.decide(key, this.sourceIp(source), now, family);
+  private async requireRateBudget(key: string, source: AuthSourceContext, now: Date, family: SessionRateFamily,
+    proof?: () => Promise<void>): Promise<void> {
+    // Source first (a spray across many accounts meets one ceiling), then the proof, then the
+    // account: a caller without a proof never spends the account's budget, so bots cannot use
+    // the temporary lock to keep its owner out.
+    const sourceDecision = this.limiter.decideSource(this.sourceIp(source), now);
+    if (sourceDecision.allowed && proof !== undefined) await proof();
+    const decision = sourceDecision.allowed ? this.limiter.decideAccount(key, now, family) : sourceDecision;
     if (decision.allowed) return;
     if (decision.auditRefusal) {
       await this.dependencies.repository.recordLoginFailure({
@@ -410,7 +420,8 @@ export class SessionService implements SessionApplication {
 
   async beginLogin(
     input: Readonly<{ email: string; password: string }>,
-    source: AuthSourceContext
+    source: AuthSourceContext,
+    proof?: () => Promise<void>
   ): Promise<Readonly<{ status: "mfa_required"; challengeToken: string; availableMethods:readonly ("passkey"|"totp"|"recovery_code")[] }>> {
     const now = this.now();
     let normalizedEmail = "";
@@ -420,7 +431,7 @@ export class SessionService implements SessionApplication {
       // Keep the same one-Argon verification shape with the process dummy.
     }
     const rateKey = this.challengeRateKey(normalizedEmail || "invalid-email");
-    await this.requireRateBudget(rateKey, source, now, "password-login");
+    await this.requireRateBudget(rateKey, source, now, "password-login", proof);
     try {
       const identity = normalizedEmail === "" ? null : await this.dependencies.repository.findLoginIdentity(
         createEmailBlindIndex(this.dependencies.blindIndexKey, normalizedEmail)
