@@ -97,7 +97,7 @@ describe("registration region API", () => {
     expect(refused).toEqual(["TN"]);
   });
   it("C11 refuses exactly the closed drawn countries", () => {
-    const closed = "DZ EG ET GH KE MA NG RW SN ZA TN UG CN IN ID MY PK PH TH VN RS UA GB BH JO KW LB OM QA SA TR AE CR MX PA AR BR CL CO EC PE UY FJ".split(" ");
+    const closed = "DZ EG ET GH KE MA NG RW SN ZA TN UG CN IN ID MY PK PH TH VN RS UA GB BH IL JO KW LB OM QA SA TR AE CR MX PA AR BR CL CO EC PE UY FJ".split(" ");
     const refused = REGION_COUNTRY_CODES.filter((code) =>
       gate().gate.declaredSignupRefusal({ country: code, usState: code === "US" ? "TX" : null }) !== null);
     expect(refused.sort()).toEqual(closed.sort());
