@@ -389,7 +389,10 @@ unit files before installing; nothing else names them.
    systemctl mask debateai-preview-runner.service
    ```
 
-9. **Check, then switch on.**
+9. **Check, then switch on.** First, the spending gate: the target `Wants=` the unit name
+   `debateai-preview-provider-budget.service`, so the v2 unit must already have replaced the v1
+   file of that name (`deploy/preview-gate/v2/README.md`, install steps 0-9). Otherwise every
+   boot starts the old v1 gate.
 
    ```sh
    systemctl daemon-reload

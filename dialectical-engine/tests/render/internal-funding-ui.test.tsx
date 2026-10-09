@@ -22,7 +22,10 @@ describe("enabled funding renders through actual reviewed UI composition",()=>{
    return Response.json({events:[],next_cursor:null,order:"RECORDED_AT_ID_ASC"});}) as typeof fetch});
   await act(async()=>root.render(<StaffAccessPanel client={client}/>));
   const button=[...host.querySelectorAll("button")].find(b=>b.textContent?.includes("Verify security key for team access"));expect(button).toBeDefined();
-  await act(async()=>button!.click());expect(host.querySelector('[data-staff-mutation="invite"]')).not.toBeNull();expect(paths.some(p=>p.includes("team?"))).toBe(true);
+  await act(async()=>button!.click());
+  const invite=[...host.querySelectorAll("button")].find(b=>b.textContent?.trim()==="Invite team member");expect(invite).toBeDefined();
+  expect(host.querySelector('[data-staff-mutation="invite"]')).toBeNull();
+  await act(async()=>invite!.click());expect(host.querySelector('[data-staff-mutation="invite"]')).not.toBeNull();expect(paths.some(p=>p.includes("team?"))).toBe(true);
   expect(paths.some(p=>p.includes("internal-allowances"))).toBe(false);
   await act(async()=>window.dispatchEvent(new Event("debateai:staff-session-ended")));expect(host.querySelector('[data-staff-mutation]')).toBeNull();
  });

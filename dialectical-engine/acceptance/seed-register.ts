@@ -45,6 +45,13 @@ import {
  * `migrations/0055_register_support_publication.sql:1288`): no rung is left.
  * The next sealed-prompt change needs the ceremony's seeding path changed,
  * not this number.
+ *
+ * 2026-10-09: serve.synthesizer.v2 moved `composerContractHash` (v1's
+ * d96e7cc9…c866 stays history) WITHOUT changing this path, so a standing
+ * ceremony database that already holds version 4 refuses this seeder with
+ * historical replay drift — as it already did for `serveContractHash`, a
+ * whole-module digest that has moved since S01. A fresh ceremony database
+ * seeds normally. Re-opening a standing one is the open ceremony-path item.
  */
 export const ACCEPTANCE_REGISTER_VERSION = 4 as const;
 /**

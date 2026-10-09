@@ -9,6 +9,12 @@
 // NRestarts. An unreadable state still emails: an alert is never lost.
 // At most one email per unit per 30 minutes. If mail itself fails, the reason goes to the
 // journal and the alert exits quietly (an alert must never break anything else).
+//
+// Notices (debateai-preview-notice@<kind>-<code>.service, `--notice <kind>-<code>`): the same
+// owner-only mail path for two fixed spending-gate events, started by the gate's watchers:
+// "gate-halted-<reason>" (the gate stopped taking paid calls) and "gate-addresses-mismatch"
+// (DeepInfra's addresses no longer match the gate's allow-list). Each carries the one command
+// that fixes it. Fixed wording, no amounts; at most one per notice name per 30 minutes.
 import { constants } from 'node:fs';
 import { link, lstat, open, unlink } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
@@ -20,6 +26,31 @@ import { LAYOUT, atomicWrite, ensureDirectory, logLine, runBounded, sha256 } fro
 export const ALERT_WINDOW_MS = 30 * 60 * 1000;
 const UNIT = /^[A-Za-z0-9][A-Za-z0-9:_.@\\-]{0,200}\.(service|socket|timer|target|mount|path)$/;
 const ADDRESS = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,24}$/;
+
+const NOTICE = /^(gate-halted|gate-addresses)-([a-z0-9_]{1,64})$/;
+const GATE_FOLDER = '/opt/debateai-v3-preview/operator/team-budget-v2';
+const GATE_UNIT = 'debateai-preview-provider-budget.service';
+const ADDRESS_UNIT = 'debateai-preview-gate-addresses.service';
+/** The fixed wording and the one fixing command of each notice kind. */
+const NOTICES = Object.freeze({
+  'gate-halted': code => ({
+    subject: `Preview: spending gate stopped: ${code}`,
+    lead: `The preview spending gate stopped taking paid model calls. Reason code: ${code}. Debates on the preview fail until it is re-opened. Check the reason first (deploy/preview-gate/v2/README.md, "Re-open after a halt"; status shows today's spend and every halt). Then re-open it with the one command below.`,
+    command: `/usr/bin/python3 -I ${GATE_FOLDER}/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-team-authority-v2 --go /etc/debateai-v3-preview/provider-team-go-v2.json`,
+    lookAt: GATE_UNIT, journal: null
+  }),
+  'gate-addresses': code => ({
+    subject: `Preview: spending gate address list needs an update (${code})`,
+    lead: 'The hourly address check of the spending gate failed. Usually the addresses of api.deepinfra.com no longer match the gate\'s allow-list, and paid calls can fail until it is updated; the journal lines below say which case it is (DEEPINFRA_ADDRESSES_CHANGED, or another error such as an unreadable list). This email blanks addresses; to see the new ones, run the journalctl line under "What to look at" and check that they are DeepInfra\'s. Then run the one command below. It adds today\'s DNS answer to the list and restarts the gate.',
+    command: `/usr/bin/python3 -I ${GATE_FOLDER}/deepinfra_addresses.py update --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf && systemctl restart debateai-preview-provider-budget`,
+    lookAt: ADDRESS_UNIT, journal: ADDRESS_UNIT
+  })
+});
+/** `<kind>-<code>` -> { kind, code, unit } for the two notice kinds; anything else null. */
+export function parseNotice(text) {
+  const match = typeof text === 'string' ? NOTICE.exec(text) : null;
+  return match ? { kind: match[1], code: match[2], unit: `debateai-preview-notice@${text}.service` } : null;
+}
 
 class AlertRefusal extends Error { constructor(code, fields) { super(code); this.code = code; if (fields) this.fields = fields; } }
 const refuse = (code, fields) => { throw new AlertRefusal(code, fields); };
@@ -163,6 +194,7 @@ export function classifyFailure(state) {
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
 function wording(unit, failure) {
+  if (failure.kind === 'notice') return { subject: failure.notice.subject, lead: failure.notice.lead };
   if (failure.kind === 'test') return {
     subject: 'Preview: test alert (nothing failed)',
     lead: `This is a test of the preview failure email, sent by hand with alert.mjs --test (unit name ${unit} is a placeholder). Nothing failed.`
@@ -187,12 +219,15 @@ export function composeAlert({ unit, at, lines, from, to, failure = { kind: 'unk
   const { subject, lead } = wording(unit, failure);
   const head = [`From: ${from}`, `To: ${to}`, `Subject: ${subject}`, `Date: ${at.toUTCString()}`, 'MIME-Version: 1.0',
     'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: 8bit', 'Auto-Submitted: auto-generated'];
+  const notice = failure.kind === 'notice' ? failure.notice : null;
+  const look = notice ? notice.lookAt : unit;
   const body = [
     lead, '',
+    ...(notice ? ['The one command (as root on the server):', `  ${notice.command}`, ''] : []),
     `Unit: ${unit}`, `Time (UTC): ${at.toISOString().slice(0, 19).replace('T', ' ')} UTC`, `Time (Bucharest): ${bucharest(at)}`, '',
-    'What to look at on the server:', `  systemctl status ${unit}`, `  journalctl -u ${unit} -n 100`, '',
-    `Last ${lines.length} journal lines (anything secret-looking replaced):`, ...lines.map(line => `  ${line}`), '',
-    'You get at most one email per unit every 30 minutes.'
+    'What to look at on the server:', `  systemctl status ${look}`, `  journalctl -u ${look} -n 100`, '',
+    ...(notice && lines.length === 0 ? [] : [`Last ${lines.length} journal lines (anything secret-looking replaced):`, ...lines.map(line => `  ${line}`), '']),
+    notice ? 'You get at most one email per notice every 30 minutes.' : 'You get at most one email per unit every 30 minutes.'
   ];
   return Buffer.from(`${head.join('\r\n')}\r\n\r\n${body.join('\r\n')}\r\n`, 'utf8');
 }
@@ -252,21 +287,27 @@ export async function readJournalTail(unit, { layout = LAYOUT, run = runBounded 
 }
 
 export const TEST_UNIT = 'debateai-preview-alert-test.service';
-/** `--unit <unit>` (systemd), `--test` (README test send) or `--install-owner-list` (README step 2); anything else is null. */
+/** `--unit <unit>` (systemd), `--notice <kind>-<code>` (gate watchers), `--test` (README test send) or `--install-owner-list` (README step 2); anything else is null. */
 export function parseAlertArgs(argv) {
   if (argv.length === 1 && argv[0] === '--test') return { unit: TEST_UNIT, test: true };
   if (argv.length === 1 && argv[0] === '--install-owner-list') return { installOwnerList: true };
+  if (argv.length === 2 && argv[0] === '--notice') {
+    const notice = parseNotice(argv[1]);
+    return notice ? { unit: notice.unit, test: false, notice } : null;
+  }
   if (argv.length === 2 && argv[0] === '--unit' && typeof argv[1] === 'string') return { unit: argv[1], test: false };
   return null;
 }
 
-export async function runAlert({ unit, layout = LAYOUT, deps = {}, test = false }) {
+export async function runAlert({ unit, layout = LAYOUT, deps = {}, test = false, notice = null }) {
   const log = deps.log ?? (event => logLine(process.stdout, event));
   const now = deps.now ?? Date.now;
   const done = event => { log(event); return event; };
   try {
     if (typeof unit !== 'string' || !UNIT.test(unit)) refuse('UNIT_REFUSED');
-    const failure = test ? { kind: 'test', send: true, restarts: null }
+    if (notice !== null && (parseNotice(`${notice.kind}-${notice.code}`)?.unit !== unit)) refuse('NOTICE_REFUSED');
+    const failure = notice !== null ? { kind: 'notice', send: true, restarts: null, notice: NOTICES[notice.kind](notice.code) }
+      : test ? { kind: 'test', send: true, restarts: null }
       : classifyFailure(await Promise.resolve().then(() => (deps.readUnitState ?? (name => readUnitState(name, { layout })))(unit)).catch(() => null));
     if (!failure.send) return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SKIPPED', unit, state: failure.kind, restarts: failure.restarts });
     const at = now();
@@ -275,7 +316,10 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {}, test = false 
     const owners = await loadOwnerDigests({ layout });
     const to = await readRecipientAddress(layout);
     if (!owners.has(sha256(to))) refuse('RECIPIENT_REFUSED');
-    const lines = (await (deps.readJournal ?? (name => readJournalTail(name, { layout })))(unit)).map(redactLine);
+    // A notice reads only its fixed source unit's journal (the address check), or none (a halt:
+    // the gate's own lines carry per-call amounts, which a notice never mails).
+    const journalUnit = failure.kind === 'notice' ? failure.notice.journal : unit;
+    const lines = journalUnit === null ? [] : (await (deps.readJournal ?? (name => readJournalTail(name, { layout })))(journalUnit)).map(redactLine);
     const message = composeAlert({ unit, at: new Date(at), lines, from: layout.mailFrom, to, failure });
     try { await (deps.sendmail ?? (bytes => submitMail(bytes, { layout })))(message); } catch (error) {
       // Its own event: "the email did not go out" must stand out from every refusal before it.
