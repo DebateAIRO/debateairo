@@ -22,6 +22,9 @@ UNIT = V2 / 'systemd/debateai-preview-provider-budget.service'
 DROPIN = V2 / 'systemd/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf'
 CHECK_UNIT = V2 / 'systemd/debateai-preview-gate-addresses.service'
 TIMER = V2 / 'systemd/debateai-preview-gate-addresses.timer'
+HALT_UNIT = V2 / 'systemd/debateai-preview-gate-halt-watch.service'
+HALT_TIMER = V2 / 'systemd/debateai-preview-gate-halt-watch.timer'
+LIFECYCLE = ROOT / 'deploy/preview-lifecycle/v1/systemd'
 GATE = ROOT / 'packages/providers/ops/preview_budget_authority.py'
 INSTALLED_DROPIN = '/etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf'
 OPERATOR = '/opt/debateai-v3-preview/operator/team-budget-v2/'
@@ -36,6 +39,7 @@ def load(path, name):
 
 
 addresses = load(V2 / 'deepinfra_addresses.py', 'deepinfra_addresses')
+gate_watch = load(V2 / 'gate_watch.py', 'gate_watch')
 
 
 def directives(path):
@@ -134,6 +138,161 @@ class AddressCheckTests(unittest.TestCase):
         self.assertEqual({str(a) for a in addresses.parse_dropin(out)}, set(MEASURED))
 
 
+class Completed:
+    def __init__(self, returncode=0, stdout=b''):
+        self.returncode, self.stdout = returncode, stdout
+
+
+class AddressWatchAndUpdateTests(unittest.TestCase):
+    def folder(self):
+        folder = Path(tempfile.mkdtemp(prefix='gate-watch-'))
+        self.addCleanup(shutil.rmtree, folder, True)
+        return folder
+
+    def run_main(self, argv, lookup, run=None):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = addresses.main(argv, lookup=lookup, **({'run': run} if run else {}))
+        return code, json.loads(out.getvalue().splitlines()[-1])
+
+    def test_watch_announces_each_change_once_and_again_after_it_is_resolved(self):
+        state = self.folder() / 'announced'
+        argv = ['watch', '--dropin', str(DROPIN), '--state', str(state)]
+        changed = fake_dns(*MEASURED, '38.101.151.31')
+        code, line = self.run_main(argv, changed)
+        self.assertEqual((code, line['error'], line['new'], line['announced']), (3, 'DEEPINFRA_ADDRESSES_CHANGED', ['38.101.151.31'], 'now'))
+        self.assertEqual(oct(os.stat(state).st_mode & 0o777), '0o600')
+        self.assertEqual(self.run_main(argv, changed)[0], 0)  # Same change: no second email.
+        self.assertEqual(self.run_main(argv, changed)[1]['announced'], 'before')
+        code, line = self.run_main(argv, fake_dns(*MEASURED, '38.101.151.32'))  # A different change.
+        self.assertEqual((code, line['announced']), (3, 'now'))
+        code, line = self.run_main(argv, fake_dns(*MEASURED))
+        self.assertEqual((code, line['status']), (0, 'ok'))
+        self.assertFalse(state.exists())  # In step again: the next change is announced.
+        self.assertEqual(self.run_main(argv, changed)[0], 3)
+
+    def test_watch_does_not_announce_a_temporary_dns_failure_but_does_a_broken_list(self):
+        state = self.folder() / 'announced'
+        self.assertEqual(self.run_main(['watch', '--dropin', str(DROPIN), '--state', str(state)], broken_dns),
+                         (0, {'status': 'dns_unavailable', 'announced': False}))
+        code, line = self.run_main(['watch', '--dropin', '/nonexistent/x.conf', '--state', str(state)], fake_dns(*MEASURED))
+        self.assertEqual((code, line['error']), (3, 'DROPIN_UNREADABLE'))
+
+    def test_update_writes_the_list_atomically_then_reloads_systemd(self):
+        dropin = self.folder() / '50-deepinfra-addresses.conf'
+        dropin.write_text(DROPIN.read_text())
+        calls = []
+
+        def run(argv, **kwargs):
+            calls.append((argv, kwargs['env']))
+            return Completed()
+        old_umask = os.umask(0o077)
+        try:
+            code, line = self.run_main(['update', '--dropin', str(dropin)], fake_dns(*MEASURED[1:], '38.101.151.31'), run)
+        finally:
+            os.umask(old_umask)
+        self.assertEqual((code, line['added'], line['removed']), (0, ['38.101.151.31'], ['38.101.151.13']))
+        self.assertEqual(dropin.read_text(), addresses.render(addresses.resolve(fake_dns(*MEASURED[1:], '38.101.151.31'))))
+        self.assertEqual(oct(os.stat(dropin).st_mode & 0o777), '0o644')
+        self.assertEqual(calls, [(['/usr/bin/systemctl', 'daemon-reload'], {})])
+        self.assertEqual(sorted(p.name for p in dropin.parent.iterdir()), [dropin.name])
+
+    def test_update_refuses_a_non_public_dns_answer_and_writes_nothing(self):
+        dropin = self.folder() / '50-deepinfra-addresses.conf'
+        dropin.write_text(DROPIN.read_text())
+        code, line = self.run_main(['update', '--dropin', str(dropin)], fake_dns('10.0.0.1'),
+                                   lambda *a, **k: self.fail('no reload'))
+        self.assertEqual((code, line['error']), (2, 'DROPIN_INVALID'))
+        self.assertEqual(dropin.read_text(), DROPIN.read_text())
+
+    def test_update_reports_a_failed_reload(self):
+        dropin = self.folder() / '50-deepinfra-addresses.conf'
+        code, line = self.run_main(['update', '--dropin', str(dropin)], fake_dns(*MEASURED), lambda *a, **k: Completed(1))
+        self.assertEqual((code, line['error']), (2, 'DAEMON_RELOAD_FAILED'))
+
+
+class HaltWatchTests(unittest.TestCase):
+    PRIVATE = '/var/lib/debateai-v3-preview/provider-team-authority-v2'
+
+    def setUp(self):
+        folder = Path(tempfile.mkdtemp(prefix='gate-halt-watch-'))
+        self.addCleanup(shutil.rmtree, folder, True)
+        self.state = folder / 'announced-halt.json'
+        self.calls = []
+
+    def runner(self, status, status_code=0, notice_code=0):
+        def run(argv, **kwargs):
+            self.calls.append(argv)
+            self.assertEqual(kwargs['env'], {})
+            if argv[0] == gate_watch.PYTHON:
+                return Completed(status_code, (json.dumps(status) + '\n').encode())
+            return Completed(notice_code)
+        return run
+
+    def watch(self, status, **kwargs):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = gate_watch.main(['--private', self.PRIVATE, '--state', str(self.state)], run=self.runner(status, **kwargs))
+        return code, json.loads(out.getvalue())
+
+    def notices(self):
+        return [argv for argv in self.calls if argv[0] == gate_watch.SYSTEMCTL]
+
+    def test_asks_the_gate_for_read_only_status_and_does_nothing_while_active(self):
+        self.assertEqual(self.watch({'state': 'active', 'reason': None, 'halted_at': None}), (0, {'status': 'ok', 'state': 'active'}))
+        self.assertEqual(self.calls, [[gate_watch.PYTHON, '-I', str(V2 / 'preview_budget_authority.py'), 'status', '--private', self.PRIVATE]])
+        self.assertFalse(self.state.exists())
+
+    def test_one_notice_per_halt_queued_without_waiting(self):
+        halted = {'state': 'halted', 'reason': 'provider_unreachable', 'halted_at': '2026-10-09T18:00:00+00:00',
+                  'today_spend_usd': '1.23'}
+        code, line = self.watch(halted)
+        self.assertEqual((code, line['announced'], line['reason']), (0, 'now', 'provider_unreachable'))
+        self.assertEqual(self.notices(), [[gate_watch.SYSTEMCTL, 'start', '--no-block',
+                                           'debateai-preview-notice@gate-halted-provider_unreachable.service']])
+        self.assertEqual(oct(os.stat(self.state).st_mode & 0o777), '0o600')
+        self.assertEqual(self.watch(halted)[1]['announced'], 'before')
+        self.watch({'state': 'active', 'reason': None, 'halted_at': halted['halted_at']})
+        self.watch(halted)  # Still the same halt (re-activation then the same moment is impossible).
+        self.assertEqual(len(self.notices()), 1)
+        self.watch({**halted, 'halted_at': '2026-10-09T19:00:00+00:00', 'reason': 'uncertain_charge'})
+        self.assertEqual(self.notices()[-1][-1], 'debateai-preview-notice@gate-halted-uncertain_charge.service')
+        self.assertEqual(len(self.notices()), 2)
+        self.assertNotIn('1.23', json.dumps(self.calls))
+
+    def test_an_odd_reason_never_reaches_a_unit_name(self):
+        self.watch({'state': 'halted', 'reason': 'x.service; rm -rf /', 'halted_at': 't'})
+        self.assertEqual(self.notices()[-1][-1], 'debateai-preview-notice@gate-halted-unknown.service')
+
+    def test_broken_status_or_notice_fails_the_watcher_so_the_alert_emails(self):
+        self.assertEqual(self.watch({'status': 'refused', 'error': 'STATE_MISSING'}, status_code=2),
+                         (1, {'status': 'refused', 'error': 'STATUS_UNAVAILABLE'}))
+        code, line = self.watch({'state': 'halted', 'reason': 'operator_stop', 'halted_at': 't'}, notice_code=1)
+        self.assertEqual((code, line['error']), (1, 'NOTICE_NOT_QUEUED'))
+        self.assertTrue(self.state.exists())  # Recorded before queuing: never two emails for one halt.
+
+    def test_halt_watch_unit_is_root_without_network_and_never_sees_the_key(self):
+        start = values(HALT_UNIT, 'ExecStart')[0].split()
+        self.assertEqual(start[:3], ['/usr/bin/python3', '-I', OPERATOR + 'gate_watch.py'])
+        options = dict(zip(start[3::2], start[4::2]))
+        self.assertEqual(options['--private'], self.PRIVATE)
+        self.assertTrue(options['--state'].startswith('/var/lib/debateai-preview-gate-watch/'))
+        self.assertEqual(values(HALT_UNIT, 'StateDirectory'), ['debateai-preview-gate-watch'])
+        self.assertIn('-' + self.PRIVATE + '/api-key.txt', ' '.join(values(HALT_UNIT, 'InaccessiblePaths')).split())
+        self.assertEqual((values(HALT_UNIT, 'RestrictAddressFamilies'), values(HALT_UNIT, 'IPAddressDeny'),
+                          values(HALT_UNIT, 'IPAddressAllow')), (['AF_UNIX'], ['any'], []))
+        self.assertEqual(values(HALT_UNIT, 'CapabilityBoundingSet'), [''])
+        self.assertEqual(values(HALT_UNIT, 'ReadWritePaths'), [])
+        self.assertEqual(values(HALT_UNIT, 'OnFailure'), ['debateai-preview-alert@%n.service'])
+
+    def test_notice_template_runs_the_alert_with_the_notice_name_only(self):
+        notice = LIFECYCLE / 'debateai-preview-notice@.service'
+        self.assertEqual(values(notice, 'ExecStart'), [
+            '/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node '
+            '/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --notice %i'])
+        self.assertEqual(values(notice, 'OnFailure'), [])
+
+
 class UnitFileTests(unittest.TestCase):
     def test_exec_lines_are_isolated_python_with_the_v2_command_line_and_fresh_socket(self):
         gate = load(GATE, 'gate_for_unit_test')  # Import only: no helper runs, no phase starts.
@@ -151,7 +310,12 @@ class UnitFileTests(unittest.TestCase):
         self.assertEqual(values(UNIT, 'ReadWritePaths'), [options['--private'] + ' /run/debateai-v3-preview'])
         check = values(UNIT, 'ExecStartPre')[0].split()
         self.assertEqual(check[2:], [OPERATOR + 'deepinfra_addresses.py', 'check', '--dropin', INSTALLED_DROPIN])
-        self.assertEqual(values(CHECK_UNIT, 'ExecStart'), [values(UNIT, 'ExecStartPre')[0]])
+        watch = values(CHECK_UNIT, 'ExecStart')[0].split()
+        self.assertEqual(watch[2:], [OPERATOR + 'deepinfra_addresses.py', 'watch', '--dropin', INSTALLED_DROPIN,
+                                     '--state', '/var/lib/debateai-preview-gate-addresses/announced'])
+        self.assertEqual(values(CHECK_UNIT, 'StateDirectory'), ['debateai-preview-gate-addresses'])
+        self.assertEqual(values(CHECK_UNIT, 'DynamicUser'), ['yes'])
+        self.assertEqual(values(CHECK_UNIT, 'OnFailure'), ['debateai-preview-notice@gate-addresses-mismatch.service'])
 
     def test_network_is_deny_all_but_localhost_with_deepinfra_only_from_the_checked_dropin(self):
         self.assertEqual(values(UNIT, 'IPAddressDeny'), ['any'])
@@ -188,10 +352,14 @@ class UnitFileTests(unittest.TestCase):
                                 + 2 * gate.LOCK_TIMEOUT_SECONDS + gate.DRAIN_REPLY_SECONDS + 10)
 
     def test_no_install_section_the_lifecycle_target_pulls_it_in(self):
-        self.assertNotIn('[Install]', UNIT.read_text().splitlines())
-        target = ROOT / 'deploy/preview-lifecycle/v1/systemd/debateai-preview.target'
-        self.assertIn('debateai-preview-provider-budget.service', target.read_text())
-        self.assertIn('WantedBy=timers.target', TIMER.read_text())
+        target = LIFECYCLE / 'debateai-preview.target'
+        wanted = ' '.join(values(target, 'Wants')).split()
+        for name in ('debateai-preview-provider-budget.service', 'debateai-preview-gate-halt-watch.timer',
+                     'debateai-preview-gate-addresses.timer'):
+            self.assertIn(name, wanted)
+        for path in (UNIT, TIMER, HALT_TIMER, HALT_UNIT, CHECK_UNIT):  # Only the target starts them.
+            self.assertNotIn('[Install]', path.read_text().splitlines(), path.name)
+        self.assertEqual((values(TIMER, 'OnUnitActiveSec'), values(HALT_TIMER, 'OnUnitActiveSec')), (['1h'], ['1min']))
 
     def test_no_secret_or_machine_specific_path_in_the_folder(self):
         for path in sorted(V2.rglob('*')):
@@ -205,7 +373,7 @@ class UnitFileTests(unittest.TestCase):
                         self.assertNotIn('provider-budget.sock', text)
 
     def test_files_have_no_world_writable_mode_in_git(self):
-        for path in (UNIT, DROPIN, CHECK_UNIT, TIMER, V2 / 'deepinfra_addresses.py'):
+        for path in (UNIT, DROPIN, CHECK_UNIT, TIMER, HALT_UNIT, HALT_TIMER, V2 / 'deepinfra_addresses.py', V2 / 'gate_watch.py'):
             self.assertFalse(os.stat(path).st_mode & 0o022, path)
 
 

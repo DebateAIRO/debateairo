@@ -13,17 +13,29 @@ visible instead of silent:
   render                 prints the drop-in for today's DNS answer (deterministic: no time stamp),
                          so `render | diff - installed-file` is empty when nothing changed. It
                          refuses (DROPIN_INVALID) if DNS gives a non-public address.
-`check` reads the file, not what systemd has loaded: after installing a new file, always run
-`systemctl daemon-reload` before restarting the gate.
+  watch  --dropin PATH --state FILE
+                         the hourly timer's form of check: exit 3 (the unit fails, and its
+                         OnFailure= notice emails the owner) only for a mismatch not announced
+                         before, so the owner gets at most one email per change. A temporary DNS
+                         failure is logged, not announced (the gate's own start check refuses on it).
+  update --dropin PATH   root, by hand (the command in the email): render today's list, write it
+                         in place atomically (0644), and run `systemctl daemon-reload`. Then
+                         restart the gate.
+`check` reads the file, not what systemd has loaded: after installing a new file by hand, always
+run `systemctl daemon-reload` before restarting the gate.
 
-The gate unit runs `check` before every start (ExecStartPre); the optional hourly timer runs it
-too and emails the owner through the preview alert when it refuses. It needs no key, no state and
-no internet access beyond the local DNS resolver. One JSON line on stdout; exit 0, or 2 on refusal.
+The gate unit runs `check` before every start (ExecStartPre); the hourly timer runs `watch`, which
+emails the owner once per change through the preview notice. check/watch/render need no key and
+no internet access beyond the local DNS resolver. One JSON line on stdout; exit 0, 2 on refusal,
+3 for a newly announced mismatch (watch).
 """
 import argparse
+import hashlib
 import ipaddress
 import json
+import os
 import socket
+import subprocess
 import sys
 from pathlib import Path
 
@@ -108,10 +120,76 @@ def render(resolved):
     return text
 
 
-def main(argv=None, lookup=socket.getaddrinfo):
+def atomic_write(path, data, mode):
+    path = Path(path)
+    temporary = path.with_name('.%s.%d.tmp' % (path.name, os.getpid()))
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary, mode)  # Exactly this mode, whatever the umask.
+        os.rename(temporary, path)
+    finally:
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
+
+
+def mismatch_fingerprint(refusal):
+    detail = refusal.args[1] if len(refusal.args) > 1 else {}
+    return hashlib.sha256(json.dumps({'error': refusal.args[0], 'new': detail.get('new', [])},
+                                     sort_keys=True).encode()).hexdigest()
+
+
+def watch(dropin, state, lookup):
+    """0 when nothing new to announce, 3 for a mismatch not announced before (recorded first)."""
+    try:
+        result = check(read_dropin(dropin), resolve(lookup))
+    except Refusal as refusal:
+        if refusal.args[0] == 'DNS_UNAVAILABLE':
+            return 0, {'status': 'dns_unavailable', 'announced': False}
+        fingerprint = mismatch_fingerprint(refusal)
+        try:
+            announced = Path(state).read_text().strip() == fingerprint
+        except OSError:
+            announced = False
+        detail = refusal.args[1] if len(refusal.args) > 1 else {}
+        line = {'status': 'refused', 'error': refusal.args[0], **detail, 'announced': 'before' if announced else 'now'}
+        if announced:
+            return 0, line
+        atomic_write(state, (fingerprint + '\n').encode(), 0o600)
+        return 3, line
+    try:
+        os.unlink(state)  # Back in step: the next change is announced again.
+    except FileNotFoundError:
+        pass
+    return 0, result
+
+
+def update(dropin, lookup, run=subprocess.run):
+    resolved = resolve(lookup)
+    text = render(resolved)
+    try:
+        before = read_dropin(dropin)
+    except Refusal:
+        before = set()
+    atomic_write(dropin, text.encode('ascii'), 0o644)
+    reload = run(['/usr/bin/systemctl', 'daemon-reload'], env={}, stdin=subprocess.DEVNULL, capture_output=True, timeout=60)
+    if reload.returncode != 0:
+        raise Refusal('DAEMON_RELOAD_FAILED')
+    return {'status': 'updated', 'dropin': str(dropin), 'allowed': len(resolved),
+            'added': [str(a) for a in sorted(resolved - before)], 'removed': [str(a) for a in sorted(before - resolved)],
+            'next': 'systemctl restart debateai-preview-provider-budget'}
+
+
+def main(argv=None, lookup=socket.getaddrinfo, run=subprocess.run):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('action', choices=('check', 'render'))
+    parser.add_argument('action', choices=('check', 'render', 'watch', 'update'))
     parser.add_argument('--dropin', type=Path)
+    parser.add_argument('--state', type=Path)
     args = parser.parse_args(argv)
     try:
         if args.action == 'render':
@@ -119,11 +197,23 @@ def main(argv=None, lookup=socket.getaddrinfo):
             return 0
         if args.dropin is None:
             raise Refusal('DROPIN_REQUIRED')
+        if args.action == 'watch':
+            if args.state is None:
+                raise Refusal('STATE_REQUIRED')
+            code, line = watch(args.dropin, args.state, lookup)
+            print(json.dumps(line))
+            return code
+        if args.action == 'update':
+            print(json.dumps(update(args.dropin, lookup, run)))
+            return 0
         print(json.dumps(check(read_dropin(args.dropin), resolve(lookup))))
         return 0
     except Refusal as refusal:
         detail = refusal.args[1] if len(refusal.args) > 1 else {}
         print(json.dumps({'status': 'refused', 'error': refusal.args[0], **detail}))
+        return 2
+    except (OSError, subprocess.SubprocessError):
+        print(json.dumps({'status': 'refused', 'error': 'WRITE_FAILED'}))
         return 2
 
 

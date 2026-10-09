@@ -16,13 +16,13 @@ describe('production preview spending guard optional JSON mode', () => {
   it('runs the v2 team daily pot, concurrency, halt and custody behaviors offline', () => {
     const result = runPython('tests/unit/preview_budget_authority_v2_test.py', 30000);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 93 tests');
+    expect(result.stderr).toContain('Ran 103 tests');
     expect(result.stderr).toContain('OK');
   });
   it('checks the reviewed gate v2 systemd files and the DeepInfra address check offline', () => {
     const result = runPython('tests/unit/preview_gate_v2_unit_test.py', 10000);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 13 tests');
+    expect(result.stderr).toContain('Ran 24 tests');
     expect(result.stderr).toContain('OK');
   });
 });

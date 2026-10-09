@@ -1,0 +1,46 @@
+# Install as /etc/systemd/system/debateai-preview-gate-halt-watch.service (root:root 0644).
+# Started every minute by debateai-preview-gate-halt-watch.timer. It asks the gate for `status`
+# (read-only) and, once per halt, queues debateai-preview-notice@gate-halted-<reason>.service with
+# `systemctl start --no-block` (the email names the reason and the one command that re-opens the
+# gate). It never touches the gate's state and never waits for mail. If the watcher itself breaks
+# (status unreadable, notice not queued), this unit fails and the preview alert emails that.
+# Root only because the gate's private folder is root-only; the key file is hidden from it, and it
+# has no network at all (systemctl talks to systemd over a local socket).
+[Unit]
+Description=DebateAI preview: email the owner once when the spending gate halts
+OnFailure=debateai-preview-alert@%n.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/gate_watch.py --private /var/lib/debateai-v3-preview/provider-team-authority-v2 --state /var/lib/debateai-preview-gate-watch/announced-halt.json
+StateDirectory=debateai-preview-gate-watch
+StateDirectoryMode=0700
+TimeoutStartSec=90
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+LimitCORE=0
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2/api-key.txt
+InaccessiblePaths=-/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/etc/debateai-v3-preview/api.env -/root -/var/lib/postgresql -/etc/postfix
+InaccessiblePaths=-/etc/debateai-v3-preview/auth-dev-v1 -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/api -/etc/debateai-v3-preview/lifecycle
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
