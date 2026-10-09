@@ -7,8 +7,8 @@ const root = fileURLToPath(new URL("../..", import.meta.url));
 const migration = "migrations/0095_registration_region.sql";
 const forwardContract = "migrations/0107_auth_dev_integration.sql";
 const verifier = "migrations/lineage/verify-effective-capabilities.sql";
-// PR-54: the verifier that supersedes the sealed one once forward step 0109 is applied keeps its checks unchanged.
-const supersedingVerifier = "migrations/lineage/verify-effective-capabilities-109.sql";
+// PR-54: the verifier that supersedes the sealed one once forward step 0111 is applied keeps its checks unchanged.
+const supersedingVerifier = "migrations/lineage/verify-effective-capabilities-111.sql";
 const writer = "packages/db/src/identity.ts";
 const socialWriter = "packages/db/src/social-identity.ts";
 

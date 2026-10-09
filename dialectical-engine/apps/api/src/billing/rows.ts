@@ -10,7 +10,7 @@ export function newChargeId(): string {
 /**
  * One charge event to append (P1b's `ChargeEventInput`): the repository takes the provider and environment from the
  * charge row itself (D5 5h), so no caller can name another. `refundsTransactionId` names the paid payment a separate
- * refund transaction refunded (D5 5g); 0109 refuses it on a NETOPIA row, so only old rows hold one. `providerCreatedAt`
+ * refund transaction refunded (D5 5g); 0111 refuses it on a NETOPIA row, so only old rows hold one. `providerCreatedAt`
  * (D5 5m) is the payment's own time as NETOPIA reports it, given only on a row that IS the payment (its SUCCEEDED):
  * P1b's quarter rows date the row by it, so a payment taken on 31 March and verified on 1 April stays in Q1. P1a
  * refuses it on a row that names no payment.

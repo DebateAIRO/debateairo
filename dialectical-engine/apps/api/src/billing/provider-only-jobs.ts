@@ -28,7 +28,7 @@ export type ProviderOnlyJobs = Readonly<{
  * F7 (final review data-1): the provider-only mode's one timer, composed in main.ts only in that mode. It runs the
  * billing runtime's daily owner job with N17's card steps alone (`ProviderOnlyOwnerJobs`), on the same daily timer
  * and at each start, with the same single-flight and the same BILLING_OWNER_JOBS_PENDING line on a failure. The sweep
- * and both purges are already granted to the API's billing role (0109); nothing else of billing runs here.
+ * and both purges are already granted to the API's billing role (0111); nothing else of billing runs here.
  */
 export function createProviderOnlyJobs(deps: ProviderOnlyJobsDeps): ProviderOnlyJobs {
   const custody = new CardCustody({

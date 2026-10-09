@@ -155,7 +155,7 @@ Rulings made by the controller (this design's author), which you can overturn:
 - No xMoney sandbox recording was ever made (`tests/fixtures/xmoney/` does not exist), so no xMoney fact was ever
   measured, and no deployment has billing rows except, possibly, a developer database filled by the dev-stack fakes
   (`DEBATEAI_BILLING_FAKES=1`).
-- The newest migration is `0095_registration_region.sql`. This design's migration is **0109 (0096 in the plan)**, the forward step after dev's 0108 (PR-54). The plan's first
+- The newest migration is `0095_registration_region.sql`. This design's migration is **0111 (0109 in the plan, renumbered after #101's 0110)**, the forward step after dev's 0110 (PR-54, PR-58). The plan's first
   task re-checks the number against `dev` and the open pull requests.
 
 #### 2.1.2 What this document replaces in the 29 September design
@@ -182,7 +182,7 @@ Everything else in the 29 September design, its amendments and the go-live check
    long key-like strings). Steps marked OWNER-RUN are the owner's.
 3. **Migrations are forward-only and replayable.** An applied migration is never edited; every statement of a new one
    can run twice (guarded by catalogue checks where SQL has no `IF NOT EXISTS`). Every new billing table grants itself to
-   `debateai_billing_runtime` in its own migration, and 0109 repeats 0093's contract check (§2.5.6).
+   `debateai_billing_runtime` in its own migration, and 0111 repeats 0093's contract check (§2.5.6).
 4. **Sealed values are superseded, never edited** (register versions, the signed support catalogue, the legal
    manifest).
 5. **No card data, no token and no full JWT ever reaches a log, an audit line, an email, an error message or a test
@@ -484,7 +484,7 @@ without `ntpID` and how NETOPIA says "no such order" (N-16), the amount's unit i
 format of the card's country (`instrument.country` against `ISSUER_COUNTRY`; if neither ever parses, the always-blocked
 card-country refusal would silently never fire), and the format of `operationDate`.
 
-### 2.5 Data: migration `0109_billing_netopia.sql`
+### 2.5 Data: migration `0111_billing_netopia.sql`
 
 Principles:
 
@@ -570,7 +570,7 @@ live boot's refusal while records of another system are open (`BILLING_STAGE_REC
 #### 2.5.6 Grants
 
 Each new table grants `SELECT, INSERT` to `debateai_billing_runtime` (and nothing to `debateai_runtime`), the purge
-functions grant EXECUTE to the billing role only, and 0109 ends with a copy of 0093's contract block (`:87-155`), which
+functions grant EXECUTE to the billing role only, and 0111 ends with a copy of 0093's contract block (`:87-155`), which
 checks again that every billing table is granted to the billing role and to no one else. The outbox's column-level
 UPDATE grant already covers `not_before` (A19), which §2.7.3 uses.
 
@@ -1145,7 +1145,7 @@ It also backs the dev stack (`DEBATEAI_BILLING_FAKES=1`) in place of the xMoney 
   time-parsing rule (the placeholder date, a time without a zone, a future time); amounts from and to decimal text; the
   base-URL table; redirects refused; `SecretToken` never printing its value (`String`, `JSON.stringify`, `inspect`, an
   error message); the configuration reader; the setup script; the fold's new rules.
-- **Integration:** migration 0109 on an empty schema, on one holding xMoney-era rows, and run twice; the 0093 contract
+- **Integration:** migration 0111 on an empty schema, on one holding xMoney-era rows, and run twice; the 0093 contract
   check; checkout → page → message → VERIFY → ACTIVATED with a saved card; a lost first message (plan starts, M12 asks
   for a card); a late token (CARD_SAVED); the adoption rules (a refused card check, a refunded upgrade, a late message
   of a replaced card); a renewal paid, declined (bank and not bank), asking for 3-D Secure, refused for a merchant
@@ -1224,7 +1224,7 @@ These are go-live row 24's; the build does not edit the legal drafts.
 
 ### 2.23 Order of work
 
-- **Part N (NETOPIA)**, one pull request to `dev`, billing off: the port and the package; the fake; migration 0109 and
+- **Part N (NETOPIA)**, one pull request to `dev`, billing off: the port and the package; the fake; migration 0111 and
   the fold; configuration, the guided setup and the check command; checkout and the billing block; the notice route,
   the intake, the quarantine and the provider-only mode; VERIFY_PAYMENT; renewals and unknown outcomes; upgrades; the
   card change; refunds; charge-backs; the checks; the saved card; pages, copy, emails; the removals and renames; the

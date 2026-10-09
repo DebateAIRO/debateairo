@@ -3,20 +3,20 @@ import { readFile } from 'node:fs/promises';
 import type { PoolClient } from 'pg';
 import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
 
-/** NETOPIA's migration as the first forward step after dev's 0108 (PR-54; migrations/lineage/README.md). */
-const NAME='0109_billing_netopia.sql';
-const VERSION='billing-netopia-forward109-v1';
-const MANIFEST_PATH='lineage/billing-netopia-forward109.json';
-const VERIFIER_PATH='lineage/verify-effective-capabilities-109.sql';
-const PREVIOUS='0108_preview_recovery_verified_bindings.sql';
+/** NETOPIA's migration as the first chain step, after dev's 0110 (PR-54, PR-58; migrations/lineage/README.md). */
+const NAME='0111_billing_netopia.sql';
+const VERSION='billing-netopia-forward111-v1';
+const MANIFEST_PATH='lineage/billing-netopia-forward111.json';
+const VERIFIER_PATH='lineage/verify-effective-capabilities-111.sql';
+const PREVIOUS='0110_account_erasure_public_debates.sql';
 const TABLES=['card_token','card_token_revocation','hosted_payment','notice_quarantine','payment_notice','payment_notice_outcome','payment_notice_raw','status_read','tool_order'] as const;
 const FUNCTIONS=['billing.purge_expired_records(timestamptz)','billing.purge_revoked_card_tokens(timestamptz)','billing.purge_short_lived(timestamptz)'] as const;
-const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD109_${detail}`);};
+const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD111_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
 const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
 
-/** 0109's tables (owner, kind, grants, columns, constraints, triggers) and its three purges (definition, owner, grants). */
+/** 0111's tables (owner, kind, grants, columns, constraints, triggers) and its three purges (definition, owner, grants). */
 async function postconditionEvidence(client:PoolClient):Promise<string>{
  const rows=(await client.query(`
   SELECT 'table' AS kind,c.relname AS name,jsonb_build_object(
@@ -39,7 +39,7 @@ async function postconditionEvidence(client:PoolClient):Promise<string>{
  return sha(JSON.stringify(rows));
 }
 
-export async function loadForward109(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
+export async function loadForward111(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
  const directory=new URL('../../../migrations/',import.meta.url);
  const bytes=await readFile(new URL(MANIFEST_PATH,directory));const raw:unknown=JSON.parse(bytes.toString('utf8'));
  if(!exactKeys(raw,['version','baseRecipeSha256','previous','migration','verifier'])||raw.version!==VERSION||raw.baseRecipeSha256!==anchor.baseRecipeSha256

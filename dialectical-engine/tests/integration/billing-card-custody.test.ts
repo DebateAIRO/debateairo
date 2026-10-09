@@ -121,7 +121,7 @@ describe("N17 the daily sweep (spec §2.15.4)", () => {
         withdrew_at: withdrewAt.toISOString()
       }));
     });
-    // 0109's purge deletes a token one day after its revocation by the database's own clock (it never trusts a later
+    // 0111's purge deletes a token one day after its revocation by the database's own clock (it never trusts a later
     // `now`: LEAST(p_now, clock_timestamp())), so this sweep runs as of two days ago and the purge runs now.
     await custodyOf().sweep(new Date(Date.now() - 2 * DAY));
     expect(await revocation(seeded.cardTokenId)).toBe("PLAN_ENDED");
@@ -275,7 +275,7 @@ const outboxRows = async () => Number((await database.pool.query<{ count: string
 
 describe("F7 the provider-only mode's daily card job (final review data-1)", () => {
   it("revokes a two-day-old tool order's card, purges it a day later, deletes a 15-day-old raw message, and nothing else", async () => {
-    // Stored three days ago: two days old at the first run, which runs as of a day ago (0109's purge trusts only the
+    // Stored three days ago: two days old at the first run, which runs as of a day ago (0111's purge trusts only the
     // database's own clock, so a revocation made "now" could not be a day old within this test).
     const toolToken = await storeToken({ customerId: null, chargeId: null, ageDays: 3 });
     const oldRaw = await storeRawNotice(15);

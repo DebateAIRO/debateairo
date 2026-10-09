@@ -5,9 +5,11 @@ import { loadMigrationPlan, type MigrationPlan } from '../../packages/db/src/mig
 import { NativeVerifyPendingForwardStepError, pendingForwardSteps, refusePendingForwardSteps } from '../../deploy/preview-auth-dev/v1/verify-native.js';
 
 // The preview's verify never applies a database step (ruling PR-57): a forward step the ledger lacks is refused
-// before migrate() runs; only the native operator's apply-and-plan applies one.
-const NETOPIA_STEP = '0109_billing_netopia.sql';
-const chainOf = (...names: string[]) => ({ forwardChain: names.map(name => ({ name })) }) as unknown as Pick<MigrationPlan, 'forwardChain'>;
+// before migrate() runs; only the native operator's apply-and-plan applies one. F10 (PR-58): dev's 0110 is applied by
+// migrate() too (applyForward110), so a pending 0110 is refused like a pending chain step (0111, NETOPIA).
+const NETOPIA_STEP = '0111_billing_netopia.sql';
+const DEV_STEP = '0110_account_erasure_public_debates.sql';
+const chainOf = (...names: string[]) => ({ forward110: { name: '0110_dev.sql' }, forwardChain: names.map(name => ({ name })) }) as unknown as Pick<MigrationPlan, 'forwardChain' | 'forward110'>;
 const fakePool = (names: readonly string[]) => {
  const queries: string[] = [];
  const pool = { query: async (sql: string) => { queries.push(sql); return { rows: names.map(name => ({ name })) }; } } as unknown as Pool;
@@ -16,37 +18,56 @@ const fakePool = (names: readonly string[]) => {
 
 describe('pendingForwardSteps', () => {
  it('returns the missing names in chain order', () => {
-  const chain = chainOf('0109_a.sql', '0110_b.sql', '0111_c.sql');
-  expect(pendingForwardSteps(chain, new Set(['0110_b.sql']))).toEqual(['0109_a.sql', '0111_c.sql']);
-  expect(pendingForwardSteps(chain, new Set())).toEqual(['0109_a.sql', '0110_b.sql', '0111_c.sql']);
+  const chain = chainOf('0111_a.sql', '0112_b.sql', '0113_c.sql');
+  expect(pendingForwardSteps(chain, new Set(['0110_dev.sql', '0112_b.sql']))).toEqual(['0111_a.sql', '0113_c.sql']);
+  expect(pendingForwardSteps(chain, new Set())).toEqual(['0110_dev.sql', '0111_a.sql', '0112_b.sql', '0113_c.sql']);
+ });
+ it('returns dev\'s 0110 first when the ledger lacks it', () => {
+  expect(pendingForwardSteps(chainOf('0111_a.sql'), new Set(['0108_x.sql', '0111_a.sql']))).toEqual(['0110_dev.sql']);
  });
  it('returns none when every step is applied', () => {
-  expect(pendingForwardSteps(chainOf('0109_a.sql', '0110_b.sql'), new Set(['0108_x.sql', '0109_a.sql', '0110_b.sql']))).toEqual([]);
+  expect(pendingForwardSteps(chainOf('0111_a.sql', '0112_b.sql'), new Set(['0108_x.sql', '0110_dev.sql', '0111_a.sql', '0112_b.sql']))).toEqual([]);
  });
- it('reads this source\'s chain: 0109 is pending on a database that has only 0108', async () => {
+ it('reads this source\'s plan: 0110 and 0111 are pending on a database that has only 0108', async () => {
   const plan = await loadMigrationPlan();
-  expect(plan.forwardChain.map(step => step.name)).toContain(NETOPIA_STEP);
-  expect(pendingForwardSteps(plan, new Set([plan.forward108.name]))).toEqual(plan.forwardChain.map(step => step.name));
+  expect(plan.forward110.name).toBe(DEV_STEP);
+  expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA_STEP]);
+  expect(pendingForwardSteps(plan, new Set([plan.forward108.name]))).toEqual([DEV_STEP, NETOPIA_STEP]);
+ });
+ it('reads this source\'s plan: only 0111 is pending on a database at dev\'s 0108 and 0110', async () => {
+  const plan = await loadMigrationPlan();
+  expect(pendingForwardSteps(plan, new Set([plan.forward108.name, DEV_STEP]))).toEqual([NETOPIA_STEP]);
  });
 });
 
 describe('refusePendingForwardSteps', () => {
- it('refuses, naming 0109, when the ledger lacks it, with one read-only SELECT', async () => {
+ it('refuses, naming 0111, when the ledger lacks it, with one read-only SELECT', async () => {
   const plan = await loadMigrationPlan();
-  const { pool, queries } = fakePool([...plan.manifest.order, plan.forward108.name]);
+  const { pool, queries } = fakePool([...plan.manifest.order, plan.forward108.name, plan.forward110.name]);
   const refusal = await refusePendingForwardSteps(pool, plan).then(() => undefined, (error: unknown) => error);
   expect(refusal).toBeInstanceOf(NativeVerifyPendingForwardStepError);
   const error = refusal as NativeVerifyPendingForwardStepError;
   expect(error.code).toBe('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP');
   expect(error.name).toBe('NativeVerifyPendingForwardStepError');
-  expect(error.pending).toContain(NETOPIA_STEP);
+  expect(error.pending).toEqual([NETOPIA_STEP]);
   expect(Object.isFrozen(error.pending)).toBe(true);
   expect(error.message).toBe(`PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: ${error.pending.join(', ')}. Verify never applies a migration; run the native operator with operation apply-and-plan first.`);
   expect(queries).toEqual(['SELECT name FROM public.debateai_schema_migration']);
  });
+ it('refuses, naming 0110 and 0111, on a database at 0108 only (migrate() would apply dev\'s 0110 too)', async () => {
+  const plan = await loadMigrationPlan();
+  const { pool, queries } = fakePool([...plan.manifest.order, plan.forward108.name]);
+  await expect(refusePendingForwardSteps(pool, plan)).rejects.toMatchObject({ code: 'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP', pending: [DEV_STEP, NETOPIA_STEP] });
+  expect(queries).toHaveLength(1);
+ });
+ it('refuses, naming 0110, when only 0110 is missing', async () => {
+  const plan = await loadMigrationPlan();
+  const { pool } = fakePool([...plan.manifest.order, plan.forward108.name, ...plan.forwardChain.map(step => step.name)]);
+  await expect(refusePendingForwardSteps(pool, plan)).rejects.toMatchObject({ pending: [DEV_STEP] });
+ });
  it('resolves when every forward step is in the ledger', async () => {
   const plan = await loadMigrationPlan();
-  const { pool, queries } = fakePool([...plan.manifest.order, plan.forward108.name, ...plan.forwardChain.map(step => step.name)]);
+  const { pool, queries } = fakePool([...plan.manifest.order, plan.forward108.name, plan.forward110.name, ...plan.forwardChain.map(step => step.name)]);
   await expect(refusePendingForwardSteps(pool, plan)).resolves.toBeUndefined();
   expect(queries).toHaveLength(1);
  });

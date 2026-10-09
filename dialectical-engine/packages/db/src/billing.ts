@@ -20,7 +20,7 @@ export type OutboxKind =
   | "VERIFY_PAYMENT" | "QUADERNO_RECORD_SALE" | "QUADERNO_RECORD_REFUND" | "SMARTBILL_INVOICE"
   | "SMARTBILL_STORNO" | "EMAIL" | "RENEWAL_NOTICE" | "OWNER_TAX_SUMMARY"
   // R-30: the durable refund executor (P9b/P12d) and the yearly retention purge (P16c). Spec 2026-10-05 §2.12.1:
-  // RefundDesk's job is PAYMENT_REFUND; the previous card processor's refund kind stays for old rows only (0109's
+  // RefundDesk's job is PAYMENT_REFUND; the previous card processor's refund kind stays for old rows only (0111's
   // CHECK keeps both; RETIRED_OUTBOX_KINDS below).
   | "XMONEY_REFUND" | "RETENTION_PURGE" | "PAYMENT_REFUND";
 /**
@@ -30,7 +30,7 @@ export type OutboxKind =
 export const RETIRED_OUTBOX_KINDS: ReadonlyArray<OutboxKind> = Object.freeze(["XMONEY_REFUND"]);
 /** Spec 2026-10-05 §2.5.1: the provider a charge row is paid with (the previous card processor's rows are inert history, §2.5.4). */
 export type PaymentProviderName = "xmoney" | "netopia";
-/** The previous card processor's systems were stage and live; NETOPIA's are sandbox and live (0109's paired CHECK). */
+/** The previous card processor's systems were stage and live; NETOPIA's are sandbox and live (0111's paired CHECK). */
 export type PaymentEnvironmentName = "stage" | "sandbox" | "live";
 export type ChargeKind = "INITIAL" | "RENEWAL" | "UPGRADE" | "CARD_CHECK";
 export type ChargeEventKind =
@@ -67,13 +67,13 @@ export type ChargeEventRow = Readonly<{
   providerPaymentId: string | null; amountMicros: number | null; errorCode: string | null;
   paymentProvider: PaymentProviderName;
   paymentEnvironment: PaymentEnvironmentName;
-  /** REFUND_REQUESTED/REFUNDED only, old rows only (0109 refuses it on a NETOPIA row): the payment refunded, when not the row's own. */
+  /** REFUND_REQUESTED/REFUNDED only, old rows only (0111 refuses it on a NETOPIA row): the payment refunded, when not the row's own. */
   refundsTransactionId: string | null;
 }>;
 /**
  * What a caller appends: the repository mints `eventId` when it is left out and takes the provider and environment from
  * the charge. `providerCreatedAt` (the provider's own time for the payment; the tax summary dates by it) is allowed only
- * on a row that IS the payment (0109's charge_event_provider_time_names_payment).
+ * on a row that IS the payment (0111's charge_event_provider_time_names_payment).
  */
 export type ChargeEventInput = Omit<ChargeEventRow, "eventId" | "paymentProvider" | "paymentEnvironment" | "refundsTransactionId">
   & Readonly<{ eventId?: string; refundsTransactionId?: string | null; providerCreatedAt?: Date | null }>;
@@ -1612,7 +1612,7 @@ export class BillingRepository {
       JOIN billing.payment_notice_raw AS raw ON raw.notice_id = notice.notice_id
       WHERE notice.order_id = $1 ORDER BY notice.received_at, notice.notice_id`, [orderId])).rows.map(frozen);
   }
-  /** §2.15.4: the daily owner job's deletes, through 0109's SECURITY DEFINER functions (A15's guard). */
+  /** §2.15.4: the daily owner job's deletes, through 0111's SECURITY DEFINER functions (A15's guard). */
   async purgeRevokedCardTokens(now: Date): Promise<number> {
     const row = (await this.pool.query<{ purged: string }>("SELECT billing.purge_revoked_card_tokens($1) AS purged", [now])).rows[0];
     return Number(row?.purged ?? "0");

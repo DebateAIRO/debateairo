@@ -73,7 +73,7 @@ async function runIsolated(steps: ReadonlyArray<DailyStep>): Promise<number> {
   return done;
 }
 
-/** N17: the sweep first, so a token it revokes today is purged one day later (0109's purge rule), then both purges. */
+/** N17: the sweep first, so a token it revokes today is purged one day later (0111's purge rule), then both purges. */
 function custodySteps(custody: Pick<CardCustody, "sweep" | "purge">, now: Date): ReadonlyArray<DailyStep> {
   return [async () => (await custody.sweep(now)).revoked, () => custody.purge(now)];
 }

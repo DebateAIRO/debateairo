@@ -106,15 +106,18 @@ describe('isolated PG18 native preview publication (source evidence, not Linux s
  },120000);
 });
 describe('the preview verify never applies a database step (PR-57)',()=>{
- it('refuses a database at 0108 that lacks 0109 without applying it, and passes after the explicit apply step',async()=>{
+ it('refuses a database at 0108 that lacks 0110 and 0111 without applying either, and passes after the explicit apply step',async()=>{
   const db=await startTestDatabase();let selected:pg.Pool|undefined;
   try{
    await db.pool.query('CREATE ROLE debateai_prod_migrator LOGIN SUPERUSER CREATEROLE CREATEDB INHERIT NOBYPASSRLS');
    selected=new pg.Pool({connectionString:db.connectionString,options:'-c role=debateai_prod_migrator',max:2});
-   // A database as dev's lineage leaves it: through 0108, no forward step after it.
+   // A database as dev's lineage left it before #101: through 0108, no forward step after it. migrate() would apply
+   // dev's 0110 and then the chain (0111), so verify must refuse both (PR-57, F10).
    await seedDevLineage108(selected);
-   const plan=await loadMigrationPlan(),chain=plan.forwardChain.map(step=>step.name);
-   expect(chain).toContain('0109_billing_netopia.sql');
+   const plan=await loadMigrationPlan(),chain=plan.forwardChain.map(step=>step.name),pending=[plan.forward110.name,...chain];
+   expect(chain).toContain('0111_billing_netopia.sql');
+   const forward110=async()=>(await selected!.query("SELECT to_regclass('public.debateai_schema_migration_forward110') IS NOT NULL present")).rows[0].present
+    ?(await selected!.query('SELECT source_name FROM public.debateai_schema_migration_forward110')).rows:[];
    const ledger=async()=>(await selected!.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
    const stepReceipts=async()=>(await selected!.query("SELECT to_regclass('public.debateai_schema_migration_step') IS NOT NULL present")).rows[0].present
     ?(await selected!.query('SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name')).rows:[];
@@ -130,18 +133,18 @@ describe('the preview verify never applies a database step (PR-57)',()=>{
    const binding={sourceRevision:observation.sourceRevision,sourceTree:observation.sourceTree,nativeSourceSha256:'d'.repeat(64),publication:receipt};
    const before=await ledger();
    expect(before.map(row=>row.name)).toEqual([...plan.manifest.order,plan.forward108.name].sort());
-   await expect(verifyNativeState(selected,binding)).rejects.toMatchObject({code:'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP',pending:chain});
-   // Nothing was applied: the ledger, 0108's receipt and the step receipts are as they were.
-   expect(await ledger()).toEqual(before);expect(await stepReceipts()).toEqual([]);expect(await forward108()).toBe(1);
+   await expect(verifyNativeState(selected,binding)).rejects.toMatchObject({code:'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP',pending});
+   // Nothing was applied: the ledger, 0108's receipt, 0110's receipt and the step receipts are as they were.
+   expect(await ledger()).toEqual(before);expect(await stepReceipts()).toEqual([]);expect(await forward108()).toBe(1);expect(await forward110()).toEqual([]);
    // The explicit apply step (apply-and-plan calls migrate()); afterwards verify passes, and 0108's receipt table still
-   // holds one row because 0109's receipt is in public.debateai_schema_migration_step.
+   // holds one row because 0110's receipt is in its own table and 0111's in public.debateai_schema_migration_step.
    await migrate(selected);
-   expect((await ledger()).map(row=>row.name)).toEqual([...before.map(row=>row.name),...chain].sort());
+   expect((await ledger()).map(row=>row.name)).toEqual([...before.map(row=>row.name),...pending].sort());
    expect(await stepReceipts()).toEqual(chain.map(source_name=>({source_name})));
-   expect(await forward108()).toBe(1);
+   expect(await forward108()).toBe(1);expect(await forward110()).toEqual([{source_name:plan.forward110.name}]);
    const verified=await verifyNativeState(selected,binding);
    expect(verified.currentContractVerified).toBe(true);expect(verified.forwardCount).toBe(1);expect(verified.publication).toEqual(receipt);
-   expect(verified.ledgerCount).toBe(before.length+chain.length);
+   expect(verified.ledgerCount).toBe(before.length+pending.length);
   }finally{await selected?.end();await db.stop();}
  },120000);
 });

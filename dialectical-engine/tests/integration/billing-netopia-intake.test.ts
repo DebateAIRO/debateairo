@@ -188,7 +188,7 @@ describe("N9 NETOPIA's verified message", () => {
   it("keeps no card and queues nothing for a charge of another payment system or environment", async () => {
     const { intake } = intakeFor();
     const live = (await openCharge("live")).chargeId;
-    // xMoney-era charges as 0109 keeps them, seeded with SQL as billing-netopia-migration.test.ts does.
+    // xMoney-era charges as 0111 keeps them, seeded with SQL as billing-netopia-migration.test.ts does.
     const xmoneyCharge = async (environment: "stage" | "live"): Promise<string> => {
       const chargeId = newChargeId();
       const ownerRef = randomUUID();
@@ -207,7 +207,7 @@ describe("N9 NETOPIA's verified message", () => {
     // An xMoney 'live' charge: only the guard's provider half refuses it on a live API (its environment matches).
     const xmoneyLive = await xmoneyCharge("live");
     const liveIntake = intakeFor({ paymentEnvironment: "live" }).intake;
-    // Another system's charge: the notice is labelled with this API's own system (0109 allows only NETOPIA's there).
+    // Another system's charge: the notice is labelled with this API's own system (0111 allows only NETOPIA's there).
     for (const [chargeId, label, system, receiver] of [
       [live, "live", "netopia/live", intake], [xmoneyStage, "sandbox", "xmoney/stage", intake],
       [xmoneyLive, "live", "xmoney/live on a live API", liveIntake]

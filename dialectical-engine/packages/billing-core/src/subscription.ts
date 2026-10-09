@@ -6,7 +6,7 @@ export type SubscriptionEventKind =
   | "CREATED" | "ACTIVATED" | "RENEWED" | "PAST_DUE" | "RECOVERED" | "UPGRADED" | "DOWNGRADE_SCHEDULED"
   | "DOWNGRADED" | "CANCEL_REQUESTED" | "CANCEL_REVOKED" | "ENDED" | "WITHDRAWN" | "SUSPENDED" | "RESUMED"
   | "CARD_CHANGED" | "ERASURE_STOPPED" | "RENEWAL_POSTPONED" | "RENEWAL_NOTICE_SENT"
-  // Spec 2026-10-05 §2.5.5: a saved card adopted after the deciding event (0109's CHECK).
+  // Spec 2026-10-05 §2.5.5: a saved card adopted after the deciding event (0111's CHECK).
   | "CARD_SAVED";
 
 export const SUBSCRIPTION_EVENT_KINDS: ReadonlyArray<SubscriptionEventKind> = Object.freeze([
@@ -64,7 +64,7 @@ function illegal(detail: string): never {
   throw new TypedDomainError("BILLING_SUBSCRIPTION_EVENTS_INVALID", `subscription events are not a legal history: ${detail}`);
 }
 
-/** §2.15.2: the events that may carry the subscription's card (0109's subscription_event_card_token_kinds). */
+/** §2.15.2: the events that may carry the subscription's card (0111's subscription_event_card_token_kinds). */
 const CARD_TOKEN_KINDS: ReadonlySet<SubscriptionEventKind> = new Set<SubscriptionEventKind>([
   "ACTIVATED", "RENEWED", "UPGRADED", "CARD_CHANGED", "CARD_SAVED"
 ]);

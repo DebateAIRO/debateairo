@@ -1,14 +1,15 @@
 import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { MigrationPlan } from './migration-lineage.js';
-import { loadForward109 } from './migration-forward109.js';
+import { loadForward111 } from './migration-forward111.js';
 
 /**
- * The forward steps after dev's sealed lineage and its 0108 (PR-54, migrations/lineage/README.md): an ordered chain.
- * Each step has its own manifest, bound to the base recipe, to the step before it (0108's manifest for the first) and
- * to the effective-capability verifier it supersedes; its own loader; and its own receipt row in
- * public.debateai_schema_migration_step. The verifier of the last applied step replaces dev's sealed verifier at the
- * end of every migrate(). A new step appends its loader to STEPS and edits no earlier step's file.
+ * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
+ * ordered chain. Each step has its own manifest, bound to the base recipe, to the step before it (0110's manifest for
+ * the first) and to the effective-capability verifier it supersedes (the sealed one for the first: 0110 keeps it in
+ * force); its own loader; and its own receipt row in public.debateai_schema_migration_step. The verifier of the last
+ * applied step replaces dev's sealed verifier at the end of every migrate(). A new step appends its loader to STEPS and
+ * edits no earlier step's file.
  */
 export type ForwardStepAnchor=Readonly<{baseRecipeSha256:string;previousName:string;previousManifestSha256:string;previousVerifierSha256:string}>;
 export type ForwardStepPlan=Readonly<{
@@ -20,8 +21,8 @@ export type ForwardStepPlan=Readonly<{
 }>;
 type StepLoader=(anchor:ForwardStepAnchor)=>Promise<ForwardStepPlan>;
 
-/** The chain, in order. Step 0110 adds its loader here (README); nothing else in this file changes. */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward109]);
+/** The chain, in order: 0111 (NETOPIA). Step 0112 adds its loader here (README); nothing else in this file changes. */
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111]);
 
 const STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD_CHAIN_${detail}`);};
@@ -97,21 +98,22 @@ function preconditionDigest(plan:MigrationPlan,step:ForwardStepPlan,owner:unknow
  const index=plan.forwardChain.indexOf(step);
  return sha(JSON.stringify({version:step.version,baseRecipeSha256:plan.recipeSha256,baseTerminal:[...plan.manifest.order].sort(),
   forward108:{name:plan.forward108.name,manifestSha256:plan.forward108.manifestSha256},
+  forward110:{name:plan.forward110.name,manifestSha256:plan.forward110.manifestSha256},
   prior:plan.forwardChain.slice(0,index).map(({name,manifestSha256})=>({name,manifestSha256})),owner,
   step:{name:step.name,manifestSha256:step.manifestSha256,sourceSha256:step.sourceSha256,verifierSha256:step.verifierSha256,previousVerifierSha256:step.previousVerifierSha256}}));
 }
 
 type Receipt=Readonly<Record<(typeof RECEIPT_COLUMNS)[number],string>>;
 /**
- * Runs after applyForward108. Before any step: 0108 is applied and the sealed verifier has passed (migrate()). Each
+ * Runs after applyForward110. Before any step: 0108 and 0110 are applied and the sealed verifier has passed. Each
  * pending step runs its SQL, then its superseding verifier, then records its ledger row and its receipt. Applied steps
  * are replayed only by their receipts (and the last one's postcondition); their SQL never runs twice.
  */
 export async function applyForwardChain(client:PoolClient,plan:MigrationPlan,applied:ReadonlySet<string>):Promise<void>{
  const done=appliedForwardSteps(plan,applied);
  if(plan.forwardChain.length===0)return;
- // applyForward108 has just replayed or applied 0108 in this transaction; its ledger row is the chain's base.
- const base=(await client.query<{present:boolean}>('SELECT EXISTS(SELECT 1 FROM public.debateai_schema_migration WHERE name=$1) present',[plan.forward108.name])).rows[0];
+ // applyForward110 has just replayed or applied 0110 (after 0108) in this transaction; its ledger row is the chain's base.
+ const base=(await client.query<{present:boolean}>('SELECT EXISTS(SELECT 1 FROM public.debateai_schema_migration WHERE name=$1) AND EXISTS(SELECT 1 FROM public.debateai_schema_migration WHERE name=$2) present',[plan.forward108.name,plan.forward110.name])).rows[0];
  if(base?.present!==true)return fail('BASE_STATE');
  const owner=await executor(client);
  const exists=(await client.query<{present:boolean}>("SELECT to_regclass('public.debateai_schema_migration_step') IS NOT NULL present")).rows[0]?.present===true;

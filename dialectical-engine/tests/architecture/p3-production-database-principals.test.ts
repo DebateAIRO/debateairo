@@ -472,7 +472,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/api:billing-check-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:check" },
         // NETOPIA spec 2026-10-05 §2.20.3 (N22): the owner's NETOPIA recording (`pnpm billing:netopia-sandbox`) runs as the
         // API, with the API's own EnvironmentFile, under systemd-run; it inserts only billing.tool_order and reads
-        // billing.card_token, card_token_revocation, payment_notice and payment_notice_raw, all granted by 0109 to
+        // billing.card_token, card_token_revocation, payment_notice and payment_notice_raw, all granted by 0111 to
         // debateai_billing_runtime; no privilege is added.
         { component: "tools/billing:netopia-sandbox", environmentKey: "DATABASE_URL", purpose: "BILLING_NETOPIA_RECORDING_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:netopia-sandbox" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },

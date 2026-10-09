@@ -1,9 +1,10 @@
--- Supersedes lineage/verify-effective-capabilities.sql (sealed, sha256 efeddf3d…7944) once forward step 0109 is
--- applied (PR-54; migrations/lineage/README.md). Every check of the sealed verifier is kept with its refusal code; the
--- only differences are NETOPIA's: its nine billing tables join the closed relation list (with the retail tables' rules:
--- the billing role holds SELECT and INSERT, nobody writes them otherwise), its two purges join the closed list of the
--- billing role's functions, and one block pins the exact owner and grants 0109 gives each of them.
-DO $billing_netopia_109_contract$
+-- Supersedes lineage/verify-effective-capabilities.sql (sealed, sha256 efeddf3d…7944), the verifier still in force
+-- after dev's 0110, once forward step 0111 is applied (PR-54, PR-58; migrations/lineage/README.md). Every check of the
+-- sealed verifier is kept with its refusal code; the only differences are NETOPIA's: its nine billing tables join the
+-- closed relation list (with the retail tables' rules: the billing role holds SELECT and INSERT, nobody writes them
+-- otherwise), its two purges join the closed list of the billing role's functions, and one block pins the exact owner
+-- and grants 0111 gives each of them.
+DO $billing_netopia_111_contract$
 DECLARE
   v_netopia text[] := ARRAY[
     'card_token','card_token_revocation','hosted_payment','notice_quarantine','payment_notice',
@@ -213,7 +214,7 @@ BEGIN
       RAISE EXCEPTION 'MIGRATION_EFFECTIVE_CAPABILITY_DRIFT %',v_name;
     END IF;
   END LOOP;
-  -- 0109's objects, exactly as it creates them: each table a plain table of the installer with no row security, its
+  -- 0111's objects, exactly as it creates them: each table a plain table of the installer with no row security, its
   -- grants SELECT and INSERT to the billing role and nothing else (no other role, no column grant, no grant option);
   -- each purge the installer's, executable by its owner and the billing role only.
   FOREACH v_name IN ARRAY v_netopia LOOP
@@ -225,7 +226,7 @@ BEGIN
           OR EXISTS(SELECT 1 FROM pg_attribute col WHERE col.attrelid=c.oid AND col.attnum>0 AND NOT col.attisdropped
             AND col.attacl IS NOT NULL AND col.attacl<>'{}'::aclitem[])
         FROM pg_class c WHERE c.oid=to_regclass('billing.'||v_name)) IS DISTINCT FROM false THEN
-      RAISE EXCEPTION 'BILLING_NETOPIA_109_TABLE_PRIVILEGE %',v_name;
+      RAISE EXCEPTION 'BILLING_NETOPIA_111_TABLE_PRIVILEGE %',v_name;
     END IF;
   END LOOP;
   FOREACH v_name IN ARRAY v_netopia_functions LOOP
@@ -235,7 +236,7 @@ BEGIN
                 WHERE a.grantee<>p.proowner ORDER BY 1)
              IS DISTINCT FROM ARRAY['debateai_billing_runtime:EXECUTE:false']
         FROM pg_proc p WHERE p.oid=to_regprocedure(v_name)) IS DISTINCT FROM false THEN
-      RAISE EXCEPTION 'BILLING_NETOPIA_109_FUNCTION_PRIVILEGE %',v_name;
+      RAISE EXCEPTION 'BILLING_NETOPIA_111_FUNCTION_PRIVILEGE %',v_name;
     END IF;
   END LOOP;
   SELECT array_agg(p.oid ORDER BY p.oid) INTO v_callable
@@ -315,4 +316,4 @@ BEGIN
     RAISE EXCEPTION 'AUTH_DEV_107_CAPABILITY_DRIFT';
   END IF;
 END
-$billing_netopia_109_contract$;
+$billing_netopia_111_contract$;

@@ -526,7 +526,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     const plan = await loadMigrationPlan();
     const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
     expect(plan.manifest.order).toHaveLength(128);
-    // PR-54: the forward chain after 0108 (0109, NETOPIA) is declared by its own manifests (migrations/lineage/README.md).
+    // PR-54, PR-58: dev's 0110, then the forward chain after it (0111, NETOPIA), each declared by its own manifests
+    // (migrations/lineage/README.md).
     expect(files).toEqual([...plan.manifest.order, plan.forward108.name, plan.forward110.name, ...plan.forwardChain.map((step) => step.name)].sort());
     for (const name of ["0104_password_only_reset.sql", "0105_backup_email_verification.sql", "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"]) {
       expect(auditMigrationReplaySafety(`migrations/${name}`, plan.sources.get(name)!.sql, { plan, migrateSource })).toEqual([]);
@@ -545,6 +546,6 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     expect(ordered.at(-1)).toBe("0107_auth_dev_integration.sql");
     expect(plan.forward108.name).toBe("0108_preview_recovery_verified_bindings.sql");
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
-    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0109_billing_netopia.sql"]);
+    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql"]);
   });
 });

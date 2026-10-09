@@ -18,9 +18,12 @@ export class NativeVerifyPendingForwardStepError extends Error {
   this.name='NativeVerifyPendingForwardStepError';this.pending=Object.freeze([...pending]);
  }
 }
-/** Every forward step of the source (plan.forwardChain, however long) whose name the ledger lacks, in chain order. */
-export function pendingForwardSteps(plan:Pick<MigrationPlan,'forwardChain'>,applied:ReadonlySet<string>):readonly string[]{
- return plan.forwardChain.map(step=>step.name).filter(name=>!applied.has(name));
+/**
+ * Every forward step of the source whose name the ledger lacks, in apply order: dev's 0110 (plan.forward110, which
+ * migrate() applies after 0108 through applyForward110), then plan.forwardChain however long (0111 first).
+ */
+export function pendingForwardSteps(plan:Pick<MigrationPlan,'forwardChain'|'forward110'>,applied:ReadonlySet<string>):readonly string[]{
+ return [plan.forward110.name,...plan.forwardChain.map(step=>step.name)].filter(name=>!applied.has(name));
 }
 /** Read-only: one SELECT of the ledger names. Refuses before anything could apply a pending forward step. */
 export async function refusePendingForwardSteps(pool:Pool,plan?:MigrationPlan):Promise<void>{
