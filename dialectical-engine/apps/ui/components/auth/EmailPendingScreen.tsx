@@ -78,11 +78,14 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
     }
   }
 
+  // After sign-up the sentence is the submit's outcome, a status message. The resend entry's sentence is an
+  // instruction until a send, and the send is said by the announcer, so it is not a live region there.
+  const outcome = notice === undefined && context === undefined;
   // The screen replaces the form whose button had focus, so focus starts on its headline.
   return <AuthShell eyebrow={context?.eyebrow ?? t(catalog, "auth.signUp.eyebrow")} title={context?.title ?? t(catalog, "auth.pending.title")}
     description={email} footer={null} focusTitle>
     {announcer.region}
-    <p className="authFinePrint">{sent && context !== undefined ? context.sent : notice ?? t(catalog, "auth.signUp.registrationSent")}</p>
+    <p className="authFinePrint" role={outcome ? "status" : undefined} aria-live={outcome ? "polite" : undefined}>{sent && context !== undefined ? context.sent : notice ?? t(catalog, "auth.signUp.registrationSent")}</p>
     {configured ? <TurnstileChallenge siteKey={turnstile.siteKey} nonce={turnstile.nonce} action="resend-verification"
       locale={locale} resetKey={resetKey} onToken={token => { setProof(token); if (token !== null) setProofUnavailable(false); }} onError={() => setProofUnavailable(true)} /> : null}
     {/* Countdown text has no live region; assistive readers hear only stable state. */}
