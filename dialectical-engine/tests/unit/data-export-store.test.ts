@@ -134,7 +134,24 @@ describe("FileDataExportStore", () => {
     await store.write(EXPORT_B, USER_A, ZIP);
     await store.deleteArchive(EXPORT_A);
     await expect(fs.stat(join(directory, `${EXPORT_A}.zip.enc`))).rejects.toMatchObject({ code: "ENOENT" });
+    expect(await store.listIds()).toEqual([EXPORT_A, EXPORT_B]);
+    await store.destroyKey(EXPORT_A);
     expect(await store.listIds()).toEqual([EXPORT_B]);
+  });
+
+  it("R36 lists key-only and temporary orphans and deletes every suffix", async () => {
+    const { FileDataExportStore } = await import("../../apps/api/src/data-export/store.js");
+    const store = new FileDataExportStore({ directory, users: users() });
+    const names = [".key", ".zip.enc", ".key.tmp", ".zip.enc.tmp"];
+    for (const [index, suffix] of names.entries()) {
+      await fs.writeFile(join(directory, `${[EXPORT_A, EXPORT_B, EXPORT_C, "10000000-0000-4000-8000-000000000004"][index]}${suffix}`), "orphan");
+    }
+    expect(await store.listIds()).toEqual([EXPORT_A, EXPORT_B, EXPORT_C, "10000000-0000-4000-8000-000000000004"]);
+    for (const id of await store.listIds()) {
+      await store.destroyKey(id);
+      await store.deleteArchive(id);
+    }
+    expect(await fs.readdir(directory)).toEqual([]);
   });
 
   it("T-6 reports a destroyed user DEK as a destroyed export key", async () => {

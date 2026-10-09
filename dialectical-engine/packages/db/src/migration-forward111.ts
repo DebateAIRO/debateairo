@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { PoolClient } from 'pg';
-import type { MigrationPlan, Lineage } from './migration-lineage.js';
+import { lineageEvidence, type MigrationPlan, type Lineage } from './migration-lineage.js';
 import { base108Lineage } from './migration-forward108.js';
 
 // Data export follows forward110 and binds its source, function bodies, shared bindings and receipt.
@@ -129,38 +129,19 @@ async function metadataDigest(client:PoolClient,forward:Forward111Plan):Promise<
   FROM unnest($1::text[]) signature JOIN pg_proc p ON p.oid=to_regprocedure(signature) ORDER BY signature
  `,[signatures])).rows;
  if(rows.length!==signatures.length)return fail('FUNCTION_DRIFT');
- const columns=(await client.query(`SELECT a.attname,format_type(a.atttypid,a.atttypmod) type,a.attnotnull,pg_get_expr(d.adbin,d.adrelid) "default" FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
+ const columns=(await client.query(`SELECT a.attname,format_type(a.atttypid,a.atttypmod) type,a.attnotnull,
+  COALESCE((SELECT jsonb_agg(x::text ORDER BY x::text) FROM unnest(a.attacl) x),'[]'::jsonb) acl,
+  pg_get_expr(d.adbin,d.adrelid) "default" FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
   WHERE a.attrelid='identity.data_export'::regclass AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum`)).rows;
+ const exportConstraints=(await client.query(`SELECT conname,contype,convalidated,pg_get_constraintdef(oid) definition
+  FROM pg_constraint WHERE conrelid='identity.data_export'::regclass ORDER BY conname`)).rows;
+ const exportIndexes=(await client.query(`SELECT c.relname,i.indisunique,i.indisprimary,i.indisvalid,i.indisready,i.indislive,pg_get_indexdef(i.indexrelid) definition
+  FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE i.indrelid='identity.data_export'::regclass ORDER BY c.relname`)).rows;
+ const exportTriggers=(await client.query(`SELECT tgname,tgenabled,pg_get_triggerdef(oid) definition
+  FROM pg_trigger WHERE tgrelid='identity.data_export'::regclass AND NOT tgisinternal ORDER BY tgname`)).rows;
  const check=(await client.query(`SELECT pg_get_constraintdef(oid) def FROM pg_constraint WHERE conrelid='identity.step_up_grant'::regclass AND conname='step_up_grant_action_check'`)).rows;
- return sha(JSON.stringify({functions:rows,columns,check}));
+ return sha(JSON.stringify({functions:rows,columns,exportConstraints,exportIndexes,exportTriggers,check}));
 }
-async function compatibilityEvidence(client: PoolClient): Promise<string> {
-  const result = await client.query<{ evidence: unknown }>(`
-    SELECT jsonb_build_object(
-      'billing_owner', (SELECT pg_get_userbyid(c.relowner) FROM pg_class c WHERE c.oid='billing.internal_grant'::regclass),
-      'internal_tables', (SELECT jsonb_agg(c.relname ORDER BY c.relname) FROM pg_class c WHERE c.relnamespace='billing'::regnamespace AND c.relname IN ('internal_grant','internal_grant_event','internal_provider_admission')),
-      'billing_role', (SELECT jsonb_build_object('login',rolcanlogin,'super',rolsuper,'inherit',rolinherit) FROM pg_roles WHERE rolname='debateai_billing_runtime'),
-      'runtime_internal_raw', (SELECT count(*) FROM pg_class c WHERE c.relnamespace='billing'::regnamespace AND c.relname IN ('internal_grant','internal_grant_event','internal_provider_admission') AND has_table_privilege('debateai_runtime',c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')),
-      'api_internal_raw', (SELECT count(*) FROM pg_class c WHERE c.relnamespace='billing'::regnamespace AND c.relname IN ('internal_grant','internal_grant_event','internal_provider_admission') AND has_table_privilege('debateai_billing_runtime',c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'))
-      ,'api_social_creation', has_function_privilege('debateai_billing_runtime',to_regprocedure('identity.create_social_account(jsonb,jsonb)'),'EXECUTE')
-      ,'runtime_social_creation', has_function_privilege('debateai_runtime',to_regprocedure('identity.create_social_account(jsonb,jsonb)'),'EXECUTE')
-      ,'runtime_internal_append', has_function_privilege('debateai_runtime','billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)','EXECUTE')
-      ,'api_internal_append', has_function_privilege('debateai_billing_runtime','billing.record_internal_charge_scope(uuid,uuid,uuid,uuid,timestamptz)','EXECUTE')
-      ,'mfa_103_policy', has_function_privilege(to_regrole('debateai_mfa_recovery_owner'),to_regprocedure('identity.password_recovery_rules(bigint)'),'EXECUTE')
-      ,'runtime_103_policy', has_function_privilege(to_regrole('debateai_password_recovery_runtime'),to_regprocedure('identity.password_recovery_rules(bigint)'),'EXECUTE')
-      ,'policy_definition', encode(sha256(convert_to(pg_get_functiondef(to_regprocedure('identity.password_recovery_rules(bigint)')),'UTF8')),'hex')
-      ,'withdraw_check', (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='identity.step_up_grant'::regclass AND conname='step_up_grant_action_check')
-      ,'consumer_authorization_definition', (SELECT encode(sha256(convert_to(pg_get_functiondef(oid),'UTF8')),'hex') FROM pg_proc WHERE oid=to_regprocedure('identity.valid_consumer_authorization_internal(jsonb)'))
-      ,'recovery_eligibility_definition', (SELECT encode(sha256(convert_to(pg_get_functiondef(oid),'UTF8')),'hex') FROM pg_proc WHERE oid=to_regprocedure('identity.mfa_recovery_eligible(uuid)'))
-      ,'cohort_owner', (SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid=to_regclass('identity.mfa_recovery_legacy_cohort'))
-      ,'cohort_columns', (SELECT jsonb_agg(attname ORDER BY attnum) FROM pg_attribute WHERE attrelid=to_regclass('identity.mfa_recovery_legacy_cohort') AND attnum>0 AND NOT attisdropped)
-      ,'cohort_runtime_read', has_table_privilege('debateai_runtime',to_regclass('identity.mfa_recovery_legacy_cohort'),'SELECT')
-    ) AS evidence
-  `);
-  return sha(JSON.stringify(result.rows[0]?.evidence));
-}
-
-
 function preconditionDigest(plan:MigrationPlan):string{
  const forward=plan.forward111;
  return sha(JSON.stringify({version:VERSION,baseRecipeSha256:plan.recipeSha256,chain:forward.chain,chainManifestSha256:forward.chainManifestSha256,
@@ -216,7 +197,7 @@ export async function applyForward111(client:PoolClient,plan:MigrationPlan,linea
   if(['auth94','auth103','auth106','integrated-compatibility'].includes(base108Lineage(lineage))){
    compatPrior=(await client.query<{postcondition_evidence_digest:string}>("SELECT postcondition_evidence_digest FROM public.debateai_schema_migration_resolution WHERE logical_name='0093_billing_runtime_role.sql'")).rows[0]?.postcondition_evidence_digest??null;
    if(!hex(compatPrior))return fail('RECEIPT_BINDING_DRIFT');
-   compatPost=await compatibilityEvidence(client);
+   compatPost=await lineageEvidence(client);
    await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name='0093_billing_runtime_role.sql'",[compatPost]);
   }
   await client.query('INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())',[forward.name]);

@@ -6,11 +6,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { hashToken } from "@debateai/crypto";
 import { loadArchiveCatalog } from "../../apps/api/src/data-export/archive-catalog.js";
 import { FileDataExportStore } from "../../apps/api/src/data-export/store.js";
+import { renderYourDataHtml } from "../../apps/api/src/data-export/html-page.js";
 import type { ExportClaim } from "../../apps/api/src/data-export/snapshot.js";
 import type { ExportSnapshot } from "../../apps/api/src/data-export/types.js";
 import { DataExportApplication } from "../../apps/api/src/data-export/service.js";
 import * as serviceModule from "../../apps/api/src/data-export/service.js";
 import { MemoryDataExportRepository } from "../support/data-export-memory-repository.js";
+import { startTestDatabase } from "../support/testDatabase.js";
 
 const USER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const OTHER = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -70,6 +72,47 @@ afterEach(async () => {
 });
 
 describe("data export application", () => {
+  it("R27 orders visibility history by event sequence regardless of insertion order", async () => {
+    const sql = await readFile("migrations/0111_data_export.sql", "utf8");
+    const line = sql.split("\n").find((part) => part.includes("'visibility_events',COALESCE"))!;
+    const aggregate = line.match(/COALESCE\(\(SELECT .*\),'\[\]'::jsonb\)/)?.[0]!;
+    const run = "11111111-1111-4111-8111-111111111111", owner = "22222222-2222-4222-8222-222222222222";
+    const query = `SELECT ${aggregate.replaceAll("core.run_visibility_event", "ev").replaceAll("core.run_ownership_event", "own").replaceAll("v_owner", `'${owner}'::uuid`)} history`;
+    const db = await startTestDatabase();
+    try {
+      await db.pool.query("CREATE TABLE ev(run_id uuid,state text,occurred_at timestamptz,at_seq bigint)");
+      await db.pool.query("CREATE TABLE own(run_id uuid,owner_ref uuid,at_seq bigint)");
+      await db.pool.query("INSERT INTO own VALUES($1,$2,1)", [run, owner]);
+      await db.pool.query("INSERT INTO ev VALUES($1,'PRIVATE',now(),2),($1,'PUBLISHED',now(),1)", [run]);
+      const history = (await db.pool.query(query)).rows[0].history as Array<{state: string; occurred_at: string}>;
+      expect(history.map((event) => event.state)).toEqual(["PUBLISHED", "PRIVATE"]);
+      const catalog = loadArchiveCatalog("en");
+      const snapshot = { locale: "en", generatedAt: START, account: { account: { pseudonym: "p", email: "e", created_at: START.toISOString() } },
+        debates: { debates: [{ reference: run, content_status: "UNRECOVERABLE", created_at: START.toISOString(), deleted_at: null,
+          tier: null, depth: null, plan_tier: null, state: null,
+          visibility_history: history.map((event) => ({ state: event.state, at: event.occurred_at })) }] } } as unknown as ExportSnapshot;
+      const html = renderYourDataHtml(snapshot, catalog);
+      expect(html).toContain(catalog["archive.visibilityPrivate"]);
+      expect(html).not.toContain(catalog["archive.visibilityPublic"]);
+    } finally { await db.stop(); }
+  });
+
+  it("R22 every snapshot JSON list aggregate declares its sequence order", async () => {
+    const sql = await readFile("migrations/0111_data_export.sql", "utf8");
+    const functionSql = sql.split("CREATE OR REPLACE FUNCTION identity.read_data_export_snapshot(")[1]!.split("CREATE OR REPLACE FUNCTION identity.complete_data_export(")[0]!;
+    const starts = [...functionSql.matchAll(/jsonb_agg\(/g)].map((match) => match.index! + match[0].length);
+    expect(starts).toHaveLength(38);
+    const unordered = starts.filter((start) => {
+      let depth = 1, order = false;
+      for (let i = start; i < functionSql.length && depth > 0; i++) {
+        if (depth === 1 && functionSql.startsWith(" ORDER BY ", i)) order = true;
+        if (functionSql[i] === "(") depth++;
+        if (functionSql[i] === ")") depth--;
+      }
+      return !order;
+    });
+    expect(unordered).toEqual([]);
+  });
   it("V-1 mails the stored archive with one handoff clock value for mail and row", async () => {
     const f = await fixture();
     await f.request();
@@ -132,6 +175,27 @@ describe("data export application", () => {
     expect(f.mails).toHaveLength(0);
     expect(f.latest().status).toBe("PREPARING");
     expect(await f.store.listIds()).toEqual([]);
+  });
+
+  it("R37 sends no mail when erasure starts during collection", async () => {
+    const f = await fixture();
+    f.setCollect(async (claim) => {
+      f.repository.setProcessing(USER, true);
+      return snapshotA(claim, f.now());
+    });
+    await f.request();
+    await f.app.runOnce();
+    expect(f.mails).toHaveLength(0);
+    expect(await f.store.listIds()).toEqual([]);
+  });
+
+  it("R31 sweeps an abandoned fourth claim and allows a later request", async () => {
+    const f = await fixture();
+    const stuck = f.repository.seedPreparing({ userId: USER, sessionId: SESSION, attempt: 4,
+      leaseUntil: new Date(START.getTime() - 60_000) });
+    await f.app.runOnce();
+    expect(stuck.status).toBe("FAILED");
+    expect(stuck.failureReason).toBe("ATTEMPTS");
   });
 
   it("V-6 reclaims a lapsed lease at attempt 2 and fails attempt 4", async () => {

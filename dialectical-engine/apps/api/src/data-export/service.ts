@@ -143,6 +143,10 @@ export class DataExportApplication {
       const tokenHash = hashToken("data-export-link", token);
       const handoffAt = (this.deps.now ?? (() => new Date()))();
       const expiresAt = new Date(handoffAt.getTime() + DATA_EXPORT_LINK_TTL_SECONDS * 1000);
+      if (leaseLost || !await repository.renewLease(claim.exportId, workerId, DATA_EXPORT_LEASE_SECONDS)) {
+        await discard();
+        return;
+      }
       phase = "MAIL";
       await this.deps.mail.sendExportReady({
         exportId: claim.exportId,

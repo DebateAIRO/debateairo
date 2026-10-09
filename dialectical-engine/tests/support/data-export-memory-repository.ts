@@ -114,7 +114,7 @@ export class MemoryDataExportRepository implements DataExportRepository {
 
   async claim(workerId: string, leaseSeconds: number): Promise<ExportClaim | null> {
     this.calls.push({ method: "claim" });
-    const row = [...this.rows.values()].find((item) => item.status === "PREPARING" && (item.leaseUntil === null || item.leaseUntil <= this.now()));
+    const row = [...this.rows.values()].find((item) => item.status === "PREPARING" && item.attempt < 4 && (item.leaseUntil === null || item.leaseUntil <= this.now()));
     if (!row) return null;
     row.attempt += 1;
     row.leaseWorker = workerId;
@@ -162,7 +162,13 @@ export class MemoryDataExportRepository implements DataExportRepository {
     for (const row of this.rows.values()) {
       if (this.processing.has(row.userId) && (row.status === "PREPARING" || row.status === "SENT")) row.status = "CANCELLED";
       if (row.status === "SENT" && row.expiresAt !== null && row.expiresAt <= this.now()) row.status = "EXPIRED";
-      if (!row.keyDestroyed && ["CANCELLED", "SUPERSEDED", "EXPIRED"].includes(row.status)) victims.push({ exportId: row.exportId, userId: row.userId });
+      if (row.status === "PREPARING" && row.attempt >= 4 && row.leaseUntil !== null && row.leaseUntil <= this.now()) {
+        row.status = "FAILED";
+        row.failureReason = "ATTEMPTS";
+        row.leaseWorker = null;
+        row.leaseUntil = null;
+      }
+      if (!row.keyDestroyed && ["CANCELLED", "SUPERSEDED", "EXPIRED", "FAILED"].includes(row.status)) victims.push({ exportId: row.exportId, userId: row.userId });
     }
     return victims;
   }
