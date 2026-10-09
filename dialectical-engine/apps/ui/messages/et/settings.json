@@ -172,5 +172,6 @@
   "settings.security.remove": "Eemalda",
   "settings.security.codesRemaining": "Taastekoodid: {count}",
   "settings.security.regenerate": "Loo uued taastekoodid",
+  "settings.security.lockoutReminder": "Teil pole veel taastekoode ega pääsuvõtit. Kui kaotate telefoni, pääsete nendega kohe tagasi sisse.",
   "settings.security.refreshFailed": "Turbeandmeid ei saanud värskendada. Laadi leht uuesti."
 }

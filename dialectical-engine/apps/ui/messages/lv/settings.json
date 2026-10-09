@@ -173,5 +173,6 @@
   "settings.security.remove": "Noņemt",
   "settings.security.codesRemaining": "Atkopšanas kodi: {count}",
   "settings.security.regenerate": "Ģenerēt jaunus atkopšanas kodus",
+  "settings.security.lockoutReminder": "Jums vēl nav atkopšanas kodu vai piekļuves atslēgas. Ja pazaudēsiet tālruni, ar tiem uzreiz atgūsiet piekļuvi.",
   "settings.security.refreshFailed": "Drošības datus nevarēja atsvaidzināt. Pārlādējiet lapu."
 }

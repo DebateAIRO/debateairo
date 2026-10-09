@@ -171,5 +171,6 @@
   "settings.security.remove": "Hapus",
   "settings.security.codesRemaining": "Kode pemulihan: {count}",
   "settings.security.regenerate": "Buat kode pemulihan baru",
+  "settings.security.lockoutReminder": "Anda belum memiliki kode pemulihan atau kunci sandi. Jika telepon Anda hilang, keduanya memungkinkan Anda langsung masuk kembali.",
   "settings.security.refreshFailed": "Detail keamanan tidak dapat diperbarui. Muat ulang halaman."
 }

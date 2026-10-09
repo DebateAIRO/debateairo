@@ -173,5 +173,6 @@
   "settings.security.remove": "Eliminați",
   "settings.security.codesRemaining": "Coduri de recuperare: {count}",
   "settings.security.regenerate": "Generați coduri noi de recuperare",
+  "settings.security.lockoutReminder": "Încă nu aveți coduri de recuperare sau o cheie de acces. Dacă vă pierdeți telefonul, acestea vă permit să reveniți imediat în contul dumneavoastră.",
   "settings.security.refreshFailed": "Detaliile de securitate nu au putut fi reîmprospătate. Reîncărcați pagina."
 }

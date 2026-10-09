@@ -172,5 +172,6 @@
   "settings.security.remove": "Премахване",
   "settings.security.codesRemaining": "Кодове за възстановяване: {count}",
   "settings.security.regenerate": "Генериране на нови кодове за възстановяване",
+  "settings.security.lockoutReminder": "Все още нямате кодове за възстановяване или ключ за достъп. Ако загубите телефона си, с тях влизате отново веднага.",
   "settings.security.refreshFailed": "Данните за сигурност не могат да бъдат обновени. Презаредете страницата."
 }

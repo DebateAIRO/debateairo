@@ -173,5 +173,6 @@
   "settings.security.remove": "הסרה",
   "settings.security.codesRemaining": "קודי שחזור: {count}",
   "settings.security.regenerate": "יצירת קודי שחזור חדשים",
+  "settings.security.lockoutReminder": "עדיין אין לכם קודי שחזור או מפתח גישה. אם הטלפון יאבד, הם יאפשרו לכם להיכנס שוב מיד.",
   "settings.security.refreshFailed": "לא ניתן היה לרענן את פרטי האבטחה. יש לטעון מחדש את הדף."
 }

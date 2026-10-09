@@ -173,5 +173,6 @@
   "settings.security.remove": "Quitar",
   "settings.security.codesRemaining": "Códigos de recuperación: {count}",
   "settings.security.regenerate": "Generar nuevos códigos de recuperación",
+  "settings.security.lockoutReminder": "Aún no tiene códigos de recuperación ni clave de acceso. Si pierde su teléfono, con ellos vuelve a entrar al instante.",
   "settings.security.refreshFailed": "No se pudieron actualizar los datos de seguridad. Vuelve a cargar la página."
 }

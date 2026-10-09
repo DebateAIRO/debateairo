@@ -174,5 +174,6 @@
   "settings.security.remove": "Odstrani",
   "settings.security.codesRemaining": "Obnovitvene kode: {count}",
   "settings.security.regenerate": "Ustvari nove obnovitvene kode",
+  "settings.security.lockoutReminder": "Še nimate obnovitvenih kod ali ključa za dostop. Če izgubite telefon, se z njimi takoj vrnete v račun.",
   "settings.security.refreshFailed": "Varnostnih podatkov ni bilo mogoče osvežiti. Znova naložite stran."
 }

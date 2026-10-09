@@ -172,5 +172,6 @@
   "settings.security.remove": "Eltávolítás",
   "settings.security.codesRemaining": "Helyreállítási kódok: {count}",
   "settings.security.regenerate": "Új helyreállítási kódok létrehozása",
+  "settings.security.lockoutReminder": "Még nincsenek helyreállítási kódjai, és hozzáférési kulcsa sincs. Ha elveszíti a telefonját, ezekkel azonnal visszajut a fiókjába.",
   "settings.security.refreshFailed": "A biztonsági adatokat nem sikerült frissíteni. Töltse be újra az oldalt."
 }

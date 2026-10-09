@@ -175,5 +175,6 @@
   "settings.security.remove": "Neħħi",
   "settings.security.codesRemaining": "Kodiċijiet ta’ rkupru: {count}",
   "settings.security.regenerate": "Iġġenera kodiċijiet ġodda ta’ rkupru",
+  "settings.security.lockoutReminder": "Għad m’għandek l-ebda kodiċi ta’ rkupru jew ċavetta tal-aċċess. Jekk titlef it-telefon tiegħek, b’dawn terġa’ tidħol minnufih.",
   "settings.security.refreshFailed": "Id-dettalji tas-sigurtà ma setgħux jiġu aġġornati. Erġa’ tella’ l-paġna."
 }

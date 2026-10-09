@@ -173,5 +173,6 @@
   "settings.security.remove": "Retirer",
   "settings.security.codesRemaining": "Codes de récupération : {count}",
   "settings.security.regenerate": "Générer de nouveaux codes de récupération",
+  "settings.security.lockoutReminder": "Vous n’avez encore ni codes de récupération ni clé d’accès. Si vous perdez votre téléphone, ils vous permettent de revenir aussitôt dans votre compte.",
   "settings.security.refreshFailed": "Les informations de sécurité n’ont pas pu être actualisées. Rechargez la page."
 }

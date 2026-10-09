@@ -174,5 +174,6 @@
   "settings.security.remove": "Видалити",
   "settings.security.codesRemaining": "Коди відновлення: {count}",
   "settings.security.regenerate": "Створити нові коди відновлення",
+  "settings.security.lockoutReminder": "У вас ще немає кодів відновлення чи ключа доступу. Якщо ви втратите телефон, з ними ви одразу ввійдете знову.",
   "settings.security.refreshFailed": "Не вдалося оновити відомості про безпеку. Перезавантажте сторінку."
 }

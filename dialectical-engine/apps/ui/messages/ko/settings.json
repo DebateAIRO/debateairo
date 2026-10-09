@@ -171,5 +171,6 @@
   "settings.security.remove": "삭제",
   "settings.security.codesRemaining": "복구 코드: {count}",
   "settings.security.regenerate": "새 복구 코드 생성",
+  "settings.security.lockoutReminder": "아직 복구 코드나 패스키가 없습니다. 이 중 하나만 있으면 휴대폰을 잃어버려도 바로 다시 로그인할 수 있습니다.",
   "settings.security.refreshFailed": "보안 정보를 새로 고칠 수 없습니다. 페이지를 다시 불러오세요."
 }

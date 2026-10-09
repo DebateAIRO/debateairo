@@ -172,5 +172,6 @@
   "settings.security.remove": "Entfernen",
   "settings.security.codesRemaining": "Wiederherstellungscodes: {count}",
   "settings.security.regenerate": "Neue Wiederherstellungscodes erstellen",
+  "settings.security.lockoutReminder": "Sie haben noch keine Wiederherstellungscodes und keinen Passkey. Wenn Sie Ihr Telefon verlieren, kommen Sie damit sofort wieder in Ihr Konto.",
   "settings.security.refreshFailed": "Die Sicherheitsdetails konnten nicht aktualisiert werden. Lade die Seite neu."
 }

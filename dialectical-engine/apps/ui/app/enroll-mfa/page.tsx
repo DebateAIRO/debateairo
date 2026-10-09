@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AuthShell, useSelectedAuthCatalog } from '@/components/AuthShell';
 import { SecurityEnrollment } from '@/components/auth/SecurityEnrollment';
 import { OnboardingEvidence } from '@/components/auth/OnboardingEvidence';
+import { LockoutPrompt } from '@/components/auth/LockoutPrompt';
 import { takeFragmentToken, verifyMfaEmail, MfaEnrollmentHttpError } from '@/lib/mfaEnrollment';
 import { useChromeI18n } from '@/lib/i18n/I18nProvider';
 import { t } from '@/lib/i18n/translate';
@@ -14,6 +15,8 @@ export default function EnrollMfaPage() {
     const [token, setToken] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [ready, setReady] = useState(false);
+    // Set once MFA set-up has signed the person in: the "don't get locked out" card comes first.
+    const [secured, setSecured] = useState(false);
     useEffect(() => {
         if (started.current)
             return;
@@ -40,9 +43,9 @@ export default function EnrollMfaPage() {
         })();
     }, [catalog]);
     return <AuthShell eyebrow={t(catalog, "auth.signUp.eyebrow")} title={t(catalog, "auth.enroll.securityTitle")} description={t(catalog, "auth.enroll.passkeyPreferred")} footer={null}>
- {error ? <><p className="authFieldError" role="alert">{error}</p><a className="authPrimary" href="/login">{t(catalog, "auth.login.backToSignIn")}</a></> : !token ? <p role="status">{t(catalog, "auth.enroll.verifyingEmail")}</p> : ready ? <SecurityEnrollment catalog={catalog} authority={{ kind: 'pending', token }} onAuthenticated={() => {
+ {error ? <><p className="authFieldError" role="alert">{error}</p><a className="authPrimary" href="/login">{t(catalog, "auth.login.backToSignIn")}</a></> : secured ? <LockoutPrompt catalog={catalog} onDone={() => window.location.assign(safeReturnPath(new URLSearchParams(window.location.search).get('next')))}/> : !token ? <p role="status">{t(catalog, "auth.enroll.verifyingEmail")}</p> : ready ? <SecurityEnrollment catalog={catalog} authority={{ kind: 'pending', token }} onAuthenticated={() => {
                 setToken('');
-                window.location.assign(safeReturnPath(new URLSearchParams(window.location.search).get('next')));
+                setSecured(true);
             }}/> : <OnboardingEvidence catalog={catalog} locale={locale} authority={{ kind: 'pending', token }} onReady={() => setReady(true)}/>}
  </AuthShell>;
 }

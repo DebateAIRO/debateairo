@@ -176,5 +176,6 @@
   "settings.security.remove": "إزالة",
   "settings.security.codesRemaining": "رموز الاسترداد: {count}",
   "settings.security.regenerate": "إنشاء رموز استرداد جديدة",
+  "settings.security.lockoutReminder": "ليس لديك بعد رموز استرداد أو مفتاح مرور. إذا فقدت هاتفك، فإنها تتيح لك العودة إلى حسابك فورًا.",
   "settings.security.refreshFailed": "تعذر تحديث تفاصيل الأمان. أعد تحميل الصفحة."
 }

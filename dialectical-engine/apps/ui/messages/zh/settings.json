@@ -171,5 +171,6 @@
   "settings.security.remove": "移除",
   "settings.security.codesRemaining": "恢复代码：{count}",
   "settings.security.regenerate": "生成新的恢复代码",
+  "settings.security.lockoutReminder": "您还没有恢复代码或通行密钥。如果您丢失了手机，有了它们即可立即重新登录。",
   "settings.security.refreshFailed": "无法刷新安全信息。请重新加载页面。"
 }

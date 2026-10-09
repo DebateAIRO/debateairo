@@ -172,5 +172,6 @@
   "settings.security.remove": "Kaldır",
   "settings.security.codesRemaining": "Kurtarma kodları: {count}",
   "settings.security.regenerate": "Yeni kurtarma kodları oluştur",
+  "settings.security.lockoutReminder": "Henüz kurtarma kodunuz veya geçiş anahtarınız yok. Telefonunuzu kaybederseniz bunlar sayesinde hemen yeniden giriş yapabilirsiniz.",
   "settings.security.refreshFailed": "Güvenlik bilgileri yenilenemedi. Sayfayı yeniden yükleyin."
 }

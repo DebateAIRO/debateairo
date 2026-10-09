@@ -174,5 +174,6 @@
   "settings.security.remove": "Odstrániť",
   "settings.security.codesRemaining": "Obnovovacie kódy: {count}",
   "settings.security.regenerate": "Vygenerovať nové obnovovacie kódy",
+  "settings.security.lockoutReminder": "Zatiaľ nemáte obnovovacie kódy ani prístupový kľúč. Ak stratíte telefón, vďaka nim sa do účtu hneď vrátite.",
   "settings.security.refreshFailed": "Podrobnosti zabezpečenia sa nepodarilo obnoviť. Načítajte stránku znova."
 }

@@ -174,5 +174,6 @@
   "settings.security.remove": "Usuń",
   "settings.security.codesRemaining": "Kody odzyskiwania: {count}",
   "settings.security.regenerate": "Wygeneruj nowe kody odzyskiwania",
+  "settings.security.lockoutReminder": "Nie masz jeszcze kodów odzyskiwania ani klucza dostępu. Jeśli zgubisz telefon, dzięki nim od razu wrócisz do konta.",
   "settings.security.refreshFailed": "Nie udało się odświeżyć danych bezpieczeństwa. Załaduj stronę ponownie."
 }

@@ -172,5 +172,6 @@
   "settings.security.remove": "Αφαίρεση",
   "settings.security.codesRemaining": "Κωδικοί ανάκτησης: {count}",
   "settings.security.regenerate": "Δημιουργία νέων κωδικών ανάκτησης",
+  "settings.security.lockoutReminder": "Δεν έχετε ακόμη κωδικούς ανάκτησης ή κλειδί πρόσβασης. Αν χάσετε το τηλέφωνό σας, με αυτά μπαίνετε ξανά αμέσως.",
   "settings.security.refreshFailed": "Δεν ήταν δυνατή η ανανέωση των στοιχείων ασφάλειας. Φορτώστε ξανά τη σελίδα."
 }

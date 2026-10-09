@@ -175,5 +175,6 @@
   "settings.security.remove": "Bain",
   "settings.security.codesRemaining": "Cóid aisghabhála: {count}",
   "settings.security.regenerate": "Gin cóid aisghabhála nua",
+  "settings.security.lockoutReminder": "Níl cóid aisghabhála ná eochair rochtana agat fós. Má chailleann tú d’fhón, ligeann siad duit filleadh isteach láithreach.",
   "settings.security.refreshFailed": "Níorbh fhéidir na sonraí slándála a athnuachan. Athlódáil an leathanach."
 }

@@ -171,5 +171,6 @@
   "settings.security.remove": "削除",
   "settings.security.codesRemaining": "復旧コード：{count}",
   "settings.security.regenerate": "新しい復旧コードを生成",
+  "settings.security.lockoutReminder": "復旧コードもパスキーもまだありません。スマートフォンをなくしても、これらがあればすぐにログインし直せます。",
   "settings.security.refreshFailed": "セキュリティ情報を更新できませんでした。ページを再読み込みしてください。"
 }

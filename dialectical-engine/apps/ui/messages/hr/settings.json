@@ -173,5 +173,6 @@
   "settings.security.remove": "Ukloni",
   "settings.security.codesRemaining": "Kodovi za oporavak: {count}",
   "settings.security.regenerate": "Generiraj nove kodove za oporavak",
+  "settings.security.lockoutReminder": "Još nemate kodove za oporavak ni pristupni ključ. Ako izgubite telefon, s njima se odmah vraćate u račun.",
   "settings.security.refreshFailed": "Sigurnosni podaci nisu osvježeni. Ponovno učitajte stranicu."
 }

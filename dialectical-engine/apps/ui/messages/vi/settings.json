@@ -171,5 +171,6 @@
   "settings.security.remove": "Xóa",
   "settings.security.codesRemaining": "Mã khôi phục: {count}",
   "settings.security.regenerate": "Tạo mã khôi phục mới",
+  "settings.security.lockoutReminder": "Bạn chưa có mã khôi phục hoặc khóa truy cập. Nếu bạn làm mất điện thoại, chúng giúp bạn vào lại ngay.",
   "settings.security.refreshFailed": "Không thể làm mới thông tin bảo mật. Hãy tải lại trang."
 }

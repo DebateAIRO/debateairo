@@ -172,5 +172,6 @@
   "settings.security.remove": "Verwijderen",
   "settings.security.codesRemaining": "Herstelcodes: {count}",
   "settings.security.regenerate": "Nieuwe herstelcodes genereren",
+  "settings.security.lockoutReminder": "U hebt nog geen herstelcodes of passkey. Als u uw telefoon kwijtraakt, komt u daarmee meteen weer binnen.",
   "settings.security.refreshFailed": "De beveiligingsgegevens konden niet worden vernieuwd. Laad de pagina opnieuw."
 }

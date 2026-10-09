@@ -172,5 +172,6 @@
   "settings.security.remove": "Poista",
   "settings.security.codesRemaining": "Palautuskoodit: {count}",
   "settings.security.regenerate": "Luo uudet palautuskoodit",
+  "settings.security.lockoutReminder": "Sinulla ei ole vielä palautuskoodeja eikä pääsyavainta. Jos kadotat puhelimesi, pääset niiden avulla heti takaisin sisään.",
   "settings.security.refreshFailed": "Turvallisuustietoja ei voitu päivittää. Lataa sivu uudelleen."
 }

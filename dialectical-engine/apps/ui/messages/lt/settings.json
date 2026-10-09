@@ -174,5 +174,6 @@
   "settings.security.remove": "Pašalinti",
   "settings.security.codesRemaining": "Atkūrimo kodai: {count}",
   "settings.security.regenerate": "Generuoti naujus atkūrimo kodus",
+  "settings.security.lockoutReminder": "Dar neturite atkūrimo kodų ar prieigos rakto. Jei pamesite telefoną, su jais iškart vėl prisijungsite.",
   "settings.security.refreshFailed": "Nepavyko atnaujinti saugumo duomenų. Įkelkite puslapį iš naujo."
 }
