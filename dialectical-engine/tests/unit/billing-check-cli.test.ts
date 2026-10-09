@@ -81,6 +81,10 @@ function depsFor(environment: Record<string, string>, script: Partial<{
   };
 }
 
+const REPLACE_KEY_FILE = "Someone other than root may have changed it, so do not trust the keys in it:"
+  + " put it in place again with the setup's NETOPIA section, run as root from the checkout:"
+  + " bash deploy/vps/billing-setup.sh --replace netopia (README §14.2).";
+
 const texts = (lines: ReadonlyArray<{ ok: boolean; text: string }>, ok: boolean) =>
   lines.filter((line) => line.ok === ok).map((line) => line.text);
 
@@ -131,7 +135,7 @@ describe("N21 pnpm billing:check", () => {
       "BILLING_LIVE_SANDBOX_INVOICER_REFUSED: Quaderno and SmartBill must match NETOPIA's system (sandbox with sandbox, live with live).",
       "QUADERNO_API_KEY_PATH is not set, so its file was not checked.",
       "NETOPIA_API_KEY_PATH: the file's mode or owner is wrong (it must be 0600 and the API's user's, in a 0700 directory of the same user).",
-      "NETOPIA_IPN_KEYS_PATH: BILLING_IPN_KEYS_FILE_UNSAFE:GROUP_OR_OTHER_WRITABLE: the file must not be writable by anyone but root (chmod 0644).",
+      `NETOPIA_IPN_KEYS_PATH: BILLING_IPN_KEYS_FILE_UNSAFE:GROUP_OR_OTHER_WRITABLE: someone other than root can write the file. ${REPLACE_KEY_FILE}`,
       "NETOPIA's acceptance of the API key was not asked: the API key file cannot be read.",
       "https://dezbatere.test/api/v1/billing/netopia/notify answers with a redirect (HTTP 301): NETOPIA does not follow redirects, so PUBLIC_APP_URL must be the site's exact public address.",
       "Register version 8 has no billingPlans row.",
@@ -143,6 +147,29 @@ describe("N21 pnpm billing:check", () => {
     const text = renderCheckLines(lines);
     expect(text.trimEnd().split("\n").at(-1)).toBe(`${crosses.length} of ${lines.length} checks need attention.`);
     for (const secret of SECRETS) expect(text).not.toContain(secret);
+  });
+
+  it("never tells the owner to chown or chmod a refused key file: it is put in place again with --replace netopia", async () => {
+    const uid = process.getuid!();
+    const keyLine = async (trustedKeyOwners: BillingCheckDeps["trustedKeyOwners"], mode = 0o644) => {
+      const environment = await stage();
+      await chmod(environment.NETOPIA_IPN_KEYS_PATH!, mode);
+      const lines = await runBillingCheck({ ...depsFor(environment), trustedKeyOwners });
+      return lines.filter((line) => line.text.startsWith("NETOPIA_IPN_KEYS_PATH"));
+    };
+    const refused = [
+      [await keyLine({ ownerUid: uid + 1, apiUid: uid }), "WRITABLE_BY_API_USER: the file belongs to the API's user, not to root."],
+      [await keyLine({ ownerUid: uid + 1, apiUid: -1 }), "NOT_ROOT_OWNED: the file does not belong to root."],
+      [await keyLine({ ownerUid: uid, apiUid: -1 }, 0o666), "GROUP_OR_OTHER_WRITABLE: someone other than root can write the file."]
+    ] as const;
+    for (const [lines, sentence] of refused) {
+      expect(lines).toEqual([{ ok: false, text: `NETOPIA_IPN_KEYS_PATH: BILLING_IPN_KEYS_FILE_UNSAFE:${sentence} ${REPLACE_KEY_FILE}` }]);
+      const text = lines[0]!.text;
+      expect(text).toContain("bash deploy/vps/billing-setup.sh --replace netopia");
+      expect(text).toContain("Someone other than root may have changed it, so do not trust the keys in it");
+      expect(text).not.toMatch(/chown|chmod/u);
+      expect(text).not.toMatch(/\/(opt|etc|Users|home)\//u);
+    }
   });
 
   it("reads NETOPIA's answer to the made-up order: refused, accepted with an error, a redirect, unreachable", async () => {

@@ -142,14 +142,20 @@ function custodyLine(key: typeof CUSTODY_KEYS[number], path: string | undefined)
   }
 }
 
+// A refused trust list is never made root's by hand: a chown or chmod would bless keys that someone other than root
+// may have written, and would follow a link planted at that name. The setup puts a fresh file in place instead.
+const REPLACE_KEY_FILE = "Someone other than root may have changed it, so do not trust the keys in it:"
+  + " put it in place again with the setup's NETOPIA section, run as root from the checkout:"
+  + " bash deploy/vps/billing-setup.sh --replace netopia (README §14.2).";
+
 function unsafeKeyFileSentence(code: string): string {
   const problem = detailOf(code);
   if (problem === "ABSENT") return "the file does not exist.";
   if (problem === "NOT_A_FILE") return "the path is not a plain file (a link is refused).";
   if (problem === "TOO_LARGE") return "the file is far too large to be a list of keys.";
-  if (problem === "WRITABLE_BY_API_USER") return "the file belongs to the API's user; it must be root's (chown root:root, chmod 0644).";
-  if (problem === "NOT_ROOT_OWNED") return "the file must belong to root (chown root:root).";
-  if (problem === "GROUP_OR_OTHER_WRITABLE") return "the file must not be writable by anyone but root (chmod 0644).";
+  if (problem === "WRITABLE_BY_API_USER") return `the file belongs to the API's user, not to root. ${REPLACE_KEY_FILE}`;
+  if (problem === "NOT_ROOT_OWNED") return `the file does not belong to root. ${REPLACE_KEY_FILE}`;
+  if (problem === "GROUP_OR_OTHER_WRITABLE") return `someone other than root can write the file. ${REPLACE_KEY_FILE}`;
   return "the file could not be read.";
 }
 
