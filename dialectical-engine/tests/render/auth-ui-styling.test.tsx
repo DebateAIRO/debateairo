@@ -27,6 +27,8 @@ import { BackupEmailVerification } from "../../apps/ui/components/BackupEmailVer
 import { SecuritySettings } from "../../apps/ui/components/SecuritySettings.js";
 import { SecurityActionResume } from "../../apps/ui/components/auth/SecurityActionResume.js";
 import { OnboardingEvidence } from "../../apps/ui/components/auth/OnboardingEvidence.js";
+import { ChangeEmailScreen, EmailSettingsCard } from "../../apps/ui/components/EmailSettings.js";
+import { SocialCompleteFlow } from "../../apps/ui/components/auth/SocialCompleteFlow.js";
 import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { mount, unmount, input } from "./task11-harness.js";
@@ -148,6 +150,30 @@ describe("every auth screen styles its own controls", () => {
     const host = await render(<OnboardingEvidence authority={{ kind: "pending", token }} locale="en" catalog={auth} client={client} onReady={vi.fn()} />);
     expect(host.querySelector("form")).not.toBeNull();
     expect(unstyled(host)).toEqual([]);
+  });
+
+  it("the email card and the change-email screen", async () => {
+    const client = {
+      readAccountEmail: vi.fn().mockResolvedValue({ email: "ana@example.test", verified: true, pending: null }),
+      authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["password_totp"], step_up_providers: [] })
+    } as never;
+    const card = await render(<EmailSettingsCard client={client} />);
+    expect(unstyled(card)).toEqual([]);
+    const screen = await render(<ChangeEmailScreen client={client} currentEmail="ana@example.test" onBack={vi.fn()} onRequested={vi.fn()} />);
+    expect(screen.querySelector("#email-change-new")).not.toBeNull();
+    expect(unstyled(screen)).toEqual([]);
+  });
+
+  it.each([
+    ["signup", { socialSignupStatus: vi.fn().mockResolvedValue({ provider: "google", email: "person@example.test", name: "Person", expires_at: new Date(Date.now() + 300_000).toISOString() }) }],
+    ["login", { socialLoginStatus: vi.fn().mockResolvedValue({ expires_at: new Date(Date.now() + 300_000).toISOString(), available_methods: ["passkey", "totp", "recovery_code"] }) }]
+  ])("finishing a %s with a provider", async (kind, client) => {
+    window.history.replaceState(null, "", `/social/complete#kind=${kind}&token=${token}`);
+    try {
+      const host = await render(<SocialCompleteFlow client={client as never} />);
+      expect(host.querySelector("input")).not.toBeNull();
+      expect(unstyled(host)).toEqual([]);
+    } finally { window.history.replaceState(null, "", "/"); }
   });
 
   it("recovery codes with Copy and Download", async () => {

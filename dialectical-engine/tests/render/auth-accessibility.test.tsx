@@ -18,6 +18,7 @@ import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { SecurityEnrollment } from "../../apps/ui/components/auth/SecurityEnrollment.js";
 import { SecurityConfirmation } from "../../apps/ui/components/auth/SecurityConfirmation.js";
 import { OnboardingEvidence } from "../../apps/ui/components/auth/OnboardingEvidence.js";
+import { SocialCompleteFlow } from "../../apps/ui/components/auth/SocialCompleteFlow.js";
 import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { mount, unmount, input } from "./task11-harness.js";
@@ -133,6 +134,19 @@ describe("a pasted code is taken only as exactly six digits", () => {
     await input(check, "[name=security-code]", "12345678");
     expect(stepUp).not.toHaveBeenCalled();
     expect(check.querySelector("[name=security-code]")?.getAttribute("aria-invalid")).toBe("true");
+  });
+});
+
+describe("a pasted code after a provider sign-in", () => {
+  it("is refused unless it is exactly six digits", async () => {
+    window.history.replaceState(null, "", `/social/complete#kind=login&token=${token}`);
+    const completeLogin = vi.fn();
+    try {
+      const host = await render(<SocialCompleteFlow client={{ socialLoginStatus: vi.fn().mockResolvedValue({ expires_at: new Date(Date.now() + 300_000).toISOString(), available_methods: ["totp"] }), completeLogin } as never} />);
+      await input(host, "#social-code", "12345678");
+      expect(completeLogin).not.toHaveBeenCalled();
+      expect(host.querySelector("#social-code")?.getAttribute("aria-invalid")).toBe("true");
+    } finally { window.history.replaceState(null, "", "/"); }
   });
 });
 
