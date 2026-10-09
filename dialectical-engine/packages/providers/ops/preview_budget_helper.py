@@ -31,6 +31,11 @@ class ResponseTooLarge(SafetyError):  # noqa: F821 - provided by the gate
     pass
 
 
+class RequestNotSent(SafetyError):  # noqa: F821 - provided by the gate
+    """Provably unsent: the TCP connect or the TLS handshake failed, or the deadline passed, before
+    http.client was asked to write any byte of the request. Nothing billable reached the provider."""
+
+
 def utc_now():
     return datetime.now(timezone.utc)
 
@@ -214,8 +219,13 @@ class HttpsTransport:
             if connection.sock is not None:
                 connection.sock.settimeout(seconds)
         try:
-            connection.connect()
-            remaining()
+            try:
+                # Only the TCP connect and the TLS handshake: no request byte exists on the wire
+                # before connection.request() below, so a failure here is provably unsent.
+                connection.connect()
+                remaining()
+            except Exception:  # noqa: BLE001 - every failure before the request is the same fact
+                raise RequestNotSent('request_not_sent') from None
             connection.request('POST', '/v1/openai/chat/completions', body=payload,
                                headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Accept': 'application/json'})
             remaining()

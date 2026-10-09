@@ -313,7 +313,8 @@ class PhaseTests(GateTest):
         for name, flags in opened:
             self.assertEqual(flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC), 0, name)
         self.assertEqual(result, {
-            'state': 'active', 'reason': None, 'open_until_utc': '2026-10-15T09:00:00+00:00', 'window_open': True,
+            'state': 'active', 'reason': None, 'halted_at': None, 'unsent_streak': 0,
+            'open_until_utc': '2026-10-15T09:00:00+00:00', 'window_open': True,
             'today': '2026-10-08', 'daily_budget_usd': '5.00', 'today_spend_usd': '0.05',
             'remaining_today_usd': '4.95', 'today_posts': 1, 'max_paid_posts_per_day': 500, 'in_flight': 0,
             'today_uncertain': 0, 'halts': [], 'halts_dropped': 0})
@@ -1227,6 +1228,181 @@ class IpcTests(GateTest):
         with self.refused('AUTHORITY_STOPPED'):
             gate.call('op-2', dispatch=lambda *args: dispatched.append(args))
         self.assertEqual(dispatched, [])
+
+
+class UnsentCallTests(GateTest):
+    """A call is provably unsent only when the TCP connect or TLS handshake failed before any
+    request byte was written: its hold is released and only it fails. Five in a row halt."""
+    ENTRY = 'preview-test:' + SCOPE + ':op-1'
+
+    @staticmethod
+    def unsent(_body, _key):
+        raise bridge.helper.RequestNotSent('request_not_sent')
+
+    def call_unsent(self, gate, operation_id='op-1'):
+        with self.refused('PROVIDER_NOT_REACHED'):
+            gate.call(operation_id, dispatch=self.unsent)
+
+    def transport_with(self, steps, **connection_behaviour):
+        class Response:
+            status = 200
+
+            def __init__(self):
+                self.chunks = [b'{"model": "m"}']
+
+            def read(self, _size):
+                return self.chunks.pop() if self.chunks else b''
+
+        class Connection:
+            def __init__(self, host, timeout, context):
+                self.sock = None
+
+            def connect(self):
+                steps.append('connect')
+                if 'connect' in connection_behaviour:
+                    raise connection_behaviour['connect']
+
+            def request(self, method, path, body, headers):
+                steps.append('request')
+                if 'request' in connection_behaviour:
+                    raise connection_behaviour['request']
+
+            def getresponse(self):
+                steps.append('getresponse')
+                if 'getresponse' in connection_behaviour:
+                    raise connection_behaviour['getresponse']
+                return Response()
+
+            def close(self):
+                steps.append('close')
+        return Connection
+
+    def test_transport_marks_only_connect_and_handshake_failures_as_not_sent(self):
+        import ssl
+        for name, failure in (('tcp_refused', ConnectionRefusedError()), ('egress_blocked', PermissionError(1, 'EPERM')),
+                              ('dns', OSError('name resolution')), ('tls_handshake', ssl.SSLError('handshake')),
+                              ('tls_certificate', ssl.SSLCertVerificationError('bad certificate')),
+                              ('connect_timeout', TimeoutError('timed out'))):
+            with self.subTest(name):
+                steps = []
+                with patch.object(bridge.helper.http.client, 'HTTPSConnection', self.transport_with(steps, connect=failure)), \
+                        self.assertRaises(bridge.helper.RequestNotSent):
+                    REAL_TRANSPORT(timeout=5)(b'{}', KEY)
+                self.assertEqual(steps, ['connect', 'close'])  # No request was ever asked for.
+
+    def test_deadline_passing_during_the_connect_is_not_sent(self):
+        steps = []
+        clock = iter([0.0, 10.0])  # The deadline, then the check right after the connect.
+        with patch.object(bridge.helper.http.client, 'HTTPSConnection', self.transport_with(steps)), \
+                patch.object(bridge.helper.time, 'monotonic', lambda: next(clock)), \
+                self.assertRaises(bridge.helper.RequestNotSent):
+            REAL_TRANSPORT(timeout=5)(b'{}', KEY)
+        self.assertEqual(steps, ['connect', 'close'])
+
+    def test_failures_once_the_request_may_have_been_written_are_never_not_sent(self):
+        for stage in ('request', 'getresponse'):
+            with self.subTest(stage):
+                steps = []
+                connection = self.transport_with(steps, **{stage: ConnectionResetError('reset')})
+                with patch.object(bridge.helper.http.client, 'HTTPSConnection', connection), \
+                        self.assertRaises(ConnectionResetError):
+                    REAL_TRANSPORT(timeout=5)(b'{}', KEY)
+                self.assertIn('request', steps)
+        self.assertFalse(issubclass(bridge.helper.ResponseTooLarge, bridge.helper.RequestNotSent))
+
+    def test_unsent_call_releases_its_hold_fails_alone_and_does_not_halt(self):
+        gate = self.gate().ready()
+        self.call_unsent(gate)
+        status = gate.status()
+        self.assertEqual((status['state'], status['in_flight'], status['today_posts'], status['today_spend_usd'],
+                          status['unsent_streak']), ('active', 0, 0, '0', 1))
+        self.assertEqual(gate.day('2026-10-08')['entries'], {})
+        self.assertEqual(gate.call('op-1')['status'], 200)  # The same operation may be tried again.
+        self.assertEqual(gate.status()['unsent_streak'], 0)  # A settled reply resets the streak.
+        self.assertIn('"status": "not_sent"', self.out.getvalue())
+        self.assertNotIn(KEY, self.out.getvalue())
+
+    def test_five_unsent_in_a_row_halt_with_provider_unreachable(self):
+        gate = self.gate().ready()
+        for number in range(1, 5):
+            self.call_unsent(gate, 'op-%d' % number)
+            self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', number))
+        self.call_unsent(gate, 'op-5')
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason'], status['in_flight'], status['today_posts']),
+                         ('halted', 'provider_unreachable', 0, 0))
+        self.assertEqual(status['halts'][-1]['entry_id'], 'preview-test:' + SCOPE + ':op-5')
+        with self.refused('AUTHORITY_STOPPED'):
+            gate.call('op-6')
+        self.assertEqual(bridge.UNSENT_HALT_STREAK, 5)
+
+    def test_any_settled_reply_resets_the_streak(self):
+        gate = self.gate().ready()
+        for number in range(4):
+            self.call_unsent(gate, 'a-%d' % number)
+        gate.call('ok-1')
+        for number in range(4):
+            self.call_unsent(gate, 'b-%d' % number)
+        self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', 4))
+
+    def test_streak_survives_a_restart_and_activation_resets_it(self):
+        gate = self.gate().ready()
+        for number in range(4):
+            self.call_unsent(gate, 'a-%d' % number)
+        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 0, 'unrecorded_uncertain': 0})
+        self.assertEqual(gate.status()['unsent_streak'], 4)
+        self.call_unsent(gate, 'a-4')
+        self.assertEqual(gate.status()['reason'], 'provider_unreachable')
+        gate.activate()
+        self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', 0))
+        self.call_unsent(gate, 'b-0')
+        self.assertEqual(gate.status()['state'], 'active')
+
+    def test_a_hold_that_cannot_be_released_is_uncertain_and_halts(self):
+        gate = self.gate().ready()
+
+        def broken_release(*_args):
+            raise SafetyError('ledger_lock_timeout')
+        with patch.object(bridge, 'release_unsent', broken_release), self.refused('NEW_CHARGE_UNCERTAIN'):
+            gate.call('op-1', dispatch=self.unsent)
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason']), ('halted', 'uncertain_charge'))
+        entry = gate.day('2026-10-08')['entries'][self.ENTRY]
+        self.assertEqual((entry['state'], Decimal(entry['held_usd']), entry['reason']), ('uncertain', RESERVED, 'release_failure'))
+
+    def test_death_during_the_release_fails_closed_or_drops_a_never_sent_hold(self):
+        for writes_before_death, expected in ((0, ('halted', 'interrupted_call_uncertain')),
+                                              (1, ('halted', 'interrupted_call_uncertain')),
+                                              (2, ('active', None))):
+            with self.subTest(writes_before_death=writes_before_death):
+                gate = self.gate().ready()
+                real, written = bridge.helper.write_bytes, []
+
+                def dying(dir_fd, name, data):
+                    if len(written) >= writes_before_death:
+                        raise Crash()
+                    written.append(name)
+                    return real(dir_fd, name, data)
+                death = patch.object(bridge.helper, 'write_bytes', dying)
+
+                def dispatch(_body, _key):
+                    death.start()
+                    raise bridge.helper.RequestNotSent('request_not_sent')
+                try:
+                    with self.assertRaises(SafetyError):
+                        gate.call('op-1', dispatch=dispatch)
+                finally:
+                    death.stop()
+                bridge.recover_interrupted(gate.private, now=gate.clock)
+                status = gate.status()
+                self.assertEqual((status['state'], status['reason']), expected)
+                self.assertEqual(status['in_flight'], 0)
+
+    def test_ipc_does_not_halt_for_an_unsent_call(self):
+        gate = self.gate().ready()
+        line, payload = IpcTests.exchange(self, gate, lambda _client: self.unsent)
+        self.assertEqual((line, json.loads(payload)), (b'HTTP/1.0 409 Conflict', {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'}))
+        self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', 1))
 
 
 class StaleSocketTests(GateTest):
