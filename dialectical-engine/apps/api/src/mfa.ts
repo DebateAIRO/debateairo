@@ -23,6 +23,8 @@ import {
   type ReadableUserDekStore
 } from "@debateai/crypto";
 import { AuthFlowError, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
+import { clientIpNetworkScope, normalizeClientIp } from "./client-ip.js";
+import { leastEvidenceKey } from "./admission.js";
 
 type MfaRepository = Pick<PostgresIdentityRepository,
   | "consumeAndReplaceRecoveryCode"
@@ -42,35 +44,60 @@ interface RateEntry {
 export type MfaRateDecision = Readonly<{ allowed: boolean; auditRefusal: boolean }>;
 
 /**
+ * The per-source key: one IPv4 address, or one IPv6 /64 (a single residential
+ * or hosting allocation), so one holder cannot mint unlimited "sources".
+ * Anything that is not an address keeps its own string and is never merged.
+ */
+export function rateLimitSourceScope(sourceIp: string): string {
+  return clientIpNetworkScope(normalizeClientIp(sourceIp) ?? sourceIp);
+}
+
+/**
  * A bounded, fail-closed online-guessing limiter. Account and source budgets
  * are separate, both expire automatically, and no remote sequence can produce
  * a permanent account lock.
+ *
+ * Each table (the source table, and one account table per route family) holds
+ * at most `capacity` keys. A full table evicts rather than refusing new keys:
+ * refusing let a flood of distinct throwaway keys lock everybody out of sign-in
+ * for the whole window, and separate account tables keep a flood on one route
+ * family from evicting the counters of another.
  */
 export class MfaVerificationLimiter {
-  private readonly entries = new Map<string, RateEntry>();
-  private capacityRefusalAuditedUntil = 0;
+  private readonly tables = new Map<string, Map<string, RateEntry>>();
 
   constructor(private readonly policy: MfaPolicy["verificationLimits"]) {}
 
-  private prune(now: number): void {
-    for (const [key, entry] of this.entries) {
+  private table(namespace: string): Map<string, RateEntry> {
+    let table = this.tables.get(namespace);
+    if (table === undefined) {
+      table = new Map();
+      this.tables.set(namespace, table);
+    }
+    return table;
+  }
+
+  private prune(entries: Map<string, RateEntry>, now: number): void {
+    for (const [key, entry] of entries) {
       if (entry.blockedUntil <= now && now - entry.windowStartedAt >= this.policy.windowMs) {
-        this.entries.delete(key);
+        entries.delete(key);
       }
     }
   }
 
-  private take(key: string, limit: number, now: number): MfaRateDecision {
-    this.prune(now);
-    let entry = this.entries.get(key);
+  private take(namespace: string, key: string, limit: number, now: number): MfaRateDecision {
+    const entries = this.table(namespace);
+    let entry = entries.get(key);
     if (entry === undefined) {
-      if (this.entries.size >= this.policy.capacity) {
-        const auditRefusal = this.capacityRefusalAuditedUntil <= now;
-        if (auditRefusal) this.capacityRefusalAuditedUntil = now + this.policy.windowMs;
-        return Object.freeze({ allowed: false, auditRefusal });
+      // An expired entry is reset on its next use, so the table is swept only when it is full.
+      if (entries.size >= this.policy.capacity) this.prune(entries, now);
+      while (entries.size >= this.policy.capacity) {
+        const victim = leastEvidenceKey(entries, now);
+        if (victim === undefined) break;
+        entries.delete(victim);
       }
       entry = { count: 0, windowStartedAt: now, blockedUntil: 0, refusalAuditedUntil: 0 };
-      this.entries.set(key, entry);
+      entries.set(key, entry);
     }
     if (entry.blockedUntil > now) {
       return Object.freeze({ allowed: false, auditRefusal: false });
@@ -91,24 +118,35 @@ export class MfaVerificationLimiter {
     return Object.freeze({ allowed: true, auditRefusal: false });
   }
 
-  decide(enrollmentKey: string, sourceIp: string, now: Date): MfaRateDecision {
-    const instant = now.getTime();
+  /** The shared per-source ceiling alone (one IPv4 address or one IPv6 /64). */
+  decideSource(sourceIp: string, now: Date): MfaRateDecision {
+    return this.take("source", rateLimitSourceScope(sourceIp), this.policy.perSourceAcrossAccounts, now.getTime());
+  }
+
+  /** The per-account (enrollment, challenge, address) ceiling of one route family. */
+  decideAccount(enrollmentKey: string, now: Date, family = "default"): MfaRateDecision {
+    return this.take(`account:${family}`, enrollmentKey, this.policy.perEnrollment, now.getTime());
+  }
+
+  decide(enrollmentKey: string, sourceIp: string, now: Date, family = "default"): MfaRateDecision {
     // Source first: a spray across many accounts receives one shared ceiling.
-    const source = this.take(`source:${sourceIp}`, this.policy.perSourceAcrossAccounts, instant);
+    const source = this.decideSource(sourceIp, now);
     if (!source.allowed) return source;
-    return this.take(`enrollment:${enrollmentKey}`, this.policy.perEnrollment, instant);
+    return this.decideAccount(enrollmentKey, now, family);
   }
 
-  consume(enrollmentKey: string, sourceIp: string, now: Date): boolean {
-    return this.decide(enrollmentKey, sourceIp, now).allowed;
+  consume(enrollmentKey: string, sourceIp: string, now: Date, family = "default"): boolean {
+    return this.decide(enrollmentKey, sourceIp, now, family).allowed;
   }
 
-  clearEnrollment(enrollmentKey: string): void {
-    this.entries.delete(`enrollment:${enrollmentKey}`);
+  clearEnrollment(enrollmentKey: string, family = "default"): void {
+    this.tables.get(`account:${family}`)?.delete(enrollmentKey);
   }
 
   size(): number {
-    return this.entries.size;
+    let total = 0;
+    for (const table of this.tables.values()) total += table.size;
+    return total;
   }
 }
 

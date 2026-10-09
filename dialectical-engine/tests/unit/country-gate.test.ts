@@ -163,11 +163,11 @@ describe("the gate on the routes", () => {
 
   it("refuses sign-up with 403 and the code only, before the registration service runs", async () => {
     const { instance, register } = api({ countryGate: gate().gate });
-    const refused = await instance.inject({ method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "5.45.1.1" });
+    const refused = await instance.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "5.45.1.1" });
     expect(refused.statusCode).toBe(403);
     expect(refused.json()).toEqual({ error: "COUNTRY_SIGNUP_UNAVAILABLE" });
     expect(register).not.toHaveBeenCalled();
-    const admitted = await instance.inject({ method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "81.196.20.30" });
+    const admitted = await instance.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "81.196.20.30" });
     expect(admitted.statusCode).toBe(202);
     await instance.close();
   });
@@ -175,7 +175,7 @@ describe("the gate on the routes", () => {
   it("refuses a closed country BEFORE the age gate judges the date, so no age lockout is ever set there", async () => {
     const { instance, register } = api({ countryGate: gate().gate });
     // An under-age date from a closed country: the country answers, the age gate never runs.
-    const refused = await instance.inject({
+    const refused = await instance.inject({ headers: { origin: TEST_APP_ORIGIN },
       method: "POST", url: "/v1/auth/register",
       payload: { ...REGISTER_BODY, date_of_birth: "2020-01-01" }, remoteAddress: "5.45.1.1"
     });
@@ -183,7 +183,7 @@ describe("the gate on the routes", () => {
     expect(refused.json()).toEqual({ error: "COUNTRY_SIGNUP_UNAVAILABLE" });
     expect(setCookies(refused).some((cookie) => cookie.startsWith("__Host-debateai-age-refusal="))).toBe(false);
     // From an open country the age gate still decides as before.
-    const underAge = await instance.inject({
+    const underAge = await instance.inject({ headers: { origin: TEST_APP_ORIGIN },
       method: "POST", url: "/v1/auth/register",
       payload: { ...REGISTER_BODY, date_of_birth: "2020-01-01" }, remoteAddress: "81.196.20.30"
     });
@@ -195,11 +195,11 @@ describe("the gate on the routes", () => {
 
   it("records the gate's country with the registration's age check when no Cloudflare edge reported one (R3-3)", async () => {
     const { instance, register } = api({ countryGate: gate().gate });
-    await instance.inject({ method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "81.196.20.30" });
+    await instance.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "81.196.20.30" });
     // A Cloudflare edge's own header still wins when there is one (the age gate's rule, kept).
     await instance.inject({
       method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "81.196.20.30",
-      headers: { "cf-ipcountry": "DE" }
+      headers: { origin: TEST_APP_ORIGIN, "cf-ipcountry": "DE" }
     });
     expect(register.mock.calls.map(([, source]) => source.countryCode)).toEqual(["RO", "DE"]);
     await instance.close();
@@ -238,7 +238,7 @@ describe("the gate on the routes", () => {
 
   it("changes nothing when no gate is composed (local mode, or hosted without the row)", async () => {
     const { instance, register } = api();
-    const response = await instance.inject({ method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "5.45.1.1" });
+    const response = await instance.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: REGISTER_BODY, remoteAddress: "5.45.1.1" });
     expect(response.statusCode).toBe(202);
     expect(register).toHaveBeenCalledTimes(1);
     const availability = await instance.inject({ method: "GET", url: "/v1/geo/availability", remoteAddress: "5.45.1.1" });

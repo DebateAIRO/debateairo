@@ -1268,9 +1268,12 @@ export const authorizationPolicyInventory = Object.freeze([
   {route:'POST /v1/account/social/unlink',auth:'user',origin:'trusted',resource:'identity',action:'social-unlink'},
   // Age gate (Turn 8): the browser-only pre-register check, like login held to the exact Origin.
   { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
-  { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
-  { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
-  { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
+  // Auth API hardening 2026-10-09: the four public account routes the site's own pages call with
+  // fetch POST (verify-email included — the mailed link opens a page that posts the token) take the
+  // same exact-Origin rule as login, so a browser on another site cannot drive them.
+  { route: "POST /v1/auth/register", auth: "public", origin: "trusted", resource: "identity", action: "register" },
+  { route: "POST /v1/auth/verify-email", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
+  { route: "POST /v1/auth/resend-verification", auth: "public", origin: "trusted", resource: "identity", action: "resend-verification" },
   { route:"POST /v1/auth/recovery/prove",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/recovery/enrollment/options",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/recovery/enrollment/complete",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
@@ -1278,7 +1281,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route:"POST /v1/auth/recovery/enrollment/complete-evidence",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/onboarding/status",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/onboarding/complete",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
-  { route: "POST /v1/auth/recovery/start", auth: "public", resource: "identity", action: "start-recovery" },
+  { route: "POST /v1/auth/recovery/start", auth: "public", origin: "trusted", resource: "identity", action: "start-recovery" },
   { route: "POST /v1/auth/mfa/totp/begin", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "begin-totp" },
   { route: "POST /v1/auth/mfa/totp/verify", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "verify-totp" },
   { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },
@@ -1595,6 +1598,20 @@ export interface ApiOptions {
   readonly registration?: RegistrationApplication;
   /** Mandatory for signup and resend; absent configuration fails closed. */
   readonly turnstile?: TurnstileVerifier;
+  /**
+   * Auth API hardening 2026-10-09 (server setting TURNSTILE_LOGIN_REQUIRED, default off): the
+   * email + password step of POST /v1/auth/login requires a single-use Turnstile proof with the
+   * action "login". Off until the UI ships the sign-in widget; when on it fails closed exactly like
+   * sign-up. The second step (challenge + code) is bound to the first and needs no new proof.
+   */
+  readonly turnstileLoginRequired?: boolean;
+  /**
+   * Same, for the three public recovery starts (TURNSTILE_RECOVERY_REQUIRED, default off):
+   * password-reset/start ("password-reset"), mfa-recovery/start ("mfa-recovery") and
+   * recovery/start ("account-recovery"). Each mails an address anyone can type, so each is a
+   * bot target; the proof is checked after the per-source admission, before any mail work.
+   */
+  readonly turnstileRecoveryRequired?: boolean;
   readonly recovery?: RecoveryApplication;
   readonly passwordReset?: PasswordResetApplication;
   readonly backupEmail?: BackupEmailApplication;
@@ -1844,6 +1861,13 @@ function exactCookie(raw: unknown, name: string): string | null {
     if (member.slice(0, index).trim() === name) matches.push(member.slice(index + 1).trim());
   }
   return matches.length === 1 && /^[A-Za-z0-9_-]{43}$/.test(matches[0]!) ? matches[0]! : null;
+}
+
+/** The submitted Turnstile proof of a JSON body; anything but a string is the empty (refused) proof. */
+function turnstileTokenOf(body: unknown): string {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) return "";
+  const token = (body as Record<string, unknown>).turnstile_token;
+  return typeof token === "string" ? token : "";
 }
 
 function exactOrigin(value: unknown, allowedOrigin: string | undefined): boolean {
@@ -2098,6 +2122,24 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       .header("retry-after", String(Math.max(1, Math.ceil(decision.retryAfterMs / 1_000))))
       .send({ error: "ADMISSION_RATE_LIMITED", message: "ADMISSION_RATE_LIMITED" });
     return false;
+  };
+  /**
+   * Auth API hardening 2026-10-09: the Turnstile proof of a public recovery start, asked only while
+   * TURNSTILE_RECOVERY_REQUIRED is on. It answers the refusal itself (the start routes map thrown
+   * errors to their own unavailable code) and returns false, like admitOrRefuse.
+   */
+  const recoveryStartProofOrRefuse = async (
+    reply: FastifyReply, body: unknown, action: "password-reset" | "mfa-recovery" | "account-recovery"
+  ): Promise<boolean> => {
+    if (options.turnstileRecoveryRequired !== true) return true;
+    try {
+      await requireTurnstileProof(options.turnstile, { token: turnstileTokenOf(body), action });
+      return true;
+    } catch (error) {
+      if (!(error instanceof TurnstileGateError)) throw error;
+      void reply.status(error.statusCode).send({ error: error.code, message: error.code });
+      return false;
+    }
   };
   const ownershipFor = (request: Readonly<{
     session: Session;
@@ -2567,10 +2609,17 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         }, sourceFor(request));
         return completeAuthenticatedResponse(reply,result);
       }
+      // Auth API hardening 2026-10-09: with TURNSTILE_LOGIN_REQUIRED on, the password step carries a
+      // single-use proof (action "login"). The service asks it after the per-source budget and before
+      // the per-account budget, so proof-less bots can neither reach the password check nor spend the
+      // account's sign-in budget (lock its owner out).
+      const proof = options.turnstileLoginRequired === true
+        ? () => requireTurnstileProof(options.turnstile, { token: turnstileTokenOf(body), action: "login" })
+        : undefined;
       const result = await options.sessions!.beginLogin({
         email: typeof body.email === "string" ? body.email : "",
         password: typeof body.password === "string" ? body.password : ""
-      }, sourceFor(request));
+      }, sourceFor(request), proof);
       return reply.status(202).send(LoginContinuationResponseSchema.parse({ status: result.status, challenge_token: result.challengeToken, available_methods:result.availableMethods??["totp"] }));
     });
     api.post("/v1/auth/logout", credentialRoutePolicy("POST /v1/auth/logout"), async (request, reply) => {
@@ -3141,8 +3190,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     ));
   });
 
-  if (options.passwordReset) registerPasswordResetRoutes(api,{service:options.passwordReset,policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/password-reset/start",sourceFor(request).ip)});
-  registerEmailMfaRoutes(api,{...(options.backupEmail?{backup:options.backupEmail}:{}),...(options.mfaRecovery?{mfa:options.mfaRecovery}:{}),policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/mfa-recovery/start",sourceFor(request).ip)});
+  if (options.passwordReset) registerPasswordResetRoutes(api,{service:options.passwordReset,policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/password-reset/start",clientIpNetworkScope(sourceFor(request).ip))&&await recoveryStartProofOrRefuse(reply,request.body,"password-reset")});
+  registerEmailMfaRoutes(api,{...(options.backupEmail?{backup:options.backupEmail}:{}),...(options.mfaRecovery?{mfa:options.mfaRecovery}:{}),policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/mfa-recovery/start",clientIpNetworkScope(sourceFor(request).ip))&&await recoveryStartProofOrRefuse(reply,request.body,"mfa-recovery")});
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
       // L1-F3: this route had no per-source admission control at all — only a
@@ -3151,9 +3200,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // The budget is charged to the SOURCE and never to the address, so the
       // refusal is identical whether or not the account exists: it adds no
       // enumeration oracle to a route whose whole design is generic.
-      if (!admitOrRefuse(reply, "recoveryStart", "POST /v1/auth/recovery/start", sourceFor(request).ip)) {
+      if (!admitOrRefuse(reply, "recoveryStart", "POST /v1/auth/recovery/start", clientIpNetworkScope(sourceFor(request).ip))) {
         return reply;
       }
+      if (!await recoveryStartProofOrRefuse(reply, request.body, "account-recovery")) return reply;
       const body = typeof request.body === "object" && request.body !== null
         ? request.body as Record<string, unknown>
         : {};
