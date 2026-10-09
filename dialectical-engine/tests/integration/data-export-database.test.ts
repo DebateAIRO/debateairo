@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
 import type { PoolClient } from "pg";
@@ -93,10 +93,53 @@ describe("data export database authority", () => {
 
   it("D3 issues account-scoped grants through both issuers and refuses a run target", async () => {
     const a = await account();
-    expect((await db.pool.query("SELECT identity.valid_consumer_authorization_internal($1::jsonb) valid", [JSON.stringify({ action: "EXPORT_DATA" })])).rows[0].valid).toBe(true);
-    expect((await db.pool.query("SELECT identity.valid_consumer_authorization_internal($1::jsonb) valid", [JSON.stringify({ action: "EXPORT_DATA", target_run_id: randomUUID() })])).rows[0].valid).toBe(false);
-    await db.pool.query("SELECT identity.insert_consumer_grant_internal($1,$2,$3,$4::jsonb,clock_timestamp()+interval '2 minutes')", [a.user, a.session, hash("d"), JSON.stringify({ action: "EXPORT_DATA" })]);
-    expect((await db.pool.query("SELECT target_account_id FROM identity.step_up_grant WHERE token_hash=$1", [hash("d")])).rows[0].target_account_id).toBe(a.user);
+    const factor = randomUUID(), token = `sha256:${createHash("sha256").update(randomUUID()).digest("hex")}`;
+    const identity = (await db.pool.query('SELECT owner_ref,password_hash,audit_token FROM identity."user" WHERE user_id=$1', [a.user])).rows[0];
+    await db.pool.query("INSERT INTO identity.mfa_factor(mfa_factor_id,user_id,factor_type,secret_ciphertext,state,created_at,verified_at) VALUES($1,$2,'totp','{}','active',clock_timestamp(),clock_timestamp())", [factor, a.user]);
+    const currentHash = `sha256:${createHash("sha256").update(a.session).digest("hex")}`;
+    const rotated = await asRuntime(client => client.query(`SELECT identity.rotate_session_after_step_up_with_audit(
+      $1,$2,$3,$4,2,$5,$6,$7,$8,'{}'::jsonb,clock_timestamp()+interval '1 hour',
+      $9,$10,'EXPORT_DATA',NULL,clock_timestamp()+interval '5 minutes',$11::jsonb) AS valid`,
+    [a.user, identity.owner_ref, identity.password_hash, factor, a.session, currentHash,
+      hash("b"), hash("c"), randomUUID(), token, JSON.stringify(source)]), true);
+    expect(rotated.rows[0].valid).toBe(true);
+    expect((await db.pool.query("SELECT action,target_account_id,target_run_id FROM identity.step_up_grant WHERE token_hash=$1", [token])).rows[0])
+      .toEqual({ action: "EXPORT_DATA", target_account_id: a.user, target_run_id: null });
+    expect((await db.pool.query("SELECT count(*)::int n FROM identity.audit_event WHERE actor_key_ref=$1 AND event_type='identity.session.step_up'", [identity.audit_token])).rows[0].n).toBe(1);
+    const runTargetToken = hash("e");
+    const badRotation = await asRuntime(client => client.query(`SELECT identity.rotate_session_after_step_up_with_audit(
+      $1,$2,$3,$4,3,$5,$6,$7,$8,'{}'::jsonb,clock_timestamp()+interval '1 hour',
+      $9,$10,'EXPORT_DATA',$11,clock_timestamp()+interval '5 minutes',$12::jsonb) AS valid`,
+    [a.user, identity.owner_ref, identity.password_hash, factor, a.session, hash("b"),
+      hash("f"), hash("a"), randomUUID(), runTargetToken, randomUUID(), JSON.stringify(source)]), true);
+    expect(badRotation.rows[0].valid).toBe(false);
+    expect((await db.pool.query("SELECT count(*)::int n FROM identity.step_up_grant WHERE token_hash=$1", [runTargetToken])).rows[0].n).toBe(0);
+
+    const credentialId = randomBytes(32).toString("base64url"), handle = randomBytes(32).toString("base64url");
+    await db.pool.query("INSERT INTO identity.consumer_passkey_subject(user_id,user_handle) VALUES($1,$2)", [a.user, handle]);
+    await db.pool.query(`INSERT INTO identity.consumer_passkey_credential(user_id,credential_id,public_key,signature_counter,device_type,backed_up,rp_id,origin,label)
+      VALUES($1,$2,$3,0,'singleDevice',false,'example.test','https://example.test','only-key')`, [a.user, credentialId, randomBytes(65).toString("base64url")]);
+    const challenge = { userId: a.user, sessionId: a.session, tokenHash: hash("b"),
+      challengesPerScope: 5, challengeCapacity: 100, handleHash: hash("1"), challengeHash: hash("2"),
+      bindingHash: hash("3"), retentionKey: hash("4"), rpId: "example.test", origin: "https://example.test",
+      authorization: { action: "EXPORT_DATA" } };
+    await asRuntime(client => client.query("SELECT identity.begin_consumer_security_step_up($1::jsonb)", [JSON.stringify(challenge)]));
+    const passkey = await asRuntime(async client => (await client.query("SELECT identity.read_consumer_security_step_up($1::jsonb) value",
+      [JSON.stringify({ userId: a.user, sessionId: a.session, tokenHash: hash("b"), handleHash: hash("1"),
+        bindingHash: hash("3"), credentialId })])).rows[0].value);
+    expect(passkey).not.toBeNull();
+    const consumerToken = hash("5");
+    const completed = await asRuntime(async client => (await client.query("SELECT identity.complete_consumer_security_step_up($1::jsonb,$2::jsonb) value",
+      [JSON.stringify({ ...passkey, userId: a.user, sessionId: a.session, tokenHash: hash("b"),
+        handleHash: hash("1"), bindingHash: hash("3"), replacementTokenHash: hash("6"),
+        replacementCsrfHash: hash("7"), grantHash: consumerToken }), JSON.stringify(source)])).rows[0].value, true);
+    expect(completed.authorization).toEqual({ action: "EXPORT_DATA" });
+    expect((await db.pool.query("SELECT action,target_account_id,target_run_id FROM identity.step_up_grant WHERE token_hash=$1", [consumerToken])).rows[0])
+      .toEqual({ action: "EXPORT_DATA", target_account_id: a.user, target_run_id: null });
+    await expect(asRuntime(client => client.query("SELECT identity.begin_consumer_security_step_up($1::jsonb)",
+      [JSON.stringify({ ...challenge, tokenHash: hash("6"), handleHash: hash("8"),
+        authorization: { action: "EXPORT_DATA", target_run_id: randomUUID() } })])))
+      .rejects.toMatchObject({ code: "P0001", message: "CONSUMER_SECURITY_INVALID" });
   });
 
   it("D4 checks audit-attempt precedence and each invalid grant before writing", async () => {
@@ -186,7 +229,7 @@ describe("data export database authority", () => {
     await db.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,failed_at)
       VALUES($1,$2,$3,'en','FAILED',clock_timestamp(),clock_timestamp())`, [randomUUID(), a.user, a.session]);
     for (let i = 0; i < 3; i++) {
-      const token = await grant(a.user, a.session, { hash: `sha256:${String(i + 5).repeat(64)}` });
+      const token = await grant(a.user, a.session);
       expect((await request(a.user, a.session, token)).result_status).toBe("ACCEPTED");
       const sentAt = new Date();
       await db.pool.query("UPDATE identity.data_export SET status='SENT',link_token_hash=$2,archive_sha256=$3,sent_at=$4,expires_at=$4::timestamptz+interval '86400 seconds' WHERE user_id=$1 AND status='PREPARING'", [a.user, `sha256:${String(i + 5).repeat(64)}`, "a".repeat(64), sentAt]);
@@ -260,6 +303,12 @@ describe("data export database authority", () => {
     expect((await open(a.user, hash("9"))).outcome).toBe("INVALID");
     expect((await open(b.user, hash("9"))).outcome).toBe("WRONG_ACCOUNT");
     await db.pool.query("UPDATE identity.data_export SET status='SUPERSEDED',closed_at=clock_timestamp() WHERE export_id=$1", [id]);
+    expect((await open(a.user, hash("9"))).outcome).toBe("INVALID");
+    const resumedAt = new Date();
+    await db.pool.query("UPDATE identity.data_export SET status='SENT',closed_at=NULL,sent_at=$2,expires_at=$2::timestamptz+interval '86400 seconds' WHERE export_id=$1", [id, resumedAt]);
+    await db.pool.query(`INSERT INTO identity.account_erasure_request(user_id,requested_at,execute_at,prepared_at,
+      prepared_run_ids,prepared_legacy_run_ids,prepared_published_run_ids,prepared_current_publication_refs,prepared_cleanup_publication_refs)
+      VALUES($1,clock_timestamp(),clock_timestamp()+interval '30 days',clock_timestamp(),'{}','{}','{}','{}','{}')`, [a.user]);
     expect((await open(a.user, hash("9"))).outcome).toBe("INVALID");
   });
 
