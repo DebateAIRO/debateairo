@@ -77,7 +77,7 @@ describe('preview mail recipient allow-list is read only from the root-owned ins
       'extra-key': { ...installation(), override: 'x@example.com' },
       'missing-alias': { recipientSha256: withoutAlias, verificationForwardTarget },
       'extra-alias': { recipientSha256: { ...recipientSha256, 'unknown-alias': digest('x@example.com') }, verificationForwardTarget },
-      'uppercase-digest': { recipientSha256: { ...recipientSha256, 'verification-forward-primary': recipientSha256['verification-forward-primary'].toUpperCase() }, verificationForwardTarget },
+      'uppercase-digest': { recipientSha256: { ...recipientSha256, 'verification-forward-primary': recipientSha256['verification-forward-primary']!.toUpperCase() }, verificationForwardTarget },
       'array-allow-list': { recipientSha256: Object.values(recipientSha256), verificationForwardTarget },
       'target-not-secondary': { recipientSha256, verificationForwardTarget: addresses['verification-forward-primary'] },
       'not-json': '{"recipientSha256":'
