@@ -24,8 +24,11 @@ describe("data export readable page", () => {
     const html = page();
     expect(html.indexOf("MARK-Q2")).toBeLessThan(html.indexOf("MARK-Q1"));
   });
-  it("H-4 shows the newest answer, nine story paths, claims, and verdict words", () => {
+  it("H-4 shows producer visibility, newest answer, nine story paths, claims, and verdict words", () => {
     const html = page();
+    expect(snapshotA.debates.debates.map((debate) => debate.visibility_history.at(-1)?.state))
+      .toEqual(["PUBLISHED", "PRIVATE", "PRIVATE"]);
+    expect(html).toMatch(/MARK-Q1[\s\S]*?Published/);
     for (const n of [1, 2]) {
       expect(html).toContain(`MARK-Q${n}`);
       expect(html).toContain(n === 1 ? "October 8, 2026" : "October 9, 2026");
@@ -48,11 +51,20 @@ describe("data export readable page", () => {
   it("H-7 never renders a UUID", () => {
     expect(page()).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   });
-  it("H-8 has one dark mode rule and escapes user text", () => {
+  it("H-8 has one dark mode rule, escapes user text, and follows S5 structure", () => {
     const altered = { ...snapshotA, debates: { debates: [{ ...snapshotA.debates.debates[0]!, question: `<b>&"'` }] } };
     const html = renderYourDataHtml(altered, loadArchiveCatalog("en"));
     expect(html.match(/@media \(prefers-color-scheme: dark\)/g)).toHaveLength(1);
     expect(html).toContain("&lt;b&gt;&amp;&quot;&#39;");
     expect(html).not.toContain(`<b>&"'`);
+    const archiveHtml = page();
+    expect(archiveHtml).toMatch(/<header>[\s\S]*?<h1>[^<]+<\/h1>[\s\S]*?<\/header>/);
+    expect(archiveHtml).toMatch(/<section class="account-section">[\s\S]*?<div class="account-card">[\s\S]*?<dl>/);
+    expect(archiveHtml).toMatch(/<p class="label">Question<\/p>\s*<h3>MARK-Q2<\/h3>\s*<p class="meta">/);
+    expect(archiveHtml).toMatch(/<p class="label verdict-label">Verdict<\/p>\s*<span class="pill contested">Contested<\/span>/);
+    expect(archiveHtml).toMatch(/<footer>[^<]*README\.txt[^<]*<\/footer>/);
+    for (const token of ["#F9F6F1", "#FDFBF6", "#29261F", "#14110E", "#181410", "#F2EAD9", "#D9C8A9", "#705A33"]) {
+      expect(archiveHtml).toContain(token);
+    }
   });
 });

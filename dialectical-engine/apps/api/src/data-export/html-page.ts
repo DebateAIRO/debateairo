@@ -34,9 +34,9 @@ function storyTexts(value: unknown): string[] {
 function renderDebate(entry: DebateEntry, catalog: ArchiveCatalog, locale: string): string {
   const date = dateText(entry.created_at, locale);
   const visibility = entry.visibility_history.at(-1)?.state;
-  const visibilityLabel = visibility === "PUBLIC" || visibility === "PUBLISHED" ? catalog["archive.visibilityPublic"] : catalog["archive.visibilityPrivate"];
+  const visibilityLabel = visibility === "PUBLISHED" ? catalog["archive.visibilityPublic"] : catalog["archive.visibilityPrivate"];
   if (entry.content_status === "UNRECOVERABLE") {
-    return `<article><p class="meta">${escapeHtml(date)} · ${escapeHtml(visibilityLabel)}</p><p>${escapeHtml(catalog["archive.unreadable"])}</p></article>`;
+    return `<article><p class="meta">${escapeHtml(date)} · ${escapeHtml(visibilityLabel)}</p><p class="unreadable">${escapeHtml(catalog["archive.unreadable"])}</p></article>`;
   }
   const verdict = words(object(entry.run_answer).verdict_state);
   const verdictKey = ({ SUPPORTED: "archive.verdictSupported", CONTESTED: "archive.verdictContested", UNSUPPORTED: "archive.verdictUnsupported" } as Record<string, string>)[verdict];
@@ -46,12 +46,12 @@ function renderDebate(entry: DebateEntry, catalog: ArchiveCatalog, locale: strin
   const claims = list(answerData.nodes).map((node) => words(object(node).claim)).filter(Boolean);
   const answerText = list(answerData.composed_text).map((segment) => words(object(segment).text)).filter(Boolean).join("\n\n");
   const story = storyTexts(answer?.story);
-  return `<article><p class="meta">${escapeHtml(date)} · ${escapeHtml(visibilityLabel)}</p>
-    <h3>${escapeHtml(catalog["archive.question"])}: ${escapeHtml(entry.question)}</h3>
-    ${verdictKey ? `<p><span class="label">${escapeHtml(catalog["archive.verdict"])}:</span> <span class="pill ${verdict.toLowerCase()}">${escapeHtml(catalog[verdictKey])}</span></p>` : ""}
+  return `<article><p class="label">${escapeHtml(catalog["archive.question"])}</p>
+    <h3>${escapeHtml(entry.question)}</h3><p class="meta">${escapeHtml(date)} · ${escapeHtml(visibilityLabel)}</p>
+    ${verdictKey ? `<p class="label verdict-label">${escapeHtml(catalog["archive.verdict"])}</p><span class="pill ${verdict.toLowerCase()}">${escapeHtml(catalog[verdictKey])}</span>` : ""}
     ${answerText ? `<div class="answer">${escapeHtml(answerText).replace(/\n\n/g, "<br><br>")}</div>` : ""}
-    ${story.length ? `<h4>${escapeHtml(catalog["archive.story"])}</h4>${story.map((text) => `<p>${escapeHtml(text)}</p>`).join("")}` : ""}
-    ${claims.length ? `<h4>${escapeHtml(catalog["archive.arguments"])}</h4><ul>${claims.map((claim) => `<li>${escapeHtml(claim)}</li>`).join("")}</ul>` : ""}
+    ${story.length ? `<p class="label section-label">${escapeHtml(catalog["archive.story"])}</p>${story.map((text) => `<p class="story-text">${escapeHtml(text)}</p>`).join("")}` : ""}
+    ${claims.length ? `<p class="label section-label">${escapeHtml(catalog["archive.arguments"])}</p><ul>${claims.map((claim) => `<li>${escapeHtml(claim)}</li>`).join("")}</ul>` : ""}
   </article>`;
 }
 
@@ -66,22 +66,35 @@ export function renderYourDataHtml(snapshot: ExportSnapshot, catalog: ArchiveCat
   const debates = [...snapshot.debates.debates].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   const heading = catalog["archive.debatesHeading"]!.replace("{count}", String(debates.length));
   return `<!doctype html>
-<html lang="${escapeHtml(locale)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="${escapeHtml(locale)}" dir="${locale === "ar" || locale === "he" ? "rtl" : "ltr"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(catalog["archive.pageTitle"])}</title>
 <style>
-:root{color-scheme:light;--bg:#faf7f2;--ink:#29231f;--card:#fffdf9;--line:#d7ccc1;--muted:#655b54}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,sans-serif}
-main{max-width:760px;margin:auto;padding:40px 20px 80px}article,section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin:18px 0}
-h1,h2,h3,h4{line-height:1.25}.meta{color:var(--muted)}.answer{white-space:normal}.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-weight:600}
-.supported{background:#d9ecdc;color:#215333}.contested{background:#f4e7bc;color:#654500}.unsupported{background:#f4d9d6;color:#7b2d27}
-@media (prefers-color-scheme: dark){:root{color-scheme:dark;--bg:#171b1d;--ink:#f2eee7;--card:#242a2d;--line:#4b5558;--muted:#c1c8c9}}
+:root{color-scheme:light;--bg:#F9F6F1;--surface:#FDFBF6;--text:#29261F;--text-2:#555147;--muted:#6E675C;--line:rgba(41,38,31,.10);--line-strong:rgba(41,38,31,.20);--gold-text:#826530;--gold-border:#D9C8A9;--agree-text:#3C754B;--dispute:#B0432F;--dispute-border:#DDAEA2}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+main{max-width:720px;margin:0 auto;padding:48px 24px}
+header{padding-bottom:20px;border-bottom:1px solid var(--line-strong)}
+h1,h2,h3{font-family:Georgia,serif;line-height:1.25}h1{margin:0}header p{margin:10px 0 0;font-size:13px;color:var(--text-2)}
+section.account-section{margin-top:28px}section.debates-section{margin-top:32px}h2{margin:0 0 12px}
+.account-card,article{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.account-card{padding:14px 18px}.pseudonym{margin:0 0 8px;font-size:15px;font-weight:700}
+dl{margin:0;display:grid;grid-template-columns:140px 1fr;row-gap:6px;font-size:14px}dt{color:var(--muted)}dd{margin:0}
+article{padding:18px 22px}article+article{margin-top:16px}
+.label{margin:0 0 4px;font-size:12px;font-weight:700}.section-label{margin:18px 0 4px}.verdict-label{margin:16px 0 4px}
+h3{margin:0}.meta{margin:8px 0 0;font-size:13px;color:var(--text-2)}
+.pill{display:inline-block;padding:2px 10px;border:1px solid var(--gold-border);border-radius:999px;color:var(--gold-text);font-size:12px;font-weight:700;line-height:1.5}
+.pill.supported{border-color:var(--agree-text);color:var(--agree-text)}.pill.unsupported{border-color:var(--dispute-border);color:var(--dispute)}
+.answer{margin:10px 0 0;font-size:15px;line-height:1.6}.story-text{margin:0;font-size:15px;line-height:1.6}
+ul{margin:0;padding-inline-start:20px;font-size:15px;line-height:1.55}li{margin:0 0 6px}
+.unreadable{margin:8px 0 0;font-size:15px;font-style:italic;color:var(--text-2)}.empty{margin:0;font-size:15px;color:var(--text-2)}
+footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--line-strong);font-size:13px;color:var(--muted)}
+@media (prefers-color-scheme: dark){:root{color-scheme:dark;--bg:#14110E;--surface:#181410;--text:#F2EAD9;--text-2:#B5A88F;--muted:#9C907A;--line:rgba(242,234,217,.09);--line-strong:rgba(242,234,217,.18);--gold-text:#C8A055;--gold-border:#705A33;--agree-text:#86B58D;--dispute:#D67F65;--dispute-border:#774A3B}}
 </style></head><body><main>
-<h1>${escapeHtml(catalog["archive.pageTitle"])}</h1><p>${escapeHtml(generated)}</p>
-<section><h2>${escapeHtml(catalog["archive.accountHeading"])}</h2><p>${escapeHtml(pseudonym)}</p>
-<p>${escapeHtml(catalog["archive.email"])}: ${escapeHtml(email)}</p>
-<p>${escapeHtml(catalog["archive.memberSince"])}: ${escapeHtml(dateText(account.created_at, locale))}</p></section>
-<h2>${escapeHtml(heading)}</h2>
-${debates.length ? debates.map((debate) => renderDebate(debate, catalog, locale)).join("\n") : `<p>${escapeHtml(catalog["archive.noDebates"])}</p>`}
-<p>${escapeHtml(catalog["archive.filesNote"])}</p>
+<header><h1>${escapeHtml(catalog["archive.pageTitle"])}</h1><p>${escapeHtml(generated)}</p></header>
+<section class="account-section"><h2>${escapeHtml(catalog["archive.accountHeading"])}</h2><div class="account-card"><p class="pseudonym">${escapeHtml(pseudonym)}</p>
+<dl><dt>${escapeHtml(catalog["archive.email"])}</dt><dd>${escapeHtml(email)}</dd>
+<dt>${escapeHtml(catalog["archive.memberSince"])}</dt><dd>${escapeHtml(dateText(account.created_at, locale))}</dd></dl></div></section>
+<section class="debates-section"><h2>${escapeHtml(heading)}</h2>
+${debates.length ? debates.map((debate) => renderDebate(debate, catalog, locale)).join("\n") : `<p class="empty">${escapeHtml(catalog["archive.noDebates"])}</p>`}
+</section><footer>${escapeHtml(catalog["archive.filesNote"])}</footer>
 </main></body></html>`;
 }
