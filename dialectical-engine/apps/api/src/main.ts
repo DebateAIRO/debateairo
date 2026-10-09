@@ -127,8 +127,8 @@ import {
 import { TimeShiftedCardPayments } from "./billing/time-shifted-payments.js";
 import { createRetentionPurge } from "./retention-purge.js";
 import {
-  assertNoRecordsDatedAhead, assertOtherSystemRecordsClosed, billingCustodyPaths, billingModeOf, incompleteNetopiaKey,
-  loadBillingConnectors, loadNetopiaConnectors, type BillingConnectors, type BillingMode, type NetopiaConnectors
+  assertNoRecordsDatedAhead, assertOtherSystemRecordsClosed, assertProviderOnlyNotifySealed, billingCustodyPaths,
+  billingModeOf, incompleteNetopiaKey, loadBillingConnectors, loadNetopiaConnectors, type BillingConnectors, type BillingMode, type NetopiaConnectors
 } from "./billing/connectors.js";
 import { createSupportCaseMaterial, createSupportCaseService, createSupportMessageCipher, createWrappedSupportSessionKey } from "./support/session.js";
 import { MfaEnrollmentService } from "./mfa.js";
@@ -698,9 +698,10 @@ const billingConnectors: BillingConnectors | null = billingMode === "ON"
     }))
   : null;
 const providerOnlyConnectors: NetopiaConnectors | null = billingMode === "PROVIDER_ONLY"
-  ? boot.runSync("billing-netopia-connectors", () => loadNetopiaConnectors({
-      environment: readNetopiaEnvironmentGroup(environment), recordsKey
-    }))
+  ? boot.runSync("billing-netopia-connectors", () => {
+      assertProviderOnlyNotifySealed(admissionPolicy);
+      return loadNetopiaConnectors({ environment: readNetopiaEnvironmentGroup(environment), recordsKey });
+    })
   : null;
 if (environment.DEPLOYMENT_MODE === "hosted" && billingMode === "OFF") {
   const missing = incompleteNetopiaKey(environment);

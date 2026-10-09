@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import {
+  assertProviderOnlyNotifySealed,
   billingModeOf,
   incompleteNetopiaKey,
   loadNetopiaConnectors,
@@ -90,5 +91,14 @@ describe("N8 — the provider-only mode (spec §2.7.3, ruling C-9)", () => {
       environment, recordsKey: Buffer.alloc(32), trustedKeyOwners: OWN, allowLoopbackBase: true
     });
     expect(connectors.paymentEnvironment).toBe("sandbox");
+  });
+
+  it("refuses to start, as billing on does, when the register leaves NETOPIA's notify scope unsealed (F3, protocol-3)", () => {
+    // An unverified message is rate-limited by billingNotify (spec §2.7.1); unsealed, every forged one would be kept.
+    expect(() => assertProviderOnlyNotifySealed({ billingNotify: null }))
+      .toThrow(expect.objectContaining({ name: "TypedDomainError", code: "BILLING_ADMISSION_UNSEALED" }));
+    expect(() => assertProviderOnlyNotifySealed({
+      billingNotify: { key: "source", limit: 120, windowMs: 60_000, capacity: 120 }
+    })).not.toThrow();
   });
 });

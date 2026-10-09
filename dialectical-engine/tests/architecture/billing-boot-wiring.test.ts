@@ -40,6 +40,10 @@ describe("N8 — the API boot wires billing only when hosted, switched on or pro
     expect(main).toContain("const providerOnlyConnectors: NetopiaConnectors | null");
     expect(main).toContain("incompleteNetopiaKey(environment)");
     expect(main).toContain('event: "billing.provider_only.incomplete"');
+    // F3 (protocol-3): the notify route's billingNotify scope is sealed here exactly as in mode ON, before anything is built.
+    const sealed = main.indexOf("assertProviderOnlyNotifySealed(admissionPolicy);");
+    expect(sealed).toBeGreaterThan(providerOnly);
+    expect(sealed).toBeLessThan(main.indexOf("loadNetopiaConnectors({", providerOnly));
   });
 
   it("refuses a live boot while another payment system's records are open, after the connectors know the payment system", async () => {

@@ -1460,9 +1460,18 @@ export class BillingRepository {
   async insertPaymentNoticeOutcome(c: PoolClient, row: Readonly<{ noticeId: string; at: Date; outcome: NoticeOutcome }>): Promise<void> {
     await c.query("INSERT INTO billing.payment_notice_outcome (notice_id, at, outcome) VALUES ($1,$2,$3)", [row.noticeId, row.at, row.outcome]);
   }
+  /**
+   * The order's newest stored message: the latest arrival, then (a tie) the latest JWT `iat` NETOPIA signed, read as a
+   * number (a missing or non-numeric one last), then the id, so the choice is the same on every read (final review
+   * protocol-2).
+   */
   async newestNoticeForOrder(executor: BillingReadExecutor, orderId: string): Promise<PaymentNoticeRow | null> {
     const row = (await executor.query<PaymentNoticeRow>(`SELECT ${PAYMENT_NOTICE_COLUMNS} FROM billing.payment_notice AS notice
-      WHERE notice.order_id = $1 ORDER BY notice.received_at DESC, notice.notice_id DESC LIMIT 1`, [orderId])).rows[0];
+      WHERE notice.order_id = $1
+      ORDER BY notice.received_at DESC,
+        CASE WHEN notice.jwt_iat ~ '^[0-9]{1,15}([.][0-9]{1,9})?$' THEN notice.jwt_iat::numeric END DESC NULLS LAST,
+        notice.notice_id DESC
+      LIMIT 1`, [orderId])).rows[0];
     return row === undefined ? null : frozen(row);
   }
   /** §2.7.4: a message that failed verification, sealed; 14 days. */

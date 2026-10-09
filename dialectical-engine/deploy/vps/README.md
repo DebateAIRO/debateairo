@@ -2242,8 +2242,10 @@ What the API does at start with these settings:
   `NETOPIA_IPN_KEYS_INVALID`. Run the NETOPIA section of the setup again (with `--replace netopia`).
 - Billing off, with all four NETOPIA settings present: the API starts in the **provider-only mode**. It serves only
   NETOPIA's notify address, for the sandbox tool and the small live test of §14.9; nothing else of billing runs, and
-  every other payment message is stored and answered without any effect. With only some of the four, it writes
-  `"event":"billing.provider_only.incomplete"` (§14.8) and serves nothing of NETOPIA.
+  every other payment message is stored and answered without any effect. Like billing on, it refuses to start with
+  `BILLING_ADMISSION_UNSEALED` if the published register version does not seal the `billing_notify` admission scope.
+  With only some of the four, it writes `"event":"billing.provider_only.incomplete"` (§14.8) and serves nothing of
+  NETOPIA.
 - A setting of the previous card processor still in `api.env` is ignored, and the API writes
   `"event":"billing.setting.retired"` naming it (never its value): delete that line. The website does the same for the
   previous card form's setting left in `/etc/debateai/ui.env` (`"event":"ui.setting.retired"`): delete that line too.

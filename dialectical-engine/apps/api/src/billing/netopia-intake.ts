@@ -69,6 +69,9 @@ type Target =
   | Readonly<{ kind: "UNKNOWN" }>;
 const UNKNOWN: Target = Object.freeze({ kind: "UNKNOWN" });
 
+/** How a verified message reached the store: NETOPIA delivered it now, or the start's re-check read it from the quarantine. */
+type Delivery = Readonly<{ arrival: "DELIVERED" | "RECHECKED"; receivedAt: Date }>;
+
 type CardSource = Readonly<{
   customerId: string | null; sourceChargeId: string | null; sourceToolOrder: string | null; environment: PaymentEnvironment;
 }>;
@@ -85,7 +88,7 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
     const verdict = verifyNetopiaNotice(input.rawBody, input.header, this.deps.trust);
     if (!verdict.ok) return this.rejected(input, verdict.reason);
     try {
-      await this.store(input.rawBody, verdict, input.now, "DELIVERED");
+      await this.store(input.rawBody, verdict, { arrival: "DELIVERED", receivedAt: input.now }, input.now);
     } catch {
       this.deps.audit("billing.notice.store_failed", {});
       return netopiaNoticeAnswer("STORE_FAILED");
@@ -137,7 +140,9 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
     try {
       const verdict = verifyNetopiaNotice(opened.rawBody, opened.header, this.deps.trust);
       if (!verdict.ok) return "UNVERIFIED";
-      return await this.store(opened.rawBody, verdict, now, "RECHECKED") === "DUPLICATE" ? "STORED_BEFORE" : "VERIFIED";
+      // Stored at its real arrival (the quarantine row's), so NETOPIA's order of messages survives the re-check.
+      const delivery = { arrival: "RECHECKED", receivedAt: row.receivedAt } as const;
+      return await this.store(opened.rawBody, verdict, delivery, now) === "DUPLICATE" ? "STORED_BEFORE" : "VERIFIED";
     } catch {
       return "FAILED";
     } finally {
@@ -182,9 +187,12 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
   /**
    * §2.7.3: one transaction. A body stored before (same SHA-256) answers DUPLICATE and changes nothing else; it adds
    * its DUPLICATE outcome only when NETOPIA `DELIVERED` it again, never when the start's re-check re-read it from the
-   * quarantine (`RECHECKED`), so restarts add no outcome rows.
+   * quarantine (`RECHECKED`), so restarts add no outcome rows. `delivery.receivedAt` is when NETOPIA's message reached
+   * us (for a re-checked one, its quarantine row's time): the notice's `received_at`, which orders an order's messages
+   * (final review protocol-2). `now` is when it is processed: the outcome's `at`, the raw bytes' `stored_at`.
    */
-  private async store(rawBody: Buffer, verdict: VerifiedNotice, now: Date, arrival: "DELIVERED" | "RECHECKED"): Promise<NoticeOutcome> {
+  private async store(rawBody: Buffer, verdict: VerifiedNotice, delivery: Delivery, now: Date): Promise<NoticeOutcome> {
+    const { arrival, receivedAt } = delivery;
     const parsed = parseNetopiaNotice(rawBody, now);
     const bodySha256 = createHash("sha256").update(rawBody).digest("hex");
     const noticeId = randomUUID();
@@ -193,7 +201,7 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
       const target = parsed.readable ? await this.targetOf(client, parsed.orderId) : UNKNOWN;
       const stored = await this.deps.repository.insertPaymentNotice(client, {
         noticeId, paymentProvider: "netopia", paymentEnvironment: target.kind === "UNKNOWN" ? this.deps.paymentEnvironment : target.environment,
-        receivedAt: now, bodySha256, orderId: parsed.orderId, providerPaymentId: parsed.providerPaymentId,
+        receivedAt, bodySha256, orderId: parsed.orderId, providerPaymentId: parsed.providerPaymentId,
         providerStatus: parsed.providerStatus, amountText: parsed.amountText, currency: parsed.currency,
         cardCountry: parsed.cardCountry, keyFingerprint: verdict.keyFingerprint, jwtIat: verdict.jwtIat,
         allowedCiphertext: allowed.ciphertext, keyId: allowed.keyId
@@ -206,13 +214,15 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
       }
       const raw = sealNoticeRaw(this.deps.recordsKey, noticeId, rawBody);
       await this.deps.repository.insertPaymentNoticeRaw(client, { noticeId, rawCiphertext: raw.ciphertext, keyId: raw.keyId, storedAt: now });
-      const outcome = await this.process(client, parsed, target, noticeId, now);
+      const outcome = await this.process(client, parsed, target, noticeId, receivedAt, now);
       await this.deps.repository.insertPaymentNoticeOutcome(client, { noticeId, at: now, outcome });
       return outcome;
     });
   }
 
-  private async process(client: PoolClient, parsed: ParsedNotice, target: Target, noticeId: string, now: Date): Promise<NoticeOutcome> {
+  private async process(
+    client: PoolClient, parsed: ParsedNotice, target: Target, noticeId: string, receivedAt: Date, now: Date
+  ): Promise<NoticeOutcome> {
     if (!parsed.readable) {
       this.deps.audit("billing.notice.parse_failed", {});
       if (this.deps.mode === "ON") {
@@ -231,7 +241,7 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
       case "TOOL_ORDER":
         await this.saveCard(client, parsed, {
           customerId: null, sourceChargeId: null, sourceToolOrder: target.orderId, environment: target.environment
-        }, noticeId, now);
+        }, noticeId, receivedAt, now);
         return "TOOL_ORDER";
       case "CHARGE": {
         if (this.deps.mode === "PROVIDER_ONLY") return "BILLING_OFF";
@@ -241,7 +251,7 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
         if (customer !== null) {
           await this.saveCard(client, parsed, {
             customerId: customer.customerId, sourceChargeId: target.chargeId, sourceToolOrder: null, environment: target.environment
-          }, noticeId, now);
+          }, noticeId, receivedAt, now);
         }
         // §2.7.3 step 4 (SR-10): the live job is brought forward to now; else one is queued.
         if (!(await this.deps.jobs.bringForward(client, "VERIFY_PAYMENT", target.chargeId, now))) {
@@ -260,8 +270,13 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
     }
   }
 
-  /** §2.7.3 step 3: the token sealed under the records key, its row naming its source; never logged or returned. */
-  private async saveCard(client: PoolClient, parsed: ParsedNotice, source: CardSource, noticeId: string, now: Date): Promise<void> {
+  /**
+   * §2.7.3 step 3: the token sealed under the records key, its row naming its source; never logged or returned. A
+   * message without NETOPIA's operation time is dated by its arrival, never by a later re-check's clock.
+   */
+  private async saveCard(
+    client: PoolClient, parsed: ParsedNotice, source: CardSource, noticeId: string, receivedAt: Date, now: Date
+  ): Promise<void> {
     const card = parsed.savedCard;
     if (card === null) return;
     const tokenId = randomUUID();
@@ -269,7 +284,7 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
     await this.deps.repository.insertCardToken(client, {
       tokenId, customerId: source.customerId, paymentProvider: "netopia", paymentEnvironment: source.environment,
       sourceChargeId: source.sourceChargeId, sourceToolOrder: source.sourceToolOrder, sourceNoticeId: noticeId,
-      sourcePaidAt: parsed.occurredAt ?? now, tokenCiphertext: sealed.ciphertext, keyId: sealed.keyId,
+      sourcePaidAt: parsed.occurredAt ?? receivedAt, tokenCiphertext: sealed.ciphertext, keyId: sealed.keyId,
       expMonth: card.expMonth, expYear: card.expYear, last4: card.last4, cardCountry: parsed.cardCountry, createdAt: now
     });
   }

@@ -177,13 +177,20 @@ describe("N9 NETOPIA's verified message", () => {
 
   it("keeps no card and queues nothing for a charge of another payment system or environment", async () => {
     const { intake } = intakeFor();
-    for (const [environment, label] of [["live", "live"]] as const) {
-      const { chargeId } = await openCharge(environment);
+    const live = (await openCharge("live")).chargeId;
+    // An xMoney-era charge as 0109 keeps it, seeded with SQL as billing-netopia-migration.test.ts does.
+    const xmoney = newChargeId();
+    await query(`INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start, period_end,
+        quote_id, net_micros, tax_micros, total_micros, currency, created_at, payment_provider, payment_environment)
+      VALUES ($1, $2, $3, 'CARD_CHECK', 1, $4::timestamptz, $4::timestamptz + interval '1 day', NULL, 0, 0, 0, 'USD', $4,
+        'xmoney', 'stage')`, [xmoney, randomUUID(), randomUUID(), "2026-10-06T08:00:00.000Z"]);
+    // Another system's charge: the notice is labelled with this API's own system (0109 allows only NETOPIA's there).
+    for (const [chargeId, label, system] of [[live, "live", "netopia/live"], [xmoney, "sandbox", "xmoney/stage"]] as const) {
       await intake.receive(arrival(sign(body(chargeId)), hour(5)));
       const [notice] = await noticesFor(chargeId);
-      expect([notice?.payment_environment, await outcomesOf(notice!.notice_id)], environment).toEqual([label, ["OTHER_SYSTEM"]]);
-      expect(await tokensFor("source_charge_id", chargeId)).toEqual([]);
-      expect(await jobsFor(chargeId)).toEqual([]);
+      expect([notice?.payment_environment, await outcomesOf(notice!.notice_id)], system).toEqual([label, ["OTHER_SYSTEM"]]);
+      expect(await tokensFor("source_charge_id", chargeId), system).toEqual([]);
+      expect(await jobsFor(chargeId), system).toEqual([]);
     }
   });
 

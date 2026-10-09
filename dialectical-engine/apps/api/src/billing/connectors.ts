@@ -9,8 +9,10 @@ import {
   type SellerCompany,
   type TaxEngine
 } from "@debateai/billing-core";
+import { TypedDomainError } from "@debateai/kernel";
 import {
   NETOPIA_ENVIRONMENT_KEYS,
+  type AdmissionPolicy,
   type BillingEnvironmentGroup,
   type NetopiaEnvironmentGroup,
   type NetopiaEnvironmentKey
@@ -166,6 +168,19 @@ export function billingModeOf(input: Readonly<{
   if (!input.hosted) return "OFF";
   if (input.billingEnabled) return "ON";
   return NETOPIA_ENVIRONMENT_KEYS.every((key) => isSet(input.environment[key])) ? "PROVIDER_ONLY" : "OFF";
+}
+
+/**
+ * The provider-only mode serves NETOPIA's notify address, and a message that fails verification charges the
+ * source-keyed billingNotify budget (spec §2.7.1) before it is quarantined for 14 days. A register version that does
+ * not seal that scope would leave such messages unlimited, so this boot is refused with the code billing on uses
+ * (main.ts's billing-runtime stage), by name (final review protocol-3).
+ */
+export function assertProviderOnlyNotifySealed(admission: Pick<AdmissionPolicy, "billingNotify">): void {
+  if (admission.billingNotify === null) {
+    throw new TypedDomainError("BILLING_ADMISSION_UNSEALED",
+      "NETOPIA's notify address is served in the provider-only mode, so the register must seal the billingNotify admission scope");
+  }
 }
 
 /** With billing off: the first NETOPIA key left out of a group that is set in part, for one boot line; else null. */

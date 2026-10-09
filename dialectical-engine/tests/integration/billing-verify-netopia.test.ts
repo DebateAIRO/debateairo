@@ -20,6 +20,8 @@ import { chargeEvent, newChargeId, subscriptionEvent } from "../../apps/api/src/
 import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
 import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-renewal.js";
 import { VerifyPaymentHandler } from "../../apps/api/src/billing/verify-payment.js";
+import { NetopiaNoticeIntake } from "../../apps/api/src/billing/netopia-intake.js";
+import { signedNetopiaNotice, testNetopiaKeys } from "../support/netopia-notice.js";
 
 let database: TestDatabase;
 let repository: BillingRepository;
@@ -460,5 +462,67 @@ describe("N10 VERIFY_PAYMENT on NETOPIA: a renewal", () => {
     expect(await kinds(chargeId)).toEqual(["REQUESTED", "SUBMITTED", "FAILED", "SUCCEEDED"]);
     expect((await repository.subscriptionEvents(seeded.subscriptionId)).at(-1)?.kind).toBe("RECOVERED");
     expect((await state(seeded.subscriptionId)).status).toBe("ACTIVE");
+  });
+});
+
+describe("F3 (final review protocol-2): messages verified at the next start keep their arrival order", () => {
+  const POS = ["F3RC", "H3CK", "Q4R7", "N0T1", "CE55"].join("-");
+  /** NETOPIA signs with `keys`; the site trusts `wrongKeys` until the owner fixes the file. */
+  const keys = testNetopiaKeys();
+  const wrongKeys = testNetopiaKeys();
+  const intakeWith = (trusted: typeof keys) => new NetopiaNoticeIntake({
+    repository, jobs: new BillingJobQueries(database.pool), trust: trusted.trust(POS), recordsKey: TEST_RECORDS_KEY,
+    paymentEnvironment: "sandbox", mode: "ON", audit: recordingAudit(), kick: () => undefined
+  });
+  /** NETOPIA's message for the checkout's order: a decline (12, no card), or the paid retry on the same page (3, its card). */
+  const message = (orderId: string, run: number, status: 3 | 12, operationDate: Date) => signedNetopiaNotice({
+    privateKey: keys.privateKey, posSignature: POS, body: {
+      payment: {
+        method: "card", ntpID: String(7_300_000 + 100 * run + status), status, amount: 23.8, currency: "USD",
+        code: status === 3 ? "00" : "19", message: status === 3 ? "Approved" : "Declined",
+        instrument: { panMasked: "9****4242", country: "DE" }, operationDate: operationDate.toISOString(),
+        ...(status === 3 ? { binding: { token: ["tok", "f3", orderId.slice(0, 8)].join("-"), expireMonth: 12, expireYear: 2031 } } : {})
+      },
+      order: { orderID: orderId }
+    }
+  });
+
+  it("decides from the paid retry, not the earlier decline, when both wait in the quarantine and the status stays unreadable", async () => {
+    // Several runs: before the fix both rows took the restart's clock and a random id broke the tie.
+    for (let run = 0; run < 4; run += 1) {
+      const bought = await checkout(`rechecked-${run}`);
+      const declinedAt = new Date(Date.now() - 4 * MINUTE);
+      const paidAt = new Date(Date.now() - 3 * MINUTE);
+      const wrong = intakeWith(wrongKeys);
+      // The trusted key is wrong (§2.7.4): both are answered "retry" and quarantined, the decline first.
+      for (const [status, at] of [[12, declinedAt], [3, paidAt]] as const) {
+        const signed = message(bought.chargeId, run, status, new Date(at.getTime() - 10_000));
+        expect((await wrong.receive({ rawBody: signed.rawBody, header: signed.header, sourceKey: "198.51.100.0/24", now: at })).status).toBe(503);
+      }
+      // The owner fixes the key and restarts: one re-check, one clock, for both.
+      const restartedAt = new Date();
+      expect(await intakeWith(keys).recheckQuarantine(restartedAt)).toBe(2);
+      const notices = (await database.pool.query<{ notice_id: string; provider_status: number; received_at: Date }>(
+        "SELECT notice_id, provider_status, received_at FROM billing.payment_notice WHERE order_id = $1 ORDER BY provider_status",
+        [bought.chargeId])).rows;
+      expect(notices.map((row) => [row.provider_status, row.received_at.toISOString()])).toEqual([
+        [3, paidAt.toISOString()], [12, declinedAt.toISOString()]
+      ]);
+      const paid = notices[0]!;
+      const declined = notices[1]!;
+      // NETOPIA's status read stays unreadable for the whole not-final schedule; the signed notice decides.
+      const status = new ScriptedStatus();
+      const now = { at: new Date() };
+      const { verify } = handlerFor(status, now);
+      for (let attempts = 1; attempts <= 7; attempts += 1) {
+        status.script(bought.chargeId, paymentError("PAYMENT_PROVIDER_UNAVAILABLE"));
+        const outcome = await verify.handle(job(bought.chargeId, attempts, now.at), now.at);
+        expect(outcome, `attempt ${attempts}`).toMatchObject(attempts < 7 ? { kind: "RETRY", code: "PAYMENT_STATUS_UNREADABLE" } : { kind: "DONE" });
+      }
+      expect(await kinds(bought.chargeId), `run ${run}`).toEqual(["REQUESTED", "SUCCEEDED"]);
+      expect((await state(bought.subscriptionId)).status).toBe("ACTIVE");
+      expect(await noticeOutcomes(paid.notice_id)).toEqual(["APPLIED", "DECIDED_BY_NOTICE"]);
+      expect(await noticeOutcomes(declined.notice_id)).toEqual(["APPLIED"]);
+    }
   });
 });

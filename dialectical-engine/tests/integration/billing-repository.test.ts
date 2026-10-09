@@ -852,6 +852,24 @@ describe("N6 — NETOPIA's rows through the repository (spec §2.5.1, §2.5.2)",
       .toMatchObject({ reason: "NOTICE_SIGNATURE_INVALID", headerCiphertext: null, orderId });
     expect((await billing.quarantineSince(database.pool, new Date(since.getTime() + 60_000))).map((row) => row.quarantineId)).not.toContain(quarantineId);
   });
+  it("breaks a tie of arrival times by NETOPIA's iat as a number, then the id, never by a random id first (F3, protocol-2)", async () => {
+    const orderId = chargeIdOf();
+    const notice = (noticeId: string, jwtIat: string | null, body: string) => ({
+      noticeId, paymentProvider: "netopia" as const, paymentEnvironment: "sandbox" as const, receivedAt: anchor,
+      bodySha256: hex64(body), orderId, providerPaymentId: "5601", providerStatus: 3, amountText: "24.2", currency: "USD",
+      cardCountry: "RO", keyFingerprint: hex64("key"), jwtIat, allowedCiphertext: sealedBytes, keyId: KEY_ID
+    });
+    // The highest id holds the oldest iat, and "999999999" sorts after "1000000000" as text: neither may win.
+    const [newest, older, oldest, unsigned] = ["00000000", "11111111", "ffffffff", "eeeeeeee"]
+      .map((head) => `${head}${randomUUID().slice(8)}`);
+    await inTx(async (c) => {
+      await billing.insertPaymentNotice(c, notice(oldest!, "999999999", `iat-old-${orderId}`));
+      await billing.insertPaymentNotice(c, notice(older!, "1000000000", `iat-mid-${orderId}`));
+      await billing.insertPaymentNotice(c, notice(newest!, "1000000001", `iat-new-${orderId}`));
+      await billing.insertPaymentNotice(c, notice(unsigned!, null, `iat-none-${orderId}`));
+    });
+    expect((await billing.newestNoticeForOrder(database.pool, orderId))?.noticeId).toBe(newest);
+  });
   it("stores a saved card, finds it by id and by source charge, lists live tokens, revokes once and purges it", async () => {
     const charge = await netopiaCharge();
     const tokenId = randomUUID();

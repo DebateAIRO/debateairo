@@ -56,13 +56,15 @@ const MIGRATIONS: ReadonlyArray<string> = Object.freeze([
   "dialectical-engine/migrations/lineage/verify-effective-capabilities-109.sql"
 ]);
 /**
- * The suites that seed rows of the old provider and prove 0109 keeps them inert, and (PR-33) the proof that a live boot
- * still counts that era's open rows as another payment system's (spec 2026-10-05 §2.5.4).
+ * The suites that seed rows of the old provider and prove 0109 keeps them inert, (PR-33) the proof that a live boot
+ * still counts that era's open rows as another payment system's (spec 2026-10-05 §2.5.4), and (F3, final review
+ * tests-2) the proof that NETOPIA's message naming such a charge keeps no card and queues nothing (OTHER_SYSTEM).
  */
 const HISTORY_TESTS: ReadonlyArray<string> = Object.freeze([
   "dialectical-engine/tests/integration/billing-migrations.test.ts",
   "dialectical-engine/tests/integration/billing-netopia-migration.test.ts",
-  "dialectical-engine/tests/integration/billing-other-system-records.test.ts"
+  "dialectical-engine/tests/integration/billing-other-system-records.test.ts",
+  "dialectical-engine/tests/integration/billing-netopia-intake.test.ts"
 ]);
 /**
  * Code that names the old provider only to recognise what it left: the outbox kind and the provider value 0087 and
