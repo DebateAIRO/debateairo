@@ -40,5 +40,6 @@
   "lib/sessionProxy.test.mjs",
   "lib/trustedClientIp.test.mjs",
   "lib/v3/runFailure.test.mjs",
-  "scripts/next-config-csp.test.mjs"
+  "scripts/next-config-csp.test.mjs",
+  "lib/previewPlanRoster.test.mjs"
 ]

@@ -861,7 +861,7 @@ const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
 const application = new PostgresAskApplication(pool, dispatcher, {
-  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig }),
+  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   registerVersion: environment.REGISTER_VERSION,
   batteryVersion: environment.BATTERY_VERSION,
@@ -1321,7 +1321,7 @@ const billingRouteOptions: BillingRouteOptions | undefined =
         ...(billingRuntime === undefined ? {} : billingRuntime.routes)
       });
 const api = buildApi({
-  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig }),
+  ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   application,
   stories: new RepositoryAnswerStoryApplication(storyRepository),
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
