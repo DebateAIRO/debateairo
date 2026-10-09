@@ -965,7 +965,8 @@ describe("P22 the Billing runbook", () => {
     for (const prefix of ["P2-I1 (X0)", "P2-I2 (", "P2-I18 (X0)"]) {
       const cells = rowStarting(prefix);
       expect(cells, `no row ${prefix}`).toBeDefined();
-      expect(cells!.at(-1), prefix).toMatch(new RegExp(`^closed: ${VOID.replace(/[()]/gu, "\\$&")}`, "u"));
+      const closedVoid = `closed: ${VOID}`;
+      expect((cells!.at(-1) ?? "").slice(0, closedVoid.length), prefix).toBe(closedVoid);
     }
     for (const prefix of ["P2-I12 (X0, owner)", "P2-I3, P2-I19, P2-I20, P2-M38 (X0, owner)", "P2-I21, ",
       "P2-M1, P2-M3, P2-M5, P2-M27 (X0, owner)", "Owner items"]) {

@@ -93,12 +93,17 @@ describe("N2 — the saved-card charge (spec §2.4.2)", () => {
   it("refuses to send a charge whose payer misses a required field, naming the field only", () => {
     for (const [change, field] of [[{ firstName: " " }, "firstName"], [{ lastName: "" }, "lastName"], [{ email: "not-an-address" }, "email"],
       [{ phone: "0712345678" }, "phone"], [{ phone: "+4071" }, "phone"], [{ city: "" }, "city"], [{ street: "" }, "street"],
-      [{ country: "XX" }, "country"], [{ country: "ROU" }, "country"]] as ReadonlyArray<readonly [Partial<Payer>, string]>) {
+      [{ country: "XX" }, "country"], [{ country: "ROU" }, "country"],
+      [{ email: `${"a".repeat(242)}@example.test` }, "email"]] as ReadonlyArray<readonly [Partial<Payer>, string]>) {
       let caught: unknown = null;
       try { buildSavedCardChargeBody({ ...CHARGE, payer: { ...PAYER, ...change } }, CONTEXT); } catch (error) { caught = error; }
       expect((caught as TypedDomainError).code, field).toBe(`PAYMENT_PAYER_INCOMPLETE:${field}`);
       expect((caught as TypedDomainError).message, field).toBe(`PAYMENT_PAYER_INCOMPLETE:${field}`);
     }
+    // 254 characters (RFC 5321's path limit) is the longest address sent; the 255-character one above is refused.
+    const longest = `${"a".repeat(241)}@example.test`;
+    expect(longest).toHaveLength(254);
+    expect(JSON.parse(buildSavedCardChargeBody({ ...CHARGE, payer: { ...PAYER, email: longest } }, CONTEXT)).order.billing.email).toBe(longest);
     for (const payerIp of ["", "not-an-ip", "256.1.1.1", "1.2.3"]) {
       expect(codeOf(() => buildSavedCardChargeBody({ ...CHARGE, payerIp }, CONTEXT)), payerIp).toBe("PAYMENT_PAYER_INCOMPLETE:payerIp");
     }

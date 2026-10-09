@@ -21,7 +21,13 @@ const SCA_EXEMPTION_MIT = "MIT";
 const ORDER_ID = /^(?:[0-9a-f]{32}|t-[0-9a-f]{30})$/u;
 const CLIENT_ID = /^[0-9a-f]{32}$/u;
 const E164 = /^\+[0-9]{8,15}$/u;
-const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
+/*
+ * One `@`, then a domain with a dot that is neither its first nor its last character: the same strings as the earlier
+ * `[^@\s]+\.[^@\s]+` domain, written so each character has one way to match (that one was quadratic on a run of dots).
+ * Longer than 254 (RFC 5321's path limit, our sign-up cap) is refused before the pattern runs.
+ */
+const EMAIL = /^[^@\s]+@[^@\s][^@\s.]*\.[^@\s]+$/u;
+const EMAIL_MAX_LENGTH = 254;
 const OCTET = "(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])";
 const IPV4 = new RegExp(`^${OCTET}(?:\\.${OCTET}){3}$`, "u");
 const IPV6 = /^[0-9A-Fa-f:.]{2,45}$/u;
@@ -57,7 +63,7 @@ function billingOf(payer: Payer): JsonObject {
   for (const field of ["firstName", "lastName", "email", "phone", "city", "street"] as const) {
     if (!filled(payer[field])) throw paymentError("PAYMENT_PAYER_INCOMPLETE", field);
   }
-  if (!EMAIL.test(payer.email)) throw paymentError("PAYMENT_PAYER_INCOMPLETE", "email");
+  if (payer.email.length > EMAIL_MAX_LENGTH || !EMAIL.test(payer.email)) throw paymentError("PAYMENT_PAYER_INCOMPLETE", "email");
   if (!E164.test(payer.phone)) throw paymentError("PAYMENT_PAYER_INCOMPLETE", "phone");
   const country = payer.country.length === 2 ? iso2ToNetopiaCountry(payer.country) : null;
   if (country === null) throw paymentError("PAYMENT_PAYER_INCOMPLETE", "country");

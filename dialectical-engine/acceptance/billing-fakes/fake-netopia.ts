@@ -3,7 +3,7 @@
 // saved-card charges), `operation/status`, the payment page's outcomes, the signed message (the IPN) and failure controls.
 // Deliberately an INDEPENDENT implementation (node: modules only, never @debateai/payments-netopia), written from NETOPIA's
 // OpenAPI file and the research notes, so it can catch the client's mistakes. It also backs the dev stack (N8, N24).
-import { createHash, generateKeyPairSync, randomBytes, sign, type KeyObject } from "node:crypto";
+import { createHash, generateKeyPairSync, randomBytes, randomInt, sign, type KeyObject } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 
@@ -90,10 +90,10 @@ function withAmount(value: unknown, amountText: string): string {
   return JSON.stringify(value).replace(AMOUNT_SLOT, amountText);
 }
 
+/** Five dash-separated groups of four; randomInt picks each character evenly (a byte modulo 36 favours some). */
 function randomPosSignature(): string {
-  const bytes = randomBytes(20);
-  return Array.from({ length: 5 }, (_, group) =>
-    Array.from({ length: 4 }, (_, index) => POS_ALPHABET[(bytes[group * 4 + index] ?? 0) % POS_ALPHABET.length]).join("")).join("-");
+  return Array.from({ length: 5 }, () =>
+    Array.from({ length: 4 }, () => POS_ALPHABET.charAt(randomInt(POS_ALPHABET.length))).join("")).join("-");
 }
 
 /** The first field a request lacks or must not carry (NETOPIA's required lists, spec §2.4.2), else null. */

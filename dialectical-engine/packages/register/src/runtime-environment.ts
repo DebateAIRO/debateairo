@@ -767,7 +767,12 @@ function requiredValue(environment: GroupSource, key: GroupKey): string {
   return found;
 }
 
-const trimSlashes = (value: string): string => value.replace(/\/+$/u, "");
+/** Drops every trailing "/"; a loop, not a pattern (a `/+$` regex is quadratic on a long run of slashes). */
+function trimSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") end -= 1;
+  return value.slice(0, end);
+}
 
 /**
  * NETOPIA's group alone: the provider-only mode (hosted, billing off) builds the NETOPIA connector from it, and
