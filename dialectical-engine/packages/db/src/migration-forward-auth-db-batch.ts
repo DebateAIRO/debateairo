@@ -47,7 +47,8 @@ export const AUTH_DB_BATCH_FUNCTIONS=Object.freeze([
  'staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)',
  'staff.revoke_independent_alert_readiness(uuid)',
  'staff.release_alert_delivery(uuid,uuid)',
- 'staff.claim_alert_delivery(integer)'
+ 'staff.claim_alert_delivery(integer)',
+ 'staff.read_independent_alert_readiness(text,uuid)'
 ] as const);
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD_AUTH_DB_BATCH_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');

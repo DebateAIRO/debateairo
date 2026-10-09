@@ -21,7 +21,8 @@ BEGIN
   'identity.mfa_recovery_link_waiting(text)',
   'identity.append_consumer_security_audit_internal(uuid,text,jsonb)',
   'staff.require_alert_readiness_jit()','staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)',
-  'staff.revoke_independent_alert_readiness(uuid)','staff.release_alert_delivery(uuid,uuid)','staff.claim_alert_delivery(integer)'] LOOP
+  'staff.revoke_independent_alert_readiness(uuid)','staff.release_alert_delivery(uuid,uuid)','staff.claim_alert_delivery(integer)',
+  'staff.read_independent_alert_readiness(text,uuid)'] LOOP
   SELECT * INTO p FROM pg_proc WHERE oid=to_regprocedure(v_name);
   IF p.oid IS NULL OR NOT p.prosecdef OR p.proconfig IS DISTINCT FROM (CASE WHEN v_name='identity.create_social_account(jsonb,jsonb)'
     THEN ARRAY['search_path=pg_catalog'] ELSE ARRAY['search_path=pg_catalog, pg_temp'] END)
@@ -89,12 +90,13 @@ BEGIN
   RAISE EXCEPTION 'MIGRATION_FORWARD_AUTH_DB_BATCH_RELEASE_DRIFT';
  END IF;
 
- -- Nobody but the owner may create temporary objects here (item 6): not PUBLIC, not a runtime, not the writer.
+ -- Nobody but the database owner (and superusers, who bypass it) may create temporary objects here (item 6): not
+ -- PUBLIC, and no other role, directly or through a membership.
  IF EXISTS(SELECT 1 FROM pg_database d CROSS JOIN LATERAL aclexplode(coalesce(d.datacl,acldefault('d',d.datdba))) a WHERE d.datname=current_database() AND a.grantee=0 AND a.privilege_type='TEMPORARY') THEN
   RAISE EXCEPTION 'MIGRATION_FORWARD_AUTH_DB_BATCH_TEMP_DRIFT';
  END IF;
- FOREACH v_name IN ARRAY ARRAY['debateai_runtime','debateai_billing_runtime','debateai_authorization_runtime','debateai_mfa_recovery_runtime','debateai_staff_readiness_writer'] LOOP
-  IF has_database_privilege(v_name,current_database(),'TEMPORARY') THEN RAISE EXCEPTION 'MIGRATION_FORWARD_AUTH_DB_BATCH_TEMP_DRIFT %',v_name;END IF;
- END LOOP;
+ SELECT r.rolname INTO v_name FROM pg_roles r WHERE NOT r.rolsuper AND r.oid<>(SELECT datdba FROM pg_database WHERE datname=current_database())
+  AND has_database_privilege(r.oid,current_database(),'TEMPORARY') ORDER BY r.rolname LIMIT 1;
+ IF v_name IS NOT NULL THEN RAISE EXCEPTION 'MIGRATION_FORWARD_AUTH_DB_BATCH_TEMP_DRIFT %',v_name;END IF;
 END
 $auth_db_batch$;

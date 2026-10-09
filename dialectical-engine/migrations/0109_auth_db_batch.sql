@@ -323,18 +323,21 @@ DECLARE c identity.mfa_recovery_control%ROWTYPE;BEGIN IF p_kind='link' THEN SELE
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_notice_event(p_id uuid,p_event text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 BEGIN IF p_event NOT IN('STARTED','WAITING','COMPLETED','CANCELLED','REFUSED') THEN RAISE EXCEPTION 'MFA_RECOVERY_NOTICE_INVALID';END IF;INSERT INTO identity.mfa_recovery_notice(challenge_id,user_id,channel_id,event_kind,payload_ciphertext) SELECT c.challenge_id,c.user_id,b.channel_id,p_event,CASE WHEN p_event IN('STARTED','WAITING') AND b.cancel_authorized AND identity.mfa_recovery_cancel_channel_current(c.user_id,b.channel_id) THEN b.cancel_payload_ciphertext ELSE b.payload_ciphertext END FROM identity.mfa_recovery_control c JOIN identity.mfa_recovery_notice_binding b USING(challenge_id) WHERE c.challenge_id=p_id ON CONFLICT DO NOTHING;END $$;
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_claim_notice(p_lease integer) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
-DECLARE n identity.mfa_recovery_notice%ROWTYPE;l uuid;t timestamptz;v uuid;BEGIN
+DECLARE n identity.mfa_recovery_notice%ROWTYPE;l uuid;t timestamptz;v integer;BEGIN
  IF p_lease IS NULL OR p_lease NOT BETWEEN 1000 AND 60000 THEN RAISE EXCEPTION 'EMAIL_NOTICE_LEASE_INVALID';END IF;t:=clock_timestamp();
  UPDATE identity.mfa_recovery_notice a SET dead_at=t WHERE a.event_kind='PROOF' AND sent_at IS NULL AND dead_at IS NULL AND NOT EXISTS(SELECT 1 FROM identity.mfa_recovery_control c WHERE c.challenge_id=a.challenge_id AND c.stage='EMAIL_REQUIRED' AND c.expires_at>t);
- -- A waiting replacement is re-checked before its WAITING or FINISH mail goes out: one invalidated meanwhile (password,
- -- email, factor, inventory or security change) is closed as EXPIRED here, and its unsent mails die below.
- FOR v IN SELECT DISTINCT a.challenge_id FROM identity.mfa_recovery_notice a JOIN identity.mfa_recovery_control c USING(challenge_id) WHERE a.event_kind IN('WAITING','FINISH') AND a.sent_at IS NULL AND a.dead_at IS NULL AND a.available_at<=t AND(a.lease_until IS NULL OR a.lease_until<=t) AND c.stage='WAITING' ORDER BY a.challenge_id LIMIT 32 LOOP
-  PERFORM identity.mfa_recovery_waiting_current(v);
- END LOOP;
- UPDATE identity.mfa_recovery_notice a SET dead_at=t WHERE a.event_kind='WAITING' AND sent_at IS NULL AND dead_at IS NULL AND EXISTS(SELECT 1 FROM identity.mfa_recovery_control c WHERE c.challenge_id=a.challenge_id AND c.stage='EXPIRED');
- -- A finish link is only ever mailed while its replacement is still waiting.
+ -- A WAITING mail goes out only while its replacement is still waiting (not once it was cancelled, refused, expired
+ -- or finished), and a finish link only while it waits too.
+ UPDATE identity.mfa_recovery_notice a SET dead_at=t WHERE a.event_kind='WAITING' AND sent_at IS NULL AND dead_at IS NULL AND NOT EXISTS(SELECT 1 FROM identity.mfa_recovery_control c WHERE c.challenge_id=a.challenge_id AND c.stage='WAITING');
  UPDATE identity.mfa_recovery_notice a SET dead_at=t WHERE a.event_kind='FINISH' AND sent_at IS NULL AND dead_at IS NULL AND NOT EXISTS(SELECT 1 FROM identity.mfa_recovery_control c WHERE c.challenge_id=a.challenge_id AND c.stage='WAITING' AND c.expires_at>t);
- SELECT * INTO n FROM identity.mfa_recovery_notice WHERE sent_at IS NULL AND dead_at IS NULL AND available_at<=t AND(lease_until IS NULL OR lease_until<=t) ORDER BY created_at,notice_id LIMIT 1 FOR UPDATE SKIP LOCKED;IF n.notice_id IS NULL THEN RETURN NULL;END IF;l:=gen_random_uuid();UPDATE identity.mfa_recovery_notice SET lease_id=l,lease_until=t+(p_lease*interval '1 millisecond'),attempts=attempts+1 WHERE notice_id=n.notice_id;
+ -- The claimed WAITING or FINISH mail's own replacement is re-checked: one invalidated meanwhile (password, email,
+ -- factor, inventory or security change) is closed as EXPIRED, the mail dies, and the next one is claimed instead.
+ FOR v IN 1..64 LOOP
+  SELECT * INTO n FROM identity.mfa_recovery_notice WHERE sent_at IS NULL AND dead_at IS NULL AND available_at<=t AND(lease_until IS NULL OR lease_until<=t) ORDER BY created_at,notice_id LIMIT 1 FOR UPDATE SKIP LOCKED;IF n.notice_id IS NULL THEN RETURN NULL;END IF;
+  EXIT WHEN n.event_kind NOT IN('WAITING','FINISH') OR (identity.mfa_recovery_waiting_current(n.challenge_id)).challenge_id IS NOT NULL;
+  UPDATE identity.mfa_recovery_notice SET dead_at=t WHERE notice_id=n.notice_id;n:=NULL;
+ END LOOP;
+ IF n.notice_id IS NULL THEN RETURN NULL;END IF;l:=gen_random_uuid();UPDATE identity.mfa_recovery_notice SET lease_id=l,lease_until=t+(p_lease*interval '1 millisecond'),attempts=attempts+1 WHERE notice_id=n.notice_id;
  RETURN jsonb_build_object('noticeId',n.notice_id,'leaseId',l,'userId',n.user_id,'channelId',n.channel_id,'event',n.event_kind,'cancelAllowed',n.event_kind IN('STARTED','WAITING') AND (identity.mfa_recovery_cancel_channel_current(n.user_id,n.channel_id) AND (SELECT cancel_authorized FROM identity.mfa_recovery_notice_binding WHERE challenge_id=n.challenge_id AND channel_id=n.channel_id)),'payload',CASE WHEN n.event_kind IN('STARTED','WAITING') AND NOT (identity.mfa_recovery_cancel_channel_current(n.user_id,n.channel_id) AND (SELECT cancel_authorized FROM identity.mfa_recovery_notice_binding WHERE challenge_id=n.challenge_id AND channel_id=n.channel_id)) THEN(SELECT payload_ciphertext FROM identity.mfa_recovery_notice_binding WHERE challenge_id=n.challenge_id AND channel_id=n.channel_id) ELSE n.payload_ciphertext END,'expiresAt',(SELECT expires_at FROM identity.mfa_recovery_control WHERE challenge_id=n.challenge_id))||CASE WHEN n.event_kind IN('WAITING','FINISH') THEN jsonb_build_object('notBefore',(SELECT not_before FROM identity.mfa_recovery_control WHERE challenge_id=n.challenge_id)) ELSE '{}'::jsonb END;END $$;
 
 -- Asked right after the emailed link (and the password) proved the mailbox: does this account already have a valid
@@ -689,6 +692,7 @@ GRANT EXECUTE ON FUNCTION staff.release_alert_delivery(uuid,uuid) TO debateai_ru
 ALTER FUNCTION staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz) SET search_path=pg_catalog,pg_temp;
 ALTER FUNCTION staff.revoke_independent_alert_readiness(uuid) SET search_path=pg_catalog,pg_temp;
 ALTER FUNCTION staff.claim_alert_delivery(integer) SET search_path=pg_catalog,pg_temp;
+ALTER FUNCTION staff.read_independent_alert_readiness(text,uuid) SET search_path=pg_catalog,pg_temp;
 
 -- 6. No temporary objects for anyone but the database owner (and superusers, which bypass it). A definer function
 -- whose search_path lists pg_catalog without pg_temp still resolves TYPE and relation names in the caller's temporary
