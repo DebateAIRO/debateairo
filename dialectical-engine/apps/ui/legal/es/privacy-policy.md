@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective [date] · Versiones anteriores en dezbatere.ro/privacy/versions · Responsable: DebateAIRO S.R.L., Bucarest**
 
-**In short.** Recopilamos lo que una cuenta necesita y lo que usted decide escribir. Sus preguntas se envían a los proveedores de IA que figuran en nuestro Registro; no se utilizan para entrenar modelos. Los debates son privados salvo que usted los publique. La eliminación de su cuenta destruye las claves de sus datos y retira sus debates publicados. Puede escribirnos a privacy@dezbatere.ro, y las personas mencionadas en un debate pueden solicitar su retirada sin disponer de una cuenta.
+**In short.** Recopilamos lo que una cuenta necesita y lo que usted decide escribir. Sus preguntas se envían a los proveedores de IA que figuran en nuestro Registro; no se utilizan para entrenar modelos. Los debates son privados salvo que usted los publique. La eliminación de su cuenta destruye las claves de sus datos privados; al programarla, usted elige si también se retiran sus debates publicados o si permanecen públicos bajo su seudónimo retirado. Puede escribirnos a privacy@dezbatere.ro, y las personas mencionadas en un debate pueden solicitar su retirada sin disponer de una cuenta.
 
 ## 1. Quién es responsable de sus datos
 
@@ -101,7 +101,7 @@ Los debates son privados hasta que usted los publica. La publicación es una acc
 
 Retirar la publicación elimina el debate de Dialectical Engine y destruye la clave de nuestra copia pública. Las copias que ya hayan realizado lectores, motores de búsqueda o archivos quedan fuera de nuestro control y no podemos recuperarlas.
 
-Cuando elimina su cuenta, retiramos del acceso público todos los debates que haya publicado sin dilación indebida y, como máximo, en 30 días, salvo que la ley nos obligue a conservar un elemento concreto. [Option B — a product change; see the Terms, section 9.]
+Cuando programe la eliminación de su cuenta, elegirá qué ocurre con los debates que haya publicado. Si marca «Eliminar también mis debates públicos», retiraremos cada uno del acceso público y destruiremos la clave de nuestra copia pública cuando se ejecute la eliminación, salvo que la ley nos obligue a conservar un elemento concreto. Si deja la casilla sin marcar, seguirán públicos bajo su seudónimo retirado.
 
 ## 7. Durante cuánto tiempo conservamos la información
 
@@ -117,14 +117,14 @@ Cuando elimina su cuenta, retiramos del acceso público todos los debates que ha
 | Señales de riesgo de inicio de sesión y recuperación | 90 días, aplicado por la base de datos | Se purgan |
 | Registro de auditoría de seguridad | Durante toda la vida del servicio | Solo permite adiciones; la IP y el agente de usuario son resúmenes unidireccionales y no pueden volver a leerse |
 | Contenido de los debates (privados) | Mientras exista la cuenta | Se destruyen las claves al cerrar la cuenta, lo que hace ilegible el contenido |
-| Contenido de los debates (publicados) | Mientras estén publicados y exista la cuenta | Se retiran del acceso público al retirar la publicación o cerrar la cuenta; se destruyen las claves |
+| Contenido de los debates (publicados) | Mientras estén publicados; si cierra su cuenta y deja «Eliminar también mis debates públicos» sin marcar, un debate publicado permanece público bajo su seudónimo retirado | Se retira del acceso público y se destruye su clave cuando usted retira la publicación, o al cerrar la cuenta si marcó «Eliminar también mis debates públicos» |
 | Registros de respuestas de proveedores y referencias de recuperación | El mismo plazo que el debate al que pertenecen | Igual |
 | Conversaciones y casos de soporte | [Until closed plus 12 months] | Se destruyen las claves |
 | Registros de aceptación y consentimiento | Vida de la cuenta más 6 años: el plazo de prescripción más largo que nos resulta aplicable | Se eliminan |
 | Registros de pago [pending] | 10 años, según exige la legislación contable rumana | Se eliminan |
 | Copias de seguridad [pending] | [… days] después de eliminarse la copia activa | Se sobrescriben |
 
-**Qué hace realmente la eliminación.** Sus debates y los datos de su cuenta están cifrados con claves específicas de su cuenta y de cada debate. Al eliminar su cuenta se destruyen esas claves, tras lo cual ni nosotros ni ninguna otra persona podemos leer los registros cifrados, y eliminamos el registro de su cuenta. Lo describimos como eliminación porque ese es su efecto y disponemos de una evaluación documentada que lo respalda; si desea saber más, pregúntenos. Debe saber tres cosas: el registro de auditoría de seguridad solo permite adiciones y no se elimina, pero no contiene identificadores suyos legibles; un reducido número de debates antiguos es anterior a nuestro sistema de cifrado actual y, si esto afecta a su cuenta, le explicaremos qué efecto tiene el cierre sobre ellos; y las copias de datos que ya se hayan enviado a un proveedor de IA se rigen por las condiciones de conservación de dicho proveedor que figuran en el Registro, no por nuestra eliminación.
+**Qué hace realmente la eliminación.** Sus debates privados y los datos de su cuenta están cifrados con claves específicas de su cuenta y de cada debate. Al eliminar su cuenta se destruyen esas claves, tras lo cual ni nosotros ni ninguna otra persona podemos leer los registros cifrados, y eliminamos el registro de su cuenta. La clave de la copia pública de un debate publicado solo se destruye al eliminar la cuenta si marcó «Eliminar también mis debates públicos» (apartado 6). Lo describimos como eliminación porque ese es su efecto y disponemos de una evaluación documentada que lo respalda; si desea saber más, pregúntenos. Debe saber tres cosas: el registro de auditoría de seguridad solo permite adiciones y no se elimina, pero no contiene identificadores suyos legibles; un reducido número de debates antiguos es anterior a nuestro sistema de cifrado actual y, si esto afecta a su cuenta, le explicaremos qué efecto tiene el cierre sobre ellos; y las copias de datos que ya se hayan enviado a un proveedor de IA se rigen por las condiciones de conservación de dicho proveedor que figuran en el Registro, no por nuestra eliminación.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
 

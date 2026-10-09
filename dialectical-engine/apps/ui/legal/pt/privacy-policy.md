@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective \[date\] · Versões anteriores em dezbatere.ro/privacy/versions · Responsável pelo tratamento: DebateAIRO S.R.L., Bucareste**
 
-**In short.** Recolhemos o que é necessário para uma conta e o que decide escrever. As suas perguntas são enviadas aos fornecedores de IA indicados no nosso Registo; não são utilizadas para treinar modelos. Os debates são privados, salvo se os publicar. A eliminação da conta destrói as chaves dos seus dados e retira do ar os debates que publicou. Pode contactar-nos através de privacy@dezbatere.ro, e as pessoas mencionadas num debate podem pedir a remoção sem terem uma conta.
+**In short.** Recolhemos o que é necessário para uma conta e o que decide escrever. As suas perguntas são enviadas aos fornecedores de IA indicados no nosso Registo; não são utilizadas para treinar modelos. Os debates são privados, salvo se os publicar. A eliminação da conta destrói as chaves dos seus dados privados; ao programá-la, escolhe se os debates que publicou também são retirados ou se continuam públicos sob o seu pseudónimo desativado. Pode contactar-nos através de privacy@dezbatere.ro, e as pessoas mencionadas num debate podem pedir a remoção sem terem uma conta.
 
 ## 1. Quem é responsável pelos seus dados
 
@@ -101,7 +101,7 @@ Os debates são privados até que os publique. A publicação é uma ação deli
 
 Cancelar a publicação remove o debate da Dialectical Engine e destrói a chave da nossa cópia pública. As cópias já feitas por leitores, motores de pesquisa ou arquivos estão fora do nosso controlo e não podemos recolhê-las.
 
-Quando elimina a conta, removemos do acesso público todos os debates que publicou, sem demora injustificada e no prazo máximo de 30 dias, salvo se a lei nos obrigar a conservar um elemento específico. \[Option B — a product change; see the Terms, section 9.\]
+Quando agenda a eliminação da sua conta, escolhe o que acontece aos debates que publicou. Se assinalar «Eliminar também os meus debates públicos», removemos cada um deles do acesso público e destruímos a chave da nossa cópia pública quando a eliminação for executada, salvo se a lei exigir a conservação de um elemento específico. Se deixar a caixa por assinalar, os debates continuam públicos sob o seu pseudónimo desativado.
 
 ## 7. Durante quanto tempo conservamos os dados
 
@@ -117,14 +117,14 @@ Quando elimina a conta, removemos do acesso público todos os debates que public
 | Endereço IP usado para determinar localmente o país no registo e no início de cada novo debate | Apenas durante o processamento do pedido | Não é conservado em texto simples para esta verificação; a recusa é registada apenas de forma agregada e no resumo abaixo |
 | Registos agregados de auditoria de recusas pelo país do IP | Durante a vida útil do serviço | O registo contém o código de recusa, o país, a indicação de que o IP foi a prova e resumos unidirecionais baseados numa chave do IP e do identificador do navegador (user-agent); apenas se acrescentam registos. |
 | Conteúdo do debate (privado) | Enquanto a conta existir | As chaves são destruídas no encerramento, tornando o conteúdo ilegível |
-| Conteúdo do debate (publicado) | Enquanto estiver publicado e a conta existir | É removido do acesso público quando a publicação é cancelada ou a conta encerrada; as chaves são destruídas |
+| Conteúdo do debate (publicado) | Enquanto estiver publicado; se encerrar a conta e deixar «Eliminar também os meus debates públicos» por selecionar, um debate publicado permanece público sob o seu pseudónimo desativado | É removido do acesso público e a sua chave é destruída quando cancela a publicação, ou no encerramento se tiver selecionado «Eliminar também os meus debates públicos» |
 | Registos de respostas dos fornecedores e referências de pesquisa | O mesmo período que o debate a que pertencem | O mesmo |
 | Conversas e casos de apoio | \[Until closed plus 12 months\] | As chaves são destruídas |
 | Registos de aceitação e consentimento | Vida útil da conta acrescida de 6 anos — o prazo de prescrição mais longo que nos é aplicável | São eliminados |
 | Registos de pagamento \[pending\] | 10 anos, conforme exigido pela legislação contabilística romena | São eliminados |
 | Cópias de segurança \[pending\] | \[… days\] após a eliminação da cópia ativa | São substituídas |
 
-**O que a eliminação efetivamente faz.** Os seus debates e os dados da sua conta são cifrados com chaves específicas da sua conta e de cada debate. A eliminação da conta destrói essas chaves, após o que os registos cifrados não podem ser lidos por nós nem por qualquer outra pessoa, e eliminamos o registo da sua conta. Descrevemo-lo como eliminação porque esse é o seu efeito, e dispomos de uma avaliação documentada que o fundamenta; se quiser saber mais, pergunte-nos. Deve saber três coisas: o registo de auditoria de segurança é exclusivamente aditivo e não é eliminado, mas não contém identificadores legíveis a seu respeito; um pequeno número de debates antigos é anterior ao nosso atual sistema de cifragem e, se isso se aplicar à sua conta, informamo-lo sobre o efeito que o encerramento terá sobre eles; e as cópias de dados já enviadas a um fornecedor de IA são regidas pelas condições de conservação desse fornecedor constantes do Registo, e não pela nossa eliminação.
+**O que a eliminação efetivamente faz.** Os seus debates privados e os dados da sua conta são cifrados com chaves específicas da sua conta e de cada debate. A eliminação da conta destrói essas chaves, após o que os registos cifrados não podem ser lidos por nós nem por qualquer outra pessoa, e eliminamos o registo da sua conta. A chave da cópia pública de um debate publicado só é destruída na eliminação se tiver selecionado «Eliminar também os meus debates públicos» (secção 6). Descrevemo-lo como eliminação porque esse é o seu efeito, e dispomos de uma avaliação documentada que o fundamenta; se quiser saber mais, pergunte-nos. Deve saber três coisas: o registo de auditoria de segurança é exclusivamente aditivo e não é eliminado, mas não contém identificadores legíveis a seu respeito; um pequeno número de debates antigos é anterior ao nosso atual sistema de cifragem e, se isso se aplicar à sua conta, informamo-lo sobre o efeito que o encerramento terá sobre eles; e as cópias de dados já enviadas a um fornecedor de IA são regidas pelas condições de conservação desse fornecedor constantes do Registo, e não pela nossa eliminação.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
 

@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective \[date\] · Prethodne verzije na dezbatere.ro/privacy/versions · Voditelj obrade: DebateAIRO S.R.L., Bukurešt**
 
-**In short.** Prikupljamo ono što je potrebno za račun i ono što odlučite upisati. Vaša se pitanja šalju pružateljima usluga umjetne inteligencije navedenima u našem Registru; ne upotrebljavaju se za treniranje modela. Rasprave su privatne osim ako ih objavite. Brisanjem računa uništavaju se ključevi vaših podataka, a vaše se objavljene rasprave uklanjaju. Možete nam se obratiti na privacy@dezbatere.ro, a osobe imenovane u raspravi mogu zatražiti uklanjanje i bez računa.
+**In short.** Prikupljamo ono što je potrebno za račun i ono što odlučite upisati. Vaša se pitanja šalju pružateljima usluga umjetne inteligencije navedenima u našem Registru; ne upotrebljavaju se za treniranje modela. Rasprave su privatne osim ako ih objavite. Brisanjem računa uništavaju se ključevi vaših privatnih podataka; pri zakazivanju birate hoće li se i vaše objavljene rasprave ukloniti ili ostati javne pod vašim pseudonimom koji se više ne upotrebljava. Možete nam se obratiti na privacy@dezbatere.ro, a osobe imenovane u raspravi mogu zatražiti uklanjanje i bez računa.
 
 ## 1. Tko je odgovoran za vaše podatke
 
@@ -101,7 +101,7 @@ Rasprave su privatne dok ih ne objavite. Objavljivanje je namjerna, zasebno potv
 
 Povlačenjem objave rasprava se uklanja s Dialectical Engine-ja i uništava se ključ naše javne kopije. Kopije koje su čitatelji, tražilice ili arhivi već izradili izvan su naše kontrole i ne možemo ih povratiti.
 
-Kada izbrišete račun, svaku raspravu koju ste objavili uklanjamo iz javnog pristupa bez nepotrebne odgode, a najkasnije u roku od 30 dana, osim ako nam zakon nalaže čuvanje određenog sadržaja. \[Option B — a product change; see the Terms, section 9.\]
+Kada zakažete brisanje računa, birate što će se dogoditi s raspravama koje ste objavili. Ako označite „Izbrišite i moje javne rasprave”, svaku od njih uklanjamo iz javnog pristupa i uništavamo ključ svoje javne kopije kada se brisanje provede, osim ako zakon nalaže čuvanje određene stavke. Ako kućicu ne označite, rasprave ostaju javne pod pseudonimom koji se više ne upotrebljava.
 
 ## 7. Koliko dugo čuvamo podatke
 
@@ -117,14 +117,14 @@ Kada izbrišete račun, svaku raspravu koju ste objavili uklanjamo iz javnog pri
 | Zapis o odbijanju pri provjeri države IP adrese | Za cijelog trajanja usluge | Može se samo dopunjavati; bilježe se putanja, kod odbijanja, država, vremensko razdoblje i vrsta dokaza „IP adresa”; IP adresa i korisnički agent čuvaju se samo kao jednosmjerni sažeci s ključem |
 | Izvorna IP adresa za provjeru države pri registraciji ili novoj raspravi | Samo tijekom odgovarajućeg zahtjeva | Ova provjera ne čuva čitljivu IP adresu; revizija odbijanja čuva IP adresu i korisnički agent samo kao jednosmjerne sažetke s ključem, a država IP adrese može biti u zapisu provjere dobi |
 | Sadržaj rasprave (privatan) | Dok račun postoji | Ključevi se uništavaju pri zatvaranju, čime sadržaj postaje nečitljiv |
-| Sadržaj rasprave (objavljen) | Dok je objavljen i dok račun postoji | Uklanja se iz javnog pristupa pri povlačenju objave ili zatvaranju; ključevi se uništavaju |
+| Sadržaj rasprave (objavljen) | Dok je objavljen; ako zatvorite račun i ostavite „Izbrišite i moje javne rasprave” neoznačenim, objavljena rasprava ostaje javna pod vašim pseudonimom koji se više ne upotrebljava | Uklanja se iz javnog pristupa i njegov se ključ uništava kada povučete objavu ili pri zatvaranju ako ste označili „Izbrišite i moje javne rasprave” |
 | Zapisi odgovora pružatelja i upućivanja za dohvaćanje | Jednako kao rasprava kojoj pripadaju | Jednako |
 | Razgovori i predmeti podrške | \[Until closed plus 12 months\] | Ključevi se uništavaju |
 | Evidencija prihvaćanja i privola | Trajanje računa uz još 6 godina — najdulji rok zastare koji se na nas primjenjuje | Briše se |
 | Evidencija plaćanja \[pending\] | 10 godina, kako zahtijeva rumunjsko računovodstveno pravo | Briše se |
 | Sigurnosne kopije \[pending\] | \[… days\] nakon brisanja aktivnog primjerka | Prepisuju se |
 
-**Što se brisanjem doista čini.** Vaše rasprave i podaci o računu šifrirani su ključevima specifičnima za vaš račun i za svaku raspravu. Brisanjem računa uništavaju se ti ključevi, nakon čega ni mi ni itko drugi ne može pročitati šifrirane zapise, a zapis o vašem računu brišemo. To opisujemo kao brisanje jer je takav njegov učinak i o tome imamo dokumentiranu procjenu; ako želite znati više, pitajte nas. Trebate znati tri stvari: sigurnosni revizijski trag može se samo dopunjavati i ne briše se, ali ne sadržava vaše čitljive identifikatore; mali broj starijih rasprava prethodi našoj trenutačnoj shemi šifriranja, a ako se to odnosi na vaš račun, obavijestit ćemo vas o tome što zatvaranje računa znači za te rasprave; te se na kopije podataka već poslane pružatelju usluga umjetne inteligencije primjenjuju uvjeti čuvanja tog pružatelja navedeni u Registru, a ne naše brisanje.
+**Što se brisanjem doista čini.** Vaše privatne rasprave i podaci o računu šifrirani su ključevima specifičnima za vaš račun i za svaku raspravu. Brisanjem računa uništavaju se ti ključevi, nakon čega ni mi ni itko drugi ne može pročitati šifrirane zapise, a zapis o vašem računu brišemo. Ključ javne kopije objavljene rasprave uništava se pri brisanju samo ako ste označili „Izbrišite i moje javne rasprave” (odjeljak 6). To opisujemo kao brisanje jer je takav njegov učinak i o tome imamo dokumentiranu procjenu; ako želite znati više, pitajte nas. Trebate znati tri stvari: sigurnosni revizijski trag može se samo dopunjavati i ne briše se, ali ne sadržava vaše čitljive identifikatore; mali broj starijih rasprava prethodi našoj trenutačnoj shemi šifriranja, a ako se to odnosi na vaš račun, obavijestit ćemo vas o tome što zatvaranje računa znači za te rasprave; te se na kopije podataka već poslane pružatelju usluga umjetne inteligencije primjenjuju uvjeti čuvanja tog pružatelja navedeni u Registru, a ne naše brisanje.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
 

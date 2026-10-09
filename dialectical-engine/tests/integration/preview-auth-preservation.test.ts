@@ -253,7 +253,7 @@ describe('closed original107 append and native atomicity',()=>{
    await Promise.all([migrate(db.pool),migrate(second)]);
    expect((await db.pool.query("SELECT count(*)::int n FROM public.debateai_schema_migration WHERE name='0108_preview_recovery_verified_bindings.sql'")).rows[0].n).toBe(1);
    expect((await db.pool.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n).toBe(1);
-   expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name<>'0108_preview_recovery_verified_bindings.sql' ORDER BY name")).rows).toEqual(before);
+   expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name NOT IN ('0108_preview_recovery_verified_bindings.sql','0110_account_erasure_public_debates.sql') ORDER BY name")).rows).toEqual(before);
   }finally{await second.end();await db.stop();}
  },120000);
  it('a late108 refusal rolls the function replacement/ledger/receipt back atomically',async()=>{
@@ -274,7 +274,7 @@ it('source/manifest/old recipe drift refuses from a bounded source copy before a
  const root=await mkdtemp(join(tmpdir(),'preview-source-108-'));
  try{
   await mkdir(join(root,'packages/db/src'),{recursive:true});
-  for(const name of ['migration-lineage.ts','migration-forward108.ts'])await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
+  for(const name of ['migration-lineage.ts','migration-forward108.ts','migration-forward110.ts'])await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
   await cp(new URL('../../migrations',import.meta.url),join(root,'migrations'),{recursive:true});
   const script=join(root,'probe.mts');await writeFile(script,`import {loadMigrationPlan} from './packages/db/src/migration-lineage.ts'; await loadMigrationPlan();`);
   const run=()=>promisify(execFile)(process.execPath,['--import','tsx',script],{cwd:process.cwd(),timeout:30000,maxBuffer:100000});

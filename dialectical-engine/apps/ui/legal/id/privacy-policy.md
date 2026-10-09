@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective \[date\] · Versi sebelumnya di dezbatere.ro/privacy/versions · Pengendali: DebateAIRO S.R.L., Bukares**
 
-**In short.** Kami mengumpulkan apa yang diperlukan akun dan apa yang Anda pilih untuk diketik. Pertanyaan Anda dikirim kepada penyedia AI yang tercantum dalam Daftar kami; pertanyaan tersebut tidak digunakan untuk melatih model. Debat bersifat privat kecuali Anda memublikasikannya. Menghapus akun Anda memusnahkan kunci data Anda dan menurunkan debat yang telah Anda publikasikan. Anda dapat menghubungi kami di privacy@dezbatere.ro, dan orang yang disebut dalam debat dapat meminta penghapusan tanpa memiliki akun.
+**In short.** Kami mengumpulkan apa yang diperlukan akun dan apa yang Anda pilih untuk diketik. Pertanyaan Anda dikirim kepada penyedia AI yang tercantum dalam Daftar kami; pertanyaan tersebut tidak digunakan untuk melatih model. Debat bersifat privat kecuali Anda memublikasikannya. Penghapusan akun memusnahkan kunci data pribadi Anda; saat menjadwalkannya, Anda memilih apakah debat yang Anda publikasikan juga diturunkan atau tetap dapat diakses publik dengan nama samaran yang tidak lagi digunakan. Anda dapat menghubungi kami di privacy@dezbatere.ro, dan orang yang disebut dalam debat dapat meminta penghapusan tanpa memiliki akun.
 
 ## 1. Siapa yang bertanggung jawab atas data Anda
 
@@ -101,7 +101,7 @@ Debat bersifat privat sampai Anda memublikasikannya. Publikasi adalah tindakan y
 
 Membatalkan publikasi menghapus debat dari Dialectical Engine dan memusnahkan kunci salinan publik kami. Salinan yang telah dibuat oleh pembaca, mesin pencari, atau arsip berada di luar kendali kami, dan kami tidak dapat menariknya kembali.
 
-Ketika Anda menghapus akun, kami menghapus setiap debat yang Anda publikasikan dari akses publik tanpa penundaan yang tidak semestinya dan paling lambat dalam 30 hari, kecuali hukum mewajibkan kami menyimpan item tertentu. \[Option B — a product change; see the Terms, section 9.\]
+Saat Anda menjadwalkan penghapusan akun, Anda memilih apa yang terjadi pada debat yang telah Anda publikasikan. Jika Anda mencentang "Hapus juga debat publik saya", kami menghapus masing-masing dari akses publik dan memusnahkan kunci salinan publik kami saat penghapusan dijalankan, kecuali jika hukum mewajibkan kami menyimpan item tertentu. Jika kotak dibiarkan tidak dicentang, debat tersebut tetap dapat diakses publik dengan nama samaran yang tidak lagi digunakan.
 
 ## 7. Berapa lama kami menyimpan sesuatu
 
@@ -117,14 +117,14 @@ Ketika Anda menghapus akun, kami menghapus setiap debat yang Anda publikasikan d
 | Catatan audit penolakan berdasarkan negara IP | Selama layanan beroperasi | Hanya dapat ditambah; mencatat rute, kode penolakan, negara, rentang waktu, dan jenis bukti “alamat IP”; alamat IP dan agen pengguna hanya berupa intisari satu arah dengan kunci |
 | Alamat IP asli untuk pemeriksaan negara saat pendaftaran atau debat baru | Hanya selama permintaan yang bersangkutan | Pemeriksaan ini tidak menyimpan IP yang dapat dibaca; audit penolakan menyimpan alamat IP dan agen pengguna hanya sebagai intisari satu arah dengan kunci, dan negara IP dapat tercatat dalam pemeriksaan usia |
 | Konten debat (privat) | Selama akun ada | Kunci dimusnahkan saat penutupan sehingga konten tidak dapat dibaca |
-| Konten debat (dipublikasikan) | Selama dipublikasikan dan selama akun ada | Dihapus dari akses publik saat publikasi dibatalkan atau akun ditutup; kunci dimusnahkan |
+| Konten debat (dipublikasikan) | Selama dipublikasikan; jika Anda menutup akun dan membiarkan "Hapus juga debat publik saya" tidak dicentang, debat yang dipublikasikan tetap tersedia untuk umum dengan nama samaran yang tidak lagi digunakan | Dihapus dari akses publik dan kuncinya dimusnahkan saat Anda membatalkan publikasinya, atau pada penutupan akun jika Anda mencentang "Hapus juga debat publik saya" |
 | Catatan pengembalian penyedia dan referensi pengambilan | Sama dengan debat terkait | Sama |
 | Percakapan dan kasus dukungan | \[Until closed plus 12 months\] | Kunci dimusnahkan |
 | Catatan penerimaan dan persetujuan | Masa berlaku akun ditambah 6 tahun — periode pembatasan terpanjang yang berlaku bagi kami | Dihapus |
 | Catatan pembayaran \[pending\] | 10 tahun, sebagaimana diwajibkan hukum akuntansi Rumania | Dihapus |
 | Cadangan \[pending\] | \[… days\] setelah salinan aktif dihapus | Ditimpa |
 
-**Apa yang sebenarnya dilakukan penghapusan.** Debat dan data akun Anda dienkripsi di bawah kunci yang khusus untuk akun Anda dan setiap debat. Menghapus akun Anda memusnahkan kunci tersebut, setelah itu catatan terenkripsi tidak dapat dibaca oleh kami atau siapa pun, dan kami menghapus catatan akun Anda. Kami menyebutnya penghapusan karena demikianlah akibatnya, dan kami memiliki penilaian terdokumentasi yang mendasarinya; jika Anda ingin mengetahui lebih lanjut, silakan bertanya. Tiga hal yang perlu diketahui: jejak audit keamanan hanya dapat ditambahi, bukan diubah atau dihapus; jejak tersebut tetap disimpan, tetapi tidak berisi pengenal Anda yang dapat dibaca; sejumlah kecil debat lama mendahului skema enkripsi kami saat ini, dan jika hal itu berlaku pada akun Anda, kami memberi tahu apa yang dicapai penutupan terhadapnya; dan salinan data yang telah dikirim kepada penyedia AI diatur oleh ketentuan retensi penyedia tersebut dalam Daftar, bukan oleh penghapusan kami.
+**Apa yang sebenarnya dilakukan penghapusan.** Debat privat dan data akun Anda dienkripsi di bawah kunci yang khusus untuk akun Anda dan setiap debat. Menghapus akun Anda memusnahkan kunci tersebut, setelah itu catatan terenkripsi tidak dapat dibaca oleh kami atau siapa pun, dan kami menghapus catatan akun Anda. Kunci salinan publik dari debat yang dipublikasikan dimusnahkan saat penghapusan hanya jika Anda mencentang "Hapus juga debat publik saya" (bagian 6). Kami menyebutnya penghapusan karena demikianlah akibatnya, dan kami memiliki penilaian terdokumentasi yang mendasarinya; jika Anda ingin mengetahui lebih lanjut, silakan bertanya. Tiga hal yang perlu diketahui: jejak audit keamanan hanya dapat ditambahi, bukan diubah atau dihapus; jejak tersebut tetap disimpan, tetapi tidak berisi pengenal Anda yang dapat dibaca; sejumlah kecil debat lama mendahului skema enkripsi kami saat ini, dan jika hal itu berlaku pada akun Anda, kami memberi tahu apa yang dicapai penutupan terhadapnya; dan salinan data yang telah dikirim kepada penyedia AI diatur oleh ketentuan retensi penyedia tersebut dalam Daftar, bukan oleh penghapusan kami.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
 

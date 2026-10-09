@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective \[date\] · Předchozí verze na dezbatere.ro/privacy/versions · Správce: DebateAIRO S.R.L., Bukurešť**
 
-**In short.** Shromažďujeme údaje nezbytné pro účet a údaje, které se rozhodnete zadat. Vaše otázky jsou předávány poskytovatelům AI uvedeným v našem Registru; nepoužívají se k trénování modelů. Debaty jsou soukromé, dokud je nezveřejníte. Výmaz účtu zničí klíče k vašim údajům a odstraní vaše zveřejněné debaty. Můžete nás kontaktovat na privacy@dezbatere.ro a osoby uvedené v debatě mohou požádat o odstranění i bez účtu.
+**In short.** Shromažďujeme údaje nezbytné pro účet a údaje, které se rozhodnete zadat. Vaše otázky jsou předávány poskytovatelům AI uvedeným v našem Registru; nepoužívají se k trénování modelů. Debaty jsou soukromé, dokud je nezveřejníte. Výmaz účtu zničí klíče k vašim soukromým údajům; při jeho plánování si zvolíte, zda se odstraní i vaše zveřejněné debaty, nebo zůstanou veřejné pod vaším vyřazeným pseudonymem. Můžete nás kontaktovat na privacy@dezbatere.ro a osoby uvedené v debatě mohou požádat o odstranění i bez účtu.
 
 ## 1. Kdo odpovídá za vaše údaje
 
@@ -101,7 +101,7 @@ Debaty jsou soukromé, dokud je nezveřejníte. Zveřejnění je úmyslný, samo
 
 Zrušení zveřejnění odstraní debatu z Dialectical Engine a zničí klíč k naší veřejné kopii. Kopie, které již vytvořili čtenáři, vyhledávače nebo archivy, jsou mimo naši kontrolu a nemůžeme je vzít zpět.
 
-Když svůj účet vymažete, bez zbytečného odkladu a nejpozději do 30 dnů odstraníme z veřejného přístupu každou vámi zveřejněnou debatu, pokud nám zákon neukládá uchovat konkrétní položku. \[Option B — a product change; see the Terms, section 9.\]
+Když naplánujete smazání účtu, zvolíte, co se stane s debatami, které jste zveřejnili. Pokud zaškrtnete „Smazat také mé veřejné debaty“, při provedení smazání každou z nich odstraníme z veřejného přístupu a zničíme klíč k naší veřejné kopii, ledaže nám zákon ukládá uchovat konkrétní položku. Pokud políčko nezaškrtnete, debaty zůstanou veřejné pod vaším vyřazeným pseudonymem.
 
 ## 7. Jak dlouho údaje uchováváme
 
@@ -117,14 +117,14 @@ Když svůj účet vymažete, bez zbytečného odkladu a nejpozději do 30 dnů 
 | Rizikové signály přihlášení a obnovení | 90 dnů, vynuceno databází | Odstraněny |
 | Bezpečnostní auditní stopa | Po dobu existence služby | Pouze s možností připojování; IP adresa a user-agent jsou jednosměrné hashe a nelze je zpětně přečíst |
 | Obsah debaty (soukromý) | Po dobu existence účtu | Při uzavření jsou zničeny klíče, čímž se obsah stane nečitelným |
-| Obsah debaty (zveřejněný) | Po dobu zveřejnění a existence účtu | Při zrušení zveřejnění nebo uzavření účtu je odstraněn z veřejného přístupu; klíče jsou zničeny |
+| Obsah debaty (zveřejněný) | Po dobu zveřejnění; pokud uzavřete účet a necháte možnost „Smazat také mé veřejné debaty“ nezaškrtnutou, zveřejněná debata zůstane veřejná pod vaším vyřazeným pseudonymem | Z veřejného přístupu se odstraní a její klíč se zničí při zrušení zveřejnění nebo při uzavření účtu, pokud jste zaškrtli „Smazat také mé veřejné debaty“ |
 | Záznamy odpovědí poskytovatelů a odkazy pro vyhledávání | Stejně jako debata, ke které patří | Stejný postup |
 | Konverzace a případy podpory | \[Until closed plus 12 months\] | Klíče jsou zničeny |
 | Záznamy o přijetí a souhlasech | Po dobu existence účtu a dalších 6 let — nejdelší promlčecí lhůta, která se na nás vztahuje | Vymazány |
 | Záznamy o platbách \[pending\] | 10 let, jak vyžadují rumunské účetní předpisy | Vymazány |
 | Zálohy \[pending\] | \[… days\] po vymazání aktivní kopie | Přepsány |
 
-**Co výmaz ve skutečnosti znamená.** Vaše debaty a údaje účtu jsou šifrovány pomocí klíčů určených konkrétně pro váš účet a jednotlivé debaty. Výmaz účtu tyto klíče zničí, po čemž zašifrované záznamy nemůžeme přečíst my ani nikdo jiný, a záznam účtu vymažeme. Označujeme to jako výmaz, protože takový je jeho účinek, a máme pro něj zdokumentované posouzení; chcete-li vědět více, zeptejte se. Je třeba vědět tři věci: bezpečnostní auditní stopa je pouze doplňována a nemaže se, neobsahuje však žádné vaše čitelné identifikátory; malý počet starších debat vznikl před naším současným systémem šifrování, a pokud se to týká vašeho účtu, sdělíme vám, čeho u nich uzavření účtu dosáhne; a kopie údajů, které již byly odeslány poskytovateli AI, se řídí podmínkami uchovávání daného poskytovatele v Registru, nikoli naším výmazem.
+**Co výmaz ve skutečnosti znamená.** Vaše soukromé debaty a údaje účtu jsou šifrovány pomocí klíčů určených konkrétně pro váš účet a jednotlivé debaty. Výmaz účtu tyto klíče zničí, po čemž zašifrované záznamy nemůžeme přečíst my ani nikdo jiný, a záznam účtu vymažeme. Klíč k veřejné kopii zveřejněné debaty se při výmazu zničí pouze tehdy, pokud jste zaškrtli „Smazat také mé veřejné debaty“ (oddíl 6). Označujeme to jako výmaz, protože takový je jeho účinek, a máme pro něj zdokumentované posouzení; chcete-li vědět více, zeptejte se. Je třeba vědět tři věci: bezpečnostní auditní stopa je pouze doplňována a nemaže se, neobsahuje však žádné vaše čitelné identifikátory; malý počet starších debat vznikl před naším současným systémem šifrování, a pokud se to týká vašeho účtu, sdělíme vám, čeho u nich uzavření účtu dosáhne; a kopie údajů, které již byly odeslány poskytovateli AI, se řídí podmínkami uchovávání daného poskytovatele v Registru, nikoli naším výmazem.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
 

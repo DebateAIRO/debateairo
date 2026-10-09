@@ -32,6 +32,9 @@ describe("S10 evidence honesty", () => {
     ]) expect(evidence).toContain(required);
     expect(evidence).toContain("published snapshots remain readable");
     expect(evidence).toContain("mixed public and claimed legacy plaintext");
+    expect(evidence).toContain("delete_public_debates = true");
+    expect(evidence).toContain("removed_public_snapshot_count");
+    expect(evidence).toContain("On the keep branch");
     expect(evidence).not.toMatch(/GDPR[- ]compliant|guarantees compliance|all personal data is gone/i);
   });
 

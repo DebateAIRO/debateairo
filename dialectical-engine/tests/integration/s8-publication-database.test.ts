@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Pool, PoolClient } from "pg";
 import {
   ContentCipher,
@@ -33,6 +33,7 @@ import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
+import { buildApi, type AskApplication } from "@debateai/api";
 import { createPublicEvaluatorConsumerWorker } from "../../apps/evaluator-worker/src/index.js";
 import {
   PostgresEvaluatorConsumerRepository,
@@ -2299,5 +2300,620 @@ describe("S8 publication on real PostgreSQL", () => {
       await blocker.query("ROLLBACK").catch(() => undefined);
       blocker.release();
     }
+  });
+});
+
+describe("DPD-S01 delete public debates at account erasure", () => {
+  let erasurePool: Pool;
+  let erasureRepository: PostgresAccountErasureRepository;
+  const publications = () => new PostgresPublicationApplication(repository,publicationCipher);
+  const askApplication: AskApplication = {
+    withContentLease:async (_runId,use)=>use(),
+    submit:async ()=>({ run_ref:randomUUID(),status:"QUEUED" }),
+    readAnswer:async ()=>null,readRunAnswer:async ()=>null,readRun:async ()=>null,
+    readAnswerIndex:async (_session,limit,offset)=>({ items:[],open_runs:[],limit,offset,total:0 }),
+    readInspection:async ()=>null,readLedgerDigest:async ()=>null,readNode:async ()=>null,
+    recordInvestigation:async ()=>null,unlinkMemoryLink:async ()=>null,
+    readDeployment:async ()=>({
+      register:{ register_version:1,rows:[] },scorecards:[],model_ledger:[],
+      fleet:{ state:"UNAVAILABLE",reason:"NO_TYPED_FLEET_SOURCE" }
+    }),
+    events:async function*() {}
+  };
+  async function httpSnapshot(refs:readonly string[]) {
+    const api=buildApi({ application:askApplication,publications:publications() });
+    try {
+      return {
+        refs:await Promise.all(refs.map(async ref=>{
+          const response=await api.inject({ method:"GET",url:`/v1/public/debates/${ref}` });
+          return { statusCode:response.statusCode,body:response.body,
+            keyReadable:await publicationCipher.keyReadable(ref) };
+        })),
+        list:(await api.inject({
+          method:"GET",url:"/v1/public/debates?limit=100&offset=0"
+        })).body
+      };
+    } finally { await api.close(); }
+  }
+  async function publicRead(ref:string) {
+    const api=buildApi({ application:askApplication,publications:publications() });
+    try {
+      const response=await api.inject({ method:"GET",url:`/v1/public/debates/${ref}` });
+      return { statusCode:response.statusCode,body:response.body };
+    } finally { await api.close(); }
+  }
+  async function identityWithGrant(label:string) {
+    const identity=await createIdentity(`dpd-${label}`);
+    const token=`dpd-${randomUUID()}`;
+    const grantTokenHash=hashToken("step-up-grant",token);
+    await database.pool.query(`
+      INSERT INTO identity.channel_binding(
+        channel_binding_id,user_id,channel_type,address_ciphertext,state,created_at,verified_at
+      ) VALUES ($1,$2,'email','{}'::jsonb,'verified',clock_timestamp(),clock_timestamp())
+    `,[randomUUID(),identity.userId]);
+    await database.pool.query(`
+      INSERT INTO identity.step_up_grant(
+        step_up_grant_id,token_hash,session_id,user_id,action,target_run_id,
+        target_account_id,issued_at,expires_at,consumed_at
+      ) VALUES ($1,$2,$3,$4,'DELETE_ACCOUNT',NULL,$4,
+        clock_timestamp()-interval '1 second',clock_timestamp()+interval '10 minutes',NULL)
+    `,[randomUUID(),grantTokenHash,identity.sessionId,identity.userId]);
+    return { identity,grantTokenHash };
+  }
+  async function publish(identity:Identity,label:string) {
+    const runId=await createRun(identity,`dpd-${label}`);
+    const ref=randomUUID();
+    const publishedAt=new Date("2026-08-24T00:00:00.000Z");
+    const token=await grant(identity,runId,"PUBLISH",label,publishedAt);
+    expect(await repository.publish({
+      runId,userId:identity.userId,ownerRef:identity.ownerRef,sessionId:identity.sessionId,
+      grantTokenHash:hashToken("step-up-grant",token),occurredAt:publishedAt,source,
+      publicationRef:ref,expectedPseudonym:identity.pseudonym,
+      contentCiphertext:await encryptedSnapshot(ref,runId,`dpd-${label}`)
+    })).toBe(true);
+    return { runId,ref };
+  }
+  async function schedule(fixture:Awaited<ReturnType<typeof identityWithGrant>>,remove:boolean) {
+    return erasureRepository.schedule({
+      userId:fixture.identity.userId,ownerRef:fixture.identity.ownerRef,
+      sessionId:fixture.identity.sessionId,grantTokenHash:fixture.grantTokenHash,
+      deletePublicDebates:remove
+    });
+  }
+  async function due(userId:string) {
+    await database.pool.query(`
+      UPDATE identity.account_erasure_request
+      SET requested_at=requested_at-interval '604800 seconds',
+          execute_at=execute_at-interval '604800 seconds'
+      WHERE user_id=$1 AND prepared_at IS NULL AND cancelled_at IS NULL
+    `,[userId]);
+  }
+  async function ackNotifications() {
+    for (const claim of await erasureRepository.claimNotifications()) {
+      expect(await erasureRepository.acknowledgeNotification(
+        claim.messageId,claim.claimToken
+      )).toBe(true);
+    }
+  }
+  async function prepare(erasureId:string) {
+    const preview=await erasureRepository.preview(erasureId);
+    expect(preview).not.toBeNull();
+    return erasureRepository.prepare(
+      erasureId,preview!.runIds,preview!.legacyRunIds,preview!.publishedRunIds
+    );
+  }
+  async function expectForgedVersion3Refused(input:{
+    erasureId:string;runId:string;ref:string;prepared:boolean;
+    preparedRefs:readonly string[];state?:"PRIVATE"|"PUBLISHED";
+    withoutShapeCheck?:boolean;
+    cancelled?:boolean;committed?:boolean;dropChecks?:readonly string[];
+    latestPublished?:Readonly<{runId:string;ref:string}>;
+  }) {
+    const client=await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      // The base row-shape CHECK itself forbids a prepared refs array before
+      // prepared_at. Drop it only inside this rolled-back transaction to prove
+      // that the visibility trigger still enforces its independent guard.
+      if (input.withoutShapeCheck) await client.query(`
+        ALTER TABLE identity.account_erasure_request
+        DROP CONSTRAINT account_erasure_request_check3
+      `);
+      for (const check of input.dropChecks ?? []) await client.query(
+        `ALTER TABLE identity.account_erasure_request DROP CONSTRAINT ${check}`
+      );
+      if (input.latestPublished) {
+        await client.query("SET LOCAL session_replication_role=replica");
+        await client.query(`
+          INSERT INTO core.run_visibility_event(
+            run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
+            actor_ref_version,warning_version,occurred_at,at_seq
+          ) VALUES ($1,$2,$3,'PUBLISHED',$4,2,'PUBLIC_INDEXED_V1',
+            clock_timestamp(),ledger.allocate_sequence())
+        `,[randomUUID(),input.latestPublished.runId,input.latestPublished.ref,randomUUID()]);
+        await client.query("SET LOCAL session_replication_role=origin");
+      }
+      const staged=await client.query(`
+        UPDATE identity.account_erasure_request
+        SET prepared_at=CASE WHEN $2::boolean THEN clock_timestamp() ELSE NULL END,
+          prepared_run_ids=$3::uuid[],
+          prepared_legacy_run_ids=$3::uuid[],
+          prepared_published_run_ids=$3::uuid[],
+          prepared_current_publication_refs=$4::uuid[],
+          prepared_cleanup_publication_refs=$3::uuid[],
+          cancelled_at=CASE WHEN $5::boolean THEN clock_timestamp()+interval '1 second' ELSE cancelled_at END,
+          committed_at=CASE WHEN $6::boolean THEN clock_timestamp()+interval '1 second' ELSE committed_at END
+        WHERE erasure_id=$1
+      `,[input.erasureId,input.prepared,
+        input.prepared ? [] : null,input.preparedRefs,
+        input.cancelled===true,input.committed===true]);
+      expect(staged.rowCount).toBe(1);
+      await expect(client.query(`
+        INSERT INTO core.run_visibility_event(
+          run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
+          actor_ref_version,warning_version,occurred_at,at_seq
+        ) VALUES ($1,$2,$3,$4,$5,3,'COPIES_MAY_PERSIST_V1',
+          clock_timestamp(),ledger.allocate_sequence())
+      `,[randomUUID(),input.runId,input.ref,input.state ?? "PRIVATE",randomUUID()]))
+        .rejects.toMatchObject({
+          code:"55000",message:"ACCOUNT_ERASURE_REMOVAL_BINDING_REQUIRED"
+        });
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
+  }
+  async function clean(erasureId:string,coordinator=new AccountErasureCoordinator(
+    erasureRepository,users,runKeys,publicationCipher
+  )) {
+    for (let round=0;round<4;round++) {
+      const outcome=await coordinator.execute(erasureId,source);
+      if (outcome==="CLEANED") return outcome;
+      await ackNotifications();
+      await publications().reconcileKeyCleanup();
+    }
+    throw new Error("DPD_ERASURE_DID_NOT_CLEAN_WITHIN_FOUR_ROUNDS");
+  }
+  beforeAll(async ()=>{
+    const role=`dpd_erasure_${randomUUID().replaceAll("-","")}`;
+    const password=`dpd-${randomUUID()}`;
+    await database.pool.query(`
+      CREATE ROLE ${role} LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
+        NOREPLICATION NOBYPASSRLS PASSWORD '${password}';
+      GRANT debateai_erasure_runtime TO ${role}
+    `);
+    const url=new URL(database.connectionString);
+    url.username=role;url.password=password;
+    erasurePool=createPool(url.toString());
+    erasureRepository=new PostgresAccountErasureRepository(erasurePool,fakeAuditHasher);
+    expect((await erasurePool.query<{ rolsuper:boolean }>(
+      "SELECT rolsuper FROM pg_roles WHERE rolname=current_user"
+    )).rows[0]!.rolsuper).toBe(false);
+  });
+  afterAll(async ()=>{ await erasurePool?.end(); });
+
+  it("DPD-S01 R12 an erasure request inserted without the column reads keep",async ()=>{
+    const { identity }=await identityWithGrant("default");
+    const row=(await database.pool.query<{ erasure_id:string;delete_public_debates:boolean }>(`
+      INSERT INTO identity.account_erasure_request(user_id,requested_at,execute_at)
+      VALUES ($1,clock_timestamp(),clock_timestamp()+interval '604800 seconds')
+      RETURNING erasure_id,delete_public_debates
+    `,[identity.userId])).rows[0]!;
+    await database.pool.query("DELETE FROM identity.account_erasure_request WHERE erasure_id=$1",[row.erasure_id]);
+    expect(row.delete_public_debates).toBe(false);
+    expect((await database.pool.query<{ column_default:string;is_nullable:string }>(`
+      SELECT column_default,is_nullable FROM information_schema.columns
+      WHERE table_schema='identity' AND table_name='account_erasure_request'
+        AND column_name='delete_public_debates'
+    `)).rows[0]).toEqual({ column_default:"false",is_nullable:"NO" });
+  });
+
+  it("DPD-S01 R9 R12 R13 schedule stores the choice and an idempotent retry returns the stored row's choice",async ()=>{
+    const fixture=await identityWithGrant("schedule");
+    const first=await schedule(fixture,true);
+    expect(first?.deletePublicDebates).toBe(true);
+    expect((await database.pool.query("SELECT delete_public_debates FROM identity.account_erasure_request WHERE erasure_id=$1",[first!.erasureId])).rows[0]?.delete_public_debates).toBe(true);
+    const retry=await schedule(fixture,false);
+    expect(retry?.erasureId).toBe(first?.erasureId);
+    expect(retry?.deletePublicDebates).toBe(true);
+    expect((await database.pool.query("SELECT delete_public_debates FROM identity.account_erasure_request WHERE erasure_id=$1",[first!.erasureId])).rows[0]?.delete_public_debates).toBe(true);
+    const oldClient=await identityWithGrant("old-client");
+    const oldClientRow=(await erasurePool.query<{
+      erasure_id:string;status:string;execute_at:Date;cancellation_ref:string;
+    }>(
+      "SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4)",
+      [oldClient.identity.userId,oldClient.identity.ownerRef,
+        oldClient.identity.sessionId,oldClient.grantTokenHash]
+    )).rows[0]!;
+    expect(Object.keys(oldClientRow).sort()).toEqual([
+      "cancellation_ref","erasure_id","execute_at","status"
+    ]);
+    expect((await database.pool.query<{ delete_public_debates:boolean }>(
+      "SELECT delete_public_debates FROM identity.account_erasure_request WHERE erasure_id=$1",
+      [oldClientRow.erasure_id]
+    )).rows[0]?.delete_public_debates).toBe(false);
+    expect(await erasureRepository.current({
+      userId:fixture.identity.userId,ownerRef:fixture.identity.ownerRef,
+      sessionId:fixture.identity.sessionId
+    })).toMatchObject({ status:"SCHEDULED",deletePublicDebates:true });
+  });
+
+  it("DPD-S01 R16 R17 nothing changes during the grace and cancel restores every public debate",async ()=>{
+    const fixture=await identityWithGrant("cancel");
+    const refs=[(await publish(fixture.identity,"cancel-1")).ref,
+      (await publish(fixture.identity,"cancel-2")).ref];
+    const before=await httpSnapshot(refs);
+    for (const ref of before.refs) expect(ref.statusCode).toBe(200);
+    for (const ref of refs) expect(before.list).toContain(ref);
+    const scheduled=await schedule(fixture,true);
+    expect(scheduled?.deletePublicDebates).toBe(true);
+    await publications().reconcileKeyCleanup();
+    const coordinator=new AccountErasureCoordinator(
+      erasureRepository,users,runKeys,publicationCipher
+    );
+    await coordinator.reconcile(source);
+    expect(await httpSnapshot(refs)).toEqual(before);
+    await due(fixture.identity.userId);
+    await publications().reconcileKeyCleanup();
+    expect(await httpSnapshot(refs)).toEqual(before);
+    expect(await erasureRepository.cancelCurrent({
+      userId:fixture.identity.userId,ownerRef:fixture.identity.ownerRef,
+      sessionId:fixture.identity.sessionId,cancellationRef:scheduled!.cancellationRef
+    })).toBe(true);
+    await publications().reconcileKeyCleanup();
+    expect(await httpSnapshot(refs)).toEqual(before);
+  });
+
+  it("DPD-S01 R18 R20 R21 R23 a remove erasure removes exactly the prepared refs, as unpublish does",async ()=>{
+    const fixture=await identityWithGrant("remove");
+    const a1=await publish(fixture.identity,"a1");
+    const a2=await publish(fixture.identity,"a2");
+    const a3=await publish(fixture.identity,"a3");
+    const unpublishToken=await grant(fixture.identity,a3.runId,"UNPUBLISH","a3",new Date());
+    expect(await repository.unpublish({
+      runId:a3.runId,userId:fixture.identity.userId,ownerRef:fixture.identity.ownerRef,
+      sessionId:fixture.identity.sessionId,
+      grantTokenHash:hashToken("step-up-grant",unpublishToken),occurredAt:new Date(),source
+    })).toBe(a3.ref);
+    await publications().reconcileKeyCleanup();
+    const oracle=await publicRead(a3.ref);
+    const scheduled=await schedule(fixture,true);
+    const a4=await publish(fixture.identity,"a4");
+    const before=await httpSnapshot([a1.ref,a2.ref,a4.ref]);
+    for (const ref of before.refs) expect(ref.statusCode).toBe(200);
+    for (const ref of [a1.ref,a2.ref,a4.ref]) expect(before.list).toContain(ref);
+    expect((await database.pool.query(`
+      SELECT retained_public_snapshot_count,removed_public_snapshot_count
+      FROM identity.account_erasure_request WHERE erasure_id=$1
+    `,[scheduled!.erasureId])).rows[0]).toEqual({
+      retained_public_snapshot_count:0,removed_public_snapshot_count:null
+    });
+    await due(fixture.identity.userId);
+    const coordinator=new AccountErasureCoordinator(
+      erasureRepository,users,runKeys,publicationCipher
+    );
+    expect(await coordinator.execute(scheduled!.erasureId,source)).toBe("CONTENDED");
+    expect(await erasureRepository.current({
+      userId:fixture.identity.userId,ownerRef:fixture.identity.ownerRef,
+      sessionId:fixture.identity.sessionId
+    })).toMatchObject({ status:"PROCESSING",deletePublicDebates:true });
+    expect((await database.pool.query(`
+      SELECT prepared_current_publication_refs,retained_public_snapshot_count,
+        removed_public_snapshot_count,keyless_historical_snapshot_count
+      FROM identity.account_erasure_request WHERE erasure_id=$1
+    `,[scheduled!.erasureId])).rows[0]).toEqual({
+      prepared_current_publication_refs:[a1.ref,a2.ref,a4.ref].sort(),
+      retained_public_snapshot_count:0,removed_public_snapshot_count:3,
+      keyless_historical_snapshot_count:1
+    });
+    await ackNotifications();
+    expect(await clean(scheduled!.erasureId,coordinator)).toBe("CLEANED");
+    const after=await httpSnapshot([a1.ref,a2.ref,a4.ref]);
+    for (const ref of after.refs) expect({ statusCode:ref.statusCode,body:ref.body }).toEqual(oracle);
+    for (const ref of [a1.ref,a2.ref,a4.ref]) {
+      expect(after.list).not.toContain(ref);
+      expect((await database.pool.query<{ state:string }>(`
+        SELECT state FROM core.run_visibility_event WHERE publication_ref=$1
+        ORDER BY at_seq DESC LIMIT 1
+      `,[ref])).rows[0]?.state).toBe("PRIVATE");
+      expect(await publicationCipher.exists(ref)).toBe(false);
+      expect(await publicationCipher.keyReadable(ref)).toBe(false);
+    }
+    expect((await database.pool.query('SELECT 1 FROM identity."user" WHERE user_id=$1',[fixture.identity.userId])).rowCount).toBe(0);
+    expect((await database.pool.query("SELECT committed_at FROM identity.account_erasure_request WHERE erasure_id=$1",[scheduled!.erasureId])).rows[0]?.committed_at).not.toBeNull();
+  });
+
+  it("DPD-S01 R19 a failed key destroy blocks finalize and the next cycle completes",async ()=>{
+    const fixture=await identityWithGrant("destroy-failure");
+    const ref=(await publish(fixture.identity,"destroy-failure")).ref;
+    const scheduled=await schedule(fixture,true);
+    await due(fixture.identity.userId);
+    expect(await prepare(scheduled!.erasureId)).toBe("PREPARED");
+    await ackNotifications();
+    const finalize=vi.spyOn(erasureRepository,"finalize");
+    let first=true;
+    const cipher={
+      destroy:async (candidate:string)=>{
+        if (candidate===ref && first) { first=false;throw new Error("DPD_FORCED_DESTROY_FAILURE"); }
+        return publicationCipher.destroy(candidate);
+      },
+      exists:(candidate:string)=>publicationCipher.exists(candidate),
+      keyReadable:(candidate:string)=>publicationCipher.keyReadable(candidate)
+    };
+    const coordinator=new AccountErasureCoordinator(erasureRepository,users,runKeys,cipher);
+    await expect(coordinator.execute(scheduled!.erasureId,source)).rejects.toThrow("DPD_FORCED_DESTROY_FAILURE");
+    expect(finalize).toHaveBeenCalledTimes(0);
+    expect((await database.pool.query('SELECT 1 FROM identity."user" WHERE user_id=$1',[fixture.identity.userId])).rowCount).toBe(1);
+    expect((await database.pool.query("SELECT committed_at FROM identity.account_erasure_request WHERE erasure_id=$1",[scheduled!.erasureId])).rows[0]?.committed_at).toBeNull();
+    expect(await clean(scheduled!.erasureId,coordinator)).toBe("CLEANED");
+    expect((await database.pool.query('SELECT 1 FROM identity."user" WHERE user_id=$1',[fixture.identity.userId])).rowCount).toBe(0);
+    finalize.mockRestore();
+  });
+
+  it("DPD-S01 R19 finalize refuses a remove request whose removed keys lack cleanup receipts",async ()=>{
+    const fixture=await identityWithGrant("receipt");
+    await publish(fixture.identity,"receipt");
+    const scheduled=await schedule(fixture,true);
+    await due(fixture.identity.userId);
+    expect(await prepare(scheduled!.erasureId)).toBe("PREPARED");
+    await ackNotifications();
+    const manifest=await erasureRepository.cleanupManifest(scheduled!.erasureId);
+    const finalize=async ()=>(await erasurePool.query<{ outcome:string }>(
+      "SELECT identity.finalize_account_erasure($1,clock_timestamp(),clock_timestamp(),$2,0,1,0) AS outcome",
+      [scheduled!.erasureId,manifest!.runIds.length]
+    )).rows[0]?.outcome;
+    expect(await finalize()).toBe("CONTENDED");
+    expect((await database.pool.query('SELECT 1 FROM identity."user" WHERE user_id=$1',[fixture.identity.userId])).rowCount).toBe(1);
+    await publications().reconcileKeyCleanup();
+    expect(await finalize()).toBe("COMMITTED");
+  });
+
+  it("DPD-S01 R22 a keep erasure leaves every current public debate byte-identical",async ()=>{
+    const fixture=await identityWithGrant("keep");
+    const refs=[(await publish(fixture.identity,"keep-1")).ref,
+      (await publish(fixture.identity,"keep-2")).ref];
+    const before=await Promise.all(refs.map(publicRead));
+    for (const ref of before) expect(ref.statusCode).toBe(200);
+    const beforeList=(await httpSnapshot(refs)).list;
+    for (const ref of refs) expect(beforeList).toContain(ref);
+    const scheduled=(await erasurePool.query<{ erasure_id:string }>(
+      "SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4)",
+      [fixture.identity.userId,fixture.identity.ownerRef,
+        fixture.identity.sessionId,fixture.grantTokenHash]
+    )).rows[0]!;
+    await due(fixture.identity.userId);
+    const keyReadable=vi.fn((ref:string)=>publicationCipher.keyReadable(ref));
+    const coordinator=new AccountErasureCoordinator(erasureRepository,users,runKeys,{
+      destroy:(ref:string)=>publicationCipher.destroy(ref),
+      exists:(ref:string)=>publicationCipher.exists(ref),keyReadable
+    });
+    expect(await clean(scheduled.erasure_id,coordinator)).toBe("CLEANED");
+    expect(await Promise.all(refs.map(publicRead))).toEqual(before);
+    for (const ref of refs) expect(keyReadable).toHaveBeenCalledWith(ref);
+    expect((await database.pool.query(`
+      SELECT delete_public_debates,retained_public_snapshot_count,
+        removed_public_snapshot_count,keyless_historical_snapshot_count
+      FROM identity.account_erasure_request WHERE erasure_id=$1
+    `,[scheduled.erasure_id])).rows[0]).toEqual({
+      delete_public_debates:false,retained_public_snapshot_count:2,
+      removed_public_snapshot_count:0,keyless_historical_snapshot_count:0
+    });
+    expect(await publicationCipher.exists(refs[0]!)).toBe(true);
+  });
+
+  it("DPD-S01 R23 a remove request with no public debate commits with counts (0, 0)",async ()=>{
+    const fixture=await identityWithGrant("empty");
+    const scheduled=await schedule(fixture,true);
+    await due(fixture.identity.userId);
+    expect(await clean(scheduled!.erasureId)).toBe("CLEANED");
+    expect((await database.pool.query(`
+      SELECT retained_public_snapshot_count,removed_public_snapshot_count
+      FROM identity.account_erasure_request WHERE erasure_id=$1
+    `,[scheduled!.erasureId])).rows[0]).toEqual({
+      retained_public_snapshot_count:0,removed_public_snapshot_count:0
+    });
+  });
+
+  it("DPD-S01 ADR-0035 a forged version-3 visibility row is refused",async ()=>{
+    const fixture=await identityWithGrant("forged");
+    const published=await publish(fixture.identity,"forged");
+    const insert=(version:number)=>database.pool.query(`
+      INSERT INTO core.run_visibility_event(
+        run_visibility_event_id,run_id,publication_ref,state,actor_audit_token,
+        actor_ref_version,warning_version,occurred_at,at_seq
+      ) VALUES ($1,$2,$3,'PRIVATE',$4,$5,'COPIES_MAY_PERSIST_V1',clock_timestamp(),ledger.allocate_sequence())
+    `,[randomUUID(),published.runId,published.ref,randomUUID(),version]);
+    await expect(insert(3)).rejects.toMatchObject({
+      code:"55000",message:"ACCOUNT_ERASURE_REMOVAL_BINDING_REQUIRED"
+    });
+    await expect(insert(2)).rejects.toMatchObject({
+      code:"55000",message:"PUBLICATION_V2_REF_BINDING_REQUIRED"
+    });
+  });
+
+  it("DPD-S01 p1-F1 version-3 rejects a ref outside the prepared set",async ()=>{
+    const fixture=await identityWithGrant("guard-set");
+    const published=await publish(fixture.identity,"guard-set");
+    const request=await schedule(fixture,true);
+    await expectForgedVersion3Refused({
+      erasureId:request!.erasureId,runId:published.runId,ref:published.ref,
+      prepared:true,preparedRefs:[]
+    });
+  });
+
+  it("DPD-S01 p1-F1 version-3 rejects a ref before prepare",async ()=>{
+    const fixture=await identityWithGrant("guard-prepared-at");
+    const published=await publish(fixture.identity,"guard-prepared-at");
+    const request=await schedule(fixture,true);
+    await expectForgedVersion3Refused({
+      erasureId:request!.erasureId,runId:published.runId,ref:published.ref,
+      prepared:false,preparedRefs:[published.ref],withoutShapeCheck:true
+    });
+  });
+
+  it("DPD-S01 p1-F1 version-3 rejects a PUBLISHED insertion",async ()=>{
+    const fixture=await identityWithGrant("guard-state");
+    const published=await publish(fixture.identity,"guard-state");
+    const request=await schedule(fixture,true);
+    await expectForgedVersion3Refused({
+      erasureId:request!.erasureId,runId:published.runId,ref:published.ref,
+      prepared:true,preparedRefs:[published.ref],state:"PUBLISHED"
+    });
+  });
+
+  it("DPD-S01 p1-F1 version-3 rejects a ref owned by another account",async ()=>{
+    const fixture=await identityWithGrant("guard-owner");
+    const other=await identityWithGrant("guard-other-owner");
+    const published=await publish(other.identity,"guard-other-owner");
+    const request=await schedule(fixture,true);
+    await expectForgedVersion3Refused({
+      erasureId:request!.erasureId,runId:published.runId,ref:published.ref,
+      prepared:true,preparedRefs:[published.ref]
+    });
+  });
+
+  it("DPD-S01 p1-F1 version-3 rejects a prepared keep request",async ()=>{
+    const fixture=await identityWithGrant("guard-choice");
+    const published=await publish(fixture.identity,"guard-choice");
+    const request=await schedule(fixture,false);
+    await expectForgedVersion3Refused({
+      erasureId:request!.erasureId,runId:published.runId,ref:published.ref,
+      prepared:true,preparedRefs:[published.ref]
+    });
+  });
+
+  it("DPD-S01 p1-F1 version-3 rejects a ref whose latest event is PRIVATE",async ()=>{
+    const fixture=await identityWithGrant("guard-latest");
+    const published=await publish(fixture.identity,"guard-latest");
+    const request=await schedule(fixture,true);
+    const token=await grant(fixture.identity,published.runId,"UNPUBLISH","guard-latest",new Date());
+    expect(await repository.unpublish({
+      runId:published.runId,userId:fixture.identity.userId,
+      ownerRef:fixture.identity.ownerRef,sessionId:fixture.identity.sessionId,
+      grantTokenHash:hashToken("step-up-grant",token),occurredAt:new Date(),source
+    })).toBe(published.ref);
+    await expectForgedVersion3Refused({
+      erasureId:request!.erasureId,runId:published.runId,ref:published.ref,
+      prepared:true,preparedRefs:[published.ref]
+    });
+  });
+
+  it("DPD-S01 p1-F1 a unique-violation retry returns the stored choice",async ()=>{
+    const fixture=await identityWithGrant("unique-retry");
+    const grantId=(await database.pool.query<{ step_up_grant_id:string }>(`
+      SELECT step_up_grant_id FROM identity.step_up_grant WHERE token_hash=$1
+    `,[fixture.grantTokenHash])).rows[0]!.step_up_grant_id;
+    const pauseKey=804091;
+    await database.pool.query(`
+      CREATE OR REPLACE FUNCTION public.dpd_p1_pause_grant_update()
+      RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $body$
+      BEGIN
+        IF NEW.step_up_grant_id::text=TG_ARGV[0] THEN
+          PERFORM pg_advisory_xact_lock(TG_ARGV[1]::bigint);
+        END IF;
+        RETURN NEW;
+      END
+      $body$;
+      CREATE TRIGGER dpd_p1_pause_grant_update
+      BEFORE UPDATE OF consumed_at ON identity.step_up_grant
+      FOR EACH ROW EXECUTE FUNCTION public.dpd_p1_pause_grant_update(
+        '${grantId}','${pauseKey}'
+      )
+    `);
+    const barrier=await database.pool.connect();
+    const rival=await database.pool.connect();
+    let scheduling:ReturnType<typeof schedule>|undefined;
+    let rivalId:string|undefined;
+    try {
+      await barrier.query("BEGIN");
+      await barrier.query("SELECT pg_advisory_xact_lock($1)",[pauseKey]);
+      scheduling=schedule(fixture,false);
+      let waiting=false;
+      for (let attempt=0;attempt<100;attempt++) {
+        waiting=(await database.pool.query<{ waiting:boolean }>(`
+          SELECT EXISTS(SELECT 1 FROM pg_stat_activity
+            WHERE wait_event='advisory'
+              AND query LIKE '%schedule_account_erasure%') AS waiting
+        `)).rows[0]?.waiting===true;
+        if (waiting) break;
+        await new Promise((resolve)=>setTimeout(resolve,10));
+      }
+      expect(waiting).toBe(true);
+
+      // The scheduler already holds FOR UPDATE on the grant and account.
+      // Bypass origin triggers, including FK locks, on this embedded owner
+      // connection only; the unique index still arbitrates the INSERT.
+      await rival.query("BEGIN");
+      await rival.query("SET LOCAL session_replication_role=replica");
+      const inserted=(await rival.query<{ erasure_id:string }>(`
+        INSERT INTO identity.account_erasure_request(
+          user_id,requested_at,execute_at,schedule_session_id,
+          schedule_grant_id,delete_public_debates
+        ) VALUES ($1,clock_timestamp(),clock_timestamp()+interval '604800 seconds',
+          $2,$3,true) RETURNING erasure_id
+      `,[fixture.identity.userId,fixture.identity.sessionId,grantId])).rows[0]!;
+      rivalId=inserted.erasure_id;
+      await rival.query("COMMIT");
+      await barrier.query("COMMIT");
+      const retry=await scheduling;
+      expect(retry?.erasureId).toBe(inserted.erasure_id);
+      expect(retry?.deletePublicDebates).toBe(true);
+      expect((await database.pool.query<{ delete_public_debates:boolean }>(`
+        SELECT delete_public_debates FROM identity.account_erasure_request
+        WHERE erasure_id=$1
+      `,[inserted.erasure_id])).rows[0]?.delete_public_debates).toBe(true);
+    } finally {
+      await rival.query("ROLLBACK").catch(()=>undefined);
+      await barrier.query("ROLLBACK").catch(()=>undefined);
+      await scheduling?.catch(()=>undefined);
+      rival.release();
+      barrier.release();
+      await database.pool.query(
+        "DROP TRIGGER IF EXISTS dpd_p1_pause_grant_update ON identity.step_up_grant"
+      );
+      await database.pool.query("DROP FUNCTION IF EXISTS public.dpd_p1_pause_grant_update()");
+      if (rivalId) await database.pool.query(
+        "DELETE FROM identity.account_erasure_request WHERE erasure_id=$1",[rivalId]
+      );
+    }
+    expect((await database.pool.query<{ n:number }>(`
+      SELECT count(*)::int AS n FROM identity.account_erasure_request AS request
+      WHERE request.prepared_at IS NULL AND request.cancelled_at IS NULL AND request.committed_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM identity.account_erasure_notification_outbox AS outbox
+          WHERE outbox.erasure_id=request.erasure_id)
+    `)).rows[0]?.n).toBe(0);
+  });
+
+  it("DPD-S01 p2-N2 version-3 rejects a cancelled remove request",async ()=>{
+    const fixture=await identityWithGrant("guard-cancelled");
+    const published=await publish(fixture.identity,"guard-cancelled");
+    const request=await schedule(fixture,true);
+    await expectForgedVersion3Refused({
+      erasureId:request!.erasureId,runId:published.runId,ref:published.ref,
+      prepared:true,preparedRefs:[published.ref],cancelled:true,
+      dropChecks:["account_erasure_request_check2","account_erasure_request_check3"]
+    });
+  });
+
+  it("DPD-S01 p2-N2 version-3 rejects a committed remove request",async ()=>{
+    const fixture=await identityWithGrant("guard-committed");
+    const published=await publish(fixture.identity,"guard-committed");
+    const request=await schedule(fixture,true);
+    await expectForgedVersion3Refused({
+      erasureId:request!.erasureId,runId:published.runId,ref:published.ref,
+      prepared:true,preparedRefs:[published.ref],committed:true,
+      dropChecks:["account_erasure_request_check6"]
+    });
+  });
+
+  it("DPD-S01 p2-N2 version-3 rejects another run's event under a prepared ref",async ()=>{
+    const fixture=await identityWithGrant("guard-snapshot");
+    const first=await publish(fixture.identity,"guard-snapshot-1");
+    const second=await publish(fixture.identity,"guard-snapshot-2");
+    const request=await schedule(fixture,true);
+    await expectForgedVersion3Refused({
+      erasureId:request!.erasureId,runId:second.runId,ref:first.ref,
+      prepared:true,preparedRefs:[first.ref],latestPublished:{ runId:second.runId,ref:first.ref }
+    });
   });
 });

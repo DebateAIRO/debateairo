@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective \[date\] · Önceki sürümler: dezbatere.ro/privacy/versions · Veri sorumlusu: DebateAIRO S.R.L., Bükreş**
 
-**In short.** Bir hesabın ihtiyaç duyduğu bilgileri ve yazmayı seçtiğiniz içerikleri toplarız. Sorularınız Sicilimizde listelenen yapay zekâ sağlayıcılarına gider; model eğitimi için kullanılmazlar. Tartışmalar, siz yayımlamadıkça gizlidir. Hesabınızı silmek, verilerinizin anahtarlarını imha eder ve yayımladığınız tartışmaları yayından kaldırır. Bize privacy@dezbatere.ro adresinden ulaşabilirsiniz; bir tartışmada adı geçen kişiler de hesapları olmadan kaldırma talebinde bulunabilir.
+**In short.** Bir hesabın ihtiyaç duyduğu bilgileri ve yazmayı seçtiğiniz içerikleri toplarız. Sorularınız Sicilimizde listelenen yapay zekâ sağlayıcılarına gider; model eğitimi için kullanılmazlar. Tartışmalar, siz yayımlamadıkça gizlidir. Hesabınızı silmek özel verilerinizin anahtarlarını imha eder; silme işlemini planlarken yayımlanmış tartışmalarınızın da kaldırılmasını veya kullanımdan kaldırılmış takma adınız altında herkese açık kalmasını seçersiniz. Bize privacy@dezbatere.ro adresinden ulaşabilirsiniz; bir tartışmada adı geçen kişiler de hesapları olmadan kaldırma talebinde bulunabilir.
 
 ## 1. Verilerinizden kim sorumludur
 
@@ -101,7 +101,7 @@ Tartışmalar siz yayımlayana kadar gizlidir. Yayımlama, bilinçli olarak yap�
 
 Yayından kaldırma, tartışmayı Dialectical Engine'dan kaldırır ve herkese açık kopyamıza ait anahtarı imha eder. Okuyucuların, arama motorlarının veya arşivlerin daha önce oluşturduğu kopyalar kontrolümüz dışındadır ve bunları geri alamayız.
 
-Hesabınızı sildiğinizde, kanun belirli bir öğeyi saklamamızı gerektirmedikçe yayımladığınız her tartışmayı gereksiz gecikme olmaksızın ve en geç 30 gün içinde kamunun erişiminden kaldırırız. \[Option B — a product change; see the Terms, section 9.\]
+Hesabınızın silinmesini planladığınızda yayımladığınız tartışmalara ne olacağını seçersiniz. "Herkese açık tartışmalarımı da sil" kutusunu işaretlerseniz, silme işlemi yapıldığında her birini herkese açık erişimden kaldırır ve herkese açık kopyamızın anahtarını yok ederiz; yasaların belirli bir öğeyi saklamamızı gerektirmesi bunun istisnasıdır. Kutuyu işaretlemezseniz tartışmalar kullanımdan kaldırılmış takma adınız altında herkese açık kalır.
 
 ## 7. Verileri ne kadar süreyle saklıyoruz
 
@@ -117,14 +117,14 @@ Hesabınızı sildiğinizde, kanun belirli bir öğeyi saklamamızı gerektirmed
 | Kayıtta ve yeni bir tartışmanın başlangıcında ülkeyi yerel olarak belirlemek için kullanılan IP adresi | Yalnızca isteğin işlendiği süre boyunca | Bu kontrol için açık biçimde saklanmaz; ret yalnızca toplulaştırılmış olarak ve aşağıda açıklanan özetle kaydedilir |
 | IP ülkesine göre toplulaştırılmış ret denetim kayıtları | Hizmetin ömrü boyunca | Kayıt; ret kodunu, ülkeyi, IP adresinin kanıt olarak kullanıldığı bilgisini ve IP adresi ile kullanıcı aracısının (user-agent) anahtarlı, tek yönlü özetlerini içerir; denetim kaydına yalnızca ekleme yapılır. |
 | Tartışma içeriği (gizli) | Hesap var olduğu sürece | Kapatma sırasında anahtarlar imha edilir ve içerik okunamaz hâle gelir |
-| Tartışma içeriği (yayımlanmış) | Yayımlanmış olduğu ve hesap var olduğu sürece | Yayından kaldırma veya kapatma hâlinde kamunun erişiminden kaldırılır; anahtarlar imha edilir |
+| Tartışma içeriği (yayımlanmış) | Yayımlanmış olduğu sürece; hesabınızı kapatırken "Herkese açık tartışmalarımı da sil" seçeneğini işaretlemezseniz yayımlanmış bir tartışma kullanımdan kaldırılmış takma adınız altında herkese açık kalır | Yayımdan kaldırdığınızda veya hesabı kapatırken "Herkese açık tartışmalarımı da sil" seçeneğini işaretlediyseniz kamusal erişimden kaldırılır ve anahtarı imha edilir |
 | Sağlayıcı yanıt kayıtları ve erişim referansları | Ait oldukları tartışmayla aynı süre | Aynı işlem uygulanır |
 | Destek görüşmeleri ve vakaları | \[Until closed plus 12 months\] | Anahtarlar imha edilir |
 | Kabul ve rıza kayıtları | Hesabın ömrü artı 6 yıl — bizim için geçerli en uzun zamanaşımı süresi | Silinir |
 | Ödeme kayıtları \[pending\] | Romanya muhasebe hukukunun gerektirdiği üzere 10 yıl | Silinir |
 | Yedekler \[pending\] | Canlı kopya silindikten \[… days\] sonra | Üzerine yazılır |
 
-**Silmenin fiilen yaptığı.** Tartışmalarınız ve hesap verileriniz, hesabınıza ve her tartışmaya özgü anahtarlar altında şifrelenir. Hesabınızın silinmesi bu anahtarları imha eder; bunun ardından şifreli kayıtlar bizim veya başka herhangi birinin okuyamayacağı hâle gelir ve hesap kaydınızı sileriz. Etkisi bu olduğu için bunu silme olarak tanımlarız ve bunun dayanağı olan belgelenmiş bir değerlendirmeyi tutarız; daha fazla bilgi edinmek isterseniz sorabilirsiniz. Bilmeniz gereken üç husus vardır: güvenlik denetim izi yalnızca ekleme yapılabilir niteliktedir ve silinmez, ancak size ait okunabilir tanımlayıcı içermez; az sayıdaki eski tartışma mevcut şifreleme düzenimizden daha eskidir ve bu durum hesabınız için geçerliyse kapatmanın bunlar bakımından ne sağladığını size bildiririz; ayrıca bir yapay zekâ sağlayıcısına daha önce gönderilmiş veri kopyaları bizim silme işlemimize değil, o sağlayıcının Sicildeki saklama koşullarına tabidir.
+**Silmenin fiilen yaptığı.** Özel tartışmalarınız ve hesap verileriniz, hesabınıza ve her tartışmaya özgü anahtarlar altında şifrelenir. Hesabınızın silinmesi bu anahtarları imha eder; bunun ardından şifreli kayıtlar bizim veya başka herhangi birinin okuyamayacağı hâle gelir ve hesap kaydınızı sileriz. Yayımlanmış bir tartışmanın herkese açık kopyasının anahtarı silme sırasında yalnızca "Herkese açık tartışmalarımı da sil" seçeneğini işaretlediyseniz imha edilir (bölüm 6). Etkisi bu olduğu için bunu silme olarak tanımlarız ve bunun dayanağı olan belgelenmiş bir değerlendirmeyi tutarız; daha fazla bilgi edinmek isterseniz sorabilirsiniz. Bilmeniz gereken üç husus vardır: güvenlik denetim izi yalnızca ekleme yapılabilir niteliktedir ve silinmez, ancak size ait okunabilir tanımlayıcı içermez; az sayıdaki eski tartışma mevcut şifreleme düzenimizden daha eskidir ve bu durum hesabınız için geçerliyse kapatmanın bunlar bakımından ne sağladığını size bildiririz; ayrıca bir yapay zekâ sağlayıcısına daha önce gönderilmiş veri kopyaları bizim silme işlemimize değil, o sağlayıcının Sicildeki saklama koşullarına tabidir.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
 

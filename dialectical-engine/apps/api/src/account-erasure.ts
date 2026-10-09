@@ -18,12 +18,14 @@ export type AccountErasureView = Readonly<{
   status:"NONE"|"SCHEDULED"|"DUE"|"PROCESSING";
   executeAt?:Date;
   cancellationRef?:string;
+  deletePublicDebates?:boolean;
 }>;
 
 export interface AccountErasureApplication {
   schedule(input:Readonly<{
     authenticated:AuthenticatedSession;
     grantToken:string;
+    deletePublicDebates?:boolean;
   }>):Promise<AccountErasureView|"NOTIFICATION_CHANNEL_REQUIRED"|null>;
   current(authenticated:AuthenticatedSession):Promise<AccountErasureView>;
   cancel(input:Readonly<{
@@ -46,6 +48,7 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
   async schedule(input:Readonly<{
     authenticated:AuthenticatedSession;
     grantToken:string;
+    deletePublicDebates?:boolean;
   }>):Promise<AccountErasureView|"NOTIFICATION_CHANNEL_REQUIRED"|null> {
     let scheduled:Awaited<ReturnType<PostgresAccountErasureRepository["schedule"]>>;
     try {
@@ -53,7 +56,8 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
         userId:input.authenticated.userId,
         ownerRef:input.authenticated.ownerRef,
         sessionId:input.authenticated.session.session_id,
-        grantTokenHash:hashToken("step-up-grant", input.grantToken)
+        grantTokenHash:hashToken("step-up-grant", input.grantToken),
+        deletePublicDebates:input.deletePublicDebates === true
       });
     } catch (error) {
       if (error instanceof Error
@@ -65,7 +69,8 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
     return scheduled===null ? null : Object.freeze({
       status:scheduled.status,
       executeAt:scheduled.executeAt,
-      cancellationRef:scheduled.cancellationRef
+      cancellationRef:scheduled.cancellationRef,
+      deletePublicDebates:scheduled.deletePublicDebates
     });
   }
 
@@ -77,7 +82,8 @@ export class PostgresAccountErasureApplication implements AccountErasureApplicat
     });
     return current===null ? Object.freeze({ status:"NONE" }) : Object.freeze({
       status:current.status,executeAt:current.executeAt,
-      cancellationRef:current.cancellationRef
+      cancellationRef:current.cancellationRef,
+      deletePublicDebates:current.deletePublicDebates
     });
   }
 

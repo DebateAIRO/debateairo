@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective \[date\] · Frühere Fassungen unter dezbatere.ro/privacy/versions · Verantwortlicher: DebateAIRO S.R.L., Bukarest**
 
-**In short.** Wir erheben, was für ein Konto erforderlich ist und was Sie freiwillig eingeben. Ihre Fragen werden an die in unserem Verzeichnis aufgeführten KI-Anbieter übermittelt; sie werden nicht zum Trainieren von Modellen verwendet. Debatten sind privat, sofern Sie sie nicht veröffentlichen. Durch die Löschung Ihres Kontos werden die Schlüssel zu Ihren Daten vernichtet und Ihre veröffentlichten Debatten entfernt. Sie erreichen uns unter privacy@dezbatere.ro; in einer Debatte genannte Personen können auch ohne Konto die Entfernung verlangen.
+**In short.** Wir erheben, was für ein Konto erforderlich ist und was Sie freiwillig eingeben. Ihre Fragen werden an die in unserem Verzeichnis aufgeführten KI-Anbieter übermittelt; sie werden nicht zum Trainieren von Modellen verwendet. Debatten sind privat, sofern Sie sie nicht veröffentlichen. Bei der Löschung Ihres Kontos werden die Schlüssel zu Ihren privaten Daten vernichtet; bei der Planung entscheiden Sie, ob auch Ihre veröffentlichten Debatten entfernt werden oder unter Ihrem stillgelegten Pseudonym öffentlich bleiben. Sie erreichen uns unter privacy@dezbatere.ro; in einer Debatte genannte Personen können auch ohne Konto die Entfernung verlangen.
 
 ## 1. Wer für Ihre Daten verantwortlich ist
 
@@ -101,7 +101,7 @@ Debatten sind privat, bis Sie sie veröffentlichen. Die Veröffentlichung ist ei
 
 Durch die Aufhebung der Veröffentlichung wird die Debatte aus Dialectical Engine entfernt und der Schlüssel zu unserer öffentlichen Kopie vernichtet. Bereits von Dritten, Suchmaschinen oder Archiven angefertigte Kopien liegen außerhalb unserer Kontrolle und können von uns nicht zurückgerufen werden.
 
-Wenn Sie Ihr Konto löschen, entfernen wir jede von Ihnen veröffentlichte Debatte unverzüglich und spätestens innerhalb von 30 Tagen aus dem öffentlichen Zugriff, sofern wir nicht gesetzlich zur Aufbewahrung eines bestimmten Inhalts verpflichtet sind. \[Option B — a product change; see the Terms, section 9.\]
+Wenn Sie die Löschung Ihres Kontos planen, entscheiden Sie, was mit Ihren veröffentlichten Debatten geschieht. Wenn Sie „Auch meine öffentlichen Debatten löschen“ ankreuzen, entfernen wir jede davon bei der Löschung aus dem öffentlichen Zugriff und vernichten den Schlüssel zu unserer öffentlichen Kopie, sofern uns das Gesetz nicht zur Aufbewahrung eines bestimmten Inhalts verpflichtet. Lassen Sie das Kästchen leer, bleiben die Debatten unter Ihrem stillgelegten Pseudonym öffentlich.
 
 ## 7. Wie lange wir Daten aufbewahren
 
@@ -117,14 +117,14 @@ Wenn Sie Ihr Konto löschen, entfernen wir jede von Ihnen veröffentlichte Debat
 | Risikoindikatoren für Anmeldung und Wiederherstellung | 90 Tage, durch die Datenbank durchgesetzt | Bereinigt |
 | Sicherheitsprotokoll | Für die Lebensdauer des Dienstes | Nur ergänzbar; IP und User-Agent sind Einweg-Digests und können nicht ausgelesen werden |
 | Debatteninhalte (privat) | Solange das Konto besteht | Schlüssel bei Schließung vernichtet, wodurch die Inhalte unlesbar werden |
-| Debatteninhalte (veröffentlicht) | Solange sie veröffentlicht sind und das Konto besteht | Bei Aufhebung der Veröffentlichung oder Schließung aus dem öffentlichen Zugriff entfernt; Schlüssel vernichtet |
+| Debatteninhalte (veröffentlicht) | Solange sie veröffentlicht sind; wenn Sie Ihr Konto schließen und „Auch meine öffentlichen Debatten löschen“ nicht auswählen, bleibt eine veröffentlichte Debatte unter Ihrem stillgelegten Pseudonym öffentlich | Beim Aufheben der Veröffentlichung oder bei der Schließung, wenn Sie „Auch meine öffentlichen Debatten löschen“ ausgewählt haben, aus dem öffentlichen Zugriff entfernt und ihr Schlüssel vernichtet |
 | Aufzeichnungen der Antworten der Anbieter und Suchreferenzen | So lange wie die zugehörige Debatte | Ebenso |
 | Support-Gespräche und -fälle | \[Until closed plus 12 months\] | Schlüssel vernichtet |
 | Nachweise über Annahme und Einwilligung | Lebensdauer des Kontos zuzüglich 6 Jahren – die längste für uns geltende Verjährungsfrist | Gelöscht |
 | Zahlungsunterlagen \[pending\] | 10 Jahre, wie nach rumänischem Rechnungslegungsrecht vorgeschrieben | Gelöscht |
 | Sicherungen \[pending\] | \[… days\] nach Löschung der aktiven Kopie | Überschrieben |
 
-**Was die Löschung tatsächlich bewirkt.** Ihre Debatten und Kontodaten sind mit Schlüsseln verschlüsselt, die jeweils Ihrem Konto und der einzelnen Debatte zugeordnet sind. Bei der Löschung Ihres Kontos werden diese Schlüssel vernichtet; anschließend können die verschlüsselten Datensätze weder von uns noch von anderen gelesen werden, und wir löschen Ihren Kontodatensatz. Wir bezeichnen dies als Löschung, weil es diese Wirkung hat, und verfügen hierzu über eine dokumentierte Bewertung; wenn Sie mehr erfahren möchten, fragen Sie uns. Drei Punkte sind zu beachten: Das Sicherheitsprotokoll ist nur ergänzbar und wird nicht gelöscht, enthält jedoch keine lesbaren Kennungen Ihrer Person; eine geringe Anzahl älterer Debatten entstand vor unserem aktuellen Verschlüsselungsverfahren, und sollte dies Ihr Konto betreffen, erläutern wir Ihnen, was die Schließung für diese Daten bewirkt; Kopien von Daten, die bereits an einen KI-Anbieter übermittelt wurden, unterliegen den Aufbewahrungsbedingungen dieses Anbieters im Verzeichnis und nicht unserer Löschung.
+**Was die Löschung tatsächlich bewirkt.** Ihre privaten Debatten und Kontodaten sind mit Schlüsseln verschlüsselt, die jeweils Ihrem Konto und der einzelnen Debatte zugeordnet sind. Bei der Löschung Ihres Kontos werden diese Schlüssel vernichtet; anschließend können die verschlüsselten Datensätze weder von uns noch von anderen gelesen werden, und wir löschen Ihren Kontodatensatz. Der Schlüssel zur öffentlichen Kopie einer veröffentlichten Debatte wird bei der Löschung nur vernichtet, wenn Sie „Auch meine öffentlichen Debatten löschen“ ausgewählt haben (Abschnitt 6). Wir bezeichnen dies als Löschung, weil es diese Wirkung hat, und verfügen hierzu über eine dokumentierte Bewertung; wenn Sie mehr erfahren möchten, fragen Sie uns. Drei Punkte sind zu beachten: Das Sicherheitsprotokoll ist nur ergänzbar und wird nicht gelöscht, enthält jedoch keine lesbaren Kennungen Ihrer Person; eine geringe Anzahl älterer Debatten entstand vor unserem aktuellen Verschlüsselungsverfahren, und sollte dies Ihr Konto betreffen, erläutern wir Ihnen, was die Schließung für diese Daten bewirkt; Kopien von Daten, die bereits an einen KI-Anbieter übermittelt wurden, unterliegen den Aufbewahrungsbedingungen dieses Anbieters im Verzeichnis und nicht unserer Löschung.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
 

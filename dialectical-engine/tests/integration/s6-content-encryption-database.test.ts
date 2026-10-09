@@ -851,8 +851,17 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
   it("applies the complete fresh migration set and replays 0040 safely", async () => {
     const directory=new URL("../../migrations/",import.meta.url);
     const migration=await readFile(new URL("0040_account_erasure.sql",directory),"utf8");
-    await expect(database.pool.query(migration)).resolves.toBeDefined();
-    await expect(database.pool.query(migration)).resolves.toBeDefined();
+    // The replay runs in full, twice, inside one rolled-back transaction: a 42P13 (or any error) still fails it, and
+    // no later test inherits 0040's bodies over the functions later migrations replaced (PLAN Revision 4, S01-Q13).
+    const client=await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await expect(client.query(migration)).resolves.toBeDefined();
+      await expect(client.query(migration)).resolves.toBeDefined();
+    } finally {
+      await client.query("ROLLBACK");
+      client.release();
+    }
   },120_000);
 
   it("bounds owner-private liveness and memory scans at N before any N+1 lease, key load, decrypt, or write", async () => {

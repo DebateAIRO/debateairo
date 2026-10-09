@@ -638,7 +638,7 @@ function constraintHasReplayGuard(source: string, index: number, name: string): 
 export type NativeMigrationReplayContext = Readonly<{ plan: MigrationPlan; migrateSource: string }>;
 const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2";
 // Finite reviewed executable module: comments/strings/dead code cannot stand in for its controls.
-const NATIVE_MIGRATE_MODULE_SHA256 = "945892e50a4d4c60dd0f5ceec97d61cd8015ac857880c867158d213c46679f4c";
+const NATIVE_MIGRATE_MODULE_SHA256 = "751688ab515a20cadbf0b2abfd9b53b1b792cd6d10e501f71c565265c93a5474";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"
@@ -668,7 +668,7 @@ function assertNativeReplayBinding(name: string, source: string, { plan, migrate
     "for (const name of plan.manifest.order)", "if (appliedSet.has(name) || resolvedSet.has(name)) continue;",
     "await client.query(plan.sources.get(name)!.sql);",
     "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
-    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,",
+    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,", "await applyForward110(client,plan,lineage,",
     'await client.query("COMMIT")', "} catch (error) {", 'await client.query("ROLLBACK")',
     "throw error;", "} finally {", "client.release();"
   ];

@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective [date] · Varasemad versioonid aadressil dezbatere.ro/privacy/versions · Vastutav töötleja: DebateAIRO S.R.L., Bukarest**
 
-**In short.** Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie andmete võtmed ja teie avaldatud väitlused eemaldatakse. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota.
+**In short.** Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie privaatsete andmete võtmed; kustutamist ajastades valite, kas ka teie avaldatud väitlused eemaldatakse või jäävad teie kasutuselt kõrvaldatud pseudonüümi all avalikuks. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota.
 
 ## 1. Kes vastutab teie andmete eest
 
@@ -101,7 +101,7 @@ Väitlused on privaatsed, kuni te need avaldate. Avaldamine on teadlik ja eraldi
 
 Avaldamise tühistamisel eemaldatakse väitlus Dialectical Engine-st ja hävitatakse meie avaliku koopia võti. Lugejate, otsingumootorite või arhiivide juba tehtud koopiad ei ole meie kontrolli all ning me ei saa neid tagasi võtta.
 
-Kui kustutate konto, eemaldame kõik teie avaldatud väitlused avalikust vaatest põhjendamatu viivituseta ja hiljemalt 30 päeva jooksul, välja arvatud juhul, kui seadus nõuab konkreetse üksuse säilitamist. [Option B — a product change; see the Terms, section 9.]
+Kui kavandate oma konto kustutamise, valite, mis saab teie avaldatud väitlustest. Kui märgite „Kustuta ka minu avalikud väitlused“, eemaldame need kõik avalikust juurdepääsust ja hävitame kustutamise ajal oma avaliku koopia võtme, välja arvatud juhul, kui seadus nõuab konkreetse kirje säilitamist. Kui jätate ruudu märkimata, jäävad väitlused avalikuks kasutuselt kõrvaldatud pseudonüümi all.
 
 ## 7. Kui kaua me andmeid säilitame
 
@@ -117,14 +117,14 @@ Kui kustutate konto, eemaldame kõik teie avaldatud väitlused avalikust vaatest
 | Sisselogimise ja taastamise riskisignaalid | 90 päeva, mida jõustab andmebaas | Kõrvaldatakse |
 | Turbeauditilogi | Teenuse kogu kasutusaja jooksul | Ainult lisatav; IP-aadress ja user-agent on ühesuunalised sõnumilühendid ning neid ei saa tagasi lugeda |
 | Väitluse sisu (privaatne) | Konto olemasolu ajal | Sulgemisel hävitatakse võtmed, mistõttu sisu muutub loetamatuks |
-| Väitluse sisu (avaldatud) | Avaldamise ja konto olemasolu ajal | Avaldamise tühistamisel või sulgemisel eemaldatakse avalikust vaatest; võtmed hävitatakse |
+| Väitluse sisu (avaldatud) | Avaldamise ajal; kui sulgete konto ja jätate valiku „Kustuta ka minu avalikud väitlused“ märkimata, jääb avaldatud väitlus teie kasutuselt kõrvaldatud pseudonüümi all avalikuks | Eemaldatakse avalikust vaatest ja selle võti hävitatakse, kui tühistate avaldamise või konto sulgemisel, kui märkisite valiku „Kustuta ka minu avalikud väitlused“ |
 | Pakkuja tagastatud kirjed ja otsinguviited | Sama kaua kui väitlus, mille juurde need kuuluvad | Sama |
 | Kasutajatoe vestlused ja juhtumid | [Until closed plus 12 months] | Võtmed hävitatakse |
 | Nõustumise ja nõusoleku kirjed | Konto kasutusaeg ja 6 aastat — pikim meile kohalduv aegumistähtaeg | Kustutatakse |
 | Makseandmed [pending] | 10 aastat, nagu nõuab Rumeenia raamatupidamisõigus | Kustutatakse |
 | Varukoopiad [pending] | [… days] pärast aktiivse koopia kustutamist | Kirjutatakse üle |
 
-**Mida kustutamine tegelikult teeb.** Teie väitlused ja kontoandmed on krüpteeritud teie kontole ja igale väitlusele omaste võtmetega. Konto kustutamisel hävitatakse need võtmed, mille järel ei saa meie ega keegi teine krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Nimetame seda kustutamiseks, sest selline on selle toime, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab kolme asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnevast ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; ja juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine.
+**Mida kustutamine tegelikult teeb.** Teie privaatsed väitlused ja kontoandmed on krüpteeritud teie kontole ja igale väitlusele omaste võtmetega. Konto kustutamisel hävitatakse need võtmed, mille järel ei saa meie ega keegi teine krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Avaldatud väitluse avaliku koopia võti hävitatakse konto kustutamisel ainult siis, kui märkisite valiku „Kustuta ka minu avalikud väitlused“ (jaotis 6). Nimetame seda kustutamiseks, sest selline on selle toime, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab kolme asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnevast ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; ja juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]
 

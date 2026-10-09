@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective [date] · Prejšnje različice na dezbatere.ro/privacy/versions · Upravljavec: DebateAIRO S.R.L., Bukarešta**
 
-**In short.** Zbiramo podatke, ki jih potrebuje račun, in to, kar se odločite vnesti. Vaša vprašanja se pošljejo ponudnikom umetne inteligence, navedenim v našem Registru; ne uporabljajo se za učenje modelov. Razprave so zasebne, razen če jih objavite. Z izbrisom računa se uničijo ključi do vaših podatkov in umaknejo vaše objavljene razprave. Dosegljivi smo na privacy@dezbatere.ro, osebe, navedene v razpravi, pa lahko zahtevajo odstranitev brez računa.
+**In short.** Zbiramo podatke, ki jih potrebuje račun, in to, kar se odločite vnesti. Vaša vprašanja se pošljejo ponudnikom umetne inteligence, navedenim v našem Registru; ne uporabljajo se za učenje modelov. Razprave so zasebne, razen če jih objavite. Z izbrisom računa se uničijo ključi vaših zasebnih podatkov; ob načrtovanju izbrisa izberete, ali bodo odstranjene tudi objavljene razprave ali bodo ostale javne pod vašim umaknjenim psevdonimom. Dosegljivi smo na privacy@dezbatere.ro, osebe, navedene v razpravi, pa lahko zahtevajo odstranitev brez računa.
 
 ## 1. Kdo je odgovoren za vaše podatke
 
@@ -101,7 +101,7 @@ Razprave so zasebne, dokler jih ne objavite. Objava je namerno in ločeno potrje
 
 Umik objave odstrani razpravo iz storitve Dialectical Engine in uniči ključ do naše javne kopije. Kopije, ki so jih že naredili bralci, iskalniki ali arhivi, niso pod našim nadzorom in jih ne moremo priklicati.
 
-Ko izbrišete račun, brez nepotrebnega odlašanja in najpozneje v 30 dneh iz javnega dostopa odstranimo vse razprave, ki ste jih objavili, razen če nam zakon nalaga hrambo posamezne postavke. [Option B — a product change; see the Terms, section 9.]
+Ko načrtujete izbris računa, izberete, kaj se zgodi z razpravami, ki ste jih objavili. Če označite »Izbriši tudi moje javne razprave«, ob izbrisu vsako odstranimo iz javnega dostopa in uničimo ključ do naše javne kopije, razen če zakon zahteva, da ohranimo določeno vsebino. Če polja ne označite, razprave ostanejo javne pod umaknjenim psevdonimom.
 
 ## 7. Kako dolgo hranimo podatke
 
@@ -117,14 +117,14 @@ Ko izbrišete račun, brez nepotrebnega odlašanja in najpozneje v 30 dneh iz ja
 | Naslov IP za lokalno določitev države ob registraciji in začetku nove razprave | Samo med obdelavo zahtevka | Za to preverjanje ga ne hranimo v berljivi obliki; zavrnitev zabeležimo le združeno in z zgoščeno vrednostjo, opisano spodaj |
 | Združeni revizijski zapisi zavrnitev glede na državo IP | Za celotno življenjsko dobo storitve | Zapis vsebuje kodo zavrnitve, državo, oznako naslova IP kot dokaza ter enosmerni zgoščeni vrednosti naslova IP in niza user-agent s ključem; v revizijsko sled je mogoče le dodajati. |
 | Vsebina razprave (zasebna) | Dokler račun obstaja | Ob zaprtju se ključi uničijo, zato vsebine ni mogoče prebrati |
-| Vsebina razprave (objavljena) | Dokler je objavljena in račun obstaja | Ob umiku objave ali zaprtju se odstrani iz javnega dostopa; ključi se uničijo |
+| Vsebina razprave (objavljena) | Dokler je objavljena; če zaprete račun in možnosti »Izbriši tudi moje javne razprave« ne označite, objavljena razprava ostane javna pod vašim umaknjenim psevdonimom | Odstrani se iz javnega dostopa in njen ključ se uniči, ko umaknete objavo, ali ob zaprtju, če ste označili »Izbriši tudi moje javne razprave« |
 | Evidence odgovorov ponudnikov in sklici za pridobivanje | Enako kot razprava, ki ji pripadajo | Enako |
 | Pogovori in primeri podpore | [Until closed plus 12 months] | Ključi se uničijo |
 | Evidence sprejetja in privolitev | Življenjska doba računa in še 6 let — najdaljši zastaralni rok, ki velja za nas | Izbrišejo se |
 | Evidence plačil [pending] | 10 let, kot zahteva romunska računovodska zakonodaja | Izbrišejo se |
 | Varnostne kopije [pending] | [… days] po izbrisu žive kopije | Prepišejo se |
 
-**Kaj izbris dejansko naredi.** Vaše razprave in podatki računa so šifrirani s ključi, posebnimi za vaš račun in posamezno razpravo. Izbris računa uniči te ključe, zato šifriranih zapisov ne moremo več prebrati ne mi ne kdo drug, zapis vašega računa pa izbrišemo. To opisujemo kot izbris, ker je tak njegov učinek, in imamo dokumentirano oceno, ki to podpira; če želite izvedeti več, vprašajte. Vedeti morate tri stvari: varnostna revizijska sled omogoča samo dodajanje in se ne izbriše, vendar ne vsebuje vaših berljivih identifikatorjev; majhno število starejših razprav je nastalo pred našo sedanjo shemo šifriranja in če to velja za vaš račun, vam pojasnimo učinek zaprtja; kopije podatkov, ki so že bile poslane ponudniku umetne inteligence, pa urejajo pogoji hrambe tega ponudnika v Registru, ne naš izbris.
+**Kaj izbris dejansko naredi.** Vaše zasebne razprave in podatki računa so šifrirani s ključi, posebnimi za vaš račun in posamezno razpravo. Izbris računa uniči te ključe, zato šifriranih zapisov ne moremo več prebrati ne mi ne kdo drug, zapis vašega računa pa izbrišemo. Ključ javne kopije objavljene razprave se ob izbrisu uniči samo, če ste označili »Izbriši tudi moje javne razprave« (razdelek 6). To opisujemo kot izbris, ker je tak njegov učinek, in imamo dokumentirano oceno, ki to podpira; če želite izvedeti več, vprašajte. Vedeti morate tri stvari: varnostna revizijska sled omogoča samo dodajanje in se ne izbriše, vendar ne vsebuje vaših berljivih identifikatorjev; majhno število starejših razprav je nastalo pred našo sedanjo shemo šifriranja in če to velja za vaš račun, vam pojasnimo učinek zaprtja; kopije podatkov, ki so že bile poslane ponudniku umetne inteligence, pa urejajo pogoji hrambe tega ponudnika v Registru, ne naš izbris.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
 

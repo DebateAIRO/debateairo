@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective \[date\] · Aiemmat versiot osoitteessa dezbatere.ro/privacy/versions · Rekisterinpitäjä: DebateAIRO S.R.L., Bukarest**
 
-**In short.** Keräämme tilin toimintaan tarvittavat tiedot sekä sen, mitä itse päätät kirjoittaa. Kysymyksesi lähetetään Rekisterissämme luetelluille tekoälypalveluntarjoajille; niitä ei käytetä mallien kouluttamiseen. Väittelyt ovat yksityisiä, ellet julkaise niitä. Tilisi poistaminen tuhoaa tietojesi avaimet ja poistaa julkaistut väittelysi näkyvistä. Voit ottaa meihin yhteyttä osoitteessa privacy@dezbatere.ro, ja väittelyssä nimetyt henkilöt voivat pyytää sisällön poistamista ilman tiliä.
+**In short.** Keräämme tilin toimintaan tarvittavat tiedot sekä sen, mitä itse päätät kirjoittaa. Kysymyksesi lähetetään Rekisterissämme luetelluille tekoälypalveluntarjoajille; niitä ei käytetä mallien kouluttamiseen. Väittelyt ovat yksityisiä, ellet julkaise niitä. Tilisi poistaminen tuhoaa yksityisten tietojesi avaimet; kun ajastat poiston, valitset, poistetaanko myös julkaistut väittelysi näkyvistä vai pysyvätkö ne julkisina käytöstä poistetulla salanimelläsi. Voit ottaa meihin yhteyttä osoitteessa privacy@dezbatere.ro, ja väittelyssä nimetyt henkilöt voivat pyytää sisällön poistamista ilman tiliä.
 
 ## 1. Kuka vastaa tiedoistasi
 
@@ -101,7 +101,7 @@ Väittelyt ovat yksityisiä, kunnes julkaiset ne. Julkaiseminen on tietoinen, er
 
 Julkaisun peruuttaminen poistaa väittelyn Dialectical Engine-palvelusta ja tuhoaa julkisen kopiomme avaimen. Lukijoiden, hakukoneiden tai arkistojen jo tekemät kopiot eivät ole hallinnassamme, emmekä voi kutsua niitä takaisin.
 
-Kun poistat tilisi, poistamme kaikki julkaisemasi väittelyt julkisesta käytöstä ilman aiheetonta viivytystä ja viimeistään 30 päivän kuluessa, ellei laki velvoita meitä säilyttämään tiettyä kohdetta. \[Option B — a product change; see the Terms, section 9.\]
+Kun ajoitat tilisi poistamisen, valitset, mitä julkaisemillesi väittelyille tapahtuu. Jos valitset "Poista myös julkiset väittelyni", poistamme jokaisen julkisesta saatavuudesta ja tuhoamme julkisen kopiomme avaimen poistamisen yhteydessä, ellei laki edellytä tietyn kohteen säilyttämistä. Jos jätät valintaruudun valitsematta, väittelyt pysyvät julkisina käytöstä poistetulla salanimellä.
 
 ## 7. Kuinka kauan säilytämme tietoja
 
@@ -117,14 +117,14 @@ Kun poistat tilisi, poistamme kaikki julkaisemasi väittelyt julkisesta käytös
 | Kirjautumisen ja palautuksen riskisignaalit | 90 päivää, tietokannan teknisesti valvomana | Hävitetään |
 | Turvallisuuden kirjausketju | Palvelun koko elinkaaren ajan | Vain lisäyksiä salliva; IP-osoite ja user-agent ovat yksisuuntaisia tiivisteitä, eikä niitä voi lukea takaisin |
 | Väittelyn sisältö (yksityinen) | Niin kauan kuin tili on olemassa | Avaimet tuhotaan tilin sulkemisen yhteydessä, jolloin sisältöä ei voi lukea |
-| Väittelyn sisältö (julkaistu) | Niin kauan kuin se on julkaistu ja tili on olemassa | Poistetaan julkisesta käytöstä julkaisun peruuttamisen tai tilin sulkemisen yhteydessä; avaimet tuhotaan |
+| Väittelyn sisältö (julkaistu) | Julkaisemisen ajan; jos suljet tilisi ja jätät kohdan "Poista myös julkiset väittelyni" valitsematta, julkaistu väittely pysyy julkisena käytöstä poistetulla salanimelläsi | Poistetaan julkisesta käytöstä ja sen avain tuhotaan, kun peruutat julkaisun, tai tilin sulkemisen yhteydessä, jos valitsit kohdan "Poista myös julkiset väittelyni" |
 | Palveluntarjoajan vastaustiedot ja hakuviitteet | Yhtä kauan kuin väittely, johon ne kuuluvat | Sama |
 | Tukikeskustelut ja -tapaukset | \[Until closed plus 12 months\] | Avaimet tuhotaan |
 | Hyväksyntä- ja suostumustiedot | Tilin elinkaari sekä 6 vuotta — pisin meihin sovellettava vanhentumisaika | Poistetaan |
 | Maksutiedot \[pending\] | 10 vuotta Romanian kirjanpitolainsäädännön edellyttämällä tavalla | Poistetaan |
 | Varmuuskopiot \[pending\] | \[… days\] aktiivisen kopion poistamisen jälkeen | Korvataan uusilla tiedoilla |
 
-**Mitä poistaminen tosiasiassa tekee.** Väittelysi ja tilitietosi salataan tilillesi ja kullekin väittelylle ominaisilla avaimilla. Tilisi poistaminen tuhoaa nämä avaimet, minkä jälkeen me tai kukaan muukaan ei voi lukea salattuja tietueita, ja poistamme tilitietueesi. Kutsumme tätä poistamiseksi, koska sen vaikutus on tämä, ja meillä on sen tueksi dokumentoitu arviointi; jos haluat lisätietoja, kysy meiltä. Kolme huomioitavaa asiaa: turvallisuuden kirjausketju on vain lisäyksiä salliva eikä sitä poisteta, mutta se ei sisällä luettavia tunnistetietojasi; pieni määrä vanhempia väittelyjä edeltää nykyistä salausjärjestelmäämme, ja jos tämä koskee tiliäsi, kerromme, mitä tilin sulkeminen niiden osalta saa aikaan; ja tekoälypalveluntarjoajalle jo lähetettyihin tietokopioihin sovelletaan kyseisen palveluntarjoajan Rekisterissä ilmoitettuja säilytysehtoja, ei meidän tekemäämme poistamista.
+**Mitä poistaminen tosiasiassa tekee.** Yksityiset väittelysi ja tilitietosi salataan tilillesi ja kullekin väittelylle ominaisilla avaimilla. Tilisi poistaminen tuhoaa nämä avaimet, minkä jälkeen me tai kukaan muukaan ei voi lukea salattuja tietueita, ja poistamme tilitietueesi. Julkaistun väittelyn julkisen kopion avain tuhotaan tilin poiston yhteydessä vain, jos valitsit kohdan "Poista myös julkiset väittelyni" (kohta 6). Kutsumme tätä poistamiseksi, koska sen vaikutus on tämä, ja meillä on sen tueksi dokumentoitu arviointi; jos haluat lisätietoja, kysy meiltä. Kolme huomioitavaa asiaa: turvallisuuden kirjausketju on vain lisäyksiä salliva eikä sitä poisteta, mutta se ei sisällä luettavia tunnistetietojasi; pieni määrä vanhempia väittelyjä edeltää nykyistä salausjärjestelmäämme, ja jos tämä koskee tiliäsi, kerromme, mitä tilin sulkeminen niiden osalta saa aikaan; ja tekoälypalveluntarjoajalle jo lähetettyihin tietokopioihin sovelletaan kyseisen palveluntarjoajan Rekisterissä ilmoitettuja säilytysehtoja, ei meidän tekemäämme poistamista.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
 

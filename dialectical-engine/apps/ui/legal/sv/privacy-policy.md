@@ -21,7 +21,7 @@ jumps:
 
 **Version 3.2 · Effective [date] · Tidigare versioner på dezbatere.ro/privacy/versions · Personuppgiftsansvarig: DebateAIRO S.R.L., Bukarest**
 
-**In short.** Vi samlar in det som behövs för ett konto och det du väljer att skriva. Dina frågor skickas till de AI-leverantörer som anges i vårt register; de används inte för att träna modeller. Debatter är privata om du inte publicerar dem. När du raderar ditt konto förstörs nycklarna till dina uppgifter och dina publicerade debatter tas bort. Du kan nå oss på privacy@dezbatere.ro, och personer som nämns i en debatt kan begära borttagning utan att ha ett konto.
+**In short.** Vi samlar in det som behövs för ett konto och det du väljer att skriva. Dina frågor skickas till de AI-leverantörer som anges i vårt register; de används inte för att träna modeller. Debatter är privata om du inte publicerar dem. När du raderar ditt konto förstörs nycklarna till dina privata uppgifter; när du schemalägger raderingen väljer du om dina publicerade debatter också ska tas bort eller förbli offentliga under din avvecklade pseudonym. Du kan nå oss på privacy@dezbatere.ro, och personer som nämns i en debatt kan begära borttagning utan att ha ett konto.
 
 ## 1. Vem ansvarar för dina uppgifter
 
@@ -101,7 +101,7 @@ Debatter är privata tills du publicerar dem. Publicering är en avsiktlig åtg�
 
 När publiceringen återkallas tas debatten bort från Dialectical Engine och nyckeln till vår offentliga kopia förstörs. Kopior som redan har gjorts av läsare, sökmotorer eller arkiv ligger utanför vår kontroll och kan inte återkallas av oss.
 
-När du raderar ditt konto tar vi bort alla debatter som du har publicerat från allmän åtkomst utan onödigt dröjsmål och senast inom 30 dagar, såvida inte lagen kräver att vi behåller en viss post. [Option B — a product change; see the Terms, section 9.]
+När du schemalägger att ditt konto ska raderas väljer du vad som händer med debatterna du har publicerat. Om du markerar ”Radera även mina offentliga debatter” tar vi bort var och en från offentlig åtkomst och förstör nyckeln till vår offentliga kopia när raderingen genomförs, om inte lagen kräver att vi behåller ett visst objekt. Om du lämnar rutan omarkerad förblir debatterna offentliga under din avvecklade pseudonym.
 
 ## 7. Hur länge vi behåller uppgifter
 
@@ -117,14 +117,14 @@ När du raderar ditt konto tar vi bort alla debatter som du har publicerat från
 | IP-adress som används för lokal landskontroll vid registrering och inför en ny debatt | Endast medan begäran behandlas | Adressen sparas inte i läsbar form för denna kontroll; avslag registreras bara aggregerat och som hashvärdet nedan |
 | Aggregerade granskningsposter om avslag utifrån IP-land | Under tjänstens livstid | Posten innehåller avslagskod, land, uppgift om att IP-adressen var underlag samt nyckelbaserade envägs-hashvärden för IP-adressen och webbläsarens user-agent; loggen är endast tilläggsbar. |
 | Debattinnehåll (privat) | Medan kontot finns | Nycklar förstörs när kontot avslutas, vilket gör innehållet oläsbart |
-| Debattinnehåll (publicerat) | Medan det är publicerat och kontot finns | Tas bort från allmän åtkomst när publiceringen återkallas eller kontot avslutas; nycklar förstörs |
+| Debattinnehåll (publicerat) | Medan det är publicerat; om du avslutar kontot och lämnar ”Radera även mina offentliga debatter” omarkerat, förblir en publicerad debatt offentlig under din avvecklade pseudonym | Tas bort från allmän åtkomst och dess nyckel förstörs när du återkallar publiceringen, eller vid avslut om du har markerat ”Radera även mina offentliga debatter” |
 | Uppgifter om leverantörssvar och sökreferenser | Lika länge som den debatt de tillhör | Samma |
 | Supportsamtal och ärenden | [Until closed plus 12 months] | Nycklar förstörs |
 | Uppgifter om godkännanden och samtycken | Kontots livstid plus 6 år — den längsta preskriptionstid som gäller för oss | Raderas |
 | Betalningsuppgifter [pending] | 10 år, i enlighet med rumänsk bokföringslagstiftning | Raderas |
 | Säkerhetskopior [pending] | [… days] efter att den aktiva kopian har raderats | Skrivs över |
 
-**Vad radering faktiskt innebär.** Dina debatter och kontouppgifter är krypterade med nycklar som är specifika för ditt konto och för varje debatt. När du raderar ditt konto förstörs dessa nycklar, varefter de krypterade posterna inte kan läsas av oss eller någon annan, och vi raderar din kontopost. Vi beskriver detta som radering eftersom det är den faktiska effekten, och vi har en dokumenterad bedömning som styrker detta; fråga oss om du vill veta mer. Du bör känna till tre saker: säkerhetsloggen kan endast utökas och raderas inte, men innehåller inga läsbara identifierare för dig; ett litet antal äldre debatter skapades före vårt nuvarande krypteringssystem, och om detta gäller ditt konto förklarar vi vad ett avslutande innebär för dem; och kopior av uppgifter som redan har skickats till en AI-leverantör omfattas av den leverantörens lagringsvillkor i registret, inte av vår radering.
+**Vad radering faktiskt innebär.** Dina privata debatter och kontouppgifter är krypterade med nycklar som är specifika för ditt konto och för varje debatt. När du raderar ditt konto förstörs dessa nycklar, varefter de krypterade posterna inte kan läsas av oss eller någon annan, och vi raderar din kontopost. Nyckeln till en publicerad debatts offentliga kopia förstörs vid radering endast om du har markerat ”Radera även mina offentliga debatter” (avsnitt 6). Vi beskriver detta som radering eftersom det är den faktiska effekten, och vi har en dokumenterad bedömning som styrker detta; fråga oss om du vill veta mer. Du bör känna till tre saker: säkerhetsloggen kan endast utökas och raderas inte, men innehåller inga läsbara identifierare för dig; ett litet antal äldre debatter skapades före vårt nuvarande krypteringssystem, och om detta gäller ditt konto förklarar vi vad ett avslutande innebär för dem; och kopior av uppgifter som redan har skickats till en AI-leverantör omfattas av den leverantörens lagringsvillkor i registret, inte av vår radering.
 
 &#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
 
