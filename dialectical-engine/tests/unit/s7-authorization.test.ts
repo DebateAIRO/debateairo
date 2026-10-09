@@ -145,7 +145,30 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
   // P13: first-party pages only, like the support mutations (DL1-F7), and never a session.
   { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },
-  { route: "POST /v1/billing/cancel-by-token", auth: "public", origin: "trusted", resource: "billing", action: "cancel-by-token" }
+  { route: "POST /v1/billing/cancel-by-token", auth: "public", origin: "trusted", resource: "billing", action: "cancel-by-token" },
+  // Staff/admin routes (apps/api/src/staff/routes.ts), pinned row for row: auth kind, the exact staff capability each one
+  // demands, resource and action. Restored after 25369039b filtered every /v1/admin/* row out of this exact comparison.
+  { route: "GET /v1/admin/enrollment", auth: "user", resource: "staff-self", action: "enrollment" },
+  { route: "POST /v1/admin/prerequisites/step-up", auth: "user", resource: "staff-self", action: "prerequisite" },
+  { route: "POST /v1/admin/webauthn/registration/options", auth: "user", resource: "staff-self", action: "registration-options" },
+  { route: "POST /v1/admin/webauthn/registration/verify", auth: "user", resource: "staff-self", action: "registration-verify" },
+  { route: "POST /v1/admin/webauthn/elevation/options", auth: "user", resource: "staff-self", action: "elevation-options" },
+  { route: "POST /v1/admin/webauthn/elevation/verify", auth: "user", resource: "staff-self", action: "elevation-verify" },
+  { route: "POST /v1/admin/webauthn/action/options", auth: "staff", resource: "staff-self", action: "action-options" },
+  { route: "POST /v1/admin/webauthn/action/verify", auth: "staff", resource: "staff-self", action: "action-verify" },
+  { route: "GET /v1/admin/team", auth: "staff", staffCapability: "TEAM_READ", resource: "staff-team", action: "list" },
+  { route: "POST /v1/admin/team/invitations", auth: "staff", staffCapability: "TEAM_INVITE", resource: "staff-team", action: "invite" },
+  { route: "POST /v1/admin/team/invitations/accept/options", auth: "user", resource: "staff-invitation", action: "accept-options" },
+  { route: "POST /v1/admin/team/invitations/accept/verify", auth: "user", resource: "staff-invitation", action: "accept-verify" },
+  { route: "POST /v1/admin/team/invitations/accept", auth: "user", resource: "staff-invitation", action: "accept" },
+  { route: "POST /v1/admin/owner-possession/options", auth: "user", resource: "owner-possession", action: "options" },
+  { route: "POST /v1/admin/owner-possession/verify", auth: "user", resource: "owner-possession", action: "verify" },
+  { route: "PATCH /v1/admin/team/{staffId}/grants", auth: "staff", staffCapability: "TEAM_GRANT", resource: "staff-team", action: "grant" },
+  // No static capability: the handler selects TEAM_DISABLE or EMERGENCY_DISABLE from the strict mode.
+  { route: "POST /v1/admin/team/{staffId}/disable", auth: "staff", resource: "staff-team", action: "disable" },
+  { route: "GET /v1/admin/audit", auth: "staff", staffCapability: "AUDIT_READ", resource: "staff-audit", action: "list" },
+  { route: "POST /v1/admin/internal-allowances", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-self", action: "allowance-configure" },
+  { route: "DELETE /v1/admin/internal-allowances/{grantId}", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-self", action: "allowance-revoke" },
 ] as const);
 
 const validAskPayload = () => ({
@@ -275,9 +298,11 @@ describe("S7 deny-by-default authorization", () => {
       expect(api.hasRoute({method: method as "GET" | "POST" | "PATCH" | "DELETE", url: path!.replace(/\{([^}]+)\}/g, ":$1")}), route).toBe(true);
     }
     await api.close();
-    const ordinary=authorizationPolicyInventory.filter(policy => !policy.route.startsWith("GET /v1/admin/") && !policy.route.startsWith("POST /v1/admin/") && !policy.route.startsWith("PATCH /v1/admin/") && policy.route !== "DELETE /v1/admin/internal-allowances/{grantId}");
+    // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
     const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
-    expect([...ordinary].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
+    expect([...authorizationPolicyInventory].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
+    // 18 staff contract routes + the two internal-allowance routes.
+    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(20);
     expect(staffContractInventory.routes).toHaveLength(18);
     // The merged closed inventory adds the nineteen external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
@@ -299,11 +324,13 @@ describe("S7 deny-by-default authorization", () => {
       sessions: {} as never,
       evaluatorDevMenu: {} as never,
       evaluatorDevMenuRegisterVersion: 1,
-      support: {} as never
+      support: {} as never,
+      // Mount the staff routes too, so every /v1/admin/* row is checked for anonymous refusal below.
+      staffPolicyVersion: 2
     });
     for (const policy of EXPECTED_AUTHORIZATION_MATRIX) {
       const [method, template] = policy.route.split(" ") as [string, string];
-      const httpMethod = method as "GET" | "POST" | "DELETE";
+      const httpMethod = method as "GET" | "POST" | "PATCH" | "DELETE";
       const registeredUrl = template.replace(/\{([^}]+)\}/g, ":$1");
       expect(api.hasRoute({ method: httpMethod, url: registeredUrl }), policy.route).toBe(true);
       if (policy.auth === "public") continue;
@@ -311,6 +338,8 @@ describe("S7 deny-by-default authorization", () => {
         .replace("{nodeId}", NODE_ID)
         .replace("{gapRef}", "gap:test")
         .replace("{chargeRef}", "0".repeat(32))
+        .replace("{staffId}", "44444444-4444-4444-8444-444444444444")
+        .replace("{grantId}", "55555555-5555-4555-8555-555555555555")
         .replace("{id}", policy.route.includes("/runs/") ? OWNED_RUN_ID : ANSWER_ID);
       const response = await api.inject({ method: httpMethod, url: requestUrl });
       expect(response.statusCode, policy.route).toBe(401);

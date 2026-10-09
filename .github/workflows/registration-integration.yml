@@ -1,0 +1,52 @@
+# .github/workflows/registration-integration.yml
+# The sign-up / verification-mail suite (tests/ci-integration-registration.txt =
+# tests/integration/registration-database.test.ts) takes about 34 minutes on its own: its timing-equivalence statistics
+# and memory tripwires dominate. Running it on every pull request would cost that much runner time on changes that
+# cannot touch it, so it lives in its own workflow (moved out of security.yml on 2026-10-09) and runs:
+#   - on a pull request into dev or main ONLY when a path that can change its outcome changes (the list below);
+#   - every night at 03:30 UTC against dev, which catches anything the path list misses (the suite also loads the
+#     whole API through apps/api/src/index.ts, so no path list can be complete);
+#   - by hand (workflow_dispatch), on any branch.
+# Same Node/pnpm setup, same recorded known-red gate (tools/ci-known-red.mjs, tests/ci-known-red.txt) and the same
+# host-sensitive list (tests/ci-flaky.txt) as the jobs in security.yml. It is NOT a required check: a path-filtered
+# workflow does not run on most pull requests, and a required check that never reports blocks the merge.
+name: registration-integration
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "dialectical-engine/migrations/**"
+      - "dialectical-engine/packages/db/**"
+      - "dialectical-engine/apps/api/src/registration*"
+      - "dialectical-engine/apps/api/src/verification-email.ts"
+      - "dialectical-engine/apps/api/src/sessions.ts"
+      - "dialectical-engine/apps/api/src/turnstile.ts"
+      - "dialectical-engine/tests/integration/registration-database.test.ts"
+      - "dialectical-engine/tests/support/**"
+      - "dialectical-engine/tests/ci-integration-registration.txt"
+      - "dialectical-engine/tests/ci-flaky.txt"
+      - "dialectical-engine/tools/ci-known-red.mjs"
+      - ".github/workflows/registration-integration.yml"
+  schedule: [{ cron: "30 3 * * *" }]
+  workflow_dispatch:
+permissions: { contents: read }
+# L6-F7 (B24e): every action is pinned to a full commit SHA; the trailing comment is the release tag (same pins as
+# security.yml; Dependabot keeps both current).
+concurrency: { group: "registration-integration-${{ github.ref }}", cancel-in-progress: true }
+jobs:
+  registration-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults: { run: { working-directory: dialectical-engine } }
+    steps:
+      # The nightly run checks out dev by name (dev is also the default branch, which a schedule otherwise uses);
+      # a pull request or a manual run checks out its own ref (an empty ref is checkout's default).
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with: { ref: "${{ github.event_name == 'schedule' && 'dev' || '' }}" }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with: { version: 11.20.0 }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 26.8.2, cache: pnpm, cache-dependency-path: dialectical-engine/pnpm-lock.yaml }
+      - run: node tools/source-map-hotfix.mjs install # pnpm install --frozen-lockfile
+      - run: node tools/source-map-hotfix.mjs generate # pnpm run generate:contract
+      - run: node tools/source-map-hotfix.mjs registration # pnpm run test:ci-integration-registration
