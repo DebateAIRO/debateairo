@@ -2123,6 +2123,12 @@ describe("open sign-up mail: the daily budget at sign-up and resend (G2)", () =>
       expect(harness.counters.mailReservation).toBe(0);
       expect(harness.counters.tokenMint).toBe(0);
     } finally { harness.restore(); }
+    // No oracle: an address with a pending account answers exactly like one without.
+    const known = rework7Harness({ outboundMail: budget(false), existingAddress: true });
+    try {
+      await expect(known.resend(0)).rejects.toMatchObject({ code: "MAIL_DAILY_LIMIT" });
+      expect(known.counters.mailReservation).toBe(0);
+    } finally { harness.restore(); }
   });
   it("with room left, sign-up and resend go on as before", async () => {
     const harness = rework7Harness({ outboundMail: budget(true) });

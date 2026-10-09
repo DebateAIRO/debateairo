@@ -116,7 +116,8 @@ export class OutboundMailGate implements OutboundMailAuthorizer {
   }>) {
     const { policy } = dependencies;
     if (!Number.isInteger(policy.dailyCap) || policy.dailyCap < 1
-      || !Number.isInteger(policy.reservedForSecurityPct) || policy.reservedForSecurityPct < 0 || policy.reservedForSecurityPct > 100
+      || !Number.isInteger(policy.reservedForSecurityPct) || policy.reservedForSecurityPct < 0 || policy.reservedForSecurityPct > 90
+      || Math.floor(policy.dailyCap * (100 - policy.reservedForSecurityPct) / 100) < 1
       || !Number.isInteger(policy.alertAtPct) || policy.alertAtPct < 1 || policy.alertAtPct > 100
       || !ArrayBuffer.isView(dependencies.blindIndexKey) || dependencies.blindIndexKey.byteLength < 1
       || typeof dependencies.report !== "function") {
@@ -155,19 +156,25 @@ export class OutboundMailGate implements OutboundMailAuthorizer {
    */
   async hasCapacity(purposeClass: MailPurposeClass): Promise<boolean> {
     const day = this.day();
-    return await this.dependencies.ledger.total(day) < ceilingOf(this.dependencies.policy, purposeClass);
+    const total = await this.dependencies.ledger.total(day);
+    if (total < ceilingOf(this.dependencies.policy, purposeClass)) return true;
+    // At the cap sign-up and resend stop HERE, before any send reaches `authorize`: the owner's alert must too.
+    this.alert(day, purposeClass === "security" ? "OUTBOUND_MAIL_DAILY_CAP_REACHED" : "OUTBOUND_MAIL_STANDARD_CAP_REACHED", total);
+    return false;
   }
 
   async authorize(request: Readonly<{ recipient: string; purpose: MailPurpose }>): Promise<void> {
     const purposeClass = mailPurposeClass(request.purpose);
-    const day = this.day();
-    if (!isMailAddress(request.recipient)) this.refuse(day, "MAIL_INPUT_INVALID", request.purpose, purposeClass);
+    if (!isMailAddress(request.recipient)) this.refuse(this.day(), "MAIL_INPUT_INVALID", request.purpose, purposeClass);
     const index = createEmailBlindIndex(this.dependencies.blindIndexKey, request.recipient);
     try {
-      if (await this.dependencies.suppression.isSuppressed(index)) this.refuse(day, "RECIPIENT_SUPPRESSED", request.purpose, purposeClass);
+      if (await this.dependencies.suppression.isSuppressed(index)) this.refuse(this.day(), "RECIPIENT_SUPPRESSED", request.purpose, purposeClass);
     } finally {
       index.fill(0);
     }
+    // The day is read after the suppression await, right before the count, so a slow lookup across midnight
+    // counts on the day it is actually sent.
+    const day = this.day();
     const { policy } = this.dependencies;
     const reservation = await this.dependencies.ledger.reserve({ day, purposeClass, ceiling: ceilingOf(policy, purposeClass) });
     if (!reservation.admitted) {
@@ -187,7 +194,8 @@ export class InMemoryOutboundMailStore implements OutboundMailLedger, MailSuppre
   private readonly suppressed = new Set<string>();
 
   private today(day: string) {
-    if (this.current.day !== day) this.current = { day, total: 0, byClass: { standard: 0, security: 0 } };
+    // Only a LATER day starts a new count; a late caller still holding yesterday counts on today's.
+    if (day > this.current.day) this.current = { day, total: 0, byClass: { standard: 0, security: 0 } };
     return this.current;
   }
 

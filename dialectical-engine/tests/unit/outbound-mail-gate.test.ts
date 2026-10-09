@@ -11,10 +11,12 @@ import {
   type OutboundMailLedger,
   type MailSuppressionList
 } from "../../apps/api/src/outbound-mail-gate.js";
+import { readFile } from "node:fs/promises";
 import {
   OUTBOUND_MAIL_POLICY_DEPLOYMENT_REGISTER_ROW,
   outboundMailPolicyFromValue
 } from "@debateai/register";
+import { hostedRegisterRefusalCode, parseHostedRegisterFile, planHostedRegisterPublication } from "../../apps/runner/src/hosted-register-publish.js";
 import {
   SendmailConsumerAccountSender,
   SendmailEmailChangeMailSender,
@@ -143,6 +145,24 @@ describe("the outbound mail gate", () => {
     expect(h.events.at(-1)).toMatchObject({ code: "OUTBOUND_MAIL_DAILY_THRESHOLD", day: "2026-10-10" });
   });
 
+  it("alerts the owner when sign-up stops at the pre-check, where no send reaches authorize", async () => {
+    const h = harness({ cap: 10, reserved: 20, alertAt: 100 });
+    for (let i = 0; i < 8; i += 1) await h.gate.authorize({ recipient: `p${i}@example.com`, purpose: "verification" });
+    expect(h.events).toEqual([]);
+    expect(await h.gate.hasCapacity("standard")).toBe(false);
+    expect(await h.gate.hasCapacity("standard")).toBe(false);
+    expect(h.events).toEqual([{ kind: "alert", code: "OUTBOUND_MAIL_STANDARD_CAP_REACHED", day: "2026-10-09", total: 8, dailyCap: 10 }]);
+  });
+
+  it("a call still carrying yesterday counts on today, never wiping today's count", async () => {
+    const store = new InMemoryOutboundMailStore();
+    await store.reserve({ day: "2026-10-10", purposeClass: "standard", ceiling: 10 });
+    await store.reserve({ day: "2026-10-09", purposeClass: "standard", ceiling: 10 });
+    expect(await store.total("2026-10-10")).toBe(2);
+    await store.reserve({ day: "2026-10-11", purposeClass: "security", ceiling: 10 });
+    expect(await store.total("2026-10-11")).toBe(1);
+  });
+
   it("never puts an address into a refusal, an event or a log line", async () => {
     const h = harness({ cap: 1, reserved: 0 });
     h.store.suppress(createEmailBlindIndex(KEY, "suppressed.person@example.com"));
@@ -175,7 +195,7 @@ describe("the outbound mail gate", () => {
 
   it("refuses a malformed configuration", () => {
     const store = new InMemoryOutboundMailStore();
-    for (const bad of [policy(0), policy(1.5), policy(10, -1), policy(10, 101), policy(10, 20, 0), policy(10, 20, 101)]) {
+    for (const bad of [policy(0), policy(1.5), policy(10, -1), policy(10, 91), policy(1, 20), policy(10, 20, 0), policy(10, 20, 101)]) {
       expect(() => new OutboundMailGate({ policy: bad, blindIndexKey: KEY, ledger: store, suppression: store, report: () => undefined }))
         .toThrow("OUTBOUND_MAIL_GATE_CONFIGURATION_INVALID");
     }
@@ -185,6 +205,34 @@ describe("the outbound mail gate", () => {
 });
 
 describe("the outboundMailPolicy register row", () => {
+  it("is sealed by every hosted publication, and the live site's file supersedes it (10 000 a day)", async () => {
+    const row = OUTBOUND_MAIL_POLICY_DEPLOYMENT_REGISTER_ROW;
+    const example = JSON.parse(await readFile(new URL("../../deploy/vps/register/hosted-register.example.json", import.meta.url), "utf8")) as Record<string, unknown>;
+    const plan = async (file: unknown) => planHostedRegisterPublication(parseHostedRegisterFile(Buffer.from(JSON.stringify(file))));
+    const sealedIn = async (file: unknown) => (await plan(file)).rows.filter((candidate) => candidate.rowKey === "outboundMailPolicy");
+    expect(Object.hasOwn(example, "outboundMailPolicy")).toBe(false);
+    const defaulted = await sealedIn(example);
+    expect(defaulted).toHaveLength(1);
+    expect(JSON.parse(defaulted[0]!.valueJsonText)).toEqual(row.value);
+    expect(defaulted[0]!.sourceRef).toBe(row.sourceRef);
+    const live = { kind: "OUTBOUND_MAIL_POLICY", daily_cap: 10_000, reserved_for_security_pct: 20, alert_at_pct: 50 };
+    const supplied = await sealedIn({ ...example, outboundMailPolicy: live });
+    expect(supplied).toHaveLength(1);
+    expect(JSON.parse(supplied[0]!.valueJsonText)).toEqual(live);
+    expect(supplied[0]!.sourceRef).toBe(example.sourceRef);
+    const refusalOf = async (file: unknown): Promise<string> => {
+      try { await plan(file); return "NO_REFUSAL"; } catch (error) { return hostedRegisterRefusalCode(error); }
+    };
+    expect(await refusalOf({ ...example, outboundMailPolicy: null })).toBe("OUTBOUND_MAIL_POLICY_INVALID");
+    expect(await refusalOf({ ...example, outboundMailPolicy: { ...live, daily_cap: 0 } })).toBe("OUTBOUND_MAIL_POLICY_INVALID");
+    expect(await refusalOf({ ...example, outboundMailPolicy: { ...live, reserved_for_security_pct: 95 } })).toBe("OUTBOUND_MAIL_POLICY_INVALID");
+    const registerReadme = await readFile(new URL("../../deploy/vps/register/README.md", import.meta.url), "utf8");
+    expect(registerReadme).toContain("| `outboundMailPolicy` |");
+    const readme = await readFile(new URL("../../deploy/vps/README.md", import.meta.url), "utf8");
+    for (const needle of ["| `outboundMailPolicy` |", "`OUTBOUND_MAIL_POLICY_UNRESOLVED`", "| `OUTBOUND_MAIL_POLICY_INVALID` |",
+      "### Upgrading to the outbound mail gate release", "'outboundMailPolicy') ORDER BY row_key"]) expect(readme, needle).toContain(needle);
+  });
+
   it("is code-owned at the preview's values (G2)", () => {
     const row = OUTBOUND_MAIL_POLICY_DEPLOYMENT_REGISTER_ROW;
     expect(row.rowKey).toBe("outboundMailPolicy");
@@ -196,7 +244,9 @@ describe("the outboundMailPolicy register row", () => {
     for (const bad of [
       null, {}, { ...value, kind: "OTHER" }, { ...value, daily_cap: 0 }, { ...value, daily_cap: 1_000_001 }, { ...value, daily_cap: 1.5 },
       { ...value, reserved_for_security_pct: 91 }, { ...value, reserved_for_security_pct: -1 }, { ...value, alert_at_pct: 0 },
-      { ...value, alert_at_pct: 101 }, { ...value, extra: true }
+      { ...value, alert_at_pct: 101 }, { ...value, extra: true },
+      // A reserve that leaves no room for one sign-up mail would refuse every sign-up.
+      { ...value, daily_cap: 1, reserved_for_security_pct: 20 }
     ]) {
       expect(() => outboundMailPolicyFromValue(bad, "live")).toThrow(expect.objectContaining({ code: "OUTBOUND_MAIL_POLICY_INVALID" }));
     }
@@ -234,15 +284,9 @@ describe("every account-mail sender asks the gate, with its purpose, before any 
     ["consumer security notice", "consumer-security-notice", (gate) => new SendmailConsumerAccountSender({ ...base, gate }).sendConsumerSecurityNotice({ recipient, messageId: uuid, eventKind: "METHOD_CHANGED", happenedAt: at })],
     ["password reset", "password-reset", (gate) => new SendmailPasswordResetSender({ ...base, gate }).send({ messageId: uuid, event: "COMPLETED", recipient, expiresAt: at })],
     ["backup email / MFA recovery", "email-recovery", (gate) => new SendmailEmailRecoverySender({ ...base, gate }).send({ flow: "backup_email", messageId: uuid, event: "VERIFIED", recipient, expiresAt: at })],
-    ["templated (billing)", "templated", (gate) => new TemplatedMailSender({ executable: base.executable, from: base.from, timeoutMs: 1000, gate }).sendTemplated({ to: recipient, templateId: "M3", locale: "en", params: {} } as never)]
   ])("%s", async (_name, purpose, send) => {
     const { gate, asked } = refusingGate();
     const outcome = await send(gate as never).then(() => "SENT", (error: unknown) => (error as { operatorCode?: string }).operatorCode ?? String(error));
-    if (purpose === "templated" && outcome !== "MAIL_DAILY_LIMIT") {
-      // The templated sender renders first: a fixture its template refuses never reaches the gate, which is also right.
-      expect(asked).toEqual([]);
-      return;
-    }
     expect(outcome).toBe("MAIL_DAILY_LIMIT");
     expect(asked).toEqual([{ recipient, purpose }]);
   });

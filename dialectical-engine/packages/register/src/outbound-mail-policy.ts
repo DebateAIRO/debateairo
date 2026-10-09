@@ -26,7 +26,10 @@ const outboundMailPolicyValueSchema = z.object({
   daily_cap: z.number().int().min(1).max(1_000_000),
   reserved_for_security_pct: z.number().int().min(0).max(90),
   alert_at_pct: z.number().int().min(1).max(100)
-}).strict();
+}).strict().refine(
+  // A cap whose security reserve leaves no room for one sign-up mail would refuse every sign-up.
+  (value) => Math.floor(value.daily_cap * (100 - value.reserved_for_security_pct) / 100) >= 1
+);
 
 export type OutboundMailPolicyValue = z.infer<typeof outboundMailPolicyValueSchema>;
 

@@ -52,17 +52,17 @@ function enclosingAsyncFunction(node: ts.Node): ts.FunctionLikeDeclaration | und
   return undefined;
 }
 
-/** True when `scope` awaits authorizeOutboundMail(...) at a position before `before`. */
-function awaitsGateBefore(scope: ts.Node, before: number): boolean {
-  let gated = false;
-  const visit = (node: ts.Node): void => {
-    if (gated || node.getStart() >= before) return;
-    if (ts.isAwaitExpression(node) && ts.isCallExpression(node.expression) && ts.isIdentifier(node.expression.expression)
-      && node.expression.expression.text === "authorizeOutboundMail") gated = true;
-    ts.forEachChild(node, visit);
-  };
-  visit(scope);
-  return gated;
+/**
+ * True when one of `scope`'s OWN top-level statements, before `before`, is `await authorizeOutboundMail(...)`: not
+ * one inside a nested function that may never run, and not one inside a try whose catch could swallow the refusal.
+ */
+function awaitsGateBefore(scope: ts.FunctionLikeDeclaration, before: number): boolean {
+  const body = scope.body;
+  if (body === undefined || !ts.isBlock(body)) return false;
+  return body.statements.some((statement) => statement.getStart() < before
+    && ts.isExpressionStatement(statement) && ts.isAwaitExpression(statement.expression)
+    && ts.isCallExpression(statement.expression.expression) && ts.isIdentifier(statement.expression.expression.expression)
+    && statement.expression.expression.expression.text === "authorizeOutboundMail");
 }
 
 function parse(source: string): ts.SourceFile {
@@ -114,6 +114,10 @@ describe("every account mail passes the outbound mail gate before the sendmail s
 
   it.each(ACCOUNT_MAIL_SPAWNERS)("%s awaits authorizeOutboundMail before each spawn", (file) => {
     const source = readFileSync(file, "utf8");
+    // Only the bare `spawn` is taken from child_process, so the scan below sees every way to start a process.
+    const imports = [...source.matchAll(/import\s*\{([^}]*)\}\s*from\s*["'](?:node:)?child_process["']/g)].map((match) => match[1]!.replace(/\s+/g, ""));
+    expect(imports).toEqual(["spawn"]);
+    expect(source).not.toMatch(/import\s+\*\s+as\s+\w+\s+from\s*["'](?:node:)?child_process["']|require\(\s*["'](?:node:)?child_process/);
     expect(spawnCalls(source).length).toBeGreaterThan(0);
     expect(ungatedSpawns(source)).toEqual([]);
   });
@@ -176,6 +180,8 @@ describe("every account mail passes the outbound mail gate before the sendmail s
     expect(ungatedSpawns(inClass("send(mail) { spawn(x, []); }"))).toHaveLength(1);
     expect(ungatedSpawns(inClass("async send(mail) { // the spawn (in a comment)\n authorizeOutboundMail(g, r, p); spawn(x, []); }"))).toHaveLength(1);
     expect(ungatedSpawns(inClass("async send(mail) { await authorizeOutboundMail(g, r, p); await new Promise(() => { spawn(x, []); }); }"))).toEqual([]);
+    expect(ungatedSpawns(inClass("async send(mail) { const never = async () => { await authorizeOutboundMail(g, r, p); }; spawn(x, []); }"))).toHaveLength(1);
+    expect(ungatedSpawns(inClass("async send(mail) { try { await authorizeOutboundMail(g, r, p); } catch {} spawn(x, []); }"))).toHaveLength(1);
     expect(ungatedSpawns("async function send(mail) { await authorizeOutboundMail(g, r, p); spawn(x, []); }")).toEqual([]);
   });
 });
