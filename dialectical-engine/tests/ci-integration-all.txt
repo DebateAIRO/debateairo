@@ -16,6 +16,9 @@
 # PostgreSQL and migrating it (~2 s a file). One process saves only
 # vitest's launch, 2-4 minutes against the file-by-file runs of the same day (27-32 minutes for the same files). The
 # owner accepted the 27 minutes (2026-10-09); a bigger cut needs the suites to share database setup, a separate task.
+# The command itself, after merging dev@4c62127c7 (226 files with the two above left out), on a quiet Mac (81% memory
+# free, no other test run): 22 minutes (1,326 s), 2,622 tests, CI_KNOWN_RED_GATE new=0 known=15 stale=0. The first
+# measurement ran while other sessions were busy, so expect 22-27 minutes depending on the machine's load.
 # The gate prints little until the end: it reads vitest's JSON report, so expect a quiet terminal for the whole run.
 # What it judges: every failed test by name, a file's own error (import failure, a file-level hook that threw) under
 # the bare file path, and every listed file that did not run. What it cannot see: vitest's "Unhandled Errors" (left
