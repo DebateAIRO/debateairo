@@ -49,6 +49,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Privātums un datu aizsardzība — privacy@dezbatere.ro",
         "Ziņošana par nelikumīgu saturu — [abuse@dezbatere.ro] — skatiet 10. sadaļu",
         "Iestāžu kontaktpunkts — [dsa@dezbatere.ro] — rumāņu un angļu valodā",
+        "Teroristiska satura izņemšanas rīkojumi (Regula (ES) 2021/784) — [dsa@dezbatere.ro] — mūsu kontaktpunkts šiem rīkojumiem; rumāņu un angļu valodā; skatiet 10. sadaļu",
         "Pārstāvji citās valstīs — Norādīti A pielikumā attiecībā uz reģioniem, kuros esam tādus iecēluši"
         ]
       },
@@ -166,9 +167,11 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Moderēšanas lēmumi par saturu un kontiem. Publicētu debašu noņemšana vai piekļuves ierobežošana, kā arī konta darbības apturēšana vai konta slēgšana ir lēmums, ko pieņemam saskaņā ar šiem Noteikumiem vai tiesību aktiem. Katrā šādā lēmumā, kas ietekmē jūsu kontu, piedalās persona. Šādu lēmumu pamati ir aprakstīti 11. sadaļā."
         ]
       },
-      { kind: "p", text: "Pamatojums. Ikreiz, kad noņemam jūsu saturu vai ierobežojam tā redzamību vai apturam vai izbeidzam jūsu konta darbību, mēs sniedzam pamatojumu: ko izdarījām un kāds ir darbības apjoms, faktus, uz kuriem balstījāmies, un vai tie iegūti no ziņojuma vai mūsu pašu pārbaudēm, vai tika izmantoti automatizēti līdzekļi, juridisko vai līgumisko pamatu un kā varat lēmumu apstrīdēt." },
+      { kind: "p", text: "Pamatojums. Ikreiz, kad noņemam jūsu saturu vai ierobežojam tā redzamību vai apturam vai izbeidzam jūsu konta darbību, mēs sniedzam pamatojumu: ko izdarījām un kāds ir darbības apjoms, faktus, uz kuriem balstījāmies, un vai tie iegūti no ziņojuma vai mūsu pašu pārbaudēm, vai tika izmantoti automatizēti līdzekļi, juridisko vai līgumisko pamatu un kā varat lēmumu apstrīdēt: izmantojot tālāk aprakstīto sūdzību kārtību, vēršoties saskaņā ar ES Digitālo pakalpojumu aktu sertificētā ārpustiesas strīdu izšķiršanas iestādē vai vēršoties tiesā." },
       { kind: "p", text: "Sūdzība par lēmumu. Ja nepiekrītat moderēšanas lēmumam, atbildiet uz pamatojumu vai sešu mēnešu laikā rakstiet uz [appeals@dezbatere.ro]. Lēmumu pārskata persona, kura nepiedalījās sākotnējā lēmuma pieņemšanā, un mēs jums paziņojam iznākumu un tā pamatojumu. Tas neietekmē jūsu tiesības vērsties tiesā vai izmantot alternatīvu strīdu izšķiršanu saskaņā ar 18. sadaļu. Sūdzību kārtība attiecas arī uz sūdzībām, ka neesam rīkojušies pēc ziņojuma, saturs noņemts nepamatoti, konts ierobežots nepamatoti vai automatizēts rīks nepamatoti ietekmējis jūsu saturu." },
+      { kind: "p", text: "Strīdu izšķiršana ārpustiesas kārtībā. Ja atrodaties Eiropas Savienībā, strīdu par kādu no mūsu moderēšanas lēmumiem varat nodot izšķiršanai ārpustiesas strīdu izšķiršanas iestādē, kas sertificēta saskaņā ar ES Digitālo pakalpojumu akta (Regulas (ES) 2022/2065) 21. pantu. Tas attiecas uz lēmumu par jūsu saturu vai kontu, kā arī uz mūsu lēmumu par jūsu iesniegtu ziņojumu. Iestādi izvēlaties no saraksta, ko Eiropas Komisija publicē vietnē digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, un jums nav vispirms jāizmanto mūsu sūdzību kārtība. Mēs piedalāmies labticīgi un atsakāmies piedalīties tikai tad, ja tas pats strīds par to pašu saturu un uz tiem pašiem pamatiem jau ir atrisināts. Iestādes lēmums nav saistošs nevienai no pusēm, un jūs saglabājat tiesības vērsties tiesā. Iestāde var iekasēt no jums nelielu maksu vai neiekasēt maksu vispār. Ja iestāde izšķir strīdu par labu jums, mēs sedzam tās maksas un atlīdzinām jūsu pamatotos izdevumus; ja tā izšķir strīdu par labu mums, jums nav jāatlīdzina mūsu maksas vai izdevumi, ja vien iestāde nekonstatē, ka jūs acīmredzami rīkojāties negodprātīgi." },
       { kind: "p", text: "Saziņa ar cilvēku. Mūsu atbalsta asistents ir MI sistēma un par to informē. Jūs jebkurā laikā varat lūgt sazināties ar cilvēku, un katrā atbalsta sarunā tiek piedāvāta šāda iespēja. Saziņā ar jums mēs nepaļaujamies tikai uz automatizētiem rīkiem." },
+      { kind: "p", text: "Teroristisks saturs. Teroristisks saturs ir nelikumīgs, un DebateAI tas nav atļauts (7. sadaļa). Eiropas Savienības kompetentās iestādes var nosūtīt mums izņemšanas rīkojumus saskaņā ar Regulu (ES) 2021/784 uz 1. sadaļā norādīto kontaktpunktu. Saņēmuši šādu rīkojumu, mēs vienas stundas laikā izņemam saturu vai atspējojam piekļuvi tam visās ES valstīs. Mēs informējam personu, kura saturu publicēja, ka tas ir izņemts, un, ja tā pieprasa, kāpēc tas izņemts un kā rīkojumu var apstrīdēt, ja vien iestāde nenolemj, ka sabiedriskās drošības dēļ informāciju uz ierobežotu laiku nedrīkst izpaust. Kā to prasa Regula, izņemto saturu un ar to saistītos datus mēs glabājam sešus mēnešus, lai izņemšanu varētu pārskatīt un, ja tā bijusi nepamatota, atcelt. Persona, kura saturu publicēja, var apstrīdēt rīkojumu tās valsts tiesās, kuras iestāde rīkojumu izdevusi, kā arī izmantot mūsu sūdzību kārtību. Neviena iestāde nav pieprasījusi, lai mēs saskaņā ar šo Regulu veiktu konkrētus pasākumus pret teroristisku saturu; ja tas notiks, mēs šos pasākumus, tostarp jebkādus automatizētus rīkus, aprakstīsim šeit." },
       { kind: "p", text: "Nopietns dzīvības vai drošības apdraudējums. Ja uzzinām informāciju, kas liecina par noziedzīgu nodarījumu, kurš apdraud kādas personas dzīvību vai drošību, mēs informējam kompetentās iestādes." }
     ]
   },
@@ -177,7 +180,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Darbības apturēšana un izbeigšana",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "No jūsu puses. Jebkurā laikā slēdziet savu kontu sadaļā Iestatījumi, kā aprakstīts 6. sadaļā. Jums nav jānorāda iemesls." },
+      { kind: "p", text: "No jūsu puses. Jebkurā laikā slēdziet savu kontu sadaļā Iestatījumi, kā aprakstīts 6. sadaļā. Jums nav jānorāda iemesls. Konta slēgšana izbeidz šo Noteikumu darbību. Noteikumi zaudē spēku brīdī, kad slēgšana stājas spēkā, t. i., pēc 7 dienu labvēlības perioda; šīs sadaļas beigās minētās sadaļas pēc tam paliek spēkā." },
       { kind: "p", text: "No mūsu puses. Mēs varam apturēt vai slēgt jūsu kontu vai noņemt vai ierobežot jūsu saturu, ja: jūs būtiski pārkāpjat šos Noteikumus, jo īpaši 7. sadaļu; jūsu saturs ir nelikumīgs vai tiesību akti, tiesa vai iestāde prasa mums rīkoties; jūsu lietošana apdraud pakalpojuma drošību, integritāti vai pieejamību vai citu personu tiesības; jūsu konts nav bijis aktīvs [24 months] un esam jūs par to brīdinājuši; vai mēs pārtraucam sniegt pakalpojumu vispār vai jūsu valstī." },
       { kind: "p", text: "Izņemot gadījumus, kad pārkāpums ir nopietns, tiesību akti prasa tūlītēju rīcību vai kavēšanās radītu kaitējumu, mēs informējam jūs par problēmu un dodam saprātīgu iespēju to novērst, pirms apturam vai slēdzam kontu. Mēs vienmēr sniedzam pamatojumu saskaņā ar 10. sadaļu, un jūs varat apstrīdēt lēmumu." },
       { kind: "p", text: "Ja pilnībā slēdzam pakalpojumu vai pārtraucam to sniegt jūsu valstī, mēs paziņojam vismaz 30 dienu iepriekš, atmaksājam iepriekš samaksāto summu par laiku pēc slēgšanas un vispirms nodrošinām iespēju eksportēt debates." },
@@ -274,7 +277,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Atsevišķu noteikumu spēkā esība. Ja kādu šo Noteikumu normu atzīst par neizpildāmu, šo normu nepiemēro, bet pārējie Noteikumi paliek spēkā." },
       { kind: "p", text: "Neatteikšanās no tiesībām. Ja neīstenojam noteikumu nekavējoties, mēs nezaudējam tiesības to īstenot vēlāk." },
       { kind: "p", text: "Pilnīga vienošanās. Šie Noteikumi kopā ar Sīkdatņu politiku un MI pakalpojumu sniedzēju reģistru ir visa mūsu savstarpējā vienošanās par pakalpojumu. Privātuma politikā sniegtās saistības mums ir saistošas. Nekas šajā rindkopā neizslēdz atbildību par krāpniecisku sagrozīšanu." },
-      { kind: "p", text: "Valoda. Šie Noteikumi ir publicēti angļu valodā [and Romanian]. [State which version prevails for which users; Annex A notes where a local language is required.]" },
+      { kind: "p", text: "Valoda. Šie Noteikumi ir publicēti visās vietnē piedāvātajās valodās. Līguma valoda ir valoda, kurā reģistrējāties, proti, tās versijas valoda, kurai piekritāt un kuru fiksē mūsu piekrišanas ieraksts. Ja vēlāk piekrītat jaunai versijai citā valodā, līgums turpinās šajā valodā. Citu valodu versijas ir tulkojumi. Ja jūsu dzīvesvietas valsts tiesību akti nosaka, ka noteicošā ir versija šīs valsts valodā, noteicošā ir šī versija. Ja divu valodu versijas atšķiras, mēs piemērojam to nozīmi, kas jums ir labvēlīgāka." },
       { kind: "p", text: "Kontaktinformācija. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bukareste, Rumānija." }
     ]
   },
@@ -382,7 +385,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "ddd89e9fee497a4862df6b4bf3757296ee732ccfbf9d22d053d8a6b3afaf0c66",
+  sha256: "574d9415615a7f719253896a5a2976d9eb6fea6c0558d8196b70e6eb635d9353",
   eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.1 · SPĒKĀ NO [DATE]",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DebateAIRO S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",

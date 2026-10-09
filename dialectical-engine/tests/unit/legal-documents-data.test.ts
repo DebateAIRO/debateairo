@@ -115,11 +115,14 @@ describe("legal documents — generated data", () => {
       expect(who.blocks.map((block) => block.kind)).toEqual(["p", "list", "p"]);
       const table = who.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(10);
+      expect(table.items).toHaveLength(11);
       expect(table.items[0]).toBe(
         "Registered office — [street, number, sector, postal code], Bucharest, Romania"
       );
       expect(table.items[6]).toBe("Privacy and data protection — privacy@dezbatere.ro");
+      expect(table.items[9]).toBe(
+        "Removal orders for terrorist content (EU Regulation 2021/784) — [dsa@dezbatere.ro] — our contact point for these orders; Romanian and English; see section 10"
+      );
       const closing = who.blocks[2]!;
       if (closing.kind !== "p") throw new Error("unreachable");
       expect(closing.text.startsWith("These details are also shown permanently")).toBe(true);
@@ -134,6 +137,23 @@ describe("legal documents — generated data", () => {
       expect(list.items).toHaveLength(2);
       expect(list.items[0]!.startsWith("Decisions inside the engine.")).toBe(true);
       expect(list.items[1]!.startsWith("Moderation decisions about content and accounts.")).toBe(true);
+    });
+
+    it("names the EU redress routes, the terrorist-content contact point, the contract language and how the contract ends", () => {
+      const reporting = texts(section(TERMS_OF_SERVICE, "10"));
+      expect(reporting.some((text) => text.startsWith("Statement of reasons.") && text.endsWith(
+        "through our complaints route below, through an out-of-court dispute settlement body certified under the EU Digital Services Act, or in court."
+      ))).toBe(true);
+      const outOfCourt = reporting.find((text) => text.startsWith("Out-of-court dispute settlement."));
+      expect(outOfCourt).toContain("Article 21 of the EU Digital Services Act (Regulation (EU) 2022/2065)");
+      expect(outOfCourt).toContain("digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement");
+      const terrorist = reporting.find((text) => text.startsWith("Terrorist content."));
+      expect(terrorist).toContain("Regulation (EU) 2021/784");
+      expect(terrorist).toContain("within one hour");
+      expect(texts(section(TERMS_OF_SERVICE, "11"))[0]).toContain("Closing your account ends these Terms.");
+      expect(texts(section(TERMS_OF_SERVICE, "19")).find((text) => text.startsWith("Language."))).toContain(
+        "The contract is in the language you signed up in"
+      );
     });
 
     it("keeps Tennessee out: section 2 lists the United States without it, and Annex A.3 says so first", () => {
