@@ -5925,6 +5925,15 @@ a:focus-visible {
   backdrop-filter: blur(18px) saturate(150%);
   -webkit-backdrop-filter: blur(18px) saturate(150%);
 }
+.lpNavSignIn {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  text-underline-offset: 4px;
+}
+.lpNavSignIn:hover { text-decoration: underline; }
+.lpNavSignIn:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
 .lpNavLinks {
   display: flex;
   align-items: center;

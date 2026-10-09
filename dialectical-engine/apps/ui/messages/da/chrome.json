@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Cookies, vi gemmer",
   "chrome.security": "Sikkerhed",
   "chrome.logout": "Log ud",
+  "chrome.logIn": "Log ind",
   "chrome.accountError": "Det virkede ikke. Genindlæs siden, og prøv igen.",
   "chrome.footer.pricing": "Priser",
   "chrome.footer.cancel": "Opsig en plan",

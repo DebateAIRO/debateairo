@@ -113,7 +113,7 @@ export function TopBar() {
         <div className="topBarContext" />
       )}
       <div className="topBarActions">
-        <AccountMenu catalog={catalog} />
+        <AccountMenu catalog={catalog} signInHref="/login" />
         <TopBarLink fullDocumentLoad={fullDocumentLoad} className="btn btnDark" href="/new">
           <span className="topBarNewLabel">+ {t(catalog, "chrome.newDebate")}</span>
         </TopBarLink>
