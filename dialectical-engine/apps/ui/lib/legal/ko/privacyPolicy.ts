@@ -177,7 +177,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "귀하의 권리 및 행사 방법",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "귀하는 privacy@dezbatere.ro로 문의하거나 해당 제어 기능이 있는 경우 설정 → 개인정보 보호에서 다음 권리를 무료로 행사할 수 있습니다. 당사는 1개월 이내에 답변합니다. 요청이 복잡한 경우 최대 2개월을 추가로 사용할 수 있으며 그 이유를 알려드립니다. 귀하의 계정을 통해 신원 확인을 요청할 수 있습니다." },
+      { kind: "p", text: "귀하는 privacy@dezbatere.ro로 문의하거나 해당 제어 기능이 있는 경우 설정 → 개인정보에서 다음 권리를 무료로 행사할 수 있습니다. 당사는 1개월 이내에 답변합니다. 요청이 복잡한 경우 최대 2개월을 추가로 사용할 수 있으며 그 이유를 알려드립니다. 귀하의 계정을 통해 신원 확인을 요청할 수 있습니다." },
       {
         kind: "list",
         items: [
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "d95874acab3c566593d5a449212f5abb4be5fcb00049b6533eeb05dd6e861aaa",
+  sha256: "1d661b181c9ab4a571f46dd8d510d2a97b98f66ef93b4650a51ec3b2d0b449c1",
   eyebrow: "개인정보 처리방침 · v3.2 · 시행일 [DATE]",
   title: "당사가 저장하는 정보와 그 이유",
   lede: "GDPR (EU) 2016/679에 따른 귀하의 권리와 당사의 의무를 알기 쉽게 설명합니다. 총 14개 조항과 부속서 B — 끝까지 스크롤하십시오.",

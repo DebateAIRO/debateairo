@@ -177,7 +177,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Vaše práva a způsob jejich uplatnění",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Kterékoli z těchto práv můžete bezplatně uplatnit písemnou žádostí na privacy@dezbatere.ro nebo v nabídce Nastavení → Soukromí, pokud je příslušný ovládací prvek k dispozici. Odpovíme do jednoho měsíce; je-li žádost složitá, můžeme lhůtu prodloužit až o další dva měsíce a sdělíme vám proč. Můžeme vás požádat o potvrzení totožnosti prostřednictvím vašeho účtu." },
+      { kind: "p", text: "Kterékoli z těchto práv můžete bezplatně uplatnit písemnou žádostí na privacy@dezbatere.ro nebo v nabídce Nastavení → Ochrana soukromí, pokud je příslušný ovládací prvek k dispozici. Odpovíme do jednoho měsíce; je-li žádost složitá, můžeme lhůtu prodloužit až o další dva měsíce a sdělíme vám proč. Můžeme vás požádat o potvrzení totožnosti prostřednictvím vašeho účtu." },
       {
         kind: "list",
         items: [
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "a134896b16fc16ac2a7259394458d9788a4cfbd4eafbcb13e6f2b2215034c2ef",
+  sha256: "cd531419e0674f8d76958fda37e1081d38a617512384fbed278f7f180ed2ea2d",
   eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.2 · ÚČINNÉ OD [DATE]",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",

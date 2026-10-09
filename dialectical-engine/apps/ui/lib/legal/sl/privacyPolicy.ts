@@ -177,7 +177,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Vaše pravice in njihovo uveljavljanje",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Katero koli od teh pravic lahko brezplačno uveljavite tako, da pišete na privacy@dezbatere.ro, ali v Nastavitvah → Zasebnost, kjer obstaja ustrezni kontrolnik. Odgovorimo v enem mesecu; če je zahteva zapletena, lahko rok podaljšamo za največ dva dodatna meseca in vam pojasnimo razlog. Lahko vas prosimo, da prek računa potrdite svojo identiteto." },
+      { kind: "p", text: "Katero koli od teh pravic lahko brezplačno uveljavite tako, da pišete na privacy@dezbatere.ro, ali v Nastavitve → Zasebnost, kjer obstaja ustrezni kontrolnik. Odgovorimo v enem mesecu; če je zahteva zapletena, lahko rok podaljšamo za največ dva dodatna meseca in vam pojasnimo razlog. Lahko vas prosimo, da prek računa potrdite svojo identiteto." },
       {
         kind: "list",
         items: [
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "7829f63da1c205b37ec3f382df71ae95535f12cafd915fb4c47ac8f1367f9de5",
+  sha256: "fba887ba8bf895db9f7610f49b83dfe308d218b2480e0acac759b6bb93dc6b37",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.2 · VELJA OD [DATE]",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",

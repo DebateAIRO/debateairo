@@ -142,7 +142,7 @@ Gesla se zgoščujejo z Argon2id. Dvostopenjsko preverjanje pristnosti je obvezn
 
 ## 10. Vaše pravice in njihovo uveljavljanje
 
-Katero koli od teh pravic lahko brezplačno uveljavite tako, da pišete na **privacy@dezbatere.ro**, ali v **Nastavitvah → Zasebnost**, kjer obstaja ustrezni kontrolnik. Odgovorimo v enem mesecu; če je zahteva zapletena, lahko rok podaljšamo za največ dva dodatna meseca in vam pojasnimo razlog. Lahko vas prosimo, da prek računa potrdite svojo identiteto.
+Katero koli od teh pravic lahko brezplačno uveljavite tako, da pišete na **privacy@dezbatere.ro**, ali v **Nastavitve → Zasebnost**, kjer obstaja ustrezni kontrolnik. Odgovorimo v enem mesecu; če je zahteva zapletena, lahko rok podaljšamo za največ dva dodatna meseca in vam pojasnimo razlog. Lahko vas prosimo, da prek računa potrdite svojo identiteto.
 
 | Pravica | Kaj pomeni tukaj |
 | --- | --- |

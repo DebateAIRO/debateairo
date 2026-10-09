@@ -181,12 +181,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       {
         kind: "list",
         items: [
-        "Acces (Art. 15) — O copie a datelor cu caracter personal pe care le deținem despre dumneavoastră și aceste informații. În Setări, alegeți Exportă datele: pregătim un fișier ZIP cu fișiere JSON și o pagină pe care o puteți deschide în orice browser, apoi vă trimitem prin e-mail un link de descărcare valabil 24 de ore și care funcționează numai cât timp sunteți autentificat în cont.",
+        "Acces (Art. 15) — O copie a datelor cu caracter personal pe care le deținem despre dumneavoastră și aceste informații. În Setări, alegeți Exportați datele: pregătim un fișier ZIP cu fișiere JSON și o pagină pe care o puteți deschide în orice browser, apoi vă trimitem prin e-mail un link de descărcare valabil 24 de ore și care funcționează numai cât timp sunteți autentificat în cont.",
         "Rectificare (Art. 16) — Corectați adresa de e-mail sau adresa de recuperare din Setări. Pseudonimul nu poate fi schimbat, din motivele indicate în Termeni; puteți închide contul și deschide unul nou",
         "Ștergere (Art. 17) — Ștergeți oricând o dezbatere privată de pe pagina dezbaterii. Închideți contul din Setări; secțiunea 7 explică exact efectele. Solicitați-ne să eliminăm o dezbatere publicată care conține datele dumneavoastră, indiferent dacă sunteți sau nu autorul",
         "Restricționare (Art. 18) — Solicitați-ne să oprim prelucrarea anumitor date până la soluționarea unei contestații privind aceste date",
         "Opoziție (Art. 21) — Opuneți-vă prelucrării întemeiate pe interese legitime — prelucrarea pentru securitate și audit din secțiunea 4 — iar noi o oprim dacă nu putem demonstra motive imperioase. Vă puteți opune oricând marketingului, iar noi îl oprim",
-        "Portabilitate (Art. 20) — Dezbaterile și datele contului într-un format utilizat în mod curent și care poate fi citit automat. Folosiți Exportă datele din Setări: fișierul ZIP conține datele dumneavoastră în fișiere JSON care pot fi citite automat și o pagină ușor de citit; linkul trimis prin e-mail este valabil 24 de ore și funcționează numai cât timp sunteți autentificat în cont. Conținutul fără caracter personal pe care l-ați creat, precum întrebările, vă este restituit la cerere la încetarea contractului",
+        "Portabilitate (Art. 20) — Dezbaterile și datele contului într-un format utilizat în mod curent și care poate fi citit automat. Folosiți Exportați datele din Setări: fișierul ZIP conține datele dumneavoastră în fișiere JSON care pot fi citite automat și o pagină ușor de citit; linkul trimis prin e-mail este valabil 24 de ore și funcționează numai cât timp sunteți autentificat în cont. Conținutul fără caracter personal pe care l-ați creat, precum întrebările, vă este restituit la cerere la încetarea contractului",
         "Retragerea consimțământului (Art. 7(3)) — Retrageți consimțământul pentru marketing din orice e-mail sau din Setări; retrageți consimțământul privind datele sensibile închizându-vă contul din Setări (puteți și omite asemenea date sau șterge o dezbatere care le conține). Retragerea nu afectează prelucrarea care a avut deja loc",
         "Depunerea unei plângeri — La autoritatea română de supraveghere, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, București, anspdcp@dataprotection.ro, sau la autoritatea din țara în care locuiți. Am prefera să ne contactați mai întâi"
         ]
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "4b6280c4b87ba221fe5b510c97decd9a73a7c3856f0e9d508015d9b0d48bee04",
+  sha256: "1064a85853454c1d3aee76239ca36484e6195303b5457cd9138bcf0cf5c650dd",
   eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.2 · ÎN VIGOARE DE LA [DATE]",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",

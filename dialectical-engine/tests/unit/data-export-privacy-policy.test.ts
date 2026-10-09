@@ -14,6 +14,15 @@ function policy(locale: string): string {
   return readFileSync(join(root, "apps/ui/legal", locale, "privacy-policy.md"), "utf8");
 }
 
+function message(locale: string, catalog: string, key: string): string {
+  const entries = JSON.parse(
+    readFileSync(join(root, "apps/ui/messages", locale, `${catalog}.json`), "utf8"),
+  ) as Record<string, string>;
+  const value = entries[key];
+  if (!value) throw new Error(`Missing ${catalog}.${key} in ${locale}`);
+  return value;
+}
+
 function rightsRows(markdown: string): { access: string; portability: string } {
   const rows = markdown.split("\n").filter((line) => line.startsWith("| **"));
   const access = rows.find((line) => /Art\. 15\b/.test(line));
@@ -32,6 +41,33 @@ function baseRows(locale: string): { access: string; portability: string } {
 }
 
 describe("data export privacy policy", () => {
+  it("names the displayed export button in both rights rows in every locale", () => {
+    const mismatches: string[] = [];
+    for (const locale of locales) {
+      const label = message(locale, "settings", "settings.export.request");
+      const { access, portability } = rightsRows(policy(locale));
+      if (!access.includes(label)) mismatches.push(`${locale}:Access`);
+      if (!portability.includes(label)) mismatches.push(`${locale}:Portability`);
+    }
+    expect(mismatches).toEqual([]);
+  });
+
+  it("quotes the displayed Settings to Privacy route in every locale", () => {
+    const mismatches: string[] = [];
+    for (const locale of locales) {
+      const expected = [
+        message(locale, "chrome", "chrome.settings"),
+        message(locale, "consent", "consent.settings.title"),
+      ];
+      const routes = [...policy(locale).matchAll(/\*\*([^*\n]*[→←][^*\n]*)\*\*/g)];
+      const labels = routes[0]?.[1]?.split(/[→←]/).map((part) => part.trim());
+      if (routes.length !== 1 || labels?.length !== 2 || labels.some((part, i) => part !== expected[i])) {
+        mismatches.push(locale);
+      }
+    }
+    expect(mismatches).toEqual([]);
+  });
+
   it("removes both Pending export promises in all 35 locales", () => {
     expect(locales).toHaveLength(35);
     for (const locale of locales) {
