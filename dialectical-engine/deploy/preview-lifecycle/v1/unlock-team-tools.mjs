@@ -105,11 +105,15 @@ export async function runUnlockWindow({ writer, evidence, deps = {}, windowMs = 
   return { outcome, ...(reason ? { reason } : {}), publishes, roleReset };
 }
 
-/** ExecStopPost: idempotent reset, needs no password and opens no pool. */
+/** ExecStopPost: idempotent reset, needs no password and opens no pool. A failure has its own event. */
 export async function runReset({ writer, log = event => logLine(process.stdout, event) }) {
-  let roleReset = false;
-  try { const closed = await writer.reset(); roleReset = closed?.passwordNull === true && closed?.expiredMinusInfinity === true; } catch { roleReset = false; }
-  log({ event: 'PREVIEW_TEAM_TOOLS_RESET', roleReset });
+  let roleReset = false, reason = null;
+  try {
+    const closed = await writer.reset();
+    roleReset = closed?.passwordNull === true && closed?.expiredMinusInfinity === true;
+    if (!roleReset) reason = 'ROLE_NOT_RESET';
+  } catch (error) { roleReset = false; reason = reasonOf(error); }
+  log(roleReset ? { event: 'PREVIEW_TEAM_TOOLS_RESET', roleReset } : { event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset, reason });
   return { roleReset };
 }
 
@@ -342,14 +346,23 @@ async function resetServer() {
   return runReset({ writer: createInterimLoginWriter({ runCreator: creatorRunner({ engine: `${sourceRoot}/dialectical-engine`, nodePath: process.execPath }), createPool: () => refuse('RESET_ONLY'), createPublisher: () => refuse('RESET_ONLY') }) });
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const command = process.argv[2];
+/**
+ * The exit code systemd sees. Non-zero whenever the login may not be reset: for ExecStopPost
+ * that marks the unit failed, so OnFailure= sends the alert.
+ */
+export async function runCommand(command, { platform = process.platform, uid = process.getuid?.(), runServer: run = runServer, resetServer: reset = resetServer, log = event => logLine(process.stderr, event) } = {}) {
   try {
-    if (process.platform !== 'linux' || process.getuid?.() !== 0 || process.argv.length !== 3 || !['run', 'reset'].includes(command)) refuse('ACTOR_REFUSED');
-    const result = command === 'run' ? await runServer() : await resetServer();
-    if (!result.roleReset) process.exitCode = 1;
+    if (platform !== 'linux' || uid !== 0 || !['run', 'reset'].includes(command)) refuse('ACTOR_REFUSED');
+    const result = command === 'run' ? await run() : await reset();
+    return result?.roleReset === true ? 0 : 1;
   } catch (error) {
-    logLine(process.stderr, { event: command === 'reset' ? 'PREVIEW_TEAM_TOOLS_RESET' : 'PREVIEW_TEAM_TOOLS_LOCKED', outcome: 'FAILED', reason: reasonOf(error), roleReset: false });
-    process.exitCode = 1;
+    log(command === 'reset'
+      ? { event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false, reason: reasonOf(error) }
+      : { event: 'PREVIEW_TEAM_TOOLS_LOCKED', outcome: 'FAILED', reason: reasonOf(error), roleReset: false });
+    return 1;
   }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  process.exitCode = await runCommand(process.argv.length === 3 ? process.argv[2] : null);
 }

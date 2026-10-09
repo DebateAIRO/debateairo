@@ -4,6 +4,8 @@
 [Unit]
 Description=DebateAI preview: unlock team tools for one hour
 After=debateai-preview-postgresql.service debateai-preview-capture.service debateai-preview-api.service
+# A failed run or a failed reset (ExecStopPost exits non-zero, which marks the unit failed) emails.
+OnFailure=debateai-preview-alert@%n.service
 
 [Service]
 Type=simple
@@ -16,6 +18,8 @@ RuntimeMaxSec=3720
 KillMode=mixed
 TimeoutStopSec=60
 Restart=no
+# The process holds the interim login's password in memory: never write it to a core dump.
+LimitCORE=0
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true

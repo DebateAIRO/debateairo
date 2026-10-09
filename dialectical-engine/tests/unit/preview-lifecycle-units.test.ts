@@ -83,6 +83,12 @@ describe('preview lifecycle systemd templates', () => {
     expect(Object.keys(value).some(key => key.startsWith('[Install]'))).toBe(false);
   });
 
+  it('team unlock emails when the run or the reset fails, and never writes a core dump of the process holding the password', () => {
+    const value = parse(unit('debateai-preview-team-unlock.service'));
+    expect(value['[Unit]OnFailure']).toEqual(['debateai-preview-alert@%n.service']);
+    expect(value['[Service]LimitCORE']).toEqual(['0']);
+  });
+
   it('every script a template names exists in this folder', () => {
     const all = ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service'].map(unit).join('\n');
     const scripts = [...all.matchAll(/deploy\/preview-lifecycle\/v1\/([a-z-]+\.mjs)/g)].map(match => match[1]!);

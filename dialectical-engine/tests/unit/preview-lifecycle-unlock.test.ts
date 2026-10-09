@@ -133,6 +133,31 @@ describe('team tools unlock window', () => {
     const failed = await unlock.runReset({ writer: { reset: async () => { throw new Error('x'); } }, log: () => undefined });
     expect(failed.roleReset).toBe(false);
   });
+
+  it('a reset that fails logs its own line and exits non-zero, so systemd marks the unit failed and the alert runs', async () => {
+    const logs: any[] = [];
+    const failingWriter = { reset: async () => { throw Object.assign(new Error('STAFF_JIT_CLOSE_REFUSED'), { code: 'STAFF_JIT_CLOSE_REFUSED' }); } };
+    const code = await unlock.runCommand('reset', { platform: 'linux', uid: 0, resetServer: () => unlock.runReset({ writer: failingWriter, log: (event: unknown) => logs.push(event) }), log: (event: unknown) => logs.push(event) });
+    expect(code).toBe(1);
+    expect(logs).toEqual([{ event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false, reason: 'STAFF_JIT_CLOSE_REFUSED' }]);
+  });
+
+  it('a reset that cannot even start (lock unreadable, release refused) also logs RESET_FAILED and exits non-zero', async () => {
+    const logs: any[] = [];
+    const code = await unlock.runCommand('reset', { platform: 'linux', uid: 0, resetServer: async () => { throw Object.assign(new Error('RELEASE_LOCK_UNREADABLE'), { code: 'RELEASE_LOCK_UNREADABLE' }); }, log: (event: unknown) => logs.push(event) });
+    expect(code).toBe(1);
+    expect(logs).toEqual([{ event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false, reason: 'RELEASE_LOCK_UNREADABLE' }]);
+  });
+
+  it('a successful reset exits 0; a run that could not reset exits non-zero; only root on Linux may run either', async () => {
+    const ok = async () => ({ roleReset: true });
+    expect(await unlock.runCommand('reset', { platform: 'linux', uid: 0, resetServer: ok, log: () => undefined })).toBe(0);
+    expect(await unlock.runCommand('run', { platform: 'linux', uid: 0, runServer: async () => ({ outcome: 'WINDOW_ENDED', roleReset: false }), log: () => undefined })).toBe(1);
+    const logs: any[] = [];
+    expect(await unlock.runCommand('reset', { platform: 'linux', uid: 1000, resetServer: ok, log: (event: unknown) => logs.push(event) })).toBe(1);
+    expect(await unlock.runCommand('other', { platform: 'linux', uid: 0, resetServer: ok, log: () => undefined })).toBe(1);
+    expect(logs).toEqual([{ event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false, reason: 'ACTOR_REFUSED' }]);
+  });
 });
 
 describe('interim writer: the existing recovery login, opened just in time', () => {
