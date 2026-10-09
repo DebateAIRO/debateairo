@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Lühidalt",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie andmete võtmed ja teie avaldatud väitlused eemaldatakse. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota." }
+      { kind: "p", text: "Kogume seda, mida konto vajab, ja seda, mida otsustate sisestada. Teie küsimused saadetakse meie registris loetletud tehisintellekti pakkujatele; neid ei kasutata mudelite treenimiseks. Väitlused on privaatsed, kui te neid ei avalda. Konto kustutamisel hävitatakse teie privaatsete andmete võtmed; kustutamist ajastades valite, kas ka teie avaldatud väitlused eemaldatakse või jäävad teie kasutuselt kõrvaldatud pseudonüümi all avalikuks. Meiega saab ühendust aadressil privacy@dezbatere.ro ning väitluses nimetatud isikud võivad taotleda eemaldamist ilma kontota." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Väitlused on privaatsed, kuni te need avaldate. Avaldamine on teadlik ja eraldi kinnitatav toiming. Avaldatud väitluses kuvatakse teie pseudonüüm, küsimus sellisel kujul, nagu selle kirjutasite, argumentide puu, hinded, otsus ja kindlusaste ning nähtav märgis, et sisu on loonud tehisintellekt. Seal ei kuvata kunagi teie e-posti aadressi, seansikirjeid ega konto ajalugu. Otsingumootorid võivad avaldatud väitlusi indekseerida." },
       { kind: "p", text: "Avaldamise tühistamisel eemaldatakse väitlus Dialectical Engine-st ja hävitatakse meie avaliku koopia võti. Lugejate, otsingumootorite või arhiivide juba tehtud koopiad ei ole meie kontrolli all ning me ei saa neid tagasi võtta." },
-      { kind: "p", text: "Kui kustutate konto, eemaldame kõik teie avaldatud väitlused avalikust vaatest põhjendamatu viivituseta ja hiljemalt 30 päeva jooksul, välja arvatud juhul, kui seadus nõuab konkreetse üksuse säilitamist. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Kui kavandate oma konto kustutamise, valite, mis saab teie avaldatud väitlustest. Kui märgite „Kustuta ka minu avalikud väitlused“, eemaldame need kõik avalikust juurdepääsust ja hävitame kustutamise ajal oma avaliku koopia võtme, välja arvatud juhul, kui seadus nõuab konkreetse kirje säilitamist. Kui jätate ruudu märkimata, jäävad väitlused avalikuks kasutuselt kõrvaldatud pseudonüümi all." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Sisselogimise ja taastamise riskisignaalid — 90 päeva, mida jõustab andmebaas — Kõrvaldatakse",
         "Turbeauditilogi — Teenuse kogu kasutusaja jooksul — Ainult lisatav; IP-aadress ja user-agent on ühesuunalised sõnumilühendid ning neid ei saa tagasi lugeda",
         "Väitluse sisu (privaatne) — Konto olemasolu ajal — Sulgemisel hävitatakse võtmed, mistõttu sisu muutub loetamatuks",
-        "Väitluse sisu (avaldatud) — Avaldamise ja konto olemasolu ajal — Avaldamise tühistamisel või sulgemisel eemaldatakse avalikust vaatest; võtmed hävitatakse",
+        "Väitluse sisu (avaldatud) — Avaldamise ajal; kui sulgete konto ja jätate valiku „Kustuta ka minu avalikud väitlused“ märkimata, jääb avaldatud väitlus teie kasutuselt kõrvaldatud pseudonüümi all avalikuks — Eemaldatakse avalikust vaatest ja selle võti hävitatakse, kui tühistate avaldamise või konto sulgemisel, kui märkisite valiku „Kustuta ka minu avalikud väitlused“",
         "Pakkuja tagastatud kirjed ja otsinguviited — Sama kaua kui väitlus, mille juurde need kuuluvad — Sama",
         "Kasutajatoe vestlused ja juhtumid — [Until closed plus 12 months] — Võtmed hävitatakse",
         "Nõustumise ja nõusoleku kirjed — Konto kasutusaeg ja 6 aastat — pikim meile kohalduv aegumistähtaeg — Kustutatakse",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Varukoopiad [pending] — [… days] pärast aktiivse koopia kustutamist — Kirjutatakse üle"
         ]
       },
-      { kind: "p", text: "Mida kustutamine tegelikult teeb. Teie väitlused ja kontoandmed on krüpteeritud teie kontole ja igale väitlusele omaste võtmetega. Konto kustutamisel hävitatakse need võtmed, mille järel ei saa meie ega keegi teine krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Nimetame seda kustutamiseks, sest selline on selle toime, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab kolme asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnevast ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; ja juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine." },
+      { kind: "p", text: "Mida kustutamine tegelikult teeb. Teie privaatsed väitlused ja kontoandmed on krüpteeritud teie kontole ja igale väitlusele omaste võtmetega. Konto kustutamisel hävitatakse need võtmed, mille järel ei saa meie ega keegi teine krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Avaldatud väitluse avaliku koopia võti hävitatakse konto kustutamisel ainult siis, kui märkisite valiku „Kustuta ka minu avalikud väitlused“ (jaotis 6). Nimetame seda kustutamiseks, sest selline on selle toime, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab kolme asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnevast ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; ja juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "b8a7c598e2c22cd083c125982ad20fb6203e732960194ac08d4414fccc99afa7",
+  sha256: "b3c1f6155ca3ae815c7191ce392add4e2a43bb692b76573c473def2206153ceb",
   eyebrow: "PRIVAATSUSPOLIITIKA · v3.2 · KEHTIB ALATES [DATE]",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",

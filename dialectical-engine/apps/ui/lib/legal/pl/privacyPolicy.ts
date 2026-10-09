@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "W skrócie",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Gromadzimy dane potrzebne do działania konta oraz treści, które zdecydujesz się wpisać. Twoje pytania trafiają do dostawców AI wymienionych w naszym Rejestrze; nie są wykorzystywane do trenowania modeli. Debaty są prywatne, chyba że je opublikujesz. Usunięcie konta niszczy klucze do Twoich danych i powoduje wycofanie opublikowanych debat. Możesz skontaktować się z nami pod adresem privacy@dezbatere.ro, a osoby wymienione w debacie mogą zażądać jej usunięcia bez posiadania konta." }
+      { kind: "p", text: "Gromadzimy dane potrzebne do działania konta oraz treści, które zdecydujesz się wpisać. Twoje pytania trafiają do dostawców AI wymienionych w naszym Rejestrze; nie są wykorzystywane do trenowania modeli. Debaty są prywatne, chyba że je opublikujesz. Usunięcie konta niszczy klucze do Twoich prywatnych danych; planując usunięcie, wybierasz, czy opublikowane debaty również zostaną wycofane, czy pozostaną publiczne pod Twoim wycofanym pseudonimem. Możesz skontaktować się z nami pod adresem privacy@dezbatere.ro, a osoby wymienione w debacie mogą zażądać jej usunięcia bez posiadania konta." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Debaty są prywatne do chwili ich opublikowania. Publikacja jest działaniem celowym i osobno potwierdzanym. Opublikowana debata pokazuje Twój pseudonim, pytanie w brzmieniu wpisanym przez Ciebie, drzewo argumentów, wyniki, werdykt i przedział ufności oraz zawiera widoczne oznaczenie, że treść została wygenerowana przez AI. Nigdy nie pokazuje Twojego adresu e-mail, rejestrów sesji ani historii konta. Wyszukiwarki mogą indeksować opublikowane debaty." },
       { kind: "p", text: "Wycofanie publikacji usuwa debatę z Dialectical Engine i niszczy klucz do naszej publicznej kopii. Kopie wykonane wcześniej przez czytelników, wyszukiwarki lub archiwa pozostają poza naszą kontrolą i nie możemy ich wycofać." },
-      { kind: "p", text: "Gdy usuwasz konto, bez zbędnej zwłoki i nie później niż w ciągu 30 dni usuwamy z publicznego dostępu każdą opublikowaną przez Ciebie debatę, chyba że prawo wymaga od nas zachowania konkretnego elementu. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Gdy planujesz usunięcie konta, wybierasz, co stanie się z opublikowanymi przez Ciebie debatami. Jeśli zaznaczysz „Usuń również moje publiczne debaty”, podczas usuwania wycofamy każdą z publicznego dostępu i zniszczymy klucz do naszej publicznej kopii, chyba że prawo wymaga zachowania określonego elementu. Jeśli nie zaznaczysz pola, debaty pozostaną publiczne pod Twoim wycofanym pseudonimem." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Adres IP użyty do lokalnego ustalenia kraju przy rejestracji i rozpoczęciu nowej debaty — Tylko podczas obsługi żądania — Adres nie jest przechowywany w postaci jawnej w związku z kontrolą; odmowę odnotowujemy wyłącznie zbiorczo i jako skrót opisany poniżej",
         "Zbiorcze wpisy audytu odmów według kraju IP — Przez okres działania usługi — Wpis zawiera kod odmowy, kraj, oznaczenie adresu IP jako dowodu oraz jednokierunkowe skróty adresu IP i identyfikatora przeglądarki (user-agent) oparte na kluczu; dziennik jest tylko do dopisywania.",
         "Treść debat (prywatna) — Przez okres istnienia konta — Przy zamknięciu klucze zostają zniszczone, przez co treść staje się nieczytelna",
-        "Treść debat (opublikowana) — Przez okres publikacji i istnienia konta — Przy wycofaniu publikacji lub zamknięciu konta zostaje usunięta z publicznego dostępu; klucze zostają zniszczone",
+        "Treść debat (opublikowana) — Przez okres publikacji; jeśli zamkniesz konto i pozostawisz „Usuń również moje publiczne debaty” bez zaznaczenia, opublikowana debata pozostanie publiczna pod Twoim wycofanym pseudonimem — Zostaje usunięta z publicznego dostępu, a jej klucz zniszczony, gdy wycofasz publikację, lub przy zamknięciu konta, jeśli zaznaczysz „Usuń również moje publiczne debaty”",
         "Rejestry odpowiedzi dostawców i odwołania do wyników wyszukiwania — Tak długo jak debata, do której należą — Tak samo",
         "Rozmowy i sprawy dotyczące wsparcia — [Until closed plus 12 months] — Klucze zostają zniszczone",
         "Rejestry akceptacji i zgód — Przez okres istnienia konta oraz 6 lat — najdłuższy mający do nas zastosowanie termin przedawnienia — Zostają usunięte",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Kopie zapasowe [pending] — [… days] od usunięcia kopii aktywnej — Zostają nadpisane"
         ]
       },
-      { kind: "p", text: "Co faktycznie powoduje usunięcie. Twoje debaty i dane konta są szyfrowane przy użyciu kluczy właściwych dla Twojego konta i każdej debaty. Usunięcie konta niszczy te klucze, po czym zaszyfrowane rekordy nie mogą zostać odczytane przez nas ani nikogo innego, a my usuwamy rekord Twojego konta. Opisujemy to jako usunięcie, ponieważ taki jest jego skutek, i dysponujemy udokumentowaną oceną uzasadniającą to określenie; jeśli chcesz dowiedzieć się więcej, zapytaj. Należy wiedzieć o trzech rzeczach: dziennik audytu bezpieczeństwa pozwala wyłącznie na dopisywanie i nie jest usuwany, lecz nie zawiera czytelnych identyfikatorów dotyczących Ciebie; niewielka liczba starszych debat powstała przed wprowadzeniem obecnego schematu szyfrowania, a jeśli dotyczy to Twojego konta, informujemy Cię, jaki skutek ma dla nich jego zamknięcie; kopie danych już wysłanych dostawcy AI podlegają natomiast warunkom przechowywania tego dostawcy podanym w Rejestrze, a nie naszemu procesowi usuwania." },
+      { kind: "p", text: "Co faktycznie powoduje usunięcie. Twoje prywatne debaty i dane konta są szyfrowane przy użyciu kluczy właściwych dla Twojego konta i każdej debaty. Usunięcie konta niszczy te klucze, po czym zaszyfrowane rekordy nie mogą zostać odczytane przez nas ani nikogo innego, a my usuwamy rekord Twojego konta. Klucz publicznej kopii opublikowanej debaty zostaje zniszczony podczas usuwania konta tylko wtedy, gdy zaznaczysz „Usuń również moje publiczne debaty” (punkt 6). Opisujemy to jako usunięcie, ponieważ taki jest jego skutek, i dysponujemy udokumentowaną oceną uzasadniającą to określenie; jeśli chcesz dowiedzieć się więcej, zapytaj. Należy wiedzieć o trzech rzeczach: dziennik audytu bezpieczeństwa pozwala wyłącznie na dopisywanie i nie jest usuwany, lecz nie zawiera czytelnych identyfikatorów dotyczących Ciebie; niewielka liczba starszych debat powstała przed wprowadzeniem obecnego schematu szyfrowania, a jeśli dotyczy to Twojego konta, informujemy Cię, jaki skutek ma dla nich jego zamknięcie; kopie danych już wysłanych dostawcy AI podlegają natomiast warunkom przechowywania tego dostawcy podanym w Rejestrze, a nie naszemu procesowi usuwania." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "efbbf6db056b50087526aee1d99fa2fa2204bfe7d6465809c9e2a518adc6412b",
+  sha256: "a290bdc260c886c91c60231f7e49079059b3318b3b3b232776225c1d5b8bac2b",
   eyebrow: "POLITYKA PRYWATNOŚCI · v3.2 · OBOWIĄZUJE OD [DATE]",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",

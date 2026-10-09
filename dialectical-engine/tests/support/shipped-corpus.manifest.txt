@@ -827,6 +827,7 @@ packages/db/src/internal-allowance.ts
 packages/db/src/legacy-claim.ts
 packages/db/src/legal-acceptance.ts
 packages/db/src/migration-forward108.ts
+packages/db/src/migration-forward110.ts
 packages/db/src/migration-lineage.ts
 packages/db/src/obs-schema.ts
 packages/db/src/onboarding-evidence.ts

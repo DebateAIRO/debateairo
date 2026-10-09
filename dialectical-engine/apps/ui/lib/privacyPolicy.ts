@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "In short",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "We collect what an account needs and what you choose to type. Your questions go to AI providers listed in our Register; they are not used to train models. Debates are private unless you publish them. Deleting your account destroys the keys to your data and takes your published debates down. You can reach us at privacy@dezbatere.ro, and people named in a debate can ask for removal without an account." }
+      { kind: "p", text: "We collect what an account needs and what you choose to type. Your questions go to AI providers listed in our Register; they are not used to train models. Debates are private unless you publish them. Deleting your account destroys the keys to your private data; when you schedule it, you choose whether your published debates are taken down too or stay public under your retired pseudonym. You can reach us at privacy@dezbatere.ro, and people named in a debate can ask for removal without an account." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Debates are private until you publish them. Publishing is a deliberate, separately confirmed action. A published debate shows your pseudonym, your question as you wrote it, the argument tree, the scores, the verdict and the confidence band, and carries a visible label that the content is AI-generated. It never shows your email address, your session records or your account history. Search engines may index published debates." },
       { kind: "p", text: "Unpublishing removes the debate from Dialectical Engine and destroys the key to our public copy. Copies already made by readers, search engines or archives are outside our control, and we cannot recall them." },
-      { kind: "p", text: "When you delete your account, we remove every debate you published from public access without undue delay and within 30 days at most, unless the law requires us to keep a specific item. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "When you schedule the deletion of your account, you choose what happens to the debates you published. If you tick \"Also delete my public debates\", we remove each of them from public access and destroy the key to our public copy when the deletion runs, unless the law requires us to keep a specific item. If you leave the box unticked, they stay public under your retired pseudonym." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Login and recovery risk signals — 90 days, enforced by the database — Purged",
         "Security audit trail — For the life of the service — Append-only; IP and user-agent are one-way digests and cannot be read back",
         "Debate content (private) — While the account exists — Keys destroyed on closure, making the content unreadable",
-        "Debate content (published) — While published and while the account exists — Removed from public access on unpublishing or closure; keys destroyed",
+        "Debate content (published) — While published; if you close your account and leave \"Also delete my public debates\" unticked, a published debate stays published under your retired pseudonym — Removed from public access, and its key destroyed, when you unpublish it, or at closure if you ticked \"Also delete my public debates\"",
         "Provider return records and retrieval references — Same as the debate they belong to — Same",
         "Support conversations and cases — [Until closed plus 12 months] — Keys destroyed",
         "Acceptance and consent records — Life of the account plus 6 years — the longest limitation period that applies to us — Deleted",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Backups [pending] — [… days] after the live copy is deleted — Overwritten"
         ]
       },
-      { kind: "p", text: "What deletion actually does. Your debates and account data are encrypted under keys specific to your account and to each debate. Deleting your account destroys those keys, after which the encrypted records cannot be read by us or anyone else, and we delete your account record. We describe this as deletion because that is its effect, and we hold a documented assessment behind it; if you want to know more, ask. Three things to know: the security audit trail is append-only and is not deleted, but contains no readable identifiers of you; a small number of older debates predate our current encryption scheme, and if that applies to your account we tell you what closure achieves for them; and copies of data already sent to an AI provider are governed by that provider's retention terms in the Register, not by our deletion." },
+      { kind: "p", text: "What deletion actually does. Your private debates and account data are encrypted under keys specific to your account and to each debate. Deleting your account destroys those keys, after which the encrypted records cannot be read by us or anyone else, and we delete your account record. The key to a published debate's public copy is destroyed at deletion only if you ticked \"Also delete my public debates\" (section 6). We describe this as deletion because that is its effect, and we hold a documented assessment behind it; if you want to know more, ask. Three things to know: the security audit trail is append-only and is not deleted, but contains no readable identifiers of you; a small number of older debates predate our current encryption scheme, and if that applies to your account we tell you what closure achieves for them; and copies of data already sent to an AI provider are governed by that provider's retention terms in the Register, not by our deletion." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "fc10dc45f1d6f759cfd1a246ecc90b3cf01d46b69f73815e007dade89a25ac45",
+  sha256: "7ffd7d728f3885cf5e3c6529e0054473e795899bb6b1685c719175bcfb5b2ff0",
   eyebrow: "PRIVACY POLICY · v3.2 · EFFECTIVE [DATE]",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",
