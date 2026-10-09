@@ -18,7 +18,7 @@ let calls: Array<{
     hash: string;
 }>;
 let caps: string[], revision: number, denied: boolean, failMutation: boolean, ordinaryDenied: boolean;
-let failSecondPossession: boolean, denialCode: string;
+let failSecondPossession: boolean, denialCode: string, toolsLocked: boolean;
 let client: ReturnType<typeof createStaffApiClient>;
 const paths = () => calls.map(c => c.path);
 const content = () => host.textContent ?? "";
@@ -44,6 +44,7 @@ beforeEach(() => {
     ordinaryDenied = false;
     failSecondPossession = false;
     denialCode = "STAFF_REQUEST_REFUSED";
+    toolsLocked = false;
     host = document.createElement("div");
     document.body.append(host);
     root = createRoot(host);
@@ -75,6 +76,8 @@ beforeEach(() => {
                     ? { receipt_id: "33333333-3333-4333-8333-333333333333", expires_at: "2099-02-01T00:00:00.000Z" }
                     : { receipt_id: "44444444-4444-4444-8444-444444444444", expires_at: "2099-03-01T00:00:00.000Z" });
             }
+            if (path.endsWith("/team/invitations") && toolsLocked)
+                return Response.json({ error: "STAFF_ALERT_UNAVAILABLE" }, { status: 503 });
             if (path.endsWith("/team/invitations"))
                 return Response.json({ receipt: { operation_id: body.operation_id, outcome: "COMPLETED", recorded_at: "2026-10-03T00:00:00.000Z" }, invitation_id: targetId, expires_at: expires });
             if (path.endsWith("/verify"))
@@ -306,4 +309,17 @@ it('records one selected Owner key without requiring or requesting an optional s
  await submit('[data-owner-possession]', { command_id: targetId, command_nonce: handle, credential_one: "aA", password: "synthetic", totp_code: "123456" });
  expect(calls.filter(call=>call.path.endsWith('/owner-possession/verify'))).toHaveLength(1);
  expect(host.querySelector('[data-owner-receipts]')?.textContent).toContain('33333333-3333-4333-8333-333333333333');
+});
+it.each([
+    ["en", "Verify security key for team access", "Team tools are locked. They unlock for one hour when the operator turns them on."],
+    ["ro", "Verifică cheia de securitate pentru accesul echipei", "Instrumentele echipei sunt blocate. Se deblochează pentru o oră atunci când operatorul le activează."]
+] as const)("shows the %s locked Team tools state when alert readiness is not fresh", async (locale, elevate, expected) => {
+    caps = ["TEAM_INVITE"];
+    toolsLocked = true;
+    await act(async () => root.render(locale === "ro" ? <StaffAccessPanel client={client} locale="ro" catalog={staffRomanian}/> : <StaffAccessPanel client={client}/>));
+    await click(elevate);
+    await submit('[data-staff-mutation="invite"]', { target_id: targetId });
+    expect(host.querySelector('[role="status"]')?.textContent).toBe(expected);
+    expect(paths().filter(path => path.endsWith("/team/invitations"))).toHaveLength(1);
+    expect(host.querySelector('[data-staff-mutation="invite"]')).not.toBeNull();
 });

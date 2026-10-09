@@ -39,6 +39,7 @@
   "staff.recovery": "Recuperarea folosește un cont înlocuitor, o cheie verificată (poate fi nouă) și material offline. Cheile suplimentare sunt opționale. Contul vechi rămâne blocat din motive de securitate; dezbaterile private rămân acolo. Parola sau codurile autentificatorului nu înlocuiesc dovezile prin chei.",
   "staff.alertUnknown": "Pregătirea alertelor independente nu a fost confirmată pentru această operațiune.",
   "staff.unavailable": "Operațiunea echipei nu este disponibilă. Alertele independente sau alt serviciu necesar pot fi indisponibile; destinația nu este expusă.",
+  "staff.locked": "Instrumentele echipei sunt blocate. Se deblochează pentru o oră atunci când operatorul le activează.",
   "staff.failed": "Operațiunea a fost refuzată. Actualizează starea înainte de a confirma o operațiune nouă.",
   "staff.denied": "Autorizarea echipei nu este disponibilă. Verifică din nou cheia de securitate.",
   "staff.signIn": "Autentifică-te pentru a verifica pregătirea contului.",
