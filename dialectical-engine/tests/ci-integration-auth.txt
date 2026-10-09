@@ -17,7 +17,8 @@
 
 # Verification mail and sign-up
 tests/integration/verification-send-budget.test.ts
-# registration-database.test.ts runs in its own job (tests/ci-integration-registration.txt): ~34 minutes alone.
+# registration-database.test.ts is not here: ~34 minutes alone, it runs from its own workflow (.github/workflows/
+# registration-integration.yml, list tests/ci-integration-registration.txt) on relevant pull requests, nightly, by hand.
 tests/integration/pending-onboarding-database.test.ts
 tests/integration/identity-database.test.ts
 tests/integration/age-gate-database.test.ts

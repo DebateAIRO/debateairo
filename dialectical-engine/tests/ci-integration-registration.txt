@@ -1,5 +1,6 @@
-# tests/ci-integration-registration.txt — the sign-up / verification-mail suite, in its own CI job
-# ("registration-integration" in .github/workflows/security.yml) because it is long: 69 cases, 2,025 s run alone on
-# the Mac on 2026-10-09 (the timing-equivalence and memory-tripwire cases dominate). Same gate and lists as
-# tests/ci-integration-auth.txt; its two host-sensitive cases are on tests/ci-flaky.txt.
+# tests/ci-integration-registration.txt — the sign-up / verification-mail suite, run by its own workflow
+# (.github/workflows/registration-integration.yml: on pull requests that touch a path that can affect it, nightly at
+# 03:30 UTC against dev, and by hand) because it is long: 69 cases, 2,025 s run alone on the Mac on 2026-10-09 (the
+# timing-equivalence and memory-tripwire cases dominate). Same gate and lists as tests/ci-integration-auth.txt; its
+# two host-sensitive cases are on tests/ci-flaky.txt.
 tests/integration/registration-database.test.ts

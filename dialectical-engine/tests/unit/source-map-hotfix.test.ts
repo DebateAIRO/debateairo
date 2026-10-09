@@ -77,8 +77,12 @@ describe("the exact expiring SourceMap process allowance", () => {
     for (const [name, argv] of Object.entries(commands)) expect(hotfix.commandArguments(name)).toEqual(argv);
     for (const name of ["install --ignore-scripts", "__proto__", "toString", "exec", ""]) expect(() => hotfix.commandArguments(name)).toThrow("SOURCE_MAP_HOTFIX_REFUSED");
     const workflow = readFileSync(resolve(root, "../.github/workflows/security.yml"), "utf8");
-    for (const name of ["install", "generate", "typecheck", "tests", "audit", "integration", "registration"]) expect(workflow).toContain(`- run: node tools/source-map-hotfix.mjs ${name}`);
+    for (const name of ["install", "generate", "typecheck", "tests", "audit", "integration"]) expect(workflow).toContain(`- run: node tools/source-map-hotfix.mjs ${name}`);
     expect(workflow).not.toContain("MINIMUM_RELEASE_AGE_EXCLUDE:");
+    // The ~34-minute registration suite has its own path-filtered/nightly workflow (2026-10-09).
+    const registrationWorkflow = readFileSync(resolve(root, "../.github/workflows/registration-integration.yml"), "utf8");
+    for (const name of ["install", "generate", "registration"]) expect(registrationWorkflow).toContain(`- run: node tools/source-map-hotfix.mjs ${name}`);
+    expect(registrationWorkflow).not.toContain("MINIMUM_RELEASE_AGE_EXCLUDE:");
   });
   it("passes the exact real child environment and preserves its nonzero exit", () => {
     const scratch = mkdtempSync(join(tmpdir(), "source-map-child-"));

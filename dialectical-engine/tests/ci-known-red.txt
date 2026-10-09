@@ -119,8 +119,9 @@
 #   - the two load-coupled `registration-database` cases ("deep-queue slack", "post-hash RSS
 #     tripwire"): they pass solo; listing them would hide a real regression. Integration
 #     tests, outside this job's directories anyway. Both are in dev's twelve.
-#     UPDATE 2026-10-09: CI now runs integration suites too (jobs auth-integration and
-#     registration-integration, lists tests/ci-integration-*.txt, same gate and this same list). These
+#     UPDATE 2026-10-09: CI now runs integration suites too (job auth-integration on every pull
+#     request; workflow registration-integration on relevant pull requests and nightly; lists
+#     tests/ci-integration-*.txt, same gate and this same list). These
 #     two cases are on tests/ci-flaky.txt instead: run and reported every time, never gating, never
 #     "stale" — the RSS tripwire measured 3.5 MiB against its 2 MiB bound on unchanged dev that day.
 #   - registration.test.ts "S3c B4 keeps the isolated production RSS curve…": it is dev's
