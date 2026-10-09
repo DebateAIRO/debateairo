@@ -66,6 +66,14 @@ function enqueue(state: DatabaseState, intent: { event: string; operationId: str
 async function until(done: () => boolean, ms = 3000): Promise<void> {
   for (const deadline = Date.now() + ms; !done(); await new Promise(r => setTimeout(r, 20))) if (Date.now() > deadline) throw Error("TIMED_OUT");
 }
+/** Internal funding selected: hosted USD billing, one priced target, the sealed funding policy. */
+function fundedActivation(f: Awaited<ReturnType<typeof fixture>>, deploymentMode: "hosted" | "local") {
+  f.state.funded = true;
+  return { ...f.activation, environment: { ...f.activation.environment, internalAllowancePolicy: fundingPolicy }, deploymentMode,
+    billingPlans: billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, "test:staff-boot-billing"),
+    providerTargets: [{ providerRef: "fixture-provider", maker: "fixture-maker", baseUrl: "https://provider.example.test/v1", model: "fixture-model",
+      inputPriceMicrosPerMillionTokens: 1, outputPriceMicrosPerMillionTokens: 1 }] };
+}
 const lockedLine = (reason: string) => JSON.stringify({ event: "api.staff.tools_locked", reason });
 const waitingLine = JSON.stringify({ event: "api.staff.alerts_waiting", reason: "READINESS_STALE" });
 
@@ -177,13 +185,7 @@ describe("staff runtime boot without fresh alert readiness", () => {
   });
 
   it("with internal funding selected, boot checks static funding facts but not fresh evidence", async () => {
-    const funded = (f: Awaited<ReturnType<typeof fixture>>, deploymentMode: "hosted" | "local") => {
-      f.state.funded = true;
-      return { ...f.activation, environment: { ...f.activation.environment, internalAllowancePolicy: fundingPolicy }, deploymentMode,
-        billingPlans: billingPlansFromValue(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, "test:staff-boot-billing"),
-        providerTargets: [{ providerRef: "fixture-provider", maker: "fixture-maker", baseUrl: "https://provider.example.test/v1", model: "fixture-model",
-          inputPriceMicrosPerMillionTokens: 1, outputPriceMicrosPerMillionTokens: 1 }] };
-    };
+    const funded = fundedActivation;
     const hosted = await fixture();
     const runtime = await createStaffRuntime(funded(hosted, "hosted"));
     try {
@@ -222,20 +224,27 @@ describe("staff runtime boot without fresh alert readiness", () => {
 });
 
 const targetUser = "44444444-4444-4444-8444-444444444444", targetStaff = "55555555-5555-4555-8555-555555555555", actorStaff = "66666666-6666-4666-8666-666666666666";
-async function lockedHttp() {
+async function lockedHttp(options: Readonly<{ funded?: boolean }> = {}) {
   const f = await fixture();
-  const runtime = await createStaffRuntime(f.activation);
+  const runtime = await createStaffRuntime(options.funded ? fundedActivation(f, "hosted") : f.activation);
   const account = testHttpIdentity("staff-boot-locked"), staffToken = Buffer.alloc(32, 1).toString("base64url"), csrf = Buffer.alloc(32, 2).toString("base64url");
   const context: StaffContext = { staffId: actorStaff, userId: account.authenticated.userId, ordinarySessionId: account.authenticated.session.session_id,
     privilegeSessionId: randomUUID(), designation: "OWNER", securityEpoch: 0, accountSecurityEpoch: 0, grantRevision: 0,
-    capabilities: ["TEAM_READ", "TEAM_INVITE", "TEAM_GRANT", "TEAM_DISABLE", "AUDIT_READ", "EMERGENCY_DISABLE"] };
+    capabilities: ["TEAM_READ", "TEAM_INVITE", "TEAM_GRANT", "TEAM_DISABLE", "AUDIT_READ", "EMERGENCY_DISABLE", ...(options.funded ? ["ALLOWANCE_WRITE" as const] : [])] };
   const authentication = { context, baseSession: account.authenticated, csrfTokenHash: "sha256:" + "a".repeat(64), expiresAt: new Date(Date.now() + 60000) };
+  const invitation = { invitationId: randomUUID(), targetUserId: account.authenticated.userId, ordinarySessionId: account.authenticated.session.session_id,
+    issuerStaffId: actorStaff, issuerSecurityEpoch: 0, targetAccountSecurityEpoch: 0, invitationRevision: 0, expiresAt: new Date(Date.now() + 86400000) };
   const access = {
     authenticate: async () => authentication, verifyCsrf: async (_auth: unknown, supplied: string) => supplied === csrf,
     assertCurrent: async () => undefined, requireCapability: async () => undefined,
     readActionProof: async (_auth: unknown, _handle: string, binding: ActionBinding) => ({ proofId: randomUUID(), context, binding, credentialId: "aA", verifiedAt: new Date(), expiresAt: new Date(Date.now() + 60000) }),
-    readInvitationContext: async () => null, readOwnerPossessionContext: async () => null, registerPrivilegedConnection: () => () => undefined
+    readInvitationContext: async () => invitation, readOwnerPossessionContext: async () => null, registerPrivilegedConnection: () => () => undefined
   };
+  // Every key ceremony entry point is recorded; a recorded ceremony means a challenge was (or would be) issued.
+  const ceremonies: string[] = [];
+  const ceremony = (name: string) => async () => { ceremonies.push(name); throw Error("FAKE_CEREMONY"); };
+  const webauthn = Object.fromEntries(["beginAction", "finishAction", "beginRegistration", "finishRegistration", "beginInvitationAcceptance", "finishInvitationAcceptance"]
+    .map(name => [name, ceremony(name)]));
   const writes: Array<{ kind: string; operationId: string; event: string }> = [];
   const alertIntents: Array<{ event: string; operationId: string; envelope: unknown }> = [];
   const receipt = (operationId: string) => ({ operationId, outcome: "COMPLETED", recordedAt: new Date() });
@@ -245,10 +254,20 @@ async function lockedHttp() {
     grant: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "grant", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); },
     disable: async (input: { operationId: string; alertIntent: { event: string; operationId: string; envelope: unknown } }) => {
       writes.push({ kind: "disable", operationId: input.operationId, event: input.alertIntent.event }); alertIntents.push(input.alertIntent); return receipt(input.operationId); },
-    readIssuedInvitation: async () => ({ invitationId: randomUUID(), expiresAt: new Date(Date.now() + 86400000) })
+    readIssuedInvitation: async () => ({ invitationId: randomUUID(), expiresAt: new Date(Date.now() + 86400000) }),
+    readInvitationProof: async () => ({ proofId: randomUUID(), purpose: "INVITATION_ACCEPT", context: invitation, credentialId: "aA", verifiedAt: new Date(), expiresAt: new Date(Date.now() + 60000) }),
+    accept: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "accept", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); }
   };
+  // Real readiness (runtime.funding) in front of fake allowance writes.
+  const funding = options.funded ? { requireReady: () => runtime.funding!.requireReady(), allowances: {
+    readSelfCommand: async () => ({ ownerRef: account.authenticated.ownerRef, expectedRevision: 0, policyRegisterVersion: 2 }),
+    configure: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "allowance-configure", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); },
+    revoke: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "allowance-revoke", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); }
+  } } : undefined;
   const sessions = testSessionApplication([account]);
-  const staff = { access, sessions, repository, webauthn: {}, intents: runtime.intents, targetInvitationTransport: runtime.targetInvitationTransport } as unknown as StaffHttpApplication;
+  // Mirrors main.ts: the runtime's readiness, intents and invitation transport.
+  const staff = { access, sessions, repository, webauthn, readiness: runtime.readiness, intents: runtime.intents, targetInvitationTransport: runtime.targetInvitationTransport,
+    ...(funding === undefined ? {} : { funding }) } as unknown as StaffHttpApplication;
   const api = buildApi({ application: staffHttpAskApplication(), sessions, allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, staffAccess: access as never, staff });
   const base = testSessionHeaders(account, true);
   const headers = { ...base, cookie: `${base.cookie}; __Host-debateai-staff=${staffToken}; __Host-debateai-staff-csrf=${csrf}`, "x-staff-csrf-token": csrf };
@@ -259,8 +278,20 @@ async function lockedHttp() {
     payload: { capabilities: ["TEAM_READ", "AUDIT_READ"], operation_id, reason: { code: "GRANT_CHANGE" }, ...mutation } });
   const disable = (operation_id = randomUUID()) => api.inject({ method: "POST", url: `/v1/admin/team/${targetStaff}/disable`, headers,
     payload: { mode: "COMPROMISE", operation_id, reason: { code: "SECURITY_RESPONSE" }, ...mutation } });
+  const handle = (fill: string) => fill.repeat(43);
+  const authCredential = { id: "aA", rawId: "aA", type: "public-key", response: { clientDataJSON: "YQ", authenticatorData: "YQ", signature: "YQ", userHandle: null }, clientExtensionResults: {} };
+  const registrationCredential = { id: "aA", rawId: "aA", type: "public-key", response: { clientDataJSON: "YQ", attestationObject: "YQ" }, clientExtensionResults: {} };
+  const post = (url: string, payload: unknown, method: "POST" | "DELETE" = "POST") => api.inject({ method, url, headers, payload: payload as Record<string, unknown> });
+  const actionOptions = (intent: unknown) => post("/v1/admin/webauthn/action/options", { intent });
+  const actionVerify = (intent: unknown) => post("/v1/admin/webauthn/action/verify", { intent, challenge_handle: handle("a"), credential: authCredential });
+  const acceptOptions = () => post("/v1/admin/team/invitations/accept/options", { invitation_handle: handle("c") });
+  const acceptVerify = () => post("/v1/admin/team/invitations/accept/verify", { invitation_handle: handle("c"), challenge_handle: handle("a"), credential: authCredential });
+  const accept = (operation_id = randomUUID()) => post("/v1/admin/team/invitations/accept", { invitation_handle: handle("c"), proof_handle: handle("b"), expected_revision: 0, operation_id });
+  const registrationOptions = (body: unknown) => post("/v1/admin/webauthn/registration/options", body);
+  const registrationVerify = () => post("/v1/admin/webauthn/registration/verify", { challenge_handle: handle("a"), credential: registrationCredential });
   const close = async () => { await api.close(); await runtime.close(); };
-  return { f, runtime, writes, alertIntents, invite, grant, disable, close };
+  return { f, runtime, writes, alertIntents, ceremonies, invite, grant, disable, post, actionOptions, actionVerify, acceptOptions, acceptVerify, accept,
+    registrationOptions, registrationVerify, close };
 }
 
 describe("locked Team tools at request time", () => {
@@ -317,6 +348,80 @@ describe("locked Team tools at request time", () => {
       expect(mail).toContain('"event":"DISABLE"');
       expect(mail).toContain(disableId);
       expect(mail).toContain(targetStaff);
+    } finally { await h.close(); }
+  });
+
+  const lockedRefusal = (response: { statusCode: number; json(): unknown }) => {
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toEqual({ error: "STAFF_ALERT_UNAVAILABLE" });
+  };
+  const mutationIntent = { expected_revision: 0, reason: { code: "GRANT_CHANGE" } };
+
+  it("refuses invite and grant key ceremonies while locked before issuing a challenge; disable ceremonies still start", async () => {
+    const h = await lockedHttp();
+    try {
+      const invite = { action: "TEAM_INVITE", target_user_id: targetUser, capabilities: ["TEAM_READ"], operation_id: randomUUID(), ...mutationIntent, reason: { code: "TEAM_ONBOARDING" } };
+      const grant = { action: "TEAM_GRANT", target_staff_id: targetStaff, capabilities: ["TEAM_READ"], operation_id: randomUUID(), ...mutationIntent };
+      for (const intent of [invite, grant]) { lockedRefusal(await h.actionOptions(intent)); lockedRefusal(await h.actionVerify(intent)); }
+      expect(h.ceremonies).toEqual([]);
+      for (const [action, mode] of [["TEAM_DISABLE", "OFFBOARD"], ["EMERGENCY_DISABLE", "COMPROMISE"]] as const)
+        await h.actionOptions({ action, target_staff_id: targetStaff, mode, operation_id: randomUUID(), expected_revision: 0, reason: { code: "SECURITY_RESPONSE" } });
+      expect(h.ceremonies).toEqual(["beginAction", "beginAction"]);
+      await h.f.unlock();
+      await h.actionOptions(invite);
+      expect(h.ceremonies).toEqual(["beginAction", "beginAction", "beginAction"]);
+    } finally { await h.close(); }
+  });
+
+  it("refuses invitation acceptance while locked before any key ceremony, and accepts after unlock", async () => {
+    const h = await lockedHttp();
+    try {
+      for (const response of [await h.acceptOptions(), await h.acceptVerify(), await h.accept()]) lockedRefusal(response);
+      expect(h.ceremonies).toEqual([]);
+      expect(h.writes).toEqual([]);
+      expect(h.f.state.authorized).toEqual([]);
+      await h.f.unlock();
+      await h.acceptOptions();
+      expect(h.ceremonies).toEqual(["beginInvitationAcceptance"]);
+      const acceptId = randomUUID(), accepted = await h.accept(acceptId);
+      expect(accepted.statusCode).toBe(200);
+      expect(h.writes).toEqual([{ kind: "accept", operationId: acceptId, event: "ACCEPT" }]);
+    } finally { await h.close(); }
+  });
+
+  it("refuses security-key registration (KEY_CHANGE) while locked before any key ceremony", async () => {
+    const h = await lockedHttp();
+    try {
+      const operationId = randomUUID(), register = { action: "CREDENTIAL_REGISTER", operation_id: operationId };
+      for (const response of [await h.actionOptions(register), await h.actionVerify(register),
+        await h.registrationOptions({ prerequisite_handle: "d".repeat(43) }), await h.registrationOptions({ proof_handle: "b".repeat(43), operation_id: operationId }),
+        await h.registrationVerify()]) lockedRefusal(response);
+      expect(h.ceremonies).toEqual([]);
+      await h.f.unlock();
+      await h.registrationOptions({ prerequisite_handle: "d".repeat(43) });
+      await h.actionOptions(register);
+      expect(h.ceremonies).toEqual(["beginRegistration", "beginAction"]);
+    } finally { await h.close(); }
+  });
+
+  it("refuses allowance ceremonies and writes while locked, and configures after unlock", async () => {
+    const h = await lockedHttp({ funded: true });
+    try {
+      const configure = { amount_micros: 1000000, day_micros: 100000, week_micros: 500000, starts_at: "2026-10-03T09:00:00.000Z",
+        expires_at: "2026-10-10T09:00:00.000Z", funding_approval_ref: "SYNTHETIC-APPROVAL", operation_id: randomUUID(), reason: { code: "FUNDING_APPROVAL" } };
+      const grantId = randomUUID(), revoke = { grant_id: grantId, operation_id: randomUUID(), reason: { code: "FUNDING_APPROVAL" } };
+      for (const response of [await h.actionOptions({ action: "ALLOWANCE_CONFIGURE", ...configure }), await h.actionVerify({ action: "ALLOWANCE_CONFIGURE", ...configure }),
+        await h.actionOptions({ action: "ALLOWANCE_REVOKE", ...revoke }),
+        await h.post("/v1/admin/internal-allowances", { ...configure, proof_handle: "b".repeat(43) }),
+        await h.post(`/v1/admin/internal-allowances/${grantId}`, { operation_id: revoke.operation_id, reason: revoke.reason, proof_handle: "b".repeat(43) }, "DELETE")]) lockedRefusal(response);
+      expect(h.ceremonies).toEqual([]);
+      expect(h.writes).toEqual([]);
+      await h.f.unlock();
+      await h.actionOptions({ action: "ALLOWANCE_CONFIGURE", ...configure });
+      expect(h.ceremonies).toEqual(["beginAction"]);
+      const configured = await h.post("/v1/admin/internal-allowances", { ...configure, proof_handle: "b".repeat(43) });
+      expect(configured.statusCode).toBe(200);
+      expect(h.writes).toEqual([{ kind: "allowance-configure", operationId: configure.operation_id, event: "ALLOWANCE_CONFIGURED" }]);
     } finally { await h.close(); }
   });
 });

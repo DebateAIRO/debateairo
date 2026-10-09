@@ -43,6 +43,9 @@ export interface StaffHttpApplication {
     intents: Pick<StaffAlertIntentProducer, 'mutation' | 'newInvitation' | 'enrollment'>;
     targetInvitationTransport?: StaffTargetInvitationTransport;
     funding?: StaffInternalFundingApplication;
+    /** Early lock check before any key ceremony (not the authority: the alert producer and the DB guard
+     * still check every mutation). Production passes the runtime's readiness; absent, only those run. */
+    readiness?: Readonly<{ readIndependentAlertReadiness(): Promise<'READY' | 'UNAVAILABLE'> }>;
 }
 export interface StaffRouteTransport {
     sourceFor(request: FastifyRequest): AuthSourceContext;
@@ -116,12 +119,20 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         await application.sessions.assertCurrent(base);
     }
     const auth = (request: FastifyRequest): StaffAuthentication => request.staffAuthentication ?? refuse();
+    /** Team tools locked: refuse before a challenge is issued or a ceremony finished. DISABLE/OFFBOARD never call this. */
+    async function requireUnlocked(): Promise<void> {
+        if (application!.readiness !== undefined && await application!.readiness.readIndependentAlertReadiness() !== 'READY')
+            throw new StaffAlertError('STAFF_ALERT_UNAVAILABLE');
+    }
     async function actionAuthority(request: FastifyRequest, intent: contract.FundedStaffActionIntent): Promise<Readonly<{
         authentication: StaffAuthentication;
         binding: ActionBinding;
         allowanceState?: InternalAllowanceCommandState;
     }>> {
         const authentication = auth(request), required = capability(intent);
+        // Containment (TEAM_DISABLE = OFFBOARD, EMERGENCY_DISABLE = COMPROMISE) stays available while locked.
+        if (intent.action !== 'TEAM_DISABLE' && intent.action !== 'EMERGENCY_DISABLE')
+            await requireUnlocked();
         let binding: ActionBinding;
         let allowanceState: InternalAllowanceCommandState | undefined;
         if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE') {
@@ -201,6 +212,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
     });
     route('POST', '/v1/admin/webauthn/registration/options', async (request) => {
         const input = parse(contract.StaffRegistrationOptionsRequestSchema, request.body), base = request.authenticatedSession!;
+        await requireUnlocked();
         if ('prerequisite_handle' in input)
             return project(contract.StaffRegistrationOptionsResponseSchema, await application!.webauthn.beginRegistration(ordinary(base), { kind: 'PREREQUISITE', prerequisiteHandle: input.prerequisite_handle, operationId: randomUUID() }));
         const rawCookie = request.headers.cookie, staffToken = exactStaffCookie(rawCookie, STAFF_COOKIE_NAME);
@@ -218,6 +230,7 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
     });
     route('POST', '/v1/admin/webauthn/registration/verify', async (request) => {
         const input = parse(contract.StaffRegistrationVerifyRequestSchema, request.body);
+        await requireUnlocked();
         const result = await application!.webauthn.finishRegistration(ordinary(request.authenticatedSession!), input, application!.intents.enrollment);
         return project(contract.StaffRegistrationResponseSchema, { receipt: receipt(result.receipt), credentialId: result.credentialId });
     });
@@ -277,16 +290,19 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
     });
     route('POST', '/v1/admin/team/invitations/accept/options', async (request) => {
         const input = parse(contract.StaffInvitationOptionsRequestSchema, request.body), context = await scopedInvitation(request, input.invitation_handle);
+        await requireUnlocked();
         const options = await application!.webauthn.beginInvitationAcceptance(context, { invitationHandle: input.invitation_handle });
         return project(contract.StaffInvitationOptionsResponseSchema, { ...options, invitation_revision: context.invitationRevision });
     });
     route('POST', '/v1/admin/team/invitations/accept/verify', async (request) => {
         const input = parse(contract.StaffInvitationVerifyRequestSchema, request.body), context = await scopedInvitation(request, input.invitation_handle);
+        await requireUnlocked();
         const result = await application!.webauthn.finishInvitationAcceptance(context, { invitationHandle: input.invitation_handle }, { challenge_handle: input.challenge_handle, credential: input.credential });
         return project(contract.StaffActionProofResponseSchema, { proof_handle: result.proofHandle, expires_at: result.proof.expiresAt.toISOString() });
     });
     route('POST', '/v1/admin/team/invitations/accept', async (request) => {
         const input = parse(contract.StaffInvitationAcceptRequestSchema, request.body), context = await scopedInvitation(request, input.invitation_handle);
+        await requireUnlocked();
         if (context.invitationRevision !== input.expected_revision)
             refuse();
         const proof = await application!.repository.readInvitationProof({ context, ordinaryTokenHash: request.authenticatedSession!.tokenHash, proofHandleHash: staffTokenHash(input.proof_handle)! });

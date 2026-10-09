@@ -827,7 +827,7 @@ if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
-  intents: staffAlerts.intents,
+  intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
 };
