@@ -4,7 +4,8 @@
 [Unit]
 Description=DebateAI preview: unlock team tools for one hour
 After=debateai-preview-postgresql.service debateai-preview-capture.service debateai-preview-api.service
-# A failed run or a failed reset (ExecStopPost exits non-zero, which marks the unit failed) emails.
+# A window that ends FAILED (e.g. EVIDENCE_UNAVAILABLE), a run that could not reset, or a failed
+# reset (ExecStopPost exits non-zero) marks the unit failed, and that emails.
 OnFailure=debateai-preview-alert@%n.service
 
 [Service]

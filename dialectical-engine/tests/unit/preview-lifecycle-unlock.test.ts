@@ -163,6 +163,13 @@ describe('team tools unlock window', () => {
     expect(logs).toEqual([{ event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false, reason: 'RELEASE_LOCK_UNREADABLE' }]);
   });
 
+  it('a window that ends FAILED exits non-zero even when the reset worked, so OnFailure= alerts', async () => {
+    const run = (result: unknown) => unlock.runCommand('run', { platform: 'linux', uid: 0, runServer: async () => result, log: () => undefined });
+    expect(await run({ outcome: 'FAILED', reason: 'EVIDENCE_UNAVAILABLE', publishes: 3, roleReset: true })).toBe(1);
+    expect(await run({ outcome: 'WINDOW_ENDED', publishes: 360, roleReset: true })).toBe(0);
+    expect(await run({ outcome: 'STOPPED', publishes: 3, roleReset: true })).toBe(0);
+  });
+
   it('a successful reset exits 0; a run that could not reset exits non-zero; only root on Linux may run either', async () => {
     const ok = async () => ({ roleReset: true });
     expect(await unlock.runCommand('reset', { platform: 'linux', uid: 0, resetServer: ok, log: () => undefined })).toBe(0);

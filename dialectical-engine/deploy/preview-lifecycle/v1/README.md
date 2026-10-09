@@ -84,7 +84,9 @@ launchers still re-check every byte exactly as before.
   file; the unlock writes each fresh proof there (same owner and mode) after archiving the old
   one once under `/var/lib/debateai-v3-preview/lifecycle/evidence-archive/`. If the wrapper only
   read that file once at load, the unlock notices within one refresh and locks with
-  `EVIDENCE_UNAVAILABLE` (nothing unsafe happens; it just cannot keep tools open).
+  `EVIDENCE_UNAVAILABLE` (nothing unsafe happens; it just cannot keep tools open). A window that
+  ends `FAILED` like this exits non-zero even when the login reset worked, so the unit is
+  `failed` and the alert emails.
 
 ## Boot sequence (what to expect after a reboot)
 

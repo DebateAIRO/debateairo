@@ -374,14 +374,15 @@ async function resetServer() {
 }
 
 /**
- * The exit code systemd sees. Non-zero whenever the login may not be reset: for ExecStopPost
- * that marks the unit failed, so OnFailure= sends the alert.
+ * The exit code systemd sees. Non-zero whenever the login may not be reset, and whenever the
+ * window itself ended FAILED (for example EVIDENCE_UNAVAILABLE) even though the reset worked:
+ * either marks the unit failed, so OnFailure= sends the alert.
  */
 export async function runCommand(command, { platform = process.platform, uid = process.getuid?.(), runServer: run = runServer, resetServer: reset = resetServer, log = event => logLine(process.stderr, event) } = {}) {
   try {
     if (platform !== 'linux' || uid !== 0 || !['run', 'reset'].includes(command)) refuse('ACTOR_REFUSED');
     const result = command === 'run' ? await run() : await reset();
-    return result?.roleReset === true ? 0 : 1;
+    return result?.roleReset === true && result?.outcome !== 'FAILED' ? 0 : 1;
   } catch (error) {
     log(command === 'reset'
       ? { event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false, reason: reasonOf(error) }
