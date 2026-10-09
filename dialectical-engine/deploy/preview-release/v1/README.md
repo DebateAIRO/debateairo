@@ -59,7 +59,7 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | `ui-build --source <ui source manifest> --out <file>` | checks the UI root against its manifest, builds with the fixed values, re-checks that the build changed no inventoried source byte, checks the build, writes the build manifest |
 | `verify --source <file> [--ui-build <file>]` | re-runs `verifySourceManifest` (and `verifyUiBuildManifest`) against the exact file bytes |
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
-| `launch-plan --service api\|ui\|runner --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, everything else from `--from`; `validateLaunchPlan` before writing |
+| `launch-plan --service api\|ui\|runner --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, runner.env custody); `validateLaunchPlan` before writing |
 | `native-plan --operation apply-and-plan\|verify --from <existing native plan> --source-manifest <candidate api manifest> --out <file>` | new native plan for a candidate API root; `verify` carries the `approval` of `--from` over unchanged; the reviewed `validateNativePlan` before writing |
 
 ## Operator sequence for one release
@@ -77,7 +77,7 @@ umask 022
 LABEL=23402d10e-parti-v1
 ART=/opt/debateai-v3-preview/artifacts/auth-dev-$LABEL
 R=/opt/debateai-v3-preview/releases
-CAPI=$R/auth-dev-candidate-$LABEL-api; CUI=$R/auth-dev-candidate-$LABEL-ui
+CAPI=$R/auth-dev-candidate-$LABEL-api; CUI=$R/auth-dev-candidate-$LABEL-ui; CRUN=$R/auth-dev-candidate-$LABEL-runner
 rel() { /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs" "$@"; }
 ```
 
@@ -165,6 +165,21 @@ OLDU=$(jq -r .services.ui.basePlan.path /etc/debateai-v3-preview/lifecycle/relea
 rel launch-plan --service api --from "$OLDA" --root "$CAPI" --source-manifest "$ART/candidate-api-source.json" --native-attestation "$ART/native-first-verify.json" --out "$ART/api-launch.json"
 rel launch-plan --service ui --from "$OLDU" --root "$CUI" --source-manifest "$ART/candidate-ui-source.json" --ui-build "$ART/candidate-ui-build.json" --native-attestation "$ART/native-first-verify.json" --out "$ART/ui-launch.json"
 ```
+
+The runner (GAP-RUNNER): the server has no runner plan yet, so the first one is derived from the
+API plan. `--service runner --from <the API plan>` copies the release fields as for the API and takes
+`serviceUid`/`serviceGid` only from the `debateai-preview-runner` OS account (`getent passwd` and
+`getent group`; refused if missing, root, nobody, a login shell, or a group whose gid differs), with
+`environment` = `/etc/debateai-v3-preview/auth-dev-v1/runner.env` root:<runner gid> 0640. A UI plan as
+`--from` refuses. Once the lifecycle lock names a runner plan, later releases use that plan instead
+(`.services.runner.basePlan.path`), which keeps its own identity.
+
+```sh
+rel launch-plan --service runner --from "$OLDA" --root "$CRUN" --source-manifest "$ART/candidate-runner-source.json" --native-attestation "$ART/native-first-verify.json" --out "$ART/runner-launch.json"
+```
+
+Then `prestart.mjs pin --from "$ART/runner-launch.json"` and the runner unit, release drop-in and
+runner.env as `deploy/preview-auth-dev/v1/README.md` "Runner start" says; the runner is started by hand.
 
 `jq` must be installed (`command -v jq`); if it is missing, the variables come out empty and the
 tool refuses. Without the lifecycle, set `OLDA` and `OLDU` to the live plans named in the newest
