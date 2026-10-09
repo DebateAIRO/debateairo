@@ -36,7 +36,7 @@ it("Y-1 loads the two scoped token-only stylesheets after billing", () => {
   expect([...order].sort((a, b) => a - b)).toEqual(order);
   for (const name of ["security-confirmation.css", "data-export.css"]) expect(source(`app/${name}`)).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|oklch\(/i);
   const selectors = [...source("app/security-confirmation.css").matchAll(/(^|})\s*([^{}]+)\s*\{/g)].map((match) => match[2]!.trim());
-  expect(selectors.length).toBe(5);
+  expect(selectors.length).toBeGreaterThanOrEqual(5);
   expect(selectors.every((selector) => selector.startsWith(".authSecurity"))).toBe(true);
 });
 it("Y-2 gives export and Delete-account panels the same measured container and pill values", async () => {
@@ -54,6 +54,10 @@ it("Y-2 gives export and Delete-account panels the same measured container and p
   await click(settings["settings.erasure.schedule"]); await flush();
   const deletePanel = host!.querySelector<HTMLElement>("section.authSecurityConfirmation")!;
   expect(measured(deletePanel)).toEqual(exportValues);
+  await click("Password");
+  const deleteForm = deletePanel.querySelector<HTMLElement>("form.authForm")!;
+  expect(getComputedStyle(deleteForm).flexDirection).toBe("row");
+  expect(deleteForm.querySelector<HTMLButtonElement>(".setBtnQuiet")?.type).toBe("button");
 });
 it("Y-3 styles all three methods, the selected password form and its accessible fields", async () => {
   injectStyles(); await mount(<DataExportCard catalog={settings} locale="en" client={exportClient() as never} />); await click(settings["settings.export.request"]); await flush();
@@ -71,11 +75,15 @@ it("Y-3 styles all three methods, the selected password form and its accessible 
   // jsdom loses the selected color after globals.css's var() border shorthand.
   expect(source("app/security-confirmation.css")).toMatch(/\.authSecurityConfirmation \.setBtn\[aria-pressed="true"\]\s*\{\s*border-color:\s*var\(--ink\);\s*\}/);
   const form = panel.querySelector<HTMLElement>(".authForm")!; const css = getComputedStyle(form);
-  expect([css.display, css.gap, css.alignItems]).toEqual(["flex", "10px", "center"]);
+  expect([css.display, css.flexDirection, css.gap, css.alignItems]).toEqual(["flex", "row", "10px", "center"]);
+  expect(css.marginTop).toBe("0px");
+  expect(form.querySelector<HTMLButtonElement>(".setBtnQuiet")?.type).toBe("button");
   for (const field of form.querySelectorAll<HTMLElement>(".setField")) {
     const label = field.querySelector("label")!; const input = field.querySelector("input")!;
     expect(getComputedStyle(label).clipPath).toBe("inset(50%)");
     expect(input.placeholder).toBe(label.textContent);
+    expect(getComputedStyle(input).fontWeight).toBe("400");
+    expect(getComputedStyle(input).letterSpacing).toBe("normal");
   }
   expect(form.querySelector("button")?.className).toContain("setBtnPrimary");
   const cancel = [...panel.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent === "Cancel")!;

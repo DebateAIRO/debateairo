@@ -42,6 +42,7 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
       setFile(ready);
       setView("starting");
       startDownload(ready);
+      clearPendingExport();
     }, (failure: unknown) => {
       if (!active) return;
       if (failure instanceof ContractHttpError && (failure.code === "SESSION_REQUIRED" || failure.serverCode === "COOKIE_SESSION_REQUIRED" || failure.serverCode === "SESSION_REQUIRED")) {
