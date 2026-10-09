@@ -41,7 +41,7 @@ jobs:
     steps:
       # The nightly run checks out dev by name (dev is also the default branch, which a schedule otherwise uses);
       # a pull request or a manual run checks out its own ref (an empty ref is checkout's default).
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: "${{ github.event_name == 'schedule' && 'dev' || '' }}" }
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with: { version: 11.20.0 }
