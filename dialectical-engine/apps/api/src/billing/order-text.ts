@@ -10,8 +10,9 @@ import type { PlanId } from "@debateai/register";
 const [brand = SELLER_COMPANY.legalName] = SELLER_COMPANY.tradingNames;
 
 /**
- * The sentences billing writes where a person or a tax document reads them: the xMoney order line (spec §2.5.3 step
- * 5: "a catalogue sentence for the plan"), the card check's order line (P12e) and the one invoice line (P10).
+ * The sentences billing writes where a person or a tax document reads them: the order line NETOPIA's payment page
+ * shows (spec §2.5.3 step 5: "a catalogue sentence for the plan"), the card check's order line (P12e) and the one
+ * invoice line (P10).
  * `params`: ORDER_PLAN `{plan}`; CARD_CHECK `{}`; INVOICE_LINE `{plan, from, to}`, the dates already worded by
  * `invoiceDate` in the same locale.
  */

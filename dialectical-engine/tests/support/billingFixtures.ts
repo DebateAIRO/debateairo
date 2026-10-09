@@ -77,19 +77,27 @@ export function unusedAskApplication(): AskApplication {
   };
 }
 
+/** The payment system a subscription was created in: NETOPIA's sandbox unless a test names its live system. */
+export type TestPaymentSystem = Readonly<{ provider: "netopia"; environment: "sandbox" | "live" }>;
+
 /**
- * CREATED then ACTIVATED for one owner: the smallest live subscription the fold accepts. CREATED names its xMoney
- * system (P1a's CHECK, P2's fold); ACTIVATED carries the recurring net price the subscriber keeps (Terms §12).
+ * CREATED then ACTIVATED for one owner: the smallest live subscription the fold accepts. CREATED names its payment
+ * system (0111's CHECK, N7's fold); ACTIVATED carries the recurring net price the subscriber keeps (Terms §12) and, on
+ * NETOPIA, the saved card it adopted (a fixed uuid: no card_token row backs it, so only the fold reads it).
  */
-export function activeSubscriptionEvents(ownerRef: string, at: Date, planId: "PLUS" | "PRO" | "MAX" = "PLUS"): SubscriptionEvent[] {
+export function activeSubscriptionEvents(
+  ownerRef: string, at: Date, planId: "PLUS" | "PRO" | "MAX" = "PLUS",
+  system: TestPaymentSystem = { provider: "netopia", environment: "sandbox" }
+): SubscriptionEvent[] {
   const subscriptionId = randomUUID();
-  const base = { subscriptionId, ownerRef, planId, xmoneyCustomerId: "9001", cardRef: null } as const;
   const netMicros = testBillingPlans.plans.find((plan) => plan.planId === planId)!.netPriceMicros;
+  const base = { subscriptionId, ownerRef, planId, cardTokenId: null } as const;
+  const created = { payment_provider: system.provider, payment_environment: system.environment };
   return [
-    { ...base, eventId: randomUUID(), kind: "CREATED", at, periodAnchorAt: null, xmoneyOrderId: null,
-      data: { country_confirmed: false, ip_country: "RO", quote_id: randomUUID(), xmoney_environment: "stage" } },
-    { ...base, eventId: randomUUID(), kind: "ACTIVATED", at, periodAnchorAt: at, xmoneyOrderId: "9002",
-      cardRef: "9003", data: {
+    { ...base, eventId: randomUUID(), kind: "CREATED", at, periodAnchorAt: null,
+      data: { country_confirmed: false, ip_country: "RO", quote_id: randomUUID(), ...created } },
+    { ...base, eventId: randomUUID(), kind: "ACTIVATED", at, periodAnchorAt: at,
+      cardTokenId: ["5b7e1c2a", "4d3f", "4a6b", "9c8d", "0e1f2a3b4c5d"].join("-"), data: {
         charge_id: "0".repeat(32), announced_total_micros: Math.round(netMicros * 1.21), recurring_net_micros: netMicros,
         reactivated: false
       } }

@@ -726,8 +726,8 @@ describe("Paid plans · the billing rows and the budget band in the hosted regis
 
   it.each([
     ["a malformed plans row", "billingPlans", { kind: "BILLING_PLANS" }, "BILLING_PLANS_INVALID"],
-    ["a policy still naming the xMoney environment (A22)", "billingPolicy",
-      { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, xmoney_environment: "stage" }, "BILLING_POLICY_INVALID"]
+    ["a policy naming a payment environment (A22: the environment follows the API's base URL, never the policy)", "billingPolicy",
+      { ...BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value, payment_environment: "sandbox" }, "BILLING_POLICY_INVALID"]
   ])("refuses %s by the register's own code", async (_name, key, value, code) => {
     const file = validFile();
     file[key] = value;

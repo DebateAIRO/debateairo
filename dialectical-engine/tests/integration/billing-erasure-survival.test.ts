@@ -12,7 +12,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
 import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
 import {
   recordingAudit,
-  seedActiveSubscription,
+  seedNetopiaSubscription,
   subscriptionDeps,
   TEST_RECORDS_KEY
 } from "../support/billingSubscriptionFixtures.js";
@@ -81,7 +81,7 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
   it("W7: scheduling stops the renewal and keeps the plan; the erasure's commit ends it; the records survive", async () => {
     // P1b's fixture: user, both verified channels, one live session, an erasure request already due (not yet run).
     const account = await createBillingTestAccount(database.pool, "p15-stop");
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: account.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * 86_400_000),
       taxCountry: "RO", email: "keep-for-ten-years@example.test"
     });
@@ -160,7 +160,7 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
 
   it("W7: cancelling the deletion keeps the paid month and does not renew unless the person undoes the cancel", async () => {
     const account = await createBillingTestAccount(database.pool, "w7-cancel");
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: account.ownerRef, planId: "MAX", activatedAt: new Date(Date.now() - 86_400_000), taxCountry: "DE"
     });
     const billing = new BillingRepository(database.pool);
@@ -193,7 +193,7 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
     const billing = new BillingRepository(database.pool);
     const seedIn = async (label: string, kind: "PAST_DUE" | "SUSPENDED") => {
       const account = await createBillingTestAccount(database.pool, label);
-      const seeded = await seedActiveSubscription(database.pool, {
+      const seeded = await seedNetopiaSubscription(database.pool, {
         ownerRef: account.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 86_400_000), taxCountry: "RO"
       });
       const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId));
@@ -218,7 +218,7 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
   it("W7: a withdrawal while the deletion is scheduled is still offered in Settings and is carried out until the commit", async () => {
     const account = await createBillingTestAccount(database.pool, "w7-withdraw");
     const now = new Date();
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: account.ownerRef, planId: "PLUS", activatedAt: new Date(now.getTime() - 3 * 86_400_000), taxCountry: "RO"
     });
     const billing = new BillingRepository(database.pool);
@@ -248,7 +248,7 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
 
   it("ends a live plan left behind after finalize: the guard still blocks it and the sweep ends it", async () => {
     const account = await createBillingTestAccount(database.pool, "p15-left-behind");
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: account.ownerRef, planId: "PRO", activatedAt: new Date(Date.now() - 86_400_000), taxCountry: "DE"
     });
     // The hook failed and the account was finalized before any sweep ran.
@@ -264,17 +264,17 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
 
   it("sweeps every owner with an erasure and a live plan, page after page, and no one else (W7: pending stops the renewal)", async () => {
     const billing = new BillingRepository(database.pool);
-    const live: Array<Awaited<ReturnType<typeof seedActiveSubscription>>> = [];
+    const live: Array<Awaited<ReturnType<typeof seedNetopiaSubscription>>> = [];
     const free: string[] = [];
     for (let index = 0; index < 3; index += 1) {
       const paying = await createBillingTestAccount(database.pool, `p15-page-${String(index)}`);
-      live.push(await seedActiveSubscription(database.pool, {
+      live.push(await seedNetopiaSubscription(database.pool, {
         ownerRef: paying.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 86_400_000), taxCountry: "RO"
       }));
       // A Free account being erased too: never listed, so it never takes a page's place.
       free.push((await createBillingTestAccount(database.pool, `p15-free-${String(index)}`)).ownerRef);
     }
-    const bystander = await seedActiveSubscription(database.pool, {
+    const bystander = await seedNetopiaSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PRO", activatedAt: new Date(Date.now() - 86_400_000), taxCountry: "DE"
     });
     const listed = await billing.pendingErasureOwnerRefs(null, 1_000);
@@ -294,12 +294,12 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
   it("ends the live plan of an account the age gate froze, never as an erasure, and names no other state (R3-2)", async () => {
     const billing = new BillingRepository(database.pool);
     const paying = await accountWithoutErasure();
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: paying.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 86_400_000), taxCountry: "RO"
     });
     // A control in another non-active state, with a live plan of its own: only age_frozen is named, never "not active".
     const other = await accountWithoutErasure();
-    const otherPlan = await seedActiveSubscription(database.pool, {
+    const otherPlan = await seedNetopiaSubscription(database.pool, {
       ownerRef: other.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 86_400_000), taxCountry: "RO"
     });
     await other.setState("pending_mfa");
@@ -343,14 +343,14 @@ describe("P15 erasure stops billing and keeps the money and legal records", () =
     // An illegal history (RESUMED straight after CREATED) written past P1b's fold check, the way P16b's test writes
     // one: its latest kind is live, so the sweep lists the owner, and P1b's strict read refuses every stop.
     const broken = randomUUID();
-    for (const [kind, data] of [["CREATED", { xmoney_environment: "stage" }], ["RESUMED", {}]] as const) {
+    for (const [kind, data] of [["CREATED", { payment_provider: "netopia", payment_environment: "sandbox" }], ["RESUMED", {}]] as const) {
       await database.pool.query(`
         INSERT INTO billing.subscription_event (event_id, subscription_id, owner_ref, kind, at, plan_id, data)
         VALUES ($1, $2, $3, $4, clock_timestamp(), 'PLUS', $5::jsonb)
       `, [randomUUID(), broken, brokenAccount.ownerRef, kind, JSON.stringify(data)]);
     }
     const healthyAccount = await createBillingTestAccount(database.pool, "p15-healthy");
-    const healthy = await seedActiveSubscription(database.pool, {
+    const healthy = await seedNetopiaSubscription(database.pool, {
       ownerRef: healthyAccount.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 86_400_000), taxCountry: "RO"
     });
     expect(await billing.pendingErasureOwnerRefs(null, 1_000))

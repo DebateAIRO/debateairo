@@ -132,7 +132,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
   { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
   { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
-  { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" },
+  { route: "POST /v1/billing/netopia/notify", auth: "public", resource: "billing", action: "notify" },
   { route: "GET /v1/billing/subscription", auth: "user", resource: "billing", action: "read-subscription" },
   { route: "GET /v1/billing/invoices", auth: "user", resource: "billing", action: "list-invoices" },
   { route: "POST /v1/billing/subscription/downgrade", auth: "user", resource: "billing", action: "downgrade" },
@@ -141,6 +141,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/billing/subscription/upgrade-quote", auth: "user", resource: "billing", action: "quote-upgrade" },
   { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
   { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
+  { route: "GET /v1/billing/subscription/card", auth: "user", resource: "billing", action: "read-card-details" },
   { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
   // P13: first-party pages only, like the support mutations (DL1-F7), and never a session.
   { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },
@@ -304,8 +305,9 @@ describe("S7 deny-by-default authorization", () => {
     expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(20);
     expect(staffContractInventory.routes).toHaveLength(18);
     // The merged closed inventory adds the nineteen external recovery routes to the current ordinary inventory and 20 staff/internal
-    // allowance routes; set equality and Fastify mounting above check each one.
-    expect(contractInventory.routes).toHaveLength(158);
+    // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
+    // GET /v1/billing/subscription/card beside dev's 158.
+    expect(contractInventory.routes).toHaveLength(159);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

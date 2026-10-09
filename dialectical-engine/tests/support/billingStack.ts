@@ -1,7 +1,9 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
 import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
-import { BillingPersonAllowanceSource } from "@debateai/billing-core";
+import { BillingPersonAllowanceSource, foldSubscription } from "@debateai/billing-core";
 import { PostgresModelSpendStore, costEnvelopeDay } from "@debateai/budget";
 import {
   createEmailBlindIndex,
@@ -20,15 +22,17 @@ import {
 } from "@debateai/db";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
 import { currentDocument } from "@debateai/legal-manifest";
-import { XMoneyClient } from "@debateai/payments-xmoney";
+import { createNetopiaPayments, iso2ToNetopiaCountry, loadTrustedKeys } from "@debateai/payments-netopia";
 import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue, type PlanId } from "@debateai/register";
 import { PostgresAccountErasureApplication } from "../../apps/api/src/account-erasure.js";
 import { buildApi } from "../../apps/api/src/index.js";
 import type { BillingConnectors } from "../../apps/api/src/billing/connectors.js";
+import { NETOPIA_NOTIFY_PATH } from "../../apps/api/src/billing/index.js";
 import { OwnerJobs } from "../../apps/api/src/billing/owner-jobs.js";
 import { BillingReconciler, type ReconcileReport } from "../../apps/api/src/billing/reconcile.js";
+import { runBillingRefundDoneCli, type RefundDoneArguments } from "../../apps/api/src/billing/refund-done-cli.js";
+import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { createBillingRuntime, type BillingRuntime, type BillingRuntimeDeps } from "../../apps/api/src/billing/runtime.js";
-import { StageShiftedXMoneyClient } from "../../apps/api/src/billing/stage-clock.js";
 import { PersonUsageReader } from "../../apps/api/src/billing/usage.js";
 import { billingMailAttachmentResolvers } from "../../apps/api/src/mail-attachments.js";
 import { EmailChangeService } from "../../apps/api/src/email-change.js";
@@ -37,29 +41,43 @@ import type { SessionApplication } from "../../apps/api/src/sessions.js";
 import { eraseBillingTestAccount } from "./billingAccountFixture.js";
 import { testBillingPlans, testBillingPolicy, testCountryPolicy, unusedAskApplication } from "./billingFixtures.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "./discoveredPanel.js";
-import { startFakeXMoney } from "./fake-xmoney.js";
 import { FakeInvoiceIssuer } from "./fake-invoice-issuer.js";
+import { startFakeNetopia, type FakeNetopia, type FakeNetopiaDelivery, type FakeNetopiaOutcome } from "./fake-netopia.js";
 import { FakeTaxEngine } from "./fake-tax-engine.js";
 import { TEST_APP_ORIGIN, testSessionHeaders, type TestHttpIdentity } from "./httpSession.js";
 import { startTestDatabase, type TestDatabase } from "./testDatabase.js";
 
 /**
- * P23 — the paid-plans runtime exactly as main.ts composes it (P7's createBillingRuntime with every P8–P16 member),
- * over embedded Postgres, the fake xMoney server, FakeTaxEngine and FakeInvoiceIssuer. Accounts are made active
- * directly (the sign-up, verification and 2-step flows are L3's, the age gate's and the existing suites'), each with
- * the age record (0077, unless a test asks for an account that still owes it) and the sign-up TERMS acceptance
- * registration writes; the session application reads that age record as SessionService does. Everything from the
- * quote on goes through the real routes and the real jobs, and the account deletion routes (DELETE /v1/account) are
- * composed with billing's hook as main.ts composes them (P2-M39). The
- * runtime's timers are never started: the test drives time. The stack's clock is real time plus whatever the test has
- * advanced, and xMoney is reached through StageShiftedXMoneyClient with that same offset, exactly as a stage host
- * with BILLING_STAGE_CLOCK_OFFSET_DAYS runs: the fake stamps transactions with real time, as xMoney does.
+ * P23, on NETOPIA (spec 2026-10-05 §2.20.2) — the paid-plans runtime exactly as main.ts composes it (createBillingRuntime
+ * with every member), over embedded Postgres, N5's NETOPIA protocol fake, FakeTaxEngine and FakeInvoiceIssuer. Accounts
+ * are made active directly (the sign-up, verification and 2-step flows are L3's, the age gate's and the existing suites'),
+ * each with the age record (0077, unless a test asks for an account that still owes it) and the sign-up TERMS acceptance
+ * registration writes. Everything from the quote on goes through the real routes and the real jobs: the checkout starts
+ * a hosted payment with the real NETOPIA client, the test pays it on the fake's page, and the fake posts its signed
+ * message to the real notify route through a loopback relay (NETOPIA posts to PUBLIC_APP_URL, which the stack never
+ * serves). The account deletion routes (DELETE /v1/account) are composed with billing's hook as main.ts composes them
+ * (P2-M39). The runtime's timers are never started: the test drives time. The stack's clock is real time plus whatever
+ * the test has advanced, and the fake reads the same clock, so every time NETOPIA reports is on the runtime's clock;
+ * TimeShiftedCardPayments, which a sandbox host with BILLING_STAGE_CLOCK_OFFSET_DAYS uses, is N1's unit suite's.
  */
 
 /** TEST-NET-3 addresses the fake country lookup maps; Fastify sees them as request.ip through inject. */
 export const TEST_IPS = Object.freeze({ RO: "203.0.113.10", DE: "203.0.113.20", US: "203.0.113.30" } as const);
 const COUNTRY_OF_IP: Readonly<Record<string, string>> = Object.freeze({
   [TEST_IPS.RO]: "RO", [TEST_IPS.DE]: "DE", [TEST_IPS.US]: "US"
+});
+/** NETOPIA's numeric issuer country for an ISO alpha-2 code (the fake's `pay` takes NETOPIA's form). */
+export function netopiaCountry(iso2: string): number {
+  const found = iso2ToNetopiaCountry(iso2);
+  if (found === null) throw new Error(`BILLING_STACK_COUNTRY_UNKNOWN:${iso2}`);
+  return found.numeric;
+}
+
+/** The payer each test country checks out as: every field NETOPIA needs (spec §2.6.1); R-15's city and county for Romania. */
+const PAYER_OF: Readonly<Record<string, Readonly<Record<string, string>>>> = Object.freeze({
+  RO: { first_name: "Ana", last_name: "Pop", phone: "+40712345678", street: "Strada Memorandumului 1", city: "Cluj-Napoca", region: "Cluj", postal_code: "400114" },
+  DE: { first_name: "Anna", last_name: "Schmidt", phone: "+4915112345678", street: "Invalidenstrasse 1", city: "Berlin", postal_code: "10115" },
+  US: { first_name: "Ann", last_name: "Smith", phone: "+12125550123", street: "1 Main Street", city: "New York", region: "NY", postal_code: "10001" }
 });
 /** A syntactically valid argon2id hash nobody can sign in with; the stack never checks a password. */
 const PASSWORD_HASH = "$argon2id$v=19$m=65536,t=3,p=1$c2FsdHNhbHRzYWx0c2FsdA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
@@ -70,13 +88,14 @@ export type AcceptedTerms = "CURRENT" | "OLDER" | "NONE";
 /** The age record: PASSED as registration writes it since 0077, or OWED (an account from before the age gate). */
 export type AgeRecord = "PASSED" | "OWED";
 export type HttpAnswer = Readonly<{ status: number; body: Record<string, unknown>; text: string }>;
-export type FakeXMoney = Awaited<ReturnType<typeof startFakeXMoney>>;
 export type PaidPlan = Exclude<PlanId, "FREE">;
 
 export interface BillingStack {
   readonly database: TestDatabase;
   readonly runtime: BillingRuntime;
-  readonly xmoney: FakeXMoney;
+  readonly netopia: FakeNetopia;
+  /** The loopback address the fake posts NETOPIA's messages to (the relay in front of the notify route). */
+  readonly notifyUrl: string;
   readonly mail: MemoryTemplatedMailSender;
   readonly invoices: FakeInvoiceIssuer;
   readonly tax: FakeTaxEngine;
@@ -93,8 +112,8 @@ export interface BillingStack {
    * new address. Billing is told nothing; it must follow the account by itself.
    */
   changeEmail(person: BillingPerson, newEmail: string): Promise<void>;
-  /** The xMoney order the person's subscription rebills (A1). */
-  xmoneyOrderOf(ownerRef: string): Promise<string | null>;
+  /** The saved card the person's subscription renews with (spec §2.15.2), or null. */
+  cardTokenOf(ownerRef: string): Promise<string | null>;
   get(person: BillingPerson | null, url: string, ip?: string): Promise<HttpAnswer>;
   post(person: BillingPerson | null, url: string, payload: unknown, ip?: string): Promise<HttpAnswer>;
   delete(person: BillingPerson, url: string, payload: unknown): Promise<HttpAnswer>;
@@ -110,24 +129,28 @@ export interface BillingStack {
    * acknowledged, finalize as the erasure principal. Returns finalize's outcome ("COMMITTED").
    */
   commitErasure(person: BillingPerson): Promise<string>;
-  /** The notice as xMoney posts it: form-encoded, no session. */
-  notify(opensslResult: string): Promise<HttpAnswer>;
+  /** NETOPIA's message as it arrives at the notify route: the exact bytes and the Verification-token header, no session. */
+  notify(input: Readonly<{ rawBody: Buffer; header: string | undefined; contentType?: string }>): Promise<HttpAnswer>;
+  /** Every message the fake has queued, posted to the notify route through the relay, as NETOPIA posts them. */
+  deliverNotices(): Promise<ReadonlyArray<FakeNetopiaDelivery>>;
   consents(locale: string): Readonly<Record<"renewal_terms" | "immediate_start", Readonly<{ version: string; sha256: string }>>>;
   /** POST /v1/billing/quote in the person's IP country, with R-15's name, city and county for Romania. */
   quote(person: BillingPerson, planId: PaidPlan): Promise<HttpAnswer>;
   checkout(person: BillingPerson, quoteRef: string): Promise<HttpAnswer>;
-  /** The browser half: xMoney's form completes the SIGNED order the checkout returned. */
-  pay(checkout: HttpAnswer, cardCountry: string, succeed?: boolean): ReturnType<FakeXMoney["completeSignedOrder"]>;
-  /** quote → checkout → pay → notice → every job. Returns the charge ref. */
+  /** The browser half: the person completes NETOPIA's page for the checkout's charge, then its message is delivered. */
+  pay(checkout: HttpAnswer, cardCountry: string, outcome?: FakeNetopiaOutcome): Promise<ReadonlyArray<FakeNetopiaDelivery>>;
+  /** quote → checkout → NETOPIA's page → the message → every job. Returns the charge ref. */
   subscribe(person: BillingPerson, planId: PaidPlan, cardCountry: string): Promise<string>;
   runJobs(): Promise<number>;
   /** P11a's renewal pass, then P11b's maintenance (the period-end sweep), then every job they queued. */
   runRenewals(): Promise<void>;
   /**
-   * P14a's daily money check (A10's listings and A2's adoption) over the stack's xMoney, built from the same members as
-   * runtime.ts builds its own (which the runtime does not expose), then every job it queued.
+   * The reconciler's 10-minute tick as the runtime runs it (spec §2.14: the status reads that are due, newest due
+   * first), built from the same members runtime.ts builds its own from, then every job it queued.
    */
-  reconcileDaily(): Promise<ReconcileReport>;
+  reconcile(): Promise<ReconcileReport>;
+  /** The owner's `pnpm billing:refund-done --charge … --amount … --confirm` (spec §2.12.2), then every job. Its output. */
+  refundDone(chargeRef: string, amount: string): Promise<string>;
   /**
    * P2-M39: P16c's daily owner-jobs tick (the quarter's tax summary queued once), built from the same members as
    * runtime.ts builds its own (which the runtime does not expose), then every job due; the runtime's own
@@ -229,7 +252,6 @@ async function createActiveAccount(
 export async function startBillingStack(): Promise<BillingStack> {
   const database = await startTestDatabase();
   await migrate(database.pool);
-  const xmoney = await startFakeXMoney();
   const tax = new FakeTaxEngine();
   const invoices = new FakeInvoiceIssuer();
   const mail = new MemoryTemplatedMailSender();
@@ -239,6 +261,10 @@ export async function startBillingStack(): Promise<BillingStack> {
   // Real time plus what the test advanced: time moves on by itself, as on a stage host with an offset.
   let advancedMs = 0;
   const now = (): Date => new Date(Date.now() + advancedMs);
+  const netopia = await startFakeNetopia({ now });
+  const payments = createNetopiaPayments(
+    { baseUrl: netopia.baseUrl, apiKey: netopia.apiKey, posSignature: netopia.posSignature }, { now }
+  );
   const acceptances = new AcceptanceRepository(database.pool);
 
   // Turn 14's change-email service on the stack's own database, DEKs and blind-index key. Its mail is kept apart from
@@ -313,18 +339,12 @@ export async function startBillingStack(): Promise<BillingStack> {
   };
 
   const connectors: BillingConnectors = Object.freeze({
-    // As main.ts does under a stage offset: the runtime's own times, translated at xMoney's door.
-    xmoney: new StageShiftedXMoneyClient(
-      new XMoneyClient({ baseUrl: xmoney.baseUrl, privateKey: xmoney.privateKey, siteId: xmoney.siteId, timeoutMs: 5_000 }),
-      () => advancedMs
-    ),
-    xmoneyEnvironment: "stage",
+    payments,
+    noticeTrust: Object.freeze({ posSignature: netopia.posSignature, keys: loadTrustedKeys(netopia.trustedKeysPem) }),
+    paymentEnvironment: "sandbox",
     tax,
     invoiceRo: invoices,
     recordsKey,
-    xmoneyPrivateKey: xmoney.privateKey,
-    xmoneyPublicKey: xmoney.publicKey,
-    siteId: xmoney.siteId,
     ownerReportEmail: "owner@example.test",
     publicAppUrl: TEST_APP_ORIGIN
   });
@@ -335,9 +355,11 @@ export async function startBillingStack(): Promise<BillingStack> {
   const spendStore = new PostgresModelSpendStore(database.pool);
   const billingRepository = new BillingRepository(database.pool);
   const entitlements = new EntitlementRepository(database.pool);
+  // runtime.ts's own `new BillingReconciler({...})`, over the stack's members.
+  const reconcilerJobs = new BillingJobQueries(database.pool);
   const reconciler = new BillingReconciler({
-    billing: billingRepository, jobs: new BillingJobQueries(database.pool), xmoney: connectors.xmoney,
-    environment: connectors.xmoneyEnvironment, audit: () => undefined, clock: now, kick: () => undefined
+    billing: billingRepository, jobs: reconcilerJobs, audit: () => undefined, clock: now, kick: () => undefined,
+    netopia: { payments: connectors.payments, paymentEnvironment: connectors.paymentEnvironment, jobs: reconcilerJobs, pool: database.pool }
   });
   const taxAuthorities = taxAuthoritiesFromValue(
     TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.sourceRef
@@ -392,6 +414,35 @@ export async function startBillingStack(): Promise<BillingStack> {
   });
   await api.ready();
 
+  // The owner command's desk (refund-done-cli.ts's entry block), over the stack's database and clock.
+  const notHere = async (): Promise<never> => { throw new Error("BILLING_STACK_OWNER_COMMAND_CALLS_NOTHING"); };
+  const ownerJobQueries = new BillingJobQueries(database.pool);
+  const ownerDesk = new RefundDesk({
+    repository: billingRepository, jobs: ownerJobQueries,
+    policy: testBillingPolicy, audit: () => undefined, clock: now,
+    netopia: { payments: { status: notHere }, paymentEnvironment: "sandbox", jobs: ownerJobQueries }
+  });
+
+  // NETOPIA posts its message to PUBLIC_APP_URL/api/v1/billing/netopia/notify, which the stack never serves: the fake
+  // posts to this loopback relay, which hands the exact bytes and the header to the notify route. `stack` is read only
+  // when a message arrives, after startBillingStack has built it.
+  const relay: Server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => { chunks.push(chunk); });
+    request.on("end", () => {
+      const header = request.headers["verification-token"];
+      const contentType = request.headers["content-type"];
+      void stack.notify({
+        rawBody: Buffer.concat(chunks), header: typeof header === "string" ? header : undefined,
+        ...(contentType === undefined ? {} : { contentType })
+      }).then((answered) => {
+        response.writeHead(answered.status, { "content-type": "application/json" }).end(answered.text);
+      }, () => { response.writeHead(500).end(); });
+    });
+  });
+  await new Promise<void>((resolve) => { relay.listen(0, "127.0.0.1", () => resolve()); });
+  const notifyUrl = `http://127.0.0.1:${(relay.address() as AddressInfo).port}${NETOPIA_NOTIFY_PATH}`;
+
   const answer = (response: { statusCode: number; body: string }): HttpAnswer => {
     let body: Record<string, unknown> = {};
     try { body = JSON.parse(response.body) as Record<string, unknown>; } catch { body = {}; }
@@ -401,7 +452,7 @@ export async function startBillingStack(): Promise<BillingStack> {
     person === null ? (mutating ? { origin: TEST_APP_ORIGIN } : {}) : { ...testSessionHeaders(person.identity, mutating) };
 
   const stack: BillingStack = {
-    database, runtime, xmoney, mail, invoices, tax,
+    database, runtime, netopia, notifyUrl, mail, invoices, tax,
     now,
     advanceDays(days) { advancedMs += days * 86_400_000; },
 
@@ -440,8 +491,10 @@ export async function startBillingStack(): Promise<BillingStack> {
       if (link === undefined || link.kind !== "confirmation") throw new Error("BILLING_STACK_EMAIL_CHANGE_NOT_SENT");
       await emailChanges.confirm(link.token, emailChangeSource);
     },
-    async xmoneyOrderOf(ownerRef) {
-      return (await billingRepository.subscriptionForOwner(ownerRef))?.xmoneyOrderId ?? null;
+    async cardTokenOf(ownerRef) {
+      const subscription = await billingRepository.subscriptionForOwner(ownerRef);
+      if (subscription === null) return null;
+      return foldSubscription(await billingRepository.subscriptionEvents(subscription.subscriptionId)).cardTokenId;
     },
 
     async get(person, url, ip) {
@@ -476,12 +529,18 @@ export async function startBillingStack(): Promise<BillingStack> {
         erasureId: request.rows[0]!.erasure_id
       });
     },
-    async notify(opensslResult) {
+    async notify(input) {
       return answer(await api.inject({
-        method: "POST", url: "/v1/billing/xmoney/notify", remoteAddress: "198.51.100.20",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        payload: `opensslResult=${encodeURIComponent(opensslResult)}`
+        method: "POST", url: NETOPIA_NOTIFY_PATH, remoteAddress: "198.51.100.20",
+        headers: {
+          "content-type": input.contentType ?? "application/json",
+          ...(input.header === undefined ? {} : { "verification-token": input.header })
+        },
+        payload: input.rawBody
       }));
+    },
+    async deliverNotices() {
+      return netopia.deliverNotices(notifyUrl);
     },
 
     consents(locale) {
@@ -495,17 +554,14 @@ export async function startBillingStack(): Promise<BillingStack> {
 
     async quote(person, planId) {
       const country = COUNTRY_OF_IP[person.ip]!;
-      return stack.post(person, "/v1/billing/quote", country === "RO"
-        ? { plan_id: planId, country, name: "Ana Pop", city: "Cluj-Napoca", region: "Cluj" }
-        : { plan_id: planId, country });
+      return stack.post(person, "/v1/billing/quote", { plan_id: planId, country, ...(PAYER_OF[country] ?? {}) });
     },
     async checkout(person, quoteRef) {
       return stack.post(person, "/v1/billing/checkout", { quote_ref: quoteRef, locale: "en", consents: stack.consents("en") });
     },
-    async pay(checkout, cardCountry, succeed = true) {
-      return xmoney.completeSignedOrder({
-        orderPayload: String(checkout.body.order_payload), orderChecksum: String(checkout.body.order_checksum), cardCountry, succeed
-      });
+    async pay(checkout, cardCountry, outcome = "APPROVE") {
+      netopia.pay(String(checkout.body.charge_ref), outcome, undefined, netopiaCountry(cardCountry));
+      return stack.deliverNotices();
     },
 
     async subscribe(person, planId, cardCountry) {
@@ -513,9 +569,8 @@ export async function startBillingStack(): Promise<BillingStack> {
       if (quote.status !== 200) throw new Error(`BILLING_STACK_QUOTE_${quote.status}_${String(quote.body.error)}`);
       const checkout = await stack.checkout(person, String(quote.body.quote_ref));
       if (checkout.status !== 200) throw new Error(`BILLING_STACK_CHECKOUT_${checkout.status}_${String(checkout.body.error)}`);
-      const notice = await stack.pay(checkout, cardCountry);
-      const notified = await stack.notify(notice.opensslResult);
-      if (notified.status !== 200 || notified.text !== "OK") throw new Error("BILLING_STACK_NOTICE_REFUSED");
+      const delivered = await stack.pay(checkout, cardCountry);
+      if (delivered.some((delivery) => delivery.httpStatus !== 200)) throw new Error("BILLING_STACK_NOTICE_REFUSED");
       await stack.runJobs();
       return String(checkout.body.charge_ref);
     },
@@ -524,6 +579,8 @@ export async function startBillingStack(): Promise<BillingStack> {
     // whoever claimed it. Retries scheduled for later are not due, and wait for the clock.
     async runJobs() {
       for (let round = 1; round <= 200; round += 1) {
+        // NETOPIA posts each message at once: deliver what the fake queued (a renewal's, an admin refund's, a dispute's).
+        if (netopia.pendingNotices() > 0) await stack.deliverNotices();
         await runtime.outbox.runOnce();
         const open = await database.pool.query<{ open: string }>(
           `SELECT count(*)::text AS open FROM billing.outbox
@@ -539,16 +596,27 @@ export async function startBillingStack(): Promise<BillingStack> {
       await runtime.maintenance.runOnce();
       await stack.runJobs();
     },
-    async reconcileDaily() {
-      // The client sends the listing window to whole seconds (P3b), so a transaction xMoney made in this very second is
-      // listed only from the next one: the stack lets that second end first, as a daily pass always has.
-      await new Promise((resolve) => setTimeout(resolve, 1_000 - (Date.now() % 1_000) + 5));
-      const report = await reconciler.runDaily(now());
-      // W13 (P2-I18): a refused listing no longer fails the pass, so a fake that stopped answering one would otherwise
-      // go unnoticed here; the fake answers all three, and any refusal is the stack's error.
-      if (report.refusedListings.length > 0) throw new Error(`BILLING_STACK_LISTING_REFUSED:${report.refusedListings.join(",")}`);
+    async reconcile() {
+      const report = await reconciler.tick();
       await stack.runJobs();
       return report;
+    },
+    async refundDone(chargeRef, amount) {
+      const output: string[] = [];
+      const sink = { stdout: (text: string) => { output.push(text); }, stderr: (text: string) => { output.push(text); } };
+      const code = await runBillingRefundDoneCli(["--charge", chargeRef, "--amount", amount, "--confirm"], sink, async () => {
+        // As the command's entry block: N15b's `--despite-chargeback` reaches the plan.
+        const plan = (input: RefundDoneArguments) => ownerDesk.planOwnerRefund(input.chargeRef, input.amountMicros, {
+          despiteChargeback: input.despiteChargeback
+        });
+        return Object.freeze({
+          plan, record: async (input: RefundDoneArguments) => ownerDesk.recordOwnerRefund(await plan(input), now()),
+          close: async () => undefined
+        });
+      });
+      if (code !== 0) throw new Error(`BILLING_STACK_REFUND_DONE_${code}:${output.join("").trim()}`);
+      await stack.runJobs();
+      return output.join("");
     },
     async runOwnerJobs() {
       const queued = await ownerJobs.schedule();
@@ -611,7 +679,9 @@ export async function startBillingStack(): Promise<BillingStack> {
     async stop() {
       runtime.stop();
       await api.close();
-      await xmoney.stop();
+      relay.closeAllConnections();
+      await new Promise<void>((resolve) => { relay.close(() => resolve()); });
+      await netopia.close();
       await database.stop();
     }
   };

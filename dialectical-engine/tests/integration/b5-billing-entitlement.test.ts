@@ -174,7 +174,7 @@ describe("the entitlement in force", () => {
       ownerRef, planId: "PLUS", periodAnchorAt: T0, cause: "SUBSCRIBED", effectiveAt: T0,
       subscriptionId, monthCreditOverrideMicros: null, paidThrough: plusMonthEnd
     });
-    // P11a's shape at the period end while xMoney or the tax service is down:
+    // P11a's shape at the period end while NETOPIA or the tax service is down:
     // same plan and anchor, no charge, paid_through pushed out by the ruling's 72 hours.
     const pendingUntil = new Date(plusMonthEnd.getTime() + 72 * 3_600_000);
     await appendEvent({
