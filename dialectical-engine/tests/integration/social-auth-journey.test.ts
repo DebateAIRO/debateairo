@@ -91,15 +91,15 @@ async function harness() {
         return social.callback('google', prepared.input, prepared.begin.flowCookie, source);
     };
     const finishFlow=async(begin:{authorization_url:string;flowCookie:string},extra:Record<string,unknown>={},metadata:Record<string,string>={})=>{const url=new URL(begin.authorization_url);assertion={...assertion,nonce:url.searchParams.get('nonce')!,...extra};return social.callback('google',{state:url.searchParams.get('state'),code:'link-code',...metadata},begin.flowCookie,source);};
-    const signup = async (email?: string, region:{country:string;usState?:string}={country:'RO'}) => {
+    const signup = async (email?: string, region:{country:string;usState?:string}={country:'RO'}, phone: string | null = '+40212345678') => {
         const cb = await callback();
-        const input = { continuation_token: cb.token, email: email ?? assertion.email, phone: '+40212345678', country:region.country,
+        const input = { continuation_token: cb.token, email: email ?? assertion.email, ...(phone === null ? {} : { phone }), country:region.country,
             ...(region.usState===undefined?{}:{us_state:region.usState}), date_of_birth: '1990-01-01', terms, privacy,
             locale: 'en', ui_locale: 'en', time_zone: 'Europe/Bucharest', turnstile_token: 'isolated-test-proof' };
         const declaredRegion=parseDeclaredRegion(input);
         if(declaredRegion===null)throw new Error('SYNTHETIC_SOCIAL_REGION_INVALID');
         const bound = { ...source, socialBrowserHash: socialHash('browser', cb.browserCookie), legal: { terms, privacy, locale: 'en' as const }, region:declaredRegion };
-        const admission = await registration.admitSource({ route: 'social', input: { email: input.email, phone: input.phone, adultAffirmed: true }, source: bound });
+        const admission = await registration.admitSource({ route: 'social', input: { email: input.email, phone: 'phone' in input ? input.phone : null, adultAffirmed: true }, source: bound });
         return { cb, bound, input, result: await social.completeSignup(input, bound, admission) };
     };
     return { social, repository, security, recovery, finishFlow, stepUp, mfa, sessions, registration, passkeys, prepareCallback, callback, signup, source, sent, users, disable: () => { enabled = false; } };
@@ -141,6 +141,16 @@ describe('actual signed-provider and restricted-database journeys', () => {
         finally {
             await h.registration.drainMailDispatches();
         }
+    });
+    // Owner ruling 2026-10-09: the phone is optional at sign-up; without one, no phone column is written (0109).
+    it('creates a social account without a phone and stores no phone profile',async()=>{
+        const h = await harness();
+        try {
+            const signup = await h.signup(undefined, {country:'RO'}, null);
+            expect(signup.result).toHaveProperty('status', 'mfa_required');
+            const row = (await db.pool.query('SELECT phone_ciphertext,phone_source,phone_verification_status,phone_updated_at,password_hash FROM identity."user" WHERE email_blind_index=$1', [createEmailBlindIndex(blindKey, signup.input.email)])).rows[0];
+            expect(row).toEqual({ phone_ciphertext: null, phone_source: null, phone_verification_status: null, phone_updated_at: null, password_hash: null });
+        } finally { await h.registration.drainMailDispatches(); }
     });
     it('persists the complete US/TX declaration for trusted-provider signup',async()=>{
         const h=await harness();
@@ -388,8 +398,8 @@ describe('actual signed-provider and restricted-database journeys', () => {
             expect(codes.codes).toHaveLength(10);
             const second = await h.callback({}, session, { action: 'READ_PHONE_PROFILE' }), bound = { ...h.source, socialBrowserHash: socialHash('browser', second.browserCookie) };
             const completed = await h.stepUp.complete({ continuation_token: second.token, code: codes.codes[0] }, session, bound);
-            expect(completed.response.replacement_recovery_code).toBeTruthy();
-            expect(completed.response.replacement_recovery_code).not.toBe(codes.codes[0]);
+            // Design note 2026-10-09 item 3: the used code is consumed, never refilled.
+            expect(completed.response).not.toHaveProperty('replacement_recovery_code');
             expect((await db.pool.query('SELECT count(*)::int n FROM identity.recovery_code WHERE user_id=$1 AND consumed_at IS NOT NULL', [session.userId])).rows[0].n).toBe(1);
         }
         finally {
