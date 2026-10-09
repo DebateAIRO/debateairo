@@ -23,11 +23,3 @@ tests/integration/registration-database.test.ts > S3 registration and verificati
 #   ruled slack (enumeration floor + tolerance) and an AUC against a 99th-percentile null, both measured on the
 #   runner's own clock while ~100 dispatches queue: on a 2-vCPU shared runner scheduling delay alone can exceed the
 #   slack. Listed so the first CI runs show its real ubuntu behaviour without blocking; drop it if it stays green.
-tests/integration/registration-database.test.ts > T9 resend lock-order race through the real HTTP boundary > T9 counterbalances six resend windows with cadence-blocked family-wise equivalence
-#   source: timed out at its 420 s budget on the first CI run of registration-integration (2026-10-09, PR #100, run
-#   37934293307, ubuntu-latest, no product change). On the Mac it passes: 327 s and 376 s isolated in the
-#   algorithm-live-loop records (.hermes/.../agent-reports/flakes.md, known-reds-self.md) and green inside the 2,025 s
-#   whole-suite run on 2026-10-09. It drives six live resend windows at the product's dispatch cadence and then runs
-#   4,095-draw randomization tests, so its wall time is CPU-bound with only a 10-30 % margin on the Mac; a shared
-#   2-vCPU runner exceeds it. The 420 s budget is NOT raised here: while it keeps timing out on CI its equivalence
-#   verdict is reached only on a faster host. A longer CI budget or a bigger runner is the owner's call.
