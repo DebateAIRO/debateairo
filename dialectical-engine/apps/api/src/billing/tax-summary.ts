@@ -12,6 +12,7 @@ import {
 } from "@debateai/register";
 import { deadEmailAction, documentJobAction } from "./dead-jobs.js";
 import { otherSystemCode } from "./outbox.js";
+import { hostCommand } from "./refunds.js";
 
 export type TaxQuarter = Readonly<{ year: number; quarter: 1 | 2 | 3 | 4; from: Date; to: Date; label: string }>;
 /**
@@ -482,7 +483,9 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
     if (dates.length > 0) out.push(`  For ${quarter.label}: ${listOf(dates.map(longDate))}.`);
     out.push("");
   }
-  const fullCommand = `pnpm billing:tax-summary --quarter ${quarter.label}`;
+  // Every owner command this text names is README §14.8's host form on its own line (F8's rule, ruling PR-56): a bare
+  // `pnpm billing:…` has none of the API's settings in a root shell.
+  const fullCommand = hostCommand(`billing:tax-summary --quarter ${quarter.label}`);
   /** Prints a list's lines (at most `limit.itemsPerSection` of them) and hands back the lines it printed. */
   const section = <T>(items: ReadonlyArray<T>, empty: string, heading: string, lineOf: (item: T) => string): ReadonlyArray<T> => {
     if (items.length === 0) {
@@ -493,7 +496,8 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
     const shown = limit === null ? items : items.slice(0, limit.itemsPerSection);
     for (const item of shown) out.push(`  - ${lineOf(item)}`);
     if (shown.length < items.length) {
-      out.push(`  - and ${String(items.length - shown.length)} more: run ${fullCommand} on the host for the whole list`);
+      out.push(`  - and ${String(items.length - shown.length)} more: run the command below as root on the server for the`
+        + ` whole list\n    ${fullCommand}`);
     }
     return shown;
   };
@@ -509,7 +513,8 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
     }
     if (actions.size === 0) return;
     out.push("  What to do:");
-    for (const [key, action] of actions) out.push(`  * ${key}: ${action}`);
+    // An action's command lines sit under its bullet.
+    for (const [key, action] of actions) out.push(`  * ${key}: ${action.replaceAll("\n", "\n  ")}`);
   };
   section(summary.conflicting, "Charges with conflicting location evidence: none.",
     "Charges with conflicting location evidence (taxed at the declared country; for the accountant):",
@@ -525,20 +530,21 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
   section(summary.unknownRefunds, "Refunds made in NETOPIA's admin, amount unknown: none.",
     // P4-K (P2-W12): once the owner records the credit note with its amount, `quarterSummaryRows` subtracts it.
     "Refunds made in NETOPIA's admin, amount unknown (not subtracted above; read the amount in NETOPIA's admin,"
-      + " issue its credit note by hand and record it with its amount (pnpm billing:invoice --amount, as its line under"
-      + " the invoices and credit notes to check by hand says), and the summary then subtracts it at that amount; until"
-      + " then, adjust that country's net sales and tax by hand, at most the amount shown):",
+      + " issue its credit note by hand and record it with its amount (with the command its line under the invoices and"
+      + " credit notes to check by hand gives), and the summary then subtracts it at that amount; until then, adjust that"
+      + " country's net sales and tax by hand, at most the amount shown):",
     (item) => `charge ${item.chargeId}, ${item.taxCountry}${item.taxRegion === null ? "" : `, ${item.taxRegion}`},`
       + ` up to ${microsToDecimal(item.upToMicros)} USD, on ${isoDay(item.at)}`);
   // W12 (P2-I16, P2-I17): every dead document job, whatever its code; what to do once per job kind and code (fix I-1).
   // `pnpm billing:invoice` records a document issued or found by hand, or re-queues the job, and the line then leaves
-  // the list.
+  // the list; each kind's commands are printed under its bullet.
   const documentKey = (item: InvoiceUnknownItem): string => `${item.jobKind} (${item.code})`;
   legend(section(summary.invoiceUnknown, "Invoices and credit notes to check by hand: none.",
     "Invoices and credit notes to check by hand in SmartBill or Quaderno (a legal document that was never issued, or"
       + " whose issuing was never confirmed; what to do is said once for each job kind and code below the list, where"
-      + " <charge> stands for the line's charge; pnpm billing:invoice records a document you issued or found by hand, or"
-      + " re-queues the job; a document's line stays until the document is recorded, and a payment refunded before its"
+      + " <charge> stands for the line's charge; its commands, run as root on the server, record a document you issued or"
+      + " found by hand, or re-queue the job; a document's line stays until the document is recorded, and a payment"
+      + " refunded before its"
       + " plan started, which owes no document, is listed only in its sale's quarter):",
     (item) => `charge ${item.chargeId}: ${documentKey(item)}, since ${isoDay(item.since)}`),
   documentKey, (item) => documentJobAction({ chargeId: "<charge>", jobKind: item.jobKind, code: item.code }));
@@ -554,16 +560,20 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
   // N9: printed only when a NETOPIA message was kept, so a summary without any reads exactly as before.
   if (summary.unverifiedNotices.length > 0) {
     out.push("NETOPIA messages that could not be verified (kept 14 days and checked again at every API start; check the"
-      + " NETOPIA key with pnpm billing:check):");
+      + " NETOPIA key with the command under this list, run as root on the server):");
     for (const item of summary.unverifiedNotices) out.push(`  ${item.day}: ${plural(item.count, "message", "messages")}`);
+    out.push(`  ${hostCommand("billing:check")}`);
   }
-  section(summary.efactura, "Romanian e-Factura documents to confirm: none.",
+  const efactura = section(summary.efactura, "Romanian e-Factura documents to confirm: none.",
     "Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV (issued this quarter or earlier, and no"
-      + " ACCEPTED status recorded yet; record ANAF's answer with pnpm billing:efactura-status --invoice"
-      + " <series>-<number> --status ACCEPTED|REJECTED):",
+      + " ACCEPTED status recorded yet; record ANAF's answer with the command under this list, run as root on the"
+      + " server):",
     (item) => `${item.kind === "INVOICE" ? "invoice" : "credit note"} ${item.document} (charge ${item.chargeId}),`
       + ` issued ${isoDay(item.issuedAt)}: ${item.status === null ? "no status recorded" : `last status ${item.status}`}`);
-  section(summary.paymentsToCheck, "Payments to check by hand in NETOPIA's admin: none.",
+  if (efactura.length > 0) {
+    out.push(`  ${hostCommand("billing:efactura-status --invoice <series>-<number> --status <ACCEPTED or REJECTED>")}`);
+  }
+  const paymentsToCheck = section(summary.paymentsToCheck, "Payments to check by hand in NETOPIA's admin: none.",
     "Payments to check by hand in NETOPIA's admin (REFUND_REFUSED: NETOPIA refused our refund, the money is still owed,"
       + " refund it from NETOPIA's admin; REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check"
       + " NETOPIA's admin before refunding again; a WITHDRAWAL refund is due within 14 days of the withdrawal;"
@@ -577,8 +587,8 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " a refund of a payment whose admin-refund credit note is recorded is already in the figures"
       + " above: do not take it off again;"
       + " WITHDRAWAL_BY_OWNER: a withdrawal over a payment an admin refund touched, refund in NETOPIA's admin what the"
-      + " command cannot take back, then settle it with pnpm billing:withdraw --owner <ref> --refund <amount>"
-      + " --dashboard <amount refunded in NETOPIA's admin>; RENEWAL_STUCK: a renewal closed with its outcome"
+      + " command cannot take back, then settle it with the withdraw command under this list, run as root on the server"
+      + " with the line's owner ref in place of <ref>; RENEWAL_STUCK: a renewal closed with its outcome"
       + " unknown, check whether the card was charged; PAYMENT_UNSETTLED: no outcome after 30 days;"
       + " DUNNING_UNPRICED: a renewal the tax service could not price within the 3-day quiet retry, so the payment"
       + " reminders run with nothing charged, check the tax service; ENDED_UNPRICED: such a plan ended after its last"
@@ -592,6 +602,9 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " SUBSCRIPTION_HISTORY_INVALID: a subscription whose records do not add up, so renewals skip it, check what its"
       + " subscriber was charged and ask the developer):",
     (item) => `${subjectOf(item)}: ${item.what}${item.reason === null ? "" : ` (${item.reason})`}, since ${isoDay(item.since)}`);
+  if (paymentsToCheck.some((item) => item.what === "WITHDRAWAL_BY_OWNER")) {
+    out.push(`  ${hostCommand("billing:withdraw --owner <ref> --refund <amount> --dashboard <amount refunded in NETOPIA's admin>")}`);
+  }
   return fitted(out, limit, fullCommand);
 }
 
@@ -599,8 +612,8 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
 function fitted(lines: readonly string[], limit: TaxSummaryLimit | null, fullCommand: string): string {
   const text = `${lines.join("\n")}\n`;
   if (limit === null || text.length <= limit.maxChars) return text;
-  const closing = `The summary is cut here: it is longer than one email holds. Run ${fullCommand} on the host for the whole`
-    + " of it.\n";
+  const closing = "The summary is cut here: it is longer than one email holds. Run the command below as root on the"
+    + ` server for the whole of it.\n  ${fullCommand}\n`;
   const kept: string[] = [];
   let length = closing.length;
   for (const line of lines) {

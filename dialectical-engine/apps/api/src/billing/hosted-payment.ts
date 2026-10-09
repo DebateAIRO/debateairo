@@ -11,6 +11,7 @@ import type { ConsentPair } from "./checkout.js";
 import { isThisPaymentSystem } from "./outbox.js";
 import { queuePaymentAlert } from "./payment-alert.js";
 import { sealPaymentUrl } from "./records.js";
+import { hostCommand } from "./refunds.js";
 import { BillingRefusal } from "./refusal.js";
 import { chargeEvent } from "./rows.js";
 import { refuse } from "./subscription-core.js";
@@ -97,15 +98,21 @@ export function hostedStartDeps(
   });
 }
 
-/** The owner's next steps for a start NETOPIA refused (English only, owner-facing, content-free). */
-const START_STEPS: Readonly<Record<"CHARGE_CONFIGURATION_REFUSED" | "CHARGE_CREDENTIALS_REFUSED", string>> = Object.freeze({
+/**
+ * The owner's next steps for a start NETOPIA refused (English only, owner-facing, content-free). The check command is
+ * README §14.8's host form on its own line (F8's rule, ruling PR-56).
+ */
+export const START_STEPS: Readonly<Record<"CHARGE_CONFIGURATION_REFUSED" | "CHARGE_CREDENTIALS_REFUSED", string>> = Object.freeze({
   CHARGE_CONFIGURATION_REFUSED: "NETOPIA refused to open its payment page for a checkout, an upgrade or a card check"
     + " because of our own setup (the merchant settings, or a code we do not know). Nothing was charged; the person was"
-    + " told the payment page could not be opened and may try again. Run pnpm billing:check, then fix the setting in"
-    + " NETOPIA's admin or ask NETOPIA about the code.",
+    + " told the payment page could not be opened and may try again. Run the check command below as root on the server,"
+    + " then fix the setting in NETOPIA's admin or ask NETOPIA about the code.\n"
+    + `  ${hostCommand("billing:check")}`,
   CHARGE_CREDENTIALS_REFUSED: "NETOPIA refused our API key when opening a payment page for a checkout, an upgrade or a"
     + " card check. Nothing was charged; the person was told the payment page could not be opened. Replace the key with"
-    + " the guided setup (deploy/vps/billing-setup.sh --replace netopia), restart the API, and run pnpm billing:check."
+    + " the guided setup (deploy/vps/billing-setup.sh --replace netopia), restart the API, and run the check command"
+    + " below as root on the server.\n"
+    + `  ${hostCommand("billing:check")}`
 });
 
 /**

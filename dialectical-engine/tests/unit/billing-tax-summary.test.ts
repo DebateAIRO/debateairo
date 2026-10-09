@@ -12,6 +12,9 @@ import {
   renderTaxSummary,
   unverifiedNoticeDaysFrom
 } from "../../apps/api/src/billing/tax-summary.js";
+import {
+  asRunbookLine, BARE_BILLING_COMMAND, ON_HOST, printedHostCommands, runbookBillingCommands
+} from "../support/runbookHostCommands.js";
 
 const authorities = taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, "test");
 const Q4 = parseTaxQuarter("2026-Q4");
@@ -138,10 +141,13 @@ describe("P16b the summary", () => {
     expect(text).toContain(`charge ${"f".repeat(32)}: QUADERNO_RECORD_REFUND (CREDIT_NOTE_REFUND_MISSING), since 2026-11-10\n`);
     expect(text).toContain("where <charge> stands for the line's charge");
     expect(text).toContain("  What to do:\n  * SMARTBILL_INVOICE (INVOICE_UNKNOWN): SmartBill never confirmed it: look for it in"
-      + " SmartBill; if it is there, record it with pnpm billing:invoice --charge <charge> --kind INVOICE --record"
-      + " <series>-<number>;");
+      + " SmartBill; if it is there, record it with the --record command below;");
+    // Each command on its own line under its kind and code, as README §14.8 runs it on the host.
+    expect(text).toContain("run the commands as root on the server:\n"
+      + `    ${ON_HOST} billing:invoice --charge <charge> --kind INVOICE --record <series>-<number>\n`
+      + `    ${ON_HOST} billing:invoice --charge <charge> --kind INVOICE --requeue --confirm-not-issued\n`);
     expect(text).toContain("  * QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED): Quaderno refused it");
-    expect(text).toContain("pnpm billing:invoice --charge <charge> --kind INVOICE --requeue");
+    expect(text).toContain(`\n    ${ON_HOST} billing:invoice --charge <charge> --kind INVOICE --requeue\n`);
     expect(text).toContain("  * QUADERNO_RECORD_REFUND (CREDIT_NOTE_REFUND_MISSING): no refund is recorded for this sale:"
       + " nothing to issue or re-queue; tell whoever runs the server");
     // F4: the job itself is not tried again; only M3 is sent again, by the renewal.
@@ -189,9 +195,15 @@ describe("P16b the summary", () => {
       + " ends after its last retry day unless a later retry prices at the announced total again; there is nothing to fix"
       + " in the tax service, and the person can subscribe again at the new price;");
     expect(text).toContain("subscription 7d0a3b4c-5e6f-4a7b-8c8d-9e0f1a2b3c4d: RENEWAL_BLOCKED, since 2026-11-16");
-    expect(text).toContain("pnpm billing:withdraw --owner <ref> --refund <amount>");
+    expect(text).toContain("WITHDRAWAL_BY_OWNER: a withdrawal over a payment an admin refund touched, refund in NETOPIA's"
+      + " admin what the command cannot take back, then settle it with the withdraw command under this list, run as root on"
+      + " the server with the line's owner ref in place of <ref>;");
+    expect(text).toContain(`, since 2026-11-13\n  ${ON_HOST} billing:withdraw --owner <ref> --refund <amount>`
+      + " --dashboard <amount refunded in NETOPIA's admin>\n");
     expect(text).toContain("Romanian e-Factura documents to confirm in SmartBill or the ANAF SPV");
-    expect(text).toContain("pnpm billing:efactura-status --invoice <series>-<number> --status ACCEPTED|REJECTED");
+    expect(text).toContain("record ANAF's answer with the command under this list, run as root on the server):");
+    expect(text).toContain(`issued 2026-11-04: last status SENT_BY_ACCOUNT_SETTING\n`
+      + `  ${ON_HOST} billing:efactura-status --invoice <series>-<number> --status <ACCEPTED or REJECTED>\n`);
     expect(text).toContain(`invoice DBAI-0042 (charge ${"a".repeat(32)}), issued 2026-11-03: no status recorded`);
     expect(text).toContain(`credit note DBAI-0043 (charge ${"b".repeat(32)}), issued 2026-11-04: last status SENT_BY_ACCOUNT_SETTING`);
     expect(text).not.toMatch(/@/);
@@ -215,9 +227,10 @@ describe("P16b the summary", () => {
     expect(text).toContain("Not subtracted: 1 refund made in NETOPIA's admin, amount unknown (listed below).");
     expect(text).toContain("Refunds made in NETOPIA's admin, amount unknown (not subtracted above;");
     // P4-K (P2-W12): the owner records the hand-made credit note with its amount, and the summary then subtracts it.
-    expect(text).toContain("issue its credit note by hand and record it with its amount (pnpm billing:invoice --amount, as"
-      + " its line under the invoices and credit notes to check by hand says), and the summary then subtracts it at that"
-      + " amount; until then, adjust that country's net sales and tax by hand, at most the amount shown):");
+    expect(text).toContain("issue its credit note by hand and record it with its amount (with the command its line under"
+      + " the invoices and credit notes to check by hand gives), and the summary then subtracts it at that amount; until"
+      + " then, adjust that country's net sales and tax by hand, at most the amount shown):");
+    expect(text).not.toMatch(BARE_BILLING_COMMAND);
     expect(text).toContain(`charge ${"a".repeat(32)}, RO, up to 24.20 USD, on 2026-11-20`);
     // A refund whose amount is known (ours, or an old one recorded as its own transaction) is still subtracted.
     const known = row({ chargeId: "a".repeat(32), type: "REFUND", amountMicros: 12_100_000, amountKnown: true });
@@ -318,17 +331,51 @@ describe("P16b the summary", () => {
 
   it("caps each list and cuts the whole text at a line boundary only when a limit is given (O1; W12 fix I-1)", () => {
     const full = renderTaxSummary(summary);
-    expect(full).not.toContain("more: run pnpm billing:tax-summary");
+    expect(full).not.toContain("more: run the command below");
     const capped = renderTaxSummary(summary, { itemsPerSection: 2, maxChars: 1_000_000 });
     expect(capped).toContain(`charge ${"b".repeat(32)}: SMARTBILL_STORNO (CREDIT_NOTE_MANUAL), since 2026-11-05\n`
-      + "  - and 4 more: run pnpm billing:tax-summary --quarter 2026-Q4 on the host for the whole list\n  What to do:");
+      + "  - and 4 more: run the command below as root on the server for the whole list\n"
+      + `    ${ON_HOST} billing:tax-summary --quarter 2026-Q4\n  What to do:`);
+    expect(capped).not.toMatch(BARE_BILLING_COMMAND);
     // The legend names only what the printed lines need.
     expect(capped).not.toContain("  * QUADERNO_RECORD_SALE (TAX_SERVICE_REFUSED):");
     const cut = renderTaxSummary(summary, { itemsPerSection: 40, maxChars: 2_000 });
     expect(cut.length).toBeLessThanOrEqual(2_000);
-    expect(cut.endsWith("The summary is cut here: it is longer than one email holds. Run pnpm billing:tax-summary --quarter"
-      + " 2026-Q4 on the host for the whole of it.\n")).toBe(true);
+    expect(cut.endsWith("The summary is cut here: it is longer than one email holds. Run the command below as root on the"
+      + ` server for the whole of it.\n  ${ON_HOST} billing:tax-summary --quarter 2026-Q4\n`)).toBe(true);
+    expect(cut).not.toMatch(BARE_BILLING_COMMAND);
     expect(full.startsWith(cut.slice(0, cut.lastIndexOf("\nThe summary is cut here")))).toBe(true);
+  });
+
+  // F8's rule (ruling PR-56): every owner command the summary prints (the CLI's text and the quarterly O1 email) is
+  // README §14.8's host form on its own line; a bare `pnpm billing:…` fails in a root shell (no settings).
+  it("prints every owner command as the runbook runs it on the host, each on its own line", () => {
+    const text = renderTaxSummary({
+      ...summary,
+      deadEmails: [...summary.deadEmails,
+        { ref: "O1:2026-Q3", template: "O1", recipient: "OWNER", code: "MAIL_RELAY_REFUSED", since: new Date("2026-11-21T00:00:00.000Z") }],
+      unverifiedNotices: [{ day: "2026-12-20", count: 1 }]
+    // Five lines a list: the sixth dead document overflows, and WITHDRAWAL_BY_OWNER (the fifth payment) is still shown.
+    }, { itemsPerSection: 5, maxChars: 1_000_000 });
+    expect(text).not.toMatch(BARE_BILLING_COMMAND);
+    const commands = printedHostCommands(text);
+    // Invoice (record, re-queue, admin refund), tax summary (overflow, owner email), withdraw, check, e-Factura.
+    for (const name of ["billing:invoice", "billing:tax-summary", "billing:withdraw", "billing:check", "billing:efactura-status"]) {
+      expect(commands.some((command) => command.startsWith(`${ON_HOST} ${name} `) || command === `${ON_HOST} ${name}`), name).toBe(true);
+    }
+    const runbook = runbookBillingCommands();
+    for (const command of commands) {
+      const line = asRunbookLine(command, [
+        ["--charge <charge>", '--charge "$CHARGE_REF"'], ["--record <series>-<number>", '--record "$DOCUMENT"'],
+        ["--record <Quaderno id>", '--record "$DOCUMENT"'], ["--record <document>", '--record "$DOCUMENT"'],
+        ["--amount <amount>", '--amount "$AMOUNT"'], ["--owner <ref>", '--owner "$OWNER_REF"'], ["--refund <amount>", '--refund "$REFUND"'],
+        ["--dashboard <amount refunded in NETOPIA's admin>", '--dashboard "$DASHBOARD"'],
+        ["--invoice <series>-<number>", '--invoice "$INVOICE"'], ["--status <ACCEPTED or REJECTED>", '--status "$STATUS"'],
+        ["--quarter <quarter>", "--quarter 2026-Q4"]
+      ]);
+      // README §14.8 names the kind as read in, except for the admin refund's credit note (always CREDIT_NOTE).
+      expect(runbook, command).toContain(line.includes("--amount ") ? line : line.replace(/--kind (?:INVOICE|CREDIT_NOTE)/u, '--kind "$KIND"'));
+    }
   });
 
   it("prints the fallback for a country the row does not cover, and says when there is nothing to list", () => {
@@ -431,9 +478,10 @@ describe("P16b the summary", () => {
       quarter: Q4, rows: [], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: [], unverifiedNotices: days
     }));
     expect(text).toContain("NETOPIA messages that could not be verified (kept 14 days and checked again at every API start;"
-      + " check the NETOPIA key with pnpm billing:check):");
-    expect(text).toContain("  2026-12-20: 1 message");
-    expect(text).toContain("  2026-12-21: 2 messages");
+      + " check the NETOPIA key with the command under this list, run as root on the server):");
+    expect(text).toContain("  2026-12-20: 1 message\n  2026-12-21: 2 messages\n"
+      + `  ${ON_HOST} billing:check\n`);
+    expect(text).not.toMatch(BARE_BILLING_COMMAND);
   });
 });
 

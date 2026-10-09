@@ -45,6 +45,7 @@ import { recordQuadernoDocument } from "./invoice-quaderno.js";
 import { INVOICE_CONFIRMED_NOT_ISSUED, parseSmartBillReference, recordSmartBillDocument } from "./invoice-smartbill.js";
 import { openBillingOperatorPool } from "./operator-connection.js";
 import { isThisPaymentSystem } from "./outbox.js";
+import { hostCommand } from "./refunds.js";
 
 export type InvoiceArguments =
   /** `amountMicros` (P4-K): only with `--kind CREDIT_NOTE`, for a DASHBOARD_REFUND line; absent otherwise. */
@@ -292,18 +293,30 @@ export function renderInvoiceResult(input: InvoiceArguments, result: InvoiceResu
     case "RECORDED": {
       const what = `${result.issuer === "SMARTBILL" ? "SmartBill" : "Quaderno"} ${result.document === "INVOICE" ? "invoice" : "credit note"}`;
       const reference = input.mode === "RECORD" ? input.reference : "";
+      // README §14.8's host form, each command on its own line after the sentences (F8's rule, ruling PR-56).
+      const commands = [
+        ...(result.issuer === "SMARTBILL"
+          ? [hostCommand(`billing:efactura-status --invoice ${reference || "<series>-<number>"} --status <ACCEPTED or REJECTED>`)]
+          : []),
+        ...(result.creditNoteWaiting
+          ? [hostCommand(`billing:invoice --charge ${input.chargeId} --kind CREDIT_NOTE --requeue`
+            + (result.issuer === "SMARTBILL" ? " --confirm-not-issued" : ""))]
+          : [])
+      ];
       return `Recorded: ${what} ${reference} for charge ${input.chargeId}.`
         + (result.document === "INVOICE" ? " The receipt (M2) is queued for the customer." : "")
         + (result.issuer === "SMARTBILL"
-          ? " It joins the e-Factura list until you record ANAF's answer with pnpm billing:efactura-status." : "")
+          ? " It joins the e-Factura list until you record ANAF's answer with the billing:efactura-status command below." : "")
         + " It leaves the owner summary's list."
         + (input.mode === "RECORD" && input.amountMicros !== undefined
           ? ` The quarter's tax summary now subtracts this refund at ${microsToDecimal(input.amountMicros)} USD.` : "")
         + (result.creditNoteWaiting
-          ? ` A credit note of this charge was waiting for this invoice: re-queue it with pnpm billing:invoice --charge`
-            + ` ${input.chargeId} --kind CREDIT_NOTE --requeue${result.issuer === "SMARTBILL" ? " --confirm-not-issued (once you have checked SmartBill)" : ""}.`
+          ? " A credit note of this charge was waiting for this invoice: re-queue it with the billing:invoice command below"
+            + `${result.issuer === "SMARTBILL" ? " (once you have checked SmartBill)" : ""}.`
           : "")
-        + "\n";
+        + (commands.length === 0 ? ""
+          : ` Run ${commands.length === 1 ? "the command" : "the commands"} as root on the server.`)
+        + "\n" + commands.map((command) => `  ${command}\n`).join("");
     }
     case "REQUEUED":
       return `Re-queued: the ${result.jobKind} job of charge ${input.chargeId} runs again within a minute, in the API's`

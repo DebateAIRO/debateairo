@@ -4,6 +4,7 @@ import { renderMail } from "@debateai/mail-templates";
 import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue } from "@debateai/register";
 import { OwnerJobs, taxSummaryJobFor } from "../../apps/api/src/billing/owner-jobs.js";
 import { recordingAudit } from "../support/billingSubscriptionFixtures.js";
+import { BARE_BILLING_COMMAND, ON_HOST } from "../support/runbookHostCommands.js";
 
 const authorities = taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, "test");
 const job = (kind: OutboxJob["kind"], ref: string): OutboxJob =>
@@ -120,8 +121,11 @@ describe("P16c the owner's tax-summary job", () => {
     // The mail renderer takes it: the send would not throw on the block's limit.
     expect(() => renderMail("O1", "en", { quarter: "2026-Q4", summaryText: text })).not.toThrow();
     // Each list shows its first 40 lines, then says how many more there are and where the whole list is.
-    expect(text).toContain("  - and 360 more: run pnpm billing:tax-summary --quarter 2026-Q4 on the host for the whole list");
-    expect(text).toContain("  - and 260 more: run pnpm billing:tax-summary --quarter 2026-Q4 on the host for the whole list");
+    // The command is README §14.8's host form, on its own line (a bare `pnpm billing:…` fails in a root shell).
+    const whole = `run the command below as root on the server for the whole list\n    ${ON_HOST} billing:tax-summary --quarter 2026-Q4\n`;
+    expect(text).toContain(`  - and 360 more: ${whole}`);
+    expect(text).toContain(`  - and 260 more: ${whole}`);
+    expect(text).not.toMatch(BARE_BILLING_COMMAND);
     // What to do is said once per job kind and code, not on every line.
     expect(text.split("SmartBill never confirmed it").length - 1).toBe(1);
     expect(text).toContain(`charge ${hex(0)}: QUADERNO_RECORD_SALE (TAX_SERVICE_UNAVAILABLE), since 2026-11-04\n`);

@@ -36,7 +36,7 @@ import { consoleBillingAudit, type BillingAudit } from "./audit.js";
 import { enqueueEmail } from "./email-job.js";
 import { openBillingOperatorPool } from "./operator-connection.js";
 import { isThisPaymentSystem } from "./outbox.js";
-import { allocateRefund, paidTransactions, RefundDesk } from "./refunds.js";
+import { allocateRefund, hostCommand, paidTransactions, RefundDesk } from "./refunds.js";
 import { BillingRefusal } from "./refusal.js";
 import { refuse } from "./subscription-core.js";
 import { recordWithdrawal, type WithdrawalDeps } from "./withdrawal.js";
@@ -227,9 +227,11 @@ export function renderWithdrawResult(result: WithdrawResult, input: WithdrawArgu
     case "OWNER_REVIEW":
       return `The withdrawal of ${owner} is recorded and the plan has ended, but a refund made in NETOPIA's admin`
         + " touched a payment, so nothing was refunded. Check NETOPIA's admin: refund there what this command cannot take"
-        + " back (a payment the earlier refund touched), then, within 14 days of the withdrawal, run"
-        + ` pnpm billing:withdraw --owner ${input.ownerRef} --refund <amount through this command>`
-        + " --dashboard <amount refunded in NETOPIA's admin>. M8 names the sum.\n";
+        + " back (a payment the earlier refund touched), then, within 14 days of the withdrawal, run the command below as"
+        + " root on the server. M8 names the sum.\n"
+        // README §14.8's host form, on its own line (F8's rule, ruling PR-56).
+        + `  ${hostCommand(`billing:withdraw --owner ${input.ownerRef} --refund <amount through this command>`
+          + " --dashboard <amount refunded in NETOPIA's admin>")}\n`;
     case "SETTLED":
       if (result.refundMicros === 0) {
         return result.dashboardMicros === 0

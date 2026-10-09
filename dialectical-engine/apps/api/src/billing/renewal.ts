@@ -19,7 +19,7 @@ import { planName, type BillingOrderText } from "./order-text.js";
 import { queuePaymentAlert } from "./payment-alert.js";
 import { taxRefusalDetail } from "./quote.js";
 import { openCardToken, openQuoteLocation, sealCardToken, sealQuoteLocation, type QuoteLocation } from "./records.js";
-import { paidAndRefundedInFull } from "./refunds.js";
+import { hostCommand, paidAndRefundedInFull } from "./refunds.js";
 import {
   dunningProgress, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingUntil
 } from "./renewal-rules.js";
@@ -139,17 +139,23 @@ const HOUR_MS = 3_600_000;
 /** How far back the NETOPIA passes look for an open renewal (§2.14's horizon). */
 const PAYMENT_LOOK_BACK_MS = 30 * DAY_MS;
 
-/** The owner's next steps for the O3 codes this file raises (English only, owner-facing, content-free). */
-const OWNER_STEPS: Readonly<Record<
+/**
+ * The owner's next steps for the O3 codes this file raises (English only, owner-facing, content-free). The check
+ * command is README §14.8's host form on its own line (F8's rule, ruling PR-56).
+ */
+export const OWNER_STEPS: Readonly<Record<
   "CHARGE_CONFIGURATION_REFUSED" | "CHARGE_CREDENTIALS_REFUSED" | "RENEWAL_OUTCOME_OPEN" | "ORDER_REUSED", string
 >> = Object.freeze({
   CHARGE_CONFIGURATION_REFUSED: "NETOPIA refused a renewal because of our own setup (the merchant settings, recurring"
     + " payments not switched on for the account, or a code we do not know). Nothing was charged and the customer was"
-    + " not emailed; the plan is kept for 72 hours and the renewal is tried again every hour. Run pnpm billing:check,"
-    + " then fix the setting in NETOPIA's admin or ask NETOPIA about the code.",
+    + " not emailed; the plan is kept for 72 hours and the renewal is tried again every hour. Run the check command"
+    + " below as root on the server, then fix the setting in NETOPIA's admin or ask NETOPIA about the code.\n"
+    + `  ${hostCommand("billing:check")}`,
   CHARGE_CREDENTIALS_REFUSED: "NETOPIA refused our API key. Nothing was charged and the customer was not emailed; the"
     + " plan is kept for 72 hours and the renewal is tried again every hour. Replace the key with the guided setup"
-    + " (deploy/vps/billing-setup.sh --replace netopia), restart the API, and run pnpm billing:check.",
+    + " (deploy/vps/billing-setup.sh --replace netopia), restart the API, and run the check command below as root on"
+    + " the server.\n"
+    + `  ${hostCommand("billing:check")}`,
   RENEWAL_OUTCOME_OPEN: "This renewal's outcome is still open at the end of its 72-hour window (24 hours for a"
     + " retry): NETOPIA holds the order, or its status could not be read. It is never closed by itself; it is read again"
     + " every hour and settles as soon as NETOPIA reports a final status. Paid access followed the window. Look the"

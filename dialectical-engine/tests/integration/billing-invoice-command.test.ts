@@ -12,6 +12,7 @@ import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue } from
 import { buildTaxSummary, parseTaxQuarter, renderTaxSummary, type TaxQuarter } from "../../apps/api/src/billing/tax-summary.js";
 import { PROFILE_ADDRESS_ONLY, testBillingPolicy } from "../support/billingFixtures.js";
 import { startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from "../support/billingHarness.js";
+import { ON_HOST } from "../support/runbookHostCommands.js";
 
 /** A SmartBill stand-in with no lookup (X1 row 8), as P5 ships it; `fail` is the next issue's outcome. */
 class SmartBillStub {
@@ -239,9 +240,11 @@ describe("W12 pnpm billing:invoice (P2-I17)", () => {
     }
     const recorded = await invoiceCommand("--charge", paid.chargeId, "--kind", "INVOICE", "--record", "DBAI-0900");
     expect(recorded).toMatchObject({ code: 0, err: "" });
-    expect(recorded.out).toContain(`A credit note of this charge was waiting for this invoice: re-queue it with pnpm`
-      + ` billing:invoice --charge ${paid.chargeId} --kind CREDIT_NOTE --requeue --confirm-not-issued (once you have checked`
-      + " SmartBill).");
+    // The commands to run next are README §14.8's host form, each on its own line (F8's rule, ruling PR-56).
+    expect(recorded.out).toContain("A credit note of this charge was waiting for this invoice: re-queue it with the"
+      + " billing:invoice command below (once you have checked SmartBill). Run the commands as root on the server.\n");
+    expect(recorded.out).toContain(`\n  ${ON_HOST} billing:invoice --charge ${paid.chargeId} --kind CREDIT_NOTE --requeue`
+      + " --confirm-not-issued\n");
     // P4-K control: a refund our records price (a void, PROVIDER_VOID) is credited at its REFUNDED row by the job, never at a typed amount.
     expect(await invoiceCommand("--charge", paid.chargeId, "--kind", "CREDIT_NOTE", "--record", "DBAI-0902", "--amount", "4.00"))
       .toMatchObject({ code: 1, err: "BILLING_INVOICE_NO_DASHBOARD_REFUND\n" });

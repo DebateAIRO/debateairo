@@ -6,6 +6,9 @@ import {
   renderWithdrawResult,
   runBillingWithdrawCli
 } from "../../apps/api/src/billing/withdraw-cli.js";
+import {
+  asRunbookLine, BARE_BILLING_COMMAND, ON_HOST, printedHostCommands, runbookBillingCommands
+} from "../support/runbookHostCommands.js";
 
 const OWNER = "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93";
 const RECEIVED = "2026-10-12T08:30:00Z";
@@ -48,8 +51,18 @@ describe("P14c the withdrawal command", () => {
     const review = renderWithdrawResult({ kind: "OWNER_REVIEW" }, record);
     // First NETOPIA's admin for what the command cannot take back, then the settle with both amounts.
     expect(review).toContain("refund there what this command cannot take back");
-    expect(review).toContain(`pnpm billing:withdraw --owner ${OWNER} --refund <amount through this command>`
-      + " --dashboard <amount refunded in NETOPIA's admin>");
+    // The settling command on its own line, as README §14.8 runs it on the host (F8's rule, ruling PR-56).
+    expect(review).not.toMatch(BARE_BILLING_COMMAND);
+    expect(review).toContain("then, within 14 days of the withdrawal, run the command below as root on the server. M8 names"
+      + " the sum.\n");
+    const settleLine = `${ON_HOST} billing:withdraw --owner ${OWNER} --refund <amount through this command>`
+      + " --dashboard <amount refunded in NETOPIA's admin>";
+    expect(printedHostCommands(review)).toEqual([settleLine]);
+    expect(review.endsWith(`\n  ${settleLine}\n`)).toBe(true);
+    expect(runbookBillingCommands()).toContain(asRunbookLine(settleLine, [
+      [`--owner ${OWNER}`, '--owner "$OWNER_REF"'], ["--refund <amount through this command>", '--refund "$REFUND"'],
+      ["--dashboard <amount refunded in NETOPIA's admin>", '--dashboard "$DASHBOARD"']
+    ]));
     const settle = parseWithdrawArguments(["--owner", OWNER, "--refund", "3.00", "--dashboard", "5.00"]);
     expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 3_000_000, dashboardMicros: 5_000_000 }, settle))
       .toContain("3.00 USD goes back to the card and 5.00 USD was refunded in NETOPIA's admin (M8 says 8.00)");

@@ -288,12 +288,21 @@ const ON_HOST = "systemd-run --pipe --wait --collect --uid=debateai-api --gid=de
   + " --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm";
 
 /**
+ * Any owner command (`billing:check`, `billing:invoice --charge …`) as README §14.8 runs it on the host. Every text
+ * that reaches the owner (an email, an O3's steps, a command's printed next step) names its commands this way: a bare
+ * `pnpm billing:…` in a root shell has none of the API's settings and stops at its missing DATABASE_URL.
+ */
+export function hostCommand(command: string): string {
+  return `${ON_HOST} ${command}`;
+}
+
+/**
  * Spec §2.12.2: the exact command the owner runs once a NETOPIA refund is made, as README §14.8 runs it. Without
  * `--confirm` (F6a, ops-4): run as given it only shows what it would record; the emails say to run it again with
  * `--confirm` added at the end to record it.
  */
 export function refundDoneCommand(chargeId: string, amountMicros: number): string {
-  return `${ON_HOST} billing:refund-done --charge ${chargeId} --amount ${microsToDecimal(amountMicros)}`;
+  return hostCommand(`billing:refund-done --charge ${chargeId} --amount ${microsToDecimal(amountMicros)}`);
 }
 
 /**
@@ -301,7 +310,7 @@ export function refundDoneCommand(chargeId: string, amountMicros: number): strin
  * records the outcome at once.
  */
 export function disputeCommand(chargeId: string, outcome: "won" | "lost"): string {
-  return `${ON_HOST} billing:dispute --charge ${chargeId} --outcome ${outcome}`;
+  return hostCommand(`billing:dispute --charge ${chargeId} --outcome ${outcome}`);
 }
 
 /** One open owner refund, as the reminder lists it (owner-facing English; our ids, no customer data). */

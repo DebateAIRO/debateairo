@@ -3,7 +3,8 @@ import type { PaymentReport, PaymentState } from "@debateai/billing-core";
 import type { ChargeEventRow } from "@debateai/db";
 import { chargeStatusOf } from "../../apps/api/src/billing/charge-status.js";
 import { REFUND_REASONS_REFUSING_THE_PAYMENT } from "../../apps/api/src/billing/codes.js";
-import { paidOrAlmost, stillPayable } from "../../apps/api/src/billing/hosted-payment.js";
+import { paidOrAlmost, START_STEPS, stillPayable } from "../../apps/api/src/billing/hosted-payment.js";
+import { BARE_BILLING_COMMAND, printedHostCommands, runbookBillingCommands } from "../support/runbookHostCommands.js";
 
 const ORDER = "0123456789abcdef0123456789abcdef";
 
@@ -86,5 +87,24 @@ describe("F4 a refused payment reads REFUND_PENDING until its refund is recorded
     for (const reason of ["CARD_COUNTRY_BLOCKED", "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE"]) {
       expect(chargeStatusOf(paid(reason)), reason).toEqual({ state: "FAILED", reasonCode: reason });
     }
+  });
+});
+
+// The O3 steps of a payment page NETOPIA refused to open for our own setup or key name the check command as README
+// §14.8 runs it on the host, on its own line (a bare `pnpm billing:check` fails in a root shell: no settings).
+describe("the owner's check command in a refused start's O3", () => {
+  it("prints billing:check as the runbook runs it, on its own line, for both codes", () => {
+    for (const code of ["CHARGE_CONFIGURATION_REFUSED", "CHARGE_CREDENTIALS_REFUSED"] as const) {
+      const steps = START_STEPS[code];
+      expect(steps, code).not.toMatch(BARE_BILLING_COMMAND);
+      expect(steps, code).toContain("the check command below as root on the server");
+      expect(printedHostCommands(steps), code).toHaveLength(1);
+      expect(steps.split("\n").at(-1), code).toBe(`  ${printedHostCommands(steps)[0]!}`);
+      expect(runbookBillingCommands(), code).toContain(printedHostCommands(steps)[0]);
+    }
+    expect(START_STEPS.CHARGE_CONFIGURATION_REFUSED).toContain("may try again. Run the check command below as root on the"
+      + " server, then fix the setting in NETOPIA's admin or ask NETOPIA about the code.\n");
+    expect(START_STEPS.CHARGE_CREDENTIALS_REFUSED).toContain("(deploy/vps/billing-setup.sh --replace netopia), restart the"
+      + " API, and run the check command below as root on the server.\n");
   });
 });

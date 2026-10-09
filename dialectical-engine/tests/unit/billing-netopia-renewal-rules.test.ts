@@ -6,7 +6,8 @@ import {
 } from "../../apps/api/src/billing/netopia-payer.js";
 import type { BillingProfile } from "../../apps/api/src/billing/records.js";
 import { isThisPaymentSystem } from "../../apps/api/src/billing/outbox.js";
-import { renewalFailureOf } from "../../apps/api/src/billing/renewal.js";
+import { OWNER_STEPS, renewalFailureOf } from "../../apps/api/src/billing/renewal.js";
+import { BARE_BILLING_COMMAND, printedHostCommands, runbookBillingCommands } from "../support/runbookHostCommands.js";
 
 const PROFILE: BillingProfile = Object.freeze({
   email: "stored@example.test", locale: "ro", name: "Ana Pop", firstName: "Ana", lastName: "Pop", phone: "+40712345678",
@@ -117,5 +118,25 @@ describe("N11 O3 for a payment that needs the owner (paymentAlert)", () => {
     expect(owner.text).toContain("Reason code: RENEWAL_OUTCOME_OPEN");
     expect(owner.text).not.toContain("A job that issues an invoice");
     expect(owner.text).toContain("This email is sent once for this reference and reason within the hour.");
+  });
+});
+
+// A renewal NETOPIA refused for our own setup or key: its O3 names the check command as README §14.8 runs it on the
+// host, on its own line (a bare `pnpm billing:check` fails in a root shell: no settings).
+describe("the owner's check command in a refused renewal's O3", () => {
+  it("prints billing:check as the runbook runs it, on its own line, for both codes", () => {
+    for (const code of ["CHARGE_CONFIGURATION_REFUSED", "CHARGE_CREDENTIALS_REFUSED"] as const) {
+      const steps = OWNER_STEPS[code];
+      expect(steps, code).not.toMatch(BARE_BILLING_COMMAND);
+      expect(steps, code).toContain("the check command below as root on the server");
+      expect(printedHostCommands(steps), code).toHaveLength(1);
+      expect(steps.split("\n").at(-1), code).toBe(`  ${printedHostCommands(steps)[0]!}`);
+      expect(runbookBillingCommands(), code).toContain(printedHostCommands(steps)[0]);
+    }
+    expect(OWNER_STEPS.CHARGE_CONFIGURATION_REFUSED).toContain("the renewal is tried again every hour. Run the check"
+      + " command below as root on the server, then fix the setting in NETOPIA's admin or ask NETOPIA about the code.\n");
+    expect(OWNER_STEPS.CHARGE_CREDENTIALS_REFUSED).toContain("(deploy/vps/billing-setup.sh --replace netopia), restart the"
+      + " API, and run the check command below as root on the server.\n");
+    for (const code of ["RENEWAL_OUTCOME_OPEN", "ORDER_REUSED"] as const) expect(OWNER_STEPS[code], code).not.toMatch(BARE_BILLING_COMMAND);
   });
 });

@@ -6,10 +6,11 @@ import {
   parseRefundDoneArguments, renderRefundDonePlan, renderRefundDoneResult, runBillingRefundDoneCli, type RefundDoneArguments
 } from "../../apps/api/src/billing/refund-done-cli.js";
 import {
-  disputeCommand, refundDoneCommand, refundHeldSteps, refundMailOf, refundReminderDue, renderOwnerRefundList,
+  disputeCommand, hostCommand, refundDoneCommand, refundHeldSteps, refundMailOf, refundReminderDue, renderOwnerRefundList,
   type OwnerRefundLine, type OwnerRefundPlan
 } from "../../apps/api/src/billing/refunds.js";
 import { chargebackLostSteps } from "../../apps/api/src/billing/verify-payment.js";
+import { runbookBillingCommands } from "../support/runbookHostCommands.js";
 
 const REF = "a".repeat(32);
 /** F6a (ops-4): README §14.8's own form of an owner command on the host, as the API's user with the API's EnvironmentFile. */
@@ -185,6 +186,12 @@ describe("N14 the owner's refund reminders (spec §2.12.2 item 3)", () => {
 describe("F8 the owner commands in O3 emails are the runbook's host form", () => {
   const runbook = readFileSync(fileURLToPath(new URL("../../deploy/vps/README.md", import.meta.url)), "utf8");
   const PAYMENT = "ntp-7300312";
+
+  it("hostCommand gives any owner command as the runbook runs it on the host (billing:check, its whole line)", () => {
+    expect(hostCommand("billing:check")).toBe(`${ON_HOST} billing:check`);
+    expect(runbookBillingCommands()).toContain(hostCommand("billing:check"));
+    expect(runbook.split("\n")).toContain(hostCommand("billing:check"));
+  });
 
   it("prints billing:dispute as the runbook runs it (it records at once: there is no preview to run first)", () => {
     for (const outcome of ["won", "lost"] as const) {
