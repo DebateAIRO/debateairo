@@ -274,6 +274,41 @@ describe("N21 deploy/vps/billing-setup.sh", () => {
     });
   }
 
+  // F8 (ruling PR-56) 1(a) and 1(b): a kept public-key file's fingerprints are worked out as the API's user; when that
+  // user's file cannot be read, one plain line says so and the run goes on.
+  it("shows a kept key file's fingerprints, and says in one line when it cannot be read, then goes on", async () => {
+    const root = await stage();
+    expect((await run(["--test-root", root], ALL_ANSWERS)).code).toBe(0);
+    const kept = await run(["--test-root", root, "netopia"], ["", ""]);
+    expect(kept.code, kept.output).toBe(0);
+    expect(kept.output).toContain(`Key 1: SHA-256 ${FINGERPRINT}, not NETOPIA's published plugin key: confirm this fingerprint with NETOPIA.`);
+    const keys = join(root, "etc/debateai/api/billing/netopia-ipn-keys.pem");
+    const before = await readFile(keys);
+    await chmod(keys, 0o000);
+    const unreadable = await run(["--test-root", root, "netopia"], ["", ""]);
+    await chmod(keys, 0o644);
+    expect(unreadable.code, unreadable.output).toBe(0);
+    expect(unreadable.output).toContain("Kept the existing netopia-ipn-keys.pem (run with --replace netopia to change it).");
+    expect(unreadable.output.split("\n").filter((line) => line.includes("could not be read"))).toEqual([
+      "The kept netopia-ipn-keys.pem could not be read, so its fingerprints are not shown; pnpm billing:check will say why."
+    ]);
+    expect(unreadable.output).not.toMatch(/^Key \d+:/mu);
+    expect(unreadable.output).toContain("Updated the billing settings block of /etc/debateai/api.env");
+    expect((await readFile(keys)).equals(before)).toBe(true);
+  });
+
+  // F8 1(c): a staged file an interrupt left behind (made, not yet recorded) is removed on the next run's exit.
+  it("removes a temporary file an interrupted run left in the billing folder", async () => {
+    const root = await stage();
+    expect((await run(["--test-root", root], ALL_ANSWERS)).code).toBe(0);
+    const billing = join(root, "etc/debateai/api/billing");
+    await writeFile(join(billing, ".billing-setup.Ab12Cd34"), `${API_KEY}\n`, { mode: 0o600 });
+    await writeFile(join(billing, ".kept-by-someone-else"), "not the script's\n");
+    const refused = await run(["--test-root", root, "netopia"], ["sandbox", "x", "y", "z"]);
+    expect(refused.code, refused.output).toBe(1);
+    expect((await readdir(billing)).filter((name) => name.startsWith(".")).sort()).toEqual([".kept-by-someone-else"]);
+  });
+
   it("refuses an API folder or a billing folder that is not the API user's", async () => {
     const strange = await stage();
     await writeFile(join(strange, ".billing-setup-owners"), "");
@@ -353,11 +388,11 @@ describe("N21 deploy/vps/billing-setup.sh", () => {
     const apiLines = lines.slice(api.start + 1, api.end).join("\n");
     expect(apiLines).toContain('runuser -u debateai-api -- sh -c "$body" sh "$@"');
     expect(apiLines).toContain("umask 077");
-    // The public-key file goes to that function only for its capped read, never to its stage or rename.
+    // The public-key file goes to that function only for its fingerprints, never to its stage or rename.
     const keyCalls = lines.filter((line) => /\bas_api\b|\bstage_secret\b|\bsave_secret\b/u.test(line) && /KEYS_FILE|netopia-ipn-keys/u.test(line));
     expect(keyCalls.length).toBeGreaterThan(0);
-    for (const line of keyCalls) expect(line).toMatch(/\bas_api read "\$KEYS_FILE"/u);
-    expect(apiLines).toContain("head -c 65536 --");
+    for (const line of keyCalls) expect(line).toMatch(/\bas_api fingerprints "\$KEYS_FILE"/u);
+    expect(apiLines).toContain('fingerprints 2>/dev/null < "$2" || exit 1');
     // Elsewhere root only names a path in the API's folder to look at it (a link test, an existence test, its owner),
     // to hand it to as_api or to print it: every such mention is one of these shapes, so a read, copy or write by root
     // (print_fingerprints "$KEYS_FILE", cat, awk) of a path there is caught.
@@ -366,7 +401,7 @@ describe("N21 deploy/vps/billing-setup.sh", () => {
       /\[ -[Le] "\$BILLING_DIR" \]/gu,
       /api_folder_safe "\$BILLING_DIR"/gu,
       /kept "\$(BILLING_DIR\/[a-z-]+|KEYS_FILE)"/gu,
-      /as_api (dir|stage|read) "\$(BILLING_DIR|KEYS_FILE)"/gu,
+      /as_api (dir|stage|fingerprints|sweep) "\$(BILLING_DIR|KEYS_FILE)"/gu,
       /record_owner [a-z:-]+ "\$(BILLING_DIR|KEYS_FILE)"/gu,
       /save_secret "\$BILLING_DIR\/[a-z-]+"/gu,
       /server_path "\$(BILLING_DIR\/[a-z-]+|KEYS_FILE)"/gu,
@@ -377,5 +412,42 @@ describe("N21 deploy/vps/billing-setup.sh", () => {
       const rest = looks.reduce((left, shape) => left.replace(shape, ""), line);
       expect(rest, `line ${index + 1}: ${line}`).not.toMatch(/BILLING_DIR|KEYS_FILE/u);
     });
+  });
+
+  // F8 (ruling PR-56) 1(a): root never parses the bytes of a file the API's user controls. openssl runs only in the one
+  // fixed body that reads standard input; as_api runs it as debateai-api on the kept file, root only on its own copy in
+  // $WORK; root reads back only the printed fingerprints.
+  it("runs openssl on a kept key file only as the API's user, and root only on its own staged copy", async () => {
+    const script = await readFile(SCRIPT, "utf8");
+    const lines = script.split("\n");
+    const start = lines.findIndex((line) => line.startsWith("read -r -d '' FINGERPRINTS_SH <<'SH'"));
+    const end = lines.findIndex((line, index) => index > start && line === "SH");
+    expect([start >= 0, end > start]).toEqual([true, true]);
+    const shared = lines.slice(start + 1, end).join("\n");
+    // The fixed body: reads standard input (capped at the boot's 65,536 bytes), names no path and takes no argument.
+    expect(shared).toContain('pem="$(head -c 65536)" || return 1');
+    expect(shared).not.toMatch(/BILLING_DIR|KEYS_FILE|WORK|\$\{?[0-9@*]|\s-in\s|\s<\s*"?\$/u);
+    // Every other line naming openssl only asks whether it is installed, or says so to the owner.
+    lines.forEach((line, index) => {
+      if ((index > start && index < end) || /^\s*#/u.test(line) || !/\bopenssl\b/u.test(line)) return;
+      const rest = line.replace(/command -v openssl >\/dev\/null 2>&1/u, "").replace(/^\s*say "[^"$`]*"$/u, "");
+      expect(rest, `line ${index + 1}: ${line}`).not.toMatch(/\bopenssl\b/u);
+    });
+    // Its two runs: as debateai-api (as_api) on the kept file, and root's own on the copy it built in $WORK.
+    const runs = lines.filter((line) => /FINGERPRINTS_SH|\bas_api fingerprints\b/u.test(line) && !/^\s*#/u.test(line));
+    expect(runs.map((line) => line.trim())).toEqual([
+      "read -r -d '' FINGERPRINTS_SH <<'SH' || true",
+      'body="$FINGERPRINTS_SH',
+      'if ! as_api fingerprints "$KEYS_FILE" < /dev/null > "$WORK/fingerprints"; then',
+      `sh -c "$FINGERPRINTS_SH"$'\\n'fingerprints sh < "$1" > "$WORK/fingerprints"`
+    ]);
+    // Root's own run reads only a copy in $WORK; root never hands a path in the API's folder to anything but as_api.
+    expect(lines.filter((line) => /\bprint_fingerprints\b/u.test(line) && !/^\s*#/u.test(line) && !/^print_fingerprints\(\)/u.test(line))
+      .map((line) => line.trim())).toEqual([
+      "print_fingerprints kept",
+      'print_fingerprints "$WORK/netopia-ipn-keys.$KEYS_STAGED"'
+    ]);
+    // The old capped copy to root's folder is gone: nothing of the API user's file lands in $WORK but fingerprints.
+    expect(script).not.toMatch(/as_api read|kept-keys/u);
   });
 });

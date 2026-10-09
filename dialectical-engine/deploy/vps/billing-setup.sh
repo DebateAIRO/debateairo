@@ -21,10 +21,13 @@
 #   exception, then moves it in: it changes into the billing folder, checks the folder it stands in ('.', owned by
 #   debateai-api, on the work folder's filesystem) and makes one rename onto the bare file name. A rename never follows
 #   its final name, and the folder it stands in cannot be swapped under it.
-# - A kept public-key file is read through as_api (at most 64 KiB, the boot's own limit) to print its fingerprints.
+# - A kept public-key file's fingerprints are worked out AS debateai-api (as_api runs openssl on at most its first
+#   64 KiB, the boot's own limit): root never reads or parses the bytes of a file that user controls, it only checks
+#   that each line printed back is a fingerprint. When that file cannot be read, one line says so and the run goes on.
 # Nothing is renamed into place until every question has been answered, right before api.env's block is rewritten: a
 # run that stops early (a wrong answer, Ctrl-C, a lost connection) leaves every key file as it was and removes what it
-# staged (the API's temporary files through as_api). An existing key file is kept unless --replace names its section.
+# staged (the API's temporary files through as_api, and any .billing-setup.* file an interrupted run left in the
+# billing folder). An existing key file is kept unless --replace names its section.
 # The plain values go into ONE block of /etc/debateai/api.env (root's, written by root as before), between the two
 # marker lines below: only that block is rewritten, a dated copy of the file is kept beside it with its mode and owner,
 # and a line outside the block that sets one of the block's keys is commented out with a note (systemd would use the
@@ -67,12 +70,15 @@ KEYS_STAGED=0
 TAB="$(printf '\t')"
 ANSWER=""
 VALUE=""
+BILLING_READY=0
 UNSAFE_FOLDER="BILLING_SETUP_UNSAFE_FOLDER: /etc/debateai/api and /etc/debateai/api/billing must be real folders (not links) owned by debateai-api (README §3)"
 
 refuse() { printf '%s\n' "$1" >&2; exit "${2:-1}"; }
 say() { printf '%s\n' "$*" >&2; }
 # On every exit (bash also runs this trap on INT, TERM and HUP): the API's staged files not yet renamed (removed as
-# the API's user), then the work folder (root's, which also holds the public-key file if it was never renamed).
+# the API's user), then any .billing-setup.* file left in the billing folder (one made but not yet recorded when an
+# interrupt came, or an earlier run's), also as the API's user, then the work folder (root's, which also holds the
+# public-key file if it was never renamed).
 cleanup() {
   local kind staged
   if [ -n "$PENDING" ]; then rm -f "$PENDING"; fi
@@ -81,6 +87,7 @@ cleanup() {
       if [ "$kind" = api ] && [ -n "$staged" ]; then as_api remove "$staged" < /dev/null || true; fi
     done < "$WORK/staged"
   fi
+  if [ "$BILLING_READY" = 1 ]; then as_api sweep "$BILLING_DIR" < /dev/null || true; fi
   if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
 }
 trap cleanup EXIT
@@ -158,6 +165,32 @@ record_owner() { # <owner:group> <its final path>
   printf '%s %s\n' "$1" "${2#"$ROOT"/}" >> "$ROOT/.billing-setup-owners"
 }
 
+# The fingerprints of a key file, one fixed POSIX sh body (its own function, fingerprints) that reads only standard
+# input, at most its first 65,536 bytes (the boot's TRUSTED_KEYS_MAX_BYTES), and prints one line per PEM block: the
+# SHA-256 of the block's public key (its SPKI, DER), or "-" when openssl cannot read the block. as_api runs it as
+# debateai-api on a kept file; root runs it only on its own copy in $WORK (the keys the owner just gave).
+read -r -d '' FINGERPRINTS_SH <<'SH' || true
+fingerprints() {
+  pem="$(head -c 65536)" || return 1
+  total="$(printf '%s\n' "$pem" | awk '/^-----BEGIN / { n++ } END { print n + 0 }')"
+  n=0
+  while [ "$n" -lt "$total" ]; do
+    n=$((n + 1))
+    block="$(printf '%s\n' "$pem" | awk -v want="$n" '/^-----BEGIN / { n++; on = (n == want) } on { print } on && /^-----END / { on = 0 }')"
+    case "$block" in
+      *"-----BEGIN CERTIFICATE-----"*) key="$(printf '%s\n' "$block" | openssl x509 -pubkey -noout 2>/dev/null)" || key="" ;;
+      *) key="$(printf '%s\n' "$block" | openssl pkey -pubin -pubout 2>/dev/null)" || key="" ;;
+    esac
+    hash=""
+    if [ -n "$key" ]; then
+      hash="$(printf '%s\n' "$key" | openssl pkey -pubin -outform DER 2>/dev/null | openssl dgst -sha256 2>/dev/null | awk '{ print $NF }')"
+    fi
+    case "$hash" in ""|*[!0-9a-f]*) hash="-" ;; esac
+    printf '%s\n' "$hash"
+  done
+}
+SH
+
 # The only function that writes inside /etc/debateai/api. On the server it runs AS debateai-api (runuser), so a link
 # that user planted can lead only where it may already write; under the test root the same body runs as the current
 # user. The body is fixed text: the paths arrive as positional arguments and a secret on standard input.
@@ -165,7 +198,8 @@ record_owner() { # <owner:group> <its final path>
 #   as_api stage <folder>        standard input into a new temporary file there, 0600; prints the file's path
 #   as_api rename <from> <to>    one rename onto the final name
 #   as_api remove <path>         removes a staged file that was never renamed
-#   as_api read <path>           at most the first 65,536 bytes (the boot's TRUSTED_KEYS_MAX_BYTES) on standard output
+#   as_api sweep <folder>        removes every .billing-setup.XXXXXXXX file left there (an interrupted run's)
+#   as_api fingerprints <path>   the file's fingerprints (FINGERPRINTS_SH below); fails when the file cannot be read
 as_api() { # <action> <path>...
   local body
   read -r -d '' body <<'SH' || true
@@ -183,10 +217,19 @@ case "$1" in
     if chmod 0600 "$t" && cat > "$t"; then printf '%s\n' "$t"; else rm -f -- "$t"; exit 1; fi ;;
   rename) mv -f -- "$2" "$3" ;;
   remove) rm -f -- "$2" ;;
-  read) head -c 65536 -- "$2" ;;
+  sweep)
+    for f in "$2"/.billing-setup.????????; do
+      if [ -f "$f" ] || [ -L "$f" ]; then rm -f -- "$f"; fi
+    done ;;
+  fingerprints)
+    # A regular file only (a planted FIFO would hold the run), opened and read as this user.
+    [ -f "$2" ] || exit 1
+    fingerprints 2>/dev/null < "$2" || exit 1 ;;
   *) exit 2 ;;
 esac
 SH
+  body="$FINGERPRINTS_SH
+$body"
   if [ "$TEST_MODE" = 1 ]; then
     sh -c "$body" sh "$@"
   else
@@ -246,6 +289,7 @@ commit_staged() {
 
 ensure_billing_dir() {
   as_api dir "$BILLING_DIR" < /dev/null || exit 1
+  BILLING_READY=1
   record_owner debateai-api:debateai-api "$BILLING_DIR"
 }
 
@@ -322,33 +366,34 @@ save_secret() { # <path>; the secret in ANSWER, staged as "<prefix><ANSWER>"
 
 published_fingerprint() { sed -n 's/^# SPKI SHA-256: \([0-9a-f]\{64\}\)$/\1/p' "$PUBLISHED_KEY" | head -n 1; }
 
-print_fingerprints() { # <pem file>
-  local published count=0 fingerprint block
+# One line per key: "kept" is the kept file in the API's folder, its fingerprints worked out by as_api as debateai-api;
+# any other argument is root's own copy in $WORK. Root reads back only the fingerprint lines, and takes a line for a
+# fingerprint only when it is 64 hex digits.
+print_fingerprints() { # kept | <root's own copy in $WORK>
+  local published count=0 fingerprint
   if ! command -v openssl >/dev/null 2>&1; then
     say "(openssl is not installed here: the check below prints each key's fingerprint.)"
     return 0
   fi
   published="$(published_fingerprint)"
-  rm -f "$WORK"/block.*
-  awk -v dir="$WORK" '/^-----BEGIN / { n++; name = dir "/block." n } name != "" { print > name } /^-----END / { close(name); name = "" }' "$1"
-  for block in "$WORK"/block.*; do
-    [ -f "$block" ] || continue
-    count=$((count + 1))
-    if grep -q -- '-----BEGIN CERTIFICATE-----' "$block"; then
-      fingerprint="$(openssl x509 -in "$block" -pubkey -noout 2>/dev/null | openssl pkey -pubin -outform DER 2>/dev/null \
-        | openssl dgst -sha256 | awk '{ print $NF }')" || fingerprint=""
-    else
-      fingerprint="$(openssl pkey -pubin -in "$block" -outform DER 2>/dev/null | openssl dgst -sha256 | awk '{ print $NF }')" \
-        || fingerprint=""
+  if [ "$1" = kept ]; then
+    if ! as_api fingerprints "$KEYS_FILE" < /dev/null > "$WORK/fingerprints"; then
+      say "The kept netopia-ipn-keys.pem could not be read, so its fingerprints are not shown; pnpm billing:check will say why."
+      return 0
     fi
-    if [ -z "$fingerprint" ]; then
+  else
+    sh -c "$FINGERPRINTS_SH"$'\n'fingerprints sh < "$1" > "$WORK/fingerprints"
+  fi
+  while IFS= read -r fingerprint; do
+    count=$((count + 1))
+    if ! [[ $fingerprint =~ ^[0-9a-f]{64}$ ]]; then
       say "Key $count: could not be read (pnpm billing:check says why)."
     elif [ "$fingerprint" = "$published" ]; then
       say "Key $count: SHA-256 $fingerprint, NETOPIA's published plugin key."
     else
       say "Key $count: SHA-256 $fingerprint, not NETOPIA's published plugin key: confirm this fingerprint with NETOPIA."
     fi
-  done
+  done < "$WORK/fingerprints"
 }
 
 pem_well_formed() { # <file>: one or more PUBLIC KEY or CERTIFICATE blocks of base64 lines, nothing else
@@ -364,10 +409,8 @@ pem_well_formed() { # <file>: one or more PUBLIC KEY or CERTIFICATE blocks of ba
 trusted_keys() {
   local tries=0
   if kept "$KEYS_FILE" netopia; then
-    # Read as the API's user and capped: a link planted there must not make root read, or copy without end, what it
-    # points to.
-    as_api read "$KEYS_FILE" < /dev/null > "$WORK/kept-keys.pem" || true
-    print_fingerprints "$WORK/kept-keys.pem"
+    # Worked out as the API's user (capped): a link planted there must not make root read, or parse, what it points to.
+    print_fingerprints kept
     return 0
   fi
   say ""
