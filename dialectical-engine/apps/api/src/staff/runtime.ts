@@ -4,7 +4,7 @@ import { lstat, open, realpath } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, normalize } from 'node:path';
 import type { ReadableUserDekStore } from '@debateai/crypto';
-import { PostgresInternalAllowanceRepository, PostgresStaffAlertRepository, PostgresStaffRepository, type Pool } from '@debateai/db';
+import { PostgresInternalAllowanceRepository, PostgresStaffAlertRepository, PostgresStaffRepository, type Pool, type StaffAlertReadinessBinding } from '@debateai/db';
 import type { StaffAccessEnvironment } from '@debateai/kernel';
 import { readStaffAccessPolicy, type BillingPlans } from '@debateai/register';
 import { StaffInternalFundingReadiness } from './internal-allowances.js';
@@ -106,7 +106,32 @@ export async function loadStaffAlertOperator(input: Readonly<{
         await fd.close();
     }
 }
-/** Startup-only activation. The web runtime consumes fresh independent publication; it cannot publish it. */
+/** Boot reason only: no path, hash, generation, adapter id or address. */
+type StaffToolsLockedReason = 'ACK_EVIDENCE_STALE' | 'READINESS_STALE';
+/** Only the database's own "not ready" answer means locked. A thrown read (missing grant, missing
+ * migration, timeout, no row) or any other answer is a deployment fault and refuses boot. The read is
+ * made even when the ACK proof is stale (with the custodied binding), so a stale proof hides no fault. */
+async function toolsLockedReason(configuration: RootStaffAlertConfiguration, custodied: StaffAlertReadinessBinding, repository: PostgresStaffAlertRepository, emit: (line: string) => void): Promise<StaffToolsLockedReason | null> {
+    const trusted = await configuration.read();
+    let published: unknown;
+    try {
+        published = await repository.readIndependentAlertReadiness(trusted?.binding ?? custodied);
+    }
+    catch {
+        published = undefined;
+    }
+    if (published !== 'READY' && published !== 'UNAVAILABLE') {
+        emit(JSON.stringify({ event: 'api.staff.activation_refused', reason: 'READINESS_UNREADABLE' }));
+        throw unavailable();
+    }
+    if (trusted === null)
+        return 'ACK_EVIDENCE_STALE';
+    return published === 'READY' ? null : 'READINESS_STALE';
+}
+/** Startup-only activation. Boot requires the static facts: reviewed operator bytes, protected alert
+ * configuration custody, a valid sealed staff policy and a COMPLETED owner installation. A stale ACK proof
+ * or readiness publication does NOT block boot: Team tools start locked, and every staff action re-checks
+ * fresh readiness per request (an operator unlock needs no restart). The web runtime cannot publish readiness. */
 export async function createStaffRuntime(input: Readonly<{
     environment: Extract<StaffAccessEnvironment, {
         policyVersion: 2;
@@ -118,6 +143,9 @@ export async function createStaffRuntime(input: Readonly<{
     operatorFiles?: StaffAlertConfigFiles;
     configurationFiles?: StaffAlertConfigFiles;
     log?: (code: string) => void;
+    /** Secret-free JSON lines: api.staff.tools_locked once per boot when Team tools start locked, and
+     * api.staff.alerts_waiting once per lock while queued alerts wait for readiness. Defaults to stderr. */
+    logEvent?: (line: string) => void;
     deploymentMode?: "hosted" | "local";
     billingPlans?: BillingPlans | null;
     providerTargets?: readonly ProviderDiscoveryTarget[];
@@ -130,17 +158,25 @@ export async function createStaffRuntime(input: Readonly<{
         if ((input.environment.internalAllowancePolicy === undefined) !== (selectedFunding === null)) throw unavailable();
         const repository = new PostgresStaffAlertRepository(input.pool), staffRepository = new PostgresStaffRepository(input.pool);
         const configuration = new RootStaffAlertConfiguration({ path: input.environment.independentAlertConfigPath, acknowledgements: operator.acknowledgements, ...(input.configurationFiles ? { files: input.configurationFiles } : {}) });
+        const custodied = await configuration.custodyBinding();
+        if (custodied === null)
+            throw unavailable();
         const readiness = new StaffIndependentAlertReadiness(configuration, repository);
         const funding = input.environment.internalAllowancePolicy === undefined ? undefined : new StaffInternalFundingReadiness(allowances, {
             expectedPolicy: input.environment.internalAllowancePolicy, deploymentMode: input.deploymentMode ?? 'local', billingPlans: input.billingPlans ?? null,
             providerTargets: input.providerTargets ?? [], independentReadiness: readiness
         });
-        if (funding !== undefined) await funding.requireReady();
+        if (funding !== undefined) await funding.requireConfigured();
         const installation = await staffRepository.readOwnerRecoveryInstallation();
-        if (installation === null || installation.outcome !== 'COMPLETED' || await readiness.readIndependentAlertReadiness() !== 'READY')
+        if (installation === null || installation.outcome !== 'COMPLETED')
             throw unavailable();
+        const emit = input.logEvent ?? (line => console.warn(line));
+        // Not cached: the lock reason is logged once; actions consult `readiness` on every request.
+        const locked = await toolsLockedReason(configuration, custodied, repository, emit);
+        if (locked !== null)
+            emit(JSON.stringify({ event: 'api.staff.tools_locked', reason: locked }));
         const targetInvitationTransport = new VerifiedStaffTargetInvitationTransport({ publicAppUrl: input.publicAppUrl, channels: staffRepository, keys: input.keys, delivery: operator.invitationDelivery });
-        const dispatcher = new StaffAlertDispatcher({ repository, keys: input.keys, independentTransport: new RootConfiguredStaffAlertTransport(configuration), targetInvitationTransport, readiness: () => readiness.readIndependentAlertReadiness(), ...(input.log ? { log: input.log } : {}) });
+        const dispatcher = new StaffAlertDispatcher({ repository, keys: input.keys, independentTransport: new RootConfiguredStaffAlertTransport(configuration), targetInvitationTransport, readiness: () => readiness.readIndependentAlertReadiness(), logEvent: emit, ...(input.log ? { log: input.log } : {}) });
         let timer: ReturnType<typeof setInterval> | undefined, running: Promise<unknown> | undefined, closed = false;
         const trigger = () => {
             if (closed || running !== undefined)

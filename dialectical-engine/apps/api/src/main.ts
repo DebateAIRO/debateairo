@@ -818,14 +818,16 @@ const mfa = new MfaEnrollmentService({
 // Explicit v2 composition retains current-state checks and refuses unavailable operator readiness.
 const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
   ? new StaffAccessService(new PostgresStaffRepository(pool), sessions) : undefined;
-// Explicit protected adapters plus installation/policy/current publication are startup-only gates.
+// Explicit protected adapters, config custody, installation and policy are startup-only gates. A stale ACK
+// proof or readiness publication never blocks boot: Team tools start locked (one api.staff.tools_locked line)
+// and each staff action re-checks readiness, so an operator unlock needs no restart.
 const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
   ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(pool),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(pool), {publicAppUrl: environment.PUBLIC_APP_URL}),
-  intents: staffAlerts.intents,
+  intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
 };

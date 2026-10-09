@@ -29,6 +29,17 @@ it('checks root custody, strict schema, known rehearsed evidence and rejects upl
  expect(await new alerts.RootStaffAlertConfiguration({path:'/operator/config.json',files:valid.files,acknowledgements:new Map([['capture-v1',expired]])}).readIndependentAlertReadiness()).toBe('UNAVAILABLE');
  expect(await new alerts.RootStaffAlertConfiguration({path:'/missing',acknowledgements:new Map()}).readIndependentAlertReadiness()).toBe('UNAVAILABLE');
 });
+it('verifies startup custody without a fresh ACK proof and still refuses broken custody or an unknown ACK route',async()=>{
+ const valid=configuration();
+ for(const evidence of [async()=>null,async()=>({configSha256:sha(valid.body),generation:config.generation,rehearsalId:uuid(),expiresAt:new Date(0)})]){
+  const loader=new alerts.RootStaffAlertConfiguration({path:'/operator/config.json',files:valid.files,acknowledgements:new Map([['capture-v1',{...valid.ack,evidence}]])});
+  expect(await loader.readIndependentAlertReadiness()).toBe('UNAVAILABLE');
+  expect(await loader.verifyCustody()).toBe(true);
+ }
+ for(const overrides of [{destination:'sentinel@example.invalid'},{recipient:'a@example.invalid\r\nBcc:other@example.invalid'},{ackAdapterId:'unknown'},{executable:'relative'}])expect(await configuration(overrides).loader.verifyCustody()).toBe(false);
+ for(const overrides of [{uid:1000},{mode:0o666},{isSymbolicLink:()=>true},{size:100000}])expect(await configuration({},overrides).loader.verifyCustody()).toBe(false);
+ expect(await new alerts.RootStaffAlertConfiguration({path:'/missing',acknowledgements:new Map()}).verifyCustody()).toBe(false);
+});
 it('produces bounded metadata, fresh nonce and purpose/user/operation-bound encryption without private body or invitation handle',async()=>{
  expect(alerts.StaffAlertIntentProducer).toBeTypeOf('function');
  const kek=loadKek(generateDek()),users=new FileUserDekStore(join(root,uuid()),kek),userId=uuid(),keyRef=uuid(),operationId=uuid(),actorStaffId=uuid(),subjectStaffId=uuid();
@@ -96,11 +107,69 @@ it('stops an in-flight pre-send readiness await promptly and never begins a late
  const keys={load:async()=>{const copy=Buffer.from(key);copies.push(copy);return copy;}};
  const producer=new alerts.StaffAlertIntentProducer({keys,mappings:{resolveUser:async()=>({userId,keyRef})},readiness:{require:async()=>{}}});
  const intent=await producer.mutation({event:'GRANT',operationId,keyUserId:userId,actorStaffId:null,subjectStaffId:null,reason:{code:'GRANT_CHANGE'}});
- let release:()=>void=()=>{},entered:()=>void=()=>{},sends=0,claimed=0;const started=new Promise<void>(r=>entered=r),wait=new Promise<void>(r=>release=r);
+ let release:()=>void=()=>{},entered:()=>void=()=>{},sends=0,claimed=0,readinessCalls=0;const started=new Promise<void>(r=>entered=r),wait=new Promise<void>(r=>release=r);
  const claim={outboxId:uuid(),eventId:uuid(),operationId,keyRef,claimToken:uuid(),event:'GRANT',purpose:'INDEPENDENT_METADATA_ALERT',envelope:intent.envelope};
- const dispatcher=new alerts.StaffAlertDispatcher({keys,repository:{claim:async()=>{claimed++;return [claim];},resolveClaim:async()=>({state:'CURRENT',mapping:{userId,keyRef}}),settle:async()=>true,status:async()=>({pending:1})} as never,independentTransport:{send:async()=>{sends++;return 'ACK';}},readiness:async()=>{entered();await wait;return 'READY';}});
+ // The first readiness read is the pre-claim gate; the second (blocked) one is the pre-send admission check.
+ const dispatcher=new alerts.StaffAlertDispatcher({keys,repository:{claim:async()=>{claimed++;return [claim];},resolveClaim:async()=>({state:'CURRENT',mapping:{userId,keyRef}}),settle:async()=>true,status:async()=>({pending:1})} as never,independentTransport:{send:async()=>{sends++;return 'ACK';}},readiness:async()=>{if(++readinessCalls===1)return 'READY';entered();await wait;return 'READY';}});
  const draining=dispatcher.drain({limit:2}).then(()=> 'closed');
  try{await started;dispatcher.stop();expect(await Promise.race([draining,new Promise(r=>setTimeout(()=>r('pending'),100))])).toBe('closed');}
  finally{release();await draining;await new Promise(r=>setTimeout(r,0));key.fill(0);}
  expect(sends).toBe(0);expect(claimed).toBe(1);expect(copies.every(copy=>copy.equals(Buffer.alloc(copy.length)))).toBe(true);
+});
+
+// A claim always spends one of the row's three SQL attempts (claim_alert_delivery), so the
+// dispatcher must not claim at all while readiness is stale, or a DISABLE alert written while
+// Team tools are locked would reach RETRY_EXHAUSTED in seconds and never reach the owner.
+const waitingLine=JSON.stringify({event:'api.staff.alerts_waiting',reason:'READINESS_STALE'});
+async function lockedQueue(rows=1){
+ const userId=uuid(),keyRef=uuid(),key=generateDek(),keys={load:async()=>Buffer.from(key)};
+ const producer=new alerts.StaffAlertIntentProducer({keys,mappings:{resolveUser:async()=>({userId,keyRef})}});
+ const queue:Record<string,unknown>[]=[];
+ for(let i=0;i<rows;i++){const operationId=uuid(),intent=await producer.mutation({event:'DISABLE',operationId,keyUserId:userId,actorStaffId:null,subjectStaffId:null,reason:{code:'SECURITY_RESPONSE'}});
+  queue.push({outboxId:uuid(),eventId:uuid(),operationId,keyRef,claimToken:uuid(),event:'DISABLE',purpose:'INDEPENDENT_METADATA_ALERT',envelope:intent.envelope,attempt:1});}
+ const seen={claims:0,settled:[] as Array<{outcome:string;failure:unknown}>,sent:[] as string[],lines:[] as string[]};
+ const repository={claim:async()=>{seen.claims++;return queue.splice(0,1);},resolveClaim:async()=>({state:'CURRENT',mapping:{userId,keyRef}}),
+  settle:async(_claim:unknown,outcome:string,failure:unknown)=>{seen.settled.push({outcome,failure});return true;},status:async()=>({pending:queue.length,acked:0,severed:0,exhausted:0})};
+ return {key,keys,queue,seen,repository,dispatcher:(readiness:()=>Promise<'READY'|'UNAVAILABLE'>)=>new alerts.StaffAlertDispatcher({keys,repository:repository as never,
+  independentTransport:{send:async(_id:string,message:{event:string})=>{seen.sent.push(message.event);return 'ACK' as const;}},readiness,logEvent:(line:string)=>{seen.lines.push(line);}} as never)};
+}
+it('claims nothing while readiness is stale and delivers the queued DISABLE alert on the first drain after unlock',async()=>{
+ const q=await lockedQueue();let ready:'READY'|'UNAVAILABLE'='UNAVAILABLE';const dispatcher=q.dispatcher(async()=>ready);
+ try{
+  for(let i=0;i<3;i++)expect(await dispatcher.drain({limit:5})).toEqual({acked:0,pending:1});
+  expect(q.seen.claims).toBe(0);expect(q.seen.settled).toEqual([]);expect(q.seen.sent).toEqual([]);
+  expect(q.seen.lines).toEqual([waitingLine]);
+  ready='READY';
+  expect(await dispatcher.drain({limit:5})).toEqual({acked:1,pending:0});
+  expect(q.seen.sent).toEqual(['DISABLE']);expect(q.seen.settled).toEqual([{outcome:'DELIVERED',failure:null}]);
+  ready='UNAVAILABLE';await dispatcher.drain({limit:5});await dispatcher.drain({limit:5});
+  expect(q.seen.lines).toEqual([waitingLine,waitingLine]);
+ }finally{q.key.fill(0);}
+});
+it('treats a throwing or hung readiness read as locked and claims nothing',async()=>{
+ const q=await lockedQueue();
+ try{
+  expect(await q.dispatcher(async()=>{throw new Error('database down');}).drain({limit:5})).toEqual({acked:0,pending:1});
+  const hung=new alerts.StaffAlertDispatcher({keys:q.keys,repository:q.repository as never,independentTransport:{send:async()=> 'ACK' as const},readiness:()=>new Promise(()=>{}),timeoutMs:25,logEvent:(line:string)=>{q.seen.lines.push(line);}} as never);
+  expect(await hung.drain({limit:5})).toEqual({acked:0,pending:1});
+  expect(q.seen.claims).toBe(0);expect(q.seen.lines).toEqual([waitingLine,waitingLine]);
+ }finally{q.key.fill(0);}
+});
+it('a readiness lapse after the claim settles only that one attempt and stops claiming the rest of the batch',async()=>{
+ const q=await lockedQueue(3);const answers:Array<'READY'|'UNAVAILABLE'>=['READY','UNAVAILABLE'];
+ const dispatcher=q.dispatcher(async()=>answers.shift()??'UNAVAILABLE');
+ try{
+  expect(await dispatcher.drain({limit:5})).toEqual({acked:0,pending:2});
+  expect(q.seen.claims).toBe(1);expect(q.seen.sent).toEqual([]);
+  expect(q.seen.settled).toEqual([{outcome:'FAILED',failure:'TRANSPORT_UNAVAILABLE'}]);
+  expect(q.seen.lines).toEqual([waitingLine]);
+ }finally{q.key.fill(0);}
+});
+it('stop() during the pre-claim readiness read returns promptly and claims nothing',async()=>{
+ const q=await lockedQueue();let release:()=>void=()=>{},entered:()=>void=()=>{};const started=new Promise<void>(r=>entered=r),wait=new Promise<void>(r=>release=r);
+ const dispatcher=q.dispatcher(async()=>{entered();await wait;return 'READY';});
+ const draining=dispatcher.drain({limit:2}).then(()=> 'closed');
+ try{await started;dispatcher.stop();expect(await Promise.race([draining,new Promise(r=>setTimeout(()=>r('pending'),100))])).toBe('closed');}
+ finally{release();await draining;q.key.fill(0);}
+ expect(q.seen.claims).toBe(0);expect(q.seen.sent).toEqual([]);expect(q.seen.lines).toEqual([]);
 });
