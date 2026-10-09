@@ -245,3 +245,64 @@ describe("every auth screen styles its own controls", () => {
     expect(unstyled(host)).toEqual([]);
   });
 });
+
+/*
+ * Review fixes (2026-10-09), read through jsdom's CSSOM: render tests have no CSS, so these check the
+ * rules that apply to the rendered markup.
+ * - Account recovery codes (35 characters, "XXXX-XXXX-...") wrapped inside a code in two columns at
+ *   phone width: one column, monospace, never broken inside a code (the list scrolls sideways if needed).
+ * - The sign-in help panel was pinned to the left, so a right-to-left page read it from the wrong side.
+ */
+describe("layout rules for the auth screens", () => {
+  type Rule = { selectors: string[]; style: CSSStyleDeclaration };
+  function rulesMatching(element: Element): Rule[] {
+    const style = document.createElement("style");
+    style.textContent = readFileSync("apps/ui/app/globals.css", "utf8");
+    document.head.append(style);
+    const rules: Rule[] = [];
+    const walk = (list: CSSRuleList) => {
+      for (const rule of [...list]) {
+        if ((rule as CSSMediaRule).cssRules !== undefined && (rule as CSSStyleRule).selectorText === undefined) walk((rule as CSSMediaRule).cssRules);
+        else if ((rule as CSSStyleRule).selectorText !== undefined) {
+          const selectors = (rule as CSSStyleRule).selectorText.split(",").map((part) => part.trim());
+          if (selectors.some((selector) => { try { return element.matches(selector); } catch { return false; } })) rules.push({ selectors, style: (rule as CSSStyleRule).style });
+        }
+      }
+    };
+    walk(style.sheet!.cssRules);
+    style.remove();
+    return rules;
+  }
+  const declared = (rules: Rule[], property: string) => rules.map((rule) => rule.style.getPropertyValue(property)).filter(Boolean);
+
+  it("recovery codes: one column, monospace, a code never broken across lines", () => {
+    const list = document.createElement("ol");
+    list.className = "recoveryCodes";
+    list.innerHTML = "<li><code>ABCD-EFGH-JKLM-NPQR-STUV-WXYZ-23456</code></li>";
+    document.body.append(list);
+    try {
+      const listRules = rulesMatching(list);
+      expect(listRules.length).toBeGreaterThan(0);
+      for (const columns of declared(listRules, "grid-template-columns")) {
+        expect(columns).not.toMatch(/repeat\(\s*(?:[2-9]|auto)/);
+        expect(columns.replace(/\((?:[^()]|\([^()]*\))*\)/g, "()").trim().split(/\s+/)).toHaveLength(1);
+      }
+      expect(declared(listRules, "font-family").join(" ")).toContain("--font-mono");
+      expect(declared(listRules, "overflow-x")).toContain("auto");
+      const code = list.querySelector("code")!;
+      expect(declared(rulesMatching(code), "white-space")).toContain("nowrap");
+      expect(declared([...rulesMatching(code), ...listRules], "overflow-wrap")).not.toContain("anywhere");
+    } finally { list.remove(); }
+  });
+
+  it("the sign-in help panel aligns to the start of the line, not the left", () => {
+    const help = document.createElement("details");
+    help.className = "authHelp";
+    document.body.append(help);
+    try {
+      const alignments = declared(rulesMatching(help), "text-align");
+      expect(alignments.length).toBeGreaterThan(0);
+      expect(alignments.filter((value) => value === "left" || value === "right")).toEqual([]);
+    } finally { help.remove(); }
+  });
+});

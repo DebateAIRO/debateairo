@@ -2353,7 +2353,7 @@ a:focus-visible {
 .authResendEntry { margin: 14px 0 0; }
 
 /* "Can't sign in?" opens the three recovery routes, each with one plain sentence. */
-.authHelp { margin: 0 0 12px; text-align: left; }
+.authHelp { margin: 0 0 12px; text-align: start; }
 .authHelp > summary {
   width: fit-content;
   margin: 0 auto;
@@ -2453,10 +2453,12 @@ a:focus-visible {
 .recoveryCancel { margin-top: 12px; }
 .recoverySetup { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 .recoverySetup svg { align-self: center; }
+/* One code per line: a 35-character code wrapped inside itself in two columns at
+   phone width. A code is never broken; a narrow screen scrolls the list sideways. */
 .recoveryCodes {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
   margin: 0 0 14px;
   padding: 14px 16px 14px 34px;
   border: 1px dashed var(--line-strong);
@@ -2464,7 +2466,9 @@ a:focus-visible {
   background: var(--surface);
   font-family: var(--font-mono);
   font-size: 12px;
+  overflow-x: auto;
 }
+.recoveryCodes code { white-space: nowrap; }
 .recoveryActivity .setPanelCore { display: flex; flex-direction: column; gap: 12px; }
 .recoveryActivity h2 { margin: 0; font-size: 13.5px; font-weight: 700; }
 .recoveryActivity p { margin: 0; color: var(--text-2); font-size: 11.5px; line-height: 1.55; }
