@@ -100,6 +100,7 @@ export async function ensureDirectory(path, { mode, uid }) {
 
 /**
  * Run a child in its own process group with a hard deadline and a hard output cap.
+ * stdin is a Buffer (piped), an open file descriptor, or absent (/dev/null).
  * No shell is involved unless argv[0] is one. The whole group is killed on timeout or
  * overflow, and once more after exit so no grandchild outlives the call.
  */
@@ -120,14 +121,15 @@ export function runBounded(argv, { cwd, env = {}, stdin, stdoutFd, timeoutMs, ma
       size += chunk.length; target.push(chunk);
     };
     try {
-      child = spawn(argv[0], argv.slice(1), { cwd, env, shell: false, detached: true, stdio: [stdin === undefined ? 'ignore' : 'pipe', stdoutFd ?? 'pipe', 'pipe'] });
+      const stdinMode = stdin === undefined ? 'ignore' : Number.isInteger(stdin) ? stdin : 'pipe';
+      child = spawn(argv[0], argv.slice(1), { cwd, env, shell: false, detached: true, stdio: [stdinMode, stdoutFd ?? 'pipe', 'pipe'] });
     } catch (error) { finish(null, null, error); return; }
     child.once('error', error => finish(null, null, error));
     child.stdout?.on('data', collect(stdout));
     child.stderr.on('data', collect(stderr));
     child.once('close', (code, signal) => finish(code, signal));
     timer = setTimeout(() => { timedOut = true; stop(); }, timeoutMs);
-    if (stdin !== undefined) { child.stdin.on('error', () => undefined); child.stdin.end(stdin); }
+    if (Buffer.isBuffer(stdin)) { child.stdin.on('error', () => undefined); child.stdin.end(stdin); }
   });
 }
 

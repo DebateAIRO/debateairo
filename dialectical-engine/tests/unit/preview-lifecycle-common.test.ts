@@ -62,6 +62,18 @@ describe('preview lifecycle shared helpers', () => {
     expect(result.stderr.toString()).toBe('E');
   });
 
+  it('passes an already-open file as stdin and as stdout', async () => {
+    const dir = scratch();
+    writeFileSync(join(dir, 'in.txt'), 'from-file');
+    const { openSync, closeSync } = await import('node:fs');
+    const input = openSync(join(dir, 'in.txt'), 'r'), output = openSync(join(dir, 'out.txt'), 'w');
+    try {
+      const result = await common.runBounded([process.execPath, '-e', 'let b="";process.stdin.on("data",d=>b+=d).on("end",()=>process.stdout.write(b+"!"))'], { env: {}, stdin: input, stdoutFd: output, timeoutMs: 5000, maxOutputBytes: 1000 });
+      expect(result.code).toBe(0);
+    } finally { closeSync(input); closeSync(output); }
+    expect(readFileSync(join(dir, 'out.txt'), 'utf8')).toBe('from-file!');
+  });
+
   it('hands the peer packet to the actor on a real pipe at FD3 and keeps stdin for private control bytes', async () => {
     const actor = 'const fs=require("node:fs");const s=fs.fstatSync(3);let p="";const b=Buffer.alloc(512);for(;;){const n=fs.readSync(3,b,0,512,null);if(!n)break;p+=b.subarray(0,n);}' +
       'let c="";process.stdin.on("data",d=>c+=d).on("end",()=>process.stdout.write(JSON.stringify({fifo:s.isFIFO(),packet:p,control:c,argv:process.argv.slice(2),env:Object.keys(process.env).filter(k=>k!=="__CF_USER_TEXT_ENCODING").sort()})));';
