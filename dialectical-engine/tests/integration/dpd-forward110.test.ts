@@ -1,6 +1,6 @@
 // delete-public-debates S01 port (PLAN Revision 4, S01-Q1): forward110 applies 0110 once, after 0108, and refuses
 // every drift 108's plan refuses, without changing any 108 or base refusal.
-import { cp,mkdtemp,mkdir,readFile,rm,writeFile } from 'node:fs/promises';
+import { cp,mkdtemp,mkdir,readdir,readFile,rm,writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -118,7 +118,8 @@ it('L4-L6 source, manifest and prior-body drift refuse from a bounded source cop
  const root=await mkdtemp(join(tmpdir(),'dpd-forward110-'));
  try{
   await mkdir(join(root,'packages/db/src'),{recursive:true});
-  for(const name of ['migration-lineage.ts','migration-forward108.ts','migration-forward110.ts'])await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
+  // F10 (PR-58): the lineage loader also loads the forward chain after 0110 (migration-forward-chain.ts and its steps).
+  for(const name of (await readdir(new URL('../../packages/db/src/',import.meta.url))).filter(entry=>/^migration-.*\.ts$/.test(entry)))await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
   await cp(new URL('../../migrations',import.meta.url),join(root,'migrations'),{recursive:true});
   const script=join(root,'probe.mts');await writeFile(script,`import {loadMigrationPlan} from './packages/db/src/migration-lineage.ts'; await loadMigrationPlan();`);
   const run=()=>promisify(execFile)(process.execPath,['--import','tsx',script],{cwd:process.cwd(),timeout:30000,maxBuffer:100000});

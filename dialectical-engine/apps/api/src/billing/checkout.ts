@@ -1,19 +1,27 @@
 import { randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
-import { computeWindows, microsToDecimal, type SubscriptionState } from "@debateai/billing-core";
-import type { AcceptanceInput, AcceptanceRepository, BillingJobQueries, BillingRepository, ChargeRow, QuoteRow } from "@debateai/db";
+import { computeWindows, type CardPayments, type Payer, type PaymentReport, type SubscriptionState } from "@debateai/billing-core";
+import type {
+  AcceptanceInput, AcceptanceRepository, BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, QuoteRow
+} from "@debateai/db";
 import type { GeoLookup } from "@debateai/geo";
-import { TypedDomainError } from "@debateai/kernel";
-import { signOrderPayload, type XMoneyClient, type XMoneyEmbeddedOrder, type XMoneyEnvironment } from "@debateai/payments-xmoney";
+import { netopiaLanguageOf, statusToState } from "@debateai/payments-netopia";
 import type { BillingPolicy, CountryPolicy, PlanId } from "@debateai/register";
 import { sealAcceptanceEvidence } from "../legal.js";
 import type { AccountEmailReader } from "./account-email.js";
-import { credentialsRefused, rejectedRows, type BillingAudit } from "./audit.js";
+import type { BillingAudit } from "./audit.js";
+import { bestPaymentId, paidOrAlmost, readPaymentStatus, startHostedCharge, stillPayable } from "./hosted-payment.js";
+import { clientIdOf, netopiaNotifyUrl, payerFromProfile, paymentReturnUrl } from "./netopia-payer.js";
 import { englishOrderText, planName, type BillingOrderText } from "./order-text.js";
+import { isThisPaymentSystem } from "./outbox.js";
 import { decidePaymentPlace, placeRefusal } from "./place.js";
 import { addressRequired, LIVE_SUBSCRIPTION_STATUSES } from "./quote.js";
-import { openQuoteLocation, sealBillingProfile, type QuoteLocation } from "./records.js";
+import { statusNeedsVerify } from "./reconcile.js";
+import {
+  openPaymentUrl, openQuoteLocation, sealBillingProfile, type BillingProfile, type QuoteLocation
+} from "./records.js";
 import { BillingRefusal } from "./refusal.js";
+import { queueVerifyNow } from "./renewal.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "./rows.js";
 
 export type ConsentKind = "CONSENT_RENEWAL" | "CONSENT_IMMEDIATE_START";
@@ -31,38 +39,12 @@ export type CheckoutInput = Readonly<{
   now: Date;
 }>;
 
+/** Spec §2.6.2 step 7: where the page sends the browser (a top-level navigation), and which NETOPIA it is. */
 export type CheckoutResult = Readonly<{
   chargeId: string;
-  publicKey: string;
-  orderPayload: string;
-  orderChecksum: string;
-  sdkEnvironment: XMoneyEnvironment;
+  redirectUrl: string;
+  environment: "sandbox" | "live";
   reused: boolean;
-}>;
-
-/** What an embedded order pays for; `signEmbeddedOrder` words it in the order's locale (spec §2.5.3 step 5). */
-export type OrderPurpose = Readonly<{ kind: "ORDER_PLAN"; planId: PlanId }> | Readonly<{ kind: "CARD_CHECK" }>;
-
-/** One embedded xMoney order: the checkout's (authAndCapture) or P12e's card check (auth, 1.00 USD). */
-export type EmbeddedOrderInput = Readonly<{
-  chargeId: string;
-  customerIdentifier: string;
-  email: string;
-  country: string;
-  amountMicros: number;
-  purpose: OrderPurpose;
-  /** The person's interface locale: the order line xMoney shows on its form and receipts is in it. */
-  locale: string;
-  cardTransactionMode: XMoneyEmbeddedOrder["cardTransactionMode"];
-  /** The page xMoney returns to; the only two pages that carry the card-form policy (A11). */
-  returnPath: "/checkout/return" | "/settings/card";
-}>;
-
-export type SignedEmbeddedOrder = Readonly<{
-  publicKey: string;
-  orderPayload: string;
-  orderChecksum: string;
-  xmoneyEnvironment: XMoneyEnvironment;
 }>;
 
 export interface CheckoutServicePort {
@@ -72,15 +54,13 @@ export interface CheckoutServicePort {
 export type CheckoutDeps = Readonly<{
   repository: Pick<BillingRepository,
     | "withTransaction" | "quote" | "subscriptionForOwner" | "subscriptionEvents" | "chargesForSubscription" | "charge"
-    | "appendSubscriptionEvent" | "useQuote" | "ensureCustomer" | "setXMoneyCustomerId" | "appendProfile"
-    | "insertCharge" | "appendChargeEvent" | "customerByOwner" | "ownerErasurePending">;
-  jobs: Pick<BillingJobQueries, "lockOwner" | "checkoutPaymentSignals">;
+    | "appendSubscriptionEvent" | "useQuote" | "ensureCustomer" | "appendProfile" | "insertCharge" | "appendChargeEvent"
+    | "ownerErasurePending" | "insertHostedPayment" | "hostedPaymentForCharge" | "newestNoticeForOrder"
+    | "insertStatusRead" | "enqueue">;
+  jobs: Pick<BillingJobQueries, "lockOwner" | "outboxJobExists" | "bringForward">;
   acceptances: Pick<AcceptanceRepository, "record">;
-  /**
-   * `listTransactions` and `getOrder`: whether the open checkout's charge already has a payment on its way (D7 #5,
-   * A1: the charge id lives on the order).
-   */
-  xmoney: Pick<XMoneyClient, "createCustomer" | "listTransactions" | "getOrder">;
+  /** N8's connector; its `environment` is the payment environment (spec §2.4.1). */
+  payments: CardPayments;
   accountEmail: AccountEmailReader;
   geo: GeoLookup;
   countryPolicy: CountryPolicy;
@@ -88,70 +68,108 @@ export type CheckoutDeps = Readonly<{
   /** `currentDocument` from @debateai/legal-manifest in production. */
   consentDocuments: (kind: ConsentKind, locale: string) => ConsentPair | null;
   recordsKey: Buffer;
-  xmoneyPrivateKey: Buffer;
-  xmoneyPublicKey: string;
-  siteId: string;
   /** R-7: PUBLIC_APP_URL. */
   publicAppUrl: string;
-  /** A22/R-35: P6a's `BillingConnectors.xmoneyEnvironment`, derived from XMONEY_API_BASE_URL. */
-  xmoneyEnvironment: XMoneyEnvironment;
   audit: BillingAudit;
+  /** The runtime's outbox kick: a VERIFY_PAYMENT the open checkout's read queued runs now, not at the next outbox tick. */
+  kick: () => void;
   chargeIds?: () => string;
-  /**
-   * The catalogue sentence for an order line (spec §2.5.3 step 5). P17/P18 supply the 35-locale sentences; absent,
-   * `englishOrderText` is used, today's English line.
-   */
+  /** P17's catalogue sentence for the order line (spec §2.5.3 step 5); absent, `englishOrderText`. */
   orderText?: BillingOrderText;
 }>;
 
-/** Every xMoney failure the person can only wait out; CREDENTIALS_REFUSED (ours to fix) also raises the alarm. */
-const PROVIDER_FAILURES: ReadonlySet<string> = new Set([
-  "XMONEY_UNAVAILABLE", "XMONEY_REFUSED", "XMONEY_OUTCOME_UNKNOWN", "XMONEY_CREDENTIALS_REFUSED"
-]);
-
-/** The statuses of a payment attempt that has not finished yet (A9's not-final set). */
-const NOT_FINAL_STATUSES: ReadonlySet<string> = new Set(["start", "in-progress", "3d-pending"]);
-
 /**
- * How long a not-final payment attempt still counts as on its way (D7 #5, narrowed): the life of the 3-D Secure
- * session a person may still finish. PROVISIONAL: 20 minutes, a conservative guess below the 30-minute reuse window
- * (so a closed bank window never blocks a checkout for longer than the checkout itself can be reused), until X0 (e)
- * records how long xMoney keeps an unanswered 3-D Secure attempt open. A function, never an exported number.
+ * How long a not-final payment still counts as "almost paid" (D7 #5, spec §2.6.3): the life of a bank check a person may
+ * still finish. A function, never an exported number.
  */
 export function inFlightAttemptLifeMs(): number {
   return 20 * 60_000;
 }
 
-/** Whether a not-final attempt created at `createdAt` may still complete (unknown creation time: yes, fail closed). */
-export function inFlightAttemptFresh(createdAt: Date | null, now: Date): boolean {
-  return createdAt === null || now.getTime() - createdAt.getTime() < inFlightAttemptLifeMs();
+/** A3 (b): an open checkout is reused only while it is this young (from its CREATED event). */
+function reuseWindowMs(): number {
+  return 30 * 60_000;
 }
 
-/** Whether two quotes declare the same buyer (A3(b)); `ip` and `ipCountry` are quote-time evidence, not the buyer. */
+/** A start whose page has not come back yet may still be on its way: above the 15-second start timeout (§2.4.1). */
+export function hostedStartInFlightMs(): number {
+  return 60_000;
+}
+
+/**
+ * The open INITIAL charge's events; NETOPIA's newest stored message; the read made before the lock (null: none for this
+ * charge); when the stored payment URL came back (null: no page reached anyone); A3 (b)'s same purchase; the CREATED
+ * time (the reuse window) and the charge's own (a start on its way).
+ */
+export type OpenCheckoutFacts = Readonly<{
+  events: ReadonlyArray<Pick<ChargeEventRow, "kind" | "errorCode">>;
+  notice: Readonly<{ providerStatus: number | null; receivedAt: Date }> | null;
+  read: PaymentReport | "NO_SUCH_ORDER" | "READ_FAILED" | null;
+  hostedStartedAt: Date | null;
+  samePurchase: boolean;
+  createdAt: Date;
+  chargeCreatedAt: Date;
+  now: Date;
+}>;
+export type OpenCheckoutVerdict = "PENDING" | "REUSE" | "ABANDON";
+
+/** Paid always counts; AUTHORIZED and NETOPIA's not-final 6, 13, 14, 18 (`paidOrAlmost`) only while `fresh`. */
+function almostPaid(report: Pick<PaymentReport, "state" | "providerStatus">, fresh: boolean): boolean {
+  return report.state === "PAID" || (fresh && paidOrAlmost(report));
+}
+
+/**
+ * Spec §2.6.3's table. PENDING: paid or almost (409 CHECKOUT_PENDING, the waiting screen), a status read that failed,
+ * or a start still on its way. REUSE: young, the same purchase, a stored payment URL, and `stillPayable` (untouched,
+ * declined: the person may retry on the same page, or waiting for the bank's check). ABANDON: everything else —
+ * older, another purchase, no stored URL, an order NETOPIA does not know, or a final failure.
+ */
+export function classifyOpenCheckout(facts: OpenCheckoutFacts): OpenCheckoutVerdict {
+  if (facts.events.some((event) => event.kind === "SUCCEEDED")) return "PENDING";
+  if (facts.events.some((event) => event.kind === "FAILED" && event.errorCode !== "PAYMENT_DECLINED")) return "ABANDON";
+  const now = facts.now.getTime();
+  if (facts.hostedStartedAt === null) {
+    const unknown = facts.events.some((event) => event.kind === "SUBMIT_UNKNOWN");
+    return !unknown && now - facts.chargeCreatedAt.getTime() < hostedStartInFlightMs() ? "PENDING" : "ABANDON";
+  }
+  const since = Math.max(facts.hostedStartedAt.getTime(), facts.notice?.receivedAt.getTime() ?? 0);
+  const fresh = now - since < inFlightAttemptLifeMs();
+  const noticeStatus = facts.notice?.providerStatus ?? null;
+  if (noticeStatus !== null
+    && almostPaid({ state: statusToState(noticeStatus), providerStatus: String(noticeStatus) }, fresh)) return "PENDING";
+  if (facts.read === null || facts.read === "READ_FAILED") return "PENDING";
+  if (facts.read === "NO_SUCH_ORDER") return "ABANDON";
+  if (almostPaid(facts.read, fresh)) return "PENDING";
+  const young = now - facts.createdAt.getTime() < reuseWindowMs();
+  return stillPayable(facts.read) && young && facts.samePurchase ? "REUSE" : "ABANDON";
+}
+
+/** Whether two quotes declare the same buyer (A3 (b)); `ip` and `ipCountry` are quote-time evidence, not the buyer. */
 function samePurchaser(a: QuoteLocation, b: QuoteLocation): boolean {
   const sameCompany = a.company === null || b.company === null
     ? a.company === b.company
     : a.company.name === b.company.name && a.company.vatId === b.company.vatId
       && a.company.address === b.company.address && a.company.vatValidated === b.company.vatValidated;
-  return a.name === b.name && a.country === b.country && a.region === b.region && a.postalCode === b.postalCode
-    && a.city === b.city && a.street === b.street && sameCompany;
+  return a.name === b.name && a.firstName === b.firstName && a.lastName === b.lastName && a.phone === b.phone
+    && a.country === b.country && a.region === b.region && a.postalCode === b.postalCode && a.city === b.city
+    && a.street === b.street && sameCompany;
 }
 
-type Prepared = Readonly<{ chargeId: string; customerId: string; totalMicros: number; planId: PlanId; reused: boolean }>;
-/** The open checkout xMoney lists a payment on its way for, as read before the owner lock (D7 #5, P2-I6). */
-type ListedUnderway = Readonly<{ subscriptionId: string }> | null;
+/** The read before the lock, for the open charge it was made for. */
+type OpenPaymentRead = Readonly<{ chargeId: string; read: PaymentReport | "NO_SUCH_ORDER" | "READ_FAILED" }>;
+
+type Verdict =
+  | Readonly<{ kind: "PENDING"; chargeId: string }>
+  | Readonly<{ kind: "REUSE"; chargeId: string; redirectUrl: string }>
+  | Readonly<{ kind: "ABANDON" }>;
+
+type Prepared =
+  | Readonly<{ kind: "REUSE"; chargeId: string; redirectUrl: string; planId: PlanId }>
+  | Readonly<{ kind: "START"; chargeId: string; customerId: string; totalMicros: number; planId: PlanId; payer: Payer }>;
+type StartPrepared = Extract<Prepared, { kind: "START" }>;
 
 export class CheckoutService implements CheckoutServicePort {
   constructor(private readonly deps: CheckoutDeps) {}
-
-  /** D5 5i: an xMoney failure is the 503 "try again in a minute"; a credentials refusal also alarms the operator. */
-  private providerRefusal(error: unknown): never {
-    credentialsRefused(this.deps.audit, error, "checkout");
-    if (error instanceof TypedDomainError && PROVIDER_FAILURES.has(error.code)) {
-      throw new BillingRefusal(503, "PAYMENT_PROVIDER_UNAVAILABLE");
-    }
-    throw error;
-  }
 
   async start(input: CheckoutInput): Promise<CheckoutResult> {
     const quote = await this.deps.repository.quote(input.quoteRef, input.ownerRef);
@@ -169,9 +187,8 @@ export class CheckoutService implements CheckoutServicePort {
     this.assertCurrentConsent("CONSENT_RENEWAL", input.locale, input.consents.renewal);
     this.assertCurrentConsent("CONSENT_IMMEDIATE_START", input.locale, input.consents.immediateStart);
     const email = await this.deps.accountEmail.read(input.userId);
-    // P2-I6: xMoney's listing is read before the owner lock (it pages the site's transactions and may answer slowly);
-    // our own rows are re-read under it.
-    const listed = await this.listedPaymentUnderway(input.ownerRef, input.now);
+    // P2-I6: NETOPIA's status is read before the owner lock (a network call never holds it); our rows are re-read under it.
+    const glimpse = await this.readOpenPayment(input.ownerRef, input.now);
 
     const prepared = await this.deps.repository.withTransaction(async (client): Promise<Prepared> => {
       await this.deps.jobs.lockOwner(client, input.ownerRef);
@@ -186,14 +203,12 @@ export class CheckoutService implements CheckoutServicePort {
         throw new BillingRefusal(409, "ALREADY_SUBSCRIBED");
       }
       if (existing !== null && existing.status === "CREATED") {
-        // D7 #5: a fresh payment on its way is answered CHECKOUT_PENDING, before any reuse or abandonment.
-        await this.assertNoPaymentUnderway(client, existing, input.now, listed);
-        const reusable = await this.reusableCharge(client, existing, quote, location, input.now);
-        const known = reusable === null ? null : await this.deps.repository.customerByOwner(input.ownerRef, undefined, client);
-        if (reusable !== null && known !== null) {
-          // Spec §2.5.3 step 2, §2.3: this checkout's consents are recorded even when its charge is the open one.
+        const verdict = await this.openCheckoutVerdict(client, existing, quote, location, glimpse, input.now);
+        if (verdict.kind === "PENDING") throw new BillingRefusal(409, "CHECKOUT_PENDING", verdict.chargeId);
+        if (verdict.kind === "REUSE") {
+          // This checkout's consents are recorded even when its charge is the open one (spec 2026-09-29 §2.5.3 step 2).
           await this.deps.acceptances.record(client, this.consentRows(input));
-          return { chargeId: reusable.chargeId, customerId: known.customerId, totalMicros: reusable.totalMicros, planId: existing.planId, reused: true };
+          return { kind: "REUSE", chargeId: verdict.chargeId, redirectUrl: verdict.redirectUrl, planId: existing.planId };
         }
         await this.deps.repository.appendSubscriptionEvent(client, subscriptionEvent(
           existing, "ENDED", input.now, { cause: "ABANDONED", reason: "NEW_CHECKOUT" }
@@ -201,35 +216,32 @@ export class CheckoutService implements CheckoutServicePort {
       }
       const chargeId = (this.deps.chargeIds ?? newChargeId)();
       await this.deps.acceptances.record(client, this.consentRows(input));
-      // R-14: a customer id belongs to one xMoney environment; a switch from stage to live creates a new one.
+      // Spec §2.6.2 step 2: NETOPIA has no customer object; our own customer is the client id's source (§2.6.4).
       const customer = await this.deps.repository.ensureCustomer(client, {
-        ownerRef: input.ownerRef, locale: input.locale, now: input.now, environment: this.deps.xmoneyEnvironment
+        ownerRef: input.ownerRef, locale: input.locale, now: input.now
       });
-      let xmoneyCustomerId = customer.xmoneyCustomerId;
-      if (xmoneyCustomerId === null) {
-        const created = await this.deps.xmoney.createCustomer({
-          identifier: customer.customerId, email, country: location.country
-        }).catch((error: unknown) => this.providerRefusal(error));
-        xmoneyCustomerId = created.customerId;
-        await this.deps.repository.setXMoneyCustomerId(client, customer.customerId, xmoneyCustomerId, this.deps.xmoneyEnvironment);
-      }
-      const profile = sealBillingProfile(this.deps.recordsKey, customer.customerId, {
-        email, locale: input.locale, name: location.company?.name ?? location.name, country: location.country,
-        region: location.region, postalCode: location.postalCode, city: location.city, street: location.street,
-        company: location.company
-      });
+      const profile: BillingProfile = {
+        email, locale: input.locale, name: location.company?.name ?? location.name, firstName: location.firstName,
+        lastName: location.lastName, phone: location.phone, paymentIp: input.ip === "unknown" ? null : input.ip,
+        country: location.country, region: location.region, postalCode: location.postalCode, city: location.city,
+        street: location.street, company: location.company
+      };
+      const payer = payerFromProfile(profile, email);
+      if (payer === null) throw new BillingRefusal(422, "BILLING_ADDRESS_REQUIRED");
+      const sealed = sealBillingProfile(this.deps.recordsKey, customer.customerId, profile);
       await this.deps.repository.appendProfile(client, {
         customerId: customer.customerId, at: input.now, locale: input.locale,
-        profileCiphertext: profile.ciphertext, keyId: profile.keyId
+        profileCiphertext: sealed.ciphertext, keyId: sealed.keyId
       });
+      const environment = this.deps.payments.environment;
       const subscriptionId = randomUUID();
       await this.deps.repository.appendSubscriptionEvent(client, {
         eventId: randomUUID(), subscriptionId, ownerRef: input.ownerRef, kind: "CREATED", at: input.now,
-        planId: quote.planId, periodAnchorAt: null, xmoneyOrderId: null, xmoneyCustomerId, cardRef: null,
+        planId: quote.planId, periodAnchorAt: null, cardTokenId: null,
         data: {
           country_confirmed: place.kind === "CONFIRM_COUNTRY", ip_country: place.ipCountry, quote_id: quote.quoteId,
-          // D5 5h: the xMoney system this subscription's order, customer and card ids belong to (P1a CHECK, P2 fold).
-          xmoney_environment: this.deps.xmoneyEnvironment
+          // Spec §2.5.5: the payment system this subscription's charges and saved card belong to.
+          payment_provider: "netopia", payment_environment: environment
         }
       });
       // Provisional: the paid period starts at activation (P9b anchors it there).
@@ -237,54 +249,131 @@ export class CheckoutService implements CheckoutServicePort {
       const charge: ChargeRow = Object.freeze({
         chargeId, ownerRef: input.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1, periodStart: month.start,
         periodEnd: month.end, quoteId: quote.quoteId, netMicros: quote.netMicros, taxMicros: quote.taxMicros,
-        totalMicros: quote.totalMicros, currency: "USD", createdAt: input.now, xmoneyEnvironment: this.deps.xmoneyEnvironment
+        totalMicros: quote.totalMicros, currency: "USD", createdAt: input.now,
+        paymentProvider: "netopia", paymentEnvironment: environment
       });
       await this.deps.repository.insertCharge(client, charge);
       await this.deps.repository.appendChargeEvent(client, chargeEvent(chargeId, "REQUESTED", input.now, {
-        xmoneyTransactionId: null, amountMicros: charge.totalMicros, errorCode: null
+        providerPaymentId: null, amountMicros: charge.totalMicros, errorCode: null
       }));
-      // A3(a), after the charge row it references: a second use of this quote rolls the whole checkout back.
+      // A3 (a), after the charge row it references: a second use of this quote rolls the whole checkout back.
       if (await this.deps.repository.useQuote(client, { quoteId: quote.quoteId, usedAt: input.now, chargeId }) === "ALREADY_USED") {
         throw new BillingRefusal(409, "QUOTE_EXPIRED");
       }
-      return { chargeId, customerId: customer.customerId, totalMicros: charge.totalMicros, planId: quote.planId, reused: false };
+      return { kind: "START", chargeId, customerId: customer.customerId, totalMicros: charge.totalMicros, planId: quote.planId, payer };
     });
 
-    const signed = this.signEmbeddedOrder({
-      chargeId: prepared.chargeId, customerIdentifier: prepared.customerId, email, country: location.country,
-      amountMicros: prepared.totalMicros, purpose: { kind: "ORDER_PLAN", planId: prepared.planId }, locale: input.locale,
-      cardTransactionMode: "authAndCapture", returnPath: "/checkout/return"
-    });
-    this.deps.audit("billing.checkout.started", { planId: prepared.planId, country: location.country, reused: prepared.reused });
+    const redirectUrl = prepared.kind === "REUSE" ? prepared.redirectUrl : await this.startPayment(prepared, input);
+    this.deps.audit("billing.checkout.started", { planId: prepared.planId, country: location.country, reused: prepared.kind === "REUSE" });
     return Object.freeze({
-      chargeId: prepared.chargeId, publicKey: signed.publicKey, orderPayload: signed.orderPayload,
-      orderChecksum: signed.orderChecksum, sdkEnvironment: signed.xmoneyEnvironment, reused: prepared.reused
+      chargeId: prepared.chargeId, redirectUrl, environment: this.deps.payments.environment, reused: prepared.kind === "REUSE"
     });
   }
 
-  /** Spec §2.5.3 steps 5–6: the order JSON, base64, signed with the private key; the card is saved for rebills. */
-  signEmbeddedOrder(input: EmbeddedOrderInput): SignedEmbeddedOrder {
+  /**
+   * Spec §2.6.2 steps 5–8 through N12's `startHostedCharge` (ruling PR-18): the request is built first (a bug there
+   * sends nothing); then the sealed URL + SUBMITTED in one transaction, or FAILED / SUBMIT_UNKNOWN and the 503 (an
+   * O3 for our own setup or key). No lock and no pool connection is held across the call.
+   */
+  private async startPayment(prepared: StartPrepared, input: CheckoutInput): Promise<string> {
     const text = this.deps.orderText ?? englishOrderText;
-    const description = input.purpose.kind === "ORDER_PLAN"
-      ? text("ORDER_PLAN", input.locale, { plan: planName(input.purpose.planId) })
-      : text("CARD_CHECK", input.locale, {});
-    const order: XMoneyEmbeddedOrder = {
-      publicKey: this.deps.xmoneyPublicKey,
-      siteId: this.deps.siteId,
-      customer: { identifier: input.customerIdentifier, email: input.email, country: input.country },
-      order: {
-        orderId: input.chargeId, type: "managed", amount: microsToDecimal(input.amountMicros), currency: "USD",
-        description
-      },
-      cardTransactionMode: input.cardTransactionMode,
-      saveCard: true,
-      backUrl: new URL(`${input.returnPath}?charge=${input.chargeId}`, this.deps.publicAppUrl).toString()
-    };
-    const signed = signOrderPayload(order, this.deps.xmoneyPrivateKey);
-    return Object.freeze({
-      publicKey: this.deps.xmoneyPublicKey, orderPayload: signed.payload, orderChecksum: signed.checksum,
-      xmoneyEnvironment: this.deps.xmoneyEnvironment
+    const environment = this.deps.payments.environment;
+    return startHostedCharge({
+      billing: this.deps.repository, jobs: this.deps.jobs, payments: this.deps.payments, paymentEnvironment: environment,
+      recordsKey: this.deps.recordsKey, audit: this.deps.audit
+    }, {
+      operation: "checkout", now: input.now,
+      start: {
+        orderId: prepared.chargeId, amountMicros: prepared.totalMicros, currency: "USD",
+        description: text("ORDER_PLAN", input.locale, { plan: planName(prepared.planId) }), payer: prepared.payer,
+        clientId: clientIdOf(prepared.customerId),
+        returnUrl: paymentReturnUrl(this.deps.publicAppUrl, "/checkout/return", prepared.chargeId),
+        notifyUrl: netopiaNotifyUrl(this.deps.publicAppUrl), language: netopiaLanguageOf(input.locale)
+      }
     });
+  }
+
+  /**
+   * Spec §2.6.3 before the lock: one status read (N12's `readPaymentStatus`, which logs it in `billing.status_read`,
+   * §2.14) for an opened, undecided NETOPIA charge of this environment. Null: no open checkout, or nothing to read
+   * (no page was opened, or our rows already decide it). F5: a read that says what our rows do not yet record
+   * (`statusNeedsVerify`: PAID after a lost message, a declined card paid on the same page) queues VERIFY_PAYMENT now,
+   * as the reconciler's read does, so the plan starts without waiting for the status schedule.
+   */
+  private async readOpenPayment(ownerRef: string, now: Date): Promise<OpenPaymentRead | null> {
+    const existing = await this.deps.repository.subscriptionForOwner(ownerRef);
+    if (existing === null || existing.status !== "CREATED") return null;
+    const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId))
+      .find((charge) => charge.kind === "INITIAL");
+    if (initial === undefined || !this.servedHere(initial)) return null;
+    const charge = await this.deps.repository.charge(initial.chargeId);
+    const events = charge?.events ?? [];
+    if (events.some((event) => event.kind === "SUCCEEDED" || (event.kind === "FAILED" && event.errorCode !== "PAYMENT_DECLINED"))) {
+      return null;
+    }
+    // SUBMITTED and the stored page are written in one transaction: no SUBMITTED, no page anyone could pay.
+    const providerPaymentId = bestPaymentId(events, null);
+    if (providerPaymentId === null) return null;
+    const { answer } = await readPaymentStatus({ billing: this.deps.repository, payments: this.deps.payments, audit: this.deps.audit }, {
+      chargeId: initial.chargeId, providerPaymentId, operation: "checkout", now
+    });
+    if (charge !== null && answer !== "UNREADABLE" && answer !== "NO_SUCH_ORDER" && statusNeedsVerify(charge, answer)) {
+      await this.deps.repository.withTransaction((client) => queueVerifyNow(
+        { repository: this.deps.repository, jobs: this.deps.jobs }, client, initial.chargeId, now
+      ));
+      this.deps.kick();
+    }
+    return Object.freeze({ chargeId: initial.chargeId, read: answer === "UNREADABLE" ? "READ_FAILED" : answer });
+  }
+
+  /** Spec §2.5.4: a NETOPIA charge of the environment this API pays in (another system's checkout is never paid here). */
+  private servedHere(charge: Pick<ChargeRow, "paymentProvider" | "paymentEnvironment">): boolean {
+    return isThisPaymentSystem(charge, this.deps.payments.environment);
+  }
+
+  /** Spec §2.6.3 under the owner lock: the open checkout's charge, from its rows and the read made before the lock. */
+  private async openCheckoutVerdict(
+    client: PoolClient, existing: SubscriptionState, quote: QuoteRow, location: QuoteLocation,
+    glimpse: OpenPaymentRead | null, now: Date
+  ): Promise<Verdict> {
+    const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId, client))
+      .find((charge) => charge.kind === "INITIAL");
+    // A checkout of another payment system is never paid here: it is abandoned (spec §2.5.4).
+    if (initial === undefined || !this.servedHere(initial)) return { kind: "ABANDON" };
+    const events = (await this.deps.repository.charge(initial.chargeId, client))?.events ?? [];
+    const hosted = await this.deps.repository.hostedPaymentForCharge(client, initial.chargeId);
+    const notice = await this.deps.repository.newestNoticeForOrder(client, initial.chargeId);
+    const created = (await this.deps.repository.subscriptionEvents(existing.subscriptionId, client))
+      .find((event) => event.kind === "CREATED");
+    const verdict = classifyOpenCheckout({
+      events, notice: notice === null ? null : { providerStatus: notice.providerStatus, receivedAt: notice.receivedAt },
+      // A read made for another charge than the one open now (it changed under the lock) counts as failed.
+      read: glimpse !== null && glimpse.chargeId === initial.chargeId ? glimpse.read : null,
+      hostedStartedAt: hosted?.startedAt ?? null,
+      samePurchase: await this.samePurchase(client, existing, initial, quote, location),
+      createdAt: created?.at ?? initial.createdAt, chargeCreatedAt: initial.createdAt, now
+    });
+    if (verdict === "PENDING") return { kind: "PENDING", chargeId: initial.chargeId };
+    if (verdict === "REUSE" && hosted !== null) {
+      return {
+        kind: "REUSE", chargeId: initial.chargeId,
+        redirectUrl: openPaymentUrl(this.deps.recordsKey, initial.chargeId, hosted.redirectCiphertext)
+      };
+    }
+    return { kind: "ABANDON" };
+  }
+
+  /**
+   * A3 (b): the same plan and total, and the open charge's own quote has the same tax country and declared buyer
+   * (names, phone, country, region, postal code, city, street and company). Read through the checkout's `client`.
+   */
+  private async samePurchase(
+    client: PoolClient, existing: SubscriptionState, initial: ChargeRow, quote: QuoteRow, location: QuoteLocation
+  ): Promise<boolean> {
+    if (existing.planId !== quote.planId || initial.totalMicros !== quote.totalMicros) return false;
+    const opened = initial.quoteId === null ? null : await this.deps.repository.quote(initial.quoteId, existing.ownerRef, client);
+    if (opened === null || opened.taxCountry !== quote.taxCountry) return false;
+    return samePurchaser(openQuoteLocation(this.deps.recordsKey, opened.quoteId, opened.locationCiphertext), location);
   }
 
   private assertCurrentConsent(kind: ConsentKind, locale: string, pair: ConsentPair): void {
@@ -305,107 +394,5 @@ export class CheckoutService implements CheckoutServicePort {
       });
     };
     return [row("RENEWAL_TERMS", input.consents.renewal), row("IMMEDIATE_START", input.consents.immediateStart)];
-  }
-
-  /**
-   * A3(b): the same open charge, when it is young, for the same plan and total, in this xMoney system (a stage order
-   * cannot be paid at live, R-14), has no outcome yet, and is for an unchanged purchase: its own quote has the same tax
-   * country and the same declared buyer (name, country, region, postal code, city, street and company). The quote's
-   * `ip` and `ipCountry` are quote-time evidence and are not compared. A changed purchase is not reused, so the
-   * caller abandons the open checkout and makes a new charge, profile and order from what the person last declared.
-   * Read through the checkout transaction's `client`.
-   */
-  private async reusableCharge(
-    client: PoolClient, existing: SubscriptionState, quote: QuoteRow, location: QuoteLocation, now: Date
-  ): Promise<ChargeRow | null> {
-    const reuseWindowMs = 30 * 60_000;
-    const events = await this.deps.repository.subscriptionEvents(existing.subscriptionId, client);
-    const created = events.find((event) => event.kind === "CREATED");
-    if (created === undefined || now.getTime() - created.at.getTime() >= reuseWindowMs) return null;
-    if (existing.planId !== quote.planId) return null;
-    const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId, client))
-      .find((charge) => charge.kind === "INITIAL");
-    if (initial === undefined || initial.totalMicros !== quote.totalMicros) return null;
-    if (initial.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return null;
-    const opened = initial.quoteId === null ? null : await this.deps.repository.quote(initial.quoteId, existing.ownerRef, client);
-    if (opened === null || opened.taxCountry !== quote.taxCountry) return null;
-    const declared = openQuoteLocation(this.deps.recordsKey, opened.quoteId, opened.locationCiphertext);
-    if (!samePurchaser(declared, location)) return null;
-    const withEvents = await this.deps.repository.charge(initial.chargeId, client);
-    if (withEvents === null || withEvents.events.some((event) => event.kind !== "REQUESTED")) return null;
-    return initial;
-  }
-
-  /**
-   * D7 #5 (narrowed): whether a payment for the open checkout's INITIAL charge may still be on its way (paid in
-   * another tab, or still in 3-D Secure). Signing that order again would let the person pay twice; abandoning it
-   * would refund a plan they bought. Evidence, cheapest first: a stored notice naming the charge, or an open
-   * VERIFY_PAYMENT job for it (`checkoutPaymentSignals`, read here under the owner lock), then what xMoney listed for
-   * it before the lock (`listedPaymentUnderway`), when that was this same open checkout. Any evidence: 409
-   * CHECKOUT_PENDING naming the charge. Every read goes through the checkout's `client`.
-   */
-  private async assertNoPaymentUnderway(
-    client: PoolClient, existing: SubscriptionState, now: Date, listed: ListedUnderway
-  ): Promise<void> {
-    const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId, client))
-      .find((charge) => charge.kind === "INITIAL");
-    if (initial === undefined) return;
-    const pending = new BillingRefusal(409, "CHECKOUT_PENDING", initial.chargeId);
-    const notFinalSince = new Date(now.getTime() - inFlightAttemptLifeMs());
-    if (await this.deps.jobs.checkoutPaymentSignals(client, initial.chargeId, initial.xmoneyEnvironment, notFinalSince)) {
-      throw pending;
-    }
-    // Another open checkout than the one listed was made by a concurrent request after this one's read: its order was
-    // signed only moments ago, and anything stored for it since is what the re-check above reads.
-    if (listed !== null && listed.subscriptionId === existing.subscriptionId) throw pending;
-  }
-
-  /**
-   * D7 #5 / P2-I6, read before the owner lock: the open CREATED checkout whose INITIAL charge xMoney lists a payment
-   * for. A1: a transaction carries no id of ours, so the listed deposits (created since the charge, by creation date)
-   * are first matched on the CREATED event's xMoney customer, then each one's order is confirmed with GET /order
-   * (asked once per order) to hold the charge id. A transaction that is `complete-failed`, or that the charge already
-   * recorded as FAILED (a decline, a void) or as CHARGEBACK (P2-N1: charged back before it was verified), is not on
-   * its way; a not-final one (`start` / `in-progress` / `3d-pending`) counts only while `inFlightAttemptFresh`, so a
-   * person who closed the bank's window is not locked out until xMoney finalises it. Null: no open checkout, or
-   * nothing on its way. An xMoney failure is the 503.
-   */
-  private async listedPaymentUnderway(ownerRef: string, now: Date): Promise<ListedUnderway> {
-    const existing = await this.deps.repository.subscriptionForOwner(ownerRef);
-    if (existing === null || existing.status !== "CREATED") return null;
-    const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId))
-      .find((charge) => charge.kind === "INITIAL");
-    // The xMoney this API talks to lists only its own system's transactions.
-    if (initial === undefined || initial.xmoneyEnvironment !== this.deps.xmoneyEnvironment) return null;
-    const created = (await this.deps.repository.subscriptionEvents(existing.subscriptionId)).find((event) => event.kind === "CREATED");
-    const customer = created?.xmoneyCustomerId ?? null;
-    if (customer === null) return null;
-    // P2-N1: a payment charged back before it was ever verified is recorded CHARGEBACK, not FAILED; neither is on its way.
-    const failed = new Set(((await this.deps.repository.charge(initial.chargeId))?.events ?? [])
-      .filter((event) => (event.kind === "FAILED" || event.kind === "CHARGEBACK") && event.xmoneyTransactionId !== null)
-      .map((event) => event.xmoneyTransactionId));
-    const rejected = rejectedRows(this.deps.audit, "checkout");
-    const listed = await this.deps.xmoney.listTransactions({
-      from: initial.createdAt, to: now, dateType: "creation", onRejected: rejected.onRejected
-    }).catch((error: unknown) => this.providerRefusal(error));
-    rejected.report();
-    const orders = new Map<string, Promise<string | null>>();
-    const merchantOrderId = (orderId: string): Promise<string | null> => {
-      let known = orders.get(orderId);
-      if (known === undefined) {
-        known = this.deps.xmoney.getOrder(orderId).then((order) => order.externalOrderId)
-          .catch((error: unknown) => this.providerRefusal(error));
-        orders.set(orderId, known);
-      }
-      return known;
-    };
-    for (const transaction of listed) {
-      if (transaction.transactionType !== null && transaction.transactionType !== "deposit") continue;
-      if (transaction.customerId !== customer || transaction.status === "complete-failed" || failed.has(transaction.transactionId)) continue;
-      if (NOT_FINAL_STATUSES.has(transaction.status) && !inFlightAttemptFresh(transaction.createdAt, now)) continue;
-      const external = transaction.externalOrderId ?? await merchantOrderId(transaction.orderId);
-      if (external === initial.chargeId) return Object.freeze({ subscriptionId: existing.subscriptionId });
-    }
-    return null;
   }
 }

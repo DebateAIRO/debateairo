@@ -1005,6 +1005,7 @@ export {
   loadApiEnvironment,
   loadBillingInvoiceEnvironment,
   loadBillingOperatorEnvironment,
+  loadBillingRefundDoneEnvironment,
   loadBillingWithdrawEnvironment,
   loadDeploymentModeSource,
   loadDevelopmentCommandEnvironment,
@@ -1020,6 +1021,7 @@ export {
   parseStaffAccessEnvironment,
   parseBillingInvoiceEnvironment,
   parseBillingOperatorEnvironment,
+  parseBillingRefundDoneEnvironment,
   parseBillingWithdrawEnvironment,
   parseKeyRotationEnvironment,
   parseLivenessEnvironment,
@@ -1028,11 +1030,26 @@ export {
   parseRunnerEnvironment,
   parseServeDisclosureReportEnvironment,
   parseSettlementEnvironment,
-  // P6a (paid plans): the billing group of the API environment, validated late (A22).
+  // P6a (paid plans): the billing group of the API environment, validated late (A22); N8: NETOPIA's group.
   BILLING_ENVIRONMENT_KEYS,
+  NETOPIA_ENVIRONMENT_KEYS,
   readBillingEnvironmentGroup,
+  readNetopiaEnvironmentGroup,
   type BillingEnvironmentGroup,
-  type BillingEnvironmentKey
+  type BillingEnvironmentKey,
+  // N23 (NETOPIA spec §2.17.1): the removed card-processor settings a boot warns about.
+  RETIRED_BILLING_SETTINGS,
+  loadRetiredBillingSettings,
+  retiredBillingSettingsIn,
+  type RetiredBillingSetting,
+  type NetopiaEnvironmentGroup,
+  type NetopiaEnvironmentKey,
+  // N21: the check command's reading of the same settings.
+  BILLING_CHECK_ENVIRONMENT_KEYS,
+  loadBillingCheckEnvironment,
+  readBillingCheckEnvironment,
+  type BillingCheckEnvironment,
+  type BillingCheckEnvironmentKey
 } from "./runtime-environment.js";
 
 export {

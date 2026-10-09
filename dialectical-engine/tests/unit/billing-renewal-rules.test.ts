@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { addBusinessDays, type SubscriptionEvent } from "@debateai/billing-core";
 import {
-  addDays, addYearsClamped, anniversaryDue, dunningProgress, ordersHoldingCharge, recurringNetOf, renewalNoticeDecision,
+  addDays, addYearsClamped, anniversaryDue, dunningProgress, recurringNetOf, renewalNoticeDecision,
   renewalPendingMs, renewalPendingUntil
 } from "../../apps/api/src/billing/renewal-rules.js";
 
@@ -11,14 +11,14 @@ const NOW = new Date("2026-11-02T10:00:00.000Z");
 function events(...rows: Array<[SubscriptionEvent["kind"], SubscriptionEvent["planId"], SubscriptionEvent["data"]]>): SubscriptionEvent[] {
   return rows.map(([kind, planId, data]) => ({
     eventId: randomUUID(), subscriptionId: "s", ownerRef: "o", kind, at: NOW, planId, periodAnchorAt: NOW,
-    xmoneyOrderId: "1", xmoneyCustomerId: "2", cardRef: null, data
+    cardTokenId: null, data
   }));
 }
 
 describe("P11a the subscriber's own recurring price (Terms §12)", () => {
   it("is the net recorded at activation, and moves only with an upgrade or a downgrade the person chose", () => {
     const activated = events(
-      ["CREATED", "PLUS", { xmoney_environment: "stage" }],
+      ["CREATED", "PLUS", { payment_provider: "netopia", payment_environment: "sandbox" }],
       ["ACTIVATED", "PLUS", { announced_total_micros: 24_200_000, recurring_net_micros: 20_000_000 }],
       ["RENEWED", "PLUS", {}]
     );
@@ -106,37 +106,6 @@ describe("P11a where a dunning stands, read from the history (Q-1: an attempt ma
     const [bare] = events(["PAST_DUE", "PLUS", { charge_id: "c1" }]);
     expect(dunningProgress([...base, { ...bare!, at: firstAt }], { status: "PAST_DUE", pastDueSince: firstAt, retryIndex: 0 }))
       .toEqual({ firstFailedAt: firstAt, lastFailedAt: firstAt, failedAttempts: 1 });
-  });
-});
-
-describe("P11a where a lost rebill may sit (A2, A12: a card change moves the subscription's order)", () => {
-  const made = new Date("2026-12-02T10:00:00.000Z");
-  const [created, activated, changed] = events(
-    ["CREATED", "PLUS", { xmoney_environment: "stage" }],
-    ["ACTIVATED", "PLUS", { announced_total_micros: 24_200_000, recurring_net_micros: 20_000_000 }],
-    ["CARD_CHANGED", "PLUS", { charge_id: "c".repeat(32), retry_now: false }]
-  );
-  const on = (event: SubscriptionEvent | undefined, at: Date, xmoneyOrderId: string): SubscriptionEvent =>
-    ({ ...event!, eventId: randomUUID(), at, xmoneyOrderId });
-  // Order "1" at activation, "2" from a card change the day before the charge, then "3" and "2" again after it.
-  const history = [
-    on(created, NOW, "1"), on(activated, NOW, "1"),
-    on(changed, new Date(made.getTime() - 86_400_000), "2"),
-    on(changed, new Date(made.getTime() + 60_000), "3"),
-    on(changed, new Date(made.getTime() + 120_000), "2")
-  ];
-
-  it("is the order in force when the charge was made, then each order a later card change set, oldest first", () => {
-    expect(ordersHoldingCharge(history, made)).toEqual(["2", "3"]);
-  });
-
-  it("is that one order alone when no card change came after the charge", () => {
-    expect(ordersHoldingCharge(history.slice(0, 3), made)).toEqual(["2"]);
-    expect(ordersHoldingCharge(history, new Date(made.getTime() + 180_000))).toEqual(["2"]);
-  });
-
-  it("reads a card change at the charge's own instant as in force when it was made", () => {
-    expect(ordersHoldingCharge([...history.slice(0, 3), on(changed, made, "4")], made)).toEqual(["4"]);
   });
 });
 
