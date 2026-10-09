@@ -84,15 +84,16 @@ const PROVIDERS_REFUSE: RuleValue = Object.freeze({ signup: false, pay: false, r
  * return for the whole EU); US, Canada, Australia, New Zealand, Singapore, Japan (tax only past
  * thresholds Quaderno watches); Liechtenstein (shares Switzerland's VAT, which needs a Swiss tax
  * representative), the tax-from-first-sale country the Terms list, South Korea, and,
- * since the owner's amendment of 1 October 2026, Switzerland, Israel, Taiwan and Moldova (Terms
- * Annex A.6, A.9, A.10, A.7; each has its own tax rule for foreign digital sellers, not yet checked):
+ * since the owner's amendment of 1 October 2026, Switzerland, Taiwan and Moldova (Terms
+ * Annex A.6, A.10, A.7; each has its own tax rule for foreign digital sellers, not yet checked):
  * sign-up yes, pay not until the owner registers there; Ukraine: closed until the occupied regions
  * can be blocked; since the owner's amendment of 2 October 2026, the United Kingdom: not offered for
  * now, to open after launch; Turkey, Brazil, Indonesia and,
  * since the owner's amendment of 1 October 2026 (high risk, low benefit), Saudi Arabia, India, the
- * UAE, Mexico, Argentina, Colombia, Chile, Thailand and the Philippines: kept out by the Terms until
- * a local annex exists — not offered, not blocked (none is sanctioned, and the AI providers serve
- * them). Always blocked: Russia, Belarus and North Korea for sanctions; China, Hong Kong,
+ * UAE, Mexico, Argentina, Colombia, Chile, Thailand and the Philippines, and, since the owner's
+ * amendment of 9 October 2026, Israel: kept out by the Terms until a local annex exists — not
+ * offered, not blocked (none is sanctioned, and the AI providers serve them). Always blocked:
+ * Russia, Belarus and North Korea for sanctions; China, Hong Kong,
  * Macau, Iran, Cuba, Syria, Venezuela and Vietnam as the AI providers' and the Terms' commercial
  * scope — Cuba and Iran deliberately NOT worded as compliance with US sanctions (the EU Blocking
  * Statute, spec §2.12 item 7). Every country not listed takes `default_rule`: closed.
@@ -108,16 +109,16 @@ const COUNTRY_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = O
     "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "NO", "IS"], OFFERED],
   [["LI"], SIGN_UP_ONLY],
   [["US", "CA", "AU", "NZ", "SG", "JP"], OFFERED],
-  [["KR", "CH", "IL", "TW", "MD"], SIGN_UP_ONLY],
+  [["KR", "CH", "TW", "MD"], SIGN_UP_ONLY],
   [["GB", "UA"], NOT_YET],
-  [["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH"], EXCLUDED],
+  [["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH", "IL"], EXCLUDED],
   [["RU", "BY", "KP"], SANCTIONED],
   [["CN", "HK", "MO", "IR", "CU", "SY", "VE", "VN"], PROVIDERS_REFUSE]
 ]);
 
 export const COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: COUNTRY_POLICY_ROW_KEY,
-  sourceRef: "Paid plans spec 2026-09-29 §1.5 country switches (owner decisions 29 September 2026, amended 1, 2 and 8 October 2026):"
+  sourceRef: "Paid plans spec 2026-09-29 §1.5 country switches (owner decisions 29 September 2026, amended 1, 2, 8 and 9 October 2026):"
     + " the Terms Annex A, sanctions and the AI providers' country lists",
   value: Object.freeze({
     kind: "COUNTRY_POLICY" as const,
