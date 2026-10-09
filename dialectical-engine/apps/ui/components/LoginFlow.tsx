@@ -1,9 +1,5 @@
 "use client";
 import Link from 'next/link';
-import { KnownPasswordRecoveryLink } from './KnownPasswordRecoveryLink';
-import resetEn from '@/messages/en/password-reset.json';
-import resetRo from '@/messages/ro/password-reset.json';
-import { useChromeI18n } from '@/lib/i18n/I18nProvider';
 import { clearStoredSupportConversation } from '@/components/support/conversation';
 import { announceSessionChange } from '@/components/support/sessionChange';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -36,8 +32,6 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     /** Public Turnstile config for the verification-email resend entry (the endpoint requires the proof). */
     turnstile?: TurnstilePublicConfig;
 }) {
-    const {locale}=useChromeI18n();
-    const resetCatalog=locale==='ro'?resetRo:resetEn;
     const browser = useRef(provided ?? createConsumerWebAuthnBrowser()).current;
     const flight = useRef(false);
     const dispatched = useRef(false);
@@ -270,7 +264,18 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     const offered = continuation?.available_methods ?? [];
     if (resending)
         return <VerificationResend catalog={catalog} client={client} turnstile={turnstile} onBack={() => setResending(false)}/>;
-    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={replacement ? t(catalog, "auth.login.replacementTitle") : continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} footer={!replacement&&!dispatched.current?<p><Link href="/reset-password" onClick={()=>{cancelConditional();}}>{t(resetCatalog,"request.title")}</Link> · <KnownPasswordRecoveryLink onClick={()=>{cancelConditional();}}/></p>:null}>
+    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={replacement ? t(catalog, "auth.login.replacementTitle") : continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} footer={!replacement && !dispatched.current ? <>
+ {/* One way in for every recovery route, each with one plain sentence (auth UI repair, 2026-10-09). */}
+ <details className="authHelp">
+ <summary>{t(catalog, "auth.login.cantSignIn")}</summary>
+ <ul className="authHelpList">
+ <li><Link href="/reset-password" onClick={cancelConditional}>{t(catalog, "auth.login.help.passwordLink")}</Link><p>{t(catalog, "auth.login.help.passwordText")}</p></li>
+ <li><Link href="/recover-authenticator" onClick={cancelConditional}>{t(catalog, "auth.login.help.authenticatorLink")}</Link><p>{t(catalog, "auth.login.help.authenticatorText")}</p></li>
+ <li><Link href="/recover" onClick={cancelConditional}>{t(catalog, "auth.login.help.codeLink")}</Link><p>{t(catalog, "auth.login.help.codeText")}</p></li>
+ </ul>
+ </details>
+ {continuation ? null : <p>{t(catalog, "auth.login.noAccountYet")} <Link href={signUpHref}>{t(catalog, "auth.login.createOne")}</Link></p>}
+ </> : null}>
  {error ? <div className="authAlert" role="alert">{error}</div> : null}
  {replacement ? <div><EphemeralCodes codes={[replacement]} catalog={catalog}/><button type="button" className="authPrimary" onClick={() => {
                 setRecoveryAcknowledgementPending(false);
@@ -344,7 +349,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 cancelConditional();
                 setError(null);
                 setResending(true);
-            }}>{t(catalog, "auth.login.resendVerification")}</button></p><Link href="/recover">{t(catalog, "auth.login.recoveryAccess")}</Link><p>{t(catalog, "auth.login.noAccountYet")} <Link href={signUpHref}>{t(catalog, "auth.login.createOne")}</Link></p>
+            }}>{t(catalog, "auth.login.resendVerification")}</button></p>
  </>}
  </AuthShell>;
 }

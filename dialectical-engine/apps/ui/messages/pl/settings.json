@@ -172,6 +172,7 @@
   "settings.phone.change": "Zmień telefon",
   "settings.phone.required": "Dodaj telefon, aby kontynuować. Pytanie i opcje zostaną zachowane.",
   "settings.security.lastPath": "Dodaj inną metodę logowania przed usunięciem tej.",
+  "settings.security.remove": "Usuń",
   "settings.security.codesRemaining": "Kody odzyskiwania: {count}",
   "settings.security.regenerate": "Wygeneruj nowe kody odzyskiwania",
   "settings.security.refreshFailed": "Nie udało się odświeżyć danych bezpieczeństwa. Załaduj stronę ponownie."

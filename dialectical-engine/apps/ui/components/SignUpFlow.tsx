@@ -212,6 +212,10 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         setTermsOpen(false);
         edit('terms');
     }
+    const submitHint = [
+        ...(declaredRegion === null ? [t(catalog, "auth.signUp.regionHint")] : []),
+        ...(!privacyAccepted || !termsAccepted ? [t(catalog, "auth.signUp.consentHint")] : [])
+    ];
     if (refused)
         return <AgeRefusal catalog={catalog}/>;
     if (submittedEmail !== null)
@@ -246,7 +250,10 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 setProof(null);
                 setError(t(catalog, "auth.pending.proofUnavailable"));
             }}/> : null}
- <button className="authPrimary" type="submit" disabled={busy || declaredRegion === null || !privacyAccepted || !termsAccepted || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth))}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
+ {/* Owner ruling V-18 (R17) keeps Create account disabled until a region is chosen and both boxes are
+     ticked; the hint says which of those is still missing (auth UI repair, 2026-10-09). */}
+ <button className="authPrimary" type="submit" aria-describedby={submitHint.length ? 'signup-submit-hint' : undefined} disabled={busy || declaredRegion === null || !privacyAccepted || !termsAccepted || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth))}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
+ {submitHint.length ? <p className="authFieldHint" id="signup-submit-hint">{submitHint.join(' ')}</p> : null}
  <p className="authPanelFooter">{t(catalog, "auth.signUp.alreadyHaveOne")} <a href={loginHref}>{t(catalog, "auth.signUp.logIn")}</a></p>
  </form>
  {policyOpen ? <PrivacyPolicyModal open mode="consent" onClose={() => {

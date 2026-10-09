@@ -171,6 +171,7 @@
   "settings.phone.change": "Schimbă numărul",
   "settings.phone.required": "Adaugă numărul de telefon pentru a continua. Întrebarea și opțiunile se păstrează.",
   "settings.security.lastPath": "Adaugă o altă metodă de autentificare înainte de a o elimina pe aceasta.",
+  "settings.security.remove": "Eliminați",
   "settings.security.codesRemaining": "Coduri de recuperare: {count}",
   "settings.security.regenerate": "Generează coduri noi de recuperare",
   "settings.security.refreshFailed": "Detaliile de securitate nu au putut fi reîmprospătate. Reîncarcă pagina."

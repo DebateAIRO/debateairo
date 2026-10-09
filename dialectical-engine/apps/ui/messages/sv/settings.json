@@ -170,6 +170,7 @@
   "settings.phone.change": "Ändra telefonnummer",
   "settings.phone.required": "Lägg till ditt telefonnummer för att fortsätta. Din fråga och dina val sparas.",
   "settings.security.lastPath": "Lägg till en annan inloggningsmetod innan du tar bort den här.",
+  "settings.security.remove": "Ta bort",
   "settings.security.codesRemaining": "Återställningskoder: {count}",
   "settings.security.regenerate": "Skapa nya återställningskoder",
   "settings.security.refreshFailed": "Säkerhetsuppgifterna kunde inte uppdateras. Ladda om sidan."
