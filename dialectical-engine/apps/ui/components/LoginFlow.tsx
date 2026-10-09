@@ -12,6 +12,8 @@ import { AuthShell } from '@/components/AuthShell';
 import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
 import { InlineFieldMessage } from '@/components/auth/InlineFieldMessage';
 import { EphemeralCodes } from '@/components/auth/EphemeralCodes';
+import { VerificationResend } from '@/components/auth/VerificationResend';
+import type { TurnstilePublicConfig } from '@/lib/turnstile';
 import { ageConfirmationHref, ageConfirmationRequired } from '@/lib/ageConfirmation';
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
@@ -21,16 +23,18 @@ import { setRecoveryAcknowledgementPending } from '@/lib/authNavigationGuard';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { safeReturnPath } from '@/lib/returnPath';
 import authEnglish from '@/messages/en/auth.json';
-type LoginClient = Pick<ContractClient, 'beginLogin' | 'completeLogin'> & Partial<Pick<ContractClient, 'authProviders' | 'beginSocialLogin' | 'beginPasskeyLogin' | 'completePasskeyLogin'>>;
+type LoginClient = Pick<ContractClient, 'beginLogin' | 'completeLogin'> & Partial<Pick<ContractClient, 'authProviders' | 'beginSocialLogin' | 'beginPasskeyLogin' | 'completePasskeyLogin' | 'resendVerification'>>;
 async function navigateHome() {
     const next = new URLSearchParams(window.location.search).get('next');
     window.location.assign(await ageConfirmationRequired() ? ageConfirmationHref(next) : safeReturnPath(next));
 }
-export function LoginFlow({ catalog = authEnglish, client = contractClient, onAuthenticated = navigateHome, browser: provided }: {
+export function LoginFlow({ catalog = authEnglish, client = contractClient, onAuthenticated = navigateHome, browser: provided, turnstile }: {
     catalog?: MessageCatalog;
     client?: LoginClient;
     onAuthenticated?: () => void | Promise<void>;
     browser?: ConsumerWebAuthnBrowser;
+    /** Public Turnstile config for the verification-email resend entry (the endpoint requires the proof). */
+    turnstile?: TurnstilePublicConfig;
 }) {
     const {locale}=useChromeI18n();
     const resetCatalog=locale==='ro'?resetRo:resetEn;
@@ -53,6 +57,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     const [emailError, setEmailError] = useState<string | null>(null);
     const [passwordError, setPasswordError] = useState<string | null>(null);
     const [signUpHref, setSignUpHref] = useState('/sign-up');
+    const [resending, setResending] = useState(false);
     function cancelConditional() {
         sequence.current++;
         conditional.current?.abort();
@@ -263,6 +268,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         }
     }
     const offered = continuation?.available_methods ?? [];
+    if (resending)
+        return <VerificationResend catalog={catalog} client={client} turnstile={turnstile} onBack={() => setResending(false)}/>;
     return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={replacement ? t(catalog, "auth.login.replacementTitle") : continuation ? t(catalog, "auth.login.twoStepVerification") : t(catalog, "auth.login.backToGraph")} description={t(catalog, "auth.login.securityPolicy")} footer={!replacement&&!dispatched.current?<p><Link href="/reset-password" onClick={()=>{cancelConditional();}}>{t(resetCatalog,"request.title")}</Link> · <KnownPasswordRecoveryLink onClick={()=>{cancelConditional();}}/></p>:null}>
  {error ? <div className="authAlert" role="alert">{error}</div> : null}
  {replacement ? <div><EphemeralCodes codes={[replacement]} catalog={catalog}/><button type="button" className="authPrimary" onClick={() => {
@@ -332,7 +339,12 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 setPasswordError(null);
             }} required aria-invalid={!!passwordError || undefined} aria-describedby={passwordError ? 'login-password-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-password-error" message={passwordError}/></div>
  <button type="submit" className="authPrimary" disabled={busy}>{busy ? t(catalog, "auth.login.checking") : t(catalog, "auth.continue")}</button>
- </form><Link href="/recover">{t(catalog, "auth.login.recoveryAccess")}</Link><p>{t(catalog, "auth.login.noAccountYet")} <Link href={signUpHref}>{t(catalog, "auth.login.createOne")}</Link></p>
+ </form>
+ <p className="authResendEntry"><button type="button" className="authTextButton" disabled={busy} onClick={() => {
+                cancelConditional();
+                setError(null);
+                setResending(true);
+            }}>{t(catalog, "auth.login.resendVerification")}</button></p><Link href="/recover">{t(catalog, "auth.login.recoveryAccess")}</Link><p>{t(catalog, "auth.login.noAccountYet")} <Link href={signUpHref}>{t(catalog, "auth.login.createOne")}</Link></p>
  </>}
  </AuthShell>;
 }

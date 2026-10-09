@@ -99,6 +99,13 @@ describe("every auth screen styles its own controls", () => {
     expect(unstyled(host)).toEqual([]);
   });
 
+  it("sign-in: the send-the-verification-email-again screens", async () => {
+    const host = await render(<LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn(), resendVerification: vi.fn() }} turnstile={{ siteKey: "1x00000000000000000000AA", nonce: "abcdefghijklmnopqrstuv==" }} />);
+    await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === auth["auth.login.resendVerification"])!.click());
+    expect(host.querySelector("#resend-email")).not.toBeNull();
+    expect(unstyled(host)).toEqual([]);
+  });
+
   it("sign-up: the password Show toggle, its hint and the social buttons", async () => {
     const host = await render(<SignUpFlow client={{ register: vi.fn(), checkAge: vi.fn(), authProviders: vi.fn().mockResolvedValue(providers), beginSocialLogin: vi.fn() }} />);
     const hint = host.querySelector("#signup-password-hint");

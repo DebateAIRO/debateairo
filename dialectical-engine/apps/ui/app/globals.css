@@ -2350,6 +2350,7 @@ a:focus-visible {
 .authAltMethods,
 .authSocial { display: flex; flex-direction: column; gap: 8px; }
 .authAltMethods { margin-bottom: 16px; }
+.authResendEntry { margin: 14px 0 0; }
 .authAltMethods:empty { display: none; }
 
 /* An inline field error, the same weight and colour as the ✗ validators. */

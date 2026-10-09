@@ -204,7 +204,12 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     }
     const matrix = totp ? totpQrMatrix(totp.uri) : null;
     if (expired)
-        return <p role="alert">{t(catalog, "auth.enroll.expired")}</p>;
+        // The setup's own time limit ran out (the link, if any, was used long before): say so and let the person start over.
+        return <section className="authEnrollment" aria-label={t(catalog, "auth.enroll.securityTitle")}><p className="authFieldError" role="alert">{t(catalog, "auth.enroll.timedOut")}</p>{authority.kind === 'recovery' ? null : <button type="button" className="authPrimary" onClick={() => {
+                clearCeremony();
+                setError(null);
+                setExpired(false);
+            }}>{t(catalog, "auth.enroll.startAgain")}</button>}</section>;
     if (enrolled)
         return <p role="status">{t(catalog, "auth.enroll.methodAdded")}</p>;
     return <section className="authEnrollment" aria-label={t(catalog, "auth.enroll.securityTitle")}>

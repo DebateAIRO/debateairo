@@ -15,10 +15,12 @@ export type EmailPendingScreenProps = Readonly<{
   catalog: MessageCatalog;
   locale: LocaleCode;
   turnstile?: TurnstilePublicConfig;
+  /** Replaces the after-sign-up sentence when nothing has been sent yet (the sign-in screen's resend entry). */
+  notice?: string;
   onDifferentEmail(): void;
 }>;
 
-export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, locale, turnstile, onDifferentEmail }: EmailPendingScreenProps) {
+export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, locale, turnstile, notice, onDifferentEmail }: EmailPendingScreenProps) {
   const [deadline, setDeadline] = useState(() => Date.now() + retryAfterSeconds * 1_000);
   const remaining = () => Math.max(0, Math.ceil((deadline - Date.now()) / 1_000));
   const [seconds, setSeconds] = useState(remaining);
@@ -66,7 +68,7 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
 
   return <AuthShell eyebrow={t(catalog, "auth.signUp.eyebrow")} title={t(catalog, "auth.pending.title")}
     description={email} footer={null}>
-    <p className="authFinePrint" role="status" aria-live="polite">{t(catalog, "auth.signUp.registrationSent")}</p>
+    <p className="authFinePrint" role="status" aria-live="polite">{notice ?? t(catalog, "auth.signUp.registrationSent")}</p>
     {configured ? <TurnstileChallenge siteKey={turnstile.siteKey} nonce={turnstile.nonce} action="resend-verification"
       locale={locale} resetKey={resetKey} onToken={token => { setProof(token); if (token !== null) setProofUnavailable(false); }} onError={() => setProofUnavailable(true)} /> : null}
     {/* Countdown text has no live region; assistive readers hear only stable state. */}
