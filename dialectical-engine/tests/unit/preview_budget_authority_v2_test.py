@@ -10,7 +10,9 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
+import subprocess
 import sys
 import tempfile
 import threading
@@ -800,13 +802,28 @@ class HaltTests(GateTest):
                               ({'uid': 994}, '/run/debateai-v3-preview/budget.sock'),
                               ({'host': 'other-host'}, '/run/debateai-v3-preview/budget.sock'),
                               ({}, '/tmp/budget.sock'), ({}, '/run/debateai-v3-preview/Budget.sock'),
-                              ({}, '/run/debateai-v3-preview/../budget.sock')):
+                              ({}, '/run/debateai-v3-preview/../budget.sock'),
+                              ({}, '/run/debateai-v3-preview/provider-budget.sock')):  # v1's retired name
             with self.subTest(changes=changes, path=path), self.refused('ROOT_IPC_CUSTODY_REQUIRED'):
                 bridge.serve(gate.private, gate.go_path, path, **{**good, **changes})
+        # These refusals need no state: nothing in the private folder was touched.
+        self.assertFalse((gate.private / 'team-serve.lock').exists())
+        # A regular file where the socket goes (in an otherwise safe folder) is never removed.
         with patch.object(bridge, 'SOCKET_PATTERN', re.compile(re.escape(str(existing)))), \
                 self.refused('ROOT_IPC_CUSTODY_REQUIRED'):
-            bridge.serve(gate.private, gate.go_path, existing, **good)
-        self.assertFalse((gate.private / 'team-serve.lock').exists())
+            bridge.serve(gate.private, gate.go_path, existing, owner_uid=os.getuid(), **good)
+        self.assertEqual(existing.read_text(), '')
+        self.assertEqual(gate.status()['state'], 'active')
+
+    def test_serve_without_a_socket_name_refuses_there_is_no_built_in_name(self):
+        gate = self.gate().ready()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = bridge.main(['serve', '--private', str(gate.private), '--go', str(gate.go_path)])
+        self.assertEqual((code, json.loads(out.getvalue())),
+                         (2, {'status': 'refused', 'error_class': 'SafetyError', 'error': 'ROOT_SOCKET_REQUIRED'}))
+        self.assertNotIn("default=Path('/run", SOURCE.read_text())
+        self.assertEqual(bridge.RETIRED_SOCKET_NAMES, frozenset({'provider-budget.sock'}))
 
     def test_only_one_server_may_hold_the_authority(self):
         gate = self.gate().ready()
@@ -1210,6 +1227,258 @@ class IpcTests(GateTest):
         with self.refused('AUTHORITY_STOPPED'):
             gate.call('op-2', dispatch=lambda *args: dispatched.append(args))
         self.assertEqual(dispatched, [])
+
+
+class StaleSocketTests(GateTest):
+    """serve start removes a left-over socket only when it is provably stale; anything else refuses
+    and is left exactly as it was. The tests run as the developer, so owner_uid is the developer."""
+
+    def folder(self):
+        gate = self.gate()
+        folder = gate.root / 'run'
+        folder.mkdir(mode=0o755)
+        os.chmod(folder, 0o755)
+        return folder
+
+    @staticmethod
+    def stale_socket(path):
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(str(path))
+        server.close()  # Like a killed server: the file stays and no one listens.
+        return path
+
+    def clear(self, path, **kwargs):
+        return bridge.clear_stale_socket(path, owner_uid=os.getuid(), **kwargs)
+
+    def test_free_path_is_left_alone(self):
+        path = self.folder() / 'gate.sock'
+        self.assertFalse(self.clear(path))
+        self.assertFalse(path.exists())
+
+    def test_stale_socket_is_removed(self):
+        path = self.stale_socket(self.folder() / 'gate.sock')
+        self.assertTrue(self.clear(path))
+        self.assertFalse(os.path.lexists(path))
+
+    def test_socket_with_a_listener_is_in_use_and_kept(self):
+        path = self.folder() / 'gate.sock'
+        live = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(live.close)
+        live.bind(str(path))
+        live.listen(8)
+        with self.refused('IPC_SOCKET_IN_USE'):
+            self.clear(path)
+        self.assertTrue(path.exists())
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(client.close)
+        client.connect(str(path))  # Still the live server's socket.
+
+    def test_connect_that_neither_answers_nor_is_refused_counts_as_in_use(self):
+        path = self.stale_socket(self.folder() / 'gate.sock')
+
+        class Silent:
+            def __init__(self, *_args):
+                pass
+
+            def settimeout(self, seconds):
+                self.seconds = seconds
+
+            def connect(self, _address):
+                raise TimeoutError('timed out')  # A live server whose backlog is full.
+
+            def close(self):
+                pass
+        with patch.object(bridge.socket, 'socket', Silent), self.refused('IPC_SOCKET_IN_USE'):
+            self.clear(path)
+        self.assertTrue(os.path.lexists(path))
+        self.assertEqual(bridge.STALE_PROBE_SECONDS, 2)
+
+    def test_anything_but_a_lone_stale_socket_is_refused_and_kept(self):
+        def regular_file(folder):
+            (folder / 'gate.sock').write_text('x')
+
+        def plain_folder(folder):
+            (folder / 'gate.sock').mkdir()
+
+        def symlink_to_stale_socket(folder):
+            self.stale_socket(folder / 'elsewhere.sock')
+            (folder / 'gate.sock').symlink_to(folder / 'elsewhere.sock')
+
+        def dangling_symlink(folder):
+            (folder / 'gate.sock').symlink_to(folder / 'missing.sock')
+
+        def hard_linked_socket(folder):
+            self.stale_socket(folder / 'gate.sock')
+            try:
+                os.link(folder / 'gate.sock', folder / 'second-name.sock')
+            except OSError:
+                self.skipTest('this file system cannot hard-link a socket')
+        for name, spoil in (('regular_file', regular_file), ('plain_folder', plain_folder),
+                            ('symlink_to_stale_socket', symlink_to_stale_socket),
+                            ('dangling_symlink', dangling_symlink), ('hard_linked_socket', hard_linked_socket)):
+            with self.subTest(name):
+                folder = self.folder()
+                spoil(folder)
+                before = sorted((p.name, os.lstat(p).st_ino) for p in folder.iterdir())
+                with self.refused('ROOT_IPC_CUSTODY_REQUIRED'):
+                    self.clear(folder / 'gate.sock')
+                self.assertEqual(sorted((p.name, os.lstat(p).st_ino) for p in folder.iterdir()), before)
+
+    def test_unsafe_folder_or_other_owner_is_refused_and_kept(self):
+        for name in ('group_writable', 'other_writable', 'folder_is_a_symlink', 'owned_by_someone_else'):
+            with self.subTest(name):
+                folder = self.folder()
+                path = self.stale_socket(folder / 'gate.sock')
+                owner = os.getuid()
+                if name == 'group_writable':
+                    os.chmod(folder, 0o775)
+                elif name == 'other_writable':
+                    os.chmod(folder, 0o757)
+                elif name == 'folder_is_a_symlink':
+                    link = folder.parent / 'run-link'
+                    link.symlink_to(folder)
+                    path = link / 'gate.sock'
+                else:
+                    owner = os.getuid() + 1
+                with self.refused('ROOT_IPC_CUSTODY_REQUIRED'):
+                    bridge.clear_stale_socket(path, owner_uid=owner)
+                self.assertTrue(os.path.lexists(folder / 'gate.sock'))
+
+    def test_entry_swapped_during_the_probe_is_not_removed(self):
+        folder = self.folder()
+        path = self.stale_socket(folder / 'gate.sock')
+        real_socket = socket.socket
+
+        class Swapping:
+            def __init__(self, *_args):
+                pass
+
+            def settimeout(self, _seconds):
+                pass
+
+            def connect(self, _address):
+                os.rename(path, folder / 'checked.sock')
+                fresh = real_socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                fresh.bind(str(path))  # Someone else's socket now has the name.
+                fresh.close()
+                raise ConnectionRefusedError()
+
+            def close(self):
+                pass
+        with patch.object(bridge.socket, 'socket', Swapping), self.refused('ROOT_IPC_CUSTODY_REQUIRED'):
+            self.clear(path)
+        self.assertTrue(os.path.lexists(path))
+        self.assertTrue(os.path.lexists(folder / 'checked.sock'))
+
+
+SERVE_SCRIPT = r"""
+import os, re, sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[1])
+from preview_budget_authority_fixture import HOST, load_bridge
+bridge = load_bridge()
+private, go, path = sys.argv[2:5]
+bridge.SOCKET_PATTERN = re.compile(re.escape(path))
+bridge.serve(private, go, path, platform='linux', uid=0, host=HOST, owner_uid=os.getuid())
+"""
+
+
+class ServeLifecycleTests(GateTest):
+    """A real serve process: SIGTERM stops it cleanly, SIGKILL leaves a stale socket that the next
+    start removes. Synthetic state only; no request reaches execution."""
+
+    def start(self, gate, path):
+        process = subprocess.Popen([sys.executable, '-I', '-c', SERVE_SCRIPT, str(Path(__file__).resolve().parent),
+                                    str(gate.private), str(gate.go_path), str(path)],
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.addCleanup(process.stderr.close)
+        self.addCleanup(process.stdout.close)
+        self.addCleanup(lambda: process.poll() is None and (process.kill(), process.wait(10)))
+        line = process.stdout.readline()
+        self.assertTrue(line, process.stderr.read() if process.poll() is not None else 'no serving line')
+        return process, json.loads(line)
+
+    def test_sigterm_stops_cleanly_and_sigkill_leftover_is_removed_on_the_next_start(self):
+        gate = self.gate().ready()
+        folder = gate.root / 'run'
+        folder.mkdir(mode=0o755)
+        os.chmod(folder, 0o755)
+        path = folder / 'gate.sock'
+
+        process, serving = self.start(gate, path)
+        self.assertEqual((serving['status'], serving['stale_socket_removed']), ('serving', False))
+        self.assertEqual(os.stat(path).st_mode & 0o777, 0o666)
+        process.send_signal(signal.SIGKILL)
+        process.wait(10)
+        self.assertTrue(os.path.lexists(path))  # What a crash leaves behind.
+
+        process, serving = self.start(gate, path)
+        self.assertEqual((serving['status'], serving['stale_socket_removed'], serving['interrupted_calls_found']),
+                         ('serving', True, 0))
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        client.connect(str(path))  # The new server listens on the reclaimed name.
+        client.close()
+        process.send_signal(signal.SIGTERM)
+        self.assertEqual(process.wait(10), 0)
+        self.assertEqual([json.loads(line)['status'] for line in process.stdout.read().splitlines()], ['stopped'])
+        self.assertFalse(os.path.lexists(path))
+        self.assertEqual(gate.status()['state'], 'active')
+
+    def test_a_second_serve_on_a_live_socket_refuses_and_leaves_it(self):
+        gate = self.gate().ready()
+        folder = gate.root / 'run'
+        folder.mkdir(mode=0o755)
+        os.chmod(folder, 0o755)
+        path = folder / 'gate.sock'
+        process, _ = self.start(gate, path)
+        with patch.object(bridge, 'SOCKET_PATTERN', re.compile(re.escape(str(path)))), \
+                self.refused('SERVE_ALREADY_RUNNING'):
+            bridge.serve(gate.private, gate.go_path, path, platform='linux', uid=0, host=HOST, owner_uid=os.getuid())
+        other = self.gate().ready()
+        with patch.object(bridge, 'SOCKET_PATTERN', re.compile(re.escape(str(path)))), \
+                self.refused('IPC_SOCKET_IN_USE'):
+            bridge.serve(other.private, other.go_path, path, platform='linux', uid=0, host=HOST, owner_uid=os.getuid())
+        process.send_signal(signal.SIGTERM)
+        self.assertEqual(process.wait(10), 0)
+
+
+class SignalStopTests(GateTest):
+    def test_stop_signal_lets_the_call_in_flight_finish_and_be_delivered(self):
+        gate = self.gate().ready()
+        path = gate.root / 's.sock'
+        started, finished = threading.Event(), []
+
+        def execute(_data, _uid, _cancelled, _on_reserved):
+            started.set()
+            time.sleep(0.5)
+            finished.append(time.monotonic())
+            return {'status': 200, 'body': '{}'}
+        handler = bridge.make_handler(gate.private, [PEER], execute, gate.slots, peer_uid_of=lambda _c: PEER,
+                                      now=gate.clock)
+        server = bridge.UnixThreadingServer(str(path), handler)
+        loop = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': 0.05}, daemon=True)
+        loop.start()
+        self.addCleanup(lambda: loop.is_alive() and server.shutdown())  # A failing test must not hang the run.
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(client.close)
+        client.connect(str(path))
+        data = b'{}'
+        client.sendall(b'POST /complete HTTP/1.0\r\nContent-Length: 2\r\n\r\n' + data)
+        self.assertTrue(started.wait(5))
+        bridge.stop_on_signal(server)(signal.SIGTERM, None)
+        loop.join(5)
+        self.assertFalse(loop.is_alive())
+        server.server_close()  # Waits for the call in flight.
+        closed = time.monotonic()
+        self.assertTrue(finished and finished[0] <= closed)
+        client.settimeout(5)
+        reply = b''
+        while True:
+            chunk = client.recv(65536)
+            if not chunk:
+                break
+            reply += chunk
+        self.assertTrue(reply.startswith(b'HTTP/1.0 200'), reply[:40])
 
 
 class SocketServerTests(GateTest):

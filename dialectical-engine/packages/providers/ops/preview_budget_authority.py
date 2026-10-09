@@ -12,7 +12,14 @@ reservation halts every new call until Root re-activates; calls already in fligh
 settle. A halt is written before the ledger entry it explains, and serve start halts on any
 call a crash interrupted. If a settlement or a halt cannot be written, the running server
 reserves nothing more until it is restarted.
-The retired v1 ledger (budget-ledger.json) is never opened.
+The retired v1 ledger (budget-ledger.json) is never opened, and serve refuses the retired v1
+socket name (provider-budget.sock): v2 always serves on its own, explicitly named socket.
+
+Stopping and restarting serve: SIGTERM (systemctl stop) closes the socket at once, lets the calls
+already in flight finish and settle, removes the socket file and exits 0. If serve dies without
+that (SIGKILL, a crash), the next serve start removes the left-over socket file only when it is
+provably stale: a socket owned by root, in a root-owned folder no one else can write, that no
+process is listening on (a connect is refused). Anything else at that path refuses serve start.
 
 Day boundary (by design): a call is charged to the Bucharest day on which it was reserved, even
 when it settles after midnight. So the real upstream charges made within one calendar day can
@@ -26,6 +33,7 @@ import hashlib
 import json
 import os
 import re
+import signal
 import socket
 import stat
 import struct
@@ -72,6 +80,8 @@ GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_
 GO_OPTIONAL = frozenset({'predecessor_ledger_sha256'})
 DAY_PATTERN = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}')
 SOCKET_PATTERN = re.compile(r'/run/debateai-v3-preview/[a-z0-9-]+\.sock')
+RETIRED_SOCKET_NAMES = frozenset({'provider-budget.sock'})  # v1's name: old clients must never reach v2.
+STALE_PROBE_SECONDS = 2
 ENTRY_STATES = ('pending', 'settled', 'uncertain')
 
 
@@ -796,17 +806,95 @@ class UnixThreadingServer(ThreadingMixIn, HTTPServer):
         self.server_port = 0
 
 
-def serve(private, go_path, socket_path, platform=None, uid=None, host=None):
+def clear_stale_socket(socket_path, owner_uid=0, probe_seconds=None):
+    """Before serve binds: True if a provably stale socket file was removed, False if the path was
+    free. Anything else refuses, and the path is left exactly as it was.
+
+    Stale means all of: the folder is a real folder (not a symlink) owned by owner_uid (root) that
+    group and others cannot write, so no one but root can create, swap or remove what is in it;
+    the entry is a socket (not a symlink, file or folder) owned by owner_uid with one link; and a
+    connect to it is refused (ECONNREFUSED: no process is listening). A listener, a full backlog,
+    a timeout or any other connect error refuses with IPC_SOCKET_IN_USE. The entry is unlinked
+    relative to the checked folder only if it is still the same inode that was checked. Callers
+    hold the serve lock, so no other serve on this state can race this.
+    """
+    probe_seconds = STALE_PROBE_SECONDS if probe_seconds is None else probe_seconds
+    path = Path(socket_path)
+    try:
+        dir_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
+        raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED') from None
+    try:
+        folder = os.fstat(dir_fd)
+        if folder.st_uid != owner_uid or folder.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED')
+        try:
+            entry = os.stat(path.name, dir_fd=dir_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED') from None
+        if not stat.S_ISSOCK(entry.st_mode) or entry.st_uid != owner_uid or entry.st_nlink != 1:
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED')
+        probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            probe.settimeout(probe_seconds)
+            probe.connect(str(path))
+        except ConnectionRefusedError:
+            # Nothing listens: the file is what a killed server left behind. (On Linux, the only
+            # platform serve runs on, a live listener with a full backlog blocks until the timeout
+            # instead, which refuses below.)
+            pass
+        except OSError:
+            raise SafetyError('IPC_SOCKET_IN_USE') from None
+        else:
+            raise SafetyError('IPC_SOCKET_IN_USE')
+        finally:
+            probe.close()
+        try:
+            again = os.stat(path.name, dir_fd=dir_fd, follow_symlinks=False)
+        except OSError:
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED') from None
+        if (again.st_dev, again.st_ino, again.st_mode, again.st_uid) != (entry.st_dev, entry.st_ino, entry.st_mode, entry.st_uid):
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED')
+        try:
+            os.unlink(path.name, dir_fd=dir_fd)
+        except OSError:
+            raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED') from None
+        return True
+    finally:
+        os.close(dir_fd)
+
+
+def socket_path_allowed(socket_path):
+    text = str(socket_path)
+    return bool(SOCKET_PATTERN.fullmatch(text)) and Path(text).name not in RETIRED_SOCKET_NAMES
+
+
+def stop_on_signal(server):
+    """A SIGTERM/SIGINT handler that asks serve_forever to return. shutdown() waits for the loop,
+    and the handler runs on the loop's own thread, so it is called from a fresh thread."""
+    asked = threading.Event()
+
+    def handle(_signum, _frame):
+        if not asked.is_set():
+            asked.set()
+            threading.Thread(target=server.shutdown, name='serve-stop', daemon=True).start()
+    return handle
+
+
+def serve(private, go_path, socket_path, platform=None, uid=None, host=None, owner_uid=0):
     go = read_go(go_path)
     platform = platform or sys.platform
     uid = os.getuid() if uid is None else uid
     host = host or socket.gethostname()
-    if platform != 'linux' or uid != 0 or host != go['target_host'] \
-            or not SOCKET_PATTERN.fullmatch(str(socket_path)) or Path(socket_path).exists():
+    if platform != 'linux' or uid != 0 or host != go['target_host'] or not socket_path_allowed(socket_path):
         raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED')
     bucharest_day(helper.utc_now())  # Fail fast without the time zone database.
     serve_lock = hold_serve_lock(private)
     try:
+        # Under the serve lock: no other serve on this state can be clearing or binding meanwhile.
+        stale_removed = clear_stale_socket(socket_path, owner_uid=owner_uid)
         recovered = recover_interrupted(private)
         slots = CallSlots(go['max_concurrent_calls'])
 
@@ -814,15 +902,26 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None):
             return execute_request(private, go_path, data, peer_uid=uid, slots=slots, cancelled=cancelled,
                                    on_reserved=on_reserved)
         server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots))
-        os.chmod(socket_path, 0o666)
-        emit({'status': 'serving', 'socket': str(socket_path), 'max_concurrent_calls': slots.limit,
-              'interrupted_calls_found': recovered['interrupted'],
-              'unrecorded_uncertain_found': recovered['unrecorded_uncertain']})
+        previous = {}
         try:
+            handler = stop_on_signal(server)
+            for number in (signal.SIGTERM, signal.SIGINT):
+                previous[number] = signal.signal(number, handler)
+            os.chmod(socket_path, 0o666)
+            emit({'status': 'serving', 'socket': str(socket_path), 'max_concurrent_calls': slots.limit,
+                  'stale_socket_removed': stale_removed, 'interrupted_calls_found': recovered['interrupted'],
+                  'unrecorded_uncertain_found': recovered['unrecorded_uncertain']})
             server.serve_forever()
         finally:
-            server.server_close()
-            Path(socket_path).unlink(missing_ok=True)
+            try:
+                # Closes the listening socket first, then waits for in-flight calls to finish and
+                # settle; the stop handler stays in place so a repeated SIGTERM cannot cut that short.
+                server.server_close()
+                Path(socket_path).unlink(missing_ok=True)
+            finally:
+                for number, old in previous.items():
+                    signal.signal(number, old)
+        log_event({'status': 'stopped', 'socket': str(socket_path)})
     finally:
         os.close(serve_lock)
 
@@ -832,7 +931,7 @@ def main(argv=None):
     parser.add_argument('phase', choices=('init', 'activate', 'serve', 'stop', 'status'))
     parser.add_argument('--private', type=Path, required=True)
     parser.add_argument('--go', type=Path)
-    parser.add_argument('--socket', type=Path, default=Path('/run/debateai-v3-preview/provider-budget.sock'))
+    parser.add_argument('--socket', type=Path)  # serve only, and required there: no built-in name.
     args = parser.parse_args(argv)
     try:
         uses_go = args.phase in ('init', 'activate', 'serve')
@@ -849,6 +948,8 @@ def main(argv=None):
         elif args.phase == 'status':
             result = status(args.private)
         else:
+            if args.socket is None:
+                raise SafetyError('ROOT_SOCKET_REQUIRED')
             serve(args.private, args.go, args.socket)
             return 0
         emit(result)
