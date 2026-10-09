@@ -1,5 +1,14 @@
-import type { ContractClient } from '@debateai/contract';
+import { ContractHttpError, type ContractClient } from '@debateai/contract';
 import { clearPhoneCompletionDraft } from './phoneCompletionDraft';
+/**
+ * The server answers a logout whose session it no longer has (expired, or revoked from another device)
+ * with 401 SESSION_REQUIRED, 409 COOKIE_SESSION_REQUIRED or 404: the person is already signed out, so the
+ * tab must say so instead of keeping the account menu (auth UI repair, 2026-10-09).
+ */
+function sessionAlreadyEnded(failure: unknown): boolean {
+    return failure instanceof ContractHttpError
+        && (failure.status === 401 || failure.status === 404 || (failure.status === 409 && failure.serverCode === 'COOKIE_SESSION_REQUIRED'));
+}
 import { announceSessionChange } from '../components/support/sessionChange';
 import { clearStoredSupportConversation } from '../components/support/conversation';
 export type EndSessionClient = Pick<ContractClient, 'logout'> & Partial<Pick<ContractClient, 'revokeAllSessions'>>;
@@ -24,7 +33,10 @@ export function endSession(client: EndSessionClient, { all = false, redirectTo =
         if (all) {
             if (!client.revokeAllSessions) throw new Error('SESSION_OPERATION_UNAVAILABLE');
             await client.revokeAllSessions();
-        } else await client.logout();
+        } else {
+            try { await client.logout(); }
+            catch (failure) { if (!sessionAlreadyEnded(failure)) throw failure; }
+        }
         finishSessionCleanup(redirectTo);
     })();
     pending[mode] = operation;
