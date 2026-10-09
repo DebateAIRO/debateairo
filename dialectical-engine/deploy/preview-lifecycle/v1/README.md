@@ -252,7 +252,10 @@ unit files before installing; nothing else names them.
    must print `"operation":"verify"`. Rule from now on: **stop the API and the website before
    editing `native-plan.json`** (`systemctl stop debateai-preview-ui debateai-preview-api`). The
    verifier reads that file itself; prestart hashes it before and after the verifier and refuses
-   with `NATIVE_PLAN_CHANGED` if it changed in between, and the lock pins its hash.
+   with `NATIVE_PLAN_CHANGED` if it changed in between, and the lock pins its hash. Verify never
+   applies a database upgrade: if a forward step is not applied yet, prestart refuses with reason
+   `NATIVE_VERIFY_PENDING_FORWARD_STEP` and names it. Then run the native operator with
+   `apply-and-plan` once, then `publish` and `verify`, and start again.
 
 4. **Pin the running release.** Use the plans the current drop-ins launch with
    (`systemctl cat debateai-preview-api debateai-preview-ui | grep -- --plan`):

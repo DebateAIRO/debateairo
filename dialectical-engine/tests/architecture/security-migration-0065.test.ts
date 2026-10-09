@@ -545,6 +545,10 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     expect(ordered.indexOf("0106_known_password_mfa_recovery.sql")).toBeLessThan(ordered.indexOf("0104_account_flow_recovery_bridge.sql"));
     expect(ordered.at(-1)).toBe("0107_auth_dev_integration.sql");
     expect(plan.forward108.name).toBe("0108_preview_recovery_verified_bindings.sql");
-    expect(plan.forwardChain.map((step) => step.name)).toEqual([AUTH_DB_BATCH_MIGRATION]);
+    // Steps of other branches may precede the auth DB batch (migrations/lineage/README.md, "renumber"); it is the last
+    // step of this branch's chain, and the chain's names are unique and ascending.
+    const chain = plan.forwardChain.map((step) => step.name);
+    expect(chain.at(-1)).toBe(AUTH_DB_BATCH_MIGRATION);
+    expect([...new Set(chain)].sort()).toEqual(chain);
   });
 });

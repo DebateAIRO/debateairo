@@ -142,7 +142,7 @@ describe('actual signed-provider and restricted-database journeys', () => {
             await h.registration.drainMailDispatches();
         }
     });
-    // Owner ruling 2026-10-09: the phone is optional at sign-up; without one, no phone column is written (0109).
+    // Owner ruling 2026-10-09: the phone is optional at sign-up; without one, no phone column is written (the auth DB batch step).
     it('creates a social account without a phone and stores no phone profile',async()=>{
         const h = await harness();
         try {
