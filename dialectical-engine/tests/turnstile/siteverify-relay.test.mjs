@@ -167,3 +167,19 @@ test("relay forgets refused proofs so garbage cannot fill its single-use memory"
   assert.equal((await call({ token: "fresh-valid", action: "signup" })).body.success, false);
   assert.equal(calls, 10_001);
 });
+// Auth API hardening 2026-10-09 (follow-up 3): one cap per action family (sign-up, sign-in, recovery).
+test("relay caps its passed-proof memory per action family, so a sign-up flood leaves sign-in and recovery verifying", async t => {
+  let calls = 0;
+  const call = await fixture(t, async (_secret, token) => { calls++; return { ...response, action: token.split(":")[0], challenge_ts: new Date().toISOString() }; });
+  for (let index = 0; index < 10_000; index += 1) assert.equal((await call({ token: `signup:${index}`, action: "signup" })).body.success, true);
+  assert.equal((await call({ token: "signup:next", action: "signup" })).status, 503);
+  assert.equal((await call({ token: "resend-verification:next", action: "resend-verification" })).status, 503);
+  for (const action of ["login", "password-reset", "mfa-recovery", "account-recovery"]) {
+    assert.equal((await call({ token: `${action}:fresh`, action })).body.success, true, action);
+  }
+  // A proof held by one family is still single-use from every other family, without transport.
+  const before = calls;
+  assert.equal((await call({ token: "signup:0", action: "login" })).body.success, false);
+  assert.equal((await call({ token: "login:fresh", action: "account-recovery" })).body.success, false);
+  assert.equal(calls, before);
+});
