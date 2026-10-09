@@ -4,6 +4,7 @@ import { migrate } from "@debateai/db";
 import type { PoolClient } from "pg";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
+import { AUTH_DB_BATCH_MIGRATION } from "../../packages/db/src/migration-forward-auth-db-batch.js";
 import { auditMigrationReplaySafety } from "../../tools/orphan-audit/src/index.js";
 
 // DB1 of the 2026-09-01 security-hardening mission pins
@@ -618,6 +619,8 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     expect(ordered.at(-1)).toBe("0107_auth_dev_integration.sql");
     expect(plan.forward108.name).toBe("0108_preview_recovery_verified_bindings.sql");
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
-    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql"]);
+    // The chain in merge order (migrations/lineage/README.md, "renumber"): NETOPIA, then the auth DB batch, last.
+    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql"]);
+    expect(plan.forwardChain.at(-1)!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });
 });

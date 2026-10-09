@@ -178,5 +178,12 @@
   "settings.security.codesRemaining": "Gendannelseskoder: {count}",
   "settings.security.regenerate": "Generér nye gendannelseskoder",
   "settings.security.lockoutReminder": "Du har endnu ingen gendannelseskoder eller adgangsnøgle. Hvis du mister din telefon, kommer du ind igen med det samme med dem.",
-  "settings.security.refreshFailed": "Sikkerhedsoplysningerne kunne ikke opdateres. Genindlæs siden."
+  "settings.security.refreshFailed": "Sikkerhedsoplysningerne kunne ikke opdateres. Genindlæs siden.",
+  "settings.security.pendingRecovery.title": "Nogen er begyndt at erstatte din godkendelsesapp",
+  "settings.security.pendingRecovery.body": "Nogen har brugt din adgangskode og et e-maillink til at begynde at erstatte godkendelsesappen på denne konto. Du kan afslutte erstatningen fra {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Nogen har brugt din adgangskode og et e-maillink til at begynde at erstatte godkendelsesappen på denne konto. Du kan afslutte erstatningen nu. Brug linket i din e-mail.",
+  "settings.security.pendingRecovery.keep": "Indtil da virker din nuværende godkendelsesapp, dine gendannelseskoder og dine sessioner fortsat. Hvis det ikke var dig, så annuller den.",
+  "settings.security.pendingRecovery.cancel": "Annuller",
+  "settings.security.pendingRecovery.cancelled": "Gendannelsen er annulleret.",
+  "settings.security.pendingRecovery.failed": "Vi kunne ikke annullere den. Genindlæs siden, og prøv igen."
 }

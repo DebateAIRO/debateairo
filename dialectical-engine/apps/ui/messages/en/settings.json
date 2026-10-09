@@ -178,5 +178,12 @@
   "settings.security.codesRemaining": "Recovery codes: {count}",
   "settings.security.regenerate": "Generate new recovery codes",
   "settings.security.lockoutReminder": "You have no recovery codes or passkey yet. If you lose your phone, they let you back in straight away.",
-  "settings.security.refreshFailed": "Security details could not be refreshed. Reload the page."
+  "settings.security.refreshFailed": "Security details could not be refreshed. Reload the page.",
+  "settings.security.pendingRecovery.title": "Someone started replacing your authenticator",
+  "settings.security.pendingRecovery.body": "Someone used your password and an email link to start replacing the authenticator on this account. You can finish it from {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Someone used your password and an email link to start replacing the authenticator on this account. You can finish it now — use the link in your email.",
+  "settings.security.pendingRecovery.keep": "Until it is finished, your current authenticator, recovery codes and sessions keep working. If this wasn't you, cancel it.",
+  "settings.security.pendingRecovery.cancel": "Cancel",
+  "settings.security.pendingRecovery.cancelled": "Recovery cancelled.",
+  "settings.security.pendingRecovery.failed": "We could not cancel it. Reload the page and try again."
 }

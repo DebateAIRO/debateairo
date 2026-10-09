@@ -551,6 +551,8 @@ install -m 0644 deploy/postgres/postgresql.hardening.conf \
   /etc/postgresql/18/main/conf.d/hardening.conf
 install -m 0640 -o postgres -g postgres deploy/postgres/pg_hba.conf.template \
   /etc/postgresql/18/main/pg_hba.conf
+install -m 0640 -o postgres -g postgres deploy/postgres/pg_ident.conf.template \
+  /etc/postgresql/18/main/pg_ident.conf
 install -d -m 0700 -o postgres -g postgres /etc/debateai/postgres-tls
 # server.crt SAN must include IP:127.0.0.1 and IP:::1; server.key is 0600 postgres:postgres
 systemctl restart postgresql
@@ -574,6 +576,21 @@ What the two config files pin, and why:
   `postgres` OS user (that is how backups run), `hostssl` on `127.0.0.1/32` and `::1/128`, and
   `host all all 0.0.0.0/0 reject` + `::/0 reject` **last**. First match wins, so order is
   load-bearing. `hatchet` is reachable only by `debateai_prod_hatchet` (audit L7-F2).
+- **No line for the staff readiness writer, and no ident map.** The auth DB batch step creates
+  `debateai_staff_readiness_writer` (no password, may only publish and withdraw the staff alert
+  readiness row). Only the private preview's team-unlock helper uses it, and the preview admits
+  it by peer from one dedicated no-login OS user (`debateai-readiness`) with lines it writes
+  itself (`deploy/preview-lifecycle/v1/README.md` step 7). This VPS has no such helper, so its
+  `pg_hba.conf` names that login nowhere (it exists but cannot log in) and `pg_ident.conf` is
+  installed with **no maps at all**. Nothing to create here: no `debateai-readiness` user, no
+  readiness line. Never map `root` to any role: peer only sees a uid, and a process running as
+  uid 0 that reaches the socket (for example a root process in the Hatchet container, which
+  bind-mounts `/var/run/postgresql`) would count as root. To confirm on the VPS, this must print
+  `0` and `0`:
+
+  ```sh
+  sudo -u postgres psql -XAt -c "SELECT count(*) FROM pg_hba_file_rules WHERE 'debateai_staff_readiness_writer' = ANY(user_name)" -c "SELECT count(*) FROM pg_ident_file_mappings"
+  ```
 - So there are exactly **two ways in**, and every client URL must say which: the unix socket
   (`@localhost/debateai?host=/var/run/postgresql`, what every service uses), or TLS on loopback
   (`@127.0.0.1/debateai?sslmode=verify-full&sslrootcert=/etc/debateai/postgres-tls/ca.crt`). A
@@ -915,6 +932,25 @@ If the 0093 steps above have already run on this host, the API's login already h
 `pnpm db:migrate` is the only step needed, and the API keeps working throughout: the privileges reach its role the
 moment the migration commits. If both migrations are pending, one pass through the 0093 steps covers both. The check is the same: one `retention.purged` line at the API's first purge
 check, and a test sign-up that succeeds. **Rolling back** the code needs nothing, for the same reason as 0093.
+
+### Upgrading to the answer-writer prompt v2 release (serve.synthesizer.v2)
+
+This release supersedes the answer writer's sealed prompt `serve.synthesizer.v1` with `serve.synthesizer.v2`, which
+also tells the model the exact name of the one served-number slot (`number:final-strength`) and the identifier form
+the runner accepts. Its fingerprint is the code-owned row `composerContractHash`, so it moves. No migration.
+
+- **Publish a new hosted register version** from the new checkout with `pnpm register:publish-hosted` and the same
+  `/etc/debateai/register/hosted-register.json` (§11), pin it in both `EnvironmentFile`s and restart both units.
+  Until then the runner sends the v2 prompt but records answer-writing calls under the v1 fingerprint the pinned
+  version carries. Do this before any later `pnpm hosted:publish-provider-set`, for the reason given in the
+  publication-check section above.
+- **Restart once, with no debate writing its answer.** The fingerprint is also the key under which the runner
+  finds a debate's earlier answer-writing attempts. A debate that is writing its answer when the new version is
+  pinned no longer sees those attempts: it may ask its writer again (extra paid calls) and its writer-seat
+  continuity starts over. So put the checkout in place, publish, pin, and restart both units in one step, at a
+  moment when `unfinished` from the command in the verdict-story section above is 0 (or accept that rare repeat).
+- Versions already sealed keep the v1 fingerprint; nothing is edited. **Rolling back** the code means pinning the
+  register version the older code was running on again.
 
 ### Upgrading an existing host (paid plans Part 1a)
 

@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { CompleteSocialSignupRequestSchema, RegisterRequestSchema, SessionSchema, StepUpAuthorizationRequestSchema, StepUpResponseSchema } from '@debateai/contract';
 const signup = { email:'integration@example.test',password:'Synthetic-password1!',phone:'+40700000000',date_of_birth:'1990-01-01',terms:{version:'1.0',sha256:'a'.repeat(64)},privacy:{version:'1.0',sha256:'b'.repeat(64)},locale:'en',ui_locale:'en-GB',time_zone:'Europe/Bucharest',turnstile_token:'synthetic-proof' };
 describe('combined auth and Dev public contracts',()=>{
- it('retains phone and display metadata while requiring a valid declared signup region',()=>{
+ it('retains an optional phone and display metadata while requiring a valid declared signup region',()=>{
   expect(RegisterRequestSchema.safeParse({...signup,country:'RO'}).success).toBe(true);
   expect(RegisterRequestSchema.safeParse({...signup,country:'US',us_state:'CA'}).success).toBe(true);
   for(const region of [{},{country:'US'},{country:'US',us_state:'XX'},{country:'RO',us_state:'CA'},{country:'XX'}]) expect(RegisterRequestSchema.safeParse({...signup,...region}).success).toBe(false);
-  expect(RegisterRequestSchema.safeParse({...signup,country:'RO',phone:undefined}).success).toBe(false);
+  // Owner ruling 2026-10-09: the phone is optional; a blank one is still refused.
+  expect(RegisterRequestSchema.safeParse({...signup,country:'RO',phone:undefined}).success).toBe(true);
+  expect(RegisterRequestSchema.safeParse({...signup,country:'RO',phone:' '}).success).toBe(false);
  });
  it('uses the same declared-region validation for social signup without a password',()=>{
   const {password,...social}=signup;

@@ -64,7 +64,8 @@ describe('preview lifecycle systemd templates', () => {
   it('one target brings the whole preview up at boot', () => {
     const value = parse(unit('debateai-preview.target'));
     expect(value['[Install]WantedBy']).toEqual(['multi-user.target']);
-    expect(value['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual(['network-online.target', ...SUPPORTING, 'debateai-preview-api.service', 'debateai-preview-ui.service'].sort());
+    expect(value['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual(['network-online.target', ...SUPPORTING, 'debateai-preview-api.service', 'debateai-preview-ui.service',
+      'debateai-preview-gate-halt-watch.timer', 'debateai-preview-gate-addresses.timer'].sort());
     expect(JSON.stringify(value)).not.toContain('runner');
   });
 
@@ -97,7 +98,7 @@ describe('preview lifecycle systemd templates', () => {
   });
 
   it('every root node command of the lifecycle units goes through env -i with PATH only', () => {
-    for (const name of ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service']) {
+    for (const name of ['debateai-preview-alert@.service', 'debateai-preview-notice@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service']) {
       const value = parse(unit(name));
       const commands = Object.entries(value).filter(([key]) => /^\[Service\]Exec(Start|StartPre|StartPost|Stop|StopPost|Reload|Condition)$/.test(key)).flatMap(([, lines]) => lines);
       expect(commands.length).toBeGreaterThan(0);
@@ -107,7 +108,7 @@ describe('preview lifecycle systemd templates', () => {
 
   it.each([
     ['debateai-preview-team-unlock.service', 'ExecStart'], ['debateai-preview-team-unlock.service', 'ExecStopPost'],
-    ['debateai-preview-alert@.service', 'ExecStart'], ['debateai-preview-backup.service', 'ExecStart']
+    ['debateai-preview-alert@.service', 'ExecStart'], ['debateai-preview-notice@.service', 'ExecStart'], ['debateai-preview-backup.service', 'ExecStart']
   ])('%s %s, run as written, hands node no inherited NODE_OPTIONS or NODE_PATH', (name, key) => {
     const line = parse(unit(name))[`[Service]${key}`]![0]!;
     const probe = join(mkdtempSync(join(tmpdir(), 'lifecycle-unit-env-')), 'probe.mjs');
@@ -152,8 +153,70 @@ describe('preview lifecycle systemd templates', () => {
     for (const text of texts) expect(text).not.toMatch(/crash-alert-after|crashAlertAfter/);
   });
 
+  // The peer readiness writer is the default (no writer named on the ExecStart line). The interim
+  // recovery login is a fallback the operator installs as one drop-in and removes again.
+  const FALLBACK = 'fallback/50-interim-recovery-login.conf';
+  const FALLBACK_RUN = `${CLEAN_ENV} PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login ${NODE} ${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs run`;
+
+  it('team unlock names no writer by default, so the unlock uses the peer readiness writer', () => {
+    expect(unit('debateai-preview-team-unlock.service')).not.toMatch(/^\s*[^#\s].*PREVIEW_LIFECYCLE_STAFF_WRITER/m);
+  });
+
+  it('the interim fallback drop-in only replaces ExecStart, naming the writer on its own env -i line', () => {
+    const value = parse(unit(FALLBACK));
+    expect(Object.keys(value)).toEqual(['[Service]ExecStart']);
+    expect(value['[Service]ExecStart']).toEqual(['', FALLBACK_RUN]);
+  });
+
+  it('the fallback ExecStart, run as written, hands node exactly PATH and the writer name', () => {
+    const probe = join(mkdtempSync(join(tmpdir(), 'lifecycle-unit-env-')), 'probe.mjs');
+    writeFileSync(probe, 'process.stdout.write(JSON.stringify({ env: process.env, execArgv: process.execArgv }));\n');
+    const line = parse(unit(FALLBACK))['[Service]ExecStart']!.at(-1)!;
+    const argv = line.split(' ').map(part => (part === NODE ? process.execPath : part.startsWith(`${OPERATOR}/`) && part.endsWith('.mjs') ? probe : part));
+    const result = spawnSync(argv[0]!, argv.slice(1), { env: { ...process.env, NODE_OPTIONS: '--require=/nonexistent-preload.cjs', PREVIEW_LIFECYCLE_STAFF_DB_HOST: '127.0.0.1' }, encoding: 'utf8' });
+    expect(result.status).toBe(0);
+    const seen = JSON.parse(result.stdout);
+    delete seen.env.__CF_USER_TEXT_ENCODING;
+    expect(seen).toEqual({ env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login' }, execArgv: [] });
+  });
+
+  it('the README installs the fallback drop-in by its real name', () => {
+    const readme = readFileSync(join(folder, 'README.md'), 'utf8');
+    expect(readme).toContain(`systemd/${FALLBACK}`);
+    expect(readme).toContain('/etc/systemd/system/debateai-preview-team-unlock.service.d/50-interim-recovery-login.conf');
+    expect(readme).toMatch(/CONNECTION LIMIT 2/);
+  });
+
+  /**
+   * The readiness login is reached by peer authentication from ONE dedicated OS user, never root:
+   * any process the kernel reports as uid 0 (a root container on the same socket, say) would
+   * otherwise get in. The production templates (deploy/postgres) carry no such line; the preview's
+   * lines live only in this README.
+   */
+  it('the README creates the dedicated no-login OS user and maps only it (never root), with the pg_hba line first', () => {
+    const readme = readFileSync(join(folder, 'README.md'), 'utf8');
+    const collapsed = readme.replace(/[ \t]+/g, ' ');
+    expect(readme).toContain('useradd --system --user-group --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin debateai-readiness');
+    expect(collapsed).toContain('readiness debateai-readiness debateai_staff_readiness_writer');
+    expect(collapsed).toContain('local debateai debateai_staff_readiness_writer peer map=readiness');
+    expect(collapsed).not.toMatch(/readiness root debateai_staff_readiness_writer/);
+    // The scripted edits: the pg_ident line names the dedicated user; the pg_hba line goes in as line 1.
+    expect(readme).toContain("printf '%s\\n' 'readiness  debateai-readiness  debateai_staff_readiness_writer' >> \"$IDENT\"");
+    expect(readme).toContain("sed -i '1i local  debateai  debateai_staff_readiness_writer  peer  map=readiness' \"$HBA\"");
+    // Verification: the dedicated user gets in; root, the same command, does not.
+    expect(readme).toContain("runuser -u debateai-readiness -- /usr/bin/env -i /usr/lib/postgresql/18/bin/psql -w --host=/run/debateai-v3-preview/postgresql --port=5434 --username=debateai_staff_readiness_writer -d debateai -XAtc 'SELECT session_user, current_user'");
+    expect(readme).toContain("/usr/bin/env -i /usr/lib/postgresql/18/bin/psql -w --host=/run/debateai-v3-preview/postgresql --port=5434 --username=debateai_staff_readiness_writer -d debateai -XAtc 'SELECT session_user'");
+    expect(readme).toContain('STAFF_WRITER_FALLBACK_NOT_NEEDED');
+  });
+
+  it('names the batch step by what it is, never by a migration number that may still change', () => {
+    for (const text of [unit('debateai-preview-team-unlock.service'), unit(FALLBACK), readFileSync(join(folder, 'README.md'), 'utf8'), readFileSync(join(folder, 'unlock-team-tools.mjs'), 'utf8'), readFileSync(join(folder, 'readiness-writer-actor.mjs'), 'utf8')]) {
+      expect(text).not.toMatch(/\b0109\b/);
+    }
+  });
+
   it('every script a template names exists in this folder', () => {
-    const all = ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service'].map(unit).join('\n');
+    const all = ['debateai-preview-alert@.service', 'debateai-preview-notice@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service', FALLBACK].map(unit).join('\n');
     const scripts = [...all.matchAll(/deploy\/preview-lifecycle\/v1\/([a-z-]+\.mjs)/g)].map(match => match[1]!);
     expect(scripts.length).toBeGreaterThanOrEqual(4);
     for (const script of scripts) expect(existsSync(join(folder, script))).toBe(true);
