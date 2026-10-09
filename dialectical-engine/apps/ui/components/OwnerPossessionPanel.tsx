@@ -52,12 +52,12 @@ export function OwnerPossessionPanel({ client, catalog, disabled, onAuthorityEnd
             onBusyChange(false);
         }
     }
-    return <section className="setCard">
+    return <section className="staffSetup">
     <h2 className="setCardTitle">{t(catalog, "staff.possession")}</h2>
     <p className="setCardHint">{t(catalog, "staff.possessionHint")}</p>
-    <form data-owner-possession onSubmit={submit}>
+    <form className="staffMutation" data-owner-possession onSubmit={submit}>
       <fieldset disabled={disabled || busy}>
-        {([["command_id", "staff.command"], ["command_nonce", "staff.nonce"], ["credential_one", "staff.keyOne"], ["credential_two", "staff.keyTwo"], ["password", "staff.password"], ["totp_code", "staff.code"]] as const).map(([name, key]) => <div className="setField" key={name}>
+        {([["command_id", "staff.command"], ["command_nonce", "staff.nonce"], ["credential_one", "staff.keyOne"], ["credential_two", "staff.keyTwo"], ["password", "staff.password"], ["totp_code", "staff.code"]] as const).map(([name, key]) => <div className="staffField" key={name}>
           <label htmlFor={`owner-${name}`}>{t(catalog, key)}</label>
           <input id={`owner-${name}`} name={name} type={name === "password" || name === "command_nonce" ? "password" : "text"} autoComplete={name === "password" ? "current-password" : name === "totp_code" ? "one-time-code" : "off"} maxLength={name === "command_nonce" ? 43 : 1024} required={name !== "credential_two"}/>
         </div>)}
