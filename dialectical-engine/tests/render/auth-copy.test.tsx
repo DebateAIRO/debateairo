@@ -24,7 +24,7 @@ import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
 import { MfaRecoveryFlow } from "../../apps/ui/components/MfaRecoveryFlow.js";
 import { BackupEmailConfirmation } from "../../apps/ui/components/BackupEmailVerification.js";
 import { pickRegion } from "../support/signupRegion.js";
-import { mount, unmount } from "./task11-harness.js";
+import { mount, unmount, input } from "./task11-harness.js";
 
 vi.mock("@/lib/consumerWebAuthn", () => ({ createConsumerWebAuthnBrowser: () => ({ supportsConditional: async () => false, authenticate: vi.fn(), register: vi.fn(), cancel: vi.fn() }) }));
 
@@ -64,6 +64,26 @@ describe("sign-in has one Can't sign in? entry", () => {
     expect(outside).not.toContain("/recover-authenticator");
     expect(outside).not.toContain("/recover");
     expect(host.textContent).not.toContain("Recovery access");
+  });
+});
+
+// Review copy tweaks (2026-10-09): the code message says what to do, and the recovery-code choice opens with
+// the situation it is for.
+describe("sign-in copy says what to do", () => {
+  it("a code that is not six digits", async () => {
+    const client = { beginLogin: vi.fn().mockResolvedValue({ status: "mfa_required", challenge_token: "a".repeat(43), available_methods: ["totp"] }), completeLogin: vi.fn() };
+    const host = await render(<LoginFlow client={client} onAuthenticated={vi.fn()} />);
+    await input(host, "[name=email]", "person@example.test");
+    await input(host, "[name=password]", "existing-password");
+    await act(async () => host.querySelector("form")!.requestSubmit());
+    await input(host, "[name=code]", "12a");
+    expect(host.querySelector("#login-code-error")?.textContent).toBe("Enter only the 6 digits (spaces are fine).");
+  });
+
+  it("the recovery-code choice under Can't sign in?", async () => {
+    const host = await render(<LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />);
+    const recover = [...host.querySelectorAll("details li")].find((item) => item.querySelector("a")?.getAttribute("href") === "/recover");
+    expect(recover?.querySelector("p")?.textContent).toBe("Lost both your password and authenticator? Use a recovery code you saved, plus a link we email you.");
   });
 });
 
