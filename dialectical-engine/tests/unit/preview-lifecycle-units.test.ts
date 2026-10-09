@@ -142,8 +142,45 @@ describe('preview lifecycle systemd templates', () => {
     for (const text of texts) expect(text).not.toMatch(/crash-alert-after|crashAlertAfter/);
   });
 
+  // The peer readiness writer is the default (no writer named on the ExecStart line). The interim
+  // recovery login is a fallback the operator installs as one drop-in and removes again.
+  const FALLBACK = 'fallback/50-interim-recovery-login.conf';
+  const FALLBACK_RUN = `${CLEAN_ENV} PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login ${NODE} ${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs run`;
+
+  it('team unlock names no writer by default, so the unlock uses the peer readiness writer', () => {
+    expect(unit('debateai-preview-team-unlock.service')).not.toMatch(/^\s*[^#\s].*PREVIEW_LIFECYCLE_STAFF_WRITER/m);
+  });
+
+  it('the interim fallback drop-in only replaces ExecStart, naming the writer on its own env -i line', () => {
+    const value = parse(unit(FALLBACK));
+    expect(Object.keys(value)).toEqual(['[Service]ExecStart']);
+    expect(value['[Service]ExecStart']).toEqual(['', FALLBACK_RUN]);
+  });
+
+  it('the fallback ExecStart, run as written, hands node exactly PATH and the writer name', () => {
+    const probe = join(mkdtempSync(join(tmpdir(), 'lifecycle-unit-env-')), 'probe.mjs');
+    writeFileSync(probe, 'process.stdout.write(JSON.stringify({ env: process.env, execArgv: process.execArgv }));\n');
+    const line = parse(unit(FALLBACK))['[Service]ExecStart']!.at(-1)!;
+    const argv = line.split(' ').map(part => (part === NODE ? process.execPath : part.startsWith(`${OPERATOR}/`) && part.endsWith('.mjs') ? probe : part));
+    const result = spawnSync(argv[0]!, argv.slice(1), { env: { ...process.env, NODE_OPTIONS: '--require=/nonexistent-preload.cjs', PREVIEW_LIFECYCLE_STAFF_DB_HOST: '127.0.0.1' }, encoding: 'utf8' });
+    expect(result.status).toBe(0);
+    const seen = JSON.parse(result.stdout);
+    delete seen.env.__CF_USER_TEXT_ENCODING;
+    expect(seen).toEqual({ env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login' }, execArgv: [] });
+  });
+
+  it('the README installs the fallback drop-in by its real name and documents the peer lines exactly as the templates', () => {
+    const readme = readFileSync(join(folder, 'README.md'), 'utf8');
+    expect(readme).toContain(`systemd/${FALLBACK}`);
+    expect(readme).toContain('/etc/systemd/system/debateai-preview-team-unlock.service.d/50-interim-recovery-login.conf');
+    const collapsed = readme.replace(/[ \t]+/g, ' ');
+    expect(collapsed).toContain('local debateai debateai_staff_readiness_writer peer map=readiness');
+    expect(collapsed).toContain('readiness root debateai_staff_readiness_writer');
+    expect(readme).toMatch(/CONNECTION LIMIT 2/);
+  });
+
   it('every script a template names exists in this folder', () => {
-    const all = ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service'].map(unit).join('\n');
+    const all = ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service', FALLBACK].map(unit).join('\n');
     const scripts = [...all.matchAll(/deploy\/preview-lifecycle\/v1\/([a-z-]+\.mjs)/g)].map(match => match[1]!);
     expect(scripts.length).toBeGreaterThanOrEqual(4);
     for (const script of scripts) expect(existsSync(join(folder, script))).toBe(true);
