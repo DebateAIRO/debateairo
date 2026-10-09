@@ -1,21 +1,24 @@
 import { tsImport } from 'tsx/esm/api';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { withPrivateBytes,strictJson,exactKeys,sha256,refuse } from './custody.mjs';
+import { withPrivateBytes,strictJson,exactKeys,refuse } from './custody.mjs';
 import { readPublicArtifact } from './launch-plan.mjs';
-import { verifySourceManifest } from './source-manifest.mjs';
+import { verifySourceManifest,operatorManifestSha256 } from './source-manifest.mjs';
 import { withActiveNativePool } from './native-peer.mjs';
-/** Fixed public plan + fixed private peer FD. No database URL, role, secret or env override argument. */
-export async function runNativeOperator() {
- const plan=await withPrivateBytes('/etc/debateai-v3-preview/auth-dev-v1/native-plan.json',{root:'/etc/debateai-v3-preview/auth-dev-v1',uid:0,mode:0o644,maxBytes:32768},raw=>strictJson(raw));
+/** The reviewed native-plan schema check; the release tool runs it before writing a plan. */
+export function validateNativePlan(plan) {
  exactKeys(plan,['schema','operation','sourceRoot','sourceRevision','sourceTree','sourceManifest','operatorManifestSha256','selectedBaseRegisterVersion','selectedBaseSnapshotSha256','publicationId','approval']);
  if(plan.schema!=='preview-auth-dev-native-plan-v1'||!['apply-and-plan','plan','publish','verify'].includes(plan.operation)
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
+ return plan;
+}
+/** Fixed public plan + fixed private peer FD. No database URL, role, secret or env override argument. */
+export async function runNativeOperator() {
+ const plan=validateNativePlan(await withPrivateBytes('/etc/debateai-v3-preview/auth-dev-v1/native-plan.json',{root:'/etc/debateai-v3-preview/auth-dev-v1',uid:0,mode:0o644,maxBytes:32768},raw=>strictJson(raw)));
  const source=await readPublicArtifact(plan.sourceManifest,'source');
  if(source.uid!==0)refuse('PREVIEW_SOURCE_OWNER_REFUSED');
  await verifySourceManifest(source,{sourceRevision:plan.sourceRevision,sourceTree:plan.sourceTree,sourceRoot:plan.sourceRoot,role:'api',manifestSha256:plan.sourceManifest.sha256,execution:{entryUrl:import.meta.url,entryName:'native-operator.mjs',operatorManifestSha256:plan.operatorManifestSha256}});
- const operator=source.files.filter(file=>file.path.startsWith('dialectical-engine/deploy/preview-auth-dev/v1/'));
- if(sha256(JSON.stringify(operator))!==plan.operatorManifestSha256)refuse('PREVIEW_OPERATOR_SOURCE_REFUSED');
+ if(operatorManifestSha256(source)!==plan.operatorManifestSha256)refuse('PREVIEW_OPERATOR_SOURCE_REFUSED');
  const engine=join(plan.sourceRoot,'dialectical-engine');
  const [db,lineage,register,publisher,verify]=await Promise.all([tsImport(join(engine,'packages/db/src/index.ts'),import.meta.url),tsImport(join(engine,'packages/db/src/migration-lineage.ts'),import.meta.url),tsImport(join(engine,'packages/register/src/index.ts'),import.meta.url),tsImport('./publish-register.ts',import.meta.url),tsImport('./verify-native.ts',import.meta.url)]);
  const migration=await lineage.loadMigrationPlan();
