@@ -1,0 +1,22 @@
+# Install as /etc/systemd/system/debateai-preview-team-unlock.service (no [Install]: on demand only).
+#   systemctl start debateai-preview-team-unlock    unlock team tools for one hour
+#   systemctl stop debateai-preview-team-unlock     lock again now
+[Unit]
+Description=DebateAI preview: unlock team tools for one hour
+After=debateai-preview-postgresql.service debateai-preview-capture.service debateai-preview-api.service
+
+[Service]
+Type=simple
+ExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs run
+# Runs after ANY exit, including a crash or a kill: the login goes back to PASSWORD NULL
+# VALID UNTIL '-infinity'. Even if this also failed, the login's own expiry is at most 4 minutes away.
+ExecStopPost=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs reset
+# One hour plus two minutes of margin; systemd sends SIGTERM to a run that overstays.
+RuntimeMaxSec=3720
+KillMode=mixed
+TimeoutStopSec=60
+Restart=no
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true

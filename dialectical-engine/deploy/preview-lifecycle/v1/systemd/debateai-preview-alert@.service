@@ -1,0 +1,15 @@
+# Install as /etc/systemd/system/debateai-preview-alert@.service
+# Started by OnFailure=debateai-preview-alert@%n.service of the preview units. One email per unit
+# per 30 minutes; a mail failure is logged and never fails this unit (so it never alerts itself).
+[Unit]
+Description=DebateAI preview: email the owner that %i failed to restart
+CollectMode=inactive-or-failed
+
+[Service]
+Type=oneshot
+ExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --unit %i
+TimeoutStartSec=60
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
