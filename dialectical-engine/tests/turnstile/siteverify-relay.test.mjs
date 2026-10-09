@@ -147,3 +147,23 @@ for (const drift of ["extra-user", "extra-group", "wrong-user", "write", "group-
     if (drift === "file-links") f.file.nlink = 2;
     assert.throws(() => relaySecretCustody(f.parent, f.file, f.uid, f.acl), /TURNSTILE_SECRET_CUSTODY_INVALID/);
   });
+// Auth API hardening 2026-10-09: sign-in and the public recovery starts carry their own actions.
+for (const action of ["login", "password-reset", "mfa-recovery", "account-recovery"]) test(`relay verifies the ${action} action and binds the provider answer to it`, async t => {
+  let calls = 0; const call = await fixture(t, async () => { calls++; return { ...response, action, challenge_ts: new Date().toISOString() }; });
+  assert.equal((await call({ token: `proof-${action}`, action })).body.success, true);
+  assert.equal((await call({ token: `other-${action}`, action: "signup" })).body.success, false);
+  assert.equal(calls, 2);
+});
+test("relay still refuses an action outside the closed set before transport", async t => {
+  let calls = 0; const call = await fixture(t, async () => { calls++; return response; });
+  assert.equal((await call({ token: "fixture", action: "admin" })).status, 400);
+  assert.equal(calls, 0);
+});
+test("relay forgets refused proofs so garbage cannot fill its single-use memory", async t => {
+  let calls = 0; const call = await fixture(t, async (_secret, token) => { calls++; return token.startsWith("garbage-") ? { success: false, "error-codes": ["invalid-input-response"] } : { ...response, challenge_ts: new Date().toISOString() }; });
+  for (let index = 0; index < 10_000; index += 1) assert.equal((await call({ token: `garbage-${index}`, action: "signup" })).body.success, false);
+  assert.equal((await call({ token: "fresh-valid", action: "signup" })).body.success, true);
+  // A passed proof stays consumed.
+  assert.equal((await call({ token: "fresh-valid", action: "signup" })).body.success, false);
+  assert.equal(calls, 10_001);
+});

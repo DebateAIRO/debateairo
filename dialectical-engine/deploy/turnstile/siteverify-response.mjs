@@ -7,10 +7,15 @@ export function deploymentHostname(publicAppUrl) {
   }
   return url.hostname;
 }
+/**
+ * The closed set of widget actions. Sign-in and the three public recovery starts were added on
+ * 2026-10-09 (auth API hardening); each proof is bound to exactly one of them.
+ */
+export const TURNSTILE_ACTIONS = Object.freeze(["signup", "resend-verification", "login", "password-reset", "mfa-recovery", "account-recovery"]);
 export function validProof(input) {
   return input !== null && typeof input === "object" && typeof input.token === "string"
     && input.token.length >= 1 && input.token.length <= 2048 && /\S/u.test(input.token)
-    && (input.action === "signup" || input.action === "resend-verification");
+    && TURNSTILE_ACTIONS.includes(input.action);
 }
 export function siteverifyOutcome(value, action, hostname, now = Date.now()) {
   if (!value || typeof value !== "object" || typeof value.success !== "boolean") return "unavailable";

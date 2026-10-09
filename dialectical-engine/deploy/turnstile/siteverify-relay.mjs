@@ -51,11 +51,18 @@ export function createSiteverifyRelay({ secret, publicAppUrl, siteverify = fixed
       if (used.has(digest)) { send(200, REJECTED); return; }
       if (used.size >= 10_000) { send(503, { error: "TURNSTILE_UNAVAILABLE" }); return; }
       used.set(digest, now + 300_000);
-      const result = await siteverify(secret, input.token, controller.signal);
-      const outcome = siteverifyOutcome(result, input.action, hostname);
-      if (outcome === "unavailable") send(503, { error: "TURNSTILE_UNAVAILABLE" });
-      else if (outcome === "rejected") send(200, REJECTED);
-      else send(200, { success: true, hostname: result.hostname, action: result.action, challenge_ts: result.challenge_ts, "error-codes": [] });
+      let outcome = "unavailable";
+      try {
+        const result = await siteverify(secret, input.token, controller.signal);
+        outcome = siteverifyOutcome(result, input.action, hostname);
+        if (outcome === "unavailable") send(503, { error: "TURNSTILE_UNAVAILABLE" });
+        else if (outcome === "rejected") send(200, REJECTED);
+        else send(200, { success: true, hostname: result.hostname, action: result.action, challenge_ts: result.challenge_ts, "error-codes": [] });
+      } finally {
+        // Only a passed proof stays held: a refused one was never accepted (Cloudflare refuses its
+        // reuse itself), and holding it let 10,000 garbage proofs refuse every real one (2026-10-09).
+        if (outcome !== "passed") used.delete(digest);
+      }
     } catch { send(503, { error: "TURNSTILE_UNAVAILABLE" }); }
     finally { clearTimeout(deadline); active--; }
   });
