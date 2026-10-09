@@ -178,8 +178,9 @@
   "settings.security.lockoutReminder": "Zatiaľ nemáte obnovovacie kódy ani prístupový kľúč. Ak stratíte telefón, vďaka nim sa do účtu hneď vrátite.",
   "settings.security.refreshFailed": "Podrobnosti zabezpečenia sa nepodarilo obnoviť. Načítajte stránku znova.",
   "settings.security.pendingRecovery.title": "Niekto začal výmenu vašej overovacej aplikácie",
-  "settings.security.pendingRecovery.body": "Niekto použil vaše heslo a odkaz z e-mailu, aby začal výmenu overovacej aplikácie na tomto účte. Výmena sa skončí {time}.",
-  "settings.security.pendingRecovery.keep": "Dovtedy vaša súčasná overovacia aplikácia, obnovovacie kódy a relácie ďalej fungujú. Ak ste to neboli vy, výmenu zrušte.",
+  "settings.security.pendingRecovery.body": "Niekto použil vaše heslo a odkaz z e-mailu, aby začal výmenu overovacej aplikácie na tomto účte. Dokončiť ju môžete od {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Niekto použil vaše heslo a odkaz z e-mailu, aby začal výmenu overovacej aplikácie na tomto účte. Dokončiť ju môžete hneď – použite odkaz vo svojom e-maile.",
+  "settings.security.pendingRecovery.keep": "Kým sa nedokončí, vaša súčasná overovacia aplikácia, obnovovacie kódy a relácie ďalej fungujú. Ak ste to neboli vy, výmenu zrušte.",
   "settings.security.pendingRecovery.cancel": "Zrušiť",
   "settings.security.pendingRecovery.cancelled": "Výmena bola zrušená.",
   "settings.security.pendingRecovery.failed": "Výmenu sa nepodarilo zrušiť. Obnovte stránku a skúste to znova."

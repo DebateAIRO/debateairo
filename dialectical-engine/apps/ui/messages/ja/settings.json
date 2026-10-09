@@ -175,8 +175,9 @@
   "settings.security.lockoutReminder": "復旧コードもパスキーもまだありません。スマートフォンをなくしても、これらがあればすぐにログインし直せます。",
   "settings.security.refreshFailed": "セキュリティ情報を更新できませんでした。ページを再読み込みしてください。",
   "settings.security.pendingRecovery.title": "誰かがあなたの認証アプリの置き換えを開始しました",
-  "settings.security.pendingRecovery.body": "誰かがパスワードとメールのリンクを使い、このアカウントの認証アプリの置き換えを開始しました。{time} に完了します。",
-  "settings.security.pendingRecovery.keep": "それまでは、現在の認証アプリ、復旧コード、セッションはそのまま使えます。心当たりがない場合は、取り消してください。",
+  "settings.security.pendingRecovery.body": "誰かがパスワードとメールのリンクを使い、このアカウントの認証アプリの置き換えを開始しました。{time} 以降に完了できます。",
+  "settings.security.pendingRecovery.bodyReady": "誰かがパスワードとメールのリンクを使い、このアカウントの認証アプリの置き換えを開始しました。今すぐ完了できます。メールのリンクを使ってください。",
+  "settings.security.pendingRecovery.keep": "完了するまでは、現在の認証アプリ、復旧コード、セッションはそのまま使えます。心当たりがない場合は、取り消してください。",
   "settings.security.pendingRecovery.cancel": "取り消す",
   "settings.security.pendingRecovery.cancelled": "復旧を取り消しました。",
   "settings.security.pendingRecovery.failed": "取り消せませんでした。ページを再読み込みしてもう一度お試しください。"

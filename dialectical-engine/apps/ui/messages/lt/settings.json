@@ -178,8 +178,9 @@
   "settings.security.lockoutReminder": "Dar neturite atkūrimo kodų ar prieigos rakto. Jei pamesite telefoną, su jais iškart vėl prisijungsite.",
   "settings.security.refreshFailed": "Nepavyko atnaujinti saugumo duomenų. Įkelkite puslapį iš naujo.",
   "settings.security.pendingRecovery.title": "Kažkas pradėjo pakeisti jūsų autentifikavimo programėlę",
-  "settings.security.pendingRecovery.body": "Kažkas panaudojo jūsų slaptažodį ir el. pašto nuorodą, kad pradėtų pakeisti šios paskyros autentifikavimo programėlę. Pakeitimas bus baigtas {time}.",
-  "settings.security.pendingRecovery.keep": "Iki tol jūsų dabartinė autentifikavimo programėlė, atkūrimo kodai ir seansai veiks kaip įprasta. Jei tai nebuvote jūs, atšaukite pakeitimą.",
+  "settings.security.pendingRecovery.body": "Kažkas panaudojo jūsų slaptažodį ir el. pašto nuorodą, kad pradėtų šios paskyros autentifikavimo programėlės keitimą. Baigti galite nuo {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Kažkas panaudojo jūsų slaptažodį ir el. pašto nuorodą, kad pradėtų šios paskyros autentifikavimo programėlės keitimą. Baigti galite dabar – naudokite nuorodą savo el. laiške.",
+  "settings.security.pendingRecovery.keep": "Kol tai nebus baigta, jūsų dabartinė autentifikavimo programėlė, atkūrimo kodai ir seansai veiks kaip įprasta. Jei tai nebuvote jūs, atšaukite pakeitimą.",
   "settings.security.pendingRecovery.cancel": "Atšaukti",
   "settings.security.pendingRecovery.cancelled": "Atkūrimas atšauktas.",
   "settings.security.pendingRecovery.failed": "Nepavyko to atšaukti. Įkelkite puslapį iš naujo ir bandykite dar kartą."

@@ -177,8 +177,9 @@
   "settings.security.lockoutReminder": "עדיין אין לכם קודי שחזור או מפתח גישה. אם הטלפון יאבד, הם יאפשרו לכם להיכנס שוב מיד.",
   "settings.security.refreshFailed": "לא ניתן היה לרענן את פרטי האבטחה. יש לטעון מחדש את הדף.",
   "settings.security.pendingRecovery.title": "מישהו התחיל להחליף את אפליקציית האימות שלכם",
-  "settings.security.pendingRecovery.body": "מישהו השתמש בסיסמה שלכם ובקישור שנשלח בדוא״ל כדי להתחיל להחליף את אפליקציית האימות בחשבון הזה. ההחלפה תסתיים ב-{time}.",
-  "settings.security.pendingRecovery.keep": "עד אז, אפליקציית האימות הנוכחית, קודי השחזור וההפעלות ממשיכים לפעול. אם לא אתם עשיתם זאת, בטלו את התהליך.",
+  "settings.security.pendingRecovery.body": "מישהו השתמש בסיסמה שלכם ובקישור שנשלח בדוא״ל כדי להתחיל להחליף את אפליקציית האימות בחשבון הזה. אפשר לסיים את ההחלפה החל מ-{time}.",
+  "settings.security.pendingRecovery.bodyReady": "מישהו השתמש בסיסמה שלכם ובקישור שנשלח בדוא״ל כדי להתחיל להחליף את אפליקציית האימות בחשבון הזה. אפשר לסיים את ההחלפה עכשיו. השתמשו בקישור שבדוא״ל שלכם.",
+  "settings.security.pendingRecovery.keep": "עד שהתהליך יסתיים, אפליקציית האימות הנוכחית, קודי השחזור וההפעלות ממשיכים לפעול. אם לא אתם עשיתם זאת, בטלו את התהליך.",
   "settings.security.pendingRecovery.cancel": "ביטול",
   "settings.security.pendingRecovery.cancelled": "תהליך השחזור בוטל.",
   "settings.security.pendingRecovery.failed": "לא הצלחנו לבטל אותו. רעננו את הדף ונסו שוב."

@@ -176,8 +176,9 @@
   "settings.security.lockoutReminder": "Henüz kurtarma kodunuz veya geçiş anahtarınız yok. Telefonunuzu kaybederseniz bunlar sayesinde hemen yeniden giriş yapabilirsiniz.",
   "settings.security.refreshFailed": "Güvenlik bilgileri yenilenemedi. Sayfayı yeniden yükleyin.",
   "settings.security.pendingRecovery.title": "Birisi kimlik doğrulama uygulamanızı değiştirmeye başladı",
-  "settings.security.pendingRecovery.body": "Birisi, bu hesabın kimlik doğrulama uygulamasını değiştirmek için parolanızı ve bir e-posta bağlantısını kullandı. Değişiklik {time} tarihinde tamamlanacak.",
-  "settings.security.pendingRecovery.keep": "O zamana kadar mevcut kimlik doğrulama uygulamanız, kurtarma kodlarınız ve oturumlarınız çalışmaya devam eder. Bunu siz yapmadıysanız değişikliği iptal edin.",
+  "settings.security.pendingRecovery.body": "Birisi, bu hesabın kimlik doğrulama uygulamasını değiştirmek için parolanızı ve bir e-posta bağlantısını kullandı. Değişikliği {time} itibarıyla tamamlayabilirsiniz.",
+  "settings.security.pendingRecovery.bodyReady": "Birisi, bu hesabın kimlik doğrulama uygulamasını değiştirmek için parolanızı ve bir e-posta bağlantısını kullandı. Bu değişikliği şimdi tamamlayabilirsiniz: e-postanızdaki bağlantıyı kullanın.",
+  "settings.security.pendingRecovery.keep": "Tamamlanana kadar mevcut kimlik doğrulama uygulamanız, kurtarma kodlarınız ve oturumlarınız çalışmaya devam eder. Bunu siz yapmadıysanız değişikliği iptal edin.",
   "settings.security.pendingRecovery.cancel": "İptal",
   "settings.security.pendingRecovery.cancelled": "Değişiklik iptal edildi.",
   "settings.security.pendingRecovery.failed": "İptal edemedik. Sayfayı yeniden yükleyin ve tekrar deneyin."

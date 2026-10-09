@@ -178,8 +178,9 @@
   "settings.security.lockoutReminder": "Nie masz jeszcze kodów odzyskiwania ani klucza dostępu. Jeśli zgubisz telefon, dzięki nim od razu wrócisz do konta.",
   "settings.security.refreshFailed": "Nie udało się odświeżyć danych bezpieczeństwa. Załaduj stronę ponownie.",
   "settings.security.pendingRecovery.title": "Ktoś rozpoczął wymianę Twojej aplikacji uwierzytelniającej",
-  "settings.security.pendingRecovery.body": "Ktoś użył Twojego hasła i linku z e-maila, aby rozpocząć wymianę aplikacji uwierzytelniającej na tym koncie. Wymiana zakończy się {time}.",
-  "settings.security.pendingRecovery.keep": "Do tego czasu Twoja obecna aplikacja uwierzytelniająca, kody odzyskiwania i sesje nadal działają. Jeśli to nie Ty, anuluj wymianę.",
+  "settings.security.pendingRecovery.body": "Ktoś użył Twojego hasła i linku z e-maila, aby rozpocząć wymianę aplikacji uwierzytelniającej na tym koncie. Możesz ją zakończyć od {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Ktoś użył Twojego hasła i linku z e-maila, aby rozpocząć wymianę aplikacji uwierzytelniającej na tym koncie. Możesz ją zakończyć teraz – użyj linku w swoim e-mailu.",
+  "settings.security.pendingRecovery.keep": "Dopóki nie zostanie zakończona, Twoja obecna aplikacja uwierzytelniająca, kody odzyskiwania i sesje nadal działają. Jeśli to nie Ty, anuluj wymianę.",
   "settings.security.pendingRecovery.cancel": "Anuluj",
   "settings.security.pendingRecovery.cancelled": "Wymiana została anulowana.",
   "settings.security.pendingRecovery.failed": "Nie udało się jej anulować. Odśwież stronę i spróbuj ponownie."
