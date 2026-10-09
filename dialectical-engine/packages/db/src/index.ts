@@ -1,5 +1,6 @@
 import { applyForward108, base108Lineage } from "./migration-forward108.js";
 import { applyForward110 } from "./migration-forward110.js";
+import { applyForward111 } from "./migration-forward111.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
@@ -14,6 +15,7 @@ import type {
 import { MODEL_STRENGTHS, TypedDomainError, type ActivationState, type CompositionBudgetTier, type ModelStrength, type RiskTier, type TierSource } from "@debateai/kernel";
 
 export * from "./publication-check.js";
+export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
 export { abortablePrivateWork, queryPrivateStream } from "./private-stream.js";
 import { abortablePrivateWork, cancelAndDestroyPrivateClient } from "./private-stream.js";
 
@@ -1083,6 +1085,7 @@ export async function migrate(pool: Pool): Promise<void> {
     await client.query(plan.effectiveCapabilityVerifierSql);
     await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
     await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
+    await applyForward111(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");

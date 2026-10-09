@@ -1,0 +1,33 @@
+import { readFile } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
+
+const source = await readFile(new URL("../../apps/api/src/main.ts", import.meta.url), "utf8");
+
+describe("data export production wiring", () => {
+  it("W1 constructs the export application only within the configured store guard", () => {
+    const guard = source.indexOf("if (environment.DATA_EXPORT_STORE_PATH !== undefined)");
+    const application = source.indexOf("new DataExportApplication(");
+    expect(guard).toBeGreaterThan(-1);
+    expect(application).toBeGreaterThan(guard);
+    const nextTopLevel = source.indexOf("\n}\nconst api = buildApi", guard);
+    expect(application).toBeLessThan(nextTopLevel);
+  });
+
+  it("W2 schedules the module-private 15-second worker and clears it on close", () => {
+    expect(source).toMatch(/(?<!export\s)const DATA_EXPORT_TICK_MS = 15_000;/);
+    expect(source).toMatch(/dataExportTimer = setInterval\(triggerDataExportWork, DATA_EXPORT_TICK_MS\);\s*dataExportTimer\.unref\(\)/);
+    expect(source).toMatch(/onClose[\s\S]*clearInterval\(dataExportTimer\)/);
+  });
+
+  it("W3 runs the export worker at boot after the erasure trigger", () => {
+    const erasure = source.indexOf("triggerErasureReconciliation();");
+    const dataExport = source.indexOf("triggerDataExportWork();", erasure);
+    expect(erasure).toBeGreaterThan(-1);
+    expect(dataExport).toBeGreaterThan(erasure);
+  });
+
+  it("W4 includes the export directory in publication secret domains", () => {
+    const block = source.match(/assertPublicationSecretDomains\([\s\S]*?additionalStorePaths:[\s\S]*?\}\);/)?.[0] ?? "";
+    expect(block).toContain("DATA_EXPORT_STORE_PATH");
+  });
+});
