@@ -18,14 +18,22 @@ export class NativeVerifyPendingForwardStepError extends Error {
   this.name='NativeVerifyPendingForwardStepError';this.pending=Object.freeze([...pending]);
  }
 }
-/** Every forward step of the source (plan.forwardChain, however long) whose name the ledger lacks, in chain order. */
-export function pendingForwardSteps(plan:Pick<MigrationPlan,'forwardChain'>,applied:ReadonlySet<string>):readonly string[]{
- return plan.forwardChain.map(step=>step.name).filter(name=>!applied.has(name));
+type SourcePlan=Pick<MigrationPlan,'forwardChain'>&Partial<Readonly<{manifest:Readonly<{order:readonly string[]}>;forward108:Readonly<{name:string}>;forward110:Readonly<{name:string}>}>>;
+/**
+ * Every numbered migration of the source that the database has neither applied (ledger name) nor resolved (resolution
+ * logical name), in source order: the recipe's order, 0108, a separate forward110 when the plan has one (dev's 0110),
+ * then the forward chain, however long. `applied` holds both kinds of name.
+ */
+export function pendingForwardSteps(plan:SourcePlan,applied:ReadonlySet<string>):readonly string[]{
+ const names=[...(plan.manifest?.order??[]),...(plan.forward108?[plan.forward108.name]:[]),...(plan.forward110?[plan.forward110.name]:[]),...plan.forwardChain.map(step=>step.name)];
+ return names.filter(name=>!applied.has(name));
 }
-/** Read-only: one SELECT of the ledger names. Refuses before anything could apply a pending forward step. */
+/** Read-only SELECTs of the ledger and resolution names. Refuses before anything could apply a pending migration. */
 export async function refusePendingForwardSteps(pool:Pool,plan?:MigrationPlan):Promise<void>{
  const chain=plan??await loadMigrationPlan();
  const applied=new Set((await pool.query<{name:string}>('SELECT name FROM public.debateai_schema_migration')).rows.map(row=>row.name));
+ const resolutions=(await pool.query<{present:boolean}>("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0]?.present===true;
+ if(resolutions)for(const row of (await pool.query<{logical_name:string}>('SELECT logical_name FROM public.debateai_schema_migration_resolution')).rows)applied.add(row.logical_name);
  const pending=pendingForwardSteps(chain,applied);
  if(pending.length>0)throw new NativeVerifyPendingForwardStepError(pending);
 }
