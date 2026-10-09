@@ -32,6 +32,8 @@ export class PostgresMfaRecoveryRepository extends EmailRecoveryRepository{
  prepare(index:Buffer,destination:"primary"|"backup"){return this.call<Readonly<{userId:string;channels:readonly EmailRecoveryChannel[]}>|null>("prepare",[index,destination]);}
  start(input:Readonly<{index:Buffer;destination:"primary"|"backup";candidateId:string|null;channels:readonly string[];linkHash:string;cancelHash:string;notices:readonly unknown[];source:EmailRecoverySource;id:string}>){return this.call<boolean>("start",[input.index,input.destination,input.candidateId,input.channels,input.linkHash,input.cancelHash,JSON.stringify(input.notices),input.source,this.version,input.id]);}
  prepareExchange(hash:string){return this.call<MfaRecoveryExchangeCandidate|null>("prepare_exchange",[hash]);}
+ // True when this email link's account already has a replacement waiting its 24 hours (stale waiting rows are closed).
+ linkWaiting(hash:string){return this.call<boolean>("link_waiting",[hash]);}
  risk(selector:string,kind:MfaRecoverySelectorKind){return this.call<MfaRiskRecord|null>("risk",[selector,kind]);}
  exchange(link:string,password:string,session:string,csrf:string,refs:CryptoEnvelope,risk:string,source:EmailRecoverySource){return this.call<"FACTOR_REQUIRED"|"INVALID">("exchange",[link,password,session,csrf,refs,risk,source]);}
  read(hash:string){return this.call<MfaRecoveryRecord|null>("read",[hash]);}

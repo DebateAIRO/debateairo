@@ -10,7 +10,9 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import english from "@/messages/en/mfa-recovery.json";
 const browserClient = createMfaRecoveryClient(fetch, API_BASE);
 // Owner ruling 2026-10-09: "waiting" follows Continue on the ready screen; the finish_* phases come from the emailed finish link.
-type Phase = MfaRecoveryState["status"] | "request" | "sent" | "email_link" | "cancel_link" | "expired" | "finish_link" | "finish_wait" | "finish_ready";
+// Review 2026-10-09: "already_waiting" stops a second recovery at the email link (I1); "finish_closed" is a finish link that no
+// longer works (M1) — cancelled, finished, expired or voided by an account change, which the server does not tell apart.
+type Phase = MfaRecoveryState["status"] | "request" | "sent" | "email_link" | "cancel_link" | "expired" | "already_waiting" | "finish_link" | "finish_wait" | "finish_ready" | "finish_closed";
 function SetupQr({ uri, label, fallback }: { uri: string; label: string; fallback: string }) {
   const matrix = useMemo(() => { try { return totpQrMatrix(uri); } catch { return null; } }, [uri]);
   if (!matrix) return <p className="authFieldHint">{fallback}</p>;
@@ -51,7 +53,10 @@ export function MfaRecoveryFlow({ catalog = english, locale = "en", client = bro
       if (!mounted.current) return;
       const status = failure instanceof ContractHttpError ? failure.status : 0, server = failure instanceof ContractHttpError ? failure.serverCode : null;
       if (status === 401 && server === "MFA_RECOVERY_PROOF_INVALID") { setCode(""); setError(text("error.proof")); }
+      else if (status === 409 && server === "MFA_RECOVERY_ALREADY_WAITING") { clear(); setUnknown(false); setPhase("already_waiting"); }
       else if (status === 429) { setCode(""); setError(text("error.rate")); }
+      // A finish link the server no longer accepts (also when re-checking after an unclear reply: it may have just finished).
+      else if (status === 410 && finishing.current !== null) { clear(); setUnknown(false); setPhase("finish_closed"); }
       else if ([401, 403, 410].includes(status) && !switching.current && !reconcile) { clear(); setUnknown(false); setPhase("refused"); }
       else { setPassword(""); setCode(""); setUnknown(true); setError(text(switching.current ? "switch.unknown" : "error.unknown")); }
     } finally { inFlight.current = false; if (mounted.current) { setPassword(""); setBusy(false); } }
@@ -73,12 +78,13 @@ export function MfaRecoveryFlow({ catalog = english, locale = "en", client = bro
   const when = (value: string) => new Intl.DateTimeFormat(dateLocale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
   const submit = (operation: () => Promise<void>) => (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (phase === "email_link" && !ready) return; void perform(operation); };
   function showConfirmedCancellation() { clear(); switching.current = false; setPhase("cancelled"); setUnknown(false); setSwitchConfirm(false); setNotice(text("cancel.pause")); }
-  const prefix = phase === "email_link" ? "link" : phase === "cancel_link" ? "cancel" : phase === "factor_required" ? "factor" : phase === "totp_required" ? "totp" : phase === "codes_required" || phase === "ack_required" ? "codes" : phase === "completed" ? "done" : phase === "finish_link" ? "finishCheck" : phase === "finish_wait" ? "finishWait" : phase === "finish_ready" ? "finish" : phase;
+  const prefix = phase === "email_link" ? "link" : phase === "cancel_link" ? "cancel" : phase === "factor_required" ? "factor" : phase === "totp_required" ? "totp" : phase === "codes_required" || phase === "ack_required" ? "codes" : phase === "completed" ? "done" : phase === "finish_link" ? "finishCheck" : phase === "finish_wait" ? "finishWait" : phase === "finish_ready" ? "finish" : phase === "finish_closed" ? "finishClosed" : phase === "already_waiting" ? "alreadyWaiting" : phase;
   const disabled = busy || unknown;
   function download() { const value = new Blob([codes.join("\n") + "\n"], { type: "text/plain;charset=utf-8" }); const url = URL.createObjectURL(value); const a = document.createElement("a"); a.href = url; a.download = "recovery-codes.txt"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }
   return <AuthShell lang={locale} eyebrow={text("eyebrow")} title={text(`${prefix}.title`)} description={text(`${prefix}.description`)} footer={<><p><a href="/login" onClick={clear}>{text("login")}</a></p>{active ? <p><button className="authTextButton" type="button" disabled={disabled} onClick={() => setSwitchConfirm(true)}>{text("saved.link")}</button></p> : !unknown && phase !== "cancelled" && <p><a href="/recover" onClick={clear}>{text("saved.link")}</a><span className="authFieldHint">{text("saved.hint")}</span></p>}</>}>
     {active && expires && <p className="authFieldHint">{text("deadline")} <time dateTime={expires}>{new Intl.DateTimeFormat(dateLocale, { hour: "2-digit", minute: "2-digit" }).format(new Date(expires))}</time></p>}
     {error && <div className="authAlert" role="alert">{error}</div>}{notice && <p className="authFieldHint" role="status">{notice}</p>}
+    {phase === "finish_link" && error && !busy && !unknown && <button className="authPrimary" type="button" onClick={() => void perform(loadFinish)}>{text("finishCheck.retry")}</button>}
     {unknown && finishing.current !== null && <button className="authSecondary recoveryCancel" type="button" disabled={busy} onClick={() => void perform(loadFinish, true)}>{text("check.state")}</button>}
     {unknown && finishing.current === null && <button className="authSecondary recoveryCancel" type="button" disabled={busy} onClick={() => void perform(async () => { const state = await client.status(); if (!mounted.current) return; if (switching.current && state.status === "cancelled") { showConfirmedCancellation(); return; } if (state.status === "refused") { switching.current = false; setSwitchConfirm(false); apply(state); return; } apply(state); if (switching.current && !["completed", "cancelled", "refused"].includes(state.status)) { await client.cancelCurrent(); if (mounted.current) showConfirmedCancellation(); } }, true)}>{text("check.state")}</button>}
     {switchConfirm && <section className="recoveryStatus" aria-label={text("switch.title")}><p>{text("cancel.pause")}</p><button className="authPrimary" type="button" disabled={disabled} onClick={() => { switching.current = true; void perform(async () => { await client.cancelCurrent(); if (mounted.current) showConfirmedCancellation(); }); }}>{text("switch.confirm")}</button><button className="authSecondary" type="button" disabled={disabled} onClick={() => setSwitchConfirm(false)}>{text("switch.stay")}</button></section>}
@@ -92,9 +98,10 @@ export function MfaRecoveryFlow({ catalog = english, locale = "en", client = bro
     {phase === "ready" && <button className="authPrimary" type="button" disabled={disabled} onClick={() => void perform(async () => { const state = await client.complete(); if (mounted.current) { clear(); setNotBefore(state.not_before); setPhase("waiting"); } })}>{busy ? text("working") : text("ready.button")}</button>}
     {(phase === "waiting" || phase === "finish_wait") && <div className="recoveryStatus" role="status">{notBefore && <p>{text("waiting.when")} <time dateTime={notBefore}>{when(notBefore)}</time></p>}{phase === "waiting" && <p>{text("waiting.hint")}</p>}</div>}
     {phase === "finish_ready" && <form className="authForm" method="post" action="/recover-authenticator" onSubmit={submit(finish)}><div className="authField"><label htmlFor="mfa-finish-password">{text("password")}</label><input id="mfa-finish-password" name="current-password" type="password" autoComplete="current-password" required disabled={disabled} value={password} onChange={event => setPassword(event.target.value)} aria-describedby="mfa-finish-password-hint" /><p id="mfa-finish-password-hint" className="authFieldHint">{text("password.hint")}</p></div><button className="authPrimary" disabled={disabled}>{busy ? text("working") : text("finish.button")}</button></form>}
+    {phase === "finish_closed" && <div className="recoveryStatus" role="status"><p>{text("finishClosed.hint")}</p></div>}
     {phase === "completed" && <div className="recoveryStatus" role="status"><p>{text("done.hint")}</p><a className="authPrimary" href="/login" onClick={clear}>{text("login")}</a></div>}
     {phase === "cancel_link" && <button className="authPrimary" type="button" disabled={disabled} onClick={() => void perform(async () => { if (!cancellation.current) throw new Error("MFA_LINK_MISSING"); await client.cancel(cancellation.current); if (mounted.current) { clear(); setPhase("cancelled"); } })}>{text("cancel.button")}</button>}
-    {(phase === "expired" || phase === "refused") && <button className="authPrimary" type="button" disabled={disabled} onClick={() => { clear(); setUnknown(false); setError(null); setPhase("request"); }}>{text("expired.button")}</button>}
+    {(phase === "expired" || phase === "refused" || phase === "finish_closed") && <button className="authPrimary" type="button" disabled={disabled} onClick={() => { clear(); setUnknown(false); setError(null); setPhase("request"); }}>{text("expired.button")}</button>}
     {active && <button className="authSecondary recoveryCancel" type="button" disabled={disabled} onClick={() => setSwitchConfirm(true)}>{text("cancel")}</button>}
   </AuthShell>;
 }

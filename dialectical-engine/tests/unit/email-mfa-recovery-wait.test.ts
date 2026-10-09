@@ -131,6 +131,36 @@ describe("finishing after the 24 hours with the finish link and the current pass
   });
 });
 
+// Review I1 2026-10-09: a second recovery started while one is already waiting is refused at the email link, right
+// after the current password is checked, so nobody sets up an authenticator and ten codes only to be refused at the end.
+// It is never refused at the public start step: only someone holding the emailed link (and the password) learns it.
+describe("a second recovery while one is already waiting", () => {
+  const LINK = "L".repeat(43), linkHash = hashToken("mfa-recovery-link", LINK);
+  const candidate = { userId: USER, passwordHash: PASSWORD_HASH, channels: [PROOF, OTHER], bindingChannelIds: [PROOF] };
+  const exchanging = (overrides: Record<string, unknown> = {}) => repository({ prepareExchange: vi.fn(async () => candidate), linkWaiting: vi.fn(async () => true), exchange: vi.fn(async () => "FACTOR_REQUIRED"), read: vi.fn(async () => ({ stage: "FACTOR_REQUIRED", expiresAt: "2026-10-09T12:05:00.000Z", csrfHash: "sha256:" + "c".repeat(64) })), ...overrides });
+  it("is refused at the email link with its own reason, after the password, before anything is set up", async () => {
+    const repo = exchanging(), { service: s } = service(repo);
+    await expect(s.exchange({ token: LINK, password: "current password" }, request)).rejects.toThrow("MFA_RECOVERY_ALREADY_WAITING");
+    expect(repo.linkWaiting).toHaveBeenCalledWith(linkHash);
+    expect(repo.exchange).not.toHaveBeenCalled(); expect(repo.failure).not.toHaveBeenCalled();
+  });
+  it("tells nothing to a wrong password", async () => {
+    const repo = exchanging(), { service: s } = service(repo);
+    await expect(s.exchange({ token: LINK, password: "wrong password" }, request)).rejects.toThrow("MFA_RECOVERY_PROOF_INVALID");
+    expect(repo.linkWaiting).not.toHaveBeenCalled(); expect(repo.exchange).not.toHaveBeenCalled();
+  });
+  it("tells nothing to an unknown link", async () => {
+    const repo = exchanging({ prepareExchange: vi.fn(async () => null) }), { service: s } = service(repo);
+    await expect(s.exchange({ token: LINK, password: "current password" }, request)).rejects.toThrow("MFA_RECOVERY_INVALID");
+    expect(repo.linkWaiting).not.toHaveBeenCalled();
+  });
+  it("goes on as before when nothing is waiting", async () => {
+    const repo = exchanging({ linkWaiting: vi.fn(async () => false) }), { service: s } = service(repo);
+    await expect(s.exchange({ token: LINK, password: "current password" }, request)).resolves.toMatchObject({ state: { status: "factor_required" } });
+    expect(repo.linkWaiting).toHaveBeenCalledWith(linkHash); expect(repo.exchange).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("the database calls behind the wait", () => {
   function pool() { const calls: { sql: string; args: unknown[] }[] = []; return { calls, pool: { query: vi.fn(async (sql: string, args: unknown[]) => { calls.push({ sql, args }); return { rows: [{ result: null }] }; }) } }; }
   it("names the exact functions and passes the exact arguments", async () => {
@@ -142,13 +172,15 @@ describe("the database calls behind the wait", () => {
     await repo.finish("finish-hash", PASSWORD_HASH, "risk", SOURCE);
     await repo.risk("finish-hash", "finish");
     await repo.failure("finish-hash", "finish", SOURCE);
+    await repo.linkWaiting("link-hash");
     expect(calls).toEqual([
       { sql: "SELECT identity.mfa_recovery_prepare_wait($1) AS result", args: ["session-hash"] },
       { sql: "SELECT identity.mfa_recovery_begin_wait($1,$2,$3,$4,$5,$6) AS result", args: ["session-hash", "risk", "finish-hash", "cancel-hash", JSON.stringify(notices), SOURCE] },
       { sql: "SELECT identity.mfa_recovery_prepare_finish($1) AS result", args: ["finish-hash"] },
       { sql: "SELECT identity.mfa_recovery_finish($1,$2,$3,$4) AS result", args: ["finish-hash", PASSWORD_HASH, "risk", SOURCE] },
       { sql: "SELECT identity.mfa_recovery_risk($1,$2) AS result", args: ["finish-hash", "finish"] },
-      { sql: "SELECT identity.mfa_recovery_failure($1,$2,$3) AS result", args: ["finish-hash", "finish", SOURCE] }
+      { sql: "SELECT identity.mfa_recovery_failure($1,$2,$3) AS result", args: ["finish-hash", "finish", SOURCE] },
+      { sql: "SELECT identity.mfa_recovery_link_waiting($1) AS result", args: ["link-hash"] }
     ]);
   });
 });

@@ -48,6 +48,8 @@ describe("approved current-password and verified-email clients", () => {
     await expect(createMfaRecoveryClient(async () => json({ status: "waiting", not_before: expires_at })).finishStatus("F".repeat(43))).resolves.toEqual({ status: "waiting", not_before: expires_at });
     await expect(createMfaRecoveryClient(async () => json({ status: "ready_to_finish", not_before: expires_at })).finishStatus("F".repeat(43))).rejects.toThrow();
     await expect(createMfaRecoveryClient(async () => json({ error: "MFA_RECOVERY_TOO_EARLY" }, 409)).finish("F".repeat(43), "p")).rejects.toMatchObject({ status: 409, serverCode: "MFA_RECOVERY_TOO_EARLY" });
+    // Review I1 2026-10-09: a replacement already waiting is refused at the email link with its own code.
+    await expect(createMfaRecoveryClient(async () => json({ error: "MFA_RECOVERY_ALREADY_WAITING" }, 409)).exchange("A".repeat(43), "p")).rejects.toMatchObject({ status: 409, serverCode: "MFA_RECOVERY_ALREADY_WAITING" });
   });
   it("verifies only the bound backup address using ordinary password and current MFA proofs", async () => {
     const requests: { url: string; init: RequestInit }[] = [];
