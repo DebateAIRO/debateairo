@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { collectSnapshot, RAW_SECTIONS, type RawExportRows } from "../../apps/api/src/data-export/snapshot.js";
 
 const rawFixture = JSON.parse(readFileSync(new URL("../fixtures/data-export/raw-a.json", import.meta.url), "utf8"));
+// owner-read.ts:72 passes through answer.answer_version from the owner answer.
+const ownerAnswerFixture = { answer_id: "answer-1", answer_version: 2 };
 
 const claim = {
   exportId: "export-1", userId: "user-1", ownerRef: "owner-1", sessionId: "session-1",
@@ -14,8 +16,8 @@ function harness() {
   const ownerView = {
     runKeyPresent: vi.fn(async () => true),
     readRun: vi.fn(async (_owner: string, _run: string) => ({ question: "My question", state: "DONE" })),
-    readRunAnswer: vi.fn(async (_owner: string, _run: string) => ({ answer_id: "answer-1", version: 2 })),
-    readAnswer: vi.fn(async (_owner: string, _answer: string, version: number) => ({ version, verdict_state: "SUPPORTED" })),
+    readRunAnswer: vi.fn(async (_owner: string, _run: string) => structuredClone(ownerAnswerFixture)),
+    readAnswer: vi.fn(async (_owner: string, _answer: string, version: number) => ({ answer_id: "answer-1", answer_version: version, verdict_state: "SUPPORTED" })),
     readInspection: vi.fn(async (_owner: string, _answer: string, _version: number) => ({ nodes: [{ node_id: "node-1" }] })),
     readLedgerDigest: vi.fn(async () => ({ digest: "ledger" })),
     readStory: vi.fn(async () => ({ text: "story" })),
@@ -82,6 +84,7 @@ describe("data-export snapshot", () => {
     expect(h.ownerView.readStory).toHaveBeenCalledTimes(1);
     expect(h.ownerView.readDisclosure).toHaveBeenCalledTimes(1);
     expect(h.ownerView.readNode).toHaveBeenCalledTimes(2);
+    expect(snapshot.debates.debates[0]?.run_answer).toEqual(ownerAnswerFixture);
     expect(snapshot.debates.debates[0]?.answers?.[0]?.versions).toHaveLength(2);
     expect(snapshot.debates.debates[0]?.answers?.[0]?.versions[0]?.nodes).toEqual({ "node-1": { text: "node" } });
   });
