@@ -143,8 +143,8 @@ function nodeIds(inspection: unknown): string[] {
 
 function answerInfo(value: unknown): { id: string; version: number } {
   const answer = row(value);
-  const id = answer.answer_id ?? answer.answerId;
-  const version = answer.version;
+  const id = answer.answer_id;
+  const version = answer.answer_version;
   if (typeof id !== "string" || typeof version !== "number" || !Number.isInteger(version) || version < 1) {
     throw new DataExportBuildError("DATA_EXPORT_DECRYPT_FAILED");
   }
