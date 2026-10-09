@@ -147,7 +147,7 @@ process start: restart both units after either change.
 | `/etc/debateai/hatchet.pgpass` | `0600` | `root:root` | the `debateai_prod_hatchet` role's password, read once by `bootstrap.sql` (§4) |
 | `/etc/debateai/api/` | `0700` | `debateai-api` | `kek.bin`, `corpus-kek.bin`, `blind-index-key.bin`, `audit-source-ip-salt.bin`, `support-kek.bin` (the support chat's master key — the file name is checked and must be exactly this), `records-key.bin` (the records key, §9) |
 | `/etc/debateai/api/providers/` | `0700` | `debateai-api` | the API's own copy of each vendor credential (V-9, §11) |
-| `/etc/debateai/api/billing/` | `0700` | `debateai-api` | billing's key files, written only by the guided setup (§14.2): `netopia-api-key`, `quaderno-api-key`, `smartbill-credentials` and `owner-report-email` (`0600`, `debateai-api`), and NETOPIA's public key `netopia-ipn-keys.pem` (`0644`, owned by root). The setup refuses (`BILLING_SETUP_UNSAFE_FOLDER`) unless this folder and `/etc/debateai/api` are real folders, not links, owned by `debateai-api` |
+| `/etc/debateai/api/billing/` | `0700` | `debateai-api` | billing's key files, written only by the guided setup (§14.2): `netopia-api-key`, `quaderno-api-key`, `smartbill-credentials` and `owner-report-email` (`0600`, `debateai-api`), and NETOPIA's public key `netopia-ipn-keys.pem` (`0644`, owned by root). The setup refuses (`BILLING_SETUP_UNSAFE_FOLDER`) unless `/etc/debateai/api`, and this folder if it exists, are real folders, not links, owned by `debateai-api` |
 | `/etc/debateai/runner/` | `0700` | `debateai-runner` | `kek.bin` (the runner's own copy of the same bytes — a master-key rotation must replace this file too, §3 "Changing a master key") |
 | `/etc/debateai/runner/providers/` | `0700` | `debateai-runner` | the runner's own copy of each vendor credential (V-9, §11) |
 | `/etc/debateai/api-previous/`, `/etc/debateai/runner-previous/` | `0700` | `debateai-api`, `debateai-runner` | the previous master keys, **only during a changeover** (§3 "Changing a master key"); absent in the steady state |
@@ -2409,7 +2409,10 @@ version the person accepted from there, even after the Terms change. The site li
 **Switching billing on.** Before this, make sure:
 
 - every row of the go-live checklist from 13 to 73 is proven (its last column holds the proof), the void rows (20, 40
-  and 46) excepted;
+  and 46) excepted. Some proofs can be read only after the switch-on: they are proven right after it, and their Proof
+  cells are filled then. These are parts of four rows' "How to prove it" cells: row 17, the footer of `/pricing` on the
+  live site; row 18, the API's start with billing on; row 19, the first real payment's message; row 23, the check run
+  again after the publish;
 - among them, NETOPIA's written approval of the shop for AI subscriptions, with recurring payments switched on (go-live
   row 14);
 - the small live test, with billing off, passed on this host (§14.9, "The small live test, with billing off"; go-live
@@ -2621,7 +2624,7 @@ sudo -u postgres psql -d debateai -c "SELECT count(*) AS unsettled_owner_withdra
 ```
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_owner_refunds FROM billing.charge_event r WHERE r.kind = 'REFUND_REQUESTED' AND r.payment_provider = 'netopia' AND r.amount_micros > 0 AND COALESCE((SELECT sum(d.amount_micros) FROM billing.charge_event d WHERE d.charge_id = r.charge_id AND d.kind = 'REFUNDED' AND COALESCE(d.refunds_transaction_id, d.provider_payment_id) = r.provider_payment_id), 0) < r.amount_micros"
+sudo -u postgres psql -d debateai -c "SELECT count(*) AS open_owner_refunds FROM billing.charge_event r WHERE r.kind = 'REFUND_REQUESTED' AND r.payment_provider = 'netopia' AND r.amount_micros > 0 AND COALESCE((SELECT sum(d.amount_micros) FROM billing.charge_event d WHERE d.charge_id = r.charge_id AND d.kind = 'REFUNDED' AND COALESCE(d.refunds_transaction_id, d.provider_payment_id) = r.provider_payment_id), 0) < r.amount_micros AND r.payment_environment = 'live'"
 ```
 
 The first counts every subscription that is not over yet: created, active (a pending cancel included), past due and
@@ -2631,10 +2634,14 @@ counts the withdrawals handed to you that you have not settled yet with `pnpm bi
 first count leaves them out, because a withdrawn plan is over, but their refund is still owed, and the jobs your
 settlement writes would never run with billing off. The fourth counts the refunds handed to you that are not recorded
 yet: a refund the site asked for on a NETOPIA payment whose recorded refunds do not add up to it yet. A refund a
-dispute holds counts too, because it is owed again if the dispute ends for us. With billing off, no reminder
-(O2_REFUND_REMINDER) and no status read would come for any of them. Only when all four are 0, publish the version
-with `enabled: false`. If any of them is not 0, do not switch billing off: stop new sales instead (above), and check
-again later.
+dispute holds counts too, because it is owed again if the dispute ends for us. The fourth counts only what is owed to
+real people. A sandbox refund is test money, and after the same-host move to live the live site refuses to record one
+(`BILLING_REFUND_DONE_OTHER_PAYMENT_SYSTEM`), so the query leaves it out. A held refund whose dispute you recorded
+lost is never owed (nothing is left to refund). A lost dispute writes nothing that closes it, so the refund stays in
+this count for good. From then on, billing cannot be switched off this way: stop new sales instead. With billing off,
+no reminder (O2_REFUND_REMINDER) and no status read would come for any of them. Only when all four are 0, publish the
+version with `enabled: false`. If any of them is not 0, do not switch billing off: stop new sales instead (above), and
+check again later.
 
 Why they must be 0: with billing off, every billing route answers 404, including NETOPIA's payment messages, cancel,
 the emailed cancel link and withdraw (a 14-day legal right), and no billing job runs. When billing comes back on, every
@@ -2788,8 +2795,9 @@ A withdrawal is settled once. Running the command a second time for the same wit
 owes (a withdrawal, a card from a blocked country, a second payment, an upgrade that can no longer be given) is made by
 you in NETOPIA's admin. The site emails you at once (O2_REFUND_DUE, "A refund to make in NETOPIA's admin") with
 the reason, our charge reference, NETOPIA's payment number, the exact amount and currency, whether it is the whole
-payment, for a withdrawal the date the law requires it by (14 days after the person withdrew), and the one command that
-records it (needed for a part of a payment). Look at that payment in NETOPIA's admin first. If it already shows a
+payment, for a withdrawal the date the law requires it by (14 days after the person withdrew), and the command that
+records it (needed for a part of a payment): run as given, it only shows what it would record; run again with
+`--confirm` added at the end, it records. Look at that payment in NETOPIA's admin first. If it already shows a
 refund of that amount, an earlier refund went through: never refund it again. If it shows a dispute (a chargeback) on
 that payment, do not refund it: the site holds that refund while the dispute lasts and has emailed you once (O3
 `REFUND_HELD_BY_CHARGEBACK`). If the dispute ends for us, record that with `pnpm billing:dispute --outcome won`, and the
@@ -2797,8 +2805,8 @@ refund comes back into the reminder; if it ends for the person, nothing is left 
 it before the dispute, record that refund with `pnpm billing:refund-done … --despite-chargeback`.
 If not, refund exactly the amount the email names, on that payment, in one refund. A whole refund is recorded by the
 site itself as soon as NETOPIA reports it: the person's email (M8 or M11) and the credit note follow by themselves.
-A part of a payment is recorded only when you run the command from the email, because NETOPIA has not said whether it
-reports the amount of a partial refund.
+A part of a payment is recorded only when you run the command from the email with `--confirm` added at the end,
+because NETOPIA has not said whether it reports the amount of a partial refund.
 The command shows first what it will record and what the person will read, and records nothing:
 
 ```sh
@@ -2891,7 +2899,7 @@ signals that matter:
 | `"event":"billing.refund.dead"`, with `count` | Once a day, the money check counts the refund jobs that stopped for good with no refund recorded since, whatever their code. Not every one is owed: `REFUND_NOT_REQUESTED` and `REFUND_CHARGE_MISSING` (no request of ours backs the job, or it names a charge we do not have) and `OTHER_PAYMENT_SYSTEM` (a payment of another payment system) owe nothing on this host; `REFUND_PAYLOAD_INVALID` (a job whose payload cannot be read, so nothing was sent) is listed with the first two, without the reason the job claims, and whoever runs the server checks that charge's own refund requests (one never refunded is still owed); `REFUND_OUTCOME_UNKNOWN` is checked in NETOPIA's admin first; every other code is still owed. The owner summary lists each one under "Payments to check by hand in NETOPIA's admin", by the summary's own names: `REFUND_REFUSED` (still owed), `REFUND_OUTCOME_UNKNOWN`, `REFUND_NOT_REQUESTED` (which covers `REFUND_CHARGE_MISSING` and `REFUND_PAYLOAD_INVALID` too) and `REFUND_OTHER_SYSTEM`. | Print the summary (**The tax summary**, above) and settle each line as its name says, and as **A refund handed to you**, above, describes. |
 | `"event":"billing.refund.owner_due"`, with `reason` | A refund was handed to you (O2_REFUND_DUE), as every refund is until NETOPIA confirms its refund call. | **A refund handed to you**, above. |
 | `"event":"billing.refund.seen_partial"`, with `reason` | NETOPIA reported a refund on a payment whose open refund is only a part of it, so the site does not record it from the status. | Record it with `pnpm billing:refund-done` (**A refund handed to you**, above), once you have made exactly the refund the email names. |
-| `"event":"billing.refund.held_by_chargeback"`, with `reason` | A dispute (a chargeback) arrived on a NETOPIA payment for which a refund to the person was still open, or a refund to the person was asked for on a NETOPIA payment already under a dispute (`reason` says what the refund was for). The person's bank is taking the money back, so the site holds that refund while the dispute lasts: it leaves the O2_REFUND_REMINDER emails, and `pnpm billing:refund-done` refuses it (`BILLING_REFUND_DONE_HELD_BY_CHARGEBACK`). You got O3 `REFUND_HELD_BY_CHARGEBACK` once for that payment. | Do not refund it in NETOPIA's admin. If the dispute ends for us, record that with `pnpm billing:dispute --outcome won`, and the refund comes back into the reminder; if it ends for the person, nothing is left to refund. If you had already refunded it before the dispute, record that refund with `pnpm billing:refund-done … --despite-chargeback`, as the O3 shows. |
+| `"event":"billing.refund.held_by_chargeback"`, with `reason` | A dispute (a chargeback) arrived on a NETOPIA payment for which a refund to the person was still open, or a refund to the person was asked for on a NETOPIA payment already under a dispute (`reason` says what the refund was for). The person's bank is taking the money back, so the site holds that refund while the dispute lasts: it leaves the O2_REFUND_REMINDER emails, and `pnpm billing:refund-done` refuses it (`BILLING_REFUND_DONE_HELD_BY_CHARGEBACK`). You got O3 `REFUND_HELD_BY_CHARGEBACK` once for that payment. | Do not refund it in NETOPIA's admin. If the dispute ends for us, record that with `pnpm billing:dispute --outcome won`, and the refund comes back into the reminder; if it ends for the person, nothing is left to refund. If you had already refunded it before the dispute, record that refund with `pnpm billing:refund-done … --despite-chargeback`: run it as **A refund handed to you**, above, shows (`systemd-run` with the API's `EnvironmentFile`), with `--despite-chargeback` after `--confirm`. |
 | `"event":"billing.payment.credentials_refused"`, with `operation` | NETOPIA refused our API key (`operation` says on what: `checkout`, `upgrade`, `card_check`, `verify`, `reconcile`, `charge`, `status` or `refund`). NETOPIA processed nothing, so nothing is counted as failed straight away, and the work is tried again, but not for ever. A renewal whose charge is refused this way is kept, as in a NETOPIA outage, for up to 3 days past its due time (a payment retry: 24 hours), and you get O3 at once. New checkouts fail while it lasts. | At once: run the check command (§14.2); it says whether NETOPIA accepts the key. A revoked or replaced key, or a sandbox key beside the live address (or the reverse): run the setup's NETOPIA section with `--replace netopia` and restart `debateai-api`; the open work then goes on by itself. Fixing the key within that time (3 days past a renewal's due time, 24 hours after a payment retry's call) keeps every renewal. |
 | `"event":"billing.payment.answer_rejected"`, with `operation` | NETOPIA answered in a shape the site cannot read (`operation` says on what), so the site took no decision from it and tries again on the call's own schedule. | Report it at once with the operation: NETOPIA's answers may have changed shape. |
 | `"event":"billing.notice.unverified"`, with `reason` | A message arrived at NETOPIA's notify address that did not pass (§14.5): `NOTICE_HEADER_MISSING`, `NOTICE_ALG_REFUSED`, `NOTICE_SIGNATURE_INVALID`, `NOTICE_ISSUER_INVALID`, `NOTICE_AUDIENCE_INVALID` or `NOTICE_BODY_HASH_INVALID`. It was answered `503` (try again) and, when it could be NETOPIA's, kept in the quarantine for 14 days. Anyone can post to that address, so a stray line now and then means nothing; each run of the check command (§14.2) writes one with `NOTICE_HEADER_MISSING`. Messages over the intake's budget show only as `api.admission.refused` for the route `POST /v1/billing/netopia/notify`, at most once a minute per reason; NETOPIA sends them again, so a later copy is quarantined when the flood passes. | A stray line: nothing. With an O4 email, or many lines with `NOTICE_SIGNATURE_INVALID` or `NOTICE_AUDIENCE_INVALID`: run the check command (§14.2); a wrong public key or POS signature is fixed with the setup's `--replace netopia`, then restart `debateai-api`: the quarantine is checked again at that start. |

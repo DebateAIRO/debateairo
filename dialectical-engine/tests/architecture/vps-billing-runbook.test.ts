@@ -386,6 +386,34 @@ describe("P22 the Billing runbook", () => {
     }
   });
 
+  it("F6b fix round 1: the emailed refund command previews first, the held row's command is the host form, §3's refusal", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    const refund = flat.slice(flat.indexOf("**A refund handed to you.**"),
+      flat.indexOf("**When NETOPIA or the tax service is down at a renewal.**"));
+    // The O2_REFUND_DUE command carries no --confirm (refundDoneCommand, F6a): run as given it only previews.
+    for (const needle of [
+      "and the command that records it (needed for a part of a payment): run as given, it only shows what it would record;"
+        + " run again with `--confirm` added at the end, it records.",
+      "A part of a payment is recorded only when you run the command from the email with `--confirm` added at the end,"
+        + " because NETOPIA has not said whether it reports the amount of a partial refund."
+    ]) {
+      expect(refund, needle).toContain(needle);
+    }
+    expect(refund).not.toContain("the one command that records it");
+    expect(read("apps/api/src/billing/refunds.ts")).toContain(
+      "return `${ON_HOST} billing:refund-done --charge ${chargeId} --amount ${microsToDecimal(amountMicros)}`;");
+    // The O3 prints only the short form, which fails in a root shell (ops-4): the row points at the host form.
+    const held = billing.split("\n").find((line) => line.startsWith("| `\"event\":\"billing.refund.held_by_chargeback\"`")) ?? "";
+    expect(held).toContain("record that refund with `pnpm billing:refund-done … --despite-chargeback`: run it as"
+      + " **A refund handed to you**, above, shows (`systemd-run` with the API's `EnvironmentFile`), with"
+      + " `--despite-chargeback` after `--confirm`. |");
+    expect(held).not.toContain("as the O3 shows");
+    // §3: the setup checks the billing folder only when it exists (billing-setup.sh), and creates it on a fresh host.
+    const folder = readme.split("\n").find((line) => line.startsWith("| `/etc/debateai/api/billing/` |")) ?? "";
+    expect(folder).toContain("The setup refuses (`BILLING_SETUP_UNSAFE_FOLDER`) unless `/etc/debateai/api`, and this folder"
+      + " if it exists, are real folders, not links, owned by `debateai-api` |");
+  });
+
   it("P4-H (P2-M41, the owner's ruling of 3 October 2026): switching billing off once plans are live is unsupported", () => {
     const flat = billing.replace(/\s+/gu, " ");
     const off = flat.indexOf("*To switch billing off*");
@@ -403,7 +431,13 @@ describe("P22 the Billing runbook", () => {
       // query counts the open owner refunds (tests/integration/billing-refunds-netopia.test.ts runs it as written).
       "check that all four of these print 0", "AS open_owner_refunds", "Only when all four are 0",
       "A refund handed to you leaves that list once its O2_REFUND_DUE email is sent",
-      "The fourth counts the refunds handed to you that are not recorded yet"
+      "The fourth counts the refunds handed to you that are not recorded yet",
+      // F6b fix round 1: live refunds only (openOwnerRefunds filters on the API's environment), and a lost dispute.
+      "The fourth counts only what is owed to real people. A sandbox refund is test money, and after the same-host move to"
+        + " live the live site refuses to record one (`BILLING_REFUND_DONE_OTHER_PAYMENT_SYSTEM`), so the query leaves it out.",
+      "A held refund whose dispute you recorded lost is never owed (nothing is left to refund). A lost dispute writes"
+        + " nothing that closes it, so the refund stays in this count for good. From then on, billing cannot be switched"
+        + " off this way: stop new sales instead."
     ]) {
       expect(paragraph, needle).toContain(needle);
     }
@@ -413,13 +447,16 @@ describe("P22 the Billing runbook", () => {
     for (const needle of [
       "FROM billing.charge_event r WHERE r.kind = 'REFUND_REQUESTED' AND r.payment_provider = 'netopia' AND r.amount_micros > 0",
       "d.charge_id = r.charge_id AND d.kind = 'REFUNDED' AND COALESCE(d.refunds_transaction_id, d.provider_payment_id) = r.provider_payment_id",
-      "< r.amount_micros"
+      "< r.amount_micros",
+      "AND r.payment_environment = 'live'"
     ]) {
       expect(query, needle).toContain(needle);
     }
     expect(query).not.toContain("CHARGEBACK");
-    expect(read("packages/db/src/billing.ts")).toContain(
+    const repository = read("packages/db/src/billing.ts");
+    expect(repository).toContain(
       "AND COALESCE(refunded.refunds_transaction_id, refunded.provider_payment_id) = requested.provider_payment_id");
+    expect(repository).toContain("AND requested.payment_environment = $1 AND requested.amount_micros > 0");
   });
 
   it("F6b (ops-1): switching billing on asks for every go-live row from 13 to the checklist's last, the void rows excepted", () => {
@@ -441,7 +478,12 @@ describe("P22 the Billing runbook", () => {
       `the void rows (${listed}) excepted`,
       "NETOPIA's written approval of the shop for AI subscriptions, with recurring payments switched on (go-live row 14)",
       "the small live test, with billing off, passed on this host (§14.9, \"The small live test, with billing off\"; go-live row 69)",
-      "the sandbox run of §14.9 passed, on its own throwaway server, never on this host"
+      "the sandbox run of §14.9 passed, on its own throwaway server, never on this host",
+      // F6b fix round 1: the proofs read only after the switch-on are proven right after it.
+      "Some proofs can be read only after the switch-on: they are proven right after it, and their Proof cells are filled"
+        + " then. These are parts of four rows' \"How to prove it\" cells: row 17, the footer of `/pricing` on the live site;"
+        + " row 18, the API's start with billing on; row 19, the first real payment's message; row 23, the check run again"
+        + " after the publish"
     ]) {
       expect(on, needle).toContain(needle);
     }
@@ -504,6 +546,19 @@ describe("P22 the Billing runbook", () => {
     const erasure = read("docs/missions/paid-plans/PART2-FINAL-REVIEW-OPEN-ITEMS.md").split("\n")
       .find((line) => line.startsWith("| P2-I10 (owner, accountant) |")) ?? "";
     expect(erasure).toContain("§14.8 gives the hand path (refund in NETOPIA's admin, confirm in the reply)");
+    // F6b fix round 1: M1's whole time limit, and the 2 business days kept until NETOPIA answers N-23 (go-live row 64).
+    const dead = read("docs/missions/paid-plans/PART2-FINAL-REVIEW-OPEN-ITEMS.md").split("\n")
+      .find((line) => line.startsWith("| P2-I16, P2-I17 (owner, native reader) |")) ?? "";
+    for (const needle of [
+      "(Directive 2011/83/EU art. 8(7): \"within a reasonable time after the contract is concluded, and at the latest before"
+        + " the performance of the service begins\";",
+      "the previous card processor's merchant rules wanted M1 within 2 business days; NETOPIA's merchant rules for"
+        + " subscriptions are question N-23, go-live row 64, still open; so keep to 2 business days until NETOPIA answers,"
+        + " as the build keeps A7's 7 business days)"
+    ]) {
+      expect(dead, needle).toContain(needle);
+    }
+    expect(dead).not.toContain("void: card processor changed to NETOPIA (2026-10-08).**), and M8_RECEIVED");
   });
 
   it("P4-H fix round 1 (the P4-F judge's route (a)): no paid question waits in line when billing goes on", () => {

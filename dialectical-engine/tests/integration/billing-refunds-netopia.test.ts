@@ -54,16 +54,16 @@ const report = (orderId: string, providerPaymentId: string, state: PaymentReport
   cardCountry: "DE", savedCard: null, declineCode: null, declineSide: null, bankDeclined: false, occurredAt: null, clientId: null
 });
 
-function deskFor(port: RefundPort, clock: { now: Date }) {
+function deskFor(port: RefundPort, clock: { now: Date }, paymentEnvironment: "sandbox" | "live" = "sandbox") {
   const audit = recordingAudit();
   const refunds = new RefundDesk({
     repository, jobs, policy: testBillingPolicy, audit, clock: () => clock.now,
-    netopia: { payments: port, paymentEnvironment: "sandbox", jobs }
+    netopia: { payments: port, paymentEnvironment, jobs }
   });
   const entitlements = new EntitlementRepository(database.pool);
   const verify = new VerifyPaymentHandler({
     repository, jobs, refunds, entitlements, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
-    recordsKey: TEST_RECORDS_KEY, audit, netopia: { payments: port, paymentEnvironment: "sandbox", jobs }
+    recordsKey: TEST_RECORDS_KEY, audit, netopia: { payments: port, paymentEnvironment, jobs }
   });
   verify.registerSettlement("INITIAL", createInitialSettlement({
     repository, entitlements, acceptances: new AcceptanceRepository(database.pool), policy: testBillingPolicy, publicAppUrl: TEST_PUBLIC_APP_URL
@@ -71,9 +71,10 @@ function deskFor(port: RefundPort, clock: { now: Date }) {
   return { refunds, verify, audit };
 }
 
-async function paidPlan(_label: string) {
+async function paidPlan(_label: string, paymentEnvironment: "sandbox" | "live" = "sandbox") {
   return seedNetopiaSubscription(database.pool, {
-    ownerRef: randomUUID() /* billing owner_ref is a uuid (0085) */, planId: "PLUS", activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "DE"
+    ownerRef: randomUUID() /* billing owner_ref is a uuid (0085) */, planId: "PLUS", activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "DE",
+    paymentEnvironment
   });
 }
 
@@ -147,15 +148,16 @@ describe("F6b (ops-2): README §14.8's switch-off query open_owner_refunds, run 
       [ref, seeded.initialChargeId])).rows).toEqual([]);
   };
 
+  // The query counts live refunds only (owed to real people), so this case runs on live plans; a sandbox one is left out.
   it("counts a refund handed to the owner once O2_REFUND_DUE is sent, until its parts are recorded; a held one stays counted", async () => {
     const sql = await readmeQuery();
     const openOwnerRefunds = async (): Promise<number> =>
       Number((await database.pool.query<{ open_owner_refunds: string }>(sql)).rows[0]!.open_owner_refunds);
     expect(await openOwnerRefunds(), "this case runs on a database with no refund yet").toBe(0);
 
-    const seeded = await paidPlan("switch-off");
+    const seeded = await paidPlan("switch-off", "live");
     const clock = { now: new Date() };
-    const { refunds } = deskFor(new RefundPort(false), clock);
+    const { refunds } = deskFor(new RefundPort(false), clock, "live");
     await withdrawalPart(seeded, refunds, 12_100_000, new Date(Date.now() - DAY));
     await handOver(seeded, refunds, clock.now);
     expect(await openOwnerRefunds()).toBe(1);
@@ -167,9 +169,9 @@ describe("F6b (ops-2): README §14.8's switch-off query open_owner_refunds, run 
 
     // A refund a charge-back holds is still owed once the dispute ends for us, so the switch-off query counts it, although
     // the reminder's own list (BillingRepository.openOwnerRefunds) leaves it out while the dispute lasts.
-    const held = await paidPlan("switch-off-held");
+    const held = await paidPlan("switch-off-held", "live");
     const port = new RefundPort(false);
-    const desk = deskFor(port, clock);
+    const desk = deskFor(port, clock, "live");
     await withdrawalPart(held, desk.refunds, 12_100_000, new Date(Date.now() - DAY));
     await handOver(held, desk.refunds, clock.now);
     port.statuses.set(held.initialChargeId, report(held.initialChargeId, held.providerPaymentId, "CHARGEBACK_OPENED", held.totalMicros));
@@ -177,7 +179,19 @@ describe("F6b (ops-2): README §14.8's switch-off query open_owner_refunds, run 
       notBefore: clock.now, createdAt: clock.now, claimedBy: "f6b", claimedAt: clock.now } as unknown as OutboxJob;
     expect(await desk.verify.handle(verifyJob, clock.now)).toEqual({ kind: "DONE" });
     expect(heldByChargeback((await repository.charge(held.initialChargeId))!, held.providerPaymentId)).toBe(true);
-    expect((await repository.openOwnerRefunds("sandbox", ["WITHDRAWAL"])).map((row) => row.chargeId)).not.toContain(held.initialChargeId);
+    expect((await repository.openOwnerRefunds("live", ["WITHDRAWAL"])).map((row) => row.chargeId)).not.toContain(held.initialChargeId);
+    expect(await openOwnerRefunds()).toBe(1);
+
+    // A sandbox refund is test money: handed over and open in the sandbox's own list, it leaves the README count unchanged.
+    const sandbox = await paidPlan("switch-off-sandbox", "sandbox");
+    const sandboxDesk = deskFor(new RefundPort(false), clock, "sandbox");
+    await withdrawalPart(sandbox, sandboxDesk.refunds, 12_100_000, new Date(Date.now() - DAY));
+    await handOver(sandbox, sandboxDesk.refunds, clock.now);
+    expect((await repository.openOwnerRefunds("sandbox", ["WITHDRAWAL"])).map((row) => row.chargeId)).toContain(sandbox.initialChargeId);
+    expect(await openOwnerRefunds()).toBe(1);
+    // Recorded, so the later cases of this shared database find no open sandbox refund of this case's.
+    expect(await sandboxDesk.refunds.recordOwnerRefund(await sandboxDesk.refunds.planOwnerRefund(sandbox.initialChargeId, 12_100_000), clock.now))
+      .toBe("RECORDED");
     expect(await openOwnerRefunds()).toBe(1);
   });
 
