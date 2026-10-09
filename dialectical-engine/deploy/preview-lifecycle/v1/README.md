@@ -89,10 +89,13 @@ launchers still re-check every byte exactly as before.
   `PREVIEW_LIFECYCLE_STAFF_DB_HOST=127.0.0.1`, placed right after `PATH=…` in the unlock unit's
   `ExecStart` line, names loopback instead, then with TLS verified against the preview CA and only
   if pg_hba has a matching `hostssl` line.
-- **The team unlock inherits no environment.** Its `ExecStart` and `ExecStopPost` run node
-  through `/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin`, like the API/UI prestart, so
-  nothing set with `Environment=`, `systemctl set-environment` or the manager's defaults
-  (`NODE_OPTIONS`, `NODE_PATH`, ...) reaches the root process. The scripts need nothing else.
+- **No root lifecycle script inherits an environment.** The team unlock's `ExecStart` and
+  `ExecStopPost`, the alert's and the backup's `ExecStart` all run node through
+  `/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin`, like the API/UI prestart, so nothing set
+  with `Environment=`, `systemctl set-environment` or the manager's defaults (`NODE_OPTIONS`,
+  `NODE_PATH`, ...) reaches a root process. The scripts need nothing else: every program they
+  start (`systemctl`, `journalctl`, `sendmail`, `runuser`, `pg_dump`, `pg_restore`) is called by
+  absolute path with its own explicit environment.
 - **Team unlock rewrites the ACK proof file in place.** The installed alert wrapper names one proof
   file; the unlock writes each fresh proof there (same owner and mode) after archiving the old
   one once under `/var/lib/debateai-v3-preview/lifecycle/evidence-archive/`. If the wrapper only
@@ -188,7 +191,7 @@ unit files before installing; nothing else names them.
    30 minutes would otherwise be suppressed):
 
    ```sh
-   /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --test
+   /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --test
    ```
 
    Expect `PREVIEW_LIFECYCLE_ALERT_SENT` for `debateai-preview-alert-test.service` and an email

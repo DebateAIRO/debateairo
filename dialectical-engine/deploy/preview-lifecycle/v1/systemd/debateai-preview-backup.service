@@ -8,7 +8,10 @@ OnFailure=debateai-preview-alert@%n.service
 
 [Service]
 Type=oneshot
-ExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/backup.mjs
+# Root runs node through `env -i` with PATH only (like the prestart and the team unlock): nothing
+# from the service manager's environment (NODE_OPTIONS, NODE_PATH, ...) reaches it. pg_dump and
+# pg_restore run by absolute path as postgres through runuser and their own `env -i`.
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/backup.mjs
 UMask=0077
 Nice=10
 IOSchedulingClass=idle

@@ -11,7 +11,10 @@ CollectMode=inactive-or-failed
 
 [Service]
 Type=oneshot
-ExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --unit %i
+# Root runs node through `env -i` with PATH only (like the prestart and the team unlock): nothing
+# from the service manager's environment (NODE_OPTIONS, NODE_PATH, ...) reaches it. systemctl,
+# journalctl and sendmail are called by absolute path with their own explicit environment.
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --unit %i
 TimeoutStartSec=60
 UMask=0077
 NoNewPrivileges=true

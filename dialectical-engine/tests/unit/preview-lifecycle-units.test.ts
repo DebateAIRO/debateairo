@@ -62,7 +62,7 @@ describe('preview lifecycle systemd templates', () => {
   it('alert template runs the reviewed alert script for the failed unit', () => {
     const value = parse(unit('debateai-preview-alert@.service'));
     expect(value['[Service]Type']).toEqual(['oneshot']);
-    expect(value['[Service]ExecStart']).toEqual([`${NODE} ${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --unit %i`]);
+    expect(value['[Service]ExecStart']).toEqual([`${CLEAN_ENV} ${NODE} ${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --unit %i`]);
     expect(value['[Unit]OnFailure']).toBeUndefined();
   });
 
@@ -73,7 +73,7 @@ describe('preview lifecycle systemd templates', () => {
     expect(timer['[Install]WantedBy']).toEqual(['timers.target']);
     const service = parse(unit('debateai-preview-backup.service'));
     expect(service['[Service]Type']).toEqual(['oneshot']);
-    expect(service['[Service]ExecStart']).toEqual([`${NODE} ${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/backup.mjs`]);
+    expect(service['[Service]ExecStart']).toEqual([`${CLEAN_ENV} ${NODE} ${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/backup.mjs`]);
     expect(service['[Service]UMask']).toEqual(['0077']);
     expect(service['[Unit]OnFailure']).toEqual(['debateai-preview-alert@%n.service']);
   });
@@ -87,12 +87,24 @@ describe('preview lifecycle systemd templates', () => {
     expect(Object.keys(value).some(key => key.startsWith('[Install]'))).toBe(false);
   });
 
-  it.each(['ExecStart', 'ExecStopPost'])('team unlock %s, run as written, hands node no inherited NODE_OPTIONS or NODE_PATH', key => {
-    const line = parse(unit('debateai-preview-team-unlock.service'))[`[Service]${key}`]![0]!;
+  it('every root node command of the lifecycle units goes through env -i with PATH only', () => {
+    for (const name of ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service']) {
+      const value = parse(unit(name));
+      const commands = Object.entries(value).filter(([key]) => /^\[Service\]Exec(Start|StartPre|StartPost|Stop|StopPost|Reload|Condition)$/.test(key)).flatMap(([, lines]) => lines);
+      expect(commands.length).toBeGreaterThan(0);
+      for (const command of commands) expect(command.startsWith(`${CLEAN_ENV} ${NODE} `)).toBe(true);
+    }
+  });
+
+  it.each([
+    ['debateai-preview-team-unlock.service', 'ExecStart'], ['debateai-preview-team-unlock.service', 'ExecStopPost'],
+    ['debateai-preview-alert@.service', 'ExecStart'], ['debateai-preview-backup.service', 'ExecStart']
+  ])('%s %s, run as written, hands node no inherited NODE_OPTIONS or NODE_PATH', (name, key) => {
+    const line = parse(unit(name))[`[Service]${key}`]![0]!;
     const probe = join(mkdtempSync(join(tmpdir(), 'lifecycle-unit-env-')), 'probe.mjs');
     writeFileSync(probe, 'process.stdout.write(JSON.stringify({ env: process.env, execArgv: process.execArgv }));\n');
     // The unit's own argv, with only the server node and script swapped for this machine's node and a probe.
-    const argv = line.split(' ').map(part => (part === NODE ? process.execPath : part.endsWith('/unlock-team-tools.mjs') ? probe : part));
+    const argv = line.split(' ').map(part => (part === NODE ? process.execPath : part.startsWith(`${OPERATOR}/`) && part.endsWith('.mjs') ? probe : part));
     const result = spawnSync(argv[0]!, argv.slice(1), { env: { ...process.env, NODE_OPTIONS: '--require=/nonexistent-preload.cjs', NODE_PATH: '/nonexistent-modules', PREVIEW_LIFECYCLE_STAFF_DB_HOST: '127.0.0.1' }, encoding: 'utf8' });
     expect(result.status).toBe(0);
     const seen = JSON.parse(result.stdout);
@@ -101,11 +113,16 @@ describe('preview lifecycle systemd templates', () => {
     expect(seen).toEqual({ env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin' }, execArgv: [] });
   });
 
-  it('the unlock script loads and refuses cleanly with no environment but PATH', () => {
-    const script = join(folder, 'unlock-team-tools.mjs');
-    const result = spawnSync('/usr/bin/env', ['-i', 'PATH=/usr/sbin:/usr/bin:/sbin:/bin', process.execPath, script, 'reset'], { encoding: 'utf8' });
-    expect(result.status).toBe(1);
-    expect(JSON.parse(result.stderr.trim())).toMatchObject({ event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false });
+  // Off the server (not Linux root) each script refuses at once; this proves it loads, imports
+  // and reports with nothing but PATH in its environment.
+  it.each([
+    ['unlock-team-tools.mjs', ['reset'], 1, 'stderr', { event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false }],
+    ['alert.mjs', ['--unit', 'debateai-preview-api.service'], 0, 'stdout', { event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', reason: 'ACTOR_REFUSED' }],
+    ['backup.mjs', [], 1, 'stderr', { event: 'PREVIEW_BACKUP_FAILED', reason: 'ACTOR_REFUSED' }]
+  ] as const)('%s loads and refuses cleanly with no environment but PATH', (script, args, status, stream, event) => {
+    const result = spawnSync('/usr/bin/env', ['-i', 'PATH=/usr/sbin:/usr/bin:/sbin:/bin', process.execPath, join(folder, script), ...args], { encoding: 'utf8' });
+    expect(result.status).toBe(status);
+    expect(JSON.parse(result[stream].trim())).toMatchObject(event);
   });
 
   it('team unlock gives the main process and the reset each room for one 120 s database actor call when stopping', async () => {
