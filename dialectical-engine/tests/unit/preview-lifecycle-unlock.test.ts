@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash, createHmac } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { createServer, type Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 const unlock = await import('../../deploy/' + 'preview-lifecycle/v1/unlock-team-tools.mjs');
@@ -280,6 +282,285 @@ describe('where the unlock connects as the recovery login', () => {
 
   it.each(['db.example.test', '10.0.0.5', 'run/postgresql', '/run/../tmp', '/run/x y', 'localhost'])('refuses the host %j', value => {
     expect(() => unlock.resolveStaffDbHost(value)).toThrow(/STAFF_DB_HOST_REFUSED/);
+  });
+});
+
+const PEER = 'peer-readiness-writer';
+const PEER_ROLE = 'debateai_staff_readiness_writer';
+/** What the identity query returns when the peer connection is exactly the readiness writer on the preview socket. */
+const peerRow = () => ({ session: PEER_ROLE, role: PEER_ROLE, database: 'debateai', port: 5434, unix_socket: true, can_login: true, no_elevated_powers: true, memberships: 0 });
+const interimRow = () => ({ session: 'debateai_prod_staff_recovery', role: 'debateai_prod_staff_recovery', database: 'debateai', port: 5434, bounded: true, no_elevated_powers: true });
+/** A stand-in for pg.Pool: records its options and every query, answers the identity query with `rows`. */
+function fakePool(answer: () => Promise<{ rows: unknown[] }>, made: { options: any; sql: string[]; ended: number }[] = []) {
+  return class {
+    record: { options: any; sql: string[]; ended: number };
+    constructor(options: any) { this.record = { options, sql: [], ended: 0 }; made.push(this.record); }
+    async query(sql: string) { this.record.sql.push(sql); return answer(); }
+    async end() { this.record.ended++; }
+  };
+}
+
+describe('peer writer: the dedicated password-less readiness role (migration 0109)', () => {
+  function peerHarness(overrides: Record<string, unknown> = {}) {
+    const calls: string[] = [];
+    const writer = unlock.createPeerReadinessWriter({
+      createPool: async (...args: unknown[]) => { calls.push(`pool:${args.length}`); return { end: async () => { calls.push('end'); } }; },
+      createPublisher: () => ({ publish: async () => { calls.push('publish'); return true; }, revoke: async (generation: string) => { calls.push(`revoke:${generation}`); return true; } }),
+      ...overrides
+    });
+    return { writer, calls };
+  }
+
+  it('is chosen by default; the interim login only when it is named exactly', () => {
+    expect(unlock.resolveStaffWriterKind(undefined)).toBe(PEER);
+    expect(unlock.resolveStaffWriterKind('')).toBe(PEER);
+    expect(unlock.resolveStaffWriterKind(PEER)).toBe(PEER);
+    expect(unlock.resolveStaffWriterKind('interim-recovery-login')).toBe('interim-recovery-login');
+  });
+
+  it.each(['interim', 'INTERIM-RECOVERY-LOGIN', ' interim-recovery-login', 'interim-recovery-login ', 'postgres', 'none'])('refuses the writer %j', value => {
+    expect(() => unlock.resolveStaffWriterKind(value)).toThrow(/STAFF_WRITER_REFUSED/);
+  });
+
+  it('opens one pool given nothing (no password), extends nothing, publishes and revokes through the publisher, then ends the pool', async () => {
+    const h = peerHarness();
+    expect(h.writer.kind).toBe(PEER);
+    await h.writer.open({ validUntil: new Date(start + 4 * MINUTE) });
+    await h.writer.extend({ validUntil: new Date(start + 4 * MINUTE) });
+    expect(await h.writer.publish(ready(start + MINUTE))).toBe(true);
+    expect(await h.writer.revoke(uuid(9))).toBe(true);
+    expect(await h.writer.close()).toEqual({ poolClosed: true });
+    expect(h.calls).toEqual(['pool:0', 'publish', `revoke:${uuid(9)}`, 'end']);
+  });
+
+  it('refuses to publish before it is open and after it closed', async () => {
+    const h = peerHarness();
+    await expect(h.writer.publish(ready(start + MINUTE))).rejects.toMatchObject({ code: 'STAFF_READINESS_NOT_OPEN' });
+    await h.writer.open({ validUntil: new Date(start + MINUTE) });
+    await h.writer.close();
+    await expect(h.writer.publish(ready(start + MINUTE))).rejects.toMatchObject({ code: 'STAFF_READINESS_NOT_OPEN' });
+    expect(await h.writer.revoke(uuid(9))).toBe(false);
+  });
+
+  it('does not claim the pool closed when ending it throws', async () => {
+    const h = peerHarness({ createPool: async () => ({ end: async () => { throw new Error('socket'); } }) });
+    await h.writer.open({ validUntil: new Date(start + MINUTE) });
+    expect(await h.writer.close()).toEqual({ poolClosed: false });
+  });
+
+  it('has nothing to reset: reset opens nothing and says so', async () => {
+    const h = peerHarness();
+    expect(await h.writer.reset()).toEqual({ nothingToReset: true });
+    expect(h.calls).toEqual([]);
+  });
+
+  it('a whole window reports `locked`, never a `roleReset` it did not do', async () => {
+    const h = harness();
+    const p = peerHarness();
+    const result = await unlock.runUnlockWindow({ writer: p.writer, evidence: h.evidence, deps: h.deps, windowMs: 10 * MINUTE });
+    expect(result).toEqual({ outcome: 'WINDOW_ENDED', publishes: 60, locked: true });
+    expect(h.logs[0]).toEqual({ event: 'PREVIEW_TEAM_TOOLS_UNLOCKED', until: '2026-10-09T10:10:00.000Z', writer: PEER, windowMinutes: 10 });
+    expect(h.logs[1]).toEqual({ event: 'PREVIEW_TEAM_TOOLS_LOCKED', outcome: 'WINDOW_ENDED', publishes: 60, locked: true, at: '2026-10-09T10:10:00.000Z' });
+    expect(p.calls.slice(-2)).toEqual([`revoke:${uuid(9)}`, 'end']);
+  });
+
+  it('a window whose open failed is still locked (nothing stayed open) and names the reason', async () => {
+    const h = harness();
+    const p = peerHarness({ createPool: async () => { throw Object.assign(new Error('STAFF_READINESS_IDENTITY_REFUSED'), { code: 'STAFF_READINESS_IDENTITY_REFUSED' }); } });
+    const result = await unlock.runUnlockWindow({ writer: p.writer, evidence: h.evidence, deps: h.deps, windowMs: 10 * MINUTE });
+    expect(result).toEqual({ outcome: 'FAILED', reason: 'STAFF_READINESS_IDENTITY_REFUSED', publishes: 0, locked: true });
+  });
+
+  it('a window whose pool would not close reports locked: false, so the unit fails and the alert runs', async () => {
+    const h = harness();
+    const p = peerHarness({ createPool: async () => ({ end: async () => { throw new Error('socket'); } }) });
+    const result = await unlock.runUnlockWindow({ writer: p.writer, evidence: h.evidence, deps: h.deps, windowMs: MINUTE });
+    expect(result).toEqual({ outcome: 'WINDOW_ENDED', publishes: 6, locked: false });
+    expect(await unlock.runCommand('run', { platform: 'linux', uid: 0, runServer: async () => result, log: () => undefined })).toBe(1);
+  });
+
+  it('exit codes: a locked peer window exits 0 unless it FAILED; a peer reset with nothing to reset exits 0', async () => {
+    const run = (result: unknown) => unlock.runCommand('run', { platform: 'linux', uid: 0, runServer: async () => result, log: () => undefined });
+    expect(await run({ outcome: 'WINDOW_ENDED', publishes: 360, locked: true })).toBe(0);
+    expect(await run({ outcome: 'STOPPED', publishes: 3, locked: true })).toBe(0);
+    expect(await run({ outcome: 'FAILED', reason: 'PUBLISH_REFUSED', publishes: 3, locked: true })).toBe(1);
+    const logs: any[] = [];
+    const reset = await unlock.runReset({ writer: peerHarness().writer, log: (event: unknown) => logs.push(event) });
+    expect(reset).toEqual({ nothingToReset: true });
+    expect(logs).toEqual([{ event: 'PREVIEW_TEAM_TOOLS_RESET', nothingToReset: true }]);
+    expect(await unlock.runCommand('reset', { platform: 'linux', uid: 0, resetServer: async () => reset, log: () => undefined })).toBe(0);
+  });
+
+  it('a peer reset that does not answer "nothing to reset" logs RESET_FAILED and exits non-zero', async () => {
+    for (const [reset, reason] of [[async () => ({ passwordNull: true, expiredMinusInfinity: true }), 'RESET_ANSWER_UNEXPECTED'], [async () => { throw new Error('x'); }, 'UNEXPECTED']] as const) {
+      const logs: any[] = [];
+      const result = await unlock.runReset({ writer: { ...peerHarness().writer, reset }, log: (event: unknown) => logs.push(event) });
+      expect(result).toEqual({ nothingToReset: false });
+      expect(logs).toEqual([{ event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', nothingToReset: false, reason }]);
+      expect(await unlock.runCommand('reset', { platform: 'linux', uid: 0, resetServer: async () => result, log: () => undefined })).toBe(1);
+    }
+  });
+});
+
+describe('peer writer connection: the preview socket, no password, exactly the readiness role', () => {
+  it('connects on the preview socket as the readiness role, and its password is a refusal, never a string', () => {
+    const options = unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(undefined) });
+    expect(options).toMatchObject({ host: '/run/debateai-v3-preview/postgresql', port: 5434, database: 'debateai', user: PEER_ROLE, ssl: false, max: 1, application_name: 'preview-team-unlock' });
+    expect(typeof options.password).toBe('function');
+    expect(() => options.password()).toThrow(/STAFF_READINESS_PASSWORD_REQUESTED/);
+    expect(unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost('/run/other/postgresql') }).host).toBe('/run/other/postgresql');
+  });
+
+  it('refuses loopback TCP: peer authentication exists only on the Unix socket', () => {
+    expect(() => unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost('127.0.0.1') })).toThrow(/STAFF_DB_HOST_REFUSED/);
+  });
+
+  it('accepts the exact identity and keeps the pool', async () => {
+    const made: any[] = [];
+    const options = unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(undefined) });
+    const pool = await unlock.openPeerReadinessPool({ Pool: fakePool(async () => ({ rows: [peerRow()] }), made), options });
+    expect(pool).toBeTruthy();
+    expect(made).toHaveLength(1);
+    expect(made[0].options).toBe(options);
+    expect(made[0].sql[0]).toMatch(/session_user/);
+    expect(made[0].ended).toBe(0);
+  });
+
+  it.each([
+    ['another login', (row: any) => ({ ...row, session: 'debateai_prod_staff_recovery', role: 'debateai_prod_staff_recovery' })],
+    ['a SET ROLE away from the login', (row: any) => ({ ...row, role: 'debateai_staff_recovery' })],
+    ['another database', (row: any) => ({ ...row, database: 'postgres' })],
+    ['another cluster port', (row: any) => ({ ...row, port: 5432 })],
+    ['a TCP connection', (row: any) => ({ ...row, unix_socket: false })],
+    ['a role that cannot log in', (row: any) => ({ ...row, can_login: false })],
+    ['an elevated attribute', (row: any) => ({ ...row, no_elevated_powers: false })],
+    ['a role membership', (row: any) => ({ ...row, memberships: 1 })]
+  ])('refuses %s and ends the pool', async (_name, mutate) => {
+    const made: any[] = [];
+    const options = unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(undefined) });
+    await expect(unlock.openPeerReadinessPool({ Pool: fakePool(async () => ({ rows: [mutate(peerRow())] }), made), options })).rejects.toMatchObject({ code: 'STAFF_READINESS_IDENTITY_REFUSED' });
+    expect(made[0].ended).toBe(1);
+  });
+
+  it('refuses no row or two rows', async () => {
+    const options = unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(undefined) });
+    for (const rows of [[], [peerRow(), peerRow()]]) {
+      await expect(unlock.openPeerReadinessPool({ Pool: fakePool(async () => ({ rows })), options })).rejects.toMatchObject({ code: 'STAFF_READINESS_IDENTITY_REFUSED' });
+    }
+  });
+
+  it('names a peer authentication refusal (pg_ident/pg_hba lines missing) in plain terms', async () => {
+    const made: any[] = [];
+    const options = unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(undefined) });
+    const Pool = fakePool(async () => { throw Object.assign(new Error('Peer authentication failed for user "debateai_staff_readiness_writer"'), { code: '28000' }); }, made);
+    await expect(unlock.openPeerReadinessPool({ Pool, options })).rejects.toMatchObject({ code: 'STAFF_READINESS_PEER_AUTH_REFUSED' });
+    expect(made[0].ended).toBe(1);
+  });
+
+  /**
+   * The real pg driver against a stand-in server on a Unix socket that asks for a password (as a
+   * server would whose pg_hba still sends this role to a scram/password line): the driver sends
+   * nothing back but its startup message, and the open fails with a named refusal.
+   */
+  it.each([['cleartext', 3], ['SCRAM-SHA-256', 10]])('with the real pg driver: a server that asks for a %s password gets none', async (_name, authCode) => {
+    const pg = createRequire(import.meta.url)('pg');
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), 'lc-peer-')));
+    const received: Buffer[] = [], sockets: Socket[] = [];
+    const int32 = (n: number) => { const b = Buffer.alloc(4); b.writeInt32BE(n); return b; };
+    const server = createServer(socket => {
+      sockets.push(socket);
+      socket.on('error', () => undefined);
+      socket.once('data', () => {
+        const body = authCode === 10 ? Buffer.concat([int32(10), Buffer.from('SCRAM-SHA-256\0\0')]) : int32(authCode);
+        socket.write(Buffer.concat([Buffer.from('R'), int32(4 + body.length), body]));
+      });
+      socket.on('data', chunk => received.push(Buffer.from(chunk)));
+    });
+    await new Promise<void>(done => server.listen(join(dir, '.s.PGSQL.5434'), done));
+    try {
+      const options = { ...unlock.peerPoolOptions({ target: unlock.resolveStaffDbHost(dir) }), connectionTimeoutMillis: 2000 };
+      await expect(unlock.openPeerReadinessPool({ Pool: pg.Pool, options })).rejects.toMatchObject({ code: 'STAFF_READINESS_PASSWORD_REQUESTED' });
+      const bytes = Buffer.concat(received);
+      const startupLength = bytes.readInt32BE(0);
+      const startup = bytes.subarray(0, startupLength).toString('latin1');
+      expect(startup).toContain(`user\0${PEER_ROLE}\0`);
+      expect(startup).toContain('database\0debateai\0');
+      // Every later message, if any, is typed; none is a password ('p') message.
+      const types: string[] = [];
+      for (let at = startupLength; at < bytes.length; at += 1 + bytes.readInt32BE(at + 1)) types.push(String.fromCharCode(bytes[at]!));
+      expect(types.filter(type => type === 'p')).toEqual([]);
+    } finally {
+      for (const socket of sockets) socket.destroy();
+      await new Promise(done => server.close(done));
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('which writer the unlock builds (PREVIEW_LIFECYCLE_STAFF_WRITER, from the unit\'s own env -i line only)', () => {
+  const publisher = () => ({ publish: async () => true, revoke: async () => true });
+  function spies() {
+    const seen = { creator: [] as unknown[], random: 0, ca: 0 };
+    return {
+      seen,
+      runCreator: async (control: { mode: string }) => { seen.creator.push(control); return control.mode === 'open' ? { existingRoleOpened: true } : { passwordNull: true, expiredMinusInfinity: true, noSessions: true }; },
+      randomBytes: (n: number) => { seen.random++; return Buffer.alloc(n, 7); },
+      readCa: async () => { seen.ca++; return 'CA'; }
+    };
+  }
+
+  it('by default builds the peer writer, which never runs the creator actor, never draws a password and never hands the driver one', async () => {
+    const s = spies(), made: any[] = [];
+    const writer = await unlock.buildStaffWriter({ env: {}, Pool: fakePool(async () => ({ rows: [peerRow()] }), made), createPublisher: publisher, runCreator: s.runCreator, randomBytes: s.randomBytes, readCa: s.readCa });
+    expect(writer.kind).toBe(PEER);
+    const h = harness();
+    const result = await unlock.runUnlockWindow({ writer, evidence: h.evidence, deps: h.deps, windowMs: 10 * MINUTE });
+    expect(result).toEqual({ outcome: 'WINDOW_ENDED', publishes: 60, locked: true });
+    expect(await writer.reset()).toEqual({ nothingToReset: true });
+    expect(s.seen).toEqual({ creator: [], random: 0, ca: 0 });
+    expect(made).toHaveLength(1);
+    expect(made[0].options).toMatchObject({ user: PEER_ROLE, host: '/run/debateai-v3-preview/postgresql', ssl: false });
+    expect(typeof made[0].options.password).toBe('function');
+    expect(made[0].ended).toBe(1);
+  });
+
+  it('builds the interim recovery-login writer only when the unit names it, with its identity check unchanged', async () => {
+    const s = spies(), made: any[] = [];
+    const writer = await unlock.buildStaffWriter({ env: { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login' }, Pool: fakePool(async () => ({ rows: [interimRow()] }), made), createPublisher: publisher, runCreator: s.runCreator, randomBytes: s.randomBytes, readCa: s.readCa, now: () => start });
+    expect(writer.kind).toBe('interim-recovery-login');
+    await writer.open({ validUntil: new Date(start + 4 * MINUTE) });
+    expect(s.seen.creator).toEqual([{ mode: 'open', validUntil: new Date(start + 4 * MINUTE).toISOString() }]);
+    expect(made[0].options).toMatchObject({ user: 'debateai_prod_staff_recovery', password: '07'.repeat(32), ssl: false });
+    expect(made[0].sql[0]).toMatch(/rolvaliduntil/);
+    await expect(writer.close()).resolves.toMatchObject({ passwordNull: true, expiredMinusInfinity: true });
+  });
+
+  it.each([
+    ['another login', (row: any) => ({ ...row, session: PEER_ROLE, role: PEER_ROLE })],
+    ['an expiry beyond five minutes', (row: any) => ({ ...row, bounded: false })],
+    ['an elevated attribute', (row: any) => ({ ...row, no_elevated_powers: false })],
+    ['another port', (row: any) => ({ ...row, port: 5432 })]
+  ])('the interim writer still refuses %s', async (_name, mutate) => {
+    const s = spies(), made: any[] = [];
+    const writer = await unlock.buildStaffWriter({ env: { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login' }, Pool: fakePool(async () => ({ rows: [mutate(interimRow())] }), made), createPublisher: publisher, runCreator: s.runCreator, randomBytes: s.randomBytes, readCa: s.readCa, now: () => start });
+    await expect(writer.open({ validUntil: new Date(start + 4 * MINUTE) })).rejects.toMatchObject({ code: 'STAFF_JIT_IDENTITY_REFUSED' });
+    expect(made[0].ended).toBe(1);
+  });
+
+  it('reads the preview CA only for the interim writer over loopback TLS', async () => {
+    const s = spies();
+    await unlock.buildStaffWriter({ env: { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim-recovery-login', PREVIEW_LIFECYCLE_STAFF_DB_HOST: '127.0.0.1' }, Pool: fakePool(async () => ({ rows: [] })), createPublisher: publisher, runCreator: s.runCreator, readCa: s.readCa });
+    expect(s.seen.ca).toBe(1);
+  });
+
+  it.each([
+    ['an unknown writer', { PREVIEW_LIFECYCLE_STAFF_WRITER: 'interim' }, 'STAFF_WRITER_REFUSED'],
+    ['the peer writer over TCP', { PREVIEW_LIFECYCLE_STAFF_DB_HOST: '127.0.0.1' }, 'STAFF_DB_HOST_REFUSED']
+  ])('refuses %s before building anything', async (_name, env, code) => {
+    const s = spies(), made: any[] = [];
+    await expect(unlock.buildStaffWriter({ env, Pool: fakePool(async () => ({ rows: [] }), made), createPublisher: publisher, runCreator: s.runCreator, readCa: s.readCa })).rejects.toMatchObject({ code });
+    expect(made).toEqual([]);
+    expect(s.seen).toEqual({ creator: [], random: 0, ca: 0 });
   });
 });
 

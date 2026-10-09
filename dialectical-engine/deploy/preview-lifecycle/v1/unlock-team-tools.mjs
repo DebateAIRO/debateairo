@@ -5,14 +5,23 @@
 // path works: an acknowledged test alert (valid 5 minutes) and a database "ready" row (valid
 // 30 seconds). This tool keeps both fresh for ONE hour (owner ruling), then locks again.
 //
-// How (interim, until a narrow dedicated role exists): it opens the existing staff recovery
-// login with a random password that lives only in this process's memory, keeps that login's
-// expiry rolling at most 4 minutes ahead (the database itself refuses anything over 5), and
-// writes the ready row every 10 seconds. At the end, on SIGTERM/SIGINT, and again from
-// ExecStopPost even after a crash, the login is reset to PASSWORD NULL VALID UNTIL '-infinity'.
+// How (default, migration 0109): it logs in as debateai_staff_readiness_writer, a role with no
+// password that can only write and withdraw the ready row, over the preview's Unix socket with
+// peer authentication (root is mapped to that role by one pg_ident line and one pg_hba line).
+// Nothing is minted, extended or reset; it writes the ready row every 10 seconds, withdraws it at
+// the end, on SIGTERM/SIGINT, and closes its connection.
+//
+// Fallback (only when the unit names PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login, until
+// the server has 0109 and the two lines): it opens the existing staff recovery login with a
+// random password that lives only in this process's memory, keeps that login's expiry rolling at
+// most 4 minutes ahead (the database itself refuses anything over 5), and resets the login to
+// PASSWORD NULL VALID UNTIL '-infinity' at the end.
+//
+// Whichever writer ran, ExecStopPost resets the recovery login again, even after a crash: it
+// needs no password and changes nothing when the login is already closed.
 //
 //   unlock-team-tools.mjs run     the one-hour window (systemd ExecStart)
-//   unlock-team-tools.mjs reset   reset the login only (systemd ExecStopPost; safe to repeat)
+//   unlock-team-tools.mjs reset   reset the recovery login only (systemd ExecStopPost; safe to repeat)
 import { lstat } from 'node:fs/promises';
 import { randomBytes as cryptoRandomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
@@ -33,6 +42,9 @@ export const REFRESH_BEFORE_MS = 60_000;
 /** No renewal this close to the end: the current lease already reaches it, and a slow renewal could fail the clean end. */
 export const NO_RENEWAL_BEFORE_END_MS = 30_000;
 const DATABASE_JIT_LIMIT_MS = 5 * 60 * 1000;
+export const PEER_WRITER = 'peer-readiness-writer';
+export const INTERIM_WRITER = 'interim-recovery-login';
+export const READINESS_WRITER_ROLE = 'debateai_staff_readiness_writer';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const HASH = /^[a-f0-9]{64}$/;
 
@@ -60,9 +72,19 @@ export function installSignalAbort(emitter = process) {
 }
 
 /**
- * The window. Writer and evidence are interfaces so a later migration can swap the interim
- * recovery-login writer for a narrow dedicated role without touching this loop.
- *   writer:   open({validUntil}) extend({validUntil}) publish(ready) revoke(generation) close()
+ * What "locked again" means for each writer, reported under its own name so neither pretends:
+ *   interim (the default reading): the login was reset to PASSWORD NULL VALID UNTIL '-infinity' -> roleReset
+ *   peer: the role has no password or expiry to take back; its lock is this process's pool
+ *         closed (the ready row was withdrawn, or lapses within 30 s) -> locked
+ */
+const lockOf = (writer, closed) => (writer.kind === PEER_WRITER
+  ? { locked: closed?.poolClosed === true }
+  : { roleReset: closed?.passwordNull === true && closed?.expiredMinusInfinity === true });
+
+/**
+ * The window. Writer and evidence are interfaces, so the dedicated peer writer and the interim
+ * recovery-login writer share this loop unchanged.
+ *   writer:   open({validUntil}) extend({validUntil}) publish(ready) revoke(generation) close() reset()
  *   evidence: refresh() current() -> {configSha256,generation,ackAdapterId,rehearsalId,evidenceExpiresAt}|null
  */
 export async function runUnlockWindow({ writer, evidence, deps = {}, windowMs = WINDOW_MS, publishEveryMs = PUBLISH_EVERY_MS, leaseMs = LEASE_MS, rollEveryMs = ROLL_EVERY_MS, refreshBeforeMs = REFRESH_BEFORE_MS }) {
@@ -70,7 +92,7 @@ export async function runUnlockWindow({ writer, evidence, deps = {}, windowMs = 
   const sleep = deps.sleep ?? abortableSleep, signal = deps.signal ?? new AbortController().signal;
   const startedAt = now(), endsAt = startedAt + windowMs;
   const lease = at => new Date(Math.min(at + leaseMs, endsAt));
-  let publishes = 0, generation = null, outcome, reason, roleReset = false;
+  let publishes = 0, generation = null, outcome, reason, lock = lockOf(writer, null);
   log({ event: 'PREVIEW_TEAM_TOOLS_UNLOCKED', until: new Date(endsAt).toISOString(), writer: writer.kind, windowMinutes: Math.round(windowMs / 60000) });
   try {
     if (signal.aborted) refuse('STOPPED_BEFORE_START');
@@ -98,16 +120,26 @@ export async function runUnlockWindow({ writer, evidence, deps = {}, windowMs = 
     outcome = signal.aborted ? 'STOPPED' : 'FAILED';
     reason = reasonOf(error);
   } finally {
-    // Lock: withdraw the ready row at once, then always reset the login.
+    // Lock: withdraw the ready row at once, then always close the writer (the interim one resets the login).
     if (generation !== null) { try { await writer.revoke(generation); } catch { /* the row expires within 30 s anyway */ } }
-    try { const closed = await writer.close(); roleReset = closed?.passwordNull === true && closed?.expiredMinusInfinity === true; } catch { roleReset = false; }
-    log({ event: 'PREVIEW_TEAM_TOOLS_LOCKED', outcome, ...(reason ? { reason } : {}), publishes, roleReset, at: new Date(now()).toISOString() });
+    try { lock = lockOf(writer, await writer.close()); } catch { lock = lockOf(writer, null); }
+    log({ event: 'PREVIEW_TEAM_TOOLS_LOCKED', outcome, ...(reason ? { reason } : {}), publishes, ...lock, at: new Date(now()).toISOString() });
   }
-  return { outcome, ...(reason ? { reason } : {}), publishes, roleReset };
+  return { outcome, ...(reason ? { reason } : {}), publishes, ...lock };
 }
 
 /** ExecStopPost: idempotent reset, needs no password and opens no pool. A failure has its own event. */
 export async function runReset({ writer, log = event => logLine(process.stdout, event) }) {
+  if (writer.kind === PEER_WRITER) {
+    // The peer role has nothing to reset; say exactly that instead of a roleReset it never did.
+    let nothingToReset = false, reason = null;
+    try {
+      nothingToReset = (await writer.reset())?.nothingToReset === true;
+      if (!nothingToReset) reason = 'RESET_ANSWER_UNEXPECTED';
+    } catch (error) { reason = reasonOf(error); }
+    log(nothingToReset ? { event: 'PREVIEW_TEAM_TOOLS_RESET', nothingToReset } : { event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', nothingToReset, reason });
+    return { nothingToReset };
+  }
   let roleReset = false, reason = null;
   try {
     const closed = await writer.reset();
@@ -160,6 +192,32 @@ export function createInterimLoginWriter({ runCreator, createPool, createPublish
       return closeRole();
     },
     reset: closeRole
+  };
+}
+
+/**
+ * DEFAULT writer (migration 0109): debateai_staff_readiness_writer, a LOGIN role with PASSWORD
+ * NULL that may only publish and revoke the ready row. It connects by peer authentication on
+ * the Unix socket, so this writer has no secret, no lease to roll and no role to reset: open()
+ * takes nothing, extend() does nothing, close() ends the pool, reset() has nothing to do.
+ */
+export function createPeerReadinessWriter({ createPool, createPublisher }) {
+  let pool = null, publisher = null;
+  return {
+    kind: PEER_WRITER,
+    async open() {
+      pool = await createPool();
+      publisher = createPublisher(pool);
+    },
+    async extend() { /* no lease: the role has no expiry and no password */ },
+    publish: async ready => (publisher ? publisher.publish(ready) : refuse('STAFF_READINESS_NOT_OPEN')),
+    revoke: async generation => (publisher ? publisher.revoke(generation) : false),
+    async close() {
+      const open = pool;
+      pool = null; publisher = null;
+      try { await open?.end(); return { poolClosed: true }; } catch { return { poolClosed: false }; }
+    },
+    reset: async () => ({ nothingToReset: true })
   };
 }
 
@@ -227,11 +285,12 @@ export function createSelfCaptureEvidence({ readWrapperText, runSelfCapture, rea
 }
 
 /**
- * Where the recovery login connects. Default: the preview's own Unix socket with SCRAM, which is
- * what deploy/postgres/pg_hba.conf.template allows for debateai_prod_staff_recovery (`local` only).
- * PREVIEW_LIFECYCLE_STAFF_DB_HOST (only from the unit's own `env -i` ExecStart line; the process
- * inherits no other environment) may name another socket folder, or loopback (127.0.0.1 / ::1)
- * when the server's pg_hba has a matching hostssl line; TCP always verifies TLS with the preview CA.
+ * Where the writer connects. Default: the preview's own Unix socket: peer for the readiness
+ * writer, SCRAM for the interim recovery login, as deploy/postgres/pg_hba.conf.template allows
+ * (`local` only). PREVIEW_LIFECYCLE_STAFF_DB_HOST (only from the unit's own `env -i` ExecStart
+ * line; the process inherits no other environment) may name another socket folder, or, for the
+ * interim login only, loopback (127.0.0.1 / ::1) when the server's pg_hba has a matching hostssl
+ * line; TCP always verifies TLS with the preview CA. The peer writer refuses TCP.
  */
 export function resolveStaffDbHost(value, layout = LAYOUT) {
   if (value === undefined || value === '') return { host: layout.pgSocketDir, tls: false };
@@ -245,6 +304,84 @@ export function staffPoolOptions({ target, password, ca, layout = LAYOUT }) {
   return { host: target.host, port: layout.pgPort, database: layout.database, user: 'debateai_prod_staff_recovery', password,
     ssl: target.tls ? { ca, rejectUnauthorized: true } : false,
     max: 1, connectionTimeoutMillis: 5000, query_timeout: 5000, statement_timeout: 5000, idleTimeoutMillis: 1000, application_name: 'preview-team-unlock' };
+}
+
+/**
+ * PREVIEW_LIFECYCLE_STAFF_WRITER, only from the unit's own `env -i` ExecStart line: unset (or the
+ * default's own name) -> the peer writer; exactly `interim-recovery-login` -> the fallback, until
+ * the server has migration 0109 and the pg_ident/pg_hba lines. Anything else is refused.
+ */
+export function resolveStaffWriterKind(value) {
+  if (value === undefined || value === '' || value === PEER_WRITER) return PEER_WRITER;
+  if (value === INTERIM_WRITER) return INTERIM_WRITER;
+  return refuse('STAFF_WRITER_REFUSED');
+}
+
+/**
+ * Peer authentication exists only on the Unix socket, so loopback TCP is refused. The password
+ * is a function that refuses: a server that asks for one (pg_hba still sends this role to a
+ * scram line) gets nothing, and the driver never looks for one in ~/.pgpass or the environment.
+ */
+export function peerPoolOptions({ target, layout = LAYOUT }) {
+  if (target.tls) refuse('STAFF_DB_HOST_REFUSED');
+  return { host: target.host, port: layout.pgPort, database: layout.database, user: READINESS_WRITER_ROLE,
+    password: () => refuse('STAFF_READINESS_PASSWORD_REQUESTED'), ssl: false,
+    max: 1, connectionTimeoutMillis: 5000, query_timeout: 5000, statement_timeout: 5000, idleTimeoutMillis: 1000, application_name: 'preview-team-unlock' };
+}
+
+/** Opens a pool and keeps it only if the one identity row is accepted; otherwise ends it and refuses with `code`. */
+async function openCheckedPool({ Pool, options, sql, accepted, code }) {
+  const pool = new Pool(options);
+  try {
+    const rows = (await pool.query(sql)).rows;
+    if (rows.length !== 1 || !accepted(rows[0])) refuse(code);
+    return pool;
+  } catch (error) { await pool.end().catch(() => undefined); throw error; }
+}
+
+const INTERIM_IDENTITY_SQL = `SELECT session_user::text session,current_user::text role,current_database() database,current_setting('port')::int port,
+  rolvaliduntil>clock_timestamp() AND rolvaliduntil<=clock_timestamp()+interval '5 minutes' bounded,
+  NOT(rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls) no_elevated_powers FROM pg_roles WHERE rolname=session_user`;
+const interimIdentityAccepted = (row, layout) => row.session === 'debateai_prod_staff_recovery' && row.role === 'debateai_prod_staff_recovery'
+  && row.database === layout.database && row.port === layout.pgPort && !!row.bounded && !!row.no_elevated_powers;
+
+/** Who the peer connection really is: the readiness role itself (no SET ROLE), on the preview socket, with no powers and no memberships. */
+const PEER_IDENTITY_SQL = `SELECT session_user::text session,current_user::text role,current_database() database,current_setting('port')::int port,
+  inet_client_addr() IS NULL unix_socket,r.rolcanlogin can_login,
+  NOT(r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication OR r.rolbypassrls) no_elevated_powers,
+  (SELECT count(*) FROM pg_catalog.pg_auth_members m WHERE m.member=r.oid OR m.roleid=r.oid)::int memberships
+  FROM pg_catalog.pg_roles r WHERE r.rolname=session_user`;
+const peerIdentityAccepted = (row, layout) => row.session === READINESS_WRITER_ROLE && row.role === READINESS_WRITER_ROLE
+  && row.database === layout.database && row.port === layout.pgPort && row.unix_socket === true && row.can_login === true
+  && row.no_elevated_powers === true && row.memberships === 0;
+
+/** SQLSTATE class 28 (no pg_hba line, or no pg_ident mapping for root) gets a name the operator can act on. */
+export async function openPeerReadinessPool({ Pool, options, layout = LAYOUT }) {
+  try {
+    return await openCheckedPool({ Pool, options, sql: PEER_IDENTITY_SQL, accepted: row => peerIdentityAccepted(row, layout), code: 'STAFF_READINESS_IDENTITY_REFUSED' });
+  } catch (error) {
+    if (typeof error?.code === 'string' && error.code.startsWith('28')) refuse('STAFF_READINESS_PEER_AUTH_REFUSED');
+    throw error;
+  }
+}
+
+/**
+ * The writer the window uses. Everything is checked before anything connects: the writer name,
+ * the host, and (peer) that the host is a socket. The CA is read only for the interim writer
+ * over loopback TLS. `runCreator` is handed only to the interim writer.
+ */
+export async function buildStaffWriter({ env, Pool, createPublisher, runCreator, readCa, randomBytes, now, layout = LAYOUT }) {
+  const kind = resolveStaffWriterKind(env.PREVIEW_LIFECYCLE_STAFF_WRITER);
+  const target = resolveStaffDbHost(env.PREVIEW_LIFECYCLE_STAFF_DB_HOST, layout);
+  if (kind === PEER_WRITER) {
+    const options = peerPoolOptions({ target, layout });
+    return createPeerReadinessWriter({ createPool: () => openPeerReadinessPool({ Pool, options, layout }), createPublisher });
+  }
+  const ca = target.tls ? await readCa() : null;
+  return createInterimLoginWriter({
+    runCreator, createPublisher, ...(randomBytes ? { randomBytes } : {}), ...(now ? { now } : {}),
+    createPool: password => openCheckedPool({ Pool, options: staffPoolOptions({ target, password, ca, layout }), sql: INTERIM_IDENTITY_SQL, accepted: row => interimIdentityAccepted(row, layout), code: 'STAFF_JIT_IDENTITY_REFUSED' })
+  });
 }
 
 /** Every release module root loads, in load order: tsx, the db package, the staff alert code, pg. */
@@ -332,26 +469,18 @@ async function serverDeps() {
 }
 
 async function runServer() {
+  // The writer choice and host are checked before the release is loaded: a typo fails at once.
+  resolveStaffWriterKind(process.env.PREVIEW_LIFECYCLE_STAFF_WRITER);
   const { plan, engine, nodePath, staff } = await serverDeps();
   const { db, alerts, runtime, pg } = await loadReleaseModules({ plan, engine });
   const operator = await runtime.loadStaffAlertOperator({ path: staff.operatorPath, sha256: staff.operatorSha256 });
   try {
     const configuration = new alerts.RootStaffAlertConfiguration({ path: staff.configPath, acknowledgements: operator.acknowledgements, timeoutMs: 2000 });
-    const target = resolveStaffDbHost(process.env.PREVIEW_LIFECYCLE_STAFF_DB_HOST);
-    const ca = target.tls ? await readCa() : null;
-    const writer = createInterimLoginWriter({
+    const writer = await buildStaffWriter({
+      env: { PREVIEW_LIFECYCLE_STAFF_WRITER: process.env.PREVIEW_LIFECYCLE_STAFF_WRITER, PREVIEW_LIFECYCLE_STAFF_DB_HOST: process.env.PREVIEW_LIFECYCLE_STAFF_DB_HOST },
+      Pool: pg.Pool,
       runCreator: creatorRunner({ engine, nodePath }),
-      createPool: async password => {
-        const pool = new pg.Pool(staffPoolOptions({ target, password, ca }));
-        try {
-          const rows = (await pool.query(`SELECT session_user::text session,current_user::text role,current_database() database,current_setting('port')::int port,
-            rolvaliduntil>clock_timestamp() AND rolvaliduntil<=clock_timestamp()+interval '5 minutes' bounded,
-            NOT(rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls) no_elevated_powers FROM pg_roles WHERE rolname=session_user`)).rows;
-          const row = rows[0];
-          if (rows.length !== 1 || row.session !== 'debateai_prod_staff_recovery' || row.role !== 'debateai_prod_staff_recovery' || row.database !== LAYOUT.database || row.port !== LAYOUT.pgPort || !row.bounded || !row.no_elevated_powers) refuse('STAFF_JIT_IDENTITY_REFUSED');
-          return pool;
-        } catch (error) { await pool.end().catch(() => undefined); throw error; }
-      },
+      readCa,
       createPublisher: pool => new db.PostgresStaffIndependentReadinessPublisher(pool)
     });
     const identity = await apiIdentity(plan);
@@ -377,6 +506,8 @@ async function runServer() {
 }
 
 async function resetServer() {
+  // Always the recovery login, whichever writer the window used: idempotent, needs no password,
+  // and it also closes a login an earlier fallback run left open by crashing.
   // Needs only the pinned API release root (for the reviewed peer channel); no plan, no staff config.
   const { lock } = await readLock(LAYOUT);
   const sourceRoot = lock.services.api?.sourceRoot ?? refuse('RELEASE_LOCK_SERVICE_MISSING');
@@ -385,15 +516,17 @@ async function resetServer() {
 }
 
 /**
- * The exit code systemd sees. Non-zero whenever the login may not be reset, and whenever the
- * window itself ended FAILED (for example EVIDENCE_UNAVAILABLE) even though the reset worked:
- * either marks the unit failed, so OnFailure= sends the alert.
+ * The exit code systemd sees. Non-zero whenever the tools may not be locked again (the interim
+ * login not reset, the peer pool not closed), and whenever the window itself ended FAILED (for
+ * example EVIDENCE_UNAVAILABLE) even though the lock worked: either marks the unit failed, so
+ * OnFailure= sends the alert.
  */
 export async function runCommand(command, { platform = process.platform, uid = process.getuid?.(), runServer: run = runServer, resetServer: reset = resetServer, log = event => logLine(process.stderr, event) } = {}) {
   try {
     if (platform !== 'linux' || uid !== 0 || !['run', 'reset'].includes(command)) refuse('ACTOR_REFUSED');
     const result = command === 'run' ? await run() : await reset();
-    return result?.roleReset === true && result?.outcome !== 'FAILED' ? 0 : 1;
+    const lockedAgain = result?.roleReset === true || result?.locked === true || result?.nothingToReset === true;
+    return lockedAgain && result?.outcome !== 'FAILED' ? 0 : 1;
   } catch (error) {
     log(command === 'reset'
       ? { event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false, reason: reasonOf(error) }
