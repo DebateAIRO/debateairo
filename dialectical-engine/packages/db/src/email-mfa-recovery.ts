@@ -1,7 +1,7 @@
 import type{Pool}from"pg";import type{AuditContextHasher,CryptoEnvelope}from"@debateai/crypto";import type{AuthSourceContext}from"./identity.js";import type{PasswordRecoveryCandidate}from"./recovery-candidate.js";
 export type EmailRecoverySource=Readonly<{ipArgon2id:string;userAgentArgon2id:string}>;
 export type EmailRecoveryChannel=PasswordRecoveryCandidate["channels"][number]&Readonly<{cancelAuthorized?:boolean}>;
-export type EmailRecoveryNotice=Readonly<{noticeId:string;leaseId:string;userId:string;channelId:string;event:"PROOF"|"VERIFIED"|"STARTED"|"COMPLETED"|"CANCELLED"|"REFUSED";payload:CryptoEnvelope;expiresAt:string;cancelAllowed?:boolean}>;
+export type EmailRecoveryNotice=Readonly<{noticeId:string;leaseId:string;userId:string;channelId:string;event:"PROOF"|"VERIFIED"|"STARTED"|"WAITING"|"FINISH"|"COMPLETED"|"CANCELLED"|"REFUSED";payload:CryptoEnvelope;expiresAt:string;cancelAllowed?:boolean;notBefore?:string}>;
 export type MfaRecoveryRecord=Readonly<{stage:string;expiresAt:string;csrfHash:string|null;notBefore?:string|null;userId?:string;emailCiphertext?:CryptoEnvelope;factorId?:string|null;factorSecret?:CryptoEnvelope|null;lastAcceptedStep?:number|null;nowMs?:number}>;
 export type BackupEmailRecord=Readonly<{userId:string;status:"pending"|"verified"|"unavailable";channelId:string|null;backupCiphertext:CryptoEnvelope|null;passwordHash:string;factorId:string;factorSecret:CryptoEnvelope;lastAcceptedStep:number|null;nowMs:number;channels:readonly EmailRecoveryChannel[]}>;
 export type MfaRecoveryExchangeCandidate=Readonly<{userId:string;passwordHash:string;channels:readonly string[];bindingChannelIds:readonly string[]}>;
