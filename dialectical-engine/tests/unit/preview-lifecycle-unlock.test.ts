@@ -163,6 +163,23 @@ describe('team tools unlock window', () => {
     expect(logs).toEqual([{ event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false, reason: 'RELEASE_LOCK_UNREADABLE' }]);
   });
 
+  // Every actor call re-verifies the whole API release as postgres before importing from it
+  // (no cached verdict: a cache would let a file changed after the open be loaded at a renewal).
+  // That re-hash is the bulk of each call, so the cap leaves room for a slow disk.
+  it('runs the postgres actor through the peer channel with a 120 s cap per call, control on stdin only', async () => {
+    const seen: any[] = [];
+    const run = async (argv: string[], options: any) => { seen.push({ argv, options: { ...options, stdin: Buffer.from(options.stdin) } }); return { code: 0, timedOut: false, overflow: false, stdout: Buffer.from('{"validUntilExtended":true}\n'), stderr: Buffer.alloc(0) }; };
+    const engine = '/opt/debateai-v3-preview/releases/auth-dev-candidate-v1/dialectical-engine';
+    const runner = unlock.creatorRunner({ engine, nodePath: '/opt/node/bin/node', run });
+    await expect(runner({ mode: 'extend', validUntil: '2026-10-09T10:04:00.000Z' }, null)).resolves.toEqual({ validUntilExtended: true });
+    expect(unlock.CREATOR_TIMEOUT_MS).toBe(120_000);
+    expect(seen[0].options).toMatchObject({ cwd: engine, env: {}, timeoutMs: unlock.CREATOR_TIMEOUT_MS });
+    expect(seen[0].argv.slice(5)).toEqual(['/usr/sbin/runuser', '-u', 'postgres', '--', '/usr/bin/env', '-i', 'PATH=/opt/node/bin:/usr/local/bin:/usr/bin:/bin', 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC', '/opt/node/bin/node', expect.stringMatching(/\/jit-creator-actor\.mjs$/), '--credential-fd', '3']);
+    expect(seen[0].options.stdin.toString()).toBe(`${JSON.stringify({ mode: 'extend', validUntil: '2026-10-09T10:04:00.000Z', engine })}\n`);
+    const slow = unlock.creatorRunner({ engine, nodePath: '/opt/node/bin/node', run: async () => ({ code: null, timedOut: true, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }) });
+    await expect(slow({ mode: 'close' }, null)).rejects.toMatchObject({ code: 'STAFF_JIT_CLOSE_REFUSED' });
+  });
+
   it('a window that ends FAILED exits non-zero even when the reset worked, so OnFailure= alerts', async () => {
     const run = (result: unknown) => unlock.runCommand('run', { platform: 'linux', uid: 0, runServer: async () => result, log: () => undefined });
     expect(await run({ outcome: 'FAILED', reason: 'EVIDENCE_UNAVAILABLE', publishes: 3, roleReset: true })).toBe(1);

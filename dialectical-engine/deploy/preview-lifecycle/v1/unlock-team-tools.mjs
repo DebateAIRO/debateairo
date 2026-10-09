@@ -269,26 +269,36 @@ export async function loadReleaseModules({ plan, engine, resolvePg = () => creat
 }
 
 // ---------------------------------------------------------------------------------------------
-// Server wiring below: not reachable from tests (needs the server, root, the release package).
+// Server wiring below: needs the server, root and the release package (only creatorRunner is
+// reachable from tests, through its injected runner).
 
 const SOURCE_ROOT = /^\/opt\/debateai-v3-preview\/releases\/auth-dev-(candidate|fallback)-[a-z0-9-]{1,80}$/;
 const here = dirname(fileURLToPath(import.meta.url));
 
-async function bounded(argv, options, code) {
-  const result = await runBounded(argv, { maxOutputBytes: 65536, ...options });
+async function bounded(argv, options, code, run = runBounded) {
+  const result = await run(argv, { maxOutputBytes: 65536, ...options });
   if (result.timedOut || result.overflow || result.error || result.code !== 0 || result.stderr.length > 0) refuse(code);
   try { return strictJson(result.stdout); } catch { return refuse(code); }
 }
 
+/**
+ * One database actor call may take this long. Each call (open, every 2-minute renewal, close,
+ * reset) re-verifies the whole pinned API release as postgres before importing anything from it;
+ * nothing is cached between calls, so a release file changed after the open is never loaded by a
+ * later call. That re-hash (about the verifier's 12 s) is most of the call; 120 s leaves room for a
+ * slow or cold disk. README install step 5 measures it.
+ */
+export const CREATOR_TIMEOUT_MS = 120_000;
+
 /** postgres OS user, peer packet on FD3 (as the reviewed root actors), control + secret on stdin. */
-function creatorRunner({ engine, nodePath }) {
+export function creatorRunner({ engine, nodePath, run = runBounded }) {
   return async (control, secret) => {
     const header = Buffer.from(`${JSON.stringify({ ...control, engine })}\n`);
     const stdin = secret ? Buffer.concat([header, secret, Buffer.from('\n')]) : header;
     try {
       const argv = peerShimArgv({ sh: LAYOUT.sh, packet: LAYOUT.peerPacket, command: [LAYOUT.runuser, '-u', 'postgres', '--', LAYOUT.env, '-i',
         `PATH=${dirname(nodePath)}:/usr/local/bin:/usr/bin:/bin`, 'LANG=C.UTF-8', 'LC_ALL=C.UTF-8', 'TZ=UTC', nodePath, join(here, 'jit-creator-actor.mjs'), '--credential-fd', '3'] });
-      return await bounded(argv, { cwd: engine, env: {}, stdin, timeoutMs: 60_000 }, control.mode === 'open' ? 'STAFF_JIT_OPEN_REFUSED' : control.mode === 'extend' ? 'STAFF_JIT_EXTEND_REFUSED' : 'STAFF_JIT_CLOSE_REFUSED');
+      return await bounded(argv, { cwd: engine, env: {}, stdin, timeoutMs: CREATOR_TIMEOUT_MS }, control.mode === 'open' ? 'STAFF_JIT_OPEN_REFUSED' : control.mode === 'extend' ? 'STAFF_JIT_EXTEND_REFUSED' : 'STAFF_JIT_CLOSE_REFUSED', run);
     } finally { stdin.fill(0); }
   };
 }

@@ -71,8 +71,13 @@ launchers still re-check every byte exactly as before.
   pinned source manifest, read as the launchers read it, verified against the whole release
   tree, plus the operator digest), and requires every file it loads, and every folder above it up
   to the release root, to be root-owned and not writable by group or others. The database actor
-  repeats that check on every call (open, every 2-minute renewal, close), which adds the release
-  re-hash time (seconds) to each call; each call may take up to 60 s.
+  repeats that full check on every call (open, every 2-minute renewal, close, reset), about 30
+  times per unlocked hour. It deliberately keeps no "already verified" result between calls: each
+  call is a new process, and a cached result (or a cheap "nothing changed" check on file times)
+  would let a release file changed after the open be loaded as the database superuser at a later
+  renewal. The cost is the release re-hash (about the verifier's 12 s) on each call, so each call
+  may take up to 120 s and the unit's `TimeoutStopSec=150` leaves room for one call when stopping.
+  Install step 5 measures it.
 - **The interim login's password never reaches SQL.** The database actor turns it into a
   SCRAM-SHA-256 verifier (random salt, 4096 rounds) and sends only that in `ALTER ROLE`, so the
   password is never in a statement, a server log or `pg_stat_activity`. The unlock then logs in
@@ -216,6 +221,21 @@ unit files before installing; nothing else names them.
    `journalctl -u debateai-preview-api -o short-iso-precise -n 50`. The receipt must be at most
    180 s old when the launcher checks it and prestart refuses one older than 60 s, so this gap
    must stay well under 120 s. Do the same for the website.
+
+   Then time **one database actor call**, while the team unlock is not running (the reset is safe
+   to repeat: it sets the login to what it already is):
+
+   ```sh
+   systemctl is-active debateai-preview-team-unlock
+   time /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin $N $L/unlock-team-tools.mjs reset
+   ```
+
+   The first line must print `inactive`. Expect `PREVIEW_TEAM_TOOLS_RESET` with
+   `"roleReset":true`, and record the `real` time: every open, 2-minute renewal and close of the
+   team unlock costs about the same. Under 20 s: nothing to do. Between 20 s and 100 s: team
+   actions are refused for a few seconds around each renewal (the ready row lasts 30 s and is not
+   rewritten while a renewal runs); tell the owner. Over 100 s: the unlock will fail closed at a
+   renewal; stop and ask.
 
 6. **Units.** Copy `systemd/debateai-preview.target`, `debateai-preview-alert@.service`,
    `debateai-preview-backup.service`, `debateai-preview-backup.timer` and

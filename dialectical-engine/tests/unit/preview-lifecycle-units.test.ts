@@ -108,6 +108,12 @@ describe('preview lifecycle systemd templates', () => {
     expect(JSON.parse(result.stderr.trim())).toMatchObject({ event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false });
   });
 
+  it('team unlock gives the main process and the reset each room for one 120 s database actor call when stopping', async () => {
+    const unlock = await import('../../deploy/' + 'preview-lifecycle/v1/unlock-team-tools.mjs');
+    const value = parse(unit('debateai-preview-team-unlock.service'));
+    expect(Number(value['[Service]TimeoutStopSec']![0]) * 1000).toBeGreaterThan(unlock.CREATOR_TIMEOUT_MS);
+  });
+
   it('team unlock emails when the run or the reset fails, and never writes a core dump of the process holding the password', () => {
     const value = parse(unit('debateai-preview-team-unlock.service'));
     expect(value['[Unit]OnFailure']).toEqual(['debateai-preview-alert@%n.service']);

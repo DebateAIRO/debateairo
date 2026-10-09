@@ -23,7 +23,9 @@ ExecStopPost=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-to
 # One hour plus two minutes of margin; systemd sends SIGTERM to a run that overstays.
 RuntimeMaxSec=3720
 KillMode=mixed
-TimeoutStopSec=60
+# Room for one database actor call (cap 120 s: it re-verifies the release) in the main process's
+# own close, and again for ExecStopPost's reset, which gets its own TimeoutStopSec.
+TimeoutStopSec=150
 Restart=no
 # The process holds the interim login's password in memory: never write it to a core dump.
 LimitCORE=0
