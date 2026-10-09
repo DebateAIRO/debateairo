@@ -64,7 +64,8 @@ describe('preview lifecycle systemd templates', () => {
   it('one target brings the whole preview up at boot', () => {
     const value = parse(unit('debateai-preview.target'));
     expect(value['[Install]WantedBy']).toEqual(['multi-user.target']);
-    expect(value['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual(['network-online.target', ...SUPPORTING, 'debateai-preview-api.service', 'debateai-preview-ui.service'].sort());
+    expect(value['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual(['network-online.target', ...SUPPORTING, 'debateai-preview-api.service', 'debateai-preview-ui.service',
+      'debateai-preview-gate-halt-watch.timer', 'debateai-preview-gate-addresses.timer'].sort());
     expect(JSON.stringify(value)).not.toContain('runner');
   });
 
@@ -97,7 +98,7 @@ describe('preview lifecycle systemd templates', () => {
   });
 
   it('every root node command of the lifecycle units goes through env -i with PATH only', () => {
-    for (const name of ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service']) {
+    for (const name of ['debateai-preview-alert@.service', 'debateai-preview-notice@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service']) {
       const value = parse(unit(name));
       const commands = Object.entries(value).filter(([key]) => /^\[Service\]Exec(Start|StartPre|StartPost|Stop|StopPost|Reload|Condition)$/.test(key)).flatMap(([, lines]) => lines);
       expect(commands.length).toBeGreaterThan(0);
@@ -107,7 +108,7 @@ describe('preview lifecycle systemd templates', () => {
 
   it.each([
     ['debateai-preview-team-unlock.service', 'ExecStart'], ['debateai-preview-team-unlock.service', 'ExecStopPost'],
-    ['debateai-preview-alert@.service', 'ExecStart'], ['debateai-preview-backup.service', 'ExecStart']
+    ['debateai-preview-alert@.service', 'ExecStart'], ['debateai-preview-notice@.service', 'ExecStart'], ['debateai-preview-backup.service', 'ExecStart']
   ])('%s %s, run as written, hands node no inherited NODE_OPTIONS or NODE_PATH', (name, key) => {
     const line = parse(unit(name))[`[Service]${key}`]![0]!;
     const probe = join(mkdtempSync(join(tmpdir(), 'lifecycle-unit-env-')), 'probe.mjs');
@@ -153,7 +154,7 @@ describe('preview lifecycle systemd templates', () => {
   });
 
   it('every script a template names exists in this folder', () => {
-    const all = ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service'].map(unit).join('\n');
+    const all = ['debateai-preview-alert@.service', 'debateai-preview-notice@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service'].map(unit).join('\n');
     const scripts = [...all.matchAll(/deploy\/preview-lifecycle\/v1\/([a-z-]+\.mjs)/g)].map(match => match[1]!);
     expect(scripts.length).toBeGreaterThanOrEqual(4);
     for (const script of scripts) expect(existsSync(join(folder, script))).toBe(true);
