@@ -50,7 +50,9 @@ const sign = (content: object | Buffer, keys = KEYS) => signedNetopiaNotice({ pr
 const arrival = (signed: Readonly<{ rawBody: Buffer; header: string }>, now: Date, admit?: () => boolean): NoticeArrival =>
   ({ rawBody: signed.rawBody, header: signed.header, sourceKey: "198.51.100.0/24", now, ...(admit === undefined ? {} : { admit }) });
 
-function intakeFor(options: Partial<{ mode: NetopiaIntakeMode; keys: typeof KEYS; storeDown: true }> = {}) {
+function intakeFor(options: Partial<{
+  mode: NetopiaIntakeMode; keys: typeof KEYS; storeDown: true; paymentEnvironment: "sandbox" | "live";
+}> = {}) {
   const audit = recordingAudit();
   const kick = vi.fn();
   const store = options.storeDown === undefined ? repository : Object.assign(Object.create(repository) as BillingRepository, {
@@ -58,7 +60,7 @@ function intakeFor(options: Partial<{ mode: NetopiaIntakeMode; keys: typeof KEYS
   });
   const intake = new NetopiaNoticeIntake({
     repository: store, jobs, trust: (options.keys ?? KEYS).trust(POS), recordsKey: TEST_RECORDS_KEY,
-    paymentEnvironment: "sandbox", mode: options.mode ?? "ON", audit, kick
+    paymentEnvironment: options.paymentEnvironment ?? "sandbox", mode: options.mode ?? "ON", audit, kick
   });
   return { intake, audit, kick };
 }
@@ -178,15 +180,31 @@ describe("N9 NETOPIA's verified message", () => {
   it("keeps no card and queues nothing for a charge of another payment system or environment", async () => {
     const { intake } = intakeFor();
     const live = (await openCharge("live")).chargeId;
-    // An xMoney-era charge as 0109 keeps it, seeded with SQL as billing-netopia-migration.test.ts does.
-    const xmoney = newChargeId();
-    await query(`INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start, period_end,
-        quote_id, net_micros, tax_micros, total_micros, currency, created_at, payment_provider, payment_environment)
-      VALUES ($1, $2, $3, 'CARD_CHECK', 1, $4::timestamptz, $4::timestamptz + interval '1 day', NULL, 0, 0, 0, 'USD', $4,
-        'xmoney', 'stage')`, [xmoney, randomUUID(), randomUUID(), "2026-10-06T08:00:00.000Z"]);
+    // xMoney-era charges as 0109 keeps them, seeded with SQL as billing-netopia-migration.test.ts does.
+    const xmoneyCharge = async (environment: "stage" | "live"): Promise<string> => {
+      const chargeId = newChargeId();
+      const ownerRef = randomUUID();
+      const at = "2026-10-06T08:00:00.000Z";
+      await repository.withTransaction(async (client: PoolClient) => {
+        // The owner's customer row, as openCharge writes it: without the provider guard a card would be kept for it.
+        await repository.ensureCustomer(client, { ownerRef, locale: "en", now: new Date(at) });
+        await client.query(`INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start,
+            period_end, quote_id, net_micros, tax_micros, total_micros, currency, created_at, payment_provider, payment_environment)
+          VALUES ($1, $2, $3, 'CARD_CHECK', 1, $4::timestamptz, $4::timestamptz + interval '1 day', NULL, 0, 0, 0, 'USD', $4,
+            'xmoney', $5)`, [chargeId, ownerRef, randomUUID(), at, environment]);
+      });
+      return chargeId;
+    };
+    const xmoneyStage = await xmoneyCharge("stage");
+    // An xMoney 'live' charge: only the guard's provider half refuses it on a live API (its environment matches).
+    const xmoneyLive = await xmoneyCharge("live");
+    const liveIntake = intakeFor({ paymentEnvironment: "live" }).intake;
     // Another system's charge: the notice is labelled with this API's own system (0109 allows only NETOPIA's there).
-    for (const [chargeId, label, system] of [[live, "live", "netopia/live"], [xmoney, "sandbox", "xmoney/stage"]] as const) {
-      await intake.receive(arrival(sign(body(chargeId)), hour(5)));
+    for (const [chargeId, label, system, receiver] of [
+      [live, "live", "netopia/live", intake], [xmoneyStage, "sandbox", "xmoney/stage", intake],
+      [xmoneyLive, "live", "xmoney/live on a live API", liveIntake]
+    ] as const) {
+      await receiver.receive(arrival(sign(body(chargeId)), hour(5)));
       const [notice] = await noticesFor(chargeId);
       expect([notice?.payment_environment, await outcomesOf(notice!.notice_id)], system).toEqual([label, ["OTHER_SYSTEM"]]);
       expect(await tokensFor("source_charge_id", chargeId), system).toEqual([]);
@@ -268,13 +286,21 @@ describe("N9 a message that fails verification", () => {
 
   it("verifies the quarantine again at the next start, with the fixed keys, and keeps the saved card after all", async () => {
     const { chargeId, customerId } = await openCharge();
-    await intakeFor({ keys: WRONG_KEYS }).intake.receive(arrival(sign(body(chargeId)), hour(10)));
+    // NETOPIA's placeholder operationDate reads as no time (§2.4.3), so the card is dated by the message's arrival.
+    const message = sign(body(chargeId, { operationDate: "0001-01-01T00:00:00" }));
+    await intakeFor({ keys: WRONG_KEYS }).intake.receive(arrival(message, hour(10)));
     expect(await noticesFor(chargeId)).toEqual([]);
     const restarted = intakeFor();
     expect(await restarted.intake.recheckQuarantine(hour(11))).toBeGreaterThanOrEqual(1);
     const [notice] = await noticesFor(chargeId);
     expect(await outcomesOf(notice!.notice_id)).toEqual(["APPLIED"]);
-    expect(await tokensFor("source_charge_id", chargeId)).toMatchObject([{ customer_id: customerId, last4: "5098" }]);
+    const [received] = await query<{ received_at: Date }>(
+      "SELECT received_at FROM billing.payment_notice WHERE notice_id = $1", [notice!.notice_id]);
+    expect(received!.received_at.toISOString()).toBe(hour(10).toISOString());
+    const tokens = await tokensFor("source_charge_id", chargeId);
+    expect(tokens).toMatchObject([{ customer_id: customerId, last4: "5098" }]);
+    // §2.7.3 step 3: source_paid_at is NETOPIA's time, else the arrival (hour 10), never the re-check's clock (hour 11).
+    expect(tokens[0]!.source_paid_at.toISOString()).toBe(hour(10).toISOString());
     expect(await jobsFor(chargeId)).toMatchObject([{ kind: "VERIFY_PAYMENT", not_before: hour(11) }]);
     expect(restarted.kick).toHaveBeenCalled();
     expect(restarted.audit.events.find((entry) => entry.event === "billing.notice.recheck")?.fields)
