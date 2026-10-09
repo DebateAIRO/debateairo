@@ -31,8 +31,16 @@ export async function runNativeOperator() {
   if(!plan.approval)refuse('PREVIEW_SNAPSHOT_REVIEW_REQUIRED');
   const {runtimeObservedAt:approvedRuntimeObservedAt,publication,...approval}=plan.approval;
   if(typeof approvedRuntimeObservedAt!=='string')refuse('PREVIEW_RUNTIME_OBSERVATION_REQUIRED');
+  // Only apply-and-plan applies SQL. publish and verify refuse a pending forward step before writing anything.
+  if(plan.operation==='publish')await verify.refusePendingForwardSteps(pool);
   const receipt=plan.operation==='publish'?await publisher.publishPreviewRegister(pool,{publicationId:plan.publicationId,sourceRef:`preview-auth-dev-v1 ${source.sourceRevision}/${source.sourceTree}; operator sha256:${plan.operatorManifestSha256}`,snapshot,approval}):publication;
   return verify.verifyNativeState(pool,{sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,nativeSourceSha256:source.nativeSha256,publication:receipt});
  });
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{process.stdout.write(`${JSON.stringify(await runNativeOperator())}\n`);}catch{process.stderr.write('PREVIEW_NATIVE_OPERATION_REFUSED\n');process.exitCode=1;}}
+/** The exact refusal verify-native.ts gives a database that lacks a forward step of this source (any number of steps). */
+const PENDING_FORWARD_STEP=/^PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: \d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63}\. Verify never applies a migration; run the native operator with operation apply-and-plan first\.$/;
+/** Every failure stays opaque except a pending forward step, whose one line tells the operator to run apply-and-plan. */
+export function operatorRefusalLine(error){
+ return error?.code==='PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP'&&typeof error.message==='string'&&PENDING_FORWARD_STEP.test(error.message)?`${error.message}\n`:'PREVIEW_NATIVE_OPERATION_REFUSED\n';
+}
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{process.stdout.write(`${JSON.stringify(await runNativeOperator())}\n`);}catch(error){process.stderr.write(operatorRefusalLine(error));process.exitCode=1;}}

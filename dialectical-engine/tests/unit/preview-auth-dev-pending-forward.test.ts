@@ -70,3 +70,40 @@ describe('verifyNativeState refuses a pending forward step before migrate() runs
   expect(body.indexOf('migrate(')).toBe(replay+'await '.length); // the first migrate( of verifyNativeState
  });
 });
+
+// The native operator (ruling PR-57, aligned byte for byte with the v3-preview session's 051e77964): only apply-and-plan
+// applies SQL; publish refuses a pending forward step before it writes a register version; the command line prints the
+// pending-step line and keeps every other failure opaque.
+describe('the native operator refuses a pending forward step and names it', () => {
+ const operatorPath = new URL('../../deploy/preview-auth-dev/v1/native-operator.mjs', import.meta.url);
+ it('prints the pending-step refusal as its one line', async () => {
+  const operator = await import('../../deploy/'+'preview-auth-dev/v1/native-operator.mjs');
+  const error = new NativeVerifyPendingForwardStepError([NETOPIA_STEP]);
+  expect(operator.operatorRefusalLine(error)).toBe(`${error.message}\n`);
+ });
+ it('keeps every other failure opaque', async () => {
+  const operator = await import('../../deploy/'+'preview-auth-dev/v1/native-operator.mjs');
+  // A two-line message whose first line is a genuine refusal: the whole message must be that one line.
+  const genuine = new NativeVerifyPendingForwardStepError([NETOPIA_STEP]).message;
+  const forged = Object.assign(new Error(`${genuine}\nsecond line`), { code: 'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP' });
+  for (const other of [new TypeError('PREVIEW_NATIVE_VERIFICATION_REFUSED'), forged, undefined]) {
+   expect(operator.operatorRefusalLine(other)).toBe('PREVIEW_NATIVE_OPERATION_REFUSED\n');
+  }
+ });
+ it('refuses a pending step in publish before it writes, and migrates only in apply-and-plan', async () => {
+  const text = await readFile(operatorPath, 'utf8');
+  const start = text.indexOf('export async function runNativeOperator(');
+  expect(start).toBeGreaterThan(-1);
+  const body = text.slice(start);
+  const planReturn = body.indexOf("if(plan.operation==='plan'||plan.operation==='apply-and-plan')return metadata;");
+  const preCheck = body.indexOf("if(plan.operation==='publish')await verify.refusePendingForwardSteps(pool);");
+  const publish = body.indexOf('publisher.publishPreviewRegister(');
+  expect(planReturn).toBeGreaterThan(-1);
+  expect(preCheck).toBeGreaterThan(planReturn);
+  expect(publish).toBeGreaterThan(preCheck);
+  expect(text.split('migrate(')).toHaveLength(2); // the file's only migrate(
+  expect(text).toContain("if(plan.operation==='apply-and-plan')await db.migrate(pool);");
+  const applyLine = "if(plan.operation==='apply-and-plan')await db.migrate(pool);";
+  expect(text.indexOf('migrate(')).toBe(text.indexOf(applyLine) + applyLine.indexOf('migrate('));
+ });
+});
