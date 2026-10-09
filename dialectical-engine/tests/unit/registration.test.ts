@@ -20,6 +20,8 @@ import {
   Argon2WorkerPool,
   FileUserDekStore,
   generatePseudonym,
+  PSEUDONYM_ADJECTIVES,
+  PSEUDONYM_NOUNS,
   generateVerificationToken,
   hashPassword,
   hashToken,
@@ -802,12 +804,35 @@ describe("S3 password, token, pseudonym, and secret-store primitives", () => {
     expect(hashToken("verification", token)).not.toContain(token);
 
     const forbidden = ["alice", "example", "00000000", "secret-value"];
-    const pseudonyms = new Set(Array.from({ length: 200 }, () => generatePseudonym()));
-    expect(pseudonyms.size).toBe(200);
-    for (const pseudonym of pseudonyms) {
+    const drawn = Array.from({ length: 200 }, () => generatePseudonym());
+    for (const pseudonym of drawn) {
       expect(pseudonym).toMatch(/^[A-Z][a-z]{2,8}[A-Z][a-z]{2,8}[1-9][0-9]$/);
       for (const fragment of forbidden) expect(pseudonym).not.toContain(fragment);
     }
+    // The space is 477 adjectives x 617 nouns x 90 numbers = 26,487,810 handles, so 200 random draws DO collide now
+    // and then (birthday: lambda = C(200,2)/26,487,810 = 7.5e-4, about one CI run in 1,300 — the old `size === 200`
+    // flaked). Allowing at most two repeats keeps the check that the draws are random: P(three or more) ~ lambda^3/6
+    // = 7e-11, below 1e-9 per run. A constant or low-entropy generator still fails at once.
+    expect(PSEUDONYM_ADJECTIVES.length * PSEUDONYM_NOUNS.length * 90).toBe(26_487_810);
+    expect(new Set(drawn).size).toBeGreaterThanOrEqual(198);
+  });
+
+  it("maps every distinct (adjective, noun, number) draw to a distinct pseudonym, deterministically", () => {
+    // Injected picks: the handle is a pure function of the three draws and none of them is ignored.
+    const scripted = (picks: readonly number[]) => { let next = 0; return generatePseudonym(() => picks[next++]!); };
+    const seen = new Map<string, string>();
+    for (const adjective of [0, 1, PSEUDONYM_ADJECTIVES.length - 1])
+      for (const noun of [0, 1, PSEUDONYM_NOUNS.length - 1])
+        for (const number of [0, 1, 89]) {
+          const key = `${adjective}/${noun}/${number}`, handle = scripted([adjective, noun, number]);
+          expect(handle).toMatch(/^[A-Z][a-z]{2,8}[A-Z][a-z]{2,8}[1-9][0-9]$/);
+          expect(scripted([adjective, noun, number]), key).toBe(handle);
+          expect(seen.has(handle), `${key} collides with ${seen.get(handle)}`).toBe(false);
+          seen.set(handle, key);
+        }
+    expect(seen.size).toBe(27);
+    expect(scripted([0, 0, 0]).endsWith("10")).toBe(true);
+    expect(scripted([0, 0, 89]).endsWith("99")).toBe(true);
   });
 
   it("stores only a wrapped DEK in a documented 0700/0600 file layout", async () => {
