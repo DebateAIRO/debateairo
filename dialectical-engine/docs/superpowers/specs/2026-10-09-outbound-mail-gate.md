@@ -110,6 +110,14 @@ the integration suite proves: 50 concurrent reservations at a ceiling of 10 admi
 UTC midnight; standard mail stops at 80% while security mail reaches 100%; no table holds an address (scan the
 bytes).
 
+## Merge gate: DRAFT until the preview kit can add register keys (ruling 2026-10-09)
+
+This PR stays a DRAFT and must NOT merge until the preview publishing kit can add new register keys. The API refuses
+to start without `outboundMailPolicy`, and the kit's composer (`deploy/preview-auth-dev/v1/publish-register.ts`,
+`composePreviewSnapshot`) only knows the preview's original 65-row base plus its three fixed additions, so merging
+first would leave the preview unable to publish a version this API accepts. The register row itself stays: it is
+the owner's established pattern for an API boot value.
+
 ## Deploying this release on the preview
 
 The API now refuses to start without the `outboundMailPolicy` row (`OUTBOUND_MAIL_POLICY_UNRESOLVED`). The preview
@@ -120,6 +128,17 @@ the API restarts on this code; the operator must not restart first.
 
 The sealed preview-mail kit (`deploy/preview-mail/v4-20261005/test-source-producer.mjs`) builds the senders
 without a gate and is hash-pinned; it is retired by the preview cut-over (design §3(f) PR 5) and is left untouched.
+
+## Follow-ups (not built here; ruling 2026-10-09)
+
+- **Preview kit:** teach the preview publishing kit to add new register keys to an already-published version
+  (precondition for merging this PR, above).
+- **Owner alerts by mail:** today one fixed-code log line; reaching the owner needs a new staff-alert event (staff
+  outbox migration) or the SES CloudWatch Send alarm of the design's B-min.
+- **Settings flows at the cap:** email change and the recovery address answer a generic failure at the cap, and their
+  pending row is already written; they should pre-check `hasCapacity` like sign-up and say "try again later".
+- **Sealed preview-mail kit:** `deploy/preview-mail/v4-20261005/test-source-producer.mjs` builds senders without the
+  gate; retire it with the preview cut-over (design §3(f) PR 5) rather than editing a hash-pinned kit.
 
 ## Still open for the owner
 
