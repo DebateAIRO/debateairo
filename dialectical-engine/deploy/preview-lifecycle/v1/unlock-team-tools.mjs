@@ -44,12 +44,16 @@ const abortableSleep = (ms, signal) => new Promise(resolve => {
   signal?.addEventListener('abort', done, { once: true });
 });
 
-/** SIGTERM (systemctl stop, RuntimeMaxSec) and SIGINT both end the window through one abort. */
+/**
+ * SIGTERM (systemctl stop, RuntimeMaxSec) and SIGINT both end the window through one abort.
+ * The listeners stay installed: a repeated signal must not fall through to Node's default exit
+ * while the login is being reset.
+ */
 export function installSignalAbort(emitter = process) {
   const controller = new AbortController();
   const abort = () => controller.abort();
-  emitter.once('SIGTERM', abort);
-  emitter.once('SIGINT', abort);
+  emitter.on('SIGTERM', abort);
+  emitter.on('SIGINT', abort);
   return controller;
 }
 
@@ -307,7 +311,7 @@ async function runServer() {
     await ensureDirectory(LAYOUT.stateDir, { mode: 0o700, uid: 0 });
     const controller = installSignalAbort(process);
     return await runUnlockWindow({ writer, evidence, deps: { signal: controller.signal } });
-  } finally { await operator.close?.().catch?.(() => undefined); }
+  } finally { await Promise.resolve().then(() => operator.close?.()).catch(() => undefined); }
 }
 
 async function resetServer() {

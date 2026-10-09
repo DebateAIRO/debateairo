@@ -83,6 +83,9 @@ describe('team tools unlock window', () => {
     expect(controller.signal.aborted).toBe(false);
     fake.emit('SIGTERM');
     expect(controller.signal.aborted).toBe(true);
+    // A second signal must not fall through to Node's default (exit) while the reset is running.
+    expect(fake.listenerCount('SIGTERM')).toBe(1);
+    expect(fake.listenerCount('SIGINT')).toBe(1);
     const other = unlock.installSignalAbort(new EventEmitter());
     expect(other.signal.aborted).toBe(false);
   });
