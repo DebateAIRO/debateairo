@@ -32,10 +32,10 @@ ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/p
 Restart=on-failure
 RestartMode=direct
 RestartSec=30
-# SIGTERM: the socket closes at once, calls in flight finish and settle (each has a 600 s
-# deadline, plus the settlement locks), the socket file is removed and serve exits 0. After this
-# systemd sends SIGKILL; the next start then removes the stale socket and halts on any
-# interrupted call.
+# SIGTERM: the socket closes at once and nothing more is reserved; calls in flight finish and
+# settle (600 s deadline, plus 2 x 10 s locks), and each reply then gets 30 s or the gate halts;
+# the socket file is removed and serve exits 0. After 700 s systemd sends SIGKILL; the next
+# start then removes the stale socket and halts on any interrupted call.
 KillSignal=SIGTERM
 TimeoutStopSec=700
 UMask=0077
@@ -63,6 +63,8 @@ ReadWritePaths=/var/lib/debateai-v3-preview/provider-team-authority-v2 /run/deba
 InaccessiblePaths=-/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/etc/debateai-v3-preview/api.env -/root -/var/lib/postgresql -/etc/postfix
 InaccessiblePaths=-/etc/debateai-v3-preview/auth-dev-v1 -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/api -/etc/debateai-v3-preview/lifecycle
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
-# Nothing but the local resolver; the DeepInfra /32s come from 50-deepinfra-addresses.conf.
+# Nothing but the local resolver stub (127.0.0.53; /etc/resolv.conf is systemd-resolved's
+# stub-resolv.conf, measured). Not all of localhost: that would open local services such as
+# the mail relay on port 25. The DeepInfra /32s come from 50-deepinfra-addresses.conf.
 IPAddressDeny=any
-IPAddressAllow=localhost
+IPAddressAllow=127.0.0.53/32

@@ -93,9 +93,19 @@ The gate's own code is not here. It is `packages/providers/ops/preview_budget_au
   - only `activate` (root) re-opens a halted gate.
 
   So a restart only brings the socket back. A clean stop exits 0 and is not restarted.
-- **Stop can take up to about 11 minutes.** A call may run up to 600 s, so `TimeoutStopSec=700`.
-  If systemd has to kill it after that, the next start halts on the interrupted call (fail
-  closed).
+- **Stop can take up to about 11 minutes.** On `systemctl stop` the gate reserves nothing more
+  at once. A call already running may take up to 600 s, and its answer then gets 30 s to be
+  taken (otherwise the gate halts, as for any lost answer). So `TimeoutStopSec=700`. If systemd
+  has to kill it after that, the next start halts on the interrupted call (fail closed).
+- **Only the API and the runner get a connection.** Anyone may connect to the socket (`666`),
+  but a caller whose account is not in `allowed_peer_uids` is closed at once. It never gets a
+  thread, so it cannot hold the gate or a stop open.
+- **The gate may reach only the DNS resolver and DeepInfra.** Not all of localhost: local
+  services such as the mail relay stay out of reach.
+- **A crash that leaves the gate halted sends no email.** systemd restarts the gate by itself,
+  and a restart that works does not email. The gate then serves but answers "stopped". You see
+  it in `status` (`state: halted`) and in the journal (`interrupted_calls_found` above 0). An
+  email for "the gate halted" is a separate feature (open question for the owner).
 - **The key never leaves root.** Only the owner (or the owner saying yes to the exact command)
   puts the key in place. No agent runs that step, and no agent reads the key file. Nothing the
   gate logs contains the key: it logs fixed codes, amounts and operation ids only, and blanks
@@ -118,25 +128,47 @@ Do all of this BEFORE `systemctl enable debateai-preview.target` (lifecycle READ
 The target pulls in this unit name at every boot. With the v1 file still there, it would start
 the old v1 gate.
 
-**0. Check the starting point.** The first command must print `disabled` or `not-found`, and the
-second `inactive` (systemd 254 or newer is needed for `RestartMode=direct`; the server has 259).
+**0. Check the starting point, and make the archive folder.** What the commands must print, in
+order:
+1. `disabled` or `not-found` (the lifecycle target is not switched on yet).
+2. `static` (the v1 unit has no boot link of its own; if it prints `enabled`, run
+   `systemctl disable debateai-preview-provider-budget` first).
+3. `inactive`.
+4. 254 or newer (`RestartMode=direct` needs it; the server has 259).
+5. `755 root:root directory`.
+6. The line `d /run/debateai-v3-preview 0755 root root -`, which recreates that folder at every
+   boot (measured in `/etc/tmpfiles.d/debateai-v3-preview.conf`). The gate cannot start without
+   the folder.
 
 ```sh
 systemctl is-enabled debateai-preview.target
+systemctl is-enabled debateai-preview-provider-budget
 systemctl is-active debateai-preview-provider-budget
 systemctl --version | head -1
+stat -c '%a %U:%G %F' /run/debateai-v3-preview
+grep -h '^d /run/debateai-v3-preview ' /etc/tmpfiles.d/*.conf
+install -d -o root -g root -m 0700 /root/preview-archive
 ```
 
-**1. Gate folder.** Copy the three files from the reviewed release tree. Set `R` to that release's
-`dialectical-engine` folder on the server.
+**1. Gate folder.** First set `R` to the reviewed release's `dialectical-engine` folder on the
+server. Type the command yourself, putting the real release folder name in place of
+REVIEWED_RELEASE. The second command must print `R ok`; if it does not, `R` is wrong, so stop.
+The later blocks that use `R` stop by themselves when `R` is unset.
 
 ```sh
-R=/opt/debateai-v3-preview/releases/<reviewed-release>/dialectical-engine
+R=/opt/debateai-v3-preview/releases/REVIEWED_RELEASE/dialectical-engine
+test -f "$R/deploy/preview-gate/v2/deepinfra_addresses.py" && echo 'R ok'
+```
+
+Then copy the four files:
+
+```sh
+( set -eu; test -d "$R/deploy/preview-gate/v2"
 G=/opt/debateai-v3-preview/operator/team-budget-v2
 install -d -o root -g root -m 0755 $G
 install -o root -g root -m 0644 $R/packages/providers/ops/preview_budget_authority.py $R/packages/providers/ops/preview_budget_helper.py $R/deploy/preview-gate/v2/deepinfra_addresses.py $R/deploy/preview-gate/v2/README.md $G/
 sha256sum $G/*.py
-namei -l $G/preview_budget_authority.py
+namei -l $G/preview_budget_authority.py )
 ```
 
 `namei` must show `root root` on every line, with no `w` for group or others. The hashes must
@@ -214,44 +246,48 @@ What to expect:
   `HELPER_CUSTODY_INVALID` (file owners or modes), `ROOT_GO_INVALID` (a GO field or hash) or
   `ACTIVATION_REFUSED` (wrong host or state).
 
-**6. The DeepInfra address list.** Write it from today's DNS, then compare it with the reviewed
-copy. Each step below is one command in the block that follows.
-
-1. Write the list from today's DNS.
-2. Compare it with the reviewed copy.
-3. Install it.
-4. Run the check.
-
-If the comparison prints nothing, nothing changed. If it shows lines, DeepInfra's addresses
-differ from 2026-10-09. Look at them (they should still be DeepInfra's) before installing.
-The check must print `"status": "ok"`.
+**6. The DeepInfra address list.** First write the list from today's DNS, compare it with the
+reviewed copy, and check it:
+- If the `diff` prints nothing, nothing changed.
+- If it shows lines, DeepInfra's addresses differ from 2026-10-09. Stop and look at them (they
+  should still be DeepInfra's) before you go on.
+- The check must print `"status": "ok"`.
 
 ```sh
-G=/opt/debateai-v3-preview/operator/team-budget-v2; R=/opt/debateai-v3-preview/releases/<reviewed-release>/dialectical-engine
+( set -eu; test -d "$R/deploy/preview-gate/v2"
+G=/opt/debateai-v3-preview/operator/team-budget-v2
 /usr/bin/python3 -I $G/deepinfra_addresses.py render > /root/preview-archive/50-deepinfra-addresses.conf
-diff $R/deploy/preview-gate/v2/systemd/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf /root/preview-archive/50-deepinfra-addresses.conf
+/usr/bin/python3 -I $G/deepinfra_addresses.py check --dropin /root/preview-archive/50-deepinfra-addresses.conf
+diff $R/deploy/preview-gate/v2/systemd/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf /root/preview-archive/50-deepinfra-addresses.conf )
+```
+
+Then, as a separate step, install it:
+
+```sh
 install -d -o root -g root -m 0755 /etc/systemd/system/debateai-preview-provider-budget.service.d
 install -o root -g root -m 0644 /root/preview-archive/50-deepinfra-addresses.conf /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf
-/usr/bin/python3 -I $G/deepinfra_addresses.py check --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf
 ```
 
 **7. Replace the v1 unit file (same name).** Keep a copy of v1, then install v2 and check.
 
 ```sh
-R=/opt/debateai-v3-preview/releases/<reviewed-release>/dialectical-engine
+( set -eu; test -d "$R/deploy/preview-gate/v2"
 cp -p /etc/systemd/system/debateai-preview-provider-budget.service /root/preview-archive/debateai-preview-provider-budget.service.v1
 install -o root -g root -m 0644 $R/deploy/preview-gate/v2/systemd/debateai-preview-provider-budget.service /etc/systemd/system/debateai-preview-provider-budget.service
-systemctl daemon-reload
+systemctl daemon-reload )
 systemd-analyze verify /etc/systemd/system/debateai-preview-provider-budget.service
 systemctl show -p ExecStart,Restart,RestartMode,TimeoutStopUSec,IPAddressDeny,IPAddressAllow debateai-preview-provider-budget
 ```
+
+If the copy of v1 fails (for example the archive folder is missing), the block stops before it
+replaces anything.
 
 What to expect:
 - `verify` prints nothing about this unit. A note that `debateai-preview-alert@` is missing only
   means the lifecycle alert is not installed yet.
 - `ExecStart` names `team-budget-v2.sock`.
 - `Restart=on-failure` and `RestartMode=direct`.
-- `IPAddressAllow` lists the localhost ranges plus exactly the addresses from step 6.
+- `IPAddressAllow` lists `127.0.0.53/32` (the resolver) plus exactly the addresses from step 6.
 
 **8. Point the API and the runner at the new socket.** Their `PREVIEW_PROVIDER_TEST_CONFIG_JSON`
 must have these two values:
@@ -283,9 +319,9 @@ What to expect:
 its own yes.
 
 ```sh
-R=/opt/debateai-v3-preview/releases/<reviewed-release>/dialectical-engine
+( set -eu; test -d "$R/deploy/preview-gate/v2"
 install -o root -g root -m 0644 $R/deploy/preview-gate/v2/systemd/debateai-preview-gate-addresses.service $R/deploy/preview-gate/v2/systemd/debateai-preview-gate-addresses.timer /etc/systemd/system/
-systemctl daemon-reload
+systemctl daemon-reload )
 systemctl start debateai-preview-gate-addresses.service && journalctl -u debateai-preview-gate-addresses -n 3 -o cat
 systemctl enable --now debateai-preview-gate-addresses.timer
 ```
@@ -358,7 +394,9 @@ systemctl stop debateai-preview-provider-budget
 Until step 2, calls refuse ("stopped"): the gate only spends under the GO it was activated with.
 
 **DeepInfra moved (the start refused with `DEEPINFRA_ADDRESSES_CHANGED`, or the hourly check
-emailed).** Run step 6 again, then restart the gate:
+emailed).** Run step 6 again (set `R` first, as in step 1). This time the `diff` is expected
+to show the changed addresses: check that they are DeepInfra's before installing. Then restart
+the gate:
 
 ```sh
 systemctl daemon-reload
@@ -379,7 +417,7 @@ ss -xlp | grep team-budget-v2
 
 - `systemd-analyze verify` passes, and the sandbox starts with the extra `-` InaccessiblePaths.
 - DNS works inside the sandbox. The check and the model probe pass through
-  `IPAddressDeny=any` + `localhost` (the resolver is `127.0.0.53`, measured).
+  `IPAddressDeny=any` + `127.0.0.53/32` (the resolver stub, measured through `/etc/resolv.conf`).
 - A real call reaches DeepInfra through the address list.
 - `systemctl stop` exits 0 and removes the socket.
 - `systemctl kill -s SIGKILL debateai-preview-provider-budget` leaves the socket, and the

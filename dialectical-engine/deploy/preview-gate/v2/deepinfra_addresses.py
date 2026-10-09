@@ -11,7 +11,10 @@ visible instead of silent:
                          DEEPINFRA_ADDRESSES_CHANGED and names the new ones. Listed addresses DNS
                          no longer gives are reported as "stale" (not a refusal).
   render                 prints the drop-in for today's DNS answer (deterministic: no time stamp),
-                         so `render | diff - installed-file` is empty when nothing changed.
+                         so `render | diff - installed-file` is empty when nothing changed. It
+                         refuses (DROPIN_INVALID) if DNS gives a non-public address.
+`check` reads the file, not what systemd has loaded: after installing a new file, always run
+`systemctl daemon-reload` before restarting the gate.
 
 The gate unit runs `check` before every start (ExecStartPre); the optional hourly timer runs it
 too and emails the owner through the preview alert when it refuses. It needs no key, no state and
@@ -98,7 +101,11 @@ def check(allowed, resolved):
 
 
 def render(resolved):
-    return HEADER + '[Service]\n' + ''.join('IPAddressAllow=%s/32\n' % a for a in sorted(resolved))
+    """The drop-in for these addresses. It must pass the same parse as `check`, so DNS can never
+    put a private, local or link-local address (or too many) into the allow-list."""
+    text = HEADER + '[Service]\n' + ''.join('IPAddressAllow=%s/32\n' % a for a in sorted(resolved))
+    parse_dropin(text)
+    return text
 
 
 def main(argv=None, lookup=socket.getaddrinfo):

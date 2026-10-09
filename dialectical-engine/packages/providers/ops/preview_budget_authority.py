@@ -15,8 +15,10 @@ reserves nothing more until it is restarted.
 The retired v1 ledger (budget-ledger.json) is never opened, and serve refuses the retired v1
 socket name (provider-budget.sock): v2 always serves on its own, explicitly named socket.
 
-Stopping and restarting serve: SIGTERM (systemctl stop) closes the socket at once, lets the calls
-already in flight finish and settle, removes the socket file and exits 0. If serve dies without
+Stopping and restarting serve: SIGTERM (systemctl stop) closes the socket at once, reserves
+nothing more, lets the calls already in flight finish and settle (a reply that cannot be written
+within DRAIN_REPLY_SECONDS halts, as any lost reply does), removes the socket file and exits 0.
+If serve dies without
 that (SIGKILL, a crash), the next serve start removes the left-over socket file only when it is
 provably stale: a socket owned by root, in a root-owned folder no one else can write, that no
 process is listening on (a connect is refused). Anything else at that path refuses serve start.
@@ -69,6 +71,8 @@ SLOT_WAIT_SECONDS = 60
 # caller's 630 s timeout (preview-test.ts: PREVIEW_GLM_DEADLINE_MS + 30 s).
 CALL_DEADLINE_SECONDS = 600
 REPLY_TIMEOUT_SECONDS = 630
+DRAIN_REPLY_SECONDS = 30  # Once stopping (or tripped), a reply must be taken this fast or the gate halts.
+STOP_SIGNALS = (signal.SIGTERM, signal.SIGINT)
 MAX_IPC_BYTES = 1024 * 1024
 IPC_READ_TIMEOUT_SECONDS = 10  # Each header or body read on the 0666 socket.
 MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a thread.
@@ -733,6 +737,9 @@ def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_u
             pass
 
         def reply(self, code, payload):
+            if slots.tripped:
+                # Stopping (or tripped): a reply must not hold the stop for the full reply timeout.
+                self.connection.settimeout(DRAIN_REPLY_SECONDS)
             self.send_response(code)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Content-Length', str(len(payload)))
@@ -780,9 +787,20 @@ class UnixThreadingServer(ThreadingMixIn, HTTPServer):
     daemon_threads = False
     max_connections = MAX_IPC_CONNECTIONS
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, allowed_uids=None, peer_uid_of=None, **kwargs):
         self.connection_slots = threading.BoundedSemaphore(self.max_connections)
+        # With allowed_uids, a peer outside them is closed before it gets a thread or a slot, so it
+        # cannot hold connections (or a stop) open by sending headers slowly.
+        self.allowed_uids, self.peer_uid_of = allowed_uids, peer_uid_of or linux_peer_uid
         super().__init__(*args, **kwargs)
+
+    def verify_request(self, request, client_address):
+        if self.allowed_uids is None:
+            return True
+        try:
+            return self.peer_uid_of(request) in self.allowed_uids
+        except Exception:  # noqa: BLE001 - an unreadable peer is refused, never fatal to the loop
+            return False
 
     def process_request(self, request, client_address):
         if not self.connection_slots.acquire(blocking=False):
@@ -842,8 +860,9 @@ def clear_stale_socket(socket_path, owner_uid=0, probe_seconds=None):
             probe.connect(str(path))
         except ConnectionRefusedError:
             # Nothing listens: the file is what a killed server left behind. (On Linux, the only
-            # platform serve runs on, a live listener with a full backlog blocks until the timeout
-            # instead, which refuses below.)
+            # platform serve runs on, a live listener with a full backlog answers EAGAIN instead,
+            # which refuses below. A socket another root process has bound but not yet put into
+            # listen also answers ECONNREFUSED; only root can do that in this folder.)
             pass
         except OSError:
             raise SafetyError('IPC_SOCKET_IN_USE') from None
@@ -871,16 +890,21 @@ def socket_path_allowed(socket_path):
     return bool(SOCKET_PATTERN.fullmatch(text)) and Path(text).name not in RETIRED_SOCKET_NAMES
 
 
-def stop_on_signal(server):
-    """A SIGTERM/SIGINT handler that asks serve_forever to return. shutdown() waits for the loop,
-    and the handler runs on the loop's own thread, so it is called from a fresh thread."""
-    asked = threading.Event()
+def begin_stop(server, slots):
+    """Stop: nothing more is reserved (the trip), and serve_forever returns. Calls already running
+    finish and settle; server_close then waits for them."""
+    slots.trip()
+    server.shutdown()
 
-    def handle(_signum, _frame):
-        if not asked.is_set():
-            asked.set()
-            threading.Thread(target=server.shutdown, name='serve-stop', daemon=True).start()
-    return handle
+
+def remove_own_socket(socket_path, bound):
+    """Unlink the socket file only if it is still the one this server bound."""
+    try:
+        now = os.stat(socket_path, follow_symlinks=False)
+    except OSError:
+        return
+    if (now.st_dev, now.st_ino) == bound:
+        os.unlink(socket_path)
 
 
 def serve(private, go_path, socket_path, platform=None, uid=None, host=None, owner_uid=0):
@@ -901,26 +925,41 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None, own
         def execute(data, uid, cancelled, on_reserved):
             return execute_request(private, go_path, data, peer_uid=uid, slots=slots, cancelled=cancelled,
                                    on_reserved=on_reserved)
-        server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots))
-        previous = {}
+        # Stop signals are blocked before any thread exists, so every thread inherits the block and
+        # this (main) thread takes them with sigwait: no Python signal handler runs at all. A stop
+        # signal that came earlier ended the process the default way (the next start recovers).
+        signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
+        server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots),
+                                     allowed_uids=frozenset(go['allowed_peer_uids']))
+        info = os.stat(socket_path, follow_symlinks=False)
+        bound, failure = (info.st_dev, info.st_ino), []
+
+        def loop():
+            try:
+                server.serve_forever()
+            except BaseException as error:  # noqa: BLE001 - reported by the main thread
+                failure.append(error)
+                os.kill(os.getpid(), signal.SIGTERM)  # Wakes the sigwait below.
+        runner = threading.Thread(target=loop, name='serve-loop')
         try:
-            handler = stop_on_signal(server)
-            for number in (signal.SIGTERM, signal.SIGINT):
-                previous[number] = signal.signal(number, handler)
             os.chmod(socket_path, 0o666)
+            runner.start()
             emit({'status': 'serving', 'socket': str(socket_path), 'max_concurrent_calls': slots.limit,
                   'stale_socket_removed': stale_removed, 'interrupted_calls_found': recovered['interrupted'],
                   'unrecorded_uncertain_found': recovered['unrecorded_uncertain']})
-            server.serve_forever()
+            signal.sigwait(STOP_SIGNALS)
+            begin_stop(server, slots)
+            runner.join()
         finally:
-            try:
-                # Closes the listening socket first, then waits for in-flight calls to finish and
-                # settle; the stop handler stays in place so a repeated SIGTERM cannot cut that short.
-                server.server_close()
-                Path(socket_path).unlink(missing_ok=True)
-            finally:
-                for number, old in previous.items():
-                    signal.signal(number, old)
+            slots.trip()
+            if runner.is_alive():  # Only if something above failed before the stop.
+                server.shutdown()
+                runner.join()
+            # Closes the listening socket first, then waits for in-flight calls to finish and settle.
+            server.server_close()
+            remove_own_socket(socket_path, bound)
+        if failure:
+            raise failure[0]
         log_event({'status': 'stopped', 'socket': str(socket_path)})
     finally:
         os.close(serve_lock)

@@ -121,6 +121,12 @@ class AddressCheckTests(unittest.TestCase):
                                   fake_dns(*MEASURED))
         self.assertEqual((code, json.loads(out)['error']), (2, 'DROPIN_INVALID'))
 
+    def test_render_refuses_a_non_public_address_from_dns(self):
+        for ip in ('169.254.169.254', '10.1.2.3', '127.0.0.1'):
+            with self.subTest(ip=ip):
+                code, out = self.run_main(['render'], fake_dns(*MEASURED, ip))
+                self.assertEqual((code, json.loads(out)['error']), (2, 'DROPIN_INVALID'))
+
     def test_render_is_deterministic_and_equals_the_reviewed_dropin_for_the_measured_answer(self):
         code, out = self.run_main(['render'], fake_dns(*reversed(MEASURED)))
         self.assertEqual(code, 0)
@@ -149,11 +155,11 @@ class UnitFileTests(unittest.TestCase):
 
     def test_network_is_deny_all_but_localhost_with_deepinfra_only_from_the_checked_dropin(self):
         self.assertEqual(values(UNIT, 'IPAddressDeny'), ['any'])
-        self.assertEqual(values(UNIT, 'IPAddressAllow'), ['localhost'])
+        self.assertEqual(values(UNIT, 'IPAddressAllow'), ['127.0.0.53/32'])  # The resolver stub only.
         self.assertEqual(values(UNIT, 'RestrictAddressFamilies'), ['AF_UNIX AF_INET AF_INET6'])
         self.assertEqual({key for key, _ in directives(DROPIN)}, {'IPAddressAllow'})
         self.assertEqual(values(CHECK_UNIT, 'IPAddressDeny'), ['any'])
-        self.assertEqual(values(CHECK_UNIT, 'IPAddressAllow'), ['localhost'])
+        self.assertEqual(values(CHECK_UNIT, 'IPAddressAllow'), ['127.0.0.53/32'])
 
     def test_measured_v1_hardening_is_kept(self):
         expected = {'User': 'root', 'Group': 'root', 'UMask': '0077', 'NoNewPrivileges': 'yes',
@@ -177,8 +183,9 @@ class UnitFileTests(unittest.TestCase):
                          [['on-failure'], ['direct'], ['30'], ['4'], ['900'], ['debateai-preview-alert@%n.service'],
                           ['SIGTERM']])
         stop = int(values(UNIT, 'TimeoutStopSec')[0])
-        # A call in flight may take its whole deadline plus two lock waits before it settles.
-        self.assertGreaterEqual(stop, gate.CALL_DEADLINE_SECONDS + 2 * gate.LOCK_TIMEOUT_SECONDS + 30)
+        # A call in flight: request read, its whole deadline, two lock waits, then the drain reply.
+        self.assertGreaterEqual(stop, gate.IPC_READ_TIMEOUT_SECONDS + gate.CALL_DEADLINE_SECONDS
+                                + 2 * gate.LOCK_TIMEOUT_SECONDS + gate.DRAIN_REPLY_SECONDS + 10)
 
     def test_no_install_section_the_lifecycle_target_pulls_it_in(self):
         self.assertNotIn('[Install]', UNIT.read_text().splitlines())

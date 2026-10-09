@@ -34,4 +34,4 @@ LockPersonality=yes
 InaccessiblePaths=-/etc/debateai-v3-preview -/var/lib/debateai-v3-preview -/var/lib/postgresql -/etc/postfix
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 IPAddressDeny=any
-IPAddressAllow=localhost
+IPAddressAllow=127.0.0.53/32

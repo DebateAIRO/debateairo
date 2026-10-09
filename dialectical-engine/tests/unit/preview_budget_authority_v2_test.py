@@ -1443,9 +1443,36 @@ class ServeLifecycleTests(GateTest):
 
 
 class SignalStopTests(GateTest):
-    def test_stop_signal_lets_the_call_in_flight_finish_and_be_delivered(self):
-        gate = self.gate().ready()
+    def serve_on(self, gate, execute, **server_options):
         path = gate.root / 's.sock'
+        handler = bridge.make_handler(gate.private, [PEER], execute, gate.slots, peer_uid_of=lambda _c: PEER,
+                                      now=gate.clock)
+        server = bridge.UnixThreadingServer(str(path), handler, **server_options)
+        loop = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': 0.05}, daemon=True)
+        loop.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(lambda: loop.is_alive() and server.shutdown())  # A failing test must not hang the run.
+        return path, server, loop
+
+    def post(self, path):
+        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(client.close)
+        client.connect(str(path))
+        client.sendall(b'POST /complete HTTP/1.0\r\nContent-Length: 2\r\n\r\n{}')
+        return client
+
+    @staticmethod
+    def read_all(client):
+        client.settimeout(5)
+        reply = b''
+        while True:
+            chunk = client.recv(65536)
+            if not chunk:
+                return reply
+            reply += chunk
+
+    def test_stop_lets_the_call_in_flight_finish_and_be_delivered(self):
+        gate = self.gate().ready()
         started, finished = threading.Event(), []
 
         def execute(_data, _uid, _cancelled, _on_reserved):
@@ -1453,32 +1480,57 @@ class SignalStopTests(GateTest):
             time.sleep(0.5)
             finished.append(time.monotonic())
             return {'status': 200, 'body': '{}'}
-        handler = bridge.make_handler(gate.private, [PEER], execute, gate.slots, peer_uid_of=lambda _c: PEER,
-                                      now=gate.clock)
-        server = bridge.UnixThreadingServer(str(path), handler)
-        loop = threading.Thread(target=server.serve_forever, kwargs={'poll_interval': 0.05}, daemon=True)
-        loop.start()
-        self.addCleanup(lambda: loop.is_alive() and server.shutdown())  # A failing test must not hang the run.
-        client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.addCleanup(client.close)
-        client.connect(str(path))
-        data = b'{}'
-        client.sendall(b'POST /complete HTTP/1.0\r\nContent-Length: 2\r\n\r\n' + data)
+        path, server, loop = self.serve_on(gate, execute)
+        client = self.post(path)
         self.assertTrue(started.wait(5))
-        bridge.stop_on_signal(server)(signal.SIGTERM, None)
+        bridge.begin_stop(server, gate.slots)
         loop.join(5)
         self.assertFalse(loop.is_alive())
         server.server_close()  # Waits for the call in flight.
-        closed = time.monotonic()
-        self.assertTrue(finished and finished[0] <= closed)
-        client.settimeout(5)
-        reply = b''
-        while True:
-            chunk = client.recv(65536)
-            if not chunk:
-                break
-            reply += chunk
+        self.assertTrue(finished and finished[0] <= time.monotonic())
+        reply = self.read_all(client)
         self.assertTrue(reply.startswith(b'HTTP/1.0 200'), reply[:40])
+
+    def test_after_stop_nothing_new_is_reserved(self):
+        gate = self.gate().ready()
+        bridge.begin_stop(types.SimpleNamespace(shutdown=lambda: None), gate.slots)
+        dispatched = []
+        with self.refused('AUTHORITY_STOPPED'):
+            gate.call('op-1', dispatch=lambda *args: dispatched.append(args))
+        self.assertEqual((dispatched, gate.status()['today_posts'], gate.status()['state']), ([], 0, 'active'))
+
+    def test_while_stopping_a_reply_gets_the_short_drain_timeout(self):
+        gate = self.gate().ready()
+        seen = []
+
+        def execute(_data, _uid, _cancelled, _on_reserved):
+            gate.slots.trip()  # The stop arrives while this call runs.
+            return {'status': 200, 'body': '{}'}
+        path, server, loop = self.serve_on(gate, execute)
+        real_reply = None
+
+        def record_timeout(handler, code, payload):
+            result = real_reply(handler, code, payload)
+            seen.append(handler.connection.gettimeout())
+            return result
+        handler_class = server.RequestHandlerClass
+        real_reply = handler_class.reply
+        with patch.object(handler_class, 'reply', record_timeout):
+            reply = self.read_all(self.post(path))
+        self.assertTrue(reply.startswith(b'HTTP/1.0 200'), reply[:40])
+        self.assertEqual((seen, bridge.DRAIN_REPLY_SECONDS), ([30], 30))
+
+    def test_a_peer_outside_the_allowed_uids_is_closed_before_it_gets_a_thread(self):
+        gate = self.gate().ready()
+
+        def execute(*_args):
+            raise AssertionError('never reached')
+        path, server, loop = self.serve_on(gate, execute, allowed_uids=frozenset({PEER}), peer_uid_of=lambda _r: 7)
+        with patch.object(server, 'process_request', side_effect=AssertionError('no thread for a stranger')):
+            self.assertEqual(self.read_all(self.post(path)), b'')
+        broken = bridge.UnixThreadingServer.__new__(bridge.UnixThreadingServer)
+        broken.allowed_uids, broken.peer_uid_of = frozenset({PEER}), lambda _r: 1 / 0
+        self.assertFalse(broken.verify_request(None, None))
 
 
 class SocketServerTests(GateTest):
