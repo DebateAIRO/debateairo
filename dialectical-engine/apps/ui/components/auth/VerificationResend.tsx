@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
 import { EmailPendingScreen } from "@/components/auth/EmailPendingScreen";
-import { InlineFieldMessage } from "@/components/auth/InlineFieldMessage";
+import { InlineFieldMessage, useFormErrorAnnouncer } from "@/components/auth/InlineFieldMessage";
 import { contractClient } from "@/lib/api";
 import { emailShape } from "@/lib/authFormValidation";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
@@ -26,6 +26,7 @@ export function VerificationResend({ catalog, client, turnstile, onBack }: Reado
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
+  const announcer = useFormErrorAnnouncer();
   useEffect(() => { if (submitted === null) field.current?.focus(); }, [submitted]);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,6 +35,7 @@ export function VerificationResend({ catalog, client, turnstile, onBack }: Reado
     if (!emailShape(address)) {
       setError(t(catalog, "auth.invalidEmail"));
       field.current?.focus();
+      announcer.announce(t(catalog, "auth.invalidEmail"));
       return;
     }
     setError(null);
@@ -45,6 +47,7 @@ export function VerificationResend({ catalog, client, turnstile, onBack }: Reado
     <form className="authForm" noValidate method="post" action="/login" onSubmit={submit}>
       <div className="authField"><label htmlFor="resend-email">{t(catalog, "auth.email")}</label><input ref={field} id="resend-email" name="email" type="email" autoComplete="email" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={event => { setEmail(event.target.value); setError(null); }} required aria-invalid={!!error || undefined} aria-describedby={error ? "resend-email-error" : undefined} /><InlineFieldMessage id="resend-email-error" message={error} /></div>
       <button className="authPrimary" type="submit">{t(catalog, "auth.continue")}</button>
+      {announcer.region}
     </form>
     <div className="authMfaAlternatives"><button type="button" className="authTextButton authBackButton" onClick={onBack}>{t(catalog, "auth.login.backToSignIn")}</button></div>
   </AuthShell>;

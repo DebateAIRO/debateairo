@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ContractHttpError, type ContractClient, type LoginContinuationResponse, type AuthenticationResponse } from '@debateai/contract';
 import { AuthShell } from '@/components/AuthShell';
 import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
-import { InlineFieldMessage } from '@/components/auth/InlineFieldMessage';
+import { InlineFieldMessage, useFormErrorAnnouncer } from '@/components/auth/InlineFieldMessage';
 import { EphemeralCodes } from '@/components/auth/EphemeralCodes';
 import { VerificationResend } from '@/components/auth/VerificationResend';
 import type { TurnstilePublicConfig } from '@/lib/turnstile';
@@ -57,6 +57,9 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     const [passwordError, setPasswordError] = useState<string | null>(null);
     const [signUpHref, setSignUpHref] = useState('/sign-up');
     const [resending, setResending] = useState(false);
+    // One live region per form: says the first error of a failed submit (review fix, 2026-10-09).
+    const credentialsAnnouncer = useFormErrorAnnouncer();
+    const codeAnnouncer = useFormErrorAnnouncer();
     function cancelConditional() {
         sequence.current++;
         conditional.current?.abort();
@@ -198,10 +201,13 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         const secret = String(data.get('password') ?? '');
         setEmail(address);
         setPassword(secret);
-        setEmailError(emailShape(address) ? null : t(catalog, "auth.invalidEmail"));
-        setPasswordError(secret ? null : t(catalog, "auth.password.required"));
-        if (!emailShape(address) || !secret) {
-            form.querySelector<HTMLElement>(!emailShape(address) ? '[name=email]' : '[name=password]')?.focus();
+        const addressError = emailShape(address) ? null : t(catalog, "auth.invalidEmail");
+        const secretError = secret ? null : t(catalog, "auth.password.required");
+        setEmailError(addressError);
+        setPasswordError(secretError);
+        if (addressError !== null || secretError !== null) {
+            form.querySelector<HTMLElement>(addressError !== null ? '[name=email]' : '[name=password]')?.focus();
+            credentialsAnnouncer.announce(addressError ?? secretError);
             return;
         }
         flight.current = true;
@@ -303,6 +309,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                     if (digits === null) {
                         setCodeError(t(catalog, "auth.login.codeFormat"));
                         codeField.current?.focus();
+                        codeAnnouncer.announce(t(catalog, "auth.login.codeFormat"));
                         return;
                     }
                     void submitCode(digits);
@@ -323,6 +330,9 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                         attempt.current.edited();
                     setCode(shown);
                     setCodeError(typed.valid ? null : t(catalog, "auth.login.codeFormat"));
+                    // Said once when the field turns invalid (a letter typed), not on every further key.
+                    if (!typed.valid && codeError === null)
+                        codeAnnouncer.announce(t(catalog, "auth.login.codeFormat"));
                     if (typed.complete)
                         void submitCode(typed.digits);
                 }}/>
@@ -330,6 +340,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
  <p className="authFieldHint" id="login-code-help" hidden={method !== 'totp'}>{t(catalog, "auth.login.authenticatorInstruction")}</p>
  </div>
  <button className="authPrimary" type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button>
+ {codeAnnouncer.region}
  </form> : null}
  <div className="authMfaAlternatives">
  {offered.includes('recovery_code') && method !== 'recovery_code' ? <button type="button" className="authTextButton" disabled={completing} onClick={() => {
@@ -377,6 +388,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 setPasswordError(null);
             }} required aria-invalid={!!passwordError || undefined} aria-describedby={passwordError ? 'login-password-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-password-error" message={passwordError}/></div>
  <button type="submit" className="authPrimary" disabled={busy}>{busy ? t(catalog, "auth.login.checking") : t(catalog, "auth.continue")}</button>
+ {credentialsAnnouncer.region}
  </form>
  <p className="authResendEntry"><button type="button" className="authTextButton" disabled={busy} onClick={() => {
                 cancelConditional();

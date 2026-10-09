@@ -6,7 +6,7 @@ import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/l
 import { matchingSecurityGrant, type ConfirmedSecurityAction } from '@/lib/securityConfirmation';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode } from '@/lib/sixDigitCode';
-import { InlineFieldMessage } from './InlineFieldMessage';
+import { InlineFieldMessage, useFormErrorAnnouncer } from './InlineFieldMessage';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { EphemeralCodes } from './EphemeralCodes';
 export type SecurityConfirmationClient = Partial<Pick<ContractClient, 'authMethods' | 'beginPasskeyStepUp' | 'completePasskeyStepUp' | 'stepUp' | 'beginSocialStepUp'>>;
@@ -44,6 +44,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     const [backup, setBackup] = useState<string | null>(null);
     const [held, setHeld] = useState<ConfirmedSecurityAction | null>(null);
     const [passwordMode, setPasswordMode] = useState(false);
+    const announcer = useFormErrorAnnouncer();
     useEffect(() => {
         sequence.current++;
         browser.cancel();
@@ -225,10 +226,14 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                             attempt.current.edited();
                         setCode(shown);
                         setCodeError(typed.valid ? null : t(catalog, "auth.login.codeFormat"));
+                        // Said once when the field turns invalid (a letter typed), not on every further key.
+                        if (!typed.valid && codeError === null)
+                            announcer.announce(t(catalog, "auth.login.codeFormat"));
                         if (typed.complete)
                             void passwordProof(typed.digits, String(e.currentTarget.form ? new FormData(e.currentTarget.form).get('security-password') ?? '' : password));
                     }}/><InlineFieldMessage id={`${id}-code-error`} message={codeError}/></div>
  <button type="submit" className="authPrimary" disabled={busy || disabled || !password || !readSixDigitCode(code).complete}>{t(catalog, "auth.security.confirm")}</button>
+ {announcer.region}
  </form> : null}
  {!methods && !error ? <p role="status">{t(catalog, "auth.login.checking")}</p> : null}
  </>}

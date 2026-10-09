@@ -9,14 +9,14 @@ import { DateOfBirthField, EMPTY_DOB } from '@/components/DateOfBirthField';
 import { EmailPendingScreen } from '@/components/auth/EmailPendingScreen';
 import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
 import { PhoneField } from '@/components/auth/PhoneField';
-import { InlineFieldMessage } from '@/components/auth/InlineFieldMessage';
+import { InlineFieldMessage, useFormErrorAnnouncer } from '@/components/auth/InlineFieldMessage';
 import { TurnstileChallenge } from '@/components/auth/TurnstileChallenge';
 import { PrivacyPolicyModal } from '@/components/consent/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '@/components/consent/TermsOfServiceModal';
 import { useLegalDocument } from '@/components/consent/useLegalDocument';
 import { contractClient } from '@/lib/api';
 import { validateSignup, type SignupFieldErrors } from '@/lib/authFormValidation';
-import { resolveDobLocale, type DobLocale } from '@/lib/dob/dobLocale';
+import { dobErrorMessage, resolveDobLocale, type DobLocale } from '@/lib/dob/dobLocale';
 import { useChromeI18n } from '@/lib/i18n/I18nProvider';
 import { catalogLocale } from '@/lib/i18n/locales';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
@@ -104,6 +104,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     const privacyInputRef = useRef<HTMLInputElement | null>(null);
     const termsInputRef = useRef<HTMLInputElement | null>(null);
     const flight = useRef(false);
+    const announcer = useFormErrorAnnouncer();
     const { locale } = useChromeI18n();
     const termsDocument = useLegalDocument('terms');
     const privacyDocument = useLegalDocument('privacy');
@@ -137,6 +138,9 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         if (Object.keys(checked).length) {
             const selector = checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : checked.password ? '[name=password]' : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy-accepted]' : '[name=terms-accepted]';
             form.querySelector<HTMLElement>(selector)?.focus();
+            // The first error, in the order focus takes; a date of birth says what its own field says.
+            const first = checked.email ?? checked.phone ?? checked.password ?? (checked.dateOfBirth === undefined ? checked.privacy ?? checked.terms : undefined);
+            announcer.announce(first !== undefined ? t(catalog, first) : dateCheck.code !== 'ok' ? dobErrorMessage(catalog, dateCheck.code, dobLocale.order) : t(catalog, "auth.dob.underAge"));
             return;
         }
         if (declaredRegion === null) return;
@@ -255,6 +259,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
  <button className="authPrimary" type="submit" aria-describedby={submitHint.length ? 'signup-submit-hint' : undefined} disabled={busy || declaredRegion === null || !privacyAccepted || !termsAccepted || (checkDob(dateOfBirth).code !== 'incomplete' && !meetsMinimumAge(dateOfBirth))}>{busy ? t(catalog, "auth.signUp.creating") : t(catalog, "auth.signUp.createAccount")}</button>
  {submitHint.length ? <p className="authFieldHint" id="signup-submit-hint">{submitHint.join(' ')}</p> : null}
  <p className="authPanelFooter">{t(catalog, "auth.signUp.alreadyHaveOne")} <a href={loginHref}>{t(catalog, "auth.signUp.logIn")}</a></p>
+ {announcer.region}
  </form>
  {policyOpen ? <PrivacyPolicyModal open mode="consent" onClose={() => {
                 setPrivacyAccepted(privacyInputRef.current?.checked ?? false);

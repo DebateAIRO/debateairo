@@ -8,7 +8,7 @@ import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode } from '@/lib/sixDigitCode';
-import { InlineFieldMessage } from './InlineFieldMessage';
+import { InlineFieldMessage, useFormErrorAnnouncer } from './InlineFieldMessage';
 import { totpQrMatrix } from '@/lib/totpQr';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import authEnglish from '@/messages/en/auth.json';
@@ -48,6 +48,7 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     const [codeError, setCodeError] = useState<string | null>(null);
     const codeField = useRef<HTMLInputElement>(null);
     const [refocusCode, setRefocusCode] = useState(0);
+    const announcer = useFormErrorAnnouncer();
     useEffect(() => {
         if (refocusCode)
             codeField.current?.focus();
@@ -249,10 +250,14 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
                     attempt.current.edited();
                 setCode(shown);
                 setCodeError(typed.valid ? null : t(catalog, "auth.login.codeFormat"));
+                // Said once when the field turns invalid (a letter typed), not on every further key.
+                if (!typed.valid && codeError === null)
+                    announcer.announce(t(catalog, "auth.login.codeFormat"));
                 if (typed.complete)
                     void submitCode(typed.digits);
             }}/><InlineFieldMessage id="enrollment-code-error" message={codeError}/></div>
         <button type="submit" className="authPrimary" disabled={busy || !readSixDigitCode(code).complete}>{t(catalog, "auth.continue")}</button>
+        {announcer.region}
       </form>
     </div> : null}
   </section>;

@@ -83,6 +83,101 @@ describe("one announcement per submit", () => {
   });
 });
 
+/*
+ * Review fix (2026-10-09): with the field errors no longer alerts, a submit made from inside the field that
+ * is already focused and invalid (five digits + Enter, a bad address + Enter, an empty password + Enter)
+ * moved focus nowhere, so nothing was read. Each form now has one polite, visually hidden live region that
+ * announces the first error on every failed submit, re-announcing an identical sentence by clearing it
+ * first.
+ */
+describe("a failed submit is announced even when focus is already in the invalid field", () => {
+  const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
+  // The form's own region sits directly in the form (a field may keep its own validity message, as the
+  // date of birth does).
+  function liveRegion(form: Element): Element {
+    const regions = form.querySelectorAll(':scope > [aria-live="polite"]');
+    expect(regions).toHaveLength(1);
+    expect(regions[0]!.classList.contains("srOnly")).toBe(true);
+    return regions[0]!;
+  }
+  async function submitFrom(field: HTMLInputElement) {
+    field.focus();
+    expect(document.activeElement).toBe(field);
+    await act(async () => field.form!.requestSubmit());
+  }
+
+  it("sign-in code: five digits, then Enter, then Enter again", async () => {
+    const { host, client } = await toCodeStep();
+    const code = host.querySelector<HTMLInputElement>("[name=code]")!;
+    await input(host, "[name=code]", "12345");
+    await submitFrom(code);
+    await settle();
+    expect(liveRegion(code.form!).textContent).toBe(auth["auth.login.codeFormat"]);
+    await submitFrom(code);
+    expect(liveRegion(code.form!).textContent).toBe("");
+    await settle();
+    expect(liveRegion(code.form!).textContent).toBe(auth["auth.login.codeFormat"]);
+    expect(client.completeLogin).not.toHaveBeenCalled();
+  });
+
+  it("sign-in code: typing a letter", async () => {
+    const { host } = await toCodeStep();
+    await input(host, "[name=code]", "12a");
+    await settle();
+    expect(liveRegion(host.querySelector("form")!).textContent).toBe(auth["auth.login.codeFormat"]);
+  });
+
+  it("sign-in: an empty password, then Enter", async () => {
+    const host = await render(<LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />);
+    await input(host, "[name=email]", "person@example.test");
+    await submitFrom(host.querySelector<HTMLInputElement>("[name=password]")!);
+    await settle();
+    expect(liveRegion(host.querySelector("form")!).textContent).toBe(auth["auth.password.required"]);
+  });
+
+  it("the resend screen: a bad address, then Enter", async () => {
+    const host = await render(<LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn(), resendVerification: vi.fn() }} />);
+    await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === auth["auth.login.resendVerification"])!.click());
+    await input(host, "#resend-email", "not-an-address");
+    await submitFrom(host.querySelector<HTMLInputElement>("#resend-email")!);
+    await settle();
+    expect(liveRegion(host.querySelector("form")!).textContent).toBe(auth["auth.invalidEmail"]);
+  });
+
+  it("sign-up: the first error", async () => {
+    const host = await render(<SignUpFlow client={{ register: vi.fn(), checkAge: vi.fn() }} />);
+    await submitFrom(host.querySelector<HTMLInputElement>("[name=email]")!);
+    await settle();
+    expect(liveRegion(host.querySelector("form")!).textContent).toBe(auth["auth.invalidEmail"]);
+  });
+
+  it("after a provider sign-in: five digits, then Enter", async () => {
+    window.history.replaceState(null, "", `/social/complete#kind=login&token=${token}`);
+    try {
+      const host = await render(<SocialCompleteFlow client={{ socialLoginStatus: vi.fn().mockResolvedValue({ expires_at: new Date(Date.now() + 300_000).toISOString(), available_methods: ["totp"] }), completeLogin: vi.fn() } as never} />);
+      await input(host, "#social-code", "12345");
+      await submitFrom(host.querySelector<HTMLInputElement>("#social-code")!);
+      await settle();
+      expect(liveRegion(host.querySelector("form")!).textContent).toBe(auth["auth.login.codeFormat"]);
+    } finally { window.history.replaceState(null, "", "/"); }
+  });
+
+  it("authenticator setup and the security check: typing a letter", async () => {
+    const enrollment = { beginTotpEnrollment: vi.fn().mockResolvedValue({ secret: "JBSWY3DPEHPK3PXP", otpauthUri: "otpauth://totp/Example:person?secret=JBSWY3DPEHPK3PXP&issuer=Example", enrollment_token: "e".repeat(43), expires_at: new Date(Date.now() + 300_000).toISOString() }), completeTotpEnrollment: vi.fn() };
+    const setup = await render(<SecurityEnrollment catalog={auth} client={enrollment as never} authority={{ kind: "grant", token }} availableMethods={["totp"]} />);
+    await act(async () => [...setup.querySelectorAll("button")].find((button) => button.textContent === auth["auth.enroll.useAuthenticator"])!.click());
+    await input(setup, "#enrollment-code", "1b");
+    await settle();
+    expect(liveRegion(setup.querySelector("form")!).textContent).toBe(auth["auth.login.codeFormat"]);
+
+    const check = await render(<SecurityConfirmation catalog={auth} client={{ authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["password_totp"], step_up_providers: [] }), stepUp: vi.fn() }} authorization={{ action: "REGENERATE_RECOVERY_CODES" }} onConfirmed={vi.fn()} />);
+    await act(async () => [...check.querySelectorAll("button")].find((button) => button.textContent === auth["auth.security.passwordMethod"])!.click());
+    await input(check, "[name=security-code]", "1c");
+    await settle();
+    expect(liveRegion(check.querySelector("form")!).textContent).toBe(auth["auth.login.codeFormat"]);
+  });
+});
+
 describe("onboarding consent boxes have visible labels", () => {
   it("each checkbox is named by a visible label and opens its document", async () => {
     const requirements = { status: "pending_mfa", country: "RO", age_confirmation_required: false, legal_acceptance_required: true, terms: { locale: "en", version: TERMS_OF_SERVICE.version, sha256: TERMS_OF_SERVICE.sha256, url: "/terms?lang=en" }, privacy: { locale: "en", version: PRIVACY_POLICY.version, sha256: PRIVACY_POLICY.sha256, url: "/privacy?lang=en" } };

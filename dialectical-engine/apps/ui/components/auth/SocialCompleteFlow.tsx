@@ -20,11 +20,11 @@ import { TurnstileChallenge } from './TurnstileChallenge';
 import { EmailPendingScreen } from './EmailPendingScreen';
 import { SecurityEnrollment } from './SecurityEnrollment';
 import { PhoneField } from './PhoneField';
-import { InlineFieldMessage } from './InlineFieldMessage';
+import { InlineFieldMessage, useFormErrorAnnouncer } from './InlineFieldMessage';
 import { EphemeralCodes } from './EphemeralCodes';
 import { RegionField, EMPTY_REGION_PICK, type RegionPick } from '../RegionField';
 import { DateOfBirthField, EMPTY_DOB } from '../DateOfBirthField';
-import { resolveDobLocale } from '@/lib/dob/dobLocale';
+import { dobErrorMessage, resolveDobLocale } from '@/lib/dob/dobLocale';
 import { AuthShell } from '../AuthShell';
 import authEnglish from '@/messages/en/auth.json';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
@@ -76,6 +76,9 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     // Set by a submit that did not hold exactly six digits; any edit clears it.
     const [codeIncomplete, setCodeIncomplete] = useState(false);
     const codeField = useRef<HTMLInputElement>(null);
+    // One live region per form: says the first error of a failed submit (review fix, 2026-10-09).
+    const signupAnnouncer = useFormErrorAnnouncer();
+    const codeAnnouncer = useFormErrorAnnouncer();
     const [proof, setProof] = useState<string | null>(null);
     const [reset, setReset] = useState(0);
     const [pending, setPending] = useState<string | null>(null);
@@ -232,6 +235,9 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         setErrors(checked);
         if (Object.keys(checked).length) {
             form.querySelector<HTMLElement>(checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy]' : '[name=terms]')?.focus();
+            // The first error, in the order focus takes; the date of birth says what its own field says.
+            const first = checked.email ?? checked.phone ?? (checked.dateOfBirth === undefined ? checked.privacy ?? checked.terms : undefined);
+            signupAnnouncer.announce(first !== undefined ? t(catalog, first) : dobErrorMessage(catalog, 'incomplete', resolveDobLocale(uiLocale).order));
             return;
         }
         if (declaredRegion === null) return;
@@ -397,7 +403,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
  {turnstile ? <TurnstileChallenge siteKey={turnstile.siteKey} nonce={turnstile.nonce} action="signup" locale={uiLocale} resetKey={reset} onToken={setProof} onError={() => {
                     setProof(null);
                     setError(t(catalog, "auth.pending.proofUnavailable"));
-                }}/> : null}<button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button></form> : null}
+                }}/> : null}<button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button>{signupAnnouncer.region}</form> : null}
  {token && kind === 'enroll' ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'pending', token }} onAuthenticated={result => finish(result, true)}/> : null}
  {token && (kind === 'login' || kind === 'stepup') ? <div>
  {methods.includes('passkey') ? <div className="authAltMethods"><button type="button" className="authSecondary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.use")}</button></div> : null}
@@ -407,6 +413,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                     if (digits === null) {
                         setCodeIncomplete(true);
                         codeField.current?.focus();
+                        codeAnnouncer.announce(t(catalog, "auth.login.codeFormat"));
                         return;
                     }
                     void submitCode(digits);
@@ -418,9 +425,12 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                         attempt.current.edited();
                     setCode(value);
                     setCodeIncomplete(false);
+                    // Said once when the field turns invalid (a letter typed), not on every further key.
+                    if (!recoveryMode && !typed.valid && !codeFormatError)
+                        codeAnnouncer.announce(t(catalog, "auth.login.codeFormat"));
                     if (!recoveryMode && typed.complete)
                         void submitCode(typed.digits);
-                }}/><InlineFieldMessage id="social-code-error" message={codeFormatError ? t(catalog, "auth.login.codeFormat") : null}/></div><button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button></form>{methods.includes('recovery_code') && methods.includes('totp') ? <button type="button" className="authTextButton" disabled={completing} onClick={() => {
+                }}/><InlineFieldMessage id="social-code-error" message={codeFormatError ? t(catalog, "auth.login.codeFormat") : null}/></div><button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button>{codeAnnouncer.region}</form>{methods.includes('recovery_code') && methods.includes('totp') ? <button type="button" className="authTextButton" disabled={completing} onClick={() => {
                         if (dispatched.current) return;
                         sequence.current++;
                         browser.cancel();
