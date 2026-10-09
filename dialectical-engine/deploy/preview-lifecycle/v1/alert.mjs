@@ -52,18 +52,38 @@ export function parseRecipient(raw, approvedDigests) {
 
 // A secret-bearing key: password, DB_PASSWORD, PGPASSWORD, client_secret, access_token,
 // NETOPIA_API_KEY, x-api-key, sessionId, ... (any [A-Za-z0-9_] around the core word). The
-// separator also covers JSON ("key":"value", "key" : "value"); the value stops at a quote,
-// space, comma, semicolon, ampersand or closing brace.
-const SECRET_KEY = String.raw`[A-Za-z0-9_]*(?:password|passwd|pwd|secret|token|api[_-]?key|authorization|cookie|session|dsn)[A-Za-z0-9_]*`;
+// separator also covers JSON ("key":"value", "key" : "value").
+const SECRET_WORD = String.raw`(?:password|passwd|pwd|secret|token|api[_-]?key|authorization|cookie|session|dsn)`;
+const SECRET_KEY = String.raw`[A-Za-z0-9_]*${SECRET_WORD}[A-Za-z0-9_]*`;
+// A whole value: a double-quoted string with backslash escapes, a single-quoted string, or a bare
+// word up to a space, quote, comma, semicolon, ampersand or closing brace. A quoted value cut
+// before its closing quote runs to the end of the line, so no part of it is ever shown.
+const QUOTED = String.raw`"(?:[^"\\]|\\[\s\S])*(?:"|\\?$)|'[^']*(?:'|$)`;
+const VALUE = String.raw`${QUOTED}|(?!\[REDACTED\])[^\s"',;&}]+`;
+/** The value blanked; a quoted value keeps its quotes. */
+const blank = value => {
+  const quote = value[0] === '"' || value[0] === "'" ? value[0] : '';
+  return quote ? `${quote}[REDACTED]${value.length > 1 && value.endsWith(quote) ? quote : ''}` : '[REDACTED]';
+};
+// Credentials inside URLs: scheme://user:password@host, scheme://token@host, also with spaces or
+// an @ in the password (up to the last @ before the first slash).
+const URL_USERINFO = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*:\/\/)[^/]*@/gi;
 const RULES = [
-  // Credentials inside URLs: scheme://user:password@host and scheme://token@host.
-  [/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1[REDACTED]@'],
+  [URL_USERINFO, '$1[REDACTED]@'],
   // Whole header-style values (they may contain spaces).
   [/(?<![A-Za-z0-9_-])(proxy-authorization|authorization|set-cookie|cookie)(\s*[=:]\s*)(?!")(.*)$/gi, '$1$2[REDACTED]'],
   [/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/g, '$1 [REDACTED]'],
-  [new RegExp(String.raw`(?<![A-Za-z0-9_])(${SECRET_KEY})("?\s*[=:]\s*"?)(?!\[REDACTED\])[^\s"',;&}]+`, 'gi'), '$1$2[REDACTED]'],
+  // key=value, key: value, "key": "value", key='value'.
+  [new RegExp(String.raw`(?<![A-Za-z0-9_])(${SECRET_KEY})("?\s*[=:]\s*)(${VALUE})`, 'gi'), (_, key, separator, value) => `${key}${separator}${blank(value)}`],
+  // Flags with a plain space: --password value, -password value, --db-password 'value'.
+  [new RegExp(String.raw`(?<![A-Za-z0-9_-])(--?[A-Za-z0-9_-]*${SECRET_WORD}[A-Za-z0-9_-]*)(\s+)(${VALUE})`, 'gi'), (_, flag, space, value) => `${flag}${space}${blank(value)}`],
+  // -p value (mysql style). Kept readable when the value is a number (psql/pg_isready -p is the
+  // port), a path (mkdir -p) or the next flag.
+  [new RegExp(String.raw`(?<![A-Za-z0-9_-])(-p)(\s+)(${VALUE})`, 'g'), (match, flag, space, value) => (/^(?:\d+|[/-][\s\S]*)$/.test(value) ? match : `${flag}${space}${blank(value)}`)],
+  // SQL: ALTER/CREATE ROLE ... PASSWORD 'literal'.
+  [new RegExp(String.raw`(?<![A-Za-z0-9_])(password)(\s+)(${QUOTED})`, 'gi'), (_, word, space, value) => `${word}${space}${blank(value)}`],
   [/\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/g, '[REDACTED]'],
-  [/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, '[EMAIL]'],
+  [/(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, '[EMAIL]'],
   [/\b(?!127\.)(?:\d{1,3}\.){3}\d{1,3}\b/g, '[IP]'],
   // Long hex, also right after an underscore or dash (where \b does not see a boundary).
   [/(?<![A-Za-z0-9])[a-fA-F0-9]{32,}(?![A-Za-z0-9])/g, '[HEX]'],
@@ -74,9 +94,22 @@ const RULES = [
 ];
 /** Only this much of a line is ever examined; the email shows at most 300 characters of it anyway. */
 const MAX_EXAMINED = 2048;
+const stripControl = text => text.replace(/[\u0000-\u001f\u007f]/g, '');
+/** %XX runs decoded (so URL-encoded JSON is seen); a malformed run decodes only its ASCII escapes. */
+const percentDecode = text => text.replace(/(?:%[0-9A-Fa-f]{2})+/g, run => {
+  try { return decodeURIComponent(run); } catch { return run.replace(/%([0-7][0-9A-Fa-f])/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16))); }
+});
 /** Blank anything secret-looking, drop control bytes, keep each line short. */
 export function redactLine(line) {
-  let text = String(line).slice(0, MAX_EXAMINED).replace(/[\u0000-\u001f\u007f]/g, '');
+  let text = String(line);
+  if (text.length > MAX_EXAMINED) {
+    const cutsToken = !/\s/.test(text[MAX_EXAMINED]);
+    text = text.slice(0, MAX_EXAMINED);
+    // Never keep the start of a token cut at the limit: drop it back to the last whitespace.
+    if (cutsToken) { let end = text.length; while (end > 0 && !/\s/.test(text[end - 1])) end--; text = text.slice(0, Math.max(0, end - 1)); }
+  }
+  // Userinfo first on the raw text: decoding could turn an encoded / or @ in a password into a delimiter.
+  text = stripControl(percentDecode(stripControl(text).replace(URL_USERINFO, '$1[REDACTED]@')));
   for (const [pattern, replacement] of RULES) text = text.replace(pattern, replacement);
   return text.slice(0, 300);
 }

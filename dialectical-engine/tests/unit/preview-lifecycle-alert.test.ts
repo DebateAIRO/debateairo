@@ -205,7 +205,21 @@ describe('failure alert', () => {
     ['a Basic credential', 'header Basic dXNlcjpwYXNzd29yZA== sent', 'header Basic [REDACTED] sent'],
     ['long hex right after an underscore', `digest_${'ab'.repeat(32)} ok`, 'digest_[HEX] ok'],
     ['a padded base64 blob', 'blob dGhpcyBpcyBhIHNlY3JldCB2YWx1ZSBmb3IgdGVzdHM= end', 'blob [TOKEN] end'],
-    ['a base64 blob with + and /', 'blob ab+/CDef0123456789ab+/CDef0123456789xy== end', 'blob [TOKEN] end']
+    ['a base64 blob with + and /', 'blob ab+/CDef0123456789ab+/CDef0123456789xy== end', 'blob [TOKEN] end'],
+    ["a single-quoted password=", "password='hunter2 pass' ok", "password='[REDACTED]' ok"],
+    ["a single-quoted PGPASSWORD=", "PGPASSWORD='hunter2' psql", "PGPASSWORD='[REDACTED]' psql"],
+    ['an SQL PASSWORD literal', "ALTER ROLE r PASSWORD 'hunter2' VALID UNTIL 'x'", "ALTER ROLE r PASSWORD '[REDACTED]' VALID UNTIL 'x'"],
+    ['an SQL PASSWORD literal in double quotes', 'ALTER ROLE r PASSWORD "hunter2" ok', 'ALTER ROLE r PASSWORD "[REDACTED]" ok'],
+    ['a --password flag with a space', 'tool --password hunter2 --verbose', 'tool --password [REDACTED] --verbose'],
+    ['a --db-password flag with a quoted value', "tool --db-password 'a b' --verbose", "tool --db-password '[REDACTED]' --verbose"],
+    ['a -p flag with a word', 'mysql -u root -p hunter2 db', 'mysql -u root -p [REDACTED] db'],
+    ['URL-encoded JSON', 'body=%7B%22password%22%3A%22hunter2%22%7D', 'body={"password":"[REDACTED]"}'],
+    ['malformed percent escapes next to an encoded secret', 'q=%E0%A4%22password%22%3A%22hunter2%22 %zz', 'q=%E0%A4"password":"[REDACTED]" %zz'],
+    ['URL userinfo with spaces', 'connect postgres://user:pa ss@db.internal/x', 'connect postgres://[REDACTED]@db.internal/x'],
+    ['an encoded slash or @ in a URL password (checked before decoding)', 'a postgres://u:p%2Fss@db.internal/x b postgres://u:p%40ss@db.internal/y', 'a postgres://[REDACTED]@db.internal/x b postgres://[REDACTED]@db.internal/y'],
+    ['a JSON password with spaces', '{"password": "a b c"}', '{"password": "[REDACTED]"}'],
+    ['a JSON password with escaped quotes', '{"password":"a\\"b","x":1}', '{"password":"[REDACTED]","x":1}'],
+    ['a JSON password cut before its closing quote', '{"password": "abc', '{"password": "[REDACTED]']
   ])('redacts %s', (_name, line, expected) => {
     expect(alert.redactLine(line)).toBe(expected);
   });
@@ -220,9 +234,40 @@ describe('failure alert', () => {
     'Started debateai-preview-api.service - DebateAI V3 private preview API.',
     '{"event":"PREVIEW_LIFECYCLE_PRESTART_READY","service":"api","registerVersion":"12","verifyMs":12000,"totalMs":13500}',
     'password reset email queued; token bucket refilled after 30s',
-    'Consumed 1.234s CPU time, 120.5M memory peak.'
+    'Consumed 1.234s CPU time, 120.5M memory peak.',
+    'pg_isready -h /run/debateai-v3-preview/postgresql -p 5434 accepting connections',
+    'mkdir -p /var/backups/debateai-v3-preview done'
   ])('leaves ordinary log text alone: %s', line => {
     expect(alert.redactLine(line)).toBe(line);
+  });
+
+  it('never shows the start of a secret token cut at the examined-length limit', () => {
+    // Ten long tokens shrink to [TOKEN] each, so the cut tail would land inside the 300 characters shown.
+    const secret = 'skZx9qL2mN8pR4tV6wY1aB3cD5eF7gH0jKLmNoP';
+    const line = `${`${'xY3'.repeat(66)}xY `.repeat(10)}abcdefghijklmnopq ${secret}`;
+    expect(line.indexOf(secret)).toBe(2028);
+    const shown = alert.redactLine(line);
+    expect(shown).not.toContain(secret.slice(0, 6));
+    expect(shown).toBe(`${'[TOKEN] '.repeat(10)}abcdefghijklmnopq`);
+  });
+
+  it.each([
+    ['a_ run', 'a_'.repeat(1024)],
+    ['escaped quotes after a JSON key', `"password":"${'\\"'.repeat(1020)}`],
+    ['URL userinfo without @', `postgres://${'a '.repeat(1020)}`],
+    ['repeated schemes', 'a://'.repeat(512)],
+    ['percent escapes', '%22'.repeat(682)],
+    ['malformed percent escapes', '%E0'.repeat(682)],
+    ['password words', 'password '.repeat(227)],
+    ['password flags', '--password '.repeat(186)],
+    ['-p flags', '-p '.repeat(682)],
+    ['open single quotes', "password='".repeat(204)],
+    ['a long address-like run', 'a.'.repeat(1024)]
+  ])('stays under 50 ms on a hostile 2048-character line: %s', (_name, line) => {
+    alert.redactLine(line);
+    const started = performance.now();
+    alert.redactLine(line.slice(0, 2048));
+    expect(performance.now() - started).toBeLessThan(50);
   });
 
   it('stays fast on a hostile, very long identifier', () => {
