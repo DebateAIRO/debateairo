@@ -25,7 +25,7 @@ import {
 } from "./renewal-rules.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "./rows.js";
 import type { ChargeSettlement } from "./settlement.js";
-import { writeDunningAttempt } from "./settlement-renewal.js";
+import { endGivenBackRenewal, writeDunningAttempt } from "./settlement-renewal.js";
 import { quoteTaxAt, storedTaxContext } from "./stored-tax-context.js";
 
 /** N11: what a NETOPIA renewal needs (N8's connectors). */
@@ -673,26 +673,38 @@ export class RenewalService {
     return this.submitNetopia(charge, state);
   }
 
+  /**
+   * A final unpaid state of this renewal's charge: FAILED with the code, then the settlement's dunning. F8 (ruling
+   * PR-56): a VOIDED report (the money never moved; the owner may have cancelled that month in NETOPIA's admin) starts
+   * or continues no dunning: the plan ends as one refunded before the site saw it paid does (`endGivenBackRenewal`),
+   * with no customer email and one O3, as VERIFY_PAYMENT's `netopiaFailed` does for the same report.
+   */
   private async refused(
     charge: ChargeRow, errorCode: RenewalFailureCode, providerPaymentId: string | null, now: Date, bankDeclined?: boolean
   ): Promise<void> {
     const quote = charge.quoteId === null ? null : await this.deps.repository.quote(charge.quoteId, charge.ownerRef);
     const customer = await this.deps.repository.customerByOwner(charge.ownerRef);
     if (quote === null || customer === null) throw new TypedDomainError("BILLING_INVOICE_DATA_MISSING", "a charge without its quote or customer");
-    await this.deps.repository.withTransaction(async (client) => {
+    const ended = await this.deps.repository.withTransaction(async (client): Promise<boolean> => {
       await this.deps.jobs.lockOwner(client, charge.ownerRef);
       const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "FAILED", now, {
         providerPaymentId, amountMicros: charge.totalMicros, errorCode
       }));
-      if (inserted === "DUPLICATE") return;
+      if (inserted === "DUPLICATE") return false;
+      if (errorCode === "VOIDED" && providerPaymentId !== null) {
+        await endGivenBackRenewal(this.deps, client, { charge, paymentId: providerPaymentId, now });
+        return true;
+      }
       const events = await this.deps.repository.subscriptionEvents(charge.subscriptionId, client);
       await this.deps.settlement.failed({
         client, now, charge, payment: null, subscription: foldSubscription(events), events, quote,
         ownerRef: charge.ownerRef, customerId: customer.customerId, cardCountry: null, errorCode,
         ...(bankDeclined === undefined ? {} : { bankDeclined })
       });
+      return false;
     });
     this.deps.audit("billing.payment.failed", { chargeKind: charge.kind, code: errorCode });
+    if (ended) this.deps.audit("billing.renewal.refunded_before_seen", { attempt: charge.attempt, voided: true });
   }
 
   /**

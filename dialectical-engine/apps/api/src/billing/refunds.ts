@@ -214,19 +214,36 @@ export async function queueRefundHeldAlert(
 ): Promise<boolean> {
   const { chargeId, currency } = charge;
   const paymentId = open.intent.transactionId;
-  const amount = microsToDecimal(open.openMicros);
   return queuePaymentAlert(deps, {
     code: "REFUND_HELD_BY_CHARGEBACK", reference: `charge ${chargeId}`, dedupeRef: `${chargeId}:REFUND_HELD:${paymentId}`, now,
-    nextSteps: `A refund of ${amount} ${currency} (reason ${open.intent.reason}) was due on this payment`
+    nextSteps: refundHeldSteps({
+      chargeId, currency, paymentId, reason: open.intent.reason, openMicros: open.openMicros, pausedEmailQueued
+    })
+  }, client);
+}
+
+/**
+ * O3 REFUND_HELD_BY_CHARGEBACK's steps (`queueRefundHeldAlert`). F8 (ruling PR-56, as ops-4 did for O2): each owner
+ * command is README §14.8's host form on its own line (`disputeCommand`, which records at once; `refundDoneCommand`
+ * with `--despite-chargeback`, which previews first and records once `--confirm` is added).
+ */
+export function refundHeldSteps(input: Readonly<{
+  chargeId: string; currency: string; paymentId: string; reason: string; openMicros: number; pausedEmailQueued: boolean;
+}>): string {
+  const { chargeId, currency, paymentId, reason, openMicros, pausedEmailQueued } = input;
+  return [
+    `A refund of ${microsToDecimal(openMicros)} ${currency} (reason ${reason}) was due on this payment`
       + ` (NETOPIA payment ${paymentId}), and NETOPIA now reports a charge-back on it: the person's bank is taking the`
       + ` money back.${pausedEmailQueued ? ` ${PAUSED_EMAIL_SENTENCE}` : ""}`
-      + " Do not refund it in NETOPIA's admin; the site no longer lists it as due. If the dispute ends for"
-      + ` us, record that with pnpm billing:dispute --charge ${chargeId} --outcome won: the refund is then due`
-      + " again and comes back into the reminder. If it ends for the person, nothing is left to refund. If you had"
-      + " already refunded it in NETOPIA's admin before the dispute, record that refund with"
-      + ` pnpm billing:refund-done --charge ${chargeId} --amount ${amount} --despite-chargeback, and tell NETOPIA,`
-      + " so the dispute is answered."
-  }, client);
+      + " Do not refund it in NETOPIA's admin; the site no longer lists it as due.",
+    "If the dispute ends for us, record that as root on the server with the command below (it records at once): the"
+      + " refund is then due again and comes back into the reminder. If it ends for the person, nothing is left to refund.",
+    `  ${disputeCommand(chargeId, "won")}`,
+    "If you had already refunded it in NETOPIA's admin before the dispute, record that refund as root on the server"
+      + " with the command below: run it once to see what it records, then again with --confirm added at the end to"
+      + " record it. Then tell NETOPIA, so the dispute is answered.",
+    `  ${refundDoneCommand(chargeId, openMicros)} --despite-chargeback`
+  ].join("\n");
 }
 
 /**
@@ -277,6 +294,14 @@ const ON_HOST = "systemd-run --pipe --wait --collect --uid=debateai-api --gid=de
  */
 export function refundDoneCommand(chargeId: string, amountMicros: number): string {
   return `${ON_HOST} billing:refund-done --charge ${chargeId} --amount ${microsToDecimal(amountMicros)}`;
+}
+
+/**
+ * F8 (ruling PR-56): `pnpm billing:dispute` as README §14.8 runs it on the host. It has no preview: run as given, it
+ * records the outcome at once.
+ */
+export function disputeCommand(chargeId: string, outcome: "won" | "lost"): string {
+  return `${ON_HOST} billing:dispute --charge ${chargeId} --outcome ${outcome}`;
 }
 
 /** One open owner refund, as the reminder lists it (owner-facing English; our ids, no customer data). */

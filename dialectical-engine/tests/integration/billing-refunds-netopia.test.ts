@@ -22,6 +22,25 @@ import { readSubscriptionView } from "../../apps/api/src/billing/subscription-vi
 import { recordOwnerWithdrawal, settleOwnerWithdrawal, withdrawStoresFor } from "../../apps/api/src/billing/withdraw-cli.js";
 import { recordWithdrawal } from "../../apps/api/src/billing/withdrawal.js";
 
+/**
+ * O3 REFUND_HELD_BY_CHARGEBACK's steps (N15b; F8, ruling PR-56: the owner commands in README §14.8's host form, each on
+ * its own line; refund-done previews first, then --confirm records).
+ */
+const ON_HOST = "systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api"
+  + " --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm";
+const heldStepsText = (chargeId: string, paymentId: string, amount: string) => [
+  `A refund of ${amount} USD (reason WITHDRAWAL) was due on this payment (NETOPIA payment ${paymentId}), and NETOPIA now`
+    + " reports a charge-back on it: the person's bank is taking the money back. Do not refund it in NETOPIA's admin; the"
+    + " site no longer lists it as due.",
+  "If the dispute ends for us, record that as root on the server with the command below (it records at once): the refund"
+    + " is then due again and comes back into the reminder. If it ends for the person, nothing is left to refund.",
+  `  ${ON_HOST} billing:dispute --charge ${chargeId} --outcome won`,
+  "If you had already refunded it in NETOPIA's admin before the dispute, record that refund as root on the server with"
+    + " the command below: run it once to see what it records, then again with --confirm added at the end to record it."
+    + " Then tell NETOPIA, so the dispute is answered.",
+  `  ${ON_HOST} billing:refund-done --charge ${chargeId} --amount ${amount} --despite-chargeback`
+].join("\n");
+
 let database: TestDatabase;
 let repository: BillingRepository;
 let jobs: BillingJobQueries;
@@ -511,13 +530,7 @@ describe("N15b an owner refund waits while the bank disputes the payment (ruling
     expect(alerts).toHaveLength(1);
     expect(alerts[0]!.ref).toBe(`O3:${chargeId}:REFUND_HELD:${seeded.providerPaymentId}`);
     expect(alerts[0]!.payload).toMatchObject({ recipient: "OWNER", "param.paymentAlert": "true", "param.jobKind": "PAYMENT" });
-    expect(alerts[0]!.payload["param.nextSteps"]).toBe(`A refund of 12.10 USD (reason WITHDRAWAL) was due on this payment (NETOPIA payment ${seeded.providerPaymentId}), and`
-      + " NETOPIA now reports a charge-back on it: the person's bank is taking the money back. Do not refund it in NETOPIA's"
-      + " admin; the site no longer lists it as due. If the dispute ends for us, record that with"
-      + ` pnpm billing:dispute --charge ${chargeId} --outcome won: the refund is then due again and comes back into the`
-      + " reminder. If it ends for the person, nothing is left to refund. If you had already refunded it in NETOPIA's admin"
-      + ` before the dispute, record that refund with pnpm billing:refund-done --charge ${chargeId} --amount 12.10`
-      + " --despite-chargeback, and tell NETOPIA, so the dispute is answered.");
+    expect(alerts[0]!.payload["param.nextSteps"]).toBe(heldStepsText(chargeId, seeded.providerPaymentId, "12.10"));
     // The same status again: no second O3, no second line.
     expect(await verify.handle(verifyJob(chargeId, day), day)).toEqual({ kind: "DONE" });
     expect(await heldAlerts(chargeId)).toHaveLength(1);
@@ -612,13 +625,7 @@ describe("N15b an owner refund waits while the bank disputes the payment (ruling
   });
 
   // Fix round 1 (F1): the PAYMENT_REFUND job of a held request moves no money and hands nothing to the owner.
-  const heldSteps = (chargeId: string, paymentId: string, amount: string) => `A refund of ${amount} USD (reason WITHDRAWAL) was due on`
-    + ` this payment (NETOPIA payment ${paymentId}), and NETOPIA now reports a charge-back on it: the person's bank is taking`
-    + " the money back. Do not refund it in NETOPIA's admin; the site no longer lists it as due. If the dispute ends for us,"
-    + ` record that with pnpm billing:dispute --charge ${chargeId} --outcome won: the refund is then due again and comes back`
-    + " into the reminder. If it ends for the person, nothing is left to refund. If you had already refunded it in NETOPIA's"
-    + ` admin before the dispute, record that refund with pnpm billing:refund-done --charge ${chargeId} --amount ${amount}`
-    + " --despite-chargeback, and tell NETOPIA, so the dispute is answered.";
+  const heldSteps = heldStepsText;
   const heldLines = (audit: ReturnType<typeof deskFor>["audit"]) => audit.events.filter((entry) => entry.event === "billing.refund.held_by_chargeback");
   const ownerDue = (audit: ReturnType<typeof deskFor>["audit"]) => audit.events.filter((entry) => entry.event === "billing.refund.owner_due");
 

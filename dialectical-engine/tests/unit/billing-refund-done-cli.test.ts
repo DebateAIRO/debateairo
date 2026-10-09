@@ -6,8 +6,10 @@ import {
   parseRefundDoneArguments, renderRefundDonePlan, renderRefundDoneResult, runBillingRefundDoneCli, type RefundDoneArguments
 } from "../../apps/api/src/billing/refund-done-cli.js";
 import {
-  refundDoneCommand, refundMailOf, refundReminderDue, renderOwnerRefundList, type OwnerRefundLine, type OwnerRefundPlan
+  disputeCommand, refundDoneCommand, refundHeldSteps, refundMailOf, refundReminderDue, renderOwnerRefundList,
+  type OwnerRefundLine, type OwnerRefundPlan
 } from "../../apps/api/src/billing/refunds.js";
+import { chargebackLostSteps } from "../../apps/api/src/billing/verify-payment.js";
 
 const REF = "a".repeat(32);
 /** F6a (ops-4): README §14.8's own form of an owner command on the host, as the API's user with the API's EnvironmentFile. */
@@ -175,5 +177,57 @@ describe("N14 the owner's refund reminders (spec §2.12.2 item 3)", () => {
     for (const reason of ["CARD_CHECK_RELEASE", "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE"] as const) {
       expect(refundMailOf(reason), reason).toBeNull();
     }
+  });
+});
+
+// F8 (ruling PR-56, decision 5): the O3s that name an owner command print README §14.8's host form, each on its own
+// line, as ops-4 made the O2 emails do; a bare `pnpm …` fails in a root shell (no settings) and skips the preview.
+describe("F8 the owner commands in O3 emails are the runbook's host form", () => {
+  const runbook = readFileSync(fileURLToPath(new URL("../../deploy/vps/README.md", import.meta.url)), "utf8");
+  const PAYMENT = "ntp-7300312";
+
+  it("prints billing:dispute as the runbook runs it (it records at once: there is no preview to run first)", () => {
+    for (const outcome of ["won", "lost"] as const) {
+      const command = disputeCommand(REF, outcome);
+      expect(command).toBe(`${ON_HOST} billing:dispute --charge ${REF} --outcome ${outcome}`);
+      expect(runbook).toContain(`${command.replace(`--charge ${REF} --outcome ${outcome}`, '--charge "$CHARGE_REF" --outcome "$OUTCOME"')}\n`);
+    }
+    expect(runbook.split("\n").filter((line) => line.includes("/usr/bin/pnpm billing:dispute") && line.includes("--confirm"))).toEqual([]);
+  });
+
+  it("O3 REFUND_HELD_BY_CHARGEBACK: the dispute command, and the refund-done preview first, then --confirm", () => {
+    const steps = (pausedEmailQueued: boolean) => refundHeldSteps({
+      chargeId: REF, currency: "USD", paymentId: PAYMENT, reason: "WITHDRAWAL", openMicros: 12_100_000, pausedEmailQueued
+    });
+    const refundDone = `${ON_HOST} billing:refund-done --charge ${REF} --amount 12.10 --despite-chargeback`;
+    expect(steps(false)).toBe([
+      `A refund of 12.10 USD (reason WITHDRAWAL) was due on this payment (NETOPIA payment ${PAYMENT}), and NETOPIA now`
+        + " reports a charge-back on it: the person's bank is taking the money back. Do not refund it in NETOPIA's admin;"
+        + " the site no longer lists it as due.",
+      "If the dispute ends for us, record that as root on the server with the command below (it records at once): the"
+        + " refund is then due again and comes back into the reminder. If it ends for the person, nothing is left to refund.",
+      `  ${ON_HOST} billing:dispute --charge ${REF} --outcome won`,
+      "If you had already refunded it in NETOPIA's admin before the dispute, record that refund as root on the server"
+        + " with the command below: run it once to see what it records, then again with --confirm added at the end to"
+        + " record it. Then tell NETOPIA, so the dispute is answered.",
+      `  ${refundDone}`
+    ].join("\n"));
+    expect(steps(true)).toContain("taking the money back. The customer was emailed that the plan is paused (M10). Do not refund");
+    // The preview line is README §14.8's own (its read-in values in place of ours), with the flag the held row names.
+    expect(runbook).toContain(`${refundDone.replace(`--charge ${REF} --amount 12.10 --despite-chargeback`, '--charge "$CHARGE_REF" --amount "$AMOUNT"')}\n`);
+    expect(steps(false)).not.toMatch(/(^|[^/])pnpm billing:|--confirm --|--despite-chargeback --confirm/u);
+  });
+
+  it("O3 OWNER_REVIEW for a dispute NETOPIA reports lost: the dispute command on its own line", () => {
+    const tail = " NETOPIA has not confirmed what this status means, so nothing ends by itself. Once you have checked it in"
+      + " NETOPIA's admin, record the outcome as root on the server with the command below (it records at once; if the"
+      + " dispute ended for us, put --outcome won in place of --outcome lost).\n"
+      + `  ${ON_HOST} billing:dispute --charge ${REF} --outcome lost`;
+    expect(chargebackLostSteps({ chargeId: REF, paymentId: PAYMENT, paused: true })).toBe(
+      `NETOPIA reports the dispute on this payment (NETOPIA payment ${PAYMENT}) as lost: status 10, "chargeback accepted".`
+        + " The paid features are paused. The customer was emailed that the plan is paused (M10)." + tail);
+    expect(chargebackLostSteps({ chargeId: REF, paymentId: PAYMENT, paused: false })).toBe(
+      `NETOPIA reports the dispute on this payment (NETOPIA payment ${PAYMENT}) as lost: status 10, "chargeback accepted".`
+        + " No plan was paused for it: the payment bought nothing, or its plan was not active." + tail);
   });
 });

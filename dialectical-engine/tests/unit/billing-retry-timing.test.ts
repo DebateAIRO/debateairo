@@ -175,3 +175,58 @@ describe("P2-I7 a saved-card charge's outcome rows are dated when the call retur
     expect(run.enqueued).toEqual([expect.objectContaining({ kind: "VERIFY_PAYMENT", notBefore: answered })]);
   });
 });
+
+// F2 (ruling PR-55, defence in depth), checked in F8 (ruling PR-56, decision 6): the maintenance pass's retry counts an
+// existing charge of the next attempt as made, so its own outcome decides; one whose SUCCEEDED went back in full
+// (`paidAndRefundedInFull`) bought nothing and does not count.
+describe("F8 an attempt whose payment was refunded in full is not an attempt made", () => {
+  const { events, periodStart, failedAt } = pastDueHistory();
+  const paidEvents = [
+    { kind: "REQUESTED", providerPaymentId: null, amountMicros: 24_200_000, errorCode: null, refundsTransactionId: null },
+    { kind: "SUCCEEDED", providerPaymentId: "ntp-attempt-2", amountMicros: 24_200_000, errorCode: null, refundsTransactionId: null }
+  ];
+  const refundedEvents = [...paidEvents,
+    { kind: "REFUND_REQUESTED", providerPaymentId: "ntp-attempt-2", amountMicros: 24_200_000, errorCode: "PROVIDER_REFUND", refundsTransactionId: null },
+    { kind: "REFUNDED", providerPaymentId: "ntp-attempt-2", amountMicros: 24_200_000, errorCode: "PROVIDER_REFUND", refundsTransactionId: null }
+  ];
+
+  it.each([
+    ["refunded in full: the retry goes ahead", refundedEvents, 1],
+    ["still paid: its own outcome decides, and no retry is made", paidEvents, 0],
+    ["refunded only in part: still an attempt made", [...paidEvents,
+      { kind: "REFUNDED", providerPaymentId: "ntp-attempt-2", amountMicros: 4_200_000, errorCode: "PROVIDER_REFUND", refundsTransactionId: null }], 0]
+  ] as const)("an existing attempt-2 charge %s", async (_name, chargeEvents, retried) => {
+    const now = new Date(failedAt.getTime() + DAY + MINUTE);
+    const charge = { chargeId: "c-attempt-2b", attempt: 2, periodStart } as ChargeRow;
+    const renewal = {
+      erasureBlocks: vi.fn(async () => false),
+      retryPrice: vi.fn(async () => ({ kind: "PRICED" as const, priced: {} as never })),
+      earlierAttemptPaid: vi.fn(async () => "NONE" as const),
+      createRetryCharge: vi.fn(async () => ({ charge, state: foldSubscription(events) })),
+      submit: vi.fn(async () => undefined),
+      failUnpricedAttempt: vi.fn(), taxRefused: vi.fn()
+    };
+    const maintenance = new BillingMaintenance({
+      repository: {
+        subscriptionEvents: async () => events,
+        chargesForSubscription: async () => [
+          { chargeId: "c-attempt-1", kind: "RENEWAL", periodStart, attempt: 1 },
+          { chargeId: "c-attempt-2", kind: "RENEWAL", periodStart, attempt: 2 }
+        ],
+        charge: async (chargeId: string) => (chargeId === "c-attempt-2" ? { chargeId, events: chargeEvents } : null)
+      } as unknown as BillingRepository,
+      jobs: {
+        liveSubscriptionIds: vi.fn(async () => [events[0]!.subscriptionId]), lockOwner: vi.fn(),
+        withSubscriptionLease: vi.fn(async (_id: string, use: () => Promise<unknown>) => ({ kind: "RAN" as const, value: await use() })),
+        outboxJobExists: vi.fn()
+      } as unknown as MaintenanceDeps["jobs"],
+      entitlements: { append: vi.fn() },
+      renewal: renewal as unknown as MaintenanceDeps["renewal"],
+      policy: testBillingPolicy, publicAppUrl: "https://dezbatere.test", paymentEnvironment: "sandbox",
+      audit: vi.fn(), clock: () => now
+    });
+    expect(await maintenance.runOnce()).toMatchObject({ retried, failed: 0 });
+    expect(renewal.createRetryCharge).toHaveBeenCalledTimes(retried);
+    if (retried === 1) expect(renewal.createRetryCharge.mock.calls[0]).toEqual([expect.objectContaining({ status: "PAST_DUE" }), periodStart, 2, {}, now]);
+  });
+});

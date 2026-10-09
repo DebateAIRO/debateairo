@@ -9,7 +9,7 @@ import { createNetopiaPayments, createSecretToken } from "@debateai/payments-net
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { AdjustableTaxEngine, testBillingPlans, testBillingPolicy } from "../support/billingFixtures.js";
 import {
-  recordingAudit, seedNetopiaSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
+  recordingAudit, seedNetopiaSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY, type RecordingAudit
 } from "../support/billingSubscriptionFixtures.js";
 import { startFakeNetopia } from "../support/fake-netopia.js";
 import { netopiaVerifyHandler, verifyJob } from "../support/netopia-verify.js";
@@ -593,15 +593,15 @@ describe("N11 a dunning retry first probes the period's earlier attempts (spec Â
   });
 });
 
-describe("F2 a renewal NETOPIA reports refunded before the site saw it paid (money-1, ruling PR-55)", () => {
-  const customerEmails = (run: Due) => outboxRows("kind = 'EMAIL' AND payload->>'customer_id' = $1", [run.seeded.customerId]);
-  const refundedBeforeSeen = (chargeId: string) => ownerAlerts("RENEWAL_REFUNDED_BEFORE_SEEN", `charge ${chargeId}`);
-  const NEXT_STEPS = "NETOPIA reports this renewal's payment refunded (or cancelled) before the site saw it paid, so the"
-    + " plan has ended and the person was not emailed. Tell them yourself; if they should keep the plan, they can"
-    + " subscribe again.";
-  const renewalAttempts = async (run: Due) => (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
-    .filter((row) => row.kind === "RENEWAL").map((row) => row.attempt);
+const customerEmails = (run: Due) => outboxRows("kind = 'EMAIL' AND payload->>'customer_id' = $1", [run.seeded.customerId]);
+const refundedBeforeSeen = (chargeId: string) => ownerAlerts("RENEWAL_REFUNDED_BEFORE_SEEN", `charge ${chargeId}`);
+const NEXT_STEPS = "NETOPIA reports this renewal's payment refunded (or cancelled) before the site saw it paid, so the"
+  + " plan has ended and the person was not emailed. Tell them yourself; if they should keep the plan, they can"
+  + " subscribe again.";
+const renewalAttempts = async (run: Due) => (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
+  .filter((row) => row.kind === "RENEWAL").map((row) => row.attempt);
 
+describe("F2 a renewal NETOPIA reports refunded before the site saw it paid (money-1, ruling PR-55)", () => {
   /** The probe reads REFUNDED (SUBMITTED + VERIFY queued), then VERIFY runs once and again; returns what it wrote. */
   async function refundedThenVerified(run: Due, chargeId: string) {
     run.payments.scriptStatus(chargeId, report(chargeId, "REFUNDED"), report(chargeId, "REFUNDED"), report(chargeId, "REFUNDED"));
@@ -716,9 +716,10 @@ describe("F2 a renewal NETOPIA reports refunded before the site saw it paid (mon
     expect(alerts[0]!.payload).toMatchObject({
       recipient: "OWNER", "param.paymentAlert": "true",
       "param.nextSteps": `NETOPIA reports this renewal's payment (NETOPIA payment ${report(chargeId, "REFUNDED").providerPaymentId})`
-        + " refunded (or cancelled) before the site saw it paid. Its plan was no longer on the month this payment renewed,"
-        + " so no plan changed and the person was not emailed. Look at the plan and this payment in NETOPIA's admin; tell"
-        + " the person yourself if they need to know."
+        + " refunded (or cancelled) before the site saw it paid. Its plan was not active or past due on the month this"
+        + " payment renewed (it had ended, was paused by a dispute, or was already renewed), so no plan changed and the"
+        + " person was not emailed. Look at the plan and this payment in NETOPIA's admin; tell the person yourself if they"
+        + " need to know."
     });
     expect(audit.events.filter((entry) => entry.event === "billing.renewal.refunded_before_seen"))
       .toEqual([{ event: "billing.renewal.refunded_before_seen", fields: { attempt: 1 } }]);
@@ -730,5 +731,97 @@ describe("F2 a renewal NETOPIA reports refunded before the site saw it paid (mon
     expect(await refundedBeforeSeen(chargeId)).toHaveLength(1);
     expect(await customerEmails(run)).toHaveLength(emailsBefore);
     expect(audit.events.filter((entry) => entry.event === "billing.renewal.refunded_before_seen")).toHaveLength(1);
+  });
+});
+
+describe("F8 a renewal whose first state NETOPIA reports is VOIDED, never seen paid (ruling PR-56)", () => {
+  /**
+   * After the period's charge, attempt 1 or a retry, answered SUBMIT_UNKNOWN: the money never moved (FAILED(VOIDED)),
+   * and the plan ends as a refunded-before-seen renewal's does, with no customer email, one O3 and no retry ever.
+   */
+  async function endsWithoutDunning(run: Due, chargeId: string, emailsBefore: number, audit: RecordingAudit, attempt: number) {
+    expect((await trail(chargeId)).slice(-2)).toEqual(["SUBMITTED", "FAILED:VOIDED"]);
+    const state = foldSubscription(await run.repository.subscriptionEvents(run.seeded.subscriptionId));
+    expect(state).toMatchObject({ status: "ENDED", endedCause: "DUNNING" });
+    expect(await run.entitlements.current(run.ownerRef, run.clock.now)).toMatchObject({ planId: "FREE", cause: "ENDED_DUNNING" });
+    expect(await customerEmails(run)).toHaveLength(emailsBefore);
+    const alerts = await refundedBeforeSeen(chargeId);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!.ref).toBe(`O3:${chargeId}:RENEWAL_REFUNDED_BEFORE_SEEN`);
+    expect(alerts[0]!.payload).toMatchObject({ recipient: "OWNER", "param.paymentAlert": "true", "param.nextSteps": NEXT_STEPS });
+    expect(audit.events.filter((entry) => entry.event === "billing.renewal.refunded_before_seen"))
+      .toEqual([{ event: "billing.renewal.refunded_before_seen", fields: { attempt, voided: true } }]);
+    expect(audit.events).toContainEqual({ event: "billing.payment.failed", fields: { chargeKind: "RENEWAL", code: "VOIDED" } });
+    // A later VERIFY (a status-4 notice, say) writes and queues nothing more.
+    const rows = (await trail(chargeId)).length;
+    const events = (await kindsOf(run)).length;
+    run.payments.scriptStatus(chargeId, report(chargeId, "VOIDED"));
+    const { verify } = netopiaVerifyHandler(database.pool, { payments: run.payments, clock: () => run.clock.now });
+    expect(await verify.handle(verifyJob(chargeId, run.clock.now), run.clock.now)).toEqual({ kind: "DONE" });
+    expect(await trail(chargeId)).toHaveLength(rows);
+    expect(await kindsOf(run)).toHaveLength(events);
+    expect(await refundedBeforeSeen(chargeId)).toHaveLength(1);
+    expect(await customerEmails(run)).toHaveLength(emailsBefore);
+    // Days later: no maintenance pass makes another charge for this plan.
+    const attempts = await renewalAttempts(run);
+    for (const days of [1, 3, 7]) {
+      run.clock.now = new Date(run.clock.now.getTime() + days * DAY + MINUTE);
+      await run.maintenance.runOnce();
+    }
+    expect(await run.renewal.renew(run.seeded.subscriptionId)).not.toBe("charged");
+    expect(await renewalAttempts(run)).toEqual(attempts);
+    expect(run.payments.charges.filter((sent) => sent.payer.email === run.email)).toHaveLength(attempts.length);
+    expect(await customerEmails(run)).toHaveLength(emailsBefore);
+  }
+
+  it("attempt 1 (SUBMIT_UNKNOWN, a PENDING probe, then VERIFY reads VOIDED): the plan ends, no customer email, one O3, no retry", async () => {
+    const run = await due();
+    run.payments.answer(run.email, () => paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout"));
+    const charge = await renewNow(run);
+    const chargeId = charge.chargeId;
+    expect(await trail(chargeId)).toEqual(["REQUESTED", "SUBMIT_UNKNOWN:CHARGE_OUTCOME_UNKNOWN"]);
+    run.payments.scriptStatus(chargeId, report(chargeId, "PENDING"));
+    run.clock.now = new Date(run.clock.now.getTime() + 2 * MINUTE);
+    expect(await run.renewal.recoverOpenCharge(chargeId)).toBe(true);
+    expect((await trail(chargeId)).at(-1)).toBe("SUBMITTED");
+    expect(await verifyJobs(chargeId)).toHaveLength(1);
+    const emailsBefore = (await customerEmails(run)).length;
+    run.payments.scriptStatus(chargeId, report(chargeId, "VOIDED"));
+    const { verify, audit } = netopiaVerifyHandler(database.pool, { payments: run.payments, clock: () => run.clock.now });
+    expect(await verify.handle(verifyJob(chargeId, run.clock.now), run.clock.now)).toEqual({ kind: "DONE" });
+    await endsWithoutDunning(run, chargeId, emailsBefore, audit, 1);
+  });
+
+  it("attempt 1 (SUBMIT_UNKNOWN, then the renewal's own probe reads VOIDED, then VERIFY): the same, without a VERIFY", async () => {
+    const run = await due();
+    run.payments.answer(run.email, () => paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout"));
+    const charge = await renewNow(run);
+    const chargeId = charge.chargeId;
+    const emailsBefore = (await customerEmails(run)).length;
+    run.payments.scriptStatus(chargeId, report(chargeId, "VOIDED"));
+    run.clock.now = new Date(run.clock.now.getTime() + 2 * MINUTE);
+    expect(await run.renewal.recoverOpenCharge(chargeId)).toBe(true);
+    await endsWithoutDunning(run, chargeId, emailsBefore, run.audit, 1);
+  });
+
+  it("a dunning retry (attempt 2 on a PAST_DUE plan) read VOIDED: the dunning does not go on; the plan ends the same way", async () => {
+    const run = await due();
+    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { bankDeclined: true }));
+    await renewNow(run);
+    expect((await kindsOf(run)).at(-1)).toBe("PAST_DUE");
+    run.payments.answer(run.email, () => paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout"));
+    run.clock.now = new Date(run.clock.now.getTime() + DAY + MINUTE);
+    await run.maintenance.runOnce();
+    const retry = (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
+      .find((row) => row.kind === "RENEWAL" && row.attempt === 2)!;
+    expect(await trail(retry.chargeId)).toEqual(["REQUESTED", "SUBMIT_UNKNOWN:CHARGE_OUTCOME_UNKNOWN"]);
+    const emailsBefore = (await customerEmails(run)).length;
+    run.payments.scriptStatus(retry.chargeId, report(retry.chargeId, "PENDING"));
+    run.clock.now = new Date(run.clock.now.getTime() + 2 * MINUTE);
+    expect(await run.renewal.recoverOpenCharge(retry.chargeId)).toBe(true);
+    run.payments.scriptStatus(retry.chargeId, report(retry.chargeId, "VOIDED"));
+    const { verify, audit } = netopiaVerifyHandler(database.pool, { payments: run.payments, clock: () => run.clock.now });
+    expect(await verify.handle(verifyJob(retry.chargeId, run.clock.now), run.clock.now)).toEqual({ kind: "DONE" });
+    await endsWithoutDunning(run, retry.chargeId, emailsBefore, audit, 2);
   });
 });

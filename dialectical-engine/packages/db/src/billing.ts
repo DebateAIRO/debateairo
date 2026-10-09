@@ -1489,13 +1489,19 @@ export class BillingRepository {
    * protocol-2).
    */
   async newestNoticeForOrder(executor: BillingReadExecutor, orderId: string): Promise<PaymentNoticeRow | null> {
-    const row = (await executor.query<PaymentNoticeRow>(`SELECT ${PAYMENT_NOTICE_COLUMNS} FROM billing.payment_notice AS notice
+    return (await this.noticesForOrder(executor, orderId, 1))[0] ?? null;
+  }
+  /**
+   * F8 (ruling PR-56): the order's stored messages, newest first in `newestNoticeForOrder`'s order, at most `limit`
+   * (VERIFY_PAYMENT's spent-schedule choice, `noticeToDecide`, reads them all up to the cap).
+   */
+  async noticesForOrder(executor: BillingReadExecutor, orderId: string, limit = 200): Promise<ReadonlyArray<PaymentNoticeRow>> {
+    return (await executor.query<PaymentNoticeRow>(`SELECT ${PAYMENT_NOTICE_COLUMNS} FROM billing.payment_notice AS notice
       WHERE notice.order_id = $1
       ORDER BY notice.received_at DESC,
         CASE WHEN notice.jwt_iat ~ '^[0-9]{1,15}([.][0-9]{1,9})?$' THEN notice.jwt_iat::numeric END DESC NULLS LAST,
         notice.notice_id DESC
-      LIMIT 1`, [orderId])).rows[0];
-    return row === undefined ? null : frozen(row);
+      LIMIT $2`, [orderId, limit])).rows.map(frozen);
   }
   /** §2.7.4: a message that failed verification, sealed; 14 days. */
   async insertNoticeQuarantine(c: PoolClient, row: NoticeQuarantineInput): Promise<void> {

@@ -1,8 +1,9 @@
 import type { PoolClient } from "pg";
-import type { SubscriptionEventData, SubscriptionState } from "@debateai/billing-core";
-import type { BillingRepository, EntitlementRepository } from "@debateai/db";
+import { foldSubscription, type SubscriptionEventData, type SubscriptionState } from "@debateai/billing-core";
+import type { BillingJobQueries, BillingRepository, ChargeRow, EntitlementRepository } from "@debateai/db";
 import type { BillingPolicy } from "@debateai/register";
 import { enqueueEmail, type BillingMailTemplateId } from "./email-job.js";
+import { queuePaymentAlert } from "./payment-alert.js";
 import { addDays, dunningProgress } from "./renewal-rules.js";
 import { subscriptionEvent } from "./rows.js";
 import { APPLIED, type ChargeSettlement, type SettlementResult } from "./settlement.js";
@@ -112,9 +113,9 @@ export async function endDunning(
  * The rows of a dunning's end, and nothing else: ENDED(DUNNING) with `data` and Free from `now` (ENDED_DUNNING), in the
  * caller's transaction under the owner lock. Only the subscription's identity (id, owner, plan, anchor) is read from
  * `subscription`; `appendSubscriptionEvent` folds the rows already written and refuses an illegal end. `endDunning`
- * passes a PAST_DUE fold and adds M6; F2 (ruling PR-55) ends a renewal NETOPIA reports refunded before the site saw
- * it paid through here alone, with no customer email, and for attempt 1 passes the ACTIVE fold after writing PAST_DUE
- * in the same transaction.
+ * passes a PAST_DUE fold and adds M6; `endGivenBackRenewal` (F2, ruling PR-55; F8, ruling PR-56) ends a renewal
+ * NETOPIA reports refunded, or first reports VOIDED, before the site saw it paid through here alone, with no customer
+ * email, and for attempt 1 passes the ACTIVE fold after writing PAST_DUE in the same transaction.
  */
 export async function writeDunningEnd(
   deps: Readonly<{ repository: Pick<BillingRepository, "appendSubscriptionEvent">; entitlements: Pick<EntitlementRepository, "append"> }>,
@@ -126,6 +127,56 @@ export async function writeDunningEnd(
     ownerRef: subscription.ownerRef, planId: "FREE", periodAnchorAt: now, cause: "ENDED_DUNNING", effectiveAt: now,
     subscriptionId: subscription.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
   });
+}
+
+/**
+ * A renewal's month given back at NETOPIA before the site saw it paid, in the caller's transaction under the owner
+ * lock: F2 (money-1, ruling PR-55) for a RENEWAL charge NETOPIA reports REFUNDED (`netopiaProviderRefund`), and F8
+ * (ruling PR-56) for one whose first state is VOIDED (its FAILED(VOIDED) written by VERIFY_PAYMENT's `netopiaFailed` or
+ * by the renewal's own `refused`): NETOPIA cannot yet tell (N-9) an owner's cancellation in its admin from another void,
+ * and dunning a person for a month the owner gave back is the worse error. The plan ends now, attempt 1 (an ACTIVE plan)
+ * and a dunning retry (PAST_DUE) alike, the way the maintenance pass ends a spent dunning (ENDED(DUNNING) and Free,
+ * `writeDunningEnd`), and with NO customer email; no dunning starts or goes on. The fold ends a dunning only from
+ * PAST_DUE, so an ACTIVE plan first records the attempt unpaid (PAST_DUE, with no retry date: none will be made). Only a
+ * plan still on the month this charge renews. Then one O3 RENEWAL_REFUNDED_BEFORE_SEEN for the owner, in the same
+ * transaction, once per charge.
+ */
+export async function endGivenBackRenewal(
+  deps: Readonly<{
+    repository: Pick<BillingRepository, "subscriptionEvents" | "appendSubscriptionEvent" | "withTransaction" | "enqueue">;
+    entitlements: Pick<EntitlementRepository, "append">;
+    jobs: Pick<BillingJobQueries, "outboxJobExists">;
+  }>,
+  client: PoolClient,
+  input: Readonly<{
+    charge: Pick<ChargeRow, "chargeId" | "subscriptionId" | "attempt" | "periodStart">; paymentId: string; now: Date;
+  }>
+): Promise<void> {
+  const { charge, paymentId, now } = input;
+  const subscription = foldSubscription(await deps.repository.subscriptionEvents(charge.subscriptionId, client));
+  const live = (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE")
+    && subscription.currentPeriodEnd?.getTime() === charge.periodStart.getTime();
+  if (live) {
+    if (subscription.status === "ACTIVE") {
+      await deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "PAST_DUE", now, {
+        charge_id: charge.chargeId, attempt: charge.attempt, first_failed_at: now.toISOString()
+      }));
+    }
+    await writeDunningEnd(deps, client, {
+      subscription, data: { charge_id: charge.chargeId, refunded_before_seen: true }, now
+    });
+  }
+  await queuePaymentAlert({ repository: deps.repository, jobs: deps.jobs }, {
+    code: "RENEWAL_REFUNDED_BEFORE_SEEN", reference: `charge ${charge.chargeId}`,
+    dedupeRef: `${charge.chargeId}:RENEWAL_REFUNDED_BEFORE_SEEN`, now,
+    nextSteps: live
+      ? "NETOPIA reports this renewal's payment refunded (or cancelled) before the site saw it paid, so the plan has"
+        + " ended and the person was not emailed. Tell them yourself; if they should keep the plan, they can subscribe again."
+      : `NETOPIA reports this renewal's payment (NETOPIA payment ${paymentId}) refunded (or cancelled) before the site saw`
+        + " it paid. Its plan was not active or past due on the month this payment renewed (it had ended, was paused by a"
+        + " dispute, or was already renewed), so no plan changed and the person was not emailed. Look at the plan and"
+        + " this payment in NETOPIA's admin; tell the person yourself if they need to know."
+  }, client);
 }
 
 export function createRenewalSettlement(deps: RenewalSettlementDeps): ChargeSettlement {

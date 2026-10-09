@@ -147,10 +147,10 @@ async function storeToken(chargeId: string, customerId: string, paidAt: Date): P
 }
 
 /** A verified NETOPIA message for `chargeId`, as N9 stores it (the sealed allow-list is a stand-in ciphertext). */
-async function storeNotice(chargeId: string, status: number, amountText: string): Promise<string> {
+async function storeNotice(chargeId: string, status: number, amountText: string, receivedAt = new Date()): Promise<string> {
   const sealed = sealIpEvidence(TEST_RECORDS_KEY, chargeId, null);
   const stored = await repository.withTransaction((client) => repository.insertPaymentNotice(client, {
-    noticeId: randomUUID(), paymentProvider: "netopia", paymentEnvironment: "sandbox", receivedAt: new Date(), bodySha256: randomBytes(32).toString("hex"),
+    noticeId: randomUUID(), paymentProvider: "netopia", paymentEnvironment: "sandbox", receivedAt, bodySha256: randomBytes(32).toString("hex"),
     orderId: chargeId, providerPaymentId: `ntp-${chargeId.slice(0, 12)}`, providerStatus: status, amountText, currency: "USD",
     cardCountry: "DE", keyFingerprint: "e".repeat(64), jwtIat: null, allowedCiphertext: sealed.ciphertext, keyId: sealed.keyId
   }));
@@ -524,5 +524,41 @@ describe("F3 (final review protocol-2): messages verified at the next start keep
       expect(await noticeOutcomes(paid.notice_id)).toEqual(["APPLIED", "DECIDED_BY_NOTICE"]);
       expect(await noticeOutcomes(declined.notice_id)).toEqual(["APPLIED"]);
     }
+  });
+});
+
+describe("F8 (ruling PR-56): a decline stored after the paid notice never closes a paid order", () => {
+  it("decides from the paid notice, not a later-stored decline of the same order, when the status stays unreadable", async () => {
+    const bought = await checkout("paid-then-declined");
+    // The paid notice first; then a decline of the same order is stored after it (NETOPIA resending an older message).
+    const paid = await storeNotice(bought.chargeId, 3, "23.80", new Date(Date.now() - 3 * MINUTE));
+    const declined = await storeNotice(bought.chargeId, 12, "23.80", new Date(Date.now() - MINUTE));
+    expect((await repository.withTransaction((client) => repository.newestNoticeForOrder(client, bought.chargeId)))?.noticeId)
+      .toBe(declined);
+    const status = new ScriptedStatus();
+    const now = { at: new Date() };
+    const { verify } = handlerFor(status, now);
+    for (let attempts = 1; attempts <= 7; attempts += 1) {
+      status.script(bought.chargeId, paymentError("PAYMENT_PROVIDER_UNAVAILABLE"));
+      const outcome = await verify.handle(job(bought.chargeId, attempts, now.at), now.at);
+      expect(outcome, `attempt ${attempts}`).toMatchObject(attempts < 7 ? { kind: "RETRY", code: "PAYMENT_STATUS_UNREADABLE" } : { kind: "DONE" });
+    }
+    expect(await kinds(bought.chargeId)).toEqual(["REQUESTED", "SUCCEEDED"]);
+    expect((await state(bought.subscriptionId)).status).toBe("ACTIVE");
+    expect(await noticeOutcomes(paid)).toEqual(["DECIDED_BY_NOTICE"]);
+    expect(await noticeOutcomes(declined)).toEqual([]);
+  });
+
+  it("still decides from a decline when no notice of the order says paid or after", async () => {
+    const bought = await checkout("declined-only");
+    await storeNotice(bought.chargeId, 1, "23.80", new Date(Date.now() - 3 * MINUTE));
+    const declined = await storeNotice(bought.chargeId, 12, "23.80", new Date(Date.now() - MINUTE));
+    const status = new ScriptedStatus();
+    const now = { at: new Date() };
+    const { verify } = handlerFor(status, now);
+    status.script(bought.chargeId, paymentError("PAYMENT_PROVIDER_UNAVAILABLE"));
+    expect(await verify.handle(job(bought.chargeId, 7, now.at), now.at)).toEqual({ kind: "DONE" });
+    expect(await kinds(bought.chargeId)).toEqual(["REQUESTED", "FAILED"]);
+    expect(await noticeOutcomes(declined)).toEqual(["DECIDED_BY_NOTICE"]);
   });
 });

@@ -23,15 +23,15 @@ import {
 import { queuePaymentAlert } from "./payment-alert.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
 import {
-  heldByChargeback, openOwnRequest, PAUSED_EMAIL_SENTENCE, queueRefundHeldAlert, refundedAlready, refundedMicros,
-  wholePaymentOpen, type RefundDesk, type RefundIntent
+  disputeCommand, heldByChargeback, openOwnRequest, PAUSED_EMAIL_SENTENCE, queueRefundHeldAlert, refundedAlready,
+  refundedMicros, wholePaymentOpen, type RefundDesk, type RefundIntent
 } from "./refunds.js";
 import { retiredVerifyJob } from "./retired-jobs.js";
 import { chargeEvent, subscriptionEvent } from "./rows.js";
 import {
   enqueueCreditNote, enqueueInvoice, type ChargeSettlement, type SettledPayment, type SettlementContext, type SettlementPrepared
 } from "./settlement.js";
-import { writeDunningEnd } from "./settlement-renewal.js";
+import { endGivenBackRenewal } from "./settlement-renewal.js";
 
 type ChargeWithEvents = ChargeRow & { events: ChargeEventRow[] };
 type Owner = Readonly<{ ownerRef: string; quote: QuoteRow | null; customerId: string; events: ReadonlyArray<SubscriptionEvent> }>;
@@ -86,6 +86,50 @@ function reportFromNotice(orderId: string, notice: PaymentNoticeRow): PaymentRep
     amountMicros, currency: notice.currency, cardCountry: notice.cardCountry, savedCard: null, declineCode: null,
     declineSide: state === "DECLINED" ? "CARD" as const : null, bankDeclined: false, occurredAt: null, clientId: null
   });
+}
+
+/** NETOPIA's failure states a stored notice can carry (declined, failed, expired). */
+const NOTICE_FAILURES: ReadonlySet<string> = new Set(["DECLINED", "FAILED", "EXPIRED"]);
+/** A notice that says paid or anything after paid; VOIDED counts only after a payment (`noticeToDecide`). */
+const NOTICE_PAID_OR_AFTER: ReadonlySet<string> = new Set([
+  "PAID", "REFUNDED", "CHARGEBACK_OPENED", "CHARGEBACK_LOST", "CHARGEBACK_REPRESENTED"
+]);
+
+/**
+ * F8 (ruling PR-56): the stored notice that decides once the status schedule is spent (spec §2.8 step 2). `notices`
+ * are the order's verified notices, newest first (`noticesForOrder`, `newestNoticeForOrder`'s order). The newest
+ * decides, except that a failure (declined, failed, expired) is passed over while a notice of the same order says paid
+ * or anything after paid (refunded, a charge-back, or a void after a payment: `paidSeen`, the charge's SUCCEEDED, or a
+ * paid notice): then the newest such notice decides, so a decline resent and stored after the paid notice never closes
+ * a paid order. Null: no notice.
+ */
+export function noticeToDecide(notices: ReadonlyArray<PaymentNoticeRow>, paidSeen: boolean): PaymentNoticeRow | null {
+  const newest = notices[0] ?? null;
+  const stateOf = (notice: PaymentNoticeRow) => notice.providerStatus === null ? null : statusToState(notice.providerStatus);
+  if (newest === null || !NOTICE_FAILURES.has(stateOf(newest) ?? "")) return newest;
+  const paid = paidSeen || notices.some((notice) => stateOf(notice) === "PAID");
+  return notices.find((notice) => {
+    const state = stateOf(notice);
+    return state !== null && (NOTICE_PAID_OR_AFTER.has(state) || (paid && state === "VOIDED"));
+  }) ?? newest;
+}
+
+/**
+ * The owner's O3 steps for a charge-back NETOPIA reports lost (status 10, N-8: nothing ends by itself). `paused`: the
+ * plan folds SUSPENDED (written only with the customer's M10). F8 (ruling PR-56, as ops-4 did for O2): the dispute
+ * command is README §14.8's host form, on its own line (`disputeCommand`; it records at once).
+ */
+export function chargebackLostSteps(input: Readonly<{ chargeId: string; paymentId: string; paused: boolean }>): string {
+  return `NETOPIA reports the dispute on this payment (NETOPIA payment ${input.paymentId}) as lost: status 10,`
+    + " \"chargeback accepted\"."
+    // F6a (ui-3): SUSPENDED is written only with the customer's M10, so a paused plan's customer was told.
+    + (input.paused
+      ? ` The paid features are paused. ${PAUSED_EMAIL_SENTENCE}`
+      : " No plan was paused for it: the payment bought nothing, or its plan was not active.")
+    + " NETOPIA has not confirmed what this status means, so nothing ends by itself. Once you have checked it in"
+    + " NETOPIA's admin, record the outcome as root on the server with the command below (it records at once; if the"
+    + " dispute ended for us, put --outcome won in place of --outcome lost).\n"
+    + `  ${disputeCommand(input.chargeId, "lost")}`;
 }
 
 /** Spec §2.11: how long a paid or authorised 0 card check waits for its saved card before it fails CARD_NOT_SAVED. */
@@ -188,9 +232,11 @@ export class VerifyPaymentHandler {
     const code = read === "NO_SUCH_ORDER" ? "PAYMENT_NOT_FOUND" : "PAYMENT_STATUS_UNREADABLE";
     const retryAt = notFinalRetryAt(job.attempts, now);
     if (retryAt !== null) return Object.freeze({ kind: "RETRY" as const, code, retryAt });
-    // Spec §2.8 step 2: the schedule is spent; NETOPIA's own signed message decides when we hold one.
+    // Spec §2.8 step 2: the schedule is spent; NETOPIA's own signed message decides when we hold one (F8: never a
+    // failure while a notice of the order says paid or after, `noticeToDecide`).
     if (read === "UNREADABLE") {
-      const notice = await this.newestNotice(charge.chargeId);
+      const notices = await this.deps.repository.withTransaction((client) => this.deps.repository.noticesForOrder(client, charge.chargeId));
+      const notice = noticeToDecide(notices, charge.events.some((event) => event.kind === "SUCCEEDED"));
       const fromNotice = notice === null ? null : reportFromNotice(charge.chargeId, notice);
       if (notice !== null && fromNotice !== null) {
         await this.noticeOutcome(notice.noticeId, now, "DECIDED_BY_NOTICE");
@@ -262,6 +308,7 @@ export class VerifyPaymentHandler {
         return this.netopiaFailed(charge, report, now, "PAYMENT_EXPIRED");
       case "VOIDED":
         // A9's void-ok rule, kept: before success a closed order; after it a full refund made at NETOPIA (F2: our own).
+        // F8 (ruling PR-56): a RENEWAL's closed order ends its plan with no dunning (`netopiaFailed`).
         return charge.events.some((event) => event.kind === "SUCCEEDED")
           ? this.netopiaVoided(charge, report, now)
           : this.netopiaFailed(charge, report, now, "VOIDED");
@@ -400,25 +447,42 @@ export class VerifyPaymentHandler {
     return DONE;
   }
 
-  /** Spec §2.8 FAILED states: FAILED with the code, then the kind's `failed`; the bank is named only when NETOPIA says so. */
+  /**
+   * Spec §2.8 FAILED states: FAILED with the code, then the kind's `failed`; the bank is named only when NETOPIA says so.
+   * F8 (ruling PR-56): a RENEWAL never seen paid that NETOPIA reports VOIDED (the money never moved) is written
+   * FAILED(VOIDED), but no dunning starts or goes on: the owner may have cancelled that month in NETOPIA's admin, so
+   * its plan ends as a renewal refunded before the site saw it paid does (`endGivenBackRenewal`), with one O3.
+   */
   private async netopiaFailed(charge: ChargeWithEvents, report: PaymentReport, now: Date, errorCode: string): Promise<OutboxOutcome> {
     if (charge.events.some((event) => event.kind === "SUCCEEDED")) return DONE;
     if (charge.events.some((event) => event.kind === "FAILED" && event.providerPaymentId === report.providerPaymentId)) return DONE;
     const settlement = this.settlementFor(charge.kind);
     const owner = await this.owner(charge);
-    await this.deps.repository.withTransaction(async (client) => {
+    const givenBack = charge.kind === "RENEWAL" && errorCode === "VOIDED";
+    const ended = await this.deps.repository.withTransaction(async (client): Promise<boolean> => {
       await this.deps.jobs.lockOwner(client, owner.ownerRef);
       const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "FAILED", now, {
         providerPaymentId: report.providerPaymentId, amountMicros: charge.totalMicros, errorCode
       }));
-      if (inserted === "DUPLICATE") return;
+      if (inserted === "DUPLICATE") return false;
+      if (givenBack) {
+        await endGivenBackRenewal(this.givenBackDeps(), client, { charge, paymentId: report.providerPaymentId, now });
+        return true;
+      }
       await settlement.failed({
         ...(await this.context(client, charge, owner, now)), errorCode,
         ...(errorCode === "PAYMENT_DECLINED" ? { bankDeclined: report.bankDeclined } : {})
       });
+      return false;
     });
     this.deps.audit("billing.payment.failed", { chargeKind: charge.kind, code: errorCode });
+    if (ended) this.deps.audit("billing.renewal.refunded_before_seen", { attempt: charge.attempt, voided: true });
     return DONE;
+  }
+
+  /** `endGivenBackRenewal`'s deps: this handler's repository and entitlements, and the O3's once-only check. */
+  private givenBackDeps(): Parameters<typeof endGivenBackRenewal>[0] {
+    return { repository: this.deps.repository, entitlements: this.deps.entitlements, jobs: this.deps.netopia.jobs };
   }
 
   /**
@@ -440,7 +504,7 @@ export class VerifyPaymentHandler {
    * A9 on NETOPIA: a void after success (PROVIDER_VOID) is a full refund with its credit note; an admin refund
    * (PROVIDER_REFUND, N14) is recorded at the remaining amount, its credit note the owner's; never seen paid: paid and refunded.
    * F2 (money-1, ruling PR-55): a RENEWAL never seen paid that NETOPIA reports refunded means the owner gave that month
-   * back in NETOPIA's admin, so in the same transaction its plan ends (`endRefundedRenewal`) and the owner gets one O3;
+   * back in NETOPIA's admin, so in the same transaction its plan ends (`endGivenBackRenewal`) and the owner gets one O3;
    * the person is never emailed and never charged for that month again.
    */
   private async netopiaProviderRefund(
@@ -479,7 +543,7 @@ export class VerifyPaymentHandler {
         }
       }
       if (succeeded || charge.kind !== "RENEWAL") return false;
-      await this.endRefundedRenewal(client, charge, paymentId, now);
+      await endGivenBackRenewal(this.givenBackDeps(), client, { charge, paymentId, now });
       return true;
     });
     if (renewalRefunded) this.deps.audit("billing.renewal.refunded_before_seen", { attempt: charge.attempt });
@@ -491,40 +555,6 @@ export class VerifyPaymentHandler {
     }
     this.deps.audit("billing.refund", { reason, chargeKind: charge.kind });
     return DONE;
-  }
-
-  /**
-   * F2 (money-1, ruling PR-55), in `netopiaProviderRefund`'s transaction under the owner lock: the plan of a RENEWAL
-   * charge NETOPIA reports refunded before the site saw it paid ends now, attempt 1 (an ACTIVE plan) and a dunning retry
-   * (PAST_DUE) alike, the way the maintenance pass ends a spent dunning (ENDED(DUNNING) and Free, `writeDunningEnd`), and
-   * with NO customer email. The fold ends a dunning only from PAST_DUE, so an ACTIVE plan first records the attempt
-   * unpaid (PAST_DUE, with no retry date: none will be made). Only a plan still on the month this charge renews. Then one
-   * O3 RENEWAL_REFUNDED_BEFORE_SEEN for the owner, in the same transaction, once per charge.
-   */
-  private async endRefundedRenewal(client: PoolClient, charge: ChargeWithEvents, paymentId: string, now: Date): Promise<void> {
-    const subscription = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId, client));
-    const live = (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE")
-      && subscription.currentPeriodEnd?.getTime() === charge.periodStart.getTime();
-    if (live) {
-      if (subscription.status === "ACTIVE") {
-        await this.deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "PAST_DUE", now, {
-          charge_id: charge.chargeId, attempt: charge.attempt, first_failed_at: now.toISOString()
-        }));
-      }
-      await writeDunningEnd(this.deps, client, {
-        subscription, data: { charge_id: charge.chargeId, refunded_before_seen: true }, now
-      });
-    }
-    await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia.jobs }, {
-      code: "RENEWAL_REFUNDED_BEFORE_SEEN", reference: `charge ${charge.chargeId}`,
-      dedupeRef: `${charge.chargeId}:RENEWAL_REFUNDED_BEFORE_SEEN`, now,
-      nextSteps: live
-        ? "NETOPIA reports this renewal's payment refunded (or cancelled) before the site saw it paid, so the plan has"
-          + " ended and the person was not emailed. Tell them yourself; if they should keep the plan, they can subscribe again."
-        : `NETOPIA reports this renewal's payment (NETOPIA payment ${paymentId}) refunded (or cancelled) before the site saw`
-          + " it paid. Its plan was no longer on the month this payment renewed, so no plan changed and the person was not"
-          + " emailed. Look at the plan and this payment in NETOPIA's admin; tell the person yourself if they need to know."
-    }, client);
   }
 
   /**
@@ -626,15 +656,7 @@ export class VerifyPaymentHandler {
     this.deps.audit("billing.payment.owner_review", { state: report.state });
     await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia.jobs }, {
       code: "OWNER_REVIEW", reference: `charge ${charge.chargeId}`, dedupeRef: `${charge.chargeId}:CHARGEBACK_LOST`, now,
-      nextSteps: `NETOPIA reports the dispute on this payment (NETOPIA payment ${paymentId}) as lost: status 10,`
-        + " \"chargeback accepted\"."
-        // F6a (ui-3): SUSPENDED is written only with the customer's M10 (above), so a paused plan's customer was told.
-        + (paused
-          ? ` The paid features are paused. ${PAUSED_EMAIL_SENTENCE}`
-          : " No plan was paused for it: the payment bought nothing, or its plan was not active.")
-        + " NETOPIA has not confirmed what this status means, so"
-        + " nothing ends by itself. Once you have checked it in NETOPIA's admin, record the outcome with"
-        + ` pnpm billing:dispute --charge ${charge.chargeId} --outcome lost (or --outcome won).`
+      nextSteps: chargebackLostSteps({ chargeId: charge.chargeId, paymentId, paused })
     });
     return DONE;
   }
