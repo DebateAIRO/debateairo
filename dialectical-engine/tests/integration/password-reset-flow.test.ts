@@ -2,6 +2,7 @@ import { createPreviewRecoveryApiFixture } from "../support/previewRecoveryPrinc
 import { canonicalRegisterJson, registerVersionToSafeLegacyNumber, PASSWORD_RESET_POLICY_REGISTER_ROW as resetFacet, BACKUP_EMAIL_POLICY_REGISTER_ROW as backupFacet, MFA_RECOVERY_POLICY_REGISTER_ROW as mfaFacet } from "@debateai/register";
 import { randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Argon2WorkerPool, AuditContextHasher, createEmailBlindIndex, encrypt, generateTotpSecret, hashPassword, hashRecoveryCode, generateRecoveryCodes, totpCodeAtStep, verifyPassword, type ReadableUserDekStore } from "@debateai/crypto";
@@ -61,7 +62,7 @@ async function receive() {
 beforeAll(async () => {
   db = await startTestDatabase();
   await migrate(db.pool);
-  root = await mkdtemp("/private/tmp/password-reset-native-");
+  root = await mkdtemp(join(tmpdir(), "password-reset-native-"));
   const bootstrap = await loadBootstrapRegister();
   await persistBootstrapRegister(db.pool, bootstrap);
   expect(await readPasswordResetPolicy(db.pool, bootstrap.registerVersion)).toBeNull();
