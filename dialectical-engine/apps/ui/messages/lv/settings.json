@@ -171,6 +171,7 @@
   "settings.phone.change": "Mainīt tālruņa numuru",
   "settings.phone.required": "Pievienojiet tālruņa numuru, lai turpinātu. Jautājums un izvēles tiks saglabātas.",
   "settings.security.lastPath": "Pirms šīs metodes noņemšanas pievienojiet citu pierakstīšanās metodi.",
+  "settings.security.remove": "Noņemt",
   "settings.security.codesRemaining": "Atkopšanas kodi: {count}",
   "settings.security.regenerate": "Ģenerēt jaunus atkopšanas kodus",
   "settings.security.refreshFailed": "Drošības datus nevarēja atsvaidzināt. Pārlādējiet lapu."

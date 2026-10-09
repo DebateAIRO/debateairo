@@ -1,4 +1,4 @@
-import { parsePreviewProviderTestConfig } from "@debateai/providers";
+import { parsePreviewProviderTestConfig, parsePreviewTeamUserIds } from "@debateai/providers";
 import { isAbsolute } from "node:path";
 import { internalAllowancePolicyFromValue } from "./internal-allowance-policy.js";
 import type { StaffAccessEnvironment } from "@debateai/kernel";
@@ -395,6 +395,8 @@ const hatchetShape = {
 
 const apiEnvironmentShape = {
     PREVIEW_PROVIDER_TEST_CONFIG_JSON: z.string().min(1).max(8192).optional(),
+    /** Step 1: the preview's team (identity user ids); parsed with the preview configuration below. */
+    PREVIEW_TEAM_USER_IDS_JSON: z.string().max(4096).optional(),
     KEK_PATH: kekPath,
     SUPPORT_KEK_PATH: kekPath,
     /**
@@ -660,8 +662,10 @@ export function parseApiEnvironment(
   source: Readonly<Record<string, string | undefined>>
 ) {
   const staffAccess = parseStaffAccessEnvironment(source);
-  return { ...validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source)), STAFF_ACCESS: staffAccess,
-    PREVIEW_PROVIDER_TEST_CONFIG: parsePreviewProviderTestConfig(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON) };
+  const environment = validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
+  const previewConfig = parsePreviewProviderTestConfig(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
+  return { ...environment, STAFF_ACCESS: staffAccess, PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
+    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, previewConfig !== undefined) };
 }
 
 /** NETOPIA (spec 2026-10-05 §2.17.1): the payment system's four settings, in the order a missing one is reported. */

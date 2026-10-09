@@ -171,6 +171,7 @@
   "settings.phone.change": "Cambia telefono",
   "settings.phone.required": "Aggiungi il telefono per continuare. La domanda e le opzioni vengono conservate.",
   "settings.security.lastPath": "Aggiungi un altro metodo di accesso prima di rimuovere questo.",
+  "settings.security.remove": "Rimuovi",
   "settings.security.codesRemaining": "Codici di recupero: {count}",
   "settings.security.regenerate": "Genera nuovi codici di recupero",
   "settings.security.refreshFailed": "Impossibile aggiornare i dettagli di sicurezza. Ricarica la pagina."

@@ -110,6 +110,7 @@
   "newDebate.legalGate.signOut": "로그아웃",
   "newDebate.legalGate.signOutFailed": "로그아웃을 완료하지 못했습니다. 다시 시도해 주세요.",
   "newDebate.room.locationBlocked": "현재 위치에서는 새 토론을 시작할 수 없습니다. 기존 토론은 계속 읽을 수 있습니다.",
+  "newDebate.room.previewTeamOnly": "이 미리 보기 버전의 토론은 팀원만 이용할 수 있습니다.",
   "newDebate.room.siteFull": "오늘의 한도에 도달했습니다. 그래도 질문할 수 있으며, 한도가 초기화되면 토론이 자동으로 시작됩니다.",
   "newDebate.room.siteClose": "오늘의 한도에 가까워졌습니다. 이 토론은 끝까지 진행되지만, 이후 토론은 초기화될 때까지 기다릴 수 있습니다.",
   "newDebate.room.alreadyWaiting": "한 번에 하나의 질문만 대기할 수 있습니다. 대기 중인 질문은 {time}에 시작됩니다. 이 질문은 그 후에 해 주세요.",

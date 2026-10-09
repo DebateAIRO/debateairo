@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Les cookies que nous stockons",
   "chrome.security": "Sécurité",
   "chrome.logout": "Se déconnecter",
+  "chrome.logIn": "Se connecter",
   "chrome.accountError": "Cela n’a pas fonctionné. Rechargez la page et réessayez.",
   "chrome.footer.pricing": "Tarifs",
   "chrome.footer.cancel": "Résilier une formule",

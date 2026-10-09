@@ -8,6 +8,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { useRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t } from "@/lib/i18n/translate";
+import { safeReturnPath } from "@/lib/returnPath";
 
 const SCREEN_TITLES: Record<string, string> = {
   "/": "chrome.library",
@@ -96,7 +97,8 @@ export function TopBar() {
         <div className="topBarContext" />
       )}
       <div className="topBarActions">
-        <AccountMenu catalog={catalog} />
+        {/* Its own class: the phone layout hides the bar's other plain buttons but keeps this one. */}
+        <AccountMenu catalog={catalog} signInHref={`/login?next=${encodeURIComponent(safeReturnPath(pathname))}`} signInClassName="btn topBarSignIn" />
         <Link className="btn btnDark" href="/new">
           <span className="topBarNewLabel">+ {t(catalog, "chrome.newDebate")}</span>
         </Link>

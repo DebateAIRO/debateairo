@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Magna tad-dibattitu tħeġġeġ mistoqsijiet dwar il-politika, ir-reliġjon, is-saħħa, is-sesswalità u t-twemmin. Dawn huma kategoriji speċjali ta’ data skont l-Artikolu 9 tal-GDPR, u jistgħu jidħlu fil-mistoqsijiet tiegħek kemm jekk ikollna l-ħsieb li niġbruhom kif ukoll jekk le." },
-      { kind: "p", text: "Dwarek. Qabel l-ewwel dibattitu tiegħek tagħti kunsens espliċitu, fuq skrin separat, biex nipproċessaw informazzjoni sensittiva li tagħżel li tinkludi fil-mistoqsijiet tiegħek stess, għall-finijiet tat-tmexxija tad-dibattiti tiegħek. Inżommu rekord tal-verżjoni tal-kliem li qbilt magħha, tal-lingwa tiegħek u tal-ħin. Mingħajr dan il-kunsens ma tistax tibda dibattitu. Tista’ tirtirah fi kwalunkwe ħin billi tikteb lil privacy@dezbatere.ro. Tista’ wkoll tħalli barra din l-informazzjoni jew tħassar dibattitu li jkun fih din l-informazzjoni. Dak li tippubblika dwarek innifsek huwa data li għażilt li tagħmel pubblika." },
+      { kind: "p", text: "Dwarek. Qabel l-ewwel dibattitu tiegħek tagħti kunsens espliċitu, fuq skrin separat, biex nipproċessaw informazzjoni sensittiva li tagħżel li tinkludi fil-mistoqsijiet tiegħek stess, għall-finijiet tat-tmexxija tad-dibattiti tiegħek. Inżommu rekord tal-verżjoni tal-kliem li qbilt magħha, tal-lingwa tiegħek u tal-ħin. Mingħajr dan il-kunsens ma tistax tibda dibattitu. Tista’ tirtirah fi kwalunkwe ħin billi tagħlaq il-kont tiegħek mill-issettjar. Tista’ wkoll tħalli barra din l-informazzjoni jew tħassar dibattitu li jkun fih din l-informazzjoni. Dak li tippubblika dwarek innifsek huwa data li għażilt li tagħmel pubblika." },
       { kind: "p", text: "Dwar persuni oħra. Ebda kundizzjoni legali ma tippermettilna nipproċessaw data sensittiva dwar parti terza li tkun semmejt f’mistoqsija, u lanqas ebda wieħed mill-fornituri tal-IA tagħna ma għandu kundizzjoni bħal din. Għalhekk it-Termini jipprojbixxuha, nimminimizzaw dak li nibagħtu, u nneħħu malajr dan il-kontenut fuq talba — it-taqsima 11." },
       { kind: "p", text: "Informazzjoni dwar is-saħħa. Xi pajjiżi jittrattaw data relatata mas-saħħa, inklużi inferenzi, taħt liġijiet speċifiċi. Jekk tgħix fi [the State of Washington], japplika [Consumer Health Data Privacy Notice] separat." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Restrizzjoni (Art. 18) — Itlobna nieqfu nipproċessaw data partikolari waqt li tiġi solvuta tilwima dwarha",
         "Oġġezzjoni (Art. 21) — Oġġezzjona għall-ipproċessar ibbażat fuq interessi leġittimi — l-ipproċessar tas-sigurtà u tal-awditjar fit-taqsima 4 — u nieqfu sakemm ma nkunux nistgħu nuru raġunijiet konvinċenti. Oġġezzjona għall-kummerċjalizzazzjoni fi kwalunkwe ħin, u nieqfu",
         "Portabbiltà (Art. 20) — Id-dibattiti u d-data tal-kont tiegħek f’format komuni li jista’ jinqara minn magna. [Pending: same export as Access.] Kontenut mhux personali li ħloqt, bħall-mistoqsijiet tiegħek, jingħatalek lura fuq talba meta jintemm il-kuntratt",
-        "Irtirar tal-kunsens (Art. 7(3)) — Irtira l-kunsens għall-kummerċjalizzazzjoni minn kwalunkwe messaġġ elettroniku jew mill-issettjar; irtira l-kunsens għal data sensittiva billi tikteb lil privacy@dezbatere.ro (tista’ wkoll tħalli barra din id-data jew tħassar dibattitu li jkun fiha). L-irtirar ma jaffettwax ipproċessar li jkun diġà sar",
+        "Irtirar tal-kunsens (Art. 7(3)) — Irtira l-kunsens għall-kummerċjalizzazzjoni minn kwalunkwe messaġġ elettroniku jew mill-issettjar; irtira l-kunsens għal data sensittiva billi tagħlaq il-kont tiegħek mill-issettjar (tista’ wkoll tħalli barra din id-data jew tħassar dibattitu li jkun fiha). L-irtirar ma jaffettwax ipproċessar li jkun diġà sar",
         "Ilment — Lill-awtorità superviżorja Rumena, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, jew lill-awtorità fil-pajjiż fejn tgħix. Nippreferu li l-ewwel tikkuntattja lilna"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "c5daf566b44043e42752c0e9b58c3eecc5b9c5affe0e7c8d7346113bd07b8e1f",
+  sha256: "dcafcd0ae4d1baf224f921ecb425672574cc8f7951f1c5b3d5bccb1eaf93d639",
   eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.2 · EFFETTIVA [DATE]",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",

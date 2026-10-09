@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Az általunk tárolt sütik",
   "chrome.security": "Biztonság",
   "chrome.logout": "Kijelentkezés",
+  "chrome.logIn": "Bejelentkezés",
   "chrome.accountError": "Ez nem sikerült. Töltse be újra az oldalt, és próbálja újra.",
   "chrome.footer.pricing": "Árak",
   "chrome.footer.cancel": "Csomag lemondása",

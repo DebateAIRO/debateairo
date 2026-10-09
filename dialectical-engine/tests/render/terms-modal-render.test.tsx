@@ -202,8 +202,8 @@ describe("terms of service modal — rendered", () => {
       expect(number.dataset.accent).toBe(token);
       expect(number.style.getPropertyValue("--accent")).toBe(`var(${token})`);
     }
-    expect(dialog().querySelectorAll(".policyText").length).toBe(108);
-    expect(dialog().querySelectorAll(".policyItem").length).toBe(12);
+    expect(dialog().querySelectorAll(".policyText").length).toBe(110);
+    expect(dialog().querySelectorAll(".policyItem").length).toBe(13);
   });
 
   it("offers Close and no acknowledgement in read mode", async () => {

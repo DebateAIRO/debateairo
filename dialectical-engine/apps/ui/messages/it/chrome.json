@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "I cookie che conserviamo",
   "chrome.security": "Sicurezza",
   "chrome.logout": "Esci",
+  "chrome.logIn": "Accedi",
   "chrome.accountError": "Non ha funzionato. Ricarica la pagina e riprova.",
   "chrome.footer.pricing": "Prezzi",
   "chrome.footer.cancel": "Disdici un piano",

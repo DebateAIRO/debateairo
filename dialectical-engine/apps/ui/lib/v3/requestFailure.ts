@@ -212,6 +212,19 @@ export function isCountryAskBlocked(error: unknown): boolean {
     && error.serverCode === LOCATION_BLOCKED_SERVER_CODE;
 }
 
+/**
+ * Step 1 (owner, 2026-10-08). On the private preview POST /v1/asks answers a person outside the
+ * team 403 PREVIEW_TEAM_ONLY: an observed refusal with its own plain sentence, like G4 above.
+ */
+const PREVIEW_TEAM_ONLY_SERVER_CODE = "PREVIEW_TEAM_ONLY";
+const PREVIEW_TEAM_ONLY_KEY = "newDebate.room.previewTeamOnly";
+const PREVIEW_TEAM_ONLY_ENGLISH = "Debates on this preview are open only to the team.";
+
+export function isPreviewTeamOnly(error: unknown): boolean {
+  return error instanceof ContractHttpError && error.status === 403
+    && error.serverCode === PREVIEW_TEAM_ONLY_SERVER_CODE;
+}
+
 /** The user-facing line for a banner. Never a sentence a server wrote. */
 export function requestFailureMessage(
   subject: RequestFailureSubject,
@@ -220,6 +233,9 @@ export function requestFailureMessage(
 ): string {
   if (subject === "DEBATE_CREATE" && isCountryAskBlocked(error)) {
     return catalog === undefined ? LOCATION_BLOCKED_ENGLISH : t(catalog, LOCATION_BLOCKED_KEY);
+  }
+  if (subject === "DEBATE_CREATE" && isPreviewTeamOnly(error)) {
+    return catalog === undefined ? PREVIEW_TEAM_ONLY_ENGLISH : t(catalog, PREVIEW_TEAM_ONLY_KEY);
   }
   const classified = classifyRequestFailure(subject,error);
   if (catalog === undefined) return classified.message;
