@@ -1,47 +1,76 @@
 import { describe, expect, it } from 'vitest';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import type { Pool } from 'pg';
 import { loadMigrationPlan, type MigrationPlan } from '../../packages/db/src/migration-lineage.js';
 import { NativeVerifyPendingForwardStepError, pendingForwardSteps, refusePendingForwardSteps } from '../../deploy/preview-auth-dev/v1/verify-native.js';
 
-// The preview's verify never applies a database step (ruling PR-57): a forward step the ledger lacks is refused
-// before migrate() runs; only the native operator's apply-and-plan applies one. F10 (PR-58): dev's 0110 is applied by
-// migrate() too (applyForward110), so a pending 0110 is refused like a pending chain step (0111, NETOPIA).
+// The preview's verify never applies a database step (ruling PR-57): a step the database lacks is refused before
+// migrate() runs; only the native operator's apply-and-plan applies one. F10 (PR-58): dev's 0110 is applied by
+// migrate() too (applyForward110). F11 (PR-59): the guard is general: every numbered migration the source holds (the
+// list loadMigrationPlan checks for SOURCE_INVENTORY: the recipe's sources, 0108, 0110 and the chain) must be recorded
+// in the ledger or as a resolution's logical name, or it is pending.
 const NETOPIA_STEP = '0111_billing_netopia.sql';
 const DEV_STEP = '0110_account_erasure_public_debates.sql';
-const chainOf = (...names: string[]) => ({ forward110: { name: '0110_dev.sql' }, forwardChain: names.map(name => ({ name })) }) as unknown as Pick<MigrationPlan, 'forwardChain' | 'forward110'>;
-const fakePool = (names: readonly string[]) => {
+const LEDGER = 'SELECT name FROM public.debateai_schema_migration';
+const RESOLUTION_TABLE = "SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present";
+const RESOLUTIONS = 'SELECT logical_name FROM public.debateai_schema_migration_resolution';
+type GuardPlan = Parameters<typeof pendingForwardSteps>[0];
+const planOf = (sources: string[], ...chain: string[]) => ({ manifest: { order: sources }, forward108: { name: '0108_x.sql' }, forward110: { name: '0110_dev.sql' },
+ forwardChain: chain.map(name => ({ name })) }) as unknown as GuardPlan;
+const chainOf = (...names: string[]) => planOf(['0001_a.sql', '0002_b.sql'], ...names);
+const BASE = ['0001_a.sql', '0002_b.sql', '0108_x.sql'];
+// A fake pool answering the guard's three read-only SELECTs; resolutions === null means the table does not exist.
+const fakePool = (names: readonly string[], resolutions: readonly string[] | null = []) => {
  const queries: string[] = [];
- const pool = { query: async (sql: string) => { queries.push(sql); return { rows: names.map(name => ({ name })) }; } } as unknown as Pool;
+ const pool = { query: async (sql: string) => {
+  queries.push(sql);
+  if (sql === LEDGER) return { rows: names.map(name => ({ name })) };
+  if (sql === RESOLUTION_TABLE) return { rows: [{ present: resolutions !== null }] };
+  if (sql === RESOLUTIONS && resolutions !== null) return { rows: resolutions.map(logical_name => ({ logical_name })) };
+  throw new Error(`unexpected query: ${sql}`);
+ } } as unknown as Pool;
  return { pool, queries };
 };
+const sourceNames = (plan: MigrationPlan) => [...plan.manifest.order, plan.forward108.name, plan.forward110.name, ...plan.forwardChain.map(step => step.name)];
 
 describe('pendingForwardSteps', () => {
- it('returns the missing names in chain order', () => {
+ it('returns the missing names in the plan\'s apply order: the recipe\'s sources, 0108, 0110, then the chain', () => {
   const chain = chainOf('0111_a.sql', '0112_b.sql', '0113_c.sql');
-  expect(pendingForwardSteps(chain, new Set(['0110_dev.sql', '0112_b.sql']))).toEqual(['0111_a.sql', '0113_c.sql']);
-  expect(pendingForwardSteps(chain, new Set())).toEqual(['0110_dev.sql', '0111_a.sql', '0112_b.sql', '0113_c.sql']);
+  expect(pendingForwardSteps(chain, new Set([...BASE, '0110_dev.sql', '0112_b.sql']))).toEqual(['0111_a.sql', '0113_c.sql']);
+  expect(pendingForwardSteps(chain, new Set())).toEqual(['0001_a.sql', '0002_b.sql', '0108_x.sql', '0110_dev.sql', '0111_a.sql', '0112_b.sql', '0113_c.sql']);
+  expect(pendingForwardSteps(chain, new Set(['0002_b.sql', '0110_dev.sql', '0111_a.sql', '0112_b.sql', '0113_c.sql']))).toEqual(['0001_a.sql', '0108_x.sql']);
  });
- it('returns dev\'s 0110 first when the ledger lacks it', () => {
-  expect(pendingForwardSteps(chainOf('0111_a.sql'), new Set(['0108_x.sql', '0111_a.sql']))).toEqual(['0110_dev.sql']);
+ it('returns dev\'s 0110 first when the database lacks it', () => {
+  expect(pendingForwardSteps(chainOf('0111_a.sql'), new Set([...BASE, '0111_a.sql']))).toEqual(['0110_dev.sql']);
  });
- it('returns none when every step is applied', () => {
-  expect(pendingForwardSteps(chainOf('0111_a.sql', '0112_b.sql'), new Set(['0108_x.sql', '0110_dev.sql', '0111_a.sql', '0112_b.sql']))).toEqual([]);
+ it('returns none when every name is applied', () => {
+  expect(pendingForwardSteps(chainOf('0111_a.sql', '0112_b.sql'), new Set([...BASE, '0110_dev.sql', '0111_a.sql', '0112_b.sql']))).toEqual([]);
  });
- it('reads this source\'s plan: 0110 and 0111 are pending on a database that has only 0108', async () => {
+ it('reads this source\'s plan: 0110 and 0111 are pending, in that order, on a database complete through 0108', async () => {
   const plan = await loadMigrationPlan();
   expect(plan.forward110.name).toBe(DEV_STEP);
   expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA_STEP]);
-  expect(pendingForwardSteps(plan, new Set([plan.forward108.name]))).toEqual([DEV_STEP, NETOPIA_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name]))).toEqual([DEV_STEP, NETOPIA_STEP]);
  });
- it('reads this source\'s plan: only 0111 is pending on a database at dev\'s 0108 and 0110', async () => {
+ it('reads this source\'s plan: only 0111 is pending on a database complete through dev\'s 0110', async () => {
   const plan = await loadMigrationPlan();
-  expect(pendingForwardSteps(plan, new Set([plan.forward108.name, DEV_STEP]))).toEqual([NETOPIA_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP]))).toEqual([NETOPIA_STEP]);
+ });
+ it('reads this source\'s plan: a recipe source the database lacks is pending, in apply order before 0108', async () => {
+  const plan = await loadMigrationPlan();
+  const missing = plan.manifest.order[3]!;
+  expect(pendingForwardSteps(plan, new Set(sourceNames(plan).filter(name => name !== missing && name !== NETOPIA_STEP)))).toEqual([missing, NETOPIA_STEP]);
+ });
+ it('covers exactly the numbered migrations the source holds (the SOURCE_INVENTORY list)', async () => {
+  const plan = await loadMigrationPlan();
+  const discovered = (await readdir(new URL('../../migrations/', import.meta.url))).filter(name => /^\d+.*\.sql$/.test(name)).sort();
+  expect([...pendingForwardSteps(plan, new Set())].sort()).toEqual(discovered);
+  expect(pendingForwardSteps(plan, new Set())).toEqual(sourceNames(plan));
  });
 });
 
 describe('refusePendingForwardSteps', () => {
- it('refuses, naming 0111, when the ledger lacks it, with one read-only SELECT', async () => {
+ it('refuses, naming 0111, when the database lacks it, with read-only SELECTs only', async () => {
   const plan = await loadMigrationPlan();
   const { pool, queries } = fakePool([...plan.manifest.order, plan.forward108.name, plan.forward110.name]);
   const refusal = await refusePendingForwardSteps(pool, plan).then(() => undefined, (error: unknown) => error);
@@ -52,27 +81,52 @@ describe('refusePendingForwardSteps', () => {
   expect(error.pending).toEqual([NETOPIA_STEP]);
   expect(Object.isFrozen(error.pending)).toBe(true);
   expect(error.message).toBe(`PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: ${error.pending.join(', ')}. Verify never applies a migration; run the native operator with operation apply-and-plan first.`);
-  expect(queries).toEqual(['SELECT name FROM public.debateai_schema_migration']);
+  expect(queries).toEqual([LEDGER, RESOLUTION_TABLE, RESOLUTIONS]);
  });
- it('refuses, naming 0110 and 0111, on a database at 0108 only (migrate() would apply dev\'s 0110 too)', async () => {
+ it('refuses, naming 0110 and 0111 in that order, on a database complete through 0108 (a plan carrying forward110 not applied)', async () => {
   const plan = await loadMigrationPlan();
-  const { pool, queries } = fakePool([...plan.manifest.order, plan.forward108.name]);
+  const { pool } = fakePool([...plan.manifest.order, plan.forward108.name]);
   await expect(refusePendingForwardSteps(pool, plan)).rejects.toMatchObject({ code: 'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP', pending: [DEV_STEP, NETOPIA_STEP] });
-  expect(queries).toHaveLength(1);
  });
  it('refuses, naming 0110, when only 0110 is missing', async () => {
   const plan = await loadMigrationPlan();
-  const { pool } = fakePool([...plan.manifest.order, plan.forward108.name, ...plan.forwardChain.map(step => step.name)]);
+  const { pool } = fakePool(sourceNames(plan).filter(name => name !== DEV_STEP));
   await expect(refusePendingForwardSteps(pool, plan)).rejects.toMatchObject({ pending: [DEV_STEP] });
  });
- it('resolves when every forward step is in the ledger', async () => {
+ it('refuses a recipe source recorded in neither the ledger nor the resolutions', async () => {
   const plan = await loadMigrationPlan();
-  const { pool, queries } = fakePool([...plan.manifest.order, plan.forward108.name, plan.forward110.name, ...plan.forwardChain.map(step => step.name)]);
+  const missing = plan.manifest.compatibility.logicalName;
+  const { pool } = fakePool(sourceNames(plan).filter(name => name !== missing));
+  await expect(refusePendingForwardSteps(pool, plan)).rejects.toMatchObject({ pending: [missing] });
+ });
+ it('counts a resolved logical name as present (the compatibility and the fresh-resolutions lineages)', async () => {
+  const plan = await loadMigrationPlan();
+  const compatibility = [plan.manifest.compatibility.logicalName];
+  const wrappers = plan.manifest.transactionBodies.map(({ logicalName }) => logicalName);
+  for (const resolved of [compatibility, wrappers]) {
+   const { pool, queries } = fakePool(sourceNames(plan).filter(name => !resolved.includes(name)), resolved);
+   await expect(refusePendingForwardSteps(pool, plan)).resolves.toBeUndefined();
+   expect(queries).toEqual([LEDGER, RESOLUTION_TABLE, RESOLUTIONS]);
+  }
+ });
+ it('treats a missing resolution table as empty and does not read it', async () => {
+  const plan = await loadMigrationPlan();
+  const complete = fakePool(sourceNames(plan), null);
+  await expect(refusePendingForwardSteps(complete.pool, plan)).resolves.toBeUndefined();
+  expect(complete.queries).toEqual([LEDGER, RESOLUTION_TABLE]);
+  const wrappers = plan.manifest.transactionBodies.map(({ logicalName }) => logicalName);
+  const lacking = fakePool(sourceNames(plan).filter(name => !wrappers.includes(name)), null);
+  await expect(refusePendingForwardSteps(lacking.pool, plan)).rejects.toMatchObject({ pending: wrappers });
+ });
+ it('resolves when every name is applied', async () => {
+  const plan = await loadMigrationPlan();
+  const { pool, queries } = fakePool(sourceNames(plan));
   await expect(refusePendingForwardSteps(pool, plan)).resolves.toBeUndefined();
-  expect(queries).toHaveLength(1);
+  expect(queries).toEqual([LEDGER, RESOLUTION_TABLE, RESOLUTIONS]);
  });
  it('loads the source plan itself when none is given', async () => {
-  await expect(refusePendingForwardSteps(fakePool([]).pool)).rejects.toMatchObject({ code: 'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP' });
+  const plan = await loadMigrationPlan();
+  await expect(refusePendingForwardSteps(fakePool([]).pool)).rejects.toMatchObject({ code: 'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP', pending: sourceNames(plan) });
  });
 });
 

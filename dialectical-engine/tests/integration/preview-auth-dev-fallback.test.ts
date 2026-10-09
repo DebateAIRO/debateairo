@@ -5,11 +5,11 @@ import { migrate } from '@debateai/db';
 import { loadBootstrapRegister,createPostgresRegisterPublicationPort,canonicalRegisterJson,computeRegisterSnapshotSha256,parseRegisterVersionText } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows,composePreviewSnapshot,publishPreviewRegister,readSealedSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
-import { verifyNativeState } from '../../deploy/preview-auth-dev/v1/verify-native.js';
+import { refusePendingForwardSteps,verifyNativeState } from '../../deploy/preview-auth-dev/v1/verify-native.js';
 import { startTestDatabase } from '../support/testDatabase.js';
 import { seedInstalledAuth106 } from '../support/auth106.js';
 import { seedDevLineage108 } from '../support/devLineage108.js';
-import { loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
+import { identifyLineage,loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
 import { createPreviewRecoveryApiFixture } from '../support/previewRecoveryPrincipal.js';
 const native=await import('../../deploy/'+'preview-auth-dev/v1/native-peer.mjs');
 const observation={nodeVersion:process.version,pnpmVersion:'11.20.0',sourceRevision:'a'.repeat(40),sourceTree:'b'.repeat(40),operatorSha256:'c'.repeat(64),observedAt:'2026-10-06T12:00:00.000Z'};
@@ -147,4 +147,50 @@ describe('the preview verify never applies a database step (PR-57)',()=>{
    expect(verified.ledgerCount).toBe(before.length+pending.length);
   }finally{await selected?.end();await db.stop();}
  },120000);
+});
+describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
+ // Each lineage is built as the suites build it: integrated-original-108 is dev's state (devLineage108.ts) taken through
+ // this branch's migrate(); integrated-compatibility-108 is an installed AUTH106 database (auth106.ts, the preservation
+ // suite's base) taken through migrate(); integrated-fresh-resolutions-108 is an empty database taken through migrate().
+ // Each ends with 0108, 0110 and 0111 applied: the live preview's shape after apply-and-plan, which must not be refused.
+ const lineages:ReadonlyArray<readonly [string,(pool:pg.Pool)=>Promise<void>]>=[
+  ['integrated-original-108',seedDevLineage108],['integrated-compatibility-108',seedInstalledAuth106],['integrated-fresh-resolutions-108',async()=>{}]];
+ for(const [lineage,seed] of lineages)it(`resolves on a complete ${lineage} database, and refuses naming 0110 and 0111 when the ledger lacks them without changing it`,async()=>{
+  const db=await startTestDatabase();
+  try{
+   const plan=await loadMigrationPlan(),pending=[plan.forward110.name,...plan.forwardChain.map(step=>step.name)];
+   expect(pending).toEqual(['0110_account_erasure_public_debates.sql','0111_billing_netopia.sql']);
+   const ledger=async(client:{query:pg.Pool['query']}=db.pool)=>(await client.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
+   const resolutionTable=async()=>(await db.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0].present as boolean;
+   await seed(db.pool);
+   if(lineage==='integrated-original-108'){
+    // Dev's own state before #101 (its seed runs dev's applyForward108 directly): 0110 and 0111 missing, and no
+    // resolution table, which the guard reads as empty. It refuses naming both and writes nothing.
+    const before=await ledger();
+    expect(before.map(row=>row.name)).toEqual([...plan.manifest.order,plan.forward108.name].sort());
+    expect(await resolutionTable()).toBe(false);
+    await expect(refusePendingForwardSteps(db.pool,plan)).rejects.toMatchObject({code:'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP',pending});
+    expect(await ledger()).toEqual(before);expect(await resolutionTable()).toBe(false);
+   }
+   await migrate(db.pool);
+   const complete=await ledger();
+   const resolutions=(await db.pool.query('SELECT logical_name FROM public.debateai_schema_migration_resolution ORDER BY logical_name')).rows.map(row=>row.logical_name as string);
+   expect(identifyLineage(plan,complete.map(row=>row.name),resolutions)).toBe(lineage);
+   expect(complete.map(row=>row.name)).toEqual(expect.arrayContaining([plan.forward108.name,...pending]));
+   await expect(refusePendingForwardSteps(db.pool,plan)).resolves.toBeUndefined();
+   await expect(refusePendingForwardSteps(db.pool)).resolves.toBeUndefined();
+   // The same database with 0110 and 0111 taken out of the ledger inside a transaction that is rolled back: the guard
+   // refuses naming both, in that order, and changes nothing (the ledger it saw is the ledger after it).
+   const client=await db.pool.connect();
+   try{
+    await client.query('BEGIN');
+    await client.query('DELETE FROM public.debateai_schema_migration WHERE name=ANY($1::text[])',[pending]);
+    const lacking=await ledger(client);
+    expect(lacking).toHaveLength(complete.length-2);
+    await expect(refusePendingForwardSteps(client as unknown as pg.Pool,plan)).rejects.toMatchObject({code:'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP',pending});
+    expect(await ledger(client)).toEqual(lacking);
+   }finally{await client.query('ROLLBACK');client.release();}
+   expect(await ledger()).toEqual(complete);
+  }finally{await db.stop();}
+ },180000);
 });
