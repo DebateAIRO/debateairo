@@ -236,6 +236,29 @@ describe('interim writer: the existing recovery login, opened just in time', () 
   });
 });
 
+describe('where the unlock connects as the recovery login', () => {
+  it('uses the preview\'s local socket by default (pg_hba allows this login on the socket only), without TLS', () => {
+    const target = unlock.resolveStaffDbHost(undefined);
+    expect(target).toEqual({ host: '/run/debateai-v3-preview/postgresql', tls: false });
+    expect(unlock.resolveStaffDbHost('')).toEqual(target);
+    const options = unlock.staffPoolOptions({ target, password: 'x', ca: null });
+    expect(options).toMatchObject({ host: '/run/debateai-v3-preview/postgresql', port: 5434, database: 'debateai', user: 'debateai_prod_staff_recovery', password: 'x', max: 1, application_name: 'preview-team-unlock' });
+    expect(options.ssl).toBe(false);
+  });
+
+  it('can be pointed at loopback TCP, and then always verifies TLS with the preview CA', () => {
+    const target = unlock.resolveStaffDbHost('127.0.0.1');
+    expect(target).toEqual({ host: '127.0.0.1', tls: true });
+    expect(unlock.staffPoolOptions({ target, password: 'x', ca: 'CA' }).ssl).toEqual({ ca: 'CA', rejectUnauthorized: true });
+    expect(() => unlock.staffPoolOptions({ target, password: 'x', ca: null })).toThrow(/STAFF_DB_HOST_REFUSED/);
+    expect(unlock.resolveStaffDbHost('/run/other/postgresql')).toEqual({ host: '/run/other/postgresql', tls: false });
+  });
+
+  it.each(['db.example.test', '10.0.0.5', 'run/postgresql', '/run/../tmp', '/run/x y', 'localhost'])('refuses the host %j', value => {
+    expect(() => unlock.resolveStaffDbHost(value)).toThrow(/STAFF_DB_HOST_REFUSED/);
+  });
+});
+
 describe('ACK evidence refresh', () => {
   const wrapper = (path: string) => `import {createAdapters} from '/opt/debateai-v3-preview/operator/staff-alerts/adapters.mjs';\nexport async function createStaffAlertOperatorAdapters(){return createAdapters({evidencePath:${JSON.stringify(path)},adapterId:'capture'});}\n`;
   it('finds the one evidence path the installed wrapper reads', () => {

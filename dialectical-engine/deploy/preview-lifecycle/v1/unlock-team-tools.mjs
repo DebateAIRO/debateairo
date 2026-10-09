@@ -226,6 +226,26 @@ export function createSelfCaptureEvidence({ readWrapperText, runSelfCapture, rea
   };
 }
 
+/**
+ * Where the recovery login connects. Default: the preview's own Unix socket with SCRAM, which is
+ * what deploy/postgres/pg_hba.conf.template allows for debateai_prod_staff_recovery (`local` only).
+ * PREVIEW_LIFECYCLE_STAFF_DB_HOST may name another socket folder, or loopback (127.0.0.1 / ::1)
+ * when the server's pg_hba has a matching hostssl line; TCP always verifies TLS with the preview CA.
+ */
+export function resolveStaffDbHost(value, layout = LAYOUT) {
+  if (value === undefined || value === '') return { host: layout.pgSocketDir, tls: false };
+  if (value === '127.0.0.1' || value === '::1') return { host: value, tls: true };
+  if (typeof value === 'string' && isAbsolute(value) && normalize(value) === value && /^\/[A-Za-z0-9/._-]+$/.test(value) && !value.split('/').includes('..')) return { host: value, tls: false };
+  return refuse('STAFF_DB_HOST_REFUSED');
+}
+
+export function staffPoolOptions({ target, password, ca, layout = LAYOUT }) {
+  if (target.tls && (typeof ca !== 'string' || !ca)) refuse('STAFF_DB_HOST_REFUSED');
+  return { host: target.host, port: layout.pgPort, database: layout.database, user: 'debateai_prod_staff_recovery', password,
+    ssl: target.tls ? { ca, rejectUnauthorized: true } : false,
+    max: 1, connectionTimeoutMillis: 5000, query_timeout: 5000, statement_timeout: 5000, idleTimeoutMillis: 1000, application_name: 'preview-team-unlock' };
+}
+
 /** Every release module root loads, in load order: tsx, the db package, the staff alert code, pg. */
 export function unlockImportPaths(engine, pgPath) {
   return [`${engine}/node_modules/tsx/dist/esm/api/index.mjs`, `${engine}/packages/db/src/index.ts`, `${engine}/apps/api/src/staff/alerts.ts`, `${engine}/apps/api/src/staff/runtime.ts`, pgPath];
@@ -306,12 +326,12 @@ async function runServer() {
   const operator = await runtime.loadStaffAlertOperator({ path: staff.operatorPath, sha256: staff.operatorSha256 });
   try {
     const configuration = new alerts.RootStaffAlertConfiguration({ path: staff.configPath, acknowledgements: operator.acknowledgements, timeoutMs: 2000 });
-    const ca = await readCa();
+    const target = resolveStaffDbHost(process.env.PREVIEW_LIFECYCLE_STAFF_DB_HOST);
+    const ca = target.tls ? await readCa() : null;
     const writer = createInterimLoginWriter({
       runCreator: creatorRunner({ engine, nodePath }),
       createPool: async password => {
-        const pool = new pg.Pool({ host: '127.0.0.1', ssl: { ca, rejectUnauthorized: true }, port: LAYOUT.pgPort, database: LAYOUT.database, user: 'debateai_prod_staff_recovery', password,
-          max: 1, connectionTimeoutMillis: 5000, query_timeout: 5000, statement_timeout: 5000, idleTimeoutMillis: 1000, application_name: 'preview-team-unlock' });
+        const pool = new pg.Pool(staffPoolOptions({ target, password, ca }));
         try {
           const rows = (await pool.query(`SELECT session_user::text session,current_user::text role,current_database() database,current_setting('port')::int port,
             rolvaliduntil>clock_timestamp() AND rolvaliduntil<=clock_timestamp()+interval '5 minutes' bounded,
