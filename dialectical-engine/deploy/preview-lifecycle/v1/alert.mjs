@@ -39,23 +39,33 @@ export function parseRecipient(raw, approvedDigests) {
   return address;
 }
 
+// A secret-bearing key: password, DB_PASSWORD, PGPASSWORD, client_secret, access_token,
+// NETOPIA_API_KEY, x-api-key, sessionId, ... (any [A-Za-z0-9_] around the core word). The
+// separator also covers JSON ("key":"value", "key" : "value"); the value stops at a quote,
+// space, comma, semicolon, ampersand or closing brace.
+const SECRET_KEY = String.raw`[A-Za-z0-9_]*(?:password|passwd|pwd|secret|token|api[_-]?key|authorization|cookie|session|dsn)[A-Za-z0-9_]*`;
 const RULES = [
-  // Credentials inside URLs: scheme://user:password@host
-  [/([a-z][a-z0-9+.-]*:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[REDACTED]@'],
+  // Credentials inside URLs: scheme://user:password@host and scheme://token@host.
+  [/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+@/gi, '$1[REDACTED]@'],
   // Whole header-style values (they may contain spaces).
-  [/\b(authorization|proxy-authorization|cookie|set-cookie)\b(\s*[=:]\s*).*$/gi, '$1$2[REDACTED]'],
+  [/(?<![A-Za-z0-9_-])(proxy-authorization|authorization|set-cookie|cookie)(\s*[=:]\s*)(?!")(.*)$/gi, '$1$2[REDACTED]'],
   [/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/g, '$1 [REDACTED]'],
-  [/\b(password|passwd|pwd|secret|token|api[_-]?key|apikey|access[_-]?key|private[_-]?key|credential)\b(\s*[=:]\s*)("?)[^\s"',;]+/gi, '$1$2$3[REDACTED]'],
+  [new RegExp(String.raw`(?<![A-Za-z0-9_])(${SECRET_KEY})("?\s*[=:]\s*"?)(?!\[REDACTED\])[^\s"',;&}]+`, 'gi'), '$1$2[REDACTED]'],
   [/\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}/g, '[REDACTED]'],
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, '[EMAIL]'],
   [/\b(?!127\.)(?:\d{1,3}\.){3}\d{1,3}\b/g, '[IP]'],
-  [/\b[a-fA-F0-9]{32,}\b/g, '[HEX]'],
-  // Random-looking tokens: long, and mixing upper case, lower case and digits (names and paths do not).
-  [/(?<![A-Za-z0-9+_=-])[A-Za-z0-9+_-]{32,}={0,2}(?![A-Za-z0-9+_=-])/g, match => (/[A-Z]/.test(match) && /[a-z]/.test(match) && /[0-9]/.test(match) ? '[TOKEN]' : match)]
+  // Long hex, also right after an underscore or dash (where \b does not see a boundary).
+  [/(?<![A-Za-z0-9])[a-fA-F0-9]{32,}(?![A-Za-z0-9])/g, '[HEX]'],
+  // Random-looking blobs (base64, base64url, tokens): 32+ characters that mix upper case, lower
+  // case and digits, or end in base64 padding. Names, paths and codes do not.
+  [/(?<![A-Za-z0-9+/=_-])[A-Za-z0-9+/_-]{32,}(={1,2}(?![A-Za-z0-9+/=_-])|(?![A-Za-z0-9+/=_-]))/g,
+    match => (match.endsWith('=') || (/[A-Z]/.test(match) && /[a-z]/.test(match) && /[0-9]/.test(match)) ? '[TOKEN]' : match)]
 ];
+/** Only this much of a line is ever examined; the email shows at most 300 characters of it anyway. */
+const MAX_EXAMINED = 2048;
 /** Blank anything secret-looking, drop control bytes, keep each line short. */
 export function redactLine(line) {
-  let text = String(line).replace(/[\u0000-\u001f\u007f]/g, '');
+  let text = String(line).slice(0, MAX_EXAMINED).replace(/[\u0000-\u001f\u007f]/g, '');
   for (const [pattern, replacement] of RULES) text = text.replace(pattern, replacement);
   return text.slice(0, 300);
 }

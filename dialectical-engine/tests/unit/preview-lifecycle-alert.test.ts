@@ -176,7 +176,21 @@ describe('failure alert', () => {
     ['public IPv4 but not loopback', 'from 203.0.113.7 to 127.0.0.1:3101', 'from [IP] to 127.0.0.1:3101'],
     ['long hex', `sha ${'ab'.repeat(32)} done`, 'sha [HEX] done'],
     ['random token', 'cookie-free value Zx9qL2mN8pR4tV6wY1aB3cD5eF7gH0jK end', 'cookie-free value [TOKEN] end'],
-    ['JWT', 'jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl x', 'jwt [REDACTED] x']
+    ['JWT', 'jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl x', 'jwt [REDACTED] x'],
+    ['a JSON password', '{"password":"hunter2pass"}', '{"password":"[REDACTED]"}'],
+    ['a JSON token', '{"token":"tok_live_abc"}', '{"token":"[REDACTED]"}'],
+    ['a JSON session and DSN with spaces', '{"session": "s%3Aabc", "dsn" : "postgres://u:p@h/db"}', '{"session": "[REDACTED]", "dsn" : "[REDACTED]"}'],
+    ['DB_PASSWORD=', 'DB_PASSWORD=hunter2pass', 'DB_PASSWORD=[REDACTED]'],
+    ['PGPASSWORD=', 'PGPASSWORD=hunter2pass psql', 'PGPASSWORD=[REDACTED] psql'],
+    ['client_secret=', 'client_secret=abc123&grant_type=client_credentials', 'client_secret=[REDACTED]&grant_type=client_credentials'],
+    ['access_token=', 'access_token=ya29.a0AfH6', 'access_token=[REDACTED]'],
+    ['NETOPIA_API_KEY=', 'NETOPIA_API_KEY=nk_9fA2', 'NETOPIA_API_KEY=[REDACTED]'],
+    ['an x-api-key header', 'x-api-key: abc123', 'x-api-key: [REDACTED]'],
+    ['a token-only URL userinfo', 'clone https://ghp_abc123@github.example/x', 'clone https://[REDACTED]@github.example/x'],
+    ['a Basic credential', 'header Basic dXNlcjpwYXNzd29yZA== sent', 'header Basic [REDACTED] sent'],
+    ['long hex right after an underscore', `digest_${'ab'.repeat(32)} ok`, 'digest_[HEX] ok'],
+    ['a padded base64 blob', 'blob dGhpcyBpcyBhIHNlY3JldCB2YWx1ZSBmb3IgdGVzdHM= end', 'blob [TOKEN] end'],
+    ['a base64 blob with + and /', 'blob ab+/CDef0123456789ab+/CDef0123456789xy== end', 'blob [TOKEN] end']
   ])('redacts %s', (_name, line, expected) => {
     expect(alert.redactLine(line)).toBe(expected);
   });
@@ -184,6 +198,22 @@ describe('failure alert', () => {
   it('keeps ordinary unit names, release folders and codes readable', () => {
     const line = 'debateai-preview-ui.service: /opt/debateai-v3-preview/releases/auth-dev-candidate-556d79afe7b4-task12-v1-ui PREVIEW_UI_STARTUP_REFUSED';
     expect(alert.redactLine(line)).toBe(line);
+  });
+
+  it.each([
+    'debateai-preview-api.service: Main process exited, code=exited, status=1/FAILURE',
+    'Started debateai-preview-api.service - DebateAI V3 private preview API.',
+    '{"event":"PREVIEW_LIFECYCLE_PRESTART_READY","service":"api","registerVersion":"12","verifyMs":12000,"totalMs":13500}',
+    'password reset email queued; token bucket refilled after 30s',
+    'Consumed 1.234s CPU time, 120.5M memory peak.'
+  ])('leaves ordinary log text alone: %s', line => {
+    expect(alert.redactLine(line)).toBe(line);
+  });
+
+  it('stays fast on a hostile, very long identifier', () => {
+    const started = Date.now();
+    alert.redactLine(`${'a_'.repeat(30000)}password`);
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 
   it('strips control characters and bounds each line', () => {
