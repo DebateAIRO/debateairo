@@ -57,7 +57,7 @@ do anyway. The preview's release files and socket folder must be readable by tha
 The full preview stage (`stage-runtime.mjs`) can no longer complete an authenticator recovery (it cannot wait a day):
 it proves the wait started and that the old session and authenticator keep working.
 
-**Renumbering (planned: 0111, after NETOPIA's 0109 and PR #101's 0110).** The number lives in: the SQL file name;
+**Renumbering (planned: 0112, after PR #101's 0110 — a separate `forward110` on dev — and NETOPIA's 0111).** The number lives in: the SQL file name;
 `NAME` and `PREVIOUS` in `packages/db/src/migration-forward-auth-db-batch.ts`; `migration.name`, `previous` and
 `verifier` in `migrations/lineage/auth-db-batch-forward.json`; the order of `STEPS` in `migration-forward-chain.ts`.
 Tests read the name from the loader and only require the batch to be the chain's last step. The full recipe (conflicts

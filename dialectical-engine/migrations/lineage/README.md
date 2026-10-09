@@ -52,13 +52,17 @@ only the native operator's `apply-and-plan` applies one.
 
 ## How to renumber this step (one or more steps merged before it)
 
-Planned order on 2026-10-09: NETOPIA payments first as 0109 (`0109_billing_netopia.sql`,
-`lineage/billing-netopia-forward109.json`, `packages/db/src/migration-forward109.ts`,
-`lineage/verify-effective-capabilities-109.sql`), then PR #101 (account deletion) as 0110, then this batch as **0111**,
-chained after #101's step. The recipe is the same for any number of preceding steps; "the step before" below is the
-LAST step already on dev (for that order: #101's 0110).
+Order as of 2026-10-09 evening: PR #101 (account deletion) is on dev as **0110**, applied right after 0108 as its own
+`plan.forward110` (`applyForward110` inside `migrate()`), NOT as a `plan.forwardChain` step; NETOPIA payments follows as
+**0111** (renumbered from 0109; `lineage/billing-netopia-forward*.json`, `packages/db/src/migration-forward*.ts`,
+`lineage/verify-effective-capabilities-*.sql`); this batch becomes **0112**, chained after NETOPIA's step. The recipe
+is the same for any number of preceding steps; "the step before" below is the LAST step already on dev (for that
+order: NETOPIA's 0111). If 0110 is still a separate `forward110` when this merges, the batch's `previous` anchor is
+whatever the chain's first-step anchor is on dev then (read `loadForwardChain`'s `first` argument in
+`migration-lineage.ts`), and the verify guard (`pendingForwardSteps`) must also list a pending `plan.forward110` —
+take NETOPIA's version of `deploy/preview-auth-dev/v1/verify-native.ts` (same names) when it does.
 
-1. `git mv migrations/0109_auth_db_batch.sql migrations/0111_auth_db_batch.sql`.
+1. `git mv migrations/0109_auth_db_batch.sql migrations/0112_auth_db_batch.sql`.
 2. In `packages/db/src/migration-forward-auth-db-batch.ts` set `NAME` to the new file name and `PREVIOUS` to the
    step before's file name.
 3. In `auth-db-batch-forward.json` set `migration.name`; set `previous` to the step before's name, its manifest
@@ -76,7 +80,7 @@ LAST step already on dev (for that order: #101's 0110).
    reads the name from `AUTH_DB_BATCH_MIGRATION`. The OTHER branches' exact-chain tests — NETOPIA's
    `tests/architecture/migration-forward-chain.test.ts` (~43) and `tests/integration/billing-netopia-migration.test.ts`
    (~478-556), and #101's equivalents — expect their step to be last or the chain to be exactly theirs; the
-   second- and third-merging branches update them so the full chain (0109, 0110, 0111) is expected.
+   later-merging branches update them so the full sequence (0110, 0111, 0112) is expected.
 6. Prose: say "the auth DB batch step", never its number, outside the SQL file name, the manifest and the two loader
    constants.
 

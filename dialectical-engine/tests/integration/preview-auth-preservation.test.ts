@@ -257,10 +257,12 @@ describe('closed original107 append and native atomicity',()=>{
    expect((await db.pool.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n).toBe(1);
    // The forward chain after 0108 (migrations/lineage/README.md) is appended exactly once too, each step with its own
    // receipt. Other branches' steps may precede the auth DB batch; it is present and the chain's last step here.
-   const chain=(await loadMigrationPlan()).forwardChain.map(step=>step.name);expect(chain.at(-1)).toBe(AUTH_DB_BATCH_MIGRATION);
+   const plan=await loadMigrationPlan(),chain=plan.forwardChain.map(step=>step.name);expect(chain.at(-1)).toBe(AUTH_DB_BATCH_MIGRATION);
+   // dev's 0110 (PR #101) is applied after 0108 as its own forward110, outside the chain, when the plan has one.
+   const separate=['0108_preview_recovery_verified_bindings.sql',...[(plan as unknown as {forward110?:{name:string}}).forward110?.name].filter((name):name is string=>typeof name==='string')];
    expect((await db.pool.query('SELECT name,count(*)::int n FROM public.debateai_schema_migration WHERE name=ANY($1::text[]) GROUP BY name ORDER BY name',[chain])).rows).toEqual(chain.map(name=>({name,n:1})));
    expect((await db.pool.query('SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name')).rows).toEqual(chain.map(source_name=>({source_name})));
-   expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name<>'0108_preview_recovery_verified_bindings.sql' AND NOT name=ANY($1::text[]) ORDER BY name",[chain])).rows).toEqual(before);
+   expect((await db.pool.query('SELECT * FROM public.debateai_schema_migration WHERE NOT name=ANY($1::text[]) ORDER BY name',[[...separate,...chain]])).rows).toEqual(before);
   }finally{await second.end();await db.stop();}
  },120000);
  it('a late108 refusal rolls the function replacement/ledger/receipt back atomically',async()=>{
