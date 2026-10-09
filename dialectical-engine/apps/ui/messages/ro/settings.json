@@ -167,12 +167,12 @@
   "settings.emailLink.continue": "Accesați Setările",
   "settings.account.title": "Cont",
   "settings.security.title": "Securitate",
-  "settings.phone.reveal": "Arată numărul",
-  "settings.phone.change": "Schimbă numărul",
-  "settings.phone.required": "Adaugă numărul de telefon pentru a continua. Întrebarea și opțiunile se păstrează.",
-  "settings.security.lastPath": "Adaugă o altă metodă de autentificare înainte de a o elimina pe aceasta.",
+  "settings.phone.reveal": "Afișați numărul",
+  "settings.phone.change": "Schimbați numărul",
+  "settings.phone.required": "Adăugați numărul de telefon pentru a continua. Întrebarea și opțiunile se păstrează.",
+  "settings.security.lastPath": "Adăugați o altă metodă de autentificare înainte de a o elimina pe aceasta.",
   "settings.security.remove": "Eliminați",
   "settings.security.codesRemaining": "Coduri de recuperare: {count}",
-  "settings.security.regenerate": "Generează coduri noi de recuperare",
-  "settings.security.refreshFailed": "Detaliile de securitate nu au putut fi reîmprospătate. Reîncarcă pagina."
+  "settings.security.regenerate": "Generați coduri noi de recuperare",
+  "settings.security.refreshFailed": "Detaliile de securitate nu au putut fi reîmprospătate. Reîncărcați pagina."
 }
