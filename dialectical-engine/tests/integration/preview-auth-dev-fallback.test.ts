@@ -179,8 +179,8 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
    expect(complete.map(row=>row.name)).toEqual(expect.arrayContaining([plan.forward108.name,...pending]));
    await expect(refusePendingForwardSteps(db.pool,plan)).resolves.toBeUndefined();
    await expect(refusePendingForwardSteps(db.pool)).resolves.toBeUndefined();
-   // The same database with 0110 and 0111 taken out of the ledger inside a transaction that is rolled back: the guard
-   // refuses naming both, in that order, and changes nothing (the ledger it saw is the ledger after it).
+   // The same database with 0110 and the chain (0111, 0112) taken out of the ledger inside a transaction that is rolled
+   // back: the guard refuses naming them, in that order, and changes nothing (the ledger it saw is the ledger after it).
    const client=await db.pool.connect();
    try{
     await client.query('BEGIN');

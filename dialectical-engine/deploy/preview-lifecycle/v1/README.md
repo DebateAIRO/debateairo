@@ -434,7 +434,9 @@ unit files before installing; nothing else names them.
       runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "SELECT rolname, rolcanlogin, rolpassword IS NULL, rolconnlimit FROM pg_authid WHERE rolname = 'debateai_staff_readiness_writer'"
       ```
 
-      If it prints nothing, the step is not applied yet: use the fallback (f) for now.
+      If it prints nothing, the step is not applied yet: use the fallback (f) for now. The step is
+      applied only by the native operator's `apply-and-plan`, with the owner's yes; `verify` and every
+      start refuse while it is pending and never apply it.
 
    b. **Create the dedicated OS user** (skip the `useradd` if `getent` already prints a line). A
       system user with its own group, no home folder and a shell that refuses every login:

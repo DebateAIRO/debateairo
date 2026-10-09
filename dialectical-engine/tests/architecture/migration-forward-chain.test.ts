@@ -153,7 +153,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }, "MIGRATION_FORWARD111_MANIFEST");
       // The same refusal when 0110's own manifest changes under 0111 (its bytes are what 0111 is bound to).
       await refusal("lineage/auth-dev-preview-20261006-forward110.json", (text) => `${text}\n`, "MIGRATION_FORWARD111_MANIFEST");
-      const extra = join(root, "migrations/0112_unbound_step.sql");
+      const extra = join(root, "migrations/0199_unbound_step.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });
       await rm(extra);

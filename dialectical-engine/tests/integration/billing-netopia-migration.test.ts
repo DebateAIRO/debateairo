@@ -558,23 +558,38 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       await query("REVOKE SELECT ON billing.card_token FROM debateai_authorization_runtime");
     }
     const receipts = await receiptOf();
-    const [receipt] = receipts;
-    for (const field of ["source_sha256", "forward_manifest_sha256", "previous_manifest_sha256", "precondition_evidence_digest"]) {
-      await query(`UPDATE public.debateai_schema_migration_step SET ${field} = repeat('0', 64) WHERE source_name = $1`, [NETOPIA_MIGRATION]);
-      try {
-        await expect(migrate(database.pool), field).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_RECEIPT_BINDING_DRIFT ${NETOPIA_MIGRATION}`);
-      } finally {
-        await query(`UPDATE public.debateai_schema_migration_step SET ${field} = $1 WHERE source_name = $2`, [receipt[field], NETOPIA_MIGRATION]);
+    // Each step's receipt is bound on its own: a drift in 0111's or in the batch's receipt names that step.
+    for (const [index, name] of CHAIN.entries()) {
+      for (const field of ["source_sha256", "forward_manifest_sha256", "previous_manifest_sha256", "precondition_evidence_digest"]) {
+        await query(`UPDATE public.debateai_schema_migration_step SET ${field} = repeat('0', 64) WHERE source_name = $1`, [name]);
+        try {
+          await expect(migrate(database.pool), `${name} ${field}`).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_RECEIPT_BINDING_DRIFT ${name}`);
+        } finally {
+          await query(`UPDATE public.debateai_schema_migration_step SET ${field} = $1 WHERE source_name = $2`, [receipts[index][field], name]);
+        }
       }
     }
-    // The postcondition digest is compared for the LAST applied step only: with the batch after it, that is the batch's.
-    await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = repeat('0', 64)");
-    try {
-      await expect(migrate(database.pool)).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${AUTH_DB_BATCH}`);
-    } finally {
-      for (const row of receipts) {
-        await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = $1 WHERE source_name = $2", [row.postcondition_evidence_digest, row.source_name]);
+    // Every applied step's postcondition digest is compared, not only the last one's: 0111's stays checked with the
+    // batch after it.
+    for (const [index, name] of CHAIN.entries()) {
+      await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = repeat('0', 64) WHERE source_name = $1", [name]);
+      try {
+        await expect(migrate(database.pool), name).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${name}`);
+      } finally {
+        await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = $1 WHERE source_name = $2", [receipts[index].postcondition_evidence_digest, name]);
       }
+    }
+    // A real drift of an 0111 object that its verifier does not pin (a purge's body, same owner, grants and settings) is
+    // refused by 0111's postcondition, although the batch is the last step.
+    const purge = "billing.purge_short_lived(timestamptz)";
+    const definition = (await query("SELECT pg_get_functiondef($1::regprocedure) AS def", [purge])).rows[0].def as string;
+    const drifted = definition.replace(/\$function\$\s*$/u, "-- drift\n$function$\n");
+    expect(drifted).not.toBe(definition);
+    await query(drifted);
+    try {
+      await expect(migrate(database.pool)).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${NETOPIA_MIGRATION}`);
+    } finally {
+      await query(definition);
     }
     await query("DELETE FROM public.debateai_schema_migration_step");
     try {
@@ -606,7 +621,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
     expect(await receiptOf()).toEqual(receipts);
   });
 
-  it("migrates a fresh database through 0108, 0110 and 0111, and a second migrate() is a no-op", async () => {
+  it("migrates a fresh database through 0108, 0110, 0111 and 0112, and a second migrate() is a no-op", async () => {
     const fresh = await startTestDatabase();
     try {
       await migrate(fresh.pool);
@@ -626,7 +641,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
     }
   }, 600_000);
 
-  it("a database at 0108 without 0110 gets 0110, then 0111, once each; a second migrate() is a no-op", async () => {
+  it("a database at 0108 without 0110 gets 0110, then 0111 and 0112, once each; a second migrate() is a no-op", async () => {
     const older = await startTestDatabase();
     try {
       await seedDevLineage108(older.pool);

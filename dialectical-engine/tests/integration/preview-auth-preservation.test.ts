@@ -255,7 +255,7 @@ describe('closed original107 append and native atomicity',()=>{
    await Promise.all([migrate(db.pool),migrate(second)]);
    expect((await db.pool.query("SELECT count(*)::int n FROM public.debateai_schema_migration WHERE name='0108_preview_recovery_verified_bindings.sql'")).rows[0].n).toBe(1);
    expect((await db.pool.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n).toBe(1);
-   // PR-54, PR-58: migrate() also appends 0110 and the forward chain after it (0111 today); each step exactly once, with one step receipt each.
+   // PR-54, PR-58: migrate() also appends 0110 and the forward chain after it (0111, then the auth DB batch 0112); each step exactly once, with one step receipt each.
    const chain=(await loadMigrationPlan()).forwardChain.map(step=>step.name);expect(chain.length).toBeGreaterThan(0);expect(chain.at(-1)).toBe(AUTH_DB_BATCH_MIGRATION);
    expect((await db.pool.query('SELECT name,count(*)::int n FROM public.debateai_schema_migration WHERE name=ANY($1) GROUP BY name ORDER BY name',[chain])).rows).toEqual([...chain].sort().map(name=>({name,n:1})));
    expect((await db.pool.query('SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name')).rows).toEqual([...chain].sort().map(source_name=>({source_name})));

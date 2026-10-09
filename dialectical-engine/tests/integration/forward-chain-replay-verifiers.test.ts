@@ -12,7 +12,12 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * nothing re-checked the batch's promises (for example: no runtime may publish staff alert readiness).
  */
 let db: TestDatabase;
-beforeAll(async () => { db = await startTestDatabase(); await migrate(db.pool); }, 300_000);
+beforeAll(async () => {
+  db = await startTestDatabase(); await migrate(db.pool);
+  // Every probe test below builds on the real chain plus a first probe step that changes and checks nothing.
+  plan = await loadMigrationPlan();
+  first = probe(plan.forwardChain.at(-1)!, "0199_replay_probe.sql");
+}, 300_000);
 const NETOPIA = "0111_billing_netopia.sql";
 afterAll(async () => { await db?.stop(); });
 
@@ -65,21 +70,25 @@ it("keeps NETOPIA's 0111 verifier in force and replaying once the auth DB batch 
 }, 300_000);
 
 it("re-runs every applied step's own verifier on replay, not only the last step's", async () => {
-  plan = await loadMigrationPlan();
   expect(plan.forwardChain.map((step) => step.name)).toContain(AUTH_DB_BATCH_MIGRATION);
   // A later step that changes nothing and checks nothing of its own (its postcondition is a constant).
-  first = probe(plan.forwardChain.at(-1)!, "0199_replay_probe.sql");
   await run(chainOf(first));
   expect(await ledger()).toContain(first.name);
   await run(chainOf(first));
   // A grant the batch forbids, made after the probe step became the last one.
   await db.pool.query(`GRANT EXECUTE ON FUNCTION ${READINESS_PUBLISH} TO debateai_runtime`);
-  await expect(run(chainOf(first))).rejects.toThrow("MIGRATION_FORWARD_AUTH_DB_BATCH_RUNTIME_DRIFT debateai_runtime");
-  await db.pool.query(`REVOKE EXECUTE ON FUNCTION ${READINESS_PUBLISH} FROM debateai_runtime`);
+  try {
+    await expect(run(chainOf(first))).rejects.toThrow("MIGRATION_FORWARD_AUTH_DB_BATCH_RUNTIME_DRIFT debateai_runtime");
+  } finally {
+    await db.pool.query(`REVOKE EXECUTE ON FUNCTION ${READINESS_PUBLISH} FROM debateai_runtime`);
+  }
+  expect(await runtimeMayPublish()).toBe(false);
   await run(chainOf(first));
 }, 300_000);
 
 it("refuses, before COMMIT, a step applied in this same run whose SQL breaks an earlier step's rules", async () => {
+  // The grant comes only from the new step's own SQL, so the post-apply re-check (not the pre-apply replay) refuses it.
+  expect(await runtimeMayPublish()).toBe(false);
   const breaking = probe(first, "0200_breaking_probe.sql", `GRANT EXECUTE ON FUNCTION ${READINESS_PUBLISH} TO debateai_runtime`);
   await expect(run(chainOf(first, breaking))).rejects.toThrow("MIGRATION_FORWARD_AUTH_DB_BATCH_RUNTIME_DRIFT debateai_runtime");
   // Rolled back: no ledger row, no receipt, no grant.
@@ -97,5 +106,10 @@ it("keeps replaying an earlier step's own verifier after a later step is appende
   expect(await ledger()).toEqual(expect.arrayContaining([probeA.name, probeB.name]));
   await run(chainOf(first, probeA, probeB));
   await db.pool.query("DROP TABLE public.replay_probe_marker");
-  await expect(run(chainOf(first, probeA, probeB))).rejects.toThrow("REPLAY_PROBE_A_DRIFT");
+  try {
+    await expect(run(chainOf(first, probeA, probeB))).rejects.toThrow("REPLAY_PROBE_A_DRIFT");
+  } finally {
+    await db.pool.query("CREATE TABLE public.replay_probe_marker(x int)");
+  }
+  await run(chainOf(first, probeA, probeB));
 }, 300_000);

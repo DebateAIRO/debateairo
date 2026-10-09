@@ -91,13 +91,14 @@ to expect, the other branches' exact-chain tests, "check the preview's applied s
    at most CONNECT, USAGE on `staff` and EXECUTE on the two readiness functions; the verifier also refuses a password,
    an expiry or role settings on it later.
 10. **Replay keeps every step's checks.** `ForwardStepPlan.replayVerifierSql` (the batch: its supplemental verifier) runs
-   for EVERY applied step on every later `migrate()`, not only the last step's postcondition, and again after a run
-   applies new steps, before COMMIT, so a step that breaks an earlier step's rules is rolled back. NETOPIA's copy of
-   `migration-forward-chain.ts` must take the same lines when the branches meet (keep ONE chain module).
+   for EVERY applied step on every later `migrate()`, and every applied step's postcondition digest is compared (not
+   only the last step's, so 0111's billing objects stay checked after 0112); both run again after a run applies new
+   steps, before COMMIT, so a step that breaks an earlier step's rules is rolled back. At merge, NETOPIA's
+   `migration-forward-chain.ts` took these lines; there is ONE chain module.
 11. **Preview verify never upgrades.** The native verify refuses a pending migration (`PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP`):
    any numbered migration of the source (recipe, 0108, a separate `forward110`, the chain) that is in neither the
-   ledger nor the resolution table; only `apply-and-plan` applies. NETOPIA ships the same guard first; at merge their
-   exact functions replace ours.
+   ledger nor the resolution table; only `apply-and-plan` applies, with the owner's yes. At merge, dev's (NETOPIA's)
+   `verify-native.ts` and `native-operator.mjs` replaced ours byte for byte.
 
 **Not done.** A "send the finish link again" action (review M6): it needs its own token rotation, rate limit and two
 screens; the finish link is mailed once, and the wait can be cancelled and restarted.

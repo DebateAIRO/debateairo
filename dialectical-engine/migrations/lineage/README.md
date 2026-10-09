@@ -9,26 +9,29 @@ right after 0108. 0110 keeps the sealed verifier in force (it runs it after its 
 base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
-first. A step is added with new files only. Worked example: 0111; the next step, 0112 (the auth DB batch), follows it.
+first and the auth DB batch (0112, below) the second. A step is added with new files only; NNNN is its number, the
+step before's number plus one:
 
-1. `migrations/0112_<name>.sql`: the SQL, forward-only and replayable.
-2. `lineage/<name>-forward112.json`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and verifier SHA-256 of the step before (for 0112: 0111,
-   `billing-netopia-forward111.json`, `verify-effective-capabilities-111.sql`), and its own migration and verifier.
-   (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json` and the sealed
+1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
+2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0112: 0112,
+   `auth-db-batch-forward.json`, and `verify-effective-capabilities-111.sql`, which 0112 keeps), and its own migration
+   and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json` and the sealed
    `verify-effective-capabilities.sql`.)
-3. A new verifier `lineage/verify-effective-capabilities-112.sql` only when the step adds billing relations or
-   functions: copy the previous verifier and extend its closed lists. Otherwise the manifest names the previous one.
-4. `packages/db/src/migration-forward112.ts`, in the style of `packages/db/src/migration-forward111.ts` (exact keys,
-   fixed version and name, digests checked, `MIGRATION_FORWARD112_*` refusals, its postcondition evidence).
-5. One loader entry: append `loadForward112` to `STEPS` in `packages/db/src/migration-forward-chain.ts`.
+3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
+   functions: copy the previous verifier and extend its closed lists. Otherwise the manifest names the previous one
+   (as `auth-db-batch-forward.json` does).
+4. A loader in `packages/db/src/`, in the style of `packages/db/src/migration-forward111.ts` or
+   `packages/db/src/migration-forward-auth-db-batch.ts` (exact keys, fixed version and name, digests checked, its own
+   refusal prefix, its postcondition evidence, and a `replayVerifierSql` when it carries checks of its own).
+5. One loader entry: append it LAST to `STEPS` in `packages/db/src/migration-forward-chain.ts`.
 6. On the preview the step is applied only by the native operator's `apply-and-plan` (with the owner's yes); its `verify`,
    `publish` and every start refuse while the step, or dev's 0110, is pending (`deploy/preview-auth-dev/v1/README.md`).
 
 `migrate()` then runs the base recipe, 0108, the sealed verifier and 0110 as before, then each pending step in order:
 its SQL, its verifier, its ledger row and its receipt in `public.debateai_schema_migration_step`. A database at 0108
 without 0110 gets 0110, then the chain. On a later run the verifier of the last applied step replaces the sealed one,
-and applied steps are checked by their receipts, never run again. A chain step recorded without 0110 is refused
+and applied steps are checked by their receipts and postconditions, never run again. A chain step recorded without 0110 is refused
 (`MIGRATION_LINEAGE_REFUSED FORWARD_CHAIN_BASE`).
 
 ## The auth database batch (0112)
@@ -48,9 +51,10 @@ The second chain step, after NETOPIA's 0111.
 
 ## Replay: every applied step keeps its own checks
 
-On a later `migrate()` each applied step is checked by its receipt, the last one also by its postcondition digest,
-and EVERY applied step that declares one runs its own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`),
-and again after a run applies new steps, before COMMIT — so a step's promises (for example the batch's "no runtime may
+On a later `migrate()` EVERY applied step is checked by its receipt and by its postcondition digest (not only the
+last one: after 0112, 0111's billing objects stay digest-checked), and every applied step that declares one runs its
+own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`); both run again after a run applies new steps, before
+COMMIT — so a step's promises (for example the batch's "no runtime may
 publish staff alert readiness") are still enforced after other steps are appended. A later step that deliberately
 changes something an earlier step's verifier pins must change that verifier through its own reviewed step design; it
 cannot silently pass. The effective-capability verifier of the last applied step (after 0112: 0111's, which the batch

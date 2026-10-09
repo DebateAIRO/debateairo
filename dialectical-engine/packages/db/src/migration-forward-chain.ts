@@ -17,7 +17,7 @@ export type ForwardStepPlan=Readonly<{
  name:string; version:string; manifestSha256:string; sourceSha256:string; sql:string;
  previousName:string; previousManifestSha256:string; previousVerifierSha256:string;
  verifierPath:string; verifierSha256:string; verifierSql:string;
- /** A digest of the catalog objects the step creates, recorded at apply and compared while it is the last step. */
+ /** A digest of the catalog objects the step creates, recorded at apply and compared on every later migrate(). */
  postconditionEvidence(client:PoolClient):Promise<string>;
  /**
   * The step's own security checks (SQL that raises on drift), re-run on EVERY later migrate() for as long as the step
@@ -149,8 +149,10 @@ export async function applyForwardChain(client:PoolClient,plan:MigrationPlan,app
  }
  // Every applied step's own checks run on every replay, whichever step is last.
  for(const step of done)if(step.replayVerifierSql!==undefined)await client.query(step.replayVerifierSql);
- const last=done.at(-1);
- if(last!==undefined&&receipts.at(-1)?.postcondition_evidence_digest!==await last.postconditionEvidence(client))return fail(`POSTCONDITION_DRIFT ${last.name}`);
+ // Every applied step's postcondition digest is compared, not only the last one's: appending a step must not retire
+ // the check of an earlier step's objects (a later step never changes an earlier step's objects without its own design).
+ const postconditions=async()=>{for(const [index,step] of done.entries())if(receipts[index]?.postcondition_evidence_digest!==await step.postconditionEvidence(client))return fail(`POSTCONDITION_DRIFT ${step.name}`);};
+ await postconditions();
  for(const step of plan.forwardChain.slice(done.length)){
   await client.query(step.sql);
   await client.query(step.verifierSql);
@@ -161,6 +163,9 @@ export async function applyForwardChain(client:PoolClient,plan:MigrationPlan,app
  }
  // A step applied in THIS run must keep every earlier step's rules too: all applied steps' own checks run again here,
  // before the caller commits, so a breaking step is rolled back instead of caught on the next migrate().
- if(plan.forwardChain.length>done.length)for(const step of plan.forwardChain)if(step.replayVerifierSql!==undefined)await client.query(step.replayVerifierSql);
+ if(plan.forwardChain.length>done.length){
+  for(const step of plan.forwardChain)if(step.replayVerifierSql!==undefined)await client.query(step.replayVerifierSql);
+  await postconditions();
+ }
  await assertReceiptAcl(client,owner);
 }
