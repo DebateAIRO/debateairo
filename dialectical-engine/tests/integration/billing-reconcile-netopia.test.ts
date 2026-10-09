@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { paymentError } from "@debateai/billing-core";
+import { foldSubscription, paymentError } from "@debateai/billing-core";
 import { BillingJobQueries, BillingRepository, migrate } from "@debateai/db";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { startBillingHarness, type BillingHarness } from "../support/billingHarness.js";
 import { StubGeo } from "../support/billingFixtures.js";
 import {
   recordingAudit, seedNetopiaSubscription, subscriptionDeps, testAgreement, TEST_RECORDS_KEY,
@@ -202,6 +203,28 @@ describe("N16 each charge's next read (spec §2.14)", () => {
     expect(await dueOf(payment, plus(paidAt, 9 * DAY + MINUTE))).toMatchObject({ schedule: "REFUND", dueAt: plus(paidAt, 8 * DAY + 2 * MINUTE) });
   });
 
+  it("reads a declined hosted upgrade on the open schedule (a decline is not final), and a declined card check never", async () => {
+    const start = epoch(2041);
+    const { seeded, chargeId } = await hostedUpgrade(start);
+    const declined = (id: string, at: Date) => repository.withTransaction((client) => repository.appendChargeEvent(client, chargeEvent(id, "FAILED", at, {
+      providerPaymentId: `ntp-${id.slice(0, 12)}`, amountMicros: null, errorCode: "PAYMENT_DECLINED"
+    })));
+    // VERIFY_PAYMENT's own read of the decline writes a status_read row: the 10-minute step still comes next.
+    await declined(chargeId, plus(start, MINUTE));
+    await readAt(chargeId, plus(start, MINUTE), "DECLINED");
+    expect(await dueOf(chargeId, plus(start, 9 * MINUTE))).toBeNull();
+    expect(await dueOf(chargeId, plus(start, 10 * MINUTE))).toMatchObject({ schedule: "OPEN", kind: "UPGRADE", dueAt: plus(start, 10 * MINUTE) });
+    await readAt(chargeId, plus(start, 10 * MINUTE), "DECLINED");
+    expect(await dueOf(chargeId, plus(start, 29 * MINUTE))).toBeNull();
+    expect((await dueOf(chargeId, plus(start, 30 * MINUTE)))?.dueAt).toEqual(plus(start, 30 * MINUTE));
+    // F5: a declined 0 card check stays unread. Its card is saved only from NETOPIA's message (a read cannot adopt it),
+    // and VERIFY's 15-minute wait closes a paid check whose message is lost as CARD_NOT_SAVED (spec §2.11).
+    const check = await hostedCheck(seeded, plus(start, HOUR));
+    await declined(check, plus(start, HOUR + MINUTE));
+    expect(await dueOf(check, plus(start, HOUR + 10 * MINUTE))).toBeNull();
+    expect(await dueOf(check, plus(start, 2 * DAY))).toBeNull();
+  });
+
   it("leaves an unknown renewal to N11's probes, and reads a SUBMITTED one on the open schedule", async () => {
     const start = epoch(2034);
     const unknown = await renewal(await subscription(plus(start, -29 * DAY)), start, false);
@@ -310,6 +333,78 @@ describe("N16 the reconciler's NETOPIA pass (spec §2.14)", () => {
     expect(await reconciler.runStatusChecks(now)).toMatchObject({ closed: 3, queued: 0, failed: 0 });
     for (const closed of [untouched, neverArrived, lapsed.chargeId]) expect(await lastEvent(closed), closed).toEqual(["FAILED", "NO_TRANSACTION"]);
     for (const open of [onItsWay, young, live.chargeId]) expect((await lastEvent(open))?.[0], open).toBe("SUBMITTED");
+  });
+});
+
+describe("F5 a declined NETOPIA checkout stays on the open schedule (spec §2.6.3, §2.8, §2.14)", () => {
+  let h: BillingHarness;
+  beforeAll(async () => { h = await startBillingHarness(new Date(Date.UTC(2026, 9, 1, 10))); }, 120_000);
+  afterAll(async () => { await h?.stop(); });
+
+  const dueIn = async (chargeId: string, now: Date) =>
+    (await h.jobs.dueStatusReads(h.database.pool, now, null, 1_000, "sandbox")).rows.find((row) => row.chargeId === chargeId) ?? null;
+  const readIn = (chargeId: string, at: Date) =>
+    h.repository.withTransaction((client) => h.repository.insertStatusRead(client, { chargeId, at, outcome: "DECLINED" }));
+  /** The charge's events as a sorted multiset: REQUESTED and SUBMITTED of one checkout share one instant. */
+  const trailOf = async (chargeId: string) => ((await h.repository.charge(chargeId))?.events ?? [])
+    .map((event) => event.errorCode === null ? event.kind : `${event.kind}:${event.errorCode}`).sort();
+  const liveVerify = async (chargeId: string) => (await h.outboxRows(chargeId))
+    .filter((row) => row.kind === "VERIFY_PAYMENT" && row.ref === chargeId && !row.done && !row.dead);
+  /** NETOPIA declines the card on its page and its message is decided: VERIFY_PAYMENT writes FAILED(PAYMENT_DECLINED). */
+  const decline = async (chargeId: string): Promise<void> => {
+    h.payments.setState(chargeId, "DECLINED", { declineCode: "20", declineSide: "CARD", bankDeclined: true });
+    await h.settle(chargeId);
+  };
+
+  it("reads a declined checkout 10 min, 30 min, 1 h and 3 h after its start, then daily, until a new checkout ends it", async () => {
+    const start = h.clock.now;
+    const bought = await h.buy();
+    h.clock.advance(2 * MINUTE);
+    await decline(bought.chargeId);
+    expect(await trailOf(bought.chargeId)).toEqual(["FAILED:PAYMENT_DECLINED", "REQUESTED", "SUBMITTED"]);
+    expect(await liveVerify(bought.chargeId)).toEqual([]);
+    expect(await dueIn(bought.chargeId, plus(start, 9 * MINUTE))).toBeNull();
+    expect(await dueIn(bought.chargeId, plus(start, 10 * MINUTE))).toMatchObject({ schedule: "OPEN", kind: "INITIAL", dueAt: plus(start, 10 * MINUTE) });
+    for (const step of [10 * MINUTE, 30 * MINUTE, HOUR]) await readIn(bought.chargeId, plus(start, step));
+    expect(await dueIn(bought.chargeId, plus(start, 3 * HOUR - MINUTE))).toBeNull();
+    expect((await dueIn(bought.chargeId, plus(start, 3 * HOUR)))?.dueAt).toEqual(plus(start, 3 * HOUR));
+    await readIn(bought.chargeId, plus(start, 3 * HOUR));
+    expect(await dueIn(bought.chargeId, plus(start, DAY))).toBeNull();
+    expect(await dueIn(bought.chargeId, plus(start, DAY + 3 * HOUR))).toMatchObject({ schedule: "OPEN", dueAt: plus(start, DAY + 3 * HOUR) });
+    // The same buyer checks out again past the 30-minute reuse window: the declined checkout is abandoned (ENDED), and
+    // its order is read on the closed schedule (daily after the last read, its own read of it included).
+    h.clock.now = plus(start, 4 * HOUR);
+    await h.buy({ ownerRef: bought.ownerRef });
+    const old = foldSubscription(await h.repository.subscriptionEvents(bought.subscriptionId));
+    expect(old.status).toBe("ENDED");
+    expect(await dueIn(bought.chargeId, plus(start, DAY + 4 * HOUR - MINUTE))).toBeNull();
+    expect(await dueIn(bought.chargeId, plus(start, DAY + 4 * HOUR))).toMatchObject({ schedule: "CLOSED", dueAt: plus(start, DAY + 4 * HOUR) });
+  });
+
+  it("reads a declined order the person then paid on the same page (its message lost) within the open steps, and starts the plan", async () => {
+    h.clock.now = new Date(Date.UTC(2026, 9, 11, 10));
+    const start = h.clock.now;
+    const bought = await h.buy();
+    h.clock.advance(2 * MINUTE);
+    await decline(bought.chargeId);
+    // Three minutes later the person retries on the same page and pays; NETOPIA's message about it never arrives.
+    h.clock.advance(3 * MINUTE);
+    const charge = (await h.repository.charge(bought.chargeId))!;
+    h.payments.pay(bought.chargeId, { amountMicros: charge.totalMicros, cardCountry: "RO" });
+    expect(await liveVerify(bought.chargeId)).toEqual([]);
+    h.clock.now = plus(start, 10 * MINUTE);
+    expect(await dueIn(bought.chargeId, h.clock.now)).toMatchObject({ schedule: "OPEN" });
+    const kick = vi.fn();
+    const reconciler = new BillingReconciler({
+      billing: h.repository, jobs: h.jobs, audit: h.audit, clock: h.clock.read, kick,
+      netopia: { payments: h.payments, paymentEnvironment: "sandbox", jobs: h.jobs, pool: h.database.pool }
+    });
+    expect((await reconciler.runStatusChecks(h.clock.now)).queued).toBeGreaterThanOrEqual(1);
+    expect(await liveVerify(bought.chargeId)).toHaveLength(1);
+    expect(kick).toHaveBeenCalled();
+    await h.worker.drain(10);
+    expect(await trailOf(bought.chargeId)).toEqual(["FAILED:PAYMENT_DECLINED", "REQUESTED", "SUBMITTED", "SUCCEEDED"]);
+    expect(foldSubscription(await h.repository.subscriptionEvents(bought.subscriptionId)).status).toBe("ACTIVE");
   });
 });
 

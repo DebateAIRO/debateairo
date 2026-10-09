@@ -83,6 +83,7 @@ function world(extra: Partial<CheckoutDeps> = {}) {
   const jobs = new BillingJobQueries(database.pool);
   const payments = new ScriptedPayments();
   const audit = recordingAudit();
+  let kicks = 0;
   const tax = new AdjustableTaxEngine();
   const quotes = new QuoteService({
     repository, tax, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy, plans: testBillingPlans,
@@ -91,7 +92,8 @@ function world(extra: Partial<CheckoutDeps> = {}) {
   const deps: CheckoutDeps = {
     repository, jobs, acceptances: new AcceptanceRepository(database.pool), payments,
     accountEmail: { read: async () => "buyer@example.test" }, geo, countryPolicy: testCountryPolicy,
-    policy: testBillingPolicy, consentDocuments, recordsKey: TEST_RECORDS_KEY, publicAppUrl: TEST_PUBLIC_APP_URL, audit, ...extra
+    policy: testBillingPolicy, consentDocuments, recordsKey: TEST_RECORDS_KEY, publicAppUrl: TEST_PUBLIC_APP_URL, audit,
+    kick: () => { kicks += 1; }, ...extra
   };
   const checkout = new CheckoutService(deps);
   // Ruling PR-19: every billing owner_ref is a uuid (0085).
@@ -105,7 +107,7 @@ function world(extra: Partial<CheckoutDeps> = {}) {
     ownerRef, userId: randomUUID(), ip: "198.51.100.7", userAgent: "n18", quoteRef, locale: "en", consents: consents(),
     countryConfirmed: false, now: clock.now, ...overrides
   });
-  return { repository, jobs, payments, audit, quotes, quote, start, ownerRef };
+  return { repository, jobs, payments, audit, quotes, quote, start, ownerRef, kicks: () => kicks };
 }
 
 const trail = async (chargeId: string): Promise<string[]> =>
@@ -286,6 +288,37 @@ describe("N18 one open checkout at a time (spec §2.6.3)", () => {
     })));
     await expect(paid.start(await paid.quote())).rejects.toMatchObject({ status: 409, code: "CHECKOUT_PENDING" });
     expect(paid.payments.reads).toHaveLength(0);
+  });
+
+  it("queues VERIFY_PAYMENT once when its read finds a declined order paid on the same page, and nothing for a read with no news", async () => {
+    const liveVerify = async (chargeId: string) => (await database.pool.query<{ not_before: Date }>(
+      "SELECT not_before FROM billing.outbox WHERE kind = 'VERIFY_PAYMENT' AND ref = $1 AND done_at IS NULL AND dead_at IS NULL", [chargeId]
+    )).rows;
+    const w = world();
+    const first = await w.start(await w.quote());
+    // The card was declined on NETOPIA's page (VERIFY wrote FAILED); the person retried and paid, and the message was lost.
+    await w.repository.withTransaction((client) => w.repository.appendChargeEvent(client, chargeEvent(first.chargeId, "FAILED", clock.now, {
+      providerPaymentId: ntpOf(first.chargeId), amountMicros: null, errorCode: "PAYMENT_DECLINED"
+    })));
+    w.payments.scriptStatus(first.chargeId, report(first.chargeId, "PAID"));
+    advance(5 * MINUTE);
+    await expect(w.start(await w.quote())).rejects.toMatchObject({ status: 409, code: "CHECKOUT_PENDING", chargeRef: first.chargeId });
+    const queued = await liveVerify(first.chargeId);
+    expect(queued).toHaveLength(1);
+    expect(queued[0]!.not_before.getTime()).toBeLessThanOrEqual(clock.now.getTime());
+    expect(w.kicks()).toBe(1);
+    // Coming back again before it ran: still the one job, brought to now.
+    advance(MINUTE);
+    await expect(w.start(await w.quote())).rejects.toMatchObject({ status: 409, code: "CHECKOUT_PENDING" });
+    expect(await liveVerify(first.chargeId)).toHaveLength(1);
+    expect(w.payments.starts).toHaveLength(1);
+    // A payment still on its way (NETOPIA's 6) says nothing our rows lack: no job.
+    const quiet = world();
+    const open = await quiet.start(await quiet.quote());
+    quiet.payments.scriptStatus(open.chargeId, report(open.chargeId, "PENDING", "6"));
+    await expect(quiet.start(await quiet.quote())).rejects.toMatchObject({ status: 409, code: "CHECKOUT_PENDING" });
+    expect(await liveVerify(open.chargeId)).toEqual([]);
+    expect(quiet.kicks()).toBe(0);
   });
 
   it("makes one charge and one start for two checkouts at once; the other waits on that charge", async () => {

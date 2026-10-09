@@ -284,8 +284,12 @@ export class BillingJobQueries {
    *   its requests nor its refunds here, so it keeps only the PAID schedule;
    * - PAID: SUCCEEDED (never a 0 card check): the latest of 1, 7, 30, 60, 90, 120 days after the payment not read since;
    * - OPEN: a hosted page started (SUBMITTED or SUBMIT_UNKNOWN) or a SUBMITTED renewal, not final: 10 min, 30 min, 1 h,
-   *   3 h after the submit, then daily after the last read, up to 30 days; never a renewal N11's probes own;
-   * - CLOSED: a hosted INITIAL or UPGRADE with no SUCCEEDED that is FAILED or whose plan ENDED: daily for 30 days.
+   *   3 h after the submit, then daily after the last read, up to 30 days; never a renewal N11's probes own. A hosted
+   *   INITIAL or UPGRADE whose only FAILED rows are PAYMENT_DECLINED and whose plan has not ENDED is not final either
+   *   (F5, spec §2.6.3 and §2.8: the person may retry on the same page, and that payment's message may be lost);
+   * - CLOSED: a hosted INITIAL or UPGRADE with no SUCCEEDED that failed for good (a FAILED other than PAYMENT_DECLINED)
+   *   or whose plan ENDED: daily for 30 days. A hosted 0 card check that failed is never read: its card is saved only
+   *   from NETOPIA's message, so a read could not adopt it (spec §2.11).
    * `next` is the last row of a full page, else null (the cursor wraps, so no due charge is starved). Every step is
    * written in hours: a `timestamptz + interval 'N days'` follows the session's time zone across a daylight-saving
    * change, and a read must not move by an hour with it.
@@ -312,6 +316,8 @@ export class BillingJobQueries {
           EXISTS (SELECT 1 FROM billing.charge_event e
             WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUBMIT_UNKNOWN')) AS sent,
           EXISTS (SELECT 1 FROM billing.charge_event e WHERE e.charge_id = c.charge_id AND e.kind = 'FAILED') AS failed,
+          EXISTS (SELECT 1 FROM billing.charge_event e WHERE e.charge_id = c.charge_id AND e.kind = 'FAILED'
+            AND e.error_code IS DISTINCT FROM 'PAYMENT_DECLINED') AS final_failed,
           EXISTS (SELECT 1 FROM billing.subscription_event s
             WHERE s.subscription_id = c.subscription_id AND s.kind = 'ENDED') AS ended,
           COALESCE((SELECT sum(e.amount_micros) FROM billing.charge_event e
@@ -340,6 +346,8 @@ export class BillingJobQueries {
           WHEN f.paid_at IS NOT NULL THEN CASE WHEN f.kind = 'CARD_CHECK' AND f.total_micros = 0 THEN NULL ELSE 'PAID' END
           WHEN f.kind = 'RENEWAL' THEN CASE WHEN f.submitted AND NOT f.failed THEN 'OPEN' END
           WHEN f.hosted_payment_id IS NULL AND NOT f.sent THEN NULL
+          WHEN f.hosted_payment_id IS NOT NULL AND f.kind IN ('INITIAL', 'UPGRADE') AND NOT f.final_failed AND NOT f.ended
+            THEN 'OPEN'
           WHEN f.failed OR f.ended THEN CASE WHEN f.hosted_payment_id IS NOT NULL AND f.kind <> 'CARD_CHECK' THEN 'CLOSED' END
           ELSE 'OPEN' END AS schedule
         FROM facts f

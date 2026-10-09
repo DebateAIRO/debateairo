@@ -16,10 +16,12 @@ import { englishOrderText, planName, type BillingOrderText } from "./order-text.
 import { isThisPaymentSystem } from "./outbox.js";
 import { decidePaymentPlace, placeRefusal } from "./place.js";
 import { addressRequired, LIVE_SUBSCRIPTION_STATUSES } from "./quote.js";
+import { statusNeedsVerify } from "./reconcile.js";
 import {
   openPaymentUrl, openQuoteLocation, sealBillingProfile, type BillingProfile, type QuoteLocation
 } from "./records.js";
 import { BillingRefusal } from "./refusal.js";
+import { queueVerifyNow } from "./renewal.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "./rows.js";
 
 export type ConsentKind = "CONSENT_RENEWAL" | "CONSENT_IMMEDIATE_START";
@@ -55,7 +57,7 @@ export type CheckoutDeps = Readonly<{
     | "appendSubscriptionEvent" | "useQuote" | "ensureCustomer" | "appendProfile" | "insertCharge" | "appendChargeEvent"
     | "ownerErasurePending" | "insertHostedPayment" | "hostedPaymentForCharge" | "newestNoticeForOrder"
     | "insertStatusRead" | "enqueue">;
-  jobs: Pick<BillingJobQueries, "lockOwner" | "outboxJobExists">;
+  jobs: Pick<BillingJobQueries, "lockOwner" | "outboxJobExists" | "bringForward">;
   acceptances: Pick<AcceptanceRepository, "record">;
   /** N8's connector; its `environment` is the payment environment (spec §2.4.1). */
   payments: CardPayments;
@@ -69,6 +71,8 @@ export type CheckoutDeps = Readonly<{
   /** R-7: PUBLIC_APP_URL. */
   publicAppUrl: string;
   audit: BillingAudit;
+  /** The runtime's outbox kick: a VERIFY_PAYMENT the open checkout's read queued runs now, not at the next outbox tick. */
+  kick: () => void;
   chargeIds?: () => string;
   /** P17's catalogue sentence for the order line (spec §2.5.3 step 5); absent, `englishOrderText`. */
   orderText?: BillingOrderText;
@@ -292,7 +296,9 @@ export class CheckoutService implements CheckoutServicePort {
   /**
    * Spec §2.6.3 before the lock: one status read (N12's `readPaymentStatus`, which logs it in `billing.status_read`,
    * §2.14) for an opened, undecided NETOPIA charge of this environment. Null: no open checkout, or nothing to read
-   * (no page was opened, or our rows already decide it).
+   * (no page was opened, or our rows already decide it). F5: a read that says what our rows do not yet record
+   * (`statusNeedsVerify`: PAID after a lost message, a declined card paid on the same page) queues VERIFY_PAYMENT now,
+   * as the reconciler's read does, so the plan starts without waiting for the status schedule.
    */
   private async readOpenPayment(ownerRef: string, now: Date): Promise<OpenPaymentRead | null> {
     const existing = await this.deps.repository.subscriptionForOwner(ownerRef);
@@ -300,7 +306,8 @@ export class CheckoutService implements CheckoutServicePort {
     const initial = (await this.deps.repository.chargesForSubscription(existing.subscriptionId))
       .find((charge) => charge.kind === "INITIAL");
     if (initial === undefined || !this.servedHere(initial)) return null;
-    const events = (await this.deps.repository.charge(initial.chargeId))?.events ?? [];
+    const charge = await this.deps.repository.charge(initial.chargeId);
+    const events = charge?.events ?? [];
     if (events.some((event) => event.kind === "SUCCEEDED" || (event.kind === "FAILED" && event.errorCode !== "PAYMENT_DECLINED"))) {
       return null;
     }
@@ -310,6 +317,12 @@ export class CheckoutService implements CheckoutServicePort {
     const { answer } = await readPaymentStatus({ billing: this.deps.repository, payments: this.deps.payments, audit: this.deps.audit }, {
       chargeId: initial.chargeId, providerPaymentId, operation: "checkout", now
     });
+    if (charge !== null && answer !== "UNREADABLE" && answer !== "NO_SUCH_ORDER" && statusNeedsVerify(charge, answer)) {
+      await this.deps.repository.withTransaction((client) => queueVerifyNow(
+        { repository: this.deps.repository, jobs: this.deps.jobs }, client, initial.chargeId, now
+      ));
+      this.deps.kick();
+    }
     return Object.freeze({ chargeId: initial.chargeId, read: answer === "UNREADABLE" ? "READ_FAILED" : answer });
   }
 

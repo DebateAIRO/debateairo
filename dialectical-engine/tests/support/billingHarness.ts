@@ -308,7 +308,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
   const checkoutDeps: CheckoutDeps = {
     repository, jobs, acceptances, payments, geo, countryPolicy: testCountryPolicy, policy: testBillingPolicy,
     accountEmail: { read: async (userId: string) => `buyer-${userId.slice(0, 8)}@example.test` },
-    consentDocuments: testConsentDocuments, recordsKey, publicAppUrl: TEST_PUBLIC_APP_URL, audit
+    consentDocuments: testConsentDocuments, recordsKey, publicAppUrl: TEST_PUBLIC_APP_URL, audit, kick: () => undefined
   };
   const checkoutWith = (overrides: Partial<CheckoutDeps>): CheckoutService =>
     new CheckoutService({ ...checkoutDeps, ...overrides } as CheckoutDeps);

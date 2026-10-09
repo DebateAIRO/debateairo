@@ -228,6 +228,8 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     accountEmail: new DekAccountEmailReader(deps.pool, deps.dekStore), geo: deps.geo, countryPolicy: deps.countryPolicy,
     policy: deps.policy, consentDocuments: (kind, locale) => currentDocument(kind, locale),
     recordsKey: deps.connectors.recordsKey, publicAppUrl: deps.connectors.publicAppUrl, audit: deps.audit,
+    // F5: `drain` is declared below; the kick only runs once a checkout's read queues VERIFY_PAYMENT.
+    kick: () => drain(),
     // P17 (D6a F29): the order line in the buyer's locale, from the catalogue.
     orderText: catalogueOrderText
   });
