@@ -91,7 +91,7 @@ export function checkNativePlan(nativePlan, entry) {
   return fields;
 }
 
-async function readLock(layout) {
+export async function readLock(layout = LAYOUT) {
   const { value, sha256: lockSha256 } = await readProtectedJson(layout.lockPath, { root: layout.lockRoot, mode: 0o644, maxBytes: 65536, layout, code: 'RELEASE_LOCK_UNREADABLE' });
   return { lock: validateReleaseLock(value, layout), lockSha256 };
 }
@@ -113,15 +113,9 @@ export async function runNativeVerify({ layout, nodePath, sourceRoot, run = runB
   try { return strictJson(result.stdout); } catch { return refuse('NATIVE_VERIFY_REFUSED'); }
 }
 
-/**
- * The ExecStartPre body. Order matters: every cheap gate runs before the database is touched;
- * the slow verifier runs last so the proof is as young as possible when ExecStart begins.
- */
-export async function runPrestart({ service, layout = LAYOUT, deps = {} }) {
+/** Lock -> pinned base plan (hash-checked, schema-checked, field-for-field equal to the lock). */
+export async function loadPinnedRelease({ service, layout = LAYOUT, validateLaunchPlan: validatePlan = reviewedValidateLaunchPlan }) {
   if (!SERVICES.includes(service)) refuse('SERVICE_REFUSED');
-  const now = deps.now ?? Date.now;
-  const validatePlan = deps.validateLaunchPlan ?? reviewedValidateLaunchPlan;
-  const startedAt = now();
   const { lock, lockSha256 } = await readLock(layout);
   const entry = lock.services[service] ?? refuse('RELEASE_LOCK_SERVICE_MISSING');
   const base = await readPlan(entry.basePlan.path, layout);
@@ -130,12 +124,24 @@ export async function runPrestart({ service, layout = LAYOUT, deps = {} }) {
   if (base.value.service !== service) refuse('BASE_PLAN_INVALID');
   const mismatched = compareLaunchPlanToLock(base.value, entry);
   if (mismatched.length) refuse('RELEASE_LOCK_MISMATCH', mismatched);
+  return { entry, plan: base.value, lockSha256 };
+}
+
+/**
+ * The ExecStartPre body. Order matters: every cheap gate runs before the database is touched;
+ * the slow verifier runs last so the proof is as young as possible when ExecStart begins.
+ */
+export async function runPrestart({ service, layout = LAYOUT, deps = {} }) {
+  const now = deps.now ?? Date.now;
+  const validatePlan = deps.validateLaunchPlan ?? reviewedValidateLaunchPlan;
+  const startedAt = now();
+  const { entry, plan: basePlan, lockSha256 } = await loadPinnedRelease({ service, layout, validateLaunchPlan: validatePlan });
   const nativePlan = await readNativePlan(layout);
   if (nativePlan.sha256 !== entry.nativePlanSha256) refuse('NATIVE_PLAN_HASH_MISMATCH');
   const nativeProblems = checkNativePlan(nativePlan.value, entry);
   if (nativeProblems.length) refuse('NATIVE_PLAN_MISMATCH', nativeProblems);
   let nativeSourceSha256;
-  try { nativeSourceSha256 = await (deps.readSourceNativeSha256 ?? (async plan => (await readPublicArtifact(plan.sourceManifest, 'source')).nativeSha256))(base.value); } catch { refuse('SOURCE_MANIFEST_UNREADABLE'); }
+  try { nativeSourceSha256 = await (deps.readSourceNativeSha256 ?? (async plan => (await readPublicArtifact(plan.sourceManifest, 'source')).nativeSha256))(basePlan); } catch { refuse('SOURCE_MANIFEST_UNREADABLE'); }
 
   const verifyStartedAt = now();
   const proof = await (deps.verifyNative ?? (input => runNativeVerify({ layout, nodePath: process.execPath, ...input })))({ sourceRoot: nativePlan.value.sourceRoot });
@@ -148,7 +154,7 @@ export async function runPrestart({ service, layout = LAYOUT, deps = {} }) {
   await ensureDirectory(layout.currentDir, { mode: 0o755, uid }).catch(() => refuse('CURRENT_DIRECTORY_REFUSED'));
   const attestationBytes = Buffer.from(JSON.stringify(proof));
   const attestationPath = join(layout.currentDir, `${service}-native.json`);
-  const plan = { ...base.value, nativeAttestation: { path: attestationPath, sha256: sha256(attestationBytes) } };
+  const plan = { ...basePlan, nativeAttestation: { path: attestationPath, sha256: sha256(attestationBytes) } };
   try { validatePlan(plan); } catch { refuse('REGENERATED_PLAN_INVALID'); }
   const planBytes = Buffer.from(JSON.stringify(plan));
   // Attestation first: a crash in between leaves the old plan naming the old proof, which the launcher refuses.
