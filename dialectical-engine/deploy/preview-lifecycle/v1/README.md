@@ -29,19 +29,22 @@ launchers still re-check every byte exactly as before.
 - **Timing.** prestart runs the verifier (about 12 s) as the *last* step before `ExecStart`, so
   when the launcher reads the receipt its age is only the launcher's own re-hash time. prestart
   refuses if the receipt is already older than 60 s when written. The 180 s rule is unchanged.
-- **Alerts go only to an already-approved address.** The recipient file must hold one of the four
-  addresses the preview mail is already allowed to reach. The alert checks it by fingerprint
-  against the preview mail's own allow-list, which lives **only on the server** in
-  `/etc/debateai/preview-mail-recipient-installation.json` (field `recipientSha256`; installed with
-  the preview mail, see `deploy/preview-mail/v4-20261005/README.md`). Git holds no address and no
-  fingerprint. The alert reads that file the same careful way as every other root file (root-owned,
-  mode 0600 or 0400, one link, no symlink, its folder root-owned and not writable by group or
-  others) and checks it with the mail wrapper's own schema check. If the file is missing or wrong,
-  **no email goes out** and the journal shows `PREVIEW_LIFECYCLE_ALERT_FAILED` with
-  `"reason":"RECIPIENT_ALLOW_LIST_UNAVAILABLE"`. Mail goes through the server's local
-  `sendmail -t` as `noreply@dezbatere.ro`; the address never appears in a process list. If the
-  owner wants a new address, that is a reviewed change to the server allow-list, not a lifecycle
-  config edit.
+- **Alerts go only to the owner, checked against the alert's own owner list.** The address is in
+  the root-only file `alert-recipient`. A second root-only file,
+  `/etc/debateai-v3-preview/lifecycle/owner-alert-digests.json`, holds one to three SHA-256
+  fingerprints of owner addresses (`{"version":1,"ownerSha256":[...]}`), built on the server by
+  `alert.mjs --install-owner-list` from the address already in `alert-recipient` (install step 2).
+  The alert sends only if the address's fingerprint is on that list, so editing one file alone
+  cannot point it at someone else; changing the address is two deliberate root steps. Git holds no
+  address and no fingerprint, and neither is ever printed. The alert reads the list the same
+  careful way as every other root file (root:root, mode 0600 or 0400, one link, no symlink, at most
+  1 KiB, its folder root-owned and not writable by group or others). If the list is missing or
+  wrong, **no email goes out** and the journal shows `PREVIEW_LIFECYCLE_ALERT_FAILED` with
+  `"reason":"OWNER_ALERT_LIST_UNAVAILABLE"`; an address not on the list gives
+  `"reason":"RECIPIENT_REFUSED"`. The alert no longer reads the preview mail's account allow-list
+  (`/etc/debateai/preview-mail-recipient-installation.json`), which is being retired. Mail goes
+  through the server's local `sendmail -t` as `noreply@dezbatere.ro`; the address never appears in
+  a process list.
 - **Team unlock and the 5-minute database rule.** Migration 0088 only accepts the recovery login
   while its expiry is at most 5 minutes away. So the unlock does not set one expiry an hour
   ahead; it keeps the expiry rolling at most 4 minutes ahead (renewed every 2 minutes) and never
@@ -130,8 +133,7 @@ systemd/debateai-preview-team-unlock.service
 ```
 
 prestart, alert and backup use Node built-ins plus the reviewed `deploy/preview-auth-dev/v1`
-helpers (custody reader, launch-plan and attestation validators); the alert also uses the
-preview mail wrapper's allow-list schema check from `deploy/preview-mail/v4-20261005`. The unlock and its two actors
+helpers (custody reader, launch-plan and attestation validators). The unlock and its two actors
 load `pg`, `tsx`, the staff alert code and `native-peer.mjs` from the **pinned release** itself,
 and only after `release-guard.mjs` has verified that release (see the decisions above).
 
@@ -151,10 +153,11 @@ unit files before installing; nothing else names them.
    chmod 0600 /root/preview-archive/systemd-before-lifecycle-*.tar.gz
    ```
 
-1. **Operator folder.** From a clean checkout of the reviewed commit, copy these three folders,
+1. **Operator folder.** From a clean checkout of the reviewed commit, copy these two folders,
    keeping their relative layout, to `/opt/debateai-v3-preview/operator/lifecycle-v1/`:
-   `dialectical-engine/deploy/preview-lifecycle`, `dialectical-engine/deploy/preview-auth-dev`,
-   `dialectical-engine/deploy/preview-mail`. Then make everything root-owned and read-only:
+   `dialectical-engine/deploy/preview-lifecycle` and `dialectical-engine/deploy/preview-auth-dev`
+   (the lifecycle no longer needs `deploy/preview-mail`). Then make everything root-owned and
+   read-only:
 
    ```sh
    chown -R root:root /opt/debateai-v3-preview/operator/lifecycle-v1
@@ -162,8 +165,17 @@ unit files before installing; nothing else names them.
    find /opt/debateai-v3-preview/operator/lifecycle-v1 -type f -exec chmod 0644 {} +
    ```
 
-2. **Root config folder, state folder and alert recipient.** Put exactly one approved address in
-   the file (type it; do not paste it into any command line that is logged):
+2. **Root config folder, state folder, alert recipient and owner list.**
+
+   In plain words: the failure email goes to one address. You type it once, into a root-only
+   file on the server. Then one command turns that address into a fingerprint (a one-way code)
+   and saves it in a second root-only file, the owner list. The alert only sends when the address
+   in the first file matches a fingerprint in the owner list, so changing one file by mistake can
+   never send the alert to someone else. The command never prints the address or the fingerprint.
+   Neither is ever in Git.
+
+   First the folders and the address. Type the address in the editor; do not paste it into any
+   command line (the shell history would keep it):
 
    ```sh
    install -d -o root -g root -m 0755 /etc/debateai-v3-preview/lifecycle
@@ -178,14 +190,36 @@ unit files before installing; nothing else names them.
    alert then refuses with `RECIPIENT_FILE_MODE_REFUSED` and names the mode it found. Fix it with
    `chmod 0600` and `chown root:root` on the file.
 
-   The alert also needs the preview mail's allow-list file. This must print `600 root:root`
-   (or `400 root:root`):
+   Then the owner list, built from that file:
 
    ```sh
-   stat -c '%a %U:%G' /etc/debateai/preview-mail-recipient-installation.json
+   /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --install-owner-list
+   stat -c '%a %U:%G %h' /etc/debateai-v3-preview/lifecycle/owner-alert-digests.json
    ```
 
-   If it is missing, stop: installing it is the preview mail's own reviewed step, not this one.
+   The first must print exactly `{"event":"PREVIEW_LIFECYCLE_OWNER_LIST_INSTALLED","mode":"0600"}`
+   (or `PREVIEW_LIFECYCLE_OWNER_LIST_ALREADY_INSTALLED` if the list already holds this address);
+   the second must print `600 root:root 1`. Anything else is a
+   `PREVIEW_LIFECYCLE_OWNER_LIST_FAILED` line, and nothing was written:
+
+   | `reason` | What to do |
+   |---|---|
+   | `RECIPIENT_FILE_MODE_REFUSED` | Fix the recipient file's mode as above, run again. |
+   | `RECIPIENT_REFUSED` | The recipient file must hold exactly one address on one line. |
+   | `OWNER_ALERT_LIST_EXISTS` | A list for a different address is already there. See "Changing the address" below. |
+   | `OWNER_ALERT_LIST_UNAVAILABLE` | Something unexpected is at the list's path (wrong mode, a link). Look with `ls -la /etc/debateai-v3-preview/lifecycle/` and ask. |
+   | `OWNER_ALERT_LIST_WRITE_REFUSED` | The folder is not root-owned 0755 (first command above). |
+
+   **Changing the address later** is the same two steps, after deliberately removing the old list
+   (until the new list is in place, alerts are refused and logged, never sent elsewhere):
+
+   ```sh
+   rm /etc/debateai-v3-preview/lifecycle/owner-alert-digests.json
+   editor /etc/debateai-v3-preview/lifecycle/alert-recipient
+   stat -c '%a %U:%G' /etc/debateai-v3-preview/lifecycle/alert-recipient
+   ```
+
+   then the two owner-list commands above, then the test send below.
 
    **Test send.** Use the built-in test name, never the API unit (a real API alert in the next
    30 minutes would otherwise be suppressed):
@@ -195,7 +229,9 @@ unit files before installing; nothing else names them.
    ```
 
    Expect `PREVIEW_LIFECYCLE_ALERT_SENT` for `debateai-preview-alert-test.service` and an email
-   "Preview: test alert (nothing failed)". `PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED` means the local
+   "Preview: test alert (nothing failed)". `OWNER_ALERT_LIST_UNAVAILABLE` means the owner list is
+   missing or wrong (run the owner-list commands above); `RECIPIENT_REFUSED` means the address in
+   `alert-recipient` is not the one the list was built from. `PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED` means the local
    sendmail refused it (exit code in the line): check what `/usr/sbin/sendmail` is on the server
    (`readlink -f /usr/sbin/sendmail`) and whether it accepts `-odi` before going on.
 

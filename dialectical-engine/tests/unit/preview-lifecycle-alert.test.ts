@@ -1,35 +1,42 @@
-import { describe, expect, it } from 'vitest';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { describe, expect, it, vi } from 'vitest';
+import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+// Every path the alert code hands to node:fs/promises, so a test can prove which files it touched.
+const touched = vi.hoisted(() => [] as string[]);
+vi.mock('node:fs/promises', async original => {
+  const real = await original<typeof import('node:fs/promises')>();
+  const record = <F extends (...args: any[]) => any>(fn: F) => ((...args: any[]) => { touched.push(String(args[0])); if (args.length > 1 && typeof args[1] === 'string') touched.push(args[1]); return fn(...args); }) as F;
+  const wrapped = { ...real, lstat: record(real.lstat), stat: record(real.stat), open: record(real.open), readFile: record(real.readFile), realpath: record(real.realpath), link: record(real.link), rename: record(real.rename) };
+  return { ...wrapped, default: wrapped };
+});
+
 const alert = await import('../../deploy/' + 'preview-lifecycle/v1/alert.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
 const me = { uid: process.getuid!(), gid: process.getgid!() };
-// Made-up example.com addresses only. The real allow-list lives in the root-owned server file
-// /etc/debateai/preview-mail-recipient-installation.json, never in Git.
-const addresses = {
-  'verification-forward-primary': 'forward-primary@example.com',
-  'verification-forward-secondary': 'forward-secondary@example.com',
-  'verification-direct-and-recovery-proof': 'proof@example.com',
-  'recovery-notice-secondary': 'notice@example.com'
-} as const;
+// Made-up example.invalid addresses only, never a real one and never a fingerprint of one. The real
+// owner list lives only in the root-only server file /etc/debateai-v3-preview/lifecycle/owner-alert-digests.json.
+const owner = ['owner', 'example.invalid'].join('@');
+const secondOwner = ['second-owner', 'example.invalid'].join('@');
+const stranger = ['stranger', 'example.invalid'].join('@');
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
-const installation = () => JSON.stringify({ recipientSha256: Object.fromEntries(Object.entries(addresses).map(([alias, address]) => [alias, digest(address)])), verificationForwardTarget: addresses['verification-forward-secondary'] });
-const owner = addresses['verification-direct-and-recovery-proof'];
+const ownerList = (addresses: string[] = [owner]) => JSON.stringify({ version: 1, ownerSha256: addresses.map(digest) });
 const unit = 'debateai-preview-api.service';
+// The account-mail allow-list the alert used to read. It must never be touched again.
+const ACCOUNT_ALLOW_LIST = 'preview-mail-recipient-installation';
 
-/** A throwaway server: lifecycle folders plus the preview mail installation file, all owned by the test user. */
-function server(recipient = `${owner}\n`, mode = 0o600, { allowList = installation() as string | null, allowListMode = 0o600 } = {}) {
+/** A throwaway server: the lifecycle folders, the recipient file and the owner list, all owned by the test user. */
+function server(recipient = `${owner}\n`, mode = 0o600, { list = ownerList() as string | null, listMode = 0o600 } = {}) {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'lifecycle-alert-')));
-  const mailFolder = join(base, 'etc-debateai');
-  const layout = { ...common.LAYOUT, ownerUid: me.uid, ownerGid: me.gid, lockRoot: join(base, 'lifecycle'), alertRecipientPath: join(base, 'lifecycle', 'alert-recipient'), stateDir: join(base, 'state'),
-    mailRecipientInstallationPath: join(mailFolder, 'preview-mail-recipient-installation.json') };
+  const lockRoot = join(base, 'lifecycle');
+  const layout = { ...common.LAYOUT, ownerUid: me.uid, ownerGid: me.gid, lockRoot, alertRecipientPath: join(lockRoot, 'alert-recipient'), stateDir: join(base, 'state'),
+    ownerAlertDigestsPath: join(lockRoot, 'owner-alert-digests.json') };
   mkdirSync(layout.lockRoot); chmodSync(layout.lockRoot, 0o755);
   mkdirSync(layout.stateDir); chmodSync(layout.stateDir, 0o700);
-  mkdirSync(mailFolder); chmodSync(mailFolder, 0o755);
-  if (allowList !== null) { writeFileSync(layout.mailRecipientInstallationPath, allowList); chmodSync(layout.mailRecipientInstallationPath, allowListMode); }
+  if (list !== null) { writeFileSync(layout.ownerAlertDigestsPath, list); chmodSync(layout.ownerAlertDigestsPath, listMode); }
   writeFileSync(layout.alertRecipientPath, recipient); chmodSync(layout.alertRecipientPath, mode);
   return layout;
 }
@@ -157,10 +164,10 @@ describe('failure alert', () => {
   });
 
   it.each([
-    ['two addresses', `${owner}, other@example.com\n`],
-    ['a header injection', `${owner}\r\nBcc: other@example.com\n`],
-    ['two lines', `${owner}\nother@example.com\n`],
-    ['an address that is not already approved for preview mail', 'stranger@example.com\n'],
+    ['two addresses', `${owner}, ${stranger}\n`],
+    ['a header injection', `${owner}\r\nBcc: ${stranger}\n`],
+    ['two lines', `${owner}\n${stranger}\n`],
+    ['an address that is not on the owner list', `${stranger}\n`],
     ['no address', '\n']
   ])('refuses a recipient file with %s', async (_name, text) => {
     const layout = server(text);
@@ -292,39 +299,203 @@ describe('failure alert', () => {
     await expect(alert.submitMail(Buffer.from('x'), { layout: common.LAYOUT, run: async () => ({ code: 75, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }) })).rejects.toThrow();
   });
 
-  it('reads the approved fingerprints only from the root-owned preview mail installation file', async () => {
-    const layout = server();
-    const digests = await alert.loadApprovedRecipientDigests({ path: layout.mailRecipientInstallationPath, ownerUid: me.uid });
-    expect([...digests].sort()).toEqual(Object.values(addresses).map(digest).sort());
+  it('reads the owner fingerprints only from its own root-only owner list', async () => {
+    const layout = server(`${owner}\n`, 0o600, { list: ownerList([owner, secondOwner]), listMode: 0o400 });
+    const digests = await alert.loadOwnerDigests({ layout });
+    expect([...digests].sort()).toEqual([owner, secondOwner].map(digest).sort());
+    expect(common.LAYOUT.ownerAlertDigestsPath).toBe('/etc/debateai-v3-preview/lifecycle/owner-alert-digests.json');
   });
 
-  it('carries no allow-list of its own in the source tree', () => {
+  it('carries no address list of its own in the source tree, and no trace of the account-mail allow-list', () => {
     const source = readFileSync(new URL('../../deploy/preview-lifecycle/v1/alert.mjs', import.meta.url), 'utf8');
+    const layoutSource = readFileSync(new URL('../../deploy/preview-lifecycle/v1/common.mjs', import.meta.url), 'utf8');
     expect(source).not.toMatch(/recipient-bindings|[0-9a-f]{64}/);
-    expect(common.LAYOUT.mailRecipientInstallationPath).toBe('/etc/debateai/preview-mail-recipient-installation.json');
+    for (const text of [source, layoutSource]) expect(text).not.toMatch(/preview-mail\/|preview-mail-recipient-installation|mailRecipientInstallationPath|recipientPolicyFromInstallation/);
+    expect(Object.keys(common.LAYOUT)).not.toContain('mailRecipientInstallationPath');
+  });
+
+  it('never opens or even looks at the account-mail allow-list file, even when one sits next door', async () => {
+    const layout = server();
+    // A planted allow-list beside the owner list, and the old layout key pointing at it.
+    const planted = join(layout.lockRoot, `${ACCOUNT_ALLOW_LIST}.json`);
+    writeFileSync(planted, '{}'); chmodSync(planted, 0o600);
+    const legacy = { ...layout, mailRecipientInstallationPath: planted };
+    touched.length = 0;
+    const h = harness(legacy);
+    await alert.runAlert({ unit, layout: legacy, deps: h.deps });
+    await alert.runAlert({ unit: alert.TEST_UNIT, test: true, layout: server(), deps: h.deps });
+    expect(h.sent).toHaveLength(2);
+    expect(touched).toContain(layout.ownerAlertDigestsPath);
+    expect(touched).toContain(layout.alertRecipientPath);
+    expect(touched.filter(path => path.includes(ACCOUNT_ALLOW_LIST) || path.startsWith('/etc/debateai/'))).toEqual([]);
   });
 
   it.each([
-    ['missing', { allowList: null }],
-    ['readable by others', { allowListMode: 0o644 }],
-    ['not JSON', { allowList: '{"recipientSha256":' }],
-    ['the old binding shape', { allowList: JSON.stringify({ schema: 'preview-mail-v4-purpose-binding', recipientSha256: JSON.parse(installation()).recipientSha256 }) }],
-    ['missing an alias', { allowList: JSON.stringify({ ...JSON.parse(installation()), recipientSha256: { 'verification-direct-and-recovery-proof': digest(owner) } }) }]
-  ])('sends nothing and logs its own reason when the installation file is %s', async (_name, options) => {
+    ['missing', { list: null }],
+    ['readable by others', { listMode: 0o644 }],
+    ['readable by its group', { listMode: 0o640 }],
+    ['executable', { listMode: 0o700 }],
+    ['empty', { list: '' }],
+    ['not JSON', { list: '{"version":1,"ownerSha256":' }],
+    ['another version', { list: JSON.stringify({ version: 2, ownerSha256: [digest(owner)] }) }],
+    ['a version written as text', { list: JSON.stringify({ version: '1', ownerSha256: [digest(owner)] }) }],
+    ['an extra key', { list: JSON.stringify({ version: 1, ownerSha256: [digest(owner)], to: owner }) }],
+    ['a duplicate key', { list: `{"version":1,"ownerSha256":["${'0'.repeat(64)}"],"ownerSha256":["${digest(owner)}"]}` }],
+    ['an empty list', { list: JSON.stringify({ version: 1, ownerSha256: [] }) }],
+    ['four fingerprints', { list: ownerList([owner, secondOwner, stranger, 'x'.concat('@example.invalid')]) }],
+    ['the same fingerprint twice', { list: JSON.stringify({ version: 1, ownerSha256: [digest(owner), digest(owner)] }) }],
+    ['an upper-case fingerprint', { list: JSON.stringify({ version: 1, ownerSha256: [digest(owner).toUpperCase()] }) }],
+    ['a short fingerprint', { list: JSON.stringify({ version: 1, ownerSha256: [digest(owner).slice(1)] }) }],
+    ['a plain address instead of a fingerprint', { list: JSON.stringify({ version: 1, ownerSha256: [owner] }) }],
+    ['over 1 KiB', { list: `${ownerList()}${' '.repeat(1024)}` }]
+  ])('sends nothing and logs its own reason when the owner list is %s', async (_name, options) => {
     const layout = server(`${owner}\n`, 0o600, options as any);
     const h = harness(layout);
-    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit, reason: 'RECIPIENT_ALLOW_LIST_UNAVAILABLE' });
+    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit, reason: 'OWNER_ALERT_LIST_UNAVAILABLE' });
     expect(h.sent).toEqual([]);
   });
 
-  it('refuses an installation file reached through a symlink or in a folder others can write', async () => {
+  it('refuses a recipient whose fingerprint is not on the owner list, even when the list is otherwise perfect', async () => {
+    const layout = server(`${owner}\n`, 0o600, { list: ownerList([secondOwner]) });
+    const h = harness(layout);
+    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit, reason: 'RECIPIENT_REFUSED' });
+    expect(h.sent).toEqual([]);
+    expect(JSON.stringify(h.logged)).not.toContain(owner);
+    expect(JSON.stringify(h.logged)).not.toContain(digest(owner));
+  });
+
+  it('a test send also needs the owner list (README step 2 test)', async () => {
+    const layout = server(`${owner}\n`, 0o600, { list: null });
+    const h = harness(layout);
+    await expect(alert.runAlert({ unit: alert.TEST_UNIT, test: true, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit: alert.TEST_UNIT, reason: 'OWNER_ALERT_LIST_UNAVAILABLE' });
+    expect(h.sent).toEqual([]);
+  });
+
+  it('refuses an owner list reached through a symlink, with a second link, in a folder others can write, or owned by someone else', async () => {
     const linked = server();
-    const real = linked.mailRecipientInstallationPath, link = join(linked.stateDir, 'linked.json');
-    symlinkSync(real, link);
-    await expect(alert.loadApprovedRecipientDigests({ path: link, ownerUid: me.uid })).rejects.toMatchObject({ code: 'RECIPIENT_ALLOW_LIST_UNAVAILABLE' });
+    const elsewhere = join(linked.stateDir, 'list.json');
+    writeFileSync(elsewhere, ownerList()); chmodSync(elsewhere, 0o600);
+    // The real list moved away, a symlink in its place.
+    const { unlinkSync } = await import('node:fs');
+    unlinkSync(linked.ownerAlertDigestsPath); symlinkSync(elsewhere, linked.ownerAlertDigestsPath);
+    await expect(alert.loadOwnerDigests({ layout: linked })).rejects.toMatchObject({ code: 'OWNER_ALERT_LIST_UNAVAILABLE' });
+    const twoLinks = server();
+    linkSync(twoLinks.ownerAlertDigestsPath, join(twoLinks.stateDir, 'second-name.json'));
+    await expect(alert.loadOwnerDigests({ layout: twoLinks })).rejects.toMatchObject({ code: 'OWNER_ALERT_LIST_UNAVAILABLE' });
     const open = server();
-    chmodSync(join(open.mailRecipientInstallationPath, '..'), 0o777);
-    await expect(alert.loadApprovedRecipientDigests({ path: open.mailRecipientInstallationPath, ownerUid: me.uid })).rejects.toMatchObject({ code: 'RECIPIENT_ALLOW_LIST_UNAVAILABLE' });
-    await expect(alert.loadApprovedRecipientDigests({ path: server().mailRecipientInstallationPath, ownerUid: me.uid + 1 })).rejects.toMatchObject({ code: 'RECIPIENT_ALLOW_LIST_UNAVAILABLE' });
+    chmodSync(open.lockRoot, 0o777);
+    await expect(alert.loadOwnerDigests({ layout: open })).rejects.toMatchObject({ code: 'OWNER_ALERT_LIST_UNAVAILABLE' });
+    chmodSync(open.lockRoot, 0o775);
+    await expect(alert.loadOwnerDigests({ layout: open })).rejects.toMatchObject({ code: 'OWNER_ALERT_LIST_UNAVAILABLE' });
+    const other = server();
+    await expect(alert.loadOwnerDigests({ layout: { ...other, ownerUid: me.uid + 1 } })).rejects.toMatchObject({ code: 'OWNER_ALERT_LIST_UNAVAILABLE' });
+    await expect(alert.loadOwnerDigests({ layout: { ...other, ownerGid: me.gid + 1 } })).rejects.toMatchObject({ code: 'OWNER_ALERT_LIST_UNAVAILABLE' });
+  });
+});
+
+describe('owner list install helper (alert.mjs --install-owner-list)', () => {
+  /** Runs the helper with its real output path (process.stdout) and captures both streams. */
+  async function install(layout: any) {
+    const out: string[] = [], err: string[] = [];
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: any) => { out.push(String(chunk)); return true; }) as any);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: any) => { err.push(String(chunk)); return true; }) as any);
+    try { return { result: await alert.installOwnerList({ layout }), out: out.join(''), err: err.join('') }; } finally { stdout.mockRestore(); stderr.mockRestore(); }
+  }
+  const neverShows = (text: string) => {
+    for (const secret of [owner, digest(owner), secondOwner, digest(secondOwner), 'example.invalid']) expect(text).not.toContain(secret);
+    expect(text).not.toMatch(/[0-9a-f]{64}|@/i);
+  };
+
+  it('is its own command-line form, with nothing else on the line', () => {
+    expect(alert.parseAlertArgs(['--install-owner-list'])).toEqual({ installOwnerList: true });
+    for (const argv of [['--install-owner-list', owner], ['--install-owner-list', '--test'], ['--unit', unit, '--install-owner-list']]) expect(alert.parseAlertArgs(argv)).toBeNull();
+  });
+
+  it('builds the list from the recipient file, root-only 0600, and prints only a fixed code and the mode', async () => {
+    const layout = server(`${owner}\n`, 0o600, { list: null });
+    const { result, out, err } = await install(layout);
+    expect(result).toEqual({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_INSTALLED', mode: '0600' });
+    expect(out).toBe('{"event":"PREVIEW_LIFECYCLE_OWNER_LIST_INSTALLED","mode":"0600"}\n');
+    expect(err).toBe('');
+    neverShows(out);
+    const stat = statSync(layout.ownerAlertDigestsPath);
+    expect([stat.mode & 0o777, stat.uid, stat.gid, stat.nlink]).toEqual([0o600, me.uid, me.gid, 1]);
+    expect(JSON.parse(readFileSync(layout.ownerAlertDigestsPath, 'utf8'))).toEqual({ version: 1, ownerSha256: [digest(owner)] });
+    // No temporary file left behind next to it.
+    expect(readdirSync(layout.lockRoot).sort()).toEqual(['alert-recipient', 'owner-alert-digests.json']);
+    // And the alert now sends to that owner.
+    const h = harness(layout);
+    await alert.runAlert({ unit, layout, deps: h.deps });
+    expect(h.sent).toHaveLength(1);
+  });
+
+  it('a second run with the same recipient changes nothing and says so', async () => {
+    const layout = server(`${owner}\n`, 0o600, { list: null });
+    await install(layout);
+    const before = statSync(layout.ownerAlertDigestsPath);
+    const { result, out, err } = await install(layout);
+    expect(result).toEqual({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_ALREADY_INSTALLED', mode: '0600' });
+    expect(err).toBe('');
+    neverShows(out);
+    expect(statSync(layout.ownerAlertDigestsPath).ino).toBe(before.ino);
+  });
+
+  it('never replaces a list that holds a different owner, and never says whose', async () => {
+    const layout = server(`${owner}\n`, 0o600, { list: ownerList([secondOwner]) });
+    const original = readFileSync(layout.ownerAlertDigestsPath);
+    const { result, out, err } = await install(layout);
+    expect(result).toEqual({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: 'OWNER_ALERT_LIST_EXISTS' });
+    neverShows(out); expect(err).toBe('');
+    expect(readFileSync(layout.ownerAlertDigestsPath)).toEqual(original);
+  });
+
+  it.each([
+    ['readable by others', `${owner}\n`, 0o644, { reason: 'RECIPIENT_FILE_MODE_REFUSED', mode: '0644' }],
+    ['read-only (0400)', `${owner}\n`, 0o400, { reason: 'RECIPIENT_FILE_MODE_REFUSED', mode: '0400' }],
+    ['holding two addresses', `${owner}, ${secondOwner}\n`, 0o600, { reason: 'RECIPIENT_REFUSED' }],
+    ['holding a header injection', `${owner}\r\nBcc: ${secondOwner}\n`, 0o600, { reason: 'RECIPIENT_REFUSED' }],
+    ['empty', '', 0o600, { reason: 'RECIPIENT_REFUSED' }]
+  ])('writes nothing when the recipient file is %s', async (_name, text, mode, expected) => {
+    const layout = server(text, mode, { list: null });
+    const { result, out, err } = await install(layout);
+    expect(result).toEqual({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', ...expected });
+    neverShows(out); expect(err).toBe('');
+    expect(existsSync(layout.ownerAlertDigestsPath)).toBe(false);
+    expect(readdirSync(layout.lockRoot)).toEqual(['alert-recipient']);
+  });
+
+  it('writes nothing when the recipient file is a symlink, has a second link, or is missing', async () => {
+    const linked = server(`${owner}\n`, 0o600, { list: null });
+    const target = join(linked.stateDir, 'recipient');
+    writeFileSync(target, `${owner}\n`); chmodSync(target, 0o600);
+    const { unlinkSync } = await import('node:fs');
+    unlinkSync(linked.alertRecipientPath); symlinkSync(target, linked.alertRecipientPath);
+    const twoLinks = server(`${owner}\n`, 0o600, { list: null });
+    linkSync(twoLinks.alertRecipientPath, join(twoLinks.stateDir, 'recipient-copy'));
+    const missing = server(`${owner}\n`, 0o600, { list: null });
+    unlinkSync(missing.alertRecipientPath);
+    for (const layout of [linked, twoLinks, missing]) {
+      const { result, out, err } = await install(layout);
+      expect(result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED' });
+      expect(['RECIPIENT_REFUSED', 'RECIPIENT_FILE_MODE_REFUSED']).toContain(result.reason);
+      neverShows(out); expect(err).toBe('');
+      expect(existsSync(layout.ownerAlertDigestsPath)).toBe(false);
+    }
+  });
+
+  it('writes nothing in a folder others can write, and never writes through a symlink left at the list path', async () => {
+    const open = server(`${owner}\n`, 0o600, { list: null });
+    chmodSync(open.lockRoot, 0o777);
+    const first = await install(open);
+    expect(first.result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED' });
+    neverShows(first.out);
+    expect(existsSync(open.ownerAlertDigestsPath)).toBe(false);
+    const trap = server(`${owner}\n`, 0o600, { list: null });
+    const victim = join(trap.stateDir, 'victim.json');
+    symlinkSync(victim, trap.ownerAlertDigestsPath);
+    const second = await install(trap);
+    expect(second.result).toEqual({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: 'OWNER_ALERT_LIST_UNAVAILABLE' });
+    neverShows(second.out); expect(second.err).toBe('');
+    expect(existsSync(victim)).toBe(false);
   });
 });

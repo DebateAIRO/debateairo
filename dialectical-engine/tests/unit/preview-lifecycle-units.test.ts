@@ -118,6 +118,7 @@ describe('preview lifecycle systemd templates', () => {
   it.each([
     ['unlock-team-tools.mjs', ['reset'], 1, 'stderr', { event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false }],
     ['alert.mjs', ['--unit', 'debateai-preview-api.service'], 0, 'stdout', { event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', reason: 'ACTOR_REFUSED' }],
+    ['alert.mjs', ['--install-owner-list'], 1, 'stdout', { event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: 'ACTOR_REFUSED' }],
     ['backup.mjs', [], 1, 'stderr', { event: 'PREVIEW_BACKUP_FAILED', reason: 'ACTOR_REFUSED' }]
   ] as const)('%s loads and refuses cleanly with no environment but PATH', (script, args, status, stream, event) => {
     const result = spawnSync('/usr/bin/env', ['-i', 'PATH=/usr/sbin:/usr/bin:/sbin:/bin', process.execPath, join(folder, script), ...args], { encoding: 'utf8' });
