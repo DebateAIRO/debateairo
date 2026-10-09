@@ -1692,7 +1692,8 @@ export class RegistrationService implements RegistrationApplication {
           });
         }
         // Open sign-up mail (G5): after the limiter, before any hashing or mail capacity. The answer depends on
-        // the domain alone, never on whether an account exists, and the response clamp still holds the timing.
+        // the domain alone, never on whether an account exists. A slow resolver (up to 2 s) lengthens this
+        // response beyond the clamp; that time says only how fast DNS answered for the domain, nothing about accounts.
         if (social === undefined) {
           for (const address of recoveryEmail === null ? [email] : [email, recoveryEmail]) {
             if (await mailDomainRefused(this.dependencies.mailDomainCheck, address)) throw new AuthFlowError("EMAIL_INVALID");

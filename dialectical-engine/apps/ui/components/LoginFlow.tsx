@@ -15,7 +15,7 @@ import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode, sixDigitCodeToSend } from '@/lib/sixDigitCode';
-import { emailShape } from '@/lib/authFormValidation';
+import { signInEmailShape } from '@/lib/authFormValidation';
 import { setRecoveryAcknowledgementPending } from '@/lib/authNavigationGuard';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { safeReturnPath } from '@/lib/returnPath';
@@ -201,7 +201,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
         const secret = String(data.get('password') ?? '');
         setEmail(address);
         setPassword(secret);
-        const addressError = emailShape(address) ? null : t(catalog, "auth.invalidEmail");
+        const addressError = signInEmailShape(address) ? null : t(catalog, "auth.invalidEmail");
         const secretError = secret ? null : t(catalog, "auth.password.required");
         setEmailError(addressError);
         setPasswordError(secretError);

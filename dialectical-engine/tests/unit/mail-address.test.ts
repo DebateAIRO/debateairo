@@ -3,9 +3,11 @@ import { canonicalMailAddress, isMailAddress, mailAddressDomain } from "@debatea
 import { RegisterRequestFieldsSchema, ResendVerificationRequestSchema } from "@debateai/contract";
 import { isSingleDeliverableRecipient, SendmailMailSender } from "../../apps/api/src/mail-channel.js";
 import { AuthFlowError, RegistrationService } from "../../apps/api/src/registration.js";
-import { EmailChangeError, normalizedAddress } from "../../apps/api/src/email-change.js";
-import { createMailDomainCheck, mailDomainRefused, type MailDomainResolver } from "../../apps/api/src/mail-domain-check.js";
-import { emailShape } from "../../apps/ui/lib/authFormValidation.js";
+import { EmailChangeError, EmailChangeService, normalizedAddress } from "../../apps/api/src/email-change.js";
+import { RecoveryEmailService } from "../../apps/api/src/recovery-email.js";
+import { createMailDomainCheck, limitMailDomainCheck, mailDomainRefused, type MailDomainResolver } from "../../apps/api/src/mail-domain-check.js";
+import { emailShape, signInEmailShape } from "../../apps/ui/lib/authFormValidation.js";
+import { normalizeEmailForBlindIndex } from "@debateai/crypto";
 import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows } from "../../packages/register/src/auth-policy.js";
 
 // Open sign-up mail, PR 2 (2026-10-09): ONE address rule, asked at sign-up, resend, the recovery address,
@@ -112,23 +114,58 @@ describe("registration refuses exactly what mail refuses", () => {
   } as never).then(() => "ADMITTED", (error: unknown) => error instanceof AuthFlowError ? error.code : "OTHER");
   const strings = [...GOOD.map(([, address]) => address), ...BAD.map(([, address]) => address).filter((value): value is string => typeof value === "string")];
 
-  it.each(strings)("%j: sign-up schema, resend schema, mail step, email change and the browser agree", async (address) => {
-    const mail = isSingleDeliverableRecipient(address);
-    expect(mail).toBe(isMailAddress(address));
-    expect(RegisterRequestFieldsSchema.shape.email.safeParse(address).success).toBe(mail);
-    expect(ResendVerificationRequestSchema.shape.email.safeParse(address).success).toBe(mail);
-    expect(emailShape(address)).toBe(isMailAddress(address.trim()));
-    let changeAccepted: boolean;
-    try { normalizedAddress(address); changeAccepted = true; }
-    catch (error) { expect(error).toBeInstanceOf(EmailChangeError); expect((error as EmailChangeError).code).toBe("EMAIL_INVALID"); changeAccepted = false; }
-    expect(changeAccepted).toBe(isMailAddress(address.trim()));
-    if (!mail) expect(await resendAdmission(address)).toBe("EMAIL_INVALID");
+  const registerAdmission = async (email: unknown) => service.admitSource({
+    route: "register", source: { ip: "198.51.100.8", userAgent: "vitest", requestId: "mail-address-register" },
+    // No password and no phone: an address the rule accepts falls through to AUTH_INPUT_INVALID.
+    input: { email, recoveryEmail: null, adultAffirmed: true } as never
+  } as never).then(() => "ADMITTED", (error: unknown) => error instanceof AuthFlowError ? error.code : "OTHER");
+  /** What each entry point would STORE for x, or null when it refuses x. */
+  const entryPoints: Record<string, (address: string) => Promise<string | null>> = {
+    "sign-up schema": async (x) => RegisterRequestFieldsSchema.shape.email.safeParse(x).success ? normalizeEmailForBlindIndex(x) : null,
+    "resend schema": async (x) => ResendVerificationRequestSchema.shape.email.safeParse(x).success ? normalizeEmailForBlindIndex(x) : null,
+    "sign-up service": async (x) => await registerAdmission(x) === "EMAIL_INVALID" ? null : normalizeEmailForBlindIndex(x),
+    "resend service": async (x) => await resendAdmission(x) === "EMAIL_INVALID" ? null : normalizeEmailForBlindIndex(x),
+    "email change and recovery address": async (x) => { try { return normalizedAddress(x); } catch (error) { expect((error as EmailChangeError).code).toBe("EMAIL_INVALID"); return null; } },
+    "browser pre-check": async (x) => emailShape(x) ? normalizeEmailForBlindIndex(x) : null
+  };
+
+  it.each(strings)("%j: whatever an entry point accepts, the mail step can send to as stored", async (address) => {
+    for (const [name, entry] of Object.entries(entryPoints)) {
+      const stored = await entry(address);
+      if (stored !== null) expect(isSingleDeliverableRecipient(stored), `${name} accepted what mail refuses`).toBe(true);
+    }
   });
+
+  it.each(GOOD.map(([, address]) => address))("%j: every entry point accepts a good address (control)", async (address) => {
+    for (const [name, entry] of Object.entries(entryPoints)) expect(await entry(address), name).not.toBeNull();
+    expect(await registerAdmission(address)).toBe("AUTH_INPUT_INVALID");
+    expect(isSingleDeliverableRecipient(address)).toBe(true);
+  });
+
+  it.each(BAD.map(([, address]) => address).filter((value): value is string => typeof value === "string" && value.trim() === value))(
+    "%j: every entry point refuses what mail refuses", async (address) => {
+      expect(isSingleDeliverableRecipient(address)).toBe(false);
+      for (const [name, entry] of Object.entries(entryPoints)) expect(await entry(address), name).toBeNull();
+    });
 
   it.each(BAD.filter(([, address]) => typeof address === "string"))("the verification sender refuses %s before any spawn", async (_name, recipient) => {
     const sender = new SendmailMailSender({ executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 1000 });
     await expect(sender.sendVerification({ attemptId: "opaque", recipient: recipient as string, token: "Z".repeat(43), expiresAt: new Date("2026-10-09T00:00:00Z") }))
       .rejects.toMatchObject({ operatorCode: "MAIL_INPUT_INVALID" });
+  });
+
+  it("a good address does reach the transport (control: the refusals above are the rule's)", async () => {
+    const sender = new SendmailMailSender({ executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 1000 });
+    await expect(sender.sendVerification({ attemptId: "opaque", recipient: "success+x@simulator.amazonses.com", token: "Z".repeat(43), expiresAt: new Date("2026-10-09T00:00:00Z") }))
+      .rejects.toMatchObject({ operatorCode: "SENDMAIL_EXEC_FAILED" });
+  });
+
+  it("sign-in and recovery keep the wider look-up shape, so older accounts can still sign in", () => {
+    expect(signInEmailShape("person@example.c")).toBe(true);
+    expect(signInEmailShape("per..son@example.com")).toBe(true);
+    expect(emailShape("person@example.c")).toBe(false);
+    expect(signInEmailShape("person@localhost")).toBe(false);
+    expect(signInEmailShape("a@example.com,b@example.com")).toBe(false);
   });
 
   it("EMAIL_INVALID is a 422 with its own code", () => {
@@ -153,7 +190,7 @@ describe("the DNS question at the entry points (fails open)", () => {
   });
   it("UNDELIVERABLE on NXDOMAIN", async () => {
     const check = createMailDomainCheck(resolver({ resolveMx: async () => { throw absent("ENOTFOUND"); } }));
-    expect(await check("no-such-domain.example")).toBe("UNDELIVERABLE");
+    expect(await check("no-such-domain.com")).toBe("UNDELIVERABLE");
   });
   it("UNDELIVERABLE on a null MX (RFC 7505)", async () => {
     for (const exchange of ["", "."]) {
@@ -178,7 +215,7 @@ describe("the DNS question at the entry points (fails open)", () => {
     try {
       const cancel = vi.fn();
       const check = createMailDomainCheck(resolver({ resolveMx: () => new Promise(() => { /* never answers */ }), cancel }));
-      const verdict = check("slow.example");
+      const verdict = check("slow.com");
       await vi.advanceTimersByTimeAsync(1_999);
       expect(cancel).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(1);
@@ -193,9 +230,84 @@ describe("the DNS question at the entry points (fails open)", () => {
     expect(await mailDomainRefused(async () => { throw new Error("boom"); }, "person@example.com")).toBe(false);
     expect(await mailDomainRefused(undefined, "person@example.com")).toBe(false);
   });
+  it("never asks about special-use names (.test, .example, .invalid, .localhost)", async () => {
+    let asked = 0;
+    const check = createMailDomainCheck(resolver({ resolveMx: async () => { asked += 1; throw absent("ENOTFOUND"); } }));
+    for (const domain of ["example.test", "mail.example", "x.invalid", "Host.LOCALHOST"]) expect(await check(domain)).toBe("UNKNOWN");
+    expect(asked).toBe(0);
+    expect(await check("example.com")).toBe("UNDELIVERABLE");
+    expect(asked).toBe(1);
+  });
+  it("sends no A/AAAA queries once the deadline has passed", async () => {
+    vi.useFakeTimers();
+    try {
+      let late!: (value: never[]) => void;
+      const resolve4 = vi.fn(async () => ["192.0.2.1"]);
+      const check = createMailDomainCheck(resolver({
+        resolveMx: () => new Promise((resolve) => { late = () => resolve([]); }), resolve4
+      }));
+      const verdict = check("late.com");
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(await verdict).toBe("UNKNOWN");
+      late([]);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(resolve4).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+  it("the process-wide brakes answer UNKNOWN without asking, over the in-flight or per-minute limit", async () => {
+    let clock = 0, asked = 0;
+    const gates: Array<() => void> = [];
+    const slow = limitMailDomainCheck(async () => { asked += 1; await new Promise<void>((done) => { gates.push(done); }); return "UNDELIVERABLE"; },
+      { maxInFlight: 2, maxPerMinute: 3, now: () => clock });
+    const first = slow("a.com"), second = slow("b.com");
+    expect(await slow("c.com")).toBe("UNKNOWN");
+    expect(asked).toBe(2);
+    for (const done of gates.splice(0)) done();
+    expect(await first).toBe("UNDELIVERABLE");
+    expect(await second).toBe("UNDELIVERABLE");
+    const third = slow("d.com");
+    for (const done of gates.splice(0)) done();
+    expect(await third).toBe("UNDELIVERABLE");
+    expect(await slow("e.com")).toBe("UNKNOWN");
+    expect(asked).toBe(3);
+    clock = 60_001;
+    const fresh = slow("f.com");
+    for (const done of gates.splice(0)) done();
+    expect(await fresh).toBe("UNDELIVERABLE");
+    expect(asked).toBe(4);
+  });
   it("is asked about the lower-cased domain, never the address", async () => {
     const asked: string[] = [];
     await mailDomainRefused(async (domain) => { asked.push(domain); return "DELIVERABLE"; }, "Secret.Person@Example.COM");
     expect(asked).toEqual(["example.com"]);
+  });
+});
+
+describe("the DNS question in the two settings flows", () => {
+  const grantToken = "G".repeat(43);
+  const session = { userId: "22222222-2222-4222-8222-222222222222", sessionId: "s", tokenHash: "t" } as never;
+  const source = { ip: "198.51.100.9", userAgent: "vitest", requestId: "settings-dns" } as never;
+  const refusing = async () => "UNDELIVERABLE" as const;
+
+  it("email change refuses an undeliverable domain with EMAIL_INVALID before any key or database work", async () => {
+    const request = vi.fn(), load = vi.fn();
+    const service = new EmailChangeService({ repository: { request } as never, users: { load } as never, blindIndexKey: Buffer.alloc(32, 1), mail: {} as never, mailDomainCheck: refusing });
+    await expect(service.request(session, { newEmail: "person@gone.com", grantToken }, source)).rejects.toMatchObject({ code: "EMAIL_INVALID" });
+    expect(request).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
+  });
+  it("the recovery address refuses an undeliverable domain with EMAIL_INVALID before any key or database work", async () => {
+    const request = vi.fn(), load = vi.fn();
+    const service = new RecoveryEmailService({ repository: { request } as never, users: { load } as never, blindIndexKey: Buffer.alloc(32, 1), mail: {} as never, mailDomainCheck: refusing });
+    await expect(service.requestRecoveryEmail(session, { email: "backup@gone.com", grantToken }, source)).rejects.toMatchObject({ code: "EMAIL_INVALID" });
+    expect(request).not.toHaveBeenCalled();
+    expect(load).not.toHaveBeenCalled();
+  });
+  it("both fail open: an UNKNOWN answer goes on to the key store (control)", async () => {
+    const load = vi.fn(async () => { throw new Error("REACHED_KEY_STORE"); });
+    const change = new EmailChangeService({ repository: {} as never, users: { load } as never, blindIndexKey: Buffer.alloc(32, 1), mail: {} as never, mailDomainCheck: async () => "UNKNOWN" });
+    await expect(change.request(session, { newEmail: "person@example.com", grantToken }, source)).rejects.toThrow("REACHED_KEY_STORE");
+    const recovery = new RecoveryEmailService({ repository: {} as never, users: { load } as never, blindIndexKey: Buffer.alloc(32, 1), mail: {} as never, mailDomainCheck: async () => "UNKNOWN" });
+    await expect(recovery.requestRecoveryEmail(session, { email: "backup@example.com", grantToken }, source)).rejects.toThrow("REACHED_KEY_STORE");
   });
 });

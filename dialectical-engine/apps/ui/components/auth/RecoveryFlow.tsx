@@ -4,7 +4,7 @@ import type { ContractClient, ConsumerRecoveryProofResponse } from '@debateai/co
 import { contractClient } from '@/lib/api';
 import { takeFragmentToken } from '@/lib/mfaEnrollment';
 import { safeReturnPath } from '@/lib/returnPath';
-import { emailShape } from '@/lib/authFormValidation';
+import { signInEmailShape } from '@/lib/authFormValidation';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import type { LocaleCode } from '@/lib/i18n/locales';
 import { KnownPasswordRecoveryLink } from '../KnownPasswordRecoveryLink';
@@ -61,7 +61,7 @@ export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthe
             return;
         const address = String(new FormData(form).get('email') ?? '').trim();
         setEmail(address);
-        if (!emailShape(address)) {
+        if (!signInEmailShape(address)) {
             setError(t(catalog, "auth.invalidEmail"));
             form.querySelector<HTMLElement>('[name=email]')?.focus();
             return;

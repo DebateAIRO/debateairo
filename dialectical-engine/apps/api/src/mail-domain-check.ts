@@ -27,6 +27,20 @@ export interface MailDomainResolver {
 
 /** Owner decision G5: two seconds, then fail open. Module-private (the source-purity law refuses an exported numeric literal). */
 const MAIL_DOMAIN_CHECK_TIMEOUT_MS = 2_000;
+/**
+ * The process-wide brakes (self-review 2026-10-09): a signed-in account can ask about a new domain on every email
+ * change or recovery-address request, so the questions this process sends are capped. Over either brake the answer
+ * is UNKNOWN without any query, which lets the address through (fail open) and can never be turned into a flood of
+ * lookups at someone else's name servers.
+ */
+const MAIL_DOMAIN_CHECK_MAX_IN_FLIGHT = 8;
+const MAIL_DOMAIN_CHECK_MAX_PER_MINUTE = 120;
+const MINUTE_MS = 60_000;
+/**
+ * Special-use names (RFC 2606, RFC 6761) are never asked about: they never resolve, they are what the test suites
+ * and the development stack sign up with, and a DNS answer would make the same input pass offline and fail online.
+ */
+const SPECIAL_USE_TOP_LEVEL = new Set(["test", "example", "invalid", "localhost"]);
 
 const errorCode = (error: unknown): string | undefined =>
   error !== null && typeof error === "object" && typeof (error as { code?: unknown }).code === "string"
@@ -35,7 +49,7 @@ const errorCode = (error: unknown): string | undefined =>
 const NAME_ABSENT = "ENOTFOUND";
 const RECORD_ABSENT = "ENODATA";
 
-async function lookUp(resolver: MailDomainResolver, domain: string): Promise<MailDomainVerdict> {
+async function lookUp(resolver: MailDomainResolver, domain: string, expired: () => boolean): Promise<MailDomainVerdict> {
   let exchanges: ReadonlyArray<Readonly<{ exchange: string; priority: number }>>;
   try {
     exchanges = await resolver.resolveMx(domain);
@@ -49,6 +63,8 @@ async function lookUp(resolver: MailDomainResolver, domain: string): Promise<Mai
     const nullMx = exchanges.length === 1 && (exchanges[0]!.exchange === "" || exchanges[0]!.exchange === ".");
     return nullMx ? "UNDELIVERABLE" : "DELIVERABLE";
   }
+  // Past the deadline the answer is already UNKNOWN: send no further queries.
+  if (expired()) return "UNKNOWN";
   const addresses = await Promise.allSettled([resolver.resolve4(domain), resolver.resolve6(domain)]);
   if (addresses.some((result) => result.status === "fulfilled" && result.value.length > 0)) return "DELIVERABLE";
   const absent = addresses.every((result) => result.status === "fulfilled"
@@ -62,17 +78,44 @@ export function createMailDomainCheck(
 ): MailDomainCheck {
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1) throw new TypeError("MAIL_DOMAIN_CHECK_CONFIGURATION_INVALID");
   return async (domain: string): Promise<MailDomainVerdict> => {
+    if (SPECIAL_USE_TOP_LEVEL.has(domain.slice(domain.lastIndexOf(".") + 1).toLowerCase())) return "UNKNOWN";
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let expired = false;
     const deadline = new Promise<MailDomainVerdict>((resolve) => {
       timer = setTimeout(() => {
+        expired = true;
         try { resolver.cancel?.(); } catch { /* The deadline's answer stands. */ }
         resolve("UNKNOWN");
       }, timeoutMs);
     });
     try {
-      return await Promise.race([lookUp(resolver, domain).catch((): MailDomainVerdict => "UNKNOWN"), deadline]);
+      return await Promise.race([lookUp(resolver, domain, () => expired).catch((): MailDomainVerdict => "UNKNOWN"), deadline]);
     } finally {
       clearTimeout(timer);
+    }
+  };
+}
+
+/** Wraps a check in the process-wide brakes above. Over a brake: UNKNOWN, and no query is sent. */
+export function limitMailDomainCheck(
+  check: MailDomainCheck,
+  limits: Readonly<{ maxInFlight: number; maxPerMinute: number; now?: () => number }> = {
+    maxInFlight: MAIL_DOMAIN_CHECK_MAX_IN_FLIGHT, maxPerMinute: MAIL_DOMAIN_CHECK_MAX_PER_MINUTE
+  }
+): MailDomainCheck {
+  const now = limits.now ?? (() => Date.now());
+  let inFlight = 0;
+  const started: number[] = [];
+  return async (domain: string): Promise<MailDomainVerdict> => {
+    const at = now();
+    while (started.length > 0 && started[0]! <= at - MINUTE_MS) started.shift();
+    if (inFlight >= limits.maxInFlight || started.length >= limits.maxPerMinute) return "UNKNOWN";
+    inFlight += 1;
+    started.push(at);
+    try {
+      return await check(domain);
+    } finally {
+      inFlight -= 1;
     }
   };
 }
@@ -82,7 +125,7 @@ export function createMailDomainCheck(
  * per question, because `cancel()` abandons every query of its Resolver and must not cut another visitor's check.
  */
 export function systemMailDomainCheck(): MailDomainCheck {
-  return (domain: string) => {
+  return limitMailDomainCheck((domain: string) => {
     const resolver = new Resolver({ timeout: MAIL_DOMAIN_CHECK_TIMEOUT_MS, tries: 1 });
     return createMailDomainCheck({
       resolveMx: (name) => resolver.resolveMx(name),
@@ -90,7 +133,7 @@ export function systemMailDomainCheck(): MailDomainCheck {
       resolve6: (name) => resolver.resolve6(name),
       cancel: () => resolver.cancel()
     })(domain);
-  };
+  });
 }
 
 /**
