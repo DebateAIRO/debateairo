@@ -49,6 +49,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Soukromí a ochrana osobních údajů — privacy@dezbatere.ro",
         "Hlášení nezákonného obsahu — [abuse@dezbatere.ro] — viz oddíl 10",
         "Kontaktní místo pro orgány veřejné moci — [dsa@dezbatere.ro] — rumunština a angličtina",
+        "Příkazy k odstranění teroristického obsahu (nařízení (EU) 2021/784) — [dsa@dezbatere.ro] — naše kontaktní místo pro tyto příkazy; rumunština a angličtina; viz oddíl 10",
         "Zástupci v jiných zemích — Uvedeni v příloze A pro regiony, v nichž jsme zástupce jmenovali"
         ]
       },
@@ -166,9 +167,11 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Moderátorská rozhodnutí o obsahu a účtech. Odstranění nebo omezení zveřejněné debaty či pozastavení nebo uzavření účtu je rozhodnutí, které činíme na základě těchto Podmínek nebo zákona. Na každém takovém rozhodnutí ovlivňujícím váš účet se podílí člověk. Důvody popisuje oddíl 11."
         ]
       },
-      { kind: "p", text: "Odůvodnění. Kdykoli odstraníme váš obsah nebo omezíme jeho viditelnost či pozastavíme nebo ukončíme váš účet, poskytneme vám odůvodnění: co jsme učinili a v jakém rozsahu, z jakých skutečností jsme vycházeli a zda pocházely z hlášení nebo z našich vlastních kontrol, zda byly použity automatizované prostředky, jaký byl právní nebo smluvní důvod a jak můžete rozhodnutí napadnout." },
+      { kind: "p", text: "Odůvodnění. Kdykoli odstraníme váš obsah nebo omezíme jeho viditelnost či pozastavíme nebo ukončíme váš účet, poskytneme vám odůvodnění: co jsme učinili a v jakém rozsahu, z jakých skutečností jsme vycházeli a zda pocházely z hlášení nebo z našich vlastních kontrol, zda byly použity automatizované prostředky, jaký byl právní nebo smluvní důvod a jak můžete rozhodnutí napadnout: prostřednictvím našeho postupu pro vyřizování stížností níže, prostřednictvím subjektu pro mimosoudní řešení sporů certifikovaného podle nařízení EU o digitálních službách nebo u soudu." },
       { kind: "p", text: "Stížnost proti rozhodnutí. Nesouhlasíte-li s moderátorským rozhodnutím, odpovězte na odůvodnění nebo napište na [appeals@dezbatere.ro] do šesti měsíců. Rozhodnutí přezkoumá osoba, která se na původním rozhodnutí nepodílela, a výsledek vám sdělíme s odůvodněním. Tím není dotčeno vaše právo obrátit se na soud nebo využít alternativní řešení sporů podle oddílu 18. Postup pro vyřizování stížností přijímá také stížnosti na to, že jsme nereagovali na hlášení, že byl obsah odstraněn nesprávně, že byl účet nesprávně omezen nebo že automatizovaný nástroj nesprávně ovlivnil váš obsah." },
+      { kind: "p", text: "Mimosoudní řešení sporů. Nacházíte-li se v Evropské unii, můžete spor týkající se některého z našich moderátorských rozhodnutí předložit subjektu pro mimosoudní řešení sporů certifikovanému podle článku 21 nařízení EU o digitálních službách (nařízení (EU) 2022/2065). To se vztahuje na rozhodnutí o vašem obsahu nebo vašem účtu i na naše rozhodnutí o hlášení, které jste podali. Subjekt vyberete ze seznamu, který zveřejňuje Evropská komise na adrese digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, a nemusíte nejprve využít náš postup pro vyřizování stížností. Řízení se účastníme v dobré víře a účast odmítneme pouze tehdy, pokud již byl urovnán tentýž spor týkající se téhož obsahu a týchž důvodů. Rozhodnutí subjektu není pro žádnou ze stran závazné a právo obrátit se na soud vám zůstává zachováno. Subjekt vám může účtovat nízký poplatek, nebo vůbec žádný. Rozhodne-li ve váš prospěch, uhradíme jeho poplatky a nahradíme vaše přiměřené výdaje; rozhodne-li v náš prospěch, neplatíte naše poplatky ani výdaje, pokud subjekt nezjistí, že jste jednali zjevně ve zlé víře." },
       { kind: "p", text: "Kontakt s člověkem. Náš asistent podpory je systém AI a tuto skutečnost uvádí. Kdykoli můžete požádat o rozhovor s člověkem a každý rozhovor s podporou tuto možnost nabízí. Při komunikaci s vámi nespoléháme pouze na automatizované nástroje." },
+      { kind: "p", text: "Teroristický obsah. Teroristický obsah je nezákonný a na DebateAI není povolen (oddíl 7). Příslušné orgány v Evropské unii nám mohou zasílat příkazy k odstranění podle nařízení (EU) 2021/784 na kontaktní místo uvedené v oddílu 1. Jakmile příkaz obdržíme, obsah odstraníme nebo k němu znemožníme přístup ve všech zemích EU do jedné hodiny. Osobu, která obsah zveřejnila, informujeme, že byl odstraněn, a na její žádost i proč a jak může příkaz napadnout, pokud orgán nerozhodne, že veřejná bezpečnost vyžaduje, abychom po omezenou dobu mlčeli. Jak nařízení vyžaduje, odstraněný obsah a související údaje uchováváme po dobu šesti měsíců, aby bylo možné odstranění přezkoumat a, pokud bylo chybné, zrušit. Osoba, která obsah zveřejnila, může příkaz napadnout u soudů země, jejíž orgán jej vydal, a může také využít náš postup pro vyřizování stížností. Žádný orgán nám dosud neuložil přijmout zvláštní opatření proti teroristickému obsahu podle tohoto nařízení; pokud k tomu dojde, tato opatření zde popíšeme, včetně případných automatizovaných nástrojů." },
       { kind: "p", text: "Vážné ohrožení života nebo bezpečnosti. Dozvíme-li se o informacích nasvědčujících trestnému činu spojenému s ohrožením života nebo bezpečnosti určité osoby, informujeme příslušné orgány." }
     ]
   },
@@ -177,7 +180,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Pozastavení a ukončení",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Z vaší strany. Svůj účet můžete kdykoli uzavřít v Nastavení, jak popisuje oddíl 6. Nemusíte uvádět důvod." },
+      { kind: "p", text: "Z vaší strany. Svůj účet můžete kdykoli uzavřít v Nastavení, jak popisuje oddíl 6. Nemusíte uvádět důvod. Uzavřením účtu tyto Podmínky končí. Skončí, jakmile uzavření nabude účinku, po uplynutí sedmidenní ochranné lhůty; oddíly uvedené na konci tohoto oddílu zůstávají v platnosti i poté." },
       { kind: "p", text: "Z naší strany. Váš účet můžeme pozastavit nebo uzavřít či váš obsah odstranit nebo omezit, pokud: podstatně porušíte tyto Podmínky, zejména oddíl 7; je váš obsah nezákonný nebo nám zákon, soud či orgán ukládá jednat; vaše užívání ohrožuje bezpečnost, integritu nebo dostupnost služby či práva jiných osob; váš účet nebyl aktivní po dobu [24 months] a my jsme vás upozornili; nebo přestaneme službu poskytovat či ji přestaneme poskytovat ve vaší zemi." },
       { kind: "p", text: "S výjimkou případů, kdy je porušení závažné, zákon vyžaduje okamžité jednání nebo by prodlení způsobilo újmu, vám sdělíme, v čem problém spočívá, a před pozastavením nebo uzavřením účtu vám poskytneme přiměřenou příležitost jej napravit. Vždy poskytneme odůvodnění podle oddílu 10 a rozhodnutí můžete napadnout." },
       { kind: "p", text: "Pokud službu zcela ukončíme nebo ji přestaneme poskytovat ve vaší zemi, upozorníme vás nejméně 30 dnů předem, vrátíme vám případnou předplacenou částku za období po ukončení a předtím vám umožníme exportovat debaty." },
@@ -274,7 +277,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Oddělitelnost. Je-li některé ustanovení těchto Podmínek shledáno nevymahatelným, toto ustanovení se nepoužije a ostatní Podmínky zůstávají v platnosti." },
       { kind: "p", text: "Nevzdání se práva. Pokud určitou podmínku nevymáháme okamžitě, neztrácíme právo vymáhat ji později." },
       { kind: "p", text: "Úplná dohoda. Tyto Podmínky společně se Zásadami používání souborů cookie a Registrem poskytovatelů AI představují úplnou dohodu mezi námi ohledně služby. Závazky, které přijímáme v Zásadách ochrany osobních údajů, jsou pro nás závazné. Nic v tomto odstavci nevylučuje odpovědnost za podvodné uvedení v omyl." },
-      { kind: "p", text: "Jazyk. Tyto Podmínky jsou zveřejněny v angličtině [and Romanian]. [State which version prevails for which users; Annex A notes where a local language is required.]" },
+      { kind: "p", text: "Jazyk. Tyto Podmínky jsou zveřejněny v každém jazyce, který web nabízí. Jazykem smlouvy je jazyk, ve kterém jste se zaregistrovali: jazyk verze, kterou jste přijali a který eviduje náš záznam o přijetí. Pokud později přijmete novou verzi v jiném jazyce, smlouva pokračuje v tomto jazyce. Ostatní jazykové verze jsou překlady. Pokud právo země, v níž žijete, stanoví, že má přednost verze v jejím vlastním jazyce, má přednost tato verze. Liší-li se dvě jazykové verze, použijeme výklad, který je pro vás výhodnější." },
       { kind: "p", text: "Kontakt. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bukurešť, Rumunsko." }
     ]
   },
@@ -382,7 +385,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.1",
-  sha256: "2d178be8825c84a5609dd63451438d66fd7e77835a438ccb92bc09034ef6d309",
+  sha256: "7488f7e6b0873536d37eaf3f9a7a0849013674fa2f5eff7729ad8406e1a0c00e",
   eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.1 · ÚČINNÉ OD [DATE]",
   title: "S čím souhlasíte",
   lede: "Smlouva mezi vámi a DebateAIRO S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.",
