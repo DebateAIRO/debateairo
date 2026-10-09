@@ -1705,7 +1705,18 @@ class SignalStopTests(GateTest):
             raise AssertionError('never reached')
         path, server, loop = self.serve_on(gate, execute, allowed_uids=frozenset({PEER}), peer_uid_of=lambda _r: 7)
         with patch.object(server, 'process_request', side_effect=AssertionError('no thread for a stranger')):
-            self.assertEqual(self.read_all(self.post(path)), b'')
+            client = self.post(path)
+            client.settimeout(5)
+            # Closed without one reply byte. Linux answers a close with unread request bytes by a
+            # reset (ECONNRESET); macOS by a plain end of stream. Both mean "closed, no reply";
+            # any byte received before either one still fails the test.
+            reply = b''
+            try:
+                while chunk := client.recv(65536):
+                    reply += chunk
+            except ConnectionResetError:
+                pass
+            self.assertEqual(reply, b'')
         broken = bridge.UnixThreadingServer.__new__(bridge.UnixThreadingServer)
         broken.allowed_uids, broken.peer_uid_of = frozenset({PEER}), lambda _r: 1 / 0
         self.assertFalse(broken.verify_request(None, None))
