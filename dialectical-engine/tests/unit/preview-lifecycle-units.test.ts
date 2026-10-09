@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const folder = resolve(import.meta.dirname, '../../deploy/preview-lifecycle/v1');
@@ -20,6 +22,8 @@ function parse(text: string) {
 }
 const OPERATOR = '/opt/debateai-v3-preview/operator/lifecycle-v1';
 const NODE = '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node';
+// Like the API/UI prestart: root starts node with PATH only, never the manager's or the unit's environment.
+const CLEAN_ENV = '/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin';
 const SUPPORTING = ['debateai-preview-postgresql.service', 'debateai-preview-hatchet.service', 'debateai-preview-hatchet-gateway.service', 'debateai-preview-capture.service', 'debateai-preview-provider-budget.service', 'debateai-preview-turnstile.service'];
 
 describe('preview lifecycle systemd templates', () => {
@@ -76,11 +80,32 @@ describe('preview lifecycle systemd templates', () => {
 
   it('team unlock is on demand only, capped at one hour, and resets the login after any exit', () => {
     const value = parse(unit('debateai-preview-team-unlock.service'));
-    expect(value['[Service]ExecStart']).toEqual([`${NODE} ${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs run`]);
-    expect(value['[Service]ExecStopPost']).toEqual([`${NODE} ${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs reset`]);
+    expect(value['[Service]ExecStart']).toEqual([`${CLEAN_ENV} ${NODE} ${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs run`]);
+    expect(value['[Service]ExecStopPost']).toEqual([`${CLEAN_ENV} ${NODE} ${OPERATOR}/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs reset`]);
     expect(Number(value['[Service]RuntimeMaxSec']![0])).toBeLessThanOrEqual(3720);
     expect(value['[Service]Restart']).toEqual(['no']);
     expect(Object.keys(value).some(key => key.startsWith('[Install]'))).toBe(false);
+  });
+
+  it.each(['ExecStart', 'ExecStopPost'])('team unlock %s, run as written, hands node no inherited NODE_OPTIONS or NODE_PATH', key => {
+    const line = parse(unit('debateai-preview-team-unlock.service'))[`[Service]${key}`]![0]!;
+    const probe = join(mkdtempSync(join(tmpdir(), 'lifecycle-unit-env-')), 'probe.mjs');
+    writeFileSync(probe, 'process.stdout.write(JSON.stringify({ env: process.env, execArgv: process.execArgv }));\n');
+    // The unit's own argv, with only the server node and script swapped for this machine's node and a probe.
+    const argv = line.split(' ').map(part => (part === NODE ? process.execPath : part.endsWith('/unlock-team-tools.mjs') ? probe : part));
+    const result = spawnSync(argv[0]!, argv.slice(1), { env: { ...process.env, NODE_OPTIONS: '--require=/nonexistent-preload.cjs', NODE_PATH: '/nonexistent-modules', PREVIEW_LIFECYCLE_STAFF_DB_HOST: '127.0.0.1' }, encoding: 'utf8' });
+    expect(result.status).toBe(0);
+    const seen = JSON.parse(result.stdout);
+    // macOS itself adds __CF_USER_TEXT_ENCODING to every process; Linux adds nothing.
+    delete seen.env.__CF_USER_TEXT_ENCODING;
+    expect(seen).toEqual({ env: { PATH: '/usr/sbin:/usr/bin:/sbin:/bin' }, execArgv: [] });
+  });
+
+  it('the unlock script loads and refuses cleanly with no environment but PATH', () => {
+    const script = join(folder, 'unlock-team-tools.mjs');
+    const result = spawnSync('/usr/bin/env', ['-i', 'PATH=/usr/sbin:/usr/bin:/sbin:/bin', process.execPath, script, 'reset'], { encoding: 'utf8' });
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.stderr.trim())).toMatchObject({ event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false });
   });
 
   it('team unlock emails when the run or the reset fails, and never writes a core dump of the process holding the password', () => {

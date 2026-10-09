@@ -78,8 +78,13 @@ launchers still re-check every byte exactly as before.
   password is never in a statement, a server log or `pg_stat_activity`. The unlock then logs in
   over the preview's **local socket**, matching `deploy/postgres/pg_hba.conf.template`, which
   allows `debateai_prod_staff_recovery` on the socket only (step 7 checks the server's copy).
-  `PREVIEW_LIFECYCLE_STAFF_DB_HOST` in the unlock unit can name loopback (`127.0.0.1`) instead,
-  then with TLS verified against the preview CA and only if pg_hba has a matching `hostssl` line.
+  `PREVIEW_LIFECYCLE_STAFF_DB_HOST=127.0.0.1`, placed right after `PATH=…` in the unlock unit's
+  `ExecStart` line, names loopback instead, then with TLS verified against the preview CA and only
+  if pg_hba has a matching `hostssl` line.
+- **The team unlock inherits no environment.** Its `ExecStart` and `ExecStopPost` run node
+  through `/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin`, like the API/UI prestart, so
+  nothing set with `Environment=`, `systemctl set-environment` or the manager's defaults
+  (`NODE_OPTIONS`, `NODE_PATH`, ...) reaches the root process. The scripts need nothing else.
 - **Team unlock rewrites the ACK proof file in place.** The installed alert wrapper names one proof
   file; the unlock writes each fresh proof there (same owner and mode) after archiving the old
   one once under `/var/lib/debateai-v3-preview/lifecycle/evidence-archive/`. If the wrapper only

@@ -229,7 +229,8 @@ export function createSelfCaptureEvidence({ readWrapperText, runSelfCapture, rea
 /**
  * Where the recovery login connects. Default: the preview's own Unix socket with SCRAM, which is
  * what deploy/postgres/pg_hba.conf.template allows for debateai_prod_staff_recovery (`local` only).
- * PREVIEW_LIFECYCLE_STAFF_DB_HOST may name another socket folder, or loopback (127.0.0.1 / ::1)
+ * PREVIEW_LIFECYCLE_STAFF_DB_HOST (only from the unit's own `env -i` ExecStart line; the process
+ * inherits no other environment) may name another socket folder, or loopback (127.0.0.1 / ::1)
  * when the server's pg_hba has a matching hostssl line; TCP always verifies TLS with the preview CA.
  */
 export function resolveStaffDbHost(value, layout = LAYOUT) {

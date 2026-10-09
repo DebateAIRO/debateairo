@@ -10,13 +10,16 @@ OnFailure=debateai-preview-alert@%n.service
 
 [Service]
 Type=simple
-# The recovery login connects over the preview's local socket (pg_hba: `local` only). For loopback
-# TLS instead, add Environment=PREVIEW_LIFECYCLE_STAFF_DB_HOST=127.0.0.1 here AND a matching
-# hostssl line in the server's pg_hba.conf (README step 7).
-ExecStart=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs run
+# Root runs node through `env -i` with PATH only, like the API/UI prestart: nothing from the
+# service manager's or this unit's environment (NODE_OPTIONS, NODE_PATH, ...) reaches it, so an
+# Environment= line here has no effect. The recovery login connects over the preview's local
+# socket (pg_hba: `local` only). For loopback TLS instead, put PREVIEW_LIFECYCLE_STAFF_DB_HOST=127.0.0.1
+# right after PATH=... in this ExecStart line AND add a matching hostssl line in the server's
+# pg_hba.conf (README step 7).
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs run
 # Runs after ANY exit, including a crash or a kill: the login goes back to PASSWORD NULL
 # VALID UNTIL '-infinity'. Even if this also failed, the login's own expiry is at most 4 minutes away.
-ExecStopPost=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs reset
+ExecStopPost=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/unlock-team-tools.mjs reset
 # One hour plus two minutes of margin; systemd sends SIGTERM to a run that overstays.
 RuntimeMaxSec=3720
 KillMode=mixed
