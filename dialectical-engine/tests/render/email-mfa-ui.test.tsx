@@ -22,7 +22,7 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 function fixture(dropped = false) {
   const requests: { path: string; body: unknown }[] = [];
   let status = "factor_required", exchanged = false;
-  const expires_at = new Date(Date.now() + 240000).toISOString();
+  const expires_at = new Date(Date.now() + 240000).toISOString(), not_before = new Date(Date.now() + 86400000).toISOString();
   const client = createMfaRecoveryClient(async (url, init) => {
     const path = String(url).split("/mfa-recovery/")[1]!; requests.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null });
     if (path === "status" && !exchanged) return json({ error: "MFA_RECOVERY_INVALID" }, 401);
@@ -31,9 +31,9 @@ function fixture(dropped = false) {
     if (path === "totp/verify") status = "codes_required";
     if (path === "codes/generate") { status = "ack_required"; return json({ status, recovery_codes: codes }); }
     if (path === "codes/confirm") status = "ready";
-    if (path === "complete") { status = "completed"; if (dropped) throw new Error("synthetic lost reply"); }
+    if (path === "complete") { status = "waiting"; if (dropped) throw new Error("synthetic lost reply"); return json({ status, not_before }); }
     if (path === "cancel-current") status = "cancelled";
-    return json(path === "status" ? { status, expires_at } : { status });
+    return json(path === "status" ? { status, expires_at, ...(status === "waiting" ? { not_before } : {}) } : { status });
   }, "/api", () => "B".repeat(43));
   return { client, requests };
 }
@@ -62,19 +62,22 @@ describe("known-password and verified-mail MFA replacement", () => {
     expect(host.querySelector('svg[role="img"]')).not.toBeNull();
     expect(host.textContent).toContain(SECRET);
   });
-  it("replaces the authenticator without requesting another password or changing it", async () => {
+  it("starts the 24-hour wait without requesting another password or changing it", async () => {
     const f = await finishToReady(); await click(en["ready.button"]);
     expect(f.requests.filter(request => request.path === "exchange")).toHaveLength(1);
     expect(f.requests.filter(request => request.path !== "exchange").every(request => !JSON.stringify(request.body).includes("known current password"))).toBe(true);
     expect(f.requests.find(request => request.path === "totp/verify")?.body).toEqual({ code: "123456" });
-    expect(host.textContent).toContain(en["done.hint"]);
+    expect(host.textContent).toContain("For your safety, this finishes in 24 hours.");
+    expect(host.textContent).toContain("We've emailed you a link to cancel if this wasn't you.");
+    expect(host.querySelector("time")?.getAttribute("datetime")).toMatch(/^\d{4}-/);
+    expect(host.textContent).not.toContain(en["done.title"]);
     expect(host.textContent).not.toContain(SECRET); expect(host.textContent).not.toContain(codes[0]);
   });
   it("blocks a repeated ambiguous completion until metadata status confirms success", async () => {
     const f = await finishToReady(fixture(true)); await click(en["ready.button"]);
     expect(host.textContent).toContain(en["error.unknown"]); await click(en["ready.button"]);
     expect(f.requests.filter(request => request.path === "complete")).toHaveLength(1);
-    await click(en["check.state"]); expect(host.textContent).toContain(en["done.title"]);
+    await click(en["check.state"]); expect(host.textContent).toContain(en["waiting.title"]);
   });
   it("clears a displayed setup secret at the original short replacement deadline", async () => {
     vi.useFakeTimers();
@@ -174,5 +177,65 @@ describe("safe entry into known-password authenticator recovery", () => {
     expect(f.requests.at(-1)?.path).toBe("cancel-current");
     expect(host.textContent).toContain(en["cancel.pause"]);
     expect(host.querySelector('a[href="/recover"]')).toBeNull();
+  });
+});
+
+// Owner ruling 2026-10-09: the replacement only takes effect after a 24-hour wait, finished from an emailed link.
+describe("the 24-hour wait and the finish link", () => {
+  const FINISH = "F".repeat(43), not_before = new Date(Date.now() + 3600000).toISOString(), expires_at = new Date(Date.now() + 7 * 86400000).toISOString();
+  function finishFixture(states: Record<string, unknown>[], finish: () => Response = () => json({ status: "completed" })) {
+    const requests: { path: string; body: unknown }[] = [];
+    const client = createMfaRecoveryClient(async (url, init) => { const path = String(url).split("/mfa-recovery/")[1]!; requests.push({ path, body: init?.body ? JSON.parse(String(init.body)) : null }); if (path === "finish/status") return json(states.length > 1 ? states.shift() : states[0]); if (path === "finish") return finish(); if (path === "cancel") return json({ status: "cancelled" }); return json({ error: "MFA_RECOVERY_INVALID" }, 401); }, "/api", () => "B".repeat(43));
+    return { client, requests };
+  }
+  async function open(f: ReturnType<typeof finishFixture>, catalog = en, locale: "en" | "ro" = "en") { history.replaceState({}, "", `/recover-authenticator#finish=${FINISH}`); await act(async () => root.render(<StrictMode><MfaRecoveryFlow client={f.client} catalog={catalog} locale={locale} /></StrictMode>)); }
+  it("uses the owner's words for the wait, the finish link and the cancel", () => {
+    expect(en["waiting.title"]).toBe("For your safety, this finishes in 24 hours.");
+    expect(en["waiting.description"]).toBe("We've emailed you a link to cancel if this wasn't you.");
+    expect(en["finish.title"]).toBe("You can finish setting up your new authenticator now.");
+    expect(en["cancelled.title"]).toBe("Recovery cancelled.");
+  });
+  it("before the 24 hours are over, shows when the link can be used and asks for nothing", async () => {
+    const f = finishFixture([{ status: "waiting", not_before }]); await open(f);
+    expect(location.hash).toBe("");
+    expect(f.requests.filter(r => r.path === "finish/status")[0]?.body).toEqual({ token: FINISH });
+    expect(host.textContent).toContain(en["waiting.title"]);
+    expect(host.querySelector("time")?.getAttribute("datetime")).toBe(not_before);
+    expect(host.querySelector('input[name="current-password"]')).toBeNull();
+    expect(f.requests.some(r => r.path === "finish")).toBe(false);
+  });
+  it("after the 24 hours, finishes with the current password", async () => {
+    const f = finishFixture([{ status: "ready_to_finish", expires_at }]); await open(f);
+    expect(host.textContent).toContain(en["finish.title"]);
+    await type("current-password", "known current password"); await submit();
+    expect(f.requests.filter(r => r.path === "finish")).toEqual([{ path: "finish", body: { token: FINISH, password: "known current password" } }]);
+    expect(host.textContent).toContain(en["done.title"]);
+    expect(host.querySelector('input[name="current-password"]')).toBeNull();
+  });
+  it("keeps the form after a wrong password and says so", async () => {
+    const f = finishFixture([{ status: "ready_to_finish", expires_at }], () => json({ error: "MFA_RECOVERY_PROOF_INVALID" }, 401)); await open(f);
+    await type("current-password", "wrong password"); await submit();
+    expect(host.textContent).toContain(en["error.proof"]);
+    expect(host.querySelector<HTMLInputElement>('input[name="current-password"]')?.value).toBe("");
+    expect(host.textContent).not.toContain(en["done.title"]);
+  });
+  it("goes back to the wait when the server says it is still too early", async () => {
+    const f = finishFixture([{ status: "ready_to_finish", expires_at }, { status: "waiting", not_before }], () => json({ error: "MFA_RECOVERY_TOO_EARLY" }, 409)); await open(f);
+    await type("current-password", "known current password"); await submit();
+    expect(host.textContent).toContain(en["waiting.title"]);
+    expect(host.querySelector('input[name="current-password"]')).toBeNull();
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+  it("cancels from the emailed link and says so", async () => {
+    const f = finishFixture([]); history.replaceState({}, "", `/recover-authenticator#cancel=${"C".repeat(43)}`);
+    await act(async () => root.render(<MfaRecoveryFlow client={f.client} />));
+    await click(en["cancel.button"]);
+    expect(f.requests.at(-1)).toEqual({ path: "cancel", body: { token: "C".repeat(43) } });
+    expect(host.textContent).toContain("Recovery cancelled.");
+  });
+  it("speaks Romanian on the finish screens", async () => {
+    const f = finishFixture([{ status: "ready_to_finish", expires_at }]); await open(f, ro, "ro");
+    expect(host.textContent).toContain(ro["finish.title"]); expect(ro["finish.title"]).not.toBe(en["finish.title"]);
+    expect(host.textContent).toContain(ro["finish.button"]);
   });
 });
