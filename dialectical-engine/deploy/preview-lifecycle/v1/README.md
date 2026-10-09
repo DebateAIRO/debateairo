@@ -52,9 +52,14 @@ launchers still re-check every byte exactly as before.
   set `RestartMode=direct` (needs systemd 254 or newer; step 0 checks), so the alert runs only when
   the start limit is reached or a unit fails for good. The alert also asks systemd for the unit's
   `Result`, `NRestarts` and state, and words the email "gave up after N restarts" or, if it was
-  started while systemd is still restarting the unit, sends nothing. If you want an email after
-  repeated crashes too, append `--crash-alert-after N` to the alert unit's `ExecStart` (email once
-  N automatic restarts happened). If the state cannot be read, it still emails.
+  started while systemd is still restarting the unit, sends nothing. If the state cannot be read,
+  it still emails.
+- **A crash that heals itself never emails.** That is the price of `RestartMode=direct`: systemd
+  does not start the alert at all for an automatic restart, so there is no "email after N
+  crashes" option (it could never fire). To see self-healed crashes, look on the server:
+  `systemctl show -p NRestarts debateai-preview-api` (automatic restarts since the unit was last
+  started by hand or at boot) and `journalctl -u debateai-preview-api --since -1day | grep 'restart counter'`
+  (one line per automatic restart). Same for `debateai-preview-ui` and `debateai-preview-postgresql`.
 - **Mail and the preview's sendmail.** `/usr/sbin/sendmail` on the preview may be the purpose
   wrapper from `deploy/preview-mail`, not plain Postfix. The alert calls it with `-t -i -odi`
   (`-odi`: deliver before exiting, because the alert kills the whole process group once sendmail

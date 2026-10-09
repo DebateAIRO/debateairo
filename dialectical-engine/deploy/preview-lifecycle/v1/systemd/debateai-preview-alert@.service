@@ -1,7 +1,8 @@
 # Install as /etc/systemd/system/debateai-preview-alert@.service
 # Started by OnFailure=debateai-preview-alert@%n.service of the preview units. It asks systemd for
 # the unit's Result/NRestarts/state first: "gave up" emails; "still restarting after a crash" does
-# not, unless you append --crash-alert-after N to ExecStart (email once N automatic restarts happened).
+# not. With RestartMode=direct, systemd does not start this unit at all for a crash it heals by
+# itself: those show only in the journal and in NRestarts (README "One email only when ...").
 # One email per unit per 30 minutes; a mail failure is logged and never fails this unit (so it
 # never alerts itself).
 [Unit]

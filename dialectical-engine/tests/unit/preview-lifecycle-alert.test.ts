@@ -86,16 +86,14 @@ describe('failure alert', () => {
     expect(existsSync(join(layout.stateDir, 'alert-state'))).toBe(false);
   });
 
-  it('emails "restarting after a crash" once crashes repeat, when the owner asked for that', async () => {
+  // RestartMode=direct: systemd never starts OnFailure= on an automatic restart, so a crash-count
+  // email could never fire. There is no such option; self-healing crashes are seen in the journal.
+  it('never emails while systemd is still restarting the unit, however many restarts so far', async () => {
     const layout = server();
-    const h = harness(layout, { readUnitState: async () => ({ ...restarting, nRestarts: 2 }) });
-    await alert.runAlert({ unit, layout, deps: h.deps, crashAlertAfter: 3 });
+    const h = harness(layout, { readUnitState: async () => ({ ...restarting, nRestarts: 50 }) });
+    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_SKIPPED', unit, state: 'restarting', restarts: 50 });
     expect(h.sent).toEqual([]);
-    await alert.runAlert({ unit, layout, deps: h.deps, crashAlertAfter: 2 });
-    expect(h.sent).toHaveLength(1);
-    expect(h.sent[0]).toContain(`Subject: Preview: ${unit} is restarting after a crash`);
-    expect(h.sent[0]).toContain('systemd is restarting it by itself (2 automatic restarts so far)');
-    expect(h.sent[0]).not.toContain('gave up');
+    expect(alert.classifyFailure({ ...restarting, nRestarts: 99 })).toEqual({ kind: 'restarting', send: false, restarts: 99 });
   });
 
   it('still emails when the unit state cannot be read (an alert must not be lost)', async () => {
@@ -114,11 +112,10 @@ describe('failure alert', () => {
     expect(text).toContain('result: exit-code');
   });
 
-  it('takes the unit, an optional repeated-crash threshold, or a test send from the command line, nothing else', () => {
-    expect(alert.parseAlertArgs(['--unit', unit])).toEqual({ unit, crashAlertAfter: null, test: false });
-    expect(alert.parseAlertArgs(['--unit', unit, '--crash-alert-after', '3'])).toEqual({ unit, crashAlertAfter: 3, test: false });
-    expect(alert.parseAlertArgs(['--test'])).toEqual({ unit: 'debateai-preview-alert-test.service', crashAlertAfter: null, test: true });
-    for (const argv of [[], ['--unit'], ['--unit', unit, '--crash-alert-after', '0'], ['--unit', unit, '--crash-alert-after', 'x'], ['--unit', unit, '--extra'], ['--test', '--unit', unit]]) expect(alert.parseAlertArgs(argv)).toBeNull();
+  it('takes the unit or a test send from the command line, nothing else (no repeated-crash option)', () => {
+    expect(alert.parseAlertArgs(['--unit', unit])).toEqual({ unit, test: false });
+    expect(alert.parseAlertArgs(['--test'])).toEqual({ unit: 'debateai-preview-alert-test.service', test: true });
+    for (const argv of [[], ['--unit'], ['--unit', unit, '--crash-alert-after', '3'], ['--unit', unit, '--crash-alert-after', '0'], ['--unit', unit, '--extra'], ['--test', '--unit', unit]]) expect(alert.parseAlertArgs(argv)).toBeNull();
   });
 
   it('a test send ignores the unit state and says plainly that nothing failed', async () => {

@@ -89,6 +89,11 @@ describe('preview lifecycle systemd templates', () => {
     expect(value['[Service]LimitCORE']).toEqual(['0']);
   });
 
+  it('offers no repeated-crash email: with RestartMode=direct, OnFailure never runs on an automatic restart', () => {
+    const texts = [unit('debateai-preview-alert@.service'), readFileSync(join(folder, 'README.md'), 'utf8'), readFileSync(join(folder, 'alert.mjs'), 'utf8')];
+    for (const text of texts) expect(text).not.toMatch(/crash-alert-after|crashAlertAfter/);
+  });
+
   it('every script a template names exists in this folder', () => {
     const all = ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service'].map(unit).join('\n');
     const scripts = [...all.matchAll(/deploy\/preview-lifecycle\/v1\/([a-z-]+\.mjs)/g)].map(match => match[1]!);
