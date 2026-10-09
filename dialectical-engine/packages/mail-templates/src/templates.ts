@@ -266,12 +266,14 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   // W9 (P2-I11): the O2 variant for a withdrawal handed to the owner (`refund_by_owner`: a dashboard refund or an
   // earlier request touched a payment), sent at once from the withdrawal's own transaction, so the 14-day refund
   // deadline never waits for the quarterly O1. The owner reference (an opaque id, what `pnpm billing:withdraw --owner`
-  // takes), the summary's code WITHDRAWAL_BY_OWNER and two dates; never a customer's name, email or card.
+  // takes), the summary's code WITHDRAWAL_BY_OWNER and two dates; never a customer's name, email or card. The settling
+  // command is README §14.8's host form (a bare `pnpm billing:withdraw` has no settings in a root shell), a paragraph of
+  // its own; it reads only ownerRef, so an O2_WITHDRAWAL queued before it renders it too.
   O2_WITHDRAWAL: define({
     catalogue: "owner", subject: "owner.O2_WITHDRAWAL.subject",
     paragraphs: [
       "owner.O2_WITHDRAWAL.intro", "owner.O2_WITHDRAWAL.owner", "owner.O2.reason", "owner.O2_WITHDRAWAL.deadline",
-      "owner.O2_WITHDRAWAL.next"
+      "owner.O2_WITHDRAWAL.next", "owner.O2_WITHDRAWAL.command"
     ],
     params: { ownerRef: "text", reasonCode: "text", withdrawalDate: "date", refundDeadline: "date" }
   }),

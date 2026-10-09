@@ -16,6 +16,10 @@ import {
   type MailAttachmentFact,
   type MailTemplateId
 } from "@debateai/mail-templates";
+import { hostCommand } from "../../apps/api/src/billing/refunds.js";
+import {
+  asRunbookLine, BARE_BILLING_COMMAND, ON_HOST, runbookBillingCommands
+} from "../support/runbookHostCommands.js";
 
 /** README §14.8's own form of the refund-done command on the host (F6a, ops-4): as the API's user, with its EnvironmentFile. */
 const HOST_REFUND_DONE = "systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api"
@@ -66,8 +70,9 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   doneCommand: HOST_REFUND_DONE,
   refundCount: "2",
   refundList: `- charge 0123456789abcdef0123456789abcdef, NETOPIA payment ntp-1: refund 12.10 USD (part of the payment)\n  ${HOST_REFUND_DONE}`,
-  nextSteps: "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with pnpm billing:invoice"
-    + " --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>"
+  nextSteps: "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with the --record command"
+    + " below; run the command as root on the server:\n"
+    + `  ${ON_HOST} billing:invoice --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>`
 });
 
 /** Every param a template declares, the optional ones included. */
@@ -381,7 +386,8 @@ describe("P17 renderMail", () => {
       + " the withdrawal). First look at this payment in NETOPIA's admin. If it already shows a refund of $12.10, an"
       + " earlier attempt went through: do not refund again. If it shows none, refund exactly $12.10 on this payment, in"
       + " one refund. A refund of the whole payment is recorded by the site itself; for part of a payment, record it"
-      + " with pnpm billing:refund-done once it is made. The customer's refund email (M8) then follows by itself."
+      + " once it is made with the refund-done command, run as root on the server as the runbook shows. The customer's"
+      + " refund email (M8) then follows by itself."
     );
     // W9 fix round 1 (F1): NETOPIA's admin is checked first, and the amount is exact: a refund over it is in no record
     // (recordRefunded records the request's amount), so the email never asks for "at least" an amount.
@@ -411,11 +417,23 @@ describe("P17 renderMail", () => {
       "Withdrawn on October 12, 2026. The law requires the refund to be made by October 26, 2026 at the latest (14"
         + " days after the withdrawal).",
       "Work out what is still due as the runbook describes (\"A withdrawal sent by email or on the model form\"),"
-        + " refund in NETOPIA's admin what the site cannot, then record the settlement with pnpm billing:withdraw"
-        + " --owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93 --refund <amount> --dashboard <amount>. The customer's refund"
-        + " email (M8) follows. The owner summary lists it as WITHDRAWAL_BY_OWNER until then.",
+        + " refund in NETOPIA's admin what the site cannot, then record the settlement with the command below, run as"
+        + " root on the server. The customer's refund email (M8) follows. The owner summary lists it as"
+        + " WITHDRAWAL_BY_OWNER until then.",
+      `${ON_HOST} billing:withdraw --owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93 --refund <amount through this command>`
+        + " --dashboard <amount refunded in NETOPIA's admin>",
       "The DebateAI team"
     ].join("\n\n"))).toBe(true);
+    // The settling command is the API's own (`hostCommand`, as billing:withdraw prints it) and README §14.8's line.
+    const settle = hostCommand("billing:withdraw --owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93"
+      + " --refund <amount through this command> --dashboard <amount refunded in NETOPIA's admin>");
+    expect(owner.text).toContain(`\n\n${settle}\n\n`);
+    expect(runbookBillingCommands()).toContain(asRunbookLine(settle, [
+      ["--owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", '--owner "$OWNER_REF"'],
+      ["--refund <amount through this command>", '--refund "$REFUND"'],
+      ["--dashboard <amount refunded in NETOPIA's admin>", '--dashboard "$DASHBOARD"']
+    ]));
+    expect(owner.text).not.toMatch(BARE_BILLING_COMMAND);
     // Owner-facing: the owner reference, the code and two dates; never a customer's name, email or card.
     expect(Object.keys(MAIL_TEMPLATES.O2_WITHDRAWAL.params).sort())
       .toEqual(["ownerRef", "reasonCode", "refundDeadline", "withdrawalDate"]);
@@ -435,9 +453,11 @@ describe("P17 renderMail", () => {
       "Job: SMARTBILL_INVOICE",
       "Reference: charge 0123456789abcdef0123456789abcdef",
       "Reason code: INVOICE_UNKNOWN",
-      "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with pnpm billing:invoice"
-        + " --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>",
-      "The owner summary (pnpm billing:tax-summary, and the quarterly email) lists it until it is settled.",
+      "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with the --record command"
+        + " below; run the command as root on the server:\n"
+        + `  ${ON_HOST} billing:invoice --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>`,
+      "The owner summary (the quarterly email, or the tax summary command run as root on the server as the runbook"
+        + " shows) lists it until it is settled.",
       "The DebateAI team"
     ].join("\n\n"))).toBe(true);
     // Owner-facing: a job kind, our own reference, a code and the steps; never a customer's name, email or card.
@@ -599,6 +619,13 @@ describe("P17 renderMail", () => {
     expect(MAIL_TEMPLATES.O2_REFUND_DUE.params.doneCommand).toBe("block");
   });
 
+  // F8's rule (ruling PR-56): a bare `pnpm billing:…` fails in a root shell (no settings); an owner sentence names a
+  // command by what it does, or prints README §14.8's host form whole.
+  it("no owner sentence prints a bare pnpm billing: command", () => {
+    const owner = JSON.parse(readFileSync(resolve("packages/mail-templates/messages/en/owner.json"), "utf8")) as Record<string, string>;
+    for (const [key, sentence] of Object.entries(owner)) expect(sentence, key).not.toMatch(BARE_BILLING_COMMAND);
+  });
+
   it("N9: tells the owner at once that NETOPIA's message about an open charge could not be verified (O4)", () => {
     const owner = renderMail("O4", "ro", paramsFor("O4"));
     expect(owner.subject).toBe("A NETOPIA payment message could not be verified (PAYMENT_CONFIGURATION_REFUSED)");
@@ -610,10 +637,11 @@ describe("P17 renderMail", () => {
       "Charge reference: 0123456789abcdef0123456789abcdef",
       "Received at: 2026-10-06T18:00:00.000Z (UTC)",
       "Reason code: PAYMENT_CONFIGURATION_REFUSED",
-      "Check the NETOPIA key with the check command (pnpm billing:check, as the runbook shows). If the key is wrong or"
-        + " out of date, put the right one in place with deploy/vps/billing-setup.sh --replace netopia and restart the"
-        + " API: every kept message is checked again at the start, saved cards included.",
-      "At most one such email is sent an hour; the owner summary (pnpm billing:tax-summary) counts every kept message by day."
+      "Check the NETOPIA key with the check command, run as root on the server as the runbook shows. If the key is"
+        + " wrong or out of date, put the right one in place with deploy/vps/billing-setup.sh --replace netopia and"
+        + " restart the API: every kept message is checked again at the start, saved cards included.",
+      "At most one such email is sent an hour; the owner summary (the quarterly email, or the tax summary command)"
+        + " counts every kept message by day."
     ].join("\n\n"))).toBe(true);
     expect(Object.keys(MAIL_TEMPLATES.O4.params).sort()).toEqual(["chargeRef", "reasonCode", "receivedAt"]);
   });
