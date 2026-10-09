@@ -55,7 +55,7 @@ describe("BillingPersonAllowanceSource (spec §2.4.1)", () => {
   });
 });
 
-describe("an entitlement anchored just after the caller's clock (the view's clock, a lapse, an xMoney date)", () => {
+describe("an entitlement anchored just after the caller's clock (the view's clock, a lapse, a NETOPIA payment time)", () => {
   const justAfter = new Date(now.getTime() + 1);
 
   it("reads a plan that began 1 ms after `now` at its anchor, and does not throw", async () => {

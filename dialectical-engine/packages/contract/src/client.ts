@@ -55,6 +55,8 @@ import {
   AskRoomResponseSchema,
   BillingCancelLinkAcceptedSchema,
   BillingCardChangeResponseSchema,
+  BillingCardChangeRequestSchema,
+  BillingCardDetailsResponseSchema,
   BillingPlansResponseSchema,
   BillingQuoteRequestSchema,
   BillingQuoteResponseSchema,
@@ -65,6 +67,8 @@ import {
   BillingInvoicesResponseSchema,
   BillingSubscriptionResponseSchema,
   BillingUpgradeQuoteResponseSchema,
+  BillingUpgradePendingErrorSchema,
+  BillingUpgradeRequestSchema,
   BillingUpgradeResponseSchema,
   BillingUsageResponseSchema,
   BillingWithdrawResponseSchema,
@@ -96,6 +100,8 @@ import {
   type AskRequest,
   type AskRoomResponse,
   type BillingCardChangeResponse,
+  type BillingCardChangeRequest,
+  type BillingCardDetailsResponse,
   type BillingPlansResponse,
   type BillingQuoteRequest,
   type BillingQuoteResponse,
@@ -103,6 +109,7 @@ import {
   type BillingCheckoutRequest,
   type BillingCheckoutResponse,
   type BillingChargeStatusResponse,
+  type BillingUpgradePendingResponse,
   type BillingInvoicesResponse,
   type BillingSubscriptionResponse,
   type BillingUpgradeQuoteResponse,
@@ -426,11 +433,17 @@ export interface ContractClient {
   revokeSubscriptionCancel(): Promise<void>;
   /** P12c: the prorated upgrade price with tax and the new plan's recurring total; spend it with `upgradeSubscription`. */
   quoteSubscriptionUpgrade(planId: "PRO" | "MAX"): Promise<BillingUpgradeQuoteResponse>;
-  upgradeSubscription(planId: "PRO" | "MAX", quoteRef: string): Promise<BillingUpgradeResponse>;
+  /** N12: NETOPIA's page for the prorated total; one paid or on its way resolves `{state: "PENDING", charge_ref}` (409). */
+  upgradeSubscription(
+    planId: "PRO" | "MAX", quoteRef: string,
+    agreement: Readonly<{ locale: string; renewal_terms: Readonly<{ version: string; sha256: string }> }>
+  ): Promise<BillingUpgradeResponse | BillingUpgradePendingResponse>;
   /** P12d: withdraw within the 14 days with a WITHDRAW_SUBSCRIPTION step-up grant; `refund` null = the owner settles it. */
   withdrawSubscription(stepUpGrant: string): Promise<BillingWithdrawResponse>;
-  /** P12e: the card form's signed 1.00 USD authorization order, released once the new card is seen. */
-  startCardChange(): Promise<BillingCardChangeResponse>;
+  /** N13 (spec §2.11): the stored billing details the card page pre-fills (country and region read-only). */
+  getBillingCardDetails(): Promise<BillingCardDetailsResponse>;
+  /** N13: NETOPIA's 0 check for the corrected details and the agreement; the browser goes to `redirect_url`. */
+  startCardChange(input: BillingCardChangeRequest): Promise<BillingCardChangeResponse>;
   /** P13 (A25): always `{status: "ACCEPTED"}`; a link reaches the billing address only if there is a plan to cancel. */
   requestCancelLink(email: string): Promise<{ status: "ACCEPTED" }>;
   /**
@@ -755,15 +768,32 @@ export function createContractClient(
       "/v1/billing/subscription/upgrade-quote", BillingUpgradeQuoteResponseSchema,
       { method: "POST", body: JSON.stringify({ plan_id: planId }) }
     ),
-    upgradeSubscription: (planId: "PRO" | "MAX", quoteRef: string) => request(
-      "/v1/billing/subscription/upgrade", BillingUpgradeResponseSchema,
-      { method: "POST", body: JSON.stringify({ plan_id: planId, quote_ref: quoteRef }) }
+    upgradeSubscription: (
+      planId: "PRO" | "MAX", quoteRef: string,
+      agreement: Readonly<{ locale: string; renewal_terms: Readonly<{ version: string; sha256: string }> }>
+    ) => requestJson<BillingUpgradeResponse | BillingUpgradePendingResponse>(
+      root.href, fetchImplementation, "/v1/billing/subscription/upgrade", BillingUpgradeResponseSchema,
+      {
+        method: "POST",
+        body: JSON.stringify(BillingUpgradeRequestSchema.parse({
+          plan_id: planId, quote_ref: quoteRef, locale: agreement.locale, renewal_terms: agreement.renewal_terms
+        }))
+      }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const pending = BillingUpgradePendingErrorSchema.safeParse(body);
+        return pending.success ? Object.freeze({ state: "PENDING" as const, charge_ref: pending.data.charge_ref }) : null;
+      }
     ),
     withdrawSubscription: (stepUpGrant: string) => request(
       "/v1/billing/subscription/withdraw", BillingWithdrawResponseSchema,
       { method: "POST", body: JSON.stringify({ step_up_grant: stepUpGrant }) }
     ),
-    startCardChange: () => request("/v1/billing/subscription/card", BillingCardChangeResponseSchema, { method: "POST" }),
+    getBillingCardDetails: () => request("/v1/billing/subscription/card", BillingCardDetailsResponseSchema),
+    startCardChange: (input: BillingCardChangeRequest) => request(
+      "/v1/billing/subscription/card", BillingCardChangeResponseSchema,
+      { method: "POST", body: JSON.stringify(BillingCardChangeRequestSchema.parse(input)) }
+    ),
     requestCancelLink: (email: string) => request(
       "/v1/billing/cancel-link", BillingCancelLinkAcceptedSchema,
       { method: "POST", body: JSON.stringify({ email }) }, 202

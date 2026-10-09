@@ -11,15 +11,19 @@ export type ChargePollerState = "PENDING" | "SUCCEEDED" | "FAILED" | "TIMED_OUT"
 const POLL_EVERY_MS = 2_000;
 const POLL_FOR_MS = 120_000;
 
-/** P8c: these FAILED reasons mean the money was taken and refunded (P7's REFUND_REASONS_REFUSING_THE_PAYMENT). */
-const REFUNDED_REASONS: ReadonlySet<string> = new Set(["ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED"]);
+/**
+ * P8c: these FAILED reasons mean the money was taken and refunded (P7's REFUND_REASONS_REFUSING_THE_PAYMENT). F4
+ * (ruling PR-55, finding ui-1): the server answers them only once the refund is recorded; before, it answers
+ * REFUND_PENDING, the refund on its way. UPGRADE_CLOSED (N12's closed upgrade paid late) is one of them.
+ */
+const REFUNDED_REASONS: ReadonlySet<string> = new Set(["ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "UPGRADE_CLOSED"]);
 
 /**
  * The sentence for a settled failure: a refund says it was refunded, and only a decline or a void may say no money
  * was taken (the caller's `failureText`). `null` = the caller's text.
- * W15 F1 (P2-M5): FAILED + PROVIDER_REFUND is a checkout's payment refunded at xMoney before we verified it. Only a
- * checkout can read so (every other kind counts as started), so its sentence speaks of the plan; it promises no email,
- * because none is sent. FAILED + PROVIDER_VOID released a hold, so no money was taken: the caller's text.
+ * W15 F1 (P2-M5): FAILED + PROVIDER_REFUND is a checkout's payment refunded at the payment provider before we verified
+ * it. Only a checkout can read so (every other kind counts as started), so its sentence speaks of the plan; it promises
+ * no email, because none is sent. FAILED + PROVIDER_VOID released a hold, so no money was taken: the caller's text.
  * Part 4 final review C-19: FAILED + CHARGEBACK is a checkout's payment charged back before we verified it; the bank
  * gave the money back and the plan never started, so it takes the same sentence (no new key; the owner may reword it).
  */
@@ -32,6 +36,10 @@ export function chargeOutcomeKey(state: "NEEDS_ACTION" | "FAILED", reasonCode: s
   // P20 (CARD_CHECK_NOT_LIVE): the plan stopped being live during the card check, so nothing changed and the hold was
   // released: the start route's NOT_SUBSCRIBED sentence for the same condition, never "saved".
   if (state === "FAILED" && reasonCode === "CARD_CHECK_NOT_LIVE") return "billing.card.notSubscribed";
+  // N13 (spec §2.11): the check passed but NETOPIA left no saved card (a wallet): try again with a card.
+  if (state === "FAILED" && reasonCode === "CARD_NOT_SAVED") return "billing.card.notSaved";
+  // F4: a payment we refused, its refund not recorded yet (the owner refunds by hand): on its way, its email to come.
+  if (state === "FAILED" && reasonCode === "REFUND_PENDING") return "billing.checkout.refundPending";
   if (state === "FAILED" && reasonCode !== null && REFUNDED_REASONS.has(reasonCode)) return "billing.checkout.refunded";
   if (state === "FAILED" && (reasonCode === "PROVIDER_REFUND" || reasonCode === "CHARGEBACK")) {
     return "billing.checkout.refundedBeforeStart";
@@ -50,6 +58,7 @@ export function ChargeStatusPoller({
   catalog = billingEnglish,
   client = contractClient,
   successText,
+  upgradeSuccessText,
   failureText,
   timedOutText,
   onSettled
@@ -58,12 +67,15 @@ export function ChargeStatusPoller({
   catalog?: MessageCatalog;
   client?: Pick<ContractClient, "getBillingCharge">;
   successText: string;
+  /** N18 (spec §2.6.5): the confirmation when the charge is an upgrade. */
+  upgradeSuccessText?: string;
   failureText: string;
   timedOutText?: string;
   onSettled?: (state: "SUCCEEDED" | "FAILED" | "TIMED_OUT") => void;
 }>) {
   const [state, setState] = useState<ChargePollerState>("PENDING");
   const [failureKey, setFailureKey] = useState<string | null>(null);
+  const [kind, setKind] = useState<string | null>(null);
   const settled = useRef(onSettled);
   settled.current = onSettled;
 
@@ -75,6 +87,7 @@ export function ChargeStatusPoller({
       try {
         const answer = await client.getBillingCharge(chargeRef);
         if (!active) return;
+        setKind(answer.kind);
         if (answer.state === "SUCCEEDED") {
           setState("SUCCEEDED");
           settled.current?.("SUCCEEDED");
@@ -103,7 +116,7 @@ export function ChargeStatusPoller({
     };
   }, [chargeRef, client]);
 
-  const text = state === "SUCCEEDED" ? successText
+  const text = state === "SUCCEEDED" ? (kind === "UPGRADE" && upgradeSuccessText !== undefined ? upgradeSuccessText : successText)
     : state === "FAILED" ? (failureKey === null ? failureText : t(catalog, failureKey))
       : state === "TIMED_OUT" ? (timedOutText ?? t(catalog, "billing.checkout.willEmail"))
         : t(catalog, "billing.checkout.waitingForBank");

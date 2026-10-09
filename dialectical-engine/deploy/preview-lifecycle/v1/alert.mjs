@@ -9,11 +9,12 @@
 // NRestarts. An unreadable state still emails: an alert is never lost.
 // At most one email per unit per 30 minutes. If mail itself fails, the reason goes to the
 // journal and the alert exits quietly (an alert must never break anything else).
-import { lstat } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { constants } from 'node:fs';
+import { link, lstat, open, unlink } from 'node:fs/promises';
+import { randomBytes } from 'node:crypto';
+import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
-import { recipientPolicyFromInstallation } from '../../preview-mail/v4-20261005/sendmail-owned-preview.mjs';
+import { exactKeys, protectedPath, strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
 import { LAYOUT, atomicWrite, ensureDirectory, logLine, runBounded, sha256 } from './common.mjs';
 
 export const ALERT_WINDOW_MS = 30 * 60 * 1000;
@@ -22,31 +23,45 @@ const ADDRESS = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63}
 
 class AlertRefusal extends Error { constructor(code, fields) { super(code); this.code = code; if (fields) this.fields = fields; } }
 const refuse = (code, fields) => { throw new AlertRefusal(code, fields); };
+const octal = mode => `0${(mode & 0o777).toString(8).padStart(3, '0')}`;
 
 /**
- * The four recipient fingerprints the preview mail is already allowed to reach. The allow-list is
- * server data, never source: it lives only in the root-owned installation file the preview mail
- * wrapper reads (`recipientSha256`: alias -> SHA-256 of the exact address bytes). Read through the
- * custody reader (no-follow regular file, one link, owner-only mode, unchanged while read, its
- * folder owned by the same owner and not group/other-writable, reached without any link) and
- * checked with the mail wrapper's own schema check. Anything else: no mail.
+ * The alert's own owner list (README install step 2): {"version":1,"ownerSha256":["<hex>"]}, exactly
+ * one lowercase hex SHA-256 fingerprint of the exact owner address bytes (alerts go to one primary
+ * owner inbox). Nothing else is accepted: no other key, no duplicate key, no other version, no
+ * second fingerprint.
  */
-export async function loadApprovedRecipientDigests({ path = LAYOUT.mailRecipientInstallationPath, ownerUid = 0 } = {}) {
-  try {
-    return await withPrivateBytes(path, { root: dirname(path), uid: ownerUid, mode: [0o600, 0o400], maxBytes: 1024 }, raw => {
-      const installation = strictJson(raw);
-      recipientPolicyFromInstallation(installation);
-      return new Set(Object.values(installation.recipientSha256));
-    });
-  } catch { return refuse('RECIPIENT_ALLOW_LIST_UNAVAILABLE'); }
+export const OWNER_LIST_VERSION = 1;
+const DIGEST = /^[0-9a-f]{64}$/;
+const OWNER_LIST_MAX_BYTES = 1024;
+export function ownerDigestsFromList(value) {
+  exactKeys(value, ['version', 'ownerSha256']);
+  const list = value.ownerSha256;
+  if (value.version !== OWNER_LIST_VERSION || !Array.isArray(list) || list.length !== 1
+    || typeof list[0] !== 'string' || !DIGEST.test(list[0])) refuse('OWNER_ALERT_LIST_UNAVAILABLE');
+  return new Set(list);
 }
 
-/** Exactly one address, one line, and one the preview is already allowed to mail. */
-export function parseRecipient(raw, approvedDigests) {
+/**
+ * The owner fingerprints the alert may mail. Server data, never source: only in the root-only file
+ * LAYOUT.ownerAlertDigestsPath. Read through the custody reader (no-follow regular file, one link,
+ * owner root:root, mode 0600 or 0400, at most 1 KiB, unchanged while read, its folder root-owned and
+ * not group/other-writable, reached without any link). Anything else: no mail.
+ */
+export async function loadOwnerDigests({ layout = LAYOUT } = {}) {
+  const path = layout.ownerAlertDigestsPath;
+  try {
+    return await withPrivateBytes(path, { root: dirname(path), uid: layout.ownerUid ?? 0, gid: layout.ownerGid ?? 0, mode: [0o600, 0o400], maxBytes: OWNER_LIST_MAX_BYTES },
+      raw => ownerDigestsFromList(strictJson(raw)));
+  } catch { return refuse('OWNER_ALERT_LIST_UNAVAILABLE'); }
+}
+
+/** Exactly one address on one line (an optional final newline), nothing else. */
+export function parseRecipientAddress(raw) {
   let text;
   try { text = new TextDecoder('utf8', { fatal: true }).decode(raw); } catch { refuse('RECIPIENT_REFUSED'); }
   const address = text.endsWith('\n') ? text.slice(0, -1) : text;
-  if (address.length > 254 || !ADDRESS.test(address) || !approvedDigests.has(sha256(address))) refuse('RECIPIENT_REFUSED');
+  if (address.length > 254 || !ADDRESS.test(address)) refuse('RECIPIENT_REFUSED');
   return address;
 }
 
@@ -218,10 +233,16 @@ export async function submitMail(message, { layout = LAYOUT, run = runBounded } 
 /** Checked before the custody read so a wrong mode (an editor that saves by rename) is named in the journal. */
 async function checkRecipientMode(layout) {
   const stat = await lstat(layout.alertRecipientPath).catch(() => refuse('RECIPIENT_REFUSED'));
-  const mode = stat.mode & 0o777;
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== (layout.ownerUid ?? 0) || stat.gid !== (layout.ownerGid ?? 0) || mode !== 0o600) {
-    refuse('RECIPIENT_FILE_MODE_REFUSED', { mode: `0${mode.toString(8).padStart(3, '0')}` });
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== (layout.ownerUid ?? 0) || stat.gid !== (layout.ownerGid ?? 0) || (stat.mode & 0o777) !== 0o600) {
+    refuse('RECIPIENT_FILE_MODE_REFUSED', { mode: octal(stat.mode) });
   }
+}
+
+/** The one address in the root-only alert-recipient file (README install step 2), read with full custody. */
+async function readRecipientAddress(layout) {
+  await checkRecipientMode(layout);
+  return withPrivateBytes(layout.alertRecipientPath, { root: dirname(layout.alertRecipientPath), uid: layout.ownerUid ?? 0, gid: layout.ownerGid ?? 0, mode: 0o600, maxBytes: 512 }, parseRecipientAddress)
+    .catch(() => refuse('RECIPIENT_REFUSED'));
 }
 
 export async function readJournalTail(unit, { layout = LAYOUT, run = runBounded } = {}) {
@@ -231,9 +252,10 @@ export async function readJournalTail(unit, { layout = LAYOUT, run = runBounded 
 }
 
 export const TEST_UNIT = 'debateai-preview-alert-test.service';
-/** `--unit <unit>` (systemd) or `--test` (README test send); anything else is null. */
+/** `--unit <unit>` (systemd), `--test` (README test send) or `--install-owner-list` (README step 2); anything else is null. */
 export function parseAlertArgs(argv) {
   if (argv.length === 1 && argv[0] === '--test') return { unit: TEST_UNIT, test: true };
+  if (argv.length === 1 && argv[0] === '--install-owner-list') return { installOwnerList: true };
   if (argv.length === 2 && argv[0] === '--unit' && typeof argv[1] === 'string') return { unit: argv[1], test: false };
   return null;
 }
@@ -250,10 +272,9 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {}, test = false 
     const at = now();
     const lastSentAt = await readLastSent(layout, unit);
     if (!shouldSend(lastSentAt, at)) return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SUPPRESSED', unit, lastSentAt: new Date(lastSentAt).toISOString() });
-    const approved = await loadApprovedRecipientDigests({ path: layout.mailRecipientInstallationPath, ownerUid: layout.ownerUid ?? 0 });
-    await checkRecipientMode(layout);
-    const to = await withPrivateBytes(layout.alertRecipientPath, { root: dirname(layout.alertRecipientPath), uid: layout.ownerUid ?? 0, gid: layout.ownerGid ?? 0, mode: 0o600, maxBytes: 512 }, raw => parseRecipient(raw, approved))
-      .catch(() => refuse('RECIPIENT_REFUSED'));
+    const owners = await loadOwnerDigests({ layout });
+    const to = await readRecipientAddress(layout);
+    if (!owners.has(sha256(to))) refuse('RECIPIENT_REFUSED');
     const lines = (await (deps.readJournal ?? (name => readJournalTail(name, { layout })))(unit)).map(redactLine);
     const message = composeAlert({ unit, at: new Date(at), lines, from: layout.mailFrom, to, failure });
     try { await (deps.sendmail ?? (bytes => submitMail(bytes, { layout })))(message); } catch (error) {
@@ -267,9 +288,81 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {}, test = false 
   }
 }
 
+/**
+ * Same folder as the target; written fully, synced, then hard-linked into place. link() never
+ * replaces an existing name (EEXIST), so a list someone else created in the meantime is never
+ * overwritten, and a reader sees no file or the whole file, never a partial one.
+ */
+async function createExclusive(path, bytes, { mode, uid, gid }, { linkFile = link, unlinkFile = unlink } = {}) {
+  const folder = dirname(path);
+  await protectedPath(path, { root: folder, uid }).catch(() => refuse('OWNER_ALERT_LIST_WRITE_REFUSED'));
+  const temporary = join(folder, `.${basename(path)}.${randomBytes(8).toString('hex')}.tmp`);
+  let handle, created = false, linking = false, linked = false;
+  try {
+    handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, mode);
+    created = true;
+    await handle.chown(uid, gid);
+    await handle.chmod(mode);
+    for (let offset = 0; offset < bytes.length;) offset += (await handle.write(bytes, offset)).bytesWritten;
+    await handle.sync();
+    await handle.close(); handle = undefined;
+    linking = true;
+    await linkFile(temporary, path);
+    linking = false; linked = true;
+    await unlinkFile(temporary); created = false;
+    const directory = await open(folder, constants.O_RDONLY);
+    try { await directory.sync(); } catch { /* Some platforms refuse fsync on a directory; link and unlink are already atomic. */ } finally { await directory.close(); }
+  } catch (error) {
+    if (error instanceof AlertRefusal) throw error;
+    // Once linked, the list exists: say so, so the owner never reads "nothing was written".
+    if (linked) refuse('OWNER_ALERT_LIST_INSTALLED_CLEANUP_FAILED');
+    refuse(linking && error?.code === 'EEXIST' ? 'OWNER_ALERT_LIST_EXISTS' : 'OWNER_ALERT_LIST_WRITE_REFUSED');
+  } finally {
+    await handle?.close().catch(() => undefined);
+    if (created) await unlinkFile(temporary).catch(() => undefined);
+  }
+}
+
+/**
+ * `alert.mjs --install-owner-list` (root, README install step 2): builds the owner list ON THE
+ * SERVER from the address already typed into alert-recipient, so the address is typed once and
+ * never appears in a command, and its fingerprint is never shown. Prints exactly one line: a fixed
+ * code plus the file's mode, or a fixed failure reason. Never the address, never the fingerprint.
+ * - list missing: create it root:root 0600 with this one fingerprint.
+ * - list present, valid, already holding this fingerprint: nothing to do (ALREADY_INSTALLED).
+ * - list present but different or broken: refuse; replacing an owner list is a deliberate
+ *   `rm` by the owner first, never a side effect of this command.
+ */
+export async function installOwnerList({ layout = LAYOUT, deps = {} } = {}) {
+  const log = deps.log ?? (event => logLine(process.stdout, event));
+  const done = event => { log(event); return event; };
+  try {
+    const uid = layout.ownerUid ?? 0, gid = layout.ownerGid ?? 0, path = layout.ownerAlertDigestsPath;
+    const fingerprint = sha256(await readRecipientAddress(layout));
+    const existing = await lstat(path).catch(error => (error?.code === 'ENOENT' ? null : refuse('OWNER_ALERT_LIST_WRITE_REFUSED')));
+    if (existing) {
+      if (!(await loadOwnerDigests({ layout })).has(fingerprint)) refuse('OWNER_ALERT_LIST_EXISTS');
+      return done({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_ALREADY_INSTALLED', mode: octal(existing.mode) });
+    }
+    const bytes = Buffer.from(`${JSON.stringify({ version: OWNER_LIST_VERSION, ownerSha256: [fingerprint] })}\n`, 'utf8');
+    try { await createExclusive(path, bytes, { mode: 0o600, uid, gid }, { linkFile: deps.link, unlinkFile: deps.unlink }); } finally { bytes.fill(0); }
+    // Read back exactly as the alert reads it: the list must pass custody and hold this fingerprint.
+    const written = await loadOwnerDigests({ layout }).catch(() => refuse('OWNER_ALERT_LIST_INSTALLED_CLEANUP_FAILED'));
+    if (!written.has(fingerprint)) refuse('OWNER_ALERT_LIST_INSTALLED_CLEANUP_FAILED');
+    return done({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_INSTALLED', mode: octal((await lstat(path)).mode) });
+  } catch (error) {
+    return done({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: error instanceof AlertRefusal ? error.code : 'UNEXPECTED', ...(error instanceof AlertRefusal && error.fields ? error.fields : {}) });
+  }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = parseAlertArgs(process.argv.slice(2));
-  if (process.platform !== 'linux' || process.getuid?.() !== 0 || !args) logLine(process.stdout, { event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit: null, reason: 'ACTOR_REFUSED' });
+  const actor = process.platform === 'linux' && process.getuid?.() === 0;
+  if (args?.installOwnerList) {
+    // The owner runs this by hand: a failure exits non-zero so it cannot be missed.
+    const event = actor ? await installOwnerList() : (logLine(process.stdout, { event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: 'ACTOR_REFUSED' }), { event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED' });
+    if (event.event === 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED') process.exitCode = 1;
+  } else if (!actor || !args) logLine(process.stdout, { event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit: null, reason: 'ACTOR_REFUSED' });
   else await runAlert(args);
   // Quiet by design: the alert unit itself never fails and never triggers another alert.
 }

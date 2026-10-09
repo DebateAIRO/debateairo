@@ -119,7 +119,7 @@ describe("P8c billing reads under the owner lock go through the transaction's cl
       "  }",
       "  async settle(context: { client: unknown }): Promise<void> {",
       "    const { client } = context;",
-      "    await deps.billing.customerByOwner('o', undefined, client);",
+      "    await deps.billing.customerByOwner('o', client);",
       "    await deps.billing.quote('q', 'o');",
       "  }",
       "}"

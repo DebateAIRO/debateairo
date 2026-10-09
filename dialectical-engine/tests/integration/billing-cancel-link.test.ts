@@ -9,7 +9,7 @@ import {
 import { foldSubscription } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import {
-  holdOwnerLock, recordingAudit, seedActiveSubscription, suspendForChargeback, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
+  holdOwnerLock, recordingAudit, seedNetopiaSubscription, suspendForChargeback, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
 } from "../support/billingSubscriptionFixtures.js";
 import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
 import { DekBillingRecipientReader } from "../../apps/api/src/billing/account-email.js";
@@ -88,7 +88,7 @@ describe("P13 the cancel link on real PostgreSQL", () => {
     const { links, mails } = service(clock);
     const email = `m12-${randomUUID().slice(0, 8)}@example.test`;
     const ownerRef = await account(email);
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "RO"
     });
     expect(await links.request(email)).toBe("SENT");
@@ -109,7 +109,7 @@ describe("P13 the cancel link on real PostgreSQL", () => {
     const ownerRef = await account("subscriber@example.test");
     // W8 (P2-I12): the profile still holds the address of the checkout; the account's address is the one that
     // matched, and M9 goes there.
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "RO", email: "billing@example.test"
     });
     expect(await links.request("  subscriber@example.TEST ")).toBe("SENT");
@@ -141,7 +141,7 @@ describe("P13 the cancel link on real PostgreSQL", () => {
     const { links, mails, audit } = service(clock);
     const email = `w10-${randomUUID().slice(0, 8)}@example.test`;
     const ownerRef = await account(email);
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef, planId: "PRO", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE"
     });
     await suspendForChargeback(database.pool, seeded, new Date(Date.now() - DAY));
@@ -170,7 +170,7 @@ describe("P13 the cancel link on real PostgreSQL", () => {
     // R3-2: an account the age gate froze gets no link, even with a live plan (open question 18); the same seeded
     // plan on an active account is sent one, which the first test proves.
     const frozen = await account("frozen@example.test", "age_frozen");
-    await seedActiveSubscription(database.pool, {
+    await seedNetopiaSubscription(database.pool, {
       ownerRef: frozen, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO"
     });
     for (const email of ["nobody@example.test", "free-only@example.test", "frozen@example.test", "not-an-address"]) {
@@ -184,7 +184,7 @@ describe("P13 the cancel link on real PostgreSQL", () => {
     const clock = { now: new Date() };
     const { links, mails } = service(clock);
     const ownerRef = await account("often@example.test");
-    await seedActiveSubscription(database.pool, { ownerRef, planId: "PRO", activatedAt: new Date(Date.now() - DAY), taxCountry: "DE" });
+    await seedNetopiaSubscription(database.pool, { ownerRef, planId: "PRO", activatedAt: new Date(Date.now() - DAY), taxCountry: "DE" });
     const outcomes = [];
     for (let attempt = 0; attempt < 4; attempt += 1) outcomes.push(await links.request("often@example.test"));
     expect(outcomes).toEqual(["SENT", "SENT", "SENT", "SILENT"]);
@@ -197,7 +197,7 @@ describe("P13 the cancel link on real PostgreSQL", () => {
     const clock = { now: new Date() };
     const { links, mails } = service(clock);
     const ownerRef = await account("late@example.test");
-    await seedActiveSubscription(database.pool, { ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO" });
+    await seedNetopiaSubscription(database.pool, { ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO" });
     expect(await links.request("late@example.test")).toBe("SENT");
     clock.now = new Date(clock.now.getTime() + DAY + 1_000);
     expect(await links.cancelByToken(tokenOf(mails[0]!))).toBe("INVALID");
@@ -209,7 +209,7 @@ describe("P13 the cancel link on real PostgreSQL", () => {
       const clock = { now: new Date() };
       const { links, mails } = service(clock, small);
       const ownerRef = await account("one-connection@example.test");
-      const seeded = await seedActiveSubscription(database.pool, {
+      const seeded = await seedNetopiaSubscription(database.pool, {
         ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO"
       });
       expect(await links.request("one-connection@example.test")).toBe("SENT");
@@ -226,7 +226,7 @@ describe("W8 (P2-I12) after the account is erased, the billing profile's address
   /** An account whose erasure has committed (P1b's helper: prepare, acknowledge, finalize), with a plan still live. */
   async function erasedWithLivePlan(label: string, profileEmail: string) {
     const erased = await createBillingTestAccount(database.pool, label);
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: erased.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO", email: profileEmail
     });
     expect(await eraseBillingTestAccount(database.pool, erased)).toBe("COMMITTED");
@@ -273,7 +273,7 @@ describe("W8 (P2-I12) after the account is erased, the billing profile's address
       return { jobId: randomUUID(), kind: "EMAIL", ref: request.ref, notBefore: request.notBefore, attempts: 1, payload: request.payload } as never;
     };
     const live = await account("lives-here-now@example.test");
-    const liveSeeded = await seedActiveSubscription(database.pool, {
+    const liveSeeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: live, planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO", email: "checkout-time@example.test"
     });
     const { seeded } = await erasedWithLivePlan("w8-email-job", "kept-for-invoices@example.test");
