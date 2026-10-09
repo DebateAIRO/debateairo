@@ -311,8 +311,8 @@ it('records one selected Owner key without requiring or requesting an optional s
  expect(host.querySelector('[data-owner-receipts]')?.textContent).toContain('33333333-3333-4333-8333-333333333333');
 });
 it.each([
-    ["en", "Verify security key for team access", "Team tools are locked. They unlock for one hour when the operator turns them on."],
-    ["ro", "Verifică cheia de securitate pentru accesul echipei", "Instrumentele echipei sunt blocate. Se deblochează pentru o oră atunci când operatorul le activează."]
+    ["en", "Verify security key for team access", "Team tools are locked. The operator can unlock them for one hour at a time."],
+    ["ro", "Verifică cheia de securitate pentru accesul echipei", "Instrumentele echipei sunt blocate. Operatorul le poate debloca pentru câte o oră."]
 ] as const)("shows the %s locked Team tools state when alert readiness is not fresh", async (locale, elevate, expected) => {
     caps = ["TEAM_INVITE"];
     toolsLocked = true;

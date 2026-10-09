@@ -39,7 +39,7 @@
   "staff.recovery": "Recovery uses a replacement account, one verified key (which may be new) and offline material. Additional keys are optional. The old account stays on security hold; its private debates stay with it. Password or authenticator codes cannot replace the key proofs.",
   "staff.alertUnknown": "Independent alert readiness has not been confirmed for this operation.",
   "staff.unavailable": "Team operation unavailable. Independent alerts or another required service may be unavailable; no destination is exposed.",
-  "staff.locked": "Team tools are locked. They unlock for one hour when the operator turns them on.",
+  "staff.locked": "Team tools are locked. The operator can unlock them for one hour at a time.",
   "staff.failed": "The operation was refused. Refresh current state before confirming a new operation.",
   "staff.denied": "Team authority is unavailable. Verify your security key again.",
   "staff.signIn": "Sign in to check account readiness.",
