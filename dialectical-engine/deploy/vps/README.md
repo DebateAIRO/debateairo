@@ -2241,11 +2241,13 @@ What the API does at start with these settings:
   `BILLING_IPN_KEYS_FILE_UNSAFE`; one whose keys cannot be read, or are shorter than 2,048 bits, with
   `NETOPIA_IPN_KEYS_INVALID`. Run the NETOPIA section of the setup again (with `--replace netopia`).
 - Billing off, with all four NETOPIA settings present: the API starts in the **provider-only mode**. It serves only
-  NETOPIA's notify address, for the sandbox tool and the small live test of §14.9; nothing else of billing runs, and
-  every other payment message is stored and answered without any effect. Like billing on, it refuses to start with
-  `BILLING_ADMISSION_UNSEALED` if the published register version does not seal the `billing_notify` admission scope.
-  With only some of the four, it writes `"event":"billing.provider_only.incomplete"` (§14.8) and serves nothing of
-  NETOPIA.
+  NETOPIA's notify address, for the sandbox tool and the small live test of §14.9, and every other payment message is
+  stored and answered without any effect. The one other thing that runs is the daily cleanup of what those messages
+  leave: a test order's saved card is revoked once it is a day old and deleted a day later, and NETOPIA's raw
+  messages and the quarantine are deleted after 14 days (at each start, then once a day). Like billing on, it
+  refuses to start with `BILLING_ADMISSION_UNSEALED` if the published register version does not seal the
+  `billing_notify` admission scope. With only some of the four, it writes
+  `"event":"billing.provider_only.incomplete"` (§14.8) and serves nothing of NETOPIA.
 - A setting of the previous card processor still in `api.env` is ignored, and the API writes
   `"event":"billing.setting.retired"` naming it (never its value): delete that line. The website does the same for the
   previous card form's setting left in `/etc/debateai/ui.env` (`"event":"ui.setting.retired"`): delete that line too.
@@ -2480,7 +2482,9 @@ systemctl restart debateai-api
 ```
 
 The API checks this itself at start-up: pointed at live while a sandbox plan, charge or queued job is still open, it
-refuses to start and prints `BILLING_OTHER_SYSTEM_RECORDS_OPEN` with the three counts. The first query can count a
+refuses to start and prints `BILLING_OTHER_SYSTEM_RECORDS_OPEN` with the three counts. It also refuses the other way
+round: pointed at the sandbox, with billing on, while a live plan has not ended, it prints the same code with the
+number of live plans (never run the sandbox over live customers). The first query can count a
 cancelled plan that had a later event (a card change, say) as open; the start-up check has the last word. If it
 refuses, put the sandbox values back (`--replace netopia` again), restart, close what is left, and try again.
 
@@ -2847,7 +2851,7 @@ signals that matter:
 | `[BILLING_OUTBOX_PENDING]` (a bare marker) | A round of the job queue stopped before it finished, almost always because the database did not answer. A single job that fails never raises it: that job is tried again on its own schedule. Queued jobs wait meanwhile and run once the queue works again. | One: nothing. Again and again: check the database and the API's other lines from the same minutes. |
 | `[BILLING_ERASURE_SWEEP_PENDING]` (a bare marker) | The sweep that ends the paid plan of an account whose deletion has gone through (or that the age check froze) failed for at least one account. It runs in front of the money check every 10 minutes, the money check still runs, and every such account is tried again on the next sweep. The cause is the database, or one subscription whose history the site cannot read (then the marker repeats every 10 minutes, and the owner summary lists that subscription among the payments to check). | One: nothing. Every 10 minutes while the database is fine: report it, because a deleted account's plan is not being ended. |
 | `[BILLING_ERASURE_STOP_PENDING]` (a bare marker) | Someone scheduled their account's deletion, but stopping their plan's renewal at that moment failed, most often because the database did not answer. The deletion is scheduled anyway, and the sweep in front of the money check stops the renewal on its next run, within 10 minutes. | One: nothing. Again and again, or together with `[BILLING_ERASURE_SWEEP_PENDING]`: check the database, and follow that row. |
-| `[BILLING_OWNER_JOBS_PENDING]` (a bare marker) | The daily owner job failed at one of its steps, often because the database did not answer. Its steps are: queuing the quarterly tax summary email (O1), the daily refund reminders, the saved-card sweep (it deletes saved cards the site no longer needs), and the two purges (of revoked cards, and of NETOPIA's raw messages and the quarantine). Each step is tried even when another one fails. The job runs once a day and at each start, so the next try is a day later. | One: nothing. When O1 has not arrived by the 6th day after a quarter ends: print the summary yourself (**The tax summary**, above). On several days in a row: check the database, then look in the owner summary for a `SUBSCRIPTION_HISTORY_INVALID` item. A subscription whose records do not add up stops the card sweep for its own cards every day, so follow what that item says. |
+| `[BILLING_OWNER_JOBS_PENDING]` (a bare marker) | The daily owner job failed at one of its steps, often because the database did not answer. Its steps are: queuing the quarterly tax summary email (O1), the daily refund reminders, the saved-card sweep (it deletes saved cards the site no longer needs), and the two purges (of revoked cards, and of NETOPIA's raw messages and the quarantine). In the provider-only mode (billing off) the job runs only the card sweep and the two purges. Each step is tried even when another one fails. The job runs once a day and at each start, so the next try is a day later. | One: nothing. When O1 has not arrived by the 6th day after a quarter ends: print the summary yourself (**The tax summary**, above). On several days in a row: check the database, then look in the owner summary for a `SUBSCRIPTION_HISTORY_INVALID` item. A subscription whose records do not add up stops the card sweep for its own cards every day, so follow what that item says. |
 | `"event":"billing.outbox.dead"`, with `kind`, `code` and `attempts` | A job stopped after its last try (or at once, for a code that no retry can change). For an invoice or credit note (`QUADERNO_RECORD_SALE`, `QUADERNO_RECORD_REFUND`, `SMARTBILL_INVOICE`, `SMARTBILL_STORNO`) or an `EMAIL`, you also get the email O3 with the steps, except when the email that died is O3 itself. A refund (`PAYMENT_REFUND`) does not send O3. Its email O2 does not come from this line: the refund itself sends O2 at each dead end it decides (the refund is handed to you, its charge cannot be found, no request backs it, and the like). O2 is not sent when the refund job's own content cannot be read (`REFUND_PAYLOAD_INVALID`), nor when the job queue stops a refund whose every one of its six tries failed (the code is then the failure's own, usually `OUTBOX_HANDLER_FAILED`). The owner summary (**The tax summary**, above) lists every dead refund job whatever its code, as long as no refund of that payment is recorded. The codes `REFUND_NOT_REQUESTED` and `REFUND_CHARGE_MISSING` (refund jobs) and `CREDIT_NOTE_REFUND_MISSING` (a credit-note job) mean our records do not back the job: no refund request is recorded for that payment, the job names a charge we do not have, or no refund is recorded for that sale, and nothing was sent to NETOPIA or to the invoicer. `OTHER_PAYMENT_SYSTEM` is a job of another payment system (NETOPIA's sandbox or live, or the previous card processor) than this host's (`billing.outbox.other_system`, below). | An invoice, a credit note or an email: **An invoice, a credit note or an email that was never sent**, below. A refund, with or without O2: **A refund handed to you**, above. `REFUND_NOT_REQUESTED`, `REFUND_CHARGE_MISSING` or `CREDIT_NOTE_REFUND_MISSING`: do not refund and do not issue a credit note; there is nothing to issue or re-queue. Tell whoever runs the server, because something able to write to the billing database queued it. `OTHER_PAYMENT_SYSTEM`, whatever the kind (a `RENEWAL_NOTICE` too): nothing to do on this host. `OWNER_TAX_SUMMARY`: print the summary yourself (**The tax summary**, above). `RENEWAL_NOTICE` with any other code: nothing is charged at a changed amount without its notice; the renewal sends the notice itself when it is due. `VERIFY_PAYMENT`: the status reads queue the payment check again while the payment is still within its reading times. Any of these repeating, or any other code: report the kind and the code. |
 | `"event":"billing.outbox.alert_failed"`, with `kind` and `code` | A job died (the `billing.outbox.dead` line just before it) but the owner's email about it, O3, could not be queued, usually because the database did not answer. The job stays dead, and the owner summary still lists it. | Print the summary now (**The tax summary**, above) to see the line, and settle it as **An invoice, a credit note or an email that was never sent** says. If it repeats, check the database. |
 | `"event":"billing.outbox.settle_failed"`, with `kind`, `outcome` and `attempts` | A job ran, but its result could not be saved (usually the database connection was lost). The job runs again after 5 minutes, so an email may arrive twice. | One: nothing. Many, or the same kind again and again: check the database, and report it if the database is fine. |
@@ -3263,7 +3267,7 @@ pnpm exec vitest run tests/unit/payments-netopia-recorded-fixtures.test.ts
 **The small live test, with billing off.** NETOPIA says monthly payments can only be tested with a real card on live.
 Do it on the production host once NETOPIA has switched on recurring payments, before billing goes on (§1.6 item 6 of
 the spec). Run the guided setup's NETOPIA section with the **live** values; with billing off the API then starts in the
-provider-only mode (§14.2): it serves only NETOPIA's notify address, and nothing else of billing runs. Make the private
+provider-only mode (§14.2): it serves only NETOPIA's notify address, and runs only the daily cleanup. Make the private
 folder as in step 7, and put your own billing details (first and last name, email, phone, country, region, city, postal
 code, street) as one JSON object in `/var/tmp/netopia-capture/payer.json`, with the fields `firstName`, `lastName`,
 `email`, `phone`, `country`, `region`, `city`, `postalCode` and `street`:
@@ -3297,7 +3301,9 @@ Refund both payments in NETOPIA's live admin, and check that the site stored bot
 sudo -u postgres psql -d debateai -c "SELECT n.received_at, n.provider_status, o.outcome FROM billing.payment_notice n JOIN billing.payment_notice_outcome o ON o.notice_id = n.notice_id WHERE n.payment_environment = 'live' ORDER BY n.received_at DESC LIMIT 10"
 ```
 
-Every row must say `TOOL_ORDER`. Write down what you saw for the go-live list. Then delete the live capture folder: it
+Every row must say `TOOL_ORDER`. Write down what you saw for the go-live list. The card this test saved is revoked by
+the daily cleanup once it is a day old (so make the charge above on the day you pay), and deleted a day after that.
+Then delete the live capture folder: it
 holds your own details, and nothing in it is committed:
 
 ```sh

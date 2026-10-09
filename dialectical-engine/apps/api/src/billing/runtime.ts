@@ -59,6 +59,11 @@ export type BillingRuntimeDeps = Readonly<{
   mail: Readonly<{ sender: BillingMailPort; attachments: ReadonlyMap<BillingAttachmentKind, AttachmentResolver> }> | undefined;
   audit: BillingAudit;
   clock: () => Date;
+  /**
+   * F7 (final review money-3): how far `clock` runs ahead of real time (the stage clock's `offsetMs`; absent or 0 off
+   * the OWNER-RUN sandbox). NETOPIA's message intake moves NETOPIA's own times by it, as TimeShiftedCardPayments does.
+   */
+  clockOffsetMs?: number;
   reportPending: (code: string) => void;
   /**
    * R-35: inputs later tasks need, declared here once and passed by main.ts in the task that uses them:
@@ -275,7 +280,8 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // N9 (spec 2026-10-05 §2.7.3): `drain` is declared below; the kick only runs once a message is stored.
   const netopiaNotices = new NetopiaNoticeIntake({
     repository, jobs, trust: deps.connectors.noticeTrust, recordsKey: deps.connectors.recordsKey,
-    paymentEnvironment: deps.connectors.paymentEnvironment, mode: "ON", audit: deps.audit, kick: () => drain()
+    paymentEnvironment: deps.connectors.paymentEnvironment, mode: "ON", audit: deps.audit, kick: () => drain(),
+    clockOffsetMs: deps.clockOffsetMs ?? 0
   });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({

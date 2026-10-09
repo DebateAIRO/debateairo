@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+import type { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { foldSubscription } from "@debateai/billing-core";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate } from "@debateai/db";
@@ -12,8 +13,9 @@ import { writeCardSaved } from "../../apps/api/src/billing/card-adoption.js";
 import { CardCustody } from "../../apps/api/src/billing/card-custody.js";
 import { BillingErasureHook } from "../../apps/api/src/billing/erasure-hook.js";
 import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
-import { OwnerJobs } from "../../apps/api/src/billing/owner-jobs.js";
-import { sealCardToken } from "../../apps/api/src/billing/records.js";
+import { OwnerJobs, ProviderOnlyOwnerJobs } from "../../apps/api/src/billing/owner-jobs.js";
+import { createProviderOnlyJobs } from "../../apps/api/src/billing/provider-only-jobs.js";
+import { sealCardToken, sealNoticeAllowed, sealNoticeRaw } from "../../apps/api/src/billing/records.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 
 let database: TestDatabase;
@@ -71,7 +73,8 @@ describe("N17 the daily sweep (spec §2.15.4)", () => {
     const newer = await storeToken({ customerId: seeded.customerId, chargeId: seeded.initialChargeId, ageDays: 2 });
     await adopt(seeded.subscriptionId, seeded.ownerRef, newer);
     const neverAdopted = await storeToken({ customerId: seeded.customerId, chargeId: seeded.initialChargeId, ageDays: 2 });
-    const otherSystem = await storeToken({ customerId: seeded.customerId, chargeId: seeded.initialChargeId, ageDays: 2, environment: "live" });
+    // F7 (final review data-2): a sandbox API never revokes a live token; only a live API revokes a sandbox one.
+    const liveOnSandbox = await storeToken({ customerId: seeded.customerId, chargeId: seeded.initialChargeId, ageDays: 2, environment: "live" });
     const toolOrder = await storeToken({ customerId: null, chargeId: null, ageDays: 2 });
     const fresh = await storeToken({ customerId: seeded.customerId, chargeId: seeded.initialChargeId, ageDays: 0 });
     const audit = recordingAudit();
@@ -79,11 +82,12 @@ describe("N17 the daily sweep (spec §2.15.4)", () => {
     expect(await revocation(newer)).toBeNull();
     expect(await revocation(replacedId)).toBe("REPLACED");
     expect(await revocation(neverAdopted)).toBe("NOT_ADOPTED");
-    expect(await revocation(otherSystem)).toBe("OTHER_SYSTEM");
+    expect(await revocation(liveOnSandbox)).toBeNull();
     expect(await revocation(toolOrder)).toBe("TOOL_ORDER");
     // A token younger than a day is not swept yet (its adoption may still be under way).
     expect(await revocation(fresh)).toBeNull();
-    expect(report.byReason).toMatchObject({ REPLACED: 1, NOT_ADOPTED: 1, OTHER_SYSTEM: 1, TOOL_ORDER: 1 });
+    expect(report.byReason).toMatchObject({ REPLACED: 1, NOT_ADOPTED: 1, TOOL_ORDER: 1 });
+    expect(report.byReason.OTHER_SYSTEM).toBeUndefined();
     expect(audit.events).toContainEqual({ event: "billing.card.revoked", fields: { reason: "REPLACED", count: 1 } });
     // Sweeping again revokes nothing twice.
     expect((await custodyOf().sweep(new Date())).revoked).toBe(0);
@@ -125,6 +129,29 @@ describe("N17 the daily sweep (spec §2.15.4)", () => {
     expect(await custodyOf(audit).purge(new Date())).toBeGreaterThanOrEqual(1);
     expect(await repository.withTransaction((client) => repository.cardTokenById(client, seeded.cardTokenId))).toBeNull();
     expect(audit.events.find((entry) => entry.event === "billing.card.purged")?.fields.tokens).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("F7 a sandbox API never revokes a live card (final review data-2)", () => {
+  it("leaves an ACTIVE live plan's current card unrevoked through a sandbox sweep and purge", async () => {
+    const seeded = await seedNetopiaSubscription(database.pool, {
+      ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE", paymentEnvironment: "live"
+    });
+    expect((await state(seeded.subscriptionId)).status).toBe("ACTIVE");
+    const custody = custodyOf();
+    await custody.sweep(new Date(Date.now() - 2 * DAY));
+    await custody.sweep(new Date());
+    await custody.purge(new Date());
+    expect(await revocation(seeded.cardTokenId)).toBeNull();
+    expect(await repository.withTransaction((client) => repository.cardTokenById(client, seeded.cardTokenId))).not.toBeNull();
+    expect((await state(seeded.subscriptionId)).cardTokenId).toBe(seeded.cardTokenId);
+  });
+
+  it("still revokes a sandbox token OTHER_SYSTEM on a live API (the supported sandbox-then-live switch)", async () => {
+    const seeded = await plan(new Date(Date.now() - 3 * DAY));
+    const live = new CardCustody({ repository, jobs, paymentEnvironment: "live", publicAppUrl: TEST_PUBLIC_APP_URL, audit: recordingAudit() });
+    await live.sweep(new Date());
+    expect(await revocation(seeded.cardTokenId)).toBe("OTHER_SYSTEM");
   });
 });
 
@@ -221,5 +248,87 @@ describe("N17 asking for a card before it is needed (spec §2.15.3, M12)", () =>
     });
     await owner.schedule();
     expect(steps).toEqual(["sweep", "purge"]);
+  });
+});
+
+/** A verified message's raw bytes as N9's intake stores them, `ageDays` days old. */
+async function storeRawNotice(ageDays: number): Promise<string> {
+  const noticeId = randomUUID();
+  const at = new Date(Date.now() - ageDays * DAY);
+  const allowed = sealNoticeAllowed(TEST_RECORDS_KEY, noticeId, { orderID: null });
+  const raw = sealNoticeRaw(TEST_RECORDS_KEY, noticeId, Buffer.from("{\"payment\":{}}", "utf8"));
+  await repository.withTransaction(async (client) => {
+    await repository.insertPaymentNotice(client, {
+      noticeId, paymentProvider: "netopia", paymentEnvironment: "sandbox", receivedAt: at,
+      bodySha256: randomBytes(32).toString("hex"), orderId: null, providerPaymentId: null, providerStatus: null,
+      amountText: null, currency: null, cardCountry: null, keyFingerprint: "e".repeat(64), jwtIat: null,
+      allowedCiphertext: allowed.ciphertext, keyId: allowed.keyId
+    });
+    await repository.insertPaymentNoticeRaw(client, { noticeId, rawCiphertext: raw.ciphertext, keyId: raw.keyId, storedAt: at });
+  });
+  return noticeId;
+}
+const rawStored = async (noticeId: string) => (await database.pool.query(
+  "SELECT 1 FROM billing.payment_notice_raw WHERE notice_id = $1", [noticeId]
+)).rowCount === 1;
+const outboxRows = async () => Number((await database.pool.query<{ count: string }>("SELECT count(*) AS count FROM billing.outbox")).rows[0]!.count);
+
+describe("F7 the provider-only mode's daily card job (final review data-1)", () => {
+  it("revokes a two-day-old tool order's card, purges it a day later, deletes a 15-day-old raw message, and nothing else", async () => {
+    // Stored three days ago: two days old at the first run, which runs as of a day ago (0109's purge trusts only the
+    // database's own clock, so a revocation made "now" could not be a day old within this test).
+    const toolToken = await storeToken({ customerId: null, chargeId: null, ageDays: 3 });
+    const oldRaw = await storeRawNotice(15);
+    const youngRaw = await storeRawNotice(13);
+    const outboxBefore = await outboxRows();
+    let now = new Date(Date.now() - DAY - 60_000);
+    const pending: string[] = [];
+    const audit = recordingAudit();
+    const daily = createProviderOnlyJobs({
+      pool: database.pool, paymentEnvironment: "sandbox", publicAppUrl: TEST_PUBLIC_APP_URL, audit,
+      clock: () => now, reportPending: (code) => { pending.push(code); }
+    });
+    await daily.schedule();
+    expect(await revocation(toolToken)).toBe("TOOL_ORDER");
+    expect(await repository.withTransaction((client) => repository.cardTokenById(client, toolToken))).not.toBeNull();
+    now = new Date();
+    await daily.schedule();
+    expect(await repository.withTransaction((client) => repository.cardTokenById(client, toolToken))).toBeNull();
+    expect(await rawStored(oldRaw)).toBe(false);
+    expect(await rawStored(youngRaw)).toBe(true);
+    expect(audit.events).toContainEqual({ event: "billing.card.revoked", fields: { reason: "TOOL_ORDER", count: 1 } });
+    // Nothing else of billing runs: no tax summary, no reminder, no job of any kind is queued.
+    expect(await outboxRows()).toBe(outboxBefore);
+    expect(pending).toEqual([]);
+  });
+
+  it("runs the sweep and both purges each in isolation: a failing sweep still purges, and the failure is thrown at the end", async () => {
+    const steps: string[] = [];
+    const owner = new ProviderOnlyOwnerJobs({
+      clock: () => new Date(),
+      custody: {
+        sweep: async () => { steps.push("sweep"); throw new Error("the sweep failed"); },
+        purge: async () => { steps.push("purge"); return 2; }
+      }
+    });
+    await expect(owner.schedule()).rejects.toThrow("the sweep failed");
+    expect(steps).toEqual(["sweep", "purge"]);
+  });
+
+  it("starts at once and daily, and reports a failed run as BILLING_OWNER_JOBS_PENDING", async () => {
+    const down = {
+      connect: async () => { throw new Error("the database is unreachable"); },
+      query: async () => { throw new Error("the database is unreachable"); }
+    } as unknown as Pool;
+    const pending: string[] = [];
+    const daily = createProviderOnlyJobs({
+      pool: down, paymentEnvironment: "sandbox", publicAppUrl: TEST_PUBLIC_APP_URL, audit: recordingAudit(),
+      clock: () => new Date(), reportPending: (code) => { pending.push(code); }
+    });
+    daily.start();
+    const deadline = Date.now() + 5_000;
+    while (pending.length === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
+    daily.stop();
+    expect(pending).toEqual(["BILLING_OWNER_JOBS_PENDING"]);
   });
 });

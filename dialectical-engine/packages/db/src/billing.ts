@@ -728,6 +728,29 @@ export class BillingRepository {
   }
 
   /**
+   * F7 (final review data-2): how many NETOPIA subscriptions of `paymentEnvironment` are still open: not ENDED and not
+   * WITHDRAWN (a cancel pending still counts: its paid month runs on its card; one whose history does not fold counts
+   * as open). The sandbox boot's guard asks it of "live": a sandbox API never runs over live customers' plans.
+   */
+  async openNetopiaSubscriptionCount(paymentEnvironment: "sandbox" | "live"): Promise<number> {
+    const rows = (await this.pool.query<SubscriptionEventRaw>(`
+      SELECT ${SUBSCRIPTION_EVENT_COLUMNS} FROM billing.subscription_event AS event
+      WHERE event.subscription_id IN (
+        SELECT created.subscription_id FROM billing.subscription_event AS created
+        WHERE created.kind = 'CREATED'
+          AND created.data ->> 'payment_provider' = 'netopia'
+          AND created.data ->> 'payment_environment' = $1
+      )
+      ORDER BY event.subscription_id, event.seq
+    `, [paymentEnvironment])).rows;
+    let open = 0;
+    for (const state of foldEach(rows, () => { open += 1; })) {
+      if (state.status !== "ENDED" && state.status !== "WITHDRAWN") open += 1;
+    }
+    return open;
+  }
+
+  /**
    * W14 (P2-I19): what lies more than a day ahead of `now`, the API's real clock at a live boot. `rows`: the billing
    * changes, whichever payment system, by the time they record (every writer stamps them with the billing clock's
    * `now`, so only a moved stage clock dates one ahead): subscription events (`at`), entitlement events

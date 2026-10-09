@@ -6,15 +6,22 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { PoolClient } from "pg";
 import { buildApi } from "@debateai/api";
 import { openRecord } from "@debateai/crypto";
+import { foldSubscription } from "@debateai/billing-core";
 import { BillingJobQueries, BillingRepository, migrate } from "@debateai/db";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
+import { writeCardSaved } from "../../apps/api/src/billing/card-adoption.js";
 import { NETOPIA_NOTIFY_PATH } from "../../apps/api/src/billing/index.js";
 import { NetopiaNoticeIntake, type NetopiaIntakeMode, type NoticeArrival } from "../../apps/api/src/billing/netopia-intake.js";
-import { openCardToken } from "../../apps/api/src/billing/records.js";
-import { newChargeId } from "../../apps/api/src/billing/rows.js";
+import { openCardToken, sealCardToken } from "../../apps/api/src/billing/records.js";
+import { chargeEvent, newChargeId } from "../../apps/api/src/billing/rows.js";
+import { TimeShiftedCardPayments } from "../../apps/api/src/billing/time-shifted-payments.js";
 import { testBillingPlans, unusedAskApplication } from "../support/billingFixtures.js";
-import { recordingAudit, TEST_RECORDS_KEY } from "../support/billingSubscriptionFixtures.js";
+import {
+  recordingAudit, seedNetopiaSubscription, testCardToken, TEST_RECORDS_KEY
+} from "../support/billingSubscriptionFixtures.js";
 import { signedNetopiaNotice, testNetopiaKeys } from "../support/netopia-notice.js";
+import { netopiaVerifyHandler, verifyJob } from "../support/netopia-verify.js";
+import { StubCardPayments, stubPaymentReport } from "../support/stub-card-payments.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const POS = ["NT9A", "B2C3", "D4E5", "F6G7", "H8J9"].join("-");
@@ -51,7 +58,7 @@ const arrival = (signed: Readonly<{ rawBody: Buffer; header: string }>, now: Dat
   ({ rawBody: signed.rawBody, header: signed.header, sourceKey: "198.51.100.0/24", now, ...(admit === undefined ? {} : { admit }) });
 
 function intakeFor(options: Partial<{
-  mode: NetopiaIntakeMode; keys: typeof KEYS; storeDown: true; paymentEnvironment: "sandbox" | "live";
+  mode: NetopiaIntakeMode; keys: typeof KEYS; storeDown: true; paymentEnvironment: "sandbox" | "live"; clockOffsetMs: number;
 }> = {}) {
   const audit = recordingAudit();
   const kick = vi.fn();
@@ -60,7 +67,8 @@ function intakeFor(options: Partial<{
   });
   const intake = new NetopiaNoticeIntake({
     repository: store, jobs, trust: (options.keys ?? KEYS).trust(POS), recordsKey: TEST_RECORDS_KEY,
-    paymentEnvironment: options.paymentEnvironment ?? "sandbox", mode: options.mode ?? "ON", audit, kick
+    paymentEnvironment: options.paymentEnvironment ?? "sandbox", mode: options.mode ?? "ON", audit, kick,
+    ...(options.clockOffsetMs === undefined ? {} : { clockOffsetMs: options.clockOffsetMs })
   });
   return { intake, audit, kick };
 }
@@ -336,6 +344,69 @@ describe("N9 the provider-only mode (ruling C-9)", () => {
     expect(await quarantineFor(chargeId)).toHaveLength(1);
     expect(await ownerMails("O4", chargeId)).toEqual([]);
     expect(audit.events.map((entry) => entry.event)).toEqual(["billing.notice.parse_failed", "billing.notice.unverified"]);
+  });
+});
+
+describe("F7 the sandbox clock offset (final review money-3)", () => {
+  it("dates a card check's token on the runtime's moved clock, so it is adopted after a time-shifted renewal", async () => {
+    const OFFSET_DAYS = 30;
+    const offsetMs = OFFSET_DAYS * 86_400_000;
+    // Real times (NETOPIA's): the renewal was charged at 09:00, the card check paid at 09:58 (body()'s operationDate).
+    const renewalPaidReal = new Date("2026-10-06T09:00:00.000Z");
+    const checkPaidReal = new Date("2026-10-06T09:58:00.000Z");
+    // The runtime's clock, BILLING_STAGE_CLOCK_OFFSET_DAYS ahead: everything it records and decides is on it.
+    const stageNow = new Date(Date.parse("2026-10-06T10:30:00.000Z") + offsetMs);
+    const seeded = await seedNetopiaSubscription(database.pool, {
+      ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(stageNow.getTime() - 3 * 86_400_000), taxCountry: "RO"
+    });
+    // The renewal's saved card, dated as renewal.ts dates it: by its answer's occurredAt, which the time-shifted port
+    // has moved forward by the offset. It becomes the plan's current card.
+    const stub = new StubCardPayments();
+    const shifted = new TimeShiftedCardPayments(stub, OFFSET_DAYS);
+    stub.scriptStatus(seeded.initialChargeId, stubPaymentReport(seeded.initialChargeId, "PAID", { occurredAt: renewalPaidReal }));
+    const renewalAnswer = await shifted.status({ orderId: seeded.initialChargeId, providerPaymentId: null });
+    if (renewalAnswer === "NO_SUCH_ORDER") throw new Error("the stub answers every scripted order");
+    expect(renewalAnswer.occurredAt).toEqual(new Date(renewalPaidReal.getTime() + offsetMs));
+    const renewalTokenId = randomUUID();
+    const sealed = sealCardToken(TEST_RECORDS_KEY, renewalTokenId, testCardToken(["tok", "f7", renewalTokenId.slice(0, 8)].join("-")));
+    await repository.withTransaction((client) => repository.insertCardToken(client, {
+      tokenId: renewalTokenId, customerId: seeded.customerId, paymentProvider: "netopia", paymentEnvironment: "sandbox",
+      sourceChargeId: seeded.initialChargeId, sourceToolOrder: null, sourceNoticeId: null, sourcePaidAt: renewalAnswer.occurredAt,
+      tokenCiphertext: sealed.ciphertext, keyId: sealed.keyId, expMonth: 12, expYear: 2031, last4: "2222", cardCountry: "RO",
+      createdAt: new Date(stageNow.getTime() - 3_600_000)
+    }));
+    await repository.withTransaction(async (client) => {
+      await jobs.lockOwner(client, seeded.ownerRef);
+      const token = (await repository.cardTokenById(client, renewalTokenId))!;
+      const state = foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId, client));
+      expect(await writeCardSaved({ repository }, client, { state, token, at: new Date(stageNow.getTime() - 3_600_000) })).toBe(true);
+    });
+    // The card check, opened on the runtime's clock.
+    const checkId = newChargeId();
+    const openedAt = new Date(stageNow.getTime() - 40 * 60_000);
+    await repository.withTransaction(async (client) => {
+      await repository.insertCharge(client, {
+        chargeId: checkId, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "CARD_CHECK", attempt: 1,
+        periodStart: openedAt, periodEnd: new Date(openedAt.getTime() + 30 * 86_400_000), quoteId: null, netMicros: 0,
+        taxMicros: 0, totalMicros: 0, currency: "USD", createdAt: openedAt, paymentProvider: "netopia", paymentEnvironment: "sandbox"
+      });
+      await repository.appendChargeEvent(client, chargeEvent(checkId, "REQUESTED", openedAt, { providerPaymentId: null, amountMicros: 0, errorCode: null }));
+      await repository.appendChargeEvent(client, chargeEvent(checkId, "SUBMITTED", openedAt, {
+        providerPaymentId: `ntp-${checkId.slice(0, 12)}`, amountMicros: 0, errorCode: null
+      }));
+    });
+    // NETOPIA's message for the check, received by the runtime's intake under the same offset.
+    const { intake } = intakeFor({ clockOffsetMs: offsetMs });
+    expect(await intake.receive(arrival(sign(body(checkId, { amount: 0 })), stageNow))).toEqual({ status: 200, body: OK });
+    const [token] = await tokensFor("source_charge_id", checkId);
+    expect(token!.source_paid_at).toEqual(new Date(checkPaidReal.getTime() + offsetMs));
+    // VERIFY_PAYMENT decides the check from NETOPIA's status through the same time-shifted port: the card is adopted.
+    stub.scriptStatus(checkId, stubPaymentReport(checkId, "AUTHORIZED", { amountMicros: 0, occurredAt: checkPaidReal }));
+    const { verify } = netopiaVerifyHandler(database.pool, { payments: shifted, clock: () => stageNow });
+    expect(await verify.handle(verifyJob(checkId, stageNow), stageNow)).toEqual({ kind: "DONE" });
+    const state = foldSubscription(await repository.subscriptionEvents(seeded.subscriptionId));
+    expect(state.cardTokenId).toBe(token!.token_id);
+    expect((await repository.charge(checkId))!.events.map((event) => event.kind)).toEqual(["REQUESTED", "SUBMITTED", "SUCCEEDED"]);
   });
 });
 

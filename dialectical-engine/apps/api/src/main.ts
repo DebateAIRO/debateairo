@@ -118,6 +118,7 @@ import { PersonUsageReader } from "./billing/usage.js";
 import type { BillingRouteOptions } from "./billing/index.js";
 import { consoleBillingAudit } from "./billing/audit.js";
 import { NetopiaNoticeIntake } from "./billing/netopia-intake.js";
+import { createProviderOnlyJobs } from "./billing/provider-only-jobs.js";
 import { createBillingRuntime } from "./billing/runtime.js";
 import {
   assertLiveInvoicersAreLive,
@@ -717,6 +718,16 @@ const providerOnlyIntake = providerOnlyConnectors === null ? undefined : new Net
   recordsKey: providerOnlyConnectors.recordsKey, paymentEnvironment: providerOnlyConnectors.paymentEnvironment,
   mode: "PROVIDER_ONLY", audit: consoleBillingAudit, kick: () => undefined
 });
+/**
+ * F7 (final review data-1): the intake above keeps the owner's test-tool cards and every message's raw bytes, so the
+ * provider-only mode runs the daily owner job's card steps alone (the tool cards revoked once a day old and purged a
+ * day later, raw messages and the quarantine purged after 14 days), started with the API like the billing runtime.
+ */
+const providerOnlyJobs = providerOnlyConnectors === null ? undefined : createProviderOnlyJobs({
+  pool, paymentEnvironment: providerOnlyConnectors.paymentEnvironment,
+  publicAppUrl: providerOnlyConnectors.publicAppUrl, audit: consoleBillingAudit, clock: () => new Date(),
+  reportPending: (code) => console.error(`[${code}]`)
+});
 // A live boot refuses while rows of another payment system (NETOPIA's sandbox, or the previous card processor) are
 // open: the live renewal pass never renews them, so they would stay ACTIVE for ever. The runbook's switch-on step
 // closes them first.
@@ -729,6 +740,15 @@ if (billingConnectors?.paymentEnvironment === "live") {
   // W14 (P2-I19): nor while billing rows or open jobs are dated more than a day ahead (a moved sandbox clock's leftovers).
   await boot.run("billing-records-dated-ahead", async () => {
     assertNoRecordsDatedAhead(await new BillingRepository(pool).recordsDatedAhead(new Date()));
+  });
+}
+// F7 (final review data-2): the reverse direction, which the runbook never takes: a sandbox boot refuses while live
+// NETOPIA plans are open, so a sandbox API never runs over live customers' plans and cards.
+if (billingConnectors?.paymentEnvironment === "sandbox") {
+  await boot.run("billing-live-records-on-sandbox", async () => {
+    assertOtherSystemRecordsClosed({
+      subscriptions: await new BillingRepository(pool).openNetopiaSubscriptionCount("live"), charges: 0, jobs: 0
+    });
   });
 }
 const deploymentRiskTier = await boot.run("deployment-risk-tier", () => readDeploymentRiskTier(pool, environment.REGISTER_VERSION));
@@ -1334,7 +1354,7 @@ const billingRuntime = billingConnectors === null
       identities: identityRepository,
       // P16c (R-35): the owner's quarterly tax summary (email O1) names where and when each tax is paid.
       taxAuthorities,
-      audit: consoleBillingAudit, clock: stageClock.clock,
+      audit: consoleBillingAudit, clock: stageClock.clock, clockOffsetMs: stageClock.offsetMs,
       reportPending: (code) => console.error(`[${code}]`)
     });
   });
@@ -1448,6 +1468,7 @@ if (publicationCleanupTimer !== undefined) {
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => billingRuntime?.stop());
+api.addHook("onClose",async () => providerOnlyJobs?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
 api.addHook("onClose",async () => askWaker?.stop());
@@ -1531,6 +1552,7 @@ triggerErasureReconciliation();
 triggerAuthenticationRiskCleanup();
 triggerRetentionPurge();
 billingRuntime?.start();
+providerOnlyJobs?.start();
 // N9 (spec 2026-10-05 §2.7.4 step 2): the trusted keys were read at this start, so every quarantined NETOPIA message is
 // verified again with them, and one that now verifies is stored as if it had just arrived. In the background: a slow
 // database never holds the listening API; a failure is one content-free line, and the next start tries again.

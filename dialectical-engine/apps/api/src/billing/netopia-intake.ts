@@ -45,6 +45,12 @@ export type NetopiaNoticeIntakeDeps = Readonly<{
   mode: NetopiaIntakeMode;
   audit: BillingAudit;
   kick: () => void;
+  /**
+   * F7 (final review money-3): the billing clock's offset in milliseconds (main.ts's `billingClock`, OWNER-RUN sandbox
+   * only; 0 or absent otherwise). NETOPIA's own operation time in a message moves forward by it, exactly as
+   * TimeShiftedCardPayments moves its answers', so card adoption compares every token's payment time on one clock.
+   */
+  clockOffsetMs?: number;
 }>;
 
 const CHARGE_ORDER = /^[0-9a-f]{32}$/u;
@@ -272,7 +278,8 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
 
   /**
    * §2.7.3 step 3: the token sealed under the records key, its row naming its source; never logged or returned. A
-   * message without NETOPIA's operation time is dated by its arrival, never by a later re-check's clock.
+   * message without NETOPIA's operation time is dated by its arrival, never by a later re-check's clock. NETOPIA's time
+   * is real time, so it moves forward by the billing clock's offset (F7); the arrival is already on that clock.
    */
   private async saveCard(
     client: PoolClient, parsed: ParsedNotice, source: CardSource, noticeId: string, receivedAt: Date, now: Date
@@ -281,10 +288,12 @@ export class NetopiaNoticeIntake implements NetopiaNoticeIntakePort {
     if (card === null) return;
     const tokenId = randomUUID();
     const sealed = sealCardToken(this.deps.recordsKey, tokenId, card.token);
+    const offsetMs = this.deps.clockOffsetMs ?? 0;
+    const paidAt = parsed.occurredAt === null ? receivedAt : new Date(parsed.occurredAt.getTime() + offsetMs);
     await this.deps.repository.insertCardToken(client, {
       tokenId, customerId: source.customerId, paymentProvider: "netopia", paymentEnvironment: source.environment,
       sourceChargeId: source.sourceChargeId, sourceToolOrder: source.sourceToolOrder, sourceNoticeId: noticeId,
-      sourcePaidAt: parsed.occurredAt ?? receivedAt, tokenCiphertext: sealed.ciphertext, keyId: sealed.keyId,
+      sourcePaidAt: paidAt, tokenCiphertext: sealed.ciphertext, keyId: sealed.keyId,
       expMonth: card.expMonth, expYear: card.expYear, last4: card.last4, cardCountry: parsed.cardCountry, createdAt: now
     });
   }

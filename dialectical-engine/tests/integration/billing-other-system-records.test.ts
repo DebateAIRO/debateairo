@@ -88,3 +88,22 @@ describe("N8 — what is still open outside NETOPIA live (spec §2.5.4)", () => 
       .toBeGreaterThanOrEqual(1);
   });
 });
+
+describe("F7 — open NETOPIA plans of one environment (final review data-2: the sandbox boot's guard)", () => {
+  it("counts live NETOPIA plans until they end or are withdrawn, never a sandbox or previous processor's plan", async () => {
+    const before = await billing.openNetopiaSubscriptionCount("live");
+    const liveOwner = randomUUID();
+    const live = await active(liveOwner, { payment_provider: "netopia", payment_environment: "live" });
+    await active(randomUUID(), { payment_provider: "netopia", payment_environment: "sandbox" });
+    await active(randomUUID(), { xmoney_environment: "stage" });
+    expect(await billing.openNetopiaSubscriptionCount("live")).toBe(before + 1);
+    // A cancel pending leaves the live plan open: its paid month still runs on a live card.
+    await billing.withTransaction((client) => billing.appendSubscriptionEvent(client, event(live, liveOwner, "CANCEL_REQUESTED")));
+    expect(await billing.openNetopiaSubscriptionCount("live")).toBe(before + 1);
+    await billing.withTransaction((client) => billing.appendSubscriptionEvent(client, event(live, liveOwner, "WITHDRAWN", {
+      data: { withdrew_at: anchor.toISOString() }
+    })));
+    expect(await billing.openNetopiaSubscriptionCount("live")).toBe(before);
+    expect(await billing.openNetopiaSubscriptionCount("sandbox")).toBeGreaterThanOrEqual(1);
+  });
+});

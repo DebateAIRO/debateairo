@@ -53,37 +53,49 @@ export type OwnerJobsDeps = Readonly<{
   custody?: Pick<CardCustody, "sweep" | "purge">;
 }>;
 
+type DailyStep = () => Promise<number>;
+
+/**
+ * The daily owner job's steps, each isolated: one failing never skips the others; the first failure is thrown at the
+ * end, so the single-flight reports BILLING_OWNER_JOBS_PENDING. Returns the steps' counts added up.
+ */
+async function runIsolated(steps: ReadonlyArray<DailyStep>): Promise<number> {
+  let done = 0;
+  let failure: unknown = undefined;
+  for (const step of steps) {
+    try {
+      done += await step();
+    } catch (error) {
+      failure ??= error;
+    }
+  }
+  if (failure !== undefined) throw failure;
+  return done;
+}
+
+/** N17: the sweep first, so a token it revokes today is purged one day later (0109's purge rule), then both purges. */
+function custodySteps(custody: Pick<CardCustody, "sweep" | "purge">, now: Date): ReadonlyArray<DailyStep> {
+  return [async () => (await custody.sweep(now)).revoked, () => custody.purge(now)];
+}
+
 export class OwnerJobs {
   constructor(private readonly deps: OwnerJobsDeps) {}
 
   /**
    * The daily owner job: the quarter's tax summary queued once (whatever state an earlier copy is in), then each later
-   * daily step (N14's refund reminders, N17's card custody). Each step is isolated: one failing never skips the others;
-   * the first failure is thrown at the end, so the single-flight reports BILLING_OWNER_JOBS_PENDING.
+   * daily step (N14's refund reminders, N17's card custody). Each step is isolated (`runIsolated`).
    */
   async schedule(): Promise<number> {
-    const now = this.deps.clock();
-    let done = 0;
-    let failure: unknown = undefined;
-    for (const step of this.dailySteps(now)) {
-      try {
-        done += await step();
-      } catch (error) {
-        failure ??= error;
-      }
-    }
-    if (failure !== undefined) throw failure;
-    return done;
+    return runIsolated(this.dailySteps(this.deps.clock()));
   }
 
-  private dailySteps(now: Date): ReadonlyArray<() => Promise<number>> {
+  private dailySteps(now: Date): ReadonlyArray<DailyStep> {
     const refunds = this.deps.refunds;
     const custody = this.deps.custody;
     return [
       () => this.queueTaxSummary(now),
       ...(refunds === undefined ? [] : [() => refunds.remindOwnerRefunds(now)]),
-      // N17: the sweep first, so a token it revokes today is purged one day later (0109's purge rule).
-      ...(custody === undefined ? [] : [async () => (await custody.sweep(now)).revoked, () => custody.purge(now)])
+      ...(custody === undefined ? [] : custodySteps(custody, now))
     ];
   }
 
@@ -124,4 +136,18 @@ export class OwnerJobs {
     if (queued) this.deps.audit("billing.tax_summary.queued", { quarter: quarter.label });
     return DONE;
   };
+}
+
+/**
+ * F7 (final review data-1): the daily owner job of the provider-only mode (billing off, NETOPIA set). The intake still
+ * keeps the owner's test-tool cards and every verified message's raw bytes there, so the card custody's steps run
+ * alone, isolated as in mode ON: tool-order tokens revoked once a day old, revoked tokens purged a day later, raw
+ * messages and the quarantine purged after 14 days (spec §2.5.2, §2.15.4). Nothing else of billing runs.
+ */
+export class ProviderOnlyOwnerJobs {
+  constructor(private readonly deps: Readonly<{ custody: Pick<CardCustody, "sweep" | "purge">; clock: () => Date }>) {}
+
+  async schedule(): Promise<number> {
+    return runIsolated(custodySteps(this.deps.custody, this.deps.clock()));
+  }
 }

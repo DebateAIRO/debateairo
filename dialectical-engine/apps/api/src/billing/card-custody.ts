@@ -11,8 +11,8 @@ import { usableSavedCard } from "./renewal.js";
 /** What the sweep knows of one live token when it decides (spec §2.15.4). */
 export type CustodyFacts = Readonly<{
   token: CardTokenRow;
-  /** NETOPIA, in this API's environment. */
-  ours: boolean;
+  /** This API's NETOPIA environment (N8's connectors.paymentEnvironment). */
+  paymentEnvironment: PaymentEnvironment;
   /** The token's source charge with its events; null for a tool order's token, or a charge we cannot find. */
   charge: (ChargeRow & { events: ReadonlyArray<ChargeEventRow> }) | null;
   /** That charge's subscription, folded, and its history; null with no charge. */
@@ -42,11 +42,16 @@ const ASK_DAYS = 10;
  * plan adopted once (REPLACED), one of a plan no longer live (PLAN_ENDED). A charge is decided by its SUCCEEDED, and a
  * renewal also by its FAILED (its retry is a new charge); a hosted payment's FAILED is not final (the person may pay on
  * the same page, and a late payment may still activate, A8 (c)). The 30 days run from the token's `created_at`.
+ * F7 (final review data-2): before all of that, a sandbox API leaves a live NETOPIA token alone, whatever it is, so a
+ * sandbox misconfiguration never revokes (and a day later purges) live customers' cards. OTHER_SYSTEM is the supported
+ * direction only: a NETOPIA sandbox token seen by a live API, and the previous card processor's tokens.
  */
 export function custodyDecision(facts: CustodyFacts): CardTokenRevocationReason | "KEEP" {
   const { token, charge, state } = facts;
+  const netopia = token.paymentProvider === "netopia";
+  if (netopia && token.paymentEnvironment === "live" && facts.paymentEnvironment === "sandbox") return "KEEP";
   if (token.sourceToolOrder !== null) return "TOOL_ORDER";
-  if (!facts.ours) return "OTHER_SYSTEM";
+  if (!netopia || token.paymentEnvironment !== facts.paymentEnvironment) return "OTHER_SYSTEM";
   if (facts.erased) return "ERASURE";
   if (charge === null || state === null) return "NOT_ADOPTED";
   if (CARD_HOLDING.has(state.status) && state.cardTokenId === token.tokenId) return "KEEP";
@@ -117,7 +122,7 @@ export class CardCustody {
       const charge = executor === undefined || sourceChargeId === null ? first : await repository.charge(sourceChargeId, executor);
       const events = charge === null ? [] : await repository.subscriptionEvents(charge.subscriptionId, executor);
       return custodyDecision({
-        token, ours: token.paymentProvider === "netopia" && token.paymentEnvironment === this.deps.paymentEnvironment,
+        token, paymentEnvironment: this.deps.paymentEnvironment,
         charge, state: events.length === 0 ? null : foldSubscription(events), events,
         erased: ownerRef !== null && erasedOwners.get(ownerRef) === true, now
       });

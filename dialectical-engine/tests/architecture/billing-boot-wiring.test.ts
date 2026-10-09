@@ -99,4 +99,40 @@ describe("N8 — the API boot wires billing only when hosted, switched on or pro
     expect(runtime).toContain('mode: "ON"');
     expect(runtime).toMatch(/netopiaNotices,\s*\n\s*subscription\s*\n\s*\}\);/u);
   });
+
+  it("F7 (data-1): the provider-only mode runs the daily card job alone, started with the API like the billing runtime", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    const jobs = main.indexOf("const providerOnlyJobs = providerOnlyConnectors === null ? undefined : createProviderOnlyJobs({");
+    expect(jobs).toBeGreaterThan(main.indexOf("const providerOnlyConnectors: NetopiaConnectors | null"));
+    const built = main.slice(jobs, jobs + 500);
+    expect(built).toContain("paymentEnvironment: providerOnlyConnectors.paymentEnvironment");
+    expect(built).toContain("publicAppUrl: providerOnlyConnectors.publicAppUrl");
+    expect(built).toContain("reportPending: (code) => console.error(`[${code}]`)");
+    const listen = main.indexOf('await startup.run("listen"');
+    const started = main.indexOf("\nproviderOnlyJobs?.start();\n");
+    expect(started).toBeGreaterThan(listen);
+    expect(main.slice(listen, started + 1)).toContain("\nbillingRuntime?.start();\n");
+    const jobsSource = await readFile("apps/api/src/billing/provider-only-jobs.ts", "utf8");
+    expect(jobsSource).toContain("new ProviderOnlyOwnerJobs({ custody, clock: deps.clock })");
+    expect(jobsSource).toContain('deps.reportPending("BILLING_OWNER_JOBS_PENDING")');
+    expect(jobsSource).toContain("setInterval(schedule, 86_400_000)");
+  });
+
+  it("F7 (data-2): refuses a sandbox boot while live NETOPIA plans are open, beside the live boot's guard", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    const ahead = main.indexOf('boot.run("billing-records-dated-ahead"');
+    const sandbox = main.indexOf('if (billingConnectors?.paymentEnvironment === "sandbox") {');
+    const guard = main.indexOf('boot.run("billing-live-records-on-sandbox"');
+    expect(sandbox).toBeGreaterThan(ahead);
+    expect(guard).toBeGreaterThan(sandbox);
+    expect(main.slice(guard, guard + 300)).toContain("assertOtherSystemRecordsClosed({");
+    expect(main.slice(guard, guard + 300)).toContain('openNetopiaSubscriptionCount("live")');
+  });
+
+  it("F7 (money-3): the intake dates a message's card on the runtime's moved clock", async () => {
+    const main = await readFile("apps/api/src/main.ts", "utf8");
+    expect(main).toContain("clockOffsetMs: stageClock.offsetMs");
+    const runtime = await readFile("apps/api/src/billing/runtime.ts", "utf8");
+    expect(runtime).toContain("clockOffsetMs: deps.clockOffsetMs ?? 0");
+  });
 });
