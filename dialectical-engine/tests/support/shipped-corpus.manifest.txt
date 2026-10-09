@@ -409,6 +409,7 @@ apps/ui/components/KnownPasswordRecoveryLink.tsx
 apps/ui/components/LanguageSwitcher.tsx
 apps/ui/components/LibraryComposer.tsx
 apps/ui/components/LoginFlow.tsx
+apps/ui/components/MfaRecoveryCatalog.tsx
 apps/ui/components/MfaRecoveryFlow.tsx
 apps/ui/components/ModeToggle.tsx
 apps/ui/components/ModelPresentation.tsx
@@ -558,6 +559,7 @@ apps/ui/lib/i18n/debateViews.test.mjs
 apps/ui/lib/i18n/legal.test.mjs
 apps/ui/lib/i18n/localeChoice.ts
 apps/ui/lib/i18n/locales.ts
+apps/ui/lib/i18n/mfaRecovery.test.mjs
 apps/ui/lib/i18n/misc.test.mjs
 apps/ui/lib/i18n/public.test.mjs
 apps/ui/lib/i18n/questionLocale.ts
