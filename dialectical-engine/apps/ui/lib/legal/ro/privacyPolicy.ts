@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Un motor de dezbatere invită la întrebări despre politică, religie, sănătate, sexualitate și convingeri. Acestea sunt categorii speciale de date potrivit articolului 9 din GDPR și pot apărea în întrebările dumneavoastră indiferent dacă intenționăm sau nu să le colectăm." },
-      { kind: "p", text: "Despre dumneavoastră. Înainte de prima dumneavoastră dezbatere acordați, pe un ecran separat, consimțământul explicit pentru prelucrarea de către noi a informațiilor sensibile pe care alegeți să le includeți în propriile întrebări, în scopul desfășurării dezbaterilor. Consemnăm versiunea formulării pe care ați acceptat-o, limba dumneavoastră și momentul acordării. Fără acest consimțământ nu puteți începe o dezbatere. Îl puteți retrage oricând scriindu-ne la privacy@dezbatere.ro. De asemenea, puteți omite asemenea informații sau șterge o dezbatere care le conține. Ceea ce publicați despre dumneavoastră reprezintă date pe care ați ales să le faceți publice." },
+      { kind: "p", text: "Despre dumneavoastră. Înainte de prima dumneavoastră dezbatere acordați, pe un ecran separat, consimțământul explicit pentru prelucrarea de către noi a informațiilor sensibile pe care alegeți să le includeți în propriile întrebări, în scopul desfășurării dezbaterilor. Consemnăm versiunea formulării pe care ați acceptat-o, limba dumneavoastră și momentul acordării. Fără acest consimțământ nu puteți începe o dezbatere. Îl puteți retrage oricând închizându-vă contul din Setări. De asemenea, puteți omite asemenea informații sau șterge o dezbatere care le conține. Ceea ce publicați despre dumneavoastră reprezintă date pe care ați ales să le faceți publice." },
       { kind: "p", text: "Despre alte persoane. Nicio condiție juridică nu ne permite să prelucrăm date sensibile despre un terț pe care îl menționați într-o întrebare și niciunul dintre furnizorii noștri de IA nu dispune de un asemenea temei. De aceea Termenii interzic acest lucru, reducem la minimum ceea ce transmitem și eliminăm rapid un asemenea conținut la cerere — secțiunea 11." },
       { kind: "p", text: "Informații privind sănătatea. Unele țări supun datele legate de sănătate, inclusiv deducțiile, unor legi speciale. Dacă locuiți în [the State of Washington], se aplică o [Consumer Health Data Privacy Notice] separată." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Restricționare (Art. 18) — Solicitați-ne să oprim prelucrarea anumitor date până la soluționarea unei contestații privind aceste date",
         "Opoziție (Art. 21) — Opuneți-vă prelucrării întemeiate pe interese legitime — prelucrarea pentru securitate și audit din secțiunea 4 — iar noi o oprim dacă nu putem demonstra motive imperioase. Vă puteți opune oricând marketingului, iar noi îl oprim",
         "Portabilitate (Art. 20) — Dezbaterile și datele contului într-un format utilizat în mod curent și care poate fi citit automat. [Pending: same export as Access.] Conținutul fără caracter personal pe care l-ați creat, precum întrebările, vă este restituit la cerere la încetarea contractului",
-        "Retragerea consimțământului (Art. 7(3)) — Retrageți consimțământul pentru marketing din orice e-mail sau din Setări; retrageți consimțământul privind datele sensibile scriindu-ne la privacy@dezbatere.ro (puteți și omite asemenea date sau șterge o dezbatere care le conține). Retragerea nu afectează prelucrarea care a avut deja loc",
+        "Retragerea consimțământului (Art. 7(3)) — Retrageți consimțământul pentru marketing din orice e-mail sau din Setări; retrageți consimțământul privind datele sensibile închizându-vă contul din Setări (puteți și omite asemenea date sau șterge o dezbatere care le conține). Retragerea nu afectează prelucrarea care a avut deja loc",
         "Depunerea unei plângeri — La autoritatea română de supraveghere, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, București, anspdcp@dataprotection.ro, sau la autoritatea din țara în care locuiți. Am prefera să ne contactați mai întâi"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "416a6489ad36f2531f0353a0eadcd9ea9ac0011b543a26b2b1cdf48c7728ff62",
+  sha256: "907cdada6e9354f86f2dc9d551050ccbfb5e078778de037f15299b75b44abf59",
   eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.2 · ÎN VIGOARE DE LA [DATE]",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",

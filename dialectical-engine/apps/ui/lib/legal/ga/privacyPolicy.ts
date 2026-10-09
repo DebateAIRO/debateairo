@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Spreagann inneall díospóireachta ceisteanna faoi pholaitíocht, reiligiún, sláinte, gnéasacht agus creideamh. Is catagóirí speisialta sonraí iad sin faoi Airteagal 9 GDPR, agus d'fhéadfaidís a bheith i do cheisteanna cibé acu atá sé ar intinn againn iad a bhailiú nó nach bhfuil." },
-      { kind: "p", text: "Fút féin. Roimh do chéad díospóireacht, tugann tú toiliú sainráite, ar scáileán ar leith, dúinn faisnéis íogair a roghnaíonn tú a chur i do cheisteanna féin a phróiseáil chun do dhíospóireachtaí a reáchtáil. Taifeadaimid an leagan den fhoclaíocht lenar aontaigh tú, do theanga agus an t-am. Gan an toiliú seo, ní féidir leat díospóireacht a thosú. Is féidir leat an toiliú seo a tharraingt siar am ar bith trí scríobh chuig privacy@dezbatere.ro. Is féidir leat freisin an fhaisnéis sin a fhágáil ar lár nó díospóireacht ina bhfuil sí a scriosadh. Is sonraí atá roghnaithe agat a chur ar fáil go poiblí iad na sonraí a fhoilsíonn tú fút féin." },
+      { kind: "p", text: "Fút féin. Roimh do chéad díospóireacht, tugann tú toiliú sainráite, ar scáileán ar leith, dúinn faisnéis íogair a roghnaíonn tú a chur i do cheisteanna féin a phróiseáil chun do dhíospóireachtaí a reáchtáil. Taifeadaimid an leagan den fhoclaíocht lenar aontaigh tú, do theanga agus an t-am. Gan an toiliú seo, ní féidir leat díospóireacht a thosú. Is féidir leat an toiliú seo a tharraingt siar am ar bith trí do chuntas a dhúnadh ó na Socruithe. Is féidir leat freisin an fhaisnéis sin a fhágáil ar lár nó díospóireacht ina bhfuil sí a scriosadh. Is sonraí atá roghnaithe agat a chur ar fáil go poiblí iad na sonraí a fhoilsíonn tú fút féin." },
       { kind: "p", text: "Faoi dhaoine eile. Ní cheadaíonn aon choinníoll dlíthiúil dúinn sonraí íogaire a phróiseáil faoi thríú páirtí a ainmníonn tú i do cheist, agus níl coinníoll den sórt sin ag aon duine dár soláthraithe IS ach oiread. Sin é an fáth a gcuireann na Téarmaí cosc air, a n-íoslaghdaímid an méid a sheolaimid, agus a mbainimid ábhar den sórt sin go tapa arna iarraidh sin — rannán 11." },
       { kind: "p", text: "Faisnéis sláinte. Déileálann roinnt tíortha le sonraí a bhaineann le sláinte, tátail san áireamh, faoi dhlíthe ar leith. Má tá cónaí ort in [the State of Washington], tá feidhm ag [Consumer Health Data Privacy Notice] ar leith." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Srianadh (Art. 18) — Iarr orainn stopadh de shonraí ar leith a phróiseáil fad atá díospóid fúthu á réiteach",
         "Agóid (Art. 21) — Déan agóid i gcoinne próiseála atá bunaithe ar leasanna dlisteanacha — an phróiseáil slándála agus iniúchóireachta i rannán 4 — agus stopaimid mura féidir linn forais sháraitheacha a léiriú. Déan agóid i gcoinne margaíochta am ar bith, agus stopaimid",
         "Iniomparthacht (Art. 20) — Do dhíospóireachtaí agus sonraí do chuntais i bhformáid a úsáidtear go coitianta agus atá inléite ag meaisín. [Pending: same export as Access.] Tugtar ábhar neamhphearsanta a chruthaigh tú, amhail do cheisteanna, ar ais duit má iarrann tú é nuair a thagann deireadh leis an gconradh",
-        "Toiliú a tharraingt siar (Art. 7(3)) — Tarraing toiliú margaíochta siar ó aon ríomhphost nó ó na Socruithe; tarraing an toiliú le haghaidh sonraí íogaire siar trí scríobh chuig privacy@dezbatere.ro (is féidir leat na sonraí a fhágáil ar lár nó díospóireacht ina bhfuil siad a scriosadh freisin). Ní dhéanann tarraingt siar difear don phróiseáil a tharla cheana",
+        "Toiliú a tharraingt siar (Art. 7(3)) — Tarraing toiliú margaíochta siar ó aon ríomhphost nó ó na Socruithe; tarraing an toiliú le haghaidh sonraí íogaire siar trí do chuntas a dhúnadh ó na Socruithe (is féidir leat na sonraí a fhágáil ar lár nó díospóireacht ina bhfuil siad a scriosadh freisin). Ní dhéanann tarraingt siar difear don phróiseáil a tharla cheana",
         "Gearán — Le húdarás maoirseachta na Rómáine, ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Búcairist, anspdcp@dataprotection.ro, nó leis an údarás sa tír ina bhfuil cónaí ort. B'fhearr linn cloisteáil uait ar dtús"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "152805f461e3b27c84ba7ab1cba0d8d1e4a23b13262187e1fcf9d4c9e5a7e46c",
+  sha256: "a079c08cc21980ff1a3eb96a1faede1b6bdddfb8067c7368f050e5dc96abb2f2",
   eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.2 · I bhFEIDHM [DATE]",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",
