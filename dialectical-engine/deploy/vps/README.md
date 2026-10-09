@@ -3078,16 +3078,18 @@ needs your notes.
 
 **Before step 1: read the journal of the first start with billing on.** Two minutes after that start, run the command
 below. For the API's current start only, it prints the lines that say NETOPIA refused our key, a message did not pass,
-or a status read failed, and billing's bracketed markers. It should print nothing:
+or a status read failed, and billing's bracketed markers. It should print nothing except one
+`billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run of the check command since that start. That
+line is the check's own unsigned message (§14.2) and needs nothing:
 
 ```sh
 journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E 'credentials_refused|notice\.unverified|status_failed|BILLING_[A-Z_]+_PENDING'
 ```
 
-Any line it prints: look it up in the journal table of §14.8 and do what it says before going on. This filter prints
-nothing else. To read every billing line of that start, run the command below as well, and look each line up in the
-same table; a line the table leaves out is in its sentence "Every other billing line records a normal event", and needs
-nothing:
+Any other line it prints: look it up in the journal table of §14.8 and do what it says before going on. This filter
+prints nothing else. To read every billing line of that start, run the command below as well, and look each line up in
+the same table; a line the table leaves out is in its sentence "Every other billing line records a normal event", and
+needs nothing:
 
 ```sh
 journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E '"event":"billing\.|\[BILLING_'
@@ -3120,8 +3122,9 @@ dated ahead (`BILLING_RECORDS_DATED_AHEAD`, §14.8).
      how the bank's check looked.
 2. **Renew.** Move the billing clock forward by a month.
    - Open `api.env` and add the line `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, then restart the API. Keep the line.
-   - Two minutes after the restart, run the journal command from **Before step 1** again; it should print nothing.
-     (Its second command, which reads every billing line, now shows the renewal's own lines too.)
+   - Two minutes after the restart, run the journal command from **Before step 1** again; it should print nothing
+     except one `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run of the check command since
+     the restart. (Its second command, which reads every billing line, now shows the renewal's own lines too.)
    - Within two minutes, a payment with the saved card appears in NETOPIA's sandbox admin and a second receipt email
      arrives.
    - The API refuses to start with `BILLING_STAGE_CLOCK_LIVE_REFUSED` if the offset is set while

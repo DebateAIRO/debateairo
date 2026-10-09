@@ -856,6 +856,13 @@ describe("P22 the Billing runbook", () => {
       "**Before step 1: read the journal of the first start with billing on.**",
       "_SYSTEMD_INVOCATION_ID=\"$(systemctl show --property=InvocationID --value debateai-api)\"",
       "run the journal command from **Before step 1** again; it should print nothing",
+      // F6a fix round 1: each check run posts one unsigned message, so both journal reads name that one line as
+      // expected; the filters themselves are unchanged, so a NETOPIA message that lost its header still shows.
+      "It should print nothing except one `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run " +
+        "of the check command since that start. That line is the check's own unsigned message (§14.2) and needs nothing",
+      "Any other line it prints: look it up in the journal table of §14.8",
+      "it should print nothing except one `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` for each run " +
+        "of the check command since the restart",
       "pnpm exec vitest run tests/integration/billing-dispute-fake-stack.test.ts",
       "Start the second only after the first has finished",
       "Do this on a **separate, throwaway server**", "**Domain and `PUBLIC_APP_URL`**",
