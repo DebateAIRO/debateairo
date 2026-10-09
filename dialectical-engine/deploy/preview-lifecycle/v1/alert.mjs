@@ -292,11 +292,11 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {}, test = false 
  * replaces an existing name (EEXIST), so a list someone else created in the meantime is never
  * overwritten, and a reader sees no file or the whole file, never a partial one.
  */
-async function createExclusive(path, bytes, { mode, uid, gid }) {
+async function createExclusive(path, bytes, { mode, uid, gid }, { linkFile = link, unlinkFile = unlink } = {}) {
   const folder = dirname(path);
   await protectedPath(path, { root: folder, uid }).catch(() => refuse('OWNER_ALERT_LIST_WRITE_REFUSED'));
   const temporary = join(folder, `.${basename(path)}.${randomBytes(8).toString('hex')}.tmp`);
-  let handle, created = false, linking = false;
+  let handle, created = false, linking = false, linked = false;
   try {
     handle = await open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, mode);
     created = true;
@@ -306,17 +306,19 @@ async function createExclusive(path, bytes, { mode, uid, gid }) {
     await handle.sync();
     await handle.close(); handle = undefined;
     linking = true;
-    await link(temporary, path);
-    linking = false;
-    await unlink(temporary); created = false;
+    await linkFile(temporary, path);
+    linking = false; linked = true;
+    await unlinkFile(temporary); created = false;
     const directory = await open(folder, constants.O_RDONLY);
     try { await directory.sync(); } catch { /* Some platforms refuse fsync on a directory; link and unlink are already atomic. */ } finally { await directory.close(); }
   } catch (error) {
     if (error instanceof AlertRefusal) throw error;
+    // Once linked, the list exists: say so, so the owner never reads "nothing was written".
+    if (linked) refuse('OWNER_ALERT_LIST_INSTALLED_CLEANUP_FAILED');
     refuse(linking && error?.code === 'EEXIST' ? 'OWNER_ALERT_LIST_EXISTS' : 'OWNER_ALERT_LIST_WRITE_REFUSED');
   } finally {
     await handle?.close().catch(() => undefined);
-    if (created) await unlink(temporary).catch(() => undefined);
+    if (created) await unlinkFile(temporary).catch(() => undefined);
   }
 }
 
@@ -342,9 +344,10 @@ export async function installOwnerList({ layout = LAYOUT, deps = {} } = {}) {
       return done({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_ALREADY_INSTALLED', mode: octal(existing.mode) });
     }
     const bytes = Buffer.from(`${JSON.stringify({ version: OWNER_LIST_VERSION, ownerSha256: [fingerprint] })}\n`, 'utf8');
-    try { await createExclusive(path, bytes, { mode: 0o600, uid, gid }); } finally { bytes.fill(0); }
+    try { await createExclusive(path, bytes, { mode: 0o600, uid, gid }, { linkFile: deps.link, unlinkFile: deps.unlink }); } finally { bytes.fill(0); }
     // Read back exactly as the alert reads it: the list must pass custody and hold this fingerprint.
-    if (!(await loadOwnerDigests({ layout })).has(fingerprint)) refuse('OWNER_ALERT_LIST_UNAVAILABLE');
+    const written = await loadOwnerDigests({ layout }).catch(() => refuse('OWNER_ALERT_LIST_INSTALLED_CLEANUP_FAILED'));
+    if (!written.has(fingerprint)) refuse('OWNER_ALERT_LIST_INSTALLED_CLEANUP_FAILED');
     return done({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_INSTALLED', mode: octal((await lstat(path)).mode) });
   } catch (error) {
     return done({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: error instanceof AlertRefusal ? error.code : 'UNEXPECTED', ...(error instanceof AlertRefusal && error.fields ? error.fields : {}) });

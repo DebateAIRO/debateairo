@@ -34,8 +34,11 @@ launchers still re-check every byte exactly as before.
   `/etc/debateai-v3-preview/lifecycle/owner-alert-digests.json`, holds one to three SHA-256
   fingerprints of owner addresses (`{"version":1,"ownerSha256":[...]}`), built on the server by
   `alert.mjs --install-owner-list` from the address already in `alert-recipient` (install step 2).
-  The alert sends only if the address's fingerprint is on that list, so editing one file alone
-  cannot point it at someone else; changing the address is two deliberate root steps. Git holds no
+  The alert sends only if the address's fingerprint is on that list, so a later change to
+  `alert-recipient` alone (a stray edit, a restored backup) fails closed instead of mailing a
+  stranger; changing the address is two deliberate root steps. This is a guard against
+  accidents, not against root: root can rewrite both files, and the list does not catch a typo
+  made when it is built (the test send does). Git holds no
   address and no fingerprint, and neither is ever printed. The alert reads the list the same
   careful way as every other root file (root:root, mode 0600 or 0400, one link, no symlink, at most
   1 KiB, its folder root-owned and not writable by group or others). If the list is missing or
@@ -170,14 +173,17 @@ unit files before installing; nothing else names them.
    In plain words: the failure email goes to one address. You type it once, into a root-only
    file on the server. Then one command turns that address into a fingerprint (a one-way code)
    and saves it in a second root-only file, the owner list. The alert only sends when the address
-   in the first file matches a fingerprint in the owner list, so changing one file by mistake can
-   never send the alert to someone else. The command never prints the address or the fingerprint.
-   Neither is ever in Git.
+   in the first file matches a fingerprint in the owner list, so if the first file is later
+   changed by mistake, the alert refuses instead of mailing someone else. The command never
+   prints the address or the fingerprint. Neither is ever in Git. A typo in the address is caught
+   by the test send at the end of this step, not by the list.
 
    First the folders and the address. Type the address in the editor; do not paste it into any
-   command line (the shell history would keep it):
+   command line (the shell history would keep it). `umask 077` first, so any file the editor
+   creates is private from the start:
 
    ```sh
+   umask 077
    install -d -o root -g root -m 0755 /etc/debateai-v3-preview/lifecycle
    [ -d /var/lib/debateai-v3-preview ] || install -d -o root -g root -m 0755 /var/lib/debateai-v3-preview
    install -o root -g root -m 0600 /dev/null /etc/debateai-v3-preview/lifecycle/alert-recipient
@@ -188,7 +194,16 @@ unit files before installing; nothing else names them.
    The last line must print `600 root:root`. Many editors save by writing a new file and renaming
    it over the old one; the new file gets the editor's default mode (often 0644), not 0600. The
    alert then refuses with `RECIPIENT_FILE_MODE_REFUSED` and names the mode it found. Fix it with
-   `chmod 0600` and `chown root:root` on the file.
+   `chmod 0600` and `chown root:root` on the file. Some editors leave a backup copy that also holds
+   the address (`alert-recipient~`, `#alert-recipient#`, `.alert-recipient.swp`): check with
+   `ls -la /etc/debateai-v3-preview/lifecycle/` and remove any such copy by its exact name.
+
+   The one-link rule below relies on the kernel stopping ordinary users from hard-linking root's
+   files. This must print `fs.protected_hardlinks = 1` (if not, stop and ask):
+
+   ```sh
+   sysctl fs.protected_hardlinks
+   ```
 
    Then the owner list, built from that file:
 
@@ -200,7 +215,7 @@ unit files before installing; nothing else names them.
    The first must print exactly `{"event":"PREVIEW_LIFECYCLE_OWNER_LIST_INSTALLED","mode":"0600"}`
    (or `PREVIEW_LIFECYCLE_OWNER_LIST_ALREADY_INSTALLED` if the list already holds this address);
    the second must print `600 root:root 1`. Anything else is a
-   `PREVIEW_LIFECYCLE_OWNER_LIST_FAILED` line, and nothing was written:
+   `PREVIEW_LIFECYCLE_OWNER_LIST_FAILED` line. Except for the last row, nothing was written:
 
    | `reason` | What to do |
    |---|---|
@@ -209,15 +224,21 @@ unit files before installing; nothing else names them.
    | `OWNER_ALERT_LIST_EXISTS` | A list for a different address is already there. See "Changing the address" below. |
    | `OWNER_ALERT_LIST_UNAVAILABLE` | Something unexpected is at the list's path (wrong mode, a link). Look with `ls -la /etc/debateai-v3-preview/lifecycle/` and ask. |
    | `OWNER_ALERT_LIST_WRITE_REFUSED` | The folder is not root-owned 0755 (first command above). |
+   | `OWNER_ALERT_LIST_INSTALLED_CLEANUP_FAILED` | The list was written but a leftover temporary name remains, so the alert refuses it. `ls -la /etc/debateai-v3-preview/lifecycle/`, remove the file named `.owner-alert-digests.json.<letters>.tmp` by its exact name, then run the `stat` line again (it must end in ` 1`). |
 
    **Changing the address later** is the same two steps, after deliberately removing the old list
    (until the new list is in place, alerts are refused and logged, never sent elsewhere):
 
    ```sh
+   umask 077
    rm /etc/debateai-v3-preview/lifecycle/owner-alert-digests.json
+   install -o root -g root -m 0600 /dev/null /etc/debateai-v3-preview/lifecycle/alert-recipient
    editor /etc/debateai-v3-preview/lifecycle/alert-recipient
    stat -c '%a %U:%G' /etc/debateai-v3-preview/lifecycle/alert-recipient
    ```
+
+   (`install … /dev/null` empties the recipient file and resets it to root:root 0600 before you
+   type the new address.) Check for editor backup copies as above.
 
    then the two owner-list commands above, then the test send below.
 
@@ -234,6 +255,9 @@ unit files before installing; nothing else names them.
    `alert-recipient` is not the one the list was built from. `PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED` means the local
    sendmail refused it (exit code in the line): check what `/usr/sbin/sendmail` is on the server
    (`readlink -f /usr/sbin/sendmail`) and whether it accepts `-odi` before going on.
+
+   Last, back to the usual default for the later steps (files they copy must stay readable):
+   `umask 022`.
 
 3. **Check the native plan is verify-only.** `prestart` and `pin` refuse anything else:
    `grep -o '"operation":"[a-z-]*"' /etc/debateai-v3-preview/auth-dev-v1/native-plan.json`

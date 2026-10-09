@@ -395,11 +395,11 @@ describe('failure alert', () => {
 
 describe('owner list install helper (alert.mjs --install-owner-list)', () => {
   /** Runs the helper with its real output path (process.stdout) and captures both streams. */
-  async function install(layout: any) {
+  async function install(layout: any, deps: Record<string, unknown> = {}) {
     const out: string[] = [], err: string[] = [];
     const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: any) => { out.push(String(chunk)); return true; }) as any);
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: any) => { err.push(String(chunk)); return true; }) as any);
-    try { return { result: await alert.installOwnerList({ layout }), out: out.join(''), err: err.join('') }; } finally { stdout.mockRestore(); stderr.mockRestore(); }
+    try { return { result: await alert.installOwnerList({ layout, deps }), out: out.join(''), err: err.join('') }; } finally { stdout.mockRestore(); stderr.mockRestore(); }
   }
   const neverShows = (text: string) => {
     for (const secret of [owner, digest(owner), secondOwner, digest(secondOwner), 'example.invalid']) expect(text).not.toContain(secret);
@@ -484,12 +484,18 @@ describe('owner list install helper (alert.mjs --install-owner-list)', () => {
   });
 
   it('writes nothing in a folder others can write, and never writes through a symlink left at the list path', async () => {
+    // The recipient file in a safe folder of its own, so the list folder's own check is what refuses.
     const open = server(`${owner}\n`, 0o600, { list: null });
-    chmodSync(open.lockRoot, 0o777);
-    const first = await install(open);
-    expect(first.result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED' });
-    neverShows(first.out);
-    expect(existsSync(open.ownerAlertDigestsPath)).toBe(false);
+    const safe = join(open.stateDir, 'recipient-folder');
+    mkdirSync(safe); chmodSync(safe, 0o755);
+    const listFolder = join(open.stateDir, 'list-folder');
+    mkdirSync(listFolder); chmodSync(listFolder, 0o777);
+    const split = { ...open, alertRecipientPath: join(safe, 'alert-recipient'), ownerAlertDigestsPath: join(listFolder, 'owner-alert-digests.json') };
+    writeFileSync(split.alertRecipientPath, `${owner}\n`); chmodSync(split.alertRecipientPath, 0o600);
+    const first = await install(split);
+    expect(first.result).toEqual({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: 'OWNER_ALERT_LIST_WRITE_REFUSED' });
+    neverShows(first.out); expect(first.err).toBe('');
+    expect(readdirSync(listFolder)).toEqual([]);
     const trap = server(`${owner}\n`, 0o600, { list: null });
     const victim = join(trap.stateDir, 'victim.json');
     symlinkSync(victim, trap.ownerAlertDigestsPath);
@@ -497,5 +503,27 @@ describe('owner list install helper (alert.mjs --install-owner-list)', () => {
     expect(second.result).toEqual({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: 'OWNER_ALERT_LIST_UNAVAILABLE' });
     neverShows(second.out); expect(second.err).toBe('');
     expect(existsSync(victim)).toBe(false);
+  });
+
+  it('never overwrites a list that appears between its check and its link, and leaves no temporary file', async () => {
+    const layout = server(`${owner}\n`, 0o600, { list: null });
+    const racer = async () => { writeFileSync(layout.ownerAlertDigestsPath, ownerList([secondOwner])); chmodSync(layout.ownerAlertDigestsPath, 0o600); throw Object.assign(new Error('exists'), { code: 'EEXIST' }); };
+    const { result, out, err } = await install(layout, { link: racer });
+    expect(result).toEqual({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: 'OWNER_ALERT_LIST_EXISTS' });
+    neverShows(out); expect(err).toBe('');
+    expect(JSON.parse(readFileSync(layout.ownerAlertDigestsPath, 'utf8')).ownerSha256).toEqual([digest(secondOwner)]);
+    expect(readdirSync(layout.lockRoot).sort()).toEqual(['alert-recipient', 'owner-alert-digests.json']);
+  });
+
+  it('says the list was written when only the clean-up after the link failed (never "nothing was written")', async () => {
+    const layout = server(`${owner}\n`, 0o600, { list: null });
+    const { result, out, err } = await install(layout, { unlink: async () => { throw Object.assign(new Error('busy'), { code: 'EBUSY' }); } });
+    expect(result).toEqual({ event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: 'OWNER_ALERT_LIST_INSTALLED_CLEANUP_FAILED' });
+    neverShows(out); expect(err).toBe('');
+    expect(existsSync(layout.ownerAlertDigestsPath)).toBe(true);
+    // The leftover second name makes the list unusable (two links): the alert refuses, never sends elsewhere.
+    const h = harness(layout);
+    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toMatchObject({ reason: 'OWNER_ALERT_LIST_UNAVAILABLE' });
+    expect(h.sent).toEqual([]);
   });
 });
