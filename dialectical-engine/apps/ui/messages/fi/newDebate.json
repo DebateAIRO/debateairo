@@ -110,6 +110,7 @@
   "newDebate.legalGate.signOut": "Kirjaudu ulos",
   "newDebate.legalGate.signOutFailed": "Uloskirjautuminen ei onnistunut. Yritä uudelleen.",
   "newDebate.room.locationBlocked": "Uusia väittelyitä ei voi aloittaa nykyisestä sijainnistasi. Väittelysi ovat edelleen luettavissa.",
+  "newDebate.room.previewTeamOnly": "Tämän esikatseluversion väittelyt ovat avoinna vain tiimille.",
   "newDebate.room.siteFull": "Tämän päivän raja on täynnä. Voit silti kysyä — väittelysi alkaa itsestään, kun raja nollautuu.",
   "newDebate.room.siteClose": "Olet lähellä tämän päivän rajaa. Tämä väittely käydään silti loppuun; myöhemmät voivat joutua odottamaan nollautumiseen asti.",
   "newDebate.room.alreadyWaiting": "Vain yksi kysymys voi odottaa kerrallaan. Omasi alkaa {time}; esitä tämä kysymys sen jälkeen.",

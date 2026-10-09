@@ -20,7 +20,7 @@ const ask={question:"Ce regulă proporțională ar trebui aplicată telefoanelor
 function settings(extra:Partial<RunCreationSettings>={}):RunCreationSettings{return {strangerSampleRate:0,registerVersion:5,batteryVersion:"fixture",settlementWatchHandle:"fixture",resolveDiscoveredPanel:async()=>[{provider_ref:REF,maker:"Z.AI",model_id:MODEL,probe_evidence_ref:"fixture:probe",probed_at:"2026-10-04T00:00:00Z"}],resolveEnvelopeBasis:async input=>({panel_size:input.panelSize,max_model_attempts:8}),resolveRisk:(effectiveRiskTier,tierSource,tierProvenanceRef)=>({effectiveRiskTier,tierSource,tierProvenanceRef}),...extra};}
 
 describe("preview provider readiness uses native seams",()=>{
- it("admits exact real GLM in a preview Free roster and honestly marks one maker",async()=>{const config=feature("parsePreviewProviderTestConfig")(JSON.stringify(CONFIG));const rosters=feature("previewPlanTierRosters")(config,PLAN_TIER_ROSTERS);const result=await evaluateAskAdmission(settings({previewProviderTestConfig:config}),ask);expect(result.discoveredPanel.map(x=>x.model_id)).toEqual([MODEL]);expect(result.criticUnavailableCap.conditionMarks).toEqual(["SINGLE-LINEAGE","CRITIQUE-UNAVAILABLE"]);expect(result.criticUnavailableCap.confidenceBandCapRequired).toBe(true);expect(PLAN_TIER_ROSTERS.free).toEqual(["gpt-5.6-luna","claude-sonnet-5"]);expect(rosters.premium).toBe(PLAN_TIER_ROSTERS.premium);});
+ it("admits exact real GLM in a preview Free roster and honestly marks one maker",async()=>{const config=feature("parsePreviewProviderTestConfig")(JSON.stringify(CONFIG));const rosters=feature("previewPlanTierRosters")(config,PLAN_TIER_ROSTERS);const result=await evaluateAskAdmission(settings({previewProviderTestConfig:config}),ask);expect(result.discoveredPanel.map(x=>x.model_id)).toEqual([MODEL]);expect(result.criticUnavailableCap.conditionMarks).toEqual(["SINGLE-LINEAGE","CRITIQUE-UNAVAILABLE"]);expect(result.criticUnavailableCap.confidenceBandCapRequired).toBe(true);expect(PLAN_TIER_ROSTERS.free).toEqual(["gpt-5.6-luna","claude-sonnet-5"]);expect(rosters.premium).toEqual([MODEL]);});
  it("keeps production default admission and refuses unapproved model/configuration",async()=>{await expect(evaluateAskAdmission(settings(),ask)).rejects.toMatchObject({code:"ASK_PLAN_TIER_MODEL_UNAVAILABLE"});const parse=feature("parsePreviewProviderTestConfig");expect(parse(undefined)).toBeUndefined();for(const bad of [{...CONFIG,deployment:"production"},{...CONFIG,free_model_ids:["other/model"]},{...CONFIG,requested_thinking_level:"medium"},{...CONFIG,budget_socket:"https://remote"}])expect(()=>parse(JSON.stringify(bad))).toThrow();});
  it("forwards typed capability fields through the existing hosted roster publisher",()=>{const roster=gateHostedRoster(JSON.stringify({providers:[{...row,adapter_kind:"openai-compatible-http",maker:"Z.AI",vetting:{},runner_authorization_file:"/root/fixture/runner.header",api_authorization_file:"/root/fixture/api.header"}]}));const targets=deriveHostedProviderTargets(roster);const target=providers.parseProviderDiscoveryTargets(targets.runner,configured)[0]!;expect(providers.providerTargetGatewayControls(target)).toEqual({thinking:{parameter:"reasoning_effort",levels:["high"]},contextWindowTokens:1048576,supportsJsonObjectResponse:true});expect(providers.providerTargetPrice(target)).toEqual({inputMicrosPerMillionTokens:150000,outputMicrosPerMillionTokens:500000});});
  it("real native gateway sends requested high with one attempt and the approved deadline",async()=>{const calls:any[]=[];const gateway=feature("withPreviewProviderCallPolicy")(nativeGateway(async(_input,init)=>{calls.push(init);return new Response(success());}),feature("parsePreviewProviderTestConfig")(JSON.stringify(CONFIG)));const result=await gateway.call(request);expect(calls).toHaveLength(1);expect(decoded(calls[0])).toMatchObject({model:MODEL,reasoning_effort:"high",max_tokens:8192});expect(result.model).toBe(MODEL);});
@@ -105,4 +105,50 @@ it('refuses unrecognized thinking before a probe fetch and retains absent-config
  let calls=0;const target={providerRef:REF,maker:'Z.AI',baseUrl:'https://api.deepinfra.com/v1/openai',model:MODEL,thinkingParameter:'reasoning_effort' as const,thinkingLevels:['high']};
  const result=await providers.observeProviderTarget({target,thinkingLevel:'medium',timeoutMs:5000,clock:()=>new Date(),fetchImplementation:async()=>{calls++;return new Response(success('OK'));}});expect(result.state).toBe('ABSENT');expect(calls).toBe(0);
  expect(feature('previewPlanTierRosters')(undefined,PLAN_TIER_ROSTERS)).toBe(PLAN_TIER_ROSTERS);
+});
+
+describe("Step 1: Premium runs on the same single GLM on the private preview",()=>{
+ const premiumAsk={...ask,plan_tier:"premium"} as unknown as AskRequest;
+ it("the preview Premium roster is exactly one GLM id, never a duplicate, and the contract is untouched",()=>{
+  const rosters=feature("previewPlanTierRosters")(feature("parsePreviewProviderTestConfig")(JSON.stringify(CONFIG)),PLAN_TIER_ROSTERS);
+  expect(rosters.premium).toEqual(["zai-org/GLM-5.3-Flash"]);
+  expect(rosters.free).toEqual(["zai-org/GLM-5.3-Flash"]);
+  expect(Object.isFrozen(rosters.premium)).toBe(true);
+  expect(PLAN_TIER_ROSTERS.premium).toEqual(["gpt-5.6-sol","claude-opus-5","grok-4.7-build"]);
+ });
+ it("a Premium ask on the preview is admitted with ONE GLM panel member, off the preview it still needs the Premium roster",async()=>{
+  const config=feature("parsePreviewProviderTestConfig")(JSON.stringify(CONFIG));
+  const result=await evaluateAskAdmission(settings({previewProviderTestConfig:config}),premiumAsk);
+  expect(result.discoveredPanel.map(x=>x.model_id)).toEqual(["zai-org/GLM-5.3-Flash"]);
+  await expect(evaluateAskAdmission(settings(),premiumAsk)).rejects.toMatchObject({code:"ASK_PLAN_TIER_MODEL_UNAVAILABLE"});
+ });
+ it("the room estimates a preview Premium ask with one maker and keeps three off the preview",async()=>{
+  const {runSettingsClassOfAsk}=await import("../../apps/api/src/ask-room.js");
+  expect(runSettingsClassOfAsk(premiumAsk,feature("parsePreviewProviderTestConfig")(JSON.stringify(CONFIG)))).toMatchObject({makerCount:1});
+  expect(runSettingsClassOfAsk(premiumAsk)).toMatchObject({makerCount:3});
+ });
+});
+
+describe("Step 1: the Premium coarse fit estimates the roster the preview really runs",()=>{
+ const premiumAsk={...ask,plan_tier:"premium",composition_budget_tier:"medium",depth_params:{depth:2}} as unknown as AskRequest;
+ function billing(estimated:unknown[]){
+  const now=new Date("2026-10-08T10:00:00Z");
+  return {
+   plans:{} as never,entitlements:{current:async()=>({planId:"PREMIUM",eventId:"fixture"})} as never,clock:()=>now,
+   coarseFit:{
+    personAllowance:{read:async()=>[{periodStart:new Date("2026-10-08T00:00:00Z"),resetsAt:new Date("2026-10-09T00:00:00Z"),limitMicros:1_000_000,scope:"DAY"}]} as never,
+    spend:{readOwnerSpentMicros:async()=>0,readOwnerCountedHoldsMicros:async()=>0},
+    estimator:{estimateMicros:async(input:unknown)=>{estimated.push(input);return 10;}} as never
+   }
+  };
+ }
+ it("asks the estimator for ONE maker on the preview and for the three-maker Premium roster elsewhere",async()=>{
+  const {coarseFitFor}=await import("../../apps/api/src/ask-billing.js");
+  const config=feature("parsePreviewProviderTestConfig")(JSON.stringify(CONFIG));
+  const onPreview:any[]=[];const offPreview:any[]=[];
+  expect(await coarseFitFor(premiumAsk,"owner-fixture",billing(onPreview) as never,new Date("2026-10-08T10:00:00Z"),config)).toBe("AS_ASKED");
+  expect(await coarseFitFor(premiumAsk,"owner-fixture",billing(offPreview) as never,new Date("2026-10-08T10:00:00Z"))).toBe("AS_ASKED");
+  expect(onPreview).toEqual([{planTier:"premium",compositionBudgetTier:"medium",makerCount:1,depth:2}]);
+  expect(offPreview).toEqual([{planTier:"premium",compositionBudgetTier:"medium",makerCount:3,depth:2}]);
+ });
 });
