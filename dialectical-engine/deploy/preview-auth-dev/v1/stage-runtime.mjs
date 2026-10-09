@@ -217,15 +217,20 @@ async function fullStageCases({apiRoot,uiRoot,apiBase,uiBase,captureRoot,environ
   await request('/v1/auth/mfa-recovery/totp/verify',{code:totp(nextSecret,-1)},200,headers);
   const codes=await request('/v1/auth/mfa-recovery/codes/generate',{},200,headers);check(codes.body.recovery_codes.length>0,'RECOVERY_CODES');
   await request('/v1/auth/mfa-recovery/codes/confirm',{code:codes.body.recovery_codes[0]},200,headers);
-  check((await request('/v1/auth/mfa-recovery/complete',{},200,headers)).body.status==='completed','MFA_COMPLETE');
-  await request('/v1/session',undefined,401,{cookie:oldCookie});
-  const fresh=await login(a,nextSecret);const normalHeaders={cookie:fresh,'x-csrf-token':csrf(fresh,'__Host-debateai-csrf')};
+  // Owner ruling 2026-10-09 (auth DB batch): email link + password recovery waits 24 hours before it replaces anything.
+  // The stage cannot wait a day, so it proves the wait started and that nothing was replaced: the old session and the
+  // old authenticator keep working (finishing after the wait is proved against a real database in
+  // tests/integration/mfa-recovery-database.test.ts).
+  const waiting=(await request('/v1/auth/mfa-recovery/complete',{},200,headers)).body;
+  check(waiting.status==='waiting'&&Date.parse(waiting.not_before)-Date.now()>23.9*3600_000,'MFA_COMPLETE');
+  await request('/v1/session',undefined,200,{cookie:oldCookie});
+  const fresh=await login(a,oldSecret);const normalHeaders={cookie:fresh,'x-csrf-token':csrf(fresh,'__Host-debateai-csrf')};
   check((await request('/v1/account/backup-email',undefined,200,normalHeaders)).body.status==='pending','BACKUP_PENDING');
-  await request('/v1/account/backup-email/verify/start',{password:a.password,code:totp(nextSecret,1)},202,normalHeaders);
+  await request('/v1/account/backup-email/verify/start',{password:a.password,code:totp(oldSecret,1)},202,normalHeaders);
   const backup=await waitMail(captureRoot,a.backupEmail,'/verify-backup-email#token=');
   check((await request('/v1/account/backup-email/verify/confirm',{token:mailToken(backup,'/verify-backup-email')})).body.status==='verified','BACKUP_VERIFIED');
   const unchanged=await captured(captureRoot,a.backupEmail,'Subject: DebateAI authenticator recovery started');check(unchanged?.sha256===notice.sha256&&!unchanged.text.includes('#cancel='),'OLD_NOTICE_IMMUTABLE');
-  proofs['legacy-primary-recovery']=passed({passwordPreserved:true,oldSessionDenied:true,freshLogin:true,completed:true});proofs['pending-backup-notice-no-cancel']=passed({noticeSha256:notice.sha256,laterVerified:true,unchanged:true});
+  proofs['legacy-primary-recovery']=passed({passwordPreserved:true,waitingHours:24,oldSessionKept:true,oldAuthenticatorKept:true,freshLogin:true,completed:false});proofs['pending-backup-notice-no-cancel']=passed({noticeSha256:notice.sha256,laterVerified:true,unchanged:true});
  }finally{oldSecret.fill(0);nextSecret?.fill(0);}
  const reset=accounts.reset,secret=Buffer.from(reset.totpSecret,'base64');
  try{
