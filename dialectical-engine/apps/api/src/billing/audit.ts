@@ -77,7 +77,9 @@ export type BillingAuditEvent =
   | "billing.renewal.recovered_earlier"
   /**
    * F2 (ruling PR-55): NETOPIA reported a renewal's payment refunded before the site saw it paid; it was recorded paid
-   * and refunded, its plan ended with no customer email, and the owner got O3 RENEWAL_REFUNDED_BEFORE_SEEN. The attempt.
+   * and refunded with no customer email, and either its plan ended (still renewing that month) or, when the plan was no
+   * longer renewing that month (ended, paused by a dispute, or renewed by another payment), no plan changed, the owner's
+   * O3 RENEWAL_REFUNDED_BEFORE_SEEN saying which. The attempt.
    */
   | "billing.renewal.refunded_before_seen"
   /**

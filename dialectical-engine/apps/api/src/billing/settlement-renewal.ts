@@ -110,8 +110,11 @@ export async function endDunning(
 
 /**
  * The rows of a dunning's end, and nothing else: ENDED(DUNNING) with `data` and Free from `now` (ENDED_DUNNING), in the
- * caller's transaction under the owner lock, on a PAST_DUE subscription folded there. `endDunning` adds M6; F2 (ruling
- * PR-55) ends a renewal NETOPIA reports refunded before the site saw it paid through here alone, with no customer email.
+ * caller's transaction under the owner lock. Only the subscription's identity (id, owner, plan, anchor) is read from
+ * `subscription`; `appendSubscriptionEvent` folds the rows already written and refuses an illegal end. `endDunning`
+ * passes a PAST_DUE fold and adds M6; F2 (ruling PR-55) ends a renewal NETOPIA reports refunded before the site saw
+ * it paid through here alone, with no customer email, and for attempt 1 passes the ACTIVE fold after writing PAST_DUE
+ * in the same transaction.
  */
 export async function writeDunningEnd(
   deps: Readonly<{ repository: Pick<BillingRepository, "appendSubscriptionEvent">; entitlements: Pick<EntitlementRepository, "append"> }>,

@@ -17,6 +17,7 @@ import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
 import { sealBillingProfile, type BillingProfile } from "../../apps/api/src/billing/records.js";
 import { RenewalService } from "../../apps/api/src/billing/renewal.js";
+import { subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { createRenewalSettlement } from "../../apps/api/src/billing/settlement-renewal.js";
 
 let database: TestDatabase;
@@ -675,5 +676,59 @@ describe("F2 a renewal NETOPIA reports refunded before the site saw it paid (mon
     expect(await renewalAttempts(run)).toEqual([1, 2]);
     expect(run.audit.events.filter((entry) => entry.event === "billing.renewal.retry_held"
       && entry.fields.code === "EARLIER_ATTEMPT_PAID")).toEqual([]);
+  });
+
+  it("attempt 1 whose plan a dispute paused before the REFUNDED read: no plan changes, and the O3 says no plan changed", async () => {
+    const run = await due();
+    run.payments.answer(run.email, () => paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout"));
+    const charge = await renewNow(run);
+    const chargeId = charge.chargeId;
+    expect(await trail(chargeId)).toEqual(["REQUESTED", "SUBMIT_UNKNOWN:CHARGE_OUTCOME_UNKNOWN"]);
+    // The plan moves off this charge's month first: one legal event (the fold allows SUSPENDED from ACTIVE), written
+    // under the owner lock as every billing writer does.
+    const jobs = new BillingJobQueries(database.pool);
+    await run.repository.withTransaction(async (client) => {
+      await jobs.lockOwner(client, run.ownerRef);
+      const state = foldSubscription(await run.repository.subscriptionEvents(run.seeded.subscriptionId, client));
+      expect(state.status).toBe("ACTIVE");
+      await run.repository.appendSubscriptionEvent(client, subscriptionEvent(state, "SUSPENDED", run.clock.now, {
+        charge_id: run.seeded.initialChargeId
+      }));
+    });
+    const eventsBefore = await kindsOf(run);
+    expect(eventsBefore.at(-1)).toBe("SUSPENDED");
+    run.payments.scriptStatus(chargeId, report(chargeId, "REFUNDED"), report(chargeId, "REFUNDED"), report(chargeId, "REFUNDED"));
+    run.clock.now = new Date(run.clock.now.getTime() + 2 * MINUTE);
+    expect(await run.renewal.recoverOpenCharge(chargeId)).toBe(true);
+    expect((await trail(chargeId)).at(-1)).toBe("SUBMITTED");
+    expect(await verifyJobs(chargeId)).toHaveLength(1);
+    const emailsBefore = (await customerEmails(run)).length;
+    const { verify, audit } = netopiaVerifyHandler(database.pool, { payments: run.payments, clock: () => run.clock.now });
+    expect(await verify.handle(verifyJob(chargeId, run.clock.now), run.clock.now)).toEqual({ kind: "DONE" });
+    // The money is recorded as NETOPIA reports it, and nothing about the plan changes (no PAST_DUE, no ENDED).
+    expect((await trail(chargeId)).slice(-3)).toEqual(["SUCCEEDED", "REFUND_REQUESTED:PROVIDER_REFUND", "REFUNDED:PROVIDER_REFUND"]);
+    expect(await kindsOf(run)).toEqual(eventsBefore);
+    expect(foldSubscription(await run.repository.subscriptionEvents(run.seeded.subscriptionId))).toMatchObject({ status: "SUSPENDED" });
+    expect(await customerEmails(run)).toHaveLength(emailsBefore);
+    const alerts = await refundedBeforeSeen(chargeId);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!.ref).toBe(`O3:${chargeId}:RENEWAL_REFUNDED_BEFORE_SEEN`);
+    expect(alerts[0]!.payload).toMatchObject({
+      recipient: "OWNER", "param.paymentAlert": "true",
+      "param.nextSteps": `NETOPIA reports this renewal's payment (NETOPIA payment ${report(chargeId, "REFUNDED").providerPaymentId})`
+        + " refunded (or cancelled) before the site saw it paid. Its plan was no longer on the month this payment renewed,"
+        + " so no plan changed and the person was not emailed. Look at the plan and this payment in NETOPIA's admin; tell"
+        + " the person yourself if they need to know."
+    });
+    expect(audit.events.filter((entry) => entry.event === "billing.renewal.refunded_before_seen"))
+      .toEqual([{ event: "billing.renewal.refunded_before_seen", fields: { attempt: 1 } }]);
+    // A second VERIFY writes and queues nothing.
+    const rows = (await trail(chargeId)).length;
+    expect(await verify.handle(verifyJob(chargeId, run.clock.now), run.clock.now)).toEqual({ kind: "DONE" });
+    expect(await trail(chargeId)).toHaveLength(rows);
+    expect(await kindsOf(run)).toEqual(eventsBefore);
+    expect(await refundedBeforeSeen(chargeId)).toHaveLength(1);
+    expect(await customerEmails(run)).toHaveLength(emailsBefore);
+    expect(audit.events.filter((entry) => entry.event === "billing.renewal.refunded_before_seen")).toHaveLength(1);
   });
 });
