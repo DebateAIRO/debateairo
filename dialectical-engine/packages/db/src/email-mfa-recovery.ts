@@ -2,9 +2,15 @@ import type{Pool}from"pg";import type{AuditContextHasher,CryptoEnvelope}from"@de
 export type EmailRecoverySource=Readonly<{ipArgon2id:string;userAgentArgon2id:string}>;
 export type EmailRecoveryChannel=PasswordRecoveryCandidate["channels"][number]&Readonly<{cancelAuthorized?:boolean}>;
 export type EmailRecoveryNotice=Readonly<{noticeId:string;leaseId:string;userId:string;channelId:string;event:"PROOF"|"VERIFIED"|"STARTED"|"COMPLETED"|"CANCELLED"|"REFUSED";payload:CryptoEnvelope;expiresAt:string;cancelAllowed?:boolean}>;
-export type MfaRecoveryRecord=Readonly<{stage:string;expiresAt:string;csrfHash:string|null;userId?:string;emailCiphertext?:CryptoEnvelope;factorId?:string|null;factorSecret?:CryptoEnvelope|null;lastAcceptedStep?:number|null;nowMs?:number}>;
+export type MfaRecoveryRecord=Readonly<{stage:string;expiresAt:string;csrfHash:string|null;notBefore?:string|null;userId?:string;emailCiphertext?:CryptoEnvelope;factorId?:string|null;factorSecret?:CryptoEnvelope|null;lastAcceptedStep?:number|null;nowMs?:number}>;
 export type BackupEmailRecord=Readonly<{userId:string;status:"pending"|"verified"|"unavailable";channelId:string|null;backupCiphertext:CryptoEnvelope|null;passwordHash:string;factorId:string;factorSecret:CryptoEnvelope;lastAcceptedStep:number|null;nowMs:number;channels:readonly EmailRecoveryChannel[]}>;
 export type MfaRecoveryExchangeCandidate=Readonly<{userId:string;passwordHash:string;channels:readonly string[];bindingChannelIds:readonly string[]}>;
+// Owner ruling 2026-10-09: the email-link + password recovery waits 24 hours before it replaces anything (0109).
+export type MfaRecoveryWaitChannel=Readonly<{channelId:string;channelType:"email"|"recovery_email";addressCiphertext:CryptoEnvelope;cancelAuthorized:boolean}>;
+export type MfaRecoveryWaitPreparation=Readonly<{userId:string;proofChannelId:string;channels:readonly MfaRecoveryWaitChannel[]}>;
+export type MfaRecoveryWaitStart=Readonly<{status:"WAITING";notBefore:string;expiresAt:string}>;
+export type MfaRecoveryFinishCandidate=Readonly<{userId:string;passwordHash:string;notBefore:string;expiresAt:string;ready:boolean}>;
+export type MfaRecoverySelectorKind="link"|"session"|"finish";
 export type MfaRiskRecord=Readonly<{userId:string;evaluatedAt:string;fingerprint:string;signals:readonly Readonly<{riskSignalId:string;kind:string;ciphertext:CryptoEnvelope;observedAt:string;expiresAt:string}>[]}>;
 class EmailRecoveryRepository{
  constructor(protected readonly pool:Pool,private readonly audit:AuditContextHasher,protected readonly version:number,protected readonly prefix:"backup_email"|"mfa_recovery"){if(!Number.isSafeInteger(version)||version<1)throw TypeError("EMAIL_RECOVERY_REGISTER_INVALID");}
@@ -26,7 +32,7 @@ export class PostgresMfaRecoveryRepository extends EmailRecoveryRepository{
  prepare(index:Buffer,destination:"primary"|"backup"){return this.call<Readonly<{userId:string;channels:readonly EmailRecoveryChannel[]}>|null>("prepare",[index,destination]);}
  start(input:Readonly<{index:Buffer;destination:"primary"|"backup";candidateId:string|null;channels:readonly string[];linkHash:string;cancelHash:string;notices:readonly unknown[];source:EmailRecoverySource;id:string}>){return this.call<boolean>("start",[input.index,input.destination,input.candidateId,input.channels,input.linkHash,input.cancelHash,JSON.stringify(input.notices),input.source,this.version,input.id]);}
  prepareExchange(hash:string){return this.call<MfaRecoveryExchangeCandidate|null>("prepare_exchange",[hash]);}
- risk(selector:string,kind:"link"|"session"){return this.call<MfaRiskRecord|null>("risk",[selector,kind]);}
+ risk(selector:string,kind:MfaRecoverySelectorKind){return this.call<MfaRiskRecord|null>("risk",[selector,kind]);}
  exchange(link:string,password:string,session:string,csrf:string,refs:CryptoEnvelope,risk:string,source:EmailRecoverySource){return this.call<"FACTOR_REQUIRED"|"INVALID">("exchange",[link,password,session,csrf,refs,risk,source]);}
  read(hash:string){return this.call<MfaRecoveryRecord|null>("read",[hash]);}
  stageFactor(hash:string,id:string,secret:CryptoEnvelope,source:EmailRecoverySource){return this.call<boolean>("stage_factor",[hash,id,secret,source]);}
@@ -34,7 +40,10 @@ export class PostgresMfaRecoveryRepository extends EmailRecoveryRepository{
  stageCodes(hash:string,codes:readonly unknown[],source:EmailRecoverySource){return this.call<boolean>("stage_codes",[hash,JSON.stringify(codes),source]);}
  readCode(hash:string,slot:number){return this.call<Readonly<{codeHash:string;slot:number}>|null>("read_code",[hash,slot]);}
  acknowledge(hash:string,slot:number,codeHash:string,source:EmailRecoverySource){return this.call<boolean>("ack_code",[hash,slot,codeHash,source]);}
- complete(hash:string,risk:string,source:EmailRecoverySource){return this.call<"COMPLETED"|"INVALID">("complete",[hash,risk,source]);}
+ prepareWait(hash:string){return this.call<MfaRecoveryWaitPreparation|null>("prepare_wait",[hash]);}
+ beginWait(hash:string,risk:string,finish:string,cancel:string,notices:readonly unknown[],source:EmailRecoverySource){return this.call<MfaRecoveryWaitStart|null>("begin_wait",[hash,risk,finish,cancel,JSON.stringify(notices),source]);}
+ prepareFinish(finish:string){return this.call<MfaRecoveryFinishCandidate|null>("prepare_finish",[finish]);}
+ finish(finish:string,password:string,risk:string,source:EmailRecoverySource){return this.call<"COMPLETED"|"TOO_EARLY"|"INVALID">("finish",[finish,password,risk,source]);}
  cancel(hash:string,source:EmailRecoverySource){return this.call<"CANCELLED"|"INVALID">("cancel",[hash,source]);}cancelSession(hash:string,source:EmailRecoverySource){return this.call<"CANCELLED"|"INVALID">("cancel_session",[hash,source]);}
- failure(hash:string,kind:"link"|"session",source:EmailRecoverySource){return this.call<void>("failure",[hash,kind,source]);}
+ failure(hash:string,kind:MfaRecoverySelectorKind,source:EmailRecoverySource){return this.call<void>("failure",[hash,kind,source]);}
 }
