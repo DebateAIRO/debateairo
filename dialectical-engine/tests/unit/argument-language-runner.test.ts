@@ -17,7 +17,14 @@ import {
 } from "@debateai/serve";
 
 const SYNTHESIZER_CONTRACT_TEXT =
-  "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it.";
+  "Return only JSON with a segments array of at most two {segment_id,text,node_refs,served_number_refs} entries. node_refs must name the node ids of the digest nodes whose facts the segment asserts, so every load-bearing claim traces to a digest node. Preserve the digest and add no facts. When the digest nodes a segment cites rest on reasoning alone, with no measured or looked-up evidence behind them, return at least two segments in order: the first segment states the provisional answer as a hypothesis; the second segment states the research plan that would lift it. "
+  + "segment_id and every node_refs or served_number_refs entry must be an ASCII identifier matching "
+  + "^[A-Za-z0-9][A-Za-z0-9:._-]*$; copy digest node ids exactly and never translate identifiers. "
+  + "served_number_refs identifies typed served-number slots, not the numeric values themselves. "
+  + "The available slot is number:final-strength, referring to code_label.servedStrength. "
+  + "Include that exact ref when the segment asserts that served number. If a segment asserts no served number, use []. "
+  + "Never invent a slot from other digest statistics or code_label.margin, and never put numeric values, "
+  + "percentages, expressions, or citation labels in served_number_refs.";
 
 const synthesizerRequest = {
   role: "SYNTHESIZER",

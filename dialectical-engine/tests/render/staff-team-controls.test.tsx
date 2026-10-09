@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StaffAccessPanel } from "../../apps/ui/components/StaffAccessPanel.js";
 import { StaffInvitationPanel } from "../../apps/ui/components/StaffInvitationPanel.js";
+import { OwnerPossessionPanel } from "../../apps/ui/components/OwnerPossessionPanel.js";
 import { createStaffApiClient } from "../../apps/ui/lib/staffApi.js";
 const selfId = "11111111-1111-4111-8111-111111111111", targetId = "22222222-2222-4222-8222-222222222222";
 const handle = "a".repeat(43), expires = "2099-01-01T00:00:00.000Z";
@@ -294,7 +295,7 @@ it("forbidden emergency-only authority is cleared without inventing a successful
     await submit('[data-staff-mutation="compromise"]', { target_id: targetId, expected_revision: "4" });
     expect(host.querySelector('[data-staff-mutation]')).toBeNull();
     expect(content()).not.toContain("Verified staff:");
-    expect(content()).toContain("Team access is locked");
+    expect(content()).toContain("Your team session has ended");
     expect(paths().some(path => path.includes("/team?") || path.includes("/audit?"))).toBe(false);
 });
 it("explicit STAFF_AUTHORITY_INVALID clears even read-capable authority without a reread", async () => {
@@ -330,6 +331,41 @@ it('records one selected Owner key without requiring or requesting an optional s
  await submit('[data-owner-possession]', { command_id: targetId, command_nonce: handle, credential_one: "aA", password: "synthetic", totp_code: "123456" });
  expect(calls.filter(call=>call.path.endsWith('/owner-possession/verify'))).toHaveLength(1);
  expect(host.querySelector('[data-owner-receipts]')?.textContent).toContain('33333333-3333-4333-8333-333333333333');
+});
+it("keeps recorded owner receipts when the setup disclosures are collapsed and reopened", async () => {
+    await mount();
+    await act(async () => host.querySelector<HTMLElement>('.staffAdvanced > summary')!.click());
+    await act(async () => host.querySelector<HTMLElement>('.staffOwnerSetup > summary')!.click());
+    await submit('[data-owner-possession]', { command_id: targetId, command_nonce: handle, credential_one: "aA", password: "synthetic", totp_code: "123456" });
+    expect(host.querySelector('[data-owner-receipts]')?.textContent).toContain('33333333-3333-4333-8333-333333333333');
+    await act(async () => host.querySelector<HTMLElement>('.staffAdvanced > summary')!.click());
+    expect(host.querySelector('[data-owner-possession]')).toBeNull();
+    await act(async () => host.querySelector<HTMLElement>('.staffAdvanced > summary')!.click());
+    await act(async () => host.querySelector<HTMLElement>('.staffOwnerSetup > summary')!.click());
+    expect(host.querySelector('[data-owner-receipts]')?.textContent).toContain('33333333-3333-4333-8333-333333333333');
+    await act(async () => window.dispatchEvent(new Event("debateai:staff-session-ended")));
+    expect(host.querySelector('[data-owner-receipts]')).toBeNull();
+});
+it("ends any verified staff authority once the owner possession prerequisite is issued", async () => {
+    const ended = vi.fn();
+    await act(async () => root.render(<OwnerPossessionPanel client={client} catalog={staffRomanian} disabled={false} onAuthorityEnded={ended} onBusyChange={() => {}}/>));
+    expect(ended).not.toHaveBeenCalled();
+    await submit('[data-owner-possession]', { command_id: targetId, command_nonce: handle, credential_one: "aA", password: "synthetic", totp_code: "123456" });
+    expect(ended).toHaveBeenCalledTimes(1);
+    const prerequisite = calls.findIndex(call => call.path.endsWith("/prerequisites/step-up"));
+    const possession = calls.findIndex(call => call.path.endsWith("/owner-possession/verify"));
+    expect(prerequisite).toBeGreaterThanOrEqual(0);
+    expect(possession).toBeGreaterThan(prerequisite);
+});
+it("asks the emergency-only responder for a Staff ID, not an account ID", async () => {
+    caps = ["EMERGENCY_DISABLE"];
+    await mount();
+    await click("Verify security key for team access");
+    await click("Disable compromised access");
+    const form = host.querySelector('[data-staff-mutation="compromise"]');
+    expect(form?.textContent).toContain("Staff ID");
+    expect(form?.textContent).toContain("The Staff ID shown under Member details.");
+    expect(form?.textContent).not.toContain("Account ID");
 });
 it.each([
     ["en", "Verify security key for team access", "Invite team member", "Team tools are locked. The operator can unlock them for one hour at a time."],
@@ -479,9 +515,9 @@ it("keeps generated staff references in details and uses readable headings and a
     const rows = host.querySelectorAll('[data-staff-member]');
     expect(rows[0]?.querySelector('h3')?.textContent).toContain("Your account");
     expect(rows[0]?.querySelector('h3')?.textContent).not.toContain(selfId);
-    expect(rows[1]?.querySelector('h3')?.textContent).toBe("Member 2");
+    expect(rows[1]?.querySelector('h3')?.textContent).toBe("Member 222222");
     expect(rows[1]?.querySelector('details')?.textContent).toContain(generated);
     await click("Edit permissions");
-    expect(host.querySelector('[data-staff-mutation="grant"]')?.textContent).toContain("Selected member: Member 2");
+    expect(host.querySelector('[data-staff-mutation="grant"]')?.textContent).toContain("Selected member: Member 222222");
     expect(host.querySelector('[data-staff-mutation="grant"]')?.textContent).not.toContain(generated);
 });

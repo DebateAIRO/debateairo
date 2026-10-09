@@ -5,7 +5,7 @@ import { createStaffApiClient, type StaffApiClient } from "../lib/staffApi.js";
 import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import type { LocaleCode } from "../lib/i18n/locales.js";
 import staffEnglish from "../messages/en/staff.json";
-import { OwnerPossessionPanel } from "./OwnerPossessionPanel.js";
+import { OwnerPossessionPanel, type OwnerPossessionRecord } from "./OwnerPossessionPanel.js";
 import "./StaffAccessPanel.css";
 type Member = StaffTeamPage["members"][number];
 type MutationKind = "invite" | "grant" | "disable" | "compromise";
@@ -24,10 +24,12 @@ function failureKey(failure: unknown): string {
 function capabilityLabel(catalog: MessageCatalog, capability: string) {
     return t(catalog, `staff.permission.${capability}`);
 }
-function memberDisplayName(member: Member, index: number, currentStaffId: string | undefined, catalog: MessageCatalog) {
+function memberDisplayName(member: Member, currentStaffId: string | undefined, catalog: MessageCatalog) {
     if (member.staff_id === currentStaffId) return t(catalog, "staff.yourAccount");
     const generated = /^staff[-_](?:[a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/iu.test(member.pseudonym);
-    return generated ? t(catalog, "staff.memberNumber", { number: index + 1 }) : member.pseudonym;
+    // A generated pseudonym is shown by a stable tag from the staff ID, never by its place on the page:
+    // the place changes with paging, and a disable or compromise form must name the same member every time.
+    return generated ? t(catalog, "staff.memberTag", { tag: member.staff_id.replaceAll("-", "").slice(-6) }) : member.pseudonym;
 }
 function MutationForm({ kind, member, selectedName, busy, catalog, onSubmit, onCancel }: {
     kind: MutationKind;
@@ -45,7 +47,7 @@ function MutationForm({ kind, member, selectedName, busy, catalog, onSubmit, onC
         <legend>{t(catalog, `staff.action.${kind}`)}</legend>
         <p className="setCardHint">{t(catalog, `staff.help.${kind}`)}</p>
         {member !== undefined ? <p className="staffTarget">{t(catalog, "staff.selectedMember", { name: selectedName ?? member.pseudonym })}</p> : <>
-          <div className="staffField"><label htmlFor={`${prefix}-target`}>{t(catalog, "staff.target")}</label><input id={`${prefix}-target`} name="target_id" required maxLength={36} aria-describedby={`${prefix}-target-help`}/><p className="setCardHint" id={`${prefix}-target-help`}>{t(catalog, "staff.targetHint")}</p></div>
+          <div className="staffField"><label htmlFor={`${prefix}-target`}>{t(catalog, kind === "invite" ? "staff.target" : "staff.targetStaff")}</label><input id={`${prefix}-target`} name="target_id" required maxLength={36} aria-describedby={`${prefix}-target-help`}/><p className="setCardHint" id={`${prefix}-target-help`}>{t(catalog, kind === "invite" ? "staff.targetHint" : "staff.targetStaffHint")}</p></div>
           {kind !== "invite" ? <div className="staffField"><label htmlFor={`${prefix}-revision`}>{t(catalog, "staff.inviteRevision")}</label><input id={`${prefix}-revision`} name="expected_revision" type="number" min="0" max={Number.MAX_SAFE_INTEGER} required/></div> : null}
         </>}
         {kind === "invite" || kind === "grant" ? <div className="staffPermissionChoices" role="group" aria-label={t(catalog, "staff.permissions")}>
@@ -76,6 +78,7 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
     const [credentialId, setCredentialId] = useState<string | null>(null);
     const [setupOpen, setSetupOpen] = useState(false);
     const [ownerSetupOpen, setOwnerSetupOpen] = useState(false);
+    const [ownerRecord, setOwnerRecord] = useState<OwnerPossessionRecord>({ receipts: [], status: null });
     const [activeMutation, setActiveMutation] = useState<{ kind: MutationKind; staffId?: string } | null>(null);
     const [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
     function clearAuthority() { generation.current++; activeApi.current.cancel(); baseApi.cancel(); setSelf(null); setTeam(null); setAudit(null); setActiveMutation(null); }
@@ -93,7 +96,7 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
             if (active)
                 setLoading(false);
         });
-        const ended = () => { clearAuthority(); setEnrollment(null); setCredentialId(null); setStatus("staff.signIn"); };
+        const ended = () => { clearAuthority(); setEnrollment(null); setCredentialId(null); setOwnerRecord({ receipts: [], status: null }); setStatus("staff.signIn"); };
         window.addEventListener("debateai:staff-session-ended", ended);
         return () => { active = false; generation.current++; api.cancel(); window.removeEventListener("debateai:staff-session-ended", ended); };
     }, [baseApi]);
@@ -280,7 +283,7 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
     const eligible = r !== undefined && r.account_active && r.email_verified && r.totp_active && !r.security_hold;
     const yesNo = (value: boolean) => t(catalog, value ? "staff.yes" : "staff.no");
     const form = (kind: MutationKind, member?: Member) => activeMutation?.kind === kind && activeMutation.staffId === member?.staff_id
-        ? <MutationForm kind={kind} {...(member === undefined ? {} : { member, selectedName: memberDisplayName(member, team?.members.indexOf(member) ?? 0, self?.staff_id, catalog) })} busy={busy} catalog={catalog} onSubmit={mutate} onCancel={() => setActiveMutation(null)}/>
+        ? <MutationForm kind={kind} {...(member === undefined ? {} : { member, selectedName: memberDisplayName(member, self?.staff_id, catalog) })} busy={busy} catalog={catalog} onSubmit={mutate} onCancel={() => setActiveMutation(null)}/>
         : null;
     const action = (kind: MutationKind, member?: Member) => <button className="setBtn" type="button" disabled={busy} aria-expanded={activeMutation?.kind === kind && activeMutation.staffId === member?.staff_id} onClick={() => setActiveMutation({ kind, ...(member === undefined ? {} : { staffId: member.staff_id }) })}>{t(catalog, `staff.action.${kind}`)}</button>;
     return <div className="setInner staffAccess" aria-busy={busy || loading}>
@@ -299,9 +302,9 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
       {has("TEAM_INVITE") || has("TEAM_READ") && team !== null ? <section className="setCard">
         <div className="staffSectionHead"><div><h2 className="staffSectionTitle">{t(catalog, "staff.members")}</h2><p className="setCardHint">{t(catalog, "staff.membersHint")}</p></div><div className="staffActions">{has("TEAM_READ") ? <button className="setBtn" type="button" disabled={busy} onClick={() => { void refresh(); }}>{t(catalog, "staff.refresh")}</button> : null}{has("TEAM_INVITE") ? action("invite") : null}</div></div>
         {has("TEAM_INVITE") ? form("invite") : null}
-        {has("TEAM_READ") && team !== null ? <div className="staffMemberList">{team.members.length === 0 ? <p className="setCardHint">{t(catalog, "staff.empty")}</p> : team.members.map((member, index) => {
+        {has("TEAM_READ") && team !== null ? <div className="staffMemberList">{team.members.length === 0 ? <p className="setCardHint">{t(catalog, "staff.empty")}</p> : team.members.map((member) => {
           const isSelf = member.staff_id === self?.staff_id;
-          const memberName = memberDisplayName(member, index, self?.staff_id, catalog);
+          const memberName = memberDisplayName(member, self?.staff_id, catalog);
           return <article className="staffMember" data-staff-member key={member.staff_id}>
             <div className="staffMemberHeading"><div><h3>{memberName}{isSelf ? <span className="staffYou">{t(catalog, "staff.you")}</span> : null}</h3><p className="staffMemberMeta">{t(catalog, "staff.keys", { count: member.credential_count })}</p></div><span className="staffBadge" data-state={member.status === "ACTIVE" ? "active" : "inactive"}>{t(catalog, `staff.memberStatus.${member.status}`)}</span></div>
             <ul className="staffPermissions" aria-label={t(catalog, "staff.permissions")}>{member.capabilities.map(capability => <li key={capability}>{capabilityLabel(catalog, capability)}</li>)}</ul>
@@ -314,9 +317,9 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
       </section> : null}
       {!has("TEAM_READ") && has("EMERGENCY_DISABLE") ? <section className="setCard"><h2 className="setCardTitle">{t(catalog, "staff.emergency")}</h2><p className="setCardHint">{t(catalog, "staff.help.compromise")}</p><div className="staffActions">{action("compromise")}</div>{form("compromise")}</section> : null}
       {has("AUDIT_READ") && audit !== null ? <section className="setCard"><div className="staffSectionHead"><h2 className="staffSectionTitle">{t(catalog, "staff.audit")}</h2><button className="setBtn" type="button" disabled={busy} onClick={() => { void refresh(); }}>{t(catalog, "staff.auditRefresh")}</button></div>{audit.events.length === 0 ? <p className="setCardHint">{t(catalog, "staff.auditEmpty")}</p> : <ul className="staffAuditList">{audit.events.map(event => <li key={event.event_id}><strong>{t(catalog, `staff.event.${event.event}`)}</strong><time dateTime={event.recorded_at}>{formatDate(locale, event.recorded_at, { dateStyle: "medium", timeStyle: "short" })}</time><span className="staffDelivery" data-state={event.delivery_state}>{t(catalog, `staff.deliveryStatus.${event.delivery_state}`)}</span></li>)}</ul>}{audit.next_cursor !== null ? <div className="staffActions"><button className="setBtn" type="button" disabled={busy} onClick={() => { void refresh(undefined, audit.next_cursor!); }}>{t(catalog, "staff.more")}</button></div> : null}</section> : null}
-      {self === null ? <details className="setCard staffAdvanced" open={setupOpen}><summary onClick={(event) => { event.preventDefault(); setSetupOpen(!setupOpen); setOwnerSetupOpen(false); }}>{t(catalog, "staff.advanced")}</summary>{setupOpen ? <><p className="setCardHint">{t(catalog, "staff.advancedHint")}</p>
+      {self === null ? <details className="setCard staffAdvanced" open={setupOpen}><summary onClick={(event) => { event.preventDefault(); if (busy) return; setSetupOpen(!setupOpen); setOwnerSetupOpen(false); }}>{t(catalog, "staff.advanced")}</summary>{setupOpen ? <><p className="setCardHint">{t(catalog, "staff.advancedHint")}</p>
         <section className="staffSetup"><h2 className="setCardTitle">{t(catalog, "staff.register")}</h2><p className="setCardHint">{t(catalog, "staff.registerHint")}</p><form className="staffMutation" data-staff-registration onSubmit={register}><fieldset disabled={!eligible || busy}><div className="staffField"><label htmlFor="staff-password">{t(catalog, "staff.password")}</label><input id="staff-password" name="password" type="password" autoComplete="current-password" maxLength={1024} required/></div><div className="staffField"><label htmlFor="staff-code">{t(catalog, "staff.code")}</label><input id="staff-code" name="totp_code" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required/></div><div className="staffActions"><button className="setBtn setBtnPrimary" type="submit">{t(catalog, "staff.register")}</button></div></fieldset></form>{credentialId !== null ? <p className="staffIdentifier" role="status">{t(catalog, "staff.registered", { id: credentialId })}</p> : null}</section>
-        <details className="staffDetails staffOwnerSetup" open={ownerSetupOpen}><summary onClick={(event) => { event.preventDefault(); setOwnerSetupOpen(!ownerSetupOpen); }}>{t(catalog, "staff.ownerSetup")}</summary>{ownerSetupOpen ? <><p className="setCardHint">{t(catalog, "staff.recovery")}</p><OwnerPossessionPanel client={api} catalog={catalog} disabled={!eligible || busy} onAuthorityEnded={clearAuthority} onBusyChange={setBusy}/></> : null}</details>
+        <details className="staffDetails staffOwnerSetup" open={ownerSetupOpen}><summary onClick={(event) => { event.preventDefault(); if (busy) return; setOwnerSetupOpen(!ownerSetupOpen); }}>{t(catalog, "staff.ownerSetup")}</summary>{ownerSetupOpen ? <><p className="setCardHint">{t(catalog, "staff.recovery")}</p><OwnerPossessionPanel client={api} catalog={catalog} disabled={!eligible || busy} onAuthorityEnded={clearAuthority} onBusyChange={setBusy} record={ownerRecord} onRecordChange={setOwnerRecord}/></> : null}</details>
       </> : null}</details> : null}
     </div>;
 }
