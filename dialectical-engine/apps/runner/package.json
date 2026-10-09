@@ -29,7 +29,7 @@
     "@debateai/support-kb": "workspace:*",
     "@debateai/story": "workspace:*",
     "@debateai/scorecard": "workspace:*",
-    "@hatchet-dev/typescript-sdk": "1.28.1",
-    "zod": "4.4.3"
+    "@hatchet-dev/typescript-sdk": "1.34.0",
+    "zod": "4.6.5"
   }
 }
