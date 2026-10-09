@@ -41,7 +41,7 @@ const evaluatorRequest = {
 
 describe("runner argument-language packets", () => {
   it.each([
-    ["synthesizer", () => buildSynthesizerPromptPacket(synthesizerRequest, "Romanian"), SYNTHESIZER_CONTRACT_TEXT, "serve.synthesizer.v1"],
+    ["synthesizer", () => buildSynthesizerPromptPacket(synthesizerRequest, "Romanian"), SYNTHESIZER_CONTRACT_TEXT, "serve.synthesizer.v2"],
     ["evaluator", () => buildEvaluatorPromptPacket(evaluatorRequest, "Romanian"), EVALUATOR_CONTRACT_TEXT, "serve.evaluator.v1"]
   ] as const)("keeps the %s contract and language directive inside the secure frame", (
     _name,build,contract,contractId
