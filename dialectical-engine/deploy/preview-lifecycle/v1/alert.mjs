@@ -26,9 +26,10 @@ const refuse = (code, fields) => { throw new AlertRefusal(code, fields); };
 const octal = mode => `0${(mode & 0o777).toString(8).padStart(3, '0')}`;
 
 /**
- * The alert's own owner list (README install step 2): {"version":1,"ownerSha256":[...]}, one to
- * three distinct lowercase hex SHA-256 fingerprints of the exact owner address bytes. Nothing else
- * is accepted: no other key, no duplicate key, no other version.
+ * The alert's own owner list (README install step 2): {"version":1,"ownerSha256":["<hex>"]}, exactly
+ * one lowercase hex SHA-256 fingerprint of the exact owner address bytes (alerts go to one primary
+ * owner inbox). Nothing else is accepted: no other key, no duplicate key, no other version, no
+ * second fingerprint.
  */
 export const OWNER_LIST_VERSION = 1;
 const DIGEST = /^[0-9a-f]{64}$/;
@@ -36,8 +37,8 @@ const OWNER_LIST_MAX_BYTES = 1024;
 export function ownerDigestsFromList(value) {
   exactKeys(value, ['version', 'ownerSha256']);
   const list = value.ownerSha256;
-  if (value.version !== OWNER_LIST_VERSION || !Array.isArray(list) || list.length < 1 || list.length > 3
-    || !list.every(entry => typeof entry === 'string' && DIGEST.test(entry)) || new Set(list).size !== list.length) refuse('OWNER_ALERT_LIST_UNAVAILABLE');
+  if (value.version !== OWNER_LIST_VERSION || !Array.isArray(list) || list.length !== 1
+    || typeof list[0] !== 'string' || !DIGEST.test(list[0])) refuse('OWNER_ALERT_LIST_UNAVAILABLE');
   return new Set(list);
 }
 

@@ -299,10 +299,10 @@ describe('failure alert', () => {
     await expect(alert.submitMail(Buffer.from('x'), { layout: common.LAYOUT, run: async () => ({ code: 75, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }) })).rejects.toThrow();
   });
 
-  it('reads the owner fingerprints only from its own root-only owner list', async () => {
-    const layout = server(`${owner}\n`, 0o600, { list: ownerList([owner, secondOwner]), listMode: 0o400 });
+  it('reads the one owner fingerprint only from its own root-only owner list (0600 or 0400)', async () => {
+    const layout = server(`${owner}\n`, 0o600, { listMode: 0o400 });
     const digests = await alert.loadOwnerDigests({ layout });
-    expect([...digests].sort()).toEqual([owner, secondOwner].map(digest).sort());
+    expect([...digests]).toEqual([digest(owner)]);
     expect(common.LAYOUT.ownerAlertDigestsPath).toBe('/etc/debateai-v3-preview/lifecycle/owner-alert-digests.json');
   });
 
@@ -342,7 +342,9 @@ describe('failure alert', () => {
     ['an extra key', { list: JSON.stringify({ version: 1, ownerSha256: [digest(owner)], to: owner }) }],
     ['a duplicate key', { list: `{"version":1,"ownerSha256":["${'0'.repeat(64)}"],"ownerSha256":["${digest(owner)}"]}` }],
     ['an empty list', { list: JSON.stringify({ version: 1, ownerSha256: [] }) }],
-    ['four fingerprints', { list: ownerList([owner, secondOwner, stranger, 'x'.concat('@example.invalid')]) }],
+    ['two fingerprints, even with the owner\'s among them', { list: ownerList([owner, secondOwner]) }],
+    ['three fingerprints', { list: ownerList([owner, secondOwner, stranger]) }],
+    ['a fingerprint that is not a string', { list: JSON.stringify({ version: 1, ownerSha256: [1] }) }],
     ['the same fingerprint twice', { list: JSON.stringify({ version: 1, ownerSha256: [digest(owner), digest(owner)] }) }],
     ['an upper-case fingerprint', { list: JSON.stringify({ version: 1, ownerSha256: [digest(owner).toUpperCase()] }) }],
     ['a short fingerprint', { list: JSON.stringify({ version: 1, ownerSha256: [digest(owner).slice(1)] }) }],

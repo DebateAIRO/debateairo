@@ -31,8 +31,8 @@ launchers still re-check every byte exactly as before.
   refuses if the receipt is already older than 60 s when written. The 180 s rule is unchanged.
 - **Alerts go only to the owner, checked against the alert's own owner list.** The address is in
   the root-only file `alert-recipient`. A second root-only file,
-  `/etc/debateai-v3-preview/lifecycle/owner-alert-digests.json`, holds one to three SHA-256
-  fingerprints of owner addresses (`{"version":1,"ownerSha256":[...]}`), built on the server by
+  `/etc/debateai-v3-preview/lifecycle/owner-alert-digests.json`, holds exactly one SHA-256
+  fingerprint, of the one owner address (`{"version":1,"ownerSha256":["<hex>"]}`), built on the server by
   `alert.mjs --install-owner-list` from the address already in `alert-recipient` (install step 2).
   The alert sends only if the address's fingerprint is on that list, so a later change to
   `alert-recipient` alone (a stray edit, a restored backup) fails closed instead of mailing a
