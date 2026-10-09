@@ -49,12 +49,14 @@ export async function submitComposite({message,argv,options,submitExternal,submi
  validateInvocation(argv);const selected=selectCanonicalMail(message,options);
  if(selected.family==='external')await submitExternal(message,argv);else await submitAccount(message,argv);
 }
+/** The recipient allow-list exists only in this root-owned installation input, never in source: strict JSON, exactly two keys. */
+export function recipientPolicyFromInstallationBytes(raw) {
+ try{return recipientPolicyFromInstallation(exactKeys(strictJson(raw),['recipientSha256','verificationForwardTarget']));}
+ catch{refuse('PREVIEW_MAIL_REFUSED');}
+}
 export async function readRecipientPolicy({path,root,clientGid}) {
  if(path!=='/etc/debateai-v3-preview/auth-dev-v1/mail-recipient.json'||root!=='/etc/debateai-v3-preview/auth-dev-v1'||!Number.isSafeInteger(clientGid)||clientGid<1)refuse('PREVIEW_MAIL_REFUSED');
- return withPrivateBytes(path,{root,uid:0,gid:clientGid,mode:0o640,parentUid:0,maxBytes:1024},raw=>{
-  // The recipient allow-list exists only in this root-owned installation input, never in source.
-  return recipientPolicyFromInstallation(exactKeys(strictJson(raw),['recipientSha256','verificationForwardTarget']));
- });
+ return withPrivateBytes(path,{root,uid:0,gid:clientGid,mode:0o640,parentUid:0,maxBytes:1024},recipientPolicyFromInstallationBytes);
 }
 export async function assertExternalHelperHashes() {
  const root='/opt/debateai-v3-preview/operator/recovery106-v1';
