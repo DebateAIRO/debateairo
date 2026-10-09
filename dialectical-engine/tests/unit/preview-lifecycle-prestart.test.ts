@@ -277,10 +277,19 @@ describe('canonical native verifier invocation', () => {
     ['a non-zero exit', { code: 1, stdout: Buffer.alloc(0), stderr: Buffer.from('PREVIEW_NATIVE_OPERATION_REFUSED\n') }, 'NATIVE_VERIFY_REFUSED'],
     ['any stderr', { code: 0, stdout: Buffer.from('{}'), stderr: Buffer.from('warning') }, 'NATIVE_VERIFY_REFUSED'],
     ['a timeout', { code: null, timedOut: true, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }, 'NATIVE_VERIFY_TIMEOUT'],
-    ['ambiguous JSON', { code: 0, stdout: Buffer.from('{"a":1,"a":2}'), stderr: Buffer.alloc(0) }, 'NATIVE_VERIFY_REFUSED']
+    ['ambiguous JSON', { code: 0, stdout: Buffer.from('{"a":1,"a":2}'), stderr: Buffer.alloc(0) }, 'NATIVE_VERIFY_REFUSED'],
+    ['a pending-step line with an exit of zero', { code: 0, stdout: Buffer.from('{}'), stderr: Buffer.from('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: 0110_auth_db_batch.sql. Verify never applies a migration; run the native operator with operation apply-and-plan first.\n') }, 'NATIVE_VERIFY_REFUSED'],
+    ['a pending-step line followed by more output', { code: 1, stdout: Buffer.alloc(0), stderr: Buffer.from('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: 0110_auth_db_batch.sql. Verify never applies a migration; run the native operator with operation apply-and-plan first.\nmore\n') }, 'NATIVE_VERIFY_REFUSED']
   ])('refuses %s', async (_name, outcome, code) => {
     const run = async () => ({ timedOut: false, overflow: false, ...outcome });
     await expect(prestart.runNativeVerify({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root, run, timeoutMs: 1000 })).rejects.toMatchObject({ code });
+  });
+
+  it('names a pending forward step: verify never applies one, the operator runs apply-and-plan', async () => {
+    const stderr = Buffer.from('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: 0109_billing_netopia.sql, 0110_auth_db_batch.sql. Verify never applies a migration; run the native operator with operation apply-and-plan first.\n');
+    const run = async () => ({ code: 1, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr });
+    await expect(prestart.runNativeVerify({ layout: common.LAYOUT, nodePath: '/opt/node/bin/node', sourceRoot: root, run, timeoutMs: 1000 }))
+      .rejects.toMatchObject({ code: 'NATIVE_VERIFY_PENDING_FORWARD_STEP', fields: { next: 'apply-and-plan', pending: ['0109_billing_netopia.sql', '0110_auth_db_batch.sql'] } });
   });
 
   it('refuses a source root outside the reviewed release folders', async () => {
