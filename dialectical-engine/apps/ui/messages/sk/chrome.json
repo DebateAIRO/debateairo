@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Súbory cookie, ktoré ukladáme",
   "chrome.security": "Zabezpečenie",
   "chrome.logout": "Odhlásiť sa",
+  "chrome.logIn": "Prihlásiť sa",
   "chrome.accountError": "Nepodarilo sa to. Znova načítajte stránku a skúste to znova.",
   "chrome.footer.pricing": "Cenník",
   "chrome.footer.cancel": "Zrušenie programu",

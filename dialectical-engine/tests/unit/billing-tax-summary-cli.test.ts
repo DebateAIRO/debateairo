@@ -31,7 +31,7 @@ describe("P16b pnpm billing:tax-summary", () => {
     // P2-M24: every document issued by the quarter's end that ANAF has not accepted, earlier quarters' included.
     expect(efactura).toHaveBeenCalledWith(new Date("2027-01-01T00:00:00.000Z"));
     expect(ok.lines.out).toContain("DebateAI tax summary for 2026-Q4");
-    expect(ok.lines.out).toContain("Payments to check by hand in xMoney: none.");
+    expect(ok.lines.out).toContain("Payments to check by hand in Netopia: none.");
     expect(ok.lines.out).toContain("Emails that never went out: none.");
     const missing = sink();
     expect(await runBillingTaxSummaryCli(["--quarter", "2026-Q4"], missing.output, reader(null))).toBe(1);

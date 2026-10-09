@@ -1,3 +1,4 @@
+import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import { describe, expect, it, vi } from "vitest";
 import { Argon2InfrastructureError } from "@debateai/crypto";
@@ -30,8 +31,8 @@ const admit = (service: RegistrationService) => service.admitSource({ route: "re
 describe("public registration admission ownership", () => {
   it("holds exactly103 structural slots at the verifier barrier and refuses104 before source/proof", async () => {
     const { service, charged, work } = fixture(); const barrier = deferred<"rejected">(); const ready = deferred(); let proofs = 0;
-    const api = buildApi({ application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; if (proofs === 103) ready.resolve(); return barrier.promise; } } });
-    const requests = Array.from({ length: 104 }, (_, i) => api.inject({ method: "POST", url: "/v1/auth/register", payload: canonicalSignup, remoteAddress: `203.0.113.${i + 1}` }));
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; if (proofs === 103) ready.resolve(); return barrier.promise; } } });
+    const requests = Array.from({ length: 104 }, (_, i) => api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: canonicalSignup, remoteAddress: `203.0.113.${i + 1}` }));
     let refusalDeadline: ReturnType<typeof setTimeout> | undefined;
     try {
       await ready.promise; await nextTurn();
@@ -47,34 +48,34 @@ describe("public registration admission ownership", () => {
   });
   it.each([["minimum", "x", null], ["configured maximum", "x".repeat(13), 12]] as const)("refuses %s password before any budget/proof and leaves the source available", async (_name, password, maximum) => {
     const { service, charged, work } = fixture({ sourceLimit: 1, maximum }); let proofs = 0;
-    const api = buildApi({ application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; return "rejected"; } } });
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; return "rejected"; } } });
     try {
-      const invalid = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...canonicalSignup, password } });
+      const invalid = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: { ...canonicalSignup, password } });
       expect(invalid.json()).toMatchObject({ error: "AUTH_INPUT_INVALID" }); expect(proofs).toBe(0); expect(charged.mock.calls).toEqual([]);
       expect(service.registrationAdmissionOccupancy()).toMatchObject({ admitted: 0, admissions: 0, releases: 0 }); expect(work).toEqual([]);
-      const valid = await api.inject({ method: "POST", url: "/v1/auth/register", payload: canonicalSignup }); expect(valid.json()).toMatchObject({ error: "TURNSTILE_REJECTED" }); expect(proofs).toBe(1);
+      const valid = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: canonicalSignup }); expect(valid.json()).toMatchObject({ error: "TURNSTILE_REJECTED" }); expect(proofs).toBe(1);
     } finally { await api.close(); await service.drainRateLimitAuditFlushes(); }
   });
   it("refuses current-legal mismatch before budgets/proof and admits a fresh pair afterward", async () => {
     const { service, charged, work } = fixture({ sourceLimit: 1, legal: true }); let proofs = 0;
-    const api = buildApi({ application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; return "unavailable"; } } });
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; return "unavailable"; } } });
     try {
-      const stale = await api.inject({ method: "POST", url: "/v1/auth/register", payload: canonicalSignup });
+      const stale = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: canonicalSignup });
       expect(stale.statusCode).toBe(409); expect(stale.json()).toMatchObject({ error: "LEGAL_DOCUMENT_STALE" }); expect(proofs).toBe(0); expect(charged.mock.calls).toEqual([]);
       expect(service.registrationAdmissionOccupancy()).toMatchObject({ admitted: 0, admissions: 0, releases: 0 }); expect(work).toEqual([]);
-      const fresh = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...canonicalSignup, ...DISPLAYED_LEGAL_EN } }); expect(fresh.json()).toMatchObject({ error: "TURNSTILE_UNAVAILABLE" }); expect(proofs).toBe(1);
+      const fresh = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: { ...canonicalSignup, ...DISPLAYED_LEGAL_EN } }); expect(fresh.json()).toMatchObject({ error: "TURNSTILE_UNAVAILABLE" }); expect(proofs).toBe(1);
     } finally { await api.close(); await service.drainRateLimitAuditFlushes(); }
   });
   it("malformed public facts and a trusted source fault spend no budget or proof", async () => {
     const { service, charged, work } = fixture(); let proofs = 0;
-    const api = buildApi({ application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; return "passed"; } } });
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; return "passed"; } } });
     try {
       for (const payload of [{ ...canonicalSignup, password: undefined }, { ...canonicalSignup, adult_affirmed: true }, { ...canonicalSignup, phone: "invalid" }, { ...canonicalSignup, terms: { version: "2.0", sha256: "invalid" } }]) {
-        const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload }); expect(response.statusCode).toBe(400);
+        const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload }); expect(response.statusCode).toBe(400);
       }
       const admitOriginal = service.admitSource.bind(service);
       service.admitSource = request => admitOriginal({ ...request, source: { ...request.source, requestId: "" } });
-      const badSource = await api.inject({ method: "POST", url: "/v1/auth/register", payload: canonicalSignup }); expect(badSource.json()).toMatchObject({ error: "AUTH_INPUT_INVALID" });
+      const badSource = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: canonicalSignup }); expect(badSource.json()).toMatchObject({ error: "AUTH_INPUT_INVALID" });
       expect(proofs).toBe(0); expect(charged.mock.calls).toEqual([]); expect(work).toEqual([]);
       expect(service.registrationAdmissionOccupancy()).toMatchObject({ admitted: 0, admissions: 0, releases: 0 });
     } finally { await api.close(); }

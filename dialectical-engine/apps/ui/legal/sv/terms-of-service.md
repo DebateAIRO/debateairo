@@ -21,7 +21,7 @@ jumps:
 18 TILLÄMPLIG LAG
 -->
 
-**Version 2.1 · Effective \[date\] · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Tidigare versioner finns på dezbatere.ro/terms/versions · Språk: svenska.**
 
 **In short.** Du måste ha fyllt 18 år. DebateAI bygger argument med AI-modeller, och allt som tjänsten genererar kan vara felaktigt — det är inte rådgivning. Dina debatter är privata om du inte publicerar dem; om du publicerar kan vem som helst läsa dem. Text som du skickar in överförs till de AI-leverantörer som anges i vårt register över AI-leverantörer och används inte för att träna modeller. Rapportera olagligt innehåll till \[abuse@dezbatere.ro\], oavsett om du har ett konto eller inte. Rumänsk lag är tillämplig, men du behåller ditt lokala konsumentskydd.
 
@@ -40,6 +40,7 @@ DebateAI drivs av **DebateAIRO S.R.L.**, ett bolag registrerat i Rumänien.
 | Integritet och dataskydd | privacy@dezbatere.ro |
 | Rapportering av olagligt innehåll | \[abuse@dezbatere.ro\] — se avsnitt 10 |
 | Kontaktpunkt för myndigheter | \[dsa@dezbatere.ro\] — rumänska och engelska |
+| Avlägsnandeorder för terrorisminnehåll (förordning (EU) 2021/784) | \[dsa@dezbatere.ro\] — vår kontaktpunkt för sådana order; rumänska och engelska; se avsnitt 10 |
 | Företrädare i andra länder | Anges i bilaga A för de regioner där vi har utsett en företrädare |
 
 Dessa uppgifter visas även permanent på webbplatsen på \[dezbatere.ro/legal\]. Du kan alltid nå en person, inte bara vår assistent; avsnitt 10 förklarar hur.
@@ -151,17 +152,21 @@ Vi bekräftar mottagandet av varje rapport utan onödigt dröjsmål. Vi hanterar
 - **Beslut i motorn.** Motorn fattar maskinella beslut om *argument*: den kan avstå från att besvara en fråga, stanna vid ett slutläge — till exempel om en fråga bygger på en falsk förutsättning eller är en värderingsfråga snarare än en empirisk fråga — sätta ett tak för konfidensnivån om en oberoende kritik inte var tillgänglig eller markera ett svar som bristfälligt om den genererade texten inte klarade sin överensstämmelsekontroll. Detta är en del av hur produkten är avsedd att fungera; besluten är synliga för dig i debatten och är inte beslut om dig.
 - **Moderering av innehåll och konton.** Att ta bort eller begränsa en publicerad debatt eller att stänga av eller avsluta ett konto är ett beslut som vi fattar med stöd av dessa villkor eller lagen. En person medverkar i varje sådant beslut som påverkar ditt konto. Grunderna beskrivs i avsnitt 11.
 
-**Motivering.** När vi tar bort eller begränsar synligheten för ditt innehåll eller stänger av eller avslutar ditt konto ger vi dig en motivering: vilken åtgärd vi vidtog och dess räckvidd, vilka omständigheter vi grundade oss på och om de kom från en rapport eller våra egna kontroller, huruvida automatiserade metoder användes, den rättsliga eller avtalsmässiga grunden samt hur du kan bestrida beslutet.
+**Motivering.** När vi tar bort eller begränsar synligheten för ditt innehåll eller stänger av eller avslutar ditt konto ger vi dig en motivering: vilken åtgärd vi vidtog och dess räckvidd, vilka omständigheter vi grundade oss på och om de kom från en rapport eller våra egna kontroller, huruvida automatiserade metoder användes, den rättsliga eller avtalsmässiga grunden samt hur du kan bestrida beslutet: genom vår klagomålsväg nedan, genom ett organ för tvistlösning utanför domstol som är certifierat enligt EU:s förordning om digitala tjänster, eller i domstol.
 
 **Klagomål på ett beslut.** Om du inte håller med om ett modereringsbeslut ska du svara på motiveringen eller skriva till \[appeals@dezbatere.ro\] inom **sex månader**. En person som inte deltog i det ursprungliga beslutet granskar det, och vi meddelar dig resultatet med en motivering. Detta påverkar inte din rätt att vända dig till domstol eller använda alternativ tvistlösning enligt avsnitt 18. Klagomålsvägen tar även emot klagomål om att vi inte har agerat på en rapport, att innehåll felaktigt har tagits bort, att ett konto felaktigt har begränsats eller att ett automatiserat verktyg felaktigt har påverkat ditt innehåll.
 
+**Tvistlösning utanför domstol.** Om du befinner dig i Europeiska unionen får du föra en tvist om ett av våra modereringsbeslut till ett organ för tvistlösning utanför domstol som är certifierat enligt artikel 21 i EU:s förordning om digitala tjänster (förordning (EU) 2022/2065). Detta omfattar ett beslut om ditt innehåll eller ditt konto, samt vårt beslut om en rapport som du har gjort. Du väljer organet från den förteckning som Europeiska kommissionen offentliggör på digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, och du behöver inte först använda vår klagomålsväg. Vi deltar i god tro och avböjer endast att delta om samma tvist, om samma innehåll och på samma grunder, redan har avgjorts. Organets beslut är inte bindande för någon av oss, och du behåller din rätt att vända dig till domstol. Organet får ta ut en liten avgift av dig, eller ingen avgift alls. Om det avgör tvisten till din fördel betalar vi dess avgifter och ersätter dina rimliga kostnader; om det avgör tvisten till vår fördel behöver du inte betala våra avgifter eller kostnader, såvida inte organet finner att du uppenbart har agerat i ond tro.
+
 **Kontakt med en person.** Vår supportassistent är ett AI-system och upplyser om detta. Du kan när som helst be att få tala med en person, och varje supportsamtal erbjuder den möjligheten. Vi förlitar oss inte enbart på automatiserade verktyg när vi kommunicerar med dig.
+
+**Terrorisminnehåll.** Terrorisminnehåll är olagligt och är inte tillåtet på DebateAI (avsnitt 7). Behöriga myndigheter i Europeiska unionen kan skicka oss avlägsnandeorder enligt förordning (EU) 2021/784 till kontaktpunkten i avsnitt 1. När vi tar emot en sådan order tar vi bort innehållet, eller blockerar åtkomsten till det i samtliga EU-länder, inom en timme. Vi informerar den person som publicerade innehållet om att det har tagits bort och, på begäran, om skälen och om hur ordern kan bestridas, såvida inte myndigheten beslutar att inga uppgifter får lämnas ut under en begränsad tid av hänsyn till allmän säkerhet. I enlighet med förordningens krav bevarar vi det borttagna innehållet och tillhörande uppgifter i sex månader, så att borttagningen kan granskas och, om den var felaktig, upphävas. Den person som publicerade innehållet kan bestrida ordern vid domstolarna i det land vars myndighet utfärdade den, och kan även använda vår klagomålsväg. Ingen myndighet har krävt att vi vidtar särskilda åtgärder mot terrorisminnehåll enligt förordningen; om någon gör det kommer vi att beskriva de åtgärderna här, inklusive eventuella automatiserade verktyg.
 
 **Allvarlig risk för liv eller säkerhet.** Om vi får kännedom om uppgifter som tyder på ett brott som innebär ett hot mot någons liv eller säkerhet underrättar vi de behöriga myndigheterna.
 
 ## 11. Avstängning och uppsägning
 
-**Av dig.** Avsluta ditt konto när som helst under Inställningar, på det sätt som beskrivs i avsnitt 6. Du behöver inte ange något skäl.
+**Av dig.** Avsluta ditt konto när som helst under Inställningar, på det sätt som beskrivs i avsnitt 6. Du behöver inte ange något skäl. Om du avslutar ditt konto upphör dessa villkor att gälla. De upphör när avslutandet träder i kraft, efter fristen på 7 dagar; de avsnitt som anges i slutet av detta avsnitt fortsätter att gälla därefter.
 
 **Av oss.** Vi kan stänga av eller avsluta ditt konto eller ta bort eller begränsa ditt innehåll om: du väsentligt bryter mot dessa villkor, i synnerhet avsnitt 7; ditt innehåll är olagligt eller lagen, en domstol eller en myndighet kräver att vi agerar; din användning hotar tjänstens säkerhet, integritet eller tillgänglighet eller andras rättigheter; ditt konto har varit inaktivt i \[24 months\] och vi har underrättat dig; eller vi upphör att tillhandahålla tjänsten eller att tillhandahålla den i ditt land.
 
@@ -259,7 +264,7 @@ Hur vi behandlar personuppgifter anges i **integritetspolicyn** på \[dezbatere.
 
 **Fullständigt avtal.** Dessa villkor utgör tillsammans med cookiepolicyn och registret över AI-leverantörer hela avtalet mellan oss om tjänsten. Åtaganden som vi gör i integritetspolicyn är bindande för oss. Ingenting i detta stycke utesluter ansvar för bedräglig vilseledning.
 
-**Språk.** Dessa villkor publiceras på engelska \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Språk.** Dessa villkor publiceras på alla språk som webbplatsen erbjuder. Avtalet har ingåtts på det språk du registrerade dig på: språket i den version du godkände, vilket framgår av den uppgift om ditt godkännande som vi bevarar. Om du senare godkänner en ny version på ett annat språk fortsätter avtalet på det språket. De övriga språkversionerna är översättningar. Om lagen i det land där du bor föreskriver att en version på landets eget språk har företräde, har den versionen företräde. Om två språkversioner skiljer sig åt tillämpar vi den innebörd som är mest fördelaktig för dig.
 
 **Kontakt.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukarest, Rumänien.
 

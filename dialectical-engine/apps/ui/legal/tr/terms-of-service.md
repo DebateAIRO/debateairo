@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.1 · Effective \[date\] · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. DebateAI, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri \[abuse@dezbatere.ro\] adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -40,6 +40,7 @@ DebateAI, Romanya'da tescilli bir şirket olan **DebateAIRO S.R.L.** tarafından
 | Gizlilik ve veri koruma | privacy@dezbatere.ro |
 | Hukuka aykırı içerik bildirimi | \[abuse@dezbatere.ro\] — 10. bölüme bakınız |
 | Yetkili makamlar için irtibat noktası | \[dsa@dezbatere.ro\] — Romence ve İngilizce |
+| Terör içeriğine yönelik kaldırma emirleri (2021/784 sayılı AB Tüzüğü) | \[dsa@dezbatere.ro\] — bu emirler için irtibat noktamız; Romence ve İngilizce; 10. bölüme bakınız |
 | Diğer ülkelerdeki temsilciler | Temsilci atadığımız bölgeler için Ek A'da listelenmiştir |
 
 Bu bilgiler ayrıca \[dezbatere.ro/legal\] adresindeki sitede kalıcı olarak gösterilir. Yalnızca asistanımıza değil, her zaman bir kişiye ulaşabilirsiniz; bunun nasıl yapılacağı 10. bölümde açıklanmıştır.
@@ -151,17 +152,21 @@ Her bildirimi gereksiz gecikme olmaksızın aldığımızı teyit ederiz. Bildir
 - **Motor içindeki kararlar.** Motor, *argümanlar* hakkında makine kararları verir: bir soruyu yanıtlamayı reddedebilir; örneğin bir sorunun yanlış bir ön kabule dayanması veya ampirik değil değer yargısına dayalı olması hâlinde nihai bir rotada durabilir; bağımsız bir eleştirinin mevcut olmadığı durumlarda güven aralığına üst sınır koyabilir veya üretilen metin uygunluk kontrolünden geçemediğinde bir yanıtı kusurlu olarak işaretleyebilir. Bunlar ürünün tasarlandığı gibi çalışmasının sonucudur; tartışmada size görünür ve sizin hakkınızda alınmış kararlar değildir.
 - **İçerik ve hesaplar hakkındaki moderasyon kararları.** Yayımlanmış bir tartışmanın kaldırılması veya kısıtlanması ya da bir hesabın askıya alınması veya kapatılması, bu Koşullara veya hukuka göre verdiğimiz bir karardır. Hesabınızı etkileyen bu tür her kararda bir kişi görev alır. Gerekçeler 11. bölümde açıklanmıştır.
 
-**Gerekçe bildirimi.** İçeriğinizi kaldırdığımızda veya görünürlüğünü kısıtladığımızda ya da hesabınızı askıya aldığımızda veya kapattığımızda size bir gerekçe bildirimi sunarız: ne yaptığımız ve bunun kapsamı, dayandığımız olgular ve bunların bir bildirimden mi yoksa kendi kontrollerimizden mi kaynaklandığı, otomatik araçların kullanılıp kullanılmadığı, hukuki veya sözleşmesel dayanak ve karara nasıl itiraz edebileceğiniz.
+**Gerekçe bildirimi.** İçeriğinizi kaldırdığımızda veya görünürlüğünü kısıtladığımızda ya da hesabınızı askıya aldığımızda veya kapattığımızda size bir gerekçe bildirimi sunarız: ne yaptığımız ve bunun kapsamı, dayandığımız olgular ve bunların bir bildirimden mi yoksa kendi kontrollerimizden mi kaynaklandığı, otomatik araçların kullanılıp kullanılmadığı, hukuki veya sözleşmesel dayanak ve karara nasıl itiraz edebileceğiniz — aşağıda açıklanan şikâyet yolumuz, AB Dijital Hizmetler Yasası kapsamında sertifikalandırılmış bir mahkeme dışı uyuşmazlık çözüm organı veya mahkeme yoluyla.
 
 **Bir karara ilişkin şikâyet.** Bir moderasyon kararına katılmıyorsanız gerekçe bildirimine yanıt verin veya **altı ay** içinde \[appeals@dezbatere.ro\] adresine yazın. İlk kararda görev almamış bir kişi kararı inceler ve sonucu gerekçeleriyle size bildiririz. Bu, mahkemeye başvurma veya 18. bölüm kapsamındaki alternatif uyuşmazlık çözümünü kullanma hakkınızı etkilemez. Şikâyet yolu; bir bildirim üzerine işlem yapmadığımız, içeriğin haksız biçimde kaldırıldığı, bir hesabın haksız biçimde kısıtlandığı veya otomatik bir aracın içeriğinizi haksız biçimde etkilediği yönündeki şikâyetleri de kabul eder.
 
+**Mahkeme dışı uyuşmazlık çözümü.** Avrupa Birliği'nde bulunuyorsanız, moderasyon kararlarımızdan birine ilişkin bir uyuşmazlığı, AB Dijital Hizmetler Yasası'nın (2022/2065 sayılı (AB) Tüzük) 21. maddesi uyarınca sertifikalandırılmış bir mahkeme dışı uyuşmazlık çözüm organına taşıyabilirsiniz. Bu, içeriğiniz veya hesabınız hakkındaki bir kararı ve yaptığınız bir bildirim üzerine verdiğimiz kararı kapsar. Organı, Avrupa Komisyonu'nun digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement adresinde yayımladığı listeden siz seçersiniz ve önce şikâyet yolumuzu kullanmak zorunda değilsiniz. İyi niyetle katılırız ve yalnızca aynı uyuşmazlığın, aynı içerik hakkında ve aynı gerekçelerle hâlihazırda çözülmüş olması durumunda katılmayı reddederiz. Organın kararı taraflardan hiçbirini bağlamaz ve mahkemeye başvurma hakkınız devam eder. Organ sizden küçük bir ücret talep edebilir veya hiç ücret almayabilir. Karar sizin lehinize verilirse organın ücretlerini öder, makul giderlerinizi de size iade ederiz; karar bizim lehimize verilirse, organ açıkça kötü niyetle hareket ettiğinizi tespit etmedikçe bizim ücretlerimizi veya giderlerimizi ödemezsiniz.
+
 **Bir kişiyle iletişim kurma.** Destek asistanımız bir yapay zekâ sistemidir ve bunu belirtir. İstediğiniz zaman bir kişiyle görüşmeyi talep edebilirsiniz ve her destek görüşmesi bu yolu sunar. Sizinle iletişim kurarken yalnızca otomatik araçlara dayanmayız.
+
+**Terör içeriği.** Terör içeriği hukuka aykırıdır ve DebateAI'da buna izin verilmez (7. bölüm). Avrupa Birliği'ndeki yetkili makamlar, 2021/784 sayılı (AB) Tüzük kapsamında kaldırma emirlerini 1. bölümde belirtilen irtibat noktamız aracılığıyla bize gönderebilir. Böyle bir emir aldığımızda bir saat içinde içeriği kaldırır veya tüm AB ülkelerinde içeriğe erişimi engelleriz. İçeriği yayımlayan kişiye içeriğin kaldırıldığını ve talep etmesi hâlinde nedenini ve emre nasıl itiraz edebileceğini bildiririz; makamın, kamu güvenliğinin sınırlı bir süre için bilgi verilmemesini gerektirdiğine karar vermesi hâli bunun dışındadır. Tüzüğün gerektirdiği üzere, kaldırmanın gözden geçirilebilmesi ve hatalı olması hâlinde geri alınabilmesi için kaldırılan içeriği ve ilgili verileri altı ay süreyle saklarız. İçeriği yayımlayan kişi, emri veren makamın bulunduğu ülkenin mahkemelerinde itiraz edebilir ve ayrıca şikâyet yolumuzu kullanabilir. Hiçbir makam, Tüzük kapsamında bizi terör içeriğine karşı belirli tedbirler almakla yükümlü tutmamıştır; bir makam bunu yaparsa, otomatik araçlar dahil bu tedbirleri burada açıklayacağız.
 
 **Yaşam veya güvenlik açısından ciddi risk.** Bir kişinin yaşamına veya güvenliğine yönelik tehdit içeren bir suça işaret eden bilgiden haberdar olursak yetkili makamları bilgilendiririz.
 
 ## 11. Askıya alma ve sona erdirme
 
-**Sizin tarafınızdan.** 6. bölümde açıklandığı üzere hesabınızı istediğiniz zaman Ayarlar bölümünden kapatın. Gerekçe göstermeniz gerekmez.
+**Sizin tarafınızdan.** 6. bölümde açıklandığı üzere hesabınızı istediğiniz zaman Ayarlar bölümünden kapatın. Gerekçe göstermeniz gerekmez. Hesabınızı kapatmanız bu Koşulları sona erdirir. Koşullar, kapatmanın hüküm doğurduğu anda, yani 7 günlük ek sürenin bitiminde sona erer; bu bölümün sonunda sayılan bölümler bundan sonra da uygulanmaya devam eder.
 
 **Bizim tarafımızdan.** Şu durumlarda hesabınızı askıya alabilir veya kapatabilir ya da içeriğinizi kaldırabilir veya kısıtlayabiliriz: bu Koşulları, özellikle 7. bölümü esaslı biçimde ihlal etmeniz; içeriğinizin hukuka aykırı olması veya hukukun, bir mahkemenin ya da bir makamın işlem yapmamızı gerektirmesi; kullanımınızın hizmetin güvenliğini, bütünlüğünü veya kullanılabilirliğini ya da başkalarının haklarını tehdit etmesi; hesabınızın \[24 months\] boyunca etkin olmaması ve size bildirimde bulunmuş olmamız ya da hizmeti tamamen veya ülkenizde sunmayı bırakmamız.
 
@@ -259,7 +264,7 @@ Kişisel verileri nasıl işlediğimiz \[dezbatere.ro/privacy\] adresindeki **Gi
 
 **Sözleşmenin tamamı.** Bu Koşullar, Çerez Politikası ve Yapay Zekâ Sağlayıcı Sicili ile birlikte hizmet hakkında aramızdaki sözleşmenin tamamını oluşturur. Gizlilik Politikası'nda verdiğimiz taahhütler bizi bağlar. Bu paragraftaki hiçbir hüküm hileli yanlış beyandan doğan sorumluluğu ortadan kaldırmaz.
 
-**Dil.** Bu Koşullar İngilizce \[and Romanian\] yayımlanır. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Dil.** Bu Koşullar, sitenin sunduğu her dilde yayımlanır. Sözleşmenin dili, kayıt olduğunuz dildir; yani kabul ettiğiniz ve kabul kaydımızda yer alan sürümün dilidir. Daha sonra başka bir dildeki yeni bir sürümü kabul ederseniz sözleşme o dilde devam eder. Diğer dillerdeki sürümler çeviridir. Yaşadığınız ülkenin hukuku, o ülkenin dilindeki sürümün esas alınacağını öngörüyorsa, o sürüm esas alınır. İki dil sürümü arasında fark olması hâlinde, sizin için daha elverişli olan anlamı uygularız.
 
 **İletişim.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bükreş, Romanya.
 

@@ -21,7 +21,7 @@ jumps:
 18 LEY APLICABLE
 -->
 
-**Version 2.1 · Effective \[date\] · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
 
 **In short.** Debe tener al menos 18 años. DebateAI elabora argumentos mediante modelos de IA y todo lo que genera puede ser erróneo; no constituye asesoramiento. Sus debates son privados salvo que los publique; si los publica, cualquiera podrá leerlos. El texto que envía se remite a los proveedores de IA incluidos en nuestro Registro de proveedores y no se utiliza para entrenar modelos. Denuncie contenido ilícito en \[abuse@dezbatere.ro\], tenga o no una cuenta. Se aplica la legislación rumana, pero usted conserva la protección local que le corresponda como consumidor.
 
@@ -40,6 +40,7 @@ DebateAI es un servicio de **DebateAIRO S.R.L.**, una sociedad registrada en Rum
 | Privacidad y protección de datos | privacy@dezbatere.ro |
 | Denuncia de contenido ilícito | \[abuse@dezbatere.ro\] — véase la sección 10 |
 | Punto de contacto para las autoridades | \[dsa@dezbatere.ro\] — rumano e inglés |
+| Órdenes de retirada de contenido terrorista (Reglamento (UE) 2021/784) | \[dsa@dezbatere.ro\] — nuestro punto de contacto para estas órdenes; rumano e inglés; véase la sección 10 |
 | Representantes en otros países | Se indican en el anexo A para las regiones en las que hemos designado uno |
 
 Estos datos también figuran de forma permanente en el sitio web, en \[dezbatere.ro/legal\]. Siempre podrá ponerse en contacto con una persona, no solo con nuestro asistente; la sección 10 explica cómo hacerlo.
@@ -151,17 +152,21 @@ Acusamos recibo de cada denuncia sin dilación indebida. Tramitamos las denuncia
 - **Decisiones dentro del motor.** El motor toma decisiones automáticas sobre *argumentos*: puede negarse a responder una pregunta, detenerse en una ruta terminal —por ejemplo, cuando una pregunta parte de una presuposición falsa o es una cuestión de valores en vez de una cuestión empírica—, limitar una banda de confianza cuando no se disponga de una crítica independiente o marcar una respuesta como defectuosa cuando el texto generado no haya superado la comprobación de conformidad. Así es como funciona el producto conforme a su diseño; estas decisiones son visibles para usted en el debate y no son decisiones sobre usted.
 - **Decisiones de moderación sobre contenido y cuentas.** Retirar un debate publicado o restringirlo, o suspender o cerrar una cuenta, constituye una decisión que tomamos conforme a estos Términos o a la ley. Una persona interviene en toda decisión de este tipo que afecte a su cuenta. La sección 11 describe los motivos.
 
-**Exposición de motivos.** Siempre que retiremos su contenido o restrinjamos su visibilidad, o suspendamos o cerremos su cuenta, le facilitaremos una exposición de motivos: qué hicimos y cuál es su alcance, los hechos en los que nos basamos y si procedían de una denuncia o de nuestras propias comprobaciones, si se utilizaron medios automatizados, el fundamento jurídico o contractual y cómo puede impugnar la decisión.
+**Exposición de motivos.** Siempre que retiremos su contenido o restrinjamos su visibilidad, o suspendamos o cerremos su cuenta, le facilitaremos una exposición de motivos: qué hicimos y cuál es su alcance, los hechos en los que nos basamos y si procedían de una denuncia o de nuestras propias comprobaciones, si se utilizaron medios automatizados, el fundamento jurídico o contractual y cómo puede impugnar la decisión: a través de nuestra vía de reclamación descrita más abajo, ante un órgano de resolución extrajudicial de litigios certificado conforme a la Reglamento de Servicios Digitales de la UE, o ante los tribunales.
 
 **Reclamación contra una decisión.** Si no está de acuerdo con una decisión de moderación, responda a la exposición de motivos o escriba a \[appeals@dezbatere.ro\] en un plazo de **seis meses**. Una persona que no haya intervenido en la decisión original la revisará y le comunicaremos el resultado con sus motivos. Esto no afecta a su derecho a acudir a los tribunales ni a utilizar la resolución alternativa de litigios con arreglo a la sección 18. La vía de reclamación también admite reclamaciones por no haber actuado ante una denuncia, por haber retirado contenido indebidamente, por haber restringido una cuenta indebidamente o porque una herramienta automatizada haya afectado erróneamente a su contenido.
 
+**Resolución extrajudicial de litigios.** Si se encuentra en la Unión Europea, puede someter una controversia relativa a una de nuestras decisiones de moderación a un órgano de resolución extrajudicial de litigios certificado conforme al artículo 21 de la Reglamento de Servicios Digitales de la UE (Reglamento (UE) 2022/2065). Esto abarca una decisión sobre su contenido o su cuenta, así como nuestra decisión sobre una denuncia que haya presentado. Usted elige el órgano de la lista que publica la Comisión Europea en digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, y no tiene que utilizar antes nuestra vía de reclamación. Participamos de buena fe y solo nos negamos a hacerlo cuando la misma controversia, sobre el mismo contenido y por los mismos motivos, ya se haya resuelto. La decisión del órgano no es vinculante para ninguna de las partes, y usted conserva su derecho a acudir a los tribunales. El órgano puede cobrarle unos honorarios reducidos o no cobrarle nada. Si decide a su favor, pagamos los honorarios del órgano y le reembolsamos a usted los gastos razonables; si decide a nuestro favor, usted no paga nuestros honorarios ni nuestros gastos, salvo que el órgano determine que usted actuó con mala fe manifiesta.
+
 **Contacto con una persona.** Nuestro asistente de soporte es un sistema de IA y así lo indica. Puede pedir hablar con una persona en cualquier momento, y todas las conversaciones de soporte ofrecen esa vía. No dependemos únicamente de herramientas automatizadas para comunicarnos con usted.
+
+**Contenido terrorista.** El contenido terrorista es ilícito y no está permitido en DebateAI (sección 7). Las autoridades competentes de la Unión Europea pueden enviarnos órdenes de retirada conforme al Reglamento (UE) 2021/784 al punto de contacto indicado en la sección 1. Cuando recibimos una, retiramos el contenido o bloqueamos el acceso a él en todos los países de la UE en el plazo de una hora. Informamos a la persona que lo publicó de que fue retirado y, si lo solicita, de los motivos y de cómo impugnar la orden, salvo que la autoridad decida que la seguridad pública exige guardar silencio durante un período limitado. Tal como exige el Reglamento, conservamos el contenido retirado y los datos conexos durante seis meses, de modo que la retirada pueda revisarse y, si fue errónea, revertirse. La persona que publicó el contenido puede impugnar la orden ante los tribunales del país cuya autoridad la haya dictado, y también puede utilizar nuestra vía de reclamación. Ninguna autoridad nos ha exigido adoptar medidas específicas contra el contenido terrorista en virtud del Reglamento; si alguna lo hace, describiremos aquí esas medidas, incluida cualquier herramienta automatizada.
 
 **Riesgo grave para la vida o la seguridad.** Si tenemos conocimiento de información que indique la comisión de un delito que suponga una amenaza para la vida o la seguridad de alguien, informaremos a las autoridades competentes.
 
 ## 11. Suspensión y terminación
 
-**Por usted.** Puede cerrar su cuenta en cualquier momento desde Configuración, tal como describe la sección 6. No necesita indicar ningún motivo.
+**Por usted.** Puede cerrar su cuenta en cualquier momento desde Configuración, tal como describe la sección 6. No necesita indicar ningún motivo. El cierre de su cuenta pone fin a estos Términos. Los Términos terminan cuando el cierre surte efecto, tras el período de gracia de 7 días; las secciones enumeradas al final de esta sección siguen aplicándose a partir de entonces.
 
 **Por nosotros.** Podemos suspender o cerrar su cuenta, o retirar o restringir su contenido, cuando: incumpla sustancialmente estos Términos, en particular la sección 7; su contenido sea ilícito o la ley, un órgano jurisdiccional o una autoridad nos obliguen a actuar; su uso amenace la seguridad, integridad o disponibilidad del servicio o los derechos de otras personas; su cuenta haya permanecido inactiva durante \[24 months\] y se lo hayamos notificado; o dejemos de prestar el servicio o de prestarlo en su país.
 
@@ -259,7 +264,7 @@ La forma en que tratamos los datos personales se expone en la **Política de pri
 
 **Acuerdo íntegro.** Estos Términos, junto con la Política de cookies y el Registro de proveedores de IA, constituyen el acuerdo íntegro entre nosotros respecto del servicio. Los compromisos que asumimos en la Política de privacidad nos vinculan. Nada de lo dispuesto en este párrafo excluye la responsabilidad por declaración fraudulenta.
 
-**Idioma.** Estos Términos se publican en inglés \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Idioma.** Estos Términos se publican en todos los idiomas que ofrece el sitio. El contrato se celebra en el idioma en el que se registró: el idioma de la versión que aceptó, que conserva nuestro registro de aceptación. Si posteriormente acepta una nueva versión en otro idioma, el contrato continúa en ese idioma. Las demás versiones lingüísticas son traducciones. Cuando la legislación del país en el que vive disponga que prevalece la versión en el idioma de ese país, prevalecerá dicha versión. Si dos versiones lingüísticas difieren, aplicamos el sentido que le resulte más favorable.
 
 **Contacto.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bucarest, Rumanía.
 

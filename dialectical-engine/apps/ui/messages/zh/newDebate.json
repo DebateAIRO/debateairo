@@ -110,6 +110,8 @@
   "newDebate.legalGate.signOut": "退出登录",
   "newDebate.legalGate.signOutFailed": "退出登录未完成。请重试。",
   "newDebate.room.locationBlocked": "无法从您当前所在的位置发起新辩论。您的辩论仍可继续阅读。",
+  "newDebate.room.previewTeamOnly": "此预览版中的辩论仅向团队开放。",
+  "newDebate.room.phoneRequired": "请在设置中添加电话号码，或几分钟后重试。",
   "newDebate.room.siteFull": "今天的上限已满。您仍然可以提问——上限重置后，您的辩论会自动开始。",
   "newDebate.room.siteClose": "您已接近今天的上限。本场辩论仍会完整进行；之后的辩论可能需要等到重置。",
   "newDebate.room.alreadyWaiting": "同一时间只能有一个问题等待。您的问题将于{time}开始；请在那之后再提这个问题。",

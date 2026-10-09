@@ -1,4 +1,4 @@
-const FROM='noreply@dezbatere.ro', YAHOO='REDACTED_INSTALLED_RECIPIENT', OWNED_GMAIL='REDACTED_INSTALLED_RECIPIENT', ORIGIN='https://v3-preview.dezbatere.ro';
+const FROM='noreply@dezbatere.ro', DIRECT_AND_PROOF='REDACTED_INSTALLED_RECIPIENT', NOTICE_SECONDARY='REDACTED_INSTALLED_RECIPIENT', ORIGIN='https://v3-preview.dezbatere.ro';
 const subjects=Object.freeze({PROOF:'Continue your DebateAI account recovery',STARTED:'DebateAI account recovery started',COMPLETED:'Your DebateAI password was changed',CANCELLED:'DebateAI account recovery cancelled',REFUSED:'DebateAI account recovery stopped'});
 const statements=Object.freeze({STARTED:'An account recovery request was started for your DebateAI account.',COMPLETED:'Your password and authenticator were replaced after account recovery. All previous sessions and recovery codes were revoked. Sign in with your new password and authenticator.',CANCELLED:'The account recovery request was cancelled.',REFUSED:'The account recovery request was stopped. Your password was not changed.'});
 const refused=()=>{throw new Error('OWNED_RECOVERY103_MAIL_REFUSED');};
@@ -7,10 +7,10 @@ export function ownedRecoveryRoute103(raw) {
  let text;try{text=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(raw);}catch{refused();}
  if(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)||/[\r\n]/.test(text.replaceAll('\r\n','')))refused();
  const lines=text.split('\r\n');
- if(lines[0]!==`From: ${FROM}`||![`To: ${YAHOO}`,`To: ${OWNED_GMAIL}`].includes(lines[1])||lines[4]!=='MIME-Version: 1.0'||lines[5]!=='Content-Type: text/plain; charset=UTF-8'||lines[6]!=='')refused();
+ if(lines[0]!==`From: ${FROM}`||![`To: ${DIRECT_AND_PROOF}`,`To: ${NOTICE_SECONDARY}`].includes(lines[1])||lines[4]!=='MIME-Version: 1.0'||lines[5]!=='Content-Type: text/plain; charset=UTF-8'||lines[6]!=='')refused();
  if(!/^Message-ID: <recovery-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}@v3-preview\.dezbatere\.ro>$/.test(lines[3]))refused();
  const event=Object.keys(subjects).find(kind=>lines[2]===`Subject: ${subjects[kind]}`);if(!event)refused();
- const recipient=lines[1].slice(4);if(event==='PROOF'&&recipient!==YAHOO)refused();
+ const recipient=lines[1].slice(4);if(event==='PROOF'&&recipient!==DIRECT_AND_PROOF)refused();
  const body=lines.slice(7);let expected;
  if(event==='PROOF') {
   const link=body[3],expires=body[5];
@@ -27,6 +27,6 @@ export function ownedRecoveryRoute103(raw) {
 }
 /** The complete required historical recipient set must be reviewed before enabling the worker. */
 export function assertOwnedRecoveryRecipients103(recipients) {
- if(!Array.isArray(recipients)||recipients.length<2||recipients.length>32||recipients.some(value=>![YAHOO,OWNED_GMAIL].includes(value))||!recipients.includes(YAHOO)||!recipients.includes(OWNED_GMAIL))refused();
+ if(!Array.isArray(recipients)||recipients.length<2||recipients.length>32||recipients.some(value=>![DIRECT_AND_PROOF,NOTICE_SECONDARY].includes(value))||!recipients.includes(DIRECT_AND_PROOF)||!recipients.includes(NOTICE_SECONDARY))refused();
  return Object.freeze({approvedRecipientCount:2,requiredChannelCount:recipients.length,origin:ORIGIN,from:FROM});
 }

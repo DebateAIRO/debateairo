@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.1 · Effective \[date\] · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. DebateAI muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen \[abuse@dezbatere.ro\] riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -40,6 +40,7 @@ DebateAI-palvelua ylläpitää **DebateAIRO S.R.L.**, Romaniaan rekisteröity yh
 | Yksityisyys ja tietosuoja | privacy@dezbatere.ro |
 | Lainvastaisesta sisällöstä ilmoittaminen | \[abuse@dezbatere.ro\] — katso kohta 10 |
 | Viranomaisten yhteyspiste | \[dsa@dezbatere.ro\] — romaniaksi ja englanniksi |
+| Terroristisen sisällön poistamismääräykset (asetus (EU) 2021/784) | \[dsa@dezbatere.ro\] — yhteyspisteemme näitä määräyksiä varten; romaniaksi ja englanniksi; katso kohta 10 |
 | Edustajat muissa maissa | Lueteltu liitteessä A niiden alueiden osalta, joille olemme nimittäneet edustajan |
 
 Nämä tiedot ovat myös pysyvästi nähtävillä sivustolla osoitteessa \[dezbatere.ro/legal\]. Saat aina yhteyden henkilöön etkä ainoastaan avustajaamme; kohdassa 10 kerrotaan, miten.
@@ -151,17 +152,21 @@ Vahvistamme jokaisen ilmoituksen vastaanottamisen ilman aiheetonta viivytystä. 
 - **Järjestelmän sisäiset päätökset.** Järjestelmä tekee koneellisia päätöksiä *argumenteista*: se voi kieltäytyä vastaamasta kysymykseen, pysähtyä päättävään reittiin — esimerkiksi jos kysymys perustuu väärään ennakko-oletukseen tai on empiirisen kysymyksen sijaan arvokysymys — rajoittaa luottamusväliä, kun riippumatonta kritiikkiä ei ollut saatavilla, tai merkitä vastauksen virheelliseksi, jos tuotettu teksti ei läpäissyt vaatimustenmukaisuustarkastusta. Nämä ovat tuotteen suunniteltua toimintaa; ne näkyvät sinulle väittelyssä, eivätkä ne ole sinua koskevia päätöksiä.
 - **Sisältöä ja tilejä koskevat moderointipäätökset.** Julkaistun väittelyn poistaminen tai sen saatavuuden rajoittaminen taikka tilin keskeyttäminen tai sulkeminen on päätös, jonka teemme näiden käyttöehtojen tai lain perusteella. Henkilö osallistuu jokaiseen tällaiseen tiliisi vaikuttavaan päätökseen. Päätösten perusteet kuvataan kohdassa 11.
 
-**Perustelut.** Aina kun poistamme sisältösi tai rajoitamme sen näkyvyyttä taikka keskeytämme tai päätämme tilisi, annamme sinulle perustelut: mitä teimme ja kuinka laajalle toimi ulottuu, tosiseikat, joihin nojauduimme, ja olivatko ne peräisin ilmoituksesta vai omista tarkastuksistamme, käytettiinkö automatisoituja keinoja, oikeudellinen tai sopimukseen perustuva peruste sekä se, miten voit riitauttaa päätöksen.
+**Perustelut.** Aina kun poistamme sisältösi tai rajoitamme sen näkyvyyttä taikka keskeytämme tai päätämme tilisi, annamme sinulle perustelut: mitä teimme ja kuinka laajalle toimi ulottuu, tosiseikat, joihin nojauduimme, ja olivatko ne peräisin ilmoituksesta vai omista tarkastuksistamme, käytettiinkö automatisoituja keinoja, oikeudellinen tai sopimukseen perustuva peruste sekä se, miten voit riitauttaa päätöksen: jäljempänä kuvatun valitusreittimme kautta, EU:n digipalvelusäädöksen nojalla sertifioidussa tuomioistuinten ulkopuolisessa riidanratkaisuelimessä tai tuomioistuimessa.
 
 **Päätöstä koskevan valituksen tekeminen.** Jos olet eri mieltä moderointipäätöksestä, vastaa perusteluihin tai kirjoita osoitteeseen \[appeals@dezbatere.ro\] **kuuden kuukauden** kuluessa. Alkuperäiseen päätökseen osallistumaton henkilö tarkastaa asian, ja ilmoitamme sinulle perustellun lopputuloksen. Tämä ei vaikuta oikeuteesi saattaa asia tuomioistuimeen tai käyttää kohdassa 18 tarkoitettua vaihtoehtoista riidanratkaisua. Valitusreittiä voi käyttää myös, jos emme ole toimineet ilmoituksen perusteella, sisältö on poistettu virheellisesti, tiliä on rajoitettu virheellisesti tai automatisoitu työkalu on virheellisesti vaikuttanut sisältöösi.
 
+**Tuomioistuinten ulkopuolinen riidanratkaisu.** Jos olet Euroopan unionissa, voit saattaa yhtä moderointipäätöksistämme koskevan riidan EU:n digipalvelusäädöksen (asetus (EU) 2022/2065) 21 artiklan nojalla sertifioidun tuomioistuinten ulkopuolisen riidanratkaisuelimen käsiteltäväksi. Tämä kattaa sisältöäsi tai tiliäsi koskevan päätöksen sekä päätöksemme tekemästäsi ilmoituksesta. Valitset elimen Euroopan komission osoitteessa digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement julkaisemasta luettelosta, eikä sinun tarvitse käyttää ensin valitusreittiämme. Osallistumme menettelyyn vilpittömässä mielessä ja kieltäydymme osallistumisesta vain, jos sama riita, joka koskee samaa sisältöä ja perustuu samoihin perusteisiin, on jo ratkaistu. Elimen päätös ei sido kumpaakaan osapuolta, ja säilytät oikeutesi viedä asia tuomioistuimeen. Elin voi periä sinulta pienen maksun, tai menettely voi olla sinulle maksuton. Jos se ratkaisee asian eduksesi, maksamme sen palkkiot ja korvaamme kohtuulliset kulusi; jos se ratkaisee asian meidän eduksemme, sinun ei tarvitse maksaa palkkioitamme tai kulujamme, ellei elin katso, että toimit ilmeisen vilpillisessä mielessä.
+
 **Yhteyden saaminen henkilöön.** Tukipalveluavustajamme on tekoälyjärjestelmä ja ilmoittaa siitä. Voit milloin tahansa pyytää saada keskustella henkilön kanssa, ja tämä vaihtoehto tarjotaan jokaisessa tukikeskustelussa. Emme käytä viestinnässäsi pelkästään automatisoituja työkaluja.
+
+**Terroristinen sisältö.** Terroristinen sisältö on laitonta, ja se on kiellettyä DebateAI-palvelussa (kohta 7). Euroopan unionin toimivaltaiset viranomaiset voivat lähettää meille poistamismääräyksiä asetuksen (EU) 2021/784 nojalla kohdassa 1 ilmoitettuun yhteyspisteeseen. Kun saamme tällaisen määräyksen, poistamme sisällön tai estämme pääsyn siihen kaikissa EU-maissa tunnin kuluessa. Ilmoitamme sisällön julkaisseelle henkilölle, että sisältö on poistettu, ja hänen pyynnöstään kerromme poistamisen syyt ja sen, miten määräyksen voi riitauttaa, paitsi jos viranomainen päättää, että yleinen turvallisuus edellyttää, ettei tietoja anneta rajoitettuna aikana. Asetuksen edellyttämällä tavalla säilytämme poistetun sisällön ja siihen liittyvät tiedot kuuden kuukauden ajan, jotta poistaminen voidaan tarkastaa ja peruuttaa, jos se oli virheellinen. Sisällön julkaissut henkilö voi riitauttaa määräyksen sen maan tuomioistuimissa, jonka viranomainen antoi määräyksen, ja voi myös käyttää valitusreittiämme. Mikään viranomainen ei ole edellyttänyt meiltä erityisiä toimenpiteitä terroristista sisältöä vastaan asetuksen nojalla; jos jokin viranomainen niin tekee, kuvaamme nämä toimenpiteet tässä, mukaan lukien mahdolliset automatisoidut työkalut.
 
 **Vakava henkeen tai turvallisuuteen kohdistuva riski.** Jos saamme tietoomme tietoja, jotka viittaavat jonkun henkeä tai turvallisuutta uhkaavaan rikokseen, ilmoitamme niistä toimivaltaisille viranomaisille.
 
 ## 11. Keskeyttäminen ja päättäminen
 
-**Sinun toimestasi.** Sulje tilisi milloin tahansa asetuksista kohdassa 6 kuvatulla tavalla. Et tarvitse siihen perustetta.
+**Sinun toimestasi.** Sulje tilisi milloin tahansa asetuksista kohdassa 6 kuvatulla tavalla. Et tarvitse siihen perustetta. Tilisi sulkeminen päättää nämä käyttöehdot. Ne päättyvät, kun sulkeminen tulee voimaan, 7 päivän odotusajan jälkeen; tämän kohdan lopussa luetellut kohdat jäävät voimaan sen jälkeen.
 
 **Meidän toimestamme.** Voimme keskeyttää tai sulkea tilisi taikka poistaa sisältösi tai rajoittaa sitä, jos: rikot olennaisesti näitä käyttöehtoja, erityisesti kohtaa 7; sisältösi on lainvastaista tai laki, tuomioistuin tai viranomainen edellyttää meiltä toimia; käyttötapasi uhkaa palvelun turvallisuutta, eheyttä tai saatavuutta taikka muiden oikeuksia; tilisi on ollut käyttämättä \[24 months\] ja olemme ilmoittaneet siitä sinulle; tai lopetamme palvelun tarjoamisen kokonaan tai maassasi.
 
@@ -259,7 +264,7 @@ Henkilötietojen käsittelymme kuvataan osoitteessa \[dezbatere.ro/privacy\] ole
 
 **Koko sopimus.** Nämä käyttöehdot muodostavat yhdessä evästekäytännön ja tekoälypalveluntarjoajarekisterin kanssa koko palvelua koskevan sopimuksen välillämme. Tietosuojakäytännössä tekemämme sitoumukset sitovat meitä. Mikään tässä kappaleessa ei sulje pois vastuuta vilpillisestä harhaanjohtamisesta.
 
-**Kieli.** Nämä käyttöehdot julkaistaan englanniksi \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Kieli.** Nämä käyttöehdot julkaistaan kaikilla kielillä, joita sivusto tarjoaa. Sopimuksen kieli on se kieli, jolla rekisteröidyit: hyväksymäsi version kieli, joka käy ilmi tiedosta, jonka säilytämme hyväksymisestäsi. Jos hyväksyt myöhemmin uuden version toisella kielellä, sopimus jatkuu sillä kielellä. Muut kieliversiot ovat käännöksiä. Jos asuinmaasi laissa säädetään, että maan omalla kielellä laadittu versio on ensisijainen, kyseinen versio on ensisijainen. Jos kahden kieliversion sisällöt eroavat toisistaan, sovellamme tulkintaa, joka on sinulle edullisempi.
 
 **Yhteystiedot.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukarest, Romania.
 

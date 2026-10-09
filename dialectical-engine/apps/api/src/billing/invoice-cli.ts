@@ -124,7 +124,7 @@ export async function runInvoiceCommand(deps: InvoiceCommandDeps, input: Invoice
   const charge = await deps.repository.charge(input.chargeId);
   if (charge === null) return refuse("BILLING_INVOICE_CHARGE_UNKNOWN", "no charge has this reference");
   if (charge.xmoneyEnvironment !== deps.xmoneyEnvironment) {
-    return refuse("BILLING_INVOICE_OTHER_XMONEY_SYSTEM", "the charge was paid in the other xMoney system");
+    return refuse("BILLING_INVOICE_OTHER_XMONEY_SYSTEM", "the charge was paid in the other Netopia system");
   }
   const paid = charge.events.find((event) => event.kind === "SUCCEEDED");
   if (paid === undefined || paid.xmoneyTransactionId === null) {
@@ -189,7 +189,7 @@ async function recordDashboardCreditNote(deps: InvoiceCommandDeps, input: Readon
 }>): Promise<InvoiceResult> {
   const dashboard = dashboardRefundOf(input.charge, input.paid);
   if (dashboard === null) {
-    return refuse("BILLING_INVOICE_NO_DASHBOARD_REFUND", "--amount is only for a refund made in the xMoney dashboard");
+    return refuse("BILLING_INVOICE_NO_DASHBOARD_REFUND", "--amount is only for a refund made in the Netopia dashboard");
   }
   if (input.original === undefined) return refuse("BILLING_INVOICE_ORIGINAL_MISSING", "settle the charge's invoice first");
   if (input.amountMicros > dashboard.upToMicros) {

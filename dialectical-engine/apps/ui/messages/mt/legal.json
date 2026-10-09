@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Prezz u ħlas",
   "legal.notice.s04.body": "{product} hija b’xejn. Il-pjanijiet bi ħlas għadhom mhumiex disponibbli. Qabel ma jibda kwalunkwe pjan bi ħlas, din it-taqsima se turi l-prezz (taxxa inkluża), kif u meta tħallas, meta jibda s-servizz, kif jiġġedded u kif tikkanċellah.",
   "legal.notice.s04.bodyPaid": "Il-pjanijiet bi ħlas u l-prezzijiet ta’ kull xahar tagħhom jinsabu fil-paġna tal-prezzijiet. Il-prezzijiet hemmhekk huma mingħajr taxxa; qabel ma tħallas, il-checkout juri l-prezz sħiħ bit-taxxa ta’ pajjiżek. Tħallas bil-kard, kull xahar bil-quddiem. Pjan jibda hekk kif il-bank tiegħek jikkonferma l-ħlas u jiġġedded kull xahar sakemm tikkanċellah. Tista’ tikkanċellah meta trid fl-Issettjar, jew fil-paġna tal-kanċellazzjoni mingħajr ma tidħol.",
-  "legal.notice.s04.payments": "Il-pagamenti bil-kard jiġu pproċessati minn xMoney. Aħna qatt ma naraw jew naħżnu n-numru tal-kard tiegħek.",
+  "legal.notice.s04.payments": "Il-pagamenti bil-kard jiġu pproċessati minn NETOPIA Payments. Aħna qatt ma naraw jew naħżnu n-numru tal-kard tiegħek.",
   "legal.notice.s04.pricingLink": "Ara l-pjanijiet u l-prezzijiet",
   "legal.notice.s04.cancelLink": "Ikkanċella pjan",
   "legal.notice.s05.title": "Irtirar u rimborżi",

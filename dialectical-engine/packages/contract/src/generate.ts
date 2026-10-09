@@ -52,6 +52,10 @@ const staffEndpointContracts: Record<string, Record<string, unknown>> = {
   "POST /v1/auth/passkeys/enrollment/complete": {...request(reference("CompletePasskeyEnrollmentRequestSchema")),...response(reference("PasskeyEnrollmentResponseSchema"))},
   "POST /v1/auth/passkeys/login/options": {...request(reference("BeginPasskeyLoginRequestSchema")),...response(reference("PasskeyAuthenticationOptionsResponseSchema"))},
   "POST /v1/auth/passkeys/login/complete": {...request(reference("CompletePasskeyLoginRequestSchema")),...response(reference("AuthenticationResponseSchema"))},
+  "POST /v1/auth/login": { ...request(variants("LoginBeginRequestSchema", "LoginCompleteRequestSchema")), responses: {
+    "202": { description: "Second factor required", content: { "application/json": { schema: reference("LoginContinuationResponseSchema") } } },
+    "200": { description: "Authenticated", content: { "application/json": { schema: reference("AuthenticationResponseSchema") } } } } },
+  "POST /v1/auth/recovery/start": request(reference("RecoveryStartRequestSchema")),
   "POST /v1/auth/register": { ...request(reference("RegisterRequestSchema")), ...response(reference("RegistrationVerificationAckSchema"), "202") },
   "POST /v1/auth/resend-verification": { ...request(reference("ResendVerificationRequestSchema")), ...response(reference("ResendVerificationAckSchema"), "202") },
   "GET /v1/account/profile": response(reference("AccountPhoneProfileSchema")),

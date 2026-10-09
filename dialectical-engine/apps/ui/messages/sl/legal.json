@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Cena in plačilo",
   "legal.notice.s04.body": "Storitev {product} je brezplačna. Plačljivi paketi še niso na voljo. Preden uvedemo kateri koli plačljivi paket, bomo v tem razdelku navedli ceno (z vključenim davkom), kako in kdaj plačate, kdaj se storitev začne, kako deluje podaljšanje in kako naročnino prekličete.",
   "legal.notice.s04.bodyPaid": "Plačljivi paketi in njihove mesečne cene so na strani s cenami. Tam navedene cene so brez davka; preden plačate, blagajna prikaže polno ceno z davkom vaše države. Plačate s kartico, vsak mesec vnaprej. Paket se začne takoj, ko vaša banka potrdi plačilo, in se vsak mesec podaljša, dokler ga ne prekličete. Prekličete ga lahko kadar koli v Nastavitvah ali na strani za preklic brez prijave.",
-  "legal.notice.s04.payments": "Plačila s kartico obdeluje xMoney. Številke vaše kartice nikoli ne vidimo in je ne shranjujemo.",
+  "legal.notice.s04.payments": "Plačila s kartico obdeluje NETOPIA Payments. Številke vaše kartice nikoli ne vidimo in je ne shranjujemo.",
   "legal.notice.s04.pricingLink": "Oglejte si pakete in cene",
   "legal.notice.s04.cancelLink": "Preklic paketa",
   "legal.notice.s05.title": "Odstop od pogodbe in vračila",

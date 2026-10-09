@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Egy vitamotor politikával, vallással, egészséggel, szexualitással és meggyőződéssel kapcsolatos kérdésekre ösztönöz. Ezek a GDPR 9. cikke szerinti különleges adatkategóriák, és attól függetlenül megjelenhetnek a kérdéseiben, hogy szándékunkban áll-e gyűjteni őket." },
-      { kind: "p", text: "Önről. Első vitája előtt, külön képernyőn adja meg kifejezett hozzájárulását ahhoz, hogy a saját kérdéseiben önként megadott különleges adatokat vitái futtatása céljából kezeljük. Rögzítjük a szöveg Ön által elfogadott verzióját, az Ön nyelvét és az időpontot. E hozzájárulás nélkül nem indíthat vitát. Ezt bármikor visszavonhatja a privacy@dezbatere.ro címre írva. Az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát. Amit saját magáról közzétesz, olyan adat, amelyet Ön döntött úgy, hogy nyilvánosságra hoz." },
+      { kind: "p", text: "Önről. Első vitája előtt, külön képernyőn adja meg kifejezett hozzájárulását ahhoz, hogy a saját kérdéseiben önként megadott különleges adatokat vitái futtatása céljából kezeljük. Rögzítjük a szöveg Ön által elfogadott verzióját, az Ön nyelvét és az időpontot. E hozzájárulás nélkül nem indíthat vitát. Ezt bármikor visszavonhatja azzal, hogy a Beállításokban megszünteti a fiókját. Az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát. Amit saját magáról közzétesz, olyan adat, amelyet Ön döntött úgy, hogy nyilvánosságra hoz." },
       { kind: "p", text: "Más személyekről. Semmilyen jogi feltétel nem teszi lehetővé számunkra, hogy az Ön által egy kérdésben megnevezett harmadik személy különleges adatait kezeljük, és MI-szolgáltatóink egyike sem rendelkezik ilyen feltétellel. Ezért tiltják ezt a Feltételek, ezért minimalizáljuk az általunk továbbított adatokat, és ezért távolítjuk el kérésre gyorsan az ilyen tartalmat — lásd a 11. szakaszt." },
       { kind: "p", text: "Egészségügyi adatok. Egyes országok külön jogszabályok alapján kezelik az egészséggel kapcsolatos adatokat, beleértve a következtetéseket is. Ha Ön [the State of Washington] területén él, külön [Consumer Health Data Privacy Notice] alkalmazandó." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Az adatkezelés korlátozása (Art. 18; a GDPR 18. cikke) — Kérheti, hogy állítsuk le meghatározott adatok kezelését, amíg az azokkal kapcsolatos vita rendeződik",
         "Tiltakozás (Art. 21; a GDPR 21. cikke) — Tiltakozhat a jogos érdeken alapuló adatkezelés — a 4. szakasz szerinti biztonsági és auditcélú adatkezelés — ellen, és azt leállítjuk, kivéve, ha kényszerítő erejű okokat tudunk igazolni. A marketing ellen bármikor tiltakozhat, és azt leállítjuk",
         "Adathordozhatóság (Art. 20; a GDPR 20. cikke) — Vitái és fiókadatai széles körben használt, géppel olvasható formátumban. Használja a Beállítások Adatok exportálása lehetőségét: a ZIP az adatait géppel olvasható JSON-fájlokban és egy olvasható oldalon tartalmazza; az e-mailben küldött hivatkozás 24 órán át és csak a fiókjába bejelentkezve működik. Az Ön által létrehozott nem személyes tartalmat, például kérdéseit, a szerződés megszűnésekor kérésére visszaadjuk Önnek",
-        "Hozzájárulás visszavonása (Art. 7(3); a GDPR 7. cikkének (3) bekezdése) — A marketing-hozzájárulás visszavonása bármely e-mailből vagy a Beállításokban; a különleges adatokra vonatkozó hozzájárulás visszavonása a privacy@dezbatere.ro címre írva (az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát). A visszavonás nem érinti a már megtörtént adatkezelést",
+        "Hozzájárulás visszavonása (Art. 7(3); a GDPR 7. cikkének (3) bekezdése) — A marketing-hozzájárulás visszavonása bármely e-mailből vagy a Beállításokban; a különleges adatokra vonatkozó hozzájárulás visszavonása a fiókja megszüntetésével a Beállításokban (az ilyen adatokat el is hagyhatja, vagy törölheti az azokat tartalmazó vitát). A visszavonás nem érinti a már megtörtént adatkezelést",
         "Panasztétel — A román felügyeleti hatóságnál, az ANSPDCP-nél, B-dul G-ral Gheorghe Magheru 28–30, Bukarest, anspdcp@dataprotection.ro, vagy a lakóhelye szerinti ország hatóságánál. Örömmel vennénk, ha először bennünket keresne meg"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "831c58f890281ad6546482f72e9c51b425c5c4d366dcaa38e9e7e4ae8ae39b7e",
+  sha256: "b75bc9c3fe4549b83481a23c6cb59709998b76d0f0bae48ca0186a1e4c46b10f",
   eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.2 · HATÁLYOS [DATE]",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",

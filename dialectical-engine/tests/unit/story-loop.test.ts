@@ -213,6 +213,14 @@ describe("verdict story — every failure is a FAILED outcome with a code and a 
       "STORY_ENVELOPE_EXHAUSTED", "RUN_COST_ENVELOPE_MONEY_REACHED"],
     ["the story attempt allowance is spent",
       (): unknown => new TypedDomainError("CALL_BUDGET_EXHAUSTED", "subject"), "STORY_ENVELOPE_EXHAUSTED", "CALL_BUDGET_EXHAUSTED"],
+    // The day's money (the private preview's team pot answers with it mid-story) and an
+    // owner's allowance window are money stops of the same kind: the envelope, not a bug.
+    ["the day's money envelope refuses the call",
+      (): unknown => new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "The day is spent"),
+      "STORY_ENVELOPE_EXHAUSTED", "DAILY_COST_ENVELOPE_REACHED"],
+    ["the owner's allowance refuses the call",
+      (): unknown => new TypedDomainError("PERSON_ALLOWANCE_REACHED", "The allowance is spent"),
+      "STORY_ENVELOPE_EXHAUSTED", "PERSON_ALLOWANCE_REACHED"],
     ["another typed refusal arrives",
       (): unknown => new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "no usage"), "STORY_UNEXPECTED_ERROR",
       "PROVIDER_USAGE_UNREPORTED"],
@@ -235,6 +243,12 @@ describe("verdict story — every failure is a FAILED outcome with a code and a 
       "STORY_ENVELOPE_EXHAUSTED", "STORY_COST_ENVELOPE_REACHED"],
     ["the story attempt allowance is spent before the check",
       (): unknown => new TypedDomainError("CALL_BUDGET_EXHAUSTED", "subject"), "STORY_ENVELOPE_EXHAUSTED", "CALL_BUDGET_EXHAUSTED"],
+    ["the day's money envelope refuses the check",
+      (): unknown => new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "The day is spent"),
+      "STORY_ENVELOPE_EXHAUSTED", "DAILY_COST_ENVELOPE_REACHED"],
+    ["the owner's allowance refuses the check",
+      (): unknown => new TypedDomainError("PERSON_ALLOWANCE_REACHED", "The allowance is spent"),
+      "STORY_ENVELOPE_EXHAUSTED", "PERSON_ALLOWANCE_REACHED"],
     ["a plain error arrives", (): unknown => new Error("bug"), "STORY_UNEXPECTED_ERROR", "Error"]
   ])("the checker: %s", async (_name, failure, code, cause) => {
     const double = recorder({ checkFails: () => failure() });

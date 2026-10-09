@@ -63,3 +63,76 @@ describe("confined Turnstile verifier", () => {
     expect(() => new UnixTurnstileVerifier({ publicAppUrl })).toThrow("TURNSTILE_PUBLIC_APP_URL_INVALID");
   });
 });
+
+/**
+ * Auth API hardening (2026-10-09, item 2): the single-use memory refused every
+ * proof once it held 10,000 digests, and it held a digest for five minutes
+ * even when the proof was refused — so 10,000 garbage proofs turned every real
+ * sign-up into TURNSTILE_UNAVAILABLE for five minutes.
+ */
+async function classifyingRelay(passing: ReadonlySet<string>) {
+  const dir = await mkdtemp(join(tmpdir(), "ts-")); const socketPath = join(dir, "relay.sock");
+  let calls = 0, clock = now.getTime();
+  const server = createServer(async (request, response) => {
+    const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    const { token, action } = JSON.parse(Buffer.concat(chunks).toString()) as { token: string; action: string };
+    calls += 1;
+    const fresh = { ...success, action, challenge_ts: new Date(clock - 1_000).toISOString() };
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(passing.has(token) || token.startsWith("valid-") ? fresh : { success: false, "error-codes": ["invalid-input-response"] }));
+  });
+  await new Promise<void>(resolve => server.listen(socketPath, resolve));
+  cleanup.push(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(dir, { recursive: true, force: true }); });
+  const verifier = new UnixTurnstileVerifier({ socketPath, publicAppUrl: "https://v3-preview.dezbatere.ro", clock: () => new Date(clock) });
+  return { verifier, calls: () => calls, advance: (ms: number) => { clock += ms; } };
+}
+describe("single-use proof memory under a garbage flood", () => {
+  it("still verifies a fresh valid proof after 10,000 refused proofs", async () => {
+    const relay = await classifyingRelay(new Set(["fresh-valid"]));
+    for (let index = 0; index < 10_000; index += 1) {
+      expect(await relay.verifier.verify({ token: `garbage-${index}`, action: "signup" })).toBe("rejected");
+    }
+    expect(await relay.verifier.verify({ token: "fresh-valid", action: "signup" })).toBe("passed");
+    // A passed proof stays consumed: its replay is refused without transport.
+    const before = relay.calls();
+    expect(await relay.verifier.verify({ token: "fresh-valid", action: "signup" })).toBe("rejected");
+    expect(relay.calls()).toBe(before);
+  }, 120_000);
+
+  it("refuses a fresh proof only while every held proof is still inside its validity window", async () => {
+    const relay = await classifyingRelay(new Set());
+    for (let index = 0; index < 10_000; index += 1) {
+      expect(await relay.verifier.verify({ token: `valid-${index}`, action: "signup" })).toBe("passed");
+    }
+    expect(await relay.verifier.verify({ token: "valid-next", action: "signup" })).toBe("unavailable");
+    relay.advance(300_001);
+    expect(await relay.verifier.verify({ token: "valid-after-window", action: "signup" })).toBe("passed");
+  }, 120_000);
+});
+
+/**
+ * Auth API hardening 2026-10-09 (follow-up 3): the passed-proof memory was one
+ * 10,000 pool shared by all six actions, so a flood of solved sign-up proofs
+ * refused every sign-in and recovery start too. Each action family — sign-up
+ * (sign-up and resend), sign-in, recovery (the three public starts) — now has
+ * its own cap.
+ */
+describe("single-use proof memory per action family", () => {
+  it("a full sign-up memory refuses sign-up and resend but leaves sign-in and recovery verifying", async () => {
+    const relay = await classifyingRelay(new Set());
+    for (let index = 0; index < 10_000; index += 1) {
+      expect(await relay.verifier.verify({ token: `valid-${index}`, action: "signup" })).toBe("passed");
+    }
+    expect(await relay.verifier.verify({ token: "valid-signup-next", action: "signup" })).toBe("unavailable");
+    expect(await relay.verifier.verify({ token: "valid-resend-next", action: "resend-verification" })).toBe("unavailable");
+    expect(await relay.verifier.verify({ token: "valid-login", action: "login" })).toBe("passed");
+    expect(await relay.verifier.verify({ token: "valid-reset", action: "password-reset" })).toBe("passed");
+    expect(await relay.verifier.verify({ token: "valid-mfa", action: "mfa-recovery" })).toBe("passed");
+    expect(await relay.verifier.verify({ token: "valid-account", action: "account-recovery" })).toBe("passed");
+    // A proof held by one family is still single-use from every other family.
+    const before = relay.calls();
+    expect(await relay.verifier.verify({ token: "valid-0", action: "login" })).toBe("rejected");
+    expect(await relay.verifier.verify({ token: "valid-login", action: "account-recovery" })).toBe("rejected");
+    expect(relay.calls()).toBe(before);
+  }, 120_000);
+});

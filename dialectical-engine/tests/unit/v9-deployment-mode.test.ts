@@ -289,7 +289,7 @@ describe("V-9 the deployment mode is explicit (task 10a)", () => {
     const api = validApiEnvironmentFixture();
     expect(parseRunnerEnvironment({ ...runner, DEBATEAI_DEPLOYMENT_MODE: "hosted" }).DEPLOYMENT_MODE)
       .toBe("hosted");
-    expect(parseApiEnvironment({ ...api, DEBATEAI_DEPLOYMENT_MODE: "hosted", GEOIP_COUNTRY_DB_PATH: "/var/lib/debateai-geoip/dbip-country-lite.mmdb", TOR_EXIT_LIST_PATH: "/var/lib/debateai-geoip/tor-exit-list.txt" }).DEPLOYMENT_MODE)
+    expect(parseApiEnvironment({ ...api, DEBATEAI_DEPLOYMENT_MODE: "hosted", GEOIP_COUNTRY_DB_PATH: "/var/lib/debateai-geoip/dbip-country-lite.mmdb", TOR_EXIT_LIST_PATH: "/var/lib/debateai-geoip/tor-exit-list.txt", TURNSTILE_SOCKET_PATH: "/run/debateai-turnstile/siteverify.sock" }).DEPLOYMENT_MODE)
       .toBe("hosted");
     expect(() => parseRunnerEnvironment({
       ...runner, NODE_ENV: "production", DEBATEAI_DEPLOYMENT_MODE: undefined

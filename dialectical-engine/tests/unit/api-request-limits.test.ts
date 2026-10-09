@@ -177,7 +177,7 @@ describe("API request limits (F-07, L1-F4)", () => {
     const { api, close, registration } = harness();
     try {
       const response = await api.inject({
-        method: "POST", url: "/v1/auth/register", headers: JSON_HEADERS,
+        method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN, ...JSON_HEADERS },
         // Register reaches the service only past the age gate, so the body carries an adult date.
         payload: JSON.stringify(canonicalSignup) + " ".repeat(AUTH_BODY_LIMIT_BYTES - Buffer.byteLength(JSON.stringify(canonicalSignup)))
       });
@@ -259,14 +259,14 @@ describe("API request limits (F-07, L1-F4)", () => {
 
       for (const password of [overByBytes, overByLength]) {
         const refused = await api.inject({
-          method: "POST", url: "/v1/auth/register", payload: registerBody(password)
+          method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN }, payload: registerBody(password)
         });
         expect(refused.statusCode).toBe(400);
         expect(refused.json()).toEqual({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
       }
       expect(registration.register).not.toHaveBeenCalled();
       const admitted = await api.inject({
-        method: "POST", url: "/v1/auth/register", payload: registerBody(atLimit)
+        method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN }, payload: registerBody(atLimit)
       });
       expect(admitted.statusCode).toBe(202);
       expect(registration.register).toHaveBeenCalledTimes(1);

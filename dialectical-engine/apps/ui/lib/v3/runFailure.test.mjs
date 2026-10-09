@@ -52,6 +52,11 @@ test("every code family lands in its group, whether or not the runner wrapped it
     ["RUN_SETUP_FAILED:WAITING_LINE", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:ROOM_HOLD", "NOT_STARTED"],
     ["RUN_SETUP_FAILED:COST_RECORD", "NOT_STARTED"],
+    // Step 1 (2026-10-08): on the private preview the waiting line records an
+    // outsider's existing question FAILED instead of starting it. It never
+    // began; the existing "before this debate began" sentence covers it.
+    ["RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY", "NOT_STARTED"],
+    ["RUNNER_EXECUTION_FAILED:RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY", "NOT_STARTED"],
     // B7b's step is not a fault (Part 4, part4-scope.md §4.1): a premium
     // question waited in line, and by the time there was room its owner's paid
     // plan had ended, been withdrawn or erased, or been paused by a dispute.

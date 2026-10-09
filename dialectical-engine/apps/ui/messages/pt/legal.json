@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Preço e pagamento",
   "legal.notice.s04.body": "A {product} é gratuita. Ainda não existem planos pagos. Antes do lançamento de qualquer plano pago, esta secção indicará o preço (impostos incluídos), como e quando paga, quando começa o serviço, como funciona a renovação e como cancelar.",
   "legal.notice.s04.bodyPaid": "Os planos pagos e os respetivos preços mensais estão na página de preços. Os preços aí indicados não incluem impostos; antes de pagar, a página de pagamento mostra o preço total com o imposto do seu país. Paga com cartão, todos os meses antecipadamente. Um plano começa assim que o seu banco confirma o pagamento e renova-se todos os meses até o cancelar. Pode cancelá-lo a qualquer momento nas Definições, ou na página de cancelamento sem iniciar sessão.",
-  "legal.notice.s04.payments": "Os pagamentos com cartão são processados pela xMoney. Nunca vemos nem guardamos o número do seu cartão.",
+  "legal.notice.s04.payments": "Os pagamentos com cartão são processados pela NETOPIA Payments. Nunca vemos nem guardamos o número do seu cartão.",
   "legal.notice.s04.pricingLink": "Ver os planos e os preços",
   "legal.notice.s04.cancelLink": "Cancelar um plano",
   "legal.notice.s05.title": "Retratação e reembolsos",

@@ -1,0 +1,288 @@
+// @vitest-environment jsdom
+/*
+ * Auth UI repair (2026-10-09), fix 7: keyboard and screen-reader basics.
+ * - After a rejected code, focus goes back to the (re-enabled, cleared) code field.
+ * - One submit makes at most one live announcement: field errors are tied to their field
+ *   (aria-describedby) and focus moves to the first invalid field; they are not each an alert.
+ * - Onboarding's two consent checkboxes have visible labels.
+ * - A pasted code is accepted only as exactly six digits (spaces and dashes ignored); anything else
+ *   is shown with an inline error instead of being cut to six digits and sent.
+ * - Credential fields carry the right autocomplete and input mode.
+ */
+import { act } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ContractHttpError } from "@debateai/contract";
+import auth from "../../apps/ui/messages/en/auth.json";
+import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
+import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import { SecurityEnrollment } from "../../apps/ui/components/auth/SecurityEnrollment.js";
+import { SecurityConfirmation } from "../../apps/ui/components/auth/SecurityConfirmation.js";
+import { OnboardingEvidence } from "../../apps/ui/components/auth/OnboardingEvidence.js";
+import { SocialCompleteFlow } from "../../apps/ui/components/auth/SocialCompleteFlow.js";
+import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
+import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
+import { mount, unmount, input } from "./task11-harness.js";
+
+vi.mock("@/lib/consumerWebAuthn", () => ({ createConsumerWebAuthnBrowser: () => ({ supportsConditional: async () => false, authenticate: vi.fn(), register: vi.fn(), cancel: vi.fn() }) }));
+
+const token = "a".repeat(43);
+const mounted: Array<Awaited<ReturnType<typeof mount>>> = [];
+async function render(view: React.ReactNode) { const result = await mount(view); mounted.push(result); return result.host; }
+afterEach(async () => { while (mounted.length) { const { root, host } = mounted.pop()!; await unmount(root, host); } });
+const describedText = (field: Element) => (field.getAttribute("aria-describedby") ?? "").split(" ").filter(Boolean).map((id) => document.getElementById(id)?.textContent ?? "").join(" ");
+
+async function toCodeStep(completeLogin = vi.fn()) {
+  const client = { beginLogin: vi.fn().mockResolvedValue({ status: "mfa_required", challenge_token: token, available_methods: ["totp", "recovery_code"] }), completeLogin };
+  const host = await render(<LoginFlow client={client} onAuthenticated={vi.fn()} />);
+  await input(host, "[name=email]", "person@example.test");
+  await input(host, "[name=password]", "existing-password");
+  await act(async () => host.querySelector("form")!.requestSubmit());
+  return { host, client };
+}
+
+describe("focus returns to the code after a rejected code", () => {
+  it("on sign-in", async () => {
+    const { host } = await toCodeStep(vi.fn().mockRejectedValue(new ContractHttpError("SESSION_REQUIRED", 401, "AUTH_MFA_INVALID", "AUTH_MFA_INVALID")));
+    await input(host, "[name=code]", "123456");
+    const code = host.querySelector<HTMLInputElement>("[name=code]")!;
+    expect(code.disabled).toBe(false);
+    expect(code.value).toBe("");
+    expect(document.activeElement).toBe(code);
+  });
+
+  it("in authenticator setup", async () => {
+    const client = {
+      beginTotpEnrollment: vi.fn().mockResolvedValue({ secret: "JBSWY3DPEHPK3PXP", otpauthUri: "otpauth://totp/Example:person?secret=JBSWY3DPEHPK3PXP&issuer=Example", enrollment_token: "e".repeat(43), expires_at: new Date(Date.now() + 300_000).toISOString() }),
+      completeTotpEnrollment: vi.fn().mockRejectedValue(new ContractHttpError("SESSION_REQUIRED", 401, "MFA_TOTP_INVALID", "MFA_TOTP_INVALID"))
+    };
+    const host = await render(<SecurityEnrollment catalog={auth} client={client as never} authority={{ kind: "grant", token }} availableMethods={["totp"]} />);
+    await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === auth["auth.enroll.useAuthenticator"])!.click());
+    await input(host, "#enrollment-code", "123456");
+    expect(client.completeTotpEnrollment).toHaveBeenCalledOnce();
+    const code = host.querySelector<HTMLInputElement>("#enrollment-code")!;
+    expect(code.value).toBe("");
+    expect(document.activeElement).toBe(code);
+  });
+});
+
+describe("one announcement per submit", () => {
+  it("sign-up: field errors are described, not shouted, and focus lands on the first", async () => {
+    const host = await render(<SignUpFlow client={{ register: vi.fn(), checkAge: vi.fn() }} />);
+    await act(async () => host.querySelector("form")!.requestSubmit());
+    expect(host.querySelectorAll("[role=alert]").length).toBe(0);
+    const email = host.querySelector<HTMLInputElement>("[name=email]")!;
+    expect(document.activeElement).toBe(email);
+    expect(describedText(email)).toContain(auth["auth.invalidEmail"]);
+  });
+
+  it("sign-in: the same", async () => {
+    const host = await render(<LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />);
+    await act(async () => host.querySelector("form")!.requestSubmit());
+    expect(host.querySelectorAll("[role=alert]").length).toBe(0);
+    expect(describedText(document.activeElement!)).toContain(auth["auth.invalidEmail"]);
+  });
+});
+
+/*
+ * Review fix (2026-10-09): with the field errors no longer alerts, a submit made from inside the field that
+ * is already focused and invalid (five digits + Enter, a bad address + Enter, an empty password + Enter)
+ * moved focus nowhere, so nothing was read. Each form now has one polite, visually hidden live region that
+ * announces the first error on every failed submit, re-announcing an identical sentence by clearing it
+ * first.
+ */
+describe("a failed submit is announced even when focus is already in the invalid field", () => {
+  const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
+  // The form's own region sits directly in the form (a field may keep its own validity message, as the
+  // date of birth does).
+  function liveRegion(form: Element): Element {
+    const regions = form.querySelectorAll(':scope > [aria-live="polite"]');
+    expect(regions).toHaveLength(1);
+    expect(regions[0]!.classList.contains("srOnly")).toBe(true);
+    return regions[0]!;
+  }
+  async function submitFrom(field: HTMLInputElement) {
+    field.focus();
+    expect(document.activeElement).toBe(field);
+    await act(async () => field.form!.requestSubmit());
+  }
+
+  it("sign-in code: five digits, then Enter, then Enter again", async () => {
+    const { host, client } = await toCodeStep();
+    const code = host.querySelector<HTMLInputElement>("[name=code]")!;
+    await input(host, "[name=code]", "12345");
+    await submitFrom(code);
+    await settle();
+    expect(liveRegion(code.form!).textContent).toBe(auth["auth.login.codeFormat"]);
+    await submitFrom(code);
+    expect(liveRegion(code.form!).textContent).toBe("");
+    await settle();
+    expect(liveRegion(code.form!).textContent).toBe(auth["auth.login.codeFormat"]);
+    expect(client.completeLogin).not.toHaveBeenCalled();
+  });
+
+  it("sign-in code: typing a letter", async () => {
+    const { host } = await toCodeStep();
+    await input(host, "[name=code]", "12a");
+    await settle();
+    expect(liveRegion(host.querySelector("form")!).textContent).toBe(auth["auth.login.codeFormat"]);
+  });
+
+  it("sign-in: an empty password, then Enter", async () => {
+    const host = await render(<LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />);
+    await input(host, "[name=email]", "person@example.test");
+    await submitFrom(host.querySelector<HTMLInputElement>("[name=password]")!);
+    await settle();
+    expect(liveRegion(host.querySelector("form")!).textContent).toBe(auth["auth.password.required"]);
+  });
+
+  it("the resend screen: a bad address, then Enter", async () => {
+    const host = await render(<LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn(), resendVerification: vi.fn() }} />);
+    await act(async () => [...host.querySelectorAll("button")].find((button) => button.textContent === auth["auth.login.resendVerification"])!.click());
+    await input(host, "#resend-email", "not-an-address");
+    await submitFrom(host.querySelector<HTMLInputElement>("#resend-email")!);
+    await settle();
+    expect(liveRegion(host.querySelector("form")!).textContent).toBe(auth["auth.invalidEmail"]);
+  });
+
+  it("sign-up: the first error", async () => {
+    const host = await render(<SignUpFlow client={{ register: vi.fn(), checkAge: vi.fn() }} />);
+    await submitFrom(host.querySelector<HTMLInputElement>("[name=email]")!);
+    await settle();
+    expect(liveRegion(host.querySelector("form")!).textContent).toBe(auth["auth.invalidEmail"]);
+  });
+
+  it("after a provider sign-in: five digits, then Enter", async () => {
+    window.history.replaceState(null, "", `/social/complete#kind=login&token=${token}`);
+    try {
+      const host = await render(<SocialCompleteFlow client={{ socialLoginStatus: vi.fn().mockResolvedValue({ expires_at: new Date(Date.now() + 300_000).toISOString(), available_methods: ["totp"] }), completeLogin: vi.fn() } as never} />);
+      await input(host, "#social-code", "12345");
+      await submitFrom(host.querySelector<HTMLInputElement>("#social-code")!);
+      await settle();
+      expect(liveRegion(host.querySelector("form")!).textContent).toBe(auth["auth.login.codeFormat"]);
+    } finally { window.history.replaceState(null, "", "/"); }
+  });
+
+  it("authenticator setup and the security check: typing a letter", async () => {
+    const enrollment = { beginTotpEnrollment: vi.fn().mockResolvedValue({ secret: "JBSWY3DPEHPK3PXP", otpauthUri: "otpauth://totp/Example:person?secret=JBSWY3DPEHPK3PXP&issuer=Example", enrollment_token: "e".repeat(43), expires_at: new Date(Date.now() + 300_000).toISOString() }), completeTotpEnrollment: vi.fn() };
+    const setup = await render(<SecurityEnrollment catalog={auth} client={enrollment as never} authority={{ kind: "grant", token }} availableMethods={["totp"]} />);
+    await act(async () => [...setup.querySelectorAll("button")].find((button) => button.textContent === auth["auth.enroll.useAuthenticator"])!.click());
+    await input(setup, "#enrollment-code", "1b");
+    await settle();
+    expect(liveRegion(setup.querySelector("form")!).textContent).toBe(auth["auth.login.codeFormat"]);
+
+    const check = await render(<SecurityConfirmation catalog={auth} client={{ authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["password_totp"], step_up_providers: [] }), stepUp: vi.fn() }} authorization={{ action: "REGENERATE_RECOVERY_CODES" }} onConfirmed={vi.fn()} />);
+    await act(async () => [...check.querySelectorAll("button")].find((button) => button.textContent === auth["auth.security.passwordMethod"])!.click());
+    await input(check, "[name=security-code]", "1c");
+    await settle();
+    expect(liveRegion(check.querySelector("form")!).textContent).toBe(auth["auth.login.codeFormat"]);
+  });
+});
+
+describe("onboarding consent boxes have visible labels", () => {
+  it("each checkbox is named by a visible label and opens its document", async () => {
+    const requirements = { status: "pending_mfa", country: "RO", age_confirmation_required: false, legal_acceptance_required: true, terms: { locale: "en", version: TERMS_OF_SERVICE.version, sha256: TERMS_OF_SERVICE.sha256, url: "/terms?lang=en" }, privacy: { locale: "en", version: PRIVACY_POLICY.version, sha256: PRIVACY_POLICY.sha256, url: "/privacy?lang=en" } };
+    const client = { pendingOnboardingStatus: vi.fn().mockResolvedValue(requirements), completePendingOnboarding: vi.fn() };
+    const host = await render(<OnboardingEvidence authority={{ kind: "pending", token }} locale="en" catalog={auth} client={client as never} onReady={vi.fn()} />);
+    const boxes = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    expect(boxes).toHaveLength(2);
+    const names = boxes.map((box) => { expect(box.hasAttribute("aria-label")).toBe(false); return host.querySelector(`label[for="${box.id}"]`)?.textContent ?? ""; });
+    expect(names[0]).toContain("Privacy Policy");
+    expect(names[1]).toContain("Terms of Service");
+    await act(async () => boxes[0]!.click());
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(boxes[0]!.checked).toBe(false);
+  });
+});
+
+describe("a pasted code is taken only as exactly six digits", () => {
+  it("eight digits are refused with an inline error, never cut and sent", async () => {
+    const completeLogin = vi.fn();
+    const { host } = await toCodeStep(completeLogin);
+    await input(host, "[name=code]", "12345678");
+    const code = host.querySelector<HTMLInputElement>("[name=code]")!;
+    expect(completeLogin).not.toHaveBeenCalled();
+    expect(code.getAttribute("aria-invalid")).toBe("true");
+    expect(describedText(code)).toContain("6 digits");
+    await act(async () => host.querySelector("form")!.requestSubmit());
+    expect(completeLogin).not.toHaveBeenCalled();
+  });
+
+  it.each(["123 456", "123-456", " 123456 "])("%j is accepted as 123456", async (pasted) => {
+    const completeLogin = vi.fn().mockResolvedValue({ status: "authenticated", csrf_token: "c".repeat(43) });
+    const { host } = await toCodeStep(completeLogin);
+    await input(host, "[name=code]", pasted);
+    expect(completeLogin).toHaveBeenCalledWith(token, "123456");
+  });
+
+  it("in authenticator setup and the security check too", async () => {
+    const enrollment = { beginTotpEnrollment: vi.fn().mockResolvedValue({ secret: "JBSWY3DPEHPK3PXP", otpauthUri: "otpauth://totp/Example:person?secret=JBSWY3DPEHPK3PXP&issuer=Example", enrollment_token: "e".repeat(43), expires_at: new Date(Date.now() + 300_000).toISOString() }), completeTotpEnrollment: vi.fn() };
+    const setup = await render(<SecurityEnrollment catalog={auth} client={enrollment as never} authority={{ kind: "grant", token }} availableMethods={["totp"]} />);
+    await act(async () => [...setup.querySelectorAll("button")].find((button) => button.textContent === auth["auth.enroll.useAuthenticator"])!.click());
+    await input(setup, "#enrollment-code", "1234567");
+    expect(enrollment.completeTotpEnrollment).not.toHaveBeenCalled();
+    expect(setup.querySelector("#enrollment-code")?.getAttribute("aria-invalid")).toBe("true");
+
+    const stepUp = vi.fn();
+    const check = await render(<SecurityConfirmation catalog={auth} client={{ authMethods: vi.fn().mockResolvedValue({ methods: [], recovery_codes_remaining: 10, available_step_up_methods: ["password_totp"], step_up_providers: [] }), stepUp }} authorization={{ action: "REGENERATE_RECOVERY_CODES" }} onConfirmed={vi.fn()} />);
+    await act(async () => [...check.querySelectorAll("button")].find((button) => button.textContent === auth["auth.security.passwordMethod"])!.click());
+    await input(check, "[name=security-password]", "existing-password");
+    await input(check, "[name=security-code]", "12345678");
+    expect(stepUp).not.toHaveBeenCalled();
+    expect(check.querySelector("[name=security-code]")?.getAttribute("aria-invalid")).toBe("true");
+  });
+});
+
+describe("full-width digits from a Japanese or Chinese keyboard count as digits", () => {
+  it("１２３４５６ is accepted as 123456", async () => {
+    const completeLogin = vi.fn().mockResolvedValue({ status: "authenticated", csrf_token: "c".repeat(43) });
+    const { host } = await toCodeStep(completeLogin);
+    await input(host, "[name=code]", "１２３　４５６");
+    expect(completeLogin).toHaveBeenCalledWith(token, "123456");
+  });
+});
+
+describe("a pasted code after a provider sign-in", () => {
+  // Review fix (2026-10-09): Enter handed whatever the field held to the submit, which dropped anything but
+  // six digits without a word. The submit now applies the sign-in screen's exactly-six-digits check: nothing
+  // is sent, and the field says why.
+  it.each(["12345678", "12345"])("%j pasted, then Enter: nothing is sent and the field says why", async (pasted) => {
+    window.history.replaceState(null, "", `/social/complete#kind=login&token=${token}`);
+    const completeLogin = vi.fn();
+    try {
+      const host = await render(<SocialCompleteFlow client={{ socialLoginStatus: vi.fn().mockResolvedValue({ expires_at: new Date(Date.now() + 300_000).toISOString(), available_methods: ["totp"] }), completeLogin } as never} />);
+      const code = host.querySelector<HTMLInputElement>("#social-code")!;
+      code.focus();
+      await input(host, "#social-code", pasted);
+      await act(async () => code.form!.requestSubmit());
+      expect(completeLogin).not.toHaveBeenCalled();
+      expect(code.getAttribute("aria-invalid")).toBe("true");
+      expect(describedText(code)).toContain("6 digits");
+    } finally { window.history.replaceState(null, "", "/"); }
+  });
+
+  it("is refused unless it is exactly six digits", async () => {
+    window.history.replaceState(null, "", `/social/complete#kind=login&token=${token}`);
+    const completeLogin = vi.fn();
+    try {
+      const host = await render(<SocialCompleteFlow client={{ socialLoginStatus: vi.fn().mockResolvedValue({ expires_at: new Date(Date.now() + 300_000).toISOString(), available_methods: ["totp"] }), completeLogin } as never} />);
+      await input(host, "#social-code", "12345678");
+      expect(completeLogin).not.toHaveBeenCalled();
+      expect(host.querySelector("#social-code")?.getAttribute("aria-invalid")).toBe("true");
+    } finally { window.history.replaceState(null, "", "/"); }
+  });
+});
+
+describe("credential fields carry the right autocomplete", () => {
+  it("sign-in, its code step and sign-up", async () => {
+    const signIn = await render(<LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn() }} />);
+    expect(signIn.querySelector("[name=email]")?.getAttribute("autocomplete")).toMatch(/^(?:username|email)\b/);
+    expect(signIn.querySelector("[name=password]")?.getAttribute("autocomplete")).toBe("current-password");
+    const { host } = await toCodeStep();
+    const code = host.querySelector("[name=code]")!;
+    expect(code.getAttribute("autocomplete")).toBe("one-time-code");
+    expect(code.getAttribute("inputmode")).toBe("numeric");
+    const signUp = await render(<SignUpFlow client={{ register: vi.fn(), checkAge: vi.fn() }} />);
+    expect(signUp.querySelector("[name=email]")?.getAttribute("autocomplete")).toMatch(/^(?:username|email)$/);
+    expect(signUp.querySelector("[name=password]")?.getAttribute("autocomplete")).toBe("new-password");
+  });
+});

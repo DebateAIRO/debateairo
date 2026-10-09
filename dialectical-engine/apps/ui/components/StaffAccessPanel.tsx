@@ -12,6 +12,8 @@ const delegatedCapabilities = ["TEAM_READ", "AUDIT_READ", "EMERGENCY_DISABLE"] a
 function failureKey(failure: unknown): string {
     if (failure instanceof Error && failure.message.startsWith("STAFF_WEBAUTHN_"))
         return "staff.webauthn";
+    if (failure instanceof ContractHttpError && failure.status === 503 && failure.serverCode === "STAFF_ALERT_UNAVAILABLE")
+        return "staff.locked";
     if (failure instanceof ContractHttpError && failure.status === 503)
         return "staff.unavailable";
     if (failure instanceof ContractHttpError && failure.status === 401)

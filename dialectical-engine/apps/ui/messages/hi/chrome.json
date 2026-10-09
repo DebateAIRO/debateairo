@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "हमारे द्वारा संग्रहीत कुकी",
   "chrome.security": "सुरक्षा",
   "chrome.logout": "लॉग आउट",
+  "chrome.logIn": "लॉग इन करें",
   "chrome.accountError": "यह काम नहीं हुआ। पेज फिर से लोड करें और दोबारा प्रयास करें।",
   "chrome.footer.pricing": "मूल्य",
   "chrome.footer.cancel": "योजना रद्द करें",

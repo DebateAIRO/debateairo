@@ -58,4 +58,24 @@ describe("email waiting screen", () => {
     const different = [...host.querySelectorAll<HTMLButtonElement>("button")].find(b => b.textContent === "Use a different email")!;
     await act(async () => different.click()); expect(requests).toEqual(["different"]);
   });
+  /*
+   * PR #95 CI red (2026-10-09): taking the live region off the sentence (so the sign-in resend entry is not
+   * read twice) also took it off sign-up's "If this address can be registered…", which nothing else says.
+   * After sign-up that sentence is the submit's outcome, a status message; the resend entry's sentence is
+   * an instruction until a send, and the send is said once, by the form announcer.
+   */
+  it("after sign-up, says the sent sentence as a status message", async () => {
+    await render();
+    const sentence = [...host.querySelectorAll("p")].find(p => p.textContent === english["auth.signUp.registrationSent"]);
+    expect(sentence?.getAttribute("role")).toBe("status");
+  });
+  it("on the sign-in resend entry, says a send once, through the announcer only", async () => {
+    const sent = english["auth.pending.resendSent"];
+    await act(async () => root.render(<EmailPendingScreen email="person@example.test" retryAfterSeconds={0} client={{ resendVerification: async () => ack } as never} catalog={english} locale="en" turnstile={{ siteKey: "1x00000000000000000000AA", nonce: "abcdefghijklmnopqrstuv==" }}
+      notice={english["auth.pending.resendNotice"]} context={{ eyebrow: "e", title: "t", action: "Send email", sent }} onDifferentEmail={() => undefined} />));
+    const live = () => [...host.querySelectorAll('[aria-live], [role="status"], [role="alert"]')];
+    expect(live().map(region => region.textContent)).not.toContain(english["auth.pending.resendNotice"]);
+    await act(async () => options.callback("proof")); await act(async () => button().click()); await act(async () => vi.advanceTimersByTimeAsync(250));
+    expect(live().filter(region => region.textContent === sent)).toHaveLength(1);
+  });
 });

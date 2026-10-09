@@ -38,7 +38,8 @@ export function LandingChrome({ catalog }: { catalog: MessageCatalog }): JSX.Ele
           <a href="#pricing">{t(catalog, "chrome.pricing")}</a>
         </nav>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <AccountMenu catalog={catalog} />
+          {/* The landing renders only without a session cookie, so the visitor is signed out. */}
+          <AccountMenu catalog={catalog} authenticated={false} signInHref="/login" signInClassName="lpNavSignIn" />
           <LanguageSwitcher />
           <ModeToggle />
           <a className="lpCta lpCtaNav" href="/login?next=%2Fnew">

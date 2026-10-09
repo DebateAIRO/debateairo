@@ -1,4 +1,5 @@
 import { PLAN_TIER_ROSTERS, type AskApplied, type AskRequest, type PlanTier } from "@debateai/contract";
+import { previewPlanTierRosters, validatePreviewProviderTestConfig, type PreviewProviderTestConfig } from "@debateai/providers";
 import type { CostEstimator, PersonAllowanceSource } from "@debateai/budget";
 import { TypedDomainError, type FundingBasis } from "@debateai/kernel";
 import { planById, type BillingPlan, type BillingPlans, type PlanId } from "@debateai/register";
@@ -199,7 +200,9 @@ export function decideCoarseFit(input: Readonly<{
  * an ask the locked decision makes WAIT is created on its plan's roster
  * whatever this chose (`#submitWithRoom`).
  */
-export async function coarseFitFor(ask: AskRequest, ownerRef: string, billing: AskBilling, now: Date): Promise<CoarseFit> {
+export async function coarseFitFor(
+  ask: AskRequest, ownerRef: string, billing: AskBilling, now: Date, previewConfig?: PreviewProviderTestConfig
+): Promise<CoarseFit> {
   if (ask.plan_tier !== "premium") return "AS_ASKED";
   const windows = await billing.coarseFit.personAllowance.read(ownerRef, now);
   if (windows.length === 0) return "AS_ASKED";
@@ -208,7 +211,8 @@ export async function coarseFitFor(ask: AskRequest, ownerRef: string, billing: A
     billing.coarseFit.estimator.estimateMicros({
       planTier: "premium",
       compositionBudgetTier: ask.composition_budget_tier,
-      makerCount: PLAN_TIER_ROSTERS.premium.length,
+      // Step 1: the roster this deployment really runs (one GLM on the private preview).
+      makerCount: previewPlanTierRosters(validatePreviewProviderTestConfig(previewConfig), PLAN_TIER_ROSTERS).premium.length,
       depth: ask.depth_params.depth
     }),
     Promise.all(windows.map((window) => billing.coarseFit.spend.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope)))

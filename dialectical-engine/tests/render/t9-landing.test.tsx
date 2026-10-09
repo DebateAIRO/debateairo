@@ -371,13 +371,18 @@ describe("T9-C4 landing content", () => {
     expect(cardText).toMatch(/REVIEW (?:AGREED|DISPUTED) BY:/);
   });
 
-  it("keeps the hero placeholder literal and states the pricing plainly when billing is off", async () => {
-    // PROPERTY: the hero counter stays the V-closed placeholder; the pricing line is real copy now
-    // (spec 2026-09-29 §2.10) and, with no plans to read, promises nothing about paid plans.
+  it("shows no placeholder counter in the hero and states the pricing plainly when billing is off", async () => {
+    // PROPERTY: the "[PLACEHOLDER] rounds argued this week" counter is gone (auth UI repair,
+    // 2026-10-09: no invented numbers), leaving the two real facts and one rule between them; the
+    // pricing line is real copy (spec 2026-09-29 §2.10) and, with no plans to read, promises
+    // nothing about paid plans.
     const document = await renderRoute(null);
     const hero = document.querySelector('[data-landing-section="hero"]');
     const pricing = document.querySelector('[data-landing-section="pricing"]');
-    expect(hero?.textContent).toContain("[PLACEHOLDER] rounds argued this week");
+    expect(hero?.textContent).not.toContain("[PLACEHOLDER]");
+    expect(hero?.textContent).not.toContain("rounds argued this week");
+    const facts = [...(hero?.querySelectorAll(".lpStatBar > li") ?? [])];
+    expect(facts.map((item) => item.classList.contains("lpStatRule") ? "rule" : "fact")).toEqual(["fact", "rule", "fact"]);
     expect(pricing?.textContent).toContain("Start free. No card needed.");
     expect(pricing?.textContent).not.toContain("[PLACEHOLDER]");
     expect(pricing?.querySelector('a[href="/pricing"]')).toBeNull();

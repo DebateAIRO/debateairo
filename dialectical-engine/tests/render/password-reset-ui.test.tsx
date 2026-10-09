@@ -38,7 +38,7 @@ async function enterForm(f = fixture()) { history.replaceState({}, "", "/reset-p
 async function fill() { await type("new-password", "long unique new password"); await type("confirm-password", "long unique new password"); await type("code", "123 456"); }
 
 describe("ordinary password-only reset screen", () => {
-  it.each([["en", en, "Email address"], ["ro", ro, "Adresa de email"]] as const)("has visible email labels and saved-code fallback in %s", async (locale, catalog, label) => {
+  it.each([["en", en, "Email address"], ["ro", ro, "Adresa de e-mail"]] as const)("has visible email labels and saved-code fallback in %s", async (locale, catalog, label) => {
     await act(async () => root.render(<PasswordResetFlow locale={locale} catalog={catalog} client={fixture().client} />));
     const field = [...host.querySelectorAll("label")].find(item => item.textContent === label)!;
     expect(host.querySelector(`#${field.htmlFor}`)?.tagName).toBe("INPUT");

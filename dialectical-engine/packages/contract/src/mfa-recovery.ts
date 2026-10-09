@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { ContractHttpError } from "./http-error.js";
+import { TurnstileTokenSchema } from "./auth-shared.js";
 const bearer = z.string().regex(/^[A-Za-z0-9_-]{43}$/), date = z.iso.datetime({ offset: true });
 const empty = z.object({}).strict(), link = z.object({ token: bearer }).strict();
 const generic = z.object({ message: z.literal("If this account can be recovered, instructions will arrive through an eligible channel.") }).strict();
 const result = <S extends string>(status: S) => z.object({ status: z.literal(status) }).strict();
 const digits = z.object({ code: z.string().regex(/^[0-9]{6}$/) }).strict();
-export const MfaRecoveryStartRequestSchema = z.object({ email: z.string().min(1).max(320), destination: z.enum(["primary", "backup"]) }).strict();
+/** `turnstile_token` (action "mfa-recovery") is required by the server only while TURNSTILE_RECOVERY_REQUIRED is on. */
+export const MfaRecoveryStartRequestSchema = z.object({ email: z.string().min(1).max(320), destination: z.enum(["primary", "backup"]), turnstile_token: TurnstileTokenSchema.optional() }).strict();
 export const MfaRecoveryExchangeRequestSchema = z.object({ token: bearer, password: z.string().min(1).max(1024) }).strict();
 export const MfaRecoveryStateSchema = z.object({ status: z.enum(["factor_required", "totp_required", "codes_required", "ack_required", "ready", "completed", "cancelled", "refused"]), expires_at: date }).strict();
 export const MfaRecoveryExchangeSchema = MfaRecoveryStateSchema.extend({ status: z.literal("factor_required") });
@@ -63,7 +65,7 @@ function transport(fetcher: typeof fetch, base: string, prefix: string, csrf: ()
 }
 export function createMfaRecoveryClient(fetcher: typeof fetch = fetch, base = "/api", csrf = () => cookie("__Host-debateai-mfa-recovery-csrf")) {
   const request = transport(fetcher, base, "/v1/auth/mfa-recovery/", csrf, "x-mfa-recovery-csrf-token");
-  return { start: (email: string, destination: "primary" | "backup") => request("start", generic, { email, destination }, false, 202), exchange: (token: string, password: string) => request("exchange", MfaRecoveryExchangeSchema, { token, password }, false), status: () => request("status", MfaRecoveryStateSchema), beginFactor: () => request("totp/begin", MfaRecoveryFactorSchema, {}), verifyFactor: (code: string) => request("totp/verify", result("codes_required"), { code }), generateCodes: () => request("codes/generate", MfaRecoveryCodesSchema, {}), acknowledge: (code: string) => request("codes/confirm", result("ready"), { code }), complete: () => request("complete", result("completed"), {}), cancel: (token: string) => request("cancel", result("cancelled"), { token }, false), cancelCurrent: () => request("cancel-current", result("cancelled"), {}) };
+  return { start: (email: string, destination: "primary" | "backup", turnstileToken?: string) => request("start", generic, { email, destination, ...(turnstileToken === undefined ? {} : { turnstile_token: turnstileToken }) }, false, 202), exchange: (token: string, password: string) => request("exchange", MfaRecoveryExchangeSchema, { token, password }, false), status: () => request("status", MfaRecoveryStateSchema), beginFactor: () => request("totp/begin", MfaRecoveryFactorSchema, {}), verifyFactor: (code: string) => request("totp/verify", result("codes_required"), { code }), generateCodes: () => request("codes/generate", MfaRecoveryCodesSchema, {}), acknowledge: (code: string) => request("codes/confirm", result("ready"), { code }), complete: () => request("complete", result("completed"), {}), cancel: (token: string) => request("cancel", result("cancelled"), { token }, false), cancelCurrent: () => request("cancel-current", result("cancelled"), {}) };
 }
 export function createBackupEmailClient(fetcher: typeof fetch = fetch, base = "/api", csrf = () => cookie("__Host-debateai-csrf")) {
   const request = transport(fetcher, base, "/v1/account/backup-email", csrf, "x-csrf-token");

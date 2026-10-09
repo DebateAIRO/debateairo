@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Iniciar mi plan ahora. Entiendo que, si desisto en un plazo de 14 días, pago la parte ya utilizada: la mayor entre los días utilizados y el crédito utilizado.",
   "billing.checkout.continueToCard": "Continuar a los datos de la tarjeta",
   "billing.checkout.cardTitle": "Datos de la tarjeta",
-  "billing.checkout.cardNote": "Introduce su tarjeta en el formulario seguro de xMoney. El número de su tarjeta nunca llega a nuestros servidores.",
+  "billing.checkout.cardNote": "Introduce su tarjeta en el formulario seguro de NETOPIA Payments. El número de su tarjeta nunca llega a nuestros servidores.",
   "billing.checkout.subscribeAndPay": "Pedido con obligación de pago",
   "billing.checkout.waitingForBank": "Esperando la confirmación de su banco…",
   "billing.checkout.willEmail": "Le enviaremos un correo en cuanto su banco lo confirme.",

@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Porniți-mi abonamentul acum. Înțeleg că, dacă mă retrag în 14 zile, plătesc partea deja folosită: cea mai mare dintre zilele folosite și creditul folosit.",
   "billing.checkout.continueToCard": "Continuați spre datele cardului",
   "billing.checkout.cardTitle": "Datele cardului",
-  "billing.checkout.cardNote": "Introduceți cardul în formularul securizat al xMoney. Numărul cardului dvs. nu ajunge niciodată pe serverele noastre.",
+  "billing.checkout.cardNote": "Introduceți cardul în formularul securizat al NETOPIA Payments. Numărul cardului dvs. nu ajunge niciodată pe serverele noastre.",
   "billing.checkout.subscribeAndPay": "Comandă cu obligație de plată",
   "billing.checkout.waitingForBank": "Așteptăm confirmarea băncii dvs.…",
   "billing.checkout.willEmail": "Vă trimitem un e-mail imediat ce banca dvs. confirmă.",

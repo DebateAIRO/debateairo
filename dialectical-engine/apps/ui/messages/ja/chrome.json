@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "保存しているクッキー",
   "chrome.security": "セキュリティ",
   "chrome.logout": "ログアウト",
+  "chrome.logIn": "ログイン",
   "chrome.accountError": "処理できませんでした。ページを再読み込みして、もう一度お試しください。",
   "chrome.footer.pricing": "料金",
   "chrome.footer.cancel": "プランの解約",

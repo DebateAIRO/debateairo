@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Giá và thanh toán",
   "legal.notice.s04.body": "{product} hiện miễn phí. Chưa có gói trả phí nào. Trước khi bất kỳ gói trả phí nào bắt đầu, mục này sẽ nêu rõ giá (đã bao gồm thuế), cách thức và thời điểm thanh toán, thời điểm dịch vụ bắt đầu, cách gia hạn và cách hủy.",
   "legal.notice.s04.bodyPaid": "Các gói trả phí và giá hằng tháng của chúng có trên trang bảng giá. Giá ở đó chưa bao gồm thuế; trước khi bạn thanh toán, trang thanh toán hiển thị giá đầy đủ kèm thuế của quốc gia bạn. Bạn thanh toán bằng thẻ, trả trước mỗi tháng. Gói bắt đầu ngay khi ngân hàng của bạn xác nhận khoản thanh toán và tự động gia hạn mỗi tháng cho đến khi bạn hủy. Bạn có thể hủy bất cứ lúc nào trong Cài đặt, hoặc trên trang hủy mà không cần đăng nhập.",
-  "legal.notice.s04.payments": "Các khoản thanh toán bằng thẻ do xMoney xử lý. Chúng tôi không bao giờ nhìn thấy hay lưu số thẻ của bạn.",
+  "legal.notice.s04.payments": "Các khoản thanh toán bằng thẻ do NETOPIA Payments xử lý. Chúng tôi không bao giờ nhìn thấy hay lưu số thẻ của bạn.",
   "legal.notice.s04.pricingLink": "Xem các gói và giá",
   "legal.notice.s04.cancelLink": "Hủy gói",
   "legal.notice.s05.title": "Rút lui và hoàn tiền",

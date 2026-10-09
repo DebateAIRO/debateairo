@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Aloita tilaukseni nyt. Ymmärrän, että jos peruutan sopimuksen 14 päivän kuluessa, maksan jo käytetystä osuudesta: suuremman käytetyistä päivistä tai käytetystä krediitistä.",
   "billing.checkout.continueToCard": "Jatka korttitietoihin",
   "billing.checkout.cardTitle": "Korttitiedot",
-  "billing.checkout.cardNote": "Syötät korttisi xMoneyn suojattuun lomakkeeseen. Korttinumerosi ei koskaan päädy palvelimillemme.",
+  "billing.checkout.cardNote": "Syötät korttisi NETOPIA Paymentsin suojattuun lomakkeeseen. Korttinumerosi ei koskaan päädy palvelimillemme.",
   "billing.checkout.subscribeAndPay": "Tilaa ja sitoudu maksamaan",
   "billing.checkout.waitingForBank": "Odotetaan pankkisi vahvistusta…",
   "billing.checkout.willEmail": "Lähetämme sinulle sähköpostia heti, kun pankkisi vahvistaa.",

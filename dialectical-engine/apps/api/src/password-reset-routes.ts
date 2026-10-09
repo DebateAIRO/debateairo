@@ -27,7 +27,8 @@ export function registerPasswordResetRoutes(api: FastifyInstance, options: Reado
   service: PasswordResetApplication;
   policy: (route: Route) => RouteShorthandOptions;
   source: (request: FastifyRequest) => AuthSourceContext;
-  admitStart: (request: FastifyRequest, reply: FastifyReply) => boolean;
+  /** Per-source admission, then (TURNSTILE_RECOVERY_REQUIRED) the proof; false = refusal already sent. */
+  admitStart: (request: FastifyRequest, reply: FastifyReply) => boolean | Promise<boolean>;
 }>) {
   const guarded = (operation: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>) => async (request: FastifyRequest, reply: FastifyReply) => {
     reply.header("cache-control", "no-store");
@@ -66,9 +67,11 @@ export function registerPasswordResetRoutes(api: FastifyInstance, options: Reado
   };
   api.post("/v1/auth/password-reset/start", options.policy("POST /v1/auth/password-reset/start"), guarded(async (request, reply) => {
     const body = parse(PasswordResetStartRequestSchema, request.body, reply);
-    if (body === null || !options.admitStart(request, reply))
+    if (body === null || !await options.admitStart(request, reply))
       return reply;
-    return reply.status(202).send(await options.service.start(body, options.source(request)));
+    // The proof was the gate's; only the account facts reach the service.
+    const { turnstile_token: _proof, ...input } = body;
+    return reply.status(202).send(await options.service.start(input, options.source(request)));
   }));
   api.post("/v1/auth/password-reset/exchange", options.policy("POST /v1/auth/password-reset/exchange"), guarded(async (request, reply) => {
     const body = parse(PasswordResetLinkRequestSchema, request.body, reply);

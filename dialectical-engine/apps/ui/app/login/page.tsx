@@ -5,6 +5,8 @@ import { LoginFlow } from "@/components/LoginFlow";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { safeReturnPath } from "@/lib/returnPath";
+import { publicTurnstileConfig } from "@/lib/turnstile";
+import { NONCE_REQUEST_HEADER } from "../../content-security-policy.mjs";
 import { createServerContractClient, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
 import { t } from "@/lib/i18n/translate";
 
@@ -61,5 +63,8 @@ export default async function LoginPage({
       </AuthShell>
     );
   }
-  return <LoginFlow catalog={catalog} />;
+  // Public config only: the "Didn't get the verification email?" entry reuses sign-up's resend screen.
+  const requestHeaders = await headers();
+  const turnstile = publicTurnstileConfig(process.env.TURNSTILE_SITE_KEY, requestHeaders.get(NONCE_REQUEST_HEADER) ?? undefined, process.env.NODE_ENV === "production");
+  return <LoginFlow catalog={catalog} turnstile={turnstile} />;
 }

@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Start min plan nu. Jeg forstår, at hvis jeg fortryder inden for 14 dage, betaler jeg for den del, der allerede er brugt: den største af de brugte dage eller den brugte kredit.",
   "billing.checkout.continueToCard": "Fortsæt til kortoplysninger",
   "billing.checkout.cardTitle": "Kortoplysninger",
-  "billing.checkout.cardNote": "Du indtaster dit kort i xMoneys sikre formular. Dit kortnummer når aldrig vores servere.",
+  "billing.checkout.cardNote": "Du indtaster dit kort i NETOPIA Payments' sikre formular. Dit kortnummer når aldrig vores servere.",
   "billing.checkout.subscribeAndPay": "Bestil med betalingspligt",
   "billing.checkout.waitingForBank": "Venter på, at din bank bekræfter…",
   "billing.checkout.willEmail": "Vi sender dig en e-mail, så snart din bank bekræfter.",

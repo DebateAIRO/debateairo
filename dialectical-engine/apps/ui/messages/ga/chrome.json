@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Na fianáin a stórálaimid",
   "chrome.security": "Slándáil",
   "chrome.logout": "Logáil amach",
+  "chrome.logIn": "Sínigh isteach",
   "chrome.accountError": "Níor oibrigh sé sin. Athlódáil an leathanach agus bain triail eile as.",
   "chrome.footer.pricing": "Praghsanna",
   "chrome.footer.cancel": "Cuir plean ar ceal",

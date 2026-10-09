@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "העוגיות שאנחנו שומרים",
   "chrome.security": "אבטחה",
   "chrome.logout": "יציאה",
+  "chrome.logIn": "התחברות",
   "chrome.accountError": "הפעולה לא הצליחה. יש לרענן את הדף ולנסות שוב.",
   "chrome.footer.pricing": "מחירים",
   "chrome.footer.cancel": "ביטול תוכנית",

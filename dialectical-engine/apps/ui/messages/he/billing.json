@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "התחילו את התוכנית שלי עכשיו. ידוע לי שאם אבטל את ההתקשרות תוך 14 ימים, אשלם על החלק שכבר נוצל: הגדול מבין הימים שנוצלו והקרדיט שנוצל.",
   "billing.checkout.continueToCard": "המשך לפרטי הכרטיס",
   "billing.checkout.cardTitle": "פרטי הכרטיס",
-  "billing.checkout.cardNote": "אתם מקלידים את הכרטיס בטופס המאובטח של xMoney. מספר הכרטיס שלכם לעולם אינו מגיע לשרתים שלנו.",
+  "billing.checkout.cardNote": "אתם מקלידים את הכרטיס בטופס המאובטח של NETOPIA Payments. מספר הכרטיס שלכם לעולם אינו מגיע לשרתים שלנו.",
   "billing.checkout.subscribeAndPay": "הזמנה עם חובת תשלום",
   "billing.checkout.waitingForBank": "ממתינים לאישור הבנק שלכם…",
   "billing.checkout.willEmail": "נשלח לכם הודעת דוא״ל ברגע שהבנק יאשר.",

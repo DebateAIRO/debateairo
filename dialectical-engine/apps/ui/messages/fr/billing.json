@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Démarrez ma formule maintenant. Je comprends que si je me rétracte dans les 14 jours, je paie la part déjà utilisée : la plus grande entre les jours utilisés et le crédit utilisé.",
   "billing.checkout.continueToCard": "Continuer vers les données de carte",
   "billing.checkout.cardTitle": "Données de carte",
-  "billing.checkout.cardNote": "Vous saisissez votre carte dans le formulaire sécurisé de xMoney. Votre numéro de carte n’atteint jamais nos serveurs.",
+  "billing.checkout.cardNote": "Vous saisissez votre carte dans le formulaire sécurisé de NETOPIA Payments. Votre numéro de carte n’atteint jamais nos serveurs.",
   "billing.checkout.subscribeAndPay": "Commande avec obligation de paiement",
   "billing.checkout.waitingForBank": "En attente de la confirmation de votre banque…",
   "billing.checkout.willEmail": "Nous vous enverrons un e-mail dès que votre banque aura confirmé.",

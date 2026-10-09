@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Alustage minu paketti kohe. Mõistan, et kui taganen 14 päeva jooksul, maksan juba kasutatud osa eest: suurema kasutatud päevadest või kasutatud krediidist.",
   "billing.checkout.continueToCard": "Jätka kaardiandmetega",
   "billing.checkout.cardTitle": "Kaardiandmed",
-  "billing.checkout.cardNote": "Sisestate kaardi xMoney turvalisse vormi. Teie kaardinumber ei jõua kunagi meie serveritesse.",
+  "billing.checkout.cardNote": "Sisestate kaardi NETOPIA Payments turvalisse vormi. Teie kaardinumber ei jõua kunagi meie serveritesse.",
   "billing.checkout.subscribeAndPay": "Esita maksekohustusega tellimus",
   "billing.checkout.waitingForBank": "Ootame teie panga kinnitust…",
   "billing.checkout.willEmail": "Saadame teile e-kirja kohe, kui teie pank kinnitab.",

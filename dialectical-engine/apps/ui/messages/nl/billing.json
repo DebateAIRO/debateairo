@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Start mijn abonnement nu. Ik begrijp dat als ik binnen 14 dagen herroep, ik betaal voor het deel dat al is gebruikt: het grootste van de gebruikte dagen of het gebruikte tegoed.",
   "billing.checkout.continueToCard": "Verder naar kaartgegevens",
   "billing.checkout.cardTitle": "Kaartgegevens",
-  "billing.checkout.cardNote": "U voert uw kaart in het beveiligde formulier van xMoney in. Uw kaartnummer bereikt nooit onze servers.",
+  "billing.checkout.cardNote": "U voert uw kaart in het beveiligde formulier van NETOPIA Payments in. Uw kaartnummer bereikt nooit onze servers.",
   "billing.checkout.subscribeAndPay": "Bestelling met betalingsverplichting",
   "billing.checkout.waitingForBank": "Wachten op bevestiging van uw bank…",
   "billing.checkout.willEmail": "We e-mailen u zodra uw bank bevestigt.",

@@ -1,3 +1,4 @@
+import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 import { canonicalSignup, canonicalResend, passedTurnstile } from "../support/turnstileFixtures.js";
 import { createHmac, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -979,16 +980,16 @@ describe("S3 public auth facade, limiter, and test mail channel", () => {
       verifyEmail: async () => { calls.push("verify"); return { status: "mfa_required" }; },
       resendVerification: async () => { calls.push("resend"); return RESEND_PUBLIC_RESPONSE; }
     };
-    const api = buildApi({ application: fixtureAskApplication(), registration, turnstile:passedTurnstile });
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: fixtureAskApplication(), registration, turnstile:passedTurnstile });
     try {
-      const register = await api.inject({
+      const register = await api.inject({ headers: { origin: TEST_APP_ORIGIN },
         method: "POST", url: "/v1/auth/register",
         payload:canonicalSignup
       });
-      const verify = await api.inject({
+      const verify = await api.inject({ headers: { origin: TEST_APP_ORIGIN },
         method: "POST", url: "/v1/auth/verify-email", payload: { token: "opaque-token" }
       });
-      const resend = await api.inject({
+      const resend = await api.inject({ headers: { origin: TEST_APP_ORIGIN },
         method: "POST", url: "/v1/auth/resend-verification", payload:canonicalResend
       });
 
@@ -1464,10 +1465,10 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
         verifyEmail: async () => { throw new Argon2InfrastructureError(code); },
         resendVerification: async () => { throw new Argon2InfrastructureError(code); }
       };
-      const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: failing });
+      const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: failing });
       try {
         for (const route of AUTH_ROUTE_REQUESTS) {
-          const response = await api.inject({
+          const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN },
             method: "POST", url: route.url, payload: route.payload
           });
           expect(response.statusCode).toBe(503);
@@ -1500,9 +1501,9 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
         verifyEmail: async () => { throw expected.error; },
         resendVerification: async () => { throw expected.error; }
       };
-      const api = buildApi({ application: fixtureAskApplication(), turnstile: passedTurnstile, registration: failing });
+      const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: fixtureAskApplication(), turnstile: passedTurnstile, registration: failing });
       try {
-        const response = await api.inject({
+        const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN },
           method: "POST", url: "/v1/auth/register", payload: AUTH_ROUTE_REQUESTS[0]!.payload
         });
         expect(response.statusCode).toBe(expected.status);

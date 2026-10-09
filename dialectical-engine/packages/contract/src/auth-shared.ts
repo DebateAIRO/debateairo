@@ -12,6 +12,13 @@ export const SessionSchema = z.object({
 }).strict();
 export type Session = z.infer<typeof SessionSchema>;
 
+/**
+ * A Cloudflare Turnstile proof as the browser widget hands it over. Required on sign-up and resend;
+ * on sign-in and the public recovery starts it is optional in the wire shape and required by the
+ * server only while TURNSTILE_LOGIN_REQUIRED / TURNSTILE_RECOVERY_REQUIRED are on (2026-10-09).
+ */
+export const TurnstileTokenSchema = z.string().min(1).max(2048).regex(/\S/u);
+
 /** The displayed document's immutable version and content digest. */
 export const LegalDocumentPairSchema = z.object({
   version: z.string().regex(/^[0-9]{1,4}\.[0-9]{1,4}$/u),

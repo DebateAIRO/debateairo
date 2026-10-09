@@ -68,7 +68,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     useEffect(() => {
         const deadline = held?.step_up_grant.expires_at ?? enrollment?.expiresAt;
         if (!deadline) return;
-        const timer = setTimeout(() => { cancel(); setError(t(authCatalog, 'auth.enroll.expired')); }, Math.max(0, Date.parse(deadline) - Date.now()));
+        const timer = setTimeout(() => { cancel(); setError(t(authCatalog, 'auth.security.expired')); }, Math.max(0, Date.parse(deadline) - Date.now()));
         return () => clearTimeout(timer);
     }, [held, enrollment, authCatalog]);
     useEffect(() => {
@@ -136,34 +136,45 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     return <div className="screen scroll setScreen"><div className="setBody"><div className="setInner">
         <h1 className="setTitle">{t(catalog, 'settings.security.title')}</h1>
         <SecurityActionResume catalog={authCatalog} settingsCatalog={catalog} publicCatalog={publicCatalog} locale={locale} client={client} onResume={receive}/>
-        {notice ? <p role="status">{notice}</p> : null}
-        {error ? <p role="alert">{error}</p> : null}
+        {notice ? <p className="setStatus" role="status">{notice}</p> : null}
+        {error ? <p className="setError" role="alert">{error}</p> : null}
         <PhoneProfileCard catalog={catalog} authCatalog={authCatalog} client={client} resume={phoneResume} onUpdated={phoneUpdated}/>
-        {returnToQuestion ? <a href="/new">{t(authCatalog, 'auth.continue')}</a> : null}
-        <section className="setList"><h2>{t(authCatalog, 'auth.enroll.securityTitle')}</h2>
-            {(methods?.methods ?? []).map(method => <div key={method.factor_id} className="setSessionRow"><span>{method.label ?? t(authCatalog, method.type === 'passkey' ? 'auth.passkey.use' : 'auth.login.useAuthenticatorCode')}</span><button type="button" data-remove-factor disabled={busy || !method.removable} onClick={() => choose({ action: 'REMOVE_AUTH_METHOD', target_factor_id: method.factor_id })}>{t(catalog, 'settings.sessions.revoke')}</button>{!method.removable ? <p>{t(catalog, 'settings.security.lastPath')}</p> : null}</div>)}
-            <button type="button" disabled={busy} onClick={() => choose({ action: 'ADD_PASSKEY' })}>{t(authCatalog, 'auth.passkey.create')}</button>
-            <button type="button" disabled={busy} onClick={() => choose({ action: 'ADD_TOTP' })}>{t(authCatalog, 'auth.enroll.useAuthenticator')}</button>
-            {methods ? <p>{t(catalog, 'settings.security.codesRemaining', { count: methods.recovery_codes_remaining })}</p> : null}
-            <button type="button" disabled={busy || !methods} onClick={() => choose({ action: 'REGENERATE_RECOVERY_CODES' })}>{t(catalog, 'settings.security.regenerate')}</button>
-            {codes ? <EphemeralCodes catalog={authCatalog} codes={codes}/> : null}
+        {returnToQuestion ? <p className="setListActions"><a className="setBtn setBtnPrimary" href="/new">{t(authCatalog, 'auth.continue')}</a></p> : null}
+        <div className="setSectionHead"><h2 className="setSectionTitle">{t(authCatalog, 'auth.enroll.securityTitle')}</h2></div>
+        <section className="setList">
+            {methods && methods.recovery_codes_remaining === 0 && !methods.methods.some(method => method.type === 'passkey') ? <p className="setStatus" data-lockout-reminder>{t(catalog, 'settings.security.lockoutReminder')}</p> : null}
+            {(methods?.methods ?? []).map(method => <div key={method.factor_id} className="setSessionRow"><div className="setSessionMain"><span className="setSessionDevice">{method.label ?? t(authCatalog, method.type === 'passkey' ? 'auth.passkey.use' : 'auth.login.useAuthenticatorCode')}</span>{!method.removable ? <p className="setSessionSeen">{t(catalog, 'settings.security.lastPath')}</p> : null}</div><button type="button" className="setBtn setBtnRevoke" data-remove-factor disabled={busy || !method.removable} onClick={() => choose({ action: 'REMOVE_AUTH_METHOD', target_factor_id: method.factor_id })}>{t(catalog, 'settings.security.remove')}</button></div>)}
+            <div className="setListActions">
+                <button type="button" className="setBtn" disabled={busy} onClick={() => choose({ action: 'ADD_PASSKEY' })}>{t(authCatalog, 'auth.passkey.create')}</button>
+                <button type="button" className="setBtn" disabled={busy} onClick={() => choose({ action: 'ADD_TOTP' })}>{t(authCatalog, 'auth.enroll.useAuthenticator')}</button>
+            </div>
+            {methods ? <p className="setStatus">{t(catalog, 'settings.security.codesRemaining', { count: methods.recovery_codes_remaining })}</p> : null}
+            <div className="setListActions"><button type="button" className="setBtn" disabled={busy || !methods} onClick={() => choose({ action: 'REGENERATE_RECOVERY_CODES' })}>{t(catalog, 'settings.security.regenerate')}</button></div>
+            {codes ? <EphemeralCodes kind="new" catalog={authCatalog} codes={codes}/> : null}
         </section>
-        <section className="setList"><h2>{t(authCatalog, 'auth.recovery.emailTitle')}</h2><p>{recovery?.email ?? '—'}</p>{recovery?.state === 'verified' ? <p>{t(catalog, 'settings.email.verified')}</p> : null}{recovery?.pending ? <p>{t(catalog, 'settings.email.pendingBadge')} · {recovery.pending.email}</p> : null}
-            <button type="button" disabled={busy} onClick={() => choose({ action: 'CHANGE_RECOVERY_EMAIL' })}>{t(catalog, 'settings.email.change')}</button>
-            {recovery && recovery.state !== 'absent' ? <button type="button" disabled={busy} onClick={() => choose({ action: 'CHANGE_RECOVERY_EMAIL' }, true)}>{t(catalog, 'settings.sessions.revoke')}</button> : null}
+        <div className="setSectionHead"><h2 className="setSectionTitle">{t(authCatalog, 'auth.recovery.emailTitle')}</h2></div>
+        <section className="setList">
+            <div className="setSessionRow"><div className="setSessionMain"><span className="setSessionDevice">{recovery?.email ?? '—'}</span>{recovery?.state === 'verified' ? <p className="setSessionSeen">{t(catalog, 'settings.email.verified')}</p> : null}{recovery?.pending ? <p className="setSessionSeen">{t(catalog, 'settings.email.pendingBadge')} · {recovery.pending.email}</p> : null}</div></div>
+            <div className="setListActions">
+                <button type="button" className="setBtn" disabled={busy} onClick={() => choose({ action: 'CHANGE_RECOVERY_EMAIL' })}>{t(catalog, 'settings.email.change')}</button>
+                {recovery && recovery.state !== 'absent' ? <button type="button" className="setBtn setBtnRevoke" disabled={busy} onClick={() => choose({ action: 'CHANGE_RECOVERY_EMAIL' }, true)}>{t(catalog, 'settings.security.remove')}</button> : null}
+            </div>
         </section>
-        <section className="setList"><BackupEmailVerification locale={locale}/></section>
-        <section className="setList"><h2>{t(authCatalog, 'auth.social.methods')}</h2>
-            {(links?.providers ?? []).map(link => <div key={link.provider}><span>{providerName(link.provider)}</span><button type="button" disabled={busy || !link.removable} onClick={() => choose({ action: 'UNLINK_PROVIDER', target_provider: link.provider })}>{t(catalog, 'settings.sessions.revoke')}</button>{!link.removable ? <p>{t(catalog, 'settings.security.lastPath')}</p> : null}</div>)}
-            {(providers?.providers ?? []).filter(provider => !links?.providers.some(link => link.provider === provider.id)).map(provider => <button type="button" key={provider.id} disabled={busy || !links} onClick={() => choose({ action: 'LINK_PROVIDER', target_provider: provider.id })}>{t(authCatalog, 'auth.social.continue', { provider: provider.name })}</button>)}
+        <BackupEmailVerification locale={locale}/>
+        <div className="setSectionHead"><h2 className="setSectionTitle">{t(authCatalog, 'auth.social.methods')}</h2></div>
+        <section className="setList">
+            {(links?.providers ?? []).map(link => <div key={link.provider} className="setSessionRow"><div className="setSessionMain"><span className="setSessionDevice">{providerName(link.provider)}</span>{!link.removable ? <p className="setSessionSeen">{t(catalog, 'settings.security.lastPath')}</p> : null}</div><button type="button" className="setBtn setBtnRevoke" disabled={busy || !link.removable} onClick={() => choose({ action: 'UNLINK_PROVIDER', target_provider: link.provider })}>{t(catalog, 'settings.security.remove')}</button></div>)}
+            <div className="setListActions">
+                {(providers?.providers ?? []).filter(provider => !links?.providers.some(link => link.provider === provider.id)).map(provider => <button type="button" className="setBtn" key={provider.id} disabled={busy || !links} onClick={() => choose({ action: 'LINK_PROVIDER', target_provider: provider.id })}>{t(authCatalog, 'auth.social.continue', { provider: provider.name })}</button>)}
+            </div>
         </section>
-        {selected ? <section className="setList">
-            {selected.action === 'REMOVE_AUTH_METHOD' ? <p>{methods?.methods.find(value => value.factor_id === selected.target_factor_id)?.label ?? t(authCatalog, 'auth.enroll.securityTitle')}</p> : null}
-            {'target_provider' in selected ? <p>{providerName(selected.target_provider)}</p> : null}
-            {selected.action === 'CHANGE_RECOVERY_EMAIL' ? <>{removeRecovery ? <p>{recovery?.email ?? recovery?.pending?.email}</p> : <label>{t(authCatalog, 'auth.recovery.emailTitle')}<input type="email" value={email} autoComplete="email" onChange={event => setEmail(event.target.value)}/></label>}
-                {held ? <button type="button" onClick={() => setRemoveRecovery(!removeRecovery)}>{t(catalog, removeRecovery ? 'settings.email.change' : 'settings.sessions.revoke')}</button> : null}</> : null}
-            {enrollment ? <><SecurityEnrollment authority={{ kind: 'grant', token: enrollment.token }} availableMethods={selected.action === 'ADD_TOTP' ? ['totp'] : ['passkey']} catalog={authCatalog} client={client} onEnrolled={enrollmentFinished} onExpired={cancel}/><button type="button" onClick={cancel}>{t(authCatalog, 'auth.security.cancel')}</button></>
-                : held ? <><button type="button" data-resumed-confirm disabled={busy || !allowed} onClick={() => void execute(held)}>{t(authCatalog, 'auth.security.confirm')}</button><button type="button" onClick={cancel}>{t(authCatalog, 'auth.security.cancel')}</button></>
+        {selected ? <section className="setCard">
+            {selected.action === 'REMOVE_AUTH_METHOD' ? <p className="setCardTitle">{methods?.methods.find(value => value.factor_id === selected.target_factor_id)?.label ?? t(authCatalog, 'auth.enroll.securityTitle')}</p> : null}
+            {'target_provider' in selected ? <p className="setCardTitle">{providerName(selected.target_provider)}</p> : null}
+            {selected.action === 'CHANGE_RECOVERY_EMAIL' ? <>{removeRecovery ? <p className="setCardTitle">{recovery?.email ?? recovery?.pending?.email}</p> : <div className="authField"><label htmlFor="security-recovery-email">{t(authCatalog, 'auth.recovery.emailTitle')}</label><input id="security-recovery-email" type="email" value={email} autoComplete="email" onChange={event => setEmail(event.target.value)}/></div>}
+                {held ? <button type="button" className="setBtn setBtnQuiet" onClick={() => setRemoveRecovery(!removeRecovery)}>{t(catalog, removeRecovery ? 'settings.email.change' : 'settings.security.remove')}</button> : null}</> : null}
+            {enrollment ? <><SecurityEnrollment authority={{ kind: 'grant', token: enrollment.token }} availableMethods={selected.action === 'ADD_TOTP' ? ['totp'] : ['passkey']} catalog={authCatalog} client={client} onEnrolled={enrollmentFinished} onExpired={() => { cancel(); setError(t(authCatalog, 'auth.enroll.timedOut')); }}/><div className="setCardRow"><button type="button" className="setBtn setBtnQuiet" onClick={cancel}>{t(authCatalog, 'auth.security.cancel')}</button></div></>
+                : held ? <div className="setCardRow"><button type="button" className="setBtn setBtnPrimary" data-resumed-confirm disabled={busy || !allowed} onClick={() => void execute(held)}>{t(authCatalog, 'auth.security.confirm')}</button><button type="button" className="setBtn setBtnQuiet" onClick={cancel}>{t(authCatalog, 'auth.security.cancel')}</button></div>
                 : <SecurityConfirmation catalog={authCatalog} client={client} authorization={selected} disabled={busy || !allowed} onConfirmed={execute} onCancel={cancel}/>}
         </section> : null}
         <SessionControls catalog={catalog} locale={locale} client={client}/>

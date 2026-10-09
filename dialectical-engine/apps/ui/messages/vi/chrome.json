@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Các cookie chúng tôi lưu",
   "chrome.security": "Bảo mật",
   "chrome.logout": "Đăng xuất",
+  "chrome.logIn": "Đăng nhập",
   "chrome.accountError": "Thao tác không thành công. Hãy tải lại trang và thử lại.",
   "chrome.footer.pricing": "Bảng giá",
   "chrome.footer.cancel": "Hủy gói",

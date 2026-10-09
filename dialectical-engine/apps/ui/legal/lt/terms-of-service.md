@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.1 · Effective \[date\] · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. DebateAI kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Jūsų debatai yra privatūs, nebent juos paskelbiate; paskelbtus debatus gali skaityti bet kas. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu \[abuse@dezbatere.ro\], nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -40,6 +40,7 @@ DebateAI valdo Rumunijoje registruota bendrovė **DebateAIRO S.R.L.**
 | Privatumas ir duomenų apsauga | privacy@dezbatere.ro |
 | Pranešimai apie neteisėtą turinį | \[abuse@dezbatere.ro\] — žr. 10 skyrių |
 | Institucijų kontaktinis punktas | \[dsa@dezbatere.ro\] — rumunų ir anglų kalbomis |
+| Nurodymai pašalinti teroristinį turinį (Reglamentas (ES) 2021/784) | \[dsa@dezbatere.ro\] — mūsų kontaktinis punktas šiems nurodymams; rumunų ir anglų kalbomis; žr. 10 skyrių |
 | Atstovai kitose šalyse | Regionuose, kuriuose juos paskyrėme, jie nurodyti A priede |
 
 Šie duomenys taip pat nuolat skelbiami svetainėje adresu \[dezbatere.ro/legal\]. Visada galite susisiekti su žmogumi, ne tik su mūsų asistentu; kaip tai padaryti, paaiškinta 10 skyriuje.
@@ -151,17 +152,21 @@ Apie kiekvieno pranešimo gavimą patvirtiname nepagrįstai nedelsdami. Praneši
 - **Variklio sprendimai.** Variklis priima automatizuotus sprendimus dėl *argumentų*: jis gali atsisakyti atsakyti į klausimą, sustoti galutinėje būsenoje — pavyzdžiui, kai klausimas grindžiamas klaidinga prielaida arba yra vertybinis, o ne empirinis — apriboti pasitikėjimo lygį, kai nebuvo galima atlikti nepriklausomos kritikos, arba pažymėti atsakymą kaip netinkamą, kai sugeneruotas tekstas neišlaikė atitikties patikros. Tai numatytas produkto veikimas; šie sprendimai jums matomi debatuose ir nėra sprendimai dėl jūsų.
 - **Moderavimo sprendimai dėl turinio ir paskyrų.** Paskelbtų debatų pašalinimas ar prieigos prie jų apribojimas arba paskyros sustabdymas ar uždarymas yra mūsų pagal šias Sąlygas ar įstatymus priimamas sprendimas. Priimant kiekvieną tokį jūsų paskyrai poveikį darantį sprendimą dalyvauja žmogus. Pagrindai aprašyti 11 skyriuje.
 
-**Motyvų pareiškimas.** Kai pašaliname jūsų turinį ar apribojame jo matomumą arba sustabdome ar uždarome jūsų paskyrą, pateikiame motyvų pareiškimą: ką padarėme ir kokia yra veiksmo apimtis, kokiais faktais rėmėmės ir ar jie gauti iš pranešimo, ar nustatyti mūsų pačių patikros metu, ar naudotos automatizuotos priemonės, koks yra teisinis ar sutartinis pagrindas ir kaip galite užginčyti sprendimą.
+**Motyvų pareiškimas.** Kai pašaliname jūsų turinį ar apribojame jo matomumą arba sustabdome ar uždarome jūsų paskyrą, pateikiame motyvų pareiškimą: ką padarėme ir kokia yra veiksmo apimtis, kokiais faktais rėmėmės ir ar jie gauti iš pranešimo, ar nustatyti mūsų pačių patikros metu, ar naudotos automatizuotos priemonės, koks yra teisinis ar sutartinis pagrindas ir kaip galite užginčyti sprendimą: pasinaudodami toliau aprašyta skundų teikimo tvarka, kreipdamiesi į pagal ES Skaitmeninių paslaugų aktą sertifikuotą neteisminio ginčų sprendimo įstaigą arba į teismą.
 
 **Skundas dėl sprendimo.** Jei nesutinkate su moderavimo sprendimu, per **šešis mėnesius** atsakykite į motyvų pareiškimą arba rašykite adresu \[appeals@dezbatere.ro\]. Sprendimą peržiūrės priimant pirminį sprendimą nedalyvavęs žmogus, o mes pranešime jums motyvuotą rezultatą. Tai neturi įtakos jūsų teisei kreiptis į teismą ar naudotis alternatyviu ginčų sprendimu pagal 18 skyrių. Pagal skundų teikimo tvarką taip pat galima skųstis dėl to, kad nesiėmėme veiksmų gavę pranešimą, kad turinys buvo pašalintas neteisingai, kad paskyra buvo nepagrįstai apribota arba kad automatizuota priemonė netinkamai paveikė jūsų turinį.
 
+**Neteisminis ginčų sprendimas.** Jei esate Europos Sąjungoje, ginčą dėl bet kurio mūsų moderavimo sprendimo galite perduoti spręsti neteisminio ginčų sprendimo įstaigai, sertifikuotai pagal ES Skaitmeninių paslaugų akto (Reglamento (ES) 2022/2065) 21 straipsnį. Tai taikoma sprendimui dėl jūsų turinio ar paskyros, taip pat mūsų sprendimui dėl jūsų pateikto pranešimo. Įstaigą pasirenkate iš sąrašo, kurį Europos Komisija skelbia adresu digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, ir prieš tai neprivalote pasinaudoti mūsų skundų teikimo tvarka. Procese dalyvaujame sąžiningai ir atsisakome dalyvauti tik tuo atveju, jei tas pats ginčas dėl to paties turinio ir tuo pačiu pagrindu jau buvo išspręstas. Įstaigos sprendimas nėra privalomas nei jums, nei mums, o jūs išsaugote teisę kreiptis į teismą. Įstaiga gali imti iš jūsų nedidelį mokestį arba jo neimti. Jei įstaiga išsprendžia ginčą jūsų naudai, sumokame jos mokesčius ir atlyginame jūsų pagrįstas išlaidas; jei ji išsprendžia ginčą mūsų naudai, neturite kompensuoti mūsų mokesčių ar išlaidų, nebent įstaiga nustato, kad veikėte akivaizdžiai nesąžiningai.
+
 **Susisiekimas su žmogumi.** Mūsų pagalbos asistentas yra DI sistema ir apie tai informuoja. Bet kada galite paprašyti pasikalbėti su žmogumi, ir ši galimybė siūloma kiekviename pagalbos pokalbyje. Bendraudami su jumis nepasikliaujame vien automatizuotomis priemonėmis.
+
+**Teroristinis turinys.** Teroristinis turinys yra neteisėtas ir DebateAI jo skelbti neleidžiama (7 skyrius). Europos Sąjungos kompetentingos institucijos per 1 skyriuje nurodytą kontaktinį punktą gali mums siųsti nurodymus pašalinti turinį pagal Reglamentą (ES) 2021/784. Gavę tokį nurodymą, per vieną valandą pašaliname turinį arba panaikiname prieigą prie jo visose ES šalyse. Turinį paskelbusiam asmeniui pranešame, kad turinys buvo pašalintas, o jam paprašius — kodėl ir kaip galima apskųsti nurodymą, išskyrus atvejus, kai institucija nusprendžia, kad dėl visuomenės saugumo informacija ribotą laiką neturi būti atskleidžiama. Kaip reikalauja Reglamentas, pašalintą turinį ir susijusius duomenis saugome šešis mėnesius, kad pašalinimą būtų galima peržiūrėti ir, jei jis buvo neteisingas, atšaukti. Turinį paskelbęs asmuo gali apskųsti nurodymą tos šalies, kurios institucija jį išdavė, teismuose, taip pat gali pasinaudoti mūsų skundų teikimo tvarka. Jokia institucija nėra pareikalavusi, kad pagal šį Reglamentą imtumės konkrečių priemonių kovai su teroristiniu turiniu; jei kuri nors institucija to pareikalaus, šias priemones, įskaitant bet kokius automatizuotus įrankius, aprašysime čia.
 
 **Didelis pavojus gyvybei ar saugumui.** Sužinoję informaciją, leidžiančią manyti, kad daroma nusikalstama veika, kelianti grėsmę kieno nors gyvybei ar saugumui, informuojame kompetentingas institucijas.
 
 ## 11. Sustabdymas ir nutraukimas
 
-**Jūsų iniciatyva.** Kaip aprašyta 6 skyriuje, savo paskyrą galite bet kada uždaryti Nustatymuose. Priežasties nurodyti nereikia.
+**Jūsų iniciatyva.** Kaip aprašyta 6 skyriuje, savo paskyrą galite bet kada uždaryti Nustatymuose. Priežasties nurodyti nereikia. Uždarius paskyrą, šios Sąlygos nustoja galioti. Jos nustoja galioti tada, kai įsigalioja uždarymas, t. y. pasibaigus 7 dienų lengvatiniam laikotarpiui; po to toliau taikomi šio skyriaus pabaigoje nurodyti skyriai.
 
 **Mūsų iniciatyva.** Galime sustabdyti ar uždaryti jūsų paskyrą arba pašalinti ar apriboti jūsų turinį, kai: iš esmės pažeidžiate šias Sąlygas, visų pirma 7 skyrių; jūsų turinys yra neteisėtas arba įstatymai, teismas ar institucija reikalauja imtis veiksmų; jūsų naudojimasis kelia grėsmę paslaugos saugumui, vientisumui ar prieinamumui arba kitų asmenų teisėms; jūsų paskyra buvo neaktyvi \[24 months\] ir jus apie tai įspėjome; arba nustojame teikti paslaugą ar teikti ją jūsų šalyje.
 
@@ -259,7 +264,7 @@ Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu \[dezba
 
 **Visas susitarimas.** Šios Sąlygos kartu su Slapukų politika ir DI paslaugų teikėjų registru sudaro visą mūsų susitarimą dėl paslaugos. Privatumo politikoje mūsų prisiimti įsipareigojimai yra mums privalomi. Jokia šios pastraipos nuostata neatmeta atsakomybės už apgaulingą klaidingos informacijos pateikimą.
 
-**Kalba.** Šios Sąlygos skelbiamos anglų kalba \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Kalba.** Šios Sąlygos skelbiamos visomis svetainėje siūlomomis kalbomis. Sutartis sudaroma kalba, kuria užsiregistravote, t. y. tos versijos, su kuria sutikote, kalba; ji užfiksuota mūsų sutikimo įraše. Jei vėliau sutinkate su nauja versija kita kalba, sutartis toliau vykdoma ta kalba. Kitų kalbų versijos yra vertimai. Kai šalies, kurioje gyvenate, teisė nustato, kad pirmenybė teikiama tos šalies kalba parengtai versijai, pirmenybė teikiama tai versijai. Jei dvi kalbų versijos skiriasi, taikome jums palankesnį aiškinimą.
 
 **Kontaktai.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukareštas, Rumunija.
 

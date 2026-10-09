@@ -69,7 +69,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--con",
     blocks: [
       { kind: "p", text: "Un moteur de débat incite à poser des questions sur la politique, la religion, la santé, la sexualité et les convictions. Il s'agit de catégories particulières de données au sens de l'article 9 du GDPR, et elles peuvent figurer dans vos questions, que nous ayons ou non l'intention de les collecter." },
-      { kind: "p", text: "À votre sujet. Avant votre premier débat, vous consentez explicitement, sur un écran distinct, au traitement par nos soins des informations sensibles que vous choisissez d'inclure dans vos propres questions, afin de mener vos débats. Nous enregistrons la version du texte que vous avez acceptée, votre langue et l'heure de votre consentement. Sans ce consentement, vous ne pouvez pas lancer de débat. Vous pouvez retirer ce consentement à tout moment en écrivant à privacy@dezbatere.ro. Vous pouvez aussi omettre ces informations ou supprimer un débat qui les contient. Les informations que vous publiez à votre sujet sont des données que vous avez choisi de rendre publiques." },
+      { kind: "p", text: "À votre sujet. Avant votre premier débat, vous consentez explicitement, sur un écran distinct, au traitement par nos soins des informations sensibles que vous choisissez d'inclure dans vos propres questions, afin de mener vos débats. Nous enregistrons la version du texte que vous avez acceptée, votre langue et l'heure de votre consentement. Sans ce consentement, vous ne pouvez pas lancer de débat. Vous pouvez retirer ce consentement à tout moment en clôturant votre compte depuis les Paramètres. Vous pouvez aussi omettre ces informations ou supprimer un débat qui les contient. Les informations que vous publiez à votre sujet sont des données que vous avez choisi de rendre publiques." },
       { kind: "p", text: "Au sujet d'autres personnes. Aucune condition juridique ne nous permet de traiter des données sensibles concernant un tiers que vous nommez dans une question, et aucun de nos fournisseurs d'IA ne bénéficie non plus d'une telle condition. C'est pourquoi les Conditions l'interdisent, pourquoi nous réduisons au minimum ce que nous envoyons et pourquoi nous retirons rapidement ce contenu sur demande — section 11." },
       { kind: "p", text: "Informations de santé. Certains pays soumettent les données relatives à la santé, y compris les inférences, à des lois spécifiques. Si vous vivez dans [the State of Washington], un document distinct, le [Consumer Health Data Privacy Notice], s'applique." }
     ]
@@ -187,7 +187,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Limitation (Art. 18) — Demandez-nous de suspendre le traitement de certaines données jusqu'à la résolution d'un litige les concernant",
         "Opposition (Art. 21) — Opposez-vous au traitement fondé sur des intérêts légitimes — les traitements de sécurité et d'audit de la section 4 — et nous y mettrons fin, sauf si nous pouvons démontrer des motifs impérieux. Opposez-vous à tout moment à la prospection, et nous y mettrons fin",
         "Portabilité (Art. 20) — Vos débats et les données de votre compte dans un format couramment utilisé et lisible par machine. Utilisez Exporter les données dans Paramètres : le ZIP contient vos données dans des fichiers JSON lisibles par machine et une page lisible ; le lien envoyé par e-mail est valable 24 heures et utilisable uniquement lorsque vous êtes connecté à votre compte. Le contenu non personnel que vous avez créé, notamment vos questions, vous est restitué sur demande à la fin du contrat",
-        "Retrait du consentement (Art. 7(3)) — Retirez votre consentement à la prospection depuis n'importe quel e-mail ou depuis les Paramètres ; retirez votre consentement au traitement des données sensibles en écrivant à privacy@dezbatere.ro (vous pouvez aussi omettre ces données ou supprimer un débat qui les contient). Le retrait n'affecte pas les traitements déjà effectués",
+        "Retrait du consentement (Art. 7(3)) — Retirez votre consentement à la prospection depuis n'importe quel e-mail ou depuis les Paramètres ; retirez votre consentement au traitement des données sensibles en clôturant votre compte depuis les Paramètres (vous pouvez aussi omettre ces données ou supprimer un débat qui les contient). Le retrait n'affecte pas les traitements déjà effectués",
         "Réclamation — Auprès de l'autorité de contrôle roumaine, l'ANSPDCP, B-dul G-ral Gheorghe Magheru 28–30, Bucarest, anspdcp@dataprotection.ro, ou auprès de l'autorité du pays dans lequel vous vivez. Nous préférerions toutefois que vous nous contactiez d'abord"
         ]
       },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "8184433957fec10cadc1f3bd920f4967392a7de67810d0fa5c0ff9f167a7b62e",
+  sha256: "2407903313cfd37066b1ff63c0d02829a5b277f1fc360f623873f31adf17a7e8",
   eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.2 · EN VIGUEUR LE [DATE]",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",

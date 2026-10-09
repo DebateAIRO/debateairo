@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.1 · Effective \[date\] · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. DebateAI tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Id-dibattiti tiegħek huma privati sakemm ma tippubblikahomx; jekk tippubblikahom, kulħadd jista’ jaqrahom. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq \[abuse@dezbatere.ro\] kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -40,6 +40,7 @@ DebateAI titħaddem minn **DebateAIRO S.R.L.**, kumpanija rreġistrata fir-Ruman
 | Privatezza u protezzjoni tad-data | privacy@dezbatere.ro |
 | Rapportar ta’ kontenut illegali | \[abuse@dezbatere.ro\] — ara t-taqsima 10 |
 | Punt ta’ kuntatt għall-awtoritajiet | \[dsa@dezbatere.ro\] — bir-Rumen u bl-Ingliż |
+| Ordnijiet ta’ tneħħija għal kontenut terroristiku (Regolament (UE) 2021/784) | \[dsa@dezbatere.ro\] — il-punt ta’ kuntatt tagħna għal dawn l-ordnijiet; bir-Rumen u bl-Ingliż; ara t-taqsima 10 |
 | Rappreżentanti f’pajjiżi oħra | Elenkati fl-Anness A għar-reġjuni fejn ħtarna wieħed |
 
 Dawn id-dettalji jintwerew ukoll b’mod permanenti fuq is-sit fuq \[dezbatere.ro/legal\]. Dejjem tista’ tikkuntattja persuna, mhux biss lill-assistent tagħna; it-taqsima 10 tispjega kif.
@@ -151,17 +152,21 @@ Nikkonfermaw li rċevejna kull rapport mingħajr dewmien żejjed. Nittrattaw ir-
 - **Deċiżjonijiet fi ħdan il-magna.** Il-magna tieħu deċiżjonijiet awtomatizzati dwar *argumenti*: tista’ tirrifjuta li twieġeb mistoqsija, tieqaf f’rotta terminali — pereżempju meta mistoqsija tkun ibbażata fuq presuppożizzjoni falza jew tkun mistoqsija ta’ valur minflok waħda empirika — tillimita medda ta’ kunfidenza meta ma tkunx disponibbli kritika indipendenti, jew timmarka tweġiba bħala difettuża meta t-test iġġenerat ma jgħaddix mill-kontroll tal-konformità tiegħu. Dan huwa l-prodott li qed jaħdem kif imfassal; dawn ikunu viżibbli għalik fid-dibattitu, u mhumiex deċiżjonijiet dwarek.
 - **Deċiżjonijiet ta’ moderazzjoni dwar kontenut u kontijiet.** It-tneħħija jew ir-restrizzjoni ta’ dibattitu ppubblikat, jew is-sospensjoni jew l-għeluq ta’ kont, hija deċiżjoni li nieħdu abbażi ta’ dawn it-Termini jew tal-liġi. Persuna tkun involuta f’kull deċiżjoni bħal din li taffettwa l-kont tiegħek. It-taqsima 11 tiddeskrivi r-raġunijiet.
 
-**Dikjarazzjoni tar-raġunijiet.** Kull meta nneħħu jew nirrestrinġu l-viżibbiltà tal-kontenut tiegħek, jew nissospendu jew intemmu l-kont tiegħek, nagħtuk dikjarazzjoni tar-raġunijiet: x’għamilna u safejn tapplika, il-fatti li bbażajna ruħna fuqhom u jekk ġewx minn rapport jew mill-kontrolli tagħna stess, jekk intużawx mezzi awtomatizzati, il-bażi legali jew kuntrattwali, u kif tista’ tikkontesta d-deċiżjoni.
+**Dikjarazzjoni tar-raġunijiet.** Kull meta nneħħu jew nirrestrinġu l-viżibbiltà tal-kontenut tiegħek, jew nissospendu jew intemmu l-kont tiegħek, nagħtuk dikjarazzjoni tar-raġunijiet: x’għamilna u safejn tapplika, il-fatti li bbażajna ruħna fuqhom u jekk ġewx minn rapport jew mill-kontrolli tagħna stess, jekk intużawx mezzi awtomatizzati, il-bażi legali jew kuntrattwali, u kif tista’ tikkontesta d-deċiżjoni: permezz tal-proċedura tal-ilmenti tagħna hawn taħt, permezz ta’ korp iċċertifikat għas-soluzzjoni tat-tilwim barra mill-qorti skont l-Att dwar is-Servizzi Diġitali tal-UE, jew quddiem il-qorti.
 
 **Ilment dwar deċiżjoni.** Jekk ma taqbilx ma’ deċiżjoni ta’ moderazzjoni, wieġeb għad-dikjarazzjoni tar-raġunijiet jew ikteb lil \[appeals@dezbatere.ro\] fi żmien **sitt xhur**. Persuna li ma kinitx involuta fid-deċiżjoni oriġinali tirrieżaminaha, u ngħidulek ir-riżultat bir-raġunijiet. Dan ma jaffettwax id-dritt tiegħek li tmur il-qorti jew tuża soluzzjoni alternattiva għat-tilwim skont it-taqsima 18. Il-proċedura tal-ilmenti taċċetta wkoll ilmenti li ma nkunux aġixxejna fuq rapport, li kontenut tneħħa bi żball, li kont ġie ristrett bi żball, jew li għodda awtomatizzata affettwat il-kontenut tiegħek bi żball.
 
+**Soluzzjoni tat-tilwim barra mill-qorti.** Jekk tinsab fl-Unjoni Ewropea, tista’ tressaq tilwima dwar waħda mid-deċiżjonijiet ta’ moderazzjoni tagħna quddiem korp iċċertifikat għas-soluzzjoni tat-tilwim barra mill-qorti skont l-Artikolu 21 tal-Att dwar is-Servizzi Diġitali tal-UE (Regolament (UE) 2022/2065). Dan ikopri deċiżjoni dwar il-kontenut jew il-kont tiegħek, u d-deċiżjoni tagħna dwar rapport li għamilt int. Tagħżel il-korp mil-lista li l-Kummissjoni Ewropea tippubblika fuq digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, u m’għandekx għalfejn tuża l-proċedura tal-ilmenti tagħna l-ewwel. Aħna nipparteċipaw in bona fide, u nirrifjutaw biss jekk l-istess tilwima, dwar l-istess kontenut u għall-istess raġunijiet, tkun diġà ġiet solvuta. Id-deċiżjoni tal-korp ma torbotx la lilek u lanqas lilna, u int tibqa’ żżomm id-dritt tiegħek li tmur il-qorti. Il-korp jista’ jitolbok tariffa żgħira jew xejn. Jekk jiddeċiedi favurek, aħna nħallsu t-tariffi tiegħu u nirrimborżawk għall-ispejjeż raġonevoli tiegħek; jekk jiddeċiedi favurina, int ma tħallas xejn mit-tariffi jew l-ispejjeż tagħna, sakemm il-korp ma jsibx li int aġixxejt manifestament in mala fide.
+
 **Kuntatt ma’ persuna.** L-assistent tal-appoġġ tagħna huwa sistema tal-IA u jgħid hekk. Tista’ titlob li titkellem ma’ persuna fi kwalunkwe ħin, u kull konverżazzjoni mal-appoġġ toffri dik ir-rotta. Ma niddependux biss fuq għodod awtomatizzati biex nikkomunikaw miegħek.
+
+**Kontenut terroristiku.** Il-kontenut terroristiku huwa illegali u mhux permess fuq DebateAI (taqsima 7). L-awtoritajiet kompetenti fl-Unjoni Ewropea jistgħu jibagħtulna ordnijiet ta’ tneħħija skont ir-Regolament (UE) 2021/784 fil-punt ta’ kuntatt fit-taqsima 1. Meta nirċievu waħda, inneħħu l-kontenut, jew niddiżattivaw l-aċċess għalih fl-Istati Membri kollha tal-UE, fi żmien siegħa. Ngħidu lill-persuna li ppubblikatu li tneħħa u, jekk titlob, għaliex u kif tista’ tikkontesta l-ordni, ħlief jekk l-awtorità tiddeċiedi li, għal raġunijiet ta’ sigurtà pubblika, ma għandu jkun hemm l-ebda żvelar għal perjodu limitat. Kif jirrikjedi r-Regolament, inżommu l-kontenut imneħħi u d-data relatata għal sitt xhur, sabiex it-tneħħija tkun tista’ tiġi rieżaminata u, jekk kienet żbaljata, titreġġa’ lura. Il-persuna li ppubblikat il-kontenut tista’ tikkontesta l-ordni quddiem il-qrati tal-pajjiż li l-awtorità tiegħu ħarġet l-ordni, u tista’ wkoll tuża l-proċedura tal-ilmenti tagħna. L-ebda awtorità ma rrikjediet minna li nieħdu miżuri speċifiċi kontra l-kontenut terroristiku skont ir-Regolament; jekk xi waħda tagħmel dan, se niddeskrivu dawk il-miżuri hawnhekk, inklużi kwalunkwe għodod awtomatizzati.
 
 **Riskju serju għall-ħajja jew għas-sigurtà.** Jekk insiru konxji ta’ informazzjoni li tissuġġerixxi reat kriminali li jinvolvi theddida għall-ħajja jew għas-sigurtà ta’ xi ħadd, ninfurmaw lill-awtoritajiet kompetenti.
 
 ## 11. Sospensjoni u terminazzjoni
 
-**Min-naħa tiegħek.** Agħlaq il-kont tiegħek fi kwalunkwe ħin mill-Issettjar, kif tiddeskrivi t-taqsima 6. Ma għandekx bżonn tagħti raġuni.
+**Min-naħa tiegħek.** Agħlaq il-kont tiegħek fi kwalunkwe ħin mill-Issettjar, kif tiddeskrivi t-taqsima 6. Ma għandekx bżonn tagħti raġuni. L-għeluq tal-kont tiegħek itemm dawn it-Termini. Dawn jintemmu meta l-għeluq jidħol fis-seħħ, wara l-perjodu ta’ grazzja ta’ 7 ijiem; it-taqsimiet elenkati fl-aħħar ta’ din it-taqsima jibqgħu japplikaw wara dan.
 
 **Min-naħa tagħna.** Nistgħu nissospendu jew nagħlqu l-kont tiegħek, jew inneħħu jew nirrestrinġu l-kontenut tiegħek, fejn: tikser materjalment dawn it-Termini, b’mod partikolari t-taqsima 7; il-kontenut tiegħek ikun illegali, jew il-liġi jew qorti jew awtorità titlobna naġixxu; l-użu tiegħek jhedded is-sigurtà, l-integrità jew id-disponibbiltà tas-servizz jew id-drittijiet ta’ oħrajn; il-kont tiegħek ikun ilu inattiv għal \[24 months\] u nkunu avżajniek; jew nieqfu nipprovdu s-servizz, jew nieqfu nipprovduh f’pajjiżek.
 
@@ -259,7 +264,7 @@ Il-mod kif nittrattaw id-data personali huwa stabbilit fil-**Politika dwar il-Pr
 
 **Il-ftehim kollu.** Dawn it-Termini, flimkien mal-Politika dwar il-Cookies u r-Reġistru tal-Fornituri tal-IA, huma l-ftehim kollu bejnietna dwar is-servizz. L-impenji li nagħmlu fil-Politika dwar il-Privatezza jorbtuna. Xejn f’dan il-paragrafu ma jeskludi r-responsabbiltà għal rappreżentazzjoni falza frawdolenti.
 
-**Lingwa.** Dawn it-Termini jiġu ppubblikati bl-Ingliż \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Lingwa.** Dawn it-Termini jiġu ppubblikati f’kull lingwa li toffri s-sit. Il-kuntratt huwa fil-lingwa li biha rreġistrajt: il-lingwa tal-verżjoni li aċċettajt, li r-rekord tal-aċċettazzjoni tagħna jżomm. Jekk aktar tard taċċetta verżjoni ġdida f’lingwa oħra, il-kuntratt ikompli f’dik il-lingwa. Il-verżjonijiet fil-lingwi l-oħra huma traduzzjonijiet. Fejn il-liġi tal-pajjiż fejn tgħix tgħid li verżjoni bil-lingwa tiegħu stess tipprevali, dik il-verżjoni tipprevali. Jekk żewġ verżjonijiet lingwistiċi jiddifferixxu, napplikaw it-tifsira li hija aktar favorevoli għalik.
 
 **Kuntatt.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukarest, ir-Rumanija.
 

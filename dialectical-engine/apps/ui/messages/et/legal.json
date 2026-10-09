@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Hind ja maksmine",
   "legal.notice.s04.body": "{product} on tasuta. Tasulisi pakette veel ei ole. Enne tasuliste pakettide kasutuselevõttu on selles jaotises kirjas hind (koos maksudega), kuidas ja millal maksta, millal teenuse osutamine algab, kuidas toimib uuendamine ja kuidas tellimust tühistada.",
   "legal.notice.s04.bodyPaid": "Tasulised paketid ja nende kuuhinnad on hinnalehel. Seal toodud hinnad on maksudeta; enne maksmist näitab kassa täishinda koos teie riigi maksuga. Maksate kaardiga, iga kuu ette. Pakett algab kohe, kui teie pank makse kinnitab, ja uueneb iga kuu, kuni selle tühistate. Saate selle igal ajal tühistada seadetes või tühistamislehel ilma sisse logimata.",
-  "legal.notice.s04.payments": "Kaardimakseid töötleb xMoney. Me ei näe ega salvesta kunagi teie kaardinumbrit.",
+  "legal.notice.s04.payments": "Kaardimakseid töötleb NETOPIA Payments. Me ei näe ega salvesta kunagi teie kaardinumbrit.",
   "legal.notice.s04.pricingLink": "Vaadake pakette ja hindu",
   "legal.notice.s04.cancelLink": "Paketi tühistamine",
   "legal.notice.s05.title": "Taganemine ja tagasimaksed",

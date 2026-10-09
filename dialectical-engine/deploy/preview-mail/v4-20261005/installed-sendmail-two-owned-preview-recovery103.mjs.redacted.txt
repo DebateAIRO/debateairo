@@ -4,9 +4,9 @@ import { ownedRecoveryRoute103 } from './recovery-mail-policy-two-owned103.mjs';
 import { pathToFileURL } from 'node:url';
 
 const FROM = 'noreply@dezbatere.ro';
-const GMAIL = '[withheld recipient sha256:2896ffbc0c81a347fb66548d4915e538f6de76143fad4b6bc374ac44f0c1b5c8]';
-const STEFAN = '[withheld recipient sha256:2bdfb49c50be86c26e2cc71a2eed037ec88852f7e227ad211cbebbd4e90e3b66]';
-const YAHOO = 'REDACTED_INSTALLED_RECIPIENT';
+const FORWARD_SECONDARY = 'REDACTED_INSTALLED_RECIPIENT';
+const FORWARD_PRIMARY = 'REDACTED_INSTALLED_RECIPIENT';
+const DIRECT_AND_PROOF = 'REDACTED_INSTALLED_RECIPIENT';
 const MAX_BYTES = 262144;
 const TOTAL_MS = 4500; // Reserve cleanup before Source's immutable 5000ms transport deadline.
 const CHILD_MS = 4000;
@@ -26,7 +26,7 @@ export function ownedVerificationRoute(message) {
   if (at < 0 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text)) throw fail('MIME_REFUSED');
   const lines = text.slice(0, at).split('\r\n');
   if (lines.length !== 5 || lines[0] !== `From: ${FROM}`
-    || ![`To: ${STEFAN}`, `To: ${GMAIL}`, `To: ${YAHOO}`].includes(lines[1])
+    || ![`To: ${FORWARD_PRIMARY}`, `To: ${FORWARD_SECONDARY}`, `To: ${DIRECT_AND_PROOF}`].includes(lines[1])
     || lines[2] !== 'Subject: Verify your DebateAI email' || lines[3] !== 'MIME-Version: 1.0'
     || lines[4] !== 'Content-Type: text/plain; charset=UTF-8') throw fail('HEADER_REFUSED');
   const body = text.slice(at + 4);
@@ -34,7 +34,7 @@ export function ownedVerificationRoute(message) {
   if (!match) throw fail('VERIFICATION_MIME_REFUSED');
   const expires = new Date(match[1]);
   if (!Number.isFinite(expires.getTime()) || expires.toISOString() !== match[1]) throw fail('VERIFICATION_MIME_REFUSED');
-  const recipient = lines[1] === `To: ${YAHOO}` ? YAHOO : GMAIL;
+  const recipient = lines[1] === `To: ${DIRECT_AND_PROOF}` ? DIRECT_AND_PROOF : FORWARD_SECONDARY;
   // Input grammar is ASCII. Replace only the single second header line; body/fragment and every other byte stay exact.
   const begin = Buffer.byteLength(lines[0] + '\r\n');
   const end = begin + Buffer.byteLength(lines[1]);

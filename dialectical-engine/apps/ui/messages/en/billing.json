@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Start my plan now. I understand that if I withdraw within 14 days, I pay for the part already used: the larger of the days used or the credit used.",
   "billing.checkout.continueToCard": "Continue to card details",
   "billing.checkout.cardTitle": "Card details",
-  "billing.checkout.cardNote": "You type your card into xMoney's secure form. Your card number never reaches our servers.",
+  "billing.checkout.cardNote": "You type your card into the secure NETOPIA Payments form. Your card number never reaches our servers.",
   "billing.checkout.subscribeAndPay": "Subscribe and pay",
   "billing.checkout.waitingForBank": "Waiting for your bank to confirm…",
   "billing.checkout.willEmail": "We'll email you as soon as your bank confirms.",

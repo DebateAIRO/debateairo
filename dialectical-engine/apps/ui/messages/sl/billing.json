@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Zaženite moj paket zdaj. Razumem, da če odstopim v 14 dneh, plačam že porabljeni del: večjega od porabljenih dni ali porabljenega dobroimetja.",
   "billing.checkout.continueToCard": "Nadaljuj na podatke o kartici",
   "billing.checkout.cardTitle": "Podatki o kartici",
-  "billing.checkout.cardNote": "Kartico vnesete v varni obrazec družbe xMoney. Številka vaše kartice nikoli ne doseže naših strežnikov.",
+  "billing.checkout.cardNote": "Kartico vnesete v varni obrazec družbe NETOPIA Payments. Številka vaše kartice nikoli ne doseže naših strežnikov.",
   "billing.checkout.subscribeAndPay": "Naročilo z obveznostjo plačila",
   "billing.checkout.waitingForBank": "Čakamo na potrditev vaše banke…",
   "billing.checkout.willEmail": "Ko vaša banka potrdi, vam pošljemo e-poštno sporočilo.",

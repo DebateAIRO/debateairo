@@ -1,3 +1,4 @@
+import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 import { createServer } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -14,7 +15,7 @@ export const signup = { email: "person@example.test", password: "password-123", 
 const resend = { email: signup.email, locale: "ro", ui_locale: "ro", time_zone: null, turnstile_token: "resend-proof" };
 function harness(result: "passed" | "rejected" | "unavailable" | null = "passed") {
   const work: unknown[] = []; const proofs: unknown[] = [];
-  const options = { application: {} as AskApplication, registration: {
+  const options = { application: {} as AskApplication, allowedOrigin: TEST_APP_ORIGIN, registration: {
     register: async (input: unknown, source: unknown) => { work.push({ input, source }); return REGISTRATION_PUBLIC_RESPONSE; },
     verifyEmail: async () => ({ status: "mfa_required" as const }),
     resendVerification: async (input: unknown, source: unknown) => { work.push({ input, source }); return RESEND_PUBLIC_RESPONSE; }
@@ -26,32 +27,32 @@ describe("mandatory proof at the public identity boundary", () => {
   // Removing the canonical parse or gate would reach registration (and its lookup/KDF/mail).
   it.each(["turnstile_token", "locale", "ui_locale", "time_zone", "phone", "terms", "privacy", "country"])("rejects missing canonical signup field %s before identity", async key => {
     const { api, work, proofs } = harness(); const payload: Record<string, unknown> = { ...signup }; delete payload[key];
-    try { const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload });
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload });
       expect(response.statusCode).toBe(400); expect(work).toEqual([]); expect(proofs).toEqual([]);
     } finally { await api.close(); }
   });
   it.each(["ZZ", "R0", null])("rejects invalid country before proof or identity: %s", async country => {
     const { api, work, proofs } = harness();
-    try { const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...signup, country } });
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: { ...signup, country } });
       expect(response.statusCode).toBe(400); expect(proofs).toEqual([]); expect(work).toEqual([]);
     } finally { await api.close(); }
   });
   it.each(["adult_affirmed", "recovery_email", "phone_source", "hostname", "action", "url", "secret"])("rejects public authority/transport override %s", async key => {
     const { api, work, proofs } = harness();
-    try { const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...signup, [key]: "untrusted" } });
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: { ...signup, [key]: "untrusted" } });
       expect(response.statusCode).toBe(400); expect(work).toEqual([]); expect(proofs).toEqual([]);
     } finally { await api.close(); }
   });
   it.each([undefined, "", " ", "x".repeat(2049)])("rejects absent, empty or oversized proof at resend: %s", async token => {
     const { api, work, proofs } = harness();
-    try { const response = await api.inject({ method: "POST", url: "/v1/auth/resend-verification", payload: { ...resend, turnstile_token: token } });
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/resend-verification", payload: { ...resend, turnstile_token: token } });
       expect(response.statusCode).toBe(400); expect(work).toEqual([]); expect(proofs).toEqual([]);
     } finally { await api.close(); }
   });
   it.each(["rejected", "unavailable"] as const)("maps %s before any signup/resend identity work", async outcome => {
     const { api, work } = harness(outcome);
     try { for (const [url, payload] of [["/v1/auth/register", signup], ["/v1/auth/resend-verification", resend]] as const) {
-      const response = await api.inject({ method: "POST", url, payload });
+      const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url, payload });
       expect(response.statusCode).toBe(outcome === "rejected" ? 400 : 503);
       expect(response.json()).toEqual({ error: outcome === "rejected" ? "TURNSTILE_REJECTED" : "TURNSTILE_UNAVAILABLE", message: outcome === "rejected" ? "TURNSTILE_REJECTED" : "TURNSTILE_UNAVAILABLE" });
       expect(response.body).not.toContain(signup.email); expect(response.body).not.toContain(payload.turnstile_token);
@@ -59,12 +60,12 @@ describe("mandatory proof at the public identity boundary", () => {
   });
   it("fails closed when composition omits the verifier", async () => {
     const { api, work } = harness(null);
-    try { const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: signup }); expect(response.statusCode).toBe(503); expect(work).toEqual([]); }
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: signup }); expect(response.statusCode).toBe(503); expect(work).toEqual([]); }
     finally { await api.close(); }
   });
   it("passes only canonical facts and server age/legal evidence after a valid proof", async () => {
     const { api, work, proofs } = harness();
-    try { const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: signup });
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: signup });
       expect(response.statusCode).toBe(202); expect(response.json()).toEqual({ ...REGISTRATION_PUBLIC_RESPONSE, retry_after_seconds: 60 });
       expect(proofs).toEqual([{ token: "fixture-proof", action: "signup" }]);
       expect(work).toEqual([{ input: { email: signup.email, password: signup.password, phone: "+40722123456", recoveryEmail: null, adultAffirmed: true }, source: expect.objectContaining({ legal: { ...legal, locale: "ro" } }) }]);
@@ -72,25 +73,25 @@ describe("mandatory proof at the public identity boundary", () => {
     } finally { await api.close(); }
   });
   it("projects only the canonical acknowledgement from internal service results", async () => {
-    const api = buildApi({ application: {} as AskApplication, turnstile: { verify: async () => "passed" }, registration: {
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, turnstile: { verify: async () => "passed" }, registration: {
       register: async () => ({ ...REGISTRATION_PUBLIC_RESPONSE, internal_user_id: "must-not-leak" }),
       resendVerification: async () => ({ ...RESEND_PUBLIC_RESPONSE, internal_user_id: "must-not-leak" }), verifyEmail: async () => ({ status: "mfa_required" as const })
     } });
     try { for (const [url, payload] of [["/v1/auth/register", signup], ["/v1/auth/resend-verification", resend]] as const) {
-      const response = await api.inject({ method: "POST", url, payload }); expect(response.statusCode).toBe(202); expect(response.body).not.toContain("must-not-leak");
+      const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url, payload }); expect(response.statusCode).toBe(202); expect(response.body).not.toContain("must-not-leak");
       expect(Object.keys(response.json()).sort()).toEqual(["message", "retry_after_seconds"]);
     } } finally { await api.close(); }
   });
   it("uses the resend action and canonical acknowledgement", async () => {
     const { api, proofs } = harness();
-    try { const response = await api.inject({ method: "POST", url: "/v1/auth/resend-verification", payload: resend });
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/resend-verification", payload: resend });
       expect(response.statusCode).toBe(202); expect(response.json()).toEqual({ ...RESEND_PUBLIC_RESPONSE, retry_after_seconds: 60 });
       expect(proofs).toEqual([{ token: "resend-proof", action: "resend-verification" }]);
     } finally { await api.close(); }
   });
   it("preserves cheap country and age refusals before verification", async () => {
     const { api, work, proofs } = harness();
-    try { const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...signup, date_of_birth: "2020-01-01" } });
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: { ...signup, date_of_birth: "2020-01-01" } });
       expect(response.statusCode).toBe(403); expect(response.headers["set-cookie"]).toBeDefined(); expect(work).toEqual([]); expect(proofs).toEqual([]);
     } finally { await api.close(); }
   });
@@ -116,10 +117,10 @@ const serviceInput = { email: signup.email, password: signup.password, phone: "+
 describe("published source admission before proof", () => {
   it.each([["/v1/auth/register", signup, "register"], ["/v1/auth/resend-verification", resend, "resend"]] as const)("limits invalid-proof %s requests before transport without identity/password/token/mail work", async (url, payload, route) => {
     const { service, work, audits } = realIdentityService(2); let proofs = 0;
-    const api = buildApi({ application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; return "rejected"; } } });
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; return "rejected"; } } });
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
-        const response = await api.inject({ method: "POST", url, payload });
+        const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url, payload });
         expect(response.statusCode).toBe(attempt < 2 ? 400 : 429);
       }
       expect(proofs).toBe(2); expect(work).toEqual([]);
@@ -143,12 +144,12 @@ describe("published source admission before proof", () => {
   it("charges valid proof once and excludes proofs/secrets from operational logs", async () => {
     const logs = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const { service, work } = realIdentityService(1); let proofs = 0;
-    const api = buildApi({ application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; return "passed"; } } });
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, registration: service, turnstile: { verify: async () => { proofs++; return "passed"; } } });
     try {
-      const first = await api.inject({ method: "POST", url: "/v1/auth/register", payload: signup });
+      const first = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: signup });
       expect(first.statusCode).toBe(503); expect(first.json()).toMatchObject({ error: "AUTH_TEMPORARILY_UNAVAILABLE" });
       expect(work).toEqual(["lookup", "password-kdf"]);
-      const second = await api.inject({ method: "POST", url: "/v1/auth/register", payload: signup }); expect(second.statusCode).toBe(429); expect(proofs).toBe(1);
+      const second = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: signup }); expect(second.statusCode).toBe(429); expect(proofs).toBe(1);
       await service.drainRateLimitAuditFlushes();
       expect(JSON.stringify(logs.mock.calls)).not.toContain(signup.turnstile_token);
       expect(JSON.stringify(logs.mock.calls)).not.toContain(signup.email);
@@ -160,9 +161,9 @@ describe("published source admission before proof", () => {
     let captured: Awaited<ReturnType<typeof admit>> | undefined;
     let source: Parameters<typeof admit>[0]["source"] | undefined;
     service.admitSource = async request => { source = request.source; captured = await admit(request); return captured; };
-    const api = buildApi({ application: {} as AskApplication, registration: service, turnstile: { verify: async () => outcome } });
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, registration: service, turnstile: { verify: async () => outcome } });
     try {
-      const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: signup }); expect(response.statusCode).toBe(outcome === "rejected" ? 400 : 503);
+      const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: signup }); expect(response.statusCode).toBe(outcome === "rejected" ? 400 : 503);
       await expect(service.register(serviceInput, source!, captured)).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" }); expect(work).toEqual([]);
     } finally { await api.close(); }
   });
@@ -206,15 +207,15 @@ describe("direct API calls cannot bypass Siteverify decisions", () => {
     ["timeout", validated, 6000, 503]
   ] as const)("refuses %s before account lookup/password KDF/DEK/token/mail", async (_name, body, delay, status) => {
     const transport = await transportBoundary(body, delay); const { service, work } = realIdentityService();
-    const api = buildApi({ application: {} as AskApplication, registration: service, turnstile: transport.verifier });
-    try { const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: signup }); expect(response.statusCode).toBe(status); expect(work).toEqual([]); }
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, registration: service, turnstile: transport.verifier });
+    try { const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: signup }); expect(response.statusCode).toBe(status); expect(work).toEqual([]); }
     finally { await api.close(); await transport.close(); }
   });
   it("refuses an already consumed proof without identity work", async () => {
     const transport = await transportBoundary(validated); const { service, work } = realIdentityService();
-    const api = buildApi({ application: {} as AskApplication, registration: service, turnstile: transport.verifier });
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, registration: service, turnstile: transport.verifier });
     try { expect(await transport.verifier.verify({ token: signup.turnstile_token, action: "signup" })).toBe("passed");
-      const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: signup }); expect(response.statusCode).toBe(400); expect(work).toEqual([]);
+      const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: signup }); expect(response.statusCode).toBe(400); expect(work).toEqual([]);
     } finally { await api.close(); await transport.close(); }
   });
 });

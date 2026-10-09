@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.1 · Effective \[date\] · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. DebateAI veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Jūsu debates ir privātas, ja vien tās nepublicējat; ja tās publicējat, ikviens tās var lasīt. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem un netiek izmantots modeļu apmācīšanai. Par nelikumīgu saturu ziņojiet uz \[abuse@dezbatere.ro\] neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -40,6 +40,7 @@ DebateAI darbību nodrošina **DebateAIRO S.R.L.**, Rumānijā reģistrēts uzņ
 | Privātums un datu aizsardzība | privacy@dezbatere.ro |
 | Ziņošana par nelikumīgu saturu | \[abuse@dezbatere.ro\] — skatiet 10. sadaļu |
 | Iestāžu kontaktpunkts | \[dsa@dezbatere.ro\] — rumāņu un angļu valodā |
+| Teroristiska satura izņemšanas rīkojumi (Regula (ES) 2021/784) | \[dsa@dezbatere.ro\] — mūsu kontaktpunkts šiem rīkojumiem; rumāņu un angļu valodā; skatiet 10. sadaļu |
 | Pārstāvji citās valstīs | Norādīti A pielikumā attiecībā uz reģioniem, kuros esam tādus iecēluši |
 
 Šī informācija ir arī pastāvīgi redzama vietnē \[dezbatere.ro/legal\]. Jūs vienmēr varat sazināties ar cilvēku, ne tikai ar mūsu asistentu; 10. sadaļā paskaidrots, kā to izdarīt.
@@ -151,17 +152,21 @@ Mēs bez nepamatotas kavēšanās apstiprinām katra ziņojuma saņemšanu. Mēs
 - **Lēmumi dzinēja iekšienē.** Dzinējs pieņem mašīnas lēmumus par *argumentiem*: tas var atteikties atbildēt uz jautājumu, noslēgt debates gala stāvoklī — piemēram, ja jautājums balstīts uz nepatiesu pieņēmumu vai ir vērtību jautājums, nevis empīrisks jautājums — ierobežot ticamības pakāpi, ja nebija pieejama neatkarīga kritika, vai atzīmēt atbildi kā defektīvu, ja ģenerētais teksts neizturēja atbilstības pārbaudi. Tā ir paredzētā produkta darbība; tā jums ir redzama debatēs, un tie nav lēmumi par jums.
 - **Moderēšanas lēmumi par saturu un kontiem.** Publicētu debašu noņemšana vai piekļuves ierobežošana, kā arī konta darbības apturēšana vai konta slēgšana ir lēmums, ko pieņemam saskaņā ar šiem Noteikumiem vai tiesību aktiem. Katrā šādā lēmumā, kas ietekmē jūsu kontu, piedalās persona. Šādu lēmumu pamati ir aprakstīti 11. sadaļā.
 
-**Pamatojums.** Ikreiz, kad noņemam jūsu saturu vai ierobežojam tā redzamību vai apturam vai izbeidzam jūsu konta darbību, mēs sniedzam pamatojumu: ko izdarījām un kāds ir darbības apjoms, faktus, uz kuriem balstījāmies, un vai tie iegūti no ziņojuma vai mūsu pašu pārbaudēm, vai tika izmantoti automatizēti līdzekļi, juridisko vai līgumisko pamatu un kā varat lēmumu apstrīdēt.
+**Pamatojums.** Ikreiz, kad noņemam jūsu saturu vai ierobežojam tā redzamību vai apturam vai izbeidzam jūsu konta darbību, mēs sniedzam pamatojumu: ko izdarījām un kāds ir darbības apjoms, faktus, uz kuriem balstījāmies, un vai tie iegūti no ziņojuma vai mūsu pašu pārbaudēm, vai tika izmantoti automatizēti līdzekļi, juridisko vai līgumisko pamatu un kā varat lēmumu apstrīdēt: izmantojot tālāk aprakstīto sūdzību kārtību, vēršoties saskaņā ar ES Digitālo pakalpojumu aktu sertificētā ārpustiesas strīdu izšķiršanas iestādē vai vēršoties tiesā.
 
 **Sūdzība par lēmumu.** Ja nepiekrītat moderēšanas lēmumam, atbildiet uz pamatojumu vai **sešu mēnešu** laikā rakstiet uz \[appeals@dezbatere.ro\]. Lēmumu pārskata persona, kura nepiedalījās sākotnējā lēmuma pieņemšanā, un mēs jums paziņojam iznākumu un tā pamatojumu. Tas neietekmē jūsu tiesības vērsties tiesā vai izmantot alternatīvu strīdu izšķiršanu saskaņā ar 18. sadaļu. Sūdzību kārtība attiecas arī uz sūdzībām, ka neesam rīkojušies pēc ziņojuma, saturs noņemts nepamatoti, konts ierobežots nepamatoti vai automatizēts rīks nepamatoti ietekmējis jūsu saturu.
 
+**Strīdu izšķiršana ārpustiesas kārtībā.** Ja atrodaties Eiropas Savienībā, strīdu par kādu no mūsu moderēšanas lēmumiem varat nodot izšķiršanai ārpustiesas strīdu izšķiršanas iestādē, kas sertificēta saskaņā ar ES Digitālo pakalpojumu akta (Regulas (ES) 2022/2065) 21. pantu. Tas attiecas uz lēmumu par jūsu saturu vai kontu, kā arī uz mūsu lēmumu par jūsu iesniegtu ziņojumu. Iestādi izvēlaties no saraksta, ko Eiropas Komisija publicē vietnē digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, un jums nav vispirms jāizmanto mūsu sūdzību kārtība. Mēs piedalāmies labticīgi un atsakāmies piedalīties tikai tad, ja tas pats strīds par to pašu saturu un uz tiem pašiem pamatiem jau ir atrisināts. Iestādes lēmums nav saistošs nevienai no pusēm, un jūs saglabājat tiesības vērsties tiesā. Iestāde var iekasēt no jums nelielu maksu vai neiekasēt maksu vispār. Ja iestāde izšķir strīdu par labu jums, mēs sedzam tās maksas un atlīdzinām jūsu pamatotos izdevumus; ja tā izšķir strīdu par labu mums, jums nav jāatlīdzina mūsu maksas vai izdevumi, ja vien iestāde nekonstatē, ka jūs acīmredzami rīkojāties negodprātīgi.
+
 **Saziņa ar cilvēku.** Mūsu atbalsta asistents ir MI sistēma un par to informē. Jūs jebkurā laikā varat lūgt sazināties ar cilvēku, un katrā atbalsta sarunā tiek piedāvāta šāda iespēja. Saziņā ar jums mēs nepaļaujamies tikai uz automatizētiem rīkiem.
+
+**Teroristisks saturs.** Teroristisks saturs ir nelikumīgs, un DebateAI tas nav atļauts (7. sadaļa). Eiropas Savienības kompetentās iestādes var nosūtīt mums izņemšanas rīkojumus saskaņā ar Regulu (ES) 2021/784 uz 1. sadaļā norādīto kontaktpunktu. Saņēmuši šādu rīkojumu, mēs vienas stundas laikā izņemam saturu vai atspējojam piekļuvi tam visās ES valstīs. Mēs informējam personu, kura saturu publicēja, ka tas ir izņemts, un, ja tā pieprasa, kāpēc tas izņemts un kā rīkojumu var apstrīdēt, ja vien iestāde nenolemj, ka sabiedriskās drošības dēļ informāciju uz ierobežotu laiku nedrīkst izpaust. Kā to prasa Regula, izņemto saturu un ar to saistītos datus mēs glabājam sešus mēnešus, lai izņemšanu varētu pārskatīt un, ja tā bijusi nepamatota, atcelt. Persona, kura saturu publicēja, var apstrīdēt rīkojumu tās valsts tiesās, kuras iestāde rīkojumu izdevusi, kā arī izmantot mūsu sūdzību kārtību. Neviena iestāde nav pieprasījusi, lai mēs saskaņā ar šo Regulu veiktu konkrētus pasākumus pret teroristisku saturu; ja tas notiks, mēs šos pasākumus, tostarp jebkādus automatizētus rīkus, aprakstīsim šeit.
 
 **Nopietns dzīvības vai drošības apdraudējums.** Ja uzzinām informāciju, kas liecina par noziedzīgu nodarījumu, kurš apdraud kādas personas dzīvību vai drošību, mēs informējam kompetentās iestādes.
 
 ## 11. Darbības apturēšana un izbeigšana
 
-**No jūsu puses.** Jebkurā laikā slēdziet savu kontu sadaļā Iestatījumi, kā aprakstīts 6. sadaļā. Jums nav jānorāda iemesls.
+**No jūsu puses.** Jebkurā laikā slēdziet savu kontu sadaļā Iestatījumi, kā aprakstīts 6. sadaļā. Jums nav jānorāda iemesls. Konta slēgšana izbeidz šo Noteikumu darbību. Noteikumi zaudē spēku brīdī, kad slēgšana stājas spēkā, t. i., pēc 7 dienu labvēlības perioda; šīs sadaļas beigās minētās sadaļas pēc tam paliek spēkā.
 
 **No mūsu puses.** Mēs varam apturēt vai slēgt jūsu kontu vai noņemt vai ierobežot jūsu saturu, ja: jūs būtiski pārkāpjat šos Noteikumus, jo īpaši 7. sadaļu; jūsu saturs ir nelikumīgs vai tiesību akti, tiesa vai iestāde prasa mums rīkoties; jūsu lietošana apdraud pakalpojuma drošību, integritāti vai pieejamību vai citu personu tiesības; jūsu konts nav bijis aktīvs \[24 months\] un esam jūs par to brīdinājuši; vai mēs pārtraucam sniegt pakalpojumu vispār vai jūsu valstī.
 
@@ -259,7 +264,7 @@ Tas, kā mēs rīkojamies ar personas datiem, ir noteikts **Privātuma politikā
 
 **Pilnīga vienošanās.** Šie Noteikumi kopā ar Sīkdatņu politiku un MI pakalpojumu sniedzēju reģistru ir visa mūsu savstarpējā vienošanās par pakalpojumu. Privātuma politikā sniegtās saistības mums ir saistošas. Nekas šajā rindkopā neizslēdz atbildību par krāpniecisku sagrozīšanu.
 
-**Valoda.** Šie Noteikumi ir publicēti angļu valodā \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Valoda.** Šie Noteikumi ir publicēti visās vietnē piedāvātajās valodās. Līguma valoda ir valoda, kurā reģistrējāties, proti, tās versijas valoda, kurai piekritāt un kuru fiksē mūsu piekrišanas ieraksts. Ja vēlāk piekrītat jaunai versijai citā valodā, līgums turpinās šajā valodā. Citu valodu versijas ir tulkojumi. Ja jūsu dzīvesvietas valsts tiesību akti nosaka, ka noteicošā ir versija šīs valsts valodā, noteicošā ir šī versija. Ja divu valodu versijas atšķiras, mēs piemērojam to nozīmi, kas jums ir labvēlīgāka.
 
 **Kontaktinformācija.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukareste, Rumānija.
 

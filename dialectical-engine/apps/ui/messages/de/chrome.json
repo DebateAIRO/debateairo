@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Gespeicherte Cookies",
   "chrome.security": "Sicherheit",
   "chrome.logout": "Abmelden",
+  "chrome.logIn": "Anmelden",
   "chrome.accountError": "Das hat nicht funktioniert. Laden Sie die Seite neu und versuchen Sie es erneut.",
   "chrome.footer.pricing": "Preise",
   "chrome.footer.cancel": "Tarif kündigen",

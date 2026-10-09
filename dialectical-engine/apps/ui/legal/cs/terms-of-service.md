@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.1 · Effective \[date\] · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
 
 **In short.** Musí vám být alespoň 18 let. DebateAI vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. Vaše debaty jsou soukromé, dokud je nezveřejníte; pokud je zveřejníte, může je číst kdokoli. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů a nepoužívá se k trénování modelů. Nezákonný obsah hlaste na \[abuse@dezbatere.ro\] bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
 
@@ -40,6 +40,7 @@ Službu DebateAI provozuje **DebateAIRO S.R.L.**, společnost zapsaná v Rumunsk
 | Soukromí a ochrana osobních údajů | privacy@dezbatere.ro |
 | Hlášení nezákonného obsahu | \[abuse@dezbatere.ro\] — viz oddíl 10 |
 | Kontaktní místo pro orgány veřejné moci | \[dsa@dezbatere.ro\] — rumunština a angličtina |
+| Příkazy k odstranění teroristického obsahu (nařízení (EU) 2021/784) | \[dsa@dezbatere.ro\] — naše kontaktní místo pro tyto příkazy; rumunština a angličtina; viz oddíl 10 |
 | Zástupci v jiných zemích | Uvedeni v příloze A pro regiony, v nichž jsme zástupce jmenovali |
 
 Tyto údaje jsou také trvale uvedeny na webu na adrese \[dezbatere.ro/legal\]. Vždy můžete kontaktovat člověka, nejen našeho asistenta; postup vysvětluje oddíl 10.
@@ -151,17 +152,21 @@ Každé hlášení potvrdíme bez zbytečného odkladu. Hlášení vyřizujeme v
 - **Rozhodnutí uvnitř systému.** Systém činí strojová rozhodnutí o *argumentech*: může odmítnout odpovědět na otázku, ukončit zpracování na koncové trase — například pokud otázka vychází z nepravdivého předpokladu nebo jde o hodnotovou, nikoli empirickou otázku — omezit interval spolehlivosti, pokud nebyla k dispozici nezávislá kritika, nebo označit odpověď za vadnou, pokud vygenerovaný text neprošel kontrolou shody. Takto produkt funguje podle návrhu; tato rozhodnutí jsou v debatě viditelná a nejsou rozhodnutími o vás.
 - **Moderátorská rozhodnutí o obsahu a účtech.** Odstranění nebo omezení zveřejněné debaty či pozastavení nebo uzavření účtu je rozhodnutí, které činíme na základě těchto Podmínek nebo zákona. Na každém takovém rozhodnutí ovlivňujícím váš účet se podílí člověk. Důvody popisuje oddíl 11.
 
-**Odůvodnění.** Kdykoli odstraníme váš obsah nebo omezíme jeho viditelnost či pozastavíme nebo ukončíme váš účet, poskytneme vám odůvodnění: co jsme učinili a v jakém rozsahu, z jakých skutečností jsme vycházeli a zda pocházely z hlášení nebo z našich vlastních kontrol, zda byly použity automatizované prostředky, jaký byl právní nebo smluvní důvod a jak můžete rozhodnutí napadnout.
+**Odůvodnění.** Kdykoli odstraníme váš obsah nebo omezíme jeho viditelnost či pozastavíme nebo ukončíme váš účet, poskytneme vám odůvodnění: co jsme učinili a v jakém rozsahu, z jakých skutečností jsme vycházeli a zda pocházely z hlášení nebo z našich vlastních kontrol, zda byly použity automatizované prostředky, jaký byl právní nebo smluvní důvod a jak můžete rozhodnutí napadnout: prostřednictvím našeho postupu pro vyřizování stížností níže, prostřednictvím subjektu pro mimosoudní řešení sporů certifikovaného podle nařízení EU o digitálních službách nebo u soudu.
 
 **Stížnost proti rozhodnutí.** Nesouhlasíte-li s moderátorským rozhodnutím, odpovězte na odůvodnění nebo napište na \[appeals@dezbatere.ro\] do **šesti měsíců**. Rozhodnutí přezkoumá osoba, která se na původním rozhodnutí nepodílela, a výsledek vám sdělíme s odůvodněním. Tím není dotčeno vaše právo obrátit se na soud nebo využít alternativní řešení sporů podle oddílu 18. Postup pro vyřizování stížností přijímá také stížnosti na to, že jsme nereagovali na hlášení, že byl obsah odstraněn nesprávně, že byl účet nesprávně omezen nebo že automatizovaný nástroj nesprávně ovlivnil váš obsah.
 
+**Mimosoudní řešení sporů.** Nacházíte-li se v Evropské unii, můžete spor týkající se některého z našich moderátorských rozhodnutí předložit subjektu pro mimosoudní řešení sporů certifikovanému podle článku 21 nařízení EU o digitálních službách (nařízení (EU) 2022/2065). To se vztahuje na rozhodnutí o vašem obsahu nebo vašem účtu i na naše rozhodnutí o hlášení, které jste podali. Subjekt vyberete ze seznamu, který zveřejňuje Evropská komise na adrese digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, a nemusíte nejprve využít náš postup pro vyřizování stížností. Řízení se účastníme v dobré víře a účast odmítneme pouze tehdy, pokud již byl urovnán tentýž spor týkající se téhož obsahu a týchž důvodů. Rozhodnutí subjektu není pro žádnou ze stran závazné a právo obrátit se na soud vám zůstává zachováno. Subjekt vám může účtovat nízký poplatek, nebo vůbec žádný. Rozhodne-li ve váš prospěch, uhradíme jeho poplatky a nahradíme vaše přiměřené výdaje; rozhodne-li v náš prospěch, neplatíte naše poplatky ani výdaje, pokud subjekt nezjistí, že jste jednali zjevně ve zlé víře.
+
 **Kontakt s člověkem.** Náš asistent podpory je systém AI a tuto skutečnost uvádí. Kdykoli můžete požádat o rozhovor s člověkem a každý rozhovor s podporou tuto možnost nabízí. Při komunikaci s vámi nespoléháme pouze na automatizované nástroje.
+
+**Teroristický obsah.** Teroristický obsah je nezákonný a na DebateAI není povolen (oddíl 7). Příslušné orgány v Evropské unii nám mohou zasílat příkazy k odstranění podle nařízení (EU) 2021/784 na kontaktní místo uvedené v oddílu 1. Jakmile příkaz obdržíme, obsah odstraníme nebo k němu znemožníme přístup ve všech zemích EU do jedné hodiny. Osobu, která obsah zveřejnila, informujeme, že byl odstraněn, a na její žádost i proč a jak může příkaz napadnout, pokud orgán nerozhodne, že veřejná bezpečnost vyžaduje, abychom po omezenou dobu mlčeli. Jak nařízení vyžaduje, odstraněný obsah a související údaje uchováváme po dobu šesti měsíců, aby bylo možné odstranění přezkoumat a, pokud bylo chybné, zrušit. Osoba, která obsah zveřejnila, může příkaz napadnout u soudů země, jejíž orgán jej vydal, a může také využít náš postup pro vyřizování stížností. Žádný orgán nám dosud neuložil přijmout zvláštní opatření proti teroristickému obsahu podle tohoto nařízení; pokud k tomu dojde, tato opatření zde popíšeme, včetně případných automatizovaných nástrojů.
 
 **Vážné ohrožení života nebo bezpečnosti.** Dozvíme-li se o informacích nasvědčujících trestnému činu spojenému s ohrožením života nebo bezpečnosti určité osoby, informujeme příslušné orgány.
 
 ## 11. Pozastavení a ukončení
 
-**Z vaší strany.** Svůj účet můžete kdykoli uzavřít v Nastavení, jak popisuje oddíl 6. Nemusíte uvádět důvod.
+**Z vaší strany.** Svůj účet můžete kdykoli uzavřít v Nastavení, jak popisuje oddíl 6. Nemusíte uvádět důvod. Uzavřením účtu tyto Podmínky končí. Skončí, jakmile uzavření nabude účinku, po uplynutí sedmidenní ochranné lhůty; oddíly uvedené na konci tohoto oddílu zůstávají v platnosti i poté.
 
 **Z naší strany.** Váš účet můžeme pozastavit nebo uzavřít či váš obsah odstranit nebo omezit, pokud: podstatně porušíte tyto Podmínky, zejména oddíl 7; je váš obsah nezákonný nebo nám zákon, soud či orgán ukládá jednat; vaše užívání ohrožuje bezpečnost, integritu nebo dostupnost služby či práva jiných osob; váš účet nebyl aktivní po dobu \[24 months\] a my jsme vás upozornili; nebo přestaneme službu poskytovat či ji přestaneme poskytovat ve vaší zemi.
 
@@ -259,7 +264,7 @@ Způsob, jakým nakládáme s osobními údaji, stanoví **Zásady ochrany osobn
 
 **Úplná dohoda.** Tyto Podmínky společně se Zásadami používání souborů cookie a Registrem poskytovatelů AI představují úplnou dohodu mezi námi ohledně služby. Závazky, které přijímáme v Zásadách ochrany osobních údajů, jsou pro nás závazné. Nic v tomto odstavci nevylučuje odpovědnost za podvodné uvedení v omyl.
 
-**Jazyk.** Tyto Podmínky jsou zveřejněny v angličtině \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Jazyk.** Tyto Podmínky jsou zveřejněny v každém jazyce, který web nabízí. Jazykem smlouvy je jazyk, ve kterém jste se zaregistrovali: jazyk verze, kterou jste přijali a který eviduje náš záznam o přijetí. Pokud později přijmete novou verzi v jiném jazyce, smlouva pokračuje v tomto jazyce. Ostatní jazykové verze jsou překlady. Pokud právo země, v níž žijete, stanoví, že má přednost verze v jejím vlastním jazyce, má přednost tato verze. Liší-li se dvě jazykové verze, použijeme výklad, který je pro vás výhodnější.
 
 **Kontakt.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukurešť, Rumunsko.
 

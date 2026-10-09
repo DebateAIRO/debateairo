@@ -9,12 +9,7 @@
     "schema": "preview-mail-v4-purpose-binding",
     "observedWrapperSha256": "bc201edd5875f1aae9984acebc6fa52b484772b06058b00f2cdef1aefcb70edf",
     "observedRecoveryPolicySha256": "b6ce9c849b3baceead6938db5b97c53bbff46f4bbd3e1fe8856d8c75f129772b",
-    "recipientSha256": {
-      "verification-forward-primary": "2bdfb49c50be86c26e2cc71a2eed037ec88852f7e227ad211cbebbd4e90e3b66",
-      "verification-forward-secondary": "2896ffbc0c81a347fb66548d4915e538f6de76143fad4b6bc374ac44f0c1b5c8",
-      "verification-direct-and-recovery-proof": "5978582c55e5d05e87c2b6aee334c0a50a5f8734dc962606be9ea2732c433015",
-      "recovery-notice-secondary": "397572f7fd895e7f681e35680724bf8664d471b019b1e830300a56da18805794"
-    }
+    "recipientSha256": "WITHHELD_INSTALLATION_DATA_ONLY"
   },
   "receipts": [
     {

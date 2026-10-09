@@ -30,7 +30,7 @@ function api(countryGate?: CountryGate) {
   });
   return { register, instance };
 }
-const post = (instance: ReturnType<typeof api>["instance"], payload: Record<string, unknown>, ip = "81.196.20.30", headers?: Record<string, string>) => instance.inject({ method: "POST", url: "/v1/auth/register", payload, remoteAddress: ip, ...(headers === undefined ? {} : { headers }) });
+const post = (instance: ReturnType<typeof api>["instance"], payload: Record<string, unknown>, ip = "81.196.20.30", headers?: Record<string, string>) => instance.inject({ method: "POST", url: "/v1/auth/register", payload, remoteAddress: ip, headers: { origin: TEST_APP_ORIGIN, ...headers } });
 const cookies = (response: { headers: Record<string, unknown> }) => {
   const raw = response.headers["set-cookie"];
   return raw === undefined ? [] : Array.isArray(raw) ? raw.map(String) : [String(raw)];

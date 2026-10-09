@@ -53,7 +53,7 @@ We do **not** collect analytics or telemetry about how you use the product, and 
 
 A debate engine invites questions about politics, religion, health, sexuality and belief. Those are special categories of data under Article 9 GDPR, and they can arrive in your questions whether or not we intend to collect them.
 
-**About you.** Before your first debate you give explicit consent, on a separate screen, to our processing sensitive information you choose to include in your own questions, for the purpose of running your debates. We record the version of the wording you agreed to, your language and the time. Without this consent you cannot start a debate. You can withdraw it at any time by writing to privacy@dezbatere.ro. You can also leave such information out, or delete a debate that contains it. What you publish about yourself is data you have chosen to make public.
+**About you.** Before your first debate you give explicit consent, on a separate screen, to our processing sensitive information you choose to include in your own questions, for the purpose of running your debates. We record the version of the wording you agreed to, your language and the time. Without this consent you cannot start a debate. You can withdraw it at any time by closing your account from Settings. You can also leave such information out, or delete a debate that contains it. What you publish about yourself is data you have chosen to make public.
 
 **About other people.** No legal condition allows us to process sensitive data about a third party you name in a question, and none of our AI providers has one either. That is why the Terms prohibit it, why we minimise what we send, and why we remove such content quickly on request — section 11.
 
@@ -152,7 +152,7 @@ You can exercise any of these free of charge by writing to **privacy@dezbatere.r
 | **Restriction** (Art. 18) | Ask us to stop processing particular data while a dispute about it is resolved |
 | **Objection** (Art. 21) | Object to processing based on legitimate interests — the security and audit processing in section 4 — and we stop unless we can show compelling grounds. Object to marketing at any time, and we stop |
 | **Portability** (Art. 20) | Your debates and account data in a commonly used, machine-readable format. Use Export data in Settings: the ZIP holds your data as machine-readable JSON files plus one readable page, sent as an emailed link that works for 24 hours and only while you are signed in. Non-personal content you created, such as your questions, is returned to you on request when the contract ends |
-| **Withdraw consent** (Art. 7(3)) | Withdraw marketing consent from any email or from Settings; withdraw the sensitive-data consent by writing to privacy@dezbatere.ro (you can also leave such data out or delete a debate). Withdrawal does not affect processing that already happened |
+| **Withdraw consent** (Art. 7(3)) | Withdraw marketing consent from any email or from Settings; withdraw the sensitive-data consent by closing your account from Settings (you can also leave such data out or delete a debate). Withdrawal does not affect processing that already happened |
 | **Complain** | To the Romanian supervisory authority, **ANSPDCP**, B-dul G-ral Gheorghe Magheru 28–30, Bucharest, <anspdcp@dataprotection.ro>, or to the authority in the country where you live. We would rather hear from you first |
 
 We never charge for a request and never treat you less favourably for making one.

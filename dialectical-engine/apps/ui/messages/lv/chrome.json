@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Mūsu glabātās sīkdatnes",
   "chrome.security": "Drošība",
   "chrome.logout": "Izrakstīties",
+  "chrome.logIn": "Pierakstīties",
   "chrome.accountError": "Tas neizdevās. Pārlādējiet lapu un mēģiniet vēlreiz.",
   "chrome.footer.pricing": "Cenas",
   "chrome.footer.cancel": "Atcelt plānu",

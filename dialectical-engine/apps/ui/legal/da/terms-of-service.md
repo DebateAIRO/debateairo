@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 2.1 · Effective \[date\] · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
 
 **In short.** Du skal være fyldt 18 år. DebateAI opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. Dine debatter er private, medmindre du offentliggør dem; hvis du offentliggør dem, kan alle læse dem. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, og bruges ikke til at træne modeller. Anmeld ulovligt indhold på \[abuse@dezbatere.ro\], uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
@@ -40,6 +40,7 @@ DebateAI drives af **DebateAIRO S.R.L.**, et selskab registreret i Rumænien.
 | Privatliv og databeskyttelse | privacy@dezbatere.ro |
 | Anmeldelse af ulovligt indhold | \[abuse@dezbatere.ro\] — se afsnit 10 |
 | Kontaktpunkt for myndigheder | \[dsa@dezbatere.ro\] — rumænsk og engelsk |
+| Påbud om fjernelse af terrorrelateret indhold (forordning (EU) 2021/784) | \[dsa@dezbatere.ro\] — vores kontaktpunkt for disse påbud; rumænsk og engelsk; se afsnit 10 |
 | Repræsentanter i andre lande | Anført i bilag A for de regioner, hvor vi har udpeget en repræsentant |
 
 Disse oplysninger vises også permanent på webstedet på \[dezbatere.ro/legal\]. Du kan altid komme i kontakt med en person og ikke kun vores assistent; afsnit 10 forklarer hvordan.
@@ -151,17 +152,21 @@ Vi bekræfter modtagelsen af enhver anmeldelse uden unødig forsinkelse. Vi beha
 - **Afgørelser i motoren.** Motoren træffer maskinelle afgørelser om *argumenter*: Den kan afvise at besvare et spørgsmål, stoppe ved en afsluttende rute — for eksempel hvis et spørgsmål bygger på en falsk forudsætning eller er et værdispørgsmål frem for et empirisk spørgsmål — begrænse et konfidensinterval, hvis en uafhængig kritik ikke var tilgængelig, eller markere et svar som mangelfuldt, hvis den genererede tekst ikke bestod overensstemmelseskontrollen. Dette er produktet, der fungerer som tilsigtet; afgørelserne er synlige for dig i debatten, og de er ikke afgørelser om dig.
 - **Moderationsafgørelser om indhold og konti.** Fjernelse af eller begrænsning af adgangen til en offentliggjort debat eller suspension eller lukning af en konto er en afgørelse, vi træffer i henhold til disse vilkår eller lovgivningen. En person medvirker ved enhver sådan afgørelse, der berører din konto. Afsnit 11 beskriver grundlagene.
 
-**Begrundelse.** Når vi fjerner eller begrænser synligheden af dit indhold eller suspenderer eller lukker din konto, giver vi dig en begrundelse: hvad vi gjorde, og hvor vidtgående det er; de faktiske omstændigheder, vi lagde til grund, og om de stammede fra en anmeldelse eller vores egne kontroller; om der blev anvendt automatiserede midler; det retlige eller kontraktlige grundlag; og hvordan du kan anfægte afgørelsen.
+**Begrundelse.** Når vi fjerner eller begrænser synligheden af dit indhold eller suspenderer eller lukker din konto, giver vi dig en begrundelse: hvad vi gjorde, og hvor vidtgående det er; de faktiske omstændigheder, vi lagde til grund, og om de stammede fra en anmeldelse eller vores egne kontroller; om der blev anvendt automatiserede midler; det retlige eller kontraktlige grundlag; og hvordan du kan anfægte afgørelsen: gennem vores klageordning nedenfor, gennem et udenretsligt tvistbilæggelsesorgan, der er certificeret i henhold til EU's forordning om digitale tjenester, eller ved domstolene.
 
 **Klage over en afgørelse.** Hvis du er uenig i en moderationsafgørelse, skal du svare på begrundelsen eller skrive til \[appeals@dezbatere.ro\] inden for **seks måneder**. En person, der ikke medvirkede ved den oprindelige afgørelse, gennemgår den, og vi meddeler dig resultatet med en begrundelse. Dette berører ikke din ret til at indbringe sagen for en domstol eller benytte alternativ tvistbilæggelse efter afsnit 18. Klageordningen modtager også klager over, at vi ikke har reageret på en anmeldelse, at indhold fejlagtigt blev fjernet, at en konto fejlagtigt blev begrænset, eller at et automatiseret værktøj fejlagtigt påvirkede dit indhold.
 
+**Udenretslig tvistbilæggelse.** Hvis du er i Den Europæiske Union, kan du indbringe en tvist om en af vores moderationsafgørelser for et udenretsligt tvistbilæggelsesorgan, der er certificeret i henhold til artikel 21 i EU's forordning om digitale tjenester (forordning (EU) 2022/2065). Dette omfatter en afgørelse om dit indhold eller din konto samt vores afgørelse om en anmeldelse, du har indgivet. Du vælger organet fra den liste, Europa-Kommissionen offentliggør på digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, og du behøver ikke først at benytte vores klageordning. Vi deltager i god tro og afviser kun at deltage, hvis den samme tvist, om det samme indhold og på samme grundlag, allerede er blevet bilagt. Organets afgørelse er ikke bindende for nogen af os, og du bevarer din ret til at indbringe sagen for domstolene. Organet kan opkræve et mindre gebyr af dig eller slet intet gebyr. Hvis det afgør tvisten til din fordel, betaler vi dets gebyrer og godtgør dine rimelige udgifter; hvis det afgør tvisten til vores fordel, skal du ikke betale vores gebyrer eller udgifter, medmindre organet finder, at du åbenlyst har handlet i ond tro.
+
 **Kontakt til et menneske.** Vores supportassistent er et AI-system og oplyser dette. Du kan til enhver tid bede om at tale med en person, og enhver supportsamtale tilbyder denne mulighed. Vi bruger ikke automatiserede værktøjer alene til at kommunikere med dig.
+
+**Terrorrelateret indhold.** Terrorrelateret indhold er ulovligt og er ikke tilladt på DebateAI (afsnit 7). Kompetente myndigheder i Den Europæiske Union kan sende os påbud om fjernelse i henhold til forordning (EU) 2021/784 til kontaktpunktet i afsnit 1. Når vi modtager et sådant påbud, fjerner vi indholdet eller blokerer adgangen til det i alle EU-lande inden for én time. Vi underretter den person, der offentliggjorde indholdet, om, at det er blevet fjernet, og oplyser på anmodning om begrundelsen og om, hvordan påbuddet kan anfægtes, medmindre myndigheden beslutter, at hensynet til den offentlige sikkerhed kræver, at der ikke gives oplysninger i en begrænset periode. Som krævet i forordningen opbevarer vi det fjernede indhold og de relaterede data i seks måneder, så fjernelsen kan efterprøves og, hvis den var forkert, omgøres. Den person, der offentliggjorde indholdet, kan anfægte påbuddet ved domstolene i det land, hvis myndighed udstedte det, og kan også benytte vores klageordning. Ingen myndighed har krævet, at vi træffer specifikke foranstaltninger mod terrorrelateret indhold i henhold til forordningen; hvis en myndighed gør det, vil vi beskrive disse foranstaltninger her, herunder eventuelle automatiserede værktøjer.
 
 **Alvorlig risiko for liv eller sikkerhed.** Hvis vi bliver bekendt med oplysninger, der tyder på en strafbar handling, som indebærer en trussel mod en persons liv eller sikkerhed, underretter vi de kompetente myndigheder.
 
 ## 11. Suspension og ophør
 
-**Fra din side.** Du kan til enhver tid lukke din konto under Indstillinger som beskrevet i afsnit 6. Du behøver ikke angive en grund.
+**Fra din side.** Du kan til enhver tid lukke din konto under Indstillinger som beskrevet i afsnit 6. Du behøver ikke angive en grund. Lukning af din konto bringer disse vilkår til ophør. De ophører, når lukningen får virkning, efter henstandsperioden på 7 dage; de afsnit, der er anført i slutningen af dette afsnit, består fortsat efter dette tidspunkt.
 
 **Fra vores side.** Vi kan suspendere eller lukke din konto eller fjerne eller begrænse dit indhold, hvis: du væsentligt misligholder disse vilkår, navnlig afsnit 7; dit indhold er ulovligt, eller lovgivningen, en domstol eller en myndighed kræver, at vi handler; din brug truer tjenestens sikkerhed, integritet eller tilgængelighed eller andres rettigheder; din konto har været inaktiv i \[24 months\], og vi har givet dig meddelelse; eller vi ophører med at levere tjenesten eller med at levere den i dit land.
 
@@ -259,7 +264,7 @@ Det fremgår af **privatlivspolitikken** på \[dezbatere.ro/privacy\], hvordan v
 
 **Hele aftalen.** Disse vilkår udgør sammen med cookiepolitikken og registeret over AI-udbydere hele aftalen mellem os om tjenesten. Forpligtelser, vi påtager os i privatlivspolitikken, er bindende for os. Intet i dette afsnit udelukker ansvar for svigagtig urigtig fremstilling.
 
-**Sprog.** Disse vilkår offentliggøres på engelsk \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Sprog.** Disse vilkår offentliggøres på alle de sprog, webstedet tilbyder. Aftalen er indgået på det sprog, du registrerede dig på: sproget i den version, du accepterede, som fremgår af vores registrering af din accept. Hvis du senere accepterer en ny version på et andet sprog, fortsætter aftalen på dette sprog. De øvrige sprogversioner er oversættelser. Hvis lovgivningen i det land, hvor du bor, bestemmer, at en version på dette lands eget sprog har forrang, har denne version forrang. Hvis to sprogversioner er forskellige, anvender vi den betydning, der er mest gunstig for dig.
 
 **Kontakt.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukarest, Rumænien.
 

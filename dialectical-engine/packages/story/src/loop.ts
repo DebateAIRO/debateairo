@@ -1,5 +1,5 @@
 import type { MakerLineage, StoryBody } from "@debateai/contract";
-import { RUN_COST_ENVELOPE_MONEY_REACHED } from "@debateai/budget";
+import { DAILY_COST_ENVELOPE_REACHED, PERSON_ALLOWANCE_REACHED, RUN_COST_ENVELOPE_MONEY_REACHED } from "@debateai/budget";
 import { TypedDomainError } from "@debateai/kernel";
 import { ProviderCallFailedError, ProviderContentUnacceptedError } from "@debateai/providers";
 import type { StoryCheckerVerdict } from "./validate.js";
@@ -136,10 +136,15 @@ function storyFailureCode(error: unknown, stage: "WRITE" | "CHECK"): string {
     return stage === "WRITE" ? STORY_LOOP_FAILURE_CODES.writeRejected : STORY_LOOP_FAILURE_CODES.checkUnavailable;
   }
   if (error instanceof ProviderCallFailedError) return STORY_LOOP_FAILURE_CODES.transportDeath;
+  // The money stops: the story's own envelope and attempt allowance, the run's money, and the
+  // shared walls of the day (the private preview's team pot answers with it) and of the owner's
+  // allowance windows. Each is the envelope speaking, never an unexpected error.
   if (error instanceof TypedDomainError
     && (error.code === STORY_COST_ENVELOPE_REACHED
       || error.code === STORY_CALL_BUDGET_EXHAUSTED
-      || error.code === RUN_COST_ENVELOPE_MONEY_REACHED)) {
+      || error.code === RUN_COST_ENVELOPE_MONEY_REACHED
+      || error.code === DAILY_COST_ENVELOPE_REACHED
+      || error.code === PERSON_ALLOWANCE_REACHED)) {
     return STORY_LOOP_FAILURE_CODES.envelopeExhausted;
   }
   return STORY_LOOP_FAILURE_CODES.unexpected;

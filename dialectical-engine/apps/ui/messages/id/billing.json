@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Mulai paket saya sekarang. Saya memahami bahwa jika saya menarik diri dalam 14 hari, saya membayar bagian yang sudah digunakan: yang lebih besar antara hari yang digunakan atau kredit yang digunakan.",
   "billing.checkout.continueToCard": "Lanjut ke detail kartu",
   "billing.checkout.cardTitle": "Detail kartu",
-  "billing.checkout.cardNote": "Anda memasukkan kartu di formulir aman xMoney. Nomor kartu Anda tidak pernah sampai ke server kami.",
+  "billing.checkout.cardNote": "Anda memasukkan kartu di formulir aman NETOPIA Payments. Nomor kartu Anda tidak pernah sampai ke server kami.",
   "billing.checkout.subscribeAndPay": "Pesan dengan kewajiban membayar",
   "billing.checkout.waitingForBank": "Menunggu konfirmasi dari bank Anda…",
   "billing.checkout.willEmail": "Kami akan mengirim email begitu bank Anda mengonfirmasi.",

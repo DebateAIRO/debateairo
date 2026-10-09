@@ -58,19 +58,19 @@ it("Y-2 gives export and Delete-account panels the same measured container and p
 it("Y-3 styles all three methods, the selected password form and its accessible fields", async () => {
   injectStyles(); await mount(<DataExportCard catalog={settings} locale="en" client={exportClient() as never} />); await click(settings["settings.export.request"]); await flush();
   const panel = host!.querySelector<HTMLElement>(".authSecurityConfirmation")!;
-  for (const row of panel.querySelectorAll<HTMLElement>(".authSecurityRow")) {
+  for (const row of panel.querySelectorAll<HTMLElement>(".authSecurityActions")) {
     const css = getComputedStyle(row); expect([css.display, css.gap, css.flexWrap]).toEqual(["flex", "10px", "wrap"]);
   }
-  expect(panel.querySelectorAll(".authSecurityRow").length).toBe(3);
-  const hint = getComputedStyle(panel.querySelector<HTMLElement>(".authSecurityHint")!);
+  expect(panel.querySelectorAll(".authSecurityActions").length).toBe(3);
+  const hint = getComputedStyle(panel.querySelector<HTMLElement>(".authFieldHint")!);
   expect([hint.marginTop, hint.marginBottom, hint.fontSize, hint.lineHeight]).toEqual(["0px", "8px", "11.5px", "1.55"]);
-  expect([...panel.querySelectorAll(".authSecurityRow button")].every((button) => button.classList.contains("setBtn"))).toBe(true);
+  expect([...panel.querySelectorAll(".authSecurityActions button")].every((button) => button.classList.contains("setBtn"))).toBe(true);
   await click("Password");
   const selected = [...panel.querySelectorAll<HTMLButtonElement>("button")].find((button) => button.textContent?.includes("Password"))!;
   expect(selected.getAttribute("aria-pressed")).toBe("true");
   // jsdom loses the selected color after globals.css's var() border shorthand.
   expect(source("app/security-confirmation.css")).toMatch(/\.authSecurityConfirmation \.setBtn\[aria-pressed="true"\]\s*\{\s*border-color:\s*var\(--ink\);\s*\}/);
-  const form = panel.querySelector<HTMLElement>(".authSecurityForm")!; const css = getComputedStyle(form);
+  const form = panel.querySelector<HTMLElement>(".authForm")!; const css = getComputedStyle(form);
   expect([css.display, css.gap, css.alignItems]).toEqual(["flex", "10px", "center"]);
   for (const field of form.querySelectorAll<HTMLElement>(".setField")) {
     const label = field.querySelector("label")!; const input = field.querySelector("input")!;

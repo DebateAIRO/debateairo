@@ -196,7 +196,9 @@ async function possession(api:ReturnType<typeof buildApi>,a:Account,commandId:st
   await expect(createStaffRuntime(activation)).rejects.toThrow('STAFF_ACTIVATION_UNAVAILABLE');
   const installed=await repository.install({generation:bundle.generation,verifier:material.verifier,operationId:randomUUID()});
   const projection=await new PostgresStaffRepository(runtime).readOwnerRecoveryInstallation();expect(projection).toEqual(installed);expect(Object.keys(projection!).sort()).toEqual(['operationId','outcome','recordedAt']);
-  await expect(createStaffRuntime(activation)).rejects.toThrow('STAFF_ACTIVATION_UNAVAILABLE');
+  // Owner ruling 2026-10-09: an unpublished readiness row no longer refuses boot; Team tools start locked.
+  const lockedLines:string[]=[],locked=await createStaffRuntime({...activation,logEvent:line=>{lockedLines.push(line);}});
+  expect(lockedLines).toEqual([JSON.stringify({event:'api.staff.tools_locked',reason:'READINESS_STALE'})]);await locked.close();
   const trusted=await configuration.read();expect(trusted).not.toBeNull();
   await publisher.publish({...trusted!.binding,ackAdapterId:config.ackAdapterId,rehearsalId:trusted!.evidence.rehearsalId,evidenceExpiresAt:trusted!.evidence.expiresAt});
   await expect(createStaffRuntime({...activation,registerVersion:9999})).rejects.toMatchObject({code:'STAFF_ACCESS_POLICY_UNRESOLVED'});

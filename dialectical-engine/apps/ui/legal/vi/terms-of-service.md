@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.1 · Effective \[date\] · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. DebateAI xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Các cuộc tranh luận của bạn là riêng tư trừ khi bạn công khai chúng; nếu bạn công khai, bất kỳ ai cũng có thể đọc. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại \[abuse@dezbatere.ro\] dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -40,6 +40,7 @@ DebateAI do **DebateAIRO S.R.L.**, một công ty đăng ký tại Romania, vậ
 | Quyền riêng tư và bảo vệ dữ liệu | privacy@dezbatere.ro |
 | Báo cáo nội dung bất hợp pháp | \[abuse@dezbatere.ro\] — xem mục 10 |
 | Đầu mối liên hệ cho cơ quan có thẩm quyền | \[dsa@dezbatere.ro\] — tiếng Romania và tiếng Anh |
+| Lệnh gỡ bỏ nội dung khủng bố (Quy định (EU) số 2021/784) | \[dsa@dezbatere.ro\] — đầu mối liên hệ của chúng tôi cho các lệnh này; tiếng Romania và tiếng Anh; xem mục 10 |
 | Đại diện tại các quốc gia khác | Được liệt kê trong Phụ lục A đối với các khu vực nơi chúng tôi đã chỉ định đại diện |
 
 Những thông tin này cũng được hiển thị thường xuyên trên trang web tại \[dezbatere.ro/legal\]. Bạn luôn có thể liên hệ với một người, không chỉ với trợ lý của chúng tôi; mục 10 giải thích cách thức.
@@ -151,17 +152,21 @@ Chúng tôi xác nhận đã nhận mọi báo cáo mà không trì hoãn quá m
 - **Quyết định bên trong công cụ.** Công cụ đưa ra quyết định bằng máy về *các lập luận*: công cụ có thể từ chối trả lời một câu hỏi, dừng tại một tuyến kết thúc — ví dụ khi câu hỏi dựa trên một tiền giả định sai hoặc là câu hỏi về giá trị thay vì vấn đề thực nghiệm — giới hạn khoảng tin cậy khi không có phê bình độc lập, hoặc đánh dấu một câu trả lời là không đạt khi văn bản được tạo ra không vượt qua kiểm tra tính phù hợp. Đây là sản phẩm hoạt động đúng như thiết kế; các quyết định này hiển thị cho bạn trong cuộc tranh luận và không phải là quyết định về bạn.
 - **Quyết định kiểm duyệt về nội dung và tài khoản.** Việc gỡ bỏ hoặc hạn chế một cuộc tranh luận đã công khai, hoặc đình chỉ hay đóng tài khoản, là quyết định chúng tôi đưa ra căn cứ vào các Điều khoản này hoặc pháp luật. Một người sẽ tham gia vào mọi quyết định như vậy có ảnh hưởng đến tài khoản của bạn. Mục 11 mô tả các căn cứ.
 
-**Bản nêu lý do.** Bất cứ khi nào chúng tôi gỡ bỏ hoặc hạn chế khả năng hiển thị nội dung của bạn, hoặc đình chỉ hay chấm dứt tài khoản, chúng tôi cung cấp cho bạn bản nêu lý do: chúng tôi đã làm gì và phạm vi tác động, các sự kiện chúng tôi dựa vào và liệu chúng xuất phát từ báo cáo hay hoạt động kiểm tra của chính chúng tôi, có sử dụng phương tiện tự động hay không, căn cứ pháp lý hoặc hợp đồng, và cách bạn có thể phản đối quyết định.
+**Bản nêu lý do.** Bất cứ khi nào chúng tôi gỡ bỏ hoặc hạn chế khả năng hiển thị nội dung của bạn, hoặc đình chỉ hay chấm dứt tài khoản, chúng tôi cung cấp cho bạn bản nêu lý do: chúng tôi đã làm gì và phạm vi tác động, các sự kiện chúng tôi dựa vào và liệu chúng xuất phát từ báo cáo hay hoạt động kiểm tra của chính chúng tôi, có sử dụng phương tiện tự động hay không, căn cứ pháp lý hoặc hợp đồng, và cách bạn có thể phản đối quyết định: thông qua kênh khiếu nại của chúng tôi nêu dưới đây, thông qua một cơ quan giải quyết tranh chấp ngoài tòa án được chứng nhận theo Đạo luật Dịch vụ Số của EU, hoặc tại tòa án.
 
 **Khiếu nại về quyết định.** Nếu không đồng ý với một quyết định kiểm duyệt, hãy trả lời bản nêu lý do hoặc viết đến \[appeals@dezbatere.ro\] trong vòng **sáu tháng**. Một người không tham gia vào quyết định ban đầu sẽ rà soát quyết định và chúng tôi thông báo cho bạn kết quả kèm lý do. Điều này không ảnh hưởng đến quyền khởi kiện ra tòa hoặc sử dụng cơ chế giải quyết tranh chấp thay thế theo mục 18. Kênh khiếu nại cũng tiếp nhận khiếu nại rằng chúng tôi đã không xử lý một báo cáo, nội dung đã bị gỡ bỏ sai, tài khoản đã bị hạn chế sai hoặc công cụ tự động đã tác động sai đến nội dung của bạn.
 
+**Giải quyết tranh chấp ngoài tòa án.** Nếu bạn đang ở Liên minh Châu Âu, bạn có thể đưa một tranh chấp về một trong các quyết định kiểm duyệt của chúng tôi đến một cơ quan giải quyết tranh chấp ngoài tòa án được chứng nhận theo Điều 21 của Đạo luật Dịch vụ Số của EU (Quy định (EU) số 2022/2065). Điều này bao gồm một quyết định về nội dung hoặc tài khoản của bạn, và quyết định của chúng tôi về một báo cáo bạn đã gửi. Bạn chọn cơ quan đó từ danh sách do Ủy ban Châu Âu công bố tại digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, và bạn không cần sử dụng kênh khiếu nại của chúng tôi trước. Chúng tôi tham gia một cách thiện chí, và chúng tôi chỉ từ chối khi cùng một tranh chấp, về cùng nội dung và trên cùng căn cứ, đã được giải quyết trước đó. Quyết định của cơ quan đó không ràng buộc bất kỳ bên nào trong chúng ta, và bạn vẫn giữ quyền khởi kiện ra tòa. Cơ quan đó có thể tính một khoản phí nhỏ hoặc không tính phí. Nếu cơ quan đó quyết định có lợi cho bạn, chúng tôi trả phí của cơ quan đó và hoàn trả các chi phí hợp lý của bạn; nếu cơ quan đó quyết định có lợi cho chúng tôi, bạn không phải trả phí hoặc chi phí của chúng tôi, trừ khi cơ quan đó xác định rằng bạn đã hành động rõ ràng thiếu thiện chí.
+
 **Liên hệ với con người.** Trợ lý hỗ trợ của chúng tôi là một hệ thống AI và tự giới thiệu như vậy. Bạn có thể yêu cầu nói chuyện với một người bất kỳ lúc nào, và mọi cuộc trao đổi hỗ trợ đều cung cấp lựa chọn đó. Chúng tôi không chỉ dựa vào các công cụ tự động để giao tiếp với bạn.
+
+**Nội dung khủng bố.** Nội dung khủng bố là bất hợp pháp và không được phép xuất hiện trên DebateAI (mục 7). Các cơ quan có thẩm quyền tại Liên minh Châu Âu có thể gửi cho chúng tôi lệnh gỡ bỏ theo Quy định (EU) số 2021/784 đến đầu mối liên hệ nêu ở mục 1. Khi nhận được một lệnh như vậy, chúng tôi gỡ bỏ nội dung, hoặc chặn quyền truy cập vào nội dung đó tại mọi quốc gia EU, trong vòng một giờ. Chúng tôi thông báo cho người đã công khai nội dung đó rằng nội dung đã bị gỡ bỏ và, nếu họ yêu cầu, lý do cũng như cách phản đối lệnh đó, trừ khi cơ quan có thẩm quyền quyết định rằng an ninh công cộng đòi hỏi không được tiết lộ thông tin này trong một thời hạn nhất định. Theo yêu cầu của Quy định này, chúng tôi lưu giữ nội dung đã gỡ bỏ và dữ liệu liên quan trong sáu tháng, để việc gỡ bỏ có thể được rà soát và, nếu sai, được đảo ngược. Người đã công khai nội dung đó có thể phản đối lệnh tại tòa án của quốc gia mà cơ quan ban hành lệnh thuộc về, và cũng có thể sử dụng kênh khiếu nại của chúng tôi. Chưa có cơ quan nào yêu cầu chúng tôi áp dụng biện pháp cụ thể đối với nội dung khủng bố theo Quy định này; nếu có, chúng tôi sẽ mô tả các biện pháp đó tại đây, bao gồm bất kỳ công cụ tự động nào.
 
 **Rủi ro nghiêm trọng đối với tính mạng hoặc an toàn.** Nếu biết được thông tin cho thấy có hành vi phạm tội liên quan đến mối đe dọa đối với tính mạng hoặc an toàn của một người, chúng tôi sẽ thông báo cho cơ quan có thẩm quyền.
 
 ## 11. Đình chỉ và chấm dứt
 
-**Do bạn thực hiện.** Bạn có thể đóng tài khoản bất kỳ lúc nào từ phần Cài đặt, như mô tả tại mục 6. Bạn không cần đưa ra lý do.
+**Do bạn thực hiện.** Bạn có thể đóng tài khoản bất kỳ lúc nào từ phần Cài đặt, như mô tả tại mục 6. Bạn không cần đưa ra lý do. Việc đóng tài khoản của bạn sẽ chấm dứt các Điều khoản này. Các Điều khoản này chấm dứt khi việc đóng tài khoản có hiệu lực, sau thời gian gia hạn 7 ngày; các mục được liệt kê ở cuối mục này tiếp tục có hiệu lực sau đó.
 
 **Do chúng tôi thực hiện.** Chúng tôi có thể đình chỉ hoặc đóng tài khoản của bạn, hoặc gỡ bỏ hay hạn chế nội dung của bạn, khi: bạn vi phạm nghiêm trọng các Điều khoản này, đặc biệt là mục 7; nội dung của bạn là bất hợp pháp, hoặc pháp luật, tòa án hay cơ quan có thẩm quyền yêu cầu chúng tôi hành động; việc sử dụng của bạn đe dọa tính bảo mật, tính toàn vẹn hoặc tính sẵn có của dịch vụ hoặc quyền của người khác; tài khoản của bạn không hoạt động trong \[24 months\] và chúng tôi đã thông báo cho bạn; hoặc chúng tôi ngừng cung cấp dịch vụ, hay ngừng cung cấp dịch vụ tại quốc gia của bạn.
 
@@ -259,7 +264,7 @@ Cách chúng tôi xử lý dữ liệu cá nhân được quy định trong **Ch
 
 **Toàn bộ thỏa thuận.** Các Điều khoản này, cùng Chính sách cookie và Sổ đăng ký nhà cung cấp AI, cấu thành toàn bộ thỏa thuận giữa chúng ta về dịch vụ. Các cam kết chúng tôi đưa ra trong Chính sách quyền riêng tư có giá trị ràng buộc đối với chúng tôi. Không nội dung nào trong đoạn này loại trừ trách nhiệm đối với hành vi trình bày sai mang tính gian lận.
 
-**Ngôn ngữ.** Các Điều khoản này được công bố bằng tiếng Anh \[and Romanian\]. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Ngôn ngữ.** Các Điều khoản này được công bố bằng mọi ngôn ngữ mà trang web cung cấp. Hợp đồng được xác lập bằng ngôn ngữ bạn đã dùng khi đăng ký: tức ngôn ngữ của phiên bản bạn đã chấp nhận, được lưu trong hồ sơ chấp nhận của chúng tôi. Nếu sau đó bạn chấp nhận một phiên bản mới bằng một ngôn ngữ khác, hợp đồng tiếp tục bằng ngôn ngữ đó. Các phiên bản ngôn ngữ khác là bản dịch. Khi pháp luật của quốc gia nơi bạn sinh sống quy định rằng phiên bản bằng ngôn ngữ riêng của quốc gia đó được ưu tiên áp dụng, phiên bản đó sẽ được ưu tiên áp dụng. Nếu hai phiên bản ngôn ngữ khác nhau, chúng tôi áp dụng cách hiểu có lợi hơn cho bạn.
 
 **Liên hệ.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bucharest, Romania.
 

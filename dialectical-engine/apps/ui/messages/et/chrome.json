@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Küpsised, mida salvestame",
   "chrome.security": "Turvalisus",
   "chrome.logout": "Logi välja",
+  "chrome.logIn": "Logi sisse",
   "chrome.accountError": "Toiming ebaõnnestus. Laadige leht uuesti ja proovige veel kord.",
   "chrome.footer.pricing": "Hinnad",
   "chrome.footer.cancel": "Paketi tühistamine",

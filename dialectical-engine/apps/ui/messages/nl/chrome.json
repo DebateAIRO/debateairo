@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Cookies die we opslaan",
   "chrome.security": "Beveiliging",
   "chrome.logout": "Uitloggen",
+  "chrome.logIn": "Aanmelden",
   "chrome.accountError": "Dat is niet gelukt. Laad de pagina opnieuw en probeer het nog eens.",
   "chrome.footer.pricing": "Prijzen",
   "chrome.footer.cancel": "Abonnement opzeggen",

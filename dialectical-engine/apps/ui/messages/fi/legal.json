@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Hinta ja maksaminen",
   "legal.notice.s04.body": "{product} on maksuton. Maksullisia tilauksia ei vielä ole. Ennen kuin maksullinen tilaus otetaan käyttöön, tässä kohdassa kerrotaan verollinen hinta, miten ja milloin maksat, milloin palvelu alkaa, miten uusiminen toimii ja miten tilauksen voi irtisanoa.",
   "legal.notice.s04.bodyPaid": "Maksulliset tilaukset ja niiden kuukausihinnat ovat hintasivulla. Siellä olevat hinnat ovat ilman veroja; ennen maksamista kassa näyttää koko hinnan maasi verolla. Maksat kortilla, aina kuukauden etukäteen. Tilaus alkaa heti, kun pankkisi vahvistaa maksun, ja se uusiutuu joka kuukausi, kunnes peruutat sen. Voit peruuttaa sen milloin tahansa asetuksissa tai peruutussivulla kirjautumatta sisään.",
-  "legal.notice.s04.payments": "Korttimaksut käsittelee xMoney. Emme koskaan näe emmekä tallenna korttisi numeroa.",
+  "legal.notice.s04.payments": "Korttimaksut käsittelee NETOPIA Payments. Emme koskaan näe emmekä tallenna korttisi numeroa.",
   "legal.notice.s04.pricingLink": "Katso tilaukset ja hinnat",
   "legal.notice.s04.cancelLink": "Peruuta tilaus",
   "legal.notice.s05.title": "Peruuttaminen ja palautukset",

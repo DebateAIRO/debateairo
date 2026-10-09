@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.1 · Effective \[date\] · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. DebateAI koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Teie väitlused on privaatsed, kui te neid ei avalda; avaldamise korral saab igaüks neid lugeda. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele ja seda ei kasutata mudelite treenimiseks. Teatage ebaseaduslikust sisust aadressil \[abuse@dezbatere.ro\], olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -40,6 +40,7 @@ DebateAI-d käitab Rumeenias registreeritud äriühing **DebateAIRO S.R.L.**.
 | Privaatsus ja andmekaitse | privacy@dezbatere.ro |
 | Ebaseaduslikust sisust teatamine | \[abuse@dezbatere.ro\] — vt jaotis 10 |
 | Ametiasutuste kontaktpunkt | \[dsa@dezbatere.ro\] — rumeenia ja inglise keeles |
+| Terroristliku sisu eemaldamiskorraldused (määrus (EL) 2021/784) | \[dsa@dezbatere.ro\] — meie kontaktpunkt selliste korralduste jaoks; rumeenia ja inglise keeles; vt jaotis 10 |
 | Esindajad teistes riikides | Loetletud lisas A nende piirkondade kohta, kus oleme esindaja määranud |
 
 Need andmed on püsivalt esitatud ka veebisaidil \[dezbatere.ro/legal\]. Teil on alati võimalik võtta ühendust inimesega, mitte ainult meie assistendiga; jaotises 10 selgitatakse, kuidas seda teha.
@@ -151,17 +152,21 @@ Kinnitame iga teate kättesaamist põhjendamatu viivituseta. Käsitleme teateid 
 - **Mootorisisesed otsused.** Mootor teeb masinotsuseid *argumentide* kohta: see võib keelduda küsimusele vastamast, peatuda lõppmarsruudil — näiteks kui küsimus põhineb vääral eeldusel või on empiirilise küsimuse asemel väärtusküsimus —, piirata kindlusastet, kui sõltumatu kriitika ei olnud kättesaadav, või märkida vastuse vigaseks, kui loodud tekst ei läbinud vastavuskontrolli. Sellistel juhtudel töötab toode ettenähtud viisil; otsused on teile väitluses nähtavad ega ole teie kohta tehtud otsused.
 - **Sisu ja kontode modereerimisotsused.** Avaldatud väitluse eemaldamine või piiramine või konto peatamine või sulgemine on otsus, mille teeme nende Tingimuste või seaduse alusel. Igas teie kontot mõjutavas otsuses osaleb inimene. Jaotises 11 kirjeldatakse aluseid.
 
-**Põhjendus.** Kui eemaldame teie sisu või piirame selle nähtavust või peatame või lõpetame teie konto, esitame teile põhjenduse: mida tegime ja millises ulatuses, asjaolud, millele tuginesime, ja kas need pärinesid teatest või meie enda kontrollist, kas kasutati automatiseeritud vahendeid, õiguslik või lepinguline alus ning viis, kuidas saate otsuse vaidlustada.
+**Põhjendus.** Kui eemaldame teie sisu või piirame selle nähtavust või peatame või lõpetame teie konto, esitame teile põhjenduse: mida tegime ja millises ulatuses, asjaolud, millele tuginesime, ja kas need pärinesid teatest või meie enda kontrollist, kas kasutati automatiseeritud vahendeid, õiguslik või lepinguline alus ning viis, kuidas saate otsuse vaidlustada: allpool kirjeldatud kaebuste esitamise kanali kaudu, ELi digiteenuste määruse alusel sertifitseeritud vaidluste kohtuvälise lahendamise organi kaudu või kohtus.
 
-**Otsuse peale kaebamine.** Kui te ei nõustu modereerimisotsusega, vastake põhjendusele või kirjutage **kuue kuu** jooksul aadressil \[appeals@dezbatere.ro\]. Otsuse vaatab läbi isik, kes ei osalenud algse otsuse tegemises, ning teatame teile põhjendatud tulemuse. See ei mõjuta teie õigust pöörduda kohtusse või kasutada jaotise 18 kohast kohtuvälist vaidluste lahendamist. Kaebuste esitamise kanalisse võib esitada ka kaebusi selle kohta, et me ei ole teate alusel tegutsenud, et sisu eemaldati alusetult, et kontot piirati alusetult või et automatiseeritud tööriist mõjutas teie sisu ekslikult.
+**Otsuse peale kaebamine.** Kui te ei nõustu modereerimisotsusega, vastake põhjendusele või kirjutage **kuue kuu** jooksul aadressil \[appeals@dezbatere.ro\]. Otsuse vaatab läbi isik, kes ei osalenud algse otsuse tegemises, ning teatame teile põhjendatud tulemuse. See ei mõjuta teie õigust pöörduda kohtusse või kasutada jaotise 18 kohast alternatiivset vaidluste lahendamist. Kaebuste esitamise kanalisse võib esitada ka kaebusi selle kohta, et me ei ole teate alusel tegutsenud, et sisu eemaldati alusetult, et kontot piirati alusetult või et automatiseeritud tööriist mõjutas teie sisu ekslikult.
+
+**Vaidluste kohtuväline lahendamine.** Kui viibite Euroopa Liidus, võite viia vaidluse ühe meie modereerimisotsuse üle ELi digiteenuste määruse (määrus (EL) 2022/2065) artikli 21 alusel sertifitseeritud vaidluste kohtuvälise lahendamise organi ette. See hõlmab teie sisu või kontot käsitlevat otsust ning meie otsust teie esitatud teate kohta. Valite organi Euroopa Komisjoni aadressil digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement avaldatud loetelust ja te ei pea enne kasutama meie kaebuste esitamise kanalit. Osaleme menetluses heas usus ning keeldume osalemisest ainult siis, kui sama sisu ja samu aluseid käsitlev sama vaidlus on juba lahendatud. Organi otsus ei ole meist kummalegi siduv ning teile jääb õigus pöörduda kohtusse. Organ võib võtta teilt väikese tasu või lahendada vaidluse teile tasuta. Kui organ otsustab teie kasuks, tasume organi tasud ja hüvitame teie mõistlikud kulud; kui organ otsustab meie kasuks, ei pea te meie tasusid ega kulusid tasuma, välja arvatud juhul, kui organ leiab, et tegutsesite selgelt pahauskselt.
 
 **Inimesega ühenduse võtmine.** Meie kasutajatoe assistent on tehisintellektisüsteem ja annab sellest teada. Võite igal ajal paluda inimesega rääkida ning see võimalus on olemas igas kasutajatoe vestluses. Me ei kasuta teiega suhtlemiseks ainult automatiseeritud tööriistu.
+
+**Terroristlik sisu.** Terroristlik sisu on ebaseaduslik ja seda ei ole DebateAI-s lubatud (jaotis 7). Euroopa Liidu pädevad asutused võivad saata meile eemaldamiskorraldusi määruse (EL) 2021/784 alusel jaotises 1 nimetatud kontaktpunktile. Sellise korralduse saamisel eemaldame sisu või blokeerime juurdepääsu sellele kõigis ELi riikides ühe tunni jooksul. Teavitame sisu avaldanud isikut selle eemaldamisest ning tema soovi korral ka sellest, miks see eemaldati ja kuidas korraldust vaidlustada, välja arvatud juhul, kui asutus otsustab, et avaliku julgeoleku huvides tuleb teabe avaldamisest piiratud ajaks loobuda. Nagu määrus nõuab, säilitame eemaldatud sisu ja sellega seotud andmed kuus kuud, et eemaldamist saaks kontrollida ja selle ekslikkuse korral tühistada. Sisu avaldanud isik võib korraldust vaidlustada selle riigi kohtutes, mille asutus korralduse tegi, ning võib samuti kasutada meie kaebuste esitamise kanalit. Ükski asutus ei ole nõudnud meilt määruse alusel konkreetsete meetmete võtmist terroristliku sisu vastu; kui nii juhtub, kirjeldame neid meetmeid siin, sealhulgas mis tahes automatiseeritud tööriistu.
 
 **Tõsine oht elule või turvalisusele.** Kui saame teada teabest, mis viitab kuriteole, millega kaasneb oht kellegi elule või turvalisusele, teavitame pädevaid asutusi.
 
 ## 11. Peatamine ja lõpetamine
 
-**Teie algatusel.** Sulgege konto igal ajal seadetes, nagu on kirjeldatud jaotises 6. Põhjendust ei ole vaja.
+**Teie algatusel.** Sulgege konto igal ajal seadetes, nagu on kirjeldatud jaotises 6. Põhjendust ei ole vaja. Konto sulgemine lõpetab need Tingimused. Need lõpevad, kui sulgemine jõustub, pärast 7-päevast ajapikendust; selle jaotise lõpus loetletud jaotised jäävad pärast seda kehtima.
 
 **Meie algatusel.** Võime teie konto peatada või sulgeda või teie sisu eemaldada või piirata, kui: rikute oluliselt neid Tingimusi, eelkõige jaotist 7; teie sisu on ebaseaduslik või seadus, kohus või ametiasutus nõuab meilt tegutsemist; teiepoolne kasutus ohustab teenuse turvalisust, terviklust või kättesaadavust või teiste õigusi; teie konto ei ole olnud aktiivne \[24 months\] ja oleme teid sellest teavitanud; või lõpetame teenuse pakkumise või selle pakkumise teie riigis.
 
@@ -247,7 +252,7 @@ Isikuandmete töötlemist kirjeldatakse **Privaatsuspoliitikas** aadressil \[dez
 
 **Ameerika Ühendriikide elanikud.** Lisa A.3 sisaldab föderaalse vahekohtuseadusega reguleeritavat vahekohtukokkulepet ja kollektiivhagi esitamisest loobumist. Seda kohaldatakse ainult Ameerika Ühendriikide elanikele ja ainult niivõrd, kuivõrd see on täitmisele pööratav. Seda ei kohaldata ELi, EMP või Ühendkuningriigi tarbijatele.
 
-**Enne kohtusse pöördumist.** Võtke meiega ühendust aadressil \[legal@dezbatere.ro\]; enamik probleeme on lahendatavad ja meie eesmärk on vastata \[5\] tööpäeva jooksul. Kui olete tarbija Rumeenias või ELis, võite kasutada kohtuvälist vaidluste lahendamist asutuse \[the ANPC – named SAL entity, website\] kaudu; me \[do / do not\] kohustume selles menetluses osalema. Modereerimisotsuste kohta esitatavaid kaebusi käsitletakse eraldi kanalis jaotise 10 kohaselt.
+**Enne kohtusse pöördumist.** Võtke meiega ühendust aadressil \[legal@dezbatere.ro\]; enamik probleeme on lahendatavad ja meie eesmärk on vastata \[5\] tööpäeva jooksul. Kui olete tarbija Rumeenias või ELis, võite kasutada alternatiivset vaidluste lahendamist asutuse \[the ANPC – named SAL entity, website\] kaudu; me \[do / do not\] kohustume selles menetluses osalema. Modereerimisotsuste kohta esitatavaid kaebusi käsitletakse eraldi kanalis jaotise 10 kohaselt.
 
 ## 19. Muud tingimused
 
@@ -259,7 +264,7 @@ Isikuandmete töötlemist kirjeldatakse **Privaatsuspoliitikas** aadressil \[dez
 
 **Kogu leping.** Need Tingimused koos Küpsisepoliitika ja tehisintellekti pakkujate registriga moodustavad kogu meievahelise teenust käsitleva lepingu. Meie Privaatsuspoliitikas võetud kohustused on meile siduvad. Miski selles lõikes ei välista vastutust petturliku valeandmete esitamise eest.
 
-**Keel.** Need Tingimused avaldatakse inglise \[and Romanian\] keeles. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Keel.** Need Tingimused avaldatakse kõigis keeltes, mida veebisait pakub. Leping on sõlmitud keeles, milles registreerusite: selle versiooni keeles, millega nõustusite, ning see keel on kirjas andmetes, mida säilitame teie nõustumise kohta. Kui nõustute hiljem uue versiooniga teises keeles, jätkub leping selles keeles. Teised keeleversioonid on tõlked. Kui teie elukohariigi õigus näeb ette, et selle riigi keeles koostatud versioon on ülimuslik, on ülimuslik see versioon. Kui kaks keeleversiooni erinevad, kohaldame tõlgendust, mis on teile soodsam.
 
 **Kontakt.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukarest, Rumeenia.
 
@@ -269,7 +274,7 @@ Iga kirjet kohaldatakse ainult juhul, kui vastav piirkond on loetletud jaotises 
 
 ### A.1 Euroopa Liit ja Euroopa Majanduspiirkond
 
-Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; kohtuväline vaidluste lahendamine on kättesaadav asutuse \[the ANPC – named entity, website\] kaudu. **Saksamaa:** tühistamisnupp aadressil \[dezbatere.ro/cancel\] võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9 \[state them\]. **Prantsusmaa:** saate tellimuse veebis kolme sammuga lõpetada aadressil \[URL\]; teile on kättesaadav \[the mediator named at URL\]. **Itaalia:** vastutuse (15), peatamise (11), muudatuste (14) ja kohaldatava õiguse (18) klauslid nõuavad teie eraldi heakskiitu, mille annate registreerumisel eraldi kinnitusega. **Madalmaad:** need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. **Poola:** poolakeelne versioon asub aadressil \[URL\].
+Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma elukohariigi kohtule; kohaldatakse jaotises 13 sätestatud taganemisõigust; alternatiivne vaidluste lahendamine on kättesaadav asutuse \[the ANPC – named entity, website\] kaudu. **Saksamaa:** tühistamisnupp aadressil \[dezbatere.ro/cancel\] võimaldab teil tellimuse sisse logimata lõpetada; tellimistingimused, uuendamisperioodid ja etteteatamistähtajad vastavad BGB § 309 lõikele 9 \[state them\]. **Prantsusmaa:** saate tellimuse veebis kolme sammuga lõpetada aadressil \[URL\]; teile on kättesaadav \[the mediator named at URL\]. **Itaalia:** vastutuse (15), peatamise (11), muudatuste (14) ja kohaldatava õiguse (18) klauslid nõuavad teie eraldi heakskiitu, mille annate registreerumisel eraldi kinnitusega. **Madalmaad:** need Tingimused esitatakse enne lepingu sõlmimist salvestatavas vormis. **Poola:** poolakeelne versioon asub aadressil \[URL\].
 
 ### A.2 Ühendkuningriik *(ainult kui loetletud jaotises 2)*
 

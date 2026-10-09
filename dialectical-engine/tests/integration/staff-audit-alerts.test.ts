@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { FileUserDekStore, generateDek, loadKek, destroyKek } from '@debateai/crypto';
@@ -131,5 +131,5 @@ it('captures exact new function/table/column/role ACLs and denies every non-enum
  const tables=(await database.pool.query(`SELECT c.oid::regclass::text AS relation,pg_get_userbyid(c.relowner) AS owner,c.relacl::text AS acl FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='staff' AND c.relkind='r' ORDER BY relation`)).rows;
  const columns=(await database.pool.query(`SELECT c.oid::regclass::text AS relation,a.attname,a.attacl::text AS acl FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN('staff','identity') AND a.attnum>0 AND NOT a.attisdropped AND a.attacl IS NOT NULL ORDER BY relation,a.attnum`)).rows;
  const roles=(await database.pool.query(`SELECT r.rolname,r.rolcanlogin,r.rolinherit,r.rolsuper,r.rolcreatedb,r.rolcreaterole,r.rolreplication,r.rolbypassrls,ARRAY(SELECT p.rolname FROM pg_auth_members m JOIN pg_roles p ON p.oid=m.roleid WHERE m.member=r.oid ORDER BY p.rolname) AS memberships FROM pg_roles r WHERE r.rolname IN('debateai_runtime','debateai_staff_security_owner','debateai_staff_recovery','debateai_prod_staff_recovery') ORDER BY r.rolname`)).rows;
- const witness={functions,tables,columns,roles};console.info('[TASK5_EXACT_CATALOG_ACL]',JSON.stringify(witness));await writeFile('/Users/stefannour/DebateAIRO/docs/operations/admin-implementation-2026-10-02/logs/task5-catalog-acl.json',JSON.stringify(witness,null,2)+'\n');
+ const witness={functions,tables,columns,roles};console.info('[TASK5_EXACT_CATALOG_ACL]',JSON.stringify(witness));
 });

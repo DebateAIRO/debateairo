@@ -23,4 +23,13 @@ describe("funding activation consumes actual finite prerequisites", () => {
     await expect(new StaffInternalFundingReadiness(port(null), ready).requireReady()).rejects.toThrow();
     await expect(new StaffInternalFundingReadiness(port({ registerVersion: 2, policy: { ...policy, maximumDayMicros: 99999 } }), ready).requireReady()).rejects.toThrow();
   });
+  it("boot checks only static funding configuration; stale evidence locks each action with the typed alert refusal", async () => {
+    const stale = { ...ready, independentReadiness: { readIndependentAlertReadiness: async () => "UNAVAILABLE" as const } };
+    await expect(new StaffInternalFundingReadiness(port(), stale).requireConfigured()).resolves.toBeUndefined();
+    await expect(new StaffInternalFundingReadiness(port(), stale).requireReady()).rejects.toMatchObject({ code: "STAFF_ALERT_UNAVAILABLE" });
+    for (const input of [{ ...stale, deploymentMode: "local" as const }, { ...stale, billingPlans: null }, { ...stale, providerTargets: [] }])
+      await expect(new StaffInternalFundingReadiness(port(), input).requireConfigured()).rejects.toThrow("STAFF_UNAVAILABLE");
+    await expect(new StaffInternalFundingReadiness(port(null), stale).requireConfigured()).rejects.toThrow("STAFF_UNAVAILABLE");
+    await expect(new StaffInternalFundingReadiness(port({ registerVersion: 2, policy: { ...policy, maximumDayMicros: 99999 } }), stale).requireConfigured()).rejects.toThrow("STAFF_UNAVAILABLE");
+  });
 });

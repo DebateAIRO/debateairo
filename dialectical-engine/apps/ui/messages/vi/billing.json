@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Bắt đầu gói của tôi ngay. Tôi hiểu rằng nếu rút lại trong vòng 14 ngày, tôi trả cho phần đã dùng: phần lớn hơn giữa số ngày đã dùng hoặc tín dụng đã dùng.",
   "billing.checkout.continueToCard": "Tiếp tục đến thông tin thẻ",
   "billing.checkout.cardTitle": "Thông tin thẻ",
-  "billing.checkout.cardNote": "Bạn nhập thẻ vào biểu mẫu bảo mật của xMoney. Số thẻ của bạn không bao giờ đến máy chủ của chúng tôi.",
+  "billing.checkout.cardNote": "Bạn nhập thẻ vào biểu mẫu bảo mật của NETOPIA Payments. Số thẻ của bạn không bao giờ đến máy chủ của chúng tôi.",
   "billing.checkout.subscribeAndPay": "Đặt hàng với nghĩa vụ thanh toán",
   "billing.checkout.waitingForBank": "Đang chờ ngân hàng của bạn xác nhận…",
   "billing.checkout.willEmail": "Chúng tôi sẽ gửi email cho bạn ngay khi ngân hàng xác nhận.",

@@ -126,7 +126,7 @@ describe("P16c the owner's tax-summary job", () => {
     expect(text).toContain(`charge ${hex(0)}: QUADERNO_RECORD_SALE (TAX_SERVICE_UNAVAILABLE), since 2026-11-04\n`);
     expect(text).not.toContain(`charge ${hex(40)}: QUADERNO_RECORD_SALE`);
     expect(text).toContain("Romanian e-Factura documents to confirm");
-    expect(text).toContain("Payments to check by hand in xMoney");
+    expect(text).toContain("Payments to check by hand in Netopia");
   });
 
   it("queues O1 at most once per quarter: a re-run after the quarter's O1 exists mails nobody and audits nothing", async () => {

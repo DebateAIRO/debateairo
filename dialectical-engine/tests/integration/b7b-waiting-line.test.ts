@@ -7,6 +7,7 @@ import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { PostgresModelSpendStore, costEnvelopeDay, type PersonWindow } from "@debateai/budget";
 import { PLAN_TIER_ROSTERS, type AskRequest, type Session } from "@debateai/contract";
 import { EntitlementRepository, RunRepository, RunWaitRepository, migrate, type WaitReason } from "@debateai/db";
+import { parsePreviewProviderTestConfig } from "@debateai/providers";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue } from "@debateai/register";
 import { AskRoom, type AskRoomOptions } from "../../apps/api/src/ask-room.js";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
@@ -75,8 +76,11 @@ function roomWith(overrides: Partial<AskRoomOptions> = {}): AskRoom {
   });
 }
 
-function applicationWith(room: AskRoom, dispatcher: Dispatcher): PostgresAskApplication {
+function applicationWith(
+  room: AskRoom, dispatcher: Dispatcher, extra: Partial<RunCreationSettings> = {}
+): PostgresAskApplication {
   const settings: RunCreationSettings = {
+    ...extra,
     strangerSampleRate: 0,
     registerVersion: 1,
     batteryVersion: "b7b-integration",
@@ -661,5 +665,95 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
     await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 1 });
     expect(dispatched).toEqual([waitingRunId]);
     expect(await chargeScopeOf(waitingRunId)).toBe("FREE");
+  });
+});
+
+/**
+ * Step 1 review fix (2026-10-08): on the private preview only the team may start a debate,
+ * and the waker and its stalled-start re-dispatch start or hand over runs that never pass
+ * POST /v1/asks. Read through the real ownership rows: an account's run (its latest
+ * ownership event; an encrypted run carries one from its creation, and a server-owned run
+ * cannot be created here without the content cipher) and a legacy asker's run (never the
+ * team's). An outsider's run is recorded FAILED as
+ * RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY with nothing of it started or dispatched.
+ */
+describe("Step 1: on the private preview the waiting line starts and hands over only the team's runs", () => {
+  const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
+    deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash"], requested_thinking_level: "high",
+    budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture"
+  }))!;
+
+  async function person(): Promise<Readonly<{ userId: string; ownerRef: string }>> {
+    const userId = randomUUID();
+    const ownerRef = randomUUID();
+    await database.pool.query(
+      `INSERT INTO identity."user" (
+         user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,
+         phone_ciphertext,password_hash,pseudonym,audit_token,owner_ref,state,
+         adult_affirmed_at,created_at
+       ) VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
+      [userId, randomBytes(32), `preview-team-${randomUUID()}`, randomUUID(), ownerRef]
+    );
+    return Object.freeze({ userId, ownerRef });
+  }
+
+  async function inLine(runId: string, at: Date): Promise<string> {
+    const line = new RunWaitRepository(database.pool);
+    await inTransaction(async (client) => {
+      await line.enterWait(client, runId, at);
+      await line.recordReason(client, runId, { waitsFor: "SITE", personRecheckAt: null, at });
+    });
+    return runId;
+  }
+
+  it("starts the team's waiting runs and records an outsider's and a legacy asker's FAILED as PREVIEW_TEAM_ONLY", async () => {
+    now = new Date("2031-12-20T10:00:00.000Z");
+    estimate = 1_000;
+    const [member, claimer, outsider] = [await person(), await person(), await person()];
+    const memberRun = await inLine(await ownedRun(member.ownerRef), new Date("2031-12-20T09:00:00.000Z"));
+    const claimedRun = await inLine(await ownedRun(claimer.ownerRef), new Date("2031-12-20T09:00:01.000Z"));
+    const outsiderRun = await inLine(await ownedRun(outsider.ownerRef), new Date("2031-12-20T09:00:02.000Z"));
+    const legacyRun = await inLine(await newRun(), new Date("2031-12-20T09:00:03.000Z"));
+    const { dispatched, dispatcher } = recording();
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const application = applicationWith(roomWith({ dailyCeilingMicros: 10_000_000 }), dispatcher, {
+      previewProviderTestConfig: PREVIEW, previewTeamUserIds: [member.userId, claimer.userId]
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ started: 2, failed: 2 });
+    expect(dispatched).toEqual([memberRun, claimedRun]);
+    expect(await jobsOf(outsiderRun)).toEqual([{ state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY" }]);
+    expect(await jobsOf(legacyRun)).toEqual([{ state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY" }]);
+    // Neither was started: no hold opened, and both left the line.
+    expect(await holdOf(outsiderRun)).toBeNull();
+    expect(await holdOf(legacyRun)).toBeNull();
+    expect(await waitingIds()).not.toContain(outsiderRun);
+    expect(await waitingIds()).not.toContain(legacyRun);
+  });
+
+  it("never re-dispatches an outsider's stalled first job: it is recorded FAILED, and the team's is handed over", async () => {
+    const [member, outsider] = [await person(), await person()];
+    const stalledStart = async (runId: string): Promise<void> => {
+      await database.pool.query(
+        `INSERT INTO ledger.model_spend_hold (hold_id, run_id, held_micros, opened_at)
+         VALUES (gen_random_uuid(), $1, 1000, clock_timestamp() - make_interval(mins => 10))`,
+        [runId]
+      );
+      await new WorkItemRepository(database.pool).enqueue({
+        runId, batteryRowId: "Q1", commandKey: `S00:${runId}:Q1`, nodeSet: []
+      });
+    };
+    const memberRun = await ownedRun(member.ownerRef);
+    const outsiderRun = await ownedRun(outsider.ownerRef);
+    await stalledStart(memberRun);
+    await stalledStart(outsiderRun);
+    const { dispatched, dispatcher } = recording();
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const application = applicationWith(roomWith(), dispatcher, {
+      previewProviderTestConfig: PREVIEW, previewTeamUserIds: [member.userId]
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toMatchObject({ redispatched: 1 });
+    expect(dispatched).toEqual([memberRun]);
+    expect(await jobsOf(outsiderRun)).toEqual([{ state: "FAILED", terminal_reason: "RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY" }]);
+    expect(await jobsOf(memberRun)).toEqual([{ state: "READY", terminal_reason: null }]);
   });
 });

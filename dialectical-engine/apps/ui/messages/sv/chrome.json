@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Cookies vi sparar",
   "chrome.security": "Säkerhet",
   "chrome.logout": "Logga ut",
+  "chrome.logIn": "Logga in",
   "chrome.accountError": "Det fungerade inte. Läs in sidan igen och försök på nytt.",
   "chrome.footer.pricing": "Priser",
   "chrome.footer.cancel": "Säg upp ett abonnemang",

@@ -42,12 +42,43 @@ function expired(entry: AdmissionEntry, windowMs: number, now: number): boolean 
 }
 
 /**
+ * Auth API hardening 2026-10-09: scopes whose full table gives up an entry
+ * instead of refusing a new key. A refusal there would let one source minting
+ * fresh keys answer 429 CAPACITY to everybody (the three public recovery
+ * starts share `recoveryStart`). Every other scope stays fail-closed.
+ */
+const EVICTING_SCOPES: ReadonlySet<AdmissionScope> = new Set<AdmissionScope>(["recoveryStart"]);
+
+/**
+ * Which entry to give up when a table is full (expired entries are swept
+ * first): the one carrying the least evidence — unblocked, lowest count,
+ * oldest first — so a flood of one-shot keys evicts itself and never resets a
+ * source that has spent its budget. Only a table made entirely of blocked
+ * entries gives up the one whose block ends soonest.
+ */
+export function leastEvidenceKey<K>(
+  entries: ReadonlyMap<K, Readonly<{ count: number; blockedUntil: number }>>,
+  now: number
+): K | undefined {
+  let open: K | undefined, openCount = Infinity, blocked: K | undefined, blockedUntil = Infinity;
+  for (const [key, entry] of entries) {
+    if (entry.blockedUntil > now) {
+      if (entry.blockedUntil < blockedUntil) { blocked = key; blockedUntil = entry.blockedUntil; }
+    } else if (entry.count < openCount) {
+      open = key; openCount = entry.count;
+    }
+  }
+  return open ?? blocked;
+}
+
+/**
  * A bounded, fail-closed admission limiter (PLAN B10, modelled on
  * MfaVerificationLimiter). Each key owns one fixed window; once its budget is
  * spent it is blocked for the remainder of that window and told how long to
  * wait. The key table is capped per scope so a caller minting fresh keys
  * cannot grow memory: at capacity, expired keys are evicted oldest-first and,
- * if none can be evicted, the new key is refused rather than admitted.
+ * if none can be evicted, the new key is refused rather than admitted — except
+ * in an EVICTING_SCOPES scope, which gives up its least-evidenced entry.
  */
 export class AdmissionLimiter {
   private readonly buckets: ReadonlyMap<AdmissionScope, AdmissionBucket>;
@@ -113,6 +144,11 @@ export class AdmissionLimiter {
         for (const [candidateKey, candidate] of entries) {
           if (expired(candidate, policy.windowMs, instant)) entries.delete(candidateKey);
         }
+      }
+      while (entries.size >= policy.capacity && EVICTING_SCOPES.has(scope)) {
+        const victim = leastEvidenceKey(entries, instant);
+        if (victim === undefined) break;
+        entries.delete(victim);
       }
       if (entries.size >= policy.capacity) {
         return Object.freeze({

@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Indítsák el most a csomagomat. Tudomásul veszem, hogy ha 14 napon belül elállok, a már felhasznált részt fizetem: a felhasznált napok és a felhasznált kredit közül a nagyobbat.",
   "billing.checkout.continueToCard": "Tovább a kártyaadatokhoz",
   "billing.checkout.cardTitle": "Kártyaadatok",
-  "billing.checkout.cardNote": "A kártyáját az xMoney biztonságos űrlapján adja meg. A kártyaszáma soha nem jut el a szervereinkre.",
+  "billing.checkout.cardNote": "A kártyáját a NETOPIA Payments biztonságos űrlapján adja meg. A kártyaszáma soha nem jut el a szervereinkre.",
   "billing.checkout.subscribeAndPay": "Fizetési kötelezettséggel járó megrendelés",
   "billing.checkout.waitingForBank": "Várjuk a bankja megerősítését…",
   "billing.checkout.willEmail": "E-mailt küldünk, amint a bankja megerősíti.",

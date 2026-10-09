@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Preț și plată",
   "legal.notice.s04.body": "{product} este gratuit. Planurile cu plată nu sunt încă disponibile. Înainte de lansarea oricărui plan cu plată, această secțiune va preciza prețul (cu taxe incluse), cum și când plătiți, când începe serviciul, cum funcționează reînnoirea și cum puteți anula.",
   "legal.notice.s04.bodyPaid": "Abonamentele plătite și prețurile lor lunare sunt pe pagina de prețuri. Prețurile de acolo sunt fără taxe; înainte să plătiți, pagina de plată arată prețul întreg, cu taxa țării dumneavoastră. Plătiți cu cardul, în fiecare lună, în avans. Un abonament începe imediat ce banca dumneavoastră confirmă plata și se reînnoiește în fiecare lună până când îl anulați. Îl puteți anula oricând din Setări sau pe pagina de anulare, fără să vă autentificați.",
-  "legal.notice.s04.payments": "Plățile cu cardul sunt procesate de xMoney. Nu vedem și nu păstrăm niciodată numărul cardului dumneavoastră.",
+  "legal.notice.s04.payments": "Plățile cu cardul sunt procesate de NETOPIA Payments. Nu vedem și nu păstrăm niciodată numărul cardului dumneavoastră.",
   "legal.notice.s04.pricingLink": "Vedeți abonamentele și prețurile",
   "legal.notice.s04.cancelLink": "Anularea unui abonament",
   "legal.notice.s05.title": "Retragere și rambursări",

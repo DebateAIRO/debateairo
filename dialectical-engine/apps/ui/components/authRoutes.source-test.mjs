@@ -97,7 +97,7 @@ test("the login route sends an already-authenticated browser back to its debate 
   assert.match(loginPage, /\.readSession\(\)/);
   assert.match(loginPage, /redirect\(safeReturnPath\(typeof requested === "string" \? requested : null\)\)/);
   assert.match(loginPage, /catch \{/);
-  assert.match(loginPage, /return <LoginFlow catalog=\{catalog\} \/>/);
+  assert.match(loginPage, /return <LoginFlow catalog=\{catalog\} turnstile=\{turnstile\} \/>/);
 });
 
 test("verification remains one canonical mailed-link path and production builds gate every auth route", () => {

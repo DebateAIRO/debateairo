@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "价格与付款",
   "legal.notice.s04.body": "{product} 目前免费，尚未推出付费方案。在任何付费方案推出之前，本节将列明价格（含税）、付款方式和时间、服务开始时间、续订方式以及取消方式。",
   "legal.notice.s04.bodyPaid": "付费方案及其月费列在价格页面上。该页面上的价格不含税；在您付款前，结账页面会显示含您所在国家税费的完整价格。您以银行卡付款，每月预付。方案在您的银行确认付款后立即开始，并每月自动续订，直至您取消。您可以随时在“设置”中取消，或无需登录在取消页面上取消。",
-  "legal.notice.s04.payments": "银行卡付款由 xMoney 处理。我们绝不会看到或存储您的卡号。",
+  "legal.notice.s04.payments": "银行卡付款由 NETOPIA Payments 处理。我们绝不会看到或存储您的卡号。",
   "legal.notice.s04.pricingLink": "查看方案和价格",
   "legal.notice.s04.cancelLink": "取消方案",
   "legal.notice.s05.title": "撤回与退款",

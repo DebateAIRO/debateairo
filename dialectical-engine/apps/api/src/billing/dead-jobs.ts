@@ -66,7 +66,7 @@ export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: st
     // P4-K (P2-W12, the owner's ruling of 3 October 2026, option (b)): P9c queued no job for this refund, so the
     // owner issues the credit note by hand and records it with its amount (`--amount`, at most what the payment held).
     // One credit note per charge (0086's invoice_one_per_intent): the command refuses a second one.
-    return "a refund made in the xMoney dashboard, whose amount only the dashboard shows: issue its credit note by hand"
+    return "a refund made in the Netopia dashboard, whose amount only the dashboard shows: issue its credit note by hand"
       + " in SmartBill (a Romanian sale) or Quaderno, then record it with its amount: pnpm billing:invoice --charge"
       + ` ${item.chargeId} --kind CREDIT_NOTE --record <series>-<number> (SmartBill) or <Quaderno id> --amount <the amount`
       + " refunded, for example 12.10>, at most what the payment held; the line then leaves this list and the quarter's"
@@ -77,7 +77,7 @@ export function documentJobAction(item: Readonly<{ chargeId: string; jobKind: st
     return "no refund is recorded for this sale: nothing to issue or re-queue; tell whoever runs the server";
   }
   if (item.code === "OTHER_XMONEY_SYSTEM") {
-    return "a payment of the other xMoney system (sandbox or live), which owes no document here: nothing to issue or"
+    return "a payment of the other Netopia system (sandbox or live), which owes no document here: nothing to issue or"
       + " re-queue";
   }
   if (unbackedDocumentCode(item.code) || !isDocumentJobKind(item.jobKind)) {

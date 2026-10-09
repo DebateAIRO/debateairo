@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Meinen Tarif jetzt starten. Mir ist bewusst, dass ich bei einem Widerruf innerhalb von 14 Tagen den bereits genutzten Teil bezahle: den größeren Anteil aus genutzten Tagen oder genutztem Guthaben.",
   "billing.checkout.continueToCard": "Weiter zu den Kartendaten",
   "billing.checkout.cardTitle": "Kartendaten",
-  "billing.checkout.cardNote": "Sie geben Ihre Karte im sicheren Formular von xMoney ein. Ihre Kartennummer erreicht niemals unsere Server.",
+  "billing.checkout.cardNote": "Sie geben Ihre Karte im sicheren Formular von NETOPIA Payments ein. Ihre Kartennummer erreicht niemals unsere Server.",
   "billing.checkout.subscribeAndPay": "Zahlungspflichtig bestellen",
   "billing.checkout.waitingForBank": "Warten auf die Bestätigung Ihrer Bank…",
   "billing.checkout.willEmail": "Wir senden Ihnen eine E-Mail, sobald Ihre Bank bestätigt.",

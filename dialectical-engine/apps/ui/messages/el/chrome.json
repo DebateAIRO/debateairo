@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Τα cookies που αποθηκεύουμε",
   "chrome.security": "Ασφάλεια",
   "chrome.logout": "Αποσύνδεση",
+  "chrome.logIn": "Σύνδεση",
   "chrome.accountError": "Κάτι δεν λειτούργησε. Φορτώστε ξανά τη σελίδα και δοκιμάστε πάλι.",
   "chrome.footer.pricing": "Τιμές",
   "chrome.footer.cancel": "Ακύρωση προγράμματος",

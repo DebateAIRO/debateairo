@@ -415,7 +415,7 @@ describe("FAIR-02 Claude Code CLI relay", () => {
 
 describe("D10 Claude relay binary resolution", () => {
   it("carries no compiled-in path: this maker is found by the NAME `claude`", () => {
-    // REPEALS the 2026-08 pin on "/Users/vladmihaimiron/.local/bin/claude".
+    // REPEALS the 2026-08 pin on one developer's "~/.local/bin/claude".
     // Owner's rule, 2026-09-17: a host fact is DEDUCED, never set in stone.
     // What is pinned now is the name searched for and the typed code an absent
     // CLI refuses with; there is no path left to fall back to.

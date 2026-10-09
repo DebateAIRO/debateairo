@@ -207,7 +207,8 @@ describe("the country lookup (paid plans G1, spec §2.3.3)", () => {
     expect(parseApiEnvironment({
       ...local, DEBATEAI_DEPLOYMENT_MODE: "hosted",
       GEOIP_COUNTRY_DB_PATH: "/var/lib/debateai-geoip/dbip-country-lite.mmdb",
-      TOR_EXIT_LIST_PATH: "/var/lib/debateai-geoip/tor-exit-list.txt"
+      TOR_EXIT_LIST_PATH: "/var/lib/debateai-geoip/tor-exit-list.txt",
+      TURNSTILE_SOCKET_PATH: "/run/debateai-turnstile/siteverify.sock"
     }).DEPLOYMENT_MODE).toBe("hosted");
   });
 });

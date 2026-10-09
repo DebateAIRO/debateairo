@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Iniciar o meu plano agora. Compreendo que, se exercer o direito de livre resolução no prazo de 14 dias, pago a parte já utilizada: a maior entre os dias utilizados e o crédito utilizado.",
   "billing.checkout.continueToCard": "Continuar para os dados do cartão",
   "billing.checkout.cardTitle": "Dados do cartão",
-  "billing.checkout.cardNote": "Introduz o seu cartão no formulário seguro da xMoney. O número do seu cartão nunca chega aos nossos servidores.",
+  "billing.checkout.cardNote": "Introduz o seu cartão no formulário seguro da NETOPIA Payments. O número do seu cartão nunca chega aos nossos servidores.",
   "billing.checkout.subscribeAndPay": "Encomenda com obrigação de pagamento",
   "billing.checkout.waitingForBank": "A aguardar a confirmação do seu banco…",
   "billing.checkout.willEmail": "Enviaremos um e-mail assim que o seu banco confirmar.",

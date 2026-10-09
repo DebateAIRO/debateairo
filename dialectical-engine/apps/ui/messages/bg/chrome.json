@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Бисквитките, които съхраняваме",
   "chrome.security": "Сигурност",
   "chrome.logout": "Изход",
+  "chrome.logIn": "Вход",
   "chrome.accountError": "Не се получи. Презаредете страницата и опитайте отново.",
   "chrome.footer.pricing": "Цени",
   "chrome.footer.cancel": "Прекратяване на план",

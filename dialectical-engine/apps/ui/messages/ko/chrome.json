@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "저장하는 쿠키",
   "chrome.security": "보안",
   "chrome.logout": "로그아웃",
+  "chrome.logIn": "로그인",
   "chrome.accountError": "처리하지 못했습니다. 페이지를 새로 고친 후 다시 시도하세요.",
   "chrome.footer.pricing": "요금",
   "chrome.footer.cancel": "요금제 해지",

@@ -93,14 +93,20 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
     expect(reacceptanceFloor("PRIVACY")).toBe("3.2");
   });
 
-  it("keeps the sensitive-data withdrawal contact in every locale", () => {
+  // V's ruling: the sensitive-data consent is withdrawn by closing the account, not by email.
+  it("withdraws the sensitive-data consent by closing the account in every locale", () => {
     for (const { code } of LOCALES) {
       const privacy = readDraft(code, "PRIVACY");
       const sensitiveSection = privacy.split(/^## 3\..+$/mu)[1]?.split(/^## 4\./mu)[0];
       const withdrawalRow = privacy.split("\n").find((line) => line.startsWith("|") && line.includes("Art. 7(3)"));
-      expect(sensitiveSection, `${code} section 3`).toContain("privacy@dezbatere.ro");
-      expect(withdrawalRow, `${code} withdrawal row`).toContain("privacy@dezbatere.ro");
+      expect(sensitiveSection, `${code} section 3`).toBeDefined();
+      expect(withdrawalRow, `${code} withdrawal row`).toBeDefined();
+      expect(sensitiveSection, `${code} section 3`).not.toContain("privacy@dezbatere.ro");
+      expect(withdrawalRow, `${code} withdrawal row`).not.toContain("privacy@dezbatere.ro");
     }
+    const english = readDraft("en", "PRIVACY");
+    expect(english).toContain("You can withdraw it at any time by closing your account from Settings.");
+    expect(english).toContain("withdraw the sensitive-data consent by closing your account from Settings");
   });
 
   it("names the actual document language in locales that previously said English", () => {

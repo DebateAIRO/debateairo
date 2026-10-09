@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.1 · Effective \[date\] · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar; \[Romanian version at …; the Romanian version prevails for users in Romania\].**
+**Version 2.1 · Effective \[date\] · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A DebateAI mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Vitái mindaddig bizalmasak, amíg közzé nem teszi őket; közzététel esetén bárki elolvashatja azokat. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, és azt nem használjuk modellek betanítására. Jogellenes tartalmat a \[abuse@dezbatere.ro\] címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -40,6 +40,7 @@ A DebateAI üzemeltetője a Romániában bejegyzett **DebateAIRO S.R.L.** társa
 | Adatvédelem | privacy@dezbatere.ro |
 | Jogellenes tartalom bejelentése | \[abuse@dezbatere.ro\] — lásd a 10. szakaszt |
 | Hatósági kapcsolattartó pont | \[dsa@dezbatere.ro\] — román és angol nyelven |
+| Terrorista tartalom eltávolítására irányuló végzések (az (EU) 2021/784 rendelet) | \[dsa@dezbatere.ro\] — kapcsolattartó pontunk ezekhez a végzésekhez; román és angol nyelven; lásd a 10. szakaszt |
 | Más országokban működő képviselők | Az A. melléklet sorolja fel azon régiók tekintetében, ahol képviselőt jelöltünk ki |
 
 Ezek az adatok folyamatosan elérhetők a webhelyen is: \[dezbatere.ro/legal\]. Mindig kapcsolatba léphet egy személlyel, nem csupán az asszisztensünkkel; ennek módját a 10. szakasz ismerteti.
@@ -151,17 +152,21 @@ Minden bejelentést indokolatlan késedelem nélkül visszaigazolunk. A bejelent
 - **A motoron belüli döntések.** A motor gépi döntéseket hoz az *érvekről*: megtagadhatja egy kérdés megválaszolását, lezárhatja a folyamatot egy végponton — például ha a kérdés hamis előfeltevésen alapul, vagy empirikus helyett értékkérdés —, felső határt szabhat a megbízhatósági sávnak, ha nem állt rendelkezésre független kritika, vagy hibásnak jelölhet egy választ, ha a létrehozott szöveg nem felelt meg a megfelelőségi ellenőrzésen. Ezek a termék rendeltetésszerű működésének részei; a vitában láthatók az Ön számára, és nem Önről szóló döntések.
 - **Tartalomra és fiókokra vonatkozó moderálási döntések.** Egy közzétett vita eltávolítása vagy korlátozása, illetve egy fiók felfüggesztése vagy megszüntetése olyan döntés, amelyet e Feltételek vagy a jog alapján hozunk. Minden, az Ön fiókját érintő ilyen döntésben közreműködik egy személy. A jogalapokat a 11. szakasz ismerteti.
 
-**Indokolás.** Valahányszor eltávolítjuk az Ön tartalmát vagy korlátozzuk annak láthatóságát, illetve felfüggesztjük vagy megszüntetjük a fiókját, indokolást adunk: mit tettünk és az milyen körre terjed ki, milyen tényekre támaszkodtunk és azok bejelentésből vagy saját ellenőrzéseinkből származtak-e, alkalmaztunk-e automatizált eszközt, mi a jogi vagy szerződéses jogalap, és hogyan támadhatja meg a döntést.
+**Indokolás.** Valahányszor eltávolítjuk az Ön tartalmát vagy korlátozzuk annak láthatóságát, illetve felfüggesztjük vagy megszüntetjük a fiókját, indokolást adunk: mit tettünk és az milyen körre terjed ki, milyen tényekre támaszkodtunk és azok bejelentésből vagy saját ellenőrzéseinkből származtak-e, alkalmaztunk-e automatizált eszközt, mi a jogi vagy szerződéses jogalap, és hogyan támadhatja meg a döntést: az alább ismertetett panaszkezelési utunkon, a digitális szolgáltatásokról szóló uniós rendelet alapján tanúsított peren kívüli vitarendezési testület útján, vagy bírósági úton.
 
 **Döntéssel kapcsolatos panasz.** Ha nem ért egyet egy moderálási döntéssel, **hat hónapon** belül válaszoljon az indokolásra, vagy írjon a \[appeals@dezbatere.ro\] címre. Az ügyet egy, az eredeti döntésben részt nem vevő személy vizsgálja felül, az eredményt pedig indokolással együtt közöljük Önnel. Ez nem érinti az Ön jogát arra, hogy bírósághoz forduljon, vagy igénybe vegye a 18. szakasz szerinti alternatív vitarendezést. A panaszkezelési út azon panaszokra is kiterjed, amelyek szerint nem intézkedtünk egy bejelentés alapján, jogtalanul távolítottunk el tartalmat, jogtalanul korlátoztunk fiókot, vagy valamely automatizált eszköz tévesen érintette az Ön tartalmát.
 
+**Peren kívüli vitarendezés.** Ha Ön az Európai Unióban tartózkodik, egy moderálási döntésünkkel kapcsolatos jogvitát a digitális szolgáltatásokról szóló uniós rendelet (az (EU) 2022/2065 rendelet) 21. cikke alapján tanúsított peren kívüli vitarendezési testület elé viheti. Ez kiterjed az Ön tartalmára vagy fiókjára vonatkozó döntésre, valamint az Ön által tett bejelentésről szóló döntésünkre is. Ön választja ki a testületet az Európai Bizottság által a digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement címen közzétett listáról, és nem kell előbb a panaszkezelési utunkat igénybe vennie. Jóhiszeműen részt veszünk az eljárásban, és csak akkor tagadjuk meg a részvételt, ha ugyanazt a jogvitát – ugyanarról a tartalomról és ugyanazon okokból – már rendezték. A testület döntése nem köti sem Önt, sem minket, és Ön megtartja a bírósághoz fordulás jogát. A testület csekély díjat számíthat fel Önnek, vagy díjmentesen járhat el. Ha az Ön javára dönt, mi viseljük a díjait, és megtérítjük az Ön észszerű költségeit; ha a mi javunkra dönt, Önnek nem kell megtérítenie a díjainkat vagy költségeinket, kivéve, ha a testület megállapítja, hogy Ön nyilvánvalóan rosszhiszeműen járt el.
+
 **Kapcsolatfelvétel egy személlyel.** Támogatási asszisztensünk egy MI-rendszer, és ezt fel is tünteti. Ön bármikor kérheti, hogy személlyel beszéljen, és minden támogatási beszélgetés felajánlja ezt a lehetőséget. Az Önnel való kommunikációban nem támaszkodunk kizárólag automatizált eszközökre.
+
+**Terrorista tartalom.** A terrorista tartalom jogellenes, és nem megengedett a DebateAI szolgáltatásban (7. szakasz). Az Európai Unió illetékes hatóságai az (EU) 2021/784 rendelet alapján eltávolítási végzéseket küldhetnek nekünk az 1. szakaszban megjelölt kapcsolattartó pontra. Ha ilyet kapunk, egy órán belül eltávolítjuk a tartalmat, vagy minden uniós országban hozzáférhetetlenné tesszük. Tájékoztatjuk a tartalmat közzétevő személyt arról, hogy azt eltávolítottuk, és kérésére arról is, miért és hogyan támadhatja meg a végzést, kivéve, ha a hatóság úgy dönt, hogy közbiztonsági okokból korlátozott ideig nem adható tájékoztatás. A rendelet előírásainak megfelelően az eltávolított tartalmat és a kapcsolódó adatokat hat hónapig megőrizzük, hogy az eltávolítás felülvizsgálható, és ha téves volt, visszavonható legyen. A tartalmat közzétevő személy megtámadhatja a végzést a végzést kibocsátó hatóság országának bíróságain, és igénybe veheti a panaszkezelési utunkat is. Egyetlen hatóság sem kötelezett bennünket konkrét intézkedések meghozatalára terrorista tartalommal szemben a rendelet alapján; ha ez megtörténik, itt ismertetjük ezeket az intézkedéseket, ideértve az esetleges automatizált eszközöket is.
 
 **Az életet vagy biztonságot fenyegető súlyos kockázat.** Ha olyan információ jut tudomásunkra, amely valakinek az életét vagy biztonságát fenyegető bűncselekményre utal, értesítjük az illetékes hatóságokat.
 
 ## 11. Felfüggesztés és megszüntetés
 
-**Az Ön részéről.** A 6. szakaszban foglaltak szerint bármikor megszüntetheti fiókját a Beállítások menüpontban. Ehhez nem kell indokot megadnia.
+**Az Ön részéről.** A 6. szakaszban foglaltak szerint bármikor megszüntetheti fiókját a Beállítások menüpontban. Ehhez nem kell indokot megadnia. Fiókja megszüntetésével e Feltételek is megszűnnek, mégpedig a megszüntetés hatálybalépésekor, a 7 napos türelmi idő elteltével; az e szakasz végén felsorolt szakaszok ezt követően is hatályban maradnak.
 
 **A mi részünkről.** Felfüggeszthetjük vagy megszüntethetjük az Ön fiókját, illetve eltávolíthatjuk vagy korlátozhatjuk tartalmát, ha: Ön lényegesen megsérti e Feltételeket, különösen a 7. szakaszt; tartalma jogellenes, vagy jogszabály, bíróság vagy hatóság intézkedést ír elő számunkra; a használat veszélyezteti a szolgáltatás biztonságát, integritását vagy rendelkezésre állását, illetve mások jogait; fiókja \[24 months\] óta inaktív, és erről előzetesen értesítettük; vagy megszüntetjük a szolgáltatás nyújtását, illetve annak nyújtását az Ön országában.
 
@@ -259,7 +264,7 @@ A személyes adatok kezelésének módját a \[dezbatere.ro/privacy\] címen el�
 
 **Teljes megállapodás.** E Feltételek a Sütiszabályzattal és az MI-szolgáltatói nyilvántartással együtt alkotják a szolgáltatásra vonatkozó teljes megállapodást közöttünk. Az Adatvédelmi szabályzatban tett kötelezettségvállalásaink köteleznek bennünket. E bekezdés egyetlen rendelkezése sem zárja ki a csalárd megtévesztésért fennálló felelősséget.
 
-**Nyelv.** E Feltételeket angol \[and Romanian\] nyelven tesszük közzé. \[State which version prevails for which users; Annex A notes where a local language is required.\]
+**Nyelv.** E Feltételeket a webhely által kínált valamennyi nyelven közzétesszük. A szerződés nyelve az, amelyen Ön regisztrált: az Ön által elfogadott változat nyelve, amelyet az elfogadásról vezetett nyilvántartásunk rögzít. Ha Ön később egy másik nyelvű új változatot fogad el, a szerződés nyelve ettől kezdve ez a nyelv. A többi nyelvi változat fordítás. Ha az Ön lakóhelye szerinti ország joga úgy rendelkezik, hogy az adott ország nyelvén készült változat az irányadó, akkor az a változat az irányadó. Ha két nyelvi változat eltér egymástól, az Önre kedvezőbb értelmezést alkalmazzuk.
 
 **Kapcsolat.** \[legal@dezbatere.ro\] · DebateAIRO S.R.L., \[address\], Bukarest, Románia.
 

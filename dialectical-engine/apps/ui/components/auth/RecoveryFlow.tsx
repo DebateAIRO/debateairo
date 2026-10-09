@@ -112,8 +112,8 @@ export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthe
         }
     }
     return <AuthShell eyebrow={t(catalog, "auth.login.recoveryAccess")} title={t(catalog, "auth.recovery.title")} description={t(catalog, "auth.recovery.description")} footer={!proof&&!token?<p><a href="/reset-password">{t(locale==='ro'?resetRo:resetEn,"request.title")}</a> · <KnownPasswordRecoveryLink/></p>:null}>
- {error ? <p role="alert">{error}</p> : null}{backup ? <EphemeralCodes codes={[backup]} catalog={catalog}/> : null}
- {expired ? <p role="alert">{t(catalog, "auth.recovery.restart")}</p> : null}
+ {error ? <div className="authAlert" role="alert">{error}</div> : null}{backup ? <EphemeralCodes codes={[backup]} catalog={catalog}/> : null}
+ {expired ? <div className="authAlert" role="alert">{t(catalog, "auth.recovery.restart")}</div> : null}
  {proof ? ready ? <SecurityEnrollment catalog={catalog} client={client} authority={{ kind: 'recovery', token: proof.recovery_capability, expiresAt: proof.expires_at, availableMethods: proof.available_methods, totpUnavailableReason: proof.totp_unavailable_reason }} onAuthenticated={() => {
                 setProof(null);
                 setBackup(null);
@@ -122,12 +122,12 @@ export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthe
                 setProof(null);
                 setReady(false);
                 setExpired(true);
-            }}/> : <OnboardingEvidence catalog={catalog} locale={locale} client={client} authority={{ kind: 'recovery', token: proof.recovery_capability }} onReady={() => setReady(true)}/> : token ? <form method="post" action="/recover" noValidate onSubmit={e => {
+            }}/> : <OnboardingEvidence catalog={catalog} locale={locale} client={client} authority={{ kind: 'recovery', token: proof.recovery_capability }} onReady={() => setReady(true)}/> : token ? <form className="authForm" method="post" action="/recover" noValidate onSubmit={e => {
                 e.preventDefault();
                 void prove(e.currentTarget);
-            }}><label htmlFor="recover-code">{t(catalog, "auth.login.recoveryCodeLabel")}</label><input id="recover-code" name="code" autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value)} disabled={busy}/><button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form> : sent ? <p role="status">{t(catalog, "auth.recovery.sent")}</p> : <form method="post" action="/recover" noValidate onSubmit={e => {
+            }}><div className="authField"><label htmlFor="recover-code">{t(catalog, "auth.login.recoveryCodeLabel")}</label><input className="authRecoveryInput" id="recover-code" name="code" autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value)} disabled={busy}/></div><button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button></form> : sent ? <p className="authFinePrint" role="status">{t(catalog, "auth.recovery.sent")}</p> : <form className="authForm" method="post" action="/recover" noValidate onSubmit={e => {
                 e.preventDefault();
                 void start(e.currentTarget);
-            }}><label htmlFor="recover-email">{t(catalog, "auth.email")}</label><input id="recover-email" name="email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} disabled={busy}/><button type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button></form>}
+            }}><div className="authField"><label htmlFor="recover-email">{t(catalog, "auth.email")}</label><input id="recover-email" name="email" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} disabled={busy}/></div><button type="submit" className="authPrimary" disabled={busy}>{t(catalog, "auth.continue")}</button></form>}
  </AuthShell>;
 }
