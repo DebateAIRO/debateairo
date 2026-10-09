@@ -24,10 +24,11 @@ export interface PendingAccountInput {
   readonly emailBlindIndex: Buffer;
   readonly emailCiphertext: CryptoEnvelope;
   readonly recoveryEmailCiphertext: CryptoEnvelope | null;
-  readonly phoneCiphertext: CryptoEnvelope;
-  readonly phoneSource: "manual";
-  readonly phoneVerificationStatus: "unverified";
-  readonly phoneUpdatedAt: Date;
+  /** All four are null together when no phone was given at sign-up (owner ruling 2026-10-09). */
+  readonly phoneCiphertext: CryptoEnvelope | null;
+  readonly phoneSource: "manual" | null;
+  readonly phoneVerificationStatus: "unverified" | null;
+  readonly phoneUpdatedAt: Date | null;
   readonly passwordHash: string;
   readonly pseudonym: string;
   readonly adultAffirmedAt: Date;
@@ -219,7 +220,7 @@ export class PostgresIdentityRepository {
           ipArgon2id: prepared.ipArgon2id,
           userAgentArgon2id: prepared.userAgentArgon2id
         }),
-        JSON.stringify(input.phoneCiphertext),
+        input.phoneCiphertext === null ? null : JSON.stringify(input.phoneCiphertext),
         input.phoneSource,
         input.phoneVerificationStatus,
         input.phoneUpdatedAt

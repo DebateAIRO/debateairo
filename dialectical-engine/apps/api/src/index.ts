@@ -2331,16 +2331,19 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (!parsed.success || !passwordWithinRequestBound(parsed.data)) throw new AuthFlowError("AUTH_INPUT_INVALID");
     if (signup) {
       const body = request.body as Record<string, unknown>;
-      try { body.phone = normalizeManualPhone(body.phone); } catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+      // The phone is optional (owner ruling 2026-10-09); a given one must still parse.
+      if (body.phone !== undefined) {
+        try { body.phone = normalizeManualPhone(body.phone); } catch { throw new AuthFlowError("AUTH_INPUT_INVALID"); }
+      }
     }
     mailDisplays.set(request, Object.freeze({ locale: parsed.data.ui_locale, timeZone: parsed.data.time_zone }));
     const body = request.body as Record<string, unknown>;
     const admission = await options.registration?.admitSource?.(socialSignup
-      ? {route:"social",source:sourceFor(request),input:{email:parsed.data.email,phone:typeof body.phone === "string" ? body.phone : "",adultAffirmed:body.adult_affirmed===true}}
+      ? {route:"social",source:sourceFor(request),input:{email:parsed.data.email,phone:typeof body.phone === "string" ? body.phone : null,adultAffirmed:body.adult_affirmed===true}}
       : path === "/v1/auth/register"
       ? { route: "register", source: sourceFor(request), input: {
           email: typeof body.email === "string" ? body.email : "", password: typeof body.password === "string" ? body.password : "",
-          phone: typeof body.phone === "string" ? body.phone : "", recoveryEmail: null, adultAffirmed: body.adult_affirmed === true
+          phone: typeof body.phone === "string" ? body.phone : null, recoveryEmail: null, adultAffirmed: body.adult_affirmed === true
         } }
       : { route: "resend", source: sourceFor(request), input: { email: parsed.data.email } });
     if (admission !== undefined) sourceAdmissions.set(request, admission);

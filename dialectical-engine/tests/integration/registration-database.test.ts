@@ -1259,6 +1259,23 @@ setTimeout(() => undefined, 500);
     expect(state.rows[0]!.state).toBe("pending_mfa");
   });
 
+  // Owner ruling 2026-10-09: the phone is optional at sign-up. EXPECTED RED until a forward migration
+  // lets identity.create_pending_account_base_internal (0096, renamed in 0101) accept a NULL phone:
+  // it still raises PHONE_PROFILE_INVALID. The table itself allows "no phone" since 0095.
+  it("registers an account without a phone and stores no phone profile", async () => {
+    const flow = buildService();
+    const email = "no-phone@example.test";
+    const response = await flow.service.register({ email, password: "correct horse battery staple", recoveryEmail: null, adultAffirmed: true }, source);
+    await (flow.service as RegistrationService & { drainMailDispatches?: () => Promise<void> }).drainMailDispatches?.();
+    expect(response).toEqual(REGISTRATION_PUBLIC_RESPONSE);
+    const rows = await database.pool.query<{ state: string; phone_ciphertext: unknown; phone_source: string | null; phone_verification_status: string | null; phone_updated_at: Date | null }>(
+      `SELECT state,phone_ciphertext,phone_source,phone_verification_status,phone_updated_at FROM identity."user" WHERE email_blind_index=$1`,
+      [createEmailBlindIndex(blindIndexKey, email)]
+    );
+    expect(rows.rows).toEqual([{ state: "pending_verification", phone_ciphertext: null, phone_source: null, phone_verification_status: null, phone_updated_at: null }]);
+    expect((flow.mail as MemoryMailSender).messages).toHaveLength(1);
+  });
+
   it("resolves a verification rate-limit identity through the actual runtime role", async () => {
     const flow = buildService();
     const registered = await registerAccount(flow.service, `runtime-verify-${randomUUID()}`);

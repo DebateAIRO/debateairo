@@ -131,6 +131,42 @@ describe("POST /v1/auth/register behind the age gate", () => {
     }
   });
 
+  // Owner ruling 2026-10-09: the phone is optional. Absent, the service gets no phone; given, it
+  // is still normalized at the edge and a malformed one is still refused before the service.
+  it("registers a person who gives no phone, and the service receives no phone", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: TODAY });
+    const { app, calls } = registrationSpy();
+    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app });
+    try {
+      const { phone: _omitted, ...withoutPhone } = body("1990-01-01");
+      const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: withoutPhone });
+      expect(response.statusCode).toBe(202);
+      // "" is the S04 register mount's "no phone" (its bytes are pinned); the service stores none for it.
+      expect(calls).toEqual([{ email: "alice@example.test", password: "password-123", phone: "", recoveryEmail: null, adultAffirmed: true }]);
+    } finally {
+      await api.close();
+    }
+  });
+
+  it("still normalizes a given phone and refuses a malformed one before the service", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: TODAY });
+    const { app, calls } = registrationSpy();
+    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app });
+    try {
+      const spaced = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...body("1990-01-01"), phone: "+40 722 123 456" } });
+      expect(spaced.statusCode).toBe(202);
+      expect(calls[0]).toMatchObject({ phone: "+40722123456" });
+      for (const phone of ["0712345678", "   "]) {
+        const refused = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...body("1990-01-01"), phone } });
+        expect(refused.statusCode).toBe(400);
+        expect(refused.json()).toMatchObject({ error: "AUTH_INPUT_INVALID" });
+      }
+      expect(calls).toHaveLength(1);
+    } finally {
+      await api.close();
+    }
+  });
+
   it("records the edge country when one is reported, and nothing when it is unknown", async () => {
     const { app, sources } = registrationSpy();
     const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app });

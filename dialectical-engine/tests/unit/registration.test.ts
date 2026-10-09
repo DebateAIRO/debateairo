@@ -2022,6 +2022,49 @@ function rework7Harness(options: {
   };
 }
 
+// Owner ruling 2026-10-09: the phone is optional. Without one, the repository is handed no phone
+// at all (no ciphertext, source, status or time); a given phone is still normalized and encrypted.
+describe("phone at the registration service", () => {
+  const base = { email: "phone@example.test", recoveryEmail: null, password: REWORK7_PASSWORD, adultAffirmed: true };
+  const source = (requestId: string) => ({ ip: "81.196.1.2", userAgent: "test/1", requestId });
+  it("P1 registers without a phone and stores none", async () => {
+    const harness = rework7Harness();
+    try {
+      await harness.service.register(base, source("phone-p1"));
+      await harness.service.register({ ...base, email: "phone-null@example.test", phone: null }, source("phone-p1-null"));
+      // The byte-pinned S04 register mount hands "" when the request carried no phone.
+      await harness.service.register({ ...base, email: "phone-blank@example.test", phone: "" }, source("phone-p1-blank"));
+      expect(harness.createdInputs).toHaveLength(3);
+      for (const created of harness.createdInputs) {
+        expect(created).toMatchObject({ phoneCiphertext: null, phoneSource: null, phoneVerificationStatus: null, phoneUpdatedAt: null });
+      }
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+  it("P2 normalizes and encrypts a given phone", async () => {
+    const harness = rework7Harness();
+    try {
+      await harness.service.register({ ...base, phone: "+40 722 123 456" }, source("phone-p2"));
+      const created = harness.createdInputs[0] as { phoneCiphertext: unknown; phoneSource: unknown; phoneVerificationStatus: unknown; phoneUpdatedAt: unknown };
+      expect(created.phoneCiphertext).toEqual(expect.objectContaining({}));
+      expect(JSON.stringify(created.phoneCiphertext)).not.toContain("722123456");
+      expect(created).toMatchObject({ phoneSource: "manual", phoneVerificationStatus: "unverified" });
+      expect(created.phoneUpdatedAt).toBeInstanceOf(Date);
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+  it("P3 refuses a malformed phone before admission and repository work", async () => {
+    const harness = rework7Harness();
+    try {
+      for (const phone of ["0712345678", "+40 12"]) {
+        await expect(harness.service.register({ ...base, phone }, source(`phone-p3-${phone.length}`))).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
+      }
+      expect(harness.counters.repository).toBe(0);
+      expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
+  });
+});
+
 describe("region at the registration service", () => {
   const input = { phone: "+40722123456", email: "region@example.test", recoveryEmail: "region-recovery@example.test", password: REWORK7_PASSWORD, adultAffirmed: true };
   it("D1 maps the declared region to the repository without changing the edge country", async () => {

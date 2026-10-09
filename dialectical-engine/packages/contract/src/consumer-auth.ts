@@ -18,7 +18,8 @@ const LocalePreferenceShape = {
 export const RegisterRequestFieldsSchema = z.object({
   email: EmailSchema,
   password: z.string().min(1).max(1024),
-  phone: z.string().trim().min(1).max(128),
+  // Optional (owner ruling 2026-10-09): absent means no phone is stored; given, it must parse.
+  phone: z.string().trim().min(1).max(128).optional(),
   date_of_birth: z.iso.date(),
   country: z.string().regex(/^[A-Z]{2}$/u),
   us_state: z.string().regex(/^[A-Z]{2}$/u).nullable().optional(),
