@@ -172,6 +172,7 @@
   "settings.phone.change": "Змінити телефон",
   "settings.phone.required": "Додайте телефон, щоб продовжити. Запитання й параметри зберігаються.",
   "settings.security.lastPath": "Додайте інший спосіб входу, перш ніж видаляти цей.",
+  "settings.security.remove": "Видалити",
   "settings.security.codesRemaining": "Коди відновлення: {count}",
   "settings.security.regenerate": "Створити нові коди відновлення",
   "settings.security.refreshFailed": "Не вдалося оновити відомості про безпеку. Перезавантажте сторінку."

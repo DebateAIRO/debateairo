@@ -29,7 +29,7 @@ export function SocialProviderButtons({ client, catalog, navigate = (url: string
     }, [client]);
     if (!providers.length || !client.beginSocialLogin)
         return null;
-    return <div aria-label={t(catalog, "auth.social.methods")}>{providers.map(provider => <button key={provider.id} type="button" className="authSecondaryButton" disabled={busy || disabled} onClick={async () => {
+    return <div className="authSocial" role="group" aria-label={t(catalog, "auth.social.methods")}>{providers.map(provider => <button key={provider.id} type="button" className="authSecondaryButton" disabled={busy || disabled} onClick={async () => {
                 if (flight.current || disabled)
                     return;
                 flight.current = true;
@@ -46,5 +46,5 @@ export function SocialProviderButtons({ client, catalog, navigate = (url: string
                     flight.current = false;
                     setBusy(false);
                 }
-            }}>{t(catalog, "auth.social.continue", { provider: provider.name })}</button>)}{error ? <p role="alert">{t(catalog, "auth.social.unavailable")}</p> : null}</div>;
+            }}>{t(catalog, "auth.social.continue", { provider: provider.name })}</button>)}{error ? <p className="authFieldError" role="alert">{t(catalog, "auth.social.unavailable")}</p> : null}</div>;
 }

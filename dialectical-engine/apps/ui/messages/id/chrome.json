@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Kuki yang kami simpan",
   "chrome.security": "Keamanan",
   "chrome.logout": "Keluar",
+  "chrome.logIn": "Masuk",
   "chrome.accountError": "Tindakan tidak berhasil. Muat ulang halaman dan coba lagi.",
   "chrome.footer.pricing": "Harga",
   "chrome.footer.cancel": "Batalkan paket",

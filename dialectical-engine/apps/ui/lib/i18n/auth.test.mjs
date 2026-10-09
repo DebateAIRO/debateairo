@@ -20,6 +20,7 @@ const ownedFiles = [
   "components/auth/SecurityActionResume.tsx",
   "components/auth/SocialCompleteFlow.tsx",
   "components/auth/SocialProviderButtons.tsx",
+  "components/auth/VerificationResend.tsx",
   "components/auth/RecoveryFlow.tsx",
   "lib/authFormValidation.ts",
   "app/recover/page.tsx",
@@ -132,7 +133,9 @@ test("S2-auth source has no hard-coded user-visible English", () => {
 
 test("auth server routes load the auth namespace and pass it to client flows", () => {
   assert.match(source("app/login/page.tsx"), /loadNamespace\(locale, "auth"\)/);
-  assert.match(source("app/login/page.tsx"), /<LoginFlow catalog=\{catalog\} \/>/);
+  // Auth UI repair (2026-10-09): the page also hands over the public Turnstile config for the
+  // "Didn't get the verification email?" entry.
+  assert.match(source("app/login/page.tsx"), /<LoginFlow catalog=\{catalog\} turnstile=\{turnstile\} \/>/);
   assert.match(source("app/sign-up/page.tsx"), /loadNamespace\(locale, "auth"\)/);
   assert.match(source("app/sign-up/page.tsx"), /<SignUpFlow catalog=\{catalog\} dobLocale=\{dobLocale\} refused=\{refused\} turnstile=\{turnstile\} \/>/);
   // Age gate (8k): the home page stands in for itself with the one-time check while it is owed.

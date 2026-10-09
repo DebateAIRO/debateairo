@@ -170,6 +170,7 @@
   "settings.phone.change": "Промяна на телефона",
   "settings.phone.required": "Добавете телефон, за да продължите. Въпросът и опциите се запазват.",
   "settings.security.lastPath": "Добавете друг метод за вход, преди да премахнете този.",
+  "settings.security.remove": "Премахване",
   "settings.security.codesRemaining": "Кодове за възстановяване: {count}",
   "settings.security.regenerate": "Генериране на нови кодове за възстановяване",
   "settings.security.refreshFailed": "Данните за сигурност не могат да бъдат обновени. Презаредете страницата."

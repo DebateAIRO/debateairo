@@ -1081,7 +1081,7 @@ describe("SUP-01 /help assistant", () => {
       : {message_id:"recovery-link",outcome:"REFUSE_ZONE",text:"Support cannot reset credentials.",sources:[],actions:[],refusal_link:"/recover"}),{status:url==="/api/v1/support/sessions"?201:200,headers:{"content-type":"application/json"}})));
     await renderLocalized(language,<Assistant client={supportAssistantClient} signedIn={false}/>);await submit(language==="ro"?"Am uitat parola":"Forgot password");
     const link=document.querySelector<HTMLAnchorElement>('a[href="/recover"]');expect(link).not.toBeNull();
-    expect(link!.textContent).toContain(language==="ro"?"Recuperează":"Recover");
+    expect(link!.textContent).toContain(language==="ro"?"Recuperați":"Recover");
     expect(link!.search).toBe("");expect(link!.hash).toBe("");
   });
 });

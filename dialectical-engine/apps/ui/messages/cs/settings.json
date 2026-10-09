@@ -172,6 +172,7 @@
   "settings.phone.change": "Změnit telefon",
   "settings.phone.required": "Pro pokračování přidejte telefon. Otázka a možnosti zůstanou zachovány.",
   "settings.security.lastPath": "Před odebráním této metody přidejte jiný způsob přihlášení.",
+  "settings.security.remove": "Odebrat",
   "settings.security.codesRemaining": "Obnovovací kódy: {count}",
   "settings.security.regenerate": "Vygenerovat nové obnovovací kódy",
   "settings.security.refreshFailed": "Podrobnosti zabezpečení se nepodařilo obnovit. Načtěte stránku znovu."

@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Mūsų saugomi slapukai",
   "chrome.security": "Saugumas",
   "chrome.logout": "Atsijungti",
+  "chrome.logIn": "Prisijungti",
   "chrome.accountError": "Nepavyko. Iš naujo įkelkite puslapį ir bandykite dar kartą.",
   "chrome.footer.pricing": "Kainos",
   "chrome.footer.cancel": "Atšaukti planą",

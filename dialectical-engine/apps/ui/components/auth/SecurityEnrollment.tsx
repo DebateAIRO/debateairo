@@ -7,6 +7,8 @@ import type { AuthenticationResponse, ContractClient, TotpEnrollmentResponse } f
 import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
+import { readSixDigitCode } from '@/lib/sixDigitCode';
+import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
 import { totpQrMatrix } from '@/lib/totpQr';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import authEnglish from '@/messages/en/auth.json';
@@ -43,6 +45,14 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [code, setCode] = useState('');
+    const [codeError, setCodeError] = useState<string | null>(null);
+    const codeField = useRef<HTMLInputElement>(null);
+    const [refocusCode, setRefocusCode] = useState(0);
+    const announcer = useFormAnnouncer();
+    useEffect(() => {
+        if (refocusCode)
+            codeField.current?.focus();
+    }, [refocusCode]);
     const [showKey, setShowKey] = useState(false);
     const [expired, setExpired] = useState(false);
     const [enrolled, setEnrolled] = useState(false);
@@ -62,6 +72,7 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         setBusy(false);
         setTotp(null);
         setCode('');
+        setCodeError(null);
         setShowKey(false);
         attempt.current.edited();
     }
@@ -190,8 +201,12 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         }
         catch (failure) {
             if (dispatched.current && authority.kind !== 'grant' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
-            if (owner === sequence.current)
+            if (owner === sequence.current) {
                 setError(t(catalog, "auth.login.authenticationCodeRejected"));
+                setCode('');
+                attempt.current.edited();
+                setRefocusCode(n => n + 1);
+            }
         }
         finally {
             if (owner === sequence.current) {
@@ -204,34 +219,45 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     }
     const matrix = totp ? totpQrMatrix(totp.uri) : null;
     if (expired)
-        return <p role="alert">{t(catalog, "auth.enroll.expired")}</p>;
+        // The setup's own time limit ran out (the link, if any, was used long before): say so and let the person start over.
+        return <section className="authEnrollment" aria-label={t(catalog, "auth.enroll.securityTitle")}><p className="authFieldError" role="alert">{t(catalog, "auth.enroll.timedOut")}</p>{authority.kind === 'recovery' ? null : <button type="button" className="authPrimary" onClick={() => {
+                clearCeremony();
+                setError(null);
+                setExpired(false);
+            }}>{t(catalog, "auth.enroll.startAgain")}</button>}</section>;
     if (enrolled)
         return <p role="status">{t(catalog, "auth.enroll.methodAdded")}</p>;
-    return <section aria-label={t(catalog, "auth.enroll.securityTitle")}>
-    {error ? <p role="alert">{error}</p> : null}
+    return <section className="authEnrollment" aria-label={t(catalog, "auth.enroll.securityTitle")}>
+    {error ? <p className="authFieldError" role="alert">{error}</p> : null}
     <p>{t(catalog, "auth.enroll.passkeyPreferred")}</p>
     {allowed.includes('passkey') ? <p id="enrollment-passkey-help">{t(catalog, "auth.enroll.passkeyExplanation")}</p> : null}
     {allowed.includes('passkey') ? <button type="button" className="authPrimary" aria-describedby="enrollment-passkey-help" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.create")}</button> : null}
     {allowed.includes('totp') ? <button type="button" className="authTextButton" disabled={completing} onClick={() => void beginTotp()}>{t(catalog, "auth.enroll.useAuthenticator")}</button> : null}
     {authority.kind === 'recovery' && authority.totpUnavailableReason === 'PASSWORD_UNAVAILABLE' ? <p>{t(catalog, "auth.recovery.passwordUnavailable")}</p> : null}
-    {totp ? <div>
+    {totp ? <div className="authEnrollment">
       {matrix ? <svg width="180" height="180" viewBox={`0 0 ${matrix.length + 8} ${matrix.length + 8}`} role="img" aria-label={t(catalog, "auth.enroll.scanQr")}><rect width="100%" height="100%" fill="white"/><path fill="black" d={matrix.flatMap((row, y) => row.flatMap((v, x) => v ? [`M${x + 4} ${y + 4}h1v1h-1z`] : [])).join('')}/></svg> : null}
-      <button type="button" onClick={() => setShowKey(!showKey)}>{t(catalog, "auth.enroll.useSetupKey")}</button>
-      {showKey ? <div><code>{totp.secret}</code><button type="button" onClick={() => void navigator.clipboard.writeText(totp.secret)}>{t(catalog, "auth.enroll.copySetupKey")}</button></div> : null}
-      <form method="post" action="/enroll-mfa" noValidate onSubmit={e => {
+      <button type="button" className="authTextButton" aria-expanded={showKey} onClick={() => setShowKey(!showKey)}>{t(catalog, "auth.enroll.useSetupKey")}</button>
+      {showKey ? <div className="authSetupKey"><code>{totp.secret}</code><button type="button" className="authSecondary" onClick={() => void navigator.clipboard.writeText(totp.secret)}>{t(catalog, "auth.enroll.copySetupKey")}</button></div> : null}
+      <form className="authForm" method="post" action="/enroll-mfa" noValidate onSubmit={e => {
                 e.preventDefault();
                 void submitCode(code);
             }}>
-        <label htmlFor="enrollment-code">{t(catalog, "auth.enroll.currentSixDigitCode")}</label>
-        <input id="enrollment-code" name="code" value={code} autoComplete="one-time-code" inputMode="numeric" maxLength={6} disabled={busy} onChange={e => {
-                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                if (value !== code)
+        <div className="authField"><label htmlFor="enrollment-code">{t(catalog, "auth.enroll.currentSixDigitCode")}</label>
+        <input ref={codeField} id="enrollment-code" name="code" value={code} autoComplete="one-time-code" inputMode="numeric" disabled={busy} aria-invalid={!!codeError || undefined} aria-describedby={codeError ? 'enrollment-code-error' : undefined} onChange={e => {
+                const typed = readSixDigitCode(e.target.value);
+                const shown = typed.valid ? typed.digits : e.target.value;
+                if (shown !== code)
                     attempt.current.edited();
-                setCode(value);
-                if (value.length === 6)
-                    void submitCode(value);
-            }}/>
-        <button type="submit" disabled={busy || code.length !== 6}>{t(catalog, "auth.continue")}</button>
+                setCode(shown);
+                setCodeError(typed.valid ? null : t(catalog, "auth.login.codeFormat"));
+                // Said once when the field turns invalid (a letter typed), not on every further key.
+                if (!typed.valid && codeError === null)
+                    announcer.announce(t(catalog, "auth.login.codeFormat"));
+                if (typed.complete)
+                    void submitCode(typed.digits);
+            }}/><InlineFieldMessage id="enrollment-code-error" message={codeError}/></div>
+        <button type="submit" className="authPrimary" disabled={busy || !readSixDigitCode(code).complete}>{t(catalog, "auth.continue")}</button>
+        {announcer.region}
       </form>
     </div> : null}
   </section>;
