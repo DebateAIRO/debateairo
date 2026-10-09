@@ -15,7 +15,6 @@ from pathlib import Path
 MODEL='zai-org/GLM-5.3-Flash'
 SCOPE='preview-synthetic-debate-20261004'
 OUTPUT_BOUND=163840
-DEFAULT_HELPER=Path('/Users/stefannour/DebateAIRO/docs/operations/initial-testing-2026-10-03/staging-execution/deepinfra/benchmark/benchmark.py')
 
 def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def load_helper(path):
@@ -167,7 +166,7 @@ def serve(private,go_path,helper,socket_path):
  finally:server.server_close();Path(socket_path).unlink(missing_ok=True)
 
 def main():
- parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('phase',choices=('prepare','freeze','activate','serve','stop'));parser.add_argument('--private',type=Path,required=True);parser.add_argument('--helper',type=Path,default=DEFAULT_HELPER);parser.add_argument('--go',type=Path);parser.add_argument('--target-host',default='ROOT_MUST_SET_REVIEWED_VPS_HOST');parser.add_argument('--frozen-ledger-sha256');parser.add_argument('--socket',type=Path,default=Path('/run/debateai-v3-preview/provider-budget.sock'));args=parser.parse_args()
+ parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('phase',choices=('prepare','freeze','activate','serve','stop'));parser.add_argument('--private',type=Path,required=True);parser.add_argument('--helper',type=Path,required=True,help='reviewed accounting helper (benchmark.py); no machine-specific default');parser.add_argument('--go',type=Path);parser.add_argument('--target-host',default='ROOT_MUST_SET_REVIEWED_VPS_HOST');parser.add_argument('--frozen-ledger-sha256');parser.add_argument('--socket',type=Path,default=Path('/run/debateai-v3-preview/provider-budget.sock'));args=parser.parse_args()
  try:
   helper=load_helper(args.helper)
   if args.phase=='prepare':result=prepare_plan(args.private,helper,args.target_host)

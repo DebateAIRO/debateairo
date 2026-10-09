@@ -7,7 +7,7 @@ describe('production preview spending guard optional JSON mode', () => {
       encoding: 'utf8', timeout: 10000, env: { PATH: '/usr/bin:/bin', PYTHONDONTWRITEBYTECODE: '1' }
     });
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 8 tests');
+    expect(result.stderr).toContain('Ran 9 tests');
     expect(result.stderr).toContain('OK');
   });
 });

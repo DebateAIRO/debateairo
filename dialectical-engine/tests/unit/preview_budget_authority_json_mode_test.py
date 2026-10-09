@@ -152,4 +152,13 @@ class RequestModeTests(unittest.TestCase):
                     dispatch=lambda *args: dispatched.append(args), host='synthetic-host', platform='linux', peer_uid=42)
             self.assertEqual(dispatched, [])
 
+class CliHelperPathTests(unittest.TestCase):
+    def test_cli_has_no_one_computer_helper_default(self):
+        # The accounting helper path must be passed explicitly; no developer-machine default may exist.
+        self.assertNotIn('/Users/', SOURCE.read_text(encoding='utf-8'))
+        with patch.object(sys, 'argv', ['preview_budget_authority.py', 'prepare', '--private', '/nonexistent-synthetic']), \
+             contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as raised:
+            bridge.main()
+        self.assertEqual(raised.exception.code, 2)
+
 if __name__ == '__main__': unittest.main()
