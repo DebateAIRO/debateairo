@@ -147,7 +147,7 @@ test("server settings routes load settings while client controls receive their c
   // Review F2 (REV-FIX-CATALOGS): the page also serves the newDebate catalogue
   // so the AuthGate's "Checking session…" paints in the reader's language.
   assert.match(page, /loadNamespace\(locale, "newDebate"\)/);
-  assert.match(page, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\} \/>/);
+  assert.match(page, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\}\s+renewalConsent=\{currentDocument\("CONSENT_RENEWAL", locale\)\} \/>/);
 
   for (const path of ["app/ai-transparency/page.tsx", "app/admin/workers/page.tsx"]) {
     assert.match(sources.get(path), /loadNamespace\(locale, "settings"\)/, path);

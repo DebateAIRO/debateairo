@@ -3,6 +3,7 @@
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { CookiePreferencesButton } from "@/components/legal/CookiePreferencesButton";
 import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
+import type { PaymentMarks } from "@/lib/billing/paymentMarks";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t } from "@/lib/i18n/translate";
 import { COMPANY, LEGAL_PAGES } from "@/lib/legal/pages";
@@ -29,7 +30,29 @@ const BILLING_LEGAL_LINKS = [
 /** DB-IP Lite's CC BY 4.0 licence asks for this credit link on the site (spec §1.5, §2.10); A14 keeps it billing-free. */
 const DBIP_URL = "https://db-ip.com";
 
-const NO_MARKS = Object.freeze({ visa: false, mastercard: false });
+const NO_MARKS: PaymentMarks = Object.freeze({ netopia: false, visa: false, mastercard: false });
+
+/** Spec §2.18: NETOPIA's logo first, then the card marks; each brand name stays untranslated in every locale. */
+const MARK_IMAGES = [
+  { mark: "netopia", src: "/payment-marks/netopia.svg", altKey: "chrome.footer.netopia" },
+  { mark: "visa", src: "/payment-marks/visa.svg", altKey: "chrome.footer.visa" },
+  { mark: "mastercard", src: "/payment-marks/mastercard.svg", altKey: "chrome.footer.mastercard" }
+] as const satisfies ReadonlyArray<Readonly<{ mark: keyof PaymentMarks; src: string; altKey: string }>>;
+
+/**
+ * The marks whose artwork the owner supplied (`availablePaymentMarks()`, read by a server page), in one group: the full
+ * footer's, and the checkout's under its Continue button (N25b). Nothing at all when none of the files is there.
+ */
+export function PaymentMarksGroup({ marks }: { marks: PaymentMarks }) {
+  const { catalog } = useChromeI18n();
+  const shown = MARK_IMAGES.filter(({ mark }) => marks[mark]);
+  if (shown.length === 0) return null;
+  return (
+    <div className="siteFooterMarks" role="group" aria-label={t(catalog, "chrome.footer.paymentMarks")}>
+      {shown.map(({ src, altKey }) => <img key={src} src={src} alt={t(catalog, altKey)} />)}
+    </div>
+  );
+}
 
 /**
  * The site footer (design 15a/15b/15c), one component in two shapes:
@@ -45,8 +68,9 @@ const NO_MARKS = Object.freeze({ visa: false, mastercard: false });
  *
  * Paid plans (P21, R3-4) extend the `full` shape only, through the optional `billing` facts a server page hands over
  * (`siteFooterBilling()`, `billingPageFooter()`, the landing's `landingPlans`): the DB-IP credit always, and while billing
- * is on the pricing, cancel and withdraw links and the card marks whose artwork the owner supplied. Without the prop
- * (local mode alike) nothing about paying shows. The `line` shape never knows billing's state: it renders on every page.
+ * is on the pricing, cancel and withdraw links and the marks whose artwork the owner supplied (NETOPIA's logo, Visa,
+ * Mastercard: `PaymentMarksGroup`). Without the prop (local mode alike) nothing about paying shows. The `line` shape
+ * never knows billing's state: it renders on every page.
  */
 export function SiteFooter({ variant, billing = null }: { variant: "full" | "line"; billing?: SiteFooterBilling | null }) {
   const { catalog } = useChromeI18n();
@@ -135,12 +159,7 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
           </ul>
         </nav>
       </div>
-      {marks.visa || marks.mastercard ? (
-        <div className="siteFooterMarks" role="group" aria-label={t(catalog, "chrome.footer.paymentMarks")}>
-          {marks.visa ? <img src="/payment-marks/visa.svg" alt={t(catalog, "chrome.footer.visa")} /> : null}
-          {marks.mastercard ? <img src="/payment-marks/mastercard.svg" alt={t(catalog, "chrome.footer.mastercard")} /> : null}
-        </div>
-      ) : null}
+      <PaymentMarksGroup marks={marks} />
       <div className="siteFooterBase">
         <span className="siteFooterCopyright">{copyright}</span>
         <a className="siteFooterLink siteFooterCredit" href={DBIP_URL}>

@@ -96,9 +96,9 @@ importers:
       '@debateai/obs-capture':
         specifier: workspace:*
         version: link:packages/obs-capture
-      '@debateai/payments-xmoney':
+      '@debateai/payments-netopia':
         specifier: workspace:*
-        version: link:packages/payments-xmoney
+        version: link:packages/payments-netopia
       '@debateai/propagation':
         specifier: workspace:*
         version: link:packages/propagation
@@ -213,9 +213,9 @@ importers:
       '@debateai/obs-capture':
         specifier: workspace:*
         version: link:../../packages/obs-capture
-      '@debateai/payments-xmoney':
+      '@debateai/payments-netopia':
         specifier: workspace:*
-        version: link:../../packages/payments-xmoney
+        version: link:../../packages/payments-netopia
       '@debateai/providers':
         specifier: workspace:*
         version: link:../../packages/providers
@@ -740,8 +740,11 @@ importers:
         specifier: 8.22.0
         version: 8.22.0
 
-  packages/payments-xmoney:
+  packages/payments-netopia:
     dependencies:
+      '@debateai/billing-core':
+        specifier: workspace:*
+        version: link:../billing-core
       '@debateai/kernel':
         specifier: workspace:*
         version: link:../kernel

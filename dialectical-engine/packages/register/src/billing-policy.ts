@@ -10,7 +10,7 @@ import type { BillingPlans } from "./billing-plans.js";
  * `enabled: false` is the resting state. Nothing about billing runs until the
  * owner publishes a version with `enabled: true`, and only in hosted mode (§2.2
  * rule 1). A22 removed two members:
- *  - the xMoney environment, which follows `XMONEY_API_BASE_URL`;
+ *  - the payment environment, which follows `NETOPIA_API_BASE_URL`;
  *  - the owner's report address, which is `OWNER_REPORT_EMAIL_PATH`.
  * Each setting therefore has one source. The row is strict, so a row that still
  * carries either of them is refused.
@@ -53,8 +53,9 @@ const WITHDRAWAL_LAW = Object.freeze({
 /**
  * The notice a CHANGED renewal needs (spec §1.10 and the global constraints:
  * M3 at least 7 business days, Monday to Friday UTC, before the charge, as
- * xMoney's merchant rules require). P11 applies the sealed value directly, so
- * a row that shortens the notice is refused by name before it can be sealed;
+ * A7's notice rule (kept for NETOPIA until N-23 is answered) requires). P11
+ * applies the sealed value directly, so a row that shortens the notice is
+ * refused by name before it can be sealed;
  * a longer notice is allowed (final review Part 1b, Minor 6).
  */
 const RENEWAL_NOTICE_RULE = Object.freeze({ leastBusinessDays: 7 });

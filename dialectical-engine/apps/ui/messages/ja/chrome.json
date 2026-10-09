@@ -65,6 +65,7 @@
   "chrome.footer.cancel": "プランの解約",
   "chrome.footer.withdraw": "プランの撤回",
   "chrome.footer.paymentMarks": "ご利用いただけるカード",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

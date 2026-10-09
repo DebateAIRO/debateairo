@@ -1,15 +1,22 @@
 import type { PoolClient } from "pg";
-import { decimalToMicros, microsToDecimal, withdrawalRefundDeadline } from "@debateai/billing-core";
+import {
+  microsToDecimal, paymentErrorCode, paymentNothingSent, withdrawalRefundDeadline,
+  type CardPayments, type PaymentEnvironment
+} from "@debateai/billing-core";
 import type {
-  BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, CustomerXMoneyEnvironment, OutboxJob
+  BillingJobQueries, BillingRepository, ChargeEventRow, ChargeRow, OutboxJob
 } from "@debateai/db";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
-import type { XMoneyClient, XMoneyTransaction } from "@debateai/payments-xmoney";
+import { renderMail, type MailTemplateId } from "@debateai/mail-templates";
 import type { BillingPolicy } from "@debateai/register";
-import { credentialsRefused, rejectedRows, type BillingAudit } from "./audit.js";
+import { credentialsRefused, type BillingAudit } from "./audit.js";
 import type { RequestedRefundReason } from "./codes.js";
-import { enqueueEmail, type BillingMailTemplateId } from "./email-job.js";
-import { claimLost, DONE, failureRetryAt, otherXMoneySystem, type OutboxHandler, type OutboxOutcome } from "./outbox.js";
+import { emailJob, enqueueEmail, type BillingMailTemplateId } from "./email-job.js";
+import {
+  claimLost, DONE, enqueueOnce, failureRetryAt, isThisPaymentSystem, otherPaymentSystem, otherSystemCode, type OutboxHandler,
+  type OutboxOutcome
+} from "./outbox.js";
+import { queuePaymentAlert } from "./payment-alert.js";
 import { chargeEvent, refundTarget } from "./rows.js";
 import { enqueueCreditNote } from "./settlement.js";
 
@@ -18,12 +25,12 @@ import { enqueueCreditNote } from "./settlement.js";
  * job dies. Only an unreadable payload (`REFUND_PAYLOAD_INVALID`) dies without it: it names no charge or amount.
  */
 
-/** One transaction's money going back (A4a: the unit of the refund-sum guard and of the XMONEY_REFUND job). */
+/** One payment's money going back (A4a: the unit of the refund-sum guard and of the PAYMENT_REFUND job). */
 export type RefundIntent = Readonly<{
   chargeId: string;
   transactionId: string;
   amountMicros: number;
-  /** The whole transaction: xMoney is called without an amount (the void of an uncaptured hold, A12). */
+  /** The whole payment (a refused or second payment, or the release of a card check's hold, A12). */
   whole: boolean;
   ownerRef: string;
   reason: RequestedRefundReason;
@@ -32,9 +39,9 @@ export type RefundIntent = Readonly<{
 export type PaidTransaction = Readonly<{
   chargeId: string; transactionId: string; paidMicros: number; refundedMicros: number; succeededAt: Date;
   /**
-   * A refund made at xMoney, not by us (P9c `PROVIDER_REFUND` / `PROVIDER_VOID`), touched this transaction. Its true
-   * refunded amount is unknown (xMoney's read shows none), so `refundedMicros` is an upper bound: a withdrawal over
-   * such a transaction goes to the owner (P12d), never settled from this figure.
+   * A refund made at NETOPIA, not by us (P9c `PROVIDER_REFUND` / `PROVIDER_VOID`), touched this payment. Its true
+   * refunded amount is unknown (NETOPIA's status shows none), so `refundedMicros` is an upper bound: a withdrawal over
+   * such a payment goes to the owner (P12d), never settled from this figure.
    */
   providerRefunded: boolean;
 }>;
@@ -42,47 +49,21 @@ export type RefundAllocation = Readonly<{ chargeId: string; transactionId: strin
 
 type ChargeWithEvents = ChargeRow & { events: ChargeEventRow[] };
 type FollowUp = (client: PoolClient, at: Date) => Promise<void>;
+type PaymentReportOrMissing = Awaited<ReturnType<CardPayments["status"]>>;
 
 const REQUESTED_REASONS: ReadonlySet<string> = new Set<RequestedRefundReason>([
   "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "WITHDRAWAL", "CARD_CHECK_RELEASE",
-  "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE", "DUPLICATE_PAYMENT"
+  "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE", "DUPLICATE_PAYMENT", "UPGRADE_CLOSED"
 ]);
 const PROVIDER_REASONS: ReadonlySet<string> = new Set(["PROVIDER_REFUND", "PROVIDER_VOID"]);
 /** The releases of a card change's hold (P12e, P20): the only refunds whose amount may be 0 (P2-M4). */
 const CARD_CHECK_REASONS: ReadonlySet<string> = new Set<RequestedRefundReason>([
   "CARD_CHECK_RELEASE", "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE"
 ]);
-/** Refused by xMoney as fraud-related: a card from an always-blocked country (a payment, or P12e's new card). */
-const FRAUD_REASONS: ReadonlySet<string> = new Set<RequestedRefundReason>(["CARD_COUNTRY_BLOCKED", "CARD_CHECK_REFUSED"]);
-/**
- * Failures that prove xMoney processed nothing (P3b: a refused connection, a 429, a 401/403). A partial refund after
- * one of them may be sent again, and the job is retried for as long as they last, never killed (D5 5i).
- */
-const NOTHING_SENT: ReadonlySet<string> = new Set(["XMONEY_UNAVAILABLE", "XMONEY_CREDENTIALS_REFUSED"]);
 /** How often a job keeps coming back once the failure schedule is spent, while nothing could be sent. */
 const KEEP_TRYING_MS = 12 * 3_600_000;
 
 const dead = (code: string): OutboxOutcome => Object.freeze({ kind: "DEAD" as const, code });
-/** A refund call's failure code; anything untyped may have reached xMoney, so it never reads as "not sent". */
-const codeOf = (error: unknown): string => error instanceof TypedDomainError ? error.code : "XMONEY_OUTCOME_UNKNOWN";
-
-/** Whether `amountMicros` is less than the whole transaction (an unreadable amount counts as partial: fail closed). */
-function isPartOf(amountMicros: number, transaction: XMoneyTransaction): boolean {
-  try {
-    return amountMicros < decimalToMicros(transaction.amountDecimal);
-  } catch {
-    return true;
-  }
-}
-
-/** Whether a listed refund of `decimal` covers `amountMicros` (an unreadable amount covers nothing: fail closed). */
-export function covers(decimal: string, amountMicros: number): boolean {
-  try {
-    return decimalToMicros(decimal) >= amountMicros;
-  } catch {
-    return false;
-  }
-}
 
 /** What rows of `kind` refunded from the paid transaction `transactionId` (P1a's target: `refundTarget`). */
 function sumOf(events: ReadonlyArray<ChargeEventRow>, kind: ChargeEventRow["kind"], transactionId: string): number {
@@ -100,9 +81,20 @@ export function refundedMicros(charge: Readonly<{ events: ReadonlyArray<ChargeEv
 }
 
 /**
+ * The one rule for when a refund request is recorded: what the REFUNDED rows of payment `paymentId` (P1a's target:
+ * `refundTarget`) add up to, a missing amount counting 0, so a refund recorded in parts adds up. A request is recorded
+ * once this covers what it asked back. Shared by RefundDesk's follow-ups (the M8/M11 mails and the credit note, through
+ * `openOwnRequest`) and the waiting and return pages (F4: `chargeStatusOf`'s REFUND_PENDING), so the page never says
+ * "refunded" while the desk still counts the request open, nor the reverse.
+ */
+export function refundedFrom(events: ReadonlyArray<ChargeEventRow>, paymentId: string): number {
+  return sumOf(events, "REFUNDED", paymentId);
+}
+
+/**
  * A4(b): what each paid transaction since `since` took and what already went back. Per transaction the larger of
- * "asked" (REFUND_REQUESTED) and "reported" (REFUNDED) counts, as P1a's refund-sum guard does; a REFUNDED row of a
- * refund that is its own xMoney transaction counts against the payment it names (D5 5g). A CARD_CHECK hold is not a
+ * "asked" (REFUND_REQUESTED) and "reported" (REFUNDED) counts, as P1a's refund-sum guard does; an old REFUNDED row of
+ * a separate refund transaction counts against the payment it names (D5 5g). A CARD_CHECK hold is not a
  * payment, and neither is a DUPLICATE_PAYMENT (D5 5f: it bought nothing and was refunded whole). Oldest first.
  */
 export function paidTransactions(charges: ReadonlyArray<ChargeWithEvents>, since: Date): PaidTransaction[] {
@@ -110,8 +102,8 @@ export function paidTransactions(charges: ReadonlyArray<ChargeWithEvents>, since
   for (const charge of charges) {
     if (charge.kind === "CARD_CHECK") continue;
     for (const event of charge.events) {
-      if (event.kind !== "SUCCEEDED" || event.xmoneyTransactionId === null || event.at.getTime() < since.getTime()) continue;
-      const transactionId = event.xmoneyTransactionId;
+      if (event.kind !== "SUCCEEDED" || event.providerPaymentId === null || event.at.getTime() < since.getTime()) continue;
+      const transactionId = event.providerPaymentId;
       paid.push(Object.freeze({
         chargeId: charge.chargeId, transactionId, paidMicros: event.amountMicros ?? 0,
         refundedMicros: refundedMicros(charge, transactionId),
@@ -144,11 +136,16 @@ export function allocateRefund(amountMicros: number, paid: ReadonlyArray<PaidTra
   return allocations;
 }
 
-/** Our REFUND_REQUESTED for this paid transaction that has no REFUNDED (on it, or naming it) yet, if any. */
-export function pendingRefund(charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>, transactionId: string): ChargeEventRow | null {
-  const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.xmoneyTransactionId === transactionId);
-  if (requested === undefined) return null;
-  return charge.events.some((event) => event.kind === "REFUNDED" && refundTarget(event) === transactionId) ? null : requested;
+/**
+ * F2 (ruling PR-55): whether the charge's paid payment (its SUCCEEDED) went back in full: the REFUNDED rows naming it,
+ * its own or a separate refund transaction's, add up to what it took. Such a payment bought nothing, so it never counts
+ * as an earlier attempt "paid" (`RenewalService.earlierAttemptPaid`) nor as an attempt made (`BillingMaintenance`'s
+ * retry). False with no SUCCEEDED.
+ */
+export function paidAndRefundedInFull(charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>): boolean {
+  const paid = charge.events.find((event) => event.kind === "SUCCEEDED");
+  if (paid === undefined || paid.providerPaymentId === null || paid.amountMicros === null) return false;
+  return sumOf(charge.events, "REFUNDED", paid.providerPaymentId) >= paid.amountMicros;
 }
 
 /** Whether this paid transaction already holds a REFUNDED row, its own or a separate refund transaction's. */
@@ -158,12 +155,210 @@ export function refundedAlready(charge: Readonly<{ events: ReadonlyArray<ChargeE
 
 /** The intent behind one of OUR requests; a provider refund's REFUND_REQUESTED (P9c) is not one. */
 export function refundIntentOf(charge: ChargeRow, event: ChargeEventRow): RefundIntent | null {
-  if (event.kind !== "REFUND_REQUESTED" || event.xmoneyTransactionId === null || event.amountMicros === null
+  if (event.kind !== "REFUND_REQUESTED" || event.providerPaymentId === null || event.amountMicros === null
     || event.errorCode === null || !REQUESTED_REASONS.has(event.errorCode)) return null;
   return Object.freeze({
-    chargeId: charge.chargeId, transactionId: event.xmoneyTransactionId, amountMicros: event.amountMicros, whole: false,
+    chargeId: charge.chargeId, transactionId: event.providerPaymentId, amountMicros: event.amountMicros, whole: false,
     ownerRef: charge.ownerRef, reason: event.errorCode as RequestedRefundReason
   });
+}
+
+/**
+ * N14 (spec §2.12.2): our own request on one NETOPIA payment and what is still open of it — the request minus every
+ * REFUNDED part (the owner may record a refund in parts). Null when the payment holds no request of ours.
+ */
+export function openOwnRequest(
+  charge: ChargeRow & { events: ReadonlyArray<ChargeEventRow> }, paymentId: string
+): Readonly<{ intent: RefundIntent; openMicros: number }> | null {
+  const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.providerPaymentId === paymentId);
+  const intent = requested === undefined ? null : refundIntentOf(charge, requested);
+  if (intent === null) return null;
+  const refunded = refundedFrom(charge.events, paymentId);
+  return Object.freeze({ intent, openMicros: Math.max(intent.amountMicros - refunded, 0) });
+}
+
+/**
+ * N15b (ruling PR-41, spec §2.13): whether an owner refund on this payment is HELD: the charge holds a CHARGEBACK of
+ * `paymentId` and no CHARGEBACK_RESOLVED of that same id. A held refund is not due (the person's bank is taking the
+ * money back): its PAYMENT_REFUND job moves no money and hands nothing to the owner (owner and API mode), the reminder
+ * leaves it out, it gets no daily status read, and `pnpm billing:refund-done` refuses it without `--despite-chargeback`. A dispute won (CHARGEBACK_RESOLVED) makes it due again; a dispute lost writes no
+ * charge event, so it stays held. The same rule as the SQL of `BillingRepository.openOwnerRefunds` and of
+ * `BillingJobQueries.dueStatusReads`' REFUND schedule (packages/db); keyed by the payment, never by the charge alone.
+ */
+export function heldByChargeback(charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>, paymentId: string): boolean {
+  return charge.events.some((event) => event.kind === "CHARGEBACK" && event.providerPaymentId === paymentId)
+    && !charge.events.some((event) => event.kind === "CHARGEBACK_RESOLVED" && event.providerPaymentId === paymentId);
+}
+
+/** F6a (final review ui-3): an O3's steps when a charge-back's VERIFY_PAYMENT queued the customer's M10 with it. */
+export const PAUSED_EMAIL_SENTENCE = "The customer was emailed that the plan is paused (M10).";
+
+/**
+ * N15b (ruling PR-41): the owner's one O3 REFUND_HELD_BY_CHARGEBACK for an open owner refund (`open`, from
+ * `openOwnRequest`) that a charge-back on its payment holds (`heldByChargeback`). Once per payment ever, whichever path
+ * finds the hold first: VERIFY_PAYMENT writing the CHARGEBACK while the request is open (`netopiaChargedBack`, queued on
+ * that transaction through `client`), or the PAYMENT_REFUND job of a request made on a payment already under a
+ * dispute (`RefundDesk`, owner and API mode). `amount` is the open amount, as the reminder and
+ * `pnpm billing:refund-done` print it. Returns `queuePaymentAlert`'s answer: false when that payment's O3 was queued
+ * before, so the caller's audit line billing.refund.held_by_chargeback stays once per payment too. F6a (final review
+ * ui-3): `pausedEmailQueued` is true when the same transaction queued the customer's M10 (the plan paused for this
+ * charge-back); the steps then say so, since O3's payment intro leaves what the customer was told to the steps.
+ */
+export async function queueRefundHeldAlert(
+  deps: Parameters<typeof queuePaymentAlert>[0],
+  charge: Pick<ChargeRow, "chargeId" | "currency">,
+  open: Readonly<{ intent: RefundIntent; openMicros: number }>,
+  now: Date,
+  client?: PoolClient,
+  pausedEmailQueued = false
+): Promise<boolean> {
+  const { chargeId, currency } = charge;
+  const paymentId = open.intent.transactionId;
+  return queuePaymentAlert(deps, {
+    code: "REFUND_HELD_BY_CHARGEBACK", reference: `charge ${chargeId}`, dedupeRef: `${chargeId}:REFUND_HELD:${paymentId}`, now,
+    nextSteps: refundHeldSteps({
+      chargeId, currency, paymentId, reason: open.intent.reason, openMicros: open.openMicros, pausedEmailQueued
+    })
+  }, client);
+}
+
+/**
+ * O3 REFUND_HELD_BY_CHARGEBACK's steps (`queueRefundHeldAlert`). F8 (ruling PR-56, as ops-4 did for O2): each owner
+ * command is README §14.8's host form on its own line (`disputeCommand`, which records at once; `refundDoneCommand`
+ * with `--despite-chargeback`, which previews first and records once `--confirm` is added).
+ */
+export function refundHeldSteps(input: Readonly<{
+  chargeId: string; currency: string; paymentId: string; reason: string; openMicros: number; pausedEmailQueued: boolean;
+}>): string {
+  const { chargeId, currency, paymentId, reason, openMicros, pausedEmailQueued } = input;
+  return [
+    `A refund of ${microsToDecimal(openMicros)} ${currency} (reason ${reason}) was due on this payment`
+      + ` (NETOPIA payment ${paymentId}), and NETOPIA now reports a charge-back on it: the person's bank is taking the`
+      + ` money back.${pausedEmailQueued ? ` ${PAUSED_EMAIL_SENTENCE}` : ""}`
+      + " Do not refund it in NETOPIA's admin; the site no longer lists it as due.",
+    "If the dispute ends for us, record that as root on the server with the command below (it records at once): the"
+      + " refund is then due again and comes back into the reminder. If it ends for the person, nothing is left to refund.",
+    `  ${disputeCommand(chargeId, "won")}`,
+    "If you had already refunded it in NETOPIA's admin before the dispute, record that refund as root on the server"
+      + " with the command below: run it once to see what it records, then again with --confirm added at the end to"
+      + " record it. Then tell NETOPIA, so the dispute is answered.",
+    `  ${refundDoneCommand(chargeId, openMicros)} --despite-chargeback`
+  ].join("\n");
+}
+
+/**
+ * Whether a request gives back the WHOLE payment it names (the payment's own amount, nothing recorded of it yet).
+ * VERIFY_PAYMENT records such a request when NETOPIA reports the payment REFUNDED or, after it was paid, VOIDED (F2).
+ */
+export function wholePaymentOpen(
+  charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>, open: Readonly<{ intent: RefundIntent; openMicros: number }>
+): boolean {
+  const paid = charge.events.find((event) => (event.kind === "SUCCEEDED" || event.kind === "DUPLICATE_PAYMENT")
+    && event.providerPaymentId === open.intent.transactionId);
+  return paid !== undefined && paid.amountMicros === open.intent.amountMicros && open.openMicros === open.intent.amountMicros;
+}
+
+/** The customer's email after a refund of `reason` is recorded (R-32's follow-ups); null: none (a card-check release). */
+export function refundMailOf(reason: RequestedRefundReason): "M8" | "M11" | "M11_DUPLICATE" | null {
+  switch (reason) {
+    case "WITHDRAWAL":
+      return "M8";
+    case "CARD_COUNTRY_BLOCKED":
+      return "M11";
+    case "ALREADY_SUBSCRIBED":
+    case "SUBSCRIPTION_ENDED":
+    case "DUPLICATE_PAYMENT":
+    case "UPGRADE_CLOSED":
+      return "M11_DUPLICATE";
+    case "CARD_CHECK_RELEASE":
+    case "CARD_CHECK_REFUSED":
+    case "CARD_CHECK_DEFERRED":
+    case "CARD_CHECK_NOT_LIVE":
+      return null;
+    default:
+      return exhaustive(reason);
+  }
+}
+
+/**
+ * README §14.8's own form of an owner command on the host (F6a, final review ops-4): run as root, it runs pnpm as the
+ * API's user with the API's EnvironmentFile, the only place the command's settings are. The runbook's paths exactly.
+ */
+const ON_HOST = "systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api"
+  + " --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm";
+
+/**
+ * Any owner command (`billing:check`, `billing:invoice --charge …`) as README §14.8 runs it on the host. Every text
+ * that reaches the owner (an email, an O3's steps, a command's printed next step) names its commands this way: a bare
+ * `pnpm billing:…` in a root shell has none of the API's settings and stops at its missing DATABASE_URL.
+ */
+export function hostCommand(command: string): string {
+  return `${ON_HOST} ${command}`;
+}
+
+/**
+ * Spec §2.12.2: the exact command the owner runs once a NETOPIA refund is made, as README §14.8 runs it. Without
+ * `--confirm` (F6a, ops-4): run as given it only shows what it would record; the emails say to run it again with
+ * `--confirm` added at the end to record it.
+ */
+export function refundDoneCommand(chargeId: string, amountMicros: number): string {
+  return hostCommand(`billing:refund-done --charge ${chargeId} --amount ${microsToDecimal(amountMicros)}`);
+}
+
+/**
+ * F8 (ruling PR-56): `pnpm billing:dispute` as README §14.8 runs it on the host. It has no preview: run as given, it
+ * records the outcome at once.
+ */
+export function disputeCommand(chargeId: string, outcome: "won" | "lost"): string {
+  return hostCommand(`billing:dispute --charge ${chargeId} --outcome ${outcome}`);
+}
+
+/** One open owner refund, as the reminder lists it (owner-facing English; our ids, no customer data). */
+export type OwnerRefundLine = Readonly<{
+  chargeId: string; providerPaymentId: string; reason: string; currency: string; openMicros: number; whole: boolean;
+  requestedAt: Date; deadline: Date | null; seenRefunded: boolean;
+}>;
+
+/** What the owner's command would record, and the email that follows when it closes the request. */
+export type OwnerRefundPlan = Readonly<{
+  chargeId: string; providerPaymentId: string; reason: RequestedRefundReason; currency: string;
+  amountMicros: number; openMicros: number; restMicros: number;
+  /** The customer's follow-up email, rendered in their language; null while a rest stays open, or for none. */
+  mail: Readonly<{ template: string; text: string }> | null;
+  /**
+   * N15b: the owner's `--despite-chargeback` (a refund made in NETOPIA's admin before the dispute arrived): only then
+   * is a refund `heldByChargeback` planned and recorded.
+   */
+  despiteChargeback: boolean;
+}>;
+
+const DAY_MS = 86_400_000;
+const utcDay = (at: Date): number => Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+
+/**
+ * Spec §2.12.2 item 3: whether an open refund puts the owner's list in today's mail: on the day it became due, then
+ * every third day, and every day from three days before a withdrawal's deadline (and after it).
+ */
+export function refundReminderDue(line: Pick<OwnerRefundLine, "requestedAt" | "deadline">, now: Date): boolean {
+  const days = Math.round((utcDay(now) - utcDay(line.requestedAt)) / DAY_MS);
+  if (days >= 0 && days % 3 === 0) return true;
+  return line.deadline !== null && line.deadline.getTime() - now.getTime() <= 3 * DAY_MS;
+}
+
+/** At most this many lines reach one reminder (O2_REFUND_REMINDER's block holds 65,536 characters). */
+const REMINDER_LINES = 40;
+
+export function renderOwnerRefundList(lines: ReadonlyArray<OwnerRefundLine>): string {
+  const shown = lines.slice(0, REMINDER_LINES).map((line) => [
+    `- charge ${line.chargeId}, NETOPIA payment ${line.providerPaymentId}: refund ${microsToDecimal(line.openMicros)} ${line.currency}`
+      + ` (${line.whole ? "the whole payment" : "part of the payment"}), reason ${line.reason},`
+      + ` open since ${line.requestedAt.toISOString().slice(0, 10)}`
+      + (line.deadline === null ? "" : `, withdrawal deadline ${line.deadline.toISOString()}`)
+      + (line.seenRefunded ? ", NETOPIA shows a refund: only the command is missing" : ""),
+    `  ${refundDoneCommand(line.chargeId, line.openMicros)}`
+  ].join("\n"));
+  const rest = lines.length - shown.length;
+  return [...shown, ...(rest > 0 ? [`... and ${rest} more open refunds.`] : [])].join("\n");
 }
 
 /**
@@ -177,6 +372,7 @@ function refundsWholePayment(reason: RequestedRefundReason): boolean {
     case "CARD_COUNTRY_BLOCKED":
     case "ALREADY_SUBSCRIBED":
     case "SUBSCRIPTION_ENDED":
+    case "UPGRADE_CLOSED":
     case "DUPLICATE_PAYMENT":
     case "CARD_CHECK_RELEASE":
     case "CARD_CHECK_REFUSED":
@@ -196,13 +392,13 @@ function refundsWholePayment(reason: RequestedRefundReason): boolean {
  * amount as its SUCCEEDED or DUPLICATE_PAYMENT row records it.
  */
 function isRequested(charge: ChargeWithEvents, intent: RefundIntent): boolean {
-  const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.xmoneyTransactionId === intent.transactionId);
+  const requested = charge.events.find((event) => event.kind === "REFUND_REQUESTED" && event.providerPaymentId === intent.transactionId);
   const recorded = requested === undefined ? null : refundIntentOf(charge, requested);
   if (recorded === null || recorded.chargeId !== intent.chargeId || recorded.ownerRef !== intent.ownerRef
     || recorded.amountMicros !== intent.amountMicros || recorded.reason !== intent.reason) return false;
   if (!intent.whole) return true;
   const paid = charge.events.find((event) => (event.kind === "SUCCEEDED" || event.kind === "DUPLICATE_PAYMENT")
-    && event.xmoneyTransactionId === intent.transactionId);
+    && event.providerPaymentId === intent.transactionId);
   return refundsWholePayment(intent.reason) && paid !== undefined && paid.amountMicros === intent.amountMicros;
 }
 
@@ -219,41 +415,49 @@ function intentOfJob(job: OutboxJob): RefundIntent | null {
   return Object.freeze({ chargeId, transactionId, amountMicros, whole, ownerRef, reason: reason as RequestedRefundReason });
 }
 
+/** Skeleton §1 rule 2: what a NETOPIA refund needs. */
+export type NetopiaRefundDeps = Readonly<{
+  /** `refund` is absent until NETOPIA confirms its refund call (N-10): the owner mode (§2.12.2). */
+  payments: Pick<CardPayments, "status" | "refund">;
+  paymentEnvironment: PaymentEnvironment;
+  /** The reminder's once-a-day check. */
+  jobs: Pick<BillingJobQueries, "outboxJobExists">;
+}>;
+
 /**
  * R-32: THE refund executor. Every refund we make (a refused card, a duplicate plan, a withdrawal, a card-check
- * release) is an intent written in the caller's transaction plus an XMONEY_REFUND job; the job moves the money,
- * looks before any second call (A4c) and writes REFUNDED with the reason's follow-up. It never cancels an order (A4d).
+ * release) is an intent written in the caller's transaction plus a PAYMENT_REFUND job (N14); the job moves the money
+ * (for now, hands it to the owner), looks before any second call (A4c) and writes REFUNDED with the reason's follow-up.
+ * It never cancels an order (A4d).
  */
 export class RefundDesk {
   constructor(private readonly deps: Readonly<{
     repository: Pick<BillingRepository,
       "withTransaction" | "appendChargeEvent" | "enqueue" | "charge" | "quote" | "customerByOwner"
-      | "subscriptionEvents" | "chargesForSubscription" | "withdrawalOwnerSettlement">;
+      | "subscriptionEvents" | "chargesForSubscription" | "withdrawalOwnerSettlement" | "openOwnerRefunds" | "lastStatusRead">;
     /** The per-transaction lease around the refund call (defense in depth beside P7's claim re-assert), the job's
      * call stage (fenced on the job's claim, P2-M6), and the owner lock every refund recording takes before it reads
      * the charge again (P2-M6) and P12d's WITHDRAWAL follow-up decides on M8. */
     jobs: Pick<BillingJobQueries, "withLease" | "markJobStage" | "jobStage" | "lockOwner">;
-    /** `listTransactions`: A4(c)'s look for a refund that is its own transaction (D5 5g). */
-    xmoney: Pick<XMoneyClient, "refund" | "getTransaction" | "listTransactions">;
     policy: BillingPolicy;
     audit: BillingAudit;
     clock: () => Date;
     /**
-     * P2-I4 (D5 5h): the xMoney system `xmoney` talks to (`connectors.xmoneyEnvironment`). A job whose charge was
-     * paid in the other one (a sandbox refund still queued after README §14.8's switch to live) ends DEAD before any
-     * call, with O2: a sandbox transaction id is never sent to live xMoney.
+     * N14: NETOPIA's port and environment. P2-I4 (D5 5h): a job whose charge was paid in another payment system (a
+     * sandbox refund still queued after README §14.8's switch to live) ends DEAD before any call, with O2.
      */
-    xmoneyEnvironment: CustomerXMoneyEnvironment;
+    netopia: NetopiaRefundDeps;
   }>) {}
 
   /** A4(a), inside the caller's transaction: the intent is on record, and its job queued, before money moves. */
   async request(client: PoolClient, intent: RefundIntent, at: Date): Promise<"REQUESTED" | "DUPLICATE"> {
     const written = await this.deps.repository.appendChargeEvent(client, chargeEvent(intent.chargeId, "REFUND_REQUESTED", at, {
-      xmoneyTransactionId: intent.transactionId, amountMicros: intent.amountMicros, errorCode: intent.reason
+      providerPaymentId: intent.transactionId, amountMicros: intent.amountMicros, errorCode: intent.reason
     }));
     if (written === "DUPLICATE") return "DUPLICATE";
     await this.deps.repository.enqueue(client, {
-      kind: "XMONEY_REFUND", ref: `${intent.chargeId}:${intent.transactionId}`, notBefore: at,
+      kind: "PAYMENT_REFUND",
+      ref: `${intent.chargeId}:${intent.transactionId}`, notBefore: at,
       payload: {
         charge_id: intent.chargeId, transaction_id: intent.transactionId, amount_micros: intent.amountMicros,
         whole: intent.whole, owner_ref: intent.ownerRef, reason: intent.reason
@@ -264,7 +468,7 @@ export class RefundDesk {
 
   /**
    * A4(b): one intent per allocation (from `allocateRefund`), each with its amount named. A transaction that already
-   * holds a refund request (UNIQUE (charge, transaction, REFUND_REQUESTED): ours, or a refund made at xMoney, P9c)
+   * holds a refund request (UNIQUE (charge, transaction, REFUND_REQUESTED): ours, or a refund made at NETOPIA, P9c)
    * cannot take a second one; that refusal is loud (`REFUND_TRANSACTION_ALREADY_REFUNDED`, the caller's transaction
    * rolls back), so a withdrawal never reports a refund that was never requested.
    */
@@ -280,9 +484,9 @@ export class RefundDesk {
   }
 
   /**
-   * The XMONEY_REFUND handler (registered in `createBillingRuntime`). The call runs under a per-transaction session
-   * lease, and the charge is re-read INSIDE it, so two processes holding the job can never both refund: the second
-   * finds the lease busy, or the REFUNDED the first one wrote.
+   * The PAYMENT_REFUND handler (registered in `createBillingRuntime`). The call runs under a
+   * per-transaction session lease, and the charge is re-read INSIDE it, so two processes holding the job can never both
+   * refund: the second finds the lease busy, or the REFUNDED the first one wrote.
    */
   readonly handle: OutboxHandler = async (job, now) => {
     const intent = intentOfJob(job);
@@ -295,83 +499,7 @@ export class RefundDesk {
   private async moveMoney(job: OutboxJob, intent: RefundIntent, now: Date): Promise<OutboxOutcome> {
     const charge = await this.deps.repository.charge(intent.chargeId);
     if (charge === null) return this.deadLetter(intent, "REFUND_CHARGE_MISSING", now);
-    // A refund already recorded has nothing left to do in either system (a job that died between its REFUNDED row and
-    // its completion): it ends DONE quietly. Any other job of the other system ends here, before any lookup or call.
-    if (refundedAlready(charge, intent.transactionId)) return DONE;
-    if (charge.xmoneyEnvironment !== this.deps.xmoneyEnvironment) {
-      return this.deadLetter(intent, otherXMoneySystem(this.deps.audit, job.kind).code, now);
-    }
-    // P2-I5 (1): a job its charge records no request for (a forged or corrupted outbox row) moves no money; it ends
-    // here, before any lookup or call, and the owner is told (O2). The 0086 guard would fire only on REFUNDED, after.
-    if (!isRequested(charge, intent)) return this.deadLetter(intent, "REFUND_NOT_REQUESTED", now);
-    // P2-M4: a 0.00 card-check hold (A12 allows it, if X0 switches the hold to 0) holds no money, so there is nothing
-    // to release at xMoney. Its release is recorded at once (REFUNDED at 0, which 0086 accepts only for such a hold),
-    // with no call, as `recordDuplicatePayment` skips a zero second hold: no refund is left owed and `deadRefunds`
-    // never counts it. `isRequested` has matched the 0 against the charge's own SUCCEEDED amount. No zero intent ever
-    // reaches xMoney (whole, it would be a call without an amount).
-    if (intent.amountMicros === 0) {
-      await this.recordRefunded(intent, now);
-      return DONE;
-    }
-    if (job.attempts > 1) {
-      // The stage the last CALL left, read once, inside the lease: XMONEY_UNAVAILABLE / XMONEY_CREDENTIALS_REFUSED
-      // prove it sent nothing; REFUND_CALL_STARTED (a process died during it) or any other code proves nothing.
-      const stage = await this.deps.jobs.jobStage(job.jobId);
-      const keep = stage !== null && NOTHING_SENT.has(stage) ? stage : null;
-      // A4(c): an earlier attempt may have moved the money; a refund (or the void of a hold) already made is recorded.
-      let transaction: XMoneyTransaction;
-      try {
-        transaction = await this.deps.xmoney.getTransaction(intent.transactionId);
-      } catch (error) {
-        // A lookup never proves anything about a call: it keeps a not-sent stage the last call established, and
-        // otherwise records its own code. No refund call was made in this attempt, so the last call's proof stands.
-        return this.again(job, intent, now, "REFUND_LOOKUP_UNAVAILABLE", this.nothingSent(error), keep);
-      }
-      if (transaction.status === "refund-ok" || transaction.status === "void-ok") {
-        await this.recordRefunded(intent, now);
-        return DONE;
-      }
-      // D5 5g: a refund is reported as its own `refund` transaction naming the payment. One of at least this amount is
-      // ours, landed; it is recorded on that transaction (provisional until X0 (g)/(h) show xMoney's real report).
-      const landed = await this.landedRefund(intent, transaction, now);
-      if (landed === "UNAVAILABLE" || landed === "UNREADABLE") {
-        return this.again(job, intent, now, "REFUND_LOOKUP_UNAVAILABLE", landed === "UNAVAILABLE", keep);
-      }
-      if (landed !== null) {
-        await this.recordRefunded(intent, now, landed.transactionId, landed.createdAt);
-        return DONE;
-      }
-      // No row for it: a partial refund an earlier attempt may have made still leaves the payment complete-ok. It is
-      // sent again only when the last CALL proved nothing was sent (P3b's XMONEY_UNAVAILABLE or a credentials
-      // refusal); otherwise never twice, and the owner checks it (P16's summary, P14a's listing). A full-amount
-      // refund that landed reads refund-ok, so complete-ok there means it did not: calling again is safe.
-      if (!intent.whole && isPartOf(intent.amountMicros, transaction) && keep === null) {
-        this.deps.audit("billing.refund.outcome_unknown", { reason: intent.reason });
-        return this.deadLetter(intent, "REFUND_OUTCOME_UNKNOWN", now);
-      }
-    }
-    // Recorded before the call: a process that dies during it leaves this stage, which never reads as "not sent".
-    // P2-M6: only the job's current claim holder records it; a stale holder (another worker claimed the job after this
-    // one's lease ran out) stops here, before the call.
-    if (!await this.deps.jobs.markJobStage(job, "REFUND_CALL_STARTED")) return claimLost(now);
-    try {
-      await this.deps.xmoney.refund({
-        transactionId: intent.transactionId,
-        amountDecimal: intent.whole ? null : microsToDecimal(intent.amountMicros),
-        reason: FRAUD_REASONS.has(intent.reason) ? "fraud-confirm" : "customer-demand",
-        message: intent.reason
-      });
-    } catch (error) {
-      const code = codeOf(error);
-      if (code === "XMONEY_REFUSED") {
-        this.deps.audit("billing.refund.refused", { reason: intent.reason });
-        return this.deadLetter(intent, "XMONEY_REFUSED", now);
-      }
-      // The code is kept as the job's stage: XMONEY_UNAVAILABLE / XMONEY_CREDENTIALS_REFUSED mean nothing was sent.
-      return this.again(job, intent, now, code, this.nothingSent(error));
-    }
-    await this.recordRefunded(intent, now);
-    return DONE;
+    return this.netopiaMoveMoney(job, intent, charge, now);
   }
 
   /**
@@ -386,16 +514,17 @@ export class RefundDesk {
    * refund's its legal deadline, 14 days after the person withdrew (`withdrawalRefundDeadline` of the WITHDRAWN row's
    * `withdrew_at`), with how to refund it by hand so that M8 still follows. A forged job's O2 carries neither: its
    * reason is only the job's claim.
-   * P2-W4: two more dead ends stop before any xMoney call, so O2 never says "xMoney refused" for them.
+   * P2-W4: two more dead ends stop before any call to NETOPIA, so O2 never says "NETOPIA refused" for them.
    * REFUND_CHARGE_MISSING (the job names a charge we do not have) is no refund to make either, so it takes the
-   * not-requested sentences and ref. OTHER_XMONEY_SYSTEM (the payment was taken in the other xMoney system) has its own
-   * sentences (`otherSystem`) and ref: nothing was sent and nothing is owed on this server, and this API never sees
-   * that system's refunds, so it carries no deadline ("M8 follows by itself" would be false). Neither carries a reason:
-   * no recorded request was checked, so it is only the job's claim.
+   * not-requested sentences and ref. OTHER_PAYMENT_SYSTEM (the payment was taken in another payment system; the code
+   * the previous card processor's era stored reads the same, `otherSystemCode`) has its own sentences (`otherSystem`)
+   * and ref: nothing was sent and nothing is owed on this server, and this API never sees that system's refunds, so it
+   * carries no deadline ("M8 follows by itself" would be false). Neither carries a reason: no recorded request was
+   * checked, so it is only the job's claim.
    */
   private async deadLetter(intent: RefundIntent, code: string, now: Date): Promise<OutboxOutcome> {
     const notRequested = code === "REFUND_NOT_REQUESTED" || code === "REFUND_CHARGE_MISSING";
-    const otherSystem = code === "OTHER_XMONEY_SYSTEM";
+    const otherSystem = otherSystemCode(code);
     const real = !notRequested && !otherSystem;
     const ref = `${intent.chargeId}:${intent.transactionId}`;
     const deadline = real ? await this.withdrawalDeadlineOf(intent) : null;
@@ -433,50 +562,13 @@ export class RefundDesk {
   }
 
   /**
-   * A `refund` transaction xMoney lists for this payment, of at least the intent's amount. No listing: UNAVAILABLE
-   * when the failure proved xMoney processed nothing (an outage, a revoked key), UNREADABLE otherwise.
+   * REFUNDED once per paid payment (P1a's unique keys), on the payment's own row, with the reason's follow-up in one
+   * transaction (the 0.00 card-check release, which moves no money). Every recording takes the owner lock first,
+   * before the REFUNDED row. P2-M6: under the owner lock the charge is read again on the transaction's own
+   * connection, and a refund whose payment already holds a REFUNDED (`refundedAlready`) is recorded already: nothing
+   * more is written and no follow-up runs (no second credit note, no second M8).
    */
-  private async landedRefund(
-    intent: RefundIntent, payment: XMoneyTransaction, now: Date
-  ): Promise<XMoneyTransaction | null | "UNAVAILABLE" | "UNREADABLE"> {
-    const rejected = rejectedRows(this.deps.audit, "refund");
-    try {
-      const listed = await this.deps.xmoney.listTransactions({
-        from: payment.createdAt ?? new Date(now.getTime() - 120 * 86_400_000), to: now, orderId: payment.orderId,
-        dateType: "refund", onRejected: rejected.onRejected
-      });
-      return listed.find((candidate) => candidate.transactionType === "refund"
-        && candidate.relatedTransactionIds.includes(intent.transactionId) && candidate.status === "complete-ok"
-        && covers(candidate.amountDecimal, intent.amountMicros)) ?? null;
-    } catch (error) {
-      return this.nothingSent(error) ? "UNAVAILABLE" : "UNREADABLE";
-    } finally {
-      rejected.report();
-    }
-  }
-
-  /** D5 5i: whether `error` proves xMoney processed nothing (it also raises the credentials alarm). */
-  private nothingSent(error: unknown): boolean {
-    credentialsRefused(this.deps.audit, error, "refund");
-    return error instanceof TypedDomainError && NOTHING_SENT.has(error.code);
-  }
-
-  /**
-   * REFUNDED once per paid transaction (P1a's unique keys), with the reason's follow-up in one transaction. For a
-   * refund xMoney reported as its own transaction, the row is written on that transaction and names the payment it
-   * refunds (`refundsTransactionId`, D5 5g), with that refund transaction's `creationDate` (D5 5m: the quarter rows
-   * date the refund by it). A refund read from the payment's own status carries no such time. Every recording takes
-   * the owner lock first, before the REFUNDED row.
-   * P2-M6: one refund can reach here twice at once from two API processes: RefundDesk with the call's answer (a row on
-   * the payment) and VERIFY_PAYMENT with xMoney's own refund transaction naming the payment (a row on that
-   * transaction). The two rows have different keys, and 0086's sum guard lets both in while the refund is at most half
-   * the payment, so the unique keys alone cannot stop the second. Under the owner lock the charge is read again on the
-   * transaction's own connection, and a refund whose payment already holds a REFUNDED (`refundedAlready`) is recorded
-   * already: nothing more is written and no follow-up runs (no second credit note, no second M8).
-   */
-  async recordRefunded(
-    intent: RefundIntent, at: Date, refundTransactionId: string | null = null, refundCreatedAt: Date | null = null
-  ): Promise<void> {
+  async recordRefunded(intent: RefundIntent, at: Date): Promise<void> {
     const followUp = await this.followUp(intent);
     await this.deps.repository.withTransaction(async (client) => {
       // The owner lock comes first, then the charge's refund lock that 0086's trigger takes on the REFUNDED insert:
@@ -486,9 +578,7 @@ export class RefundDesk {
       const current = await this.deps.repository.charge(intent.chargeId, client);
       if (current !== null && refundedAlready(current, intent.transactionId)) return;
       const written = await this.deps.repository.appendChargeEvent(client, chargeEvent(intent.chargeId, "REFUNDED", at, {
-        xmoneyTransactionId: refundTransactionId ?? intent.transactionId, amountMicros: intent.amountMicros,
-        errorCode: intent.reason, refundsTransactionId: refundTransactionId === null ? null : intent.transactionId,
-        xmoneyCreatedAt: refundTransactionId === null ? null : refundCreatedAt
+        providerPaymentId: intent.transactionId, amountMicros: intent.amountMicros, errorCode: intent.reason
       }));
       if (written === "DUPLICATE") return;
       await followUp(client, at);
@@ -511,30 +601,23 @@ export class RefundDesk {
     return Object.freeze({ kind: "RETRY" as const, code: retryCode ?? code, retryAt });
   }
 
-  /** What follows a refund we made: the person's email, or the credit note for a charge that was invoiced. */
+  /** What follows a refund we made: the person's email (`refundMailOf`), or the credit note for a charge that was invoiced. */
   private async followUp(intent: RefundIntent): Promise<FollowUp> {
-    switch (intent.reason) {
-      case "CARD_COUNTRY_BLOCKED":
-        return this.mail(intent, "M11", intent.chargeId, await this.planEndedByRefusal(intent));
-      case "ALREADY_SUBSCRIBED":
-      case "SUBSCRIPTION_ENDED":
-        return this.mail(intent, "M11_DUPLICATE", intent.chargeId);
-      case "DUPLICATE_PAYMENT":
-        // One charge can take more than one duplicate: each refunded transaction gets its own email.
-        return this.mail(intent, "M11_DUPLICATE", `${intent.chargeId}:${intent.transactionId}`);
-      case "WITHDRAWAL":
+    const template = refundMailOf(intent.reason);
+    switch (template) {
+      case "M8":
         return this.withdrawalFollowUp(intent);
-      case "CARD_CHECK_RELEASE":
-        return async () => undefined;
-      case "CARD_CHECK_REFUSED":
-        return async () => undefined;
-      case "CARD_CHECK_DEFERRED":
-        return async () => undefined;
-      case "CARD_CHECK_NOT_LIVE":
-        // P20: the plan stopped being live during the card check; the hold goes back with no email and no credit note.
+      case "M11":
+        return this.mail(intent, "M11", intent.chargeId, await this.planEndedByRefusal(intent));
+      case "M11_DUPLICATE":
+        // One charge can take more than one duplicate: each refunded transaction gets its own email.
+        return this.mail(intent, "M11_DUPLICATE",
+          intent.reason === "DUPLICATE_PAYMENT" ? `${intent.chargeId}:${intent.transactionId}` : intent.chargeId);
+      case null:
+        // The card-check releases (P12e, P20): the hold goes back with no email and no credit note.
         return async () => undefined;
       default:
-        return exhaustive(intent.reason);
+        return exhaustive(template);
     }
   }
 
@@ -549,7 +632,7 @@ export class RefundDesk {
   private async planEndedByRefusal(intent: RefundIntent): Promise<string | null> {
     const charge = await this.deps.repository.charge(intent.chargeId);
     if (charge === null || (charge.kind !== "RENEWAL" && charge.kind !== "UPGRADE")) return null;
-    const paidAt = charge.events.find((event) => event.kind === "SUCCEEDED" && event.xmoneyTransactionId === intent.transactionId)?.at;
+    const paidAt = charge.events.find((event) => event.kind === "SUCCEEDED" && event.providerPaymentId === intent.transactionId)?.at;
     if (paidAt === undefined) return null;
     const ended = (await this.deps.repository.subscriptionEvents(charge.subscriptionId)).find((event) =>
       event.kind === "ENDED" && event.data.cause === "CANCEL" && event.data.reason === "CARD_COUNTRY_BLOCKED"
@@ -583,7 +666,7 @@ export class RefundDesk {
 
   /**
    * P12d (spec §2.5.6): the credit note for this transaction, and M8 "we refunded {refundAmount}" once the LAST
-   * refund of the withdrawal is recorded — never before the money moved, and never for a refund xMoney refused
+   * refund of the withdrawal is recorded — never before the money moved, and never for a refund NETOPIA refused
    * (that job dies and P14a/P16b list it for the owner). One M8 per withdrawal rests on three things: (1) the owner
    * lock, which `recordRefunded` takes before the REFUNDED row, serializes the refund recordings of one withdrawal, so
    * exactly one of them sees every refund recorded; (2) a repeated REFUNDED returns before its follow-up runs; (3) the
@@ -592,7 +675,7 @@ export class RefundDesk {
    * withdrawals, and those never get one).
    * The amount is the sum of the withdrawal's own requests (reason WITHDRAWAL): `refund_micros` when P12d computed
    * it, the owner's amount when P14c settled a withdrawal handed to the owner (whose `refund_micros` is null), plus
-   * what the owner recorded as refunded in the xMoney dashboard for it (P12a's `billing.withdrawal_owner_settlement`).
+   * what the owner recorded as refunded in NETOPIA's admin for it (P12a's `billing.withdrawal_owner_settlement`).
    */
   private async withdrawalFollowUp(intent: RefundIntent): Promise<FollowUp> {
     const creditNote = await this.creditNote(intent);
@@ -616,14 +699,14 @@ export class RefundDesk {
           if (event.kind !== "REFUND_REQUESTED" || event.errorCode !== "WITHDRAWAL" || target === null) continue;
           // This transaction's REFUNDED is the row this very transaction has just written.
           const isThisRefund = row.chargeId === intent.chargeId && target === intent.transactionId;
-          // D5 5g: a REFUNDED may sit on xMoney's own refund transaction, naming the payment in
-          // `refundsTransactionId`; `refundTarget` reads both shapes, never the transaction id alone.
-          const refunded = isThisRefund || recorded.some((other) => other.kind === "REFUNDED" && refundTarget(other) === target);
+          // N14: a request is refunded only once its REFUNDED parts cover it (the owner may record it in parts).
+          const covered = read !== null && openOwnRequest(read, target)?.openMicros === 0;
+          const refunded = isThisRefund || covered;
           if (!refunded) return;
           refundMicros += event.amountMicros ?? 0;
         }
       }
-      // P14c: what the owner refunded in the xMoney dashboard for this withdrawal is part of the refund M8 names.
+      // P14c: what the owner refunded in NETOPIA's admin for this withdrawal is part of the refund M8 names.
       refundMicros += (await this.deps.repository.withdrawalOwnerSettlement(charge.subscriptionId, client))
         ?.dashboardRefundMicros ?? 0;
       await enqueueEmail(this.deps.repository, client, {
@@ -632,5 +715,236 @@ export class RefundDesk {
         params: { plan: withdrawn.planId, refundAmount: microsToDecimal(refundMicros) }, notBefore: at
       });
     };
+  }
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // N14 — NETOPIA (spec §2.12).
+  // ---------------------------------------------------------------------------------------------------------------
+
+  /**
+   * Spec §2.12.1-2.12.3, inside the lease: another system's job dies (O2); an unrequested one moves nothing; the 0.00
+   * card-check release is recorded with no call, ahead of the rest; a covered request is done; then API or owner mode.
+   */
+  private async netopiaMoveMoney(job: OutboxJob, intent: RefundIntent, charge: ChargeWithEvents, now: Date): Promise<OutboxOutcome> {
+    const netopia = this.deps.netopia;
+    if (!isThisPaymentSystem(charge, netopia.paymentEnvironment)) {
+      return this.deadLetter(intent, otherPaymentSystem(this.deps.audit, job.kind).code, now);
+    }
+    if (!isRequested(charge, intent)) return this.deadLetter(intent, "REFUND_NOT_REQUESTED", now);
+    if (intent.amountMicros === 0) {
+      await this.recordRefunded(intent, now);
+      return DONE;
+    }
+    if (openOwnRequest(charge, intent.transactionId)?.openMicros === 0) return DONE;
+    // N15b (ruling PR-41), owner mode: a request on a payment already under a dispute is held, not handed to the owner
+    // (no OWNER_REFUND_DUE, no O2_REFUND_DUE); the owner gets the O3 instead. The request stays open: a dispute won
+    // brings it into O2_REFUND_REMINDER. The API mode checks the same after its look-first (`netopiaApiRefund`).
+    if (netopia.payments.refund === undefined && heldByChargeback(charge, intent.transactionId)) return this.refundHeld(intent, charge, now);
+    if (netopia.payments.refund !== undefined) return this.netopiaApiRefund(job, intent, charge, now);
+    // §2.12.2 item 1: the owner refunds in NETOPIA's admin. The open REFUND_REQUESTED is what stays open.
+    if (!await this.deps.jobs.markJobStage(job, "OWNER_REFUND_DUE")) return claimLost(now);
+    const deadline = await this.withdrawalDeadlineOf(intent);
+    const whole = wholePaymentOpen(charge, { intent, openMicros: intent.amountMicros });
+    await this.deps.repository.withTransaction((client) => enqueueOnce({ repository: this.deps.repository, jobs: netopia.jobs }, client, emailJob({
+      template: "O2_REFUND_DUE", recipient: { kind: "OWNER" }, dedupeRef: `${intent.chargeId}:${intent.transactionId}`,
+      params: {
+        chargeRef: intent.chargeId, paymentRef: intent.transactionId, refundAmount: microsToDecimal(intent.amountMicros),
+        currency: charge.currency, refundReason: intent.reason, whole: whole ? "true" : "false",
+        doneCommand: refundDoneCommand(intent.chargeId, intent.amountMicros),
+        ...(deadline === null ? {} : { refundDeadline: deadline.toISOString() })
+      },
+      notBefore: now
+    })));
+    this.deps.audit("billing.refund.owner_due", { reason: intent.reason });
+    return DONE;
+  }
+
+  /**
+   * Spec §2.12.3 (dormant until N-10). A4 (c): after a first attempt, look first: a payment already REFUNDED is recorded,
+   * never refunded again; a partial refund whose last call may have landed is never sent twice (O2).
+   */
+  private async netopiaApiRefund(job: OutboxJob, intent: RefundIntent, charge: ChargeWithEvents, now: Date): Promise<OutboxOutcome> {
+    const payments = this.deps.netopia.payments;
+    if (job.attempts > 1) {
+      const stage = await this.deps.jobs.jobStage(job.jobId);
+      const keep = stage === "PAYMENT_PROVIDER_UNAVAILABLE" || stage === "PAYMENT_CREDENTIALS_REFUSED" ? stage : null;
+      let read: PaymentReportOrMissing;
+      try {
+        read = await payments.status({ orderId: intent.chargeId, providerPaymentId: intent.transactionId });
+      } catch (error) {
+        return this.again(job, intent, now, "REFUND_LOOKUP_UNAVAILABLE", paymentNothingSent(error), keep);
+      }
+      if (read !== "NO_SUCH_ORDER" && read.state === "REFUNDED") {
+        await this.recordNetopiaRefund(intent, intent.amountMicros, now);
+        return DONE;
+      }
+      if (!intent.whole && keep === null) {
+        this.deps.audit("billing.refund.outcome_unknown", { reason: intent.reason });
+        return this.deadLetter(intent, "REFUND_OUTCOME_UNKNOWN", now);
+      }
+    }
+    // N15b (ruling PR-41): after the look-first (a refund NETOPIA already reports is still recorded), a payment under a
+    // dispute never gets a new refund call: the request is held, and the owner gets the O3.
+    if (heldByChargeback(charge, intent.transactionId)) return this.refundHeld(intent, charge, now);
+    if (!await this.deps.jobs.markJobStage(job, "REFUND_CALL_STARTED")) return claimLost(now);
+    try {
+      await payments.refund!({ orderId: intent.chargeId, providerPaymentId: intent.transactionId, amountMicros: intent.amountMicros });
+    } catch (error) {
+      const code = paymentErrorCode(error) ?? "PAYMENT_OUTCOME_UNKNOWN";
+      credentialsRefused(this.deps.audit, error, "refund");
+      if (code === "PAYMENT_CONFIGURATION_REFUSED") {
+        this.deps.audit("billing.refund.refused", { reason: intent.reason });
+        return this.deadLetter(intent, code, now);
+      }
+      return this.again(job, intent, now, code, paymentNothingSent(error));
+    }
+    await this.recordNetopiaRefund(intent, intent.amountMicros, now);
+    return DONE;
+  }
+
+  /**
+   * N15b (ruling PR-41): a PAYMENT_REFUND job whose payment is `heldByChargeback` moves no money, writes no job stage
+   * and ends DONE; its request stays open. The owner's one O3 (`queueRefundHeldAlert`), and the audit line
+   * billing.refund.held_by_chargeback only when that O3 was queued now, so the line is once per payment.
+   */
+  private async refundHeld(intent: RefundIntent, charge: ChargeWithEvents, now: Date): Promise<OutboxOutcome> {
+    const open = openOwnRequest(charge, intent.transactionId);
+    if (open !== null && open.openMicros > 0
+      && await queueRefundHeldAlert({ repository: this.deps.repository, jobs: this.deps.netopia.jobs }, charge, open, now)) {
+      this.deps.audit("billing.refund.held_by_chargeback", { reason: open.intent.reason });
+    }
+    return DONE;
+  }
+
+  /**
+   * Spec §2.12.2 item 4 / §2.12.4: REFUNDED at `amountMicros` on our open NETOPIA request, under the owner lock, never
+   * above what is open. The closing part runs the follow-ups for the whole request; a smaller part keeps the rest open.
+   */
+  async recordNetopiaRefund(
+    intent: RefundIntent, amountMicros: number, at: Date
+  ): Promise<"RECORDED" | "PART_RECORDED" | "ALREADY_RECORDED"> {
+    if (!Number.isSafeInteger(amountMicros) || amountMicros <= 0) {
+      throw new TypedDomainError("REFUND_AMOUNT_INVALID", "a recorded refund is a positive whole number of micros");
+    }
+    const followUp = await this.followUp(intent);
+    const result = await this.deps.repository.withTransaction(async (client): Promise<"RECORDED" | "PART_RECORDED" | "ALREADY_RECORDED"> => {
+      await this.deps.jobs.lockOwner(client, intent.ownerRef);
+      const current = await this.deps.repository.charge(intent.chargeId, client);
+      const open = current === null ? null : openOwnRequest(current, intent.transactionId);
+      if (open === null || open.openMicros === 0) return "ALREADY_RECORDED";
+      if (amountMicros > open.openMicros) throw new TypedDomainError("REFUND_EXCEEDS_REQUEST", "more than the open refund request");
+      const written = await this.deps.repository.appendChargeEvent(client, chargeEvent(intent.chargeId, "REFUNDED", at, {
+        providerPaymentId: intent.transactionId, amountMicros, errorCode: intent.reason
+      }));
+      if (written === "DUPLICATE") return "ALREADY_RECORDED";
+      if (amountMicros < open.openMicros) return "PART_RECORDED";
+      await followUp(client, at);
+      return "RECORDED";
+    });
+    if (result !== "ALREADY_RECORDED") this.deps.audit("billing.refund", { reason: intent.reason });
+    return result;
+  }
+
+  /**
+   * `pnpm billing:refund-done`'s first half: what it would record, and the email when this amount closes the request.
+   * A request held by a charge-back (`heldByChargeback`) is refused with BILLING_REFUND_DONE_HELD_BY_CHARGEBACK unless
+   * `despiteChargeback`; an open request of another payment of the charge that is not held is planned first.
+   */
+  async planOwnerRefund(
+    chargeId: string, amountMicros: number, options: Readonly<{ despiteChargeback?: boolean }> = {}
+  ): Promise<OwnerRefundPlan> {
+    const despiteChargeback = options.despiteChargeback === true;
+    const charge = await this.deps.repository.charge(chargeId);
+    if (charge === null) throw new TypeError("BILLING_REFUND_DONE_CHARGE_NOT_FOUND");
+    if (!isThisPaymentSystem(charge, this.deps.netopia.paymentEnvironment)) {
+      throw new TypeError("BILLING_REFUND_DONE_OTHER_PAYMENT_SYSTEM");
+    }
+    const opens = charge.events.filter((event) => event.kind === "REFUND_REQUESTED" && event.providerPaymentId !== null)
+      .map((event) => openOwnRequest(charge, event.providerPaymentId!))
+      .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== null && candidate.openMicros > 0);
+    const open = despiteChargeback ? opens[0] : opens.find((candidate) => !heldByChargeback(charge, candidate.intent.transactionId));
+    if (open === undefined) {
+      throw new TypeError(opens.length > 0 ? "BILLING_REFUND_DONE_HELD_BY_CHARGEBACK" : "BILLING_REFUND_DONE_NO_OPEN_REQUEST");
+    }
+    if (amountMicros <= 0 || amountMicros > open.openMicros) throw new TypeError("BILLING_REFUND_DONE_EXCEEDS_REQUEST");
+    const restMicros = open.openMicros - amountMicros;
+    return Object.freeze({
+      chargeId, providerPaymentId: open.intent.transactionId, reason: open.intent.reason, currency: charge.currency,
+      amountMicros, openMicros: open.openMicros, restMicros, mail: restMicros > 0 ? null : await this.followUpMail(open.intent),
+      despiteChargeback
+    });
+  }
+
+  /** The owner's command, its second half: records the plan's amount (the plan is re-checked under the lock). */
+  async recordOwnerRefund(plan: OwnerRefundPlan, at: Date): Promise<"RECORDED" | "PART_RECORDED" | "ALREADY_RECORDED"> {
+    const charge = await this.deps.repository.charge(plan.chargeId);
+    const open = charge === null ? null : openOwnRequest(charge, plan.providerPaymentId);
+    if (open === null) throw new TypeError("BILLING_REFUND_DONE_NO_OPEN_REQUEST");
+    // N15b: the hold is checked again (a charge-back may have arrived since the plan), unless the owner's flag says so.
+    if (!plan.despiteChargeback && heldByChargeback(charge!, plan.providerPaymentId)) {
+      throw new TypeError("BILLING_REFUND_DONE_HELD_BY_CHARGEBACK");
+    }
+    const result = await this.recordNetopiaRefund(open.intent, plan.amountMicros, at);
+    this.deps.audit("billing.refund.recorded_by_owner", { reason: plan.reason });
+    return result;
+  }
+
+  /** The follow-up email of `intent`, as the customer will read it (rendered by the same catalogue as the sender). */
+  private async followUpMail(intent: RefundIntent): Promise<Readonly<{ template: string; text: string }> | null> {
+    const template = refundMailOf(intent.reason);
+    if (template === null) return null;
+    const customer = await this.deps.repository.customerByOwner(intent.ownerRef);
+    const locale = customer?.locale ?? "en";
+    const params: Record<string, string> = { refundAmount: microsToDecimal(intent.amountMicros) };
+    if (template === "M11") {
+      const endedPlan = await this.planEndedByRefusal(intent);
+      if (endedPlan !== null) params.endedPlan = endedPlan;
+    }
+    if (template === "M8") {
+      const charge = await this.deps.repository.charge(intent.chargeId);
+      const events = charge === null ? [] : await this.deps.repository.subscriptionEvents(charge.subscriptionId);
+      const withdrawn = events.find((event) => event.kind === "WITHDRAWN");
+      if (charge === null || withdrawn === undefined) return null;
+      let refundMicros = 0;
+      for (const row of await this.deps.repository.chargesForSubscription(charge.subscriptionId)) {
+        const read = await this.deps.repository.charge(row.chargeId);
+        for (const event of read?.events ?? []) {
+          if (event.kind === "REFUND_REQUESTED" && event.errorCode === "WITHDRAWAL") refundMicros += event.amountMicros ?? 0;
+        }
+      }
+      refundMicros += (await this.deps.repository.withdrawalOwnerSettlement(charge.subscriptionId))?.dashboardRefundMicros ?? 0;
+      params.plan = withdrawn.planId;
+      params.refundAmount = microsToDecimal(refundMicros);
+    }
+    return Object.freeze({ template, text: renderMail(template as MailTemplateId, locale, params).text });
+  }
+
+  /**
+   * Spec §2.12.2 item 3: one O2_REFUND_REMINDER a day listing every open owner refund, when one is due today. "NETOPIA
+   * shows a refund": the charge's latest status read was REFUNDED (§2.12.4) or VOIDED (F2: a payment cancelled in
+   * NETOPIA's admin is money back too). Returns the refunds listed (0: no email).
+   */
+  async remindOwnerRefunds(now: Date): Promise<number> {
+    const netopia = this.deps.netopia;
+    const lines: OwnerRefundLine[] = [];
+    for (const row of await this.deps.repository.openOwnerRefunds(netopia.paymentEnvironment, [...REQUESTED_REASONS])) {
+      const intent: RefundIntent = Object.freeze({
+        chargeId: row.chargeId, transactionId: row.providerPaymentId, amountMicros: row.requestedMicros, whole: row.whole,
+        ownerRef: row.ownerRef, reason: row.reason as RequestedRefundReason
+      });
+      const last = await this.deps.repository.lastStatusRead(row.chargeId);
+      lines.push(Object.freeze({
+        chargeId: row.chargeId, providerPaymentId: row.providerPaymentId, reason: row.reason, currency: row.currency,
+        openMicros: row.requestedMicros - row.refundedMicros, whole: row.whole, requestedAt: row.requestedAt,
+        deadline: await this.withdrawalDeadlineOf(intent),
+        seenRefunded: last?.outcome === "REFUNDED" || last?.outcome === "VOIDED"
+      }));
+    }
+    if (!lines.some((line) => refundReminderDue(line, now))) return 0;
+    const queued = await this.deps.repository.withTransaction((client) => enqueueOnce({ repository: this.deps.repository, jobs: netopia.jobs }, client, emailJob({
+      template: "O2_REFUND_REMINDER", recipient: { kind: "OWNER" }, dedupeRef: now.toISOString().slice(0, 10),
+      params: { refundCount: String(lines.length), refundList: renderOwnerRefundList(lines) }, notBefore: now
+    })));
+    return queued ? lines.length : 0;
   }
 }

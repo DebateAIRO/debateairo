@@ -22,6 +22,8 @@ export type SaleRecord = Readonly<{
   lines: ReadonlyArray<SaleLine>;
   taxCode: "saas" | "eservice";
   evidence: Readonly<{ billingCountry: string; ipAddress: string | null; bankCountry: string | null }>;
+  /** N10 (spec §2.8 step 5): who took the payment `transactionId` names (NETOPIA's ntpID). */
+  processor: "netopia";
 }>;
 export type RefundRecord = Readonly<{
   chargeId: string; transactionId: string; issuedOn: Date; refundTotalMicros: number;
@@ -31,6 +33,8 @@ export type RefundRecord = Readonly<{
    * description), so a connector never writes its own English on a customer's credit note.
    */
   description: string;
+  /** N10 (spec §2.8 step 5): who took the payment `transactionId` names (NETOPIA's ntpID). */
+  processor: "netopia";
 }>;
 export type TaxErrorCode = "TAX_SERVICE_UNAVAILABLE" | "TAX_SERVICE_REFUSED";
 export type InvoiceErrorCode = "INVOICE_SERVICE_UNAVAILABLE" | "INVOICE_SERVICE_REFUSED" | "INVOICE_UNKNOWN";

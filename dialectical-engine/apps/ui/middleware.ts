@@ -1,32 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
-import {
-  cardFormContentSecurityPolicy,
-  cardFormOrigins,
-  createNonce,
-  isCardFormPath,
-  NONCE_REQUEST_HEADER,
-  nonceContentSecurityPolicy
-} from "./content-security-policy.mjs";
+import { createNonce, NONCE_REQUEST_HEADER, nonceContentSecurityPolicy } from "./content-security-policy.mjs";
 
 /**
- * F-08 / L3-F3: every document gets a per-request nonce policy.
- *
- * Next reads the nonce from the REQUEST `content-security-policy` header
- * (app-render) and stamps it on its bootstrap and flight-data scripts; the
- * root layout reads `x-nonce` for the app-owned theme bootstrap. The RESPONSE
- * header is the policy the browser enforces. server.mjs strips any
- * caller-supplied copy of these headers before Next runs and pre-sets a
- * fallback policy that this one replaces.
+ * F-08 / L3-F3: every document gets a per-request nonce policy, the checkout and card pages included (spec 2026-10-05
+ * §2.18: NETOPIA's page is its own site, reached by a top-level navigation). Next reads the nonce from the REQUEST
+ * `content-security-policy` header and stamps it on its scripts; the root layout reads `x-nonce`. The RESPONSE header is
+ * the policy the browser enforces; server.mjs strips caller-supplied copies and pre-sets the fallback this replaces.
  */
 export function middleware(request: NextRequest) {
   const nonce = createNonce();
-  const development = process.env.NODE_ENV === "development";
-  // AMENDMENTS-R1 A11: only the three card-form documents read XMONEY_SDK_ORIGIN; every other page keeps
-  // exactly the policy it had.
-  const cardForm = isCardFormPath(request.nextUrl.pathname) ? cardFormOrigins(process.env.XMONEY_SDK_ORIGIN) : null;
-  const policy = cardForm === null
-    ? nonceContentSecurityPolicy(nonce, development)
-    : cardFormContentSecurityPolicy(nonce, development, cardForm);
+  const policy = nonceContentSecurityPolicy(nonce, process.env.NODE_ENV === "development");
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(NONCE_REQUEST_HEADER, nonce);
   requestHeaders.set("content-security-policy", policy);

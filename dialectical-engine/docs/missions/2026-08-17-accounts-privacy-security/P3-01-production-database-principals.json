@@ -582,6 +582,14 @@
           "condition": "package script billing:withdraw"
         },
         {
+          "component": "apps/api:billing-refund-done-cli",
+          "sourceFile": "apps/api/src/billing/refund-done-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_REFUND_DONE_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:refund-done"
+        },
+        {
           "component": "apps/api:billing-tax-summary-cli",
           "sourceFile": "apps/api/src/billing/tax-summary-cli.ts",
           "environmentKey": "DATABASE_URL",
@@ -604,6 +612,22 @@
           "purpose": "BILLING_INVOICE_OPERATOR_COMMAND",
           "binding": "WIRED",
           "condition": "package script billing:invoice"
+        },
+        {
+          "component": "apps/api:billing-check-cli",
+          "sourceFile": "apps/api/src/billing/check-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_CHECK_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:check"
+        },
+        {
+          "component": "tools/billing:netopia-sandbox",
+          "sourceFile": "tools/billing/netopia-sandbox.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BILLING_NETOPIA_RECORDING_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script billing:netopia-sandbox"
         }
       ]
     },
