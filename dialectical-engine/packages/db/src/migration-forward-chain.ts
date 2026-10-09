@@ -17,6 +17,11 @@ export type ForwardStepPlan=Readonly<{
  verifierPath:string; verifierSha256:string; verifierSql:string;
  /** A digest of the catalog objects the step creates, recorded at apply and compared while it is the last step. */
  postconditionEvidence(client:PoolClient):Promise<string>;
+ /**
+  * The step's own security checks (SQL that raises on drift), re-run on EVERY later migrate() for as long as the step
+  * is applied — not only while it is the last one — so appending a step never retires an earlier step's promises.
+  */
+ replayVerifierSql?:string;
 }>;
 type StepLoader=(anchor:ForwardStepAnchor)=>Promise<ForwardStepPlan>;
 
@@ -139,6 +144,8 @@ export async function applyForwardChain(client:PoolClient,plan:MigrationPlan,app
    ||receipt.forward_manifest_sha256!==step.manifestSha256||receipt.source_sha256!==step.sourceSha256||receipt.verifier_sha256!==step.verifierSha256
    ||receipt.precondition_evidence_digest!==preconditionDigest(plan,step,owner))return fail(`RECEIPT_BINDING_DRIFT ${step.name}`);
  }
+ // Every applied step's own checks run on every replay, whichever step is last.
+ for(const step of done)if(step.replayVerifierSql!==undefined)await client.query(step.replayVerifierSql);
  const last=done.at(-1);
  if(last!==undefined&&receipts.at(-1)?.postcondition_evidence_digest!==await last.postconditionEvidence(client))return fail(`POSTCONDITION_DRIFT ${last.name}`);
  for(const step of plan.forwardChain.slice(done.length)){

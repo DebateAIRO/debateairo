@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0109_auth_db_batch.sql",
-    "sha256": "97f402167247e14ef778d260cf81f74dff81a9fcd130bfb43597b7e9dcde9fce"
+    "sha256": "9594623974814f4848646f1216d593bc4574cb7f107c2fc275257d1f19f8dfd6"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities.sql",
@@ -16,6 +16,6 @@
   },
   "supplementalVerifier": {
     "path": "lineage/verify-auth-db-batch.sql",
-    "sha256": "7b5eb26e17b6e9c011647ccb4f331251a8f5b22c1ba079b53176e3248ec01443"
+    "sha256": "13721de72d699601c5b9ced9c2b26762451af39437761d94a5752ba5b347bc2d"
   }
 }

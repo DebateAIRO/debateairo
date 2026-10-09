@@ -1,12 +1,16 @@
 -- Auth database batch (owner-approved 2026-10-09; docs/superpowers/specs/2026-10-09-auth-db-batch-design.md).
 -- One forward step after the sealed 0108 (migrations/lineage/README.md). Earlier migrations are never edited:
--- replaced functions keep their signature, owner, ACL, SECURITY DEFINER and search_path=pg_catalog, and every new
--- function gets its family's owner plus explicit REVOKE/GRANT below.
+-- replaced functions keep their signature, owner, ACL and SECURITY DEFINER, and every new function gets its family's
+-- owner plus explicit REVOKE/GRANT below. Every function this step creates or replaces searches pg_catalog first and
+-- pg_temp last (`search_path=pg_catalog,pg_temp`), so a temporary type or table can never shadow one it uses — except
+-- identity.create_social_account, whose `search_path=pg_catalog` the sealed effective-capability verifier pins (the
+-- step keeps that verifier); item 6 closes the gap for it and every older definer by revoking TEMPORARY.
 --   1. Phone optional at sign-up.
 --   2. A 24-hour wait before an email-link + password authenticator replacement takes effect.
 --   3. Used recovery codes are no longer refilled; every verified email is told when one is used.
 --   4. A password-less, peer-authenticated staff readiness writer role.
 --   5. An uncounted release of a staff alert delivery claim.
+--   6. Nobody but the database owner may create temporary objects (no type/relation shadowing in definer functions).
 
 -- 1. Phone optional at sign-up. Since 0095 the table allows "no phone"; the shared private constructor
 -- (0096's body under its 0101 name) and the social constructor now accept it too.
@@ -22,7 +26,7 @@ RETURNS TABLE(status text,user_id uuid,channel_binding_id uuid,verification_expi
 LANGUAGE plpgsql
 VOLATILE
 SECURITY DEFINER
-SET search_path=pg_catalog
+SET search_path=pg_catalog,pg_temp
 AS $$
 DECLARE
   v_staff_lock_existing_user_id uuid;
@@ -119,6 +123,7 @@ BEGIN
   RETURN QUERY SELECT 'CREATED'::text,p_user_id,v_channel_id,v_expires_at,v_reservation_id;
 END;
 $$;
+-- search_path stays exactly pg_catalog here: the sealed effective-capability verifier pins it (item 6 covers it).
 CREATE OR REPLACE FUNCTION identity.create_social_account(p jsonb,p_source jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE f identity.social_flow%ROWTYPE;r record;phone jsonb:=NULLIF(p->'phoneCiphertext','null'::jsonb);u uuid:=(p->>'userId')::uuid;existing_user uuid;sid uuid;t timestamptz;trusted boolean;BEGIN
  SELECT * INTO f FROM identity.social_flow WHERE proof_hash=p->>'proofHash';
@@ -176,7 +181,7 @@ ALTER TABLE identity.mfa_recovery_notice ADD CONSTRAINT mfa_recovery_notice_even
 -- A waiting replacement stays valid only while nothing security-relevant changed since the proofs. A stale one is
 -- closed as EXPIRED here (its new factor revoked), so it can neither finish nor block a later recovery.
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_waiting_current(p_id uuid) RETURNS identity.mfa_recovery_control
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE c identity.mfa_recovery_control%ROWTYPE;u identity."user"%ROWTYPE;BEGIN
  SELECT * INTO c FROM identity.mfa_recovery_control WHERE challenge_id=p_id;IF c.challenge_id IS NULL THEN RETURN NULL;END IF;
  PERFORM identity.lock_security_subjects(ARRAY[c.user_id]);PERFORM identity.lock_account_t9_internal(c.user_id,true);
@@ -196,7 +201,7 @@ END $$;
 
 -- What the API needs to word the WAITING mails: every bound address, which may cancel, and which one proved.
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_prepare_wait(p_session text) RETURNS jsonb
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE c identity.mfa_recovery_control%ROWTYPE;BEGIN
  c:=identity.mfa_recovery_current(p_session);IF c.challenge_id IS NULL OR c.stage<>'READY' THEN RETURN NULL;END IF;
  RETURN jsonb_build_object('userId',c.user_id,'proofChannelId',c.channel_id,'channels',(SELECT jsonb_agg(jsonb_build_object('channelId',ch.channel_binding_id,'channelType',ch.channel_type,'addressCiphertext',ch.address_ciphertext,
@@ -208,7 +213,7 @@ END $$;
 -- READY -> WAITING. Replaces nothing. Closes the five-minute recovery binding (so password reset and sign-in are
 -- not blocked), mails every bound address now and the proving address a finish link at not_before.
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_begin_wait(p_session text,p_risk text,p_finish text,p_cancel text,p_notices jsonb,p_source jsonb) RETURNS jsonb
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE c identity.mfa_recovery_control%ROWTYPE;other identity.mfa_recovery_control%ROWTYPE;item jsonb;t timestamptz;nb timestamptz;channels uuid[];BEGIN
  c:=identity.mfa_recovery_current(p_session);
  IF c.challenge_id IS NULL OR c.stage<>'READY' OR NOT identity.mfa_recovery_risk_matches(c.user_id,p_risk) THEN RETURN NULL;END IF;
@@ -234,16 +239,18 @@ DECLARE c identity.mfa_recovery_control%ROWTYPE;other identity.mfa_recovery_cont
  t:=clock_timestamp();nb:=t+interval '24 hours';
  UPDATE identity.mfa_recovery_notice_binding b SET cancel_payload_ciphertext=x.value->'cancelEnvelope' FROM jsonb_array_elements(p_notices) x
   WHERE b.challenge_id=c.challenge_id AND b.channel_id=(x.value->>'channelId')::uuid AND x.value ? 'cancelEnvelope';
- UPDATE identity.mfa_recovery_control SET stage='WAITING',waiting_at=t,not_before=nb,expires_at=nb+interval '7 days',finish_hash=p_finish,wait_cancel_hash=p_cancel,csrf_hash=NULL WHERE challenge_id=c.challenge_id;
+ -- The finish gets its own five tries: mistakes made while proving and setting up do not count against it.
+ UPDATE identity.mfa_recovery_control SET stage='WAITING',waiting_at=t,not_before=nb,expires_at=nb+interval '7 days',finish_hash=p_finish,wait_cancel_hash=p_cancel,csrf_hash=NULL,failures=0 WHERE challenge_id=c.challenge_id;
  UPDATE identity.account_recovery_binding SET closed_at=t WHERE recovery_request_id=c.recovery_request_id AND closed_at IS NULL;
  PERFORM identity.mfa_recovery_notice_event(c.challenge_id,'WAITING');
  INSERT INTO identity.mfa_recovery_notice(challenge_id,user_id,channel_id,event_kind,payload_ciphertext,available_at)
   SELECT c.challenge_id,c.user_id,c.channel_id,'FINISH',x.value->'finishEnvelope',nb FROM jsonb_array_elements(p_notices) x WHERE (x.value->>'channelId')::uuid=c.channel_id;
+ PERFORM identity.append_consumer_security_audit_internal((SELECT audit_token FROM identity."user" WHERE user_id=c.user_id),'RECOVERY_WAITING',p_source);
  RETURN jsonb_build_object('status','WAITING','notBefore',nb,'expiresAt',nb+interval '7 days');
 END $$;
 
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_prepare_finish(p_finish text) RETURNS jsonb
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE c identity.mfa_recovery_control%ROWTYPE;id uuid;BEGIN
  IF p_finish IS NULL OR p_finish !~ '^sha256:[0-9a-f]{64}$' THEN RETURN NULL;END IF;
  SELECT challenge_id INTO id FROM identity.mfa_recovery_control WHERE finish_hash=p_finish AND stage='WAITING';
@@ -253,7 +260,7 @@ END $$;
 
 -- WAITING -> COMPLETED: refused before not_before whoever calls it; then exactly what the immediate completion did.
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_finish(p_finish text,p_password text,p_risk text,p_source jsonb) RETURNS text
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE c identity.mfa_recovery_control%ROWTYPE;id uuid;t timestamptz;BEGIN
  IF p_finish IS NULL OR p_finish !~ '^sha256:[0-9a-f]{64}$' THEN RETURN 'INVALID';END IF;
  SELECT challenge_id INTO id FROM identity.mfa_recovery_control WHERE finish_hash=p_finish;
@@ -267,12 +274,13 @@ DECLARE c identity.mfa_recovery_control%ROWTYPE;id uuid;t timestamptz;BEGIN
  INSERT INTO identity.account_security_hold(user_id,held,security_epoch,changed_at) VALUES(c.user_id,false,c.security_epoch+1,t) ON CONFLICT(user_id) DO UPDATE SET security_epoch=identity.account_security_hold.security_epoch+1,changed_at=t;
  UPDATE identity.mfa_recovery_control SET stage='COMPLETED',completed_at=t WHERE challenge_id=c.challenge_id;
  INSERT INTO identity.account_recovery_state_event(recovery_request_id,state) VALUES(c.recovery_request_id,'COMPLETED_FULL');
- PERFORM identity.mfa_recovery_notice_event(c.challenge_id,'COMPLETED');RETURN 'COMPLETED';
+ PERFORM identity.mfa_recovery_notice_event(c.challenge_id,'COMPLETED');
+ PERFORM identity.append_consumer_security_audit_internal((SELECT audit_token FROM identity."user" WHERE user_id=c.user_id),'RECOVERY_COMPLETED',p_source);RETURN 'COMPLETED';
 END $$;
 
 -- Settings -> Security: a signed-in session of the same account sees the waiting replacement and may cancel it.
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_pending_read(p_input jsonb) RETURNS jsonb
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE u uuid:=(p_input->>'userId')::uuid;id uuid;c identity.mfa_recovery_control%ROWTYPE;BEGIN
  IF identity.assert_session_current(u,(p_input->>'sessionId')::uuid,p_input->>'tokenHash') IS DISTINCT FROM true THEN RAISE EXCEPTION 'CONSUMER_SECURITY_INVALID';END IF;
  SELECT challenge_id INTO id FROM identity.mfa_recovery_control WHERE user_id=u AND stage='WAITING';
@@ -280,7 +288,7 @@ DECLARE u uuid:=(p_input->>'userId')::uuid;id uuid;c identity.mfa_recovery_contr
  RETURN jsonb_build_object('notBefore',c.not_before,'waitingAt',c.waiting_at);
 END $$;
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_pending_cancel(p_input jsonb,p_source jsonb) RETURNS text
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE u uuid:=(p_input->>'userId')::uuid;id uuid;c identity.mfa_recovery_control%ROWTYPE;BEGIN
  -- Same audited write protocol as the other Settings security writes (remove_consumer_auth_method).
  PERFORM identity.consume_runtime_audit_attempt();
@@ -294,47 +302,71 @@ END $$;
 
 -- The immediate completion is retired: it refuses whoever calls it, and the runtime loses its grant.
 CREATE OR REPLACE FUNCTION identity.mfa_recovery_complete(p_session text,p_risk text,p_source jsonb) RETURNS text
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 BEGIN RETURN 'INVALID';END $$;
 
 -- Existing steps extended for WAITING (read, both cancel links, finish risk and failures, WAITING/FINISH mail).
-CREATE OR REPLACE FUNCTION identity.mfa_recovery_read(p_session text) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE c identity.mfa_recovery_control%ROWTYPE;BEGIN c:=identity.mfa_recovery_current(p_session);IF c.challenge_id IS NULL THEN SELECT p.* INTO c FROM identity.mfa_recovery_control p JOIN identity.account_recovery_binding b USING(recovery_request_id) WHERE p.session_hash=p_session AND p.stage IN('COMPLETED','CANCELLED','REFUSED','WAITING') AND p.expires_at>clock_timestamp() AND b.closed_at IS NOT NULL;IF c.challenge_id IS NULL THEN RETURN NULL;END IF;RETURN jsonb_build_object('stage',c.stage,'expiresAt',c.expires_at,'csrfHash',c.csrf_hash)||CASE WHEN c.stage='WAITING' THEN jsonb_build_object('notBefore',c.not_before) ELSE '{}'::jsonb END;END IF;
+CREATE OR REPLACE FUNCTION identity.mfa_recovery_read(p_session text) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE c identity.mfa_recovery_control%ROWTYPE;BEGIN c:=identity.mfa_recovery_current(p_session);IF c.challenge_id IS NULL THEN SELECT p.* INTO c FROM identity.mfa_recovery_control p JOIN identity.account_recovery_binding b USING(recovery_request_id) WHERE p.session_hash=p_session AND p.stage IN('COMPLETED','CANCELLED','REFUSED','WAITING') AND p.expires_at>clock_timestamp() AND b.closed_at IS NOT NULL;IF c.challenge_id IS NULL THEN RETURN NULL;END IF;
+ -- A waiting replacement is "waiting" only while still valid; a stale one is closed (EXPIRED) by the check itself.
+ IF c.stage='WAITING' THEN c:=identity.mfa_recovery_waiting_current(c.challenge_id);IF c.challenge_id IS NULL THEN RETURN NULL;END IF;END IF;RETURN jsonb_build_object('stage',c.stage,'expiresAt',c.expires_at,'csrfHash',c.csrf_hash)||CASE WHEN c.stage='WAITING' THEN jsonb_build_object('notBefore',c.not_before) ELSE '{}'::jsonb END;END IF;
  RETURN jsonb_build_object('stage',c.stage,'expiresAt',c.expires_at,'csrfHash',c.csrf_hash,'userId',c.user_id,'emailCiphertext',c.primary_snapshot,'factorId',c.new_factor_id,'factorSecret',c.new_factor_snapshot,'lastAcceptedStep',(SELECT last_accepted_step FROM identity.mfa_factor WHERE mfa_factor_id=c.new_factor_id),'nowMs',floor(extract(epoch FROM clock_timestamp())*1000));END $$;
-CREATE OR REPLACE FUNCTION identity.mfa_recovery_cancel(p_cancel text,p_source jsonb) RETURNS text LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.mfa_recovery_cancel(p_cancel text,p_source jsonb) RETURNS text LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE c identity.mfa_recovery_control%ROWTYPE;BEGIN SELECT * INTO c FROM identity.mfa_recovery_control WHERE cancel_hash=p_cancel OR wait_cancel_hash=p_cancel ORDER BY challenge_id LIMIT 1;IF c.challenge_id IS NULL THEN RETURN 'INVALID';END IF;PERFORM identity.lock_security_subjects(ARRAY[c.user_id]);SELECT * INTO c FROM identity.mfa_recovery_control WHERE challenge_id=c.challenge_id FOR UPDATE;IF c.expires_at<=clock_timestamp() THEN PERFORM identity.mfa_recovery_close(c.challenge_id,'EXPIRED');RETURN 'INVALID';END IF;IF c.stage='CANCELLED' THEN RETURN 'CANCELLED';END IF;IF c.stage IN('COMPLETED','REFUSED','EXPIRED') THEN RETURN 'INVALID';END IF;PERFORM identity.mfa_recovery_close(c.challenge_id,'CANCELLED');RETURN 'CANCELLED';END $$;
-CREATE OR REPLACE FUNCTION identity.mfa_recovery_risk(p_selector text,p_kind text) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.mfa_recovery_risk(p_selector text,p_kind text) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE c identity.mfa_recovery_control%ROWTYPE;BEGIN
  IF p_kind='link' THEN SELECT * INTO c FROM identity.mfa_recovery_control WHERE link_hash=p_selector AND stage='EMAIL_REQUIRED';ELSIF p_kind='session' THEN SELECT * INTO c FROM identity.mfa_recovery_control WHERE session_hash=p_selector;ELSIF p_kind='finish' THEN SELECT * INTO c FROM identity.mfa_recovery_control WHERE finish_hash=p_selector AND stage='WAITING';ELSE RETURN NULL;END IF;
  IF c.challenge_id IS NULL THEN RETURN NULL;END IF;PERFORM identity.lock_security_subjects(ARRAY[c.user_id]);RETURN identity.mfa_recovery_risk_user(c.user_id);
 END $$;
-CREATE OR REPLACE FUNCTION identity.mfa_recovery_failure(p_selector text,p_kind text,p_source jsonb) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.mfa_recovery_failure(p_selector text,p_kind text,p_source jsonb) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE c identity.mfa_recovery_control%ROWTYPE;BEGIN IF p_kind='link' THEN SELECT * INTO c FROM identity.mfa_recovery_control WHERE link_hash=p_selector;ELSIF p_kind='finish' THEN SELECT * INTO c FROM identity.mfa_recovery_control WHERE finish_hash=p_selector;ELSE SELECT * INTO c FROM identity.mfa_recovery_control WHERE session_hash=p_selector;END IF;IF c.challenge_id IS NULL THEN RETURN;END IF;PERFORM identity.lock_security_subjects(ARRAY[c.user_id]);SELECT * INTO c FROM identity.mfa_recovery_control WHERE challenge_id=c.challenge_id FOR UPDATE;IF c.stage IN('COMPLETED','CANCELLED','REFUSED','EXPIRED') THEN RETURN;END IF;UPDATE identity.mfa_recovery_control SET failures=failures+1 WHERE challenge_id=c.challenge_id;IF c.failures+1>=5 THEN PERFORM identity.mfa_recovery_close(c.challenge_id,'REFUSED');END IF;END $$;
-CREATE OR REPLACE FUNCTION identity.mfa_recovery_notice_event(p_id uuid,p_event text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.mfa_recovery_notice_event(p_id uuid,p_event text) RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 BEGIN IF p_event NOT IN('STARTED','WAITING','COMPLETED','CANCELLED','REFUSED') THEN RAISE EXCEPTION 'MFA_RECOVERY_NOTICE_INVALID';END IF;INSERT INTO identity.mfa_recovery_notice(challenge_id,user_id,channel_id,event_kind,payload_ciphertext) SELECT c.challenge_id,c.user_id,b.channel_id,p_event,CASE WHEN p_event IN('STARTED','WAITING') AND b.cancel_authorized AND identity.mfa_recovery_cancel_channel_current(c.user_id,b.channel_id) THEN b.cancel_payload_ciphertext ELSE b.payload_ciphertext END FROM identity.mfa_recovery_control c JOIN identity.mfa_recovery_notice_binding b USING(challenge_id) WHERE c.challenge_id=p_id ON CONFLICT DO NOTHING;END $$;
-CREATE OR REPLACE FUNCTION identity.mfa_recovery_claim_notice(p_lease integer) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE n identity.mfa_recovery_notice%ROWTYPE;l uuid;t timestamptz;BEGIN
+CREATE OR REPLACE FUNCTION identity.mfa_recovery_claim_notice(p_lease integer) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE n identity.mfa_recovery_notice%ROWTYPE;l uuid;t timestamptz;v uuid;BEGIN
  IF p_lease IS NULL OR p_lease NOT BETWEEN 1000 AND 60000 THEN RAISE EXCEPTION 'EMAIL_NOTICE_LEASE_INVALID';END IF;t:=clock_timestamp();
  UPDATE identity.mfa_recovery_notice a SET dead_at=t WHERE a.event_kind='PROOF' AND sent_at IS NULL AND dead_at IS NULL AND NOT EXISTS(SELECT 1 FROM identity.mfa_recovery_control c WHERE c.challenge_id=a.challenge_id AND c.stage='EMAIL_REQUIRED' AND c.expires_at>t);
+ -- A waiting replacement is re-checked before its WAITING or FINISH mail goes out: one invalidated meanwhile (password,
+ -- email, factor, inventory or security change) is closed as EXPIRED here, and its unsent mails die below.
+ FOR v IN SELECT DISTINCT a.challenge_id FROM identity.mfa_recovery_notice a JOIN identity.mfa_recovery_control c USING(challenge_id) WHERE a.event_kind IN('WAITING','FINISH') AND a.sent_at IS NULL AND a.dead_at IS NULL AND a.available_at<=t AND(a.lease_until IS NULL OR a.lease_until<=t) AND c.stage='WAITING' ORDER BY a.challenge_id LIMIT 32 LOOP
+  PERFORM identity.mfa_recovery_waiting_current(v);
+ END LOOP;
+ UPDATE identity.mfa_recovery_notice a SET dead_at=t WHERE a.event_kind='WAITING' AND sent_at IS NULL AND dead_at IS NULL AND EXISTS(SELECT 1 FROM identity.mfa_recovery_control c WHERE c.challenge_id=a.challenge_id AND c.stage='EXPIRED');
  -- A finish link is only ever mailed while its replacement is still waiting.
  UPDATE identity.mfa_recovery_notice a SET dead_at=t WHERE a.event_kind='FINISH' AND sent_at IS NULL AND dead_at IS NULL AND NOT EXISTS(SELECT 1 FROM identity.mfa_recovery_control c WHERE c.challenge_id=a.challenge_id AND c.stage='WAITING' AND c.expires_at>t);
  SELECT * INTO n FROM identity.mfa_recovery_notice WHERE sent_at IS NULL AND dead_at IS NULL AND available_at<=t AND(lease_until IS NULL OR lease_until<=t) ORDER BY created_at,notice_id LIMIT 1 FOR UPDATE SKIP LOCKED;IF n.notice_id IS NULL THEN RETURN NULL;END IF;l:=gen_random_uuid();UPDATE identity.mfa_recovery_notice SET lease_id=l,lease_until=t+(p_lease*interval '1 millisecond'),attempts=attempts+1 WHERE notice_id=n.notice_id;
  RETURN jsonb_build_object('noticeId',n.notice_id,'leaseId',l,'userId',n.user_id,'channelId',n.channel_id,'event',n.event_kind,'cancelAllowed',n.event_kind IN('STARTED','WAITING') AND (identity.mfa_recovery_cancel_channel_current(n.user_id,n.channel_id) AND (SELECT cancel_authorized FROM identity.mfa_recovery_notice_binding WHERE challenge_id=n.challenge_id AND channel_id=n.channel_id)),'payload',CASE WHEN n.event_kind IN('STARTED','WAITING') AND NOT (identity.mfa_recovery_cancel_channel_current(n.user_id,n.channel_id) AND (SELECT cancel_authorized FROM identity.mfa_recovery_notice_binding WHERE challenge_id=n.challenge_id AND channel_id=n.channel_id)) THEN(SELECT payload_ciphertext FROM identity.mfa_recovery_notice_binding WHERE challenge_id=n.challenge_id AND channel_id=n.channel_id) ELSE n.payload_ciphertext END,'expiresAt',(SELECT expires_at FROM identity.mfa_recovery_control WHERE challenge_id=n.challenge_id))||CASE WHEN n.event_kind IN('WAITING','FINISH') THEN jsonb_build_object('notBefore',(SELECT not_before FROM identity.mfa_recovery_control WHERE challenge_id=n.challenge_id)) ELSE '{}'::jsonb END;END $$;
 
+-- Asked right after the emailed link (and the password) proved the mailbox: does this account already have a valid
+-- waiting replacement? Then the API stops here, before a second authenticator and codes are set up for nothing.
+-- Unknown or stale links answer false, so it reveals nothing the link holder could not already read in that mailbox.
+CREATE OR REPLACE FUNCTION identity.mfa_recovery_link_waiting(p_link text) RETURNS boolean
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE c identity.mfa_recovery_control%ROWTYPE;other uuid;BEGIN
+ IF p_link IS NULL OR p_link !~ '^sha256:[0-9a-f]{64}$' THEN RETURN false;END IF;
+ SELECT * INTO c FROM identity.mfa_recovery_control WHERE link_hash=p_link AND stage='EMAIL_REQUIRED';
+ c:=identity.mfa_recovery_snapshot_current(c.challenge_id);IF c.challenge_id IS NULL OR c.stage<>'EMAIL_REQUIRED' THEN RETURN false;END IF;
+ FOR other IN SELECT challenge_id FROM identity.mfa_recovery_control WHERE user_id=c.user_id AND stage='WAITING' AND challenge_id<>c.challenge_id ORDER BY challenge_id LOOP
+  IF (identity.mfa_recovery_waiting_current(other)).challenge_id IS NOT NULL THEN RETURN true;END IF;
+ END LOOP;
+ RETURN false;
+END $$;
+
 DO $$ DECLARE f text;BEGIN
- FOREACH f IN ARRAY ARRAY['mfa_recovery_waiting_current(uuid)','mfa_recovery_prepare_wait(text)','mfa_recovery_begin_wait(text,text,text,text,jsonb,jsonb)','mfa_recovery_prepare_finish(text)','mfa_recovery_finish(text,text,text,jsonb)','mfa_recovery_pending_read(jsonb)','mfa_recovery_pending_cancel(jsonb,jsonb)','mfa_recovery_complete(text,text,jsonb)'] LOOP
+ FOREACH f IN ARRAY ARRAY['mfa_recovery_link_waiting(text)','mfa_recovery_waiting_current(uuid)','mfa_recovery_prepare_wait(text)','mfa_recovery_begin_wait(text,text,text,text,jsonb,jsonb)','mfa_recovery_prepare_finish(text)','mfa_recovery_finish(text,text,text,jsonb)','mfa_recovery_pending_read(jsonb)','mfa_recovery_pending_cancel(jsonb,jsonb)','mfa_recovery_complete(text,text,jsonb)'] LOOP
   EXECUTE format('ALTER FUNCTION identity.%s OWNER TO debateai_mfa_recovery_owner',f);EXECUTE format('REVOKE ALL ON FUNCTION identity.%s FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_mfa_recovery_runtime',f);
  END LOOP;
 END $$;
-GRANT EXECUTE ON FUNCTION identity.mfa_recovery_prepare_wait(text),identity.mfa_recovery_begin_wait(text,text,text,text,jsonb,jsonb),identity.mfa_recovery_prepare_finish(text),identity.mfa_recovery_finish(text,text,text,jsonb) TO debateai_mfa_recovery_runtime;
+GRANT EXECUTE ON FUNCTION identity.mfa_recovery_link_waiting(text),identity.mfa_recovery_prepare_wait(text),identity.mfa_recovery_begin_wait(text,text,text,text,jsonb,jsonb),identity.mfa_recovery_prepare_finish(text),identity.mfa_recovery_finish(text,text,text,jsonb) TO debateai_mfa_recovery_runtime;
 GRANT EXECUTE ON FUNCTION identity.mfa_recovery_pending_read(jsonb),identity.mfa_recovery_pending_cancel(jsonb,jsonb) TO debateai_authorization_runtime;
 GRANT EXECUTE ON FUNCTION identity.assert_session_current(uuid,uuid,text) TO debateai_mfa_recovery_owner;
 
--- A signed-in cancel of a waiting replacement is audited like the other consumer security writes.
+-- A signed-in cancel, the start and the finish of a waiting authenticator replacement are audited like the other
+-- consumer security writes (actor = the account's audit token, source = hashed IP and user agent only).
 CREATE OR REPLACE FUNCTION identity.append_consumer_security_audit_internal(p_actor uuid,p_purpose text,p_source jsonb) RETURNS void
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 BEGIN
- IF p_actor IS NULL OR p_purpose IS NULL OR p_purpose NOT IN ('STEP_UP','REMOVE_AUTH_METHOD','REGENERATE_RECOVERY_CODES','RECOVERY_STARTED','RECOVERY_PROVED','RECOVERY_ENROLLMENT_STARTED','RECOVERY_COMPLETED','ONBOARDING_COMPLETED','RECOVERY_CANCELLED')
+ IF p_actor IS NULL OR p_purpose IS NULL OR p_purpose NOT IN ('STEP_UP','REMOVE_AUTH_METHOD','REGENERATE_RECOVERY_CODES','RECOVERY_STARTED','RECOVERY_PROVED','RECOVERY_ENROLLMENT_STARTED','RECOVERY_COMPLETED','ONBOARDING_COMPLETED','RECOVERY_CANCELLED','RECOVERY_WAITING')
  OR jsonb_typeof(p_source) IS DISTINCT FROM 'object'
  OR p_source<>jsonb_build_object('ipArgon2id',p_source->>'ipArgon2id','userAgentArgon2id',p_source->>'userAgentArgon2id')
  OR COALESCE(p_source->>'ipArgon2id','') !~ '^argon2id-audit:v1:[0-9a-f]{64}$' OR COALESCE(p_source->>'userAgentArgon2id','') !~ '^argon2id-audit:v1:[0-9a-f]{64}$' THEN RAISE EXCEPTION 'CONSUMER_SECURITY_AUDIT_INVALID';END IF;
@@ -358,7 +390,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 VOLATILE
 SECURITY DEFINER
-SET search_path=pg_catalog
+SET search_path=pg_catalog,pg_temp
 AS $$
 DECLARE
   v_locked_owner_ref uuid := NULL;
@@ -436,7 +468,7 @@ BEGIN
   RETURN COALESCE(v_valid,false);
 END;
 $$;
-CREATE OR REPLACE FUNCTION identity.complete_social_login(p jsonb,p_source jsonb) RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.complete_social_login(p jsonb,p_source jsonb) RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE c identity.login_challenge%ROWTYPE;a record;f identity.mfa_factor%ROWTYPE;r identity.recovery_code%ROWTYPE;u uuid:=(p->>'userId')::uuid;step bigint:=(p->>'acceptedStep')::bigint;t timestamptz;BEGIN
  PERFORM identity.consume_runtime_audit_attempt();SELECT * INTO a FROM identity.lock_account_t9_internal(u,true);
  SELECT * INTO f FROM identity.mfa_factor WHERE mfa_factor_id=(p->>'factorId')::uuid AND user_id=u FOR UPDATE;
@@ -460,7 +492,7 @@ DECLARE c identity.login_challenge%ROWTYPE;a record;f identity.mfa_factor%ROWTYP
  PERFORM identity.append_social_audit_internal(a.audit_token,'LOGIN_COMPLETED',p_source);
  IF c.expires_at<=clock_timestamp() THEN RAISE EXCEPTION 'SOCIAL_FLOW_INVALID';END IF;RETURN true;
 END $$;
-CREATE OR REPLACE FUNCTION identity.complete_social_step_up(p jsonb,p_source jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE OR REPLACE FUNCTION identity.complete_social_step_up(p jsonb,p_source jsonb) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE r jsonb;t timestamptz;u uuid:=(p->>'userId')::uuid;counter bigint:=(p->>'counter')::bigint;step bigint:=(p->>'acceptedStep')::bigint;BEGIN
  PERFORM identity.consume_runtime_audit_attempt();r:=identity.read_social_step_up(p);t:=clock_timestamp();
  IF p->>'method'='totp' THEN
@@ -493,7 +525,7 @@ DECLARE r jsonb;t timestamptz;u uuid:=(p->>'userId')::uuid;counter bigint:=(p->>
  RETURN jsonb_build_object('authorization',r->'authorization','expiresAt',r->>'expiresAt');
 END $$;
 CREATE OR REPLACE FUNCTION identity.prove_consumer_recovery(p jsonb,p_source jsonb) RETURNS jsonb
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE k identity.consumer_recovery_token%ROWTYPE;r identity.recovery_code%ROWTYPE;a record;t timestamptz;e bigint;BEGIN
  PERFORM identity.consume_runtime_audit_attempt();
  SELECT * INTO k FROM identity.consumer_recovery_token WHERE token_hash=p->>'tokenHash';
@@ -537,7 +569,7 @@ RETURNS boolean
 LANGUAGE plpgsql
 VOLATILE
 SECURITY DEFINER
-SET search_path=pg_catalog
+SET search_path=pg_catalog,pg_temp
 AS $$
 DECLARE v_account record; v_audit_token uuid; v_factor_id uuid; v_slot smallint; v_valid boolean;
 BEGIN
@@ -571,8 +603,23 @@ BEGIN
   RETURN v_valid;
 END;
 $$;
+-- The older password recovery (0103) accepts a saved code as its proof; it is announced like every other used code.
+-- Same body as 0103 plus the notice. No sealed verifier pins it (lineage/README.md); its owner, ACL and signature stay.
+CREATE OR REPLACE FUNCTION identity.password_recovery_accept_code(p_session text,p_code uuid,p_hash text,p_source jsonb) RETURNS boolean
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE c identity.password_recovery_control%ROWTYPE;BEGIN
+ c:=identity.password_recovery_current(p_session);IF c.recovery_request_id IS NULL OR c.stage<>'CODE_REQUIRED' THEN RETURN false; END IF;
+ UPDATE identity.recovery_code SET consumed_at=clock_timestamp() WHERE recovery_code_id=p_code AND user_id=c.user_id AND code_hash=p_hash AND consumed_at IS NULL AND revoked_at IS NULL AND created_at<(SELECT requested_at FROM identity.account_recovery_request WHERE recovery_request_id=c.recovery_request_id);
+ IF NOT FOUND THEN RETURN false;END IF;
+ PERFORM identity.enqueue_consumer_security_notice_internal(c.user_id,'RECOVERY_CODE_USED');
+ UPDATE identity.password_recovery_control SET stage='FACTOR_REQUIRED',saved_code_id=p_code,saved_code_snapshot=p_hash WHERE recovery_request_id=c.recovery_request_id;
+ UPDATE identity.session SET revoked_at=clock_timestamp() WHERE user_id=c.user_id AND revoked_at IS NULL;
+ INSERT INTO identity.account_recovery_state_event(recovery_request_id,state) VALUES(c.recovery_request_id,'FACTOR_BINDING_REQUIRED');
+ PERFORM identity.password_recovery_audit(c.recovery_request_id,'proof',p_source,true);RETURN true;
+END $$;
 DO $$ DECLARE o name;BEGIN
  FOR o IN SELECT DISTINCT pg_get_userbyid(p.proowner) FROM pg_proc p WHERE p.oid IN(
+  'identity.password_recovery_accept_code(text,uuid,text,jsonb)'::regprocedure,
   'identity.complete_recovery_login_with_audit(uuid,uuid,text,uuid,uuid,text,text,uuid,text,uuid,text,text,jsonb,timestamptz,timestamptz,timestamptz,jsonb)'::regprocedure,
   'identity.complete_social_login(jsonb,jsonb)'::regprocedure,'identity.complete_social_step_up(jsonb,jsonb)'::regprocedure,
   'identity.prove_consumer_recovery(jsonb,jsonb)'::regprocedure,'identity.consume_recovery_code_with_audit(uuid,uuid,text,timestamptz,jsonb)'::regprocedure) LOOP
@@ -581,20 +628,42 @@ DO $$ DECLARE o name;BEGIN
 END $$;
 
 -- 4. Staff readiness writer: replaces the minted temporary password of the JIT recovery login for the team unlock.
--- No password (password authentication always fails); the operator maps it by peer over the local socket
--- (pg_ident `readiness root debateai_staff_readiness_writer`, pg_hba `local <db> debateai_staff_readiness_writer peer map=readiness`).
--- It may call exactly the readiness publish and revoke functions; the API runtime gains nothing.
+-- No password (password authentication always fails) and no expiry. On the preview only, the operator maps ONE
+-- dedicated, shell-less OS user to it by peer over the local socket — never root (deploy/preview-lifecycle/v1/README.md;
+-- the production templates in deploy/postgres/ carry no such line). It may call exactly the readiness publish and
+-- revoke functions; the API runtime gains nothing.
 DO $$ BEGIN
  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='debateai_staff_readiness_writer') THEN
   CREATE ROLE debateai_staff_readiness_writer LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 2 PASSWORD NULL;
  END IF;
- IF EXISTS(SELECT 1 FROM pg_auth_members m JOIN pg_roles r ON r.oid IN(m.member,m.roleid) WHERE r.rolname='debateai_staff_readiness_writer') THEN RAISE EXCEPTION 'STAFF_READINESS_WRITER_MEMBERSHIP';END IF;
 END $$;
+-- Roles are cluster-wide, so the role may already exist (another database of this cluster, or someone else's doing).
+-- It is adopted only when it carries nothing beyond what this step grants: no memberships, no role settings, no
+-- password, no expiry, owns nothing, and in this database holds at most CONNECT on databases, USAGE on schema staff
+-- and EXECUTE on the two readiness functions. Grants it holds inside OTHER databases are those databases' business
+-- (pg_hba admits it to this one only).
+-- readiness-writer-guard:begin
+DO $readiness_writer_guard$ DECLARE r oid;BEGIN
+ SELECT oid INTO r FROM pg_roles WHERE rolname='debateai_staff_readiness_writer';
+ IF r IS NULL THEN RETURN;END IF;
+ IF EXISTS(SELECT 1 FROM pg_auth_members m WHERE m.member=r OR m.roleid=r) THEN RAISE EXCEPTION 'STAFF_READINESS_WRITER_MEMBERSHIP';END IF;
+ IF EXISTS(SELECT 1 FROM pg_db_role_setting WHERE setrole=r) THEN RAISE EXCEPTION 'STAFF_READINESS_WRITER_SETTINGS';END IF;
+ IF EXISTS(SELECT 1 FROM pg_authid WHERE oid=r AND (rolpassword IS NOT NULL OR rolvaliduntil IS NOT NULL OR rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls)) THEN RAISE EXCEPTION 'STAFF_READINESS_WRITER_ATTRIBUTES';END IF;
+ IF EXISTS(SELECT 1 FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass AND d.refobjid=r AND d.deptype IN('o','r')) THEN RAISE EXCEPTION 'STAFF_READINESS_WRITER_OWNS_OBJECTS';END IF;
+ IF EXISTS(SELECT 1 FROM pg_shdepend d WHERE d.refclassid='pg_authid'::regclass AND d.refobjid=r AND d.deptype='a' AND d.dbid IN(0,(SELECT oid FROM pg_database WHERE datname=current_database()))
+   AND NOT(
+    (d.classid='pg_database'::regclass AND NOT EXISTS(SELECT 1 FROM pg_database x CROSS JOIN LATERAL aclexplode(x.datacl) a WHERE x.oid=d.objid AND a.grantee=r AND (a.privilege_type<>'CONNECT' OR a.is_grantable)))
+    OR (d.classid='pg_namespace'::regclass AND d.objid='staff'::regnamespace AND d.objsubid=0 AND NOT EXISTS(SELECT 1 FROM pg_namespace x CROSS JOIN LATERAL aclexplode(x.nspacl) a WHERE x.oid=d.objid AND a.grantee=r AND (a.privilege_type<>'USAGE' OR a.is_grantable)))
+    OR (d.classid='pg_proc'::regclass AND d.objid IN('staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)'::regprocedure,'staff.revoke_independent_alert_readiness(uuid)'::regprocedure) AND d.objsubid=0
+     AND NOT EXISTS(SELECT 1 FROM pg_proc x CROSS JOIN LATERAL aclexplode(x.proacl) a WHERE x.oid=d.objid AND a.grantee=r AND (a.privilege_type<>'EXECUTE' OR a.is_grantable)))))
+ THEN RAISE EXCEPTION 'STAFF_READINESS_WRITER_PRIVILEGES';END IF;
+END $readiness_writer_guard$;
+-- readiness-writer-guard:end
 ALTER ROLE debateai_staff_readiness_writer LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 2 PASSWORD NULL;
 DO $$ BEGIN EXECUTE format('GRANT CONNECT ON DATABASE %I TO debateai_staff_readiness_writer',current_database());END $$;
 GRANT USAGE ON SCHEMA staff TO debateai_staff_readiness_writer;
 CREATE OR REPLACE FUNCTION staff.require_alert_readiness_jit() RETURNS void
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$ BEGIN
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$ BEGIN
  IF session_user='debateai_staff_readiness_writer' AND EXISTS(SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname=session_user AND r.rolcanlogin
   AND NOT r.rolsuper AND NOT r.rolcreatedb AND NOT r.rolcreaterole AND NOT r.rolreplication AND NOT r.rolbypassrls
   AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_auth_members m WHERE m.member=r.oid OR m.roleid=r.oid)) THEN RETURN;END IF;
@@ -606,7 +675,7 @@ GRANT EXECUTE ON FUNCTION staff.publish_independent_alert_readiness(text,uuid,te
 -- 5. Give back a live staff alert claim without spending one of its three attempts (readiness lapsed after the
 -- claim, before any send). Only the claim holder can, and only while the claim is live.
 CREATE OR REPLACE FUNCTION staff.release_alert_delivery(p_outbox uuid,p_claim uuid) RETURNS boolean
-LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
 DECLARE s staff.alert_dispatch_state%ROWTYPE;BEGIN
  SELECT * INTO s FROM staff.alert_dispatch_state WHERE outbox_id=p_outbox FOR UPDATE;
  IF NOT FOUND OR p_claim IS NULL OR s.terminal OR s.claim_token IS DISTINCT FROM p_claim OR s.claimed_until<=clock_timestamp() OR s.attempts<1 THEN RETURN false;END IF;
@@ -616,3 +685,13 @@ END $$;
 ALTER FUNCTION staff.release_alert_delivery(uuid,uuid) OWNER TO debateai_staff_security_owner;
 REVOKE ALL ON FUNCTION staff.release_alert_delivery(uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_staff_recovery,debateai_staff_readiness_writer;
 GRANT EXECUTE ON FUNCTION staff.release_alert_delivery(uuid,uuid) TO debateai_runtime;
+-- The readiness and delivery functions this step touches but does not replace search pg_temp last as well.
+ALTER FUNCTION staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz) SET search_path=pg_catalog,pg_temp;
+ALTER FUNCTION staff.revoke_independent_alert_readiness(uuid) SET search_path=pg_catalog,pg_temp;
+ALTER FUNCTION staff.claim_alert_delivery(integer) SET search_path=pg_catalog,pg_temp;
+
+-- 6. No temporary objects for anyone but the database owner (and superusers, which bypass it). A definer function
+-- whose search_path lists pg_catalog without pg_temp still resolves TYPE and relation names in the caller's temporary
+-- schema first; with TEMPORARY revoked from PUBLIC no runtime role can plant one. No application or runtime code uses
+-- temporary objects (the principal provisioner's pg_temp function runs as the superuser migrator).
+DO $$ BEGIN EXECUTE format('REVOKE TEMPORARY ON DATABASE %I FROM PUBLIC',current_database());END $$;

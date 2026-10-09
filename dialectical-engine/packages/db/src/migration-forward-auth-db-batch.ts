@@ -26,7 +26,7 @@ export const AUTH_DB_BATCH_FUNCTIONS=Object.freeze([
  'identity.complete_social_step_up(jsonb,jsonb)',
  'identity.prove_consumer_recovery(jsonb,jsonb)',
  'identity.consume_recovery_code_with_audit(uuid,uuid,text,timestamptz,jsonb)',
- 'identity.mfa_recovery_prepare(bytea,text)',
+ 'identity.password_recovery_accept_code(text,uuid,text,jsonb)',
  'identity.mfa_recovery_read(text)',
  'identity.mfa_recovery_complete(text,text,jsonb)',
  'identity.mfa_recovery_cancel(text,jsonb)',
@@ -41,11 +41,13 @@ export const AUTH_DB_BATCH_FUNCTIONS=Object.freeze([
  'identity.mfa_recovery_finish(text,text,text,jsonb)',
  'identity.mfa_recovery_pending_read(jsonb)',
  'identity.mfa_recovery_pending_cancel(jsonb,jsonb)',
+ 'identity.mfa_recovery_link_waiting(text)',
  'identity.append_consumer_security_audit_internal(uuid,text,jsonb)',
  'staff.require_alert_readiness_jit()',
  'staff.publish_independent_alert_readiness(text,uuid,text,uuid,timestamptz)',
  'staff.revoke_independent_alert_readiness(uuid)',
- 'staff.release_alert_delivery(uuid,uuid)'
+ 'staff.release_alert_delivery(uuid,uuid)',
+ 'staff.claim_alert_delivery(integer)'
 ] as const);
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD_AUTH_DB_BATCH_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
@@ -72,11 +74,14 @@ function postconditionEvidence(supplementalSql:string){
    UNION ALL
    SELECT 'role',r.rolname,jsonb_build_object('login',r.rolcanlogin,'super',r.rolsuper,'inherit',r.rolinherit,'createdb',r.rolcreatedb,'createrole',r.rolcreaterole,
      'replication',r.rolreplication,'bypassrls',r.rolbypassrls,'connections',r.rolconnlimit,
-     'memberOf',(SELECT count(*) FROM pg_auth_members m WHERE m.member=r.oid),'members',(SELECT count(*) FROM pg_auth_members m WHERE m.roleid=r.oid))
+     'memberOf',(SELECT count(*) FROM pg_auth_members m WHERE m.member=r.oid),'members',(SELECT count(*) FROM pg_auth_members m WHERE m.roleid=r.oid),
+     'validUntil',r.rolvaliduntil,'settings',(SELECT count(*) FROM pg_db_role_setting s WHERE s.setrole=r.oid))
    FROM pg_roles r WHERE r.rolname='debateai_staff_readiness_writer'
+   UNION ALL
+   SELECT 'database',current_database(),jsonb_build_object('publicTemporary',EXISTS(SELECT 1 FROM pg_database d CROSS JOIN LATERAL aclexplode(coalesce(d.datacl,acldefault('d',d.datdba))) a WHERE d.datname=current_database() AND a.grantee=0 AND a.privilege_type='TEMPORARY'))
    ORDER BY 1,2
   `,[AUTH_DB_BATCH_FUNCTIONS])).rows;
-  if(rows.length!==AUTH_DB_BATCH_FUNCTIONS.length+4+4+1)return fail('POSTCONDITION_OBJECTS');
+  if(rows.length!==AUTH_DB_BATCH_FUNCTIONS.length+4+4+1+1)return fail('POSTCONDITION_OBJECTS');
   return sha(JSON.stringify(rows));
  };
 }
@@ -99,5 +104,7 @@ export async function loadForwardAuthDbBatch(anchor:ForwardStepAnchor):Promise<F
  return Object.freeze({name:NAME,version:VERSION,manifestSha256:sha(bytes),sourceSha256:raw.migration.sha256,sql:sqlBytes.toString('utf8'),
   previousName:PREVIOUS,previousManifestSha256:anchor.previousManifestSha256,previousVerifierSha256:anchor.previousVerifierSha256,
   verifierPath:raw.verifier.path,verifierSha256:raw.verifier.sha256,verifierSql:verifierBytes.toString('utf8'),
-  postconditionEvidence:postconditionEvidence(supplementalBytes.toString('utf8'))});
+  postconditionEvidence:postconditionEvidence(supplementalBytes.toString('utf8')),
+  // Re-run on every later migrate(), also once other steps follow this one (migration-forward-chain.ts).
+  replayVerifierSql:supplementalBytes.toString('utf8')});
 }

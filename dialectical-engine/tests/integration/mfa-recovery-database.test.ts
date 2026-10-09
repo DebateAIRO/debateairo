@@ -91,7 +91,7 @@ it("the old immediate completion is inert and no longer granted to the recovery 
  expect((await db.pool.query(`SELECT identity.mfa_recovery_complete($1,$2,$3) AS value`,[a.session,risk.fingerprint,source])).rows[0].value).toBe("INVALID");expect(await stage(a.user)).toBe("READY");
  const grants=(await db.pool.query(`SELECT p.proname,has_function_privilege('debateai_mfa_recovery_runtime',p.oid,'EXECUTE') AS runtime,has_function_privilege('debateai_authorization_runtime',p.oid,'EXECUTE') AS authorization,has_function_privilege('debateai_runtime',p.oid,'EXECUTE') AS api,pg_get_userbyid(p.proowner) AS owner,p.prosecdef,p.proconfig FROM pg_proc p WHERE p.pronamespace='identity'::regnamespace AND p.proname IN('mfa_recovery_complete','mfa_recovery_waiting_current','mfa_recovery_prepare_wait','mfa_recovery_begin_wait','mfa_recovery_prepare_finish','mfa_recovery_finish','mfa_recovery_pending_read','mfa_recovery_pending_cancel') ORDER BY p.proname`)).rows;
  expect(grants.map(g=>[g.proname,g.runtime,g.authorization,g.api])).toEqual([["mfa_recovery_begin_wait",true,false,false],["mfa_recovery_complete",false,false,false],["mfa_recovery_finish",true,false,false],["mfa_recovery_pending_cancel",false,true,false],["mfa_recovery_pending_read",false,true,false],["mfa_recovery_prepare_finish",true,false,false],["mfa_recovery_prepare_wait",true,false,false],["mfa_recovery_waiting_current",false,false,false]]);
- for(const g of grants){expect(g.owner).toBe("debateai_mfa_recovery_owner");expect(g.prosecdef).toBe(true);expect(g.proconfig).toEqual(["search_path=pg_catalog"]);}
+ for(const g of grants){expect(g.owner).toBe("debateai_mfa_recovery_owner");expect(g.prosecdef).toBe(true);expect(g.proconfig).toEqual(["search_path=pg_catalog, pg_temp"]);}
 });
 it("cancels a waiting replacement with the emailed wait-cancel link or the original cancel link",async()=>{for(const which of["wait","start"]as const){const {a,newFactor,finishHash,waitCancel}=await readyWaiting();
  expect((await db.pool.query(`SELECT identity.mfa_recovery_cancel($1,$2) AS value`,[which==="wait"?waitCancel:a.cancel,source])).rows[0].value).toBe("CANCELLED");
@@ -114,3 +114,54 @@ it("a password change during the wait voids the pending replacement",async()=>{c
  expect((await db.pool.query(`SELECT state FROM identity.mfa_factor WHERE mfa_factor_id=$1`,[newFactor])).rows[0].state).toBe("revoked");await age(a);expect(await complete(finishHash,"changed-by-owner")).toBe("INVALID");
 });
 it("keeps at most one waiting replacement per account",async()=>{const {a}=await readyWaiting();const b={...a,link:hash(),cancel:hash(),session:hash(),csrf:hash(),challenge:randomUUID()};expect(await start(b,"backup")).toBe(true);expect(await pair(b)).toBe("FACTOR_REQUIRED");await ready(b);expect((await beginWait(b)).value).toBeNull();expect((await db.pool.query(`SELECT count(*)::int AS n FROM identity.mfa_recovery_control WHERE user_id=$1 AND stage='WAITING'`,[a.user])).rows[0].n).toBe(1);});
+
+// Review fixes 2026-10-09 (design note item 2).
+async function drainNotices(user:string){const seen:Array<{event:string;channelId:string}>=[];for(let i=0;i<1000;i++){const n=(await db.pool.query(`SELECT identity.mfa_recovery_claim_notice(60000) AS value`)).rows[0].value;if(!n)break;if(n.userId===user)seen.push({event:n.event,channelId:n.channelId});await db.pool.query(`SELECT identity.mfa_recovery_finish_notice($1,$2,true,300000,3)`,[n.noticeId,n.leaseId]);}return seen;}
+it("tells the emailed link of a second recovery that one is already waiting, before any setup is done",async()=>{const {a,waitCancel}=await readyWaiting();const b={...a,link:hash(),cancel:hash(),session:hash(),csrf:hash(),challenge:randomUUID()};expect(await start(b,"backup")).toBe(true);
+ const waiting=async(link:string)=>(await db.pool.query(`SELECT identity.mfa_recovery_link_waiting($1) AS value`,[link])).rows[0].value;
+ expect(await waiting(b.link)).toBe(true);expect(await waiting(hash())).toBe(false);expect(await waiting("not-a-hash")).toBe(false);
+ const other=await fixture();expect(await start(other)).toBe(true);expect(await waiting(other.link)).toBe(false);
+ // A waiting replacement that went stale no longer counts (it is closed by the check itself).
+ await db.pool.query(`UPDATE identity.mfa_recovery_control SET expires_at=clock_timestamp()-interval '1 second' WHERE user_id=$1 AND stage='WAITING'`,[a.user]);
+ expect(await waiting(b.link)).toBe(false);expect((await db.pool.query(`SELECT stage FROM identity.mfa_recovery_control WHERE wait_cancel_hash=$1`,[waitCancel])).rows[0].stage).toBe("EXPIRED");
+ const fn=(await db.pool.query(`SELECT pg_get_userbyid(proowner) AS owner,prosecdef,proconfig,has_function_privilege('debateai_mfa_recovery_runtime',oid,'EXECUTE') AS recovery,has_function_privilege('debateai_runtime',oid,'EXECUTE') OR has_function_privilege('debateai_authorization_runtime',oid,'EXECUTE') OR has_function_privilege('debateai_billing_runtime',oid,'EXECUTE') AS others FROM pg_proc WHERE oid='identity.mfa_recovery_link_waiting(text)'::regprocedure`)).rows[0];
+ expect(fn).toEqual({owner:"debateai_mfa_recovery_owner",prosecdef:true,proconfig:["search_path=pg_catalog, pg_temp"],recovery:true,others:false});
+});
+it("the finish has its own five tries: earlier mistakes do not count, the fifth wrong finish password refuses and locks like any refusal",async()=>{const a=await fixture();expect(await start(a)).toBe(true);
+ for(let i=0;i<3;i++)await db.pool.query(`SELECT identity.mfa_recovery_failure($1,'link',$2)`,[a.link,source]);
+ expect(await pair(a)).toBe("FACTOR_REQUIRED");await db.pool.query(`SELECT identity.mfa_recovery_failure($1,'session',$2)`,[a.session,source]);
+ const newFactor=await ready(a);const w=await beginWait(a);expect(w.value?.status).toBe("WAITING");
+ expect((await db.pool.query(`SELECT failures FROM identity.mfa_recovery_control WHERE user_id=$1`,[a.user])).rows[0].failures).toBe(0);
+ await drainNotices(a.user);await age(a);
+ for(let i=0;i<4;i++){await db.pool.query(`SELECT identity.mfa_recovery_failure($1,'finish',$2)`,[w.finishHash,source]);expect(await stage(a.user)).toBe("WAITING");}
+ await db.pool.query(`SELECT identity.mfa_recovery_failure($1,'finish',$2)`,[w.finishHash,source]);
+ expect(await stage(a.user)).toBe("REFUSED");
+ expect((await db.pool.query(`SELECT state FROM identity.mfa_factor WHERE mfa_factor_id=$1`,[newFactor])).rows[0].state).toBe("revoked");
+ expect((await db.pool.query(`SELECT mfa_factor_id FROM identity.mfa_factor WHERE user_id=$1 AND state='active'`,[a.user])).rows).toEqual([{mfa_factor_id:a.factor}]);
+ expect((await db.pool.query(`SELECT locked_until>clock_timestamp()+interval '4 minutes' AS paused FROM identity.password_recovery_retry_lock WHERE user_id=$1`,[a.user])).rows[0].paused).toBe(true);
+ const mails=await drainNotices(a.user);expect(mails.filter(m=>m.event==="REFUSED").map(m=>m.channelId).sort()).toEqual([a.primary,a.backup].sort());expect(mails.some(m=>m.event==="FINISH")).toBe(false);
+ expect(await complete(w.finishHash)).toBe("INVALID");
+});
+it("audits the start and the finish of the wait, with only the hashed source",async()=>{const {a,finishHash}=await readyWaiting();
+ const events=async()=>(await db.pool.query(`SELECT event_type,source_context FROM identity.audit_event WHERE actor_key_ref=(SELECT audit_token::text FROM identity."user" WHERE user_id=$1) AND event_type LIKE 'identity.consumer_security.RECOVERY_%' ORDER BY occurred_at`,[a.user])).rows;
+ expect((await events()).map(e=>e.event_type)).toEqual(["identity.consumer_security.RECOVERY_WAITING"]);
+ await age(a);expect(await complete(finishHash)).toBe("COMPLETED");
+ const rows=await events();expect(rows.map(e=>e.event_type)).toEqual(["identity.consumer_security.RECOVERY_WAITING","identity.consumer_security.RECOVERY_COMPLETED"]);for(const e of rows)expect(e.source_context).toEqual(source);
+});
+it("an invalidated waiting replacement mails neither the waiting notice nor the finish link",async()=>{const {a}=await readyWaiting();
+ await db.pool.query(`UPDATE identity."user" SET password_hash='changed-by-owner' WHERE user_id=$1`,[a.user]);
+ await age(a);const mails=await drainNotices(a.user);
+ expect(mails.filter(m=>m.event==="WAITING"||m.event==="FINISH")).toEqual([]);expect(await stage(a.user)).toBe("EXPIRED");
+});
+it("the recovery page stops saying 'waiting' once the waiting replacement was invalidated",async()=>{const {a}=await readyWaiting();
+ expect((await db.pool.query(`SELECT identity.mfa_recovery_read($1) AS value`,[a.session])).rows[0].value.stage).toBe("WAITING");
+ await db.pool.query(`UPDATE identity.mfa_factor SET secret_ciphertext=$1 WHERE mfa_factor_id=$2`,[box(randomUUID()),a.factor]);
+ expect((await db.pool.query(`SELECT identity.mfa_recovery_read($1) AS value`,[a.session])).rows[0].value).toBeNull();expect(await stage(a.user)).toBe("EXPIRED");
+});
+it("a recovery code accepted by the older password recovery (0103) is announced like every other used code",async()=>{const a=await fixture(),code=randomUUID();
+ await db.pool.query(`INSERT INTO identity.recovery_code(recovery_code_id,user_id,code_slot,code_hash,created_at) VALUES($1,$2,1,$3,clock_timestamp()-interval '1 minute')`,[code,a.user,encoded]);
+ const request=(await db.pool.query(`INSERT INTO identity.account_recovery_request(channel_refs_ciphertext) VALUES($1) RETURNING recovery_request_id`,[box(a.user)])).rows[0].recovery_request_id;
+ await db.pool.query(`INSERT INTO identity.password_recovery_control(recovery_request_id,user_id,register_version,policy,password_snapshot,security_epoch,channel_id,channel_snapshot,original_factor_id,factor_snapshot,link_hash,cancel_hash,session_hash,expires_at,stage) VALUES($1,$2,3,'{}'::jsonb,'preserved-password',0,$3,$4,$5,$4,$6,$7,$8,clock_timestamp()+interval '5 minutes','CODE_REQUIRED')`,[request,a.user,a.primary,a.envelope,a.factor,hash(),hash(),a.session]);
+ expect((await db.pool.query(`SELECT identity.password_recovery_accept_code($1,$2,$3,$4) AS value`,[a.session,code,encoded,source])).rows[0].value).toBe(true);
+ expect((await db.pool.query(`SELECT channel_binding_id FROM identity.consumer_security_notice WHERE user_id=$1 AND event_kind='RECOVERY_CODE_USED' ORDER BY channel_binding_id`,[a.user])).rows.map(r=>r.channel_binding_id)).toEqual([a.primary,a.backup].sort());
+});
