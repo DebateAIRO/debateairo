@@ -60,3 +60,7 @@ aa15f4e9e63d2fab63b6c8d103802b42051b41d3:dialectical-engine/tests/unit/billing-c
 39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/docs/operations/account-flow-release-2026-10-05/public-profile-manifest.json:generic-api-key:143
 # non-secret TypeScript variable assignment; Redacted finding context is let previousToken=firstToken,[REDACTED] mfa.beginTotp({enro... . Current line4259 assigns runtime fixture variables and awaits mfa.beginTotp; it has no string literal or embedded credential. Reported historical line4262 is not the current line.
 39f0a9d3a9d91e175f9ec92a7445a8b0ca86b33d:dialectical-engine/tests/integration/registration-database.test.ts:generic-api-key:4262
+# 2026-10-09 — preview spending gate v2 tests (PR #86): generic-api-key matched the made-up fixture value written
+# as a test key; not a key. Owner's ruling on PR #86. The fixture now builds the value from pieces, so later edits
+# do not raise the same match.
+40f0edba2f2275cbd677d0677105540afd06065d:dialectical-engine/tests/unit/preview_budget_authority_fixture.py:generic-api-key:23

@@ -1,78 +1,39 @@
 """Synthetic guard tests. No private files, keys, sockets, or upstream calls."""
-import copy
 import contextlib
-import hashlib
-import importlib.util
-import json
 import io
+import json
 import sys
-import types
 import unittest
-from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import patch
 
 sys.dont_write_bytecode = True
-SOURCE = Path(__file__).resolve().parents[2] / 'packages/providers/ops/preview_budget_authority.py'
-spec = importlib.util.spec_from_file_location('production_preview_budget_authority', SOURCE)
-bridge = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(bridge)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from preview_budget_authority_fixture import (  # noqa: E402
+    HOST, KEY, MODEL, PEER, RESERVED, SCOPE, Gate, body, envelope, load_bridge, provider_response)
 
-class SafetyError(RuntimeError):
-    pass
+bridge = load_bridge()
+SafetyError = bridge.helper.SafetyError
+GO = {'scope_id': SCOPE, 'target_host': HOST, 'allowed_peer_uids': [PEER], 'max_concurrent_calls': 4}
 
-HELPER = types.SimpleNamespace(SafetyError=SafetyError, decimal_amount=Decimal,
-    utc_now=lambda: '2030-01-01T00:00:00Z', read_key=lambda _: 'synthetic-key',
-    redact=lambda value, _: value, account_response=lambda _: {'guard_charge_usd': '0.01'})
-GO = {'scope_id': 'preview-synthetic-debate-20261004', 'target_host': 'synthetic-host',
-      'allowed_peer_uids': [42], 'max_paid_posts': 2}
-
-def body():
-    return {'model': 'zai-org/GLM-5.3-Flash', 'reasoning_effort': 'high',
-            'max_tokens': 8192, 'messages': [{'role': 'user', 'content': 'Offline synthetic test'}]}
-
-def envelope(value, **json_options):
-    raw = json.dumps(value, **json_options)
-    # Independent calculation from the fixed reviewed prices/output bound.
-    reservation = (Decimal(len(raw.encode()) + 2048) * Decimal('0.15')
-                   + Decimal(163840) * Decimal('0.50')) / Decimal(1000000)
-    return {'scope_id': 'preview-synthetic-debate-20261004', 'operationId': 'synthetic-1',
-            'requestBody': raw, 'requestSha256': hashlib.sha256(raw.encode()).hexdigest(),
-            'reservedUsd': str(reservation)}
-
-class LedgerFixture:
-    def __init__(self):
-        old = {'state': 'uncertain', 'held_usd': '0.15'}
-        self.data = {'entries': {'original-entry': copy.deepcopy(old)}, 'preview_authority': {
-            'state': 'active', 'go_sha256': 'synthetic-go-hash', 'active_host': 'synthetic-host',
-            'scope_id': GO['scope_id'], 'paid_posts': 0, 'baseline_entries': {'original-entry': old},
-            'expires_at_utc': (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()}}
-        self.saved = 0
-    def __enter__(self): return self
-    def __exit__(self, *args): pass
-    def total(self):
-        return sum((Decimal(entry.get('held_usd', entry.get('reserved_usd', '0')))
-                    for entry in self.data['entries'].values()), Decimal(0))
-    def save(self):
-        assert self.data['entries']['original-entry'] == self.data['preview_authority']['baseline_entries']['original-entry']
-        self.saved += 1
 
 class RequestModeTests(unittest.TestCase):
     def test_existing_four_field_request_keeps_identical_body_and_reservation(self):
         request = envelope(body())
-        parsed, reserved = bridge.validate_request(request, GO, HELPER)
-        self.assertEqual(parsed, body())
+        outgoing, reserved = bridge.validate_request(request, GO)
+        self.assertEqual(outgoing, bridge.helper.canonical(body()))
+        self.assertEqual(json.loads(outgoing), body())
         self.assertEqual(str(reserved), request['reservedUsd'])
-        self.assertNotIn('response_format', parsed)
+        self.assertNotIn('response_format', json.loads(outgoing))
 
     def test_exact_json_object_mode_is_accepted_without_normalizing_request_bytes(self):
         value = {**body(), 'response_format': {'type': 'json_object'}}
         compact = envelope(value, separators=(',', ':'))
         spaced = envelope(value, indent=2)
         for request in (compact, spaced):
-            parsed, reserved = bridge.validate_request(request, GO, HELPER)
-            self.assertEqual(parsed, value)
+            outgoing, reserved = bridge.validate_request(request, GO)
+            self.assertEqual(outgoing, bridge.helper.canonical(value))
             self.assertEqual(str(reserved), request['reservedUsd'])
         self.assertNotEqual(compact['requestSha256'], spaced['requestSha256'])
         self.assertNotEqual(compact['reservedUsd'], spaced['reservedUsd'])
@@ -93,15 +54,15 @@ class RequestModeTests(unittest.TestCase):
                          {'type': 'json_schema', 'json_schema': {}},
                          {'type': 'json_object', 'extra': False})
         for mode in invalid_modes:
-            with self.subTest(mode=mode), patch.object(bridge, 'read_go', return_value=GO), \
-                 patch.object(bridge, 'LockedLedger') as ledger:
+            with self.subTest(mode=mode), patch.object(bridge, 'load_go', return_value=(GO, 'go-hash')), \
+                 patch.object(bridge, 'TeamStore') as store:
                 calls = []
                 request = envelope({**body(), 'response_format': mode})
                 with self.assertRaisesRegex(SafetyError, '^REQUEST_PARAMETERS_INVALID$'):
-                    bridge.execute_request(None, None, request, HELPER,
+                    bridge.execute_request(None, None, request, peer_uid=PEER, slots=bridge.CallSlots(4),
                         dispatch=lambda *args: calls.append(args), key_loader=lambda _: calls.append('key'),
-                        host='synthetic-host', platform='linux', peer_uid=42)
-                ledger.assert_not_called()
+                        host=HOST, platform='linux')
+                store.assert_not_called()
                 self.assertEqual(calls, [])
 
     def test_other_body_fields_model_effort_and_token_bound_remain_refused(self):
@@ -111,54 +72,58 @@ class RequestModeTests(unittest.TestCase):
                    {**body(), 'max_tokens': 1.5}, {**body(), 'max_tokens': 0}]
         for value in invalid:
             with self.subTest(value=value), self.assertRaisesRegex(SafetyError, '^REQUEST_PARAMETERS_INVALID$'):
-                bridge.validate_request(envelope(value), GO, HELPER)
+                bridge.validate_request(envelope(value), GO)
 
     def test_scope_hash_reservation_and_envelope_fields_remain_exact(self):
         for changes in ({'scope_id': 'other'}, {'requestSha256': '0' * 64},
                         {'reservedUsd': '0.01'}, {'extra': True}):
             with self.subTest(changes=changes), self.assertRaises(SafetyError):
-                bridge.validate_request({**envelope(body()), **changes}, GO, HELPER)
+                bridge.validate_request({**envelope(body()), **changes}, GO)
 
     def test_json_mode_dispatch_retains_prior_uncertainty_and_paid_post_accounting(self):
-        ledger = LedgerFixture()
-        original = copy.deepcopy(ledger.data['entries']['original-entry'])
-        value = {**body(), 'response_format': {'type': 'json_object'}}
-        dispatched = []
-        def dispatch(request, key):
-            dispatched.append(request)
-            return 200, {'model': 'zai-org/GLM-5.3-Flash', 'choices': []}
-        with contextlib.redirect_stdout(io.StringIO()), patch.object(bridge, 'read_go', return_value=GO), \
-             patch.object(bridge, 'LockedLedger', return_value=ledger), \
-             patch.object(bridge, 'sha', return_value='synthetic-go-hash'):
-            result = bridge.execute_request(None, None, envelope(value), HELPER, dispatch=dispatch,
-                host='synthetic-host', platform='linux', peer_uid=42)
-        self.assertEqual(result['status'], 200)
-        self.assertEqual(dispatched, [value])
-        self.assertEqual(ledger.data['entries']['original-entry'], original)
-        self.assertEqual(ledger.data['preview_authority']['paid_posts'], 1)
-        self.assertEqual(ledger.total(), Decimal('0.16'))
+        gate = Gate(bridge)
+        self.addCleanup(gate.close)
+        gate.ready()
 
-    def test_expired_window_and_paid_post_limit_still_prevent_dispatch(self):
-        for condition in ('expired', 'limit'):
-            ledger = LedgerFixture()
-            control = ledger.data['preview_authority']
-            if condition == 'expired': control['expires_at_utc'] = '2000-01-01T00:00:00+00:00'
-            else: control['paid_posts'] = 2
+        def broken(_body, _key):
+            raise TimeoutError('synthetic')
+        with contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(SafetyError, '^NEW_CHARGE_UNCERTAIN$'):
+                gate.call('prior', dispatch=broken)
+            gate.activate()  # Root re-activates; the uncertain hold stays on its day.
+            prior = json.loads(json.dumps(gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':prior']))
+            value = {**body(), 'response_format': {'type': 'json_object'}}
             dispatched = []
-            with patch.object(bridge, 'read_go', return_value=GO), \
-                 patch.object(bridge, 'LockedLedger', return_value=ledger), \
-                 patch.object(bridge, 'sha', return_value='synthetic-go-hash'), self.assertRaises(SafetyError):
-                bridge.execute_request(None, None, envelope({**body(), 'response_format': {'type': 'json_object'}}), HELPER,
-                    dispatch=lambda *args: dispatched.append(args), host='synthetic-host', platform='linux', peer_uid=42)
-            self.assertEqual(dispatched, [])
 
-class CliHelperPathTests(unittest.TestCase):
-    def test_cli_has_no_one_computer_helper_default(self):
-        # The accounting helper path must be passed explicitly; no developer-machine default may exist.
-        self.assertNotIn('/Users/', SOURCE.read_text(encoding='utf-8'))
-        with patch.object(sys, 'argv', ['preview_budget_authority.py', 'prepare', '--private', '/nonexistent-synthetic']), \
-             contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as raised:
-            bridge.main()
-        self.assertEqual(raised.exception.code, 2)
+            def dispatch(request, key):
+                dispatched.append((request, key))
+                return 200, provider_response('0.01')
+            result = gate.call('json-mode', dispatch=dispatch, value=value)
+        self.assertEqual(result['status'], 200)
+        self.assertEqual(dispatched, [(bridge.helper.canonical(value), KEY)])
+        self.assertEqual(json.loads(result['body'])['model'], MODEL)
+        self.assertEqual(gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':prior'], prior)
+        status = gate.status()
+        self.assertEqual(status['today_posts'], 2)
+        self.assertEqual(Decimal(status['today_spend_usd']), RESERVED + Decimal('0.01'))
 
-if __name__ == '__main__': unittest.main()
+    def test_expired_window_and_daily_post_limit_still_prevent_dispatch(self):
+        for condition in ('expired', 'limit'):
+            with self.subTest(condition=condition):
+                gate = Gate(bridge, open_days=1, max_paid_posts_per_day=1)
+                self.addCleanup(gate.close)
+                gate.ready()
+                with contextlib.redirect_stdout(io.StringIO()):
+                    if condition == 'expired':
+                        gate.clock.set('2026-10-09T09:00:00+00:00')
+                    else:
+                        gate.call('first')
+                    dispatched = []
+                    with self.assertRaises(SafetyError):
+                        gate.call('json-mode', dispatch=lambda *args: dispatched.append(args),
+                                  value={**body(), 'response_format': {'type': 'json_object'}})
+                self.assertEqual(dispatched, [])
+
+
+if __name__ == '__main__':
+    unittest.main()

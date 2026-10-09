@@ -1,181 +1,865 @@
 #!/usr/bin/env python3
-"""Root-owned, single-authority private preview spending gate. No retries.
+"""Root-owned private preview spending gate, v2: one shared team pot per Bucharest day. No retries.
 
-prepare is read-only. freeze revokes legacy Mac GO hashes; activate accepts only
-that exact frozen ledger on the reviewed Linux host. The original entries and
-uncertain holds remain intact. serve is Root-operated Unix IPC; only it reads
-Root's credential and makes the one fixed upstream HTTPS request.
+init creates fresh v2 state from a hash-bound GO; activate opens it on the reviewed Linux host
+for open_days; serve is Root-operated Unix IPC and the only reader of Root's provider key;
+stop halts; status is read-only. Before any phase, the helper's custody (root-owned, writable by
+no one else) and, with a GO, its bound hash are checked; only then do those exact bytes run.
+Each call reserves its worst case under a short ledger lock, the lock is released for the one
+fixed upstream HTTPS request, and the charge is then settled under the lock. Uncertainty,
+missing usage, overrun, a provider error, another model, a lost reply or any failure after the
+reservation halts every new call until Root re-activates; calls already in flight finish and
+settle. A halt is written before the ledger entry it explains, and serve start halts on any
+call a crash interrupted. If a settlement or a halt cannot be written, the running server
+reserves nothing more until it is restarted.
+The retired v1 ledger (budget-ledger.json) is never opened.
+
+Day boundary (by design): a call is charged to the Bucharest day on which it was reserved, even
+when it settles after midnight. So the real upstream charges made within one calendar day can
+exceed daily_budget_usd by up to max_concurrent_calls x one reservation (about $0.08-0.12 each):
+calls reserved just before midnight are paid just after it, while the new day's pot is already
+open.
 """
-import argparse, copy, fcntl, hashlib, importlib.util, json, os, re, socket, stat, struct, sys, time
-from decimal import Decimal
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+import re
+import socket
+import stat
+import struct
+import sys
+import threading
+import time
+import types
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from socketserver import ThreadingMixIn
+from zoneinfo import ZoneInfo
 
-MODEL='zai-org/GLM-5.3-Flash'
-SCOPE='preview-synthetic-debate-20261004'
-OUTPUT_BOUND=163840
+sys.dont_write_bytecode = True
+MODEL = 'zai-org/GLM-5.3-Flash'
+OUTPUT_BOUND = 163840
+GO_SCHEMA = 'preview-provider-budget-go-v2'
+CONTROL_SCHEMA = 'preview-provider-budget-control-v2'
+DAY_SCHEMA = 'preview-provider-budget-day-v2'
+TEAM_DAY_ZONE = 'Europe/Bucharest'
+CONTROL_NAME = 'team-control.json'
+LOCK_NAME = 'team.lock'
+SERVE_LOCK_NAME = 'team-serve.lock'
+CONTROL_BYTES = 1024 * 1024
+MAX_HALT_EVENTS = 2048  # About 0.6 MiB at most, so a halt always fits the control file.
+DAY_LEDGER_BYTES = 16 * 1024 * 1024
+DAY_LEDGER_RESERVE_BYTES = 15 * 1024 * 1024  # Headroom so in-flight settlements always fit.
+LOCK_TIMEOUT_SECONDS = 10
+SLOT_WAIT_SECONDS = 60
+# From acceptance, slot wait + reservation lock + upstream call share this deadline; after it a
+# settlement lock wait and a fallback halt lock wait (2 x 10 s) and the reply still fit inside the
+# caller's 630 s timeout (preview-test.ts: PREVIEW_GLM_DEADLINE_MS + 30 s).
+CALL_DEADLINE_SECONDS = 600
+REPLY_TIMEOUT_SECONDS = 630
+MAX_IPC_BYTES = 1024 * 1024
+IPC_READ_TIMEOUT_SECONDS = 10  # Each header or body read on the 0666 socket.
+MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a thread.
+STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
+PUBLIC_REFUSALS = frozenset({'TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED'})
+GO_REQUIRED = frozenset({'schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'model', 'requested_effort',
+                         'scope_id', 'target_host', 'allowed_peer_uids', 'daily_budget_usd', 'max_paid_posts_per_day',
+                         'max_concurrent_calls', 'open_days'})
+GO_OPTIONAL = frozenset({'predecessor_ledger_sha256'})
+DAY_PATTERN = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}')
+SOCKET_PATTERN = re.compile(r'/run/debateai-v3-preview/[a-z0-9-]+\.sock')
+ENTRY_STATES = ('pending', 'settled', 'uncertain')
 
-def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-def load_helper(path):
- spec=importlib.util.spec_from_file_location('preview_accounting_helper',path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
 
-def read_go(path,helper):
- try:go=json.loads(Path(path).read_text())
- except (OSError,ValueError):raise helper.SafetyError('ROOT_GO_REQUIRED') from None
- if go.get('schema')!='preview-provider-budget-go-v1' or go.get('allow_paid_calls') is not True or go.get('bridge_sha256')!=sha(Path(__file__)) or go.get('helper_sha256')!=sha(Path(helper.__file__)) or go.get('model')!=MODEL or go.get('requested_effort')!='high' or go.get('total_budget_usd')!='1.00' or go.get('retain_prior_uncertainty') is not True or go.get('revoke_mac_execution') is not True or go.get('scope_id')!=SCOPE or not isinstance(go.get('target_host'),str) or not re.fullmatch(r'[A-Za-z0-9.-]{1,128}',go['target_host']) or type(go.get('max_paid_posts')) is not int or not 1<=go['max_paid_posts']<=64 or not isinstance(go.get('allowed_peer_uids'),list) or not go['allowed_peer_uids'] or any(type(uid) is not int or uid<0 for uid in go['allowed_peer_uids']):
-  raise helper.SafetyError('ROOT_GO_INVALID')
- return go
+def sha_bytes(raw):
+    return hashlib.sha256(raw).hexdigest()
 
-class LockedLedger:
- def __init__(self,private,helper):self.private=Path(private);self.helper=helper
- def __enter__(self):
-  h=self.helper;self.writer=h.Ledger(self.private);self.writer.dir_fd=h.private_dir_fd(self.private);self.writer.lock_fd=None
-  try:
-   self.writer.lock_fd=h.secure_open(self.writer.dir_fd,'budget-ledger.lock',os.O_RDWR,create=True);fcntl.flock(self.writer.lock_fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
-   fd=h.secure_open(self.writer.dir_fd,'budget-ledger.json',os.O_RDONLY)
-   with os.fdopen(fd,'rb') as stream:raw=stream.read(1024*1024+1)
-   if len(raw)>1024*1024:raise h.SafetyError('LEDGER_TOO_LARGE')
-   self.data=json.loads(raw);self.before_hash=hashlib.sha256(raw).hexdigest();self.writer.data=self.data
-   if self.data.get('schema')!='deepinfra-global-dollar-ledger-v1' or self.data.get('budget_usd')!='1.00' or self.data.get('stopped') is not True:raise h.SafetyError('ORIGINAL_STOPPED_LEDGER_REQUIRED')
-   self.writer.total();self.check_originals();return self
-  except BaseException:self.writer.__exit__(None,None,None);raise
- def __exit__(self,*args):self.writer.__exit__(*args)
- def total(self):return self.writer.total()
- def check_originals(self):
-  control=self.data.get('preview_authority')
-  if control and any(self.data['entries'].get(k)!=v for k,v in control['baseline_entries'].items()):raise self.helper.SafetyError('PRIOR_CHARGE_CHANGED')
- def save(self):self.check_originals();self.writer.save()
 
-def prepare_plan(private,helper,target_host):
- with LockedLedger(private,helper) as ledger:
-  if any(e['state']=='pending' for e in ledger.data['entries'].values()) or ledger.total()>Decimal('1.00'):raise helper.SafetyError('UNFINISHED_OR_OVERRUN_LEDGER')
-  return {'schema':'preview-provider-budget-transfer-plan-v1','starting_ledger_sha256':ledger.before_hash,'prior_entry_count':len(ledger.data['entries']),'retained_held_usd':str(ledger.total()),'remaining_usd':str(Decimal('1.00')-ledger.total()),'retained_uncertain_entry_ids':[k for k,e in ledger.data['entries'].items() if e['state']=='uncertain'],'target_host':target_host,'model':MODEL,'requested_effort':'high','output_reservation_tokens':OUTPUT_BOUND,'context_window_tokens':1048576,'prices_usd_per_million':{'input':'0.15','output':'0.50'},'deadline_seconds':600,'manual_window_hours':24,'bridge_sha256':sha(Path(__file__)),'helper_sha256':sha(Path(helper.__file__)),'scope_id':SCOPE,'activation_state':'NOT_ACTIVATED; Root must approve/freeze sole authority before transferring'}
+def sha(path):
+    return sha_bytes(Path(path).read_bytes())
 
-def freeze_source(private,go_path,helper):
- go=read_go(go_path,helper)
- with LockedLedger(private,helper) as ledger:
-  if ledger.before_hash!=go['starting_ledger_sha256'] or 'preview_authority' in ledger.data or any(e['state']=='pending' for e in ledger.data['entries'].values()) or ledger.total()>Decimal('1.00'):raise helper.SafetyError('FREEZE_SNAPSHOT_MISMATCH')
-  ledger.data['preview_authority']={'state':'frozen_for_transfer','go_sha256':sha(go_path),'source_ledger_sha256':ledger.before_hash,'baseline_entries':copy.deepcopy(ledger.data['entries']),'target_host':go['target_host'],'scope_id':SCOPE,'paid_posts':0,'frozen_at':helper.utc_now()};ledger.save()
-  return {'state':'frozen_for_transfer','frozen_ledger_sha256':sha(Path(private)/'budget-ledger.json'),'held_usd':str(ledger.total()),'mac_v1_still_stopped':True,'legacy_v2_go_revoked_by_new_ledger_hash':True}
 
-def activate_target(private,go_path,frozen_hash,helper,host=None,platform=None):
- go=read_go(go_path,helper);host=host or socket.gethostname();platform=platform or sys.platform
- with LockedLedger(private,helper) as ledger:
-  control=ledger.data.get('preview_authority',{})
-  if platform!='linux' or host!=go['target_host'] or ledger.before_hash!=frozen_hash or control.get('state')!='frozen_for_transfer' or control.get('go_sha256')!=sha(go_path) or control.get('source_ledger_sha256')!=go['starting_ledger_sha256']:raise helper.SafetyError('TRANSFER_AUTHORITY_MISMATCH')
-  control.update(state='active',active_host=host,activated_at=helper.utc_now(),expires_at_utc=(datetime.now(timezone.utc)+timedelta(hours=24)).isoformat());ledger.save()
-  return {'state':'active','held_usd':str(ledger.total()),'remaining_usd':str(Decimal('1.00')-ledger.total()),'authority_host':host}
+class SafetyError(Exception):
+    """A refusal with a fixed code. The gate hands this class to the helper it runs, so both raise it."""
+
+
+BRIDGE_PATH = Path(__file__).resolve()
+HELPER_PATH = BRIDGE_PATH.parent / 'preview_budget_helper.py'
+BRIDGE_SHA256 = sha(BRIDGE_PATH)
+helper = HELPER_SHA256 = None  # Set by load_helper, which main() runs before any phase.
+_emit_lock = threading.Lock()
+
+
+def _custody_ok(info, kind, owner_uid):
+    if not kind(info.st_mode) or info.st_uid != owner_uid or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise SafetyError('HELPER_CUSTODY_INVALID')
+
+
+def read_helper_in_custody(owner_uid=0):
+    """The helper's bytes, read once from a checked descriptor. The gate's directory, the gate file
+    and the helper must be owned by root (owner_uid), writable by no one else, and not symlinks."""
+    try:
+        dir_fd = os.open(HELPER_PATH.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    except OSError:
+        raise SafetyError('HELPER_CUSTODY_INVALID') from None
+    try:
+        _custody_ok(os.fstat(dir_fd), stat.S_ISDIR, owner_uid)
+        _custody_ok(os.stat(BRIDGE_PATH.name, dir_fd=dir_fd, follow_symlinks=False), stat.S_ISREG, owner_uid)
+        with os.fdopen(os.open(HELPER_PATH.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=dir_fd), 'rb') as stream:
+            _custody_ok(os.fstat(stream.fileno()), stat.S_ISREG, owner_uid)
+            return stream.read()
+    except OSError:
+        raise SafetyError('HELPER_CUSTODY_INVALID') from None
+    finally:
+        os.close(dir_fd)
+
+
+def load_helper(expected_sha256=None, *, skip_custody_for_tests=False):
+    """Run the helper once per process, from exactly the bytes that were checked.
+
+    Custody comes first (read_helper_in_custody); with a GO in play the bytes must then match its
+    helper_sha256 before any of them runs. skip_custody_for_tests is the offline tests' seam (they
+    run as the developer, not root); main() never passes it.
+    """
+    global helper, HELPER_SHA256
+    if helper is None:
+        source = HELPER_PATH.read_bytes() if skip_custody_for_tests else read_helper_in_custody()
+        digest = sha_bytes(source)
+        if expected_sha256 is not None and digest != expected_sha256:
+            raise SafetyError('ROOT_GO_INVALID')
+        module = types.ModuleType('preview_budget_helper')
+        module.__file__ = str(HELPER_PATH)
+        module.SafetyError = SafetyError
+        exec(compile(source, str(HELPER_PATH), 'exec'), module.__dict__)
+        helper, HELPER_SHA256 = module, digest
+    elif expected_sha256 is not None and HELPER_SHA256 != expected_sha256:
+        raise SafetyError('ROOT_GO_INVALID')
+    return helper
+
+
+def go_helper_sha256(path):
+    """Only the helper hash a GO binds, read before any helper code runs; load_go validates the rest."""
+    try:
+        go = json.loads(Path(path).read_bytes())
+    except (OSError, ValueError, TypeError):
+        raise SafetyError('ROOT_GO_REQUIRED') from None
+    value = go.get('helper_sha256') if isinstance(go, dict) else None
+    if not isinstance(value, str) or not re.fullmatch(r'[0-9a-f]{64}', value):
+        raise SafetyError('ROOT_GO_INVALID')
+    return value
+
+
+def emit(value):
+    line = json.dumps(value, ensure_ascii=False, default=str) + '\n'
+    with _emit_lock:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+
+
+def log_event(value):
+    """Best effort: the ledger is the record, so a broken log stream never costs a settled reply.
+    If the reply cannot be delivered either, the IPC handler halts."""
+    try:
+        emit(value)
+    except Exception:  # noqa: BLE001 - logging only
+        pass
+
+
+def iso(moment):
+    return moment.astimezone(timezone.utc).isoformat()
+
+
+def current(now):
+    moment = now()
+    if not isinstance(moment, datetime) or moment.tzinfo is None:
+        raise SafetyError('CLOCK_INVALID')
+    return moment
+
+
+def bucharest_day(moment):
+    if moment.tzinfo is None:
+        raise SafetyError('CLOCK_INVALID')
+    return moment.astimezone(ZoneInfo(TEAM_DAY_ZONE)).date().isoformat()
+
+
+def _int_in(value, low, high):
+    return type(value) is int and low <= value <= high
+
+
+def valid_go(go):
+    if not isinstance(go, dict) or not GO_REQUIRED <= set(go) or not set(go) <= GO_REQUIRED | GO_OPTIONAL:
+        return False
+    budget, uids = go['daily_budget_usd'], go['allowed_peer_uids']
+    predecessor = go.get('predecessor_ledger_sha256', '0' * 64)
+    return bool(
+        go['schema'] == GO_SCHEMA and go['allow_paid_calls'] is True
+        and go['bridge_sha256'] == BRIDGE_SHA256 and go['helper_sha256'] == HELPER_SHA256
+        and go['model'] == MODEL and go['requested_effort'] == 'high'
+        and isinstance(go['scope_id'], str) and re.fullmatch(r'[a-z0-9][a-z0-9-]{0,95}', go['scope_id'])
+        and isinstance(go['target_host'], str) and re.fullmatch(r'[A-Za-z0-9.-]{1,128}', go['target_host'])
+        and isinstance(uids, list) and uids and all(type(uid) is int and uid >= 0 for uid in uids)
+        and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
+        and Decimal('0.01') <= Decimal(budget) <= Decimal('50.00')
+        and _int_in(go['max_paid_posts_per_day'], 1, 5000) and _int_in(go['max_concurrent_calls'], 1, 8)
+        and _int_in(go['open_days'], 1, 31)
+        and isinstance(predecessor, str) and re.fullmatch(r'[0-9a-f]{64}', predecessor))
+
+
+def load_go(path):
+    """Returns the validated GO and the hash of the exact bytes that were validated."""
+    try:
+        raw = Path(path).read_bytes()
+        go = json.loads(raw)
+    except (OSError, ValueError, TypeError):
+        raise SafetyError('ROOT_GO_REQUIRED') from None
+    if not valid_go(go):
+        raise SafetyError('ROOT_GO_INVALID')
+    return go, sha_bytes(raw)
+
+
+def read_go(path):
+    return load_go(path)[0]
+
+
+def limits_of(go):
+    return {name: go[name] for name in ('daily_budget_usd', 'max_paid_posts_per_day', 'max_concurrent_calls', 'open_days')}
+
+
+def day_ledger_name(day):
+    if not isinstance(day, str) or not DAY_PATTERN.fullmatch(day):
+        raise SafetyError('LEDGER_DAY_INVALID')
+    return 'team-ledger-' + day + '.json'
+
+
+def day_spend(ledger):
+    """Held amounts of every entry reserved on this day: pending, settled and uncertain."""
+    total = Decimal(0)
+    for entry in ledger['entries'].values():
+        held = helper.decimal_amount(entry.get('held_usd')) if isinstance(entry, dict) else None
+        reserved = helper.decimal_amount(entry.get('reserved_usd')) if isinstance(entry, dict) else None
+        if held is None or reserved is None or entry.get('state') not in ENTRY_STATES:
+            raise SafetyError('LEDGER_ENTRY_INVALID')
+        if entry['state'] != 'settled' and held < reserved:
+            raise SafetyError('LEDGER_ENTRY_UNDER_RESERVED')
+        total += held
+    return total
+
+
+def validate_control(control):
+    in_flight = control.get('in_flight') if isinstance(control, dict) else None
+    if not (isinstance(control, dict) and control.get('schema') == CONTROL_SCHEMA
+            and control.get('state') in ('initialized', 'active', 'halted') and isinstance(control.get('limits'), dict)
+            and isinstance(in_flight, dict) and all(isinstance(k, str) and isinstance(v, str) and DAY_PATTERN.fullmatch(v)
+                                                    for k, v in in_flight.items())):
+        raise SafetyError('CONTROL_INVALID')
+    return control
+
+
+class TeamStore:
+    """Owner-only state in the 0700 private directory: one control file plus one ledger per team day.
+
+    A blocking lock with a short timeout guards every read-modify-write. It is never held
+    while an upstream call runs.
+    """
+
+    def __init__(self, private, lock_timeout=None, shared=False, create=False):
+        lock_timeout = LOCK_TIMEOUT_SECONDS if lock_timeout is None else lock_timeout
+        self.private, self.lock_timeout, self.shared, self.create = Path(private), lock_timeout, shared, create
+        self.dir_fd = self.lock_fd = None
+
+    def __enter__(self):
+        self.dir_fd = helper.private_dir_fd(self.private)
+        try:
+            if not self.create and not helper.file_exists(self.dir_fd, LOCK_NAME):
+                raise SafetyError('STATE_MISSING')
+            self.lock_fd = helper.secure_open(self.dir_fd, LOCK_NAME, os.O_RDONLY if self.shared else os.O_RDWR,
+                                              create=self.create)
+            helper.lock(self.lock_fd, fcntl.LOCK_SH if self.shared else fcntl.LOCK_EX, self.lock_timeout)
+            return self
+        except BaseException:
+            self.__exit__()
+            raise
+
+    def __exit__(self, *_args):
+        for name in ('lock_fd', 'dir_fd'):
+            fd = getattr(self, name)
+            if fd is not None:
+                os.close(fd)
+                setattr(self, name, None)
+
+    def has_control(self):
+        return helper.file_exists(self.dir_fd, CONTROL_NAME)
+
+    def control(self):
+        if not self.has_control():
+            raise SafetyError('STATE_MISSING')
+        return validate_control(helper.read_json(self.dir_fd, CONTROL_NAME, CONTROL_BYTES))
+
+    def save_control(self, control):
+        helper.write_json(self.dir_fd, CONTROL_NAME, validate_control(control), CONTROL_BYTES)
+
+    def ledger(self, day):
+        name = day_ledger_name(day)
+        if not helper.file_exists(self.dir_fd, name):
+            return {'schema': DAY_SCHEMA, 'day': day, 'zone': TEAM_DAY_ZONE, 'entries': {}}
+        ledger = helper.read_json(self.dir_fd, name, DAY_LEDGER_BYTES)
+        if not isinstance(ledger, dict) or ledger.get('schema') != DAY_SCHEMA or ledger.get('day') != day \
+                or not isinstance(ledger.get('entries'), dict):
+            raise SafetyError('LEDGER_INVALID')
+        day_spend(ledger)
+        return ledger
+
+    def save_ledger(self, ledger, data=None):
+        data = helper.encode_json(ledger) if data is None else data
+        if len(data) > DAY_LEDGER_BYTES:
+            raise SafetyError('DAY_LEDGER_FULL')
+        helper.write_bytes(self.dir_fd, day_ledger_name(ledger['day']), data)
+
+
+def _halt(control, reason, moment, entry_id=None):
+    # The first reason stands while halted; every halt is also appended to the history, which
+    # re-activation keeps. Past the bound only a count grows, so a halt never fails for room.
+    if control['state'] != 'halted':
+        control.update(state='halted', reason=reason, halted_at=iso(moment))
+    halts = control.setdefault('halts', [])
+    if len(halts) < MAX_HALT_EVENTS:
+        halts.append({'reason': reason, 'at': iso(moment), **({} if entry_id is None else {'entry_id': entry_id})})
+    else:
+        control['halts_dropped'] = control.get('halts_dropped', 0) + 1
+
+
+def day_summary(control, ledger, moment):
+    budget, spend = Decimal(control['limits']['daily_budget_usd']), day_spend(ledger)
+    open_until = control.get('open_until_utc')
+    return {'state': control['state'], 'reason': control['reason'], 'open_until_utc': open_until,
+            'window_open': control['state'] == 'active' and moment < datetime.fromisoformat(open_until),
+            'today': ledger['day'], 'daily_budget_usd': control['limits']['daily_budget_usd'],
+            'today_spend_usd': str(spend), 'remaining_today_usd': str(max(Decimal(0), budget - spend)),
+            'today_posts': len(ledger['entries']), 'max_paid_posts_per_day': control['limits']['max_paid_posts_per_day'],
+            'in_flight': len(control['in_flight']),
+            'today_uncertain': sum(1 for entry in ledger['entries'].values() if entry['state'] == 'uncertain'),
+            'halts': control.get('halts', []), 'halts_dropped': control.get('halts_dropped', 0)}
+
+
+def init_state(private, go_path, now=None):
+    now = now or helper.utc_now
+    go, go_sha = load_go(go_path)
+    with TeamStore(private, create=True) as store:
+        if store.has_control():
+            raise SafetyError('STATE_ALREADY_EXISTS')
+        control = {'schema': CONTROL_SCHEMA, 'scope_id': go['scope_id'], 'target_host': go['target_host'],
+                   'state': 'initialized', 'reason': None, 'go_sha256': go_sha, 'limits': limits_of(go),
+                   'predecessor_ledger_sha256': go.get('predecessor_ledger_sha256'),
+                   'initialized_at': iso(current(now)), 'activated_at': None, 'active_host': None,
+                   'open_until_utc': None, 'halted_at': None, 'activations': 0, 'in_flight': {},
+                   'halts': [], 'halts_dropped': 0}
+        store.save_control(control)
+    return {'state': 'initialized', 'scope_id': go['scope_id'], 'target_host': go['target_host'],
+            'go_sha256': go_sha, 'predecessor_ledger_sha256': control['predecessor_ledger_sha256']}
+
+
+def activate(private, go_path, host=None, platform=None, now=None):
+    now = now or helper.utc_now
+    go, go_sha = load_go(go_path)
+    host, platform = host or socket.gethostname(), platform or sys.platform
+    if platform != 'linux' or host != go['target_host']:
+        raise SafetyError('ACTIVATION_REFUSED')
+    with TeamStore(private) as store:
+        control = store.control()
+        if control['state'] not in ('initialized', 'halted') or control['scope_id'] != go['scope_id']:
+            raise SafetyError('ACTIVATION_REFUSED')
+        moment = current(now)
+        control.update(state='active', last_halt_reason=control['reason'], reason=None, go_sha256=go_sha,
+                       limits=limits_of(go), target_host=go['target_host'], active_host=host,
+                       activated_at=iso(moment), open_until_utc=iso(moment + timedelta(days=go['open_days'])),
+                       activations=control['activations'] + 1)
+        store.save_control(control)
+        return day_summary(control, store.ledger(bucharest_day(moment)), moment)
+
+
+def halt(private, reason, now=None, entry_id=None):
+    now = now or helper.utc_now
+    with TeamStore(private) as store:
+        control = store.control()
+        _halt(control, reason, current(now), entry_id)
+        store.save_control(control)
+        return {'state': control['state'], 'reason': control['reason'], 'halted_at': control['halted_at']}
+
+
+def stop_authority(private, now=None):
+    return halt(private, 'operator_stop', now)
+
+
+def status(private, now=None):
+    """Read-only: shared lock, no file is created or written."""
+    now = now or helper.utc_now
+    with TeamStore(private, shared=True) as store:
+        control = store.control()
+        moment = current(now)
+        return day_summary(control, store.ledger(bucharest_day(moment)), moment)
+
 
 def valid_response_format(body):
- if not isinstance(body,dict):return False
- fields={'model','reasoning_effort','max_tokens','messages'}
- if set(body)==fields:return True
- if set(body)!=fields|{'response_format'}:return False
- mode=body['response_format']
- return isinstance(mode,dict) and set(mode)=={'type'} and mode['type']=='json_object'
+    if not isinstance(body, dict):
+        return False
+    fields = {'model', 'reasoning_effort', 'max_tokens', 'messages'}
+    if set(body) == fields:
+        return True
+    if set(body) != fields | {'response_format'}:
+        return False
+    mode = body['response_format']
+    return isinstance(mode, dict) and set(mode) == {'type'} and mode['type'] == 'json_object'
 
-def validate_request(input,go,helper):
- if not isinstance(input,dict) or set(input)!={'scope_id','operationId','requestBody','requestSha256','reservedUsd'} or input['scope_id']!=go['scope_id'] or not isinstance(input['operationId'],str) or not re.fullmatch(r'[A-Za-z0-9-]{1,96}',input['operationId']) or not isinstance(input['requestBody'],str) or len(input['requestBody'].encode())>256*1024 or hashlib.sha256(input['requestBody'].encode()).hexdigest()!=input['requestSha256']:raise helper.SafetyError('REQUEST_SCOPE_INVALID')
- try:body=json.loads(input['requestBody'])
- except ValueError:raise helper.SafetyError('REQUEST_INVALID') from None
- if not valid_response_format(body) or body['model']!=MODEL or body['reasoning_effort']!='high' or type(body['max_tokens']) is not int or not 1<=body['max_tokens']<=OUTPUT_BOUND or not isinstance(body['messages'],list) or not body['messages'] or any(not isinstance(m,dict) or set(m)!={'role','content'} or m['role'] not in ('system','user','assistant') or not isinstance(m['content'],str) for m in body['messages']):raise helper.SafetyError('REQUEST_PARAMETERS_INVALID')
- reserved=(Decimal(len(input['requestBody'].encode())+2048)*Decimal('0.15')+Decimal(OUTPUT_BOUND)*Decimal('0.50'))/Decimal(1000000)
- if helper.decimal_amount(input['reservedUsd'])!=reserved:raise helper.SafetyError('RESERVATION_MISMATCH')
- return body,reserved
 
-def execute_request(private,go_path,input,helper,dispatch=None,key_loader=None,host=None,platform=None,peer_uid=None):
- go=read_go(go_path,helper);body,reserved=validate_request(input,go,helper);host=host or socket.gethostname();platform=platform or sys.platform
- if platform!='linux' or host!=go['target_host'] or peer_uid not in go['allowed_peer_uids']:raise helper.SafetyError('EXECUTION_AUTHORITY_REFUSED')
- key_loader=key_loader or helper.read_key
- if dispatch is None:
-  transport=helper.HttpsTransport();transport.timeout=600
-  dispatch=transport
- with LockedLedger(private,helper) as ledger:
-  control=ledger.data.get('preview_authority',{})
-  if control.get('state')!='active' or control.get('go_sha256')!=sha(go_path) or control.get('active_host')!=host or control.get('scope_id')!=SCOPE or control.get('paid_posts',64)>=go['max_paid_posts']:raise helper.SafetyError('AUTHORITY_STOPPED')
-  try:expired=datetime.fromisoformat(control['expires_at_utc'])<=datetime.now(timezone.utc)
-  except (KeyError,ValueError,TypeError):raise helper.SafetyError('AUTHORITY_EXPIRY_INVALID') from None
-  if expired:
-   control.update(state='halted',reason='manual_window_expired');ledger.save();raise helper.SafetyError('AUTHORITY_EXPIRED')
-  entry_id='preview-test:'+SCOPE+':'+input['operationId']
-  if entry_id in ledger.data['entries'] or ledger.total()+reserved>Decimal('1.00') or any(e['state'] in ('pending','uncertain') for k,e in ledger.data['entries'].items() if k not in control['baseline_entries']):raise helper.SafetyError('GLOBAL_TEST_BUDGET_REFUSED')
-  entry={'state':'pending','reserved_usd':str(reserved),'held_usd':str(reserved),'reserved_at':helper.utc_now(),'request_sha256':input['requestSha256'],'requested_effort':'high','model':MODEL};ledger.data['entries'][entry_id]=entry;ledger.save()
-  start=time.monotonic();response=None;status=None
-  try:
-   key=key_loader(private)
-   entry['dispatched_at']=helper.utc_now();control['paid_posts']+=1;ledger.save()
-   status,response=dispatch(body,key)
-   response=helper.redact(response if isinstance(response,dict) else {},key)
-  except BaseException as error:
-   entry.update(state='uncertain',reason='transport_failure',error_class=type(error).__name__);control.update(state='halted',reason='uncertain_charge');ledger.save();raise helper.SafetyError('NEW_CHARGE_UNCERTAIN') from None
-  accounting=helper.account_response(response);charge=accounting.get('guard_charge_usd')
-  entry['accounting']=accounting;entry['elapsed_seconds']=round(time.monotonic()-start,6)
-  if charge is None:
-   entry.update(state='uncertain',reason='usage_or_cost_unreported');control.update(state='halted',reason='uncertain_charge');ledger.save();raise helper.SafetyError('NEW_CHARGE_UNCERTAIN')
-  amount=Decimal(charge);entry.update(state='settled',held_usd=str(amount),overrun_usd=str(max(Decimal(0),amount-reserved)),reconciled_at=helper.utc_now())
-  if amount>reserved or ledger.total()>Decimal('1.00'):control.update(state='halted',reason='charge_overrun')
-  elif status!=200 or response.get('model')!=MODEL:control.update(state='halted',reason='provider_error_or_model_identity')
-  ledger.save()
-  print(json.dumps({'event':'preview_provider_paid_post','operation_id':input['operationId'],'status':'settled' if control['state']=='active' else 'halted','held_usd':str(ledger.total()),'guard_charge_usd':charge,'elapsed_seconds':entry['elapsed_seconds']}),flush=True)
-  if control['state']!='active':raise helper.SafetyError('AUTHORITY_HALTED')
-  return {'status':status,'body':json.dumps(response,ensure_ascii=False,default=str)}
+def validate_request(input, go):
+    if not isinstance(input, dict) or set(input) != {'scope_id', 'operationId', 'requestBody', 'requestSha256', 'reservedUsd'} \
+            or input['scope_id'] != go['scope_id'] or not isinstance(input['operationId'], str) \
+            or not re.fullmatch(r'[A-Za-z0-9-]{1,96}', input['operationId']) or not isinstance(input['requestBody'], str) \
+            or len(input['requestBody'].encode()) > 256 * 1024 \
+            or hashlib.sha256(input['requestBody'].encode()).hexdigest() != input['requestSha256']:
+        raise SafetyError('REQUEST_SCOPE_INVALID')
+    try:
+        body = json.loads(input['requestBody'])
+    except ValueError:
+        raise SafetyError('REQUEST_INVALID') from None
+    if not valid_response_format(body) or body['model'] != MODEL or body['reasoning_effort'] != 'high' \
+            or type(body['max_tokens']) is not int or not 1 <= body['max_tokens'] <= OUTPUT_BOUND \
+            or not isinstance(body['messages'], list) or not body['messages'] \
+            or any(not isinstance(m, dict) or set(m) != {'role', 'content'} or m['role'] not in ('system', 'user', 'assistant')
+                   or not isinstance(m['content'], str) for m in body['messages']):
+        raise SafetyError('REQUEST_PARAMETERS_INVALID')
+    raw = input['requestBody'].encode()
+    # The exact bytes that will go upstream, fixed before any reservation: a body that cannot be
+    # encoded (a lone UTF-16 surrogate) is refused here, never after the connection opens. The
+    # reservation prices len(raw), so the bytes sent may never be longer than that.
+    try:
+        outgoing = helper.canonical(body)
+    except (UnicodeError, ValueError, TypeError):
+        raise SafetyError('REQUEST_INVALID') from None
+    if not isinstance(outgoing, bytes) or len(outgoing) > len(raw):
+        raise SafetyError('REQUEST_INVALID')
+    reserved = (Decimal(len(raw) + 2048) * Decimal('0.15') + Decimal(OUTPUT_BOUND) * Decimal('0.50')) / Decimal(1000000)
+    if helper.decimal_amount(input['reservedUsd']) != reserved:
+        raise SafetyError('RESERVATION_MISMATCH')
+    return outgoing, reserved
 
-def halt_authority(private,go_path,helper,reason='operator_stop'):
- go=read_go(go_path,helper)
- with LockedLedger(private,helper) as ledger:
-  control=ledger.data.get('preview_authority',{})
-  if control.get('go_sha256')!=sha(go_path):raise helper.SafetyError('AUTHORITY_MISMATCH')
-  control.update(state='halted',reason=reason);ledger.save();return {'state':'halted','held_usd':str(ledger.total())}
 
-def serve(private,go_path,helper,socket_path):
- go=read_go(go_path,helper)
- if sys.platform!='linux' or os.getuid()!=0 or socket.gethostname()!=go['target_host'] or not re.fullmatch(r'/run/debateai-v3-preview/[a-z0-9-]+\.sock',str(socket_path)) or Path(socket_path).exists():raise helper.SafetyError('ROOT_IPC_CUSTODY_REQUIRED')
- class Server(HTTPServer):
-  address_family=socket.AF_UNIX
-  def server_bind(self):self.socket.bind(self.server_address);self.server_name='localhost';self.server_port=0
- class Handler(BaseHTTPRequestHandler):
-  def log_message(self,*args):pass
-  def do_POST(self):
-   execution_started=False
-   try:
-    uid=struct.unpack('3i',self.connection.getsockopt(socket.SOL_SOCKET,socket.SO_PEERCRED,12))[1]
-    length=int(self.headers.get('content-length','0'))
-    if self.path!='/complete' or uid not in go['allowed_peer_uids'] or not 1<=length<=1024*1024:raise helper.SafetyError('IPC_REQUEST_REFUSED')
-    self.connection.settimeout(5)
-    data=json.loads(self.rfile.read(length))
+def reserve_call(private, go, go_sha, input, reserved, host, peer_uid, now):
+    """Lock, check state and today's team limits, durably write the pending hold, unlock."""
+    with TeamStore(private) as store:
+        control = store.control()
+        if control['state'] != 'active' or control['go_sha256'] != go_sha or control['active_host'] != host \
+                or control['scope_id'] != go['scope_id']:
+            raise SafetyError('AUTHORITY_STOPPED')
+        moment = current(now)
+        if moment >= datetime.fromisoformat(control['open_until_utc']):
+            _halt(control, 'open_window_expired', moment)
+            store.save_control(control)
+            raise SafetyError('AUTHORITY_EXPIRED')
+        day = bucharest_day(moment)
+        ledger = store.ledger(day)
+        entry_id = 'preview-test:' + go['scope_id'] + ':' + input['operationId']
+        if entry_id in ledger['entries'] or entry_id in control['in_flight']:
+            raise SafetyError('DUPLICATE_OPERATION')
+        if len(ledger['entries']) >= go['max_paid_posts_per_day']:
+            raise SafetyError('DAILY_CALL_LIMIT_REACHED')
+        if day_spend(ledger) + reserved > Decimal(go['daily_budget_usd']):
+            raise SafetyError('TEAM_DAILY_BUDGET_REACHED')
+        ledger['entries'][entry_id] = {'state': 'pending', 'reserved_usd': str(reserved), 'held_usd': str(reserved),
+                                       'reserved_at': iso(moment), 'request_sha256': input['requestSha256'],
+                                       'requested_effort': 'high', 'model': MODEL, 'peer_uid': peer_uid}
+        data = helper.encode_json(ledger)
+        if len(data) > DAY_LEDGER_RESERVE_BYTES:
+            raise SafetyError('DAY_LEDGER_FULL')
+        # In-flight first: a crash before the ledger write leaves an id recovery drops as never dispatched.
+        control['in_flight'][entry_id] = day
+        store.save_control(control)
+        try:
+            store.save_ledger(ledger, data)
+        except BaseException:
+            control['in_flight'].pop(entry_id, None)
+            try:
+                store.save_control(control)
+            except BaseException:
+                pass
+            raise
+        return entry_id, day
+
+
+def record_settlement(private, entry_id, day, changes, halt_reason, budget, now):
+    """Lock, settle the entry on its reservation day (or halt), unlock.
+
+    A halt reaches the control file before the ledger entry it explains, and the in-flight id is
+    cleared last: a process that dies between any two writes leaves the id in flight, and the
+    next serve start halts on it.
+    """
+    with TeamStore(private) as store:
+        control = store.control()
+        moment = current(now)
+        ledger = store.ledger(day)
+        entry = ledger['entries'].get(entry_id)
+        if entry is None or entry['state'] != 'pending':
+            _halt(control, 'settlement_state_invalid', moment, entry_id)
+            store.save_control(control)
+            raise SafetyError('SETTLEMENT_STATE_INVALID')
+        entry.update(changes, reconciled_at=iso(moment))
+        if halt_reason is None and day_spend(ledger) > budget:
+            halt_reason = 'charge_overrun'
+        if halt_reason is not None:
+            _halt(control, halt_reason, moment, entry_id)
+            store.save_control(control)
+        store.save_ledger(ledger)
+        control['in_flight'].pop(entry_id, None)
+        store.save_control(control)
+        return {'authority': control['state'], 'day_held_usd': str(day_spend(ledger))}
+
+
+def settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots):
+    try:
+        return record_settlement(private, entry_id, day, changes, halt_reason, budget, now)
+    except BaseException:
+        # The pending hold stays in the ledger and in flight; serve start turns it uncertain.
+        # This server reserves nothing more, even when the halt below cannot be written either.
+        slots.trip()
+        try:
+            halt(private, 'settlement_failure', now=now, entry_id=entry_id)
+        except BaseException:
+            pass
+        raise SafetyError('SETTLEMENT_FAILED') from None
+
+
+def bounded_accounting(accounting):
+    # Every stored amount stays short, so settlements always fit the day ledger's headroom.
+    if any(isinstance(value, str) and len(value) > 64 for name, value in accounting.items() if name != 'cost_basis'):
+        return {'usage_valid': False, 'oversized_accounting': True, 'guard_charge_usd': None}
+    return accounting
+
+
+class CallSlots:
+    """One server's call slots, plus its trip: after a failed settlement or a failed halt this
+    process reserves nothing more until it is restarted (restart recovery then halts on the
+    interrupted entry)."""
+
+    def __init__(self, limit):
+        self.limit = limit
+        self._semaphore = threading.BoundedSemaphore(limit)
+        self.tripped = False
+
+    def trip(self):
+        self.tripped = True
+
+    def acquire(self, wait):
+        return self._semaphore.acquire(timeout=wait)
+
+    def release(self):
+        self._semaphore.release()
+
+
+def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, key_loader=None, host=None,
+                    platform=None, now=None, slot_wait=SLOT_WAIT_SECONDS, cancelled=None, on_reserved=None):
+    accepted = time.monotonic()
+    now = now or helper.utc_now
+    go, go_sha = load_go(go_path)
+    outgoing, reserved = validate_request(input, go)
+    host, platform = host or socket.gethostname(), platform or sys.platform
+    if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int or peer_uid not in go['allowed_peer_uids']:
+        raise SafetyError('EXECUTION_AUTHORITY_REFUSED')
+    if slots.limit != go['max_concurrent_calls']:
+        raise SafetyError('SERVE_RESTART_REQUIRED')
+    if not slots.acquire(slot_wait):
+        raise SafetyError('CONCURRENCY_LIMIT_REACHED')
+    try:
+        if cancelled is not None and cancelled():
+            raise SafetyError('CALLER_CANCELED_BEFORE_DISPATCH')
+        key = (key_loader or helper.read_key)(private)
+        if slots.tripped:
+            raise SafetyError('AUTHORITY_STOPPED')
+        entry_id, day = reserve_call(private, go, go_sha, input, reserved, host, peer_uid, now)
+        if on_reserved is not None:
+            on_reserved(entry_id)
+        budget, started = Decimal(go['daily_budget_usd']), time.monotonic()
+        event = {'event': 'preview_provider_paid_post', 'operation_id': input['operationId'], 'day': day}
+        try:
+            # The upstream timeout is what remains after the slot wait and the reservation lock.
+            send = dispatch or helper.HttpsTransport(timeout=max(1.0, CALL_DEADLINE_SECONDS - (time.monotonic() - accepted)))
+            status, response = send(outgoing, key)
+            response = helper.redact(response if isinstance(response, dict) else {}, key)
+        except BaseException as error:
+            outcome = settle_or_halt(private, entry_id, day, {
+                'state': 'uncertain', 'held_usd': str(reserved), 'reason': 'transport_failure',
+                'error_class': type(error).__name__, 'elapsed_seconds': round(time.monotonic() - started, 6)},
+                'uncertain_charge', budget, now, slots)
+            log_event({**event, 'status': 'uncertain', **outcome})
+            raise SafetyError('NEW_CHARGE_UNCERTAIN') from None
+        elapsed = round(time.monotonic() - started, 6)
+        try:
+            changes, halt_reason, charge, reply = assess_reply(status, response, reserved, elapsed)
+        except BaseException:
+            # Paid but unaccountable: keep the full hold and stop, as for a transport failure.
+            changes, halt_reason, charge, reply = ({'state': 'uncertain', 'held_usd': str(reserved),
+                                                    'reason': 'accounting_failure', 'elapsed_seconds': elapsed},
+                                                   'uncertain_charge', None, None)
+        outcome = settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots)
+        log_event({**event, 'status': changes['state'], 'halt_reason': halt_reason, 'guard_charge_usd': charge,
+                   'elapsed_seconds': elapsed, **outcome})
+        if charge is None:
+            raise SafetyError('NEW_CHARGE_UNCERTAIN')
+        if halt_reason is not None:
+            raise SafetyError('AUTHORITY_HALTED')
+        return reply
+    finally:
+        slots.release()
+
+
+def assess_reply(status, response, reserved, elapsed):
+    """Ledger changes, halt reason, guard charge and caller reply for one redacted provider reply."""
+    accounting = bounded_accounting(helper.account_response(response))
+    charge = accounting.get('guard_charge_usd')
+    changes = {'accounting': accounting, 'elapsed_seconds': elapsed, 'http_status': status if type(status) is int else None}
+    if charge is None or accounting.get('usage_valid') is not True:
+        # A reported cost alone is not usage: without valid token counts the charge is uncertain.
+        # With both, the guard charge is the larger of the token list price and the reported cost.
+        changes.update(state='uncertain', held_usd=str(reserved), reason='usage_or_cost_unreported')
+        return changes, 'uncertain_charge', None, None
+    amount = Decimal(charge)
+    changes.update(state='settled', held_usd=str(amount), overrun_usd=str(max(Decimal(0), amount - reserved)))
+    if amount > reserved:
+        halt_reason = 'charge_overrun'
+    elif status != 200 or response.get('model') != MODEL:
+        halt_reason = 'provider_error_or_model_identity'
+    else:
+        halt_reason = None
+    # ASCII escapes keep any lone surrogate in a provider reply encodable all the way to the caller.
+    return changes, halt_reason, charge, {'status': status, 'body': json.dumps(response, ensure_ascii=True, default=str)}
+
+
+def recover_interrupted(private, now=None):
+    """Serve start only (one server per state).
+
+    Every id still in flight was interrupted. If its entry reached the ledger, its charge, its
+    halt or its reply may be lost whatever state the entry shows, so the gate halts; a pending
+    entry becomes uncertain. An id without an entry was never dispatched and is dropped. An
+    uncertain entry that no recorded halt names (on today's or an in-flight day's ledger) also
+    halts. The halt is written first, so dying here repeats the recovery.
+    """
+    now = now or helper.utc_now
+    with TeamStore(private) as store:
+        control = store.control()
+        moment, in_flight = current(now), control['in_flight']
+        ledgers = {day: store.ledger(day) for day in sorted(set(in_flight.values()) | {bucharest_day(moment)})}
+        named = {event.get('entry_id') for event in control.get('halts', [])}
+        interrupted = [(entry_id, day) for entry_id, day in sorted(in_flight.items()) if entry_id in ledgers[day]['entries']]
+        unrecorded = [entry_id for ledger in ledgers.values() for entry_id, entry in sorted(ledger['entries'].items())
+                      if entry['state'] == 'uncertain' and entry_id not in named and entry_id not in in_flight]
+        if not in_flight and not unrecorded:
+            return {'interrupted': 0, 'unrecorded_uncertain': 0}
+        for entry_id, day in interrupted:
+            pending = ledgers[day]['entries'][entry_id]['state'] == 'pending'
+            _halt(control, 'interrupted_call_uncertain' if pending else 'interrupted_after_settlement', moment, entry_id)
+        for entry_id in unrecorded:
+            _halt(control, 'uncertain_entry_unrecorded', moment, entry_id)
+        if interrupted or unrecorded:
+            store.save_control(control)
+        touched = set()
+        for entry_id, day in interrupted:
+            entry = ledgers[day]['entries'][entry_id]
+            if entry['state'] == 'pending':
+                entry.update(state='uncertain', held_usd=entry['reserved_usd'], reason='interrupted_before_reconciliation',
+                             reconciled_at=iso(moment))
+                touched.add(day)
+        for day in sorted(touched):
+            store.save_ledger(ledgers[day])
+        control['in_flight'] = {}
+        store.save_control(control)
+        return {'interrupted': len(interrupted), 'unrecorded_uncertain': len(unrecorded)}
+
+
+def hold_serve_lock(private):
+    dir_fd = helper.private_dir_fd(private)
+    try:
+        fd = helper.secure_open(dir_fd, SERVE_LOCK_NAME, os.O_RDWR, create=True)
+    finally:
+        os.close(dir_fd)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        raise SafetyError('SERVE_ALREADY_RUNNING') from None
+    return fd
+
+
+def linux_peer_uid(connection):
+    return struct.unpack('3i', connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[1]
+
+
+def caller_canceled(connection):
     # Timeout-mode recv waits for readiness even with MSG_DONTWAIT. Check
     # cancellation in nonblocking mode, then restore the reply timeout.
-    self.connection.setblocking(False)
+    connection.setblocking(False)
     try:
-     if self.connection.recv(1,socket.MSG_PEEK)==b'':raise helper.SafetyError('CALLER_CANCELED_BEFORE_DISPATCH')
-    except BlockingIOError:pass
-    finally:self.connection.settimeout(630)
-    execution_started=True
-    result=execute_request(private,go_path,data,helper,peer_uid=uid)
-    encoded=json.dumps(result,ensure_ascii=False).encode();self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(encoded)));self.end_headers();self.wfile.write(encoded)
-   except BaseException:
-    # A lost reply may follow a paid settled call; preserve the charge and stop.
-    if execution_started:
-     try:halt_authority(private,go_path,helper,'ipc_or_delivery_failure')
-     except BaseException:pass
-    try:self.send_response(409);self.end_headers();self.wfile.write(b'{"error":"PREVIEW_TEST_AUTHORITY_STOPPED"}')
-    except BaseException:pass
- server=Server(str(socket_path),Handler);os.chmod(socket_path,0o666)
- try:server.serve_forever()
- finally:server.server_close();Path(socket_path).unlink(missing_ok=True)
+        return connection.recv(1, socket.MSG_PEEK) == b''
+    except (BlockingIOError, InterruptedError):
+        return False
+    except OSError:
+        return True
+    finally:
+        connection.settimeout(REPLY_TIMEOUT_SECONDS)
 
-def main():
- parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('phase',choices=('prepare','freeze','activate','serve','stop'));parser.add_argument('--private',type=Path,required=True);parser.add_argument('--helper',type=Path,required=True,help='reviewed accounting helper (benchmark.py); no machine-specific default');parser.add_argument('--go',type=Path);parser.add_argument('--target-host',default='ROOT_MUST_SET_REVIEWED_VPS_HOST');parser.add_argument('--frozen-ledger-sha256');parser.add_argument('--socket',type=Path,default=Path('/run/debateai-v3-preview/provider-budget.sock'));args=parser.parse_args()
- try:
-  helper=load_helper(args.helper)
-  if args.phase=='prepare':result=prepare_plan(args.private,helper,args.target_host)
-  elif args.go is None:raise helper.SafetyError('ROOT_GO_REQUIRED')
-  elif args.phase=='freeze':result=freeze_source(args.private,args.go,helper)
-  elif args.phase=='activate':result=activate_target(args.private,args.go,args.frozen_ledger_sha256,helper)
-  elif args.phase=='stop':result=halt_authority(args.private,args.go,helper)
-  else:serve(args.private,args.go,helper,args.socket);return 0
-  print(json.dumps(result,ensure_ascii=False,default=str));return 0
- except BaseException as error:print(json.dumps({'status':'refused','error_class':type(error).__name__}));return 2
 
-if __name__=='__main__':raise SystemExit(main())
+def refusal_body(error):
+    code = str(error) if isinstance(error, SafetyError) and str(error) in PUBLIC_REFUSALS else STOPPED
+    return json.dumps({'error': code}).encode()
+
+
+def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_uid, now=None):
+    class Handler(BaseHTTPRequestHandler):
+        timeout = IPC_READ_TIMEOUT_SECONDS  # An idle or slow client cannot hold a thread forever.
+
+        def log_message(self, *_args):
+            pass
+
+        def reply(self, code, payload):
+            self.send_response(code)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def stop_gate(self, entry_id):
+            # A paid reply may be lost: keep the charge and stop. If even the halt cannot be
+            # written, this server reserves nothing more until it is restarted.
+            try:
+                halt(private, 'ipc_or_delivery_failure', now=now, entry_id=entry_id)
+            except BaseException:
+                slots.trip()
+
+        def do_POST(self):
+            reserved = []
+            try:
+                uid = peer_uid_of(self.connection)
+                length = int(self.headers.get('content-length', '0'))
+                if self.path != '/complete' or uid not in allowed_uids or not 1 <= length <= MAX_IPC_BYTES:
+                    raise SafetyError('IPC_REQUEST_REFUSED')
+                data = json.loads(self.rfile.read(length))
+                result = execute(data, uid, lambda: caller_canceled(self.connection), reserved.append)
+                encoded = json.dumps(result, ensure_ascii=True).encode('ascii')
+            except BaseException as error:
+                if reserved:
+                    # Once a hold exists, any failure may lose a paid reply: halt, as for a lost reply.
+                    self.stop_gate(reserved[0])
+                try:
+                    self.reply(409, refusal_body(error))
+                except BaseException:
+                    pass
+                return
+            try:
+                self.reply(200, encoded)
+            except BaseException:
+                self.stop_gate(reserved[0] if reserved else None)
+    return Handler
+
+
+class UnixThreadingServer(ThreadingMixIn, HTTPServer):
+    """One thread per connection, at most max_connections at once. Every read has a timeout and
+    every call a deadline, so server_close (which lets in-flight calls finish and settle) is bounded."""
+    address_family = socket.AF_UNIX
+    daemon_threads = False
+    max_connections = MAX_IPC_CONNECTIONS
+
+    def __init__(self, *args, **kwargs):
+        self.connection_slots = threading.BoundedSemaphore(self.max_connections)
+        super().__init__(*args, **kwargs)
+
+    def process_request(self, request, client_address):
+        if not self.connection_slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self.connection_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.connection_slots.release()
+
+    def server_bind(self):
+        self.socket.bind(self.server_address)
+        self.server_name = 'localhost'
+        self.server_port = 0
+
+
+def serve(private, go_path, socket_path, platform=None, uid=None, host=None):
+    go = read_go(go_path)
+    platform = platform or sys.platform
+    uid = os.getuid() if uid is None else uid
+    host = host or socket.gethostname()
+    if platform != 'linux' or uid != 0 or host != go['target_host'] \
+            or not SOCKET_PATTERN.fullmatch(str(socket_path)) or Path(socket_path).exists():
+        raise SafetyError('ROOT_IPC_CUSTODY_REQUIRED')
+    bucharest_day(helper.utc_now())  # Fail fast without the time zone database.
+    serve_lock = hold_serve_lock(private)
+    try:
+        recovered = recover_interrupted(private)
+        slots = CallSlots(go['max_concurrent_calls'])
+
+        def execute(data, uid, cancelled, on_reserved):
+            return execute_request(private, go_path, data, peer_uid=uid, slots=slots, cancelled=cancelled,
+                                   on_reserved=on_reserved)
+        server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots))
+        os.chmod(socket_path, 0o666)
+        emit({'status': 'serving', 'socket': str(socket_path), 'max_concurrent_calls': slots.limit,
+              'interrupted_calls_found': recovered['interrupted'],
+              'unrecorded_uncertain_found': recovered['unrecorded_uncertain']})
+        try:
+            server.serve_forever()
+        finally:
+            server.server_close()
+            Path(socket_path).unlink(missing_ok=True)
+    finally:
+        os.close(serve_lock)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('phase', choices=('init', 'activate', 'serve', 'stop', 'status'))
+    parser.add_argument('--private', type=Path, required=True)
+    parser.add_argument('--go', type=Path)
+    parser.add_argument('--socket', type=Path, default=Path('/run/debateai-v3-preview/provider-budget.sock'))
+    args = parser.parse_args(argv)
+    try:
+        uses_go = args.phase in ('init', 'activate', 'serve')
+        if uses_go and args.go is None:
+            raise SafetyError('ROOT_GO_REQUIRED')
+        # No helper code runs before its custody, and with a GO its bound hash, are checked.
+        load_helper(go_helper_sha256(args.go) if uses_go else None)
+        if args.phase == 'init':
+            result = init_state(args.private, args.go)
+        elif args.phase == 'activate':
+            result = activate(args.private, args.go)
+        elif args.phase == 'stop':
+            result = stop_authority(args.private)
+        elif args.phase == 'status':
+            result = status(args.private)
+        else:
+            serve(args.private, args.go, args.socket)
+            return 0
+        emit(result)
+        return 0
+    except BaseException as error:
+        refusal = {'status': 'refused', 'error_class': type(error).__name__}
+        if isinstance(error, SafetyError):
+            refusal['error'] = str(error)  # Fixed public codes only; never exception text from elsewhere.
+        emit(refusal)
+        return 2
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
