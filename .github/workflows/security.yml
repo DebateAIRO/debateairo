@@ -30,6 +30,40 @@ jobs:
       # runs in a row fails the gate until its entry is deleted (V-4).
       - run: node tools/source-map-hotfix.mjs tests # pnpm run test:ci-gate
       - run: node tools/source-map-hotfix.mjs audit # pnpm audit --audit-level=moderate
+  # 2026-10-09 (review of PR #82): `verify` never ran tests/integration, so the only real proof of the sign-in and
+  # account-security rules (server-side resend limit, 30-day absolute session cut-off, phone masking, recovery-email
+  # lifecycle, reset/MFA-recovery non-enumeration, the staff boundary) ran nowhere. This job runs the curated list
+  # tests/ci-integration-auth.txt through the same known-red gate, each file on its own embedded PostgreSQL
+  # (@embedded-postgres/linux-x64; no Docker, network or secrets). Separate job: it runs in parallel with `verify`
+  # (about four minutes of tests on the Mac).
+  auth-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults: { run: { working-directory: dialectical-engine } }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with: { version: 11.20.0 }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 26.8.2, cache: pnpm, cache-dependency-path: dialectical-engine/pnpm-lock.yaml }
+      - run: node tools/source-map-hotfix.mjs install # pnpm install --frozen-lockfile
+      - run: node tools/source-map-hotfix.mjs generate # pnpm run generate:contract
+      - run: node tools/source-map-hotfix.mjs integration # pnpm run test:ci-integration
+  # The registration/verification-mail suite alone takes ~35 minutes (timing-equivalence statistics and memory
+  # tripwires), so it runs as its own parallel job; its two host-sensitive cases are reported via tests/ci-flaky.txt.
+  registration-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults: { run: { working-directory: dialectical-engine } }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+        with: { version: 11.20.0 }
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: { node-version: 26.8.2, cache: pnpm, cache-dependency-path: dialectical-engine/pnpm-lock.yaml }
+      - run: node tools/source-map-hotfix.mjs install # pnpm install --frozen-lockfile
+      - run: node tools/source-map-hotfix.mjs generate # pnpm run generate:contract
+      - run: node tools/source-map-hotfix.mjs registration # pnpm run test:ci-integration-registration
   secrets:
     runs-on: ubuntu-latest
     env:

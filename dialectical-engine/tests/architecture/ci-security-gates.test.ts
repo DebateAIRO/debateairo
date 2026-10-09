@@ -40,8 +40,39 @@ describe("CI security gates (F-03)", () => {
     for (const needle of [`node-version: ${declaredNodeFloor()}`, "gitleaks", "github/codeql-action/analyze"]) expect(wf).toContain(needle);
     expect(executableGateCommands(wf)).toEqual([
       "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run typecheck",
-      "pnpm run test:ci-gate", "pnpm audit --audit-level=moderate"
+      "pnpm run test:ci-gate", "pnpm audit --audit-level=moderate",
+      // jobs auth-integration and registration-integration (2026-10-09)
+      "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-integration",
+      "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-integration-registration"
     ]);
+  });
+  // 2026-10-09 (review of PR #82): the integration suites are the only real proof of the sign-in and account-security
+  // rules, and `verify` never ran tests/integration. A separate job runs the curated list through the same gate.
+  it("runs the curated auth/security integration suites in their own job, through the known-red gate", async () => {
+    const wf = read(".github/workflows/security.yml");
+    const job = wf.slice(wf.indexOf("\n  auth-integration:\n"), wf.indexOf("\n  registration-integration:\n"));
+    const registrationJob = wf.slice(wf.indexOf("\n  registration-integration:\n"), wf.indexOf("\n  secrets:\n"));
+    expect(registrationJob).toContain("runs-on: ubuntu-latest");
+    expect(executableGateCommands(registrationJob)).toEqual(["pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-integration-registration"]);
+    expect(job).toContain("runs-on: ubuntu-latest");
+    expect(job).toContain(`node-version: ${declaredNodeFloor()}`);
+    expect(executableGateCommands(job)).toEqual(["pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-integration"]);
+    const scripts = JSON.parse(read("dialectical-engine/package.json")).scripts as Record<string, string>;
+    expect(scripts["test:ci-integration"]).toBe("node tools/ci-known-red.mjs @tests/ci-integration-auth.txt");
+    const { expandTargets } = await import(pathToFileURL(resolve(gitRoot, "dialectical-engine/tools/ci-known-red.mjs")).href) as {
+      expandTargets: (args: string[]) => { targets: string[]; invalid: string[] };
+    };
+    expect(scripts["test:ci-integration-registration"]).toBe("node tools/ci-known-red.mjs @tests/ci-integration-registration.txt");
+    const { targets, invalid } = expandTargets(["@tests/ci-integration-auth.txt", "@tests/ci-integration-registration.txt"]);
+    expect(invalid).toEqual([]);
+    for (const file of targets) expect(file).toMatch(/^tests\/integration\/[\w.-]+\.test\.ts$/);
+    // The suites the review named as the only real proof of each rule stay on the list.
+    for (const name of ["verification-send-budget", "session-database", "phone-profile-database", "recovery-email-database",
+      "backup-email-database", "password-reset-flow", "email-mfa-flow", "mfa-recovery-database", "consumer-recovery-journey",
+      "registration-database", "account-flow-release-upgrade", "staff-access-database", "staff-http-database",
+      "staff-security-acceptance", "staff-disable-races", "staff-webauthn-database"]) {
+      expect(targets, name).toContain(`tests/integration/${name}.test.ts`);
+    }
   });
   it("cannot satisfy an executable gate with a comment or removed step", () => {
     const wf = read(".github/workflows/security.yml");
