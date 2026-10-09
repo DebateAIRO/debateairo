@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { chmod, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -27,7 +27,9 @@ const fundingPolicy = internalAllowancePolicyFromValue(fundingValue, "test:staff
 if (!fundingPolicy.enabled) throw Error("Enabled synthetic funding policy required");
 const fundedStaffValue = { ...(STAFF_ACCESS_POLICY_REGISTER_ROW.value as Record<string, unknown>), funding_policy_version: 1,
   active_capabilities: [...(STAFF_ACCESS_POLICY_REGISTER_ROW.value as { active_capabilities: string[] }).active_capabilities, "ALLOWANCE_WRITE"] };
-type DatabaseState = { installation: unknown; published: boolean; authorized: string[]; funded: boolean };
+type DatabaseState = { installation: unknown; published: boolean; authorized: string[]; funded: boolean;
+  /** Fake alert outbox: every claim spends one attempt, as staff.claim_alert_delivery does. */
+  outbox: Array<Record<string, unknown>>; keyUsers: Map<string, string>; claimCalls: number; attempts: number; receipts: Array<{ outcome: unknown; failure: unknown }> };
 /** Enumerated SQL answers only; any unknown statement returns no row and fails closed. */
 function database(state: DatabaseState): Pool {
   const answer = (sql: string, params: readonly unknown[]): unknown[] => {
@@ -38,23 +40,47 @@ function database(state: DatabaseState): Pool {
     if (sql.includes("staff.read_independent_alert_readiness")) return [{ value: state.published ? "READY" : "UNAVAILABLE" }];
     if (sql.includes("staff.authorize_alert_operation")) { if (state.published) state.authorized.push(String(params[0])); return [{ value: state.published }]; }
     if (sql.includes("staff.read_alert_user_mapping")) return [{ value: { userId: params[0], keyRef } }];
+    if (sql.includes("staff.claim_alert_delivery")) {
+      state.claimCalls++;
+      const row = state.outbox.shift();
+      if (row === undefined) return [{ value: [] }];
+      state.attempts++;
+      return [{ value: [{ ...row, claimToken: randomUUID(), attempt: state.attempts }] }];
+    }
+    if (sql.includes("staff.read_alert_key_mapping")) return [{ value: { state: "CURRENT", mapping: { userId: state.keyUsers.get(String(params[0])), keyRef } } }];
+    if (sql.includes("staff.settle_alert_delivery")) { state.receipts.push({ outcome: params[2], failure: params[3] }); return [{ value: true }]; }
+    if (sql.includes("staff.read_alert_delivery_status")) return [{ value: { pending: state.outbox.length, acked: 0, severed: 0, exhausted: 0 } }];
     return [];
   };
   const query = async (sql: string, params: readonly unknown[] = []) => ({ rows: answer(sql, params) });
   return { query, connect: async () => ({ query, release: () => undefined }) } as unknown as Pool;
 }
+/** Queue a sealed alert intent exactly as the outbox would hand it to the dispatcher. */
+function enqueue(state: DatabaseState, intent: { event: string; operationId: string; envelope: unknown }, keyUserId: string): void {
+  const outboxId = randomUUID();
+  state.keyUsers.set(outboxId, keyUserId);
+  state.outbox.push({ outboxId, eventId: randomUUID(), operationId: intent.operationId, event: intent.event, purpose: "INDEPENDENT_METADATA_ALERT", keyRef, envelope: intent.envelope });
+}
+async function until(done: () => boolean, ms = 3000): Promise<void> {
+  for (const deadline = Date.now() + ms; !done(); await new Promise(r => setTimeout(r, 20))) if (Date.now() > deadline) throw Error("TIMED_OUT");
+}
+const lockedLine = (reason: string) => JSON.stringify({ event: "api.staff.tools_locked", reason });
+const waitingLine = JSON.stringify({ event: "api.staff.alerts_waiting", reason: "READINESS_STALE" });
 
 async function fixture() {
   const root = await realpath(await mkdtemp(join(tmpdir(), "staff-boot-locked-")));
   roots.push(root);
   const configPath = join(root, "alert.json"), executable = join(root, "capture-sendmail"), ackState = join(root, "ack-state"), operatorPath = join(root, "operator.mjs");
-  await writeFile(executable, "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+  // The submitted independent alert mail lands in `sent` (real spawn, no shell interpolation of data).
+  const sent = join(root, "sent.eml");
+  await writeFile(executable, `#!/bin/sh\ncat > '${sent}'\n`, { mode: 0o700 });
   await writeFile(configPath, JSON.stringify({ schema: "staff-independent-alert-config-v1", generation: randomUUID(), executable,
     from: "noreply@example.test", recipient: "independent@example.test", ackAdapterId: "capture" }), { mode: 0o600 });
   await writeFile(ackState, "STALE", { mode: 0o600 });
   const operatorSource = `import {readFile} from 'node:fs/promises';import {createHash} from 'node:crypto';export function createStaffAlertOperatorAdapters(){return {schema:'staff-alert-operator-v1',acknowledgements:new Map([['capture',{evidence:async config=>{if(await readFile(${JSON.stringify(ackState)},'utf8')!=='FRESH')return null;return {configSha256:createHash('sha256').update(await readFile(${JSON.stringify(configPath)})).digest('hex'),generation:config.generation,rehearsalId:${JSON.stringify(randomUUID())},expiresAt:new Date(Date.now()+60000)};},acknowledge:async()=> 'ACK'}]]),invitationDelivery:{send:async()=> 'ACK'},dispatch:{batchSize:1,intervalMs:100}};}`;
   await writeFile(operatorPath, operatorSource, { mode: 0o600 });
-  const state: DatabaseState = { installation: { operationId: randomUUID(), outcome: "COMPLETED", recordedAt: new Date().toISOString() }, published: false, authorized: [], funded: false };
+  const state: DatabaseState = { installation: { operationId: randomUUID(), outcome: "COMPLETED", recordedAt: new Date().toISOString() }, published: false, authorized: [], funded: false,
+    outbox: [], keyUsers: new Map(), claimCalls: 0, attempts: 0, receipts: [] };
   const deks = new Map<string, Buffer>();
   const keys = { load: async (userId: string) => { const key = deks.get(userId) ?? Buffer.alloc(32, 9); deks.set(userId, key); return Buffer.from(key); },
     store: async () => undefined, exists: async () => true, destroy: async () => "ALREADY_ABSENT" } as unknown as ReadableUserDekStore;
@@ -66,7 +92,7 @@ async function fixture() {
     operatorFiles: syntheticAlertFiles(root), configurationFiles: syntheticAlertFiles(root), logEvent: (line: string) => { lines.push(line); }
   };
   const unlock = async () => { await writeFile(ackState, "FRESH"); state.published = true; };
-  return { root, configPath, ackState, state, activation, lines, unlock };
+  return { root, configPath, ackState, sent, state, activation, lines, unlock };
 }
 
 describe("staff runtime boot without fresh alert readiness", () => {
@@ -143,6 +169,29 @@ describe("staff runtime boot without fresh alert readiness", () => {
     await expect(createStaffRuntime(funded(local, "local"))).rejects.toThrow("STAFF_UNAVAILABLE");
     expect(local.lines).toEqual([]);
   });
+
+  it("start() while locked claims nothing, so a queued alert keeps all three attempts and goes out after unlock", async () => {
+    const f = await fixture();
+    const runtime = await createStaffRuntime(f.activation);
+    try {
+      const operationId = randomUUID();
+      enqueue(f.state, await runtime.intents.mutation({ event: "DISABLE", operationId, keyUserId: targetUser, actorStaffId: null, subjectStaffId: null,
+        reason: { code: "SECURITY_RESPONSE" } }), targetUser);
+      runtime.start();
+      await new Promise(r => setTimeout(r, 350)); // the immediate boot drain plus three 100 ms dispatch ticks
+      expect(f.state.claimCalls).toBe(0);
+      expect(f.state.attempts).toBe(0);
+      expect(f.state.receipts).toEqual([]);
+      expect(f.lines).toEqual([lockedLine("ACK_EVIDENCE_STALE"), waitingLine]);
+      await f.unlock();
+      await until(() => f.state.receipts.length > 0);
+      expect(f.state.receipts).toEqual([{ outcome: "DELIVERED", failure: null }]);
+      expect(f.state.attempts).toBe(1);
+      const mail = await readFile(f.sent, "utf8");
+      expect(mail).toContain('"event":"DISABLE"');
+      expect(mail).toContain(operationId);
+    } finally { await runtime.close(); }
+  });
 });
 
 const targetUser = "44444444-4444-4444-8444-444444444444", targetStaff = "55555555-5555-4555-8555-555555555555", actorStaff = "66666666-6666-4666-8666-666666666666";
@@ -161,12 +210,14 @@ async function lockedHttp() {
     readInvitationContext: async () => null, readOwnerPossessionContext: async () => null, registerPrivilegedConnection: () => () => undefined
   };
   const writes: Array<{ kind: string; operationId: string; event: string }> = [];
+  const alertIntents: Array<{ event: string; operationId: string; envelope: unknown }> = [];
   const receipt = (operationId: string) => ({ operationId, outcome: "COMPLETED", recordedAt: new Date() });
   const repository = {
     readMutationTarget: async () => targetUser,
     invite: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "invite", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); },
     grant: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "grant", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); },
-    disable: async (input: { operationId: string; alertIntent: { event: string } }) => { writes.push({ kind: "disable", operationId: input.operationId, event: input.alertIntent.event }); return receipt(input.operationId); },
+    disable: async (input: { operationId: string; alertIntent: { event: string; operationId: string; envelope: unknown } }) => {
+      writes.push({ kind: "disable", operationId: input.operationId, event: input.alertIntent.event }); alertIntents.push(input.alertIntent); return receipt(input.operationId); },
     readIssuedInvitation: async () => ({ invitationId: randomUUID(), expiresAt: new Date(Date.now() + 86400000) })
   };
   const sessions = testSessionApplication([account]);
@@ -182,7 +233,7 @@ async function lockedHttp() {
   const disable = (operation_id = randomUUID()) => api.inject({ method: "POST", url: `/v1/admin/team/${targetStaff}/disable`, headers,
     payload: { mode: "COMPROMISE", operation_id, reason: { code: "SECURITY_RESPONSE" }, ...mutation } });
   const close = async () => { await api.close(); await runtime.close(); };
-  return { f, writes, invite, grant, disable, close };
+  return { f, runtime, writes, alertIntents, invite, grant, disable, close };
 }
 
 describe("locked Team tools at request time", () => {
@@ -217,13 +268,28 @@ describe("locked Team tools at request time", () => {
     } finally { await h.close(); }
   });
 
-  it("keeps containment available while locked: disable is recorded with its alert queued", async () => {
+  it("keeps containment available while locked: disable is recorded and its alert waits unclaimed until unlock, then is delivered", async () => {
     const h = await lockedHttp();
     try {
       const disableId = randomUUID();
       const disabled = await h.disable(disableId);
       expect(disabled.statusCode).toBe(200);
       expect(h.writes).toEqual([{ kind: "disable", operationId: disableId, event: "DISABLE" }]);
+      // The sealed DISABLE alert the route handed to the record write enters the (fake) outbox.
+      expect(h.alertIntents).toHaveLength(1);
+      enqueue(h.f.state, h.alertIntents[0]!, targetUser);
+      h.runtime.start();
+      await new Promise(r => setTimeout(r, 250));
+      expect(h.f.state.claimCalls).toBe(0);
+      expect(h.f.state.receipts).toEqual([]);
+      await h.f.unlock();
+      await until(() => h.f.state.receipts.length > 0);
+      expect(h.f.state.receipts).toEqual([{ outcome: "DELIVERED", failure: null }]);
+      expect(h.f.state.attempts).toBe(1);
+      const mail = await readFile(h.f.sent, "utf8");
+      expect(mail).toContain('"event":"DISABLE"');
+      expect(mail).toContain(disableId);
+      expect(mail).toContain(targetStaff);
     } finally { await h.close(); }
   });
 });

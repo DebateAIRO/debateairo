@@ -466,6 +466,8 @@ function failure(error: unknown): StaffAlertFailureCode {
 export class StaffAlertDispatcher {
     private draining = false;
     private stopped = false;
+    /** True while queued alerts wait for fresh readiness; the waiting line is logged once per lock. */
+    private waiting = false;
     private readonly activeDeliveries = new Set<AbortController>();
     stop(): void { this.stopped = true; for (const controller of this.activeDeliveries) controller.abort(); }
     constructor(private readonly dependencies: Readonly<{
@@ -475,6 +477,8 @@ export class StaffAlertDispatcher {
         targetInvitationTransport?: StaffTargetInvitationTransport;
         readiness: () => Promise<'READY' | 'UNAVAILABLE'>;
         log?: (code: StaffAlertFailureCode | 'SEVERED') => void;
+        /** One secret-free JSON line when queued alerts start waiting for readiness. */
+        logEvent?: (line: string) => void;
         timeoutMs?: number;
     }>) {
         if (dependencies.timeoutMs !== undefined && (!Number.isInteger(dependencies.timeoutMs) || dependencies.timeoutMs < 1 || dependencies.timeoutMs > 5000))
@@ -502,6 +506,27 @@ export class StaffAlertDispatcher {
             controller.signal.removeEventListener('abort', abort);
             controller.abort();
         }
+    }
+    /** Pre-claim gate. claim_alert_delivery spends one of a row's three attempts on every claim, so
+     * while readiness is stale (or unreadable) nothing is claimed: queued alerts, DISABLE included,
+     * keep their attempts and go out on the first drain after the operator unlocks. */
+    private async readyToClaim(): Promise<boolean> {
+        let ready = false;
+        try {
+            await this.bounded(async () => { ready = await this.dependencies.readiness() === 'READY'; });
+        }
+        catch {
+            ready = false;
+        }
+        if (ready) {
+            this.waiting = false;
+            return true;
+        }
+        if (!this.stopped && !this.waiting) {
+            this.waiting = true;
+            this.dependencies.logEvent?.(JSON.stringify({ event: 'api.staff.alerts_waiting', reason: 'READINESS_STALE' }));
+        }
+        return false;
     }
     private async deliver(claim: StaffAlertClaim, signal: AbortSignal): Promise<void> {
         let key: Buffer | undefined;
@@ -600,6 +625,10 @@ export class StaffAlertDispatcher {
             // Claim just in time; a batch of 100 five-second sends must not carry a
             // single already-expired lease by the time its last event is admitted.
             for (let count = 0; count < limit && !this.stopped; count++) {
+                // Checked before EVERY claim: a lapse after one claim costs that row one attempt
+                // (settled FAILED below; the SQL has no uncounted release) and stops the batch here.
+                if (!await this.readyToClaim() || this.stopped)
+                    break;
                 const claims = await this.dependencies.repository.claim(1);
                 const claim = claims[0];
                 if (!claim || this.stopped)

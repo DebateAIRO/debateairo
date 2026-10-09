@@ -130,7 +130,8 @@ export async function createStaffRuntime(input: Readonly<{
     operatorFiles?: StaffAlertConfigFiles;
     configurationFiles?: StaffAlertConfigFiles;
     log?: (code: string) => void;
-    /** One JSON line per boot when Team tools start locked. Defaults to stderr. */
+    /** Secret-free JSON lines: api.staff.tools_locked once per boot when Team tools start locked, and
+     * api.staff.alerts_waiting once per lock while queued alerts wait for readiness. Defaults to stderr. */
     logEvent?: (line: string) => void;
     deploymentMode?: "hosted" | "local";
     billingPlans?: BillingPlans | null;
@@ -155,12 +156,13 @@ export async function createStaffRuntime(input: Readonly<{
         const installation = await staffRepository.readOwnerRecoveryInstallation();
         if (installation === null || installation.outcome !== 'COMPLETED')
             throw unavailable();
+        const emit = input.logEvent ?? (line => console.warn(line));
         // Not cached: the lock reason is logged once; actions consult `readiness` on every request.
         const locked = await toolsLockedReason(configuration, repository);
         if (locked !== null)
-            (input.logEvent ?? (line => console.warn(line)))(JSON.stringify({ event: 'api.staff.tools_locked', reason: locked }));
+            emit(JSON.stringify({ event: 'api.staff.tools_locked', reason: locked }));
         const targetInvitationTransport = new VerifiedStaffTargetInvitationTransport({ publicAppUrl: input.publicAppUrl, channels: staffRepository, keys: input.keys, delivery: operator.invitationDelivery });
-        const dispatcher = new StaffAlertDispatcher({ repository, keys: input.keys, independentTransport: new RootConfiguredStaffAlertTransport(configuration), targetInvitationTransport, readiness: () => readiness.readIndependentAlertReadiness(), ...(input.log ? { log: input.log } : {}) });
+        const dispatcher = new StaffAlertDispatcher({ repository, keys: input.keys, independentTransport: new RootConfiguredStaffAlertTransport(configuration), targetInvitationTransport, readiness: () => readiness.readIndependentAlertReadiness(), logEvent: emit, ...(input.log ? { log: input.log } : {}) });
         let timer: ReturnType<typeof setInterval> | undefined, running: Promise<unknown> | undefined, closed = false;
         const trigger = () => {
             if (closed || running !== undefined)
