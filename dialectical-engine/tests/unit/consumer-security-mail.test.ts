@@ -11,10 +11,14 @@ describe('consumer recovery and security mail purposes', () => {
         expect(serializeAccountMail(input, 'noreply@dezbatere.ro')).toContain('X-Account-Template: consumer-recovery-v1');
     });
     // Design note 2026-10-09 item 3: every verified email is told when a recovery code is used; codes are not refilled.
-    it('tells the owner in plain words that a recovery code was just used to sign in, with no link and no code', () => {
+    // Review D3 2026-10-09: the same mail goes out for sign-in, a security confirmation (step-up) and account-recovery
+    // proof, so it says "was just used", never "to sign in". The prose is English only; locales format the time.
+    it('tells the owner in plain words that a recovery code was just used, with no link and no code', () => {
         const input = { template: 'security-recovery-code-used-v1', recipient, expiresAt, messageId: '11111111-1111-4111-8111-111111111111' } as AccountMailInput;
         const mail = renderAccountEmail(input);
-        expect(mail.text).toContain('One of your recovery codes was just used to sign in.');
+        expect(mail.text).toContain('One of your recovery codes was just used.');
+        expect(mail.text).not.toContain('to sign in');
+        expect(renderAccountEmail({ ...input, display: { locale: 'ro', timeZone: 'Europe/Bucharest' } }).text).toContain('One of your recovery codes was just used.');
         expect(mail.text).toContain("If this wasn't you,");
         expect(mail.text).not.toMatch(/https?:\/\//u);
         expect(serializeAccountMail(input, 'noreply@dezbatere.ro')).toContain('X-Account-Template: security-recovery-code-used-v1');

@@ -5,7 +5,7 @@ export type EmailRecoveryNotice=Readonly<{noticeId:string;leaseId:string;userId:
 export type MfaRecoveryRecord=Readonly<{stage:string;expiresAt:string;csrfHash:string|null;notBefore?:string|null;userId?:string;emailCiphertext?:CryptoEnvelope;factorId?:string|null;factorSecret?:CryptoEnvelope|null;lastAcceptedStep?:number|null;nowMs?:number}>;
 export type BackupEmailRecord=Readonly<{userId:string;status:"pending"|"verified"|"unavailable";channelId:string|null;backupCiphertext:CryptoEnvelope|null;passwordHash:string;factorId:string;factorSecret:CryptoEnvelope;lastAcceptedStep:number|null;nowMs:number;channels:readonly EmailRecoveryChannel[]}>;
 export type MfaRecoveryExchangeCandidate=Readonly<{userId:string;passwordHash:string;channels:readonly string[];bindingChannelIds:readonly string[]}>;
-// Owner ruling 2026-10-09: the email-link + password recovery waits 24 hours before it replaces anything (0109).
+// Owner ruling 2026-10-09: the email-link + password recovery waits 24 hours before it replaces anything (the auth DB batch step).
 export type MfaRecoveryWaitChannel=Readonly<{channelId:string;channelType:"email"|"recovery_email";addressCiphertext:CryptoEnvelope;cancelAuthorized:boolean}>;
 export type MfaRecoveryWaitPreparation=Readonly<{userId:string;proofChannelId:string;channels:readonly MfaRecoveryWaitChannel[]}>;
 export type MfaRecoveryWaitStart=Readonly<{status:"WAITING";notBefore:string;expiresAt:string}>;

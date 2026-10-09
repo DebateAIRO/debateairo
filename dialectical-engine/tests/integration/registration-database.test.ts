@@ -1259,9 +1259,9 @@ setTimeout(() => undefined, 500);
     expect(state.rows[0]!.state).toBe("pending_mfa");
   });
 
-  // Owner ruling 2026-10-09: the phone is optional at sign-up. EXPECTED RED until a forward migration
-  // lets identity.create_pending_account_base_internal (0096, renamed in 0101) accept a NULL phone:
-  // it still raises PHONE_PROFILE_INVALID. The table itself allows "no phone" since 0095.
+  // Owner ruling 2026-10-09: the phone is optional at sign-up. The auth DB batch forward step lets
+  // identity.create_pending_account_base_internal (0096, renamed in 0101) accept an all-NULL phone and
+  // store no phone columns; a given phone keeps its checks. The table itself allows "no phone" since 0095.
   it("registers an account without a phone and stores no phone profile", async () => {
     const flow = buildService();
     const email = "no-phone@example.test";

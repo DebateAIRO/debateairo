@@ -66,9 +66,10 @@ export function renderAccountEmail(input) {
       paragraphs = [`Both recovery proofs were accepted at ${expiry}.`, 'Existing sessions have ended. Normal sign-in remains blocked until a replacement security method is verified.', 'If you did not begin recovery, contact the site operator immediately.'];
       break;
     case 'security-recovery-code-used-v1':
-      // 2026-10-09: a used recovery code is not refilled; every verified email is told when one is used.
+      // 2026-10-09: a used recovery code is not refilled; every verified email is told when one is used — to sign in,
+      // to confirm a security change, or to prove an account recovery, so the sentence names none of them.
       subject = 'A Dialectical Engine recovery code was used';
-      paragraphs = ['One of your recovery codes was just used to sign in.', `This happened at ${expiry}. Each code works only once.`, "If this wasn't you, contact the site operator immediately, then change your password and create new recovery codes in Settings."];
+      paragraphs = ['One of your recovery codes was just used.', `This happened at ${expiry}. Each code works only once.`, "If this wasn't you, contact the site operator immediately, then change your password and create new recovery codes in Settings."];
       break;
     case 'security-recovery-completed-v1':
       subject = 'Your Dialectical Engine account recovery completed';
