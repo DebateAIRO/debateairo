@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "Đăng xuất không hoàn tất. Vui lòng thử lại.",
   "newDebate.room.locationBlocked": "Không thể bắt đầu cuộc tranh luận mới từ vị trí hiện tại của bạn. Các cuộc tranh luận của bạn vẫn có thể đọc được.",
   "newDebate.room.previewTeamOnly": "Các cuộc tranh luận trên bản xem trước này chỉ dành cho nhóm.",
+  "newDebate.room.phoneRequired": "Vui lòng thêm số điện thoại trong Cài đặt, hoặc thử lại sau vài phút.",
   "newDebate.room.siteFull": "Đã đạt giới hạn của hôm nay. Bạn vẫn có thể đặt câu hỏi — cuộc tranh luận của bạn sẽ tự bắt đầu khi giới hạn được đặt lại.",
   "newDebate.room.siteClose": "Bạn sắp đạt giới hạn của hôm nay. Cuộc tranh luận này vẫn sẽ diễn ra đầy đủ; các cuộc sau có thể phải chờ đến khi đặt lại.",
   "newDebate.room.alreadyWaiting": "Mỗi lần chỉ một câu hỏi được chờ. Câu hỏi của bạn sẽ bắt đầu lúc {time}; hãy đặt câu hỏi này sau thời điểm đó.",
