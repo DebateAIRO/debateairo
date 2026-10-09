@@ -13,10 +13,8 @@ import {
   Argon2InfrastructureError,
   createEmailBlindIndex,
   decrypt,
-  generateRecoveryCode,
   generateVerificationToken,
   hashPassword,
-  hashRecoveryCode,
   hashToken,
   matchTotpStep,
   normalizeEmailForBlindIndex,
@@ -59,7 +57,6 @@ export type LoginResult = Readonly<{
   sessionToken: string;
   csrfToken: string;
   session: Session;
-  replacementRecoveryCode?: string;
 }>;
 
 /** Internal producer for verified consumer methods. Raw bearers never cross the HTTP projection. */
@@ -527,7 +524,6 @@ export class SessionService implements SessionApplication {
       const socialAuthority={admittedProviders,...(source.socialBrowserHash===undefined?{}:{browserHash:source.socialBrowserHash})};
       const material = this.sessionMaterial(now);
       const context = Object.freeze({ user_agent_hash: bindingHash });
-      let replacementRecoveryCode: string | undefined;
       let completed = false;
       if (/^\d{6}$/.test(input.code)) {
         const acceptedStep = await this.totpStep(challenge, input.code, now);
@@ -556,17 +552,11 @@ export class SessionService implements SessionApplication {
             record.codeHash, this.dependencies.mfaPolicy.recoveryCodes.argon2id, "recovery-code"
           )
           && await verifyRecoveryCode(this.dependencies.argon2, record.codeHash, recoveryCode);
+        // Design note 2026-10-09 item 3: the used code is consumed and never refilled.
         if (verified && record !== null) {
-          replacementRecoveryCode = generateRecoveryCode(record.codeSlot);
-          const replacementHash = await hashRecoveryCode(
-            this.dependencies.argon2,
-            replacementRecoveryCode,
-            this.dependencies.mfaPolicy.recoveryCodes.argon2id
-          );
           completed = await this.dependencies.repository.completeRecoveryLogin({
             ...socialAuthority,recoveryCodeHash:record.codeHash,challenge,
             recoveryCodeId: record.recoveryCodeId,
-            replacementHash,
             bindingHash,
             sessionId: material.sessionId,
             sessionTokenHash: material.sessionTokenHash,
@@ -587,7 +577,7 @@ export class SessionService implements SessionApplication {
       }
       this.limiter.clearEnrollment(rateKey);
       const result=await this.consumerProducer().committed({...material,bindingHash,sessionBindingContext:context,occurredAt:now},challenge,source);
-      return Object.freeze({...result,...(replacementRecoveryCode===undefined?{}:{replacementRecoveryCode})});
+      return Object.freeze(result);
     } catch (error) {
       throw asAuthFailure(error);
     }

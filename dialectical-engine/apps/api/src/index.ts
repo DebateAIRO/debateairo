@@ -1872,8 +1872,8 @@ function csrfCookie(value: string, maxAgeSeconds: number): string {
 
 /** All verified consumer methods share this sole public bearer/cookie projection. */
 function completeAuthenticatedResponse(reply:FastifyReply,result:LoginResult):FastifyReply {
-  const response=AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session,
-    ...(result.replacementRecoveryCode===undefined?{}:{replacement_recovery_code:result.replacementRecoveryCode})});
+  // Design note 2026-10-09 item 3: a used recovery code is never refilled, so no replacement code is returned.
+  const response=AuthenticationResponseSchema.parse({status:result.status,csrf_token:result.csrfToken,session:result.session});
   reply.header("set-cookie",[sessionCookie(result.sessionToken,SESSION_IDLE_MAX_AGE_SECONDS),csrfCookie(result.csrfToken,SESSION_IDLE_MAX_AGE_SECONDS),...(exactCookie(reply.request.headers.cookie,SOCIAL_BROWSER_COOKIE)===null?[]:[`${SOCIAL_BROWSER_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`])]);
   return reply.send(response);
 }

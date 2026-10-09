@@ -762,10 +762,11 @@ export class PostgresIdentityRepository {
     });
   }
 
-  async consumeAndReplaceRecoveryCode(input: {
+  /** Consumes one saved recovery code. It is never refilled (design note 2026-10-09 item 3); the database tells every
+   * verified email that a code was used. The SQL keeps its old replacement argument, which it ignores. */
+  async consumeRecoveryCode(input: {
     readonly userId: string;
     readonly recoveryCodeId: string;
-    readonly replacementHash: string;
     readonly occurredAt: Date;
     readonly source: AuthSourceContext;
   }): Promise<boolean> {
@@ -773,9 +774,9 @@ export class PostgresIdentityRepository {
     return this.transaction(async (client) => {
       const result = await client.query<{ valid: boolean }>(`
         SELECT identity.consume_recovery_code_with_audit(
-          $1,$2,$3,$4,$5::jsonb
+          $1,$2,NULL,$3,$4::jsonb
         ) AS valid
-      `, [input.userId,input.recoveryCodeId,input.replacementHash,input.occurredAt,
+      `, [input.userId,input.recoveryCodeId,input.occurredAt,
         JSON.stringify({ ipArgon2id: prepared.ipArgon2id,
           userAgentArgon2id: prepared.userAgentArgon2id })]);
       return result.rows[0]?.valid === true;

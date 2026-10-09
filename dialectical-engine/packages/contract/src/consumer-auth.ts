@@ -170,7 +170,7 @@ export type PasskeyEnrollmentResponse=z.infer<typeof PasskeyEnrollmentResponseSc
 
 
 export const ConsumerRecoveryProveRequestSchema=z.object({token:HandleSchema,recovery_code:z.string().min(1).max(128),method:z.enum(['passkey','totp'])}).strict();
-export const ConsumerRecoveryProofResponseSchema=z.object({status:z.literal('RECOVERY_ENROLL_ONLY'),available_methods:z.array(z.enum(['passkey','totp'])).min(1).max(2),totp_unavailable_reason:z.literal('PASSWORD_UNAVAILABLE').nullable(),recovery_capability:HandleSchema,replacement_recovery_code:z.string().min(1).max(128),expires_at:z.iso.datetime()}).strict();
+export const ConsumerRecoveryProofResponseSchema=z.object({status:z.literal('RECOVERY_ENROLL_ONLY'),available_methods:z.array(z.enum(['passkey','totp'])).min(1).max(2),totp_unavailable_reason:z.literal('PASSWORD_UNAVAILABLE').nullable(),recovery_capability:HandleSchema,replacement_recovery_code:z.string().min(1).max(128).optional(),expires_at:z.iso.datetime()}).strict();
 export const RecoveryEnrollmentBeginRequestSchema=z.object({recovery_capability:HandleSchema,method:z.enum(['passkey','totp'])}).strict();
 export const RecoveryEnrollmentCompleteRequestSchema=z.union([
  z.object({recovery_capability:HandleSchema,challenge_handle:HandleSchema,credential:ConsumerRegistrationCredentialSchema,label:z.string().trim().min(1).max(128).optional()}).strict(),
