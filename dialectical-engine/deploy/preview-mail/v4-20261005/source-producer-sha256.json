@@ -10,8 +10,8 @@
     "recovery-mail-policy-two-owned103.mjs": "b6ce9c849b3baceead6938db5b97c53bbff46f4bbd3e1fe8856d8c75f129772b"
   },
   "redactedInstalledSource": {
-    "installed-recovery-mail-policy-two-owned103.mjs.redacted.txt": "058d6034b914edfb0e1121e0349054c5a91788cd971f856b929427d57c996b30",
-    "installed-sendmail-two-owned-preview-recovery103.mjs.redacted.txt": "a3063f3cddf3eca63ede872814f92104c48cadfab70cc499221cc4fb9d5bddc4"
+    "installed-recovery-mail-policy-two-owned103.mjs.redacted.txt": "75934a4847b208fcd566404dd891eafdc1e0bc53936b10aa41b88dcf90b285e2",
+    "installed-sendmail-two-owned-preview-recovery103.mjs.redacted.txt": "f9d8359e171f5878e5e26c61932fdc701de4e184ec12a8e717ae89f99b3bf0e7"
   },
   "sourceMatrix": {
     "purposes": 13,
@@ -22,7 +22,7 @@
     "sourceCaptureManifestSha256": "43cba442f969d38c5b18bfa650e8e56c983a1ceaa36db81e90fc30741f52de92",
     "receiptSha256": "85f1296d22e666416628a1904dd59c830f79ae9771dadfbc4c9bebc089959d40"
   },
-  "originalAliases": "restricted ignored evidence only; recipient bindings in artifact are SHA-256 digests",
+  "originalAliases": "restricted ignored evidence only; no recipient address or recipient digest is tracked (allow-list is root-owned installation data)",
   "installation": "NOT_INSTALLED",
   "delivery": "NOT_OBSERVED",
   "initialSourceMatrix": {
@@ -62,6 +62,30 @@
       "test-source-producer.mjs": "6a84f3aeff245d33b6106de5ecd0f4f92fd65be16c7c93b1d11fb78f55c4e480",
       "installed-sendmail-two-owned-preview-recovery103.mjs.redacted.txt": "ab5629f99ce2bff1111f6afbf699cbbb50712cb1d8d6cbaa530fb59fb6fd58bd",
       "synthetic-recipient-fixture.mjs": "c67250510aa164cbdfde85b20b25c8ae342b1490d616a4c997e73ae3d69a005c"
+    }
+  },
+  "recipientDigestWithdrawal": {
+    "date": "2026-10-09",
+    "reason": "Plain SHA-256 recipient digests are guessable; the recipient allow-list moved to the root-owned installation file and is never tracked.",
+    "removedFiles": [
+      "recipient-bindings.json"
+    ],
+    "withheld": [
+      "review-captures/capture-manifest.json observedBindings.recipientSha256",
+      "installed-sendmail-two-owned-preview-recovery103.mjs.redacted.txt withheld-digest markers"
+    ],
+    "derivativeMeaning": "Installed-source review derivatives use alias-derived constant names and no digests; their hashes differ from earlier derivatives and from the retained original installation fingerprints. Receipts and original capture hashes are unchanged.",
+    "supersedes": [
+      "reviewCaptureRevision.currentDerivativeManifestSha256",
+      "privacyCorrection.correctedFileSha256"
+    ],
+    "currentDerivativeManifestSha256": "204370619012a2c28c8df8e9e87ce3d9d091b69265400de2b7e28ee4dbd7d4ef",
+    "correctedFileSha256": {
+      "sendmail-owned-preview.mjs": "ca52301f866c70b25297b11da59aaeef51e42c6217f435aefee4496d0682fd10",
+      "test-mail.mjs": "767392a1a7342bb1266c651fe1877dc7a204f4297ea8fb6951fa64b9d0cd94b7",
+      "test-source-producer.mjs": "e56f458dae996a75a8fc319ddd2e7724c7a9b5c0f34a92a38a13ee78aa23e3ea",
+      "installed-sendmail-two-owned-preview-recovery103.mjs.redacted.txt": "f9d8359e171f5878e5e26c61932fdc701de4e184ec12a8e717ae89f99b3bf0e7",
+      "installed-recovery-mail-policy-two-owned103.mjs.redacted.txt": "75934a4847b208fcd566404dd891eafdc1e0bc53936b10aa41b88dcf90b285e2"
     }
   }
 }

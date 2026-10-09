@@ -8,9 +8,9 @@ import { serializeAccountMail, ACCOUNT_MAIL_LOCALES } from './account-mail-templ
 import { validateInvocation, cleanSubmissionEnvironment, readBounded } from './sendmail-owned-preview.mjs';
 const here=new URL('../',import.meta.url);
 const token='Z'.repeat(43);
-const from='noreply@dezbatere.ro',gmail='secondary@example.test',stefan='primary@example.test';
+const from='noreply@dezbatere.ro',forwardTarget='secondary@example.test',forwardPrimary='primary@example.test';
 const sourceArgs=['-i','-t','-f',from];
-function message(to=stefan) {
+function message(to=forwardPrimary) {
  return Buffer.from(serializeAccountMail({template:'verification-v1',recipient:to,url:new URL('https://v3-preview.dezbatere.ro/verify-email#token='+token),expiresAt:new Date('2026-10-05T07:41:00Z'),display:{locale:'ro',timeZone:'Europe/Bucharest'}},from));
 }
 
@@ -29,30 +29,30 @@ function stub({exit=0,ignoreTerm=false,neverClose=false,stdinFail=false}={}) {
 }
 test('only exact Source argv is admitted',()=>{
  validateInvocation(sourceArgs);
- for(const args of [[],['-t','-i','-f',from],[...sourceArgs,gmail],['-i','-t','-f','unowned@example.test'],['-i','-f',from,'--',gmail]])assert.throws(()=>validateInvocation(args));
+ for(const args of [[],['-t','-i','-f',from],[...sourceArgs,forwardTarget],['-i','-t','-f','unowned@example.test'],['-i','-f',from,'--',forwardTarget]])assert.throws(()=>validateInvocation(args));
 });
 test('owned forwarder rewrites only one To header and preserves body/token bytes',()=>{
  const before=message();const after=ownedForwardingMessage(before);
- assert.ok(after.equals(Buffer.from(before.toString().replace('To: '+stefan,'To: '+gmail))));
+ assert.ok(after.equals(Buffer.from(before.toString().replace('To: '+forwardPrimary,'To: '+forwardTarget))));
  assert.deepEqual(before.subarray(before.indexOf('\r\n\r\n')+4),after.subarray(after.indexOf('\r\n\r\n')+4));
- assert.deepEqual(ownedForwardingMessage(message(gmail)),message(gmail));
+ assert.deepEqual(ownedForwardingMessage(message(forwardTarget)),message(forwardTarget));
 });
 test('unowned/fanout/duplicate/folded/control/foreign-link inputs never submit',async()=>{
  const base=message().toString();
- const bad=[Buffer.concat([Buffer.from([0xef,0xbb,0xbf]),message()]),Buffer.concat([Buffer.from([0xff]),message()]),message('unowned@example.test'),message('unowned@example.test'),Buffer.from(base.replace(stefan,stefan+','+gmail)),
-  Buffer.from(base.replace('MIME-Version:',`Cc: ${gmail}\r\nMIME-Version:`)),Buffer.from(base.replace('MIME-Version:',`Bcc: ${gmail}\r\nMIME-Version:`)),
-  Buffer.from(base.replace('MIME-Version:',`Resent-To: ${gmail}\r\nMIME-Version:`)),Buffer.from(base.replace('MIME-Version:',`To: ${gmail}\r\nMIME-Version:`)),
+ const bad=[Buffer.concat([Buffer.from([0xef,0xbb,0xbf]),message()]),Buffer.concat([Buffer.from([0xff]),message()]),message('unowned@example.test'),message('unowned@example.test'),Buffer.from(base.replace(forwardPrimary,forwardPrimary+','+forwardTarget)),
+  Buffer.from(base.replace('MIME-Version:',`Cc: ${forwardTarget}\r\nMIME-Version:`)),Buffer.from(base.replace('MIME-Version:',`Bcc: ${forwardTarget}\r\nMIME-Version:`)),
+  Buffer.from(base.replace('MIME-Version:',`Resent-To: ${forwardTarget}\r\nMIME-Version:`)),Buffer.from(base.replace('MIME-Version:',`To: ${forwardTarget}\r\nMIME-Version:`)),
   Buffer.from(base.replace('Subject:',' Subject:')),Buffer.from(base.replace('From: dezbatere.ro <'+from+'>','From: unowned@example.test')),
   Buffer.from(base.replace('Verify your email for Dialectical Engine','something else')),Buffer.from(base.replace('MIME-Version: 1.0','MIME-Version: 1.0\u0000')),Buffer.from(base.replace(/\r\n/g,'\n'))];
  for(const input of bad){const fixture=stub();await assert.rejects(submitVerification({argv:sourceArgs,message:input,...fixture}));assert.equal(fixture.record.executable,undefined);}
 });
-test('Postfix receives only fixed explicit Gmail envelope and no bearer env/output',async()=>{
+test('Postfix receives only the fixed explicit forward-target envelope and no bearer env/output',async()=>{
  const fixture=stub();
  await submitVerification({argv:sourceArgs,message:message(),ambient:{LANG:'C.UTF-8',AWS_SECRET_ACCESS_KEY:token,DATABASE_URL:token,HATCHET_CLIENT_TOKEN:token,MAIL_CONFIG:'/tmp/evil'},...fixture});
  assert.equal(fixture.record.executable,'/usr/sbin/sendmail');
- assert.deepEqual(fixture.record.args,['-i','-f',from,'--',gmail]);assert.ok(!fixture.record.args.includes('-t'));
+ assert.deepEqual(fixture.record.args,['-i','-f',from,'--',forwardTarget]);assert.ok(!fixture.record.args.includes('-t'));
  assert.deepEqual(fixture.record.options.stdio,['pipe','ignore','ignore']);assert.equal(fixture.record.options.shell,false);assert.equal(fixture.record.options.detached,true);
- assert.ok(fixture.record.body.equals(Buffer.from(message().toString().replace('To: '+stefan,'To: '+gmail))));
+ assert.ok(fixture.record.body.equals(Buffer.from(message().toString().replace('To: '+forwardPrimary,'To: '+forwardTarget))));
  assert.deepEqual(fixture.record.options.env,{PATH:'/usr/sbin:/usr/bin:/bin',LANG:'C.UTF-8'});
  assert.ok(!JSON.stringify(fixture.record.options.env).includes(token));
 });
@@ -115,7 +115,7 @@ function editPart(message, kind, edit) {
 test('multipart/template/link/metadata attacks refuse before child spawn',async()=>{
  const good=message(), base=good.toString();
  const bad=[
-  Buffer.from(base.replace(stefan,'unowned@example.test')),Buffer.from(base.replace(stefan,stefan+';'+gmail)),
+  Buffer.from(base.replace(forwardPrimary,'unowned@example.test')),Buffer.from(base.replace(forwardPrimary,forwardPrimary+';'+forwardTarget)),
   Buffer.from(base.replace('boundary="dialectical-account-v1"','boundary="other"')),
   Buffer.from(base.replace('Content-Type: text/html','Content-Type: application/octet-stream')),
   Buffer.from(base.replace('Content-Transfer-Encoding: base64','Content-Transfer-Encoding: quoted-printable')),
@@ -127,7 +127,7 @@ test('multipart/template/link/metadata attacks refuse before child spawn',async(
   Buffer.from(base.replace('X-Account-Time-Zone: Europe/Bucharest','X-Account-Time-Zone: UTC')),
   Buffer.from(base.replace('X-Account-Locale: ro','X-Account-Locale: unknown')),
   Buffer.from(base.replace('X-Account-Time-Zone: Europe/Bucharest','X-Account-Time-Zone: Invalid/Zone')),
-  Buffer.from(base.replace('X-Account-Locale: ro','X-Account-Locale: ro\r\nBcc: '+gmail)),
+  Buffer.from(base.replace('X-Account-Locale: ro','X-Account-Locale: ro\r\nBcc: '+forwardTarget)),
   Buffer.from(base.replace('X-Account-Runtime: node=','X-Account-Runtime: node=changed')),
   editPart(good,'plain',text=>text.replace('#token=','?token=')),
   editPart(good,'plain',text=>text.replace('v3-preview.dezbatere.ro','outside.example')),
@@ -143,9 +143,9 @@ test('multipart/template/link/metadata attacks refuse before child spawn',async(
 });
 test('all served locales use canonical UTF8 alternatives with only To rewritten',()=>{
  for(const locale of ACCOUNT_MAIL_LOCALES){
-  const original=Buffer.from(serializeAccountMail({template:'verification-v1',recipient:stefan,url:new URL('https://v3-preview.dezbatere.ro/verify-email#token='+token),expiresAt:new Date('2026-10-05T07:41:00Z'),display:{locale,timeZone:'Europe/Bucharest'}},from));
+  const original=Buffer.from(serializeAccountMail({template:'verification-v1',recipient:forwardPrimary,url:new URL('https://v3-preview.dezbatere.ro/verify-email#token='+token),expiresAt:new Date('2026-10-05T07:41:00Z'),display:{locale,timeZone:'Europe/Bucharest'}},from));
   const forwarded=ownedForwardingMessage(original);
-  assert.deepEqual(forwarded,Buffer.from(original.toString().replace('To: '+stefan,'To: '+gmail)));
+  assert.deepEqual(forwarded,Buffer.from(original.toString().replace('To: '+forwardPrimary,'To: '+forwardTarget)));
   assert.deepEqual(original.subarray(original.indexOf('\r\n\r\n')+4),forwarded.subarray(forwarded.indexOf('\r\n\r\n')+4));
  }
 });
