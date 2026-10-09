@@ -17,7 +17,10 @@ describe('production preview spending guard optional JSON mode', () => {
     // About 4 s locally (2026-10-09): the margin covers a loaded CI runner. On failure, show the
     // END of the output (the failing test and its traceback) and any spawn error or signal.
     const result = runPython('tests/unit/preview_budget_authority_v2_test.py', 90000);
-    expect(result.status, `${String(result.error ?? '')} signal=${result.signal}\n${result.stderr.slice(-6000)}`).toBe(0);
+    // The CI gate prints only the first lines of a failure message, so the end of the output (the
+    // last test that ran, a traceback, the summary) comes first, on one line.
+    const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
+    expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
     expect(result.stderr).toContain('Ran 103 tests');
     expect(result.stderr).toContain('OK');
   });
