@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Starta mitt abonnemang nu. Jag förstår att om jag ångrar mig inom 14 dagar betalar jag för den del som redan har använts: den största av använda dagar och använd kredit.",
   "billing.checkout.continueToCard": "Fortsätt till kortuppgifter",
   "billing.checkout.cardTitle": "Kortuppgifter",
-  "billing.checkout.cardNote": "Du anger ditt kort i xMoneys säkra formulär. Ditt kortnummer når aldrig våra servrar.",
+  "billing.checkout.cardNote": "Du anger ditt kort i NETOPIA Payments säkra formulär. Ditt kortnummer når aldrig våra servrar.",
   "billing.checkout.subscribeAndPay": "Beställ med betalningsskyldighet",
   "billing.checkout.waitingForBank": "Väntar på bekräftelse från din bank…",
   "billing.checkout.willEmail": "Vi mejlar dig så snart din bank bekräftar.",

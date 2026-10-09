@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Pradėkite mano planą dabar. Suprantu, kad jei atsisakysiu sutarties per 14 dienų, mokėsiu už jau panaudotą dalį: didesnę iš panaudotų dienų ar panaudoto kredito.",
   "billing.checkout.continueToCard": "Tęsti į kortelės duomenis",
   "billing.checkout.cardTitle": "Kortelės duomenys",
-  "billing.checkout.cardNote": "Kortelę įvedate saugioje xMoney formoje. Jūsų kortelės numeris niekada nepasiekia mūsų serverių.",
+  "billing.checkout.cardNote": "Kortelę įvedate saugioje NETOPIA Payments formoje. Jūsų kortelės numeris niekada nepasiekia mūsų serverių.",
   "billing.checkout.subscribeAndPay": "Užsakymas su prievole sumokėti",
   "billing.checkout.waitingForBank": "Laukiame jūsų banko patvirtinimo…",
   "billing.checkout.willEmail": "Kai tik jūsų bankas patvirtins, atsiųsime el. laišką.",

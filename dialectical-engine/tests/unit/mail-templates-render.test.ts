@@ -345,11 +345,11 @@ describe("P17 renderMail", () => {
     // The five sentences of ruling Q-5's O2, in order and unchanged (compared with the render before the flag existed).
     expect(refused.text.startsWith([
       "Hello,",
-      "xMoney refused a refund we asked for, or its outcome stayed unknown after every retry. No more tries are made by themselves.",
+      "Netopia refused a refund we asked for, or its outcome stayed unknown after every retry. No more tries are made by themselves.",
       "Charge reference: 0123456789abcdef0123456789abcdef",
       "Amount to refund: $12.10",
       "Reason code: XMONEY_REFUSED",
-      "Check this charge in the xMoney dashboard and settle the refund by hand there. The owner summary lists it until then.",
+      "Check this charge in the Netopia dashboard and settle the refund by hand there. The owner summary lists it until then.",
       "The DebateAI team"
     ].join("\n\n"))).toBe(true);
     expect(refused.subject).toBe("A refund could not be completed and needs your attention");
@@ -360,7 +360,7 @@ describe("P17 renderMail", () => {
     expect(dead.text).toContain("Reason code: XMONEY_REFUSED\n\nRefund reason: WITHDRAWAL\n\n");
     expect(dead.text).toContain(
       "This is a withdrawal refund: the law requires it to be made by October 26, 2026 at the latest (14 days after"
-      + " the withdrawal). First look at this payment in the xMoney dashboard. If it already shows a refund of"
+      + " the withdrawal). First look at this payment in the Netopia dashboard. If it already shows a refund of"
       + " $12.10, an earlier attempt went through: do not refund again; the site records it at its daily check, and"
       + " the customer's refund email (M8) follows by itself. If it shows none, refund exactly $12.10 on this payment,"
       + " in one refund, so the site records it and M8 follows by itself."
@@ -385,7 +385,7 @@ describe("P17 renderMail", () => {
     expect(owner.html).toContain('<html lang="en" dir="ltr">');
     expect(owner.text.startsWith([
       "Hello,",
-      "A customer withdrew from their plan, and the plan has ended. A refund made in the xMoney dashboard, or an"
+      "A customer withdrew from their plan, and the plan has ended. A refund made in the Netopia dashboard, or an"
         + " earlier refund request, already touched one of their payments, so the site could not work out what is still"
         + " due. Nothing has been refunded for this withdrawal yet.",
       "Owner reference: 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93",
@@ -393,7 +393,7 @@ describe("P17 renderMail", () => {
       "Withdrawn on October 12, 2026. The law requires the refund to be made by October 26, 2026 at the latest (14"
         + " days after the withdrawal).",
       "Work out what is still due as the runbook describes (\"A withdrawal sent by email or on the model form\"),"
-        + " refund in the xMoney dashboard what the site cannot, then record the settlement with pnpm billing:withdraw"
+        + " refund in the Netopia dashboard what the site cannot, then record the settlement with pnpm billing:withdraw"
         + " --owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93 --refund <amount> --dashboard <amount>. The customer's refund"
         + " email (M8) follows. The owner summary lists it as WITHDRAWAL_BY_OWNER until then.",
       "The DebateAI team"
@@ -447,7 +447,7 @@ describe("P17 renderMail", () => {
     const forged = renderMail("O2", "en", { ...paramsFor("O2"), reasonCode: "REFUND_NOT_REQUESTED", notRequested: "true" });
     expect(forged.subject).toBe("A refund could not be completed and needs your attention");
     for (const part of [forged.text, forged.html]) {
-      expect(part).not.toContain("xMoney refused");
+      expect(part).not.toContain("Netopia refused");
       expect(part).not.toContain("Amount to refund");
       expect(part).not.toContain("settle the refund by hand");
     }
@@ -455,7 +455,7 @@ describe("P17 renderMail", () => {
     expect(forged.text).toContain("Reason code: REFUND_NOT_REQUESTED");
     // The four things it must say: nothing was sent; it matches no request we hold; the amount is only the job's;
     // something able to write to the billing database queued it, so whoever runs the server checks the requests.
-    expect(forged.text).toContain("stopped before anything was sent to xMoney");
+    expect(forged.text).toContain("stopped before anything was sent to Netopia");
     expect(forged.text).toContain("it does not match any refund request our records hold for this payment");
     expect(forged.text).toContain("Amount the job named: $12.10. This is only the job's own figure, not a refund to make.");
     expect(forged.text).toContain("Something able to write to the billing database queued it, so tell whoever runs the server.");
@@ -469,7 +469,7 @@ describe("P17 renderMail", () => {
     expect(other.subject).toBe("A refund could not be completed and needs your attention");
     expect(other.text.startsWith([
       "Hello,",
-      "A refund job was stopped before anything was sent to xMoney: the payment it names was taken in the other xMoney"
+      "A refund job was stopped before anything was sent to Netopia: the payment it names was taken in the other Netopia"
         + " system (sandbox or live), which this server does not use. No money moved.",
       "Charge reference: 0123456789abcdef0123456789abcdef",
       "Amount to refund: $12.10",
@@ -479,20 +479,20 @@ describe("P17 renderMail", () => {
       "The DebateAI team"
     ].join("\n\n"))).toBe(true);
     for (const part of [other.text, other.html]) {
-      expect(part).not.toContain("xMoney refused");
+      expect(part).not.toContain("Netopia refused");
       expect(part).not.toContain("settle the refund by hand");
       // No deadline paragraph, and never "M8 follows by itself": this API never sees the other system's refunds.
       expect(part).not.toContain("the law requires");
       expect(part).not.toContain("M8");
-      expect(part).not.toContain("A refund job was stopped before anything was sent to xMoney: it does not match");
+      expect(part).not.toContain("A refund job was stopped before anything was sent to Netopia: it does not match");
     }
     // The flag off (or left out, as in every O2 queued before it) keeps the refused wording; notRequested still wins.
     const refused = renderMail("O2", "en", { ...base, notRequested: "false", otherSystem: "false" }).text;
-    expect(refused).toContain("xMoney refused a refund we asked for");
-    expect(refused).not.toContain("other xMoney system");
+    expect(refused).toContain("Netopia refused a refund we asked for");
+    expect(refused).not.toContain("other Netopia system");
     const forged = renderMail("O2", "en", { ...base, notRequested: "true" }).text;
     expect(forged).toContain("it does not match any refund request our records hold for this payment");
-    expect(forged).not.toContain("other xMoney system");
+    expect(forged).not.toContain("other Netopia system");
     expect(MAIL_TEMPLATES.O2.optional?.otherSystem).toBe("flag");
   });
 

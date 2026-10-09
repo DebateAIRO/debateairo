@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Spusťte můj plán hned. Beru na vědomí, že pokud odstoupím do 14 dnů, zaplatím za již využitou část: větší z využitých dnů nebo využitého kreditu.",
   "billing.checkout.continueToCard": "Pokračovat k údajům o kartě",
   "billing.checkout.cardTitle": "Údaje o kartě",
-  "billing.checkout.cardNote": "Kartu zadáváte do zabezpečeného formuláře společnosti xMoney. Číslo vaší karty se nikdy nedostane na naše servery.",
+  "billing.checkout.cardNote": "Kartu zadáváte do zabezpečeného formuláře společnosti NETOPIA Payments. Číslo vaší karty se nikdy nedostane na naše servery.",
   "billing.checkout.subscribeAndPay": "Objednávka zavazující k platbě",
   "billing.checkout.waitingForBank": "Čekáme na potvrzení od vaší banky…",
   "billing.checkout.willEmail": "Jakmile to vaše banka potvrdí, pošleme vám e-mail.",

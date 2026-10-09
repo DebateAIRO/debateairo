@@ -261,7 +261,7 @@ function deadRefundCheck(
 function subjectOf(item: PaymentToCheckItem): string {
   switch (item.what) {
     case "REFUND_UNRECORDED":
-      return `xMoney transaction ${item.ref}`;
+      return `Netopia transaction ${item.ref}`;
     case "WITHDRAWAL_BY_OWNER":
       return `owner ${item.ref}`;
     case "DUNNING_UNPRICED":
@@ -438,7 +438,7 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
     out.push(`  Net sales ${microsToDecimal(line.netMicros)} USD, tax collected ${microsToDecimal(line.taxMicros)} USD,`
       + ` from ${plural(line.sales, "sale", "sales")} and ${plural(line.refunds, "refund", "refunds")}.`);
     if (line.unknownRefunds > 0) {
-      out.push(`  Not subtracted: ${plural(line.unknownRefunds, "refund", "refunds")} made in the xMoney dashboard,`
+      out.push(`  Not subtracted: ${plural(line.unknownRefunds, "refund", "refunds")} made in the Netopia dashboard,`
         + " amount unknown (listed below).");
     }
     const statuses = (Object.entries(line.statusCounts) as Array<[TaxStatus, number]>)
@@ -491,9 +491,9 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " accountant decides, except for a line that says no sale was recorded for it):",
     (item) => `charge ${item.chargeId}, ${item.taxCountry}, ${microsToDecimal(item.amountMicros)} USD, on ${isoDay(item.at)}`
       + (item.saleRecorded ? "" : ": no sale was recorded for it"));
-  section(summary.unknownRefunds, "Refunds made in the xMoney dashboard, amount unknown: none.",
+  section(summary.unknownRefunds, "Refunds made in the Netopia dashboard, amount unknown: none.",
     // P4-K (P2-W12): once the owner records the credit note with its amount, `quarterSummaryRows` subtracts it.
-    "Refunds made in the xMoney dashboard, amount unknown (not subtracted above; read the amount in the dashboard,"
+    "Refunds made in the Netopia dashboard, amount unknown (not subtracted above; read the amount in the dashboard,"
       + " issue its credit note by hand and record it with its amount (pnpm billing:invoice --amount, as its line under"
       + " the invoices and credit notes to check by hand says), and the summary then subtracts it at that amount; until"
       + " then, adjust that country's net sales and tax by hand, at most the amount shown):",
@@ -526,17 +526,17 @@ export function renderTaxSummary(summary: TaxSummary, limit: TaxSummaryLimit | n
       + " <series>-<number> --status ACCEPTED|REJECTED):",
     (item) => `${item.kind === "INVOICE" ? "invoice" : "credit note"} ${item.document} (charge ${item.chargeId}),`
       + ` issued ${isoDay(item.issuedAt)}: ${item.status === null ? "no status recorded" : `last status ${item.status}`}`);
-  section(summary.paymentsToCheck, "Payments to check by hand in xMoney: none.",
-    "Payments to check by hand in xMoney (REFUND_REFUSED: xMoney refused our refund, the money is still owed, refund"
+  section(summary.paymentsToCheck, "Payments to check by hand in Netopia: none.",
+    "Payments to check by hand in Netopia (REFUND_REFUSED: Netopia refused our refund, the money is still owed, refund"
       + " it from the dashboard; REFUND_OUTCOME_UNKNOWN: a partial refund whose outcome is unknown, check the"
       + " dashboard before refunding again; a WITHDRAWAL refund is due within 14 days of the withdrawal;"
       + " REFUND_NOT_REQUESTED: a refund job that matches no refund request our records hold for this payment, so"
-      + " nothing was sent to xMoney and it is no refund to make; do not refund it: something able to write to the"
+      + " nothing was sent to Netopia and it is no refund to make; do not refund it: something able to write to the"
       + " billing database queued it, so tell whoever runs the server, who checks this charge's own refund requests"
       + " (one never refunded is still owed);"
-      + " REFUND_OTHER_SYSTEM: a refund job for a payment of the other xMoney system (sandbox or live): nothing was"
+      + " REFUND_OTHER_SYSTEM: a refund job for a payment of the other Netopia system (sandbox or live): nothing was"
       + " sent, and nothing is owed on this server;"
-      + " REFUND_UNRECORDED: a second refund made in the xMoney dashboard on a payment that already had one, which our"
+      + " REFUND_UNRECORDED: a second refund made in the Netopia dashboard on a payment that already had one, which our"
       + " records cannot hold, so it is in no figure above: read its amount on that transaction in the dashboard and"
       + " take it off that country's net sales and tax by hand."
       // Part 4 final review C-6: P4-K's --amount credit note is already subtracted above (quarterSummaryRows).
