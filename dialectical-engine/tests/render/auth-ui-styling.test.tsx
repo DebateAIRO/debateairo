@@ -29,6 +29,7 @@ import { SecurityActionResume } from "../../apps/ui/components/auth/SecurityActi
 import { OnboardingEvidence } from "../../apps/ui/components/auth/OnboardingEvidence.js";
 import { ChangeEmailScreen, EmailSettingsCard } from "../../apps/ui/components/EmailSettings.js";
 import { SocialCompleteFlow } from "../../apps/ui/components/auth/SocialCompleteFlow.js";
+import { RecoveryFlow } from "../../apps/ui/components/auth/RecoveryFlow.js";
 import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { mount, unmount, input } from "./task11-harness.js";
@@ -171,6 +172,15 @@ describe("every auth screen styles its own controls", () => {
     window.history.replaceState(null, "", `/social/complete#kind=${kind}&token=${token}`);
     try {
       const host = await render(<SocialCompleteFlow client={client as never} />);
+      expect(host.querySelector("input")).not.toBeNull();
+      expect(unstyled(host)).toEqual([]);
+    } finally { window.history.replaceState(null, "", "/"); }
+  });
+
+  it.each([["/recover", "the request"], [`/recover#token=${token}`, "the saved-code step"]])("account recovery: %s (%s)", async (path) => {
+    window.history.replaceState(null, "", path);
+    try {
+      const host = await render(<RecoveryFlow catalog={auth} locale="en" client={{ recoveryStart: vi.fn(), recoveryProve: vi.fn() } as never} />);
       expect(host.querySelector("input")).not.toBeNull();
       expect(unstyled(host)).toEqual([]);
     } finally { window.history.replaceState(null, "", "/"); }
