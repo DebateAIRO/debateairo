@@ -49,6 +49,7 @@ function environment(
     PUBLICATION_ENABLED: "true",
     PUBLICATION_CLEANUP_DATABASE_URL: database("debateai_dev_publication_cleanup", "pub"),
     ERASURE_DATABASE_URL: database("debateai_dev_erasure", "two"),
+    DATA_EXPORT_DATABASE_URL: database("debateai_dev_data_export", "export"),
     ACCOUNT_ERASURE_GRACE_MS: "604800000",
     MAIL_SENDMAIL_PATH: join(root, "deploy", "dev-auth", "sendmail-capture.mjs"),
     MAIL_FROM: "noreply@localhost.test",

@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate } from "@debateai/db";
-import type { PoolClient } from "pg";
+import { Pool, type PoolClient } from "pg";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { PostgresDataExportRepository } from "../../packages/db/src/data-export.js";
 
@@ -16,7 +16,7 @@ const signatures = [
 ];
 
 describe("data export database authority", () => {
-  let db: TestDatabase;
+  let db: TestDatabase, requestPool: Pool, workerPool: Pool;
   beforeAll(async () => {
     db = await startTestDatabase();
     await migrate(db.pool);
@@ -25,9 +25,23 @@ describe("data export database authority", () => {
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE debateai_authorization_runtime");
       expect((await client.query("SELECT current_user name")).rows[0].name).toBe("debateai_authorization_runtime");
+      await client.query("SET LOCAL ROLE debateai_data_export_worker");
+      expect((await client.query("SELECT current_user name")).rows[0].name).toBe("debateai_data_export_worker");
     } finally { await client.query("ROLLBACK"); client.release(); }
+    await db.pool.query("CREATE ROLE data_export_db_request LOGIN PASSWORD 'data-export-db-request-only' IN ROLE debateai_authorization_runtime");
+    await db.pool.query("CREATE ROLE data_export_db_worker LOGIN PASSWORD 'data-export-db-worker-only' IN ROLE debateai_data_export_worker");
+    const loginPool = (role: string, password: string) => {
+      const url = new URL(db.connectionString);
+      url.username = role;
+      url.password = password;
+      return new Pool({ connectionString: url.toString() });
+    };
+    requestPool = loginPool("data_export_db_request", "data-export-db-request-only");
+    workerPool = loginPool("data_export_db_worker", "data-export-db-worker-only");
+    expect((await requestPool.query("SELECT current_user name")).rows[0].name).toBe("data_export_db_request");
+    expect((await workerPool.query("SELECT current_user name")).rows[0].name).toBe("data_export_db_worker");
   }, 180_000);
-  afterAll(async () => { await db?.stop(); });
+  afterAll(async () => { await requestPool?.end(); await workerPool?.end(); await db?.stop(); });
 
   async function account(verified = true) {
     const user = randomUUID(), session = randomUUID(), owner = randomUUID();
@@ -56,6 +70,19 @@ describe("data export database authority", () => {
       await client.query("SET LOCAL ROLE debateai_authorization_runtime");
       expect((await client.query("SELECT current_user name")).rows[0].name).toBe("debateai_authorization_runtime");
       if (audit) await client.query("SELECT identity.begin_runtime_audit_attempt()");
+      const value = await fn(client);
+      await client.query("COMMIT");
+      return value;
+    } catch (error) { await client.query("ROLLBACK"); throw error; }
+    finally { client.release(); }
+  }
+
+  async function asWorker<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
+    const client = await db.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL ROLE debateai_data_export_worker");
+      expect((await client.query("SELECT current_user name")).rows[0].name).toBe("debateai_data_export_worker");
       const value = await fn(client);
       await client.query("COMMIT");
       return value;
@@ -187,7 +214,7 @@ describe("data export database authority", () => {
     const rotated = await account(), stale = await grant(rotated.user, rotated.session);
     await db.pool.query("UPDATE identity.session SET token_hash=$2 WHERE session_id=$1", [rotated.session, hash("8")]);
     await expect(request(rotated.user, rotated.session, stale)).rejects.toMatchObject({ code: "P0001", message: "STEP_UP_GRANT_GENERATION_INVALID" });
-    const repo = new PostgresDataExportRepository(db.pool, { hashSourceIp: async () => "a".repeat(64), hashUserAgent: async () => "b".repeat(64) } as never);
+    const repo = new PostgresDataExportRepository(requestPool, workerPool, { hashSourceIp: async () => "a".repeat(64), hashUserAgent: async () => "b".repeat(64) } as never);
     expect(await repo.request({ userId: rotated.user, sessionId: rotated.session, grantTokenHash: stale,
       exportId: randomUUID(), locale: "en", source: { ip: "192.0.2.1", userAgent: "fixture", requestId: "D4" } }))
       .toEqual({ kind: "STEP_UP_INVALID" });
@@ -280,10 +307,10 @@ describe("data export database authority", () => {
     await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp() WHERE status='PREPARING'");
     const a = await account();
     await request(a.user, a.session, await grant(a.user, a.session));
-    const [left, right] = await Promise.all([randomUUID(), randomUUID()].map(worker => asRuntime(client => client.query("SELECT * FROM identity.claim_data_export($1,1)", [worker]))));
+    const [left, right] = await Promise.all([randomUUID(), randomUUID()].map(worker => asWorker(client => client.query("SELECT * FROM identity.claim_data_export($1,1)", [worker]))));
     expect([left!.rows[0]?.export_id, right!.rows[0]?.export_id].filter(Boolean)).toHaveLength(1);
     await db.pool.query("UPDATE identity.data_export SET lease_until=clock_timestamp()-interval '1 second' WHERE user_id=$1", [a.user]);
-    const next = await asRuntime(client => client.query("SELECT * FROM identity.claim_data_export($1,1)", [randomUUID()]));
+    const next = await asWorker(client => client.query("SELECT * FROM identity.claim_data_export($1,1)", [randomUUID()]));
     expect(next.rows[0].attempt).toBe(2);
   });
 
@@ -315,10 +342,40 @@ describe("data export database authority", () => {
   });
 
   it("D14 denies table DML and other runtime roles execute on all twelve functions", async () => {
+    const workerAttributes = (await db.pool.query("SELECT rolcanlogin,rolinherit,rolsuper,rolbypassrls FROM pg_roles WHERE rolname='debateai_data_export_worker'")).rows[0];
+    expect(workerAttributes).toEqual({ rolcanlogin: false, rolinherit: false, rolsuper: false, rolbypassrls: false });
+    expect((await db.pool.query("SELECT has_schema_privilege('debateai_data_export_worker','identity','USAGE') allowed")).rows[0].allowed).toBe(true);
     for (const verb of ["SELECT * FROM", "DELETE FROM", "UPDATE", "INSERT INTO"]) {
       const sql = verb === "UPDATE" ? "UPDATE identity.data_export SET status='FAILED'" : verb === "INSERT INTO" ? "INSERT INTO identity.data_export DEFAULT VALUES" : `${verb} identity.data_export`;
       await expect(asRuntime(client => client.query(sql))).rejects.toMatchObject({ code: "42501" });
+      await expect(asWorker(client => client.query(sql))).rejects.toMatchObject({ code: "42501" });
     }
+    const a = await account();
+    const exportId = randomUUID(), thief = randomUUID();
+    await db.pool.query("INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at) VALUES($1,$2,$3,'en','PREPARING',clock_timestamp())", [exportId, a.user, a.session]);
+    for (const [sql, params] of [
+      ["SELECT * FROM identity.claim_data_export($1,60)", [thief]],
+      ["SELECT identity.read_data_export_snapshot($1,$2)", [exportId, thief]],
+      ["SELECT identity.complete_data_export($1,$2,$3,$4,1,clock_timestamp())", [exportId, thief, hash("9"), "a".repeat(64)]],
+      ["SELECT * FROM identity.sweep_data_exports()", []]
+    ] as const) await expect(asRuntime(client => client.query(sql, [...params]))).rejects.toMatchObject({ code: "42501" });
+    expect((await db.pool.query("SELECT status,lease_owner FROM identity.data_export WHERE export_id=$1", [exportId])).rows[0])
+      .toEqual({ status: "PREPARING", lease_owner: null });
+    for (const [sql, params] of [
+      ["SELECT * FROM identity.request_data_export($1,$2,$3,$4,'en','{}'::jsonb)", [a.user, a.session, hash("1"), randomUUID()]],
+      ["SELECT * FROM identity.read_data_export_status($1)", [a.user]],
+      ["SELECT * FROM identity.open_data_export_link($1,$2)", [a.user, hash("1")]],
+      ["SELECT identity.record_data_export_download($1,$2,'{}'::jsonb)", [exportId, a.user]]
+    ] as const) await expect(asWorker(client => client.query(sql, [...params]))).rejects.toMatchObject({ code: "42501" });
+    for (const [index, signature] of signatures.entries()) {
+      const request = (await db.pool.query("SELECT has_function_privilege('debateai_authorization_runtime',$1,'EXECUTE') allowed", [`identity.${signature}`])).rows[0].allowed;
+      const worker = (await db.pool.query("SELECT has_function_privilege('debateai_data_export_worker',$1,'EXECUTE') allowed", [`identity.${signature}`])).rows[0].allowed;
+      expect([request, worker], signature).toEqual(index < 2 || index >= 10 ? [true, false] : [false, true]);
+    }
+    const { assertDataExportDatabaseRoles } = await import("../../packages/db/src/data-export.js");
+    await expect(assertDataExportDatabaseRoles(requestPool, workerPool)).resolves.toBeUndefined();
+    await expect(assertDataExportDatabaseRoles(requestPool, requestPool)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
+    await expect(assertDataExportDatabaseRoles(workerPool, requestPool)).rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     for (const role of ["debateai_runtime", "debateai_billing_runtime", "debateai_erasure_runtime", "debateai_replay"]) {
       for (const signature of signatures) {
         const allowed = (await db.pool.query("SELECT has_function_privilege($1,$2,'EXECUTE') allowed", [role, `identity.${signature}`])).rows[0].allowed;
@@ -328,6 +385,7 @@ describe("data export database authority", () => {
     const audit = JSON.stringify((await db.pool.query("SELECT source_context FROM identity.audit_event WHERE event_type LIKE 'identity.data_export.%'")).rows);
     expect(audit).not.toContain(hash("9"));
     expect(audit).not.toContain("fixture-ip-plaintext");
+    await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp() WHERE export_id=$1", [exportId]);
   });
 
   it("R31 fails a PREPARING row whose fourth lease expired without fail()", async () => {
@@ -336,9 +394,9 @@ describe("data export database authority", () => {
     await db.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)
       VALUES($1,$2,$3,'en','PREPARING',clock_timestamp()-interval '20 minutes',4,$4,clock_timestamp()-interval '10 minutes')`,
     [exportId, a.user, a.session, randomUUID()]);
-    const claim = await asRuntime(client => client.query("SELECT * FROM identity.claim_data_export($1,45)", [randomUUID()]));
+    const claim = await asWorker(client => client.query("SELECT * FROM identity.claim_data_export($1,45)", [randomUUID()]));
     expect(claim.rows).toEqual([]);
-    await asRuntime(client => client.query("SELECT * FROM identity.sweep_data_exports()"));
+    await asWorker(client => client.query("SELECT * FROM identity.sweep_data_exports()"));
     const row = (await db.pool.query("SELECT status,lease_owner,lease_until FROM identity.data_export WHERE export_id=$1", [exportId])).rows[0];
     expect(row).toEqual({ status: "FAILED", lease_owner: null, lease_until: null });
   });
@@ -351,7 +409,7 @@ describe("data export database authority", () => {
     await db.pool.query(`INSERT INTO identity.account_erasure_request(user_id,requested_at,execute_at,prepared_at,
       prepared_run_ids,prepared_legacy_run_ids,prepared_published_run_ids,prepared_current_publication_refs,prepared_cleanup_publication_refs)
       VALUES($1,clock_timestamp(),clock_timestamp()+interval '30 days',clock_timestamp(),'{}','{}','{}','{}','{}')`, [a.user]);
-    const result = await asRuntime(async client => (await client.query("SELECT identity.renew_data_export_lease($1,$2,45) ok", [exportId, worker])).rows[0].ok);
+    const result = await asWorker(async client => (await client.query("SELECT identity.renew_data_export_lease($1,$2,45) ok", [exportId, worker])).rows[0].ok);
     expect(result).toBe(false);
   });
 });

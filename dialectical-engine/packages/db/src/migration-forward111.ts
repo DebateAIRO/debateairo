@@ -17,28 +17,28 @@ const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD111_${detail}`)
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 const hex=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
 const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
-export type Forward111Function=Readonly<{signature:string;identityArguments:string;result:string;language:string;volatility:string;runtimeExecute:boolean;originalSource:string|null;originalBodySha256:string|null;currentBodySha256:string}>;
+export type Forward111Function=Readonly<{signature:string;identityArguments:string;result:string;language:string;volatility:string;runtimeExecute:boolean;workerExecute:boolean;originalSource:string|null;originalBodySha256:string|null;currentBodySha256:string}>;
 export type Forward111Plan=Readonly<{
  name:typeof NAME; manifestSha256:string; chain:typeof CHAIN_NAME; chainManifestSha256:string; sourceSha256:string; verifierSha256:string;
  sql:string; verifierSql:string; originalVerifierSql:string; functions:readonly Forward111Function[];
  sharedBindings:readonly Readonly<{signature:string;source:string;bodySha256:string}>[];
 }>;
-// [signature, originalSource, language, volatility, runtimeExecute].
-const FUNCTIONS:readonly (readonly [string,string|null,string,string,boolean])[]=[
- ['identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)','0107_auth_dev_integration.sql','plpgsql','v',false],
- ['identity.valid_consumer_authorization_internal(jsonb)','0107_auth_dev_integration.sql','sql','i',false],
- ['identity.request_data_export(uuid,uuid,text,uuid,text,jsonb)',null,'plpgsql','v',true],
- ['identity.read_data_export_status(uuid)',null,'plpgsql','s',true],
- ['identity.claim_data_export(uuid,integer)',null,'plpgsql','v',true],
- ['identity.renew_data_export_lease(uuid,uuid,integer)',null,'plpgsql','v',true],
- ['identity.read_data_export_snapshot(uuid,uuid)',null,'plpgsql','s',true],
- ['identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)',null,'plpgsql','v',true],
- ['identity.fail_data_export(uuid,uuid,text)',null,'plpgsql','v',true],
- ['identity.sweep_data_exports()',null,'plpgsql','v',true],
- ['identity.mark_data_export_key_destroyed(uuid)',null,'plpgsql','v',true],
- ['identity.live_data_export_ids(uuid[])',null,'sql','s',true],
- ['identity.open_data_export_link(uuid,text)',null,'plpgsql','s',true],
- ['identity.record_data_export_download(uuid,uuid,jsonb)',null,'plpgsql','v',true],
+// [signature, originalSource, language, volatility, runtimeExecute, workerExecute].
+const FUNCTIONS:readonly (readonly [string,string|null,string,string,boolean,boolean])[]=[
+ ['identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)','0107_auth_dev_integration.sql','plpgsql','v',false,false],
+ ['identity.valid_consumer_authorization_internal(jsonb)','0107_auth_dev_integration.sql','sql','i',false,false],
+ ['identity.request_data_export(uuid,uuid,text,uuid,text,jsonb)',null,'plpgsql','v',true,false],
+ ['identity.read_data_export_status(uuid)',null,'plpgsql','s',true,false],
+ ['identity.claim_data_export(uuid,integer)',null,'plpgsql','v',false,true],
+ ['identity.renew_data_export_lease(uuid,uuid,integer)',null,'plpgsql','v',false,true],
+ ['identity.read_data_export_snapshot(uuid,uuid)',null,'plpgsql','s',false,true],
+ ['identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)',null,'plpgsql','v',false,true],
+ ['identity.fail_data_export(uuid,uuid,text)',null,'plpgsql','v',false,true],
+ ['identity.sweep_data_exports()',null,'plpgsql','v',false,true],
+ ['identity.mark_data_export_key_destroyed(uuid)',null,'plpgsql','v',false,true],
+ ['identity.live_data_export_ids(uuid[])',null,'sql','s',false,true],
+ ['identity.open_data_export_link(uuid,text)',null,'plpgsql','s',true,false],
+ ['identity.record_data_export_download(uuid,uuid,jsonb)',null,'plpgsql','v',true,false],
 ];
 // Shared functions used by 0111 but unchanged by it.
 const SHARED:readonly (readonly [string,string])[]=[
@@ -64,9 +64,9 @@ export async function loadForward111(baseRecipeSha256:string,baseVerifierSha256:
   ||!exactKeys(raw.migration,['name','sha256'])||raw.migration.name!==NAME||!exactKeys(raw.verifier,['path','sha256'])||raw.verifier.path!==VERIFIER_PATH
   ||!Array.isArray(raw.functions)||raw.functions.length!==FUNCTIONS.length||!Array.isArray(raw.sharedBindings)||raw.sharedBindings.length!==SHARED.length)return fail('MANIFEST');
  for(const [index,item] of raw.functions.entries()){
-  const [signature,source,language,volatility,runtime]=FUNCTIONS[index]!;
-  if(!exactKeys(item,['signature','identityArguments','result','language','volatility','runtimeExecute','originalSource','originalBodySha256','currentBodySha256'])||item.signature!==signature
-   ||typeof item.identityArguments!=='string'||typeof item.result!=='string'||item.language!==language||item.volatility!==volatility||item.runtimeExecute!==runtime
+  const [signature,source,language,volatility,runtime,worker]=FUNCTIONS[index]!;
+  if(!exactKeys(item,['signature','identityArguments','result','language','volatility','runtimeExecute','workerExecute','originalSource','originalBodySha256','currentBodySha256'])||item.signature!==signature
+   ||typeof item.identityArguments!=='string'||typeof item.result!=='string'||item.language!==language||item.volatility!==volatility||item.runtimeExecute!==runtime||item.workerExecute!==worker
    ||item.originalSource!==source||(source===null?item.originalBodySha256!==null:!hex(item.originalBodySha256))||!hex(item.currentBodySha256))return fail('MANIFEST');
  }
  for(const [index,item] of raw.sharedBindings.entries()){

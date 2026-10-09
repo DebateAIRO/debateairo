@@ -519,7 +519,7 @@ describe("VPS baseline: runbook and environment templates", () => {
       "NODE_ENV", "KEK_PATH", "BLIND_INDEX_KEY_PATH", "AUDIT_KEY_STORE_PATH", "AUDIT_SOURCE_IP_SALT_PATH",
       "USER_DEK_STORE_PATH", "CONTENT_ENCRYPTION_ENABLED", "CONTENT_PROVISION_DATABASE_URL", "PUBLICATION_ENABLED",
       "CORPUS_KEK_PATH", "PUBLICATION_KEY_STORE_PATH", "AUTHORIZATION_DATABASE_URL", "PUBLICATION_CLEANUP_DATABASE_URL",
-      "ERASURE_DATABASE_URL", "ACCOUNT_ERASURE_GRACE_MS", "MAIL_SENDMAIL_PATH", "MAIL_FROM", "PUBLIC_APP_URL",
+      "ERASURE_DATABASE_URL", "DATA_EXPORT_DATABASE_URL", "ACCOUNT_ERASURE_GRACE_MS", "MAIL_SENDMAIL_PATH", "MAIL_FROM", "PUBLIC_APP_URL",
       "DATABASE_URL", "API_HOST", "API_PORT", "STRANGER_SAMPLE_RATE", "REGISTER_VERSION", "BATTERY_VERSION",
       "SETTLEMENT_WATCH_HANDLE", "PROVIDER_DISCOVERY_TARGETS_JSON", "HATCHET_CLIENT_TOKEN", "HATCHET_HOST_PORT",
       "HATCHET_API_URL", "HATCHET_TENANT_ID", "HATCHET_WORKFLOW_NAME", "HATCHET_TLS_STRATEGY",
@@ -544,19 +544,19 @@ describe("VPS baseline: runbook and environment templates", () => {
     expect(env.get("HATCHET_TLS_STRATEGY")).toBe("tls");
     expect(env.get("HATCHET_HOST_PORT")).toBe("127.0.0.1:7077");
     expect(env.get("ACCOUNT_ERASURE_GRACE_MS")).toBe("604800000");
-    // Six API principals, one URL each (P3-01: api-runtime, content-provision, authorization,
-    // publication-cleanup, erasure, api-support). The sixth is SUPPORT_DATABASE_URL, which the
-    // strict shape requires and this example used to omit (E-I2). There is no seventh:
+    // Seven API principals, one URL each (P3-01: api-runtime, content-provision, authorization,
+    // publication-cleanup, erasure, api-support, data-export). SUPPORT_DATABASE_URL was the sixth;
+    // DATA_EXPORT_DATABASE_URL is the seventh. There is no eighth:
     // MIGRATION_DATABASE_URL is the just-in-time superuser credential and the manifest invariant
     // NO_LONG_LIVED_SUPERUSER_CREDENTIAL forbids parking it in an EnvironmentFile.
     const urls = [...env.entries()].filter(([key]) => key.endsWith("DATABASE_URL"));
-    expect(urls.length).toBe(6);
+    expect(urls.length).toBe(7);
     expect(env.has("MIGRATION_DATABASE_URL")).toBe(false);
     const roles = urls.map(([key, url]) => {
       expect(url, key).toMatch(/^postgresql:\/\/debateai_prod_[a-z_]+:<[a-z-]+>@localhost\/debateai\?host=\/var\/run\/postgresql$/);
       return /^postgresql:\/\/([a-z_]+):/.exec(url)?.[1];
     });
-    expect(new Set(roles).size).toBe(6);
+    expect(new Set(roles).size).toBe(7);
     for (const [key] of env) expect(key).not.toMatch(/^DEBATEAI_DEV_|^EVALUATOR_DEV_MENU/);
   });
 

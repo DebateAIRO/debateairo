@@ -183,6 +183,7 @@ observation agent's is set separately (§12).
 | `api.env` `AUTHORIZATION_DATABASE_URL` | `api-authorization` | `debateai_prod_api_authorization` | step-up session rotation |
 | `api.env` `PUBLICATION_CLEANUP_DATABASE_URL` | `api-publication-cleanup` | `debateai_prod_api_publication_cleanup` | publication-key cleanup |
 | `api.env` `ERASURE_DATABASE_URL` | `api-erasure` | `debateai_prod_api_erasure` | account and private-run erasure |
+| `api.env` `DATA_EXPORT_DATABASE_URL` | `api-data-export` | `debateai_prod_api_data_export` | the data-export worker: claim, snapshot read, complete, fail, sweep — never a request route (V-25) |
 | `runner.env` `DATABASE_URL` | `runner-runtime` | `debateai_prod_runner_runtime` | the runner, and its read-only disclosure report `pnpm ops:serve-disclosure`, run as the runner (§11, "One answer's record") |
 | `observation-agent.env` `OBSERVATION_DATABASE_URL` | `observation-agent` | `debateai_observation_agent` | the observation agent (§12); reads the threshold policy, cannot write it |
 | `observation-threshold-operator.env` `OBSERVATION_THRESHOLD_OPERATOR_DATABASE_URL` | `observation-threshold-operator` | `debateai_observation_threshold_operator` | `oactl thresholds apply` only — the one principal that may write the threshold policy (§12, `DL7-F9`) |
@@ -567,11 +568,11 @@ What the two config files pin, and why:
   survives a restart and matches what the principal provisioner's drift check expects.
 - `log_connections = on`, `log_disconnections = on`, and **`log_statement = 'none'` permanently**
   with `log_min_error_statement = 'panic'` and `log_parameter_max_length* = 0`. Provisioning sends
-  the eighteen service passwords as bind parameters and the dev tooling as `format()`-built SQL;
+  the nineteen service passwords as bind parameters and the dev tooling as `format()`-built SQL;
   with statement logging on, `/var/log/postgresql` would hold every one of them (audit L5-F11).
   **Never raise `log_statement` on this cluster**, including "just for one debugging session".
-- `pg_hba.conf`: `local` + `scram-sha-256` for the migrator and all twenty service LOGIN
-  principals (the eighteen the provisioner manages, the observation agent and its threshold
+- `pg_hba.conf`: `local` + `scram-sha-256` for the migrator and all twenty-one service LOGIN
+  principals (the nineteen the provisioner manages, the observation agent and its threshold
   operator), `peer` for the
   `postgres` OS user (that is how backups run), `hostssl` on `127.0.0.1/32` and `::1/128`, and
   `host all all 0.0.0.0/0 reject` + `::/0 reject` **last**. First match wins, so order is
@@ -664,7 +665,7 @@ pnpm db:migrate
 sudo -u postgres psql -v ON_ERROR_STOP=1 -f deploy/postgres/hardening.sql
 ```
 
-**4. The eighteen managed service principals.** The provisioner reads one exact JSON envelope on
+**4. The nineteen managed service principals.** The provisioner reads one exact JSON envelope on
 standard input — its format is `docs/missions/2026-08-17-accounts-privacy-security/P3-02-production-database-principal-provisioning.md`
 § "Input contract" — and publishes the JIT support-config operator's credential to the file
 named on its command line. Write the envelope to `/run/debateai/principals.json` (`0600`, root):
@@ -679,11 +680,11 @@ install -d -m 0700 /run/debateai/support-config
 pnpm db:provision-principals --support-config-credential-file /run/debateai/support-config/operator.json < /run/debateai/principals.json && shred -u /run/debateai/principals.json
 ```
 
-It prints `PRODUCTION_DATABASE_PRINCIPALS_READY=18` and nothing secret, and only then is the
+It prints `PRODUCTION_DATABASE_PRINCIPALS_READY=19` and nothing secret, and only then is the
 envelope destroyed. If it refuses, the envelope stays in `/run/debateai` (memory only, `0600`) so
 the run can be corrected and repeated; destroy it by hand once you are done.
 
-**Six of the eighteen are provisioned expired (V-20).** `evaluator-worker`, `evaluator-api`,
+**Six of the nineteen are provisioned expired (V-20).** `evaluator-worker`, `evaluator-api`,
 `evaluator-reader`, `obs-writer`, `obs-listener` and `obs-watchdog` have no shipped component
 that connects as them (every connection purpose in the manifest is `REQUIRED_NOT_WIRED`). The
 provisioner gives them `VALID UNTIL '-infinity'`: the role exists with its verifier and every
@@ -887,7 +888,7 @@ this code:
    opens CONNECT to `debateai_billing_runtime`.
 3. **Re-run the provisioner** (§4 step 4, exactly as written: a fresh envelope, each new password copied into
    its `EnvironmentFile` before the envelope is destroyed). It moves `debateai_prod_api_runtime` from
-   `debateai_runtime` to `debateai_billing_runtime` and prints `PRODUCTION_DATABASE_PRINCIPALS_READY=18`.
+   `debateai_runtime` to `debateai_billing_runtime` and prints `PRODUCTION_DATABASE_PRINCIPALS_READY=19`.
 4. **Close the migrator window** (§4 step 5).
 5. **Restart the API and the runner** (`systemctl restart debateai-api debateai-runner`) so both connect with the
    passwords step 3 set.
@@ -1294,7 +1295,7 @@ master-key rotation, because the rotation changes what is in escrow.
   `COST_ENVELOPE_POLICY_UNRESOLVED` or `COST_ENVELOPE_POLICY_INVALID`.
 - Six P3-01 principals are `REQUIRED_NOT_WIRED` (`evaluator-worker`, `evaluator-api`,
   `evaluator-reader`, `obs-writer`, `obs-listener`, `obs-watchdog`, re-counted 2026-09-25). The
-  provisioner reconciles all eighteen and provisions these six with `VALID UNTIL '-infinity'`
+  provisioner reconciles all nineteen and provisions these six with `VALID UNTIL '-infinity'`
   (V-20, §4): present, unusable, and not a live credential for an unused principal.
 
 ### Known limitations — what this kit and this tree do NOT do yet

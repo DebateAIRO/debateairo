@@ -137,8 +137,9 @@ describe("P3-02 production database principal provisioner", () => {
       input: "STDIN_EXACT_JSON_AND_PRIVATE_FILE_ARG",
       runbook: "docs/missions/2026-08-17-accounts-privacy-security/P3-02-production-database-principal-provisioning.md"
     });
-    expect(manifest.provisioner.managedPrincipalIds).toHaveLength(18);
-    expect(new Set(manifest.provisioner.managedPrincipalIds).size).toBe(18);
+    expect(manifest.provisioner.managedPrincipalIds).toHaveLength(19);
+    expect(new Set(manifest.provisioner.managedPrincipalIds).size).toBe(19);
+    expect(manifest.provisioner.managedPrincipalIds).toContain("api-data-export");
     expect(manifest.provisioner.managedPrincipalIds).toContain("api-support");
     expect(manifest.provisioner.managedPrincipalIds).toContain("support-config-operator");
     expect(developmentSource).toContain('roleName: "debateai_dev_evaluator_api"');

@@ -46,18 +46,23 @@ function entries(zip: Buffer): Record<string, string> {
 }
 
 describe("data export over a real database and encrypted file store", () => {
-  let db: TestDatabase, runtime: ReturnType<typeof createPool>, root: string;
+  let db: TestDatabase, runtime: ReturnType<typeof createPool>, workerRuntime: ReturnType<typeof createPool>, root: string;
   const sent: TemplatedMail[] = [];
   const lines: string[] = [];
   beforeAll(async () => {
     db = await startTestDatabase();
     await migrate(db.pool);
     await db.pool.query("CREATE ROLE data_export_e2e_auth LOGIN PASSWORD 'data-export-e2e-only' IN ROLE debateai_authorization_runtime");
+    await db.pool.query("CREATE ROLE data_export_e2e_worker LOGIN PASSWORD 'data-export-e2e-worker-only' IN ROLE debateai_data_export_worker");
     const url = new URL(db.connectionString); url.username = "data_export_e2e_auth"; url.password = "data-export-e2e-only";
     runtime = createPool(url.toString());
+    url.username = "data_export_e2e_worker"; url.password = "data-export-e2e-worker-only";
+    workerRuntime = createPool(url.toString());
+    expect((await runtime.query("SELECT current_user name")).rows[0].name).toBe("data_export_e2e_auth");
+    expect((await workerRuntime.query("SELECT current_user name")).rows[0].name).toBe("data_export_e2e_worker");
     root = await mkdtemp(join(tmpdir(), "data-export-e2e-"));
   }, 180_000);
-  afterAll(async () => { await runtime?.end(); await db?.stop(); if (root) await rm(root, { recursive: true, force: true }); });
+  afterAll(async () => { await runtime?.end(); await workerRuntime?.end(); await db?.stop(); if (root) await rm(root, { recursive: true, force: true }); });
   afterEach(async () => {
     if (db) await db.pool.query("UPDATE identity.data_export SET status='CANCELLED',closed_at=clock_timestamp() WHERE status='PREPARING'");
   });
@@ -79,10 +84,10 @@ describe("data export over a real database and encrypted file store", () => {
 
   function application(directory: string, email: string, workerId = randomUUID(), recoveryEmail?: string, recordsKey?: Buffer,
     userKey?: Buffer, actualOwnerView?: OwnerViewAdapter) {
-    const repo = new PostgresDataExportRepository(runtime, {
+    const repo = new PostgresDataExportRepository(runtime, workerRuntime, {
       hashSourceIp: async () => "a".repeat(64), hashUserAgent: async () => "b".repeat(64)
     } as never);
-    const source = new PostgresDataExportSource(runtime);
+    const source = new PostgresDataExportSource(workerRuntime);
     const store = new FileDataExportStore({ directory, users: { load: async () => Buffer.alloc(32, 7) } });
     const ownerView = new OwnerViewAdapter({ application: {} as never },
       { exists: async () => false });

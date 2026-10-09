@@ -34,6 +34,7 @@ import { loadArchiveCatalog } from "./data-export/archive-catalog.js";
 import { OwnerViewAdapter } from "./data-export/owner-view-adapter.js";
 import { TemplatedDataExportMail } from "./data-export/mail.js";
 import { PostgresDataExportRepository, PostgresDataExportSource } from "@debateai/db";
+import { assertDataExportDatabaseRoles } from "../../../packages/db/src/data-export.js";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -315,6 +316,7 @@ await boot.run("ask-admission-pools", async () => {
   }
 });
 const erasurePool = boot.hold(createPool(environment.ERASURE_DATABASE_URL));
+const dataExportPool = environment.DATA_EXPORT_STORE_PATH === undefined ? undefined : boot.hold(createPool(environment.DATA_EXPORT_DATABASE_URL!));
 // DL7-F7: the hand-rolled pool cleanup this stage carried is the ledger's job
 // now, and it covers the KEKs the old one never reached.
 await boot.run("database-roles", () => Promise.all([
@@ -325,7 +327,8 @@ await boot.run("database-roles", () => Promise.all([
     assertPublicationCleanupDatabaseRole(publicationCleanupPool)
   ] : []),
   assertContentProvisionDatabaseRole(pool,contentProvisionPool),
-  assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool)
+  assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool),
+  ...(dataExportPool === undefined ? [] : [assertDataExportDatabaseRoles(authorizationPool, dataExportPool)])
 ]));
 const authPolicy = await boot.run("auth-policy", () => readAuthPolicy(pool, environment.REGISTER_VERSION));
 const mfaPolicy = await boot.run("mfa-policy", () => readMfaPolicy(pool, environment.REGISTER_VERSION));
@@ -1338,8 +1341,8 @@ let dataExport: DataExportApplication | undefined;
 let dataExportTimer: ReturnType<typeof setInterval> | undefined;
 let triggerDataExportWork = (): void => {};
 if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
-  const repository = new PostgresDataExportRepository(authorizationPool, auditContextHasher);
-  const source = new PostgresDataExportSource(authorizationPool);
+  const repository = new PostgresDataExportRepository(authorizationPool, dataExportPool!, auditContextHasher);
+  const source = new PostgresDataExportSource(dataExportPool!);
   const store = new FileDataExportStore({ directory: environment.DATA_EXPORT_STORE_PATH, users: dekStore });
   const mail = new TemplatedDataExportMail(new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
@@ -1511,6 +1514,7 @@ const startup = installStartupResourceOwner({
         || erasurePool === contentProvisionPool
       ? [] : [erasurePool]),
     ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool]),
+    ...(dataExportPool === undefined ? [] : [dataExportPool]),
     supportPool,
     supportRelayLeasePool,
     { end: () => supportKeys.close() },
