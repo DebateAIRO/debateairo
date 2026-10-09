@@ -172,7 +172,7 @@ describe('the native operator refuses a pending forward step and names it', () =
   const body = text.slice(start);
   const planReturn = body.indexOf("if(plan.operation==='plan'||plan.operation==='apply-and-plan')return metadata;");
   const preCheck = body.indexOf("if(plan.operation==='publish')await verify.refusePendingForwardSteps(pool);");
-  const publish = body.indexOf('publisher.publishPreviewRegister(');
+  const publish = body.indexOf('publisher.publishPreviewRegisterV2('); // publish kit v2 (publish-register-v2.ts)
   expect(planReturn).toBeGreaterThan(-1);
   expect(preCheck).toBeGreaterThan(planReturn);
   expect(publish).toBeGreaterThan(preCheck);

@@ -12,6 +12,15 @@ export function validateNativePlan(plan) {
   ||!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(plan.sourceRoot))refuse('PREVIEW_NATIVE_PLAN_REFUSED');
  return plan;
 }
+/**
+ * What the owner reviews before publish (v2): the full delta with old and new canonical values.
+ * The release tool re-hashes `delta` against `deltaSha256` and copies the approval from this file.
+ */
+export function snapshotProposal({runtimeObservedAt,source,plan,snapshot}) {
+ return {schema:'preview-auth-dev-snapshot-proposal-v2',composer:snapshot.composer,runtimeObservedAt,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorManifestSha256:plan.operatorManifestSha256,
+  baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256,
+  rowCount:snapshot.rows.length,rowKeys:snapshot.rows.map(row=>row.rowKey),addedKeys:snapshot.addedKeys,changedKeys:snapshot.changedKeys,delta:snapshot.delta};
+}
 /** Fixed public plan + fixed private peer FD. No database URL, role, secret or env override argument. */
 export async function runNativeOperator() {
  const plan=validateNativePlan(await withPrivateBytes('/etc/debateai-v3-preview/auth-dev-v1/native-plan.json',{root:'/etc/debateai-v3-preview/auth-dev-v1',uid:0,mode:0o644,maxBytes:32768},raw=>strictJson(raw)));
@@ -20,23 +29,25 @@ export async function runNativeOperator() {
  await verifySourceManifest(source,{sourceRevision:plan.sourceRevision,sourceTree:plan.sourceTree,sourceRoot:plan.sourceRoot,role:'api',manifestSha256:plan.sourceManifest.sha256,execution:{entryUrl:import.meta.url,entryName:'native-operator.mjs',operatorManifestSha256:plan.operatorManifestSha256}});
  if(operatorManifestSha256(source)!==plan.operatorManifestSha256)refuse('PREVIEW_OPERATOR_SOURCE_REFUSED');
  const engine=join(plan.sourceRoot,'dialectical-engine');
- const [db,lineage,register,publisher,verify]=await Promise.all([tsImport(join(engine,'packages/db/src/index.ts'),import.meta.url),tsImport(join(engine,'packages/db/src/migration-lineage.ts'),import.meta.url),tsImport(join(engine,'packages/register/src/index.ts'),import.meta.url),tsImport('./publish-register.ts',import.meta.url),tsImport('./verify-native.ts',import.meta.url)]);
+ const [db,lineage,register,publisher,verify]=await Promise.all([tsImport(join(engine,'packages/db/src/index.ts'),import.meta.url),tsImport(join(engine,'packages/db/src/migration-lineage.ts'),import.meta.url),tsImport(join(engine,'packages/register/src/index.ts'),import.meta.url),tsImport('./publish-register-v2.ts',import.meta.url),tsImport('./verify-native.ts',import.meta.url)]);
  const migration=await lineage.loadMigrationPlan();
  return withActiveNativePool({publicPeerModule:'/opt/debateai-v3-preview/operator/recovery106-v1/native-common106.mjs',auth106Names:migration.manifest.cohorts.auth106},async pool=>{
   if(plan.operation==='apply-and-plan')await db.migrate(pool);
   const base=await publisher.readSealedSnapshot(pool,plan.selectedBaseRegisterVersion);
   if(base.snapshotSha256!==plan.selectedBaseSnapshotSha256)refuse('PREVIEW_SELECTED_BASE_DRIFT');
+  // Publish kit v2: plan and publish compose from the CURRENT published version (nothing sealed above the base but this publication's own replay).
+  if(plan.operation==='plan'||plan.operation==='publish')await publisher.assertBaseIsCurrent(pool,base.registerVersion,plan.publicationId);
   const runtimeObservedAt=plan.approval?.runtimeObservedAt??new Date().toISOString();
-  const rows=await publisher.buildPreviewSourceRows(await register.loadBootstrapRegister(),{nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt});
-  const snapshot=publisher.composePreviewSnapshot({sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256});
-  const metadata={schema:'preview-auth-dev-snapshot-proposal-v1',runtimeObservedAt,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256,rowCount:snapshot.rows.length,rowKeys:snapshot.rows.map(row=>row.rowKey),addedKeys:snapshot.addedKeys,delta:snapshot.delta};
+  const rows=await publisher.buildPreviewSourceRowsV2(await register.loadBootstrapRegister(),{nodeVersion:process.version,pnpmVersion:source.pnpmVersion,sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,operatorSha256:plan.operatorManifestSha256,observedAt:runtimeObservedAt});
+  const snapshot=publisher.composePreviewSnapshotV2({sourceRows:rows,baseRows:base.rows,baseRegisterVersion:base.registerVersion,baseSnapshotSha256:base.snapshotSha256});
+  const metadata=snapshotProposal({runtimeObservedAt,source,plan,snapshot});
   if(plan.operation==='plan'||plan.operation==='apply-and-plan')return metadata;
   if(!plan.approval)refuse('PREVIEW_SNAPSHOT_REVIEW_REQUIRED');
   const {runtimeObservedAt:approvedRuntimeObservedAt,publication,...approval}=plan.approval;
   if(typeof approvedRuntimeObservedAt!=='string')refuse('PREVIEW_RUNTIME_OBSERVATION_REQUIRED');
   // Only apply-and-plan applies SQL. publish and verify refuse a pending forward step before writing anything.
   if(plan.operation==='publish')await verify.refusePendingForwardSteps(pool);
-  const receipt=plan.operation==='publish'?await publisher.publishPreviewRegister(pool,{publicationId:plan.publicationId,sourceRef:`preview-auth-dev-v1 ${source.sourceRevision}/${source.sourceTree}; operator sha256:${plan.operatorManifestSha256}`,snapshot,approval}):publication;
+  const receipt=plan.operation==='publish'?await publisher.publishPreviewRegisterV2(pool,{publicationId:plan.publicationId,sourceRef:`preview-auth-dev-v1 ${source.sourceRevision}/${source.sourceTree}; operator sha256:${plan.operatorManifestSha256}`,snapshot,approval}):publication;
   return verify.verifyNativeState(pool,{sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,nativeSourceSha256:source.nativeSha256,publication:receipt});
  });
 }
