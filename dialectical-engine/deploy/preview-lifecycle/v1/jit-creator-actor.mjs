@@ -1,10 +1,12 @@
 // Runs ONLY as the postgres OS user, started by unlock-team-tools.mjs through the reviewed
 // postgres-peer channel: peer packet on FD3, argv exactly `--credential-fd 3`, environment
 // exactly PATH/LANG/LC_ALL/TZ. Control (and, for open, the password) arrive on stdin only.
+// The password never reaches SQL: it becomes a SCRAM-SHA-256 verifier here, and only that is sent.
 //
 // It changes exactly one thing: the existing debateai_prod_staff_recovery login's password and
 // expiry. No grants, no ownership, no other role. SQL is ported from the reviewed task-12 root
 // actor (open/close), plus `extend`, which moves only the expiry forward (never past 5 minutes).
+import { createHash, createHmac, pbkdf2Sync, randomBytes } from 'node:crypto';
 import { userInfo } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { exactKeys, strictJson } from '../../preview-auth-dev/v1/custody.mjs';
@@ -105,7 +107,24 @@ export async function closeLogin(client) {
   return { passwordNull: true, expiredMinusInfinity: true, noSessions: true, capabilitiesPreserved: true };
 }
 
-async function openLogin(client, password, validUntil) {
+/**
+ * PostgreSQL's stored SCRAM-SHA-256 form (RFC 5802 / RFC 7677), computed here so the plaintext
+ * never reaches the server, its logs or pg_stat_activity: given a verifier, ALTER ROLE stores it
+ * as-is. SaltedPassword = PBKDF2-SHA256(password, salt, 4096); ClientKey = HMAC(SaltedPassword,
+ * "Client Key"); StoredKey = SHA256(ClientKey); ServerKey = HMAC(SaltedPassword, "Server Key").
+ * The password here is 64 hex characters, which SASLprep leaves unchanged.
+ */
+export function scramSha256Verifier(password, { salt = randomBytes(16), iterations = 4096 } = {}) {
+  if (!Buffer.isBuffer(password) || password.length < 1 || !Buffer.isBuffer(salt) || salt.length !== 16 || iterations !== 4096) refuse('STAFF_JIT_VERIFIER_REFUSED');
+  const salted = pbkdf2Sync(password, salt, iterations, 32, 'sha256');
+  try {
+    const storedKey = createHash('sha256').update(createHmac('sha256', salted).update('Client Key').digest()).digest();
+    const serverKey = createHmac('sha256', salted).update('Server Key').digest();
+    return `SCRAM-SHA-256$${iterations}:${salt.toString('base64')}$${storedKey.toString('base64')}:${serverKey.toString('base64')}`;
+  } finally { salted.fill(0); }
+}
+
+export async function openLogin(client, password, validUntil) {
   let changed = false;
   try {
     await originalCreator(client);
@@ -114,10 +133,13 @@ async function openLogin(client, password, validUntil) {
     // Session-local logging protection before any password-bearing statement. No global change.
     await client.query("SET log_statement='none'"); await client.query('SET log_parameter_max_length=0');
     await client.query('SET log_parameter_max_length_on_error=0'); await client.query("SET log_min_error_statement='panic'");
+    // A SCRAM verifier is stored as-is whatever password_encryption says; kept so nothing else could ever hash differently.
     await client.query("SET password_encryption='scram-sha-256'");
     await bounded(client, validUntil);
-    const statement = (await client.query(`SELECT format('ALTER ROLE debateai_prod_staff_recovery PASSWORD %L VALID UNTIL %L',$1::text,$2::timestamptz::text) statement`, [password.toString('latin1'), validUntil])).rows[0]?.statement;
-    if (typeof statement !== 'string') refuse('STAFF_JIT_OPEN_REFUSED');
+    // Only the verifier is ever sent; the plaintext stays in this process.
+    const verifier = scramSha256Verifier(password);
+    const statement = (await client.query(`SELECT format('ALTER ROLE debateai_prod_staff_recovery PASSWORD %L VALID UNTIL %L',$1::text,$2::timestamptz::text) statement`, [verifier, validUntil])).rows[0]?.statement;
+    if (typeof statement !== 'string' || !statement.includes(verifier)) refuse('STAFF_JIT_OPEN_REFUSED');
     changed = true;
     await client.query(statement);
     await confirmBounded(client);

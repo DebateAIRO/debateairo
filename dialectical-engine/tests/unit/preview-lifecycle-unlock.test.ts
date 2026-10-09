@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 const unlock = await import('../../deploy/' + 'preview-lifecycle/v1/unlock-team-tools.mjs');
@@ -340,6 +340,68 @@ describe('postgres-peer creator actor input', () => {
     ['an extra key', input({ mode: 'close', engine, role: 'postgres' })]
   ])('refuses %s', (_name, bytes) => {
     expect(() => creator.parseCreatorInput(bytes, at)).toThrow(/STAFF_JIT_INPUT_REFUSED/);
+  });
+});
+
+describe('the interim login password never appears in SQL text', () => {
+  // RFC 7677 section 3 (SCRAM-SHA-256): user "user", password "pencil", this salt, 4096 iterations.
+  const RFC = {
+    salt: 'W22ZaJ0SNY7soEsUEjb6gQ==',
+    authMessage: 'n=user,r=rOprNGfwEbeRWgbNEkqO,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0,s=W22ZaJ0SNY7soEsUEjb6gQ==,i=4096,c=biws,r=rOprNGfwEbeRWgbNEkqO%hvYDpWUa2RaTCAfuxFIlj)hNlF$k0',
+    clientProof: 'dHzbZapWIk4jUhN+Ute9ytag9zjfMHgsqmmiz7AndVQ=',
+    serverSignature: '6rriTRBi23WpRR/wtup+mMhUZUn/dB5nLTJRsjl95G4='
+  };
+  const parse = (verifier: string) => {
+    const match = /^SCRAM-SHA-256\$4096:([A-Za-z0-9+/=]+)\$([A-Za-z0-9+/=]+):([A-Za-z0-9+/=]+)$/.exec(verifier);
+    expect(match).not.toBeNull();
+    return { salt: match![1]!, storedKey: Buffer.from(match![2]!, 'base64'), serverKey: Buffer.from(match![3]!, 'base64') };
+  };
+  /** Exactly what the server does with a stored verifier: recover ClientKey from the proof and hash it. */
+  const serverAccepts = (verifier: string, authMessage: string, clientProof: Buffer) => {
+    const { storedKey } = parse(verifier);
+    const signature = createHmac('sha256', storedKey).update(authMessage).digest();
+    const clientKey = Buffer.from(clientProof.map((byte, index) => byte ^ signature[index]!));
+    return createHash('sha256').update(clientKey).digest().equals(storedKey);
+  };
+
+  it('builds the PostgreSQL SCRAM-SHA-256 verifier that the RFC 7677 exchange authenticates against', () => {
+    const verifier = creator.scramSha256Verifier(Buffer.from('pencil'), { salt: Buffer.from(RFC.salt, 'base64') });
+    const { salt, serverKey } = parse(verifier);
+    expect(salt).toBe(RFC.salt);
+    expect(serverAccepts(verifier, RFC.authMessage, Buffer.from(RFC.clientProof, 'base64'))).toBe(true);
+    expect(createHmac('sha256', serverKey).update(RFC.authMessage).digest('base64')).toBe(RFC.serverSignature);
+    expect(serverAccepts(creator.scramSha256Verifier(Buffer.from('pencil!'), { salt: Buffer.from(RFC.salt, 'base64') }), RFC.authMessage, Buffer.from(RFC.clientProof, 'base64'))).toBe(false);
+  });
+
+  it('uses a fresh 16-byte salt each time', () => {
+    const a = parse(creator.scramSha256Verifier(Buffer.from('ab'.repeat(32)))), b = parse(creator.scramSha256Verifier(Buffer.from('ab'.repeat(32))));
+    expect(Buffer.from(a.salt, 'base64')).toHaveLength(16);
+    expect(a.salt).not.toBe(b.salt);
+    expect(a.storedKey).toHaveLength(32);
+  });
+
+  it('opens the login with ALTER ROLE ... PASSWORD <verifier>: the plaintext is in no statement and no parameter', async () => {
+    const seen: { sql: string; params: unknown[] }[] = [];
+    const client = {
+      query: async (sql: string, params: unknown[] = []) => {
+        seen.push({ sql, params });
+        if (sql.includes("current_setting('cluster_name')")) return { rows: [{ session: 'postgres', role: 'debateai_prod_migrator', database: 'debateai', port: 5434, cluster: 'debateai-v3-preview-15fccd74', directory: '/var/lib/postgresql/18/v3-preview', major: 18 }] };
+        if (sql.includes('pg_authid')) return { rows: [{ rolcanlogin: true, rolinherit: true, no_elevated_powers: true, password_null: true, expired_minus_infinity: true, open_now: false, sessions: 0, memberships: 1, exact_capability: 1, members: 0 }] };
+        if (sql.includes("format('ALTER ROLE")) return { rows: [{ statement: `ALTER ROLE debateai_prod_staff_recovery PASSWORD '${String(params[0])}' VALID UNTIL '${String(params[1])}'` }] };
+        if (/\bok\b/.test(sql)) return { rows: [{ ok: true }] };
+        return { rows: [] };
+      }
+    };
+    const plaintext = 'cd'.repeat(32), password = Buffer.from(plaintext);
+    await expect(creator.openLogin(client, password, '2026-10-09T10:04:00.000Z')).resolves.toMatchObject({ existingRoleOpened: true });
+    for (const call of seen) expect(JSON.stringify(call)).not.toContain(plaintext);
+    const alter = seen.find(call => call.sql.startsWith('ALTER ROLE'))!;
+    const verifier = /PASSWORD '([^']+)'/.exec(alter.sql)![1]!;
+    const { salt, storedKey } = parse(verifier);
+    // First principles (RFC 5802): SaltedPassword = PBKDF2-SHA256(password, salt, 4096); StoredKey = SHA256(HMAC(SaltedPassword, "Client Key")).
+    const salted = (await import('node:crypto')).pbkdf2Sync(plaintext, Buffer.from(salt, 'base64'), 4096, 32, 'sha256');
+    expect(createHash('sha256').update(createHmac('sha256', salted).update('Client Key').digest()).digest().equals(storedKey)).toBe(true);
+    expect(password.every(byte => byte === 0)).toBe(true);
   });
 });
 
