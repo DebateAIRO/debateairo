@@ -137,7 +137,10 @@ describe("finishing after the 24 hours with the finish link and the current pass
 describe("a second recovery while one is already waiting", () => {
   const LINK = "L".repeat(43), linkHash = hashToken("mfa-recovery-link", LINK);
   const candidate = { userId: USER, passwordHash: PASSWORD_HASH, channels: [PROOF, OTHER], bindingChannelIds: [PROOF] };
-  const exchanging = (overrides: Record<string, unknown> = {}) => repository({ prepareExchange: vi.fn(async () => candidate), linkWaiting: vi.fn(async () => true), exchange: vi.fn(async () => "FACTOR_REQUIRED"), read: vi.fn(async () => ({ stage: "FACTOR_REQUIRED", expiresAt: "2026-10-09T12:05:00.000Z", csrfHash: "sha256:" + "c".repeat(64) })), ...overrides });
+  const exchanging = (overrides: Record<string, unknown> = {}) => {
+    const linkWaiting = vi.fn(async () => true), exchange = vi.fn(async () => "FACTOR_REQUIRED");
+    return repository({ prepareExchange: vi.fn(async () => candidate), linkWaiting, exchange, read: vi.fn(async () => ({ stage: "FACTOR_REQUIRED", expiresAt: "2026-10-09T12:05:00.000Z", csrfHash: "sha256:" + "c".repeat(64) })), ...overrides }) as ReturnType<typeof repository> & { linkWaiting: typeof linkWaiting; exchange: typeof exchange };
+  };
   it("is refused at the email link with its own reason, after the password, before anything is set up", async () => {
     const repo = exchanging(), { service: s } = service(repo);
     await expect(s.exchange({ token: LINK, password: "current password" }, request)).rejects.toThrow("MFA_RECOVERY_ALREADY_WAITING");
