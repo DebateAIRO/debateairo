@@ -550,6 +550,8 @@ install -m 0644 deploy/postgres/postgresql.hardening.conf \
   /etc/postgresql/18/main/conf.d/hardening.conf
 install -m 0640 -o postgres -g postgres deploy/postgres/pg_hba.conf.template \
   /etc/postgresql/18/main/pg_hba.conf
+install -m 0640 -o postgres -g postgres deploy/postgres/pg_ident.conf.template \
+  /etc/postgresql/18/main/pg_ident.conf
 install -d -m 0700 -o postgres -g postgres /etc/debateai/postgres-tls
 # server.crt SAN must include IP:127.0.0.1 and IP:::1; server.key is 0600 postgres:postgres
 systemctl restart postgresql
@@ -570,7 +572,8 @@ What the two config files pin, and why:
 - `pg_hba.conf`: `local` + `scram-sha-256` for the migrator and all twenty service LOGIN
   principals (the eighteen the provisioner manages, the observation agent and its threshold
   operator), `peer` for the
-  `postgres` OS user (that is how backups run), `hostssl` on `127.0.0.1/32` and `::1/128`, and
+  `postgres` OS user (that is how backups run), `peer map=readiness` for the password-less staff
+  readiness writer of migration 0109 (`pg_ident.conf` maps only root to it), `hostssl` on `127.0.0.1/32` and `::1/128`, and
   `host all all 0.0.0.0/0 reject` + `::/0 reject` **last**. First match wins, so order is
   load-bearing. `hatchet` is reachable only by `debateai_prod_hatchet` (audit L7-F2).
 - So there are exactly **two ways in**, and every client URL must say which: the unix socket

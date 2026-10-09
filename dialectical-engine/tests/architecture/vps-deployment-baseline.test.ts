@@ -37,6 +37,9 @@ function hbaLines(text: string): string[] {
   return configLines(text).map((line) => line.replace(/\s+/g, " "));
 }
 
+/** Migration 0109's password-less readiness writer: root, peer, one ident map (collapsed whitespace). */
+const READINESS_PEER_LINE = "local debateai debateai_staff_readiness_writer peer map=readiness";
+
 function publishedPorts(compose: string): string[] {
   const ports: string[] = [];
   let inPorts = false;
@@ -71,6 +74,7 @@ function envKeys(text: string): Map<string, string> {
 
 const POSTGRES_FILES = [
   "deploy/postgres/pg_hba.conf.template",
+  "deploy/postgres/pg_ident.conf.template",
   "deploy/postgres/postgresql.hardening.conf",
   "deploy/postgres/bootstrap.sql",
   "deploy/postgres/hardening.sql"
@@ -111,6 +115,8 @@ describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => 
     const lines = hbaLines(read("deploy/postgres/pg_hba.conf.template"));
     expect(lines.length).toBeGreaterThan(0);
     for (const line of lines) {
+      // The one option anywhere is the readiness writer's ident map (pinned in the next test).
+      if (line === READINESS_PEER_LINE) continue;
       expect(line, line).toMatch(/^(local|hostssl|host)\s+\S+\s+\S+(\s+\S+)?\s+(scram-sha-256|peer|reject)$/);
       expect(line, line).not.toMatch(/\b(trust|md5|password|ident|hostnossl)\b/);
     }
@@ -122,7 +128,7 @@ describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => 
       expect(socketLine, `${principal.roleName} needs a local scram-sha-256 line on ${principal.database}`).toBeDefined();
     }
     for (const line of local) {
-      if (!/\s+postgres\s+peer$/.test(line)) expect(line, line).toMatch(/scram-sha-256$/);
+      if (!/\s+postgres\s+peer$/.test(line) && line !== READINESS_PEER_LINE) expect(line, line).toMatch(/scram-sha-256$/);
     }
     for (const line of hostssl) {
       expect(line, line).toMatch(/\s(127\.0\.0\.1\/32|::1\/128)\s+scram-sha-256$/);
@@ -136,6 +142,26 @@ describe("VPS baseline: native hardened Postgres (L5-F6, L5-F7, L5-F11)", () => 
       if (/\shatchet\s/.test(line)) expect(line, line).toMatch(/\shatchet\s+debateai_prod_hatchet\s/);
       if (/debateai_prod_hatchet/.test(line)) expect(line, line).toMatch(/\shatchet\s+debateai_prod_hatchet\s/);
     }
+  });
+
+  /**
+   * Migration 0109: debateai_staff_readiness_writer has PASSWORD NULL and may only publish and
+   * revoke the staff readiness row. Root reaches it by peer on the socket, through one ident map:
+   * no other OS user, no other principal, no password line, nothing earlier that could match it.
+   */
+  it("pg_hba + pg_ident: the staff readiness writer is admitted only by peer on the socket, mapped from root (0109)", () => {
+    const lines = hbaLines(read("deploy/postgres/pg_hba.conf.template"));
+    expect(lines.filter((line) => line.includes("debateai_staff_readiness_writer"))).toEqual([READINESS_PEER_LINE]);
+    expect(lines.filter((line) => /\speer(\s|$)/.test(line))).toEqual(["local all postgres peer", READINESS_PEER_LINE]);
+    expect(lines.filter((line) => line.includes("map="))).toEqual([READINESS_PEER_LINE]);
+    const at = lines.indexOf(READINESS_PEER_LINE);
+    const broader = lines.slice(0, at).filter((line) => /^local\s+(all|debateai)\s+all\s/.test(line));
+    expect(broader).toEqual([]);
+    expect(hbaLines(read("deploy/postgres/pg_ident.conf.template"))).toEqual(["readiness root debateai_staff_readiness_writer"]);
+    // The VPS bring-up installs the ident map next to pg_hba, or the peer line can never match.
+    const readme = read("deploy/vps/README.md");
+    expect(readme).toContain("install -m 0640 -o postgres -g postgres deploy/postgres/pg_ident.conf.template \\\n  /etc/postgresql/18/main/pg_ident.conf");
+    expect(readme.indexOf("deploy/postgres/pg_ident.conf.template")).toBeLessThan(readme.indexOf("systemctl restart postgresql"));
   });
 
   it("postgresql.hardening.conf: loopback listen, TLS 1.3, SCRAM, connection logs, no statement text (L5-F11)", () => {
@@ -224,6 +250,10 @@ describe("VPS baseline: hardening.sql re-opens CONNECT for every manifest role (
     expect(expected).toContain("debateai_support");
     expect(expected).toContain("debateai_support_config_operator");
     expect(expected.filter((role) => !grantees.has(role))).toEqual([]);
+  });
+
+  it("restates CONNECT for the staff readiness writer that migration 0109 mints with its own LOGIN", () => {
+    expect(connectGrantees(read("deploy/postgres/hardening.sql")).has("debateai_staff_readiness_writer")).toBe(true);
   });
 });
 

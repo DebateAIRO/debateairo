@@ -1,14 +1,21 @@
 # deploy/postgres/pg_hba.conf.template
 # Rendered verbatim to /etc/postgresql/18/main/pg_hba.conf on the VPS (PLAN §8 C3, audit L5-F7).
 # PostgreSQL runs NATIVELY on the host: every DebateAI principal connects over the Unix socket
-# (/var/run/postgresql) with SCRAM-SHA-256; TCP exists only on loopback and only with TLS;
-# everything else is rejected. First match wins, so order is load-bearing. No trailing comments:
+# (/var/run/postgresql) with SCRAM-SHA-256, except the password-less staff readiness writer
+# (peer, below); TCP exists only on loopback and only with TLS; everything else is rejected.
+# First match wins, so order is load-bearing. No trailing comments:
 # tests/architecture/vps-deployment-baseline.test.ts parses every non-comment line.
 #
 # TYPE    DATABASE   USER                                    [ADDRESS]       METHOD
 #
 # Maintenance and backups: root runs `sudo -u postgres ...` over the socket (peer = OS identity).
 local     all        postgres                                                peer
+#
+# Migration 0109: the staff readiness writer has PASSWORD NULL and may only publish and revoke
+# the staff alert readiness row. Only root reaches it, by peer on the socket, through the
+# `readiness` map in pg_ident.conf (deploy/postgres/pg_ident.conf.template). It must stay above
+# any broader rule that could match it; no password line names it.
+local     debateai   debateai_staff_readiness_writer                         peer map=readiness
 #
 # Just-in-time superuser for `pnpm db:migrate` / `pnpm db:provision-principals` (README §4):
 # its password is NULL between ceremonies and VALID UNTIL <= 15 minutes during one.
