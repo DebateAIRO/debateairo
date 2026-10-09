@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { MailTemplateError, renderMail } from "../../packages/mail-templates/src/render.js";
+import { TemplatedDataExportMail } from "../../apps/api/src/data-export/mail.js";
 
 const downloadUrl = `https://app.test/export#${"A".repeat(43)}`;
 const params = {
@@ -13,6 +14,15 @@ const locales = readdirSync(join(process.cwd(), "packages/mail-templates/message
   .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
 
 describe("DATA_EXPORT mail", () => {
+  it("R29 adapter renders the actual expiry UTC time", async () => {
+    let body = "";
+    const adapter = new TemplatedDataExportMail({ sendTemplated: async (input) => {
+      body = renderMail(input.templateId, input.locale, input.params).text;
+    } });
+    await adapter.sendExportReady({ exportId: "10000000-0000-4000-8000-000000000001", to: "a@example.test", locale: "en",
+      requestedAt: new Date("2026-10-08T10:00:00Z"), expiresAt: new Date("2026-10-09T15:43:00Z"), downloadUrl });
+    expect(body).toContain("October 9, 2026, 15:43 UTC");
+  });
   it("M-1 names the export and keeps the request, link, expiry and safety paragraphs in order", () => {
     const mail = renderMail("DATA_EXPORT", "en", params);
     expect(mail.subject).toBe("Your data export is ready");

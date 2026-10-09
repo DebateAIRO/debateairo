@@ -233,10 +233,12 @@ describe("data export database authority", () => {
       expect((await request(a.user, a.session, token)).result_status).toBe("ACCEPTED");
       const sentAt = new Date();
       await db.pool.query("UPDATE identity.data_export SET status='SENT',link_token_hash=$2,archive_sha256=$3,sent_at=$4,expires_at=$4::timestamptz+interval '86400 seconds' WHERE user_id=$1 AND status='PREPARING'", [a.user, `sha256:${String(i + 5).repeat(64)}`, "a".repeat(64), sentAt]);
+      await db.pool.query("UPDATE identity.data_export SET requested_at=clock_timestamp()-make_interval(secs=>$2) WHERE user_id=$1 AND link_token_hash=$3", [a.user, (2 - i) * 3600, `sha256:${String(i + 5).repeat(64)}`]);
     }
     const result = await request(a.user, a.session, await grant(a.user, a.session, { hash: hash("8") }));
     expect(result.result_status).toBe("RATE_LIMITED");
-    expect(result.result_retry_after_seconds).toBeGreaterThan(86_398);
+    expect(result.result_retry_after_seconds).toBeGreaterThanOrEqual(79_199);
+    expect(result.result_retry_after_seconds).toBeLessThanOrEqual(79_201);
   });
 
   it("D10 records PREPARING and requested audit while superseding old SENT", async () => {
@@ -326,5 +328,30 @@ describe("data export database authority", () => {
     const audit = JSON.stringify((await db.pool.query("SELECT source_context FROM identity.audit_event WHERE event_type LIKE 'identity.data_export.%'")).rows);
     expect(audit).not.toContain(hash("9"));
     expect(audit).not.toContain("fixture-ip-plaintext");
+  });
+
+  it("R31 fails a PREPARING row whose fourth lease expired without fail()", async () => {
+    const a = await account();
+    const exportId = randomUUID();
+    await db.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)
+      VALUES($1,$2,$3,'en','PREPARING',clock_timestamp()-interval '20 minutes',4,$4,clock_timestamp()-interval '10 minutes')`,
+    [exportId, a.user, a.session, randomUUID()]);
+    const claim = await asRuntime(client => client.query("SELECT * FROM identity.claim_data_export($1,45)", [randomUUID()]));
+    expect(claim.rows).toEqual([]);
+    await asRuntime(client => client.query("SELECT * FROM identity.sweep_data_exports()"));
+    const row = (await db.pool.query("SELECT status,lease_owner,lease_until FROM identity.data_export WHERE export_id=$1", [exportId])).rows[0];
+    expect(row).toEqual({ status: "FAILED", lease_owner: null, lease_until: null });
+  });
+
+  it("R37 refuses lease renewal after erasure reaches PROCESSING", async () => {
+    const a = await account(), exportId = randomUUID(), worker = randomUUID();
+    await db.pool.query(`INSERT INTO identity.data_export(export_id,user_id,session_id,locale,status,requested_at,attempts,lease_owner,lease_until)
+      VALUES($1,$2,$3,'en','PREPARING',clock_timestamp(),1,$4,clock_timestamp()+interval '45 seconds')`,
+    [exportId, a.user, a.session, worker]);
+    await db.pool.query(`INSERT INTO identity.account_erasure_request(user_id,requested_at,execute_at,prepared_at,
+      prepared_run_ids,prepared_legacy_run_ids,prepared_published_run_ids,prepared_current_publication_refs,prepared_cleanup_publication_refs)
+      VALUES($1,clock_timestamp(),clock_timestamp()+interval '30 days',clock_timestamp(),'{}','{}','{}','{}','{}')`, [a.user]);
+    const result = await asRuntime(async client => (await client.query("SELECT identity.renew_data_export_lease($1,$2,45) ok", [exportId, worker])).rows[0].ok);
+    expect(result).toBe(false);
   });
 });

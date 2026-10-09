@@ -104,31 +104,35 @@ export class FileDataExportStore {
   }
 
   async destroyKey(exportId: string): Promise<"DESTROYED" | "ALREADY_ABSENT"> {
-    try {
-      await this.fs.unlink(join(this.directory, `${exportId}.key`));
-      return "DESTROYED";
-    } catch (error) {
-      if (isMissing(error)) return "ALREADY_ABSENT";
-      throw new DataExportStoreError("DATA_EXPORT_STORE_UNREADABLE");
-    }
+    const key = await this.unlinkIfPresent(`${exportId}.key`);
+    const temporary = await this.unlinkIfPresent(`${exportId}.key.tmp`);
+    return key || temporary ? "DESTROYED" : "ALREADY_ABSENT";
   }
 
   async deleteArchive(exportId: string): Promise<void> {
-    try {
-      await this.fs.unlink(join(this.directory, `${exportId}.zip.enc`));
-    } catch (error) {
-      if (!isMissing(error)) throw new DataExportStoreError("DATA_EXPORT_STORE_UNREADABLE");
-    }
+    await this.unlinkIfPresent(`${exportId}.zip.enc`);
+    await this.unlinkIfPresent(`${exportId}.zip.enc.tmp`);
   }
 
   async listIds(): Promise<string[]> {
     try {
-      return (await this.fs.readdir(this.directory))
-        .filter((name) => name.endsWith(".zip.enc"))
-        .map((name) => name.slice(0, -".zip.enc".length))
-        .sort();
+      const ids = (await this.fs.readdir(this.directory)).flatMap((name) => {
+        const match = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(?:key|zip\.enc)(?:\.tmp)?$/.exec(name);
+        return match ? [match[1]!] : [];
+      });
+      return [...new Set(ids)].sort();
     } catch (error) {
       if (isMissing(error)) return [];
+      throw new DataExportStoreError("DATA_EXPORT_STORE_UNREADABLE");
+    }
+  }
+
+  private async unlinkIfPresent(name: string): Promise<boolean> {
+    try {
+      await this.fs.unlink(join(this.directory, name));
+      return true;
+    } catch (error) {
+      if (isMissing(error)) return false;
       throw new DataExportStoreError("DATA_EXPORT_STORE_UNREADABLE");
     }
   }

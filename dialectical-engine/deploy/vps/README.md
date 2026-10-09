@@ -113,6 +113,7 @@ usermod -a -G debateai-custody debateai-runner
 install -d -m 0755 -o root -g root /var/lib/debateai /var/lib/debateai/api
 install -d -m 0700 -o debateai-api -g debateai-api \
   /var/lib/debateai/api/publication-keys /var/lib/debateai/api/audit-keys
+install -d -m 0700 -o debateai-api -g debateai-api /var/lib/debateai/data-exports
 install -d -m 2750 -o debateai-api -g debateai-custody /var/lib/debateai/api/user-deks
 ```
 
@@ -163,6 +164,7 @@ process start: restart both units after either change.
 | `/var/lib/debateai/api/user-deks` | `2750` | `debateai-api:debateai-custody` | user-DEK store — the one tree the runner also reads (V-19) |
 | `/var/lib/debateai/api/publication-keys` | `0700` | `debateai-api` | publication-key store |
 | `/var/lib/debateai/api/audit-keys` | `0700` | `debateai-api` | audit-key store |
+| `/var/lib/debateai/data-exports` | `0700` | `debateai-api` | transient encrypted exports; excluded from backups |
 | `/var/lib/debateai-geoip` | `0755` | `debateai-geoip` | the DB-IP Lite country file and the Tor exit list (public data, `0644`), written only by `debateai-geoip-refresh.service` (§5 "Country data") |
 
 `/etc/default/caddy` carries `DEBATEAI_PUBLIC_HOSTNAME` and `DEBATEAI_ACME_EMAIL`.
@@ -283,6 +285,7 @@ single-owner modes with the same setting on. Check the tree after provisioning:
 
 ```sh
 stat -c '%a %U %G %n' /var/lib/debateai/api/user-deks
+stat -c '%a %U %G %n' /var/lib/debateai/data-exports
 find /var/lib/debateai/api/user-deks ! -group debateai-custody -print
 find /var/lib/debateai/api/user-deks -type d ! -perm 2750 -print -o -type f ! -perm 0640 -print
 ```
@@ -763,7 +766,7 @@ recipient address on the sendmail argv is not readable by other local uids — a
 `SystemCallFilter=@system-service`, `TimeoutStopSec=30`, `Restart=on-failure`.
 `MemoryDenyWriteExecute` is deliberately **not** set: it breaks the V8 JIT.
 
-`ReadWritePaths` is exactly what each service writes — the API's three custody stores, nothing for
+`ReadWritePaths` is exactly what each service writes — the API's four custody stores, nothing for
 the UI, and `ReadOnlyPaths` on the DEK store for the runner (it only ever *loads* run content keys;
 `ContentCipher.provisionRun` runs on the API's content-provision path).
 

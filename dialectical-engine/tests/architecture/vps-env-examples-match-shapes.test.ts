@@ -46,6 +46,17 @@ const CASES = [
 ] as const;
 
 describe("VPS env examples cover the strict environment shapes (Task 14 amendment)", () => {
+  it("provisions each API export custody directory as owner-only and writable under the unit", () => {
+    const example = readFileSync(resolve(engineRoot, "deploy/vps/env/api.env.example"), "utf8");
+    const unit = readFileSync(resolve(engineRoot, "deploy/vps/systemd/debateai-api.service"), "utf8");
+    const readme = readFileSync(resolve(engineRoot, "deploy/vps/README.md"), "utf8");
+    const path = /^DATA_EXPORT_STORE_PATH=(.+)$/m.exec(example)?.[1];
+    expect(path).toBe("/var/lib/debateai/data-exports");
+    expect(unit.match(/^ReadWritePaths=(.+)$/m)?.[1]?.split(/\s+/)).toContain(path);
+    expect(readme).toContain(`install -d -m 0700 -o debateai-api -g debateai-api ${path}`);
+    expect(readme).toContain(`| \`${path}\` | \`0700\` | \`debateai-api\``);
+    expect(readme).toContain(`stat -c '%a %U %G %n' ${path}`);
+  });
   it.each(CASES)("$service: every REQUIRED key of the shape is in $example", ({ example, keys }) => {
     const shape = inventory(keys);
     expect(shape.required.length).toBeGreaterThan(0);

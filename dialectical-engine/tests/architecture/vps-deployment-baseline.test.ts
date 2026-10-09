@@ -317,7 +317,7 @@ describe("VPS baseline: Caddy edge, loopback-only compose, hardened systemd unit
 
   it("ReadWritePaths are exactly the custody trees each service writes (L2 out-of-scope, C3 amendment)", () => {
     const api = read("deploy/vps/systemd/debateai-api.service");
-    expect(api).toMatch(/^ReadWritePaths=\/var\/lib\/debateai\/api\/user-deks \/var\/lib\/debateai\/api\/publication-keys \/var\/lib\/debateai\/api\/audit-keys$/m);
+    expect(api).toMatch(/^ReadWritePaths=\/var\/lib\/debateai\/api\/user-deks \/var\/lib\/debateai\/api\/publication-keys \/var\/lib\/debateai\/api\/audit-keys \/var\/lib\/debateai\/data-exports$/m);
     expect(api).toContain("ExecStart=/usr/bin/pnpm --dir /opt/debateai/dialectical-engine exec tsx apps/api/src/main.ts");
     const runner = read("deploy/vps/systemd/debateai-runner.service");
     expect(runner).not.toMatch(/^ReadWritePaths=/m);

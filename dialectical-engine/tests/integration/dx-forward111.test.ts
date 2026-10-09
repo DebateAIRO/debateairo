@@ -66,6 +66,33 @@ describe("data export forward111", () => {
     expect([await ledger(db), await receipt(db)]).toEqual(before);
   });
 
+  it("F10 refuses column ACL, index, constraint, FK and trigger drift on the export table", async () => {
+    const drifts: Array<[string, string, string]> = [
+      ["column ACL", "GRANT SELECT(link_token_hash) ON identity.data_export TO debateai_runtime", "REVOKE SELECT(link_token_hash) ON identity.data_export FROM debateai_runtime"],
+      ["one-PREPARING index", "DROP INDEX identity.data_export_one_preparing", "CREATE UNIQUE INDEX data_export_one_preparing ON identity.data_export(user_id) WHERE status='PREPARING'"],
+      ["token UNIQUE", "ALTER TABLE identity.data_export DROP CONSTRAINT data_export_link_token_hash_key", "ALTER TABLE identity.data_export ADD CONSTRAINT data_export_link_token_hash_key UNIQUE(link_token_hash)"],
+      ["token CHECK", "ALTER TABLE identity.data_export DROP CONSTRAINT data_export_token_check", "ALTER TABLE identity.data_export ADD CONSTRAINT data_export_token_check CHECK (link_token_hash ~ '^sha256:[0-9a-f]{64}$')"],
+      ["SENT CHECK", "ALTER TABLE identity.data_export DROP CONSTRAINT data_export_sent_check", "ALTER TABLE identity.data_export ADD CONSTRAINT data_export_sent_check CHECK ((status='SENT') <= (link_token_hash IS NOT NULL AND archive_sha256 IS NOT NULL AND sent_at IS NOT NULL AND expires_at = sent_at + interval '86400 seconds'))"],
+      ["user FK", "ALTER TABLE identity.data_export DROP CONSTRAINT data_export_user_id_fkey", "ALTER TABLE identity.data_export ADD CONSTRAINT data_export_user_id_fkey FOREIGN KEY(user_id) REFERENCES identity.\"user\"(user_id) ON DELETE CASCADE"],
+      ["truncate guard", "ALTER TABLE identity.data_export DISABLE TRIGGER ALL", "ALTER TABLE identity.data_export ENABLE TRIGGER ALL"]
+    ];
+    for (const [name, mutate, restore] of drifts) {
+      await db.pool.query(mutate);
+      try {
+        await expect(migrate(db.pool), name).rejects.toThrow("MIGRATION_FORWARD111_POSTCONDITION_DRIFT");
+      } finally {
+        await db.pool.query(restore);
+      }
+      await migrate(db.pool);
+    }
+  });
+
+  it("F11 reuses the lineage evidence query for compatibility receipts", async () => {
+    const source = await readFile(new URL("../../packages/db/src/migration-forward111.ts", import.meta.url), "utf8");
+    expect(source).toMatch(/import \{ lineageEvidence, type MigrationPlan, type Lineage \} from '\.\/migration-lineage\.js';/);
+    expect(source).not.toContain("async function compatibilityEvidence");
+  });
+
   it("F3 refuses a 111 ledger without 110 and a missing 111 receipt", async () => {
     const row = (await db.pool.query("DELETE FROM public.debateai_schema_migration WHERE name='0110_account_erasure_public_debates.sql' RETURNING *")).rows[0];
     try { await expect(migrate(db.pool)).rejects.toThrow("MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE"); }

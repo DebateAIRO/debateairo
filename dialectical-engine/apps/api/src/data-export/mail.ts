@@ -12,6 +12,5 @@ export class TemplatedDataExportMail implements DataExportMailPort {
       params: { requested: input.requestedAt.toISOString(), expires: input.expiresAt.toISOString(), downloadUrl: input.downloadUrl },
       messageId: input.exportId
     });
-    new Date();
   }
 }

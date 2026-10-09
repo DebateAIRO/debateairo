@@ -6,11 +6,11 @@
   "chainManifestSha256": "aab6bee30ee55b07116c21a25701af9af33f715caf5103a0b5c82f1fd77999d2",
   "migration": {
     "name": "0111_data_export.sql",
-    "sha256": "e334fb6ffa2d735d656b0a65448b428a678a5b8e0ce5804acda87bfc12411041"
+    "sha256": "bbec720fd5b273912cf9b6712b550601b712b1be9e9b9dbe3d1529d2791b2fc9"
   },
   "verifier": {
     "path": "lineage/verify-dx111-data-export.sql",
-    "sha256": "8df29c5ed717a8d85a8f95120804a19c34823922b833c2c451e4cd8a43fbe5d0"
+    "sha256": "1e3d9bae50c3a8635a0ac9447b9afaa0695eea9ed3fba8971abd0c7c1614b544"
   },
   "functions": [
     {
@@ -77,7 +77,7 @@
       "runtimeExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
-      "currentBodySha256": "e4c3a540b2411ec1cb04319491219c7b3cdc653f664f37fde0a5a07168e5f306"
+      "currentBodySha256": "b3399dde63370b3b1bcc586474ea4422d4b4cf7d05ae4f44022612efbb17fed0"
     },
     {
       "signature": "identity.read_data_export_snapshot(uuid,uuid)",
@@ -88,7 +88,7 @@
       "runtimeExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
-      "currentBodySha256": "e4b0dede0df360dcc201b9b7e45631ddfb0af3da9b2c72ca86e6316e1d8ac0b0"
+      "currentBodySha256": "2e472b32145629a3fd7931f336a1c9e287823b7ad8bfe3fcf5de423a12c04a05"
     },
     {
       "signature": "identity.complete_data_export(uuid,uuid,text,text,bigint,timestamp with time zone)",
@@ -121,7 +121,7 @@
       "runtimeExecute": true,
       "originalSource": null,
       "originalBodySha256": null,
-      "currentBodySha256": "d39216a2c6510659b76003a98e7f07c60ba730cebfd82221051582dc5a08f7c9"
+      "currentBodySha256": "8dfeedf81a2c974e5919b1855dcec8c18c8d83a438d9b62b011c6b0031f6b632"
     },
     {
       "signature": "identity.mark_data_export_key_destroyed(uuid)",
