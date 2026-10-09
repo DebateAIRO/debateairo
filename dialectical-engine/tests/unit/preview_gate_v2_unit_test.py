@@ -191,8 +191,9 @@ class AddressWatchAndUpdateTests(unittest.TestCase):
             code, line = self.run_main(['update', '--dropin', str(dropin)], fake_dns(*MEASURED[1:], '38.101.151.31'), run)
         finally:
             os.umask(old_umask)
-        self.assertEqual((code, line['added'], line['removed']), (0, ['38.101.151.31'], ['38.101.151.13']))
-        self.assertEqual(dropin.read_text(), addresses.render(addresses.resolve(fake_dns(*MEASURED[1:], '38.101.151.31'))))
+        self.assertEqual((code, line['added'], line['stale'], line['allowed']), (0, ['38.101.151.31'], ['38.101.151.13'], 15))
+        # Nothing listed is dropped: a DNS pool answering with changing subsets cannot flip the list.
+        self.assertEqual(dropin.read_text(), addresses.render(addresses.resolve(fake_dns(*MEASURED, '38.101.151.31'))))
         self.assertEqual(oct(os.stat(dropin).st_mode & 0o777), '0o644')
         self.assertEqual(calls, [(['/usr/bin/systemctl', 'daemon-reload'], {})])
         self.assertEqual(sorted(p.name for p in dropin.parent.iterdir()), [dropin.name])

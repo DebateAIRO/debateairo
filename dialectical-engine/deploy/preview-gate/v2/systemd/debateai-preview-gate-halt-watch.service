@@ -17,7 +17,8 @@ Group=root
 ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/gate_watch.py --private /var/lib/debateai-v3-preview/provider-team-authority-v2 --state /var/lib/debateai-preview-gate-watch/announced-halt.json
 StateDirectory=debateai-preview-gate-watch
 StateDirectoryMode=0700
-TimeoutStartSec=90
+# Short, so a stuck status run never holds the gate's shared lock long (the gate waits 10 s).
+TimeoutStartSec=20
 UMask=0077
 NoNewPrivileges=yes
 CapabilityBoundingSet=

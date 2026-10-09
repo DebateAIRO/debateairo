@@ -346,7 +346,9 @@ What to expect:
 **10. The two watchers and their email (standard install).** This needs the lifecycle alert's
 operator folder and recipient file (lifecycle README install steps 1 and 2). The commands do
 four things:
-1. Install the notice template from the lifecycle folder, and the four watcher files.
+1. Refresh the installed alert script from this release (an older copy does not know
+   `--notice` and would drop the emails without a sound), then install the notice template and
+   the four watcher files.
 2. Run each watcher once by hand.
 3. Show its last journal lines.
 4. Start both timers.
@@ -357,6 +359,9 @@ with the preview at every boot.
 
 ```sh
 ( set -eu; test -d "$R/deploy/preview-gate/v2"
+L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
+install -o root -g root -m 0644 $R/deploy/preview-lifecycle/v1/alert.mjs $L/alert.mjs
+grep -q -- "'--notice'" $L/alert.mjs
 install -o root -g root -m 0644 $R/deploy/preview-lifecycle/v1/systemd/debateai-preview-notice@.service /etc/systemd/system/
 install -o root -g root -m 0644 $R/deploy/preview-gate/v2/systemd/debateai-preview-gate-halt-watch.service $R/deploy/preview-gate/v2/systemd/debateai-preview-gate-halt-watch.timer $R/deploy/preview-gate/v2/systemd/debateai-preview-gate-addresses.service $R/deploy/preview-gate/v2/systemd/debateai-preview-gate-addresses.timer /etc/systemd/system/
 systemctl daemon-reload )
@@ -373,7 +378,8 @@ To see one real halt email, have the owner say yes, then:
 Only now may the lifecycle target be enabled.
 
 **Rollback.**
-1. Run `systemctl stop debateai-preview-provider-budget`.
+1. Run `systemctl stop debateai-preview-gate-halt-watch.timer debateai-preview-gate-addresses.timer`,
+   then `systemctl stop debateai-preview-provider-budget`.
 2. Copy the `.v1` file back from `/root/preview-archive/`.
 3. Remove the `.service.d/50-deepinfra-addresses.conf` drop-in by moving it to
    `/root/preview-archive/`.
@@ -436,9 +442,10 @@ Until step 2, calls refuse ("stopped"): the gate only spends under the GO it was
 **DeepInfra moved (the hourly check emailed, or a start refused with
 `DEEPINFRA_ADDRESSES_CHANGED`).**
 1. Check that the new addresses the email lists are DeepInfra's.
-2. Run the one command the email gives. It writes the list from today's DNS (refusing any
-   address that is not public), reloads systemd, and restarts the gate. It prints what it
-   added and removed.
+2. Run the one command the email gives. It adds today's DNS answer to the list (refusing any
+   address that is not public; nothing listed is dropped), reloads systemd, and restarts the
+   gate. It prints what it added and which listed addresses DNS no longer gives ("stale"). To
+   drop stale ones, redo install step 6.
 
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/deepinfra_addresses.py update --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf && systemctl restart debateai-preview-provider-budget

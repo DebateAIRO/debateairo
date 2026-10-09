@@ -1256,6 +1256,7 @@ class UnsentCallTests(GateTest):
         class Connection:
             def __init__(self, host, timeout, context):
                 self.sock = None
+                steps.append(('timeout', timeout))
 
             def connect(self):
                 steps.append('connect')
@@ -1287,8 +1288,8 @@ class UnsentCallTests(GateTest):
                 steps = []
                 with patch.object(bridge.helper.http.client, 'HTTPSConnection', self.transport_with(steps, connect=failure)), \
                         self.assertRaises(bridge.helper.RequestNotSent):
-                    REAL_TRANSPORT(timeout=5)(b'{}', KEY)
-                self.assertEqual(steps, ['connect', 'close'])  # No request was ever asked for.
+                    REAL_TRANSPORT(timeout=600)(b'{}', KEY)
+                self.assertEqual(steps, [('timeout', 15), 'connect', 'close'])  # No request was ever asked for.
 
     def test_deadline_passing_during_the_connect_is_not_sent(self):
         steps = []
@@ -1297,7 +1298,7 @@ class UnsentCallTests(GateTest):
                 patch.object(bridge.helper.time, 'monotonic', lambda: next(clock)), \
                 self.assertRaises(bridge.helper.RequestNotSent):
             REAL_TRANSPORT(timeout=5)(b'{}', KEY)
-        self.assertEqual(steps, ['connect', 'close'])
+        self.assertEqual(steps, [('timeout', 5), 'connect', 'close'])
 
     def test_failures_once_the_request_may_have_been_written_are_never_not_sent(self):
         for stage in ('request', 'getresponse'):

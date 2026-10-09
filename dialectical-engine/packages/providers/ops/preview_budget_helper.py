@@ -21,6 +21,7 @@ INPUT_PRICE = Decimal('0.15')
 OUTPUT_PRICE = Decimal('0.50')
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_TIMEOUT_SECONDS = 600
+CONNECT_TIMEOUT_SECONDS = 15  # TCP connect + TLS handshake; a black-holed address fails (unsent) fast.
 
 
 # SafetyError is not defined here: the gate checks this file's custody and hash, then runs it with
@@ -210,7 +211,9 @@ class HttpsTransport:
         if not isinstance(payload, bytes):
             raise SafetyError('request_bytes_required')
         deadline = time.monotonic() + self.timeout
-        connection = http.client.HTTPSConnection('api.deepinfra.com', timeout=self.timeout, context=ssl.create_default_context())
+        # The connect gets its own short timeout; remaining() then gives the socket the rest.
+        connection = http.client.HTTPSConnection('api.deepinfra.com', timeout=min(CONNECT_TIMEOUT_SECONDS, self.timeout),
+                                                 context=ssl.create_default_context())
 
         def remaining():
             seconds = deadline - time.monotonic()

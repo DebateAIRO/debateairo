@@ -18,9 +18,9 @@ visible instead of silent:
                          OnFailure= notice emails the owner) only for a mismatch not announced
                          before, so the owner gets at most one email per change. A temporary DNS
                          failure is logged, not announced (the gate's own start check refuses on it).
-  update --dropin PATH   root, by hand (the command in the email): render today's list, write it
-                         in place atomically (0644), and run `systemctl daemon-reload`. Then
-                         restart the gate.
+  update --dropin PATH   root, by hand (the command in the email): add today's DNS answer to the
+                         list (nothing listed is dropped), write it in place atomically (0644),
+                         and run `systemctl daemon-reload`. Then restart the gate.
 `check` reads the file, not what systemd has loaded: after installing a new file by hand, always
 run `systemctl daemon-reload` before restarting the gate.
 
@@ -131,6 +131,11 @@ def atomic_write(path, data, mode):
             os.fsync(stream.fileno())
         os.chmod(temporary, mode)  # Exactly this mode, whatever the umask.
         os.rename(temporary, path)
+        folder = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(folder)
+        finally:
+            os.close(folder)
     finally:
         try:
             os.unlink(temporary)
@@ -170,18 +175,21 @@ def watch(dropin, state, lookup):
 
 
 def update(dropin, lookup, run=subprocess.run):
+    """Adds today's DNS answer to the list; never drops an address that is listed (a DNS pool that
+    answers with changing subsets must not flip the list). Removing stale addresses is a reviewed
+    `render` (README step 6)."""
     resolved = resolve(lookup)
-    text = render(resolved)
     try:
         before = read_dropin(dropin)
     except Refusal:
         before = set()
+    text = render(resolved | before)
     atomic_write(dropin, text.encode('ascii'), 0o644)
     reload = run(['/usr/bin/systemctl', 'daemon-reload'], env={}, stdin=subprocess.DEVNULL, capture_output=True, timeout=60)
     if reload.returncode != 0:
         raise Refusal('DAEMON_RELOAD_FAILED')
-    return {'status': 'updated', 'dropin': str(dropin), 'allowed': len(resolved),
-            'added': [str(a) for a in sorted(resolved - before)], 'removed': [str(a) for a in sorted(before - resolved)],
+    return {'status': 'updated', 'dropin': str(dropin), 'allowed': len(resolved | before),
+            'added': [str(a) for a in sorted(resolved - before)], 'stale': [str(a) for a in sorted(before - resolved)],
             'next': 'systemctl restart debateai-preview-provider-budget'}
 
 

@@ -33,8 +33,9 @@ class WatchError(Exception):
 
 def read_status(private, run=subprocess.run):
     try:
+        # Short: status holds the gate's shared lock, which must never outlast the gate's 10 s wait.
         result = run([PYTHON, '-I', str(GATE), 'status', '--private', str(private)], env={}, stdin=subprocess.DEVNULL,
-                     capture_output=True, timeout=60)
+                     capture_output=True, timeout=8)
         lines = result.stdout.decode('utf-8', 'replace').splitlines()
         value = json.loads(lines[-1]) if lines else None
     except (OSError, ValueError, subprocess.SubprocessError):
@@ -70,6 +71,11 @@ def write_announced(path, value):
             stream.flush()
             os.fsync(stream.fileno())
         os.rename(temporary, path)
+        folder = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(folder)
+        finally:
+            os.close(folder)
     finally:
         try:
             os.unlink(temporary)
