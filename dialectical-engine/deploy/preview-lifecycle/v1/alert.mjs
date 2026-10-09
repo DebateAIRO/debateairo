@@ -8,10 +8,11 @@
 // N crashes with --crash-alert-after N). An unreadable state still emails: an alert is never lost.
 // At most one email per unit per 30 minutes. If mail itself fails, the reason goes to the
 // journal and the alert exits quietly (an alert must never break anything else).
-import { readFile, lstat } from 'node:fs/promises';
+import { lstat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
+import { recipientPolicyFromInstallation } from '../../preview-mail/v4-20261005/sendmail-owned-preview.mjs';
 import { LAYOUT, atomicWrite, ensureDirectory, logLine, runBounded, sha256 } from './common.mjs';
 
 export const ALERT_WINDOW_MS = 30 * 60 * 1000;
@@ -21,13 +22,22 @@ const ADDRESS = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63}
 class AlertRefusal extends Error { constructor(code, fields) { super(code); this.code = code; if (fields) this.fields = fields; } }
 const refuse = (code, fields) => { throw new AlertRefusal(code, fields); };
 
-/** The four recipient fingerprints already approved for preview mail (no address is stored in Git). */
-export async function loadApprovedRecipientDigests() {
-  const raw = await readFile(new URL('../../preview-mail/v4-20261005/recipient-bindings.json', import.meta.url));
-  const bindings = strictJson(raw);
-  const digests = Object.values(bindings?.recipientSha256 ?? {});
-  if (bindings?.schema !== 'preview-mail-v4-purpose-binding' || digests.length < 1 || digests.some(value => typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value))) refuse('RECIPIENT_REFUSED');
-  return new Set(digests);
+/**
+ * The four recipient fingerprints the preview mail is already allowed to reach. The allow-list is
+ * server data, never source: it lives only in the root-owned installation file the preview mail
+ * wrapper reads (`recipientSha256`: alias -> SHA-256 of the exact address bytes). Read through the
+ * custody reader (no-follow regular file, one link, owner-only mode, unchanged while read, its
+ * folder owned by the same owner and not group/other-writable, reached without any link) and
+ * checked with the mail wrapper's own schema check. Anything else: no mail.
+ */
+export async function loadApprovedRecipientDigests({ path = LAYOUT.mailRecipientInstallationPath, ownerUid = 0 } = {}) {
+  try {
+    return await withPrivateBytes(path, { root: dirname(path), uid: ownerUid, mode: [0o600, 0o400], maxBytes: 1024 }, raw => {
+      const installation = strictJson(raw);
+      recipientPolicyFromInstallation(installation);
+      return new Set(Object.values(installation.recipientSha256));
+    });
+  } catch { return refuse('RECIPIENT_ALLOW_LIST_UNAVAILABLE'); }
 }
 
 /** Exactly one address, one line, and one the preview is already allowed to mail. */
@@ -212,7 +222,7 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {}, crashAlertAft
     const at = now();
     const lastSentAt = await readLastSent(layout, unit);
     if (!shouldSend(lastSentAt, at)) return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SUPPRESSED', unit, lastSentAt: new Date(lastSentAt).toISOString() });
-    const approved = deps.allowedDigests ?? await loadApprovedRecipientDigests();
+    const approved = await loadApprovedRecipientDigests({ path: layout.mailRecipientInstallationPath, ownerUid: layout.ownerUid ?? 0 });
     await checkRecipientMode(layout);
     const to = await withPrivateBytes(layout.alertRecipientPath, { root: dirname(layout.alertRecipientPath), uid: layout.ownerUid ?? 0, gid: layout.ownerGid ?? 0, mode: 0o600, maxBytes: 512 }, raw => parseRecipient(raw, approved))
       .catch(() => refuse('RECIPIENT_REFUSED'));

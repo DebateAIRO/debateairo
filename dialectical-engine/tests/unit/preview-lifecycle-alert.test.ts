@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -7,15 +7,29 @@ const alert = await import('../../deploy/' + 'preview-lifecycle/v1/alert.mjs');
 const common = await import('../../deploy/' + 'preview-lifecycle/v1/common.mjs');
 
 const me = { uid: process.getuid!(), gid: process.getgid!() };
-const owner = 'owner@example.test';
-const allowed = new Set([createHash('sha256').update(owner).digest('hex')]);
+// Made-up example.com addresses only. The real allow-list lives in the root-owned server file
+// /etc/debateai/preview-mail-recipient-installation.json, never in Git.
+const addresses = {
+  'verification-forward-primary': 'forward-primary@example.com',
+  'verification-forward-secondary': 'forward-secondary@example.com',
+  'verification-direct-and-recovery-proof': 'proof@example.com',
+  'recovery-notice-secondary': 'notice@example.com'
+} as const;
+const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+const installation = () => JSON.stringify({ recipientSha256: Object.fromEntries(Object.entries(addresses).map(([alias, address]) => [alias, digest(address)])), verificationForwardTarget: addresses['verification-forward-secondary'] });
+const owner = addresses['verification-direct-and-recovery-proof'];
 const unit = 'debateai-preview-api.service';
 
-function server(recipient = `${owner}\n`, mode = 0o600) {
+/** A throwaway server: lifecycle folders plus the preview mail installation file, all owned by the test user. */
+function server(recipient = `${owner}\n`, mode = 0o600, { allowList = installation() as string | null, allowListMode = 0o600 } = {}) {
   const base = realpathSync(mkdtempSync(join(tmpdir(), 'lifecycle-alert-')));
-  const layout = { ...common.LAYOUT, ownerUid: me.uid, ownerGid: me.gid, lockRoot: join(base, 'lifecycle'), alertRecipientPath: join(base, 'lifecycle', 'alert-recipient'), stateDir: join(base, 'state') };
+  const mailFolder = join(base, 'etc-debateai');
+  const layout = { ...common.LAYOUT, ownerUid: me.uid, ownerGid: me.gid, lockRoot: join(base, 'lifecycle'), alertRecipientPath: join(base, 'lifecycle', 'alert-recipient'), stateDir: join(base, 'state'),
+    mailRecipientInstallationPath: join(mailFolder, 'preview-mail-recipient-installation.json') };
   mkdirSync(layout.lockRoot); chmodSync(layout.lockRoot, 0o755);
   mkdirSync(layout.stateDir); chmodSync(layout.stateDir, 0o700);
+  mkdirSync(mailFolder); chmodSync(mailFolder, 0o755);
+  if (allowList !== null) { writeFileSync(layout.mailRecipientInstallationPath, allowList); chmodSync(layout.mailRecipientInstallationPath, allowListMode); }
   writeFileSync(layout.alertRecipientPath, recipient); chmodSync(layout.alertRecipientPath, mode);
   return layout;
 }
@@ -25,7 +39,7 @@ function harness(layout: any, overrides: Record<string, unknown> = {}) {
   const sent: string[] = [], logged: any[] = [];
   let clock = Date.parse('2026-10-09T10:00:00Z');
   const deps = {
-    now: () => clock, allowedDigests: allowed, readUnitState: async () => gaveUp,
+    now: () => clock, readUnitState: async () => gaveUp,
     readJournal: async () => ['2026-10-09T09:59:58+0000 host node[1]: PREVIEW_API_STARTUP_REFUSED', '2026-10-09T09:59:59+0000 host systemd[1]: debateai-preview-api.service: Failed with result exit-code.'],
     sendmail: async (message: Buffer) => { sent.push(message.toString('utf8')); },
     log: (event: unknown) => logged.push(event), ...overrides
@@ -146,10 +160,10 @@ describe('failure alert', () => {
   });
 
   it.each([
-    ['two addresses', `${owner}, other@example.test\n`],
-    ['a header injection', `${owner}\r\nBcc: other@example.test\n`],
-    ['two lines', `${owner}\nother@example.test\n`],
-    ['an address that is not already approved for preview mail', 'stranger@example.test\n'],
+    ['two addresses', `${owner}, other@example.com\n`],
+    ['a header injection', `${owner}\r\nBcc: other@example.com\n`],
+    ['two lines', `${owner}\nother@example.com\n`],
+    ['an address that is not already approved for preview mail', 'stranger@example.com\n'],
     ['no address', '\n']
   ])('refuses a recipient file with %s', async (_name, text) => {
     const layout = server(text);
@@ -236,9 +250,39 @@ describe('failure alert', () => {
     await expect(alert.submitMail(Buffer.from('x'), { layout: common.LAYOUT, run: async () => ({ code: 75, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }) })).rejects.toThrow();
   });
 
-  it('accepts only addresses whose fingerprint the reviewed preview mail bindings already approve', async () => {
-    const digests = await alert.loadApprovedRecipientDigests();
-    expect(digests.size).toBe(4);
-    for (const value of digests) expect(value).toMatch(/^[a-f0-9]{64}$/);
+  it('reads the approved fingerprints only from the root-owned preview mail installation file', async () => {
+    const layout = server();
+    const digests = await alert.loadApprovedRecipientDigests({ path: layout.mailRecipientInstallationPath, ownerUid: me.uid });
+    expect([...digests].sort()).toEqual(Object.values(addresses).map(digest).sort());
+  });
+
+  it('carries no allow-list of its own in the source tree', () => {
+    const source = readFileSync(new URL('../../deploy/preview-lifecycle/v1/alert.mjs', import.meta.url), 'utf8');
+    expect(source).not.toMatch(/recipient-bindings|[0-9a-f]{64}/);
+    expect(common.LAYOUT.mailRecipientInstallationPath).toBe('/etc/debateai/preview-mail-recipient-installation.json');
+  });
+
+  it.each([
+    ['missing', { allowList: null }],
+    ['readable by others', { allowListMode: 0o644 }],
+    ['not JSON', { allowList: '{"recipientSha256":' }],
+    ['the old binding shape', { allowList: JSON.stringify({ schema: 'preview-mail-v4-purpose-binding', recipientSha256: JSON.parse(installation()).recipientSha256 }) }],
+    ['missing an alias', { allowList: JSON.stringify({ ...JSON.parse(installation()), recipientSha256: { 'verification-direct-and-recovery-proof': digest(owner) } }) }]
+  ])('sends nothing and logs its own reason when the installation file is %s', async (_name, options) => {
+    const layout = server(`${owner}\n`, 0o600, options as any);
+    const h = harness(layout);
+    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit, reason: 'RECIPIENT_ALLOW_LIST_UNAVAILABLE' });
+    expect(h.sent).toEqual([]);
+  });
+
+  it('refuses an installation file reached through a symlink or in a folder others can write', async () => {
+    const linked = server();
+    const real = linked.mailRecipientInstallationPath, link = join(linked.stateDir, 'linked.json');
+    symlinkSync(real, link);
+    await expect(alert.loadApprovedRecipientDigests({ path: link, ownerUid: me.uid })).rejects.toMatchObject({ code: 'RECIPIENT_ALLOW_LIST_UNAVAILABLE' });
+    const open = server();
+    chmodSync(join(open.mailRecipientInstallationPath, '..'), 0o777);
+    await expect(alert.loadApprovedRecipientDigests({ path: open.mailRecipientInstallationPath, ownerUid: me.uid })).rejects.toMatchObject({ code: 'RECIPIENT_ALLOW_LIST_UNAVAILABLE' });
+    await expect(alert.loadApprovedRecipientDigests({ path: server().mailRecipientInstallationPath, ownerUid: me.uid + 1 })).rejects.toMatchObject({ code: 'RECIPIENT_ALLOW_LIST_UNAVAILABLE' });
   });
 });

@@ -30,10 +30,18 @@ launchers still re-check every byte exactly as before.
   when the launcher reads the receipt its age is only the launcher's own re-hash time. prestart
   refuses if the receipt is already older than 60 s when written. The 180 s rule is unchanged.
 - **Alerts go only to an already-approved address.** The recipient file must hold one of the four
-  addresses the preview mail is already allowed to reach (checked by fingerprint against
-  `deploy/preview-mail/v4-20261005/recipient-bindings.json`). Mail goes through the server's
-  local `sendmail -t` as `noreply@dezbatere.ro`; the address never appears in a process list.
-  If the owner wants a new address, that is a new reviewed binding, not a config edit.
+  addresses the preview mail is already allowed to reach. The alert checks it by fingerprint
+  against the preview mail's own allow-list, which lives **only on the server** in
+  `/etc/debateai/preview-mail-recipient-installation.json` (field `recipientSha256`; installed with
+  the preview mail, see `deploy/preview-mail/v4-20261005/README.md`). Git holds no address and no
+  fingerprint. The alert reads that file the same careful way as every other root file (root-owned,
+  mode 0600 or 0400, one link, no symlink, its folder root-owned and not writable by group or
+  others) and checks it with the mail wrapper's own schema check. If the file is missing or wrong,
+  **no email goes out** and the journal shows `PREVIEW_LIFECYCLE_ALERT_FAILED` with
+  `"reason":"RECIPIENT_ALLOW_LIST_UNAVAILABLE"`. Mail goes through the server's local
+  `sendmail -t` as `noreply@dezbatere.ro`; the address never appears in a process list. If the
+  owner wants a new address, that is a reviewed change to the server allow-list, not a lifecycle
+  config edit.
 - **Team unlock and the 5-minute database rule.** Migration 0088 only accepts the recovery login
   while its expiry is at most 5 minutes away. So the unlock does not set one expiry an hour
   ahead; it keeps the expiry rolling at most 4 minutes ahead (renewed every 2 minutes) and never
@@ -99,7 +107,8 @@ systemd/debateai-preview-team-unlock.service
 ```
 
 prestart, alert and backup use Node built-ins plus the reviewed `deploy/preview-auth-dev/v1`
-helpers (custody reader, launch-plan and attestation validators). The unlock and its two actors
+helpers (custody reader, launch-plan and attestation validators); the alert also uses the
+preview mail wrapper's allow-list schema check from `deploy/preview-mail/v4-20261005`. The unlock and its two actors
 load `pg`, `tsx`, the staff alert code and `native-peer.mjs` from the **pinned release** itself,
 and only after `release-guard.mjs` has verified that release (see the decisions above).
 
@@ -145,6 +154,15 @@ unit files before installing; nothing else names them.
    it over the old one; the new file gets the editor's default mode (often 0644), not 0600. The
    alert then refuses with `RECIPIENT_FILE_MODE_REFUSED` and names the mode it found. Fix it with
    `chmod 0600` and `chown root:root` on the file.
+
+   The alert also needs the preview mail's allow-list file. This must print `600 root:root`
+   (or `400 root:root`):
+
+   ```sh
+   stat -c '%a %U:%G' /etc/debateai/preview-mail-recipient-installation.json
+   ```
+
+   If it is missing, stop: installing it is the preview mail's own reviewed step, not this one.
 
    **Test send.** Use the built-in test name, never the API unit (a real API alert in the next
    30 minutes would otherwise be suppressed):
