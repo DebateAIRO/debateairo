@@ -18,8 +18,8 @@ export const ALERT_WINDOW_MS = 30 * 60 * 1000;
 const UNIT = /^[A-Za-z0-9][A-Za-z0-9:_.@\\-]{0,200}\.(service|socket|timer|target|mount|path)$/;
 const ADDRESS = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,24}$/;
 
-class AlertRefusal extends Error { constructor(code) { super(code); this.code = code; } }
-const refuse = code => { throw new AlertRefusal(code); };
+class AlertRefusal extends Error { constructor(code, fields) { super(code); this.code = code; if (fields) this.fields = fields; } }
+const refuse = (code, fields) => { throw new AlertRefusal(code, fields); };
 
 /** The four recipient fingerprints already approved for preview mail (no address is stored in Git). */
 export async function loadApprovedRecipientDigests() {
@@ -163,10 +163,25 @@ async function recordSent(layout, unit, at) {
   await atomicWrite(statePath(layout, unit), Buffer.from(JSON.stringify({ unit, lastSentAt: at })), { mode: 0o600, uid, gid: layout.ownerGid ?? 0 });
 }
 
-/** sendmail -t: recipients come from the To: header, so no address appears in any process list. */
+/**
+ * sendmail -t: recipients come from the To: header, so no address appears in any process list.
+ * -odi: deliver (or queue) before exiting, never in a forked background process: runBounded
+ * kills the whole process group once sendmail exits, which would cut a background delivery.
+ */
 export async function submitMail(message, { layout = LAYOUT, run = runBounded } = {}) {
-  const result = await run([layout.sendmail, '-t', '-i', '-f', layout.mailFrom], { env: { PATH: '/usr/sbin:/usr/bin:/bin' }, stdin: message, timeoutMs: 15000, maxOutputBytes: 4096 });
-  if (result.timedOut || result.overflow || result.error || result.code !== 0) throw new Error('MAIL_FAILED');
+  const result = await run([layout.sendmail, '-t', '-i', '-odi', '-f', layout.mailFrom], { env: { PATH: '/usr/sbin:/usr/bin:/bin' }, stdin: message, timeoutMs: 15000, maxOutputBytes: 4096 });
+  if (result.timedOut || result.overflow || result.error || result.code !== 0) {
+    throw Object.assign(new Error('MAIL_FAILED'), { mail: { exitCode: Number.isInteger(result.code) ? result.code : null, signal: typeof result.signal === 'string' ? result.signal : null, timedOut: result.timedOut === true } });
+  }
+}
+
+/** Checked before the custody read so a wrong mode (an editor that saves by rename) is named in the journal. */
+async function checkRecipientMode(layout) {
+  const stat = await lstat(layout.alertRecipientPath).catch(() => refuse('RECIPIENT_REFUSED'));
+  const mode = stat.mode & 0o777;
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== (layout.ownerUid ?? 0) || stat.gid !== (layout.ownerGid ?? 0) || mode !== 0o600) {
+    refuse('RECIPIENT_FILE_MODE_REFUSED', { mode: `0${mode.toString(8).padStart(3, '0')}` });
+  }
 }
 
 export async function readJournalTail(unit, { layout = LAYOUT, run = runBounded } = {}) {
@@ -198,15 +213,19 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {}, crashAlertAft
     const lastSentAt = await readLastSent(layout, unit);
     if (!shouldSend(lastSentAt, at)) return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SUPPRESSED', unit, lastSentAt: new Date(lastSentAt).toISOString() });
     const approved = deps.allowedDigests ?? await loadApprovedRecipientDigests();
+    await checkRecipientMode(layout);
     const to = await withPrivateBytes(layout.alertRecipientPath, { root: dirname(layout.alertRecipientPath), uid: layout.ownerUid ?? 0, gid: layout.ownerGid ?? 0, mode: 0o600, maxBytes: 512 }, raw => parseRecipient(raw, approved))
       .catch(() => refuse('RECIPIENT_REFUSED'));
     const lines = (await (deps.readJournal ?? (name => readJournalTail(name, { layout })))(unit)).map(redactLine);
     const message = composeAlert({ unit, at: new Date(at), lines, from: layout.mailFrom, to, failure });
-    try { await (deps.sendmail ?? (bytes => submitMail(bytes, { layout })))(message); } catch { refuse('MAIL_FAILED'); }
+    try { await (deps.sendmail ?? (bytes => submitMail(bytes, { layout })))(message); } catch (error) {
+      // Its own event: "the email did not go out" must stand out from every refusal before it.
+      return done({ event: 'PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED', unit, reason: 'MAIL_FAILED', exitCode: error?.mail?.exitCode ?? null, signal: error?.mail?.signal ?? null, timedOut: error?.mail?.timedOut ?? false });
+    }
     await recordSent(layout, unit, at).catch(() => undefined);
     return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SENT', unit });
   } catch (error) {
-    return done({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit: typeof unit === 'string' && UNIT.test(unit) ? unit : null, reason: error instanceof AlertRefusal ? error.code : 'UNEXPECTED' });
+    return done({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit: typeof unit === 'string' && UNIT.test(unit) ? unit : null, reason: error instanceof AlertRefusal ? error.code : 'UNEXPECTED', ...(error instanceof AlertRefusal && error.fields ? error.fields : {}) });
   }
 }
 

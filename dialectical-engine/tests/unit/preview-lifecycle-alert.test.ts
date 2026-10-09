@@ -134,11 +134,15 @@ describe('failure alert', () => {
     expect(h.sent).toHaveLength(3);
   });
 
-  it('fails quietly to the journal and keeps the next alert allowed when mail fails', async () => {
+  it('logs its own MAIL_FAILED line with the sendmail exit, and keeps the next alert allowed', async () => {
     const layout = server();
-    const h = harness(layout, { sendmail: async () => { throw new Error('postfix down'); } });
-    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toMatchObject({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', reason: 'MAIL_FAILED' });
+    const run = async () => ({ code: 75, signal: null, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.from('temporary failure') });
+    const h = harness(layout, { sendmail: (bytes: Buffer) => alert.submitMail(bytes, { layout, run }) });
+    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED', unit, reason: 'MAIL_FAILED', exitCode: 75, signal: null, timedOut: false });
+    expect(h.logged).toEqual([{ event: 'PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED', unit, reason: 'MAIL_FAILED', exitCode: 75, signal: null, timedOut: false }]);
     expect(existsSync(join(layout.stateDir, 'alert-state'))).toBe(false);
+    const g = harness(server(), { sendmail: async () => { throw new Error('postfix down'); } });
+    await expect(alert.runAlert({ unit, layout, deps: g.deps })).resolves.toMatchObject({ event: 'PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED', reason: 'MAIL_FAILED' });
   });
 
   it.each([
@@ -154,10 +158,10 @@ describe('failure alert', () => {
     expect(h.sent).toEqual([]);
   });
 
-  it('refuses a recipient file other users can read', async () => {
+  it('names the mode when the recipient file is readable by others (an editor that saves by rename can do that)', async () => {
     const layout = server(`${owner}\n`, 0o644);
     const h = harness(layout);
-    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toMatchObject({ reason: 'RECIPIENT_REFUSED' });
+    await expect(alert.runAlert({ unit, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', unit, reason: 'RECIPIENT_FILE_MODE_REFUSED', mode: '0644' });
     expect(h.sent).toEqual([]);
   });
 
@@ -225,7 +229,8 @@ describe('failure alert', () => {
     const seen: any[] = [];
     const run = async (argv: string[], options: any) => { seen.push({ argv, options }); return { code: 0, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }; };
     await alert.submitMail(Buffer.from(`To: ${owner}\r\n\r\nx`), { layout: common.LAYOUT, run });
-    expect(seen[0].argv).toEqual(['/usr/sbin/sendmail', '-t', '-i', '-f', 'noreply@dezbatere.ro']);
+    // -odi: deliver before sendmail exits, so the process-group kill after exit cannot cut a background delivery.
+    expect(seen[0].argv).toEqual(['/usr/sbin/sendmail', '-t', '-i', '-odi', '-f', 'noreply@dezbatere.ro']);
     expect(seen[0].argv.join(' ')).not.toContain(owner);
     expect(seen[0].options.env).toEqual({ PATH: '/usr/sbin:/usr/bin:/bin' });
     await expect(alert.submitMail(Buffer.from('x'), { layout: common.LAYOUT, run: async () => ({ code: 75, timedOut: false, overflow: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }) })).rejects.toThrow();
