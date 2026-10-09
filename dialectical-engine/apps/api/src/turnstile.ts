@@ -38,12 +38,21 @@ export class UnixTurnstileVerifier implements TurnstileVerifier {
     for (const [digest, until] of this.#used) if (until <= now) this.#used.delete(digest);
     const digest = createHash("sha256").update(input.token).digest("hex");
     if (this.#used.has(digest)) return "rejected";
+    // Expired digests were pruned above, so a full memory means every held proof is still
+    // inside its validity window; only then is a fresh proof refused.
     if (this.#used.size >= 10_000) return "unavailable";
     // Reserve before awaiting transport: parallel requests cannot both use a proof.
     this.#used.set(digest, now + 300_000);
     return new Promise(resolve => {
       let done = false;
-      const finish = (outcome: TurnstileOutcome) => { if (done) return; done = true; clearTimeout(deadline); resolve(outcome); };
+      const finish = (outcome: TurnstileOutcome) => {
+        if (done) return; done = true; clearTimeout(deadline);
+        // Auth API hardening 2026-10-09: only a PASSED proof stays held. A refused or unverifiable
+        // proof was never accepted (Cloudflare and the relay refuse its reuse on their own), and
+        // holding it let 10,000 garbage proofs fill this memory and refuse every real sign-up.
+        if (outcome !== "passed") this.#used.delete(digest);
+        resolve(outcome);
+      };
       const req = request({ socketPath: this.options.socketPath, path: "/siteverify", method: "POST", agent: false,
         headers: { "content-type": "application/json", accept: "application/json" }, maxHeaderSize: 4096 }, response => {
         if (response.statusCode !== 200) { response.destroy(); finish("unavailable"); return; }

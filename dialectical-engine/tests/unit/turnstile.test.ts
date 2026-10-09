@@ -63,3 +63,49 @@ describe("confined Turnstile verifier", () => {
     expect(() => new UnixTurnstileVerifier({ publicAppUrl })).toThrow("TURNSTILE_PUBLIC_APP_URL_INVALID");
   });
 });
+
+/**
+ * Auth API hardening (2026-10-09, item 2): the single-use memory refused every
+ * proof once it held 10,000 digests, and it held a digest for five minutes
+ * even when the proof was refused — so 10,000 garbage proofs turned every real
+ * sign-up into TURNSTILE_UNAVAILABLE for five minutes.
+ */
+async function classifyingRelay(passing: ReadonlySet<string>) {
+  const dir = await mkdtemp(join(tmpdir(), "ts-")); const socketPath = join(dir, "relay.sock");
+  let calls = 0, clock = now.getTime();
+  const server = createServer(async (request, response) => {
+    const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
+    const { token } = JSON.parse(Buffer.concat(chunks).toString()) as { token: string };
+    calls += 1;
+    const fresh = { ...success, challenge_ts: new Date(clock - 1_000).toISOString() };
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(passing.has(token) || token.startsWith("valid-") ? fresh : { success: false, "error-codes": ["invalid-input-response"] }));
+  });
+  await new Promise<void>(resolve => server.listen(socketPath, resolve));
+  cleanup.push(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); await rm(dir, { recursive: true, force: true }); });
+  const verifier = new UnixTurnstileVerifier({ socketPath, publicAppUrl: "https://v3-preview.dezbatere.ro", clock: () => new Date(clock) });
+  return { verifier, calls: () => calls, advance: (ms: number) => { clock += ms; } };
+}
+describe("single-use proof memory under a garbage flood", () => {
+  it("still verifies a fresh valid proof after 10,000 refused proofs", async () => {
+    const relay = await classifyingRelay(new Set(["fresh-valid"]));
+    for (let index = 0; index < 10_000; index += 1) {
+      expect(await relay.verifier.verify({ token: `garbage-${index}`, action: "signup" })).toBe("rejected");
+    }
+    expect(await relay.verifier.verify({ token: "fresh-valid", action: "signup" })).toBe("passed");
+    // A passed proof stays consumed: its replay is refused without transport.
+    const before = relay.calls();
+    expect(await relay.verifier.verify({ token: "fresh-valid", action: "signup" })).toBe("rejected");
+    expect(relay.calls()).toBe(before);
+  }, 120_000);
+
+  it("refuses a fresh proof only while every held proof is still inside its validity window", async () => {
+    const relay = await classifyingRelay(new Set());
+    for (let index = 0; index < 10_000; index += 1) {
+      expect(await relay.verifier.verify({ token: `valid-${index}`, action: "signup" })).toBe("passed");
+    }
+    expect(await relay.verifier.verify({ token: "valid-next", action: "signup" })).toBe("unavailable");
+    relay.advance(300_001);
+    expect(await relay.verifier.verify({ token: "valid-after-window", action: "signup" })).toBe("passed");
+  }, 120_000);
+});
