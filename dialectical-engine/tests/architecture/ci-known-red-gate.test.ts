@@ -20,6 +20,7 @@ type GateModule = {
     targets: string[]; invalid: string[]; excluded: { path: string; list: string }[];
   };
   exclusionReport: (excluded: { path: string; list: string }[]) => string[];
+  missingTargets: (targets: string[], report: unknown, rootDir: string) => string[];
   confirmStale: (input: { stale: string[]; rerunPasses: string[][] }) => { confirmed: string[]; cleared: string[] };
   gateExitCode: (input: { newFailures: string[]; confirmedStale: string[] }) => number;
   STALE_CONFIRMATION_RERUNS: number;
@@ -112,6 +113,31 @@ describe("CI known-red gate (B31)", () => {
     expect(failed).toEqual(["tests/unit/a.test.ts > suite > nested > red one", "tests/unit/b.test.ts"]);
     expect(ran).toEqual(["tests/unit/a.test.ts > suite > nested > red one", "tests/unit/a.test.ts > suite > green one"]);
     expect(messages["tests/unit/a.test.ts > suite > nested > red one"]).toContain("AssertionError: nope");
+  });
+
+  it("names a file's own error (a file-level hook that threw) beside its failed tests, so it cannot hide behind them", () => {
+    const report = {
+      success: false,
+      testResults: [
+        {
+          name: `${productRoot}/tests/integration/a.test.ts`,
+          status: "failed",
+          message: "afterAll hook threw",
+          assertionResults: [{ ancestorTitles: ["suite"], title: "listed red", status: "failed", failureMessages: ["AssertionError: known"] }]
+        },
+        {
+          name: `${productRoot}/tests/integration/b.test.ts`,
+          status: "failed",
+          message: "",
+          assertionResults: [{ ancestorTitles: ["suite"], title: "listed red", status: "failed", failureMessages: ["AssertionError: known"] }]
+        }
+      ]
+    };
+    const { failed, messages } = gate.failedNamesFromReport(report, productRoot);
+    expect(failed).toEqual(["tests/integration/a.test.ts > suite > listed red", "tests/integration/a.test.ts", "tests/integration/b.test.ts > suite > listed red"]);
+    expect(messages["tests/integration/a.test.ts"]).toBe("afterAll hook threw");
+    const decision = gate.decide({ failed, allowlist: ["tests/integration/a.test.ts > suite > listed red", "tests/integration/b.test.ts > suite > listed red"] });
+    expect(decision.newFailures).toEqual(["tests/integration/a.test.ts"]);
   });
 
   it("names the tests that passed, beside the ones that failed", () => {
@@ -221,6 +247,7 @@ describe("curated test lists (@file targets, 2026-10-09)", () => {
 describe("directory globs and named exclusions in a list file (2026-10-09)", () => {
   const lists: Record<string, string> = {
     "tests/all.txt": "# every suite but the long one\ntests/integration/*.test.ts\n!tests/integration/long.test.ts\n",
+    "tests/glob-only.txt": "tests/integration/*.test.ts\n",
     "tests/long.txt": "tests/integration/long.test.ts\n",
     "tests/stale-exclusion.txt": "tests/integration/a.test.ts\n!tests/integration/b.test.ts\n",
     "tests/empty-glob.txt": "tests/nothing/*.test.ts\n",
@@ -259,6 +286,27 @@ describe("directory globs and named exclusions in a list file (2026-10-09)", () 
     expect(expand(["@tests/bad-glob.txt"]).invalid).toEqual(["tests/integration/*.ts", "tests/*/a.test.ts", "tests/integration/a*.test.ts"]);
   });
 
+  it("refuses a glob that would skip a test file vitest runs in that directory", () => {
+    const skipping = (entries: string[]) => gate.expandTargets(["@tests/glob-only.txt"], (path) => lists[path]!, (path) => present.has(path),
+      () => entries).invalid;
+    expect(skipping(["a.test.ts", "b.test.tsx"])).toEqual(["tests/integration/*.test.ts (would skip tests/integration/b.test.tsx)"]);
+    expect(skipping(["a.test.ts", "sub", "sub/c.test.ts"])).toEqual(["tests/integration/*.test.ts (would skip tests/integration/sub/c.test.ts)"]);
+    expect(skipping(["a.test.ts", "odd name.test.ts"])).toEqual(["tests/integration/*.test.ts (would skip tests/integration/odd name.test.ts)"]);
+    expect(skipping(["a.test.ts", "long.test.ts", "helper.ts", "sub/fixture.json"])).toEqual([]);
+  });
+
+  it("does not call a file left out when a plain directory argument still runs it", () => {
+    expect(expand(["tests/integration", "@tests/all.txt"]).excluded).toEqual([]);
+    expect(expand(["tests/unit", "@tests/all.txt"]).excluded).toEqual([{ path: "tests/integration/long.test.ts", list: "tests/all.txt" }]);
+  });
+
+  it("names every listed test file the report has no entry for, and checks no directory target", () => {
+    const report = { testResults: [{ name: `${productRoot}/tests/integration/a.test.ts`, status: "passed", assertionResults: [] }] };
+    expect(gate.missingTargets(["tests/integration/a.test.ts", "tests/integration/b.test.ts", "tests/unit"], report, productRoot))
+      .toEqual(["tests/integration/b.test.ts"]);
+    expect(gate.missingTargets(["tests/integration/a.test.ts"], {}, productRoot)).toEqual(["tests/integration/a.test.ts"]);
+  });
+
   it("prints every left-out file beside the list that left it out, and prints nothing when none was", () => {
     expect(gate.exclusionReport(expand(["@tests/all.txt"]).excluded)).toEqual([
       'NOT RUN on purpose (1) — left out by a "!" line of the list named beside it:',
@@ -269,8 +317,9 @@ describe("directory globs and named exclusions in a list file (2026-10-09)", () 
 });
 
 describe("the all-integration list tests/ci-integration-all.txt (2026-10-09)", () => {
-  const integrationFiles = () => readdirSync(resolve(productRoot, "tests/integration")).filter((name) => name.endsWith(".test.ts")).sort()
-    .map((name) => `tests/integration/${name}`);
+  // Every file vitest would run under tests/integration (any depth, .ts or .tsx), not the glob's own filter.
+  const integrationFiles = () => readdirSync(resolve(productRoot, "tests/integration"), { recursive: true }).map(String)
+    .filter((name) => /\.test\.tsx?$/.test(name)).sort().map((name) => `tests/integration/${name}`);
   const scripts = JSON.parse(readFileSync(resolve(productRoot, "package.json"), "utf8")).scripts as Record<string, string>;
   const registration = "tests/integration/registration-database.test.ts";
   const stageRehearsal = "tests/integration/preview-auth-dev-startup.test.ts";

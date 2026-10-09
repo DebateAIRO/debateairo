@@ -63,6 +63,9 @@ export function parseAllowlist(text) {
  * `<file path relative to the product root> > <ancestor titles…> > <title>`.
  * A file that failed without producing a single failed assertion (a collection or import
  * error) is reported under its bare path so it can never be mistaken for a green run.
+ * So is a file that carries its own error (vitest's file `message`: a file-level hook such as
+ * `afterAll` that threw) BESIDE failed assertions (2026-10-09): a bare path is never on the
+ * allowlist, so a new file-level error cannot hide behind a file's listed reds.
  */
 export function failedNamesFromReport(report, rootDir) {
   const failed = [];
@@ -89,7 +92,8 @@ export function failedNamesFromReport(report, rootDir) {
         ran.push(name);
       }
     }
-    if (String(file?.status ?? "") === "failed" && failedHere === 0) {
+    const fileMessage = String(file?.message ?? "");
+    if (String(file?.status ?? "") === "failed" && (failedHere === 0 || fileMessage !== "")) {
       failed.push(rel);
       messages[rel] = String(file?.message ?? "the test file failed without reporting a failed test (collection or import error)");
     }
@@ -126,16 +130,22 @@ const DIRECTORY_GLOB_PATTERN = /^(tests\/[\w.-]+)\/\*(\.test\.tsx?)$/;
  *
  * Two more line forms (2026-10-09, tests/ci-integration-all.txt):
  *   - `tests/<dir>/*.test.ts` names every test file of that one directory, sorted, so a new suite joins without an
- *     edit. A glob that matches no test file is `invalid` (a moved directory must not shrink the run to nothing).
+ *     edit. A glob that matches no test file is `invalid` (a moved directory must not shrink the run to nothing), and
+ *     so is one that would skip a test file vitest runs there (a `.test.tsx` beside `.test.ts` files, a test in a
+ *     sub-folder, a name outside [\w.-]): the glob takes the whole directory or the list says why not.
  *   - `!<path>` leaves out a file the SAME list named. The file comes back if another argument names it. Whatever
  *     stays left out is returned in `excluded` (path and list) for the caller to print, so an exclusion is never
- *     silent; a `!` line naming no file of its own list is `invalid`, so a stale exclusion cannot linger.
+ *     silent; a `!` line naming no file of its own list is `invalid`, so a stale exclusion cannot linger. A file a
+ *     plain directory argument still runs is not reported as left out.
+ * `listDirectory` lists a directory RECURSIVELY, as `/`-separated paths relative to it.
  */
 export function expandTargets(
   args,
   readText = (path) => readFileSync(resolve(PRODUCT_ROOT, path), "utf8"),
   exists = (path) => existsSync(resolve(PRODUCT_ROOT, path)),
-  listDirectory = (path) => (existsSync(resolve(PRODUCT_ROOT, path)) ? readdirSync(resolve(PRODUCT_ROOT, path)) : [])
+  listDirectory = (path) => (existsSync(resolve(PRODUCT_ROOT, path))
+    ? readdirSync(resolve(PRODUCT_ROOT, path), { recursive: true }).map((entry) => String(entry).split(sep).join("/"))
+    : [])
 ) {
   const targets = [];
   const invalid = [];
@@ -151,9 +161,13 @@ export function expandTargets(
       const glob = DIRECTORY_GLOB_PATTERN.exec(line);
       if (glob !== null) {
         const [, directory, suffix] = glob;
-        const files = listDirectory(directory).filter((name) => name.endsWith(suffix)).sort()
+        const entries = listDirectory(directory);
+        const files = entries.filter((name) => !name.includes("/") && name.endsWith(suffix)).sort()
           .map((name) => `${directory}/${name}`).filter((path) => TEST_FILE_PATTERN.test(path));
+        const skipped = entries.filter((name) => /\.test\.tsx?$/.test(name)).map((name) => `${directory}/${name}`)
+          .filter((path) => !files.includes(path)).sort();
         if (files.length === 0) invalid.push(line);
+        else if (skipped.length > 0) invalid.push(`${line} (would skip ${skipped.join(", ")})`);
         else named.push(...files);
       } else if (line.startsWith("!")) {
         leftOut.push(line);
@@ -171,13 +185,24 @@ export function expandTargets(
   }
   const unique = [...new Set(targets)];
   const reported = new Set(unique);
+  const directories = unique.filter((target) => !TEST_FILE_PATTERN.test(target)).map((target) => `${target.replace(/\/+$/, "")}/`);
   const excluded = [];
   for (const entry of exclusions) {
-    if (reported.has(entry.path)) continue;
+    if (reported.has(entry.path) || directories.some((directory) => entry.path.startsWith(directory))) continue;
     reported.add(entry.path);
     excluded.push(entry);
   }
   return { targets: unique, invalid, excluded };
+}
+
+/**
+ * The test-file targets the report has no entry for. vitest takes a target as a filter, so a file its include
+ * globs do not cover would simply not run; the gate names it instead (2026-10-09). Directory targets are not checked.
+ */
+export function missingTargets(targets, report, rootDir) {
+  const files = Array.isArray(report?.testResults) ? report.testResults : [];
+  const reported = new Set(files.map((file) => relative(rootDir, String(file?.name ?? "")).split(sep).join("/")));
+  return targets.filter((target) => TEST_FILE_PATTERN.test(target) && !reported.has(target));
 }
 
 /** The lines that say, before and after a run, which files its lists left out on purpose. */
@@ -250,7 +275,7 @@ function sweep(targets, reportPath) {
 function main(args) {
   const { targets: dirs, invalid: invalidTargets, excluded } = expandTargets(args);
   if (invalidTargets.length > 0) {
-    console.error("list lines that name no test file (a missing or non-test path, a glob that matches nothing, or a \"!\" line naming no file of its own list):");
+    console.error("list lines that name no test file (a missing or non-test path, a glob that matches nothing or would skip a test file, or a \"!\" line naming no file of its own list):");
     for (const line of invalidTargets) console.error(`  ${line}`);
     return 2;
   }
@@ -293,6 +318,14 @@ function main(args) {
     const decision = decide({ failed, allowlist, ran, flaky });
     // How much actually ran, so a log can never show a green gate over a sweep that collected nothing.
     console.log(`CI_GATE_SCOPE files=${Array.isArray(report?.testResults) ? report.testResults.length : 0} tests=${ran.length}`);
+    const missing = missingTargets(dirs, report, PRODUCT_ROOT);
+    if (missing.length > 0) {
+      console.error(`listed test files vitest did not run (${missing.length}) — refusing to report a green gate:`);
+      for (const path of missing) console.error(`  ${path}`);
+      for (const line of notRun) console.log(line);
+      console.log(summary(decision));
+      return 1;
+    }
     const ranFlaky = flaky.filter((name) => ran.includes(name));
     if (ranFlaky.length > 0) {
       console.log(`host-sensitive tests (tests/ci-flaky.txt), reported and never gating — ${decision.flakyFailures.length} of ${ranFlaky.length} failed:`);
@@ -305,6 +338,7 @@ function main(args) {
 
     if (report?.success === false && failed.length === 0) {
       console.error("vitest reported failure but named no failing test; refusing to report a green gate");
+      for (const line of notRun) console.log(line);
       console.log(summary(decision));
       return 1;
     }
@@ -322,6 +356,7 @@ function main(args) {
         const rerun = sweep(targets, join(scratch, `vitest-rerun-${attempt}.json`));
         if (rerun.problem !== undefined) {
           console.error(`re-run ${attempt} of ${STALE_CONFIRMATION_RERUNS}: ${rerun.problem}; refusing to report a green gate`);
+          for (const line of notRun) console.log(line);
           console.log(summary(decision));
           return rerun.unparseable === true ? 2 : 1;
         }
