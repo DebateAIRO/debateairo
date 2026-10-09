@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import type { AuthMethodsResponse, AuthProvidersResponse, ContractClient, RecoveryEmailSettings, SocialLinksResponse, StepUpAuthorizationRequest } from '@debateai/contract';
+import { ContractHttpError, type AuthMethodsResponse, type AuthProvidersResponse, type ContractClient, type RecoveryEmailSettings, type SocialLinksResponse, type StepUpAuthorizationRequest } from '@debateai/contract';
 import { contractClient } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { ownedPhoneCompletionDraft, acknowledgePhoneDraftUpdate } from '@/lib/phoneCompletionDraft';
@@ -129,7 +129,9 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         } catch (failure) {
             if (active.current && epoch === generation.current) {
                 setSelected(null); setEmail('');
-                setError(t(catalog, 'settings.email.actionFailed'));
+                // A recovery address the server refused (its domain takes no mail) says so; anything else stays generic.
+                setError(authorization.action === 'CHANGE_RECOVERY_EMAIL' && failure instanceof ContractHttpError && failure.serverCode === 'EMAIL_INVALID'
+                    ? t(authCatalog, 'auth.emailUndeliverable') : t(catalog, 'settings.email.actionFailed'));
             }
         } finally { if (active.current && epoch === generation.current) { flight.current = false; setBusy(false); } }
     }

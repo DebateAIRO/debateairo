@@ -1,8 +1,9 @@
-import { checkDob, meetsMinimumAge, type DobParts } from '@debateai/kernel';
+import { checkDob, isMailAddress, meetsMinimumAge, type DobParts } from '@debateai/kernel';
 import { normalizeManualPhone } from '@debateai/kernel/manualPhone';
 export type SignupField = 'email' | 'phone' | 'password' | 'dateOfBirth' | 'privacy' | 'terms';
 export type SignupFieldErrors = Partial<Record<SignupField, string>>;
-export const emailShape = (email: string) => email.length <= 254 && /^[^\s@,;]+@[^\s@.]+(?:\.[^\s@.]+)+$/.test(email.trim());
+/** The server's own address rule (packages/kernel/src/mail-address.ts), so the form never accepts what sign-up refuses. */
+export const emailShape = (email: string) => isMailAddress(email.trim());
 export function validateSignup(input: {
     email: string;
     phone: string;

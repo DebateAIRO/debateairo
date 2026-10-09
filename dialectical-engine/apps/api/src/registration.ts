@@ -19,12 +19,13 @@ import {
   type Argon2Executor,
   type UserDekStore
 } from "@debateai/crypto";
-import { AGE_RULE_VERSION, MIN_AGE, isDeclaredRegion, type DeclaredRegion } from "@debateai/kernel";
+import { AGE_RULE_VERSION, MIN_AGE, isDeclaredRegion, isMailAddress, type DeclaredRegion } from "@debateai/kernel";
 import type { RegisterLegalDocuments } from "@debateai/contract";
 import { LocaleCodeSchema } from "@debateai/contract/locale";
 import { resolveSignUpDocuments, signUpAcceptanceRows, type SignUpDocuments } from "./legal.js";
 import { normalizeManualPhone } from "./phone-profile.js";
 import { MailDeliveryError, type MailSender } from "./mail-channel.js";
+import { mailDomainRefused, type MailDomainCheck } from "./mail-domain-check.js";
 
 export const REGISTRATION_PUBLIC_RESPONSE = Object.freeze({
   message: "If this address can be registered, verification instructions will arrive. Check your spam folder."
@@ -142,15 +143,18 @@ export class AuthFlowError extends Error {
     | "MFA_TOTP_REPLAYED"
     | "MFA_RECOVERY_CONFIRMATION_INVALID"
     | "MFA_RATE_LIMITED"
-    | "LEGAL_DOCUMENT_STALE",
+    | "LEGAL_DOCUMENT_STALE"
+    /** Open sign-up mail (2026-10-09): the one address rule, or a domain that takes no mail. Same code as email change. */
+    | "EMAIL_INVALID",
     options?: ErrorOptions
   ) {
     super(code, options);
     this.name = "AuthFlowError";
   }
 
-  get statusCode(): 400 | 401 | 409 | 429 | 503 {
+  get statusCode(): 400 | 401 | 409 | 422 | 429 | 503 {
     return this.code === "AUTH_CREDENTIALS_INVALID" ? 401
+      : this.code === "EMAIL_INVALID" ? 422
       : this.code === "AUTH_RATE_LIMITED" || this.code === "MFA_RATE_LIMITED" ? 429
       : this.code === "MFA_FIRST_STEP_UNAVAILABLE" || this.code === "MFA_ENROLLMENT_STATE_INVALID" || this.code === "MFA_TOTP_REPLAYED"
         || this.code === "LEGAL_DOCUMENT_STALE" ? 409
@@ -481,9 +485,12 @@ type IdentityRepository = Pick<PostgresIdentityRepository,
   | "recordRateLimitRefusal"
 >;
 
+/**
+ * The one shared address rule (packages/kernel/src/mail-address.ts), the same one every mail sender asks just
+ * before the sendmail hand-off: an account can never hold an address its own verification mail would refuse.
+ */
 function validEmail(value: unknown): value is string {
-  return typeof value === "string" && value.length <= 320 && !value.startsWith("-")
-    && /^[^\s@]+@[^\s@]+$/.test(value);
+  return isMailAddress(value);
 }
 
 interface PendingRegistration {
@@ -682,8 +689,10 @@ export class RegistrationService implements RegistrationApplication {
 
   private validateRegistration(input: RegisterInput | SocialRegisterInput, rawSource: RegistrationSource, social = false) {
     const maximumPasswordLength = this.dependencies.policy.password.maximumLength;
-    if (!validEmail(input.email) || ("recoveryEmail" in input && input.recoveryEmail != null && !validEmail(input.recoveryEmail))
-      || (!social && (!("password" in input) || typeof input.password !== "string"
+    if (!validEmail(input.email) || ("recoveryEmail" in input && input.recoveryEmail != null && !validEmail(input.recoveryEmail))) {
+      throw new AuthFlowError("EMAIL_INVALID");
+    }
+    if ((!social && (!("password" in input) || typeof input.password !== "string"
       || input.password.length < this.dependencies.policy.password.minimumLength
       // V-14: the ruled maximum, in the same unit as the minimum. The route
       // keeps its own 1024-byte request-shape bound ahead of this; a
@@ -725,7 +734,7 @@ export class RegistrationService implements RegistrationApplication {
         // The existing 103-registration slot spans proof, provisioning, clamp and handoff: no async stage before it.
         releaseStructural = this.acquireRegistrationAdmission(randomUUID());
       } else {
-        if (!validEmail(input.email)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+        if (!validEmail(input.email)) throw new AuthFlowError("EMAIL_INVALID");
         source = sourceContext(rawSource);
       }
       const now = this.clock();
@@ -787,6 +796,13 @@ export class RegistrationService implements RegistrationApplication {
      * that predates the acceptance record and registers exactly as before.
      */
     readonly legalAcceptance?: Readonly<{ recordsKey: Buffer }>;
+    /**
+     * Open sign-up mail (owner decision G5, 2026-10-09): "does this domain take mail at all?", asked once per
+     * password sign-up after the limiter has charged the request, so it can never be used to make this server
+     * query DNS for free. UNDELIVERABLE refuses with EMAIL_INVALID; a timeout or resolver failure lets the address
+     * through (fail open). Absent, no DNS question is asked (tests, and compositions that predate it).
+     */
+    readonly mailDomainCheck?: MailDomainCheck;
   }) {
     this.clock = dependencies.clock ?? (() => new Date());
     this.sleep = dependencies.sleep ?? (async (milliseconds) => {
@@ -1675,6 +1691,13 @@ export class RegistrationService implements RegistrationApplication {
             persistAfter: clampResponse()
           });
         }
+        // Open sign-up mail (G5): after the limiter, before any hashing or mail capacity. The answer depends on
+        // the domain alone, never on whether an account exists, and the response clamp still holds the timing.
+        if (social === undefined) {
+          for (const address of recoveryEmail === null ? [email] : [email, recoveryEmail]) {
+            if (await mailDomainRefused(this.dependencies.mailDomainCheck, address)) throw new AuthFlowError("EMAIL_INVALID");
+          }
+        }
 
         let passwordHash: string | null = null;
         if(social === undefined) {
@@ -1861,7 +1884,7 @@ export class RegistrationService implements RegistrationApplication {
     let releaseMailDispatch: MailDispatchRelease | undefined;
     const granted = admission === undefined ? undefined : this.takeSourceAdmission(admission);
     try {
-      if (!validEmail(input.email)) throw new AuthFlowError("AUTH_INPUT_INVALID");
+      if (!validEmail(input.email)) throw new AuthFlowError("EMAIL_INVALID");
       const source = sourceContext(rawSource);
       if (admission !== undefined) this.assertSourceAdmission("resend", source, granted);
       const email = normalizeEmailForBlindIndex(input.email);

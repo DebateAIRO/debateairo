@@ -140,6 +140,7 @@ import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
+import { systemMailDomainCheck } from "./mail-domain-check.js";
 import { EmailChangeService } from "./email-change.js";
 import { billingMailAttachmentResolvers } from "./mail-attachments.js";
 import {
@@ -738,6 +739,8 @@ if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
 }
 const socialProviders = (()=>{try{return new SocialProviders(socialConfigurations(environment.SOCIAL_PROVIDERS_JSON,environment.PUBLIC_APP_URL),environment.SOCIAL_SOCKET_PATH===undefined?undefined:new UnixSocialTransport(environment.SOCIAL_SOCKET_PATH));}catch{console.error('[SOCIAL_CONFIGURATION_INVALID]');return new SocialProviders([]);}})();
 const socialRepository = new PostgresSocialIdentityRepository(authorizationPool,auditContextHasher,pool);
+// Open sign-up mail (owner decision G5, 2026-10-09): the DNS question at the three entry points, 2 s, fail open.
+const mailDomainCheck = systemMailDomainCheck();
 const registration = new RegistrationService({
   repository: identityRepository,
   socialRepository,
@@ -757,7 +760,8 @@ const registration = new RegistrationService({
   ),
   argon2: argon2Pool,
   // Paid plans L3b: the acceptance record's evidence is sealed under the records key (L1).
-  legalAcceptance: { recordsKey }
+  legalAcceptance: { recordsKey },
+  mailDomainCheck
 });
 // Paid plans L4: re-acceptance of the Terms and the Privacy Policy, over the acceptance record.
 // Hosted: an account with no record owes both documents (it must accept before it can pay).
@@ -846,7 +850,8 @@ const recoveryEmail = new RecoveryEmailService({
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
     timeoutMs: authPolicy.channel.transportTimeoutMs
-  })
+  }),
+  mailDomainCheck
 });
 const emailChange = new EmailChangeService({
   repository: new PostgresEmailChangeRepository(authorizationPool, auditContextHasher),
@@ -857,7 +862,8 @@ const emailChange = new EmailChangeService({
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
     timeoutMs: authPolicy.channel.transportTimeoutMs
-  })
+  }),
+  mailDomainCheck
 });
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)

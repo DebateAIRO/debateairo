@@ -130,7 +130,7 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
                 else if (action === 'DELETE_ACCOUNT')
                     setStatus(t(settingsCatalog, failure instanceof ContractHttpError && failure.serverCode === 'ACCOUNT_NOTIFICATION_CHANNEL_REQUIRED' ? 'settings.erasure.notificationChannelRequired' : 'settings.erasure.notAuthorized'));
                 else if (action === 'CHANGE_EMAIL')
-                    setStatus(t(settingsCatalog, 'settings.emailChange.failed'));
+                    setStatus(failure instanceof ContractHttpError && failure.serverCode === 'EMAIL_INVALID' ? t(catalog, 'auth.emailUndeliverable') : t(settingsCatalog, 'settings.emailChange.failed'));
                 else
                     setStatus(t(catalog, 'auth.security.unavailable'));
             }

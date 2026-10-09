@@ -176,6 +176,7 @@ import {
   checkDob,
   detectArgumentLanguage,
   dobFromIso,
+  isMailAddress,
   meetsMinimumAge,
   MIN_AGE,
   parseDeclaredRegion,
@@ -2366,6 +2367,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const submitted = signup ? registerPublicBodies.get(request) : request.body;
     if (submitted && typeof submitted === "object" && !passwordWithinRequestBound(submitted as Record<string, unknown>)) {
       return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
+    }
+    // Open sign-up mail (2026-10-09): an address the mail step would refuse answers its own stable code, before
+    // the schema's catch-all. Shape only, never account state, so it says nothing about who is registered.
+    if (!socialSignup && submitted && typeof submitted === "object"
+      && typeof (submitted as Record<string, unknown>).email === "string"
+      && !isMailAddress((submitted as Record<string, unknown>).email)) {
+      throw new AuthFlowError("EMAIL_INVALID");
     }
     const parsed = socialSignup ? CompleteSocialSignupRequestSchema.safeParse(registerPublicBodies.get(request)) : path === "/v1/auth/register"
       ? RegisterRequestSchema.safeParse(registerPublicBodies.get(request))

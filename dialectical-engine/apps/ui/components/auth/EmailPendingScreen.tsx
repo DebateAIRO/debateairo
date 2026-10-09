@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ContractClient, LocaleCode } from "@debateai/contract";
+import { ContractHttpError, type ContractClient, type LocaleCode } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
 import { TurnstileChallenge } from "@/components/auth/TurnstileChallenge";
 import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
@@ -34,7 +34,8 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
   const [proof, setProof] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  // The message key of the last resend's refusal, or null.
+  const [error, setError] = useState<string | null>(null);
   const [proofUnavailable, setProofUnavailable] = useState(false);
   const [sent, setSent] = useState(false);
   const announcer = useFormAnnouncer();
@@ -58,7 +59,7 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
   async function resend(): Promise<void> {
     // Ref ownership closes the same-event double-click gap before React paints.
     if (inFlight.current || Date.now() < deadline || proof === null || !configured) return;
-    inFlight.current = true; setBusy(true); setError(false);
+    inFlight.current = true; setBusy(true); setError(null);
     const token = proof; setProof(null);
     try {
       let timeZone: string | null = null;
@@ -70,8 +71,9 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
         setDeadline(Date.now() + acknowledgement.retry_after_seconds * 1_000);
         if (context !== undefined) { setSent(true); announcer.announce(context.sent); }
       }
-    } catch {
-      if (mounted.current) setError(true);
+    } catch (failure) {
+      const code = failure instanceof ContractHttpError ? failure.serverCode : null;
+      if (mounted.current) setError(code === "EMAIL_INVALID" ? "auth.emailUndeliverable" : "auth.pending.unavailable");
     } finally {
       inFlight.current = false;
       if (mounted.current) { setBusy(false); setResetKey(value => value + 1); }
@@ -94,7 +96,7 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
     <button className="authPrimary" type="button" data-action="resend" disabled={busy || seconds > 0 || proof === null || !configured} onClick={() => { void resend(); }}>
       {context?.action ?? t(catalog, "auth.pending.resend")}
     </button>
-    {error ? <p className="authFinePrint" role="alert">{t(catalog, "auth.pending.unavailable")}</p> : null}
+    {error !== null ? <p className="authFinePrint" role="alert">{t(catalog, error)}</p> : null}
     {!configured || proofUnavailable ? <p className="authFinePrint" role="status">{t(catalog, "auth.pending.proofUnavailable")}</p> : null}
     <button className="authSecondary" type="button" disabled={busy} onClick={onDifferentEmail}>{t(catalog, "auth.pending.different")}</button>
   </AuthShell>;

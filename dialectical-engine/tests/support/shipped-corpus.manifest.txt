@@ -93,6 +93,7 @@ apps/api/src/legacy-claim.ts
 apps/api/src/legal.ts
 apps/api/src/mail-attachments.ts
 apps/api/src/mail-channel.ts
+apps/api/src/mail-domain-check.ts
 apps/api/src/mail-mime.ts
 apps/api/src/main.ts
 apps/api/src/mfa.ts
@@ -870,6 +871,7 @@ packages/kernel/src/argument-language.ts
 packages/kernel/src/date-of-birth.ts
 packages/kernel/src/debate-roles.ts
 packages/kernel/src/index.ts
+packages/kernel/src/mail-address.ts
 packages/kernel/src/manualPhone.ts
 packages/kernel/src/provider-funding.ts
 packages/kernel/src/region.ts
