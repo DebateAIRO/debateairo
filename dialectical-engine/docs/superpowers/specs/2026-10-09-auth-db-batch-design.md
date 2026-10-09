@@ -6,7 +6,7 @@ the five functions 0108's receipt pins (`password_reset_prepare/start`, `mfa_rec
 `start_account_recovery`) are not touched; neither are `mfa_recovery_eligible`, `password_recovery_rules`,
 `valid_consumer_authorization_internal` (pinned by lineage evidence). Every replaced function keeps its signature,
 owner and `SECURITY DEFINER`; new ones get the owner of their family and explicit REVOKE/GRANT. Every function the step
-creates or replaces (and `staff.publish/revoke_independent_alert_readiness`, `staff.claim_alert_delivery`) searches
+creates or replaces (and `staff.publish/revoke/read_independent_alert_readiness`, `staff.claim_alert_delivery`) searches
 `pg_catalog, pg_temp` — pg_temp last, so a temporary type cannot shadow `timestamptz`/`uuid`/`jsonb` inside a definer —
 except `identity.create_social_account`, whose exact `search_path=pg_catalog` the sealed effective-capability verifier
 pins (the step keeps that verifier). Item 6 covers it and every older definer.
@@ -68,8 +68,8 @@ to expect, the other branches' exact-chain tests, "check the preview's applied s
 
 6. **No temporary objects.** The step revokes `TEMPORARY` on the database from PUBLIC (also in
    `deploy/postgres/hardening.sql`); no application or runtime code uses temporary objects (the principal provisioner's
-   `pg_temp` function runs as the superuser migrator, which the revoke does not affect). The step's verifier refuses a
-   PUBLIC, runtime or writer TEMP grant. Older definer functions whose search_path lacks `pg_temp` are left as they
+   `pg_temp` function runs as the superuser migrator, which the revoke does not affect). The step's verifier refuses TEMP for
+   PUBLIC and for every role that is neither a superuser nor the database owner. Older definer functions whose search_path lacks `pg_temp` are left as they
    are (re-pinning them would trip sealed verifiers); the revoke mitigates them. Follow-up: a step that re-pins the
    remaining ones together with a superseding effective verifier.
 7. **The 24-hour wait, tightened.** The emailed link of a second recovery asks `identity.mfa_recovery_link_waiting`
@@ -77,8 +77,9 @@ to expect, the other branches' exact-chain tests, "check the preview's applied s
    a wasted setup; entering WAITING resets `failures`, so the finish has its own five tries (the fifth wrong finish
    password refuses, revokes the pending authenticator and starts the usual failure cooldown); `begin_wait` and `finish`
    write `identity.consumer_security.RECOVERY_WAITING` / `RECOVERY_COMPLETED` audit rows (audit token + hashed source
-   only); a WAITING row invalidated by a password, email, factor, inventory or security change is closed (EXPIRED)
-   before any WAITING or FINISH mail is sent, and the recovery page's status no longer reports it as waiting.
+   only); the mail queue re-checks the replacement of every WAITING or FINISH mail it claims (closing an invalidated one as
+   EXPIRED and dropping the mail), a WAITING mail never goes out once the replacement stopped waiting (cancelled,
+   refused, expired or finished), and the recovery page's status no longer reports it as waiting.
 8. **Used codes, everywhere.** The older password recovery (0103, `identity.password_recovery_accept_code`, pinned by
    no sealed verifier) also queues `RECOVERY_CODE_USED`. `consumer_recovery_eligible_internal` already refuses an
    account under a security hold, so no code is consumed silently while the notice queue skips held accounts
@@ -88,10 +89,13 @@ to expect, the other branches' exact-chain tests, "check the preview's applied s
    at most CONNECT, USAGE on `staff` and EXECUTE on the two readiness functions; the verifier also refuses a password,
    an expiry or role settings on it later.
 10. **Replay keeps every step's checks.** `ForwardStepPlan.replayVerifierSql` (the batch: its supplemental verifier) runs
-   for EVERY applied step on every later `migrate()`, not only the last step's postcondition. NETOPIA's copy of
+   for EVERY applied step on every later `migrate()`, not only the last step's postcondition, and again after a run
+   applies new steps, before COMMIT, so a step that breaks an earlier step's rules is rolled back. NETOPIA's copy of
    `migration-forward-chain.ts` must take the same lines when the branches meet (keep ONE chain module).
-11. **Preview verify never upgrades.** The native verify refuses a pending migration (`PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP`);
-   only `apply-and-plan` applies.
+11. **Preview verify never upgrades.** The native verify refuses a pending migration (`PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP`):
+   any numbered migration of the source (recipe, 0108, a separate `forward110`, the chain) that is in neither the
+   ledger nor the resolution table; only `apply-and-plan` applies. NETOPIA ships the same guard first; at merge their
+   exact functions replace ours.
 
 **Not done.** A "send the finish link again" action (review M6): it needs its own token rotation, rate limit and two
 screens; the finish link is mailed once, and the wait can be cancelled and restarted.

@@ -26,8 +26,8 @@ and applied steps are checked by their receipts (and the last one by its postcon
 ## Replay: every applied step keeps its own checks
 
 On a later `migrate()` each applied step is checked by its receipt, the last one also by its postcondition digest,
-and EVERY applied step that declares one runs its own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`)
-— so the batch's promises (for example "no runtime may publish staff alert readiness") are still enforced after other
+and EVERY applied step that declares one runs its own `replayVerifierSql` (the batch: `verify-auth-db-batch.sql`),
+and again after a run applies new steps, before COMMIT — so the batch's promises (for example "no runtime may publish staff alert readiness") are still enforced after other
 steps are appended. A later step that deliberately changes something an earlier step's verifier pins must change that
 verifier through its own reviewed step design; it cannot silently pass. NETOPIA's and every other copy of
 `migration-forward-chain.ts` needs the same few lines (`replayVerifierSql` on `ForwardStepPlan`, the loop in
