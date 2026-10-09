@@ -142,7 +142,7 @@ Pokud dojde k porušení zabezpečení osobních údajů, oznámíme je rumunsk�
 
 ## 10. Vaše práva a způsob jejich uplatnění
 
-Kterékoli z těchto práv můžete bezplatně uplatnit písemnou žádostí na **privacy@dezbatere.ro** nebo v nabídce **Nastavení → Soukromí**, pokud je příslušný ovládací prvek k dispozici. Odpovíme do jednoho měsíce; je-li žádost složitá, můžeme lhůtu prodloužit až o další dva měsíce a sdělíme vám proč. Můžeme vás požádat o potvrzení totožnosti prostřednictvím vašeho účtu.
+Kterékoli z těchto práv můžete bezplatně uplatnit písemnou žádostí na **privacy@dezbatere.ro** nebo v nabídce **Nastavení → Ochrana soukromí**, pokud je příslušný ovládací prvek k dispozici. Odpovíme do jednoho měsíce; je-li žádost složitá, můžeme lhůtu prodloužit až o další dva měsíce a sdělíme vám proč. Můžeme vás požádat o potvrzení totožnosti prostřednictvím vašeho účtu.
 
 | Právo | Co zde znamená |
 | --- | --- |
