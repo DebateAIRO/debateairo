@@ -3183,8 +3183,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     ));
   });
 
-  if (options.passwordReset) registerPasswordResetRoutes(api,{service:options.passwordReset,policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/password-reset/start",sourceFor(request).ip)&&await recoveryStartProofOrRefuse(reply,request.body,"password-reset")});
-  registerEmailMfaRoutes(api,{...(options.backupEmail?{backup:options.backupEmail}:{}),...(options.mfaRecovery?{mfa:options.mfaRecovery}:{}),policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/mfa-recovery/start",sourceFor(request).ip)&&await recoveryStartProofOrRefuse(reply,request.body,"mfa-recovery")});
+  if (options.passwordReset) registerPasswordResetRoutes(api,{service:options.passwordReset,policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/password-reset/start",clientIpNetworkScope(sourceFor(request).ip))&&await recoveryStartProofOrRefuse(reply,request.body,"password-reset")});
+  registerEmailMfaRoutes(api,{...(options.backupEmail?{backup:options.backupEmail}:{}),...(options.mfaRecovery?{mfa:options.mfaRecovery}:{}),policy:route=>credentialRoutePolicy(route),source:sourceFor,admitStart:async(request,reply)=>admitOrRefuse(reply,"recoveryStart","POST /v1/auth/mfa-recovery/start",clientIpNetworkScope(sourceFor(request).ip))&&await recoveryStartProofOrRefuse(reply,request.body,"mfa-recovery")});
   if (options.recovery !== undefined) {
     api.post("/v1/auth/recovery/start", credentialRoutePolicy("POST /v1/auth/recovery/start"), async (request, reply) => {
       // L1-F3: this route had no per-source admission control at all — only a
@@ -3193,7 +3193,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       // The budget is charged to the SOURCE and never to the address, so the
       // refusal is identical whether or not the account exists: it adds no
       // enumeration oracle to a route whose whole design is generic.
-      if (!admitOrRefuse(reply, "recoveryStart", "POST /v1/auth/recovery/start", sourceFor(request).ip)) {
+      if (!admitOrRefuse(reply, "recoveryStart", "POST /v1/auth/recovery/start", clientIpNetworkScope(sourceFor(request).ip))) {
         return reply;
       }
       if (!await recoveryStartProofOrRefuse(reply, request.body, "account-recovery")) return reply;

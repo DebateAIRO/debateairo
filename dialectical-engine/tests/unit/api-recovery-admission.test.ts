@@ -163,3 +163,91 @@ describe("B25a recovery/start admission (L1-F3)", () => {
     }
   });
 });
+
+/**
+ * Auth API hardening 2026-10-09 (follow-up 1). The recovery-start budget was
+ * keyed by the FULL client address and refused every NEW key once its table
+ * was full, so one IPv6 /64 minting fresh addresses could fill the table and
+ * make all three recovery starts answer 429 CAPACITY to everybody.
+ */
+function recoveryPolicyWith(overrides: Partial<{ limit: number; window_ms: number; capacity: number }>): AdmissionPolicy {
+  const value = ADMISSION_POLICY_REGISTER_ROW.value;
+  return admissionPolicyFromValue({
+    ...value,
+    recovery_start: { ...value.recovery_start, ...overrides }
+  }, ADMISSION_POLICY_REGISTER_ROW.sourceRef);
+}
+
+describe("recovery/start admission under a source flood (auth hardening 2026-10-09)", () => {
+  it("counts every address of one IPv6 /64 as one source and leaves a different source admitted", async () => {
+    const { start, startRecovery, close } = harness();
+    try {
+      for (let index = 1; index <= POLICY.recoveryStart.limit; index += 1) {
+        expect((await startRecovery(`2001:db8:1:2::${index.toString(16)}`)).statusCode, `address ${index}`).toBe(202);
+      }
+      // A fresh address of the same /64 is the same source: its budget is spent.
+      expect((await startRecovery("2001:db8:1:2:ffff:ffff:ffff:fffe")).statusCode).toBe(429);
+      expect(start).toHaveBeenCalledTimes(POLICY.recoveryStart.limit);
+      // A different /64 and an IPv4 source are untouched.
+      expect((await startRecovery("2001:db8:1:3::1")).statusCode).toBe(202);
+      expect((await startRecovery(SOURCE_B)).statusCode).toBe(202);
+    } finally {
+      await close();
+    }
+  });
+
+  it("counts an IPv4-mapped IPv6 caller as its IPv4 address, never as one shared ::ffff /64", async () => {
+    const { startRecovery, close } = harness();
+    try {
+      for (let attempt = 0; attempt < POLICY.recoveryStart.limit; attempt += 1) {
+        expect((await startRecovery(`::ffff:${SOURCE_A}`)).statusCode).toBe(202);
+      }
+      expect((await startRecovery(SOURCE_A)).statusCode).toBe(429);
+      expect((await startRecovery(`::ffff:${SOURCE_B}`)).statusCode).toBe(202);
+    } finally {
+      await close();
+    }
+  });
+
+  it("admits a new source when the table is full, evicting one-shot sources and keeping a spent one blocked", async () => {
+    const { start, startRecovery, close } = harness(recoveryPolicyWith({ capacity: 3 }));
+    try {
+      for (let attempt = 0; attempt < POLICY.recoveryStart.limit; attempt += 1) {
+        expect((await startRecovery(SOURCE_A)).statusCode).toBe(202);
+      }
+      expect((await startRecovery(SOURCE_A)).statusCode).toBe(429);
+      // A flood of fresh sources fills and overflows the table.
+      for (let index = 1; index <= 10; index += 1) {
+        expect((await startRecovery(`10.0.0.${index}`)).statusCode, `flood source ${index}`).toBe(202);
+      }
+      // A legitimate new source is admitted, not refused for CAPACITY.
+      expect((await startRecovery(SOURCE_B)).statusCode).toBe(202);
+      // The spent source kept its counter through the flood.
+      expect((await startRecovery(SOURCE_A)).statusCode).toBe(429);
+      expect(start).toHaveBeenCalledTimes(POLICY.recoveryStart.limit + 11);
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe("AdmissionLimiter recoveryStart eviction", () => {
+  it("evicts the least-evidenced unblocked key instead of refusing a new one, and stays bounded", () => {
+    const limiter = new AdmissionLimiter(recoveryPolicyWith({ limit: 2, window_ms: 1_000, capacity: 2 }));
+    const at = (ms: number) => new Date(T0 + ms);
+    expect(limiter.decide("recoveryStart", "spent", at(0))).toEqual({ allowed: true });
+    expect(limiter.decide("recoveryStart", "spent", at(0))).toEqual({ allowed: true });
+    expect(limiter.decide("recoveryStart", "spent", at(0)).allowed).toBe(false);
+    expect(limiter.decide("recoveryStart", "one-shot", at(10))).toEqual({ allowed: true });
+    expect(limiter.decide("recoveryStart", "fresh", at(20))).toEqual({ allowed: true });
+    expect(limiter.size("recoveryStart")).toBe(2);
+    // The blocked key survived; the one-shot key was the one given up.
+    expect(limiter.decide("recoveryStart", "spent", at(30))).toMatchObject({ allowed: false, reason: "LIMIT" });
+    // With every slot blocked, the key whose block ends soonest is given up, never a refusal.
+    expect(limiter.decide("recoveryStart", "fresh", at(40))).toEqual({ allowed: true });
+    expect(limiter.decide("recoveryStart", "fresh", at(40)).allowed).toBe(false);
+    expect(limiter.decide("recoveryStart", "newest", at(50))).toEqual({ allowed: true });
+    expect(limiter.size("recoveryStart")).toBe(2);
+    expect(limiter.decide("recoveryStart", "fresh", at(60))).toMatchObject({ allowed: false, reason: "LIMIT" });
+  });
+});

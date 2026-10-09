@@ -24,6 +24,7 @@ import {
 } from "@debateai/crypto";
 import { AuthFlowError, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
 import { clientIpNetworkScope, normalizeClientIp } from "./client-ip.js";
+import { leastEvidenceKey } from "./admission.js";
 
 type MfaRepository = Pick<PostgresIdentityRepository,
   | "consumeAndReplaceRecoveryCode"
@@ -49,26 +50,6 @@ export type MfaRateDecision = Readonly<{ allowed: boolean; auditRefusal: boolean
  */
 export function rateLimitSourceScope(sourceIp: string): string {
   return clientIpNetworkScope(normalizeClientIp(sourceIp) ?? sourceIp);
-}
-
-/**
- * Auth API hardening 2026-10-09: which entry to give up when a table is full.
- * Expired entries go first (pruned before this runs); then the entry carrying
- * the least evidence — unblocked, lowest count, oldest first — so a flood of
- * one-shot keys evicts itself and never resets a locked account or a sprayer
- * that has nearly spent its source budget. Only a table made entirely of
- * blocked entries gives up the one whose lock ends soonest.
- */
-function evictionCandidate(entries: ReadonlyMap<string, RateEntry>, now: number): string | undefined {
-  let open: string | undefined, openCount = Infinity, blocked: string | undefined, blockedUntil = Infinity;
-  for (const [key, entry] of entries) {
-    if (entry.blockedUntil > now) {
-      if (entry.blockedUntil < blockedUntil) { blocked = key; blockedUntil = entry.blockedUntil; }
-    } else if (entry.count < openCount) {
-      open = key; openCount = entry.count;
-    }
-  }
-  return open ?? blocked;
 }
 
 /**
@@ -111,7 +92,7 @@ export class MfaVerificationLimiter {
       // An expired entry is reset on its next use, so the table is swept only when it is full.
       if (entries.size >= this.policy.capacity) this.prune(entries, now);
       while (entries.size >= this.policy.capacity) {
-        const victim = evictionCandidate(entries, now);
+        const victim = leastEvidenceKey(entries, now);
         if (victim === undefined) break;
         entries.delete(victim);
       }
