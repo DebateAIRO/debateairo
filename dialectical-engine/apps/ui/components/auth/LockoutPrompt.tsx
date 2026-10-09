@@ -91,7 +91,7 @@ export function LockoutPrompt({ catalog, client = contractClient, onDone }: {
         <h2 id={`${id}-title`} ref={heading} tabIndex={-1}>{t(catalog, 'auth.lockout.title')}</h2>
         <p>{t(catalog, 'auth.lockout.why')}</p>
         {error ? <p className="authFieldError" role="alert">{error}</p> : null}
-        {codes ? <EphemeralCodes kind="new" catalog={catalog} codes={codes}/> : null}
+        {codes ? <EphemeralCodes catalog={catalog} codes={codes}/> : null}
         {choice && grant && !complete ? <>
             <SecurityEnrollment authority={{ kind: 'grant', token: grant.token }} availableMethods={['passkey']} catalog={catalog} client={client} onEnrolled={() => setAdded(true)} onExpired={expired}/>
             <div className="authLockoutActions">

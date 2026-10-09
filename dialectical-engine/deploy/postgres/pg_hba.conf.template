@@ -10,6 +10,14 @@
 # Maintenance and backups: root runs `sudo -u postgres ...` over the socket (peer = OS identity).
 local     all        postgres                                                peer
 #
+# DELIBERATELY NO LINE for debateai_staff_readiness_writer (the auth DB batch step's
+# password-less staff readiness writer). Only the PREVIEW's team-unlock helper uses it, and the
+# preview admits it by peer from one dedicated no-login OS user through lines written by
+# deploy/preview-lifecycle/v1/README.md (step 7). Production has no such helper: with no line
+# here the login exists but can never log in. NEVER add a peer line for it here, and never map
+# root to it: peer sees only a uid, and any process running as uid 0 that reaches this socket
+# (a root container through the compose bind mount, for one) would count as root.
+#
 # Just-in-time superuser for `pnpm db:migrate` / `pnpm db:provision-principals` (README §4):
 # its password is NULL between ceremonies and VALID UNTIL <= 15 minutes during one.
 local     debateai   debateai_prod_migrator                                  scram-sha-256

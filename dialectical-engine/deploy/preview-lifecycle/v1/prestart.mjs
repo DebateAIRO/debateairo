@@ -101,6 +101,9 @@ export async function readLock(layout = LAYOUT) {
 const readNativePlan = layout => readProtectedJson(layout.nativePlanPath, { root: layout.nativePlanRoot, mode: 0o644, maxBytes: 32768, layout, code: 'NATIVE_PLAN_UNREADABLE' });
 const readPlan = (path, layout) => readProtectedJson(path, { root: dirname(path), mode: 0o644, maxBytes: 32768, layout, code: 'BASE_PLAN_UNREADABLE' });
 
+/** The one line native-operator.mjs prints when verify finds a forward step the database lacks (verify-native.ts). */
+const PENDING_FORWARD_STEP_LINE = /^PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: (\d{4}_[a-z0-9_]+\.sql(?:, \d{4}_[a-z0-9_]+\.sql){0,63})\. Verify never applies a migration; run the native operator with operation apply-and-plan first\.\n$/;
+
 /** Exact argv of the canonical verifier: release native-operator, as postgres, peer packet on FD3. */
 export function nativeVerifyArgv({ layout, nodePath, sourceRoot }) {
   const entry = `${sourceRoot}/dialectical-engine/deploy/preview-auth-dev/v1/native-operator.mjs`;
@@ -112,6 +115,10 @@ export async function runNativeVerify({ layout, nodePath, sourceRoot, run = runB
   if (!/^\/opt\/debateai-v3-preview\/releases\/auth-dev-candidate-[a-z0-9-]+$/.test(sourceRoot)) refuse('NATIVE_VERIFY_REFUSED');
   const result = await run(nativeVerifyArgv({ layout, nodePath, sourceRoot }), { cwd: `${sourceRoot}/dialectical-engine`, env: {}, timeoutMs, maxOutputBytes: 262144 });
   if (result.timedOut) refuse('NATIVE_VERIFY_TIMEOUT');
+  // Verify never applies a migration (verify-native.ts). A release whose forward step is not applied yet is refused
+  // with its own reason, so the journal says what to do: the operator runs the native operator's apply-and-plan.
+  const pending = !result.overflow && !result.error && result.code !== 0 ? PENDING_FORWARD_STEP_LINE.exec(String(result.stderr)) : null;
+  if (pending) refuse('NATIVE_VERIFY_PENDING_FORWARD_STEP', { next: 'apply-and-plan', pending: pending[1].split(', ') });
   if (result.overflow || result.error || result.code !== 0 || result.stderr.length > 0) refuse('NATIVE_VERIFY_REFUSED');
   try { return strictJson(result.stdout); } catch { return refuse('NATIVE_VERIFY_REFUSED'); }
 }

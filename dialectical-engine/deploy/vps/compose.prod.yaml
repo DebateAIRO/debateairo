@@ -44,8 +44,13 @@ services:
       SERVER_AUTH_BASIC_AUTH_ENABLED: "true"
     volumes:
       # The native cluster's socket directory. debateai_prod_hatchet authenticates with
-      # scram-sha-256 over it (pg_hba `local hatchet debateai_prod_hatchet`), so the container's
-      # uid is irrelevant — peer authentication is reserved for the postgres OS user.
+      # scram-sha-256 over it (pg_hba `local hatchet debateai_prod_hatchet`). The container's uid
+      # still matters: on this socket PostgreSQL's peer check sees the container process's host
+      # uid (no user namespace here), and production's pg_hba admits by peer only the host's
+      # `postgres` OS user (`local all postgres peer`), with pg_ident mapping no OS user to any
+      # role. So this container must never run as the host uid of `postgres`, and no peer line or
+      # ident map may ever name root (uid 0, which this image may well run as). No `user:` is set:
+      # nothing in this repository shows the pinned image runs correctly as non-root.
       - /var/run/postgresql:/var/run/postgresql
       - /etc/debateai/hatchet-tls:/etc/hatchet-tls:ro
       - hatchet-config:/config
