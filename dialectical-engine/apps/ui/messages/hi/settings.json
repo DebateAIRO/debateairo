@@ -173,5 +173,11 @@
   "settings.security.codesRemaining": "रिकवरी कोड: {count}",
   "settings.security.regenerate": "नए रिकवरी कोड बनाएँ",
   "settings.security.lockoutReminder": "आपके पास अभी तक कोई रिकवरी कोड या पासकी नहीं है। अगर आपका फ़ोन खो जाए, तो इनसे आप तुरंत वापस अंदर आ सकते हैं।",
-  "settings.security.refreshFailed": "सुरक्षा जानकारी रीफ़्रेश नहीं हो सकी। पेज फिर से लोड करें।"
+  "settings.security.refreshFailed": "सुरक्षा जानकारी रीफ़्रेश नहीं हो सकी। पेज फिर से लोड करें।",
+  "settings.security.pendingRecovery.title": "किसी ने आपका ऑथेंटिकेटर ऐप बदलना शुरू किया है",
+  "settings.security.pendingRecovery.body": "किसी ने आपका पासवर्ड और एक ईमेल लिंक इस्तेमाल करके इस खाते का ऑथेंटिकेटर ऐप बदलना शुरू किया है। यह {time} पर पूरा होगा।",
+  "settings.security.pendingRecovery.keep": "तब तक आपका मौजूदा ऑथेंटिकेटर ऐप, पुनर्प्राप्ति कोड और सत्र काम करते रहेंगे। अगर यह आपने नहीं किया, तो इसे रद्द करें।",
+  "settings.security.pendingRecovery.cancel": "रद्द करें",
+  "settings.security.pendingRecovery.cancelled": "पुनर्प्राप्ति रद्द कर दी गई है।",
+  "settings.security.pendingRecovery.failed": "हम इसे रद्द नहीं कर सके। पेज दोबारा लोड करें और फिर से कोशिश करें।"
 }

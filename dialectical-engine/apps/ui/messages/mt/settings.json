@@ -176,5 +176,11 @@
   "settings.security.codesRemaining": "Kodiċijiet ta’ rkupru: {count}",
   "settings.security.regenerate": "Iġġenera kodiċijiet ġodda ta’ rkupru",
   "settings.security.lockoutReminder": "Għad m’għandek l-ebda kodiċi ta’ rkupru jew ċavetta tal-aċċess. Jekk titlef it-telefon tiegħek, b’dawn terġa’ tidħol minnufih.",
-  "settings.security.refreshFailed": "Id-dettalji tas-sigurtà ma setgħux jiġu aġġornati. Erġa’ tella’ l-paġna."
+  "settings.security.refreshFailed": "Id-dettalji tas-sigurtà ma setgħux jiġu aġġornati. Erġa’ tella’ l-paġna.",
+  "settings.security.pendingRecovery.title": "Xi ħadd beda jbiddel l-app tal-awtentikazzjoni tiegħek",
+  "settings.security.pendingRecovery.body": "Xi ħadd uża l-password tiegħek u ħolqa mibgħuta bl-email biex beda jbiddel l-app tal-awtentikazzjoni ta’ dan il-kont. Tispiċċa fi {time}.",
+  "settings.security.pendingRecovery.keep": "Sa dak iż-żmien, l-app tal-awtentikazzjoni attwali tiegħek, il-kodiċijiet ta’ rkupru u s-sessjonijiet tiegħek għadhom jaħdmu. Jekk ma kinitx int, ikkanċellaha.",
+  "settings.security.pendingRecovery.cancel": "Ikkanċella",
+  "settings.security.pendingRecovery.cancelled": "Il-bidla ġiet ikkanċellata.",
+  "settings.security.pendingRecovery.failed": "Ma stajniex nikkanċellawha. Erġa’ tella’ l-paġna u erġa’ pprova."
 }

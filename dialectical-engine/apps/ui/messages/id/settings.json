@@ -172,5 +172,11 @@
   "settings.security.codesRemaining": "Kode pemulihan: {count}",
   "settings.security.regenerate": "Buat kode pemulihan baru",
   "settings.security.lockoutReminder": "Anda belum memiliki kode pemulihan atau kunci sandi. Jika telepon Anda hilang, keduanya memungkinkan Anda langsung masuk kembali.",
-  "settings.security.refreshFailed": "Detail keamanan tidak dapat diperbarui. Muat ulang halaman."
+  "settings.security.refreshFailed": "Detail keamanan tidak dapat diperbarui. Muat ulang halaman.",
+  "settings.security.pendingRecovery.title": "Seseorang mulai mengganti autentikator Anda",
+  "settings.security.pendingRecovery.body": "Seseorang menggunakan kata sandi Anda dan tautan email untuk mulai mengganti autentikator di akun ini. Proses ini selesai pada {time}.",
+  "settings.security.pendingRecovery.keep": "Sampai saat itu, autentikator Anda saat ini, kode pemulihan, dan sesi tetap berfungsi. Jika itu bukan Anda, batalkan prosesnya.",
+  "settings.security.pendingRecovery.cancel": "Batalkan",
+  "settings.security.pendingRecovery.cancelled": "Pemulihan dibatalkan.",
+  "settings.security.pendingRecovery.failed": "Kami tidak dapat membatalkannya. Muat ulang halaman lalu coba lagi."
 }

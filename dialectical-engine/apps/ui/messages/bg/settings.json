@@ -173,5 +173,11 @@
   "settings.security.codesRemaining": "Кодове за възстановяване: {count}",
   "settings.security.regenerate": "Генериране на нови кодове за възстановяване",
   "settings.security.lockoutReminder": "Все още нямате кодове за възстановяване или ключ за достъп. Ако загубите телефона си, с тях влизате отново веднага.",
-  "settings.security.refreshFailed": "Данните за сигурност не могат да бъдат обновени. Презаредете страницата."
+  "settings.security.refreshFailed": "Данните за сигурност не могат да бъдат обновени. Презаредете страницата.",
+  "settings.security.pendingRecovery.title": "Някой започна смяна на приложението ви за удостоверяване",
+  "settings.security.pendingRecovery.body": "Някой използва паролата ви и връзка от имейл, за да започне смяна на приложението за удостоверяване в този акаунт. Смяната приключва на {time}.",
+  "settings.security.pendingRecovery.keep": "Дотогава текущото ви приложение за удостоверяване, кодовете за възстановяване и сесиите продължават да работят. Ако не сте били вие, отменете смяната.",
+  "settings.security.pendingRecovery.cancel": "Отказ",
+  "settings.security.pendingRecovery.cancelled": "Смяната е отменена.",
+  "settings.security.pendingRecovery.failed": "Не успяхме да я отменим. Презаредете страницата и опитайте отново."
 }

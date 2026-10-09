@@ -173,5 +173,11 @@
   "settings.security.codesRemaining": "Återställningskoder: {count}",
   "settings.security.regenerate": "Skapa nya återställningskoder",
   "settings.security.lockoutReminder": "Du har inga återställningskoder eller någon nyckel ännu. Om du tappar bort telefonen tar de dig tillbaka in direkt.",
-  "settings.security.refreshFailed": "Säkerhetsuppgifterna kunde inte uppdateras. Ladda om sidan."
+  "settings.security.refreshFailed": "Säkerhetsuppgifterna kunde inte uppdateras. Ladda om sidan.",
+  "settings.security.pendingRecovery.title": "Någon har börjat ersätta din autentiseringsapp",
+  "settings.security.pendingRecovery.body": "Någon använde ditt lösenord och en e-postlänk för att börja ersätta autentiseringsappen för det här kontot. Ersättningen slutförs den {time}.",
+  "settings.security.pendingRecovery.keep": "Fram till dess fungerar din nuvarande autentiseringsapp, dina återställningskoder och dina sessioner som vanligt. Om det inte var du, avbryt den.",
+  "settings.security.pendingRecovery.cancel": "Avbryt",
+  "settings.security.pendingRecovery.cancelled": "Återställningen har avbrutits.",
+  "settings.security.pendingRecovery.failed": "Vi kunde inte avbryta den. Ladda om sidan och försök igen."
 }

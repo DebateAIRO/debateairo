@@ -173,5 +173,11 @@
   "settings.security.codesRemaining": "Herstelcodes: {count}",
   "settings.security.regenerate": "Nieuwe herstelcodes genereren",
   "settings.security.lockoutReminder": "U hebt nog geen herstelcodes of passkey. Als u uw telefoon kwijtraakt, komt u daarmee meteen weer binnen.",
-  "settings.security.refreshFailed": "De beveiligingsgegevens konden niet worden vernieuwd. Laad de pagina opnieuw."
+  "settings.security.refreshFailed": "De beveiligingsgegevens konden niet worden vernieuwd. Laad de pagina opnieuw.",
+  "settings.security.pendingRecovery.title": "Iemand is begonnen uw authenticator-app te vervangen",
+  "settings.security.pendingRecovery.body": "Iemand heeft uw wachtwoord en een e-maillink gebruikt om de authenticator-app van dit account te gaan vervangen. De vervanging wordt afgerond op {time}.",
+  "settings.security.pendingRecovery.keep": "Tot die tijd blijven uw huidige authenticator-app, herstelcodes en sessies werken. Als u dat niet was, annuleer het dan.",
+  "settings.security.pendingRecovery.cancel": "Annuleren",
+  "settings.security.pendingRecovery.cancelled": "Het herstel is geannuleerd.",
+  "settings.security.pendingRecovery.failed": "We konden het niet annuleren. Laad de pagina opnieuw en probeer het nog eens."
 }

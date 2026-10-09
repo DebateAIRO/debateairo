@@ -173,5 +173,11 @@
   "settings.security.codesRemaining": "Palautuskoodit: {count}",
   "settings.security.regenerate": "Luo uudet palautuskoodit",
   "settings.security.lockoutReminder": "Sinulla ei ole vielä palautuskoodeja eikä pääsyavainta. Jos kadotat puhelimesi, pääset niiden avulla heti takaisin sisään.",
-  "settings.security.refreshFailed": "Turvallisuustietoja ei voitu päivittää. Lataa sivu uudelleen."
+  "settings.security.refreshFailed": "Turvallisuustietoja ei voitu päivittää. Lataa sivu uudelleen.",
+  "settings.security.pendingRecovery.title": "Joku on aloittanut todennussovelluksesi vaihtamisen",
+  "settings.security.pendingRecovery.body": "Joku käytti salasanaasi ja sähköpostilinkkiä aloittaakseen tämän tilin todennussovelluksen vaihtamisen. Vaihto valmistuu {time}.",
+  "settings.security.pendingRecovery.keep": "Siihen asti nykyinen todennussovellus, palautuskoodit ja istunnot toimivat edelleen. Jos et tehnyt sitä itse, peruuta vaihto.",
+  "settings.security.pendingRecovery.cancel": "Peruuta",
+  "settings.security.pendingRecovery.cancelled": "Palautus on peruutettu.",
+  "settings.security.pendingRecovery.failed": "Vaihtoa ei voitu peruuttaa. Lataa sivu uudelleen ja yritä uudestaan."
 }

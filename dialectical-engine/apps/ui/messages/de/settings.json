@@ -173,5 +173,11 @@
   "settings.security.codesRemaining": "Wiederherstellungscodes: {count}",
   "settings.security.regenerate": "Neue Wiederherstellungscodes erstellen",
   "settings.security.lockoutReminder": "Sie haben noch keine Wiederherstellungscodes und keinen Passkey. Wenn Sie Ihr Telefon verlieren, kommen Sie damit sofort wieder in Ihr Konto.",
-  "settings.security.refreshFailed": "Die Sicherheitsdetails konnten nicht aktualisiert werden. Lade die Seite neu."
+  "settings.security.refreshFailed": "Die Sicherheitsdetails konnten nicht aktualisiert werden. Lade die Seite neu.",
+  "settings.security.pendingRecovery.title": "Jemand hat begonnen, Ihre Authenticator-App zu ersetzen",
+  "settings.security.pendingRecovery.body": "Jemand hat mit Ihrem Passwort und einem E-Mail-Link begonnen, die Authenticator-App dieses Kontos zu ersetzen. Der Vorgang wird am {time} abgeschlossen.",
+  "settings.security.pendingRecovery.keep": "Bis dahin funktionieren Ihre aktuelle Authenticator-App, Ihre Wiederherstellungscodes und Ihre Sitzungen weiterhin. Wenn Sie das nicht waren, brechen Sie ihn ab.",
+  "settings.security.pendingRecovery.cancel": "Abbrechen",
+  "settings.security.pendingRecovery.cancelled": "Wiederherstellung abgebrochen.",
+  "settings.security.pendingRecovery.failed": "Wir konnten den Vorgang nicht abbrechen. Laden Sie die Seite neu und versuchen Sie es erneut."
 }

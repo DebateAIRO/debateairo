@@ -175,5 +175,11 @@
   "settings.security.codesRemaining": "Коди відновлення: {count}",
   "settings.security.regenerate": "Створити нові коди відновлення",
   "settings.security.lockoutReminder": "У вас ще немає кодів відновлення чи ключа доступу. Якщо ви втратите телефон, з ними ви одразу ввійдете знову.",
-  "settings.security.refreshFailed": "Не вдалося оновити відомості про безпеку. Перезавантажте сторінку."
+  "settings.security.refreshFailed": "Не вдалося оновити відомості про безпеку. Перезавантажте сторінку.",
+  "settings.security.pendingRecovery.title": "Хтось почав заміну вашого застосунку автентифікації",
+  "settings.security.pendingRecovery.body": "Хтось використав ваш пароль і посилання з листа, щоб почати заміну застосунку автентифікації для цього облікового запису. Заміна завершиться {time}.",
+  "settings.security.pendingRecovery.keep": "До того часу ваш поточний застосунок автентифікації, коди відновлення та сеанси продовжують працювати. Якщо це були не ви, скасуйте заміну.",
+  "settings.security.pendingRecovery.cancel": "Скасувати",
+  "settings.security.pendingRecovery.cancelled": "Заміну скасовано.",
+  "settings.security.pendingRecovery.failed": "Не вдалося її скасувати. Оновіть сторінку і спробуйте ще раз."
 }

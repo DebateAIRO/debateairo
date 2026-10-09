@@ -176,5 +176,11 @@
   "settings.security.codesRemaining": "Cóid aisghabhála: {count}",
   "settings.security.regenerate": "Gin cóid aisghabhála nua",
   "settings.security.lockoutReminder": "Níl cóid aisghabhála ná eochair rochtana agat fós. Má chailleann tú d’fhón, ligeann siad duit filleadh isteach láithreach.",
-  "settings.security.refreshFailed": "Níorbh fhéidir na sonraí slándála a athnuachan. Athlódáil an leathanach."
+  "settings.security.refreshFailed": "Níorbh fhéidir na sonraí slándála a athnuachan. Athlódáil an leathanach.",
+  "settings.security.pendingRecovery.title": "Thosaigh duine éigin ar d’aip fíordheimhnithe a athsholáthar",
+  "settings.security.pendingRecovery.body": "D’úsáid duine éigin do phasfhocal agus nasc ríomhphoist chun d’aip fíordheimhnithe a athsholáthar ar an gcuntas seo. Beidh sé críochnaithe ag {time}.",
+  "settings.security.pendingRecovery.keep": "Go dtí sin, leanfaidh d’aip fíordheimhnithe reatha, do chóid aisghabhála agus do sheisiúin ag obair. Mura tusa a thosaigh é, cealaigh é.",
+  "settings.security.pendingRecovery.cancel": "Cealaigh",
+  "settings.security.pendingRecovery.cancelled": "Cealaíodh an t-athsholáthar.",
+  "settings.security.pendingRecovery.failed": "Níorbh fhéidir é a chealú. Athlódáil an leathanach agus bain triail eile as."
 }

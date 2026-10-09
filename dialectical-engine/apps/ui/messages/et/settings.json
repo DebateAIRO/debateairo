@@ -173,5 +173,11 @@
   "settings.security.codesRemaining": "Taastekoodid: {count}",
   "settings.security.regenerate": "Loo uued taastekoodid",
   "settings.security.lockoutReminder": "Teil pole veel taastekoode ega pääsuvõtit. Kui kaotate telefoni, pääsete nendega kohe tagasi sisse.",
-  "settings.security.refreshFailed": "Turbeandmeid ei saanud värskendada. Laadi leht uuesti."
+  "settings.security.refreshFailed": "Turbeandmeid ei saanud värskendada. Laadi leht uuesti.",
+  "settings.security.pendingRecovery.title": "Keegi on alustanud teie autentimisrakenduse asendamist",
+  "settings.security.pendingRecovery.body": "Keegi kasutas teie parooli ja e-posti linki, et alustada selle konto autentimisrakenduse asendamist. Asendamine lõpeb {time}.",
+  "settings.security.pendingRecovery.keep": "Kuni selleni töötavad teie praegune autentimisrakendus, taastekoodid ja seansid edasi. Kui see ei olnud teie, tühistage see.",
+  "settings.security.pendingRecovery.cancel": "Tühista",
+  "settings.security.pendingRecovery.cancelled": "Taastamine tühistati.",
+  "settings.security.pendingRecovery.failed": "Seda ei õnnestunud tühistada. Laadige leht uuesti ja proovige veel kord."
 }

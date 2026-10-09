@@ -174,5 +174,11 @@
   "settings.security.codesRemaining": "Kodovi za oporavak: {count}",
   "settings.security.regenerate": "Generiraj nove kodove za oporavak",
   "settings.security.lockoutReminder": "Još nemate kodove za oporavak ni pristupni ključ. Ako izgubite telefon, s njima se odmah vraćate u račun.",
-  "settings.security.refreshFailed": "Sigurnosni podaci nisu osvježeni. Ponovno učitajte stranicu."
+  "settings.security.refreshFailed": "Sigurnosni podaci nisu osvježeni. Ponovno učitajte stranicu.",
+  "settings.security.pendingRecovery.title": "Netko je započeo zamjenu vaše aplikacije za autentifikaciju",
+  "settings.security.pendingRecovery.body": "Netko je upotrijebio vašu lozinku i poveznicu iz e-maila da bi započeo zamjenu aplikacije za autentifikaciju na ovom računu. Zamjena završava {time}.",
+  "settings.security.pendingRecovery.keep": "Do tada vaša trenutačna aplikacija za autentifikaciju, kodovi za oporavak i sesije i dalje rade. Ako to niste bili vi, otkažite zamjenu.",
+  "settings.security.pendingRecovery.cancel": "Odustani",
+  "settings.security.pendingRecovery.cancelled": "Zamjena je otkazana.",
+  "settings.security.pendingRecovery.failed": "Zamjenu nismo uspjeli otkazati. Osvježite stranicu i pokušajte ponovno."
 }

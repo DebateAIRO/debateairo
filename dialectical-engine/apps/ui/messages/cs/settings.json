@@ -175,5 +175,11 @@
   "settings.security.codesRemaining": "Obnovovací kódy: {count}",
   "settings.security.regenerate": "Vygenerovat nové obnovovací kódy",
   "settings.security.lockoutReminder": "Zatím nemáte žádné obnovovací kódy ani přístupový klíč. Pokud ztratíte telefon, díky nim se do účtu hned znovu dostanete.",
-  "settings.security.refreshFailed": "Podrobnosti zabezpečení se nepodařilo obnovit. Načtěte stránku znovu."
+  "settings.security.refreshFailed": "Podrobnosti zabezpečení se nepodařilo obnovit. Načtěte stránku znovu.",
+  "settings.security.pendingRecovery.title": "Někdo zahájil výměnu vaší ověřovací aplikace",
+  "settings.security.pendingRecovery.body": "Někdo použil vaše heslo a odkaz z e-mailu, aby zahájil výměnu ověřovací aplikace u tohoto účtu. Výměna skončí {time}.",
+  "settings.security.pendingRecovery.keep": "Do té doby vaše stávající ověřovací aplikace, obnovovací kódy a relace dál fungují. Pokud jste to nebyli vy, zrušte výměnu.",
+  "settings.security.pendingRecovery.cancel": "Zrušit",
+  "settings.security.pendingRecovery.cancelled": "Výměna byla zrušena.",
+  "settings.security.pendingRecovery.failed": "Výměnu se nepodařilo zrušit. Obnovte stránku a zkuste to znovu."
 }

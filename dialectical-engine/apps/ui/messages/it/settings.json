@@ -174,5 +174,11 @@
   "settings.security.codesRemaining": "Codici di recupero: {count}",
   "settings.security.regenerate": "Genera nuovi codici di recupero",
   "settings.security.lockoutReminder": "Non hai ancora codici di recupero né una passkey. Se perdi il telefono, ti permettono di rientrare subito.",
-  "settings.security.refreshFailed": "Impossibile aggiornare i dettagli di sicurezza. Ricarica la pagina."
+  "settings.security.refreshFailed": "Impossibile aggiornare i dettagli di sicurezza. Ricarica la pagina.",
+  "settings.security.pendingRecovery.title": "Qualcuno ha iniziato a sostituire la tua app di autenticazione",
+  "settings.security.pendingRecovery.body": "Qualcuno ha usato la tua password e un link ricevuto via email per iniziare a sostituire l’app di autenticazione di questo account. La sostituzione si concluderà il {time}.",
+  "settings.security.pendingRecovery.keep": "Fino ad allora, la tua app di autenticazione attuale, i codici di recupero e le sessioni attive continuano a funzionare. Se non eri tu, annullala.",
+  "settings.security.pendingRecovery.cancel": "Annulla",
+  "settings.security.pendingRecovery.cancelled": "Sostituzione annullata.",
+  "settings.security.pendingRecovery.failed": "Non siamo riusciti ad annullarla. Ricarica la pagina e riprova."
 }
