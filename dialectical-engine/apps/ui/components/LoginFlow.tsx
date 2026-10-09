@@ -270,15 +270,14 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                 setReplacement(null);
                 void onAuthenticated();
             }}>{t(catalog, "auth.continue")}</button></div> : continuation ? <div>
- {offered.includes('passkey') ? <button type="button" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.signIn")}</button> : null}
- {offered.includes('totp') || offered.includes('recovery_code') ? <>
- <form className="authForm authMfaForm" noValidate method="post" action="/login" onSubmit={e => {
+ {offered.includes('passkey') ? <div className="authAltMethods"><button type="button" className="authSecondary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.signIn")}</button></div> : null}
+ {offered.includes('totp') || offered.includes('recovery_code') ? <form className="authForm authMfaForm" noValidate method="post" action="/login" onSubmit={e => {
                     e.preventDefault();
                     void submitCode(code);
                 }} aria-busy={busy}>
+ <div className="authField">
  <label htmlFor="login-code">{method === 'totp' ? t(catalog, "auth.login.authenticationCodeLabel") : t(catalog, "auth.login.recoveryCodeLabel")}</label>
- <p id="login-code-help" hidden={method !== 'totp'}>{t(catalog, "auth.login.authenticatorInstruction")}</p>
- <input aria-describedby={method === 'totp' ? 'login-code-help' : undefined} id="login-code" name="code" value={code} autoComplete="one-time-code" inputMode={method === 'totp' ? 'numeric' : 'text'} maxLength={method === 'totp' ? 6 : 128} disabled={busy} autoFocus onChange={e => {
+ <input className={method === 'totp' ? undefined : 'authRecoveryInput'} aria-describedby={method === 'totp' ? 'login-code-help' : undefined} id="login-code" name="code" value={code} autoComplete="one-time-code" inputMode={method === 'totp' ? 'numeric' : 'text'} maxLength={method === 'totp' ? 6 : 128} disabled={busy} autoFocus onChange={e => {
                     const value = method === 'totp' ? e.target.value.replace(/\D/g, '').slice(0, 6) : e.target.value;
                     if (value !== code)
                         attempt.current.edited();
@@ -286,9 +285,12 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                     if (method === 'totp' && value.length === 6)
                         void submitCode(value);
                 }}/>
+ <p className="authFieldHint" id="login-code-help" hidden={method !== 'totp'}>{t(catalog, "auth.login.authenticatorInstruction")}</p>
+ </div>
  <button className="authPrimary" type="submit" disabled={busy}>{t(catalog, "auth.continue")}</button>
- </form>
- {offered.includes('recovery_code') && method !== 'recovery_code' ? <button type="button" disabled={completing} onClick={() => {
+ </form> : null}
+ <div className="authMfaAlternatives">
+ {offered.includes('recovery_code') && method !== 'recovery_code' ? <button type="button" className="authTextButton" disabled={completing} onClick={() => {
                         if (dispatched.current) return;
                         cancelConditional();
                         flight.current = false;
@@ -297,7 +299,7 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                         setCode('');
                         attempt.current.edited();
                     }}>{t(catalog, "auth.login.useRecoveryCode")}</button> : null}
- {offered.includes('totp') && method !== 'totp' ? <button type="button" disabled={completing} onClick={() => {
+ {offered.includes('totp') && method !== 'totp' ? <button type="button" className="authTextButton" disabled={completing} onClick={() => {
                         if (dispatched.current) return;
                         cancelConditional();
                         flight.current = false;
@@ -306,27 +308,29 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
                         setCode('');
                         attempt.current.edited();
                     }}>{t(catalog, "auth.login.useAuthenticatorCode")}</button> : null}
- </> : null}
- <button type="button" disabled={busy} onClick={() => {
+ <button type="button" className="authTextButton authBackButton" disabled={busy} onClick={() => {
                 cancelConditional();
                 setContinuation(null);
                 setCode('');
                 setError(null);
             }}>{t(catalog, "auth.login.backToSignIn")}</button>
+ </div>
  </div> : <>
- <button type="button" className="authPrimary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.signIn")}</button>
+ <div className="authAltMethods">
+ <button type="button" className="authSecondary" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.signIn")}</button>
  <SocialProviderButtons disabled={completing} client={client} catalog={catalog} onBegin={cancelConditional}/>
+ </div>
  <form className="authForm" noValidate method="post" action="/login" onSubmit={submitCredentials} aria-busy={busy}>
- <label htmlFor="login-email">{t(catalog, "auth.email")}</label><input id="login-email" name="email" type="email" autoComplete="username webauthn" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={e => {
+ <div className="authField"><label htmlFor="login-email">{t(catalog, "auth.email")}</label><input id="login-email" name="email" type="email" autoComplete="username webauthn" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={e => {
                 cancelConditional();
                 setEmail(e.target.value);
                 setEmailError(null);
-            }} required aria-invalid={!!emailError || undefined} aria-describedby={emailError ? 'login-email-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-email-error" message={emailError}/>
- <label htmlFor="login-password">{t(catalog, "auth.password")}</label><input id="login-password" name="password" type="password" autoComplete="current-password" value={password} onChange={e => {
+            }} required aria-invalid={!!emailError || undefined} aria-describedby={emailError ? 'login-email-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-email-error" message={emailError}/></div>
+ <div className="authField"><label htmlFor="login-password">{t(catalog, "auth.password")}</label><input id="login-password" name="password" type="password" autoComplete="current-password" value={password} onChange={e => {
                 cancelConditional();
                 setPassword(e.target.value);
                 setPasswordError(null);
-            }} required aria-invalid={!!passwordError || undefined} aria-describedby={passwordError ? 'login-password-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-password-error" message={passwordError}/>
+            }} required aria-invalid={!!passwordError || undefined} aria-describedby={passwordError ? 'login-password-error' : undefined} disabled={busy}/><InlineFieldMessage id="login-password-error" message={passwordError}/></div>
  <button type="submit" className="authPrimary" disabled={busy}>{busy ? t(catalog, "auth.login.checking") : t(catalog, "auth.continue")}</button>
  </form><Link href="/recover">{t(catalog, "auth.login.recoveryAccess")}</Link><p>{t(catalog, "auth.login.noAccountYet")} <Link href={signUpHref}>{t(catalog, "auth.login.createOne")}</Link></p>
  </>}

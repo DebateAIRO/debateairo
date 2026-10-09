@@ -217,8 +217,8 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     if (submittedEmail !== null)
         return <EmailPendingScreen email={submittedEmail} retryAfterSeconds={retryAfterSeconds} client={{ resendVerification: client.resendVerification ?? contractClient.resendVerification }} catalog={catalog} locale={locale} turnstile={turnstile} onDifferentEmail={() => setSubmittedEmail(null)}/>;
     return <AuthShell eyebrow={t(catalog, "auth.signUp.eyebrow")} title={t(catalog, "auth.signUp.title")} description={t(catalog, "auth.signUp.description")} footer={null}>
- {error ? <div className="authAlert" role="alert">{error}</div> : null}{documentsStale ? <button type="button" onClick={reloadPage}>{t(catalog, "auth.signUp.reloadDocuments")}</button> : null}
- <SocialProviderButtons client={client} catalog={catalog}/>
+ {error ? <div className="authAlert" role="alert">{error}</div> : null}{documentsStale ? <button type="button" className="authSecondary" onClick={reloadPage}>{t(catalog, "auth.signUp.reloadDocuments")}</button> : null}
+ <div className="authAltMethods"><SocialProviderButtons client={client} catalog={catalog}/></div>
  <form className="authForm" data-form="signup" noValidate method="post" action="/sign-up" aria-busy={busy} onSubmit={submitRegistration}>
  <div className="authField"><label htmlFor="signup-email">{t(catalog, "auth.email")}</label><input id="signup-email" name="email" type="email" autoComplete="username" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={e => {
             setEmail(e.target.value);
@@ -228,10 +228,10 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
             setPhone(raw);
             edit('phone');
         }} error={fieldError('phone')} disabled={busy}/>
- <div className="authField"><label htmlFor="signup-password">{t(catalog, "auth.password")}</label><input id="signup-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={password} onChange={e => {
+ <div className="authField"><label htmlFor="signup-password">{t(catalog, "auth.password")}</label><div className="authInputRow"><input id="signup-password" name="password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" value={password} onChange={e => {
             setPassword(e.target.value);
             edit('password');
-        }} required disabled={busy} aria-invalid={!!errors.password || undefined} aria-describedby={errors.password ? 'signup-password-error' : 'signup-password-hint'}/><button type="button" aria-controls="signup-password" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? t(catalog, "auth.password.hide") : t(catalog, "auth.password.show")}</button><p id="signup-password-hint">{t(catalog, "auth.signUp.passwordInvalid")}</p><InlineFieldMessage id="signup-password-error" message={fieldError('password')}/></div>
+        }} required disabled={busy} aria-invalid={!!errors.password || undefined} aria-describedby={errors.password ? 'signup-password-error' : 'signup-password-hint'}/><button type="button" className="authInlineToggle" aria-controls="signup-password" aria-pressed={showPassword} onClick={() => setShowPassword(!showPassword)}>{showPassword ? t(catalog, "auth.password.hide") : t(catalog, "auth.password.show")}</button></div><p className="authFieldHint" id="signup-password-hint">{t(catalog, "auth.signUp.passwordInvalid")}</p><InlineFieldMessage id="signup-password-error" message={fieldError('password')}/></div>
  <RegionField catalog={catalog} locale={locale} value={region} onChange={setRegion} disabled={busy}/>
  <div className="authField"><DateOfBirthField catalog={catalog} locale={dobLocale} value={dateOfBirth} error={dateOfBirthError} onChange={next => {
             setDateOfBirth(next);

@@ -2314,6 +2314,144 @@ a:focus-visible {
    lives in CSS and stays out of the button's accessible name. */
 .authBackButton::before { content: "← "; }
 
+/* Auth UI repair (2026-10-09). The classes below were in use with no rule, so their controls fell
+   back to browser defaults. Every value reuses the auth card's own tokens. */
+
+/* The quiet partner of .authPrimary: same pill, outlined (social sign-in, "Use a different email",
+   passkey alternatives, Copy/Download). */
+.authSecondary,
+.authSecondaryButton {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 10px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--shell);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+}
+.authSecondary:hover:not(:disabled),
+.authSecondaryButton:hover:not(:disabled) { border-color: var(--ink); }
+.authSecondary:disabled,
+.authSecondaryButton:disabled { opacity: 0.55; cursor: not-allowed; }
+.authPrimary:focus-visible,
+.authSecondary:focus-visible,
+.authSecondaryButton:focus-visible,
+.authTextButton:focus-visible,
+.authInlineToggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Passkey and social sign-in sit above the form as one stack. */
+.authAltMethods,
+.authSocial { display: flex; flex-direction: column; gap: 8px; }
+.authAltMethods { margin-bottom: 16px; }
+.authAltMethods:empty { display: none; }
+
+/* An inline field error, the same weight and colour as the ✗ validators. */
+.authFieldError {
+  margin: 5px 0 0;
+  color: var(--dispute-text);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: normal;
+}
+
+/* A password input with its Show/Hide toggle inside the field's right edge. */
+.authInputRow { position: relative; }
+.authInputRow input { padding-right: 64px; }
+.authInlineToggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.authInlineToggle:hover { background: var(--surface-2); color: var(--ink); }
+
+/* Selects in auth forms look like the inputs beside them. */
+.authField select,
+.mfaRecoveryDestination {
+  width: 100%;
+  padding: 10px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--shell);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+}
+.authField select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 22%, transparent); outline: none; }
+
+/* Saved recovery codes, with Copy and Download under them. */
+.authCodes { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
+.authCodes p { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.55; }
+.authCodes pre { margin: 0; white-space: pre-wrap; }
+.authCodesActions { display: flex; gap: 8px; }
+.authCodesActions > button { flex: 1; }
+
+/* The step-up check used by Settings, phone and debate actions. */
+.authSecurityConfirmation { display: flex; flex-direction: column; gap: 10px; padding: 14px 0; }
+.authSecurityConfirmation p { margin: 0; color: var(--text-2); font-size: 11.5px; line-height: 1.5; }
+.authSecurityConfirmation .authForm { margin-top: 4px; }
+.authSecurityActions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.authSecurityActions > p { flex-basis: 100%; }
+.authSecurityConfirmation > .setBtn { align-self: flex-start; }
+
+/* Authenticator setup: QR code, the setup key and the code form. */
+.authEnrollment { display: flex; flex-direction: column; gap: 12px; }
+.authEnrollment p { margin: 0; color: var(--text-2); font-size: 11.5px; line-height: 1.55; }
+.authEnrollment svg { align-self: center; border-radius: 8px; }
+.authSetupKey { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.authSetupKey code,
+.recoverySetupKey {
+  padding: 8px 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.authSetupKey .authSecondary { width: auto; padding-inline: 16px; }
+
+/* Password reset and authenticator recovery panels. */
+.recoveryStatus { display: flex; flex-direction: column; gap: 12px; }
+.recoveryStatus p { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.55; }
+.recoveryCancel { margin-top: 12px; }
+.recoverySetup { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.recoverySetup svg { align-self: center; }
+.recoveryCodes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  margin: 0 0 14px;
+  padding: 14px 16px 14px 34px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.recoveryActivity .setPanelCore { display: flex; flex-direction: column; gap: 12px; }
+.recoveryActivity h2 { margin: 0; font-size: 13.5px; font-weight: 700; }
+.recoveryActivity p { margin: 0; color: var(--text-2); font-size: 11.5px; line-height: 1.55; }
+
 .authAlert,
 .authPhase,
 .authCheckEmail,

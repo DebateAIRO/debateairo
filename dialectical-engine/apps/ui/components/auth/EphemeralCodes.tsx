@@ -14,5 +14,5 @@ export function EphemeralCodes({ codes, catalog }: {
         link.click();
         URL.revokeObjectURL(url);
     }
-    return <aside><p>{t(catalog, "auth.login.replacementCodeNotice")}</p><pre>{content}</pre><button type="button" onClick={() => void navigator.clipboard.writeText(content)}>{t(catalog, "auth.codes.copy")}</button><button type="button" onClick={download}>{t(catalog, "auth.codes.download")}</button></aside>;
+    return <aside className="authCodes"><p>{t(catalog, "auth.login.replacementCodeNotice")}</p><pre className="authRecoveryCode">{content}</pre><div className="authCodesActions"><button type="button" className="authSecondary" onClick={() => void navigator.clipboard.writeText(content)}>{t(catalog, "auth.codes.copy")}</button><button type="button" className="authSecondary" onClick={download}>{t(catalog, "auth.codes.download")}</button></div></aside>;
 }

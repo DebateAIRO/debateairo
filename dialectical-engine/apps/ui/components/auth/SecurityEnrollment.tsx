@@ -207,22 +207,22 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         return <p role="alert">{t(catalog, "auth.enroll.expired")}</p>;
     if (enrolled)
         return <p role="status">{t(catalog, "auth.enroll.methodAdded")}</p>;
-    return <section aria-label={t(catalog, "auth.enroll.securityTitle")}>
-    {error ? <p role="alert">{error}</p> : null}
+    return <section className="authEnrollment" aria-label={t(catalog, "auth.enroll.securityTitle")}>
+    {error ? <p className="authFieldError" role="alert">{error}</p> : null}
     <p>{t(catalog, "auth.enroll.passkeyPreferred")}</p>
     {allowed.includes('passkey') ? <p id="enrollment-passkey-help">{t(catalog, "auth.enroll.passkeyExplanation")}</p> : null}
     {allowed.includes('passkey') ? <button type="button" className="authPrimary" aria-describedby="enrollment-passkey-help" disabled={busy} onClick={() => void passkey()}>{t(catalog, "auth.passkey.create")}</button> : null}
     {allowed.includes('totp') ? <button type="button" className="authTextButton" disabled={completing} onClick={() => void beginTotp()}>{t(catalog, "auth.enroll.useAuthenticator")}</button> : null}
     {authority.kind === 'recovery' && authority.totpUnavailableReason === 'PASSWORD_UNAVAILABLE' ? <p>{t(catalog, "auth.recovery.passwordUnavailable")}</p> : null}
-    {totp ? <div>
+    {totp ? <div className="authEnrollment">
       {matrix ? <svg width="180" height="180" viewBox={`0 0 ${matrix.length + 8} ${matrix.length + 8}`} role="img" aria-label={t(catalog, "auth.enroll.scanQr")}><rect width="100%" height="100%" fill="white"/><path fill="black" d={matrix.flatMap((row, y) => row.flatMap((v, x) => v ? [`M${x + 4} ${y + 4}h1v1h-1z`] : [])).join('')}/></svg> : null}
-      <button type="button" onClick={() => setShowKey(!showKey)}>{t(catalog, "auth.enroll.useSetupKey")}</button>
-      {showKey ? <div><code>{totp.secret}</code><button type="button" onClick={() => void navigator.clipboard.writeText(totp.secret)}>{t(catalog, "auth.enroll.copySetupKey")}</button></div> : null}
-      <form method="post" action="/enroll-mfa" noValidate onSubmit={e => {
+      <button type="button" className="authTextButton" aria-expanded={showKey} onClick={() => setShowKey(!showKey)}>{t(catalog, "auth.enroll.useSetupKey")}</button>
+      {showKey ? <div className="authSetupKey"><code>{totp.secret}</code><button type="button" className="authSecondary" onClick={() => void navigator.clipboard.writeText(totp.secret)}>{t(catalog, "auth.enroll.copySetupKey")}</button></div> : null}
+      <form className="authForm" method="post" action="/enroll-mfa" noValidate onSubmit={e => {
                 e.preventDefault();
                 void submitCode(code);
             }}>
-        <label htmlFor="enrollment-code">{t(catalog, "auth.enroll.currentSixDigitCode")}</label>
+        <div className="authField"><label htmlFor="enrollment-code">{t(catalog, "auth.enroll.currentSixDigitCode")}</label>
         <input id="enrollment-code" name="code" value={code} autoComplete="one-time-code" inputMode="numeric" maxLength={6} disabled={busy} onChange={e => {
                 const value = e.target.value.replace(/\D/g, '').slice(0, 6);
                 if (value !== code)
@@ -230,8 +230,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
                 setCode(value);
                 if (value.length === 6)
                     void submitCode(value);
-            }}/>
-        <button type="submit" disabled={busy || code.length !== 6}>{t(catalog, "auth.continue")}</button>
+            }}/></div>
+        <button type="submit" className="authPrimary" disabled={busy || code.length !== 6}>{t(catalog, "auth.continue")}</button>
       </form>
     </div> : null}
   </section>;
