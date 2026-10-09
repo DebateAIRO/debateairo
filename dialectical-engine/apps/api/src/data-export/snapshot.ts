@@ -112,7 +112,10 @@ function rows(value: unknown): RawRow[] {
 
 function project(source: RawRow, columns: readonly string[]): Row {
   const output: Record<string, unknown> = {};
-  for (const name of columns) if (Object.hasOwn(source, name)) output[name] = source[name];
+  for (const name of columns) {
+    if (!Object.hasOwn(source, name)) throw new DataExportBuildError("DATA_EXPORT_SOURCE_FAILED");
+    output[name] = source[name];
+  }
   return output;
 }
 
@@ -135,9 +138,33 @@ function object(value: unknown): RawRow {
   return value === null ? {} : row(value);
 }
 
-function nodeIds(inspection: unknown): string[] {
-  const value = object(inspection).nodes;
-  if (!Array.isArray(value)) return [];
+// PostgreSQL jsonb renders timestamptz in the database session's offset.
+// Normalize timestamp fields after collection, including owner reads, while
+// leaving user-authored text intact and retaining PostgreSQL's microseconds.
+function timestampField(name: string): boolean {
+  return name === "at" || name === "as_of" || name === "period_start" || name === "period_end"
+    || name === "paid_through" || name === "hold_until" || name === "waits_until"
+    || /(?:_at|_as_of|At|AsOf)$/.test(name);
+}
+
+function utcTimestampStrings<T>(value: T, field?: string): T {
+  if (typeof value === "string") {
+    if (field === undefined || !timestampField(field)) return value;
+    const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?([+-]\d{2}:\d{2})$/.exec(value);
+    if (match === null) return value;
+    const instant = Date.parse(value);
+    if (!Number.isFinite(instant)) return value;
+    const fraction = (match[2] ?? "").padEnd(3, "0");
+    return `${new Date(instant).toISOString().slice(0, 19)}.${fraction}Z` as T;
+  }
+  if (Array.isArray(value)) return value.map((item) => utcTimestampStrings(item, field)) as T;
+  if (value === null || value instanceof Date || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, utcTimestampStrings(item, key)])) as T;
+}
+
+function nodeIds(answer: unknown): string[] {
+  const value = object(answer).nodes;
+  if (!Array.isArray(value)) throw new DataExportBuildError("DATA_EXPORT_DECRYPT_FAILED");
   return value.map((node: unknown) => typeof node === "string" ? node : string(row(node).node_id));
 }
 
@@ -187,7 +214,11 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
         const answer = await ownerView.readAnswer(ownerRef, id, version);
         const inspection = await ownerView.readInspection(ownerRef, id, version);
         const nodes: Record<string, unknown> = {};
-        for (const nodeId of nodeIds(inspection)) nodes[nodeId] = await ownerView.readNode(ownerRef, id, nodeId);
+        for (const nodeId of nodeIds(answer)) {
+          const node = await ownerView.readNode(ownerRef, id, nodeId);
+          if (node == null) throw new DataExportBuildError("DATA_EXPORT_DECRYPT_FAILED");
+          nodes[nodeId] = node;
+        }
         versions.push({ version, answer, inspection, nodes });
       }
       answers.push({
@@ -198,8 +229,10 @@ async function collectDebates(raw: RawExportRows, ownerView: OwnerViewPort, owne
       });
     }
     const view = object(runView);
-    entries.push({ ...base, content_status: "READABLE", state: view.state ?? null,
-      ...(typeof view.question === "string" ? { question: view.question } : {}),
+    if (typeof view.state !== "string" || typeof view.question_line !== "string" || view.question_line.length === 0) {
+      throw new DataExportBuildError("DATA_EXPORT_DECRYPT_FAILED");
+    }
+    entries.push({ ...base, content_status: "READABLE", state: view.state, question: view.question_line,
       run: runView, run_answer: runAnswer, answers });
   }
   return entries;
@@ -333,7 +366,7 @@ export async function collectSnapshot(input: {
     for (const source of rows(raw.legal_acceptances)) legalAcceptances.push(plain(project(source, KEEP_COLUMNS.legal_acceptances), "evidence_ciphertext", "evidence",
       openedRecord(decrypt, source, "evidence_ciphertext", { table: "legal.acceptance", column: "evidence_ciphertext", rowId: string(source.acceptance_id) })));
     const simple = <K extends Exclude<RawSection, "billing">>(section: K): Row[] => rows(raw[section]).map((source) => project(source, KEEP_COLUMNS[section]));
-    return {
+    return utcTimestampStrings({
       exportId: claim.exportId, userId: claim.userId, locale: claim.locale,
       requestedAt: claim.requestedAt, generatedAt: input.now(), recipient: email ?? "",
       account: {
@@ -352,7 +385,7 @@ export async function collectSnapshot(input: {
       billing: await collectBilling(raw.billing, decrypt),
       support: await collectSupport(raw, decrypt),
       activity: { events: rows(raw.audit_events).map((source) => ({ type: string(source.event_type), at: string(source.occurred_at) })) },
-    };
+    });
   } catch (error) {
     if (error instanceof DataExportBuildError && error.code === "DATA_EXPORT_SOURCE_FAILED") throw error;
     throw new DataExportBuildError("DATA_EXPORT_DECRYPT_FAILED", error);

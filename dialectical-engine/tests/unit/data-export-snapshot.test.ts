@@ -15,10 +15,12 @@ function harness() {
   const raw = structuredClone(rawFixture) as Record<string, any>;
   const ownerView = {
     runKeyPresent: vi.fn(async () => true),
-    readRun: vi.fn(async (_owner: string, _run: string) => ({ question: "My question", state: "DONE" })),
+    // RunProjectionSchema at contract/src/index.ts:552-559 calls the question question_line.
+    readRun: vi.fn(async (_owner: string, _run: string) => ({ run_ref: "run-1", question_line: "My question", state: "SETTLED", terminal_reason: null, hold_until: null })),
     readRunAnswer: vi.fn(async (_owner: string, _run: string) => structuredClone(ownerAnswerFixture)),
-    readAnswer: vi.fn(async (_owner: string, _answer: string, version: number) => ({ answer_id: "answer-1", answer_version: version, verdict_state: "SUPPORTED" })),
-    readInspection: vi.fn(async (_owner: string, _answer: string, _version: number) => ({ nodes: [{ node_id: "node-1" }] })),
+    // contract/src/index.ts:1239 puts nodes on Answer; :1309-1326 defines Inspection without nodes.
+    readAnswer: vi.fn(async (_owner: string, _answer: string, version: number) => ({ answer_id: "answer-1", answer_version: version, verdict_state: "SUPPORTED", nodes: [{ node_id: "node-1" }], relevant_as_of: "2026-10-03T00:00:00.000Z" })),
+    readInspection: vi.fn(async (_owner: string, _answer: string, version: number) => ({ answer_id: "answer-1", answer_version: version, conformance: { outcome: "PASS", coverage_mode: "EXHAUSTIVE", segment_results: [] }, segment_suppressions: [], shadow_suppressions: [] })),
     readLedgerDigest: vi.fn(async () => ({ digest: "ledger" })),
     readStory: vi.fn(async () => ({ text: "story" })),
     readDisclosure: vi.fn(async () => ({ text: "disclosure" })),
@@ -85,6 +87,8 @@ describe("data-export snapshot", () => {
     expect(h.ownerView.readDisclosure).toHaveBeenCalledTimes(1);
     expect(h.ownerView.readNode).toHaveBeenCalledTimes(2);
     expect(snapshot.debates.debates[0]?.run_answer).toEqual(ownerAnswerFixture);
+    expect(snapshot.debates.debates[0]?.question).toBe("My question");
+    expect(snapshot.debates.debates[0]?.state).toBe("SETTLED");
     expect(snapshot.debates.debates[0]?.answers?.[0]?.versions).toHaveLength(2);
     expect(snapshot.debates.debates[0]?.answers?.[0]?.versions[0]?.nodes).toEqual({ "node-1": { text: "node" } });
   });
@@ -127,6 +131,12 @@ describe("data-export snapshot", () => {
     await expect(h.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_DECRYPT_FAILED" });
     h.ownerView.readRun.mockResolvedValue(null as never);
     await expect(h.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_DECRYPT_FAILED" });
+    const missingNode = harness();
+    missingNode.ownerView.readNode.mockResolvedValue(null as never);
+    await expect(missingNode.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_DECRYPT_FAILED" });
+    const missingNodeList = harness();
+    missingNodeList.ownerView.readAnswer.mockResolvedValue({ answer_id: "answer-1", answer_version: 2, verdict_state: "SUPPORTED" } as never);
+    await expect(missingNodeList.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_DECRYPT_FAILED" });
   });
 
   it("S-9 retains all 130 runs without a limit", async () => {
@@ -135,7 +145,7 @@ describe("data-export snapshot", () => {
     expect((await h.collect()).debates.debates).toHaveLength(130);
   });
 
-  it("S-10 projects only archive columns even when raw rows carry secret columns", async () => {
+  it("S-10 projects only archive columns and UTC timestamps even when raw rows carry secret columns", async () => {
     const h = harness();
     const secrets = ["password_hash", "email_blind_index", "audit_token", "owner_ref", "totp_secret", "public_key", "credential_id", "token_hash", "code_hash", "cancellation_ref", "source_ip_hash"];
     function poison(row: Record<string, unknown>) {
@@ -151,6 +161,30 @@ describe("data-export snapshot", () => {
     for (const internal of ["run_id", "acceptance_id", "session_id", "case_id", "message_id", "case_message_id", "wrapped_key", "email_ciphertext", "evidence_ciphertext"]) expect(encoded).not.toContain(`"${internal}"`);
     expect(Object.keys(h.raw)).toEqual([...RAW_SECTIONS]);
 
+    // migrations/0111_data_export.sql:188 emits execute_at directly into JSON;
+    // the database session can serialize its offset as in C12's E-2 frame.
+    expect((await h.collect()).account.erasure_requests[0]?.execute_at).toBe("2030-05-04T03:02:01.000Z");
+
+    const offset = harness();
+    const shifted = "2030-05-04T06:02:01.029961+03:00";
+    offset.raw.user.created_at = shifted;
+    offset.raw.billing.quotes[0].expires_at = shifted;
+    offset.raw.support_messages[0].received_at = shifted;
+    offset.raw.audit_events[0].occurred_at = shifted;
+    offset.ownerView.readAnswer.mockImplementation(async (_owner: string, _answer: string, version: number) => ({ answer_id: "answer-1", answer_version: version, verdict_state: "SUPPORTED", nodes: [{ node_id: "node-1" }], relevant_as_of: shifted }));
+    const shiftedSnapshot = await offset.collect();
+    expect(JSON.stringify(shiftedSnapshot)).not.toContain("+03:00");
+    expect(shiftedSnapshot.account.account.created_at).toBe("2030-05-04T03:02:01.029961Z");
+    expect(shiftedSnapshot.billing.quotes[0]?.expires_at).toBe("2030-05-04T03:02:01.029961Z");
+    expect((shiftedSnapshot.debates.debates[0]?.answers?.[0]?.versions[0]?.answer as Record<string, unknown>).relevant_as_of).toBe("2030-05-04T03:02:01.029961Z");
+
+    const literalText = harness();
+    literalText.ownerView.readRun.mockResolvedValue({ run_ref: "run-1", question_line: shifted, state: "SETTLED", terminal_reason: null, hold_until: null });
+    literalText.ownerView.readStory.mockResolvedValue({ text: shifted });
+    const literalSnapshot = await literalText.collect();
+    expect(literalSnapshot.debates.debates[0]?.question).toBe(shifted);
+    expect((literalSnapshot.debates.debates[0]?.answers?.[0]?.story as Record<string, unknown>).text).toBe(shifted);
+
     const absentEnvelope = harness();
     absentEnvelope.raw.support_cases[0].summary_ciphertext = null;
     const absentEncoded = JSON.stringify(await absentEnvelope.collect());
@@ -162,6 +196,9 @@ describe("data-export snapshot", () => {
     const extra = harness();
     extra.raw.unlisted_section = [];
     await expect(extra.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
+    const missingColumn = harness();
+    delete missingColumn.raw.billing.quotes[0].expires_at;
+    await expect(missingColumn.collect()).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
   });
 
   it("S-11 rejects a records-key failure without a destruction record", async () => {
