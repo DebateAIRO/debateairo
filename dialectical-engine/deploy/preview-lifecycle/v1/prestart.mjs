@@ -135,6 +135,35 @@ export async function waitForPostgres({ layout = LAYOUT, run = runBounded, now =
   }
 }
 
+export const RUNNER_UNIT = 'debateai-preview-runner.service';
+const tokens = value => (value ?? '').split(/\s+/).filter(Boolean).sort().join(' ');
+/**
+ * The runner's confinement lives in its reviewed unit file; an older drop-in (the live host has
+ * 42-provider-sdk-interfaces.conf, 99-provider-high-v1.conf, zzzz-glm-clarification-v1.conf) could
+ * replace ExecStart or widen it. So before any database work the loaded unit must be exactly the
+ * reviewed file plus the one generated release drop-in, with loopback-only IP and the four
+ * reviewed address families, as systemd itself reports them.
+ */
+export async function checkRunnerUnit({ layout = LAYOUT, run = runBounded } = {}) {
+  const result = await run([layout.systemctl, 'show', RUNNER_UNIT, '--property=FragmentPath', '--property=DropInPaths',
+    '--property=IPAddressAllow', '--property=IPAddressDeny', '--property=RestrictAddressFamilies', '--no-pager'], { env: {}, timeoutMs: 5000, maxOutputBytes: 16384 });
+  if (result.timedOut || result.overflow || result.error || result.code !== 0) refuse('RUNNER_UNIT_UNREADABLE');
+  const shown = {};
+  for (const line of String(result.stdout).split('\n').filter(Boolean)) {
+    const at = line.indexOf('=');
+    if (at < 1 || Object.hasOwn(shown, line.slice(0, at))) refuse('RUNNER_UNIT_UNREADABLE');
+    shown[line.slice(0, at)] = line.slice(at + 1);
+  }
+  const unitDir = layout.systemdUnitDir ?? '/etc/systemd/system';
+  const fields = [];
+  if (shown.FragmentPath !== `${unitDir}/${RUNNER_UNIT}`) fields.push('FragmentPath');
+  if (shown.DropInPaths !== `${unitDir}/${RUNNER_UNIT}.d/${RELEASE_DROPIN_NAME}`) fields.push('DropInPaths');
+  if (tokens(shown.IPAddressAllow) !== tokens('127.0.0.0/8 ::1/128')) fields.push('IPAddressAllow');
+  if (tokens(shown.IPAddressDeny) !== tokens('0.0.0.0/0 ::/0')) fields.push('IPAddressDeny');
+  if (tokens(shown.RestrictAddressFamilies) !== tokens('AF_UNIX AF_INET AF_INET6 AF_NETLINK')) fields.push('RestrictAddressFamilies');
+  if (fields.length) refuse('RUNNER_UNIT_REFUSED', fields);
+}
+
 /** Lock -> pinned base plan (hash-checked, schema-checked, field-for-field equal to the lock). */
 export async function loadPinnedRelease({ service, layout = LAYOUT, validateLaunchPlan: validatePlan = reviewedValidateLaunchPlan }) {
   if (!SERVICES.includes(service)) refuse('SERVICE_REFUSED');
@@ -159,6 +188,7 @@ export async function runPrestart({ service, layout = LAYOUT, deps = {} }) {
   const validatePlan = deps.validateLaunchPlan ?? reviewedValidateLaunchPlan;
   const startedAt = now();
   const { entry, plan: basePlan, lockSha256 } = await loadPinnedRelease({ service, layout, validateLaunchPlan: validatePlan });
+  if (service === 'runner') await (deps.checkRunnerUnit ?? (() => checkRunnerUnit({ layout })))();
   const nativePlan = await readNativePlan(layout);
   if (nativePlan.sha256 !== entry.nativePlanSha256) refuse('NATIVE_PLAN_HASH_MISMATCH');
   const nativeProblems = checkNativePlan(nativePlan.value, entry);

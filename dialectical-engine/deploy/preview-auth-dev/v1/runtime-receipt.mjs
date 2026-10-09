@@ -87,7 +87,8 @@ export function validateRunnerRuntimeEvent(event) {
  * the normalized register selection is unchanged. A main that fails or ends before readiness
  * emits nothing. Returns the event and the still-running main, whose later failure the caller sees.
  */
-export async function afterRunnerReady({ binding, publication, identity, readSelection, importMain, subscribeReady, emit }) {
+export const RUNNER_READY_DEADLINE_MS = 120_000;
+export async function afterRunnerReady({ binding, publication, identity, readSelection, importMain, subscribeReady, emit, readyDeadlineMs = RUNNER_READY_DEADLINE_MS }) {
   validatePublication(publication); exactKeys(binding, RUNNER_BINDING, 'PREVIEW_RUNTIME_BINDING_REFUSED');
   const before = selected(readSelection(), publication);
   // Every field but the count is checked before main runs, exactly as the API's event is.
@@ -96,17 +97,19 @@ export async function afterRunnerReady({ binding, publication, identity, readSel
   let announce;
   const announced = new Promise(resolve => { announce = resolve; });
   const unsubscribe = subscribeReady(message => announce(message));
-  let message, running;
+  let message, running, deadline;
   try {
     running = Promise.resolve().then(importMain);
     // Before readiness any end of main (failure included) is the one code below, never its text.
     // A failure after readiness is the caller's, through `running`.
     running.catch(() => {});
     const ended = running.then(() => null, () => null);
-    const first = await Promise.race([announced.then(value => ({ value })), ended]);
+    // Readiness must come within the deadline (worker ready in 30 s, then at most 100 re-dispatches).
+    const late = new Promise(resolve => { deadline = setTimeout(() => resolve(null), readyDeadlineMs); });
+    const first = await Promise.race([announced.then(value => ({ value })), ended, late]);
     if (first === null) refuse('PREVIEW_RUNNER_NOT_READY');
     message = first.value;
-  } finally { unsubscribe(); }
+  } finally { clearTimeout(deadline); unsubscribe(); }
   if (!message || Object.getPrototypeOf(message) !== Object.prototype
     || Object.keys(message).sort().join('\0') !== ['kind','registerVersion','startupDispatched','worker'].join('\0')
     || message.kind !== 'DEBATEAI_RUNNER_READY' || message.registerVersion !== before.selectedRegisterVersion) refuse('PREVIEW_RUNNER_NOT_READY');
@@ -119,4 +122,13 @@ export async function afterRunnerReady({ binding, publication, identity, readSel
 export function parseRunnerRuntimeEvent(line) {
   if (typeof line !== 'string' || Buffer.byteLength(line) > 4096 || !line.startsWith('PREVIEW_RUNNER_STARTED ')) refuse('PREVIEW_RUNTIME_RECEIPT_REFUSED');
   return validateRunnerRuntimeEvent(strictJson(Buffer.from(line.slice('PREVIEW_RUNNER_STARTED '.length))));
+}
+/** Root's independent readback for the runner: the event must match the live unit's process and selection. */
+export function verifyRunnerRuntimeReadback(event, observed, facts) {
+  validateRunnerRuntimeEvent(event); validateRunnerRuntimeEvent(observed); validatePublication(facts.publication);
+  if (RUNNER_KEYS.filter(key => key !== 'startupDispatched').some(key => event[key] !== observed[key]) || facts.unit !== facts.expectedUnit
+    || facts.expectedUnit !== 'debateai-preview-runner.service' || facts.rootMatched !== true || facts.mainPidMatched !== true
+    || event.selectedRegisterVersion !== facts.publication.registerVersion
+    || event.nativeRequestSha256 !== facts.publication.requestSha256 || event.nativeSnapshotSha256 !== facts.publication.snapshotSha256) refuse('PREVIEW_RUNTIME_READBACK_REFUSED');
+  return Object.freeze({ selectionVerified: true, service:'runner', registerVersion:event.selectedRegisterVersion, pid:event.pid });
 }

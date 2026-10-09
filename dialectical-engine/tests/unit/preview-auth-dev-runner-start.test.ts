@@ -79,6 +79,29 @@ describe('runner startup event (afterRunnerReady)', () => {
     main.stop();
   });
 
+  it('refuses without an event when readiness misses the deadline (120 s by default)', async () => {
+    expect(receipt.RUNNER_READY_DEADLINE_MS).toBe(120_000);
+    const main = fakeMain(undefined);
+    const events: unknown[] = [];
+    await expect(receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => selection, subscribeReady: main.subscribeReady, importMain: main.importMain, emit: (x: unknown) => events.push(x), readyDeadlineMs: 20 })).rejects.toThrow('PREVIEW_RUNNER_NOT_READY');
+    expect(events).toEqual([]);
+    main.stop();
+  });
+
+  it('root readback refuses an event that does not match the live runner unit process', async () => {
+    const main = fakeMain(ready);
+    const { event } = await receipt.afterRunnerReady({ binding, publication, identity, readSelection: () => selection, subscribeReady: main.subscribeReady, importMain: main.importMain, emit: () => undefined });
+    main.stop();
+    const facts = { unit: 'debateai-preview-runner.service', expectedUnit: 'debateai-preview-runner.service', rootMatched: true, mainPidMatched: true, publication };
+    expect(receipt.verifyRunnerRuntimeReadback(event, event, facts)).toEqual({ selectionVerified: true, service: 'runner', registerVersion: '12', pid: 123 });
+    for (const key of ['pid', 'uid', 'bootId', 'startTicks', 'sourceRevision', 'runnerMainSha256'] as const) {
+      const observed = { ...event, [key]: key === 'pid' || key === 'uid' ? 999 : key === 'bootId' ? '22222222-2222-4222-8222-222222222222' : key === 'startTicks' ? '20002' : key === 'sourceRevision' ? 'c'.repeat(40) : 'c'.repeat(64) };
+      expect(() => receipt.verifyRunnerRuntimeReadback(event, observed, facts), key).toThrow('PREVIEW_RUNTIME_READBACK_REFUSED');
+    }
+    for (const patch of [{ unit: 'debateai-preview-api.service' }, { expectedUnit: 'debateai-preview-api.service', unit: 'debateai-preview-api.service' }, { rootMatched: false }, { mainPidMatched: false }, { publication: { ...publication, snapshotSha256: 'c'.repeat(64) } }])
+      expect(() => receipt.verifyRunnerRuntimeReadback(event, event, { ...facts, ...patch })).toThrow();
+  });
+
   it('emits nothing when the register selection changes during main', async () => {
     let version = '12';
     const main = fakeMain(ready);
@@ -147,11 +170,52 @@ describe('launch-runner.mjs: start mirrors launch-api.mjs, prepare-only stays th
     expect(prepare).toContain('started:false');
   });
 
-  it('both modes refuse before any effect off Linux or with any other argv', async () => {
-    for (const argv of [['--plan', '/opt/debateai-v3-preview/artifacts/x/runner-launch.json'], ['--plan'], ['--start', '--plan', '/tmp/runner-launch.json']]) {
+  // Pretend to be the reviewed Linux/Node so each case proves the argv check itself, on every CI host.
+  async function asReviewedLinux(run: () => Promise<void>) {
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')!, version = Object.getOwnPropertyDescriptor(process, 'version')!;
+    Object.defineProperty(process, 'platform', { ...platform, value: 'linux' });
+    Object.defineProperty(process, 'version', { ...version, value: 'v26.8.2' });
+    try { await run(); } finally { Object.defineProperty(process, 'platform', platform); Object.defineProperty(process, 'version', version); }
+  }
+  const PLAN = '/opt/debateai-v3-preview/artifacts/x/runner-launch.json';
+  it.each([
+    ['no plan path', ['--plan']],
+    ['a plan outside the artifacts folder', ['--plan', '/tmp/runner-launch.json']],
+    ['a plan with another name', ['--plan', '/opt/debateai-v3-preview/artifacts/x/runner.json']],
+    ['--start passed to the function', ['--start', '--plan', PLAN]],
+    ['an extra argument', ['--plan', PLAN, '--start']],
+    ['another flag', ['--config', PLAN]]
+  ])('both modes refuse %s at the argv check, before any read', async (_name, argv) => {
+    await asReviewedLinux(async () => {
       await expect(launcher.prepareRunner(argv)).rejects.toThrow('PREVIEW_LAUNCH_INPUT_REFUSED');
       await expect(launcher.launchRunner(argv)).rejects.toThrow('PREVIEW_LAUNCH_INPUT_REFUSED');
-    }
+    });
+  });
+  it('control: a well-formed argv passes the argv check and stops at plan custody', async () => {
+    await asReviewedLinux(async () => {
+      await expect(launcher.prepareRunner(['--plan', PLAN])).rejects.toThrow('PREVIEW_CUSTODY_REFUSED');
+      await expect(launcher.launchRunner(['--plan', PLAN])).rejects.toThrow('PREVIEW_CUSTODY_REFUSED');
+    });
+  });
+  it('a start requires the preview configuration and a non-empty team, checked before any connection', async () => {
+    const code = await readFile(resolve(OPERATOR, 'launch-runner.mjs'), 'utf8');
+    const start = code.slice(code.indexOf('export async function launchRunner'));
+    const check = start.indexOf("refuse('PREVIEW_RUNNER_TEAM_REQUIRED')");
+    expect(start).toContain('parsed.PREVIEW_PROVIDER_TEST_CONFIG===undefined||!Array.isArray(parsed.PREVIEW_TEAM_USER_IDS)||parsed.PREVIEW_TEAM_USER_IDS.length===0');
+    expect(check).toBeGreaterThan(start.indexOf("narrowEnvironment('runner'"));
+    expect(check).toBeLessThan(start.indexOf('assertSelectedRunnerConnection'));
+  });
+  it('every end of a started runner prints one fixed code and exits 1', () => {
+    const events: Record<string, (value?: unknown) => void> = {}, written: string[] = [], exits: number[] = [];
+    const target = { on: (name: string, handler: () => void) => { events[name] = handler; }, stderr: { write: (text: string) => written.push(text) }, exit: (code: number) => exits.push(code) };
+    const stop = launcher.installRunnerFailureCodes(target);
+    events.uncaughtException!(new Error('secret text')); events.unhandledRejection!(new Error('secret text')); stop();
+    expect(written).toEqual(Array(3).fill('PREVIEW_RUNNER_STOPPED_ON_FAILURE\n'));
+    expect(exits).toEqual([1, 1, 1]);
+    return readFile(resolve(OPERATOR, 'launch-runner.mjs'), 'utf8').then(code => {
+      expect(code.indexOf('const stop=installRunnerFailureCodes();')).toBeLessThan(code.indexOf('started=await launchRunner('));
+      expect(code).toContain('await started.running.then(stop,stop);');
+    });
   });
 
   it.each([

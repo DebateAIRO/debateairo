@@ -27,6 +27,10 @@ export async function launchRunner(argv) {
  const runtime=await tsImport(join(engine,'packages/register/src/runtime-environment.ts'),import.meta.url);
  const configured=await readEnvironmentFile(plan.environment.path,plan.environment);
  const selected=narrowEnvironment('runner',configured,runtime,plan.publication,plan);
+ // Starting is preview-only: the start-up team gate is off without the preview configuration, so
+ // a start without it (or with no team) is refused here rather than run without the team rule.
+ const parsed=runtime.parseRunnerEnvironment(configured);
+ if(parsed.PREVIEW_PROVIDER_TEST_CONFIG===undefined||!Array.isArray(parsed.PREVIEW_TEAM_USER_IDS)||parsed.PREVIEW_TEAM_USER_IDS.length===0)refuse('PREVIEW_RUNNER_TEAM_REQUIRED');
  const verify=await tsImport('./verify-native.ts',import.meta.url);
  await verify.assertSelectedRunnerConnection(configured,plan.publication);
  const entry=join(engine,'apps/runner/src/main.ts'),main=source.files.find(file=>file.path==='dialectical-engine/apps/runner/src/main.ts');
@@ -37,13 +41,21 @@ export async function launchRunner(argv) {
   subscribeReady:listener=>{process.once(RUNNER_READY_PROCESS_EVENT,listener);return ()=>process.removeListener(RUNNER_READY_PROCESS_EVENT,listener);},
   importMain:()=>tsImport(entry,import.meta.url),emit:event=>process.stdout.write(`PREVIEW_RUNNER_STARTED ${JSON.stringify(event)}\n`)});
 }
+/** Every way the started process ends prints one fixed code and exits 1: no stack, no message text. */
+export function installRunnerFailureCodes(target=process) {
+ const stop=()=>{target.stderr.write('PREVIEW_RUNNER_STOPPED_ON_FAILURE\n');target.exit(1);};
+ target.on('uncaughtException',stop);target.on('unhandledRejection',stop);
+ return stop;
+}
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const argv=process.argv.slice(2);
  if(argv[0]==='--start'){
-  // Any refusal or later failure ends this process: the runner's worker must not stay up unreported.
+  // Any refusal or later end ends this process: the runner's worker must not stay up unreported.
+  const stop=installRunnerFailureCodes();
   let started;
   try{started=await launchRunner(argv.slice(1));}catch{process.stderr.write('PREVIEW_RUNNER_STARTUP_REFUSED\n');process.exit(1);}
-  try{await started.running;}catch{process.stderr.write('PREVIEW_RUNNER_STOPPED_ON_FAILURE\n');process.exit(1);}
+  // A long-running worker that ends at all (failed or returned) is reported, never a silent exit 0.
+  await started.running.then(stop,stop);
  }else{
   try{process.stdout.write(`${JSON.stringify(await prepareRunner(argv))}\n`);}catch{process.stderr.write('PREVIEW_RUNNER_PREPARATION_REFUSED\n');process.exitCode=1;}
  }

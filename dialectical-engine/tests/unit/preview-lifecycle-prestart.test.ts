@@ -319,9 +319,11 @@ describe('runner release', () => {
     const lock = JSON.parse(readFileSync(s.layout.lockPath, 'utf8'));
     expect(Object.keys(lock.services).sort()).toEqual(['api', 'runner', 'ui']);
     expect(lock.services.runner).toMatchObject({ serviceUid: 992, serviceGid: 975, uiBuildSha256: null, sourceRevision: revision });
-    const { calls, deps: d } = deps(s);
+    let unitChecks = 0;
+    const { calls, deps: d } = deps(s, { checkRunnerUnit: async () => { unitChecks++; } });
     const result = await prestart.runPrestart({ service: 'runner', layout: s.layout, deps: d });
     expect(calls).toEqual([root]);
+    expect(unitChecks).toBe(1);
     expect(readdirSync(s.layout.currentDir).sort()).toEqual(['runner-launch.json', 'runner-native.json']);
     expect(result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY', service: 'runner' });
     const text = prestart.renderReleaseDropin({ service: 'runner', entry: lock.services.runner, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
@@ -334,5 +336,46 @@ describe('runner release', () => {
     const s = server();
     s.write(s.planPath('runner'), { ...runnerPlan(), sourceRevision: 'c'.repeat(40) });
     await expect(prestart.pinRelease({ planPath: s.planPath('runner'), layout: s.layout, deps: { validateLaunchPlan: plans.validateLaunchPlan }, now: () => 0 })).rejects.toMatchObject({ code: 'NATIVE_PLAN_MISMATCH', fields: ['sourceRevision'] });
+  });
+});
+
+describe('runner unit check (before any database work)', () => {
+  const good = ['FragmentPath=/etc/systemd/system/debateai-preview-runner.service', 'DropInPaths=/etc/systemd/system/debateai-preview-runner.service.d/zzzzzzzzzz-lifecycle-release.conf',
+    'IPAddressAllow=127.0.0.0/8 ::1/128', 'IPAddressDeny=::/0 0.0.0.0/0', 'RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX'];
+  const shown = (lines: string[], code = 0) => async (argv: string[], options: { env: Record<string, string> }) => {
+    expect(argv).toEqual(['/usr/bin/systemctl', 'show', 'debateai-preview-runner.service', '--property=FragmentPath', '--property=DropInPaths', '--property=IPAddressAllow', '--property=IPAddressDeny', '--property=RestrictAddressFamilies', '--no-pager']);
+    expect(options.env).toEqual({});
+    return { code, timedOut: false, overflow: false, stdout: Buffer.from(lines.join('\n') + '\n'), stderr: Buffer.alloc(0) };
+  };
+  it('accepts exactly the reviewed unit plus the one release drop-in (live systemd 259 output format)', async () => {
+    await expect(prestart.checkRunnerUnit({ layout: common.LAYOUT, run: shown(good) })).resolves.toBeUndefined();
+  });
+  it.each([
+    ['an old drop-in left beside the release one', 1, 'DropInPaths=/etc/systemd/system/debateai-preview-runner.service.d/42-provider-sdk-interfaces.conf /etc/systemd/system/debateai-preview-runner.service.d/zzzzzzzzzz-lifecycle-release.conf', 'DropInPaths'],
+    ['no release drop-in', 1, 'DropInPaths=', 'DropInPaths'],
+    ['a runtime override fragment', 0, 'FragmentPath=/run/systemd/system/debateai-preview-runner.service', 'FragmentPath'],
+    ['Internet allowed', 2, 'IPAddressAllow=any', 'IPAddressAllow'],
+    ['no IP deny', 3, 'IPAddressDeny=', 'IPAddressDeny'],
+    ['a widened address family', 4, 'RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX AF_PACKET', 'RestrictAddressFamilies']
+  ] as const)('refuses %s', async (_name, index, line, field) => {
+    const lines = [...good]; lines[index] = line;
+    await expect(prestart.checkRunnerUnit({ layout: common.LAYOUT, run: shown(lines) })).rejects.toMatchObject({ code: 'RUNNER_UNIT_REFUSED', fields: [field] });
+  });
+  it('refuses an unreadable or ambiguous answer', async () => {
+    await expect(prestart.checkRunnerUnit({ layout: common.LAYOUT, run: shown(good, 1) })).rejects.toMatchObject({ code: 'RUNNER_UNIT_UNREADABLE' });
+    await expect(prestart.checkRunnerUnit({ layout: common.LAYOUT, run: shown([...good, good[1]!]) })).rejects.toMatchObject({ code: 'RUNNER_UNIT_UNREADABLE' });
+  });
+  it('runs before the native plan is read for the runner, and never for api or ui', async () => {
+    const s = server();
+    s.write(s.planPath('runner'), { ...basePlan('api'), service: 'runner', serviceUid: 992, serviceGid: 975, environment: { ...basePlan('api').environment, path: '/etc/debateai-v3-preview/auth-dev-v1/runner.env', gid: 975 } });
+    await pinned(s);
+    await prestart.pinRelease({ planPath: s.planPath('runner'), layout: s.layout, deps: { validateLaunchPlan: plans.validateLaunchPlan }, now: () => 0 });
+    let checks = 0;
+    const refusing = deps(s, { checkRunnerUnit: async () => { checks++; throw Object.assign(new Error('x'), { code: 'RUNNER_UNIT_REFUSED' }); } });
+    await expect(prestart.runPrestart({ service: 'runner', layout: s.layout, deps: refusing.deps })).rejects.toMatchObject({ code: 'RUNNER_UNIT_REFUSED' });
+    expect(refusing.calls).toEqual([]);
+    const api = deps(s, { checkRunnerUnit: async () => { checks++; } });
+    await prestart.runPrestart({ service: 'api', layout: s.layout, deps: api.deps });
+    expect(checks).toBe(1);
   });
 });

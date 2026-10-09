@@ -80,8 +80,9 @@ export async function assertSelectedApiConnection(environment:Readonly<Record<st
 
 /**
  * The runner's twin of the check above: only the selected opaque runner URL, on the exact
- * preview cluster, as the restricted runner principal (never the API's, the migrator's or a
- * recovery role), then the same sealed publication identity.
+ * preview cluster, as the restricted runner principal, then the same sealed publication identity.
+ * Its ONLY role membership is debateai_runtime (measured 2026-10-09; 0110 grants none), so any
+ * billing, erasure, staff, API, migrator or recovery membership refuses.
  */
 export async function assertSelectedRunnerConnection(environment:Readonly<Record<string,string>>,publication:RegisterPublicationReceipt) {
  const pool=new pg.Pool({connectionString:environment.DATABASE_URL,max:1,connectionTimeoutMillis:5000});
@@ -92,6 +93,8 @@ export async function assertSelectedRunnerConnection(environment:Readonly<Record
    AND NOT pg_has_role(current_user,'debateai_password_recovery_runtime','MEMBER')
    AND NOT pg_has_role(current_user,'debateai_prod_api_runtime','MEMBER')
    AND NOT pg_has_role(current_user,'debateai_prod_migrator','MEMBER')
+   AND (SELECT coalesce(array_agg(g.rolname::text ORDER BY g.rolname),ARRAY[]::text[]) FROM pg_roles g
+     WHERE g.oid<>r.oid AND pg_has_role(current_user,g.oid,'MEMBER'))=ARRAY['debateai_runtime']::text[]
    AND NOT has_schema_privilege(current_user,'identity','CREATE')
    AND NOT has_table_privilege(current_user,'identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
    AND NOT has_any_column_privilege(current_user,'identity.mfa_recovery_legacy_cohort','SELECT,INSERT,UPDATE,REFERENCES')

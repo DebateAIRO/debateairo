@@ -12,7 +12,7 @@ const ALICE = '0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e';
 const run = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
 const job = (n: number) => `10000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
 
-function harness(open: Array<{ runId: string; workItemId: string }>, teamOwned: readonly string[], options: { unrecorded?: boolean } = {}) {
+function harness(open: Array<{ runId: string; workItemId: string; claimLive?: boolean }>, teamOwned: readonly string[], options: { unrecorded?: boolean } = {}) {
   const calls: string[] = [];
   const failures: unknown[] = [];
   const lines: unknown[] = [];
@@ -21,8 +21,8 @@ function harness(open: Array<{ runId: string; workItemId: string }>, teamOwned: 
     input: (previewConfigured: boolean, teamUserIds: readonly string[] | undefined) => ({
       previewConfigured, teamUserIds,
       work: {
-        listOpenRunWork: async (limit: number) => { calls.push(`list:${limit}`); return open; },
-        recordTerminalFailure: async (failure: unknown) => { calls.push('fail'); failures.push(failure); return !options.unrecorded; }
+        listOpenRunWork: async (limit: number) => { calls.push(`list:${limit}`); return open.map(item => ({ claimLive: false, ...item })); },
+        failClaimable: async (failure: unknown) => { calls.push('fail'); failures.push(failure); return !options.unrecorded; }
       },
       teamRuns: async (runIds: readonly string[], team: readonly string[]) => { calls.push(`team:${runIds.length}:${team.length}`); return new Set(teamOwned); },
       log: (line: unknown) => lines.push(line)
@@ -53,6 +53,16 @@ describe('refusePreviewOutsiderWork', () => {
     ]);
   });
 
+  it('refuses the start, writing nothing, while an outsider job has a live claim; a team live claim is left alone', async () => {
+    const open = [{ runId: run(1), workItemId: job(1), claimLive: true }, { runId: run(2), workItemId: job(2) }, { runId: run(3), workItemId: job(3), claimLive: true }];
+    const h = harness(open, [run(1)]);
+    await expect(refusePreviewOutsiderWork(h.input(true, [ALICE]))).rejects.toMatchObject({ code: 'RUNNER_PREVIEW_OUTSIDER_CLAIM_LIVE' });
+    expect(h.calls).toEqual(['list:101', 'team:3:1']);
+    const ok = harness([{ runId: run(1), workItemId: job(1), claimLive: true }, { runId: run(2), workItemId: job(2) }], [run(1)]);
+    expect(await refusePreviewOutsiderWork(ok.input(true, [ALICE]))).toEqual({ checked: 2, refused: 1 });
+    expect(ok.failures).toEqual([{ runId: run(2), workItemId: job(2), reason: 'RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY' }]);
+  });
+
   it('an empty queue needs no team read', async () => {
     const h = harness([], []);
     expect(await refusePreviewOutsiderWork(h.input(true, [ALICE]))).toEqual({ checked: 0, refused: 0 });
@@ -75,17 +85,25 @@ describe('refusePreviewOutsiderWork', () => {
 describe('the store applies the API rule on the runner pool', () => {
   it('lists every open run job and asks the shared team query with uuid arrays', async () => {
     const queries: Array<{ text: string; values: unknown[] }> = [];
-    const pool = { query: async (text: string, values: unknown[]) => {
+    const query = async (text: string, values: unknown[]) => {
       queries.push({ text, values });
-      return text === PREVIEW_TEAM_RUNS_SQL ? { rows: [{ run_id: run(1) }] } : { rows: [{ work_item_id: job(1), run_id: run(1) }] };
-    } };
+      if (text === PREVIEW_TEAM_RUNS_SQL) return { rows: [{ run_id: run(1) }] };
+      if (text.startsWith('UPDATE')) return { rows: [], rowCount: 1 };
+      return { rows: [{ work_item_id: job(1), run_id: run(1), claim_live: false }], rowCount: 1 };
+    };
+    const client = { query: async (text: string, values: unknown[] = []) => (/^(BEGIN|COMMIT|ROLLBACK)$/.test(text) ? { rows: [] } : query(text, values)), release: () => undefined };
+    const pool = { query, connect: async () => client };
     const store = postgresRunnerPreviewTeamGateStore(pool as never);
-    expect(await store.work.listOpenRunWork(101)).toEqual([{ runId: run(1), workItemId: job(1) }]);
+    expect(await store.work.listOpenRunWork(101)).toEqual([{ runId: run(1), workItemId: job(1), claimLive: false }]);
     expect(queries[0]!.text).toMatch(/state IN \('READY', 'CLAIMED'\)/);
     expect(queries[0]!.text).toMatch(/run_id IS NOT NULL/);
     expect(queries[0]!.values).toEqual([101]);
     expect([...await store.teamRuns([run(1), run(2)], [ALICE])]).toEqual([run(1)]);
     expect(queries[1]).toEqual({ text: PREVIEW_TEAM_RUNS_SQL, values: [[run(1), run(2)], [ALICE]] });
+    expect(await store.work.failClaimable({ runId: run(1), workItemId: job(1), reason: 'RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY' })).toBe(true);
+    // Only what claimById could still take: never a DONE/FAILED job, a live claim or a settled attempt.
+    expect(queries[2]!.text.replace(/\s+/g, ' ')).toContain("WHERE work_item_id = $1 AND run_id = $2 AND settled_attempt_id IS NULL AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))");
+    expect(queries[2]!.values).toEqual([job(1), run(1), 'RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY']);
   });
 
   it('the API waker reads the very same query', async () => {
