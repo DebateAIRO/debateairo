@@ -626,15 +626,47 @@ describe("F2 a void NETOPIA reports on a payment with our own open refund reques
     expect(await verify.handle(verifyJob(chargeId, clock.now), clock.now)).toEqual({ kind: "DONE" });
     expect(await refundedRows(chargeId)).toEqual([seeded.totalMicros]);
     expect(await emails("M11_DUPLICATE", seeded.customerId)).toHaveLength(1);
-    // The next reconcile pass (the REFUND schedule's daily read is past) still reads VOIDED and queues no VERIFY.
     expect(statusNeedsVerify((await repository.charge(chargeId))!, voided)).toBe(false);
+    const verifiedAt = (await repository.lastStatusRead(chargeId))!;
+    expect(verifiedAt).toEqual({ at: clock.now, outcome: "VOIDED" });
     const later = { now: new Date(clock.now.getTime() + DAY + 3_600_000) };
     const reconciler = new BillingReconciler({
       billing: repository, jobs, audit: recordingAudit(), clock: () => later.now, kick: () => undefined,
       netopia: { payments: port, paymentEnvironment: "sandbox", jobs, pool: database.pool }
     });
+    // 25 hours on: the refund is recorded, so the REFUND schedule's daily read has stopped; the PAID schedule's 24-hour
+    // step (the seeded payment is two days old) was already met by VERIFY's own read. Nothing is read.
     await reconciler.runStatusChecks(later.now);
+    expect(await repository.lastStatusRead(chargeId)).toEqual(verifiedAt);
     expect(await verifyRows(chargeId)).toBe(0);
+    // Six days on, past the PAID schedule's 168-hour step: the charge is read again, NETOPIA still says VOIDED, and no
+    // VERIFY is queued for it.
+    later.now = new Date(clock.now.getTime() + 6 * DAY);
+    await reconciler.runStatusChecks(later.now);
+    expect(await repository.lastStatusRead(chargeId)).toEqual({ at: later.now, outcome: "VOIDED" });
+    expect(await verifyRows(chargeId)).toBe(0);
+  });
+
+  it("ruling PR-41: a VOIDED read on a payment whose whole own request a charge-back holds records nothing and emails nobody", async () => {
+    const seeded = await paidPlan("voided-held");
+    const chargeId = seeded.initialChargeId;
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds, verify } = deskFor(port, clock);
+    await requestWhole(seeded, refunds, "ALREADY_SUBSCRIBED", seeded.totalMicros);
+    expect(await listed(chargeId)).toHaveLength(1);
+    // The bank disputes the payment, recorded through VERIFY (N15b's pattern): the request is held.
+    port.statuses.set(chargeId, report(chargeId, seeded.providerPaymentId, "CHARGEBACK_OPENED", seeded.totalMicros));
+    expect(await verify.handle(verifyJob(chargeId, clock.now), clock.now)).toEqual({ kind: "DONE" });
+    expect(heldByChargeback((await repository.charge(chargeId))!, seeded.providerPaymentId)).toBe(true);
+    expect(await listed(chargeId)).toEqual([]);
+    // Then NETOPIA reports the payment VOIDED: the hold wins, so nothing is recorded through the desk.
+    port.statuses.set(chargeId, report(chargeId, seeded.providerPaymentId, "VOIDED", seeded.totalMicros));
+    expect(await verify.handle(verifyJob(chargeId, clock.now), clock.now)).toEqual({ kind: "DONE" });
+    expect(await refundedRows(chargeId)).toEqual([]);
+    for (const template of ["M8", "M11", "M11_DUPLICATE"]) expect(await emails(template, seeded.customerId)).toEqual([]);
+    expect(heldByChargeback((await repository.charge(chargeId))!, seeded.providerPaymentId)).toBe(true);
+    expect(await listed(chargeId)).toEqual([]);
   });
 
   it("the reminder's hint names a refund NETOPIA shows when the last read was VOIDED", async () => {
