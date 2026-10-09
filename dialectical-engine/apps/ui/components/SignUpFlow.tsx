@@ -9,7 +9,7 @@ import { DateOfBirthField, EMPTY_DOB } from '@/components/DateOfBirthField';
 import { EmailPendingScreen } from '@/components/auth/EmailPendingScreen';
 import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
 import { PhoneField } from '@/components/auth/PhoneField';
-import { InlineFieldMessage, useFormErrorAnnouncer } from '@/components/auth/InlineFieldMessage';
+import { InlineFieldMessage, useFormAnnouncer } from '@/components/auth/InlineFieldMessage';
 import { TurnstileChallenge } from '@/components/auth/TurnstileChallenge';
 import { PrivacyPolicyModal } from '@/components/consent/PrivacyPolicyModal';
 import { TermsOfServiceModal } from '@/components/consent/TermsOfServiceModal';
@@ -104,7 +104,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     const privacyInputRef = useRef<HTMLInputElement | null>(null);
     const termsInputRef = useRef<HTMLInputElement | null>(null);
     const flight = useRef(false);
-    const announcer = useFormErrorAnnouncer();
+    const announcer = useFormAnnouncer();
     const { locale } = useChromeI18n();
     const termsDocument = useLegalDocument('terms');
     const privacyDocument = useLegalDocument('privacy');

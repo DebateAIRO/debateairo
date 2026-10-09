@@ -6,7 +6,7 @@ import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/l
 import { matchingSecurityGrant, type ConfirmedSecurityAction } from '@/lib/securityConfirmation';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode } from '@/lib/sixDigitCode';
-import { InlineFieldMessage, useFormErrorAnnouncer } from './InlineFieldMessage';
+import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { EphemeralCodes } from './EphemeralCodes';
 export type SecurityConfirmationClient = Partial<Pick<ContractClient, 'authMethods' | 'beginPasskeyStepUp' | 'completePasskeyStepUp' | 'stepUp' | 'beginSocialStepUp'>>;
@@ -44,7 +44,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     const [backup, setBackup] = useState<string | null>(null);
     const [held, setHeld] = useState<ConfirmedSecurityAction | null>(null);
     const [passwordMode, setPasswordMode] = useState(false);
-    const announcer = useFormErrorAnnouncer();
+    const announcer = useFormAnnouncer();
     useEffect(() => {
         sequence.current++;
         browser.cancel();

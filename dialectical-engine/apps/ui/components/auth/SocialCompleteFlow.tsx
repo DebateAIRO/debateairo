@@ -20,7 +20,7 @@ import { TurnstileChallenge } from './TurnstileChallenge';
 import { EmailPendingScreen } from './EmailPendingScreen';
 import { SecurityEnrollment } from './SecurityEnrollment';
 import { PhoneField } from './PhoneField';
-import { InlineFieldMessage, useFormErrorAnnouncer } from './InlineFieldMessage';
+import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
 import { EphemeralCodes } from './EphemeralCodes';
 import { RegionField, EMPTY_REGION_PICK, type RegionPick } from '../RegionField';
 import { DateOfBirthField, EMPTY_DOB } from '../DateOfBirthField';
@@ -77,8 +77,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [codeIncomplete, setCodeIncomplete] = useState(false);
     const codeField = useRef<HTMLInputElement>(null);
     // One live region per form: says the first error of a failed submit (review fix, 2026-10-09).
-    const signupAnnouncer = useFormErrorAnnouncer();
-    const codeAnnouncer = useFormErrorAnnouncer();
+    const signupAnnouncer = useFormAnnouncer();
+    const codeAnnouncer = useFormAnnouncer();
     const [proof, setProof] = useState<string | null>(null);
     const [reset, setReset] = useState(0);
     const [pending, setPending] = useState<string | null>(null);

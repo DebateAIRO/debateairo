@@ -105,6 +105,49 @@ describe("(c) sign-in offers to send the verification email again", () => {
     expect(client.beginLogin).not.toHaveBeenCalled();
   });
 
+  /*
+   * Review fix (2026-10-09): after "Continue" the screen said "Create an account" / "Check your email",
+   * as if a link had been sent, while nothing had been. It now names what it does ("Send the verification
+   * email again", button "Send email"), takes focus to its heading, and only after a send says, in the
+   * same words for every address (the server always answers 202), that a link is on its way.
+   */
+  async function resendScreen(resendVerification = vi.fn().mockResolvedValue({ message: "sent", retry_after_seconds: 60 })) {
+    const host = await render(<LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn(), resendVerification }} turnstile={turnstile} />);
+    await act(async () => button(host, RESEND_ENTRY)!.click());
+    await input(host, "#resend-email", "person@example.test");
+    await act(async () => host.querySelector("form")!.requestSubmit());
+    return host;
+  }
+  const SENT = auth["auth.pending.resendSent"];
+
+  it("before sending, says what it will do and not that anything was sent", async () => {
+    const host = await resendScreen();
+    const heading = host.querySelector("h1")!;
+    expect(heading.textContent).toBe("Send the verification email again");
+    expect(document.activeElement).toBe(heading);
+    expect(host.querySelector(".authEyebrow")?.textContent).not.toBe(auth["auth.signUp.eyebrow"]);
+    expect(host.textContent).not.toContain(auth["auth.pending.title"]);
+    expect(host.querySelector<HTMLButtonElement>('button[data-action="resend"]')?.textContent).toBe("Send email");
+    expect(host.textContent).not.toContain(SENT);
+  });
+
+  it("after a send, says a link is on its way and announces it", async () => {
+    const host = await resendScreen();
+    await act(async () => host.querySelector<HTMLButtonElement>('button[data-action="resend"]')!.click());
+    await wait(250);
+    expect(SENT).toBe("If this address has an account waiting for verification, a new link is on its way. Check your spam folder too.");
+    expect(host.querySelector("p.authFinePrint")?.textContent).toBe(SENT);
+    expect([...host.querySelectorAll('[aria-live="polite"]')].map((region) => region.textContent)).toContain(SENT);
+  });
+
+  it("a failed send does not claim anything was sent", async () => {
+    const host = await resendScreen(vi.fn().mockRejectedValue(new Error("offline")));
+    await act(async () => host.querySelector<HTMLButtonElement>('button[data-action="resend"]')!.click());
+    await wait(250);
+    expect(host.textContent).not.toContain(SENT);
+    expect(host.querySelector("[role=alert]")?.textContent).toBe(auth["auth.pending.unavailable"]);
+  });
+
   it("Back to sign in returns to the password form", async () => {
     const host = await render(<LoginFlow client={{ beginLogin: vi.fn(), completeLogin: vi.fn(), resendVerification: vi.fn() }} turnstile={turnstile} />);
     await act(async () => button(host, RESEND_ENTRY)!.click());

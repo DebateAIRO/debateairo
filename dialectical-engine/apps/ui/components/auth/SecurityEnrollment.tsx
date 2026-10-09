@@ -8,7 +8,7 @@ import { contractClient } from '@/lib/api';
 import { createConsumerWebAuthnBrowser, type ConsumerWebAuthnBrowser } from '@/lib/consumerWebAuthn';
 import { createCodeAttempt } from '@/lib/authCodeAttempt';
 import { readSixDigitCode } from '@/lib/sixDigitCode';
-import { InlineFieldMessage, useFormErrorAnnouncer } from './InlineFieldMessage';
+import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
 import { totpQrMatrix } from '@/lib/totpQr';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import authEnglish from '@/messages/en/auth.json';
@@ -48,7 +48,7 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     const [codeError, setCodeError] = useState<string | null>(null);
     const codeField = useRef<HTMLInputElement>(null);
     const [refocusCode, setRefocusCode] = useState(0);
-    const announcer = useFormErrorAnnouncer();
+    const announcer = useFormAnnouncer();
     useEffect(() => {
         if (refocusCode)
             codeField.current?.focus();

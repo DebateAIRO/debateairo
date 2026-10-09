@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { ContractClient } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
 import { EmailPendingScreen } from "@/components/auth/EmailPendingScreen";
-import { InlineFieldMessage, useFormErrorAnnouncer } from "@/components/auth/InlineFieldMessage";
+import { InlineFieldMessage, useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
 import { contractClient } from "@/lib/api";
 import { emailShape } from "@/lib/authFormValidation";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
@@ -26,7 +26,7 @@ export function VerificationResend({ catalog, client, turnstile, onBack }: Reado
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
-  const announcer = useFormErrorAnnouncer();
+  const announcer = useFormAnnouncer();
   useEffect(() => { if (submitted === null) field.current?.focus(); }, [submitted]);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,7 +42,8 @@ export function VerificationResend({ catalog, client, turnstile, onBack }: Reado
     setSubmitted(address);
   }
   if (submitted !== null)
-    return <EmailPendingScreen email={submitted} retryAfterSeconds={0} client={{ resendVerification: client.resendVerification ?? contractClient.resendVerification }} catalog={catalog} locale={locale} turnstile={turnstile} notice={t(catalog, "auth.pending.resendNotice")} onDifferentEmail={() => setSubmitted(null)} />;
+    return <EmailPendingScreen email={submitted} retryAfterSeconds={0} client={{ resendVerification: client.resendVerification ?? contractClient.resendVerification }} catalog={catalog} locale={locale} turnstile={turnstile} notice={t(catalog, "auth.pending.resendNotice")}
+      context={{ eyebrow: t(catalog, "auth.login.welcomeBack"), title: t(catalog, "auth.pending.resendTitle"), action: t(catalog, "auth.pending.sendEmail"), sent: t(catalog, "auth.pending.resendSent") }} onDifferentEmail={() => setSubmitted(null)} />;
   return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={t(catalog, "auth.pending.resend")} description={t(catalog, "auth.login.resendHint")} footer={null}>
     <form className="authForm" noValidate method="post" action="/login" onSubmit={submit}>
       <div className="authField"><label htmlFor="resend-email">{t(catalog, "auth.email")}</label><input ref={field} id="resend-email" name="email" type="email" autoComplete="email" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={event => { setEmail(event.target.value); setError(null); }} required aria-invalid={!!error || undefined} aria-describedby={error ? "resend-email-error" : undefined} /><InlineFieldMessage id="resend-email-error" message={error} /></div>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ContractClient, LocaleCode } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
 import { TurnstileChallenge } from "@/components/auth/TurnstileChallenge";
+import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
 import { catalogLocale } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { validTurnstilePublicConfig, type TurnstilePublicConfig } from "@/lib/turnstile";
@@ -17,10 +18,16 @@ export type EmailPendingScreenProps = Readonly<{
   turnstile?: TurnstilePublicConfig;
   /** Replaces the after-sign-up sentence when nothing has been sent yet (the sign-in screen's resend entry). */
   notice?: string;
+  /**
+   * The sign-in screen's resend entry names its own screen and button (nothing has been sent when it
+   * opens), and after a send says `sent` instead of `notice`: one sentence for every address, since the
+   * server answers every resend the same way.
+   */
+  context?: Readonly<{ eyebrow: string; title: string; action: string; sent: string }>;
   onDifferentEmail(): void;
 }>;
 
-export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, locale, turnstile, notice, onDifferentEmail }: EmailPendingScreenProps) {
+export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, locale, turnstile, notice, context, onDifferentEmail }: EmailPendingScreenProps) {
   const [deadline, setDeadline] = useState(() => Date.now() + retryAfterSeconds * 1_000);
   const remaining = () => Math.max(0, Math.ceil((deadline - Date.now()) / 1_000));
   const [seconds, setSeconds] = useState(remaining);
@@ -29,6 +36,8 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [proofUnavailable, setProofUnavailable] = useState(false);
+  const [sent, setSent] = useState(false);
+  const announcer = useFormAnnouncer();
   const inFlight = useRef(false);
   const mounted = useRef(true);
   const configured = turnstile !== undefined && validTurnstilePublicConfig(turnstile);
@@ -57,7 +66,10 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
       const acknowledgement = await client.resendVerification({
         email, locale: catalogLocale(locale), ui_locale: locale, time_zone: timeZone, turnstile_token: token
       });
-      if (mounted.current) setDeadline(Date.now() + acknowledgement.retry_after_seconds * 1_000);
+      if (mounted.current) {
+        setDeadline(Date.now() + acknowledgement.retry_after_seconds * 1_000);
+        if (context !== undefined) { setSent(true); announcer.announce(context.sent); }
+      }
     } catch {
       if (mounted.current) setError(true);
     } finally {
@@ -66,15 +78,18 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
     }
   }
 
-  return <AuthShell eyebrow={t(catalog, "auth.signUp.eyebrow")} title={t(catalog, "auth.pending.title")}
-    description={email} footer={null}>
-    <p className="authFinePrint" role="status" aria-live="polite">{notice ?? t(catalog, "auth.signUp.registrationSent")}</p>
+  // The screen replaces the form whose button had focus, so focus starts on its headline.
+  return <AuthShell eyebrow={context?.eyebrow ?? t(catalog, "auth.signUp.eyebrow")} title={context?.title ?? t(catalog, "auth.pending.title")}
+    description={email} footer={null} focusTitle>
+    {announcer.region}
+    <p className="authFinePrint">{sent && context !== undefined ? context.sent : notice ?? t(catalog, "auth.signUp.registrationSent")}</p>
     {configured ? <TurnstileChallenge siteKey={turnstile.siteKey} nonce={turnstile.nonce} action="resend-verification"
       locale={locale} resetKey={resetKey} onToken={token => { setProof(token); if (token !== null) setProofUnavailable(false); }} onError={() => setProofUnavailable(true)} /> : null}
     {/* Countdown text has no live region; assistive readers hear only stable state. */}
-    <p className="authFinePrint">{seconds > 0 ? t(catalog, "auth.pending.retry", { seconds }) : t(catalog, "auth.pending.resend")}</p>
+    {seconds > 0 ? <p className="authFinePrint">{t(catalog, "auth.pending.retry", { seconds })}</p>
+      : context === undefined ? <p className="authFinePrint">{t(catalog, "auth.pending.resend")}</p> : null}
     <button className="authPrimary" type="button" data-action="resend" disabled={busy || seconds > 0 || proof === null || !configured} onClick={() => { void resend(); }}>
-      {t(catalog, "auth.pending.resend")}
+      {context?.action ?? t(catalog, "auth.pending.resend")}
     </button>
     {error ? <p className="authFinePrint" role="alert">{t(catalog, "auth.pending.unavailable")}</p> : null}
     {!configured || proofUnavailable ? <p className="authFinePrint" role="status">{t(catalog, "auth.pending.proofUnavailable")}</p> : null}

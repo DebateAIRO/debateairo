@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ContractHttpError, type ContractClient, type LoginContinuationResponse, type AuthenticationResponse } from '@debateai/contract';
 import { AuthShell } from '@/components/AuthShell';
 import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
-import { InlineFieldMessage, useFormErrorAnnouncer } from '@/components/auth/InlineFieldMessage';
+import { InlineFieldMessage, useFormAnnouncer } from '@/components/auth/InlineFieldMessage';
 import { EphemeralCodes } from '@/components/auth/EphemeralCodes';
 import { VerificationResend } from '@/components/auth/VerificationResend';
 import type { TurnstilePublicConfig } from '@/lib/turnstile';
@@ -58,8 +58,8 @@ export function LoginFlow({ catalog = authEnglish, client = contractClient, onAu
     const [signUpHref, setSignUpHref] = useState('/sign-up');
     const [resending, setResending] = useState(false);
     // One live region per form: says the first error of a failed submit (review fix, 2026-10-09).
-    const credentialsAnnouncer = useFormErrorAnnouncer();
-    const codeAnnouncer = useFormErrorAnnouncer();
+    const credentialsAnnouncer = useFormAnnouncer();
+    const codeAnnouncer = useFormAnnouncer();
     function cancelConditional() {
         sequence.current++;
         conditional.current?.abort();
