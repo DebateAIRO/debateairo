@@ -878,7 +878,6 @@ const application = new PostgresAskApplication(pool, dispatcher, {
         assertDailyCostEnvelope: () => costEnvelopeGuard.assertDailyEnvelopeAdmitsNewRun()
       }),
   ...(askBilling === undefined ? {} : { billing: askBilling }),
-  accountProfile,
   resolveDiscoveredPanel: resolveProviderPanel,
   // A20: the per-role model picker (built above, under the boot ledger).
   modelPicker,

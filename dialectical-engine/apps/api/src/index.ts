@@ -3794,7 +3794,6 @@ export interface RunCreationSettings {
    * signed-in owner (ASK_SIGN_IN_REQUIRED). Absent means today's ask exactly.
    */
   readonly billing?: AskBilling;
-  readonly accountProfile?: Pick<AccountProfileService,"hasPhone">;
   /** Budget spec §2.7 (B7b): the line the waker drains. main.ts supplies the room itself. */
   readonly waitingLine?: AskWaitingLinePort;
   readonly resolveDiscoveredPanel: () => Promise<readonly DiscoveredPanelMember[]>;
@@ -4365,12 +4364,6 @@ export class PostgresAskApplication implements AskApplication {
       }
       const now = billing.clock();
       const resolved = await resolveBillingAsk(requestedAsk, principal.ownerRef, billing, now);
-      // The resolved plan governs completion. Paid/internal questions remain
-      // usable even when coarse fit later chooses the Free provider roster.
-      if (resolved.planId === "FREE" && this.settings.accountProfile !== undefined
-        && !await this.settings.accountProfile.hasPhone(principal.ownerRef)) {
-        markAskRefusal(new TypedDomainError("ACCOUNT_PHONE_REQUIRED", "Complete your phone profile before asking a free question"));
-      }
       fundingBasis = resolved.fundingBasis;
       ask = resolved.ask;
       plannedAsk = resolved.ask;
