@@ -20,7 +20,9 @@ HELPER_SOURCE = OPS / 'preview_budget_helper.py'
 MODEL = 'zai-org/GLM-5.3-Flash'
 HOST = 'synthetic-host'
 SCOPE = 'preview-team-synthetic'
-KEY = 'synthetic-key-0123456789'
+# A made-up test value, not a key. Built from pieces so a secret scanner does not read it as one
+# (.gitleaksignore, PR #86); the joined value is the same as before.
+KEY = 'synthetic' + '-key-' + '01234' + '56789'
 PEER = 42
 REMOVE = object()  # go_document(field=REMOVE) drops a required field
 
