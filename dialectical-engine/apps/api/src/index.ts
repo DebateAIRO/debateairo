@@ -1374,7 +1374,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
   { route: "POST /v1/billing/checkout", auth: "user", resource: "billing", action: "checkout" },
   { route: "GET /v1/billing/charges/{chargeRef}", auth: "user", resource: "billing", action: "read-charge" },
-  { route: "POST /v1/billing/xmoney/notify", auth: "public", resource: "billing", action: "notify" },
+  // N9 (spec 2026-10-05 §2.7.1): NETOPIA's signed message; no session, no CSRF, verified by its own signature.
+  { route: "POST /v1/billing/netopia/notify", auth: "public", resource: "billing", action: "notify" },
   // P12: the subscriber's own subscription. Every mutation carries the CSRF pair like any user route.
   { route: "GET /v1/billing/subscription", auth: "user", resource: "billing", action: "read-subscription" },
   { route: "GET /v1/billing/invoices", auth: "user", resource: "billing", action: "list-invoices" },
@@ -1386,7 +1387,8 @@ export const authorizationPolicyInventory = Object.freeze([
   { route: "POST /v1/billing/subscription/upgrade", auth: "user", resource: "billing", action: "upgrade" },
   // P12d: the step-up grant rides in the body, like DELETE /v1/account's.
   { route: "POST /v1/billing/subscription/withdraw", auth: "user", resource: "billing", action: "withdraw" },
-  // P12e (A12): the card change's signed authorization order; the CSRF pair like any user mutation.
+  // P12e / N13 (spec §2.11): the card page's details and NETOPIA's 0 check.
+  { route: "GET /v1/billing/subscription/card", auth: "user", resource: "billing", action: "read-card-details" },
   { route: "POST /v1/billing/subscription/card", auth: "user", resource: "billing", action: "change-card" },
   // P13: cancel without signing in (Terms §12). First-party Origin only; never a session.
   { route: "POST /v1/billing/cancel-link", auth: "public", origin: "trusted", resource: "billing", action: "request-cancel-link" },
@@ -2528,7 +2530,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   });
   void api.register(async apple=>{
     // Replace the inherited billing-only parser in this callback's encapsulated scope.
-    // The parent still refuses form bodies on all routes except the xMoney notification.
+    // The parent registers no form-body parser (its one extra parser is NETOPIA's notify route's), so form bodies
+    // stay refused everywhere else.
     if (apple.hasContentTypeParser('application/x-www-form-urlencoded')) apple.removeContentTypeParser('application/x-www-form-urlencoded');
     apple.addContentTypeParser('application/x-www-form-urlencoded',{parseAs:'string',bodyLimit:8192},(_request,body,done)=>{
       try {const form=new URLSearchParams(body as string);const value:Record<string,string>={};for(const [key,member] of form){if(Object.hasOwn(value,key)||!['state','code','error','error_description','user'].includes(key))throw new SocialAuthError('SOCIAL_PROOF_INVALID');value[key]=member;}done(null,value);}catch{done(new SocialAuthError('SOCIAL_PROOF_INVALID'));}

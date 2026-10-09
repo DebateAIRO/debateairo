@@ -447,6 +447,10 @@ describe("P3-01 production database-principal manifest", () => {
         // billing.outbox, and billing.withdrawal_owner_settlement, on which 0088 grants
         // SELECT, INSERT; since 0093 each to debateai_billing_runtime); no privilege is added.
         { component: "apps/api:billing-withdraw-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_WITHDRAW_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:withdraw" },
+        // N14 (spec §2.12.2): the owner's refund-done command (`pnpm billing:refund-done`) runs as the API, with the
+        // API's own EnvironmentFile, under systemd-run, and writes only billing rows that principal already writes
+        // (billing.charge_event and billing.outbox, since 0093 granted to debateai_billing_runtime); no privilege is added.
+        { component: "apps/api:billing-refund-done-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_REFUND_DONE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:refund-done" },
         // Paid plans, Task P16b: the owner's tax summary (`pnpm billing:tax-summary`)
         // runs as the API under systemd-run on a READ-ONLY one-connection pool
         // (billing rows and the register's taxAuthorities row); it writes nothing.
@@ -463,6 +467,14 @@ describe("P3-01 production database-principal manifest", () => {
         // SELECT, INSERT, and billing.outbox, on which 0087 grants SELECT, INSERT;
         // since 0093 both to debateai_billing_runtime); no privilege is added.
         { component: "apps/api:billing-invoice-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_INVOICE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:invoice" },
+        // NETOPIA spec 2026-10-05 §2.17.3 (N21): the owner's check command (`pnpm billing:check`) runs as the API under
+        // systemd-run on a READ-ONLY one-connection pool and reads only the register's billing rows; it writes nothing.
+        { component: "apps/api:billing-check-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_CHECK_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:check" },
+        // NETOPIA spec 2026-10-05 §2.20.3 (N22): the owner's NETOPIA recording (`pnpm billing:netopia-sandbox`) runs as the
+        // API, with the API's own EnvironmentFile, under systemd-run; it inserts only billing.tool_order and reads
+        // billing.card_token, card_token_revocation, payment_notice and payment_notice_raw, all granted by 0111 to
+        // debateai_billing_runtime; no privilege is added.
+        { component: "tools/billing:netopia-sandbox", environmentKey: "DATABASE_URL", purpose: "BILLING_NETOPIA_RECORDING_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:netopia-sandbox" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "CONTENT_PROVISION", binding: "WIRED" },
         { component: "apps/api", environmentKey: "CONTENT_PROVISION_DATABASE_URL", purpose: "SERVER_ASK_ADMISSION_POOL", binding: "WIRED" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },
@@ -756,7 +768,10 @@ describe("P3-01 production database-principal manifest", () => {
     const appSourceRoots = [
       "apps/api/src",
       "apps/runner/src",
-      "apps/scheduler/src"
+      "apps/scheduler/src",
+      // The owner's billing tools that open the API's own pool (N22's NETOPIA recording). Only this folder: the other
+      // tools/ folders (acceptance-bundle, orphan-audit) hold node_modules.
+      "tools/billing"
     ];
     const appSourcePaths = (await Promise.all(appSourceRoots.map(async (root) =>
       (await readdir(root, { recursive: true }))

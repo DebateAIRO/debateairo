@@ -5,13 +5,13 @@ import { AcceptanceRepository, BillingJobQueries, BillingRepository, Entitlement
 import type { GeoLookup } from "@debateai/geo";
 import { currentDocument } from "@debateai/legal-manifest";
 import { TypedDomainError } from "@debateai/kernel";
-import { decryptNotice } from "@debateai/payments-xmoney";
 import type { BillingPlans, BillingPolicy, CountryPolicy, TaxAuthorities } from "@debateai/register";
 import { createSingleFlightErasureReconciler } from "../account-erasure.js";
 import { DekAccountEmailReader, DekBillingRecipientReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
 import { CancelLinkService } from "./cancel-link.js";
 import { createCardCheckSettlement } from "./card-change.js";
+import { CardCustody } from "./card-custody.js";
 import { ChargeStatusReader } from "./charge-status.js";
 import { CheckoutService } from "./checkout.js";
 import type { BillingConnectors } from "./connectors.js";
@@ -22,7 +22,7 @@ import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
 import { createQuadernoRefundHandler, createQuadernoSaleHandler } from "./invoice-quaderno.js";
 import { createSmartBillInvoiceHandler, createSmartBillStornoHandler, smartBillPdfResolver } from "./invoice-smartbill.js";
 import { BillingMaintenance } from "./maintenance.js";
-import { NoticeIntake } from "./notice-intake.js";
+import { NetopiaNoticeIntake } from "./netopia-intake.js";
 import { catalogueOrderText } from "./order-text-catalogue.js";
 import { BillingOutboxWorker } from "./outbox.js";
 import { OwnerJobs } from "./owner-jobs.js";
@@ -30,6 +30,7 @@ import { QuoteService } from "./quote.js";
 import { BillingReconciler } from "./reconcile.js";
 import { RefundDesk } from "./refunds.js";
 import { RenewalService } from "./renewal.js";
+import { registerRetiredJobs } from "./retired-jobs.js";
 import { createRenewalNoticeHandler } from "./renewal-notice-job.js";
 import { createInitialSettlement } from "./settlement-initial.js";
 import { createRenewalSettlement } from "./settlement-renewal.js";
@@ -58,6 +59,11 @@ export type BillingRuntimeDeps = Readonly<{
   mail: Readonly<{ sender: BillingMailPort; attachments: ReadonlyMap<BillingAttachmentKind, AttachmentResolver> }> | undefined;
   audit: BillingAudit;
   clock: () => Date;
+  /**
+   * F7 (final review money-3): how far `clock` runs ahead of real time (the stage clock's `offsetMs`; absent or 0 off
+   * the OWNER-RUN sandbox). NETOPIA's message intake moves NETOPIA's own times by it, as TimeShiftedCardPayments does.
+   */
+  clockOffsetMs?: number;
   reportPending: (code: string) => void;
   /**
    * R-35: inputs later tasks need, declared here once and passed by main.ts in the task that uses them:
@@ -73,10 +79,12 @@ export type BillingRuntimeDeps = Readonly<{
 
 export type BillingRuntime = Readonly<{
   outbox: BillingOutboxWorker;
-  /** P8c: the checkout; P12e signs its card-check order with `checkout.signEmbeddedOrder` (R-17). */
+  /** P8c / N18: the checkout (NETOPIA's hosted page). */
   checkout: CheckoutService;
   /** P8a onward: the billing routes' members this runtime composes (main.ts's `billingRouteOptions`). */
   routes: BillingRouteOptions;
+  /** N9: NETOPIA's message intake (the routes hold it too); main.ts runs its quarantine re-check at every start. */
+  netopiaNotices: NetopiaNoticeIntake;
   /** P9b: VERIFY_PAYMENT; P11a and P12 register their charge kinds' settlements on it. */
   verify: VerifyPaymentHandler;
   /** P9b (R-32): the one refund executor; P12d and P12e move money back through it. */
@@ -120,16 +128,20 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     batchSize: 20, onDead: createDeadJobAlert({ repository })
   });
   const entitlements = new EntitlementRepository(deps.pool);
-  // P2-I4 (D5 5h): a refund of a charge paid in the other xMoney system ends DEAD before any call.
+  // P2-I4 (D5 5h): a refund of a charge paid in another payment system ends DEAD before any call.
   const refunds = new RefundDesk({
-    repository, jobs, xmoney: deps.connectors.xmoney, policy: deps.policy, audit: deps.audit, clock: deps.clock,
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+    repository, jobs, policy: deps.policy, audit: deps.audit, clock: deps.clock,
+    // N14 (spec §2.12): NETOPIA refunds go to the owner (the port has no `refund` until N-10).
+    netopia: { payments: deps.connectors.payments, paymentEnvironment: deps.connectors.paymentEnvironment, jobs }
   });
-  outbox.register("XMONEY_REFUND", refunds.handle);
+  outbox.register("PAYMENT_REFUND", refunds.handle);
+  // NETOPIA spec 2026-10-05 §2.5.4: the previous card processor's queued refunds end DEAD OTHER_PAYMENT_SYSTEM.
+  registerRetiredJobs(outbox, deps.audit);
   const verify = new VerifyPaymentHandler({
-    repository, jobs, xmoney: deps.connectors.xmoney, refunds, entitlements, countryPolicy: deps.countryPolicy,
+    repository, jobs, refunds, entitlements, countryPolicy: deps.countryPolicy,
     policy: deps.policy, recordsKey: deps.connectors.recordsKey, audit: deps.audit,
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+    // N10 (skeleton §1 rule 2): NETOPIA charges are verified from NETOPIA's status (N8's connector).
+    netopia: { payments: deps.connectors.payments, paymentEnvironment: deps.connectors.paymentEnvironment, jobs }
   });
   verify.registerSettlement("INITIAL", createInitialSettlement({
     repository, entitlements, acceptances, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl
@@ -147,19 +159,34 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P11a: `drain` is declared below; the kick only runs once a tick does. P15 (R-34): `erasurePending` over
   // `billing.owner_erasure_pending`, which answers true for a pending or finished erasure and for an `age_frozen`
   // owner (R3-2); P11b's maintenance reuses this `renewal` and its `erasureBlocks`.
+  // W8 (P2-I12, the owner's ruling of 2 October 2026): every billing email, the cancel link's M9 and every invoice go
+  // to the account's CURRENT address at the time of sending; the billing profile's only after the account is erased.
+  // N11: the NETOPIA renewal's payer email is the same current address (spec §2.5.3).
+  const recipients = new DekBillingRecipientReader(deps.pool, deps.dekStore);
   const renewal = new RenewalService({
-    repository, jobs, entitlements, xmoney: deps.connectors.xmoney, tax: deps.connectors.tax, settlement: renewalSettlement,
+    repository, jobs, entitlements, tax: deps.connectors.tax, settlement: renewalSettlement,
     policy: deps.policy, plans: deps.plans, recordsKey: deps.connectors.recordsKey,
     publicAppUrl: deps.connectors.publicAppUrl, audit: deps.audit, clock: deps.clock, kick: () => drain(),
     erasurePending: erasurePendingOf(repository),
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+    // N11 (spec §2.9): the saved-card renewals, their probes and the pending deadline; the payer's current address (W8).
+    netopia: {
+      payments: deps.connectors.payments, paymentEnvironment: deps.connectors.paymentEnvironment, recipients,
+      orderText: catalogueOrderText
+    }
+  });
+  // N17 (spec §2.15.3–2.15.4): the saved card's life — M12 from the look-ahead, the erasure commit's revocation, and the
+  // daily sweep and purges of the owner job.
+  const custody = new CardCustody({
+    repository, jobs, paymentEnvironment: deps.connectors.paymentEnvironment, publicAppUrl: deps.connectors.publicAppUrl,
+    audit: deps.audit
   });
   const maintenance = new BillingMaintenance({
     repository, jobs, entitlements, renewal, policy: deps.policy, publicAppUrl: deps.connectors.publicAppUrl,
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit, clock: deps.clock
+    paymentEnvironment: deps.connectors.paymentEnvironment, audit: deps.audit, clock: deps.clock, custody
   });
   outbox.register("RENEWAL_NOTICE", createRenewalNoticeHandler({
-    repository, jobs, renewal, policy: deps.policy, xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit
+    repository, jobs, renewal, policy: deps.policy, paymentEnvironment: deps.connectors.paymentEnvironment,
+    audit: deps.audit
   }));
   let lastMaintenance = Number.NEGATIVE_INFINITY;
   const renewTick = createSingleFlightErasureReconciler(
@@ -176,16 +203,14 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   outbox.register("VERIFY_PAYMENT", verify.handle);
   // P10a: the legal documents of a non-Romanian charge (spec §2.5.9). P17 (D6a F29): the invoice line in the buyer's
   // locale, from the catalogue, as for the checkout below.
-  // P2-I4 (D5 5h): no document is issued for a charge paid in the other xMoney system.
-  // W8 (P2-I12, the owner's ruling of 2 October 2026): every billing email, the cancel link's M9 and every invoice go
-  // to the account's CURRENT address at the time of sending; the billing profile's only after the account is erased.
-  const recipients = new DekBillingRecipientReader(deps.pool, deps.dekStore);
+  // P2-I4 (D5 5h): no document is issued for a charge paid in another payment system.
+  // W8: `recipients` (declared above, before the renewal) is every billing email's and every invoice's address.
   const invoiceDeps = {
     repository, recordsKey: deps.connectors.recordsKey, recipients, policy: deps.policy,
     publicAppUrl: deps.connectors.publicAppUrl,
     audit: deps.audit,
     orderText: catalogueOrderText,
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment
+    paymentEnvironment: deps.connectors.paymentEnvironment
   };
   outbox.register("QUADERNO_RECORD_SALE", createQuadernoSaleHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
   outbox.register("QUADERNO_RECORD_REFUND", createQuadernoRefundHandler({ ...invoiceDeps, tax: deps.connectors.tax }));
@@ -204,13 +229,13 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     }));
   }
   const checkout = new CheckoutService({
-    repository, jobs, acceptances, xmoney: deps.connectors.xmoney,
+    repository, jobs, acceptances, payments: deps.connectors.payments,
     accountEmail: new DekAccountEmailReader(deps.pool, deps.dekStore), geo: deps.geo, countryPolicy: deps.countryPolicy,
     policy: deps.policy, consentDocuments: (kind, locale) => currentDocument(kind, locale),
-    recordsKey: deps.connectors.recordsKey, xmoneyPrivateKey: deps.connectors.xmoneyPrivateKey,
-    xmoneyPublicKey: deps.connectors.xmoneyPublicKey, siteId: deps.connectors.siteId,
-    publicAppUrl: deps.connectors.publicAppUrl, xmoneyEnvironment: deps.connectors.xmoneyEnvironment, audit: deps.audit,
-    // P17 (D6a F29): the order line in the buyer's locale, from the catalogue (englishOrderText until this task).
+    recordsKey: deps.connectors.recordsKey, publicAppUrl: deps.connectors.publicAppUrl, audit: deps.audit,
+    // F5: `drain` is declared below; the kick only runs once a checkout's read queues VERIFY_PAYMENT.
+    kick: () => drain(),
+    // P17 (D6a F29): the order line in the buyer's locale, from the catalogue.
     orderText: catalogueOrderText
   });
   // P13 (A25): the emailed one-time cancel link. P12d's `required` refuses a composition without either input.
@@ -237,21 +262,26 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     legal: deps.legal,
     audit: deps.audit,
     clock: deps.clock,
-    // P12c: the upgrade's rebill, its xMoney system (D5 5h), checkout's country gate and the outbox kick (`drain` is
-    // declared below; the kick only runs once an upgrade is submitted).
-    xmoney: deps.connectors.xmoney,
-    xmoneyEnvironment: deps.connectors.xmoneyEnvironment,
+    // P12c: checkout's country gate and the outbox kick (`drain` is declared below; the kick only runs once an upgrade
+    // is submitted).
+    // N12/N13 (spec §2.10, §2.11, §2.18): NETOPIA's page and status read, its environment, the agreement, the order line.
+    payments: deps.connectors.payments, paymentEnvironment: deps.connectors.paymentEnvironment, acceptances,
+    consentDocuments: (kind, locale) => currentDocument(kind, locale), orderText: catalogueOrderText,
     countryPolicy: deps.countryPolicy,
     geo: deps.geo,
     kick: () => drain(),
     // P12d: the credit-used share of a withdrawal, and its refunds through the one executor (R-32).
     ownerSpend: required(deps.ownerSpend, "ownerSpend"),
     refunds,
-    // P12e (R-17): the card change's order is built and signed by the checkout, for the account's own address.
-    checkout,
     accountEmail: new DekAccountEmailReader(deps.pool, deps.dekStore),
     // P13: the two public cancel routes.
     cancelLinks
+  });
+  // N9 (spec 2026-10-05 §2.7.3): `drain` is declared below; the kick only runs once a message is stored.
+  const netopiaNotices = new NetopiaNoticeIntake({
+    repository, jobs, trust: deps.connectors.noticeTrust, recordsKey: deps.connectors.recordsKey,
+    paymentEnvironment: deps.connectors.paymentEnvironment, mode: "ON", audit: deps.audit, kick: () => drain(),
+    clockOffsetMs: deps.clockOffsetMs ?? 0
   });
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({
@@ -260,25 +290,22 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
       repository, tax: deps.connectors.tax, geo: deps.geo, countryPolicy: deps.countryPolicy, policy: deps.policy,
       plans: deps.plans, recordsKey: deps.connectors.recordsKey, audit: deps.audit
     }),
-    checkout, charges: new ChargeStatusReader(repository),
-    // P9a: `drain` is declared below; the kick only runs once a notice arrives.
-    notices: new NoticeIntake({
-      repository, decrypt: (value) => decryptNotice(value, deps.connectors.xmoneyPrivateKey), audit: deps.audit,
-      clock: deps.clock, kick: () => drain(), xmoneyEnvironment: deps.connectors.xmoneyEnvironment
-    }),
+    checkout, charges: new ChargeStatusReader({ repository, jobs, clock: deps.clock }),
+    netopiaNotices,
     subscription
   });
   const drain = createCoalescingSingleFlight(() => outbox.drain(10), () => deps.reportPending("BILLING_OUTBOX_PENDING"));
-  // P14a: the money check against xMoney (A10's daily listings, A2's adoption) in this connectors' xMoney system.
+  // P14a / N16: the money check (NETOPIA's status reads, and the owner's daily counts).
   const reconciler = new BillingReconciler({
-    billing: repository, jobs, xmoney: deps.connectors.xmoney, environment: deps.connectors.xmoneyEnvironment,
-    audit: deps.audit, clock: deps.clock, kick: drain
+    billing: repository, jobs, audit: deps.audit, clock: deps.clock, kick: drain,
+    // N16 (spec §2.14): NETOPIA's status reads, in this API's NETOPIA environment, on the same 10-minute tick.
+    netopia: { payments: deps.connectors.payments, paymentEnvironment: deps.connectors.paymentEnvironment, jobs, pool: deps.pool }
   });
   // P15: the erasure stop sweep runs in front of the money check, isolated from it (`reconcileWork`): a failed sweep
   // reports BILLING_ERASURE_SWEEP_PENDING and the reconciler runs anyway; BILLING_RECONCILIATION_PENDING means only
   // that the reconciler failed. Both are tried again on the next 10-minute tick.
   const erasure = new BillingErasureHook({
-    billing: repository, jobs, entitlements, audit: deps.audit, clock: deps.clock
+    billing: repository, jobs, entitlements, audit: deps.audit, clock: deps.clock, custody
   });
   const reconcile = createCoalescingSingleFlight(
     reconcileWork({ erasure, reconciler, reportPending: deps.reportPending }),
@@ -287,7 +314,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P16c: the owner's quarterly tax summary (spec §2.5.9), queued once per quarter and sent as email O1.
   const ownerJobs = new OwnerJobs({
     billing: repository, jobs, taxAuthorities: required(deps.taxAuthorities, "taxAuthorities"),
-    audit: deps.audit, clock: deps.clock
+    audit: deps.audit, clock: deps.clock, custody, refunds
   });
   outbox.register("OWNER_TAX_SUMMARY", ownerJobs.taxSummary);
   const scheduleOwnerJobs = createCoalescingSingleFlight(
@@ -298,6 +325,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     outbox,
     checkout,
     routes,
+    netopiaNotices,
     verify,
     refunds,
     renewal,

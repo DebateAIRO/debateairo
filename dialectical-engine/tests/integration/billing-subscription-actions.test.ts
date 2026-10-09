@@ -9,7 +9,7 @@ import {
   holdOwnerLock,
   mountSubscriptionRoutes,
   recordingAudit,
-  seedActiveSubscription,
+  seedNetopiaSubscription,
   subscriptionDeps,
   suspendForChargeback,
   TEST_PUBLIC_APP_URL
@@ -56,7 +56,7 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     const headers = { "x-test-session": identity.rawSessionToken };
     expect((await api.inject({ method: "GET", url: "/v1/billing/subscription", headers })).json())
       .toEqual({ subscription: null });
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: identity.authenticated.ownerRef, planId: "PLUS",
       activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "RO"
     });
@@ -78,7 +78,7 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     const audit = recordingAudit();
     const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool, { audit }), identity);
     const headers = { "x-test-session": identity.rawSessionToken };
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: identity.authenticated.ownerRef, planId: "PRO",
       activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE"
     });
@@ -116,7 +116,7 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
 
   it("dates the cancel after the owner lock it waited for, never before a row written meanwhile (P2-M12)", async () => {
     const ownerRef = randomUUID();
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE"
     });
     const clock = { now: new Date() };
@@ -132,15 +132,15 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     expect((await events(seeded.subscriptionId)).find((event) => event.kind === "CANCEL_REQUESTED")?.at).toEqual(clock.now);
   });
 
-  it("lets a plan of the other xMoney system be cancelled, but never revoked or offered a withdrawal (P2-I4)", async () => {
+  it("lets a plan of the other NETOPIA environment be cancelled, but never revoked or offered a withdrawal (P2-I4, spec §2.5.4)", async () => {
     const identity = testHttpIdentity("p2i4-other-system");
     const audit = recordingAudit();
-    // The fixture's connectors talk to stage; this plan was created in live (or the other way round after §14.8).
+    // The fixture's connectors serve NETOPIA's sandbox; this plan was created in live (or the other way round after §14.8).
     const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool, { audit }), identity);
     const headers = { "x-test-session": identity.rawSessionToken };
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: identity.authenticated.ownerRef, planId: "PRO",
-      activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE", xmoneyEnvironment: "live"
+      activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "DE", paymentEnvironment: "live"
     });
     const read = await api.inject({ method: "GET", url: "/v1/billing/subscription", headers });
     expect(read.json().subscription).toMatchObject({ status: "ACTIVE", withdrawal_open_until: null, withdrawal_last_day: null });
@@ -161,7 +161,7 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     const now = new Date();
     const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool, { audit, clock: () => now }), identity);
     const headers = { "x-test-session": identity.rawSessionToken };
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: identity.authenticated.ownerRef, planId: "PRO", activatedAt: new Date(now.getTime() - 3 * DAY), taxCountry: "DE"
     });
     await suspendForChargeback(database.pool, seeded, new Date(now.getTime() - DAY));
@@ -199,7 +199,7 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
   });
 
   it("never marks an ACTIVE plan's M7 as paused (P2-W10 control)", async () => {
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "RO"
     });
     await cancelForOwner(subscriptionDeps(database.pool), seeded.ownerRef);
@@ -223,8 +223,8 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
   it("ends the plan at once, M7 dated today with no undo, when the period already ended and the renewal is waiting out an outage (R2 Q-1)", async () => {
     const identity = testHttpIdentity("p12b-pending-renewal");
     const now = new Date();
-    // Still ACTIVE, its period end behind it: P11a keeps it so (RENEWAL_PENDING) while xMoney or the tax service is down.
-    const seeded = await seedActiveSubscription(database.pool, {
+    // Still ACTIVE, its period end behind it: P11a keeps it so (RENEWAL_PENDING) while NETOPIA or the tax service is down.
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: identity.authenticated.ownerRef, planId: "PLUS", activatedAt: new Date(now.getTime() - 40 * DAY),
       taxCountry: "RO"
     });
@@ -260,7 +260,7 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     const tax = new AdjustableTaxEngine();
     const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool, { tax }), identity);
     const headers = { "x-test-session": identity.rawSessionToken };
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: identity.authenticated.ownerRef, planId: "PRO",
       activatedAt: new Date(Date.now() - 4 * DAY), taxCountry: "RO"
     });
@@ -294,7 +294,7 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     const quote = vi.fn<TaxEngine["quote"]>(async () => { throw new Error("the tax engine must not be called"); });
     const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool, { tax: { quote } }), identity, () => false);
     const headers = { "x-test-session": identity.rawSessionToken };
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: identity.authenticated.ownerRef, planId: "MAX",
       activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "RO"
     });
@@ -319,7 +319,7 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
       tax: { quote }, legal: { requiresReacceptance: async () => true }
     }), identity);
     const headers = { "x-test-session": identity.rawSessionToken };
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: identity.authenticated.ownerRef, planId: "MAX",
       activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "RO"
     });
@@ -345,7 +345,7 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
   it("cancels on a pool of ONE connection: every read under the owner lock uses the transaction's own", async () => {
     const small = createPool(database.connectionString, { max: 1 });
     try {
-      const seeded = await seedActiveSubscription(database.pool, {
+      const seeded = await seedNetopiaSubscription(database.pool, {
         ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(Date.now() - DAY), taxCountry: "RO"
       });
       // A read through the pool while the transaction holds its only connection would wait here for ever.
@@ -360,7 +360,7 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     const identity = testHttpIdentity("p12b-invoices");
     const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool), identity);
     const headers = { "x-test-session": identity.rawSessionToken };
-    const seeded = await seedActiveSubscription(database.pool, {
+    const seeded = await seedNetopiaSubscription(database.pool, {
       ownerRef: identity.authenticated.ownerRef, planId: "PLUS",
       activatedAt: new Date(Date.now() - 5 * DAY), taxCountry: "RO"
     });

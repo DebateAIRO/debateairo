@@ -16,6 +16,15 @@ import {
   type MailAttachmentFact,
   type MailTemplateId
 } from "@debateai/mail-templates";
+import { hostCommand } from "../../apps/api/src/billing/refunds.js";
+import {
+  asRunbookLine, BARE_BILLING_COMMAND, ON_HOST, runbookBillingCommands
+} from "../support/runbookHostCommands.js";
+
+/** README §14.8's own form of the refund-done command on the host (F6a, ops-4): as the API's user, with its EnvironmentFile. */
+const HOST_REFUND_DONE = "systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api"
+  + " --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine"
+  + " /usr/bin/pnpm billing:refund-done --charge 0123456789abcdef0123456789abcdef --amount 12.10";
 
 const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   plan: "PLUS",
@@ -39,20 +48,31 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   notRequested: "true",
   otherSystem: "true",
   bankDeclined: "true",
+  confirmCard: "true",
+  paymentAlert: "true",
+  cardExpiring: "true",
   endedPlan: "PRO",
   invoiceNumber: "DBAI 0042",
   quarter: "2026-Q4",
   summaryText: "RO  net 100.00  tax 21.00\nDE  net 50.00  tax 9.50",
   chargeRef: "0123456789abcdef0123456789abcdef",
-  reasonCode: "XMONEY_REFUSED",
+  reasonCode: "PAYMENT_CONFIGURATION_REFUSED",
   withdrawalDate: "2026-10-12T08:30:00.000Z",
   refundDeadline: "2026-10-26T08:30:00.000Z",
   refundReason: "WITHDRAWAL",
   ownerRef: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93",
   jobKind: "SMARTBILL_INVOICE",
   reference: "charge 0123456789abcdef0123456789abcdef",
-  nextSteps: "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with pnpm billing:invoice"
-    + " --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>"
+  receivedAt: "2026-10-06T18:00:00.000Z",
+  paymentRef: "ntp-1234567890",
+  currency: "USD",
+  whole: "true",
+  doneCommand: HOST_REFUND_DONE,
+  refundCount: "2",
+  refundList: `- charge 0123456789abcdef0123456789abcdef, NETOPIA payment ntp-1: refund 12.10 USD (part of the payment)\n  ${HOST_REFUND_DONE}`,
+  nextSteps: "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with the --record command"
+    + " below; run the command as root on the server:\n"
+    + `  ${ON_HOST} billing:invoice --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>`
 });
 
 /** Every param a template declares, the optional ones included. */
@@ -195,11 +215,13 @@ describe("P17 renderMail", () => {
     for (const id of ["M5A", "M5B", "M5C"] as const) {
       // An outage past Q-1's 72 hours, our own refused key, an unknown outcome or a tax service that stayed down: no
       // bank was asked, so no sentence blames one.
-      const ours = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "false" }).text;
+      // N11: `confirmCard` (AUTHENTICATION_REQUIRED) is left "false" here; its own sentence is pinned in
+      // tests/unit/billing-netopia-renewal-rules.test.ts.
+      const ours = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "false", confirmCard: "false" }).text;
       expect(ours, id).toContain(`Hello,\n\n${first}\n\n`);
       expect(ours, id).not.toMatch(/bank/iu);
       // PAYMENT_DECLINED: the same first sentence, then the bank's refusal.
-      const declined = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "true" }).text;
+      const declined = renderMail(id, "en", { ...paramsFor(id), bankDeclined: "true", confirmCard: "false" }).text;
       expect(declined, id).toContain(`Hello,\n\n${first}\n\nYour bank refused the payment.\n\n`);
       expect(MAIL_TEMPLATES[id].params.bankDeclined, id).toBe("flag");
       const { bankDeclined: _flag, ...withoutFlag } = paramsFor(id);
@@ -329,7 +351,7 @@ describe("P17 renderMail", () => {
     expect(owner.subject).toBe("A refund could not be completed and needs your attention");
     expect(owner.text).toContain("Charge reference: 0123456789abcdef0123456789abcdef");
     expect(owner.text).toContain("Amount to refund: $12.10");
-    expect(owner.text).toContain("Reason code: XMONEY_REFUSED");
+    expect(owner.text).toContain("Reason code: PAYMENT_CONFIGURATION_REFUSED");
     expect(owner.html).toContain('<html lang="en" dir="ltr">');
     // Owner-facing, never a customer's data: the charge id, the amount and the code are all it carries, plus P2-I5's
     // flag, which only picks the sentences and is never printed.
@@ -338,18 +360,19 @@ describe("P17 renderMail", () => {
     expect(codeOf(() => renderMail("O2", "en", { ...paramsFor("O2"), reasonCode: "X\nY" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
   });
 
-  it("keeps O2 for a refund xMoney refused exactly as it was before P2-I5's flag", () => {
+  it("keeps O2 for a refund NETOPIA refused as it was before P2-I5's flag, in NETOPIA's words (N23)", () => {
     // W9's optional reason and deadline and P2-W4's other-system flag left out: the render of every O2 queued before them.
     const { refundReason: _reason, refundDeadline: _deadline, otherSystem: _other, ...before } = paramsFor("O2");
     const refused = renderMail("O2", "en", { ...before, notRequested: "false" });
-    // The five sentences of ruling Q-5's O2, in order and unchanged (compared with the render before the flag existed).
+    // The five sentences of ruling Q-5's O2, in order (compared with the render before the flag existed; N23 put the
+    // intro and the next step in NETOPIA's words).
     expect(refused.text.startsWith([
       "Hello,",
-      "Netopia refused a refund we asked for, or its outcome stayed unknown after every retry. No more tries are made by themselves.",
+      "A refund we asked for could not be completed: NETOPIA refused it, or its outcome stayed unknown after every retry. No more tries are made by themselves.",
       "Charge reference: 0123456789abcdef0123456789abcdef",
       "Amount to refund: $12.10",
-      "Reason code: XMONEY_REFUSED",
-      "Check this charge in the Netopia dashboard and settle the refund by hand there. The owner summary lists it until then.",
+      "Reason code: PAYMENT_CONFIGURATION_REFUSED",
+      "Check this payment in NETOPIA's admin and settle the refund by hand there. The owner summary lists it until then.",
       "The DebateAI team"
     ].join("\n\n"))).toBe(true);
     expect(refused.subject).toBe("A refund could not be completed and needs your attention");
@@ -357,15 +380,16 @@ describe("P17 renderMail", () => {
 
   it("names a dead withdrawal refund's reason, its legal deadline and how to settle it so M8 follows (W9, P2-M8)", () => {
     const dead = renderMail("O2", "en", { ...paramsFor("O2"), notRequested: "false", otherSystem: "false" });
-    expect(dead.text).toContain("Reason code: XMONEY_REFUSED\n\nRefund reason: WITHDRAWAL\n\n");
+    expect(dead.text).toContain("Reason code: PAYMENT_CONFIGURATION_REFUSED\n\nRefund reason: WITHDRAWAL\n\n");
     expect(dead.text).toContain(
       "This is a withdrawal refund: the law requires it to be made by October 26, 2026 at the latest (14 days after"
-      + " the withdrawal). First look at this payment in the Netopia dashboard. If it already shows a refund of"
-      + " $12.10, an earlier attempt went through: do not refund again; the site records it at its daily check, and"
-      + " the customer's refund email (M8) follows by itself. If it shows none, refund exactly $12.10 on this payment,"
-      + " in one refund, so the site records it and M8 follows by itself."
+      + " the withdrawal). First look at this payment in NETOPIA's admin. If it already shows a refund of $12.10, an"
+      + " earlier attempt went through: do not refund again. If it shows none, refund exactly $12.10 on this payment, in"
+      + " one refund. A refund of the whole payment is recorded by the site itself; for part of a payment, record it"
+      + " once it is made with the refund-done command, run as root on the server as the runbook shows. The customer's"
+      + " refund email (M8) then follows by itself."
     );
-    // W9 fix round 1 (F1): the dashboard is checked first, and the amount is exact: a refund over it is in no record
+    // W9 fix round 1 (F1): NETOPIA's admin is checked first, and the amount is exact: a refund over it is in no record
     // (recordRefunded records the request's amount), so the email never asks for "at least" an amount.
     expect(dead.text).not.toContain("at least");
     expect(dead.html).not.toContain("at least");
@@ -385,7 +409,7 @@ describe("P17 renderMail", () => {
     expect(owner.html).toContain('<html lang="en" dir="ltr">');
     expect(owner.text.startsWith([
       "Hello,",
-      "A customer withdrew from their plan, and the plan has ended. A refund made in the Netopia dashboard, or an"
+      "A customer withdrew from their plan, and the plan has ended. A refund made in NETOPIA's admin, or an"
         + " earlier refund request, already touched one of their payments, so the site could not work out what is still"
         + " due. Nothing has been refunded for this withdrawal yet.",
       "Owner reference: 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93",
@@ -393,19 +417,32 @@ describe("P17 renderMail", () => {
       "Withdrawn on October 12, 2026. The law requires the refund to be made by October 26, 2026 at the latest (14"
         + " days after the withdrawal).",
       "Work out what is still due as the runbook describes (\"A withdrawal sent by email or on the model form\"),"
-        + " refund in the Netopia dashboard what the site cannot, then record the settlement with pnpm billing:withdraw"
-        + " --owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93 --refund <amount> --dashboard <amount>. The customer's refund"
-        + " email (M8) follows. The owner summary lists it as WITHDRAWAL_BY_OWNER until then.",
+        + " refund in NETOPIA's admin what the site cannot, then record the settlement with the command below, run as"
+        + " root on the server. The customer's refund email (M8) follows. The owner summary lists it as"
+        + " WITHDRAWAL_BY_OWNER until then.",
+      `${ON_HOST} billing:withdraw --owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93 --refund <amount through this command>`
+        + " --dashboard <amount refunded in NETOPIA's admin>",
       "The DebateAI team"
     ].join("\n\n"))).toBe(true);
+    // The settling command is the API's own (`hostCommand`, as billing:withdraw prints it) and README §14.8's line.
+    const settle = hostCommand("billing:withdraw --owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93"
+      + " --refund <amount through this command> --dashboard <amount refunded in NETOPIA's admin>");
+    expect(owner.text).toContain(`\n\n${settle}\n\n`);
+    expect(runbookBillingCommands()).toContain(asRunbookLine(settle, [
+      ["--owner 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", '--owner "$OWNER_REF"'],
+      ["--refund <amount through this command>", '--refund "$REFUND"'],
+      ["--dashboard <amount refunded in NETOPIA's admin>", '--dashboard "$DASHBOARD"']
+    ]));
+    expect(owner.text).not.toMatch(BARE_BILLING_COMMAND);
     // Owner-facing: the owner reference, the code and two dates; never a customer's name, email or card.
     expect(Object.keys(MAIL_TEMPLATES.O2_WITHDRAWAL.params).sort())
       .toEqual(["ownerRef", "reasonCode", "refundDeadline", "withdrawalDate"]);
   });
 
   it("tells the owner at once of a legal document or an email that was never sent, and what to do (W12, P2-I16)", () => {
-    const owner = renderMail("O3", "de", { ...paramsFor("O3"), reasonCode: "INVOICE_UNKNOWN" });
-    expect(owner.subject).toBe("A legal document or a required email was not sent and needs your attention");
+    const { paymentAlert: _alert, ...deadJob } = paramsFor("O3");
+    const owner = renderMail("O3", "de", { ...deadJob, reasonCode: "INVOICE_UNKNOWN" });
+    expect(owner.subject).toBe("Billing needs your attention (INVOICE_UNKNOWN)");
     expect(owner.html).toContain('<html lang="en" dir="ltr">');
     expect(owner.html).toContain("<pre");
     expect(owner.text.startsWith([
@@ -416,9 +453,11 @@ describe("P17 renderMail", () => {
       "Job: SMARTBILL_INVOICE",
       "Reference: charge 0123456789abcdef0123456789abcdef",
       "Reason code: INVOICE_UNKNOWN",
-      "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with pnpm billing:invoice"
-        + " --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>",
-      "The owner summary (pnpm billing:tax-summary, and the quarterly email) lists it until it is settled.",
+      "SmartBill never confirmed it: look for it in SmartBill; if it is there, record it with the --record command"
+        + " below; run the command as root on the server:\n"
+        + `  ${ON_HOST} billing:invoice --charge 0123456789abcdef0123456789abcdef --kind INVOICE --record <series>-<number>`,
+      "The owner summary (the quarterly email, or the tax summary command run as root on the server as the runbook"
+        + " shows) lists it until it is settled.",
       "The DebateAI team"
     ].join("\n\n"))).toBe(true);
     // Owner-facing: a job kind, our own reference, a code and the steps; never a customer's name, email or card.
@@ -447,7 +486,7 @@ describe("P17 renderMail", () => {
     const forged = renderMail("O2", "en", { ...paramsFor("O2"), reasonCode: "REFUND_NOT_REQUESTED", notRequested: "true" });
     expect(forged.subject).toBe("A refund could not be completed and needs your attention");
     for (const part of [forged.text, forged.html]) {
-      expect(part).not.toContain("Netopia refused");
+      expect(part).not.toContain("NETOPIA refused");
       expect(part).not.toContain("Amount to refund");
       expect(part).not.toContain("settle the refund by hand");
     }
@@ -455,44 +494,44 @@ describe("P17 renderMail", () => {
     expect(forged.text).toContain("Reason code: REFUND_NOT_REQUESTED");
     // The four things it must say: nothing was sent; it matches no request we hold; the amount is only the job's;
     // something able to write to the billing database queued it, so whoever runs the server checks the requests.
-    expect(forged.text).toContain("stopped before anything was sent to Netopia");
+    expect(forged.text).toContain("stopped before anything was sent to NETOPIA");
     expect(forged.text).toContain("it does not match any refund request our records hold for this payment");
     expect(forged.text).toContain("Amount the job named: $12.10. This is only the job's own figure, not a refund to make.");
     expect(forged.text).toContain("Something able to write to the billing database queued it, so tell whoever runs the server.");
     expect(forged.text).toContain("They check this charge's own refund requests: a request that was never refunded is still owed.");
   });
 
-  it("tells the owner a refund job of the other xMoney system sent nothing and is owed nothing here (P2-W4)", () => {
+  it("tells the owner a refund job of another payment system sent nothing and is owed nothing here (P2-W4)", () => {
     // RefundDesk sends the flag and neither the reason nor the deadline (C2: the scope's English, the default).
     const { refundReason: _reason, refundDeadline: _deadline, ...base } = paramsFor("O2");
-    const other = renderMail("O2", "en", { ...base, reasonCode: "OTHER_XMONEY_SYSTEM", notRequested: "false", otherSystem: "true" });
+    const other = renderMail("O2", "en", { ...base, reasonCode: "OTHER_PAYMENT_SYSTEM", notRequested: "false", otherSystem: "true" });
     expect(other.subject).toBe("A refund could not be completed and needs your attention");
     expect(other.text.startsWith([
       "Hello,",
-      "A refund job was stopped before anything was sent to Netopia: the payment it names was taken in the other Netopia"
-        + " system (sandbox or live), which this server does not use. No money moved.",
+      "A refund job was stopped before anything was sent: the payment it names was taken in another payment system than"
+        + " the one this server uses (the previous card processor, or NETOPIA's sandbox or live). No money moved.",
       "Charge reference: 0123456789abcdef0123456789abcdef",
       "Amount to refund: $12.10",
-      "Reason code: OTHER_XMONEY_SYSTEM",
+      "Reason code: OTHER_PAYMENT_SYSTEM",
       "Nothing is owed on this server. If it was a real customer's payment in the other system, refund it in that"
-        + " system's dashboard; a sandbox test payment needs nothing. The owner summary lists it as REFUND_OTHER_SYSTEM.",
+        + " system's admin; a sandbox test payment needs nothing. The owner summary lists it as REFUND_OTHER_SYSTEM.",
       "The DebateAI team"
     ].join("\n\n"))).toBe(true);
     for (const part of [other.text, other.html]) {
-      expect(part).not.toContain("Netopia refused");
+      expect(part).not.toContain("NETOPIA refused");
       expect(part).not.toContain("settle the refund by hand");
       // No deadline paragraph, and never "M8 follows by itself": this API never sees the other system's refunds.
       expect(part).not.toContain("the law requires");
       expect(part).not.toContain("M8");
-      expect(part).not.toContain("A refund job was stopped before anything was sent to Netopia: it does not match");
+      expect(part).not.toContain("A refund job was stopped before anything was sent to NETOPIA: it does not match");
     }
     // The flag off (or left out, as in every O2 queued before it) keeps the refused wording; notRequested still wins.
     const refused = renderMail("O2", "en", { ...base, notRequested: "false", otherSystem: "false" }).text;
-    expect(refused).toContain("Netopia refused a refund we asked for");
-    expect(refused).not.toContain("other Netopia system");
+    expect(refused).toContain("A refund we asked for could not be completed: NETOPIA refused it");
+    expect(refused).not.toContain("another payment system");
     const forged = renderMail("O2", "en", { ...base, notRequested: "true" }).text;
     expect(forged).toContain("it does not match any refund request our records hold for this payment");
-    expect(forged).not.toContain("other Netopia system");
+    expect(forged).not.toContain("another payment system");
     expect(MAIL_TEMPLATES.O2.optional?.otherSystem).toBe("flag");
   });
 
@@ -532,5 +571,86 @@ describe("P17 renderMail", () => {
     expect(english).toContain("To: DebateAIRO S.R.L.");
     expect(renderWithdrawalForm("ro")).not.toBe(english);
     expect(renderWithdrawalForm("xx")).toBe(english);
+  });
+
+  it("N9/N10: speaks of a payment, not of a dead job, when O3 carries paymentAlert", () => {
+    const owner = renderMail("O3", "en", {
+      jobKind: "PAYMENT_NOTICE", reference: "notice 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93", reasonCode: "NOTICE_PARSE_FAILED",
+      nextSteps: "Report the code.", paymentAlert: "true"
+    });
+    expect(owner.subject).toBe("Billing needs your attention (NOTICE_PARSE_FAILED)");
+    // F6a (ui-3): a charge-back's O3 is queued together with the customer's M10, so the intro no longer claims silence.
+    expect(owner.text).toContain("A payment needs your attention. Nothing more was charged. The steps below say what the customer was told, if anything.");
+    expect(owner.text).not.toContain("not emailed");
+    expect(owner.text).toContain("This email is sent once for this reference and reason within the hour.");
+    expect(owner.text).not.toContain("A job that issues an invoice");
+    expect(Object.keys(MAIL_TEMPLATES.O3.optional ?? {})).toEqual(["paymentAlert"]);
+  });
+
+  it("F6a (ops-3, ops-4): both O2 refund emails say look in NETOPIA's admin first, and give the host's command, preview first", () => {
+    const LOOK_FIRST = "First look at the payment in NETOPIA's admin. If it already shows a refund of this amount, do not"
+      + " refund it again: only run the command below.";
+    const PREVIEW_THEN_CONFIRM = "once to see what it records, then again with --confirm added at the end to record it.";
+    const paragraphs = (text: string) => text.split("\n\n");
+    const whole = renderMail("O2_REFUND_DUE", "en", paramsFor("O2_REFUND_DUE"));
+    const part = renderMail("O2_REFUND_DUE", "en", { ...paramsFor("O2_REFUND_DUE"), whole: "false" });
+    const reminder = renderMail("O2_REFUND_REMINDER", "en", paramsFor("O2_REFUND_REMINDER"));
+    for (const [name, mail] of [["whole", whole], ["part", part], ["reminder", reminder]] as const) {
+      expect(paragraphs(mail.text).filter((paragraph) => paragraph.startsWith(LOOK_FIRST)), name).toHaveLength(1);
+      expect(mail.text, name).toContain(PREVIEW_THEN_CONFIRM);
+      expect(mail.text, name).not.toMatch(/not yet recorded\.|the next day|--confirm\n|--confirm$/mu);
+    }
+    expect(paragraphs(whole.text)).toContain(`${LOOK_FIRST} If it shows none, refund exactly this amount on this payment in`
+      + " NETOPIA's admin, in one refund.");
+    expect(paragraphs(whole.text)).toContain("Once NETOPIA reports the refund, the site records it by itself, and the customer's"
+      + " email and the credit note follow. If it is still open in the site's next reminder, record it yourself with the"
+      + ` command below, run as root on the server: run it ${PREVIEW_THEN_CONFIRM}`);
+    expect(paragraphs(part.text)).toContain("Once it is done, record it with the command below, run as root on the server (the"
+      + ` site cannot tell a partial refund from a whole one): run it ${PREVIEW_THEN_CONFIRM}`);
+    // The command is a paragraph of its own (a block: it is longer than a text param's 200 characters), copied whole.
+    for (const mail of [whole, part]) {
+      expect(paragraphs(mail.text)).toContain(HOST_REFUND_DONE);
+      expect(mail.html).toContain(`<pre style="white-space:pre-wrap;font-family:monospace">${HOST_REFUND_DONE}</pre>`);
+    }
+    expect(paragraphs(reminder.text)[1]).toBe(`${LOOK_FIRST} Do this for each refund listed here: each is owed, and not yet`
+      + " recorded on the site. If its payment shows no such refund, make it in NETOPIA's admin exactly as listed, in one"
+      + ` refund. Then run the command under it as root on the server: ${PREVIEW_THEN_CONFIRM}`);
+    expect(reminder.text).toContain(`  ${HOST_REFUND_DONE}`);
+    expect(MAIL_TEMPLATES.O2_REFUND_DUE.params.doneCommand).toBe("block");
+  });
+
+  // F8's rule (ruling PR-56): a bare `pnpm billing:…` fails in a root shell (no settings); an owner sentence names a
+  // command by what it does, or prints README §14.8's host form whole.
+  it("no owner sentence prints a bare pnpm billing: command", () => {
+    const owner = JSON.parse(readFileSync(resolve("packages/mail-templates/messages/en/owner.json"), "utf8")) as Record<string, string>;
+    for (const [key, sentence] of Object.entries(owner)) expect(sentence, key).not.toMatch(BARE_BILLING_COMMAND);
+  });
+
+  it("N9: tells the owner at once that NETOPIA's message about an open charge could not be verified (O4)", () => {
+    const owner = renderMail("O4", "ro", paramsFor("O4"));
+    expect(owner.subject).toBe("A NETOPIA payment message could not be verified (PAYMENT_CONFIGURATION_REFUSED)");
+    expect(owner.html).toContain('<html lang="en" dir="ltr">');
+    expect(owner.text.startsWith([
+      "Hello,",
+      "NETOPIA sent a message about one of our open payments, and the site could not verify it with the trusted NETOPIA"
+        + " key. It was answered \"try again\", so NETOPIA keeps sending it, and a sealed copy is kept for 14 days.",
+      "Charge reference: 0123456789abcdef0123456789abcdef",
+      "Received at: 2026-10-06T18:00:00.000Z (UTC)",
+      "Reason code: PAYMENT_CONFIGURATION_REFUSED",
+      "Check the NETOPIA key with the check command, run as root on the server as the runbook shows. If the key is"
+        + " wrong or out of date, put the right one in place with deploy/vps/billing-setup.sh --replace netopia and"
+        + " restart the API: every kept message is checked again at the start, saved cards included.",
+      "At most one such email is sent an hour; the owner summary (the quarterly email, or the tax summary command)"
+        + " counts every kept message by day."
+    ].join("\n\n"))).toBe(true);
+    expect(Object.keys(MAIL_TEMPLATES.O4.params).sort()).toEqual(["chargeRef", "reasonCode", "receivedAt"]);
+  });
+
+  it("N17: M12 says which card is missing, in English and Romanian", () => {
+    const expiring = renderMail("M12", "en", paramsFor("M12"));
+    expect(expiring.text).toContain("The card we have expires before then.");
+    expect(expiring.text).not.toContain("We couldn't keep your card");
+    const missing = renderMail("M12", "ro", { ...paramsFor("M12"), cardExpiring: "false" });
+    expect(missing.text).toContain("Nu am putut păstra cardul de la ultima dumneavoastră plată.");
   });
 });

@@ -4,20 +4,19 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BUCHAREST_SECTORS, ContractHttpError, ROMANIA_COUNTIES } from "@debateai/contract";
 import { CheckoutFlow, type CheckoutClient } from "../../apps/ui/components/billing/CheckoutFlow.js";
-import type { XMoneyGlobal, XMoneyPaymentFormOptions } from "../../apps/ui/lib/billing/xmoneySdk.js";
 import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+/** Every English sentence is read from the catalogue, so N20's rewording changes no expectation here. */
+const EN = billingEnglish as Readonly<Record<string, string>>;
 const CONSENTS = Object.freeze({
   renewal: { version: "consent-renewal-1", sha256: "a".repeat(64) },
   immediateStart: { version: "consent-immediate-1", sha256: "b".repeat(64) }
 });
-const CHECKOUT = Object.freeze({
-  public_key: "pk_test_x", order_payload: "cGF5bG9hZA==", order_checksum: "c2lnbg==",
-  charge_ref: "0123456789abcdef0123456789abcdef", sdk_environment: "stage" as const
-});
-/** P8b's BillingQuoteResponse, field for field (a connection in Germany, priced for Germany). */
+const PAGE = "https://secure-sandbox.netopia-payments.com/ui/card?p=0123456789ab";
+const STARTED = Object.freeze({ redirect_url: PAGE, charge_ref: "0123456789abcdef0123456789abcdef", environment: "sandbox" as const });
+/** N18's BillingQuoteResponse, field for field (a connection in Germany, priced for Germany). */
 function quote(overrides: Record<string, unknown> = {}) {
   return {
     quote_ref: "11111111-1111-4111-8111-111111111111", plan_id: "PLUS", net: "20.00", tax: "3.80", total: "23.80",
@@ -29,477 +28,390 @@ function quote(overrides: Record<string, unknown> = {}) {
 
 let container: HTMLDivElement;
 let root: Root;
-let mounted: XMoneyPaymentFormOptions[];
-let submit: ReturnType<typeof vi.fn>;
 let client: { [K in keyof CheckoutClient]: ReturnType<typeof vi.fn> };
-
+let goToPayment: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
-  mounted = [];
-  submit = vi.fn();
   client = { createBillingQuote: vi.fn(), startBillingCheckout: vi.fn(), getBillingCharge: vi.fn() };
+  goToPayment = vi.fn();
 });
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
 });
 
-const loadSdk = async (): Promise<XMoneyGlobal> => ({
-  paymentForm: (options) => { mounted.push(options); return { submit, destroy: () => undefined }; }
-});
-
-/** The flow chains several awaited calls (quote → checkout → SDK load → mount); let each hop settle. */
 async function settle(): Promise<void> {
   for (let hop = 0; hop < 6; hop += 1) await act(async () => { await Promise.resolve(); });
 }
 async function render(navigate?: (href: string) => void): Promise<void> {
   await act(async () => {
     root.render(<CheckoutFlow planId="PLUS" locale="en" catalog={billingEnglish} consents={CONSENTS}
-      sdkOrigin="https://secure-stage.xmoney.com" nonce="AAAAAAAAAAAAAAAAAAAAAA=="
-      client={client as unknown as CheckoutClient} loadSdk={loadSdk} navigate={navigate} />);
+      client={client as unknown as CheckoutClient} navigate={navigate} goToPayment={goToPayment} />);
   });
   await settle();
 }
-const countrySelect = (): HTMLSelectElement => container.querySelector<HTMLSelectElement>("#checkout-country")!;
-async function choose(select: HTMLSelectElement, value: string): Promise<void> {
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, value);
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+async function remount(navigate?: (href: string) => void): Promise<void> {
+  act(() => root.unmount());
+  root = createRoot(container);
+  await render(navigate);
 }
 const text = (): string => container.textContent ?? "";
+const input = (id: string): HTMLInputElement => container.querySelector<HTMLInputElement>(`input#${id}`)!;
 const select = (id: string): HTMLSelectElement => container.querySelector<HTMLSelectElement>(`select#${id}`)!;
-const optionValues = (element: HTMLSelectElement): string[] => [...element.options].map((option) => option.value);
-const button = (label: string): HTMLButtonElement =>
-  [...container.querySelectorAll("button")].find((candidate) => candidate.textContent === label)!;
+const button = (key: string): HTMLButtonElement | undefined =>
+  [...container.querySelectorAll("button")].find((candidate) => candidate.textContent === EN[key]);
 const checkbox = (index: number): HTMLInputElement => container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[index]!;
 async function click(element: HTMLElement): Promise<void> {
   await act(async () => { element.click(); });
   await settle();
 }
-async function fill(input: HTMLInputElement, value: string): Promise<void> {
+async function fill(element: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(element, value);
+    element.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
+async function choose(element: HTMLSelectElement, value: string): Promise<void> {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(element, value);
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+/** The billing block NETOPIA needs, for a German buyer (no region asked). */
+async function fillDetails(): Promise<void> {
+  await fill(input("checkout-firstName"), " Anna ");
+  await fill(input("checkout-lastName"), "Schmidt");
+  await fill(input("checkout-phone"), "+49 151 1234 5678");
+  await fill(input("checkout-street"), "Invalidenstrasse 1");
+  await fill(input("checkout-city"), "Berlin");
+  await fill(input("checkout-postalCode"), "10115");
+}
+async function consentAndContinue(): Promise<void> {
+  await click(checkbox(0));
+  await click(checkbox(1));
+  await click(button("billing.checkout.continueToCard")!);
+}
 
-describe("P19 CheckoutFlow", () => {
-  it("prices the connection's country at once, takes both consents with their manifest pairs, and pays through xMoney", async () => {
-    client.createBillingQuote.mockResolvedValue(quote());
-    client.startBillingCheckout.mockResolvedValue(CHECKOUT);
-    client.getBillingCharge.mockResolvedValue({ state: "SUCCEEDED", reason_code: null });
+describe("N19 CheckoutFlow on NETOPIA's page", () => {
+  it("shows the billing block at once, prices it, takes both consents with the total, and leaves for NETOPIA's page", async () => {
+    client.createBillingQuote.mockResolvedValueOnce(quote({ address_required: true })).mockResolvedValueOnce(quote());
+    client.startBillingCheckout.mockResolvedValue(STARTED);
     await render();
-    // P8b's pre-fill: no country on the first quote; the answer's `country` is the connection's, and it is selected.
-    expect(client.createBillingQuote).toHaveBeenCalledTimes(1);
     expect(client.createBillingQuote).toHaveBeenCalledWith({ plan_id: "PLUS" });
-    expect(text()).toContain(
-      "Plus — $20.00 + $3.80 MwSt. (19%, Germany) = $23.80 per month. Renews on the 29th of each month until you cancel."
-    );
-    expect(countrySelect().value).toBe("DE");
-    const next = button("Continue to card details");
-    expect(next.disabled).toBe(true);
+    expect(select("checkout-country").value).toBe("DE");
+    expect(text()).toContain(EN["billing.checkout.billingNote"]);
+    // The phone field offers the connection country's calling code.
+    expect(input("checkout-phone").value).toBe("+49 ");
+    expect(button("billing.checkout.continueToCard")!.disabled).toBe(true);
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    await fillDetails();
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith({
+      plan_id: "PLUS", country: "DE", first_name: "Anna", last_name: "Schmidt", phone: "+49 151 1234 5678",
+      street: "Invalidenstrasse 1", city: "Berlin", postal_code: "10115"
+    });
+    expect(text()).toContain("Plus — $20.00 + $3.80 MwSt. (19%, Germany) = $23.80 per month.");
+    // Spec §2.18: the card-saving agreement names the monthly total (live once N20 adds {total} to the sentence).
+    expect(text()).toContain(EN["billing.consent.renewal"]!.replace("{total}", "$23.80"));
+    expect(text()).toContain(EN["billing.checkout.cardNote"]);
+    const next = button("billing.checkout.continueToCard")!;
     await click(checkbox(0));
     expect(next.disabled).toBe(true);
     await click(checkbox(1));
     expect(next.disabled).toBe(false);
     await click(next);
     expect(client.startBillingCheckout).toHaveBeenCalledWith({
-      quote_ref: "11111111-1111-4111-8111-111111111111",
-      locale: "en",
+      quote_ref: "11111111-1111-4111-8111-111111111111", locale: "en",
       consents: { renewal_terms: CONSENTS.renewal, immediate_start: CONSENTS.immediateStart }
     });
-    expect(mounted).toHaveLength(1);
-    await act(async () => { mounted[0]!.onReady(); });
-    await click(button("Subscribe and pay"));
-    expect(submit).toHaveBeenCalledTimes(1);
-    await act(async () => { mounted[0]!.onPaymentComplete({}); });
-    await settle();
-    expect(client.getBillingCharge).toHaveBeenCalledWith(CHECKOUT.charge_ref);
-    expect(text()).toContain("Your Plus plan is active. A confirmation email is on its way.");
-    expect(document.querySelectorAll('script[src*="xmoney"]')).toHaveLength(0);
+    // Spec §2.6.2 step 7: a top-level navigation to the page the server answered; no frame, no script of NETOPIA's.
+    expect(goToPayment.mock.calls).toEqual([[PAGE]]);
+    expect(container.querySelectorAll("iframe, script")).toHaveLength(0);
   });
 
-  it("says G2 plainly when the country cannot pay, and offers no way forward to a card", async () => {
-    client.createBillingQuote.mockRejectedValue(new ContractHttpError("FORBIDDEN", 403, "x", "COUNTRY_PAYMENT_UNAVAILABLE"));
+  it("asks Romania for the county from SmartBill's list and, in Bucharest, a sector as the city (R-15, P2-M15)", async () => {
+    client.createBillingQuote.mockResolvedValue(quote({ country: "RO", ip_country: "RO", tax_country: "RO", address_required: true }));
     await render();
-    expect(text()).toContain("Paid plans aren't available in your country yet. You can keep using the Free plan.");
-    expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Continue to card details")).toBe(false);
-    // An unknown address or Tor reads the same (P8b's COUNTRY_UNKNOWN / TOR_REFUSED for a quote without a country).
-    client.createBillingQuote.mockRejectedValue(new ContractHttpError("FORBIDDEN", 403, "x", "COUNTRY_UNKNOWN"));
-    act(() => root.unmount());
-    root = createRoot(container);
-    await render();
-    expect(text()).toContain("Paid plans aren't available in your country yet. You can keep using the Free plan.");
-    expect(countrySelect().value).toBe("");
+    expect(input("checkout-phone").value).toBe("+40 ");
+    const county = select("checkout-region");
+    expect([...county.options].map((option) => option.value)).toEqual(["", ...ROMANIA_COUNTIES]);
+    await fill(input("checkout-firstName"), "Ana");
+    await fill(input("checkout-lastName"), "Pop");
+    await fill(input("checkout-phone"), "+40 712 345 678");
+    await fill(input("checkout-street"), "Strada Lipscani 1");
+    await fill(input("checkout-postalCode"), "030031");
+    await choose(county, "Bucuresti");
+    const sector = select("checkout-city");
+    expect([...sector.options].map((option) => option.value)).toEqual(["", ...BUCHAREST_SECTORS]);
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    await choose(sector, "Sector 3");
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith(expect.objectContaining({
+      country: "RO", region: "Bucuresti", city: "Sector 3", postal_code: "030031", first_name: "Ana"
+    }));
+    // Moving the county away from Bucharest clears the sector, so "Sector 3" never names a city elsewhere.
+    await choose(select("checkout-region"), "Ilfov");
+    expect(input("checkout-city").value).toBe("");
   });
 
-  it("asks G3 when the person picks a country other than the connection's, and says the person confirmed it", async () => {
+  it("asks the US and Canada for the state, and lets Ireland go without a postal code", async () => {
+    client.createBillingQuote.mockResolvedValue(quote({ address_required: true }));
+    await render();
+    await fillDetails();
+    await choose(select("checkout-country"), "US");
+    expect(input("checkout-phone").value).toBe("+49 151 1234 5678");
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    await fill(input("checkout-region"), "NY");
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+    await choose(select("checkout-country"), "IE");
+    expect(container.querySelector("#checkout-region")).toBeNull();
+    await fill(input("checkout-postalCode"), "");
+    expect(container.querySelector("label[for='checkout-postalCode']")?.textContent).toBe(EN["billing.checkout.postalCodeOptional"]);
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote.mock.calls.at(-1)![0]).not.toHaveProperty("postal_code");
+  });
+
+  it("asks G3 when the person picks a country other than the connection's", async () => {
     client.createBillingQuote
       .mockResolvedValueOnce(quote({ country: "IT", ip_country: "IT", tax_name: "IVA", tax_rate_bp: 2200, tax_country: "IT" }))
       .mockResolvedValueOnce(quote({ ip_country: "IT", country_confirm_needed: true }));
-    client.startBillingCheckout.mockResolvedValue(CHECKOUT);
+    client.startBillingCheckout.mockResolvedValue(STARTED);
     await render();
-    expect(countrySelect().value).toBe("IT");
-    await choose(countrySelect(), "DE");
-    await click(button("Show the full price"));
-    expect(client.createBillingQuote).toHaveBeenLastCalledWith({ plan_id: "PLUS", country: "DE" });
+    await choose(select("checkout-country"), "DE");
+    await fillDetails();
+    await click(button("billing.checkout.showPrice")!);
     expect(text()).toContain("Your connection looks like it's from Italy. Do you live in Germany?");
     await click(checkbox(0));
     await click(checkbox(1));
-    expect(button("Continue to card details").disabled).toBe(true);
-    await click(button("Yes, I live there"));
-    await click(button("Continue to card details"));
-    expect(client.startBillingCheckout).toHaveBeenCalledWith(expect.objectContaining({ locale: "en", country_confirmed: true }));
+    expect(button("billing.checkout.continueToCard")!.disabled).toBe(true);
+    await click(button("billing.checkout.confirmCountryYes")!);
+    await click(button("billing.checkout.continueToCard")!);
+    expect(client.startBillingCheckout).toHaveBeenCalledWith(expect.objectContaining({ country_confirmed: true }));
   });
 
-  it("prices Romania from the connection, then asks for the name, city and county a SmartBill invoice needs (R-15)", async () => {
-    const romania = {
-      net: "20.00", tax: "4.20", total: "24.20", tax_name: "TVA", tax_rate_bp: 2100, tax_country: "RO",
-      country: "RO", ip_country: "RO"
+  it("keeps the price disabled while the phone holds only its calling code", async () => {
+    client.createBillingQuote.mockResolvedValue(quote({ address_required: true }));
+    await render();
+    await fill(input("checkout-firstName"), "Anna");
+    await fill(input("checkout-lastName"), "Schmidt");
+    await fill(input("checkout-street"), "Invalidenstrasse 1");
+    await fill(input("checkout-city"), "Berlin");
+    await fill(input("checkout-postalCode"), "10115");
+    // The quote's schema refuses "+49" before any request leaves, so the page never asks with it.
+    expect(input("checkout-phone").value).toBe("+49 ");
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    await fill(input("checkout-phone"), "+49 151 1234 5678");
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+  });
+
+  it("takes the price away after any edit, so the next price carries the corrected details", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    await render();
+    await fillDetails();
+    const priced = async (): Promise<void> => {
+      await click(button("billing.checkout.showPrice")!);
+      expect(button("billing.checkout.continueToCard")).toBeDefined();
     };
-    client.createBillingQuote
-      .mockResolvedValueOnce(quote({ ...romania, address_required: true }))
-      .mockResolvedValueOnce(quote(romania));
-    client.startBillingCheckout.mockResolvedValue(CHECKOUT);
-    await render();
-    expect(client.createBillingQuote).toHaveBeenCalledWith({ plan_id: "PLUS" });
-    expect(text()).toContain("Plus — $20.00 + $4.20 TVA (21%, Romania) = $24.20 per month.");
-    expect(text()).toContain("A Romanian invoice needs your name, city and county.");
-    // P8c would refuse BILLING_ADDRESS_REQUIRED for this quote, so the page never offers the card step for it.
-    await click(checkbox(0));
-    await click(checkbox(1));
-    expect(button("Continue to card details").disabled).toBe(true);
-    const showPrice = button("Show the full price");
-    expect(showPrice.disabled).toBe(true);
-    await fill(container.querySelector<HTMLInputElement>("#checkout-name")!, " Ana Pop ");
-    // The county is SmartBill's fixed list (smartbill-api-facts.md row 3), chosen before the city.
-    const county = select("checkout-region");
-    expect(county.compareDocumentPosition(container.querySelector("#checkout-city")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(optionValues(county)).toEqual(["", ...ROMANIA_COUNTIES]);
-    expect(county.options[0]!.disabled).toBe(true);
-    expect(county.options[0]!.textContent).toBe("County");
-    await choose(county, "Cluj");
-    expect(showPrice.disabled).toBe(true);
-    // Outside Bucharest the city stays free text.
-    await fill(container.querySelector<HTMLInputElement>("input#checkout-city")!, "Cluj-Napoca");
-    expect(showPrice.disabled).toBe(false);
-    await click(showPrice);
-    expect(client.createBillingQuote).toHaveBeenLastCalledWith({
-      plan_id: "PLUS", country: "RO", region: "Cluj", city: "Cluj-Napoca", name: "Ana Pop"
-    });
-    await click(checkbox(0));
-    await click(checkbox(1));
-    expect(button("Continue to card details").disabled).toBe(false);
-    await click(button("Continue to card details"));
-    expect(client.startBillingCheckout).toHaveBeenCalledTimes(1);
+    await priced();
+    await fill(input("checkout-street"), "Unter den Linden 5");
+    expect(button("billing.checkout.continueToCard")).toBeUndefined();
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith(expect.objectContaining({ street: "Unter den Linden 5" }));
+    expect(button("billing.checkout.continueToCard")).toBeDefined();
+    await fill(input("checkout-city"), "Potsdam");
+    expect(button("billing.checkout.continueToCard")).toBeUndefined();
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith(expect.objectContaining({ city: "Potsdam" }));
+    await click(button("billing.checkout.companyToggle")!);
+    expect(button("billing.checkout.continueToCard")).toBeUndefined();
+    await fill(input("checkout-company-name"), "Acme GmbH");
+    await fill(input("checkout-company-vat"), "DE123456789");
+    await fill(input("checkout-company-address"), "1 Hauptstraße, Berlin");
+    await priced();
+    await fill(input("checkout-company-name"), "Acme Berlin GmbH");
+    expect(button("billing.checkout.continueToCard")).toBeUndefined();
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith(expect.objectContaining({
+      street: "Unter den Linden 5", city: "Potsdam",
+      company: { name: "Acme Berlin GmbH", vat_id: "DE123456789", address: "1 Hauptstraße, Berlin" }
+    }));
+    expect(button("billing.checkout.continueToCard")).toBeDefined();
   });
 
-  it("asks a Bucharest buyer for the sector as the city, the only city SmartBill's e-Factura accepts there", async () => {
-    const romania = {
-      net: "20.00", tax: "4.20", total: "24.20", tax_name: "TVA", tax_rate_bp: 2100, tax_country: "RO",
-      country: "RO", ip_country: "RO"
-    };
-    client.createBillingQuote
-      .mockResolvedValueOnce(quote({ ...romania, address_required: true }))
-      .mockResolvedValueOnce(quote(romania));
+  it("drops a price that answers after an edit made while it was asked", async () => {
+    let answer: (value: ReturnType<typeof quote>) => void = () => undefined;
+    client.createBillingQuote.mockResolvedValueOnce(quote())
+      .mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
     await render();
-    const showPrice = button("Show the full price");
-    await fill(container.querySelector<HTMLInputElement>("#checkout-name")!, "Ana Pop");
-    await fill(container.querySelector<HTMLInputElement>("input#checkout-city")!, "Bucuresti");
-    await choose(select("checkout-region"), "Bucuresti");
-    // Moving the county to Bucuresti clears the city, and the city becomes the six sectors.
-    const sector = select("checkout-city");
-    expect(sector.value).toBe("");
-    expect(optionValues(sector)).toEqual(["", ...BUCHAREST_SECTORS]);
-    expect(sector.options[0]!.textContent).toBe("City");
-    expect(showPrice.disabled).toBe(true);
-    await choose(sector, "Sector 3");
-    expect(showPrice.disabled).toBe(false);
-    await click(showPrice);
-    expect(client.createBillingQuote).toHaveBeenLastCalledWith({
-      plan_id: "PLUS", country: "RO", region: "Bucuresti", city: "Sector 3", name: "Ana Pop"
-    });
-    // Moving the county away from Bucuresti clears the sector, so "Sector 3" never names a city elsewhere.
-    await choose(select("checkout-region"), "Ilfov");
-    expect(container.querySelector<HTMLInputElement>("input#checkout-city")!.value).toBe("");
-    expect(button("Show the full price").disabled).toBe(true);
-  });
-
-  it("never counts a county typed for another country as a Romanian one", async () => {
-    client.createBillingQuote.mockResolvedValueOnce(quote({ address_required: true }));
-    await render();
-    await fill(container.querySelector<HTMLInputElement>("#checkout-name")!, "Ana Pop");
-    await fill(container.querySelector<HTMLInputElement>("#checkout-region")!, "Berlin");
-    await fill(container.querySelector<HTMLInputElement>("#checkout-city")!, "Berlin");
-    expect(button("Show the full price").disabled).toBe(false);
-    await choose(countrySelect(), "RO");
-    expect(select("checkout-region").value).toBe("");
-    expect(button("Show the full price").disabled).toBe(true);
-  });
-
-  it("asks a US connection only for the postal code its address_required means, never the Romanian block", async () => {
-    const unitedStates = { country: "US", ip_country: "US", tax_country: "US" };
-    client.createBillingQuote
-      .mockResolvedValueOnce(quote({ ...unitedStates, address_required: true }))
-      .mockResolvedValueOnce(quote(unitedStates));
-    await render();
-    expect(client.createBillingQuote).toHaveBeenCalledWith({ plan_id: "PLUS" });
-    expect(countrySelect().value).toBe("US");
-    expect(container.querySelector("#checkout-postal")).not.toBeNull();
-    expect(container.querySelector("#checkout-state")).not.toBeNull();
-    expect(container.querySelector("#checkout-name")).toBeNull();
-    expect(container.querySelector("#checkout-city")).toBeNull();
-    expect(text()).not.toContain("A Romanian invoice");
-    const ids = [...container.querySelectorAll("[id]")].map((element) => element.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    await click(checkbox(0));
-    await click(checkbox(1));
-    expect(button("Continue to card details").disabled).toBe(true);
-    await fill(container.querySelector<HTMLInputElement>("#checkout-postal")!, "10001");
-    await click(button("Show the full price"));
-    expect(client.createBillingQuote).toHaveBeenLastCalledWith({ plan_id: "PLUS", country: "US", postal_code: "10001" });
-    const next = button("Continue to card details");
-    expect(next.disabled).toBe(true);
-    await click(checkbox(0));
-    expect(next.disabled).toBe(true);
-    await click(checkbox(1));
-    expect(next.disabled).toBe(false);
-  });
-
-  it("sends a session that ended while the page was open back to sign in and to this plan, from the quote or the checkout", async () => {
-    client.createBillingQuote.mockRejectedValueOnce(new ContractHttpError("SESSION_REQUIRED", 401, "Session required"));
-    const fromQuote = vi.fn();
-    await render(fromQuote);
-    expect(fromQuote.mock.calls).toEqual([["/login?next=%2Fcheckout%3Fplan%3DPLUS"]]);
-    expect(text()).not.toContain("Something went wrong");
-
-    client.createBillingQuote.mockResolvedValue(quote());
-    client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("SESSION_REQUIRED", 401, "Session required"));
-    const fromCheckout = vi.fn();
-    act(() => root.unmount());
-    root = createRoot(container);
-    await render(fromCheckout);
-    await click(checkbox(0));
-    await click(checkbox(1));
-    await click(button("Continue to card details"));
-    expect(fromCheckout.mock.calls).toEqual([["/login?next=%2Fcheckout%3Fplan%3DPLUS"]]);
-    expect(mounted).toHaveLength(0);
-    expect(text()).not.toContain("Something went wrong");
-  });
-
-  it("lets the person pick another country, and asks the US and Canada for a postal code", async () => {
-    client.createBillingQuote.mockResolvedValueOnce(quote());
-    await render();
-    await choose(countrySelect(), "US");
-    const showPrice = button("Show the full price");
-    expect(showPrice.disabled).toBe(true);
-    await fill(container.querySelector<HTMLInputElement>("#checkout-postal")!, "10001");
-    await click(button("Buying as a company?"));
-    await fill(container.querySelector<HTMLInputElement>("#checkout-company-name")!, "Acme Inc");
-    await fill(container.querySelector<HTMLInputElement>("#checkout-company-vat")!, "US123");
-    await fill(container.querySelector<HTMLInputElement>("#checkout-company-address")!, "1 Main St, New York");
-    client.createBillingQuote.mockRejectedValueOnce(new ContractHttpError("UNPROCESSABLE", 422, "x", "TAX_ID_INVALID"));
-    await click(showPrice);
-    expect(client.createBillingQuote).toHaveBeenLastCalledWith({
-      plan_id: "PLUS", country: "US", postal_code: "10001",
-      company: { name: "Acme Inc", vat_id: "US123", address: "1 Main St, New York" }
-    });
-    expect(text()).toContain("That VAT number couldn't be confirmed. Check it, or buy without a company.");
-  });
-
-  it("asks for a fresh price when the quote expired between pricing and payment", async () => {
-    client.createBillingQuote.mockResolvedValue(quote());
-    client.startBillingCheckout.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 409, "x", "QUOTE_EXPIRED"));
-    await render();
-    await click(checkbox(0));
-    await click(checkbox(1));
-    await click(button("Continue to card details"));
-    expect(text()).toContain("This price has expired. Show the full price again to continue.");
-    expect(mounted).toHaveLength(0);
-  });
-
-  it("after a bank decline offers Try again, which prices afresh", async () => {
-    client.createBillingQuote.mockResolvedValue(quote());
-    client.startBillingCheckout.mockResolvedValue(CHECKOUT);
-    client.getBillingCharge.mockResolvedValue({ state: "NEEDS_ACTION", reason_code: "PAYMENT_DECLINED" });
-    await render();
-    await click(checkbox(0));
-    await click(checkbox(1));
-    await click(button("Continue to card details"));
-    await act(async () => { mounted[0]!.onReady(); });
-    await click(button("Subscribe and pay"));
-    await act(async () => { mounted[0]!.onPaymentComplete({}); });
+    await fillDetails();
+    await click(button("billing.checkout.showPrice")!);
+    await fill(input("checkout-street"), "Unter den Linden 5");
+    await act(async () => { answer(quote()); });
     await settle();
-    expect(text()).toContain("The payment didn't go through, and no money was taken. You can try again or use another card.");
-    await click(button("Try again"));
-    expect(client.createBillingQuote).toHaveBeenCalledTimes(2);
-    expect(client.createBillingQuote).toHaveBeenLastCalledWith({ plan_id: "PLUS", country: "DE" });
+    expect(button("billing.checkout.continueToCard")).toBeUndefined();
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
   });
 
-  it("a checkout whose payment is already in flight shows that charge's waiting screen, never a second card form", async () => {
-    // P8c answers CHECKOUT_PENDING when the open charge already has a notice, a VERIFY_PAYMENT job or an xMoney
-    // transaction: signing the same charge again would let the person pay twice.
+  it("refuses to price a half-filled company block", async () => {
     client.createBillingQuote.mockResolvedValue(quote());
-    client.startBillingCheckout.mockResolvedValue({ state: "PENDING", charge_ref: CHECKOUT.charge_ref });
-    client.getBillingCharge.mockResolvedValue({ state: "PENDING", reason_code: null });
     await render();
-    await click(checkbox(0));
-    await click(checkbox(1));
-    await click(button("Continue to card details"));
-    expect(mounted).toHaveLength(0);
-    expect(client.getBillingCharge).toHaveBeenCalledWith(CHECKOUT.charge_ref);
-    expect(text()).toContain("Waiting for your bank to confirm…");
-    expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Subscribe and pay")).toBe(false);
+    await fillDetails();
+    await click(button("billing.checkout.companyToggle")!);
+    await fill(input("checkout-company-name"), "Acme GmbH");
+    expect(button("billing.checkout.showPrice")!.disabled).toBe(true);
+    expect(text()).toContain(EN["billing.checkout.companyIncomplete"]);
+    await fill(input("checkout-company-vat"), "DE123456789");
+    await fill(input("checkout-company-address"), "1 Hauptstraße, Berlin");
+    await click(button("billing.checkout.showPrice")!);
+    expect(client.createBillingQuote).toHaveBeenLastCalledWith(expect.objectContaining({
+      company: { name: "Acme GmbH", vat_id: "DE123456789", address: "1 Hauptstraße, Berlin" }
+    }));
   });
 
-  it("after two minutes of waiting, says not to pay again and leads to Settings instead of a new payment", async () => {
+  it("words every refusal plainly and never leaves for a page it did not get", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    for (const [code, status, key] of [
+      ["PAYMENT_PROVIDER_UNAVAILABLE", 503, "billing.checkout.formUnavailable"],
+      ["BILLING_ADDRESS_REQUIRED", 422, "billing.checkout.detailsRequired"],
+      ["QUOTE_EXPIRED", 409, "billing.checkout.quoteExpired"],
+      ["LEGAL_DOCUMENT_STALE", 409, "billing.checkout.pageOutdated"],
+      ["COUNTRY_CONFIRMATION_REQUIRED", 422, "billing.checkout.confirmCountryRequired"],
+      ["ACCOUNT_ERASURE_PENDING", 409, "billing.checkout.erasurePending"],
+      ["ADMISSION_RATE_LIMITED", 429, "billing.checkout.rateLimited"],
+      ["AGE_CHECK_UNAVAILABLE", 503, "billing.checkout.genericError"]
+    ] as const) {
+      client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", status, "x", code));
+      await remount();
+      await consentAndContinue();
+      expect(text(), code).toContain(EN[key]);
+    }
+    client.createBillingQuote.mockRejectedValueOnce(new ContractHttpError("UNPROCESSABLE", 422, "x", "BILLING_PHONE_INVALID"));
+    await remount();
+    expect(text()).toContain(EN["billing.checkout.phoneInvalid"]);
+    expect(goToPayment).not.toHaveBeenCalled();
+  });
+
+  // N19b (A3 (a)): a failed start leaves a FAILED charge holding the quote's one use, so the next try needs a new price.
+  for (const [code, status, key] of [
+    ["PAYMENT_PROVIDER_UNAVAILABLE", 503, "billing.checkout.formUnavailable"],
+    ["BILLING_ADDRESS_REQUIRED", 422, "billing.checkout.detailsRequired"]
+  ] as const) {
+    it(`a failed start (${status} ${code}) asks for a fresh price and never resends the used one`, async () => {
+      const used = "22222222-2222-4222-8222-222222222222";
+      const fresh = "33333333-3333-4333-8333-333333333333";
+      client.createBillingQuote.mockResolvedValueOnce(quote())
+        .mockResolvedValueOnce(quote({ quote_ref: used })).mockResolvedValueOnce(quote({ quote_ref: fresh }));
+      client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", status, "x", code))
+        .mockResolvedValueOnce(STARTED);
+      await render();
+      await fillDetails();
+      await click(button("billing.checkout.showPrice")!);
+      await consentAndContinue();
+      expect(client.startBillingCheckout).toHaveBeenLastCalledWith(expect.objectContaining({ quote_ref: used }));
+      expect(text()).toContain(EN[key]);
+      // The used price is gone: nothing to continue with until the price is asked again.
+      expect(button("billing.checkout.continueToCard")).toBeUndefined();
+      expect(button("billing.checkout.showPrice")!.disabled).toBe(false);
+      const asked = client.createBillingQuote.mock.calls.length;
+      await click(button("billing.checkout.showPrice")!);
+      expect(client.createBillingQuote).toHaveBeenCalledTimes(asked + 1);
+      // The fresh price is accepted afresh: both confirmations start unticked.
+      expect(checkbox(0).checked).toBe(false);
+      expect(checkbox(1).checked).toBe(false);
+      expect(button("billing.checkout.continueToCard")!.disabled).toBe(true);
+      await consentAndContinue();
+      expect(client.startBillingCheckout).toHaveBeenCalledTimes(2);
+      expect(client.startBillingCheckout).toHaveBeenLastCalledWith(expect.objectContaining({ quote_ref: fresh }));
+      expect(client.startBillingCheckout.mock.calls.filter(([body]) => body.quote_ref === used)).toHaveLength(1);
+      expect(goToPayment.mock.calls).toEqual([[PAGE]]);
+    });
+  }
+
+  it("links the updated-Terms sentence to the accept screen, and sends the age gate and a lost session where they belong", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("FORBIDDEN", 403, "x", "LEGAL_REACCEPTANCE_REQUIRED"));
+    await render();
+    await consentAndContinue();
+    const link = [...container.querySelectorAll("a")].find((candidate) => candidate.textContent === EN["billing.checkout.reacceptRequired"]);
+    expect(link?.getAttribute("href")).toBe("/");
+    const navigate = vi.fn();
+    client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("FORBIDDEN", 403, "x", "AGE_CONFIRMATION_REQUIRED"));
+    await remount(navigate);
+    await consentAndContinue();
+    client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("SESSION_REQUIRED", 401, "Session required"));
+    await remount(navigate);
+    await consentAndContinue();
+    expect(navigate.mock.calls).toEqual([["/?next=%2Fcheckout%3Fplan%3DPLUS"], ["/login?next=%2Fcheckout%3Fplan%3DPLUS"]]);
+    expect(goToPayment).not.toHaveBeenCalled();
+  });
+
+  it("waits on the open checkout's charge when the server says its payment is on its way, and offers Try again after a decline", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    client.startBillingCheckout.mockResolvedValue({ state: "PENDING", charge_ref: STARTED.charge_ref });
+    client.getBillingCharge.mockResolvedValue({ state: "NEEDS_ACTION", reason_code: "PAYMENT_DECLINED", kind: "INITIAL" });
+    await render();
+    await consentAndContinue();
+    expect(goToPayment).not.toHaveBeenCalled();
+    expect(client.getBillingCharge).toHaveBeenCalledWith(STARTED.charge_ref);
+    expect(text()).toContain(EN["billing.checkout.failed"]);
+    await click(button("billing.checkout.tryAgain")!);
+    expect(client.createBillingQuote).toHaveBeenCalledTimes(2);
+  });
+
+  it("after two minutes of waiting says not to pay again and leads to Settings", async () => {
     vi.useFakeTimers();
     try {
       client.createBillingQuote.mockResolvedValue(quote());
-      client.startBillingCheckout.mockResolvedValue(CHECKOUT);
-      client.getBillingCharge.mockResolvedValue({ state: "PENDING", reason_code: null });
+      client.startBillingCheckout.mockResolvedValue({ state: "PENDING", charge_ref: STARTED.charge_ref });
+      client.getBillingCharge.mockResolvedValue({ state: "PENDING", reason_code: null, kind: "INITIAL" });
       await render();
-      await click(checkbox(0));
-      await click(checkbox(1));
-      await click(button("Continue to card details"));
-      await act(async () => { mounted[0]!.onReady(); });
-      await click(button("Subscribe and pay"));
-      await act(async () => { mounted[0]!.onPaymentComplete({}); });
+      await consentAndContinue();
       await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
-      expect(text()).toContain("We'll email you as soon as your bank confirms.");
-      expect(text()).toContain("Please don't pay again. Your plan appears in Settings once your bank confirms.");
-      expect(container.querySelector('a[href="/settings"]')?.textContent).toBe("Go to Settings");
-      expect([...container.querySelectorAll("button")].some((b) => b.textContent === "Try again")).toBe(false);
+      expect(text()).toContain(EN["billing.checkout.doNotPayAgain"]);
+      expect(button("billing.checkout.tryAgain")).toBeUndefined();
     } finally {
       vi.useRealTimers();
     }
   });
+});
 
-  it("asks for the invoice address whenever the quote says so, not only for Romania (the issuer is the register's)", async () => {
-    client.createBillingQuote
-      .mockResolvedValueOnce(quote({ address_required: true }))
-      .mockResolvedValueOnce(quote());
-    await render();
-    expect(countrySelect().value).toBe("DE");
-    expect(text()).toContain("A Romanian invoice needs your name, city and county.");
-    expect(button("Show the full price").disabled).toBe(true);
-    await fill(container.querySelector<HTMLInputElement>("#checkout-name")!, "Anna Schmidt");
-    await fill(container.querySelector<HTMLInputElement>("#checkout-city")!, "Berlin");
-    await fill(container.querySelector<HTMLInputElement>("#checkout-region")!, "Berlin");
-    await click(button("Show the full price"));
-    expect(client.createBillingQuote).toHaveBeenLastCalledWith({
-      plan_id: "PLUS", country: "DE", region: "Berlin", city: "Berlin", name: "Anna Schmidt"
+describe("N25b the payment marks under Continue (spec §2.18)", () => {
+  const marksImages = (): string[][] => [...container.querySelectorAll('[role="group"] img')]
+    .map((image) => [image.getAttribute("src") ?? "", image.getAttribute("alt") ?? ""]);
+  async function renderWithMarks(paymentMarks?: Readonly<{ netopia: boolean; visa: boolean; mastercard: boolean }>): Promise<void> {
+    await act(async () => {
+      root.render(<CheckoutFlow planId="PLUS" locale="en" catalog={billingEnglish} consents={CONSENTS}
+        client={client as unknown as CheckoutClient} goToPayment={goToPayment} paymentMarks={paymentMarks} />);
     });
-    // The fields stay for this country after the answer, so the next quote carries them again.
-    expect(container.querySelector("#checkout-name")).not.toBeNull();
-    await choose(countrySelect(), "FR");
-    expect(container.querySelector("#checkout-name")).toBeNull();
+    await settle();
+  }
+
+  it("shows the marks it is given, NETOPIA's first, in the footer's words, right under the Continue button", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    await renderWithMarks({ netopia: true, visa: true, mastercard: true });
+    expect(marksImages()).toEqual([
+      ["/payment-marks/netopia.svg", "NETOPIA Payments"],
+      ["/payment-marks/visa.svg", "Visa"],
+      ["/payment-marks/mastercard.svg", "Mastercard"]
+    ]);
+    const group = container.querySelector('[role="group"]')!;
+    expect(group.getAttribute("aria-label")).toBe("Cards we accept");
+    expect(group.previousElementSibling?.contains(button("billing.checkout.continueToCard")!)).toBe(true);
   });
 
-  it("refuses to price a half-filled company block, so a business buyer is never quoted as a consumer", async () => {
+  it("shows only the marks whose files are there, and no group when none is given or none is there", async () => {
     client.createBillingQuote.mockResolvedValue(quote());
-    await render();
-    await click(button("Buying as a company?"));
-    await fill(container.querySelector<HTMLInputElement>("#checkout-company-name")!, "Acme GmbH");
-    expect(button("Show the full price").disabled).toBe(true);
-    expect(text()).toContain("Fill in all three company fields, or close the company section.");
-    await fill(container.querySelector<HTMLInputElement>("#checkout-company-vat")!, "DE123456789");
-    await fill(container.querySelector<HTMLInputElement>("#checkout-company-address")!, "1 Hauptstraße, Berlin");
-    expect(button("Show the full price").disabled).toBe(false);
-    expect(text()).not.toContain("Fill in all three company fields");
-    await click(button("Show the full price"));
-    expect(client.createBillingQuote).toHaveBeenLastCalledWith({
-      plan_id: "PLUS", country: "DE", company: { name: "Acme GmbH", vat_id: "DE123456789", address: "1 Hauptstraße, Berlin" }
-    });
-  });
-
-  it("words the checkout's other refusals plainly: a stale page, a country to confirm, a pending deletion, a missing invoice address", async () => {
-    client.createBillingQuote.mockResolvedValue(quote());
-    for (const [code, status, sentence] of [
-      ["LEGAL_DOCUMENT_STALE", 409, "This page is out of date. Please reload it."],
-      ["COUNTRY_CONFIRMATION_REQUIRED", 422, "Please confirm the country where you live, then continue."],
-      ["ACCOUNT_ERASURE_PENDING", 409, "Your account is scheduled for deletion. Cancel the deletion in Settings to subscribe or change your plan."],
-      ["BILLING_ADDRESS_REQUIRED", 422, "A Romanian invoice needs your name, city and county."]
-    ] as const) {
-      client.startBillingCheckout.mockRejectedValueOnce(
-        new ContractHttpError(status === 409 ? "SERVER_FAILURE" : "UNPROCESSABLE", status, "x", code)
-      );
-      act(() => root.unmount());
-      root = createRoot(container);
-      await render();
-      await click(checkbox(0));
-      await click(checkbox(1));
-      await click(button("Continue to card details"));
-      expect(text(), code).toContain(sentence);
-      expect(text(), code).not.toContain("Something went wrong");
-    }
-    // After BILLING_ADDRESS_REQUIRED the page shows the three fields at once.
-    expect(container.querySelector("#checkout-name")).not.toBeNull();
-  });
-
-  it("words the hourly limit with its own sentence, never 'try again' (W10, P2-M19)", async () => {
-    const limited = () => new ContractHttpError("RATE_LIMITED", 429, "x", "ADMISSION_RATE_LIMITED");
-    // The quote made when /checkout loads spends the shared hourly budget (10 an hour per person).
-    client.createBillingQuote.mockRejectedValueOnce(limited());
-    await render();
-    expect(text()).toContain("Too many tries in the last hour. Please try again later.");
-    expect(text()).not.toContain("Something went wrong");
-    // The checkout's own budget.
-    act(() => root.unmount());
-    root = createRoot(container);
-    client.createBillingQuote.mockResolvedValue(quote());
-    client.startBillingCheckout.mockRejectedValueOnce(limited());
-    await render();
-    await click(checkbox(0));
-    await click(checkbox(1));
-    await click(button("Continue to card details"));
-    expect(text()).toContain("Too many tries in the last hour. Please try again later.");
-    expect(text()).not.toContain("Something went wrong");
-    expect(mounted).toHaveLength(0);
-  });
-
-  it("links the updated-Terms sentence to the accept screen (W10, P2-M20)", async () => {
-    client.createBillingQuote.mockResolvedValue(quote());
-    client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("FORBIDDEN", 403, "x", "LEGAL_REACCEPTANCE_REQUIRED"));
-    await render();
-    await click(checkbox(0));
-    await click(checkbox(1));
-    await click(button("Continue to card details"));
-    // The accept screen covers the signed-in home page (L4); /checkout itself has none.
-    const link = [...container.querySelectorAll("a")]
-      .find((candidate) => candidate.textContent === "Please accept the updated Terms first, then come back to this page.");
-    expect(link?.getAttribute("href")).toBe("/");
-    expect(link?.closest('[role="alert"]')).not.toBeNull();
-    expect(mounted).toHaveLength(0);
-  });
-
-  it("sends an account the server says still owes its age check to the age gate, and says 'try again' when the check cannot be read (P8c, R3-2)", async () => {
-    // The page's own read fails open; P8c's checkout guard fails closed and has the last word.
-    client.createBillingQuote.mockResolvedValue(quote());
-    client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("FORBIDDEN", 403, "x", "AGE_CONFIRMATION_REQUIRED"));
-    const navigate = vi.fn();
-    await render(navigate);
-    await click(checkbox(0));
-    await click(checkbox(1));
-    await click(button("Continue to card details"));
-    // The age gate's own interstitial and return path, exactly the redirect the page makes (ageConfirmationHref).
-    expect(navigate.mock.calls).toEqual([["/?next=%2Fcheckout%3Fplan%3DPLUS"]]);
-    expect(mounted).toHaveLength(0);
-    expect(text()).not.toContain("Something went wrong");
-
-    client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 503, "x", "AGE_CHECK_UNAVAILABLE"));
-    const stay = vi.fn();
-    act(() => root.unmount());
-    root = createRoot(container);
-    await render(stay);
-    await click(checkbox(0));
-    await click(checkbox(1));
-    await click(button("Continue to card details"));
-    expect(text()).toContain("Something went wrong. Please try again.");
-    expect(stay).not.toHaveBeenCalled();
-    expect(mounted).toHaveLength(0);
+    await renderWithMarks({ netopia: true, visa: false, mastercard: false });
+    expect(marksImages()).toEqual([["/payment-marks/netopia.svg", "NETOPIA Payments"]]);
+    await renderWithMarks({ netopia: false, visa: false, mastercard: false });
+    expect(button("billing.checkout.continueToCard")).toBeDefined();
+    expect(container.querySelector('[role="group"]')).toBeNull();
+    await renderWithMarks();
+    expect(button("billing.checkout.continueToCard")).toBeDefined();
+    expect(container.querySelectorAll("img")).toHaveLength(0);
   });
 });
