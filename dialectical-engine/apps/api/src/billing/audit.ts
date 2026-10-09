@@ -76,6 +76,11 @@ export type BillingAuditEvent =
   /** N11: an earlier attempt of the period read PAID before a retry; its check was queued. The attempt. */
   | "billing.renewal.recovered_earlier"
   /**
+   * F2 (ruling PR-55): NETOPIA reported a renewal's payment refunded before the site saw it paid; it was recorded paid
+   * and refunded, its plan ended with no customer email, and the owner got O3 RENEWAL_REFUNDED_BEFORE_SEEN. The attempt.
+   */
+  | "billing.renewal.refunded_before_seen"
+  /**
    * N11 (spec §2.4.3, ruling PR-11): NETOPIA answered a renewal's FIRST send with 56 (the orderID was already used), an
    * anomaly; O3 ORDER_REUSED was queued. Our own order id (the charge id) only.
    */

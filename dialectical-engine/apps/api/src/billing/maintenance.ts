@@ -6,6 +6,7 @@ import type { BillingAudit } from "./audit.js";
 import type { CardCustody } from "./card-custody.js";
 import { emailJob } from "./email-job.js";
 import { enqueueOnce, isThisPaymentSystem } from "./outbox.js";
+import { paidAndRefundedInFull } from "./refunds.js";
 import { codeOf, failureCode, type RenewalService, type RetryPrice } from "./renewal.js";
 import { addDays, anniversaryDue, dunningProgress } from "./renewal-rules.js";
 import { subscriptionEvent } from "./rows.js";
@@ -171,9 +172,7 @@ export class BillingMaintenance {
       if (progress === null) return false;
       const periodStart = state.currentPeriodEnd;
       const next = progress.failedAttempts + 1;
-      const made = (await this.deps.repository.chargesForSubscription(subscriptionId)).some((charge) =>
-        charge.kind === "RENEWAL" && charge.periodStart.getTime() === periodStart.getTime() && charge.attempt >= next);
-      if (made) return false;
+      if (await this.attemptMade(subscriptionId, periodStart, next)) return false;
       const retryDay = this.deps.policy.dunningRetryDays[progress.failedAttempts - 1];
       // P2-M13: the policy in force has no retry day left for this many failed attempts (the owner published shorter
       // `dunning_retry_days` during this dunning). No attempt is open, so nothing else would ever end it: it ends here.
@@ -220,6 +219,21 @@ export class BillingMaintenance {
     });
     if (leased.kind === "RAN" && leased.value === "RETRIED") report.retried += 1;
     if (leased.kind === "RAN" && leased.value === "ENDED") report.ended += 1;
+  }
+
+  /**
+   * Whether a RENEWAL charge of this attempt or a later one exists for the period: its own outcome decides, so nothing
+   * more is made. F2 (ruling PR-55, defence in depth): an attempt whose SUCCEEDED was refunded in full
+   * (`paidAndRefundedInFull`) does not count; `createRetryCharge` still never writes a second charge of one attempt.
+   */
+  private async attemptMade(subscriptionId: string, periodStart: Date, next: number): Promise<boolean> {
+    const rows = (await this.deps.repository.chargesForSubscription(subscriptionId)).filter((charge) =>
+      charge.kind === "RENEWAL" && charge.periodStart.getTime() === periodStart.getTime() && charge.attempt >= next);
+    for (const row of rows) {
+      const charge = await this.deps.repository.charge(row.chargeId);
+      if (charge === null || !paidAndRefundedInFull(charge)) return true;
+    }
+    return false;
   }
 
   /**

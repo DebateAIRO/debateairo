@@ -12,6 +12,7 @@ import {
   recordingAudit, seedNetopiaSubscription, TEST_PUBLIC_APP_URL, TEST_RECORDS_KEY
 } from "../support/billingSubscriptionFixtures.js";
 import { startFakeNetopia } from "../support/fake-netopia.js";
+import { netopiaVerifyHandler, verifyJob } from "../support/netopia-verify.js";
 import { BillingMaintenance } from "../../apps/api/src/billing/maintenance.js";
 import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
 import { sealBillingProfile, type BillingProfile } from "../../apps/api/src/billing/records.js";
@@ -588,5 +589,91 @@ describe("N11 a dunning retry first probes the period's earlier attempts (spec Â
     expect(run.payments.reads.filter((read) => read.orderId === first.chargeId)).toHaveLength(4);
     expect(heldPending()).toHaveLength(2);
     expect(await ownerAlerts("RENEWAL_OUTCOME_OPEN", reference)).toHaveLength(1);
+  });
+});
+
+describe("F2 a renewal NETOPIA reports refunded before the site saw it paid (money-1, ruling PR-55)", () => {
+  const customerEmails = (run: Due) => outboxRows("kind = 'EMAIL' AND payload->>'customer_id' = $1", [run.seeded.customerId]);
+  const refundedBeforeSeen = (chargeId: string) => ownerAlerts("RENEWAL_REFUNDED_BEFORE_SEEN", `charge ${chargeId}`);
+  const NEXT_STEPS = "NETOPIA reports this renewal's payment refunded (or cancelled) before the site saw it paid, so the"
+    + " plan has ended and the person was not emailed. Tell them yourself; if they should keep the plan, they can"
+    + " subscribe again.";
+  const renewalAttempts = async (run: Due) => (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
+    .filter((row) => row.kind === "RENEWAL").map((row) => row.attempt);
+
+  /** The probe reads REFUNDED (SUBMITTED + VERIFY queued), then VERIFY runs once and again; returns what it wrote. */
+  async function refundedThenVerified(run: Due, chargeId: string) {
+    run.payments.scriptStatus(chargeId, report(chargeId, "REFUNDED"), report(chargeId, "REFUNDED"), report(chargeId, "REFUNDED"));
+    run.clock.now = new Date(run.clock.now.getTime() + 2 * MINUTE);
+    expect(await run.renewal.recoverOpenCharge(chargeId)).toBe(true);
+    expect((await trail(chargeId)).at(-1)).toBe("SUBMITTED");
+    expect(await verifyJobs(chargeId)).toHaveLength(1);
+    const emailsBefore = (await customerEmails(run)).length;
+    const { verify, audit } = netopiaVerifyHandler(database.pool, { payments: run.payments, clock: () => run.clock.now });
+    expect(await verify.handle(verifyJob(chargeId, run.clock.now), run.clock.now)).toEqual({ kind: "DONE" });
+    // The money is recorded as NETOPIA reports it: paid, then refunded in NETOPIA's admin.
+    expect((await trail(chargeId)).slice(-3)).toEqual(["SUCCEEDED", "REFUND_REQUESTED:PROVIDER_REFUND", "REFUNDED:PROVIDER_REFUND"]);
+    const state = foldSubscription(await run.repository.subscriptionEvents(run.seeded.subscriptionId));
+    expect(state).toMatchObject({ status: "ENDED", endedCause: "DUNNING" });
+    expect(await run.entitlements.current(run.ownerRef, run.clock.now)).toMatchObject({ planId: "FREE", cause: "ENDED_DUNNING" });
+    expect(await customerEmails(run)).toHaveLength(emailsBefore);
+    const alerts = await refundedBeforeSeen(chargeId);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]!.ref).toBe(`O3:${chargeId}:RENEWAL_REFUNDED_BEFORE_SEEN`);
+    expect(alerts[0]!.payload).toMatchObject({ recipient: "OWNER", "param.paymentAlert": "true", "param.nextSteps": NEXT_STEPS });
+    // A second VERIFY queues nothing more and writes nothing more.
+    const rows = (await trail(chargeId)).length;
+    const events = (await kindsOf(run)).length;
+    expect(await verify.handle(verifyJob(chargeId, run.clock.now), run.clock.now)).toEqual({ kind: "DONE" });
+    expect(await trail(chargeId)).toHaveLength(rows);
+    expect(await kindsOf(run)).toHaveLength(events);
+    expect(await refundedBeforeSeen(chargeId)).toHaveLength(1);
+    expect(await customerEmails(run)).toHaveLength(emailsBefore);
+    return { audit, state };
+  }
+
+  it("attempt 1 (SUBMIT_UNKNOWN, then REFUNDED): the ACTIVE plan ends, no customer email, one O3, and the month is never charged again", async () => {
+    const run = await due();
+    run.payments.answer(run.email, () => paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout"));
+    const charge = await renewNow(run);
+    expect(await trail(charge.chargeId)).toEqual(["REQUESTED", "SUBMIT_UNKNOWN:CHARGE_OUTCOME_UNKNOWN"]);
+    const { audit } = await refundedThenVerified(run, charge.chargeId);
+    expect(audit.events.filter((entry) => entry.event === "billing.renewal.refunded_before_seen"))
+      .toEqual([{ event: "billing.renewal.refunded_before_seen", fields: { attempt: 1 } }]);
+    // Days later: neither the renewal nor the maintenance pass charges this plan again.
+    run.clock.now = new Date(run.clock.now.getTime() + 10 * DAY);
+    expect(await run.renewal.renew(run.seeded.subscriptionId)).not.toBe("charged");
+    await run.maintenance.runOnce();
+    expect(await renewalAttempts(run)).toEqual([1]);
+    expect(run.payments.charges.filter((sent) => sent.payer.email === run.email)).toHaveLength(1);
+  });
+
+  it("attempt 2 on a PAST_DUE plan: the plan ends the same way; no attempt 3, and the refunded attempt never holds a retry as paid", async () => {
+    const run = await due();
+    run.payments.answer(run.email, (input) => report(input.orderId, "DECLINED", { bankDeclined: true }));
+    await renewNow(run);
+    expect((await kindsOf(run)).at(-1)).toBe("PAST_DUE");
+    run.payments.answer(run.email, () => paymentError("PAYMENT_OUTCOME_UNKNOWN", "timeout"));
+    run.clock.now = new Date(run.clock.now.getTime() + DAY + MINUTE);
+    await run.maintenance.runOnce();
+    const retry = (await run.repository.chargesForSubscription(run.seeded.subscriptionId))
+      .find((row) => row.kind === "RENEWAL" && row.attempt === 2);
+    expect(retry).toBeDefined();
+    expect(await trail(retry!.chargeId)).toEqual(["REQUESTED", "SUBMIT_UNKNOWN:CHARGE_OUTCOME_UNKNOWN"]);
+    const customerEmailsBefore = (await customerEmails(run)).length;
+    const { audit, state } = await refundedThenVerified(run, retry!.chargeId);
+    expect(await customerEmails(run)).toHaveLength(customerEmailsBefore);
+    expect(audit.events.filter((entry) => entry.event === "billing.renewal.refunded_before_seen"))
+      .toEqual([{ event: "billing.renewal.refunded_before_seen", fields: { attempt: 2 } }]);
+    // Defence in depth: an attempt whose payment was refunded in full is never an earlier attempt "paid".
+    expect(await run.renewal.earlierAttemptPaid(state, retry!.periodStart, 3, run.clock.now)).toBe("NONE");
+    // The next maintenance passes make no attempt 3 and never hold a retry as EARLIER_ATTEMPT_PAID.
+    run.clock.now = new Date(run.clock.now.getTime() + 3 * DAY);
+    await run.maintenance.runOnce();
+    run.clock.now = new Date(run.clock.now.getTime() + 5 * DAY);
+    await run.maintenance.runOnce();
+    expect(await renewalAttempts(run)).toEqual([1, 2]);
+    expect(run.audit.events.filter((entry) => entry.event === "billing.renewal.retry_held"
+      && entry.fields.code === "EARLIER_ATTEMPT_PAID")).toEqual([]);
   });
 });

@@ -125,6 +125,18 @@ export function allocateRefund(amountMicros: number, paid: ReadonlyArray<PaidTra
   return allocations;
 }
 
+/**
+ * F2 (ruling PR-55): whether the charge's paid payment (its SUCCEEDED) went back in full: the REFUNDED rows naming it,
+ * its own or a separate refund transaction's, add up to what it took. Such a payment bought nothing, so it never counts
+ * as an earlier attempt "paid" (`RenewalService.earlierAttemptPaid`) nor as an attempt made (`BillingMaintenance`'s
+ * retry). False with no SUCCEEDED.
+ */
+export function paidAndRefundedInFull(charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>): boolean {
+  const paid = charge.events.find((event) => event.kind === "SUCCEEDED");
+  if (paid === undefined || paid.providerPaymentId === null || paid.amountMicros === null) return false;
+  return sumOf(charge.events, "REFUNDED", paid.providerPaymentId) >= paid.amountMicros;
+}
+
 /** Whether this paid transaction already holds a REFUNDED row, its own or a separate refund transaction's. */
 export function refundedAlready(charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>, transactionId: string): boolean {
   return charge.events.some((event) => event.kind === "REFUNDED" && refundTarget(event) === transactionId);
@@ -200,8 +212,11 @@ export async function queueRefundHeldAlert(
   }, client);
 }
 
-/** Whether a request gives back the WHOLE payment it names (the payment's own amount, nothing recorded of it yet). */
-function wholePaymentOpen(
+/**
+ * Whether a request gives back the WHOLE payment it names (the payment's own amount, nothing recorded of it yet).
+ * VERIFY_PAYMENT records such a request when NETOPIA reports the payment REFUNDED or, after it was paid, VOIDED (F2).
+ */
+export function wholePaymentOpen(
   charge: Readonly<{ events: ReadonlyArray<ChargeEventRow> }>, open: Readonly<{ intent: RefundIntent; openMicros: number }>
 ): boolean {
   const paid = charge.events.find((event) => (event.kind === "SUCCEEDED" || event.kind === "DUPLICATE_PAYMENT")
@@ -844,7 +859,8 @@ export class RefundDesk {
 
   /**
    * Spec §2.12.2 item 3: one O2_REFUND_REMINDER a day listing every open owner refund, when one is due today. "NETOPIA
-   * shows a refund": the charge's latest status read was REFUNDED (§2.12.4). Returns the refunds listed (0: no email).
+   * shows a refund": the charge's latest status read was REFUNDED (§2.12.4) or VOIDED (F2: a payment cancelled in
+   * NETOPIA's admin is money back too). Returns the refunds listed (0: no email).
    */
   async remindOwnerRefunds(now: Date): Promise<number> {
     const netopia = this.deps.netopia;
@@ -858,7 +874,8 @@ export class RefundDesk {
       lines.push(Object.freeze({
         chargeId: row.chargeId, providerPaymentId: row.providerPaymentId, reason: row.reason, currency: row.currency,
         openMicros: row.requestedMicros - row.refundedMicros, whole: row.whole, requestedAt: row.requestedAt,
-        deadline: await this.withdrawalDeadlineOf(intent), seenRefunded: last?.outcome === "REFUNDED"
+        deadline: await this.withdrawalDeadlineOf(intent),
+        seenRefunded: last?.outcome === "REFUNDED" || last?.outcome === "VOIDED"
       }));
     }
     if (!lines.some((line) => refundReminderDue(line, now))) return 0;

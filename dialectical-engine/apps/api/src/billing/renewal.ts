@@ -19,6 +19,7 @@ import { planName, type BillingOrderText } from "./order-text.js";
 import { queuePaymentAlert } from "./payment-alert.js";
 import { taxRefusalDetail } from "./quote.js";
 import { openCardToken, openQuoteLocation, sealCardToken, sealQuoteLocation, type QuoteLocation } from "./records.js";
+import { paidAndRefundedInFull } from "./refunds.js";
 import {
   dunningProgress, recurringNetOf, renewalLeadMs, renewalNoticeDecision, renewalPendingUntil
 } from "./renewal-rules.js";
@@ -1209,6 +1210,8 @@ export class RenewalService {
    * charge, and no retry this pass (its money could still be taken). An attempt that cannot be read: "UNKNOWN", and no
    * retry this pass (a second payment is never risked); "PENDING" wins over "UNKNOWN". Every other read (NO_SUCH_ORDER, a
    * final unpaid state, REFUNDED, CHARGEBACK_*, UNCLEAR) holds nothing. A plan of another payment system: "NONE".
+   * F2 (ruling PR-55, defence in depth): an earlier attempt whose SUCCEEDED was refunded in full (`paidAndRefundedInFull`)
+   * paid for nothing, so it is not "PAID" and holds nothing.
    */
   async earlierAttemptPaid(
     state: SubscriptionState, periodStart: Date, attempt: number, now: Date
@@ -1222,7 +1225,10 @@ export class RenewalService {
     for (const row of earlier) {
       const charge = await this.deps.repository.charge(row.chargeId);
       if (charge === null || !charge.events.some((event) => event.kind === "SUBMITTED" || event.kind === "SUBMIT_UNKNOWN")) continue;
-      if (charge.events.some((event) => event.kind === "SUCCEEDED")) return "PAID";
+      if (charge.events.some((event) => event.kind === "SUCCEEDED")) {
+        if (paidAndRefundedInFull(charge)) continue;
+        return "PAID";
+      }
       const read = await this.readStatus(charge, now);
       if (read === "UNREADABLE") {
         unknown = true;

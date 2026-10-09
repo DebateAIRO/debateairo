@@ -12,6 +12,7 @@ import {
 } from "../support/billingSubscriptionFixtures.js";
 import { recordDisputeOutcome } from "../../apps/api/src/billing/dispute-cli.js";
 import { OwnerJobs } from "../../apps/api/src/billing/owner-jobs.js";
+import { BillingReconciler, statusNeedsVerify } from "../../apps/api/src/billing/reconcile.js";
 import { heldByChargeback, RefundDesk, refundReminderDue } from "../../apps/api/src/billing/refunds.js";
 import { chargeEvent, newChargeId, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { createInitialSettlement } from "../../apps/api/src/billing/settlement-initial.js";
@@ -47,7 +48,8 @@ class RefundPort implements Pick<CardPayments, "status" | "refund"> {
 }
 
 const report = (orderId: string, providerPaymentId: string, state: PaymentReport["state"], amountMicros: number): PaymentReport => Object.freeze({
-  orderId, providerPaymentId, state, providerStatus: state === "REFUNDED" ? "8" : state === "CHARGEBACK_OPENED" ? "9" : "3", amountMicros, currency: "USD",
+  orderId, providerPaymentId, state,
+  providerStatus: state === "REFUNDED" ? "8" : state === "CHARGEBACK_OPENED" ? "9" : state === "VOIDED" ? "4" : "3", amountMicros, currency: "USD",
   cardCountry: "DE", savedCard: null, declineCode: null, declineSide: null, bankDeclined: false, occurredAt: null, clientId: null
 });
 
@@ -93,7 +95,10 @@ const emails = async (template: string, needle: string) => (await database.pool.
 const refundedRows = async (chargeId: string) => (await repository.charge(chargeId))!.events
   .filter((event) => event.kind === "REFUNDED").map((event) => event.amountMicros);
 
-async function requestWhole(seeded: Awaited<ReturnType<typeof paidPlan>>, desk: RefundDesk, reason: "SUBSCRIPTION_ENDED" | "WITHDRAWAL", amountMicros: number) {
+async function requestWhole(
+  seeded: Awaited<ReturnType<typeof paidPlan>>, desk: RefundDesk, reason: "SUBSCRIPTION_ENDED" | "WITHDRAWAL" | "ALREADY_SUBSCRIBED",
+  amountMicros: number
+) {
   await repository.withTransaction(async (client) => {
     await jobs.lockOwner(client, seeded.ownerRef);
     await desk.request(client, {
@@ -589,5 +594,64 @@ describe("N15b an owner refund waits while the bank disputes the payment (ruling
     expect(await refunds.handle({ ...retried, attempts: 2 } as OutboxJob, clock.now)).toEqual({ kind: "DONE" });
     expect(port.refunds).toEqual([]);
     expect(await refundedRows(again.initialChargeId)).toEqual([again.totalMicros]);
+  });
+});
+
+describe("F2 a void NETOPIA reports on a payment with our own open refund request (money-2, ruling PR-55)", () => {
+  const REASONS = ["WITHDRAWAL", "CARD_COUNTRY_BLOCKED", "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "DUPLICATE_PAYMENT",
+    "UPGRADE_CLOSED", "CARD_CHECK_RELEASE", "CARD_CHECK_REFUSED", "CARD_CHECK_DEFERRED", "CARD_CHECK_NOT_LIVE"];
+  const listed = async (chargeId: string) => (await repository.openOwnerRefunds("sandbox", REASONS)).filter((row) => row.chargeId === chargeId);
+  const verifyJob = (chargeId: string, now: Date) => ({ jobId: randomUUID(), kind: "VERIFY_PAYMENT", ref: chargeId, payload: {}, attempts: 1,
+    notBefore: now, createdAt: now, claimedBy: "f2", claimedAt: now }) as unknown as OutboxJob;
+  const verifyRows = async (chargeId: string) => (await database.pool.query(
+    "SELECT 1 FROM billing.outbox WHERE kind = 'VERIFY_PAYMENT' AND ref = $1", [chargeId]
+  )).rowCount;
+
+  it("a refused checkout's whole request, then a VOIDED read: one REFUNDED, the customer's email, nothing open, and no VERIFY after", async () => {
+    const seeded = await paidPlan("voided-own");
+    const chargeId = seeded.initialChargeId;
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds, verify } = deskFor(port, clock);
+    await requestWhole(seeded, refunds, "ALREADY_SUBSCRIBED", seeded.totalMicros);
+    expect(await listed(chargeId)).toHaveLength(1);
+    const voided = report(chargeId, seeded.providerPaymentId, "VOIDED", seeded.totalMicros);
+    port.statuses.set(chargeId, voided);
+    expect(await verify.handle(verifyJob(chargeId, clock.now), clock.now)).toEqual({ kind: "DONE" });
+    const refunded = (await repository.charge(chargeId))!.events.filter((event) => event.kind === "REFUNDED");
+    expect(refunded.map((event) => [event.errorCode, event.amountMicros])).toEqual([["ALREADY_SUBSCRIBED", seeded.totalMicros]]);
+    expect(await emails("M11_DUPLICATE", seeded.customerId)).toHaveLength(1);
+    expect(await listed(chargeId)).toEqual([]);
+    // Seen again: nothing more.
+    expect(await verify.handle(verifyJob(chargeId, clock.now), clock.now)).toEqual({ kind: "DONE" });
+    expect(await refundedRows(chargeId)).toEqual([seeded.totalMicros]);
+    expect(await emails("M11_DUPLICATE", seeded.customerId)).toHaveLength(1);
+    // The next reconcile pass (the REFUND schedule's daily read is past) still reads VOIDED and queues no VERIFY.
+    expect(statusNeedsVerify((await repository.charge(chargeId))!, voided)).toBe(false);
+    const later = { now: new Date(clock.now.getTime() + DAY + 3_600_000) };
+    const reconciler = new BillingReconciler({
+      billing: repository, jobs, audit: recordingAudit(), clock: () => later.now, kick: () => undefined,
+      netopia: { payments: port, paymentEnvironment: "sandbox", jobs, pool: database.pool }
+    });
+    await reconciler.runStatusChecks(later.now);
+    expect(await verifyRows(chargeId)).toBe(0);
+  });
+
+  it("the reminder's hint names a refund NETOPIA shows when the last read was VOIDED", async () => {
+    const seeded = await paidPlan("voided-hint");
+    const chargeId = seeded.initialChargeId;
+    const port = new RefundPort(false);
+    const clock = { now: new Date() };
+    const { refunds } = deskFor(port, clock);
+    await requestWhole(seeded, refunds, "WITHDRAWAL", 12_100_000);
+    await repository.withTransaction((client) => repository.insertStatusRead(client, { chargeId, at: clock.now, outcome: "VOIDED" }));
+    // A reminder day of its own (every third day after the request; today's reminder is another test's).
+    const day = new Date(clock.now.getTime() + 33 * DAY);
+    expect(await refunds.remindOwnerRefunds(day)).toBeGreaterThan(0);
+    const [reminder] = (await database.pool.query<{ payload: Record<string, string> }>(
+      "SELECT payload FROM billing.outbox WHERE kind = 'EMAIL' AND ref = $1", [`O2_REFUND_REMINDER:${day.toISOString().slice(0, 10)}`]
+    )).rows.map((row) => row.payload);
+    const line = (reminder!["param.refundList"] ?? "").split("\n").find((entry) => entry.startsWith(`- charge ${chargeId},`)) ?? "";
+    expect(line).toContain("NETOPIA shows a refund: only the command is missing");
   });
 });

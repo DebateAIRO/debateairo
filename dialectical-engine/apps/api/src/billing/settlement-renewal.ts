@@ -101,14 +101,27 @@ export async function endDunning(
   input: Readonly<{ subscription: SubscriptionState; customerId: string; data: SubscriptionEventData; now: Date }>
 ): Promise<void> {
   const { subscription, now } = input;
+  await writeDunningEnd(deps, client, input);
+  await enqueueEmail(deps.repository, client, {
+    template: "M6", recipient: { kind: "CUSTOMER", customerId: input.customerId }, dedupeRef: subscription.subscriptionId,
+    params: { plan: subscription.planId, pricingUrl: new URL("/pricing", deps.publicAppUrl).toString() }, notBefore: now
+  });
+}
+
+/**
+ * The rows of a dunning's end, and nothing else: ENDED(DUNNING) with `data` and Free from `now` (ENDED_DUNNING), in the
+ * caller's transaction under the owner lock, on a PAST_DUE subscription folded there. `endDunning` adds M6; F2 (ruling
+ * PR-55) ends a renewal NETOPIA reports refunded before the site saw it paid through here alone, with no customer email.
+ */
+export async function writeDunningEnd(
+  deps: Readonly<{ repository: Pick<BillingRepository, "appendSubscriptionEvent">; entitlements: Pick<EntitlementRepository, "append"> }>,
+  client: PoolClient, input: Readonly<{ subscription: SubscriptionState; data: SubscriptionEventData; now: Date }>
+): Promise<void> {
+  const { subscription, now } = input;
   await deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "ENDED", now, { cause: "DUNNING", ...input.data }));
   await deps.entitlements.append(client, {
     ownerRef: subscription.ownerRef, planId: "FREE", periodAnchorAt: now, cause: "ENDED_DUNNING", effectiveAt: now,
     subscriptionId: subscription.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
-  });
-  await enqueueEmail(deps.repository, client, {
-    template: "M6", recipient: { kind: "CUSTOMER", customerId: input.customerId }, dedupeRef: subscription.subscriptionId,
-    params: { plan: subscription.planId, pricingUrl: new URL("/pricing", deps.publicAppUrl).toString() }, notBefore: now
   });
 }
 

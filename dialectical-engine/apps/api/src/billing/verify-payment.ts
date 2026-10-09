@@ -23,13 +23,15 @@ import {
 import { queuePaymentAlert } from "./payment-alert.js";
 import { openQuoteLocation, sealIpEvidence } from "./records.js";
 import {
-  openOwnRequest, queueRefundHeldAlert, refundedAlready, refundedMicros, type RefundDesk, type RefundIntent
+  heldByChargeback, openOwnRequest, queueRefundHeldAlert, refundedAlready, refundedMicros, wholePaymentOpen, type RefundDesk,
+  type RefundIntent
 } from "./refunds.js";
 import { retiredVerifyJob } from "./retired-jobs.js";
 import { chargeEvent, subscriptionEvent } from "./rows.js";
 import {
   enqueueCreditNote, enqueueInvoice, type ChargeSettlement, type SettledPayment, type SettlementContext, type SettlementPrepared
 } from "./settlement.js";
+import { writeDunningEnd } from "./settlement-renewal.js";
 
 type ChargeWithEvents = ChargeRow & { events: ChargeEventRow[] };
 type Owner = Readonly<{ ownerRef: string; quote: QuoteRow | null; customerId: string; events: ReadonlyArray<SubscriptionEvent> }>;
@@ -259,9 +261,9 @@ export class VerifyPaymentHandler {
       case "EXPIRED":
         return this.netopiaFailed(charge, report, now, "PAYMENT_EXPIRED");
       case "VOIDED":
-        // A9's void-ok rule, kept: before success a closed order; after it a full refund made at NETOPIA.
+        // A9's void-ok rule, kept: before success a closed order; after it a full refund made at NETOPIA (F2: our own).
         return charge.events.some((event) => event.kind === "SUCCEEDED")
-          ? this.netopiaProviderRefund(charge, report, now, "PROVIDER_VOID")
+          ? this.netopiaVoided(charge, report, now)
           : this.netopiaFailed(charge, report, now, "VOIDED");
       case "REFUNDED":
         return this.netopiaRefunded(charge, report, now);
@@ -420,8 +422,26 @@ export class VerifyPaymentHandler {
   }
 
   /**
+   * F2 (money-2, ruling PR-55): a void after success. When our own open request covers the WHOLE payment (the test
+   * `netopiaRefunded` uses) and no charge-back holds it (PR-41: the hold wins), it is recorded through RefundDesk, the
+   * follow-ups included (M11/M8, the credit note), as a REFUNDED read records it; otherwise A9's PROVIDER_VOID.
+   */
+  private async netopiaVoided(charge: ChargeWithEvents, report: PaymentReport, now: Date): Promise<OutboxOutcome> {
+    const paymentId = charge.events.find((event) => event.kind === "SUCCEEDED")?.providerPaymentId ?? report.providerPaymentId;
+    const open = openOwnRequest(charge, paymentId);
+    if (open !== null && open.openMicros > 0 && !heldByChargeback(charge, paymentId) && wholePaymentOpen(charge, open)) {
+      await this.deps.refunds.recordNetopiaRefund(open.intent, open.openMicros, now);
+      return DONE;
+    }
+    return this.netopiaProviderRefund(charge, report, now, "PROVIDER_VOID");
+  }
+
+  /**
    * A9 on NETOPIA: a void after success (PROVIDER_VOID) is a full refund with its credit note; an admin refund
    * (PROVIDER_REFUND, N14) is recorded at the remaining amount, its credit note the owner's; never seen paid: paid and refunded.
+   * F2 (money-1, ruling PR-55): a RENEWAL never seen paid that NETOPIA reports refunded means the owner gave that month
+   * back in NETOPIA's admin, so in the same transaction its plan ends (`endRefundedRenewal`) and the owner gets one O3;
+   * the person is never emailed and never charged for that month again.
    */
   private async netopiaProviderRefund(
     charge: ChargeWithEvents, report: PaymentReport, now: Date, reason: "PROVIDER_REFUND" | "PROVIDER_VOID"
@@ -434,13 +454,13 @@ export class VerifyPaymentHandler {
     const paidMicros = paidRow?.amountMicros ?? charge.totalMicros;
     const amountMicros = paidMicros - refundedMicros(charge, paidRow?.providerPaymentId ?? paymentId);
     const target = paidRow?.providerPaymentId ?? paymentId;
-    await this.deps.repository.withTransaction(async (client) => {
+    const renewalRefunded = await this.deps.repository.withTransaction(async (client): Promise<boolean> => {
       await this.deps.jobs.lockOwner(client, owner.ownerRef);
       if (!succeeded) {
         const inserted = await this.deps.repository.appendChargeEvent(client, chargeEvent(charge.chargeId, "SUCCEEDED", now, {
           providerPaymentId: paymentId, amountMicros: charge.totalMicros, errorCode: null, providerCreatedAt: report.occurredAt
         }));
-        if (inserted === "DUPLICATE") return;
+        if (inserted === "DUPLICATE") return false;
         if (charge.kind === "INITIAL") {
           const subscription = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId, client));
           if (subscription.status === "CREATED") {
@@ -458,7 +478,11 @@ export class VerifyPaymentHandler {
           });
         }
       }
+      if (succeeded || charge.kind !== "RENEWAL") return false;
+      await this.endRefundedRenewal(client, charge, paymentId, now);
+      return true;
     });
+    if (renewalRefunded) this.deps.audit("billing.renewal.refunded_before_seen", { attempt: charge.attempt });
     if (reason === "PROVIDER_REFUND" && succeeded && owner.quote !== null && amountMicros > 0) {
       this.deps.audit("billing.invoice.unknown", {
         issuer: invoiceIssuerFor(owner.quote.taxCountry, this.deps.policy.invoiceIssuerRules), kind: "CREDIT_NOTE",
@@ -467,6 +491,40 @@ export class VerifyPaymentHandler {
     }
     this.deps.audit("billing.refund", { reason, chargeKind: charge.kind });
     return DONE;
+  }
+
+  /**
+   * F2 (money-1, ruling PR-55), in `netopiaProviderRefund`'s transaction under the owner lock: the plan of a RENEWAL
+   * charge NETOPIA reports refunded before the site saw it paid ends now, attempt 1 (an ACTIVE plan) and a dunning retry
+   * (PAST_DUE) alike, the way the maintenance pass ends a spent dunning (ENDED(DUNNING) and Free, `writeDunningEnd`), and
+   * with NO customer email. The fold ends a dunning only from PAST_DUE, so an ACTIVE plan first records the attempt
+   * unpaid (PAST_DUE, with no retry date: none will be made). Only a plan still on the month this charge renews. Then one
+   * O3 RENEWAL_REFUNDED_BEFORE_SEEN for the owner, in the same transaction, once per charge.
+   */
+  private async endRefundedRenewal(client: PoolClient, charge: ChargeWithEvents, paymentId: string, now: Date): Promise<void> {
+    const subscription = foldSubscription(await this.deps.repository.subscriptionEvents(charge.subscriptionId, client));
+    const live = (subscription.status === "ACTIVE" || subscription.status === "PAST_DUE")
+      && subscription.currentPeriodEnd?.getTime() === charge.periodStart.getTime();
+    if (live) {
+      if (subscription.status === "ACTIVE") {
+        await this.deps.repository.appendSubscriptionEvent(client, subscriptionEvent(subscription, "PAST_DUE", now, {
+          charge_id: charge.chargeId, attempt: charge.attempt, first_failed_at: now.toISOString()
+        }));
+      }
+      await writeDunningEnd(this.deps, client, {
+        subscription, data: { charge_id: charge.chargeId, refunded_before_seen: true }, now
+      });
+    }
+    await queuePaymentAlert({ repository: this.deps.repository, jobs: this.deps.netopia.jobs }, {
+      code: "RENEWAL_REFUNDED_BEFORE_SEEN", reference: `charge ${charge.chargeId}`,
+      dedupeRef: `${charge.chargeId}:RENEWAL_REFUNDED_BEFORE_SEEN`, now,
+      nextSteps: live
+        ? "NETOPIA reports this renewal's payment refunded (or cancelled) before the site saw it paid, so the plan has"
+          + " ended and the person was not emailed. Tell them yourself; if they should keep the plan, they can subscribe again."
+        : `NETOPIA reports this renewal's payment (NETOPIA payment ${paymentId}) refunded (or cancelled) before the site saw`
+          + " it paid. Its plan was no longer on the month this payment renewed, so no plan changed and the person was not"
+          + " emailed. Look at the plan and this payment in NETOPIA's admin; tell the person yourself if they need to know."
+    }, client);
   }
 
   /**
@@ -479,10 +537,7 @@ export class VerifyPaymentHandler {
     if (!requested) return this.netopiaProviderRefund(charge, report, now, "PROVIDER_REFUND");
     const open = openOwnRequest(charge, paymentId);
     if (open === null || open.openMicros === 0) return DONE;
-    const paid = charge.events.find((event) => (event.kind === "SUCCEEDED" || event.kind === "DUPLICATE_PAYMENT")
-      && event.providerPaymentId === paymentId);
-    const whole = paid !== undefined && paid.amountMicros === open.intent.amountMicros && open.openMicros === open.intent.amountMicros;
-    if (!whole) {
+    if (!wholePaymentOpen(charge, open)) {
       this.deps.audit("billing.refund.seen_partial", { reason: open.intent.reason });
       return DONE;
     }
