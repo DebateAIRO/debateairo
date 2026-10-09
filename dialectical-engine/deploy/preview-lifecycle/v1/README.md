@@ -15,8 +15,8 @@ launchers still re-check every byte exactly as before.
 |---|---|
 | `prestart.mjs` | Runs as root right before every start of the API or the website. It runs the same reviewed database check as before, saves the fresh receipt and a copy of the pinned launch plan, and refuses unless the release is the one the owner pinned. |
 | `release-lock.json` | A root-only file saying which release may restart unattended. Written once per release with `prestart.mjs pin`. |
-| systemd files | Restart after a crash (10 s pause, at most 4 tries in 15 min), start everything at boot, email the owner when a service gives up. |
-| `alert.mjs` | That email: "Preview: <unit> failed to restart", the time in UTC and Bucharest, the last 20 log lines with secrets blanked. At most one per service per 30 minutes. |
+| systemd files | Restart after a crash (30 s pause for the API and website, 10 s for the database, at most 4 tries in 15 min), start everything at boot, email the owner when a service gives up. |
+| `alert.mjs` | That email: "Preview: <unit> gave up after N restarts", the time in UTC and Bucharest, the last 20 log lines with secrets blanked. A crash that systemd is still fixing by itself sends nothing. At most one per service per 30 minutes. |
 | `backup.mjs` | A checked copy of the preview database every night at 03:15 Bucharest time; the 7 newest are kept. A local safety net, not an off-site backup. |
 | `unlock-team-tools.mjs` | `systemctl start debateai-preview-team-unlock` turns team (staff) tools on for one hour, then they lock again by themselves. |
 
@@ -39,16 +39,57 @@ launchers still re-check every byte exactly as before.
   ahead; it keeps the expiry rolling at most 4 minutes ahead (renewed every 2 minutes) and never
   past the end of the hour. If everything crashed, the login stops working within 4 minutes even
   before the reset runs.
+- **One email only when systemd gives up.** On systemd 254 and newer, `OnFailure=` would run after
+  *every* failed attempt, so a crash that heals itself would still email "gave up". The drop-ins
+  set `RestartMode=direct` (needs systemd 254 or newer; step 0 checks), so the alert runs only when
+  the start limit is reached or a unit fails for good. The alert also asks systemd for the unit's
+  `Result`, `NRestarts` and state, and words the email "gave up after N restarts" or, if it was
+  started while systemd is still restarting the unit, sends nothing. If you want an email after
+  repeated crashes too, append `--crash-alert-after N` to the alert unit's `ExecStart` (email once
+  N automatic restarts happened). If the state cannot be read, it still emails.
+- **Mail and the preview's sendmail.** `/usr/sbin/sendmail` on the preview may be the purpose
+  wrapper from `deploy/preview-mail`, not plain Postfix. The alert calls it with `-t -i -odi`
+  (`-odi`: deliver before exiting, because the alert kills the whole process group once sendmail
+  exits). A failed submission logs its own `PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED` line with the
+  exit code. Install step 2 includes a test send.
+- **No release code runs as root (or as the database superuser) before it is checked.** The team
+  unlock (root) and its database actor (the `postgres` OS user) load code from the pinned API
+  release. Before the first import, `release-guard.mjs` runs the launchers' own check (the
+  pinned source manifest, read as the launchers read it, verified against the whole release
+  tree, plus the operator digest), and requires every file it loads, and every folder above it up
+  to the release root, to be root-owned and not writable by group or others. The database actor
+  repeats that check on every call (open, every 2-minute renewal, close), which adds the release
+  re-hash time (seconds) to each call; each call may take up to 60 s.
+- **The interim login's password never reaches SQL.** The database actor turns it into a
+  SCRAM-SHA-256 verifier (random salt, 4096 rounds) and sends only that in `ALTER ROLE`, so the
+  password is never in a statement, a server log or `pg_stat_activity`. The unlock then logs in
+  over the preview's **local socket**, matching `deploy/postgres/pg_hba.conf.template`, which
+  allows `debateai_prod_staff_recovery` on the socket only (step 7 checks the server's copy).
+  `PREVIEW_LIFECYCLE_STAFF_DB_HOST` in the unlock unit can name loopback (`127.0.0.1`) instead,
+  then with TLS verified against the preview CA and only if pg_hba has a matching `hostssl` line.
 - **Team unlock rewrites the ACK proof file in place.** The installed alert wrapper names one proof
   file; the unlock writes each fresh proof there (same owner and mode) after archiving the old
   one once under `/var/lib/debateai-v3-preview/lifecycle/evidence-archive/`. If the wrapper only
   read that file once at load, the unlock notices within one refresh and locks with
   `EVIDENCE_UNAVAILABLE` (nothing unsafe happens; it just cannot keep tools open).
 
+## Boot sequence (what to expect after a reboot)
+
+1. `debateai-preview-postgresql` starts (it restarts itself 10 s after a crash).
+2. `debateai-preview-api` starts after the supporting services. Its root prestart first runs the
+   cheap checks, then waits up to 60 s for PostgreSQL to accept connections on its socket
+   (`pg_isready`), then runs the database verifier (about 12 s), then the launcher re-hashes the
+   release and starts the API. If PostgreSQL is still not ready, prestart refuses with
+   `POSTGRES_NOT_READY` and systemd tries again 30 s later (at most 4 tries in 15 minutes).
+3. `debateai-preview-ui` is ordered `After=` the API, so its own prestart (the same wait and
+   verifier) only begins once the API's start job is done; the two verifiers do not overlap at boot.
+
+`TimeoutStartSec=300` covers the wait (60 s), the verifier (hard cap 150 s) and the rest.
+
 ## Files
 
 ```text
-prestart.mjs  common.mjs  alert.mjs  backup.mjs
+prestart.mjs  common.mjs  alert.mjs  backup.mjs  release-guard.mjs
 unlock-team-tools.mjs  jit-creator-actor.mjs  self-capture-actor.mjs
 systemd/debateai-preview.target
 systemd/debateai-preview-{api,ui,postgresql}.service.d/50-lifecycle.conf
@@ -59,13 +100,24 @@ systemd/debateai-preview-team-unlock.service
 
 prestart, alert and backup use Node built-ins plus the reviewed `deploy/preview-auth-dev/v1`
 helpers (custody reader, launch-plan and attestation validators). The unlock and its two actors
-load `pg`, `tsx`, the staff alert code and `native-peer.mjs` from the **pinned release** itself.
+load `pg`, `tsx`, the staff alert code and `native-peer.mjs` from the **pinned release** itself,
+and only after `release-guard.mjs` has verified that release (see the decisions above).
 
 ## Install (operator, root, in this order)
 
 The units name `/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node` and the operator folder
 `/opt/debateai-v3-preview/operator/lifecycle-v1`. If either differs on the server, change the
 unit files before installing; nothing else names them.
+
+0. **Before anything: version check and a copy of today's units.** `systemctl --version` must
+   report 254 or newer (`RestartMode=direct` needs it; on an older systemd stop here and ask).
+   Then archive every existing preview unit file and drop-in folder, root-only:
+
+   ```sh
+   install -d -o root -g root -m 0700 /root/preview-archive
+   cd /etc/systemd/system && tar -czf /root/preview-archive/systemd-before-lifecycle-$(date -u +%Y%m%dT%H%M%SZ).tar.gz debateai-preview-*
+   chmod 0600 /root/preview-archive/systemd-before-lifecycle-*.tar.gz
+   ```
 
 1. **Operator folder.** From a clean checkout of the reviewed commit, copy these three folders,
    keeping their relative layout, to `/opt/debateai-v3-preview/operator/lifecycle-v1/`:
@@ -78,18 +130,40 @@ unit files before installing; nothing else names them.
    find /opt/debateai-v3-preview/operator/lifecycle-v1 -type f -exec chmod 0644 {} +
    ```
 
-2. **Root config folder and alert recipient.** Put exactly one approved address in the file
-   (type it; do not paste it into any command line that is logged):
+2. **Root config folder, state folder and alert recipient.** Put exactly one approved address in
+   the file (type it; do not paste it into any command line that is logged):
 
    ```sh
    install -d -o root -g root -m 0755 /etc/debateai-v3-preview/lifecycle
+   [ -d /var/lib/debateai-v3-preview ] || install -d -o root -g root -m 0755 /var/lib/debateai-v3-preview
    install -o root -g root -m 0600 /dev/null /etc/debateai-v3-preview/lifecycle/alert-recipient
    editor /etc/debateai-v3-preview/lifecycle/alert-recipient
+   stat -c '%a %U:%G' /etc/debateai-v3-preview/lifecycle/alert-recipient
    ```
+
+   The last line must print `600 root:root`. Many editors save by writing a new file and renaming
+   it over the old one; the new file gets the editor's default mode (often 0644), not 0600. The
+   alert then refuses with `RECIPIENT_FILE_MODE_REFUSED` and names the mode it found. Fix it with
+   `chmod 0600` and `chown root:root` on the file.
+
+   **Test send.** Use the built-in test name, never the API unit (a real API alert in the next
+   30 minutes would otherwise be suppressed):
+
+   ```sh
+   /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --test
+   ```
+
+   Expect `PREVIEW_LIFECYCLE_ALERT_SENT` for `debateai-preview-alert-test.service` and an email
+   "Preview: test alert (nothing failed)". `PREVIEW_LIFECYCLE_ALERT_MAIL_FAILED` means the local
+   sendmail refused it (exit code in the line): check what `/usr/sbin/sendmail` is on the server
+   (`readlink -f /usr/sbin/sendmail`) and whether it accepts `-odi` before going on.
 
 3. **Check the native plan is verify-only.** `prestart` and `pin` refuse anything else:
    `grep -o '"operation":"[a-z-]*"' /etc/debateai-v3-preview/auth-dev-v1/native-plan.json`
-   must print `"operation":"verify"`.
+   must print `"operation":"verify"`. Rule from now on: **stop the API and the website before
+   editing `native-plan.json`** (`systemctl stop debateai-preview-ui debateai-preview-api`). The
+   verifier reads that file itself; prestart hashes it before and after the verifier and refuses
+   with `NATIVE_PLAN_CHANGED` if it changed in between, and the lock pins its hash.
 
 4. **Pin the running release.** Use the plans the current drop-ins launch with
    (`systemctl cat debateai-preview-api debateai-preview-ui | grep -- --plan`):
@@ -105,8 +179,13 @@ unit files before installing; nothing else names them.
 
 5. **Dry run** (safe while the services run; it only writes the lifecycle-current files):
    `$N $L/prestart.mjs --service api` then `--service ui`. Expect
-   `PREVIEW_LIFECYCLE_PRESTART_READY` with `verifyMs` around 12000. Record `verifyMs` and
-   `totalMs`; they are the measurement this design depends on.
+   `PREVIEW_LIFECYCLE_PRESTART_READY` with `postgresWaitMs` near 0 and `verifyMs` around 12000.
+   Record `verifyMs` and `totalMs`; they are the measurement this design depends on.
+   After the first real restart in step 9, also measure the **launcher re-hash time**: the gap
+   between the `PREVIEW_LIFECYCLE_PRESTART_READY` line and the `PREVIEW_API_STARTED` line in
+   `journalctl -u debateai-preview-api -o short-iso-precise -n 50`. The receipt must be at most
+   180 s old when the launcher checks it and prestart refuses one older than 60 s, so this gap
+   must stay well under 120 s. Do the same for the website.
 
 6. **Units.** Copy `systemd/debateai-preview.target`, `debateai-preview-alert@.service`,
    `debateai-preview-backup.service`, `debateai-preview-backup.timer` and
@@ -135,11 +214,29 @@ unit files before installing; nothing else names them.
    Delete only the `Requires=`/`BindsTo=` lines naming capture or Hatchet; `50-lifecycle.conf`
    already adds `Wants=` and `After=` for them.
 
-8. **Mask the runner** until it is repointed at a current release. `systemctl mask` refuses while a
-   real unit file sits in `/etc/systemd/system`, so archive that file first:
+   Also check the **runner**: step 8 masks it, and a masked unit cannot start, so any hard
+   dependency on it would stop the API or the website. This must print nothing:
 
    ```sh
-   install -d -m 0700 /root/preview-archive
+   systemctl show -p Requires,BindsTo,Requisite debateai-preview-api debateai-preview-ui | grep runner
+   ```
+
+   And check **pg_hba on the server**: the team unlock logs in as `debateai_prod_staff_recovery`
+   over the preview's local socket, so the preview cluster's `pg_hba.conf` needs a `local` line
+   for that role with `scram-sha-256`, as in `deploy/postgres/pg_hba.conf.template`:
+
+   ```sh
+   runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc "SELECT line_number,type,database,user_name,auth_method FROM pg_hba_file_rules WHERE 'debateai_prod_staff_recovery' = ANY(user_name) OR 'all' = ANY(user_name) ORDER BY line_number"
+   ```
+
+   Expect a `local` row for `debateai_prod_staff_recovery` with `scram-sha-256` (and a database
+   column that covers `debateai`) on a lower line number than any `reject` row that would match it.
+   If it is missing, stop: adding it is a reviewed pg_hba change, not part of this install.
+
+8. **Mask the runner** until it is repointed at a current release. `systemctl mask` refuses while a
+   real unit file sits in `/etc/systemd/system`, so archive that file first (step 0 made the folder):
+
+   ```sh
    mv /etc/systemd/system/debateai-preview-runner.service /root/preview-archive/
    systemctl mask debateai-preview-runner.service
    ```
@@ -149,11 +246,13 @@ unit files before installing; nothing else names them.
    ```sh
    systemctl daemon-reload
    systemd-analyze verify /etc/systemd/system/debateai-preview.target /etc/systemd/system/debateai-preview-backup.timer
-   systemctl show -p Restart,RestartUSec,StartLimitBurst,StartLimitIntervalUSec,OnFailure,TimeoutStartUSec,ExecStartPre,ExecStart debateai-preview-api debateai-preview-ui
+   systemctl show -p Restart,RestartMode,RestartUSec,StartLimitBurst,StartLimitIntervalUSec,OnFailure,TimeoutStartUSec,ExecStartPre,ExecStart debateai-preview-api debateai-preview-ui
    ```
 
-   Expect `Restart=on-failure`, `StartLimitBurst=4`, `OnFailure=debateai-preview-alert@…`, the
-   prestart as the **last** `ExecStartPre`, and `--plan /opt/debateai-v3-preview/artifacts/lifecycle-current/…`.
+   Expect `Restart=on-failure`, `RestartMode=direct`, `RestartUSec=30s`, `StartLimitBurst=4`,
+   `OnFailure=debateai-preview-alert@…`, the prestart as the **last** `ExecStartPre` (run through
+   `/usr/bin/env -i PATH=…`, so it inherits none of the service's environment or secrets), and
+   `--plan /opt/debateai-v3-preview/artifacts/lifecycle-current/…`.
    If an older drop-in still sets `Restart=no` (it would win over `50-`), move that one setting
    out of it. If `ExecStartPre` lists older one-time steps, review whether they should run on every
    restart; to drop them, add `ExecStartPre=` (empty) as the first `ExecStartPre` line of the
@@ -167,9 +266,12 @@ unit files before installing; nothing else names them.
 
 ## Pinning a NEW release
 
-After the new release has passed its own reviewed checks and its launch plans exist:
-`pin --from` the new api and ui plans, regenerate both `zzzzzzzzzz-lifecycle-release.conf` files
-with `dropin`, `daemon-reload`, restart api then ui. Until you re-pin, prestart refuses the new
+After the new release has passed its own reviewed checks and its launch plans exist: first make
+`/etc/debateai-v3-preview/auth-dev-v1/native-plan.json` the **new release's verify-only plan**
+(with the API and website stopped, step 3's rule), because `pin` records that file's hash and
+refuses a plan that does not describe the release being pinned. Then `pin --from` the new api
+and ui plans, regenerate both `zzzzzzzzzz-lifecycle-release.conf` files with `dropin`,
+`daemon-reload`, restart api then ui. Until you re-pin, prestart refuses the new
 plans (`RELEASE_LOCK_MISMATCH` or `BASE_PLAN_HASH_MISMATCH`), so nothing unpinned can start
 unattended.
 
@@ -186,7 +288,8 @@ inert without the drop-ins.
 1. **Crash, API.** `systemctl kill -s KILL debateai-preview-api`. Within about a minute the journal
    shows `PREVIEW_LIFECYCLE_PRESTART_READY` then `PREVIEW_API_STARTED` with a new `pid`
    (`journalctl -u debateai-preview-api -n 50`), and `systemctl show -p NRestarts debateai-preview-api`
-   went up by one.
+   went up by one. **No email** arrives for a crash that heals itself
+   (`journalctl -u 'debateai-preview-alert@*' --since -5min` shows no new run).
 2. **Crash, UI.** Same with `debateai-preview-ui`; the site answers again on 127.0.0.1:3100.
 3. **Reboot.** After `reboot`, every unit in the target is `active`; every public page returns 200
    through Caddy with the preview credentials and 401 without them.
@@ -194,16 +297,21 @@ inert without the drop-ins.
    `/root/preview-archive/`, change one byte of the original, then
    `systemctl restart debateai-preview-api`. Expect `PREVIEW_LIFECYCLE_PRESTART_REFUSED` with
    `NATIVE_VERIFY_REFUSED`, four tries, the unit `failed`, and one email
-   "Preview: debateai-preview-api.service failed to restart". Restore the exact bytes and mode
+   "Preview: debateai-preview-api.service gave up after N restarts" (start limit reached). Restore the exact bytes and mode
    (`sha256sum` must match the copy), `systemctl reset-failed debateai-preview-api`, start it.
 5. **Team unlock.** `systemctl start debateai-preview-team-unlock`: the journal shows
    `PREVIEW_TEAM_TOOLS_UNLOCKED`; team actions work. After one hour (or `systemctl stop …`)
    `PREVIEW_TEAM_TOOLS_LOCKED` with `"roleReset":true`, and team actions are refused again.
    Crash drill: `systemctl kill -s KILL debateai-preview-team-unlock` must log
-   `PREVIEW_TEAM_TOOLS_RESET` with `"roleReset":true`. As postgres, the login must read back as
+   `PREVIEW_TEAM_TOOLS_RESET` with `"roleReset":true`. A reset that fails logs
+   `PREVIEW_TEAM_TOOLS_RESET_FAILED` with a reason, leaves the unit `failed` and sends the alert. As postgres, the login must read back as
    `rolpassword IS NULL` and `rolvaliduntil = '-infinity'` in `pg_authid`.
 6. **Backup.** `systemctl start debateai-preview-backup` logs `PREVIEW_BACKUP_OK`; the folder
-   `/var/backups/debateai-v3-preview` is 0700 and each dump 0600.
+   `/var/backups/debateai-v3-preview` is 0700 and each dump 0600. The nightly check is
+   `pg_restore --list`: it proves the file is a readable archive with a table of contents, **not**
+   that the data restores. Do the scratch-database restore below once after installing, and again
+   after any PostgreSQL upgrade. Retention keeps the 7 newest, never removes the dump it just
+   wrote, and never leaves fewer than 2.
 
 ## Restore a nightly dump
 
