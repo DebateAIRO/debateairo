@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Ibda l-pjan tiegħi issa. Nifhem li jekk nirtira fi żmien 14-il jum, inħallas għall-parti diġà użata: l-akbar bejn il-jiem użati jew il-kreditu użat.",
   "billing.checkout.continueToCard": "Kompli għad-dettalji tal-karta",
   "billing.checkout.cardTitle": "Dettalji tal-karta",
-  "billing.checkout.cardNote": "Iddaħħal il-karta tiegħek fil-formola sigura ta’ xMoney. In-numru tal-karta tiegħek qatt ma jasal fis-servers tagħna.",
+  "billing.checkout.cardNote": "Iddaħħal il-karta tiegħek fil-formola sigura ta’ NETOPIA Payments. In-numru tal-karta tiegħek qatt ma jasal fis-servers tagħna.",
   "billing.checkout.subscribeAndPay": "Ordna b’obbligu ta’ ħlas",
   "billing.checkout.waitingForBank": "Qed nistennew li l-bank tiegħek jikkonferma…",
   "billing.checkout.willEmail": "Nibagħtulek email hekk kif il-bank tiegħek jikkonferma.",

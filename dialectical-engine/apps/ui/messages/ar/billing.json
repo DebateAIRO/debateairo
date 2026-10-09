@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "ابدأ خطتي الآن. أفهم أنني إذا انسحبت خلال 14 يومًا، أدفع مقابل الجزء المستخدم بالفعل: الأكبر بين الأيام المستخدمة والرصيد المستخدم.",
   "billing.checkout.continueToCard": "تابع إلى بيانات البطاقة",
   "billing.checkout.cardTitle": "بيانات البطاقة",
-  "billing.checkout.cardNote": "تُدخل بطاقتك في نموذج xMoney الآمن. لا يصل رقم بطاقتك إلى خوادمنا أبدًا.",
+  "billing.checkout.cardNote": "تُدخل بطاقتك في نموذج NETOPIA Payments الآمن. لا يصل رقم بطاقتك إلى خوادمنا أبدًا.",
   "billing.checkout.subscribeAndPay": "طلب مع التزام بالدفع",
   "billing.checkout.waitingForBank": "في انتظار تأكيد مصرفك…",
   "billing.checkout.willEmail": "سنراسلك عبر البريد الإلكتروني فور تأكيد مصرفك.",

@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "立即开始我的方案。我了解，如果我在 14 天内撤回，需要为已使用的部分付费：取已使用天数与已使用额度中较大者。",
   "billing.checkout.continueToCard": "继续填写银行卡信息",
   "billing.checkout.cardTitle": "银行卡信息",
-  "billing.checkout.cardNote": "您在 xMoney 的安全表单中输入银行卡。您的卡号绝不会到达我们的服务器。",
+  "billing.checkout.cardNote": "您在 NETOPIA Payments 的安全表单中输入银行卡。您的卡号绝不会到达我们的服务器。",
   "billing.checkout.subscribeAndPay": "提交订单并承担付款义务",
   "billing.checkout.waitingForBank": "正在等待您的银行确认…",
   "billing.checkout.willEmail": "您的银行确认后，我们会立即发邮件通知您。",

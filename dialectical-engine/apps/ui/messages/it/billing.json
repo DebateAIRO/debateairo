@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Avvia subito il mio piano. Capisco che, se recedo entro 14 giorni, pago la parte già utilizzata: la maggiore tra i giorni utilizzati e il credito utilizzato.",
   "billing.checkout.continueToCard": "Continua con i dati della carta",
   "billing.checkout.cardTitle": "Dati della carta",
-  "billing.checkout.cardNote": "Inserisci la carta nel modulo sicuro di xMoney. Il numero della tua carta non raggiunge mai i nostri server.",
+  "billing.checkout.cardNote": "Inserisci la carta nel modulo sicuro di NETOPIA Payments. Il numero della tua carta non raggiunge mai i nostri server.",
   "billing.checkout.subscribeAndPay": "Ordine con obbligo di pagamento",
   "billing.checkout.waitingForBank": "In attesa della conferma della tua banca…",
   "billing.checkout.willEmail": "Ti invieremo un’e-mail non appena la tua banca conferma.",

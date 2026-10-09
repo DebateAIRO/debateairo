@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Sāciet manu plānu tūlīt. Es saprotu, ka, ja atsakos no līguma 14 dienu laikā, es maksāju par jau izmantoto daļu: lielāko no izmantotajām dienām vai izmantotā kredīta.",
   "billing.checkout.continueToCard": "Turpināt uz kartes datiem",
   "billing.checkout.cardTitle": "Kartes dati",
-  "billing.checkout.cardNote": "Jūs ievadāt karti xMoney drošajā veidlapā. Jūsu kartes numurs nekad nenonāk mūsu serveros.",
+  "billing.checkout.cardNote": "Jūs ievadāt karti NETOPIA Payments drošajā veidlapā. Jūsu kartes numurs nekad nenonāk mūsu serveros.",
   "billing.checkout.subscribeAndPay": "Pasūtījums ar pienākumu maksāt",
   "billing.checkout.waitingForBank": "Gaidām jūsu bankas apstiprinājumu…",
   "billing.checkout.willEmail": "Nosūtīsim jums e-pastu, tiklīdz jūsu banka apstiprinās.",
