@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Palun ärge makske uuesti. Teie pakett ilmub seadetesse, kui teie pank on kinnitanud.",
   "billing.checkout.cardCountryRefused": "Me ei saa vastu võtta kaarte, mis on välja antud selle kaardi riigis. Kogu võetud raha läheb täies ulatuses teie kaardile tagasi.",
   "billing.checkout.refunded": "Tagastasime selle makse täies ulatuses. Meie saadetud e-kiri selgitab, miks.",
+  "billing.checkout.refundPending": "Me ei saa seda makset kasutada, seega tagastame selle täies ulatuses teie kaardile. Saadame teile e-kirja, kui see on tehtud.",
   "billing.checkout.refundedBeforeStart": "See makse tagastati täies ulatuses teie kaardile ja teie pakett ei alanud. Võite uuesti proovida.",
   "billing.checkout.succeeded": "Teie pakett {plan} on aktiivne. Kinnituskiri on teel.",
   "billing.checkout.failed": "Makse ei läinud läbi ja raha ei võetud. Võite uuesti proovida või kasutada muud kaarti.",

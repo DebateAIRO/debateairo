@@ -139,7 +139,9 @@ describe("P20 the card change page (A11, A12)", () => {
       [409, "CARD_CHANGE_NOT_AVAILABLE_NOW", "We couldn't save your new card just now because a payment on your plan is still being confirmed. Your current card stays in use; please try again in an hour."],
       [403, "LEGAL_REACCEPTANCE_REQUIRED", "Please accept the updated Terms first, then come back to this page."],
       // W10 (P2-M19): the card change spends the hourly budget it shares with quotes, downgrades and undos.
-      [429, "ADMISSION_RATE_LIMITED", "Too many tries in the last hour. Please try again later."]
+      [429, "ADMISSION_RATE_LIMITED", "Too many tries in the last hour. Please try again later."],
+      // F4 (finding ui-2): the agreement the page carries was superseded while it was open; only a reload fixes it.
+      [409, "LEGAL_DOCUMENT_STALE", "This page is out of date. Please reload it."]
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);

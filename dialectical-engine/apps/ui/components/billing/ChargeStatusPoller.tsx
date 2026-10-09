@@ -11,8 +11,12 @@ export type ChargePollerState = "PENDING" | "SUCCEEDED" | "FAILED" | "TIMED_OUT"
 const POLL_EVERY_MS = 2_000;
 const POLL_FOR_MS = 120_000;
 
-/** P8c: these FAILED reasons mean the money was taken and refunded (P7's REFUND_REASONS_REFUSING_THE_PAYMENT). */
-const REFUNDED_REASONS: ReadonlySet<string> = new Set(["ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED"]);
+/**
+ * P8c: these FAILED reasons mean the money was taken and refunded (P7's REFUND_REASONS_REFUSING_THE_PAYMENT). F4
+ * (ruling PR-55, finding ui-1): the server answers them only once the refund is recorded; before, it answers
+ * REFUND_PENDING, the refund on its way. UPGRADE_CLOSED (N12's closed upgrade paid late) is one of them.
+ */
+const REFUNDED_REASONS: ReadonlySet<string> = new Set(["ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "UPGRADE_CLOSED"]);
 
 /**
  * The sentence for a settled failure: a refund says it was refunded, and only a decline or a void may say no money
@@ -34,6 +38,8 @@ export function chargeOutcomeKey(state: "NEEDS_ACTION" | "FAILED", reasonCode: s
   if (state === "FAILED" && reasonCode === "CARD_CHECK_NOT_LIVE") return "billing.card.notSubscribed";
   // N13 (spec §2.11): the check passed but NETOPIA left no saved card (a wallet): try again with a card.
   if (state === "FAILED" && reasonCode === "CARD_NOT_SAVED") return "billing.card.notSaved";
+  // F4: a payment we refused, its refund not recorded yet (the owner refunds by hand): on its way, its email to come.
+  if (state === "FAILED" && reasonCode === "REFUND_PENDING") return "billing.checkout.refundPending";
   if (state === "FAILED" && reasonCode !== null && REFUNDED_REASONS.has(reasonCode)) return "billing.checkout.refunded";
   if (state === "FAILED" && (reasonCode === "PROVIDER_REFUND" || reasonCode === "CHARGEBACK")) {
     return "billing.checkout.refundedBeforeStart";

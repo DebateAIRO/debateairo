@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Prosím, neplaťte znova. Váš program sa zobrazí v Nastaveniach, keď ho vaša banka potvrdí.",
   "billing.checkout.cardCountryRefused": "Nemôžeme prijímať karty vydané v krajine tejto karty. Všetky stiahnuté peniaze sa vrátia v plnej výške na vašu kartu.",
   "billing.checkout.refunded": "Túto platbu sme vám vrátili v plnej výške. E-mail, ktorý sme poslali, vysvetľuje prečo.",
+  "billing.checkout.refundPending": "Túto platbu nemôžeme použiť, preto vám ju vraciame v plnej výške na kartu. Keď to bude hotové, pošleme vám e-mail.",
   "billing.checkout.refundedBeforeStart": "Táto platba vám bola v plnej výške vrátená na kartu a váš program sa nezačal. Môžete to skúsiť znova.",
   "billing.checkout.succeeded": "Váš program {plan} je aktívny. Potvrdzujúci e-mail je na ceste.",
   "billing.checkout.failed": "Platba neprešla a neboli stiahnuté žiadne peniaze. Môžete to skúsiť znova alebo použiť inú kartu.",

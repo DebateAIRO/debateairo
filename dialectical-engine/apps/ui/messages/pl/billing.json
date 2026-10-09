@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Nie płać ponownie. Twój plan pojawi się w Ustawieniach, gdy tylko Twój bank potwierdzi.",
   "billing.checkout.cardCountryRefused": "Nie możemy akceptować kart wydanych w kraju tej karty. Wszystkie pobrane pieniądze wracają w całości na Twoją kartę.",
   "billing.checkout.refunded": "Zwróciliśmy tę płatność w całości. Wysłany przez nas e-mail wyjaśnia dlaczego.",
+  "billing.checkout.refundPending": "Nie możemy wykorzystać tej płatności, więc zwracamy ją w całości na Twoją kartę. Wyślemy Ci e-mail, gdy to nastąpi.",
   "billing.checkout.refundedBeforeStart": "Ta płatność została w całości zwrócona na Twoją kartę, a Twój plan się nie rozpoczął. Możesz spróbować ponownie.",
   "billing.checkout.succeeded": "Twój plan {plan} jest aktywny. E-mail z potwierdzeniem jest w drodze.",
   "billing.checkout.failed": "Płatność nie przeszła i nie pobrano żadnych pieniędzy. Możesz spróbować ponownie lub użyć innej karty.",

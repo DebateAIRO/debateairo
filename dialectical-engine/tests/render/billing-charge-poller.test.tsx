@@ -85,6 +85,24 @@ describe("P19 the waiting screen (B5)", () => {
     expect(container.textContent).toBe("REFUSED");
   });
 
+  // F4 (ruling PR-55, finding ui-1): the owner refunds by hand, so the refund and its email can be days away. Until
+  // the refund is recorded the server answers REFUND_PENDING, and the page says the refund is on its way.
+  it("a refused payment whose refund is not recorded yet says it is on its way, then 'refunded' once it is (F4)", async () => {
+    await mount(vi.fn(async () => ({ state: "FAILED" as const, reason_code: "REFUND_PENDING" })));
+    expect(container.textContent).toBe(billingEnglish["billing.checkout.refundPending"]);
+    expect(container.textContent)
+      .toBe("We can't use this payment, so we're refunding it to your card in full. We'll email you when it's done.");
+    expect(container.textContent).not.toContain("no money was taken");
+    expect(container.textContent).not.toContain("We refunded");
+    for (const reason of ["ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "UPGRADE_CLOSED"]) {
+      act(() => root.unmount());
+      root = createRoot(container);
+      await mount(vi.fn(async () => ({ state: "FAILED" as const, reason_code: reason })));
+      expect(container.textContent, reason).toBe("We refunded this payment in full. The email we sent explains why.");
+      expect(container.textContent, reason).not.toContain("no money was taken");
+    }
+  });
+
   // W15 F1 (P2-M5): a checkout whose payment was refunded at NETOPIA before we verified it reads FAILED with
   // PROVIDER_REFUND. The money was taken and given back, so never "no money was taken", and no email follows it.
   it("a checkout refunded at NETOPIA before it started says the card was refunded and the plan didn't start (P2-M5)", async () => {

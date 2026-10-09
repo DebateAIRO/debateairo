@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Betal ikke igen. Din plan vises under Indstillinger, når din bank har bekræftet.",
   "billing.checkout.cardCountryRefused": "Vi kan ikke acceptere kort, der er udstedt i det korts land. Eventuelle trukne beløb går fuldt ud tilbage til dit kort.",
   "billing.checkout.refunded": "Vi har refunderet denne betaling fuldt ud. Den e-mail, vi har sendt, forklarer hvorfor.",
+  "billing.checkout.refundPending": "Vi kan ikke bruge denne betaling, så vi refunderer den fuldt ud til dit kort. Vi sender dig en e-mail, når det er sket.",
   "billing.checkout.refundedBeforeStart": "Denne betaling er refunderet fuldt ud til dit kort, og din plan er ikke startet. Du kan prøve igen.",
   "billing.checkout.succeeded": "Din {plan}-plan er aktiv. En bekræftelse er på vej til din e-mail.",
   "billing.checkout.failed": "Betalingen gik ikke igennem, og der blev ikke trukket penge. Du kan prøve igen eller bruge et andet kort.",

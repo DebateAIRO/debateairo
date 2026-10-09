@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Ne plačajte znova. Vaš paket se prikaže v Nastavitvah, ko ga vaša banka potrdi.",
   "billing.checkout.cardCountryRefused": "Ne moremo sprejemati kartic, izdanih v državi te kartice. Ves zaračunani denar se v celoti vrne na vašo kartico.",
   "billing.checkout.refunded": "To plačilo smo v celoti vrnili. E-poštno sporočilo, ki smo vam ga poslali, pojasnjuje zakaj.",
+  "billing.checkout.refundPending": "Tega plačila ne moremo uporabiti, zato vam ga v celoti vračamo na kartico. Ko bo to opravljeno, vam pošljemo e-poštno sporočilo.",
   "billing.checkout.refundedBeforeStart": "To plačilo je bilo v celoti vrnjeno na vašo kartico in vaš paket se ni začel. Poskusite znova.",
   "billing.checkout.succeeded": "Vaš paket {plan} je aktiven. E-poštno sporočilo s potrditvijo je na poti.",
   "billing.checkout.failed": "Plačilo ni uspelo in denar ni bil zaračunan. Poskusite znova ali uporabite drugo kartico.",

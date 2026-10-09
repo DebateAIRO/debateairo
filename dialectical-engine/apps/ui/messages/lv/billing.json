@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Lūdzu, nemaksājiet vēlreiz. Jūsu plāns parādīsies iestatījumos, tiklīdz banka to apstiprinās.",
   "billing.checkout.cardCountryRefused": "Mēs nevaram pieņemt kartes, kas izdotas šīs kartes valstī. Visa iekasētā nauda pilnībā atgriežas jūsu kartē.",
   "billing.checkout.refunded": "Mēs pilnībā atmaksājām šo maksājumu. Mūsu nosūtītajā e-pastā ir paskaidrots, kāpēc.",
+  "billing.checkout.refundPending": "Mēs nevaram izmantot šo maksājumu, tāpēc pilnībā atmaksājam to jūsu kartē. Nosūtīsim jums e-pastu, kad tas būs izdarīts.",
   "billing.checkout.refundedBeforeStart": "Šis maksājums ir pilnībā atmaksāts uz jūsu karti, un jūsu plāns nav sācies. Varat mēģināt vēlreiz.",
   "billing.checkout.succeeded": "Jūsu plāns {plan} ir aktīvs. Apstiprinājuma e-pasts ir ceļā.",
   "billing.checkout.failed": "Maksājums neizdevās, un nauda netika iekasēta. Varat mēģināt vēlreiz vai izmantot citu karti.",

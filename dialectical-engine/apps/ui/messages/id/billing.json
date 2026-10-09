@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Jangan membayar lagi. Paket Anda muncul di Pengaturan setelah bank Anda mengonfirmasi.",
   "billing.checkout.cardCountryRefused": "Kami tidak dapat menerima kartu yang diterbitkan di negara kartu tersebut. Uang yang sudah ditarik kembali sepenuhnya ke kartu Anda.",
   "billing.checkout.refunded": "Kami telah mengembalikan pembayaran ini sepenuhnya. Email yang kami kirim menjelaskan alasannya.",
+  "billing.checkout.refundPending": "Kami tidak dapat menggunakan pembayaran ini, jadi kami mengembalikannya sepenuhnya ke kartu Anda. Kami akan mengirim email setelah selesai.",
   "billing.checkout.refundedBeforeStart": "Pembayaran ini telah dikembalikan sepenuhnya ke kartu Anda, dan paket Anda tidak dimulai. Anda dapat mencoba lagi.",
   "billing.checkout.succeeded": "Paket {plan} Anda aktif. Email konfirmasi sedang dikirim.",
   "billing.checkout.failed": "Pembayaran tidak berhasil, dan tidak ada uang yang ditarik. Anda dapat mencoba lagi atau menggunakan kartu lain.",

@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Não pague novamente. O seu plano aparece nas Definições assim que o seu banco confirmar.",
   "billing.checkout.cardCountryRefused": "Não podemos aceitar cartões emitidos no país desse cartão. Qualquer valor cobrado regressa integralmente ao seu cartão.",
   "billing.checkout.refunded": "Reembolsámos integralmente este pagamento. O e-mail que enviámos explica porquê.",
+  "billing.checkout.refundPending": "Não podemos usar este pagamento, por isso estamos a reembolsá-lo integralmente no seu cartão. Enviaremos um e-mail quando estiver concluído.",
   "billing.checkout.refundedBeforeStart": "Este pagamento foi reembolsado integralmente no seu cartão e o seu plano não começou. Pode tentar novamente.",
   "billing.checkout.succeeded": "O seu plano {plan} está ativo. Um e-mail de confirmação está a caminho.",
   "billing.checkout.failed": "O pagamento não foi concluído e não foi cobrado qualquer valor. Pode tentar novamente ou usar outro cartão.",

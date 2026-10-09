@@ -1,11 +1,31 @@
 import type { BillingJobQueries, BillingRepository, ChargeEventRow, ChargeKind, ChargeRow } from "@debateai/db";
 import { REFUND_REASONS_REFUSING_THE_PAYMENT, type BillingRefundReason } from "./codes.js";
 import { queueVerifyNow } from "./renewal.js";
+import { refundTarget } from "./rows.js";
 
 export type ChargeState = "PENDING" | "SUCCEEDED" | "FAILED" | "NEEDS_ACTION";
 export type ChargeStatus = Readonly<{ state: ChargeState; reasonCode: string | null }>;
 /** Spec 2026-10-05 §2.6.5: the kind lets the one return page word an upgrade's confirmation. */
 export type ChargeStatusAnswer = ChargeStatus & Readonly<{ kind: ChargeKind }>;
+
+/**
+ * F4 (ruling PR-55, finding ui-1): the refusing reasons whose page sentence says the payment WAS refunded and an email
+ * explains why (`billing.checkout.refunded`; the email, M11_DUPLICATE, follows only the REFUNDED row). Refunds are the
+ * owner's own act in NETOPIA's admin, so such a request can wait days: until REFUNDED rows of the same payment cover
+ * it, the charge reads REFUND_PENDING (the refund is on its way). The other refusing reasons' sentences are true
+ * before the refund too (a blocked card country: "any money taken goes back"; a card check's hold released).
+ */
+const REFUSALS_SAID_REFUNDED: ReadonlySet<string> = new Set<BillingRefundReason>([
+  "ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "UPGRADE_CLOSED"
+]);
+
+/** Whether REFUNDED rows naming the request's payment (P1a's refund target) add up to what it asked back. */
+function refundRecorded(events: ReadonlyArray<ChargeEventRow>, request: ChargeEventRow): boolean {
+  if (request.providerPaymentId === null || request.amountMicros === null) return false;
+  const refunded = events.filter((event) => event.kind === "REFUNDED" && refundTarget(event) === request.providerPaymentId)
+    .reduce((total, event) => total + (event.amountMicros ?? 0), 0);
+  return refunded >= request.amountMicros;
+}
 
 /**
  * The waiting screen's answer, derived only from our own events: a payment we refunded because we refuse it
@@ -16,12 +36,17 @@ export type ChargeStatusAnswer = ChargeStatus & Readonly<{ kind: ChargeKind }>;
  * Part 4 final review C-19 (the controller's ruling): a checkout's payment charged back before we verified it writes
  * only the CHARGEBACK (no SUCCEEDED, no plan), so an unstarted checkout reads it as FAILED (reason CHARGEBACK; the
  * waiting screen says the existing refunded-before-start sentence), never PENDING for ever.
+ * F4: a duplicate plan, an ended subscription or a closed upgrade reads FAILED with REFUND_PENDING until its refund is
+ * recorded (`REFUSALS_SAID_REFUNDED`), and with its own reason after.
  */
 export function chargeStatusOf(events: ReadonlyArray<ChargeEventRow>, activated = true): ChargeStatus {
   const refused = events.find((event) => event.kind === "REFUND_REQUESTED" && event.errorCode !== null
     && (REFUND_REASONS_REFUSING_THE_PAYMENT.has(event.errorCode as BillingRefundReason)
       || (!activated && (event.errorCode === "PROVIDER_REFUND" || event.errorCode === "PROVIDER_VOID"))));
-  if (refused !== undefined) return Object.freeze({ state: "FAILED", reasonCode: refused.errorCode });
+  if (refused !== undefined) {
+    const pending = REFUSALS_SAID_REFUNDED.has(refused.errorCode!) && !refundRecorded(events, refused);
+    return Object.freeze({ state: "FAILED", reasonCode: pending ? "REFUND_PENDING" : refused.errorCode });
+  }
   if (!activated && events.some((event) => event.kind === "CHARGEBACK")) {
     return Object.freeze({ state: "FAILED", reasonCode: "CHARGEBACK" });
   }

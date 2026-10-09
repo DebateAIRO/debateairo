@@ -448,6 +448,8 @@ describe("P20 SubscriptionControls (S1)", () => {
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "UPGRADE_NOT_AVAILABLE_NOW"), "Your plan is about to renew, so an upgrade can't start right now. You can upgrade as soon as the renewal has gone through.", false],
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"), "Your account is scheduled for deletion. Cancel the deletion in Settings to subscribe or change your plan.", false],
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "UPGRADE_IN_PROGRESS"), "Your last upgrade payment is still being confirmed. Please wait a few minutes and try again.", true],
+      // F4 (finding ui-2): the agreement the page carries was superseded while it was open; only a reload fixes it.
+      [new ContractHttpError("SERVER_FAILURE", 409, "x", "LEGAL_DOCUMENT_STALE"), "This page is out of date. Please reload it.", false],
       [new ContractHttpError("NETWORK_FAILURE", 0, "x"), "We're still confirming this with the payment provider.", true],
       [new ContractHttpError("SERVER_FAILURE", 503, "x"), "We're still confirming this with the payment provider.", true]
     ] as const) {

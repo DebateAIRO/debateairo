@@ -276,7 +276,8 @@ describe("N12 an upgrade on NETOPIA's page (spec §2.10)", () => {
     expect(events.find((event) => event.kind === "REFUND_REQUESTED")).toMatchObject({
       errorCode: "UPGRADE_CLOSED", amountMicros: events.find((event) => event.kind === "SUCCEEDED")!.amountMicros
     });
-    expect(chargeStatusOf(events)).toEqual({ state: "FAILED", reasonCode: "UPGRADE_CLOSED" });
+    // F4 (finding ui-1): the owner refunds by hand, so until the refund is recorded the page says it is on its way.
+    expect(chargeStatusOf(events)).toEqual({ state: "FAILED", reasonCode: "REFUND_PENDING" });
     expect((await stateOf(run.seeded.subscriptionId)).planId).toBe("MAX");
     expect((await repository.subscriptionEvents(run.seeded.subscriptionId)).filter((event) => event.kind === "UPGRADED")).toHaveLength(1);
     await run.api.close();
@@ -320,7 +321,8 @@ describe("N12 an upgrade on NETOPIA's page (spec §2.10)", () => {
     expect(charge.events.find((event) => event.kind === "REFUND_REQUESTED")).toMatchObject({
       errorCode: "SUBSCRIPTION_ENDED", amountMicros: charge.totalMicros
     });
-    expect(chargeStatusOf(charge.events)).toEqual({ state: "FAILED", reasonCode: "SUBSCRIPTION_ENDED" });
+    // F4 (finding ui-1): no REFUNDED yet, so the page says the refund is on its way, never that it was made.
+    expect(chargeStatusOf(charge.events)).toEqual({ state: "FAILED", reasonCode: "REFUND_PENDING" });
     expect((await stateOf(run.seeded.subscriptionId)).planId).toBe("PRO");
     expect(await upgradedEvents(run.seeded.subscriptionId)).toHaveLength(1);
     await run.api.close();

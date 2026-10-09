@@ -56,6 +56,8 @@ const UPGRADE_REFUSALS: Readonly<Record<string, FailureWords>> = Object.freeze({
   UPGRADE_IN_PROGRESS: Object.freeze({ key: "billing.subscription.upgradeInProgress", reload: true }),
   ACCOUNT_ERASURE_PENDING: ERASURE_PENDING,
   LEGAL_REACCEPTANCE_REQUIRED: REACCEPT_REQUIRED,
+  // F4 (finding ui-2): the agreement the page carries was superseded while it was open; only a page reload fixes it.
+  LEGAL_DOCUMENT_STALE: Object.freeze({ key: "billing.checkout.pageOutdated", reload: false }),
   ADMISSION_RATE_LIMITED: RATE_LIMITED,
   UPGRADE_PENDING: Object.freeze({ key: "billing.subscription.upgradeInProgress", reload: true }),
   PAYMENT_PROVIDER_UNAVAILABLE: Object.freeze({ key: "billing.checkout.formUnavailable", reload: false })

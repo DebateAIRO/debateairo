@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Jekk jogħġbok terġax tħallas. Il-pjan tiegħek jidher fl-Issettjar ladarba l-bank tiegħek jikkonferma.",
   "billing.checkout.cardCountryRefused": "Ma nistgħux naċċettaw karti maħruġa fil-pajjiż ta’ dik il-karta. Kull flus meħuda jmorru lura kollha fuq il-karta tiegħek.",
   "billing.checkout.refunded": "Irrimborsajna dan il-ħlas kollu. L-email li bgħatnielek tispjega għaliex.",
+  "billing.checkout.refundPending": "Ma nistgħux nużaw dan il-ħlas, għalhekk qed nirrimborsawh kollu fuq il-karta tiegħek. Nibagħtulek email meta jkun lest.",
   "billing.checkout.refundedBeforeStart": "Dan il-ħlas ġie rimborsat kollu fuq il-karta tiegħek, u l-pjan tiegħek ma bediex. Tista’ terġa’ tipprova.",
   "billing.checkout.succeeded": "Il-pjan {plan} tiegħek huwa attiv. Email ta’ konferma fi triqitha.",
   "billing.checkout.failed": "Il-ħlas ma għaddiex, u ma ttieħdu l-ebda flus. Tista’ terġa’ tipprova jew tuża karta oħra.",

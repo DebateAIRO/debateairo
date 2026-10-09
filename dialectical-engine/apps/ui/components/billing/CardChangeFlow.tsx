@@ -93,6 +93,8 @@ export function CardChangeFlow({
         : code === "ACCOUNT_ERASURE_PENDING" ? "billing.checkout.erasurePending"
         : code === "CARD_CHANGE_NOT_AVAILABLE_NOW" ? "billing.card.tryAgainShortly"
         : code === "LEGAL_REACCEPTANCE_REQUIRED" ? "billing.checkout.reacceptRequired"
+        // F4 (finding ui-2): the agreement this page carries was superseded while it was open; a retry resends it.
+        : code === "LEGAL_DOCUMENT_STALE" ? "billing.checkout.pageOutdated"
         : code === "ADMISSION_RATE_LIMITED" ? "billing.checkout.rateLimited"
         : code === "BILLING_PHONE_INVALID" ? "billing.checkout.phoneInvalid"
         : code === "BILLING_ADDRESS_REQUIRED" ? "billing.checkout.detailsRequired"

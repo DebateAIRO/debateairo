@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Betala inte igen. Ditt abonnemang visas i Inställningar när din bank har bekräftat.",
   "billing.checkout.cardCountryRefused": "Vi kan inte godta kort som har utfärdats i det kortets land. Alla dragna pengar går i sin helhet tillbaka till ditt kort.",
   "billing.checkout.refunded": "Vi har återbetalat hela den här betalningen. Mejlet vi skickade förklarar varför.",
+  "billing.checkout.refundPending": "Vi kan inte använda den här betalningen, så vi återbetalar hela beloppet till ditt kort. Vi mejlar dig när det är klart.",
   "billing.checkout.refundedBeforeStart": "Den här betalningen har återbetalats i sin helhet till ditt kort, och ditt abonnemang har inte startat. Du kan försöka igen.",
   "billing.checkout.succeeded": "Ditt {plan}-abonnemang är aktivt. Ett bekräftelsemejl är på väg.",
   "billing.checkout.failed": "Betalningen gick inte igenom och inga pengar drogs. Du kan försöka igen eller använda ett annat kort.",

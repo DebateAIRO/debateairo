@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Please don't pay again. Your plan appears in Settings once your bank confirms.",
   "billing.checkout.cardCountryRefused": "We can't accept cards issued in that card's country. Any money taken goes back to your card in full.",
   "billing.checkout.refunded": "We refunded this payment in full. The email we sent explains why.",
+  "billing.checkout.refundPending": "We can't use this payment, so we're refunding it to your card in full. We'll email you when it's done.",
   "billing.checkout.refundedBeforeStart": "This payment was refunded to your card in full, and your plan didn't start. You can try again.",
   "billing.checkout.succeeded": "Your {plan} plan is active. A confirmation email is on its way.",
   "billing.checkout.failed": "The payment didn't go through, and no money was taken. You can try again or use another card.",

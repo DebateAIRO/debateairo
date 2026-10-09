@@ -82,6 +82,7 @@
   "billing.checkout.doNotPayAgain": "Ná híoc arís. Beidh do phlean le feiceáil sna Socruithe nuair a dheimhníonn do bhanc é.",
   "billing.checkout.cardCountryRefused": "Ní féidir linn glacadh le cártaí a eisíodh i dtír an chárta sin. Téann aon airgead a tógadh ar ais go hiomlán chuig do chárta.",
   "billing.checkout.refunded": "D’aisíocamar an íocaíocht seo go hiomlán. Míníonn an ríomhphost a sheolamar an fáth.",
+  "billing.checkout.refundPending": "Ní féidir linn an íocaíocht seo a úsáid, mar sin táimid á haisíoc go hiomlán chuig do chárta. Seolfaimid ríomhphost chugat nuair a bheidh sé déanta.",
   "billing.checkout.refundedBeforeStart": "Aisíocadh an íocaíocht seo go hiomlán le do chárta, agus níor thosaigh do phlean. Is féidir leat triail eile a bhaint as.",
   "billing.checkout.succeeded": "Tá do phlean {plan} gníomhach. Tá ríomhphost deimhnithe ar a bhealach.",
   "billing.checkout.failed": "Níor éirigh leis an íocaíocht, agus níor tógadh aon airgead. Is féidir leat triail eile a bhaint as nó cárta eile a úsáid.",
