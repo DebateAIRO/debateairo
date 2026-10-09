@@ -230,7 +230,12 @@ export class RootStaffAlertConfiguration {
     async read(): Promise<ProtectedStaffAlertConfiguration | null> { return this.bounded(this.readProtected()); }
     /** Startup custody only: root-owned file and executable, exact schema and an installed ACK route.
      * A fresh ACK proof is NOT required here; every staff action still requires one through read(). */
-    async verifyCustody(): Promise<boolean> { return await this.bounded(this.readCustodied()) !== null; }
+    async verifyCustody(): Promise<boolean> { return await this.custodyBinding() !== null; }
+    /** The custodied file's readiness binding (sha + generation), with no ACK freshness requirement. */
+    async custodyBinding(): Promise<StaffAlertReadinessBinding | null> {
+        const custodied = await this.bounded(this.readCustodied());
+        return custodied === null ? null : Object.freeze({ configSha256: custodied.hash, generation: custodied.config.generation });
+    }
     private async bounded<T>(work: Promise<T | null>): Promise<T | null> {
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {

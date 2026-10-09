@@ -29,7 +29,9 @@ const fundedStaffValue = { ...(STAFF_ACCESS_POLICY_REGISTER_ROW.value as Record<
   active_capabilities: [...(STAFF_ACCESS_POLICY_REGISTER_ROW.value as { active_capabilities: string[] }).active_capabilities, "ALLOWANCE_WRITE"] };
 type DatabaseState = { installation: unknown; published: boolean; authorized: string[]; funded: boolean;
   /** Fake alert outbox: every claim spends one attempt, as staff.claim_alert_delivery does. */
-  outbox: Array<Record<string, unknown>>; keyUsers: Map<string, string>; claimCalls: number; attempts: number; receipts: Array<{ outcome: unknown; failure: unknown }> };
+  outbox: Array<Record<string, unknown>>; keyUsers: Map<string, string>; claimCalls: number; attempts: number; receipts: Array<{ outcome: unknown; failure: unknown }>;
+  /** Replaces the readiness read: a thrown database fault or an unexpected answer. */
+  readinessFault?: () => unknown[] };
 /** Enumerated SQL answers only; any unknown statement returns no row and fails closed. */
 function database(state: DatabaseState): Pool {
   const answer = (sql: string, params: readonly unknown[]): unknown[] => {
@@ -37,7 +39,7 @@ function database(state: DatabaseState): Pool {
       source_ref: STAFF_ACCESS_POLICY_REGISTER_ROW.sourceRef, sealed: true, declared_row_count: 1, actual_row_count: "1" }] : [];
     if (sql.includes("staff.read_internal_funding_policy")) return [{ value: state.funded ? { registerVersion: 2, policy: fundingValue, sourceRef: fundingPolicy.sourceRef } : null }];
     if (sql.includes("staff.read_owner_recovery_installation")) return [{ value: state.installation }];
-    if (sql.includes("staff.read_independent_alert_readiness")) return [{ value: state.published ? "READY" : "UNAVAILABLE" }];
+    if (sql.includes("staff.read_independent_alert_readiness")) return state.readinessFault?.() ?? [{ value: state.published ? "READY" : "UNAVAILABLE" }];
     if (sql.includes("staff.authorize_alert_operation")) { if (state.published) state.authorized.push(String(params[0])); return [{ value: state.published }]; }
     if (sql.includes("staff.read_alert_user_mapping")) return [{ value: { userId: params[0], keyRef } }];
     if (sql.includes("staff.claim_alert_delivery")) {
@@ -122,6 +124,31 @@ describe("staff runtime boot without fresh alert readiness", () => {
       expect(f.lines).toEqual([]);
       expect(await runtime.readiness.readIndependentAlertReadiness()).toBe("READY");
     } finally { await runtime.close(); }
+  });
+
+  it("refuses boot with a distinct reason when the readiness read itself faults, instead of starting locked", async () => {
+    const faults: Array<() => unknown[]> = [
+      () => { throw Object.assign(new Error("permission denied for function read_independent_alert_readiness"), { code: "42501" }); },
+      () => { throw Object.assign(new Error("function staff.read_independent_alert_readiness(text, uuid) does not exist"), { code: "42883" }); },
+      () => [],
+      () => [{ value: "MAYBE" }]
+    ];
+    // Probed whether or not the ACK proof is fresh, so a stale proof cannot hide a database fault.
+    for (const ackFresh of [true, false]) for (const fault of faults) {
+      const f = await fixture();
+      if (ackFresh) await writeFile(f.ackState, "FRESH");
+      f.state.readinessFault = fault;
+      await expect(createStaffRuntime(f.activation)).rejects.toThrow("STAFF_ACTIVATION_UNAVAILABLE");
+      expect(f.lines).toEqual([JSON.stringify({ event: "api.staff.activation_refused", reason: "READINESS_UNREADABLE" })]);
+    }
+    // Control: the specific "not ready" answer still starts locked.
+    for (const [ackFresh, reason] of [[true, "READINESS_STALE"], [false, "ACK_EVIDENCE_STALE"]] as const) {
+      const stale = await fixture();
+      if (ackFresh) await writeFile(stale.ackState, "FRESH");
+      stale.state.readinessFault = () => [{ value: "UNAVAILABLE" }];
+      const runtime = await createStaffRuntime(stale.activation);
+      try { expect(stale.lines).toEqual([lockedLine(reason)]); } finally { await runtime.close(); }
+    }
   });
 
   it("still refuses boot on operator hash mismatch, broken config custody, invalid policy or incomplete owner installation", async () => {

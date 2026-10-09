@@ -4,7 +4,7 @@ import { lstat, open, realpath } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { dirname, isAbsolute, normalize } from 'node:path';
 import type { ReadableUserDekStore } from '@debateai/crypto';
-import { PostgresInternalAllowanceRepository, PostgresStaffAlertRepository, PostgresStaffRepository, type Pool } from '@debateai/db';
+import { PostgresInternalAllowanceRepository, PostgresStaffAlertRepository, PostgresStaffRepository, type Pool, type StaffAlertReadinessBinding } from '@debateai/db';
 import type { StaffAccessEnvironment } from '@debateai/kernel';
 import { readStaffAccessPolicy, type BillingPlans } from '@debateai/register';
 import { StaffInternalFundingReadiness } from './internal-allowances.js';
@@ -108,11 +108,24 @@ export async function loadStaffAlertOperator(input: Readonly<{
 }
 /** Boot reason only: no path, hash, generation, adapter id or address. */
 type StaffToolsLockedReason = 'ACK_EVIDENCE_STALE' | 'READINESS_STALE';
-async function toolsLockedReason(configuration: RootStaffAlertConfiguration, repository: PostgresStaffAlertRepository): Promise<StaffToolsLockedReason | null> {
+/** Only the database's own "not ready" answer means locked. A thrown read (missing grant, missing
+ * migration, timeout, no row) or any other answer is a deployment fault and refuses boot. The read is
+ * made even when the ACK proof is stale (with the custodied binding), so a stale proof hides no fault. */
+async function toolsLockedReason(configuration: RootStaffAlertConfiguration, custodied: StaffAlertReadinessBinding, repository: PostgresStaffAlertRepository, emit: (line: string) => void): Promise<StaffToolsLockedReason | null> {
     const trusted = await configuration.read();
+    let published: unknown;
+    try {
+        published = await repository.readIndependentAlertReadiness(trusted?.binding ?? custodied);
+    }
+    catch {
+        published = undefined;
+    }
+    if (published !== 'READY' && published !== 'UNAVAILABLE') {
+        emit(JSON.stringify({ event: 'api.staff.activation_refused', reason: 'READINESS_UNREADABLE' }));
+        throw unavailable();
+    }
     if (trusted === null)
         return 'ACK_EVIDENCE_STALE';
-    const published = await repository.readIndependentAlertReadiness(trusted.binding).catch(() => 'UNAVAILABLE' as const);
     return published === 'READY' ? null : 'READINESS_STALE';
 }
 /** Startup-only activation. Boot requires the static facts: reviewed operator bytes, protected alert
@@ -145,7 +158,8 @@ export async function createStaffRuntime(input: Readonly<{
         if ((input.environment.internalAllowancePolicy === undefined) !== (selectedFunding === null)) throw unavailable();
         const repository = new PostgresStaffAlertRepository(input.pool), staffRepository = new PostgresStaffRepository(input.pool);
         const configuration = new RootStaffAlertConfiguration({ path: input.environment.independentAlertConfigPath, acknowledgements: operator.acknowledgements, ...(input.configurationFiles ? { files: input.configurationFiles } : {}) });
-        if (!await configuration.verifyCustody())
+        const custodied = await configuration.custodyBinding();
+        if (custodied === null)
             throw unavailable();
         const readiness = new StaffIndependentAlertReadiness(configuration, repository);
         const funding = input.environment.internalAllowancePolicy === undefined ? undefined : new StaffInternalFundingReadiness(allowances, {
@@ -158,7 +172,7 @@ export async function createStaffRuntime(input: Readonly<{
             throw unavailable();
         const emit = input.logEvent ?? (line => console.warn(line));
         // Not cached: the lock reason is logged once; actions consult `readiness` on every request.
-        const locked = await toolsLockedReason(configuration, repository);
+        const locked = await toolsLockedReason(configuration, custodied, repository, emit);
         if (locked !== null)
             emit(JSON.stringify({ event: 'api.staff.tools_locked', reason: locked }));
         const targetInvitationTransport = new VerifiedStaffTargetInvitationTransport({ publicAppUrl: input.publicAppUrl, channels: staffRepository, keys: input.keys, delivery: operator.invitationDelivery });
