@@ -17,7 +17,8 @@ const KEY = randomBytes(32);
 const CUSTOMER = "4b1c6f2a-9f55-4d47-9d0e-3c1f8b2a7e10";
 const JOB_ID = "8c3f1b2e-6a4d-4f1e-9b7a-2d5c8e1f0a93";
 const profile = (email: string, locale: string): BillingProfile => ({
-  email, locale, name: null, country: "RO", region: null, postalCode: null, city: null, street: null, company: null
+  email, locale, name: null, firstName: null, lastName: null, phone: null, paymentIp: null, country: "RO", region: null,
+  postalCode: null, city: null, street: null, company: null
 });
 
 function asJob(request: ReturnType<typeof emailJob>, attempts = 1): OutboxJob {

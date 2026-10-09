@@ -3,8 +3,9 @@ import { MailTemplateError, mailMessagesDirectory, readStringTable } from "./ren
 
 /**
  * The sentences billing writes where a person or a tax document reads them (D6a's `BillingOrderText` port): the
- * xMoney order line (spec §2.5.3 step 5), the card check's order line (A12) and the one invoice line (P10). They
- * live in messages/<locale>/order.json (English authoritative) and are read on the first call, never at import.
+ * order line NETOPIA's payment page shows (spec §2.5.3 step 5), the card check's order line (A12) and the one
+ * invoice line (P10). They live in messages/<locale>/order.json (English authoritative) and are read on the first
+ * call, never at import.
  */
 export const ORDER_TEXT_KINDS = Object.freeze(["ORDER_PLAN", "CARD_CHECK", "INVOICE_LINE"] as const);
 export type OrderTextKindId = (typeof ORDER_TEXT_KINDS)[number];
@@ -30,7 +31,7 @@ let loaded: Readonly<Record<MailLocale, Catalogue>> | null = null;
 
 /**
  * One order or invoice sentence in the buyer's locale (an unknown locale reads English). Every param is one short
- * line: the order line is signed into xMoney's payload and the invoice line goes on a tax document, so a line break
+ * line: the order line is sent to NETOPIA and the invoice line goes on a tax document, so a line break
  * or a control character is refused, with a code that names the param and never its value.
  */
 export function renderOrderText(kind: OrderTextKindId, locale: string, params: Readonly<Record<string, string>>): string {

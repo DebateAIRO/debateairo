@@ -12,7 +12,8 @@
  *   characters (RFC 5321); it may not begin with `-`, which a mail program could read as an option. `+label`
  *   is allowed, so the SES mailbox simulator addresses (`success+x@simulator.amazonses.com`) pass;
  * - the domain has at least one dot; each label is letters, digits and inner hyphens, at most 63 characters;
- *   the last label (the top-level domain) is 2 to 24 letters;
+ *   the last label (the top-level domain) is 2 to 24 letters, or an internationalised ending in its ASCII form
+ *   (`xn--` and 2 to 59 letters, digits or hyphens, e.g. `.xn--p1ai` for .рф; ruling 2026-10-09);
  * - the domain is lower-cased in the canonical form. The local part keeps its case here; the account store
  *   lower-cases the whole address later (normalizeEmailForBlindIndex), which never makes a valid address invalid.
  * Separators (`,` `;`), spaces, quotes, angle brackets and control characters can never match, so one address can
@@ -22,15 +23,15 @@
  * local part is REFUSED, not converted. The account is found by a keyed digest of the address exactly as stored,
  * so silently storing the punycode form would make the Unicode spelling a different account at sign-in; and a
  * Unicode local part needs SMTPUTF8, which our relay path (Postfix -> SES SMTP) is not set up to promise. An
- * IDN domain written in its ASCII form (`user@xn--bcher-kva.de`) passes, because each label is plain ASCII. An
- * ASCII-form top-level domain (`xn--p1ai`) does not, because the owner's rule is "2 to 24 letters".
+ * IDN domain written in its ASCII form (`user@xn--bcher-kva.de`, `user@example.xn--p1ai`) passes, because each label
+ * is plain ASCII.
  */
 const MAX_ADDRESS_LENGTH = 254;
 const MAX_LOCAL_PART_LENGTH = 64;
 const MAX_DOMAIN_LABEL_LENGTH = 63;
 const LOCAL_PART = /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
 const DOMAIN_LABEL = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/;
-const TOP_LEVEL_LABEL = /^[A-Za-z]{2,24}$/;
+const TOP_LEVEL_LABEL = /^(?:[A-Za-z]{2,24}|[Xx][Nn]--[A-Za-z0-9-]{2,59})$/;
 
 /** The one refusal code every entry point answers with, for a malformed address and for a domain that takes no mail. */
 export const MAIL_ADDRESS_REFUSAL_CODE = "EMAIL_INVALID" as const;

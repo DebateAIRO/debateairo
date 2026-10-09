@@ -1,0 +1,9 @@
+# Install as /etc/systemd/system/debateai-preview-gate-halt-watch.timer (root:root 0644).
+# Part of the standard install: debateai-preview.target Wants= this timer.
+[Unit]
+Description=DebateAI preview: check every minute whether the spending gate halted
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=5s

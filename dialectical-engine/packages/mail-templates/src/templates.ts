@@ -1,11 +1,14 @@
 /**
  * R-8's sixteen ids, ruling Q-5's owner template O2 (a refund that could not be completed), W9's (P2-I11)
  * M8_RECEIVED (a withdrawal's acknowledgement of receipt) and O2_WITHDRAWAL (a withdrawal the owner settles by hand),
- * and W12's (P2-I16) O3 (a legal document or an email that was never sent).
+ * W12's (P2-I16) O3 (a legal document or an email that was never sent), and N9's O4 (NETOPIA's message about an open
+ * charge could not be verified), and N14's O2_REFUND_DUE and O2_REFUND_REMINDER (a NETOPIA refund for the owner to make
+ * in NETOPIA's admin, and the daily list of the open ones), and N17's M12 (a card is needed before a renewal).
  */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
-  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "O1", "O2", "O2_WITHDRAWAL", "O3"
+  "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M11", "M11_DUPLICATE", "M12", "O1", "O2", "O2_WITHDRAWAL",
+  "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4"
 ] as const);
 
 export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
@@ -81,14 +84,21 @@ export const RESERVED_MAIL_PARAMS = Object.freeze(["merchantName", "merchantAddr
 const define = (template: MailTemplateDefinition): MailTemplateDefinition => Object.freeze(template);
 /**
  * W10 (P2-I21): `bankDeclined` is "true" only for a charge the bank declined (PAYMENT_DECLINED); every other failed
- * attempt (an outage past Q-1's 72 hours, our refused key, an unknown outcome, xMoney's own refusal, a tax service
+ * attempt (an outage past Q-1's 72 hours, our refused key, an unknown outcome, NETOPIA's own refusal, a tax service
  * that stayed down, a retry whose total changed) asked no bank, so its email never says one refused.
+ * N11 (spec §2.9.2): the optional flag `confirmCard` is "true" for AUTHENTICATION_REQUIRED (the bank asked for its
+ * security check on a renewal nobody was present to finish): its sentence replaces the bank's refusal. An M5 queued
+ * without it reads as before.
  */
 const retry = Object.freeze({ plan: "plan", retryDate: "date", cardPageUrl: "url", bankDeclined: "flag" } as const);
-/** W10 (P2-I21): the first M5 sentence is true in every case; the bank's refusal follows only when there was one. */
+const retryOptional = Object.freeze({ confirmCard: "flag" } as const);
+/** W10 (P2-I21): the first M5 sentence is true in every case; then the bank's check or its refusal, when there was one. */
 const notTaken: ReadonlyArray<MailParagraph> = Object.freeze([
   "mail.M5.notTaken",
-  { ifParam: "bankDeclined", test: "true", then: "mail.M5.bankRefused", otherwise: null }
+  {
+    ifParam: "confirmCard", test: "true", then: "mail.M5.confirmCard",
+    otherwise: { ifParam: "bankDeclined", test: "true", then: "mail.M5.bankRefused", otherwise: null }
+  }
 ]);
 const charged = Object.freeze({ plan: "plan", totalAmount: "amount", chargeDate: "date" } as const);
 
@@ -131,9 +141,15 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     paragraphs: ["mail.M4.reminder", "mail.M4.cancel"],
     params: { plan: "plan", totalAmount: "amount", renewDate: "date", cancelPageUrl: "url" }
   }),
-  M5A: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.retry"], params: retry }),
-  M5B: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.secondTry"], params: retry }),
-  M5C: define({ catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.lastTry"], params: retry }),
+  M5A: define({
+    catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.retry"], params: retry, optional: retryOptional
+  }),
+  M5B: define({
+    catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.secondTry"], params: retry, optional: retryOptional
+  }),
+  M5C: define({
+    catalogue: "mail", subject: "mail.M5.subject", paragraphs: [...notTaken, "mail.M5.lastTry"], params: retry, optional: retryOptional
+  }),
   M6: define({
     catalogue: "mail", subject: "mail.M6.subject",
     paragraphs: ["mail.M6.moved", "mail.M6.again"],
@@ -205,6 +221,17 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     paragraphs: ["mail.M11.duplicate"],
     params: { refundAmount: "amount" }
   }),
+  // N17 (spec §2.15.3): ten days before a renewal of a plan with no usable card. `cardExpiring` "true": a card is held
+  // but expires before the renewal; otherwise the last payment's card could not be kept (no token, or it was revoked).
+  M12: define({
+    catalogue: "mail", subject: "mail.M12.subject",
+    paragraphs: [
+      "mail.M12.intro",
+      { ifParam: "cardExpiring", test: "true", then: "mail.M12.expiring", otherwise: "mail.M12.missing" },
+      "mail.M12.action"
+    ],
+    params: { plan: "plan", renewDate: "date", cardPageUrl: "url", cardExpiring: "flag" }
+  }),
   O1: define({
     catalogue: "owner", subject: "owner.O1.subject",
     paragraphs: ["owner.O1.intro", { block: "summaryText" }],
@@ -213,12 +240,12 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   // Ruling Q-5: RefundDesk's dead-letter path (P9b) sends this to the owner at once. Our charge id, the amount and
   // the dead job's code; never a customer's name, email or card. P2-I5: a job the charge records no request for
   // (REFUND_NOT_REQUESTED, notRequested "true") moved no money and is no refund to make, so it says that instead:
-  // nothing went to xMoney, the amount is only the job's, and whoever runs the server checks the charge's requests.
+  // nothing went to NETOPIA, the amount is only the job's, and whoever runs the server checks the charge's requests.
   // W9 (P2-M8): a real refund's O2 also names what the refund was for (`refundReason`, the intent's reason) and, for a
   // withdrawal's, its legal deadline and how to refund by hand so that M8 still follows (`refundDeadline`). Both are
   // optional, so an O2 queued before them renders as it did; RefundDesk sends neither for REFUND_NOT_REQUESTED.
-  // P2-W4: REFUND_CHARGE_MISSING also takes the not-requested sentences (notRequested "true"). A job of the other
-  // xMoney system (OTHER_XMONEY_SYSTEM, the optional flag `otherSystem` "true") says nothing was sent and nothing is
+  // P2-W4: REFUND_CHARGE_MISSING also takes the not-requested sentences (notRequested "true"). A job of another
+  // payment system (OTHER_PAYMENT_SYSTEM, the optional flag `otherSystem` "true") says nothing was sent and nothing is
   // owed on this server, with no deadline; notRequested wins if both were ever set. Left out, it changes nothing.
   O2: define({
     catalogue: "owner", subject: "owner.O2.subject",
@@ -239,25 +266,74 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   // W9 (P2-I11): the O2 variant for a withdrawal handed to the owner (`refund_by_owner`: a dashboard refund or an
   // earlier request touched a payment), sent at once from the withdrawal's own transaction, so the 14-day refund
   // deadline never waits for the quarterly O1. The owner reference (an opaque id, what `pnpm billing:withdraw --owner`
-  // takes), the summary's code WITHDRAWAL_BY_OWNER and two dates; never a customer's name, email or card.
+  // takes), the summary's code WITHDRAWAL_BY_OWNER and two dates; never a customer's name, email or card. The settling
+  // command is README §14.8's host form (a bare `pnpm billing:withdraw` has no settings in a root shell), a paragraph of
+  // its own; it reads only ownerRef, so an O2_WITHDRAWAL queued before it renders it too.
   O2_WITHDRAWAL: define({
     catalogue: "owner", subject: "owner.O2_WITHDRAWAL.subject",
     paragraphs: [
       "owner.O2_WITHDRAWAL.intro", "owner.O2_WITHDRAWAL.owner", "owner.O2.reason", "owner.O2_WITHDRAWAL.deadline",
-      "owner.O2_WITHDRAWAL.next"
+      "owner.O2_WITHDRAWAL.next", "owner.O2_WITHDRAWAL.command"
     ],
     params: { ownerRef: "text", reasonCode: "text", withdrawalDate: "date", refundDeadline: "date" }
+  }),
+  // N14 (spec §2.12.2, ruling C-3): while NETOPIA's refund call is unconfirmed, RefundDesk hands each NETOPIA refund to
+  // the owner at once: our charge id, NETOPIA's payment number, the exact amount and currency, whether it is the whole
+  // payment, the reason, a withdrawal's legal deadline, and the exact command that records it. Never a customer's name,
+  // email or card. F6a (final review ops-3, ops-4): the steps say to look at the payment in NETOPIA's admin first, and the
+  // command is README §14.8's host form (systemd-run as the API's user), longer than a text param's 200 characters, so it
+  // is a block: a paragraph of its own, copied whole.
+  O2_REFUND_DUE: define({
+    catalogue: "owner", subject: "owner.O2_REFUND_DUE.subject",
+    paragraphs: [
+      "owner.O2_REFUND_DUE.intro", "owner.O2.charge", "owner.O2_REFUND_DUE.payment", "owner.O2_REFUND_DUE.amount",
+      { ifParam: "whole", test: "true", then: "owner.O2_REFUND_DUE.whole", otherwise: "owner.O2_REFUND_DUE.part" },
+      "owner.O2.refundReason",
+      { ifParam: "refundDeadline", test: "present", then: "owner.O2_REFUND_DUE.deadline", otherwise: null },
+      "owner.O2_REFUND_DUE.next",
+      { ifParam: "whole", test: "true", then: "owner.O2_REFUND_DUE.recordedBySite", otherwise: "owner.O2_REFUND_DUE.command" },
+      { block: "doneCommand" },
+      "owner.O2_REFUND_DUE.reminded"
+    ],
+    params: {
+      chargeRef: "text", paymentRef: "text", refundAmount: "amount", currency: "text", refundReason: "text", whole: "flag",
+      doneCommand: "block"
+    },
+    optional: { refundDeadline: "date" }
+  }),
+  // N14 (spec §2.12.2 item 3): the daily list of the open owner refunds, each with its exact command (`refundList`,
+  // preformatted English lines built by RefundDesk). Our ids only.
+  O2_REFUND_REMINDER: define({
+    catalogue: "owner", subject: "owner.O2_REFUND_REMINDER.subject",
+    paragraphs: ["owner.O2_REFUND_REMINDER.intro", { block: "refundList" }, "owner.O2_REFUND_REMINDER.seen"],
+    params: { refundCount: "count", refundList: "block" }
   }),
   // W12 (P2-I16, the controller's ruling): the outbox worker's dead-letter hook sends this to the owner at once when an
   // invoice or credit-note job, or an email, dies (never for a dead O3 itself). The job kind, our own reference (a
   // charge id, or the email job's ref of template and ids), the dead job's code, and the steps (`nextSteps`, the same
   // wording the owner summary prints, with the `pnpm billing:invoice` command to copy); never a customer's name, email
   // or card.
+  // N10/N11 (spec §2.8, §2.9, ruling C-8): the same O3 also carries a payment that needs the owner (an amount or customer
+  // NETOPIA reports that our charge does not hold, a status whose meaning NETOPIA has not confirmed, a renewal NETOPIA
+  // refused for our own settings or key, a renewal whose outcome stays open). Those set the optional flag `paymentAlert`
+  // "true": the intro and the closing line then speak of the payment, never of a dead job. The reference is our own
+  // charge id; never a customer's name, email or card.
   O3: define({
     catalogue: "owner", subject: "owner.O3.subject",
     paragraphs: [
-      "owner.O3.intro", "owner.O3.job", "owner.O3.reference", "owner.O2.reason", { block: "nextSteps" }, "owner.O3.listed"
+      { ifParam: "paymentAlert", test: "true", then: "owner.O3.paymentIntro", otherwise: "owner.O3.intro" },
+      "owner.O3.job", "owner.O3.reference", "owner.O2.reason", { block: "nextSteps" },
+      { ifParam: "paymentAlert", test: "true", then: "owner.O3.paymentListed", otherwise: "owner.O3.listed" }
     ],
-    params: { jobKind: "text", reference: "text", reasonCode: "text", nextSteps: "block" }
+    params: { jobKind: "text", reference: "text", reasonCode: "text", nextSteps: "block" },
+    optional: { paymentAlert: "flag" }
+  }),
+  // N9 (spec 2026-10-05 §2.7.4 step 3): NETOPIA's message about one of our open charges failed verification. Sent at
+  // once, at most one an hour (the intake's dedupe ref is the UTC hour). Our charge id, the time and the reason code;
+  // never the message, its token or anything of the customer.
+  O4: define({
+    catalogue: "owner", subject: "owner.O4.subject",
+    paragraphs: ["owner.O4.intro", "owner.O2.charge", "owner.O4.received", "owner.O2.reason", "owner.O4.next", "owner.O4.listed"],
+    params: { chargeRef: "text", receivedAt: "text", reasonCode: "text" }
   })
 });

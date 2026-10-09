@@ -56,7 +56,11 @@ const UPGRADE_REFUSALS: Readonly<Record<string, FailureWords>> = Object.freeze({
   UPGRADE_IN_PROGRESS: Object.freeze({ key: "billing.subscription.upgradeInProgress", reload: true }),
   ACCOUNT_ERASURE_PENDING: ERASURE_PENDING,
   LEGAL_REACCEPTANCE_REQUIRED: REACCEPT_REQUIRED,
-  ADMISSION_RATE_LIMITED: RATE_LIMITED
+  // F4 (finding ui-2): the agreement the page carries was superseded while it was open; only a page reload fixes it.
+  LEGAL_DOCUMENT_STALE: Object.freeze({ key: "billing.checkout.pageOutdated", reload: false }),
+  ADMISSION_RATE_LIMITED: RATE_LIMITED,
+  UPGRADE_PENDING: Object.freeze({ key: "billing.subscription.upgradeInProgress", reload: true }),
+  PAYMENT_PROVIDER_UNAVAILABLE: Object.freeze({ key: "billing.checkout.formUnavailable", reload: false })
 });
 
 /** A request that may have reached the payment side: a network failure, a 5xx, or anything that is not an answer. */
@@ -148,12 +152,18 @@ export function SubscriptionControls({
   catalog = billingEnglish,
   locale = "en",
   client = contractClient,
-  now = () => new Date()
+  now = () => new Date(),
+  renewalConsent = null,
+  goToPayment = (url: string): void => { window.location.assign(url); }
 }: Readonly<{
   catalog?: MessageCatalog;
   locale?: LocaleCode;
   client?: SubscriptionClient;
   now?: () => Date;
+  /** Spec §2.18: the card-saving sentence's manifest pair in this locale; null: the upgrade offers no payment. */
+  renewalConsent?: Readonly<{ version: string; sha256: string }> | null;
+  /** Spec §2.10: NETOPIA's page for the upgrade is reached by a top-level navigation. */
+  goToPayment?: (url: string) => void;
 }>) {
   const [loaded, setLoaded] = useState<"LOADING" | "ABSENT" | "READY">("LOADING");
   const [subscription, setSubscription] = useState<Subscription | null>(null);
@@ -162,6 +172,7 @@ export function SubscriptionControls({
   const [panel, setPanel] = useState<"NONE" | "CHANGE" | "CANCEL" | "WITHDRAW">("NONE");
   const [upgrade, setUpgrade] = useState<Readonly<{ planId: UpgradeTarget; quote: UpgradeQuote }> | null>(null);
   const [upgradeCharge, setUpgradeCharge] = useState<Readonly<{ planId: UpgradeTarget; chargeRef: string }> | null>(null);
+  const [upgradeAgreed, setUpgradeAgreed] = useState(false);
   const [downgrade, setDowngrade] = useState<Readonly<{ planId: DowngradeTarget; netPrice: string }> | null>(null);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -342,7 +353,7 @@ export function SubscriptionControls({
               ? <a className="setBtn" href="/settings/card">{t(catalog, "billing.subscription.updateCard")}</a>
               : null}
             {/* C-15: Undo only where the server says the revoke route would accept it (`can_revoke_cancel`): never for
-                a plan of the other xMoney system, whose cancel stands. After the period end the server refuses the undo
+                a plan of another payment system, whose cancel stands. After the period end the server refuses the undo
                 (NOT_SUBSCRIBED) and the sweep ends the plan: offer neither (the page's own clock hides it too, for a
                 view read just before the end). While SUSPENDED it refuses the undo too, whatever wrote the cancel
                 (P2-W10, the W7 review's item 3); a won dispute resumes the plan, and the undo comes back until the
@@ -369,7 +380,9 @@ export function SubscriptionControls({
                 <button key={planId} type="button" className="setBtn" disabled={busy}
                   onClick={() => { void run(async () => {
                     setDowngrade(null);
-                    setUpgrade({ planId, quote: await client.quoteSubscriptionUpgrade(planId) });
+                    const quote = await client.quoteSubscriptionUpgrade(planId);
+                    setUpgradeAgreed(false);
+                    setUpgrade({ planId, quote });
                   }, quoteFailureWords); }}>
                   {t(catalog, "billing.subscription.upgradeTo", { plan: planName(catalog, planId) })}
                 </button>
@@ -404,15 +417,37 @@ export function SubscriptionControls({
                 // A7: this is the price the next renewal charges without an M3 notice, so it is seen before paying.
                 recurringTotal: formatUsd(locale, upgrade.quote.recurring_total)
               })}</p>
+              {/* Spec §2.18: the card-saving agreement with the new plan's monthly total, before NETOPIA's page. */}
+              <label className="billingConsent">
+                <input id="upgrade-agreement" type="checkbox" checked={upgradeAgreed}
+                  onChange={(event) => setUpgradeAgreed(event.target.checked)} />
+                <span>{t(catalog, "billing.consent.renewal", { total: formatUsd(locale, upgrade.quote.recurring_total) })}</span>
+              </label>
               <div className="setCardRow">
-                <button type="button" className="setBtn" disabled={busy}
+                <button type="button" className="setBtn" disabled={busy || !upgradeAgreed || renewalConsent === null}
                   onClick={() => { void run(async () => {
-                    const started = await client.upgradeSubscription(upgrade.planId, upgrade.quote.quote_ref);
-                    setUpgradeCharge({ planId: upgrade.planId, chargeRef: started.charge_ref });
-                    setUpgrade(null);
-                    setPanel("NONE");
+                    if (renewalConsent === null) return;
+                    let started: Awaited<ReturnType<SubscriptionClient["upgradeSubscription"]>>;
+                    try {
+                      started = await client.upgradeSubscription(upgrade.planId, upgrade.quote.quote_ref, {
+                        locale, renewal_terms: renewalConsent
+                      });
+                    } catch (failure) {
+                      // N19b (A3 (a)): a failed start holds this quote's one use, so it is never sent again; choosing
+                      // the upgrade again asks for a fresh quote. `run` words the failure as for every other action.
+                      setUpgrade(null);
+                      throw failure;
+                    }
+                    // N12's 409 UPGRADE_PENDING read as data: wait on that charge instead of paying twice.
+                    if ("state" in started) {
+                      setUpgradeCharge({ planId: upgrade.planId, chargeRef: started.charge_ref });
+                      setUpgrade(null);
+                      setPanel("NONE");
+                      return;
+                    }
+                    goToPayment(started.redirect_url);
                   }, upgradeFailureWords); }}>
-                  {t(catalog, "billing.subscription.upgradeConfirm")}
+                  {t(catalog, "billing.subscription.upgradePay", { amount: formatUsd(locale, upgrade.quote.total) })}
                 </button>
               </div>
             </div>

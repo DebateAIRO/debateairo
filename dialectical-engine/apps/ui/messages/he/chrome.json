@@ -65,6 +65,7 @@
   "chrome.footer.cancel": "ביטול תוכנית",
   "chrome.footer.withdraw": "ביטול עסקה בתוכנית",
   "chrome.footer.paymentMarks": "כרטיסים שאנו מקבלים",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

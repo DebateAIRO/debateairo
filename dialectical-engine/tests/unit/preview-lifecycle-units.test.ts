@@ -40,6 +40,15 @@ describe('preview lifecycle systemd templates', () => {
     expect(Object.keys(value).filter(key => /ExecStart|Requires|BindsTo|Requisite/.test(key))).toEqual([]);
   });
 
+  it.each(['debateai-preview-api.service.d', 'debateai-preview-ui.service.d'])('%s: the release drop-in repeats exactly the restart settings of 50-lifecycle.conf', async folderName => {
+    const { LIFECYCLE_RESTART } = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.mjs');
+    const value = parse(unit(`${folderName}/50-lifecycle.conf`));
+    const restartKeys = Object.keys(value).filter(key => /^\[(Unit|Service)\](Restart|StartLimit|OnFailure|TimeoutStart)/.test(key));
+    const repeated = [...LIFECYCLE_RESTART.unit.map(([key, v]: string[]) => [`[Unit]${key}`, v]), ...LIFECYCLE_RESTART.service.map(([key, v]: string[]) => [`[Service]${key}`, v])];
+    expect(repeated.map(([key]) => key).sort()).toEqual(restartKeys.sort());
+    for (const [key, v] of repeated) expect(value[key!]).toEqual([v]);
+  });
+
   it('API: hard dependencies become soft (Wants + After), never Requires', () => {
     const value = parse(unit('debateai-preview-api.service.d/50-lifecycle.conf'));
     expect(value['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual([...SUPPORTING].sort());
@@ -55,7 +64,8 @@ describe('preview lifecycle systemd templates', () => {
   it('one target brings the whole preview up at boot', () => {
     const value = parse(unit('debateai-preview.target'));
     expect(value['[Install]WantedBy']).toEqual(['multi-user.target']);
-    expect(value['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual(['network-online.target', ...SUPPORTING, 'debateai-preview-api.service', 'debateai-preview-ui.service'].sort());
+    expect(value['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual(['network-online.target', ...SUPPORTING, 'debateai-preview-api.service', 'debateai-preview-ui.service',
+      'debateai-preview-gate-halt-watch.timer', 'debateai-preview-gate-addresses.timer'].sort());
     expect(JSON.stringify(value)).not.toContain('runner');
   });
 
@@ -88,7 +98,7 @@ describe('preview lifecycle systemd templates', () => {
   });
 
   it('every root node command of the lifecycle units goes through env -i with PATH only', () => {
-    for (const name of ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service']) {
+    for (const name of ['debateai-preview-alert@.service', 'debateai-preview-notice@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service']) {
       const value = parse(unit(name));
       const commands = Object.entries(value).filter(([key]) => /^\[Service\]Exec(Start|StartPre|StartPost|Stop|StopPost|Reload|Condition)$/.test(key)).flatMap(([, lines]) => lines);
       expect(commands.length).toBeGreaterThan(0);
@@ -98,7 +108,7 @@ describe('preview lifecycle systemd templates', () => {
 
   it.each([
     ['debateai-preview-team-unlock.service', 'ExecStart'], ['debateai-preview-team-unlock.service', 'ExecStopPost'],
-    ['debateai-preview-alert@.service', 'ExecStart'], ['debateai-preview-backup.service', 'ExecStart']
+    ['debateai-preview-alert@.service', 'ExecStart'], ['debateai-preview-notice@.service', 'ExecStart'], ['debateai-preview-backup.service', 'ExecStart']
   ])('%s %s, run as written, hands node no inherited NODE_OPTIONS or NODE_PATH', (name, key) => {
     const line = parse(unit(name))[`[Service]${key}`]![0]!;
     const probe = join(mkdtempSync(join(tmpdir(), 'lifecycle-unit-env-')), 'probe.mjs');
@@ -118,6 +128,7 @@ describe('preview lifecycle systemd templates', () => {
   it.each([
     ['unlock-team-tools.mjs', ['reset'], 1, 'stderr', { event: 'PREVIEW_TEAM_TOOLS_RESET_FAILED', roleReset: false }],
     ['alert.mjs', ['--unit', 'debateai-preview-api.service'], 0, 'stdout', { event: 'PREVIEW_LIFECYCLE_ALERT_FAILED', reason: 'ACTOR_REFUSED' }],
+    ['alert.mjs', ['--install-owner-list'], 1, 'stdout', { event: 'PREVIEW_LIFECYCLE_OWNER_LIST_FAILED', reason: 'ACTOR_REFUSED' }],
     ['backup.mjs', [], 1, 'stderr', { event: 'PREVIEW_BACKUP_FAILED', reason: 'ACTOR_REFUSED' }]
   ] as const)('%s loads and refuses cleanly with no environment but PATH', (script, args, status, stream, event) => {
     const result = spawnSync('/usr/bin/env', ['-i', 'PATH=/usr/sbin:/usr/bin:/sbin:/bin', process.execPath, join(folder, script), ...args], { encoding: 'utf8' });
@@ -143,7 +154,7 @@ describe('preview lifecycle systemd templates', () => {
   });
 
   it('every script a template names exists in this folder', () => {
-    const all = ['debateai-preview-alert@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service'].map(unit).join('\n');
+    const all = ['debateai-preview-alert@.service', 'debateai-preview-notice@.service', 'debateai-preview-backup.service', 'debateai-preview-team-unlock.service'].map(unit).join('\n');
     const scripts = [...all.matchAll(/deploy\/preview-lifecycle\/v1\/([a-z-]+\.mjs)/g)].map(match => match[1]!);
     expect(scripts.length).toBeGreaterThanOrEqual(4);
     for (const script of scripts) expect(existsSync(join(folder, script))).toBe(true);

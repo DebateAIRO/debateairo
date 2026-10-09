@@ -65,6 +65,7 @@
   "chrome.footer.cancel": "Anularea unui abonament",
   "chrome.footer.withdraw": "Retragerea dintr-un abonament",
   "chrome.footer.paymentMarks": "Carduri acceptate",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

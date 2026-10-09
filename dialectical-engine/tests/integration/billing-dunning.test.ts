@@ -28,7 +28,7 @@ async function firstFailure() {
   const paid = await h.activate();
   h.clock.now = new Date((await h.periodEndOf(paid.subscriptionId)).getTime() + MINUTE);
   const failedAt = h.clock.now;
-  h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_PAYMENT_FAILED");
+  h.payments.failNextCharge(paid.subscriptionId, "DECLINED");
   await h.renewal.runOnce();
   return { paid, failedAt };
 }
@@ -54,7 +54,7 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     const { paid, failedAt } = await firstFailure();
     for (const [day, template] of [[1, "M5B"], [3, "M5C"]] as const) {
       h.clock.now = new Date(failedAt.getTime() + day * DAY + MINUTE);
-      h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_PAYMENT_FAILED");
+      h.payments.failNextCharge(paid.subscriptionId, "DECLINED");
       await h.maintenance.runOnce();
       const latest = (await renewals(paid.subscriptionId)).at(-1)!;
       expect((await h.outboxRows(latest.chargeId)).map((row) => row.ref)).toContain(`${template}:${latest.chargeId}`);
@@ -62,7 +62,7 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
       expect(await emailParam(`${template}:${latest.chargeId}`, "bankDeclined")).toBe("true");
     }
     h.clock.now = new Date(failedAt.getTime() + 7 * DAY + MINUTE);
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_PAYMENT_FAILED");
+    h.payments.failNextCharge(paid.subscriptionId, "DECLINED");
     await h.maintenance.runOnce();
     expect((await renewals(paid.subscriptionId)).map((charge) => charge.attempt)).toEqual([1, 2, 3, 4]);
     const ended = (await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1);
@@ -89,8 +89,9 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     const changed = await firstFailure();
     h.clock.now = new Date(changed.failedAt.getTime() + 2 * 60 * MINUTE);
     const state = foldSubscription(await h.repository.subscriptionEvents(changed.paid.subscriptionId));
+    const cardTokenId = await h.storeCardToken(changed.paid.chargeId);
     await h.repository.withTransaction((client) => h.repository.appendSubscriptionEvent(client,
-      subscriptionEvent(state, "CARD_CHANGED", h.clock.now, { retry_now: true }, { xmoneyOrderId: state.xmoneyOrderId!, cardRef: "9555" })));
+      subscriptionEvent(state, "CARD_CHANGED", h.clock.now, { retry_now: true }, { cardTokenId })));
     await h.maintenance.runOnce();
     expect((await renewals(changed.paid.subscriptionId)).map((charge) => charge.attempt)).toEqual([1, 2]);
     await h.maintenance.runOnce();
@@ -106,8 +107,8 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
 
   it("never retries an owner the age gate froze (0077's age_frozen, through P15's port, R3-2), nor bills the card again", async () => {
     const frozen = await firstFailure();
-    const orderId = frozen.paid.transaction.orderId;
-    const rebillsAfterFailure = h.xmoney.rebillsFor(orderId);
+    const orderId = frozen.paid.subscriptionId;
+    const rebillsAfterFailure = h.payments.chargesFor(orderId);
     h.frozen.add(frozen.paid.ownerRef);
     const stopped = () => h.auditLines.filter((line) => line.event === "billing.renewal.owner_stopped").length;
     const before = stopped();
@@ -115,11 +116,12 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     h.clock.now = new Date(frozen.failedAt.getTime() + DAY + MINUTE);
     await h.maintenance.runOnce();
     const state = foldSubscription(await h.repository.subscriptionEvents(frozen.paid.subscriptionId));
+    const cardTokenId = await h.storeCardToken(frozen.paid.chargeId);
     await h.repository.withTransaction((client) => h.repository.appendSubscriptionEvent(client,
-      subscriptionEvent(state, "CARD_CHANGED", h.clock.now, { retry_now: true }, { xmoneyOrderId: state.xmoneyOrderId!, cardRef: "9556" })));
+      subscriptionEvent(state, "CARD_CHANGED", h.clock.now, { retry_now: true }, { cardTokenId })));
     await h.maintenance.runOnce();
     expect(await renewals(frozen.paid.subscriptionId)).toHaveLength(1);
-    expect(h.xmoney.rebillsFor(orderId)).toBe(rebillsAfterFailure);
+    expect(h.payments.chargesFor(orderId)).toBe(rebillsAfterFailure);
     expect((await kinds(frozen.paid.subscriptionId)).at(-1)).toBe("CARD_CHANGED");
     expect(stopped()).toBeGreaterThan(before);
     h.frozen.delete(frozen.paid.ownerRef);
@@ -131,8 +133,8 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     const end = await h.periodEndOf(cancelled.subscriptionId);
     const unpaid = await h.buy();
     const disputed = await h.activate();
-    h.xmoney.setStatus(disputed.transaction.transactionId, "charge-back");
-    await h.settle(disputed.transaction.transactionId);
+    h.payments.setState(disputed.chargeId, "CHARGEBACK_OPENED");
+    await h.settle(disputed.chargeId);
     h.clock.now = new Date(end.getTime() + MINUTE);
     await h.renewal.runOnce();
     await h.maintenance.runOnce();
@@ -248,12 +250,16 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     await h.maintenance.runOnce();
     const retry = (await renewals(paid.subscriptionId)).at(-1)!;
     expect(retry.attempt).toBe(2);
-    // The rebill answered; its VERIFY_PAYMENT has not run yet when the cancel lands.
+    // NETOPIA answered the charge; its VERIFY_PAYMENT has not run yet when the cancel lands.
     await append(paid.subscriptionId, "CANCEL_REQUESTED", {});
     await h.worker.drain(10);
-    expect(await h.eventKinds(retry.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMITTED", "SUCCEEDED", "REFUND_REQUESTED", "REFUNDED"));
+    expect(await h.eventKinds(retry.chargeId)).toEqual(kindsOf("REQUESTED", "SUBMITTED", "SUCCEEDED", "REFUND_REQUESTED"));
     expect((await h.repository.charge(retry.chargeId))!.events.find((event) => event.kind === "REFUND_REQUESTED"))
       .toMatchObject({ errorCode: "SUBSCRIPTION_ENDED" });
+    // Spec §2.12.2, the owner mode: the whole retry is handed to the owner to refund in NETOPIA's admin.
+    expect(await h.ownerRefundsDue(retry.chargeId)).toEqual([
+      expect.objectContaining({ refundAmount: "24.20", refundReason: "SUBSCRIPTION_ENDED", whole: "true" })
+    ]);
     expect(await kinds(paid.subscriptionId)).not.toContain("RECOVERED");
     h.clock.advance(11 * MINUTE);
     await h.maintenance.runOnce();
@@ -309,14 +315,14 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
 
   it("never charges a changed total after a dunning that began with no charge: the attempt fails with no charge (P2-M10, A7)", async () => {
     const { paid, end, failedAt } = await unpricedDunning();
-    const rebills = h.xmoney.rebillsFor(paid.transaction.orderId);
+    const rebills = h.payments.chargesFor(paid.subscriptionId);
     // The tax service answers again, but at a rate the person was never told (19 % then, 20 % now).
     h.tax.unavailableCountries.delete("DE");
     h.tax.rateOverride.set("DE", 2_000);
     h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
     await h.maintenance.runOnce();
     expect(await renewals(paid.subscriptionId)).toEqual([]);
-    expect(h.xmoney.rebillsFor(paid.transaction.orderId)).toBe(rebills);
+    expect(h.payments.chargesFor(paid.subscriptionId)).toBe(rebills);
     expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({
       kind: "PAST_DUE", data: { attempt: 2, reason: "RETRY_TOTAL_CHANGED", first_failed_at: failedAt.toISOString() }
     });
@@ -355,15 +361,15 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref)).toContain(`M6:${paid.subscriptionId}`);
   });
 
-  it("never retries, nor announces a renewal for, a subscription of the other xMoney system, but still ends its cancel (D5 5h)", async () => {
-    // The live runtime's pass, on the same database as the harness's stage subscriptions.
+  it("never retries, nor announces a renewal for, a subscription of the other NETOPIA system, but still ends its cancel (D5 5h)", async () => {
+    // The live runtime's pass, on the same database as the harness's sandbox subscriptions.
     const live = new BillingMaintenance({
       repository: h.repository, jobs: h.jobs, entitlements: h.entitlements, renewal: h.renewal, policy: testBillingPolicy,
-      publicAppUrl: TEST_PUBLIC_APP_URL, xmoneyEnvironment: "live", audit: h.audit, clock: h.clock.read
+      publicAppUrl: TEST_PUBLIC_APP_URL, paymentEnvironment: "live", audit: h.audit, clock: h.clock.read
     });
     const { paid: pastDue, failedAt } = await firstFailure();
-    const orderId = pastDue.transaction.orderId;
-    const rebillsAfterFailure = h.xmoney.rebillsFor(orderId);
+    const orderId = pastDue.subscriptionId;
+    const rebillsAfterFailure = h.payments.chargesFor(orderId);
     const cancelled = await h.activate();
     await append(cancelled.subscriptionId, "CANCEL_REQUESTED", {});
     const cancelEnd = await h.periodEndOf(cancelled.subscriptionId);
@@ -374,7 +380,7 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
     await live.runOnce();
     expect(await renewals(pastDue.subscriptionId)).toHaveLength(1);
-    expect(h.xmoney.rebillsFor(orderId)).toBe(rebillsAfterFailure);
+    expect(h.payments.chargesFor(orderId)).toBe(rebillsAfterFailure);
     expect((await h.repository.subscriptionEvents(pastDue.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 1 } });
 
     // A changed total inside the look-ahead: the live pass queues no notice (P11a's live renewal never renews it).
@@ -384,18 +390,18 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     expect((await h.outboxRows(noticed.subscriptionId)).map((row) => row.ref)).not.toContain(`${noticed.subscriptionId}:${noticedEnd.toISOString()}`);
     h.tax.rateOverride.clear();
 
-    // A cancel pending past the period end IS ended by it (no xMoney call; README §14.8 step 1).
+    // A cancel pending past the period end IS ended by it (no NETOPIA call; README §14.8 step 1).
     h.clock.now = new Date(Math.max(cancelEnd.getTime(), noticedEnd.getTime()) + MINUTE);
     await live.runOnce();
     expect((await h.repository.subscriptionEvents(cancelled.subscriptionId)).at(-1)).toMatchObject({ kind: "ENDED", data: { cause: "CANCEL" } });
     expect(await h.entitlements.current(cancelled.ownerRef, h.clock.now)).toMatchObject({ planId: "FREE", cause: "ENDED_CANCEL" });
     expect(await renewals(pastDue.subscriptionId)).toHaveLength(1);
-    expect(h.xmoney.rebillsFor(orderId)).toBe(rebillsAfterFailure);
+    expect(h.payments.chargesFor(orderId)).toBe(rebillsAfterFailure);
 
-    // The control: the harness's own stage pass does retry that plan.
+    // The control: the harness's own sandbox pass does retry that plan.
     await h.maintenance.runOnce();
     expect((await renewals(pastDue.subscriptionId)).map((charge) => charge.attempt)).toEqual([1, 2]);
-    expect(h.xmoney.rebillsFor(orderId)).toBe(rebillsAfterFailure + 1);
+    expect(h.payments.chargesFor(orderId)).toBe(rebillsAfterFailure + 1);
   });
 
   it("ends a dunning the owner's shorter retry days left with no retry day: ENDED(DUNNING), Free and M6 (P2-M13)", async () => {
@@ -403,16 +409,16 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     const shorter = new BillingMaintenance({
       repository: h.repository, jobs: h.jobs, entitlements: h.entitlements, renewal: h.renewal,
       policy: { ...testBillingPolicy, dunningRetryDays: [1] },
-      publicAppUrl: TEST_PUBLIC_APP_URL, xmoneyEnvironment: "stage", audit: h.audit, clock: h.clock.read
+      publicAppUrl: TEST_PUBLIC_APP_URL, paymentEnvironment: "sandbox", audit: h.audit, clock: h.clock.read
     });
     // Two attempts failed under +1/+3/+7: the plan waits for its +3 retry, which the new policy no longer has.
     const { paid, failedAt } = await firstFailure();
-    const orderId = paid.transaction.orderId;
+    const orderId = paid.subscriptionId;
     h.clock.now = new Date(failedAt.getTime() + DAY + MINUTE);
-    h.xmoney.failNextRebill(orderId, "XMONEY_PAYMENT_FAILED");
+    h.payments.failNextCharge(orderId, "DECLINED");
     await h.maintenance.runOnce();
     expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "PAST_DUE", data: { attempt: 2 } });
-    const rebills = h.xmoney.rebillsFor(orderId);
+    const rebills = h.payments.chargesFor(orderId);
     await shorter.runOnce();
     expect((await h.repository.subscriptionEvents(paid.subscriptionId)).at(-1)).toMatchObject({ kind: "ENDED", data: { cause: "DUNNING" } });
     expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).status).toBe("ENDED");
@@ -420,7 +426,7 @@ describe("P11b dunning, the period-end sweep, the yearly reminder and the look-a
     expect((await h.outboxRows(paid.subscriptionId)).map((row) => row.ref)).toContain(`M6:${paid.subscriptionId}`);
     // Nothing is charged for it, and the next pass writes nothing more.
     expect(await renewals(paid.subscriptionId)).toHaveLength(2);
-    expect(h.xmoney.rebillsFor(orderId)).toBe(rebills);
+    expect(h.payments.chargesFor(orderId)).toBe(rebills);
     const written = (await h.repository.subscriptionEvents(paid.subscriptionId)).length;
     await shorter.runOnce();
     expect(await h.repository.subscriptionEvents(paid.subscriptionId)).toHaveLength(written);
