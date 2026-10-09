@@ -8,6 +8,6 @@
     "./manualPhone": "./src/manualPhone.ts"
   },
   "dependencies": {
-    "libphonenumber-js": "1.13.7"
+    "libphonenumber-js": "1.13.14"
   }
 }
