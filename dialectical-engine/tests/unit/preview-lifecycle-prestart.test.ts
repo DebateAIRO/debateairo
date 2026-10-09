@@ -87,7 +87,9 @@ describe('release lock', () => {
 
   it.each([
     ['unknown top-level key', (l: any) => { l.extra = 1; }],
-    ['unknown service', (l: any) => { l.services.runner = l.services.api; }],
+    ['unknown service', (l: any) => { l.services.worker = l.services.api; }],
+    ['ui build on runner', (l: any) => { l.services.runner = { ...l.services.api, basePlan: { ...l.services.api.basePlan, path: l.services.api.basePlan.path.replace('api-launch', 'runner-launch') }, uiBuildSha256: digest }; }],
+    ['runner under another service name', (l: any) => { l.services.api.basePlan.path = l.services.api.basePlan.path.replace('api-launch', 'runner-launch'); }],
     ['unknown entry key', (l: any) => { l.services.api.note = 'x'; }],
     ['short sha', (l: any) => { l.services.api.sourceManifestSha256 = 'abc'; }],
     ['ui build on api', (l: any) => { l.services.api.uiBuildSha256 = digest; }],
@@ -301,5 +303,36 @@ describe('release drop-in', () => {
     const ui = prestart.renderReleaseDropin({ service: 'ui', entry: lock.services.ui, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
     expect(ui).toContain(`WorkingDirectory=${root}/dialectical-engine/apps/ui\n`);
     expect(ui).toContain('launch-ui.mjs --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/ui-launch.json');
+  });
+});
+
+// GAP-RUNNER (2026-10-09): the runner is pinned and refreshed exactly like the API, starts only in
+// its explicit --start mode, and still stays out of debateai-preview.target (units test).
+describe('runner release', () => {
+  const runnerPlan = () => ({ ...basePlan('api'), service: 'runner', serviceUid: 992, serviceGid: 975,
+    environment: { ...basePlan('api').environment, path: '/etc/debateai-v3-preview/auth-dev-v1/runner.env', gid: 975 } });
+  it('pins, refreshes and renders the runner with a --start launcher line', async () => {
+    const s = server();
+    s.write(s.planPath('runner'), runnerPlan());
+    await pinned(s);
+    await prestart.pinRelease({ planPath: s.planPath('runner'), layout: s.layout, deps: { validateLaunchPlan: plans.validateLaunchPlan }, now: () => 0 });
+    const lock = JSON.parse(readFileSync(s.layout.lockPath, 'utf8'));
+    expect(Object.keys(lock.services).sort()).toEqual(['api', 'runner', 'ui']);
+    expect(lock.services.runner).toMatchObject({ serviceUid: 992, serviceGid: 975, uiBuildSha256: null, sourceRevision: revision });
+    const { calls, deps: d } = deps(s);
+    const result = await prestart.runPrestart({ service: 'runner', layout: s.layout, deps: d });
+    expect(calls).toEqual([root]);
+    expect(readdirSync(s.layout.currentDir).sort()).toEqual(['runner-launch.json', 'runner-native.json']);
+    expect(result).toMatchObject({ event: 'PREVIEW_LIFECYCLE_PRESTART_READY', service: 'runner' });
+    const text = prestart.renderReleaseDropin({ service: 'runner', entry: lock.services.runner, lockSha256: digest, nodePath: '/opt/node/bin/node', prestartPath: '/opt/op/prestart.mjs', layout: common.LAYOUT });
+    const lines = text.split('\n').filter((line: string) => !line.startsWith('#') && line);
+    expect(lines).toEqual(['[Service]', `WorkingDirectory=${root}/dialectical-engine`, 'ExecStartPre=+/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/node/bin/node /opt/op/prestart.mjs --service runner', 'ExecStart=',
+      `ExecStart=/opt/node/bin/node ${root}/dialectical-engine/deploy/preview-auth-dev/v1/launch-runner.mjs --start --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/runner-launch.json`]);
+  });
+
+  it('refuses a runner whose release is not the native plan\'s source revision before any database work', async () => {
+    const s = server();
+    s.write(s.planPath('runner'), { ...runnerPlan(), sourceRevision: 'c'.repeat(40) });
+    await expect(prestart.pinRelease({ planPath: s.planPath('runner'), layout: s.layout, deps: { validateLaunchPlan: plans.validateLaunchPlan }, now: () => 0 })).rejects.toMatchObject({ code: 'NATIVE_PLAN_MISMATCH', fields: ['sourceRevision'] });
   });
 });

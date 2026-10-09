@@ -1,12 +1,15 @@
-// Root ExecStartPre for debateai-preview-api / -ui (systemd `ExecStartPre=+`).
+// Root ExecStartPre for debateai-preview-api / -ui / -runner (systemd `ExecStartPre=+`).
 //
 // Plain words: before every start or restart, re-run the reviewed database check, store its
 // fresh receipt next to a copy of the pinned launch plan, and start only the release the owner
 // pinned. The launcher then re-checks every byte exactly as before; nothing here relaxes it.
 //
-//   prestart.mjs --service api|ui         refresh proof + plan (systemd runs this)
+//   prestart.mjs --service api|ui|runner  refresh proof + plan (systemd runs this)
 //   prestart.mjs pin --from <plan>        pin a NEW reviewed release (operator, once per release)
-//   prestart.mjs dropin --service api|ui  print the release drop-in for the pinned release
+//   prestart.mjs dropin --service api|ui|runner  print the release drop-in for the pinned release
+//
+// The runner may be pinned and given a release drop-in, but it is NOT in debateai-preview.target:
+// it starts only by hand (deploy/preview-auth-dev/v1/debateai-preview-runner.service).
 import { lstat } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -18,7 +21,7 @@ import { LAYOUT, atomicWrite, canonicalJson, ensureDirectory, logLine, peerShimA
 
 export const LOCK_SCHEMA = 'preview-lifecycle-release-lock-v1';
 export const RELEASE_DROPIN_NAME = 'zzzzzzzzzz-lifecycle-release.conf';
-const SERVICES = ['api', 'ui'];
+const SERVICES = ['api', 'ui', 'runner'];
 const SOURCE_ROOT = /^\/opt\/debateai-v3-preview\/releases\/auth-dev-(candidate|fallback)-[a-z0-9-]{1,80}$/;
 const HASH = /^[a-f0-9]{64}$/;
 const GIT = /^[a-f0-9]{40}$/;
@@ -37,7 +40,7 @@ const refuse = (code, fields) => { throw new Refusal(code, fields); };
 const layoutOwner = layout => ({ uid: layout.ownerUid ?? 0, gid: layout.ownerGid ?? 0 });
 const artifactsRoot = layout => layout.artifactsRoot ?? '/opt/debateai-v3-preview/artifacts';
 const escape = text => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
-const planPathPattern = layout => new RegExp(`^${escape(artifactsRoot(layout))}/[a-z0-9-]+/(api|ui)-launch\\.json$`);
+const planPathPattern = layout => new RegExp(`^${escape(artifactsRoot(layout))}/[a-z0-9-]+/(api|ui|runner)-launch\\.json$`);
 
 /** Bounded, no-follow, owner/mode-checked read through the reviewed custody reader. */
 async function readProtectedJson(path, { root, mode, maxBytes, layout, code }) {
@@ -55,7 +58,7 @@ function validEntry(entry, service, layout) {
     || !HASH.test(entry.nativePlanSha256) || !SOURCE_ROOT.test(entry.sourceRoot) || !GIT.test(entry.sourceRevision) || !GIT.test(entry.sourceTree)
     || !Number.isSafeInteger(entry.serviceUid) || entry.serviceUid < 1 || !Number.isSafeInteger(entry.serviceGid) || entry.serviceGid < 1
     || !HASH.test(entry.sourceManifestSha256) || !HASH.test(entry.operatorManifestSha256)
-    || (service === 'api' ? entry.uiBuildSha256 !== null : !HASH.test(entry.uiBuildSha256 ?? ''))
+    || (service === 'ui' ? !HASH.test(entry.uiBuildSha256 ?? '') : entry.uiBuildSha256 !== null)
     || entry.publication === null || typeof entry.publication !== 'object' || Object.getPrototypeOf(entry.publication) !== Object.prototype
     || typeof entry.pinnedAt !== 'string' || !Number.isFinite(Date.parse(entry.pinnedAt))) throw new Error('entry');
   validatePublication(entry.publication);
@@ -239,7 +242,8 @@ export function renderReleaseDropin({ service, entry, lockSha256, nodePath, pres
     // secrets). env -i starts node with PATH only; prestart reads nothing else from the environment.
     `ExecStartPre=+${layout.env} -i ${CLEAN_PATH} ${nodePath} ${prestartPath} --service ${service}`,
     'ExecStart=',
-    `ExecStart=${nodePath} ${engine}/deploy/preview-auth-dev/v1/launch-${service}.mjs --plan ${layout.currentDir}/${service}-launch.json`,
+    // The runner launcher's default is prepare-only; starting it is the explicit --start mode.
+    `ExecStart=${nodePath} ${engine}/deploy/preview-auth-dev/v1/launch-${service}.mjs ${service === 'runner' ? '--start ' : ''}--plan ${layout.currentDir}/${service}-launch.json`,
     ''
   ].join('\n');
 }

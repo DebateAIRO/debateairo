@@ -2,12 +2,49 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { tsImport } from 'tsx/esm/api';
 import { prepareLaunch } from './launch-plan.mjs';
-import { readEnvironmentFile,narrowEnvironment } from './environment.mjs';
-/** This release prepares the inactive runner only. It has no start command. */
+import { readEnvironmentFile,narrowEnvironment,installNarrowEnvironment } from './environment.mjs';
+import { afterRunnerReady,linuxProcessIdentity } from './runtime-receipt.mjs';
+import { refuse } from './custody.mjs';
+/** The in-process readiness event apps/runner/src/runner-ready.ts announces (RUNNER_READY_PROCESS_EVENT). */
+export const RUNNER_READY_PROCESS_EVENT='debateai:runner-ready';
+/** Prepare-only (the default, `--plan <file>`): validates plan, custody and environment; starts nothing. */
 export async function prepareRunner(argv) {
  const {plan,source}=await prepareLaunch(argv,'runner',import.meta.url);
  const runtime=await tsImport(join(plan.sourceRoot,'dialectical-engine/packages/register/src/runtime-environment.ts'),import.meta.url);
  narrowEnvironment('runner',await readEnvironmentFile(plan.environment.path,plan.environment),runtime,plan.publication,plan);
  return {schema:'preview-auth-dev-runner-prepared-v1',sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,registerVersion:plan.publication.registerVersion,started:false,runtimeSelectionVerified:false};
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{process.stdout.write(`${JSON.stringify(await prepareRunner(process.argv.slice(2)))}\n`);}catch{process.stderr.write('PREVIEW_RUNNER_PREPARATION_REFUSED\n');process.exitCode=1;}}
+/**
+ * Start (`--start --plan <file>`), the API launcher's sequence for the runner: the same shared
+ * prepareLaunch custody gate, the same narrowed environment for role 'runner', the selected
+ * restricted runner connection checked, then the real main imported in this same process. The
+ * content-free PREVIEW_RUNNER_STARTED event is printed only after the real main announced
+ * readiness (worker ready, start-up re-dispatch done) with an unchanged register selection.
+ */
+export async function launchRunner(argv) {
+ const {plan,source}=await prepareLaunch(argv,'runner',import.meta.url);
+ const engine=join(plan.sourceRoot,'dialectical-engine');
+ const runtime=await tsImport(join(engine,'packages/register/src/runtime-environment.ts'),import.meta.url);
+ const configured=await readEnvironmentFile(plan.environment.path,plan.environment);
+ const selected=narrowEnvironment('runner',configured,runtime,plan.publication,plan);
+ const verify=await tsImport('./verify-native.ts',import.meta.url);
+ await verify.assertSelectedRunnerConnection(configured,plan.publication);
+ const entry=join(engine,'apps/runner/src/main.ts'),main=source.files.find(file=>file.path==='dialectical-engine/apps/runner/src/main.ts');
+ if(!main)refuse('PREVIEW_RUNNER_MAIN_UNBOUND');
+ process.chdir(engine);installNarrowEnvironment(selected.environment);
+ return afterRunnerReady({binding:{sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,sourceManifestSha256:plan.sourceManifest.sha256,operatorManifestSha256:plan.operatorManifestSha256,contractSha256:source.contractSha256,runnerMainSha256:main.sha256},publication:plan.publication,identity:await linuxProcessIdentity(),
+  readSelection:()=>({REGISTER_VERSION:process.env.REGISTER_VERSION,DEBATEAI_DEPLOYMENT_MODE:process.env.DEBATEAI_DEPLOYMENT_MODE}),
+  subscribeReady:listener=>{process.once(RUNNER_READY_PROCESS_EVENT,listener);return ()=>process.removeListener(RUNNER_READY_PROCESS_EVENT,listener);},
+  importMain:()=>tsImport(entry,import.meta.url),emit:event=>process.stdout.write(`PREVIEW_RUNNER_STARTED ${JSON.stringify(event)}\n`)});
+}
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
+ const argv=process.argv.slice(2);
+ if(argv[0]==='--start'){
+  // Any refusal or later failure ends this process: the runner's worker must not stay up unreported.
+  let started;
+  try{started=await launchRunner(argv.slice(1));}catch{process.stderr.write('PREVIEW_RUNNER_STARTUP_REFUSED\n');process.exit(1);}
+  try{await started.running;}catch{process.stderr.write('PREVIEW_RUNNER_STOPPED_ON_FAILURE\n');process.exit(1);}
+ }else{
+  try{process.stdout.write(`${JSON.stringify(await prepareRunner(argv))}\n`);}catch{process.stderr.write('PREVIEW_RUNNER_PREPARATION_REFUSED\n');process.exitCode=1;}
+ }
+}
