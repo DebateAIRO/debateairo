@@ -232,6 +232,10 @@ const CEREMONY_RATE_FAMILY: Readonly<Record<ConsumerCeremonyOperation, SessionRa
   SECURITY_CODES: "account-security", AUTH_METHOD_REMOVE: "account-security"
 });
 
+/** The consumer session lifetimes in force (2026-10-04 policy): 14 days idle, 30 days absolute. */
+const CONSUMER_IDLE_MAX_MS = 1_209_600_000;
+const CONSUMER_ABSOLUTE_MAX_MS = 2_592_000_000;
+
 function sameHash(left: string, right: string): boolean {
   const leftBytes = Buffer.from(left, "utf8");
   const rightBytes = Buffer.from(right, "utf8");
@@ -323,6 +327,21 @@ export class SessionService implements SessionApplication {
   }
 
   /** One IPv4 address or one IPv6 /64: the unit every per-source budget and scope counts. */
+  /**
+   * Auth API hardening 2026-10-09: sessions minted under the sealed v1 policy
+   * still carry a 90-day absolute expiry in the database, and only NEW sessions
+   * were clamped. Every session read is now held to the lifetimes in force —
+   * 30 days from creation, 14 days from its last use — whatever its stored
+   * expiry says. No session row changes; one past either limit is simply
+   * treated as expired.
+   */
+  private withinCurrentLifetime(record: Readonly<{ createdAt: Date; lastSeenAt: Date }>, now: Date): boolean {
+    const absoluteMs = Math.min(this.dependencies.sessionPolicy.absoluteTtlMs, CONSUMER_ABSOLUTE_MAX_MS);
+    const idleMs = Math.min(this.dependencies.sessionPolicy.idleTtlMs, CONSUMER_IDLE_MAX_MS);
+    const instant = now.getTime();
+    return instant < record.createdAt.getTime() + absoluteMs && instant < record.lastSeenAt.getTime() + idleMs;
+  }
+
   private sourceIp(source: AuthSourceContext): string {
     const ip = typeof source?.ip === "string" ? source.ip.trim() : "";
     return rateLimitSourceScope((ip === "" ? "unknown" : ip).slice(0, 64));
@@ -356,9 +375,9 @@ export class SessionService implements SessionApplication {
       tokenHash,
       bindingHash: this.bindingHash(source),
       occurredAt: now,
-      idleExpiresAt: new Date(now.getTime() + Math.min(this.dependencies.sessionPolicy.idleTtlMs,1209600000))
+      idleExpiresAt: new Date(now.getTime() + Math.min(this.dependencies.sessionPolicy.idleTtlMs,CONSUMER_IDLE_MAX_MS))
     });
-    return record === null ? null : Object.freeze({
+    return record === null || !this.withinCurrentLifetime(record, now) ? null : Object.freeze({
       session: sessionFor(record.ownerRef, record.sessionId),
       userId: record.userId,
       ownerRef: record.ownerRef,
@@ -373,10 +392,11 @@ export class SessionService implements SessionApplication {
   ):Promise<AuthenticatedSession|null> {
     const tokenHash=safeTokenHash("session", sessionToken);
     if (tokenHash===null) return null;
+    const now=this.now();
     const record=await this.dependencies.repository.authenticateAccountErasureStatusSession({
-      tokenHash,bindingHash:this.bindingHash(source),occurredAt:this.now()
+      tokenHash,bindingHash:this.bindingHash(source),occurredAt:now
     });
-    return record===null ? null : Object.freeze({
+    return record===null || !this.withinCurrentLifetime(record,now) ? null : Object.freeze({
       session:sessionFor(record.ownerRef,record.sessionId),userId:record.userId,
       ownerRef:record.ownerRef,tokenHash,csrfTokenHash:record.csrfTokenHash,
       authKind:"cookie" as const
@@ -621,16 +641,24 @@ export class SessionService implements SessionApplication {
   }
 
   async listSessions(session: AuthenticatedSession): Promise<readonly SessionSummary[]> {
-    const rows = await this.dependencies.repository.listActiveSessions(session.userId, this.now());
-    return Object.freeze(rows.map((row) => Object.freeze({
-      session_id: row.sessionId,
-      created_at: row.createdAt.toISOString(),
-      last_seen_at: row.lastSeenAt.toISOString(),
-      idle_expires_at: row.idleExpiresAt.toISOString(),
-      absolute_expires_at: row.absoluteExpiresAt.toISOString(),
-      last_mfa_at: row.lastMfaAt.toISOString(),
-      current: row.sessionId === session.session.session_id
-    })));
+    const now = this.now();
+    const rows = await this.dependencies.repository.listActiveSessions(session.userId, now);
+    const absoluteMs = Math.min(this.dependencies.sessionPolicy.absoluteTtlMs, CONSUMER_ABSOLUTE_MAX_MS);
+    const idleMs = Math.min(this.dependencies.sessionPolicy.idleTtlMs, CONSUMER_IDLE_MAX_MS);
+    return Object.freeze(rows.filter((row) => this.withinCurrentLifetime(row, now)).map((row) => {
+      // The expiries shown are the ones enforced, never a longer v1 value still stored.
+      const absolute = Math.min(row.absoluteExpiresAt.getTime(), row.createdAt.getTime() + absoluteMs);
+      const idle = Math.min(row.idleExpiresAt.getTime(), row.lastSeenAt.getTime() + idleMs, absolute);
+      return Object.freeze({
+        session_id: row.sessionId,
+        created_at: row.createdAt.toISOString(),
+        last_seen_at: row.lastSeenAt.toISOString(),
+        idle_expires_at: new Date(idle).toISOString(),
+        absolute_expires_at: new Date(absolute).toISOString(),
+        last_mfa_at: row.lastMfaAt.toISOString(),
+        current: row.sessionId === session.session.session_id
+      });
+    }));
   }
 
   revokeSession(session: AuthenticatedSession, sessionId: string, source: AuthSourceContext): Promise<boolean> {
