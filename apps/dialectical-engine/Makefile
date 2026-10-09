@@ -394,7 +394,7 @@ install-services:
 	@echo "Coordinator and web services installed. Register Worker A with: make install-worker COORDINATOR_URL=http://localhost:8000 WORKER_NAME=mac-mini"
 
 watchdog-once:
-	$(PYTHON_ENV) "$(PYTHON)" scripts/dezbatere_watchdog.py --root "$(CURDIR)" --public-url "https://dezbatere.ro" --check-lmstudio --strict-exit
+	$(PYTHON_ENV) "$(PYTHON)" scripts/dezbatere_watchdog.py --root "$(CURDIR)" --public-url "https://dezbatere.ro" --strict-exit
 
 install-watchdog:
 	mkdir -p "$$HOME/Library/LaunchAgents"

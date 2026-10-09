@@ -21,7 +21,6 @@
     <string>__ROOT__</string>
     <string>--public-url</string>
     <string>https://dezbatere.ro</string>
-    <string>--check-lmstudio</string>
     <string>--invoke-codex</string>
   </array>
   <key>RunAtLoad</key>
