@@ -78,3 +78,7 @@ aa15f4e9e63d2fab63b6c8d103802b42051b41d3:dialectical-engine/tests/unit/billing-c
 # 2026-10-09 — NETOPIA switch (PR #103): generic-api-key matched the same made-up card-token id (a UUID) in the retry
 # timing test. A made-up test value, not a token. Owner's ruling on PR #103.
 1bb5935b7871c24c0ba7e2244f0a00760d8edb83:dialectical-engine/tests/unit/billing-retry-timing.test.ts:generic-api-key:87
+# 2026-10-10 — auth DB batch 0112 (PR #111): generic-api-key matched the same public SHA-256 digest of the sealed
+# lineage file migrations/lineage/auth-dev-20261006.json, pinned so the 0112 forward step proves the sealed bytes
+# unchanged. A public file digest, not a key. Owner's ruling on PR #111.
+754973eb1c3f86071c549d31dd349880e7a04182:dialectical-engine/tests/architecture/migration-forward-auth-db-batch.test.ts:generic-api-key:24
