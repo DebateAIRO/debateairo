@@ -146,6 +146,9 @@ export async function runPrestart({ service, layout = LAYOUT, deps = {} }) {
   const verifyStartedAt = now();
   const proof = await (deps.verifyNative ?? (input => runNativeVerify({ layout, nodePath: process.execPath, ...input })))({ sourceRoot: nativePlan.value.sourceRoot });
   const verifiedAt = now();
+  // The verifier re-reads native-plan.json itself; the proof only counts if it read the bytes checked above.
+  const nativePlanAfter = await readNativePlan(layout).catch(() => refuse('NATIVE_PLAN_CHANGED'));
+  if (nativePlanAfter.sha256 !== nativePlan.sha256) refuse('NATIVE_PLAN_CHANGED');
   try {
     validateNativeAttestation(proof, { sourceRevision: entry.sourceRevision, sourceTree: entry.sourceTree, nativeSourceSha256, publication: entry.publication }, verifiedAt);
   } catch { refuse('NATIVE_ATTESTATION_INVALID'); }

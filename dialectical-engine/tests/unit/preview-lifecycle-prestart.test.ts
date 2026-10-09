@@ -173,6 +173,14 @@ describe('prestart', () => {
     expect(calls).toEqual([]);
   });
 
+  it('refuses when native-plan.json changed while the verifier was reading it, and writes nothing', async () => {
+    const s = server();
+    await pinned(s);
+    const { deps: d } = deps(s, { verifyNative: async () => { s.write(s.layout.nativePlanPath, nativePlan({ operation: 'publish' })); return attestation('2026-10-09T10:00:00.000Z'); } });
+    await expect(prestart.runPrestart({ service: 'api', layout: s.layout, deps: d })).rejects.toMatchObject({ code: 'NATIVE_PLAN_CHANGED' });
+    expect(existsSync(join(s.layout.currentDir, 'api-launch.json'))).toBe(false);
+  });
+
   it('keeps the previous files and refuses when the canonical verifier refuses (tampered release)', async () => {
     const s = server();
     await pinned(s);
