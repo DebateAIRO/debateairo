@@ -400,8 +400,10 @@ describe("P22 the Billing runbook", () => {
       expect(refund, needle).toContain(needle);
     }
     expect(refund).not.toContain("the one command that records it");
-    expect(read("apps/api/src/billing/refunds.ts")).toContain(
-      "return `${ON_HOST} billing:refund-done --charge ${chargeId} --amount ${microsToDecimal(amountMicros)}`;");
+    const refundsSource = read("apps/api/src/billing/refunds.ts");
+    expect(refundsSource).toContain("return `${ON_HOST} ${command}`;");
+    expect(refundsSource).toContain(
+      "return hostCommand(`billing:refund-done --charge ${chargeId} --amount ${microsToDecimal(amountMicros)}`);");
     // The O3 prints only the short form, which fails in a root shell (ops-4): the row points at the host form.
     const held = billing.split("\n").find((line) => line.startsWith("| `\"event\":\"billing.refund.held_by_chargeback\"`")) ?? "";
     expect(held).toContain("record that refund with `pnpm billing:refund-done … --despite-chargeback`: run it as"
