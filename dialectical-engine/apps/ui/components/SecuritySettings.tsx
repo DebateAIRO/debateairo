@@ -168,7 +168,8 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         <h1 className="setTitle">{t(catalog, 'settings.security.title')}</h1>
         {pendingRecovery ? <section className="setCard" data-pending-recovery aria-label={t(catalog, 'settings.security.pendingRecovery.title')}>
             <p className="setCardTitle">{t(catalog, 'settings.security.pendingRecovery.title')}</p>
-            <p className="setStatus">{withTime(t(catalog, 'settings.security.pendingRecovery.body'), pendingRecovery.not_before)}</p>
+            {/* Review M2 2026-10-09: it never finishes by itself; say from when it can be finished, and "now" once that time has passed. */}
+            <p className="setStatus">{Date.parse(pendingRecovery.not_before) <= Date.now() ? t(catalog, 'settings.security.pendingRecovery.bodyReady') : withTime(t(catalog, 'settings.security.pendingRecovery.body'), pendingRecovery.not_before)}</p>
             <p className="setStatus">{t(catalog, 'settings.security.pendingRecovery.keep')}</p>
             {recoveryError ? <p className="setError" role="alert">{recoveryError}</p> : null}
             <div className="setCardRow"><button type="button" className="setBtn setBtnRevoke" disabled={recoveryBusy} onClick={() => void cancelPendingRecovery()}>{t(catalog, 'settings.security.pendingRecovery.cancel')}</button></div>

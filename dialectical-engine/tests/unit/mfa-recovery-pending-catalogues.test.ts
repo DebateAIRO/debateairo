@@ -11,8 +11,10 @@ const read = (locale: string): Record<string, string> => JSON.parse(readFileSync
 const LOCALES = readdirSync(MESSAGES, { withFileTypes: true }).filter(entry => entry.isDirectory()).map(entry => entry.name);
 const ENGLISH = Object.freeze({
   "settings.security.pendingRecovery.title": "Someone started replacing your authenticator",
-  "settings.security.pendingRecovery.body": "Someone used your password and an email link to start replacing the authenticator on this account. It finishes at {time}.",
-  "settings.security.pendingRecovery.keep": "Until then, your current authenticator, recovery codes and sessions keep working. If this wasn't you, cancel it.",
+  // Review M2 2026-10-09: it never finishes by itself, so the banner says from when it can be finished, and "now" after that.
+  "settings.security.pendingRecovery.body": "Someone used your password and an email link to start replacing the authenticator on this account. You can finish it from {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Someone used your password and an email link to start replacing the authenticator on this account. You can finish it now — use the link in your email.",
+  "settings.security.pendingRecovery.keep": "Until it is finished, your current authenticator, recovery codes and sessions keep working. If this wasn't you, cancel it.",
   "settings.security.pendingRecovery.cancel": "Cancel",
   "settings.security.pendingRecovery.cancelled": "Recovery cancelled.",
   "settings.security.pendingRecovery.failed": "We could not cancel it. Reload the page and try again."
