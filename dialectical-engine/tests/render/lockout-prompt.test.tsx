@@ -111,3 +111,120 @@ it('a failed code generation says so in plain words and returns to the choices',
   for (const text of ['Save recovery codes', 'Add a passkey', 'Later']) expect(button(text), text).toBeDefined();
   expect(onDone).not.toHaveBeenCalled();
 });
+
+// Review fix (2026-10-09): the account check never leaves a blank space and never holds anyone up.
+const CHECKING = 'Checking your account…';
+it('says it is checking while the account check is pending', async () => {
+  const c = client(); c.authMethods.mockReturnValue(new Promise(() => {}));
+  const onDone = await mount(c);
+  expect(document.querySelector('[role=status]')?.textContent).toBe(CHECKING);
+  expect(document.body.textContent).not.toContain(TITLE);
+  expect(onDone).not.toHaveBeenCalled();
+});
+it('a check that hangs for five seconds is skipped, and a late answer changes nothing', async () => {
+  vi.useFakeTimers();
+  try {
+    let answer!: (value: ReturnType<typeof methods>) => void;
+    const c = client(); c.authMethods.mockReturnValue(new Promise(resolve => { answer = resolve; }));
+    const onDone = await mount(c);
+    await act(async () => { vi.advanceTimersByTime(4999); });
+    expect(onDone).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(onDone).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).not.toContain(CHECKING);
+    await act(async () => answer(methods()));
+    expect(document.body.textContent).not.toContain(TITLE);
+    expect(onDone).toHaveBeenCalledTimes(1);
+  } finally { vi.useRealTimers(); }
+});
+
+// Review fix (2026-10-09): once the fresh proof for "Add a passkey" passes, the person can still go back
+// or move on — a browser without passkeys, a cancelled prompt or an expired proof never strands them.
+async function toPasskeySetUp(c: ReturnType<typeof client>) {
+  await click('Add a passkey');
+  await confirmWithPassword();
+  expect(button('Create a passkey')).toBeDefined();
+}
+const CHOICES = ['Save recovery codes', 'Add a passkey', 'Later'];
+it('Back from the passkey set-up returns to the three choices', async () => {
+  const c = client(); const onDone = await mount(c);
+  await toPasskeySetUp(c);
+  await click('Back');
+  for (const text of CHOICES) expect(button(text), text).toBeDefined();
+  expect(button('Create a passkey')).toBeUndefined();
+  expect(c.beginPasskeyEnrollment).not.toHaveBeenCalled();
+  expect(onDone).not.toHaveBeenCalled();
+});
+it('Later from the passkey set-up moves on without creating anything', async () => {
+  const c = client(); const onDone = await mount(c);
+  await toPasskeySetUp(c);
+  await click('Later');
+  expect(onDone).toHaveBeenCalledTimes(1);
+  expect(c.beginPasskeyEnrollment).not.toHaveBeenCalled();
+});
+it.each([
+  ['the person cancels the passkey prompt', 'NotAllowedError'],
+  ['the browser has no passkey support', 'NotSupportedError']
+])('when %s, Back and Later still work', async (_case, name) => {
+  browser.register.mockRejectedValue(new DOMException('prompt', name));
+  const c = client(); const onDone = await mount(c);
+  await toPasskeySetUp(c);
+  await click('Create a passkey');
+  expect(c.completePasskeyEnrollment).not.toHaveBeenCalled();
+  expect(document.body.textContent).toContain('The passkey check was not completed.');
+  await click('Back');
+  for (const text of CHOICES) expect(button(text), text).toBeDefined();
+  await click('Add a passkey');
+  await confirmWithPassword();
+  await click('Create a passkey');
+  await click('Later');
+  expect(onDone).toHaveBeenCalledTimes(1);
+});
+it('when the fresh proof expires during the passkey set-up, the card returns to its choices and says so', async () => {
+  vi.useFakeTimers();
+  try {
+    const c = client();
+    c.stepUp.mockImplementation(async (_p: string, _code: string, authorization: { action: string }) => ({ ...proof(authorization.action), step_up_grant: { ...proof(authorization.action).step_up_grant, expires_at: new Date(Date.now() + 60_000).toISOString() } }));
+    const onDone = await mount(c);
+    await toPasskeySetUp(c);
+    await act(async () => { vi.advanceTimersByTime(59_999); });
+    expect(button('Create a passkey')).toBeDefined();
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(button('Create a passkey')).toBeUndefined();
+    expect(document.querySelector('[role=alert]')?.textContent).toBe('That took too long — please try again.');
+    for (const text of CHOICES) expect(button(text), text).toBeDefined();
+    expect(onDone).not.toHaveBeenCalled();
+  } finally { vi.useRealTimers(); }
+});
+
+// Review fix (2026-10-09, a11y): the card replaces a set-up form that had focus, so focus moves to its
+// heading and a polite live region says it once; every change of step does the same.
+const heading = () => document.querySelector<HTMLHeadingElement>('.authLockout h2')!;
+const spoken = () => document.querySelector('.authLockout [aria-live=polite]')?.textContent;
+const settle = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 150)); });
+it('moves focus to the card heading and announces the card once, politely', async () => {
+  await mount(client());
+  expect(heading().textContent).toBe(TITLE);
+  expect(heading().getAttribute('tabindex')).toBe('-1');
+  expect(document.activeElement).toBe(heading());
+  await settle();
+  expect(spoken()).toBe(TITLE);
+});
+it('each change of step moves focus back to the heading and says the step', async () => {
+  await mount(client());
+  await settle();
+  (document.querySelector<HTMLButtonElement>('.authLockoutActions button'))!.focus();
+  await click('Save recovery codes');
+  expect(document.activeElement).toBe(heading());
+  await settle();
+  expect(spoken()).toBe('Save recovery codes');
+  await click('Cancel');
+  expect(document.activeElement).toBe(heading());
+  await settle();
+  expect(spoken()).toBe(TITLE);
+  await click('Add a passkey');
+  await settle();
+  expect(spoken()).toBe('Add a passkey');
+  await confirmWithPassword();
+  expect(document.activeElement).toBe(heading());
+});

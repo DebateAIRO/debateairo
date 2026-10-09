@@ -168,6 +168,7 @@
   "settings.security.title": "Säkerhet",
   "settings.phone.reveal": "Visa telefonnummer",
   "settings.phone.change": "Ändra telefonnummer",
+  "settings.phone.purpose": "Längre fram kan vi komma att skicka en kod via sms för att hjälpa dig tillbaka in på ditt konto, och om du ber oss om hjälp kan vi ringa eller sms:a dig. Lagras krypterat; delas aldrig och används aldrig för marknadsföring.",
   "settings.security.lastPath": "Lägg till en annan inloggningsmetod innan du tar bort den här.",
   "settings.security.remove": "Ta bort",
   "settings.security.codesRemaining": "Återställningskoder: {count}",

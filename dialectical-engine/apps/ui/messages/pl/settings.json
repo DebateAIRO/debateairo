@@ -170,6 +170,7 @@
   "settings.security.title": "Bezpieczeństwo",
   "settings.phone.reveal": "Pokaż telefon",
   "settings.phone.change": "Zmień telefon",
+  "settings.phone.purpose": "W przyszłości możemy wysłać Ci kod SMS-em, aby pomóc Ci wrócić do konta, a jeśli poprosisz nas o pomoc, możemy do Ciebie zadzwonić lub wysłać SMS. Przechowywany w formie zaszyfrowanej; nigdy nie jest udostępniany ani używany do celów marketingowych.",
   "settings.security.lastPath": "Dodaj inną metodę logowania przed usunięciem tej.",
   "settings.security.remove": "Usuń",
   "settings.security.codesRemaining": "Kody odzyskiwania: {count}",

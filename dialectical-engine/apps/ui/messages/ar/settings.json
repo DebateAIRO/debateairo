@@ -172,6 +172,7 @@
   "settings.security.title": "الأمان",
   "settings.phone.reveal": "إظهار رقم الهاتف",
   "settings.phone.change": "تغيير رقم الهاتف",
+  "settings.phone.purpose": "قد نرسل إليك لاحقًا رمزًا برسالة نصية لمساعدتك على العودة إلى حسابك، وإذا طلبت منا المساعدة يمكننا الاتصال بك أو مراسلتك برسالة نصية. يُحفظ مشفّرًا، ولا نشاركه مع أحد ولا نستخدمه للتسويق أبدًا.",
   "settings.security.lastPath": "أضف طريقة أخرى لتسجيل الدخول قبل إزالة هذه الطريقة.",
   "settings.security.remove": "إزالة",
   "settings.security.codesRemaining": "رموز الاسترداد: {count}",

@@ -167,6 +167,7 @@
   "settings.security.title": "Bảo mật",
   "settings.phone.reveal": "Hiện số điện thoại",
   "settings.phone.change": "Đổi số điện thoại",
+  "settings.phone.purpose": "Sau này, chúng tôi có thể gửi mã qua tin nhắn SMS để giúp bạn vào lại tài khoản, và nếu bạn nhờ chúng tôi hỗ trợ, chúng tôi có thể gọi điện hoặc nhắn tin cho bạn. Được lưu trữ dưới dạng mã hóa; không bao giờ được chia sẻ hay dùng cho mục đích tiếp thị.",
   "settings.security.lastPath": "Thêm cách đăng nhập khác trước khi xóa cách này.",
   "settings.security.remove": "Xóa",
   "settings.security.codesRemaining": "Mã khôi phục: {count}",

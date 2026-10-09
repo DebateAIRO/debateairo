@@ -168,6 +168,7 @@
   "settings.security.title": "Güvenlik",
   "settings.phone.reveal": "Telefonu göster",
   "settings.phone.change": "Telefonu değiştir",
+  "settings.phone.purpose": "İleride hesabınıza yeniden girmenize yardımcı olmak için size SMS ile bir kod gönderebiliriz; bizden yardım isterseniz sizi arayabilir veya size SMS gönderebiliriz. Şifrelenmiş olarak saklanır; asla paylaşılmaz ve pazarlama için kullanılmaz.",
   "settings.security.lastPath": "Bunu kaldırmadan önce başka bir giriş yöntemi ekleyin.",
   "settings.security.remove": "Kaldır",
   "settings.security.codesRemaining": "Kurtarma kodları: {count}",

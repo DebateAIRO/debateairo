@@ -92,7 +92,7 @@ export function PhoneProfileCard({ client = contractClient, catalog, authCatalog
     return <section className="setList" aria-labelledby={`${id}-title`}>
         <div className="setSessionRow"><div className="setSessionMain">
         <h2 className="setSessionDevice" id={`${id}-title`}>{t(authCatalog, 'auth.phone.label')}</h2>
-        <p className="setSessionSeen">{t(authCatalog, 'auth.phone.purpose')}</p>
+        <p className="setSessionSeen">{t(catalog, 'settings.phone.purpose')}</p>
         <p className="setSessionSeen">{t(authCatalog, 'auth.phone.hint')}</p>
         <p className="setSessionLine">{full ?? profile?.phone_masked ?? '—'}</p>
         </div>{full ? <button type="button" className="setBtn setBtnQuiet" onClick={() => setFull(null)}>{t(authCatalog, 'auth.password.hide')}</button> : null}</div>

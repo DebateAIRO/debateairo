@@ -169,6 +169,7 @@
   "settings.security.title": "Sigurnost",
   "settings.phone.reveal": "Prikaži telefon",
   "settings.phone.change": "Promijeni telefon",
+  "settings.phone.purpose": "Ubuduće vam možda pošaljemo kod SMS-om kako bismo vam pomogli da se vratite u svoj račun, a ako nas zamolite za pomoć, možemo vas nazvati ili vam poslati SMS. Pohranjuje se šifrirano; nikad se ne dijeli niti koristi za marketing.",
   "settings.security.lastPath": "Dodajte drugi način prijave prije uklanjanja ovoga.",
   "settings.security.remove": "Ukloni",
   "settings.security.codesRemaining": "Kodovi za oporavak: {count}",

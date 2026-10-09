@@ -168,6 +168,7 @@
   "settings.security.title": "Sicherheit",
   "settings.phone.reveal": "Telefonnummer anzeigen",
   "settings.phone.change": "Telefonnummer ändern",
+  "settings.phone.purpose": "Künftig senden wir Ihnen möglicherweise einen Code per SMS, damit Sie wieder in Ihr Konto gelangen, und wenn Sie uns um Hilfe bitten, können wir Sie anrufen oder Ihnen eine SMS schicken. Verschlüsselt gespeichert; wird nie weitergegeben und nie für Werbung verwendet.",
   "settings.security.lastPath": "Füge eine andere Anmeldemethode hinzu, bevor du diese entfernst.",
   "settings.security.remove": "Entfernen",
   "settings.security.codesRemaining": "Wiederherstellungscodes: {count}",

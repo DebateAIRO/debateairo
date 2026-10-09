@@ -169,6 +169,7 @@
   "settings.security.title": "Drošība",
   "settings.phone.reveal": "Rādīt tālruņa numuru",
   "settings.phone.change": "Mainīt tālruņa numuru",
+  "settings.phone.purpose": "Nākotnē mēs varam nosūtīt jums kodu īsziņā, lai palīdzētu atgūt piekļuvi kontam, un, ja lūgsiet mums palīdzību, varam jums piezvanīt vai nosūtīt īsziņu. Tiek glabāts šifrētā veidā; nekad netiek kopīgots un netiek izmantots mārketingam.",
   "settings.security.lastPath": "Pirms šīs metodes noņemšanas pievienojiet citu pierakstīšanās metodi.",
   "settings.security.remove": "Noņemt",
   "settings.security.codesRemaining": "Atkopšanas kodi: {count}",
