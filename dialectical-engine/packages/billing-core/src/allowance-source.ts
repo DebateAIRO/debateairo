@@ -51,7 +51,7 @@ export class BillingPersonAllowanceSource implements PersonAllowanceSource {
     //    from its own clock before the query;
     //  - a period end (a lapse anchors at `paid_through`) or an API-dated event
     //    (a new subscription's activation) falls between that `now` and the read;
-    //  - an INITIAL charge is anchored at xMoney's `transaction.createdAt`,
+    //  - an INITIAL charge is anchored at the payment's own time (NETOPIA's `operationDate`, else ours),
     //    another clock again.
     // Such a plan's first window opens at its anchor, and nothing has been spent
     // inside it yet, so the windows are built at max(now, anchor): the correct

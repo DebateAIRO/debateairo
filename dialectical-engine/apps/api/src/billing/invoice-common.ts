@@ -1,13 +1,13 @@
 import { computeWindows, type RefundRecord, type SaleRecord } from "@debateai/billing-core";
 import type {
-  BillingRepository, ChargeEventRow, ChargeRow, CustomerXMoneyEnvironment, InvoiceRow, OutboxJob, QuoteRow
+  BillingRepository, ChargeEventRow, ChargeRow, InvoiceRow, OutboxJob, QuoteRow
 } from "@debateai/db";
 import { TypedDomainError } from "@debateai/kernel";
 import type { BillingPolicy, PlanId } from "@debateai/register";
 import type { BillingRecipientReader } from "./account-email.js";
 import type { BillingAudit } from "./audit.js";
 import { englishOrderText, invoiceDate, planName, type BillingOrderText } from "./order-text.js";
-import { DONE, failureRetryAt, otherXMoneySystem, type OutboxOutcome } from "./outbox.js";
+import { DONE, failureRetryAt, isThisPaymentSystem, otherPaymentSystem, type OutboxOutcome } from "./outbox.js";
 import { openBillingProfile, openQuoteLocation, type BillingProfile, type QuoteLocation } from "./records.js";
 import { refundTarget } from "./rows.js";
 
@@ -27,23 +27,25 @@ export type InvoiceJobDeps = Readonly<{
   /** P8c's order-text port for the invoice line; absent = `englishOrderText` until P17/P18's sentences exist. */
   orderText?: BillingOrderText;
   /**
-   * P2-I4 (D5 5h): the connectors' xMoney system. The invoicers follow it (P23's rules), so a document is issued only
-   * for a charge paid in this system: a sandbox payment never becomes a live fiscal invoice or OSS record.
+   * P2-I4 (D5 5h), N8's connectors.paymentEnvironment: the NETOPIA environment this API talks to. The invoicers follow
+   * it (P23's rules), so a document is issued only for a charge paid in this system: a sandbox payment never becomes a
+   * live fiscal invoice or OSS record.
    */
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
+  paymentEnvironment: "sandbox" | "live";
 }>;
 
 /**
- * P2-I4 (D5 5h): the outcome of a job whose charge was paid in the other xMoney system (DEAD, one audit line), read
+ * P2-I4 (D5 5h): the outcome of a job whose charge was paid in another payment system (DEAD, one audit line), read
  * before anything else the job does; null when the charge is this system's, or missing (the job's own check answers).
+ * A charge is this system's only when it is NETOPIA's, in the connectors' NETOPIA environment (OTHER_PAYMENT_SYSTEM).
  */
 export async function otherSystemOutcome(
-  deps: Pick<InvoiceJobDeps, "repository" | "xmoneyEnvironment"> & Readonly<{ audit: BillingAudit }>, job: OutboxJob,
-  chargeId: string
+  deps: Pick<InvoiceJobDeps, "repository" | "paymentEnvironment"> & Readonly<{ audit: BillingAudit }>,
+  job: OutboxJob, chargeId: string
 ): Promise<OutboxOutcome | null> {
   const charge = await deps.repository.charge(chargeId);
-  return charge !== null && charge.xmoneyEnvironment !== deps.xmoneyEnvironment
-    ? otherXMoneySystem(deps.audit, job.kind) : null;
+  if (charge === null) return null;
+  return isThisPaymentSystem(charge, deps.paymentEnvironment) ? null : otherPaymentSystem(deps.audit, job.kind);
 }
 
 export type PaidCharge = Readonly<{
@@ -87,7 +89,7 @@ export async function loadPaidCharge(
 ): Promise<PaidCharge | null> {
   const charge = await deps.repository.charge(chargeId);
   const paid = charge?.events.find((event) => event.kind === "SUCCEEDED");
-  if (charge === null || paid === undefined || paid.xmoneyTransactionId === null) return null;
+  if (charge === null || paid === undefined || paid.providerPaymentId === null) return null;
   const quote = charge.quoteId === null ? null : await deps.repository.quote(charge.quoteId, charge.ownerRef);
   const customer = await deps.repository.customerByOwner(charge.ownerRef);
   const latest = customer === null ? null : await deps.repository.latestProfile(customer.customerId);
@@ -156,7 +158,7 @@ export function saleRecordOf(
   const region = PRICED_REGION_COUNTRIES.has(buyer.country) ? paid.quote.taxRegion : buyer.region;
   return Object.freeze({
     chargeId: paid.charge.chargeId,
-    transactionId: paid.paid.xmoneyTransactionId!,
+    transactionId: paid.paid.providerPaymentId!,
     issuedOn: paid.paid.at,
     customer: Object.freeze({
       name: company?.name ?? buyer.name, email: paid.profile.email, country: buyer.country,
@@ -173,7 +175,9 @@ export function saleRecordOf(
     evidence: Object.freeze({
       billingCountry: paid.location.country, ipAddress: paid.location.ip,
       bankCountry: typeof payload.card_country === "string" ? payload.card_country : null
-    })
+    }),
+    // Spec §2.8 step 5: Quaderno's sale names who took the payment (`processor_id` is `transactionId`, the ntpID).
+    processor: "netopia"
   });
 }
 
@@ -192,8 +196,8 @@ export function refundJobOf(job: Pick<OutboxJob, "payload">): Readonly<{ chargeI
  * and `pnpm billing:invoice --record` (W12 fix I-2), so the two can never credit different amounts. The credit note
  * credits what the charge records, never what the job says: the refund of the SALE's paid transaction, on its own row
  * or on a refund transaction naming it (D5 5g), gives the amount and the date. A job naming any other transaction (a
- * duplicate payment's refund was never a sale), or one with no such REFUNDED row, is MISSING. P9c's dashboard refund
- * recorded on the payment itself (PROVIDER_REFUND, no refund transaction) holds only an upper bound: xMoney's read
+ * duplicate payment's refund was never a sale), or one with no such REFUNDED row, is MISSING. P9c's admin refund
+ * recorded on the payment itself (PROVIDER_REFUND, no refund transaction) holds only an upper bound: NETOPIA's status
  * named no amount (`quarterSummaryRows` marks it amountKnown=false until its credit note is recorded), so it is
  * AMOUNT_UNKNOWN, with that row (`upToMicros`, what was left of the payment, bounds the credit note P4-K's
  * `pnpm billing:invoice --record --amount` records). A D5 5g PROVIDER_REFUND on its own refund transaction, and a
@@ -207,14 +211,21 @@ export type SaleRefund =
 export function saleRefundOf(
   charge: Readonly<{ events: readonly ChargeEventRow[] }>, paid: ChargeEventRow, transactionId: string
 ): SaleRefund {
-  const refunded = transactionId === paid.xmoneyTransactionId
-    ? charge.events.find((event) => event.kind === "REFUNDED" && refundTarget(event) === transactionId)
-    : undefined;
+  const rows = transactionId === paid.providerPaymentId
+    ? charge.events.filter((event) => event.kind === "REFUNDED" && refundTarget(event) === transactionId)
+    : [];
+  const refunded = rows[0];
   if (refunded === undefined || refunded.amountMicros === null || refunded.amountMicros <= 0) {
     return Object.freeze({ kind: "MISSING" as const });
   }
   if (refunded.errorCode === "PROVIDER_REFUND" && refunded.refundsTransactionId === null) {
     return Object.freeze({ kind: "AMOUNT_UNKNOWN" as const, refunded, upToMicros: refunded.amountMicros });
+  }
+  // N14 (spec §2.12.2 item 4): the owner may record a NETOPIA refund in parts, several REFUNDED rows of one request;
+  // the credit note credits their sum, dated by the last part (the one that closed the request).
+  if (paid.paymentProvider === "netopia" && rows.length > 1) {
+    const last = rows[rows.length - 1]!;
+    return Object.freeze({ kind: "BACKED" as const, refunded: last, amountMicros: rows.reduce((total, row) => total + (row.amountMicros ?? 0), 0) });
   }
   return Object.freeze({ kind: "BACKED" as const, refunded, amountMicros: refunded.amountMicros });
 }
@@ -237,9 +248,11 @@ export async function creditNoteContext(
   if (paid === null) return Object.freeze({ kind: "DEAD" as const, code: "INVOICE_CHARGE_NOT_PAID" });
   const issued = await invoicesOfCharge(deps.repository, paid);
   if (issued.some((invoice) => invoice.kind === "CREDIT_NOTE")) {
-    // Refunds of the sale itself only: a DUPLICATE_PAYMENT's refund (D5 5f) was never a sale and has no document.
-    const saleRefunds = paid.charge.events.filter((event) => event.kind === "REFUNDED"
-      && refundTarget(event) === paid.paid.xmoneyTransactionId).length;
+    // Refunds of the sale itself only: a DUPLICATE_PAYMENT's refund (D5 5f) was never a sale and has no document. N14:
+    // a NETOPIA refund recorded in parts is one request, so its requests are counted, not its REFUNDED rows.
+    const counted = paid.paid.paymentProvider === "netopia" ? "REFUND_REQUESTED" : "REFUNDED";
+    const saleRefunds = paid.charge.events.filter((event) => event.kind === counted
+      && refundTarget(event) === paid.paid.providerPaymentId).length;
     if (saleRefunds <= 1) return DONE;
     deps.audit("billing.invoice.unknown", { issuer, kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" });
     return Object.freeze({ kind: "DEAD" as const, code: "CREDIT_NOTE_MANUAL" });
@@ -255,7 +268,7 @@ export async function creditNoteContext(
   if (sale.kind === "MISSING") {
     return Object.freeze({ kind: "RETRY" as const, code: "CREDIT_NOTE_REFUND_MISSING", retryAt: failureRetryAt(job.attempts, now) });
   }
-  // P9c queues no credit note for a dashboard refund of unknown amount, and a job that names it issues none at that
+  // P9c queues no credit note for an admin refund of unknown amount, and a job that names it issues none at that
   // figure: it goes to the owner (P16b lists the charge as DASHBOARD_REFUND).
   if (sale.kind === "AMOUNT_UNKNOWN") {
     deps.audit("billing.invoice.unknown", { issuer, kind: "CREDIT_NOTE", code: "CREDIT_NOTE_MANUAL" });
@@ -268,7 +281,9 @@ export async function creditNoteContext(
       refundTotalMicros: sale.amountMicros, original: { documentId: original.externalRef, number: original.number },
       // RefundRecord.description (D5 Open question 4): the credited line in the buyer's language, the same sentence
       // the invoice carried for the period it credits (SmartBill's P5 still names its negative line itself).
-      description: invoiceLine(deps.orderText ?? englishOrderText, paid.profile.locale, paid.quote.planId, paid.period)
+      description: invoiceLine(deps.orderText ?? englishOrderText, paid.profile.locale, paid.quote.planId, paid.period),
+      // Spec §2.8 step 5: the credit note names the processor of the payment it refunds.
+      processor: "netopia"
     })
   });
 }

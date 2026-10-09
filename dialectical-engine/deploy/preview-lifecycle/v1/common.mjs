@@ -14,8 +14,9 @@ export const LAYOUT = Object.freeze({
   lockRoot: '/etc/debateai-v3-preview/lifecycle',
   lockPath: '/etc/debateai-v3-preview/lifecycle/release-lock.json',
   alertRecipientPath: '/etc/debateai-v3-preview/lifecycle/alert-recipient',
-  // The preview mail's recipient allow-list (deploy/preview-mail/v4-20261005), root-owned server data.
-  mailRecipientInstallationPath: '/etc/debateai/preview-mail-recipient-installation.json',
+  // The alert's own owner list: SHA-256 fingerprints of the owner addresses the alert may reach.
+  // Root-only server data, built on the server by `alert.mjs --install-owner-list`.
+  ownerAlertDigestsPath: '/etc/debateai-v3-preview/lifecycle/owner-alert-digests.json',
   nativePlanRoot: '/etc/debateai-v3-preview/auth-dev-v1',
   nativePlanPath: '/etc/debateai-v3-preview/auth-dev-v1/native-plan.json',
   // The reviewed launchers accept a plan only below /opt/debateai-v3-preview/artifacts/<id>/,

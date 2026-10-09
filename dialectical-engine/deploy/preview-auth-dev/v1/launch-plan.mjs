@@ -1,6 +1,6 @@
 import { dirname, join } from 'node:path';
 import { exactKeys,sha256,strictJson,withPrivateBytes,refuse } from './custody.mjs';
-import { verifySourceManifest } from './source-manifest.mjs';
+import { verifySourceManifest,operatorManifestSha256 } from './source-manifest.mjs';
 import { validateNativeAttestation } from './native-attestation.mjs';
 import { validatePublication } from './runtime-receipt.mjs';
 const ROOT=/^\/opt\/debateai-v3-preview\/releases\/auth-dev-(candidate|fallback)-[a-z0-9-]{1,80}$/;
@@ -40,8 +40,7 @@ export async function prepareLaunch(argv,service,entryUrl) {
  const source=await readPublicArtifact(plan.sourceManifest,'source');
  if(source.uid!==0)refuse('PREVIEW_SOURCE_OWNER_REFUSED');
  await verifySourceManifest(source,{sourceRevision:plan.sourceRevision,sourceTree:plan.sourceTree,sourceRoot:plan.sourceRoot,role:service,manifestSha256:plan.sourceManifest.sha256,execution:{entryUrl,entryName:`launch-${service}.mjs`,operatorManifestSha256:plan.operatorManifestSha256}});
- const operator=source.files.filter(file=>file.path.startsWith('dialectical-engine/deploy/preview-auth-dev/v1/'));
- if(sha256(JSON.stringify(operator))!==plan.operatorManifestSha256)refuse('PREVIEW_OPERATOR_SOURCE_REFUSED');
+ if(operatorManifestSha256(source)!==plan.operatorManifestSha256)refuse('PREVIEW_OPERATOR_SOURCE_REFUSED');
  const native=await readPublicArtifact(plan.nativeAttestation);
  validateNativeAttestation(native,{sourceRevision:plan.sourceRevision,sourceTree:plan.sourceTree,nativeSourceSha256:source.nativeSha256,publication:plan.publication});
  return {plan,source,native};

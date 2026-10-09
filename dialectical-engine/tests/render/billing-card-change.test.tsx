@@ -5,8 +5,18 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import { CardChangeFlow, type CardChangeClient } from "../../apps/ui/components/billing/CardChangeFlow.js";
-import type { XMoneyGlobal, XMoneyPaymentFormOptions } from "../../apps/ui/lib/billing/xmoneySdk.js";
 import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
+
+const EN = billingEnglish as Readonly<Record<string, string>>;
+const CONSENT = Object.freeze({ version: "consent-renewal-1", sha256: "a".repeat(64) });
+const DETAILS = Object.freeze({
+  country: "RO", region: "Cluj", first_name: "Ana", last_name: "Pop", phone: "+40712345678", street: "Strada Memorandumului 1",
+  city: "Cluj-Napoca", postal_code: "400001"
+});
+const SUBSCRIBED = Object.freeze({ subscription: { renewal_total: "24.20" } });
+const PAGE = "https://secure-sandbox.netopia-payments.com/ui/card?p=fedcba987654";
+const continueButton = (container: HTMLElement) =>
+  [...container.querySelectorAll("button")].find((candidate) => candidate.textContent === EN["billing.card.checkCard"]);
 
 const mocks = vi.hoisted(() => ({
   session: null as string | null, billingOn: true, sessionLive: true, sessionCheckedWith: [] as string[]
@@ -50,56 +60,75 @@ async function settle(): Promise<void> {
 }
 
 describe("P20 the card change page (A11, A12)", () => {
-  it("names the $1.00 hold before the card is saved, then saves it through xMoney and the server's charge state", async () => {
-    const mounted: XMoneyPaymentFormOptions[] = [];
-    const submit = vi.fn();
-    const loadSdk = async (): Promise<XMoneyGlobal> => ({
-      paymentForm: (options) => { mounted.push(options); return { submit, destroy: () => undefined }; }
-    });
+  it("pre-fills the billing details, keeps the country and region fixed, takes the agreement and leaves for NETOPIA's check", async () => {
+    const goToPayment = vi.fn();
     const client = {
-      startCardChange: vi.fn(async () => ({
-        public_key: "pk_test_x", order_payload: "cA==", order_checksum: "cw==",
-        charge_ref: "fedcba9876543210fedcba9876543210", sdk_environment: "stage" as const, hold_amount: "1.00"
-      })),
-      getBillingCharge: vi.fn(async () => ({ state: "SUCCEEDED" as const, reason_code: null }))
-    };
-    await act(async () => {
-      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
-        nonce={undefined} client={client as unknown as CardChangeClient} loadSdk={loadSdk} />);
-    });
-    expect(container.textContent).toContain("We check the new card with your bank before we save it.");
-    expect(client.startCardChange).not.toHaveBeenCalled();
-    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Continue to card details")!.click(); });
-    await settle();
-    expect(client.startCardChange).toHaveBeenCalledTimes(1);
-    // Spec §1.3: the page names the hold in plain words, with the amount the server signed, before "Save card".
-    expect(container.textContent).toContain("To check the new card, your bank shows a hold of $1.00. We release it at once; it is never charged.");
-    await act(async () => { mounted[0]!.onReady(); });
-    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Save card")!.click(); });
-    expect(submit).toHaveBeenCalledTimes(1);
-    await act(async () => { mounted[0]!.onPaymentComplete({}); });
-    await settle();
-    expect(client.getBillingCharge).toHaveBeenCalledWith("fedcba9876543210fedcba9876543210");
-    expect(container.textContent).toContain("Your new card is saved. Future payments use it.");
-  });
-
-  it("says nothing is charged when the check holds no money (X0 may set the hold to 0)", async () => {
-    const client = {
-      startCardChange: vi.fn(async () => ({
-        public_key: "pk_test_x", order_payload: "cA==", order_checksum: "cw==",
-        charge_ref: "fedcba9876543210fedcba9876543210", sdk_environment: "stage" as const, hold_amount: "0.00"
-      })),
+      getBillingCardDetails: vi.fn(async () => DETAILS),
+      getBillingSubscription: vi.fn(async () => SUBSCRIBED),
+      startCardChange: vi.fn(async () => ({ redirect_url: PAGE, charge_ref: "fedcba9876543210fedcba9876543210", hold_amount: "0.00" })),
       getBillingCharge: vi.fn()
     };
-    const loadSdk = async (): Promise<XMoneyGlobal> => ({ paymentForm: () => ({ submit: () => undefined, destroy: () => undefined }) });
     await act(async () => {
-      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
-        nonce={undefined} client={client as unknown as CardChangeClient} loadSdk={loadSdk} />);
+      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+        client={client as unknown as CardChangeClient} goToPayment={goToPayment} />);
     });
-    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Continue to card details")!.click(); });
     await settle();
-    expect(container.textContent).toContain("Your bank checks the new card. Nothing is charged.");
-    expect(container.textContent).not.toContain("hold of");
+    expect(container.querySelector<HTMLInputElement>("#card-firstName")!.value).toBe("Ana");
+    expect(container.querySelector<HTMLInputElement>("#card-country")!.readOnly).toBe(true);
+    expect(container.querySelector<HTMLInputElement>("#card-region")!.value).toBe("Cluj");
+    expect(container.textContent).toContain(EN["billing.card.noHoldNote"]);
+    expect(container.textContent).toContain(EN["billing.card.taxPlaceNote"]);
+    // Spec §2.18: the card-saving agreement with the plan's monthly total, before the button.
+    expect(container.textContent).toContain(EN["billing.consent.renewal"]!.replace("{total}", "$24.20"));
+    expect(continueButton(container)!.disabled).toBe(true);
+    await act(async () => { container.querySelector<HTMLInputElement>("#card-agreement")!.click(); });
+    await act(async () => { continueButton(container)!.click(); });
+    await settle();
+    expect(client.startCardChange).toHaveBeenCalledWith({
+      locale: "en", renewal_terms: CONSENT, first_name: "Ana", last_name: "Pop", phone: "+40712345678",
+      street: "Strada Memorandumului 1", city: "Cluj-Napoca", postal_code: "400001"
+    });
+    expect(goToPayment.mock.calls).toEqual([[PAGE]]);
+  });
+
+  it("names why no check is offered when the read has no total, never a button that cannot enable", async () => {
+    for (const [subscription, sentence] of [
+      // A pending cancel: the plan is charged no more, so there is no agreement to give.
+      [{ renewal_total: null, cancel_requested: true }, EN["billing.subscription.wontRenew"]],
+      // Any other read without a total: a plain error, not a silent page.
+      [{ renewal_total: null, cancel_requested: false }, EN["billing.checkout.genericError"]]
+    ] as const) {
+      act(() => root.unmount());
+      root = createRoot(container);
+      const client = {
+        getBillingCardDetails: vi.fn(async () => DETAILS), getBillingSubscription: vi.fn(async () => ({ subscription })),
+        startCardChange: vi.fn(), getBillingCharge: vi.fn()
+      };
+      await act(async () => {
+        root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+          client={client as unknown as CardChangeClient} />);
+      });
+      await settle();
+      // Control: the details did load, so the sentence stands where the agreement and the button would.
+      expect(container.querySelector<HTMLInputElement>("#card-firstName")!.value).toBe("Ana");
+      expect(container.textContent).toContain(sentence);
+      expect(continueButton(container)).toBeUndefined();
+      expect(container.querySelector("#card-agreement")).toBeNull();
+    }
+  });
+
+  it("says a check that saved no card asks for a card instead of a wallet (N13's CARD_NOT_SAVED)", async () => {
+    const client = {
+      getBillingCardDetails: vi.fn(), getBillingSubscription: vi.fn(), startCardChange: vi.fn(),
+      getBillingCharge: vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CARD_NOT_SAVED", kind: "CARD_CHECK" as const }))
+    };
+    await act(async () => {
+      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+        returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
+    });
+    await settle();
+    expect(container.textContent).toContain(EN["billing.card.notSaved"]);
+    expect(client.startCardChange).not.toHaveBeenCalled();
   });
 
   it("says plainly that a card needs an active plan, that a pending deletion or an open payment takes no new card, and that the Terms come first", async () => {
@@ -110,19 +139,24 @@ describe("P20 the card change page (A11, A12)", () => {
       [409, "CARD_CHANGE_NOT_AVAILABLE_NOW", "We couldn't save your new card just now because a payment on your plan is still being confirmed. Your current card stays in use; please try again in an hour."],
       [403, "LEGAL_REACCEPTANCE_REQUIRED", "Please accept the updated Terms first, then come back to this page."],
       // W10 (P2-M19): the card change spends the hourly budget it shares with quotes, downgrades and undos.
-      [429, "ADMISSION_RATE_LIMITED", "Too many tries in the last hour. Please try again later."]
+      [429, "ADMISSION_RATE_LIMITED", "Too many tries in the last hour. Please try again later."],
+      // F4 (finding ui-2): the agreement the page carries was superseded while it was open; only a reload fixes it.
+      [409, "LEGAL_DOCUMENT_STALE", "This page is out of date. Please reload it."]
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);
       const client = {
+        getBillingCardDetails: vi.fn(async () => DETAILS), getBillingSubscription: vi.fn(async () => SUBSCRIBED),
         startCardChange: vi.fn(async () => { throw new ContractHttpError(status === 403 ? "FORBIDDEN" : "SERVER_FAILURE", status, "x", code); }),
         getBillingCharge: vi.fn()
       };
       await act(async () => {
-        root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
-          nonce={undefined} client={client as unknown as CardChangeClient} />);
+        root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+          client={client as unknown as CardChangeClient} />);
       });
-      await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Continue to card details")!.click(); });
+      await settle();
+      await act(async () => { container.querySelector<HTMLInputElement>("#card-agreement")!.click(); });
+      await act(async () => { continueButton(container)!.click(); });
       await settle();
       expect(container.textContent, code).toContain(sentence);
       expect(container.textContent, code).not.toContain("Something went wrong");
@@ -140,12 +174,13 @@ describe("P20 the card change page (A11, A12)", () => {
 
   it("back from the bank's check (P12e's backUrl ?charge=), polls that charge instead of starting again", async () => {
     const client = {
+      getBillingCardDetails: vi.fn(async () => DETAILS), getBillingSubscription: vi.fn(async () => SUBSCRIBED),
       startCardChange: vi.fn(),
       getBillingCharge: vi.fn(async () => ({ state: "SUCCEEDED" as const, reason_code: null }))
     };
     await act(async () => {
-      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
-        nonce={undefined} returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
+      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+        returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
     });
     await settle();
     expect(client.getBillingCharge).toHaveBeenCalledWith("fedcba9876543210fedcba9876543210");
@@ -153,30 +188,32 @@ describe("P20 the card change page (A11, A12)", () => {
     expect(container.textContent).toContain("Your new card is saved. Future payments use it.");
   });
 
-  it("a new card from a country we cannot serve: the page says the hold is released and the old card stays (no email follows)", async () => {
+  it("a new card from a country we cannot serve: the page says nothing was charged and the old card stays (no email follows)", async () => {
     const client = {
+      getBillingCardDetails: vi.fn(async () => DETAILS), getBillingSubscription: vi.fn(async () => SUBSCRIBED),
       startCardChange: vi.fn(),
       getBillingCharge: vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CARD_CHECK_REFUSED" }))
     };
     await act(async () => {
-      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
-        nonce={undefined} returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
+      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+        returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
     });
     await settle();
     expect(container.textContent).toContain(
-      "We can't accept cards issued in that card's country. The hold on it is released, and your plan keeps the card it had."
+      "We can't accept cards issued in that card's country. Nothing was charged, and your plan keeps the card it had."
     );
     expect(container.textContent).not.toContain("The card couldn't be checked.");
   });
 
   it("a card check deferred because a plan payment is still open (D6b's CARD_CHECK_DEFERRED) asks to try again, never 'saved'", async () => {
     const client = {
+      getBillingCardDetails: vi.fn(async () => DETAILS), getBillingSubscription: vi.fn(async () => SUBSCRIBED),
       startCardChange: vi.fn(),
       getBillingCharge: vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CARD_CHECK_DEFERRED" }))
     };
     await act(async () => {
-      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
-        nonce={undefined} returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
+      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+        returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
     });
     await settle();
     expect(container.textContent).toContain(
@@ -188,12 +225,13 @@ describe("P20 the card change page (A11, A12)", () => {
 
   it("a plan that stopped being live during the check (CARD_CHECK_NOT_LIVE) says a card needs an active plan, never 'saved'", async () => {
     const client = {
+      getBillingCardDetails: vi.fn(async () => DETAILS), getBillingSubscription: vi.fn(async () => SUBSCRIBED),
       startCardChange: vi.fn(),
       getBillingCharge: vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CARD_CHECK_NOT_LIVE" }))
     };
     await act(async () => {
-      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
-        nonce={undefined} returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
+      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+        returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
     });
     await settle();
     expect(container.textContent).toContain("You need an active plan to change the card.");
@@ -205,12 +243,13 @@ describe("P20 the card change page (A11, A12)", () => {
     vi.useFakeTimers();
     try {
       const client = {
+        getBillingCardDetails: vi.fn(async () => DETAILS), getBillingSubscription: vi.fn(async () => SUBSCRIBED),
         startCardChange: vi.fn(),
         getBillingCharge: vi.fn(async () => ({ state: "PENDING" as const, reason_code: null }))
       };
       await act(async () => {
-        root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
-          nonce={undefined} returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
+        root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+          returnedChargeRef="fedcba9876543210fedcba9876543210" client={client as unknown as CardChangeClient} />);
       });
       await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
       expect(container.querySelector('[data-charge-state="TIMED_OUT"]')).not.toBeNull();
@@ -261,14 +300,17 @@ describe("P20 the card change page (A11, A12)", () => {
   it("a session that ended while the page was open goes back to sign-in and then to this page, with no error sentence", async () => {
     const navigated: string[] = [];
     const client = {
+      getBillingCardDetails: vi.fn(async () => DETAILS), getBillingSubscription: vi.fn(async () => SUBSCRIBED),
       startCardChange: vi.fn(async () => { throw new ContractHttpError("SESSION_REQUIRED", 401, "x"); }),
       getBillingCharge: vi.fn()
     };
     await act(async () => {
-      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" sdkOrigin="https://secure-stage.xmoney.com"
-        nonce={undefined} client={client as unknown as CardChangeClient} navigate={(href) => { navigated.push(href); }} />);
+      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+        client={client as unknown as CardChangeClient} navigate={(href) => { navigated.push(href); }} />);
     });
-    await act(async () => { [...container.querySelectorAll("button")].find((b) => b.textContent === "Continue to card details")!.click(); });
+    await settle();
+    await act(async () => { container.querySelector<HTMLInputElement>("#card-agreement")!.click(); });
+    await act(async () => { continueButton(container)!.click(); });
     await settle();
     expect(navigated).toEqual(["/login?next=%2Fsettings%2Fcard"]);
     expect(container.querySelector('[role="alert"]')).toBeNull();
@@ -281,10 +323,10 @@ describe("P20 the card change page (A11, A12)", () => {
       searchParams: Promise.resolve({ charge: "fedcba9876543210fedcba9876543210" })
     }));
     expect(returned).toContain('data-charge-state="PENDING"');
-    expect(returned).not.toContain("Continue to card details");
+    expect(returned).not.toContain(EN["billing.card.checkCard"]);
     for (const charge of ["../x", "FEDCBA9876543210FEDCBA9876543210", ["fedcba9876543210fedcba9876543210"]]) {
       const html = renderToStaticMarkup(await CardChangePage({ searchParams: Promise.resolve({ charge }) }));
-      expect(html, String(charge)).toContain("Continue to card details");
+      expect(html, String(charge)).toContain(EN["billing.card.title"]);
       expect(html, String(charge)).not.toContain("data-charge-state");
     }
   });

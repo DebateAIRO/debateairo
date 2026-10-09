@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BillingJobQueries, BillingRepository, RunRepository, migrate } from "@debateai/db";
+import { BillingRepository, RunRepository, migrate } from "@debateai/db";
 import { fixtureDiscoveredPanel, fixtureStructuralCeiling } from "../support/discoveredPanel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { createBillingTestAccount, eraseBillingTestAccount } from "../support/billingAccountFixture.js";
@@ -18,7 +18,9 @@ const APPEND_ONLY = [
   "billing.customer", "billing.customer_xmoney", "billing.customer_profile_event", "billing.quote",
   "billing.subscription_event", "billing.charge", "billing.charge_event", "billing.quote_use",
   "billing.location_evidence", "billing.invoice_intent", "billing.invoice", "billing.invoice_status_event",
-  "billing.xmoney_notice", "billing.xmoney_notice_outcome", "billing.cancel_token", "billing.cancel_token_use"
+  "billing.xmoney_notice", "billing.xmoney_notice_outcome", "billing.cancel_token", "billing.cancel_token_use",
+  "billing.payment_notice", "billing.payment_notice_raw", "billing.notice_quarantine", "billing.payment_notice_outcome",
+  "billing.card_token", "billing.card_token_revocation", "billing.hosted_payment", "billing.status_read", "billing.tool_order"
 ] as const;
 /** B5's 0084 tables carry the same guard (R-13), so the one purge path reaches them too. */
 const ENTITLEMENT_TABLES = ["billing.entitlement_event", "billing.run_charge_scope"] as const;
@@ -80,9 +82,9 @@ async function seedCharge(createdAt = RECENT, system: XMoneySystem = "stage"): P
   await createdEvent(subscriptionId, ownerRef, createdAt, system);
   await database.pool.query(`
     INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start, period_end, quote_id,
-      net_micros, tax_micros, total_micros, currency, created_at, xmoney_environment)
+      net_micros, tax_micros, total_micros, currency, created_at, payment_provider, payment_environment)
     VALUES ($1, $2, $3, 'INITIAL', 1, $4::timestamptz, $4::timestamptz + interval '1 month', $5, 20000000, 4200000,
-      24200000, 'USD', $4, $6)
+      24200000, 'USD', $4, 'xmoney', $6)
   `, [chargeId, ownerRef, subscriptionId, createdAt, quoteId, system]);
   return { ownerRef, subscriptionId, quoteId, chargeId };
 }
@@ -92,9 +94,9 @@ async function seedCardCheck(totalMicros: number): Promise<string> {
   const chargeId = chargeIdOf();
   await database.pool.query(`
     INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start, period_end, quote_id,
-      net_micros, tax_micros, total_micros, currency, created_at, xmoney_environment)
+      net_micros, tax_micros, total_micros, currency, created_at, payment_provider, payment_environment)
     VALUES ($1, $2, $3, 'CARD_CHECK', 1, $4::timestamptz, $4::timestamptz + interval '1 month', NULL, $5, 0, $5,
-      'USD', $4, 'stage')
+      'USD', $4, 'xmoney', 'stage')
   `, [chargeId, randomUUID(), randomUUID(), RECENT, totalMicros]);
   return chargeId;
 }
@@ -104,9 +106,9 @@ async function chargeEvent(
   options: Readonly<{ at?: string; refunds?: string; system?: XMoneySystem }> = {}
 ) {
   return database.pool.query(`
-    INSERT INTO billing.charge_event (charge_id, kind, at, xmoney_transaction_id, amount_micros, error_code,
-      refunds_transaction_id, xmoney_environment)
-    VALUES ($1, $2, $3, $4, $5, NULL, $6, $7) ON CONFLICT DO NOTHING RETURNING event_id
+    INSERT INTO billing.charge_event (charge_id, kind, at, provider_payment_id, amount_micros, error_code,
+      refunds_transaction_id, payment_provider, payment_environment)
+    VALUES ($1, $2, $3, $4, $5, NULL, $6, 'xmoney', $7) ON CONFLICT DO NOTHING RETURNING event_id
   `, [chargeId, kind, options.at ?? `${thisYear}-01-15T10:01:00Z`, transactionId, amountMicros, options.refunds ?? null,
     options.system ?? "stage"]);
 }
@@ -247,7 +249,7 @@ describe("P1a — billing tables are append-only and guarded", () => {
   it("queues every job kind the billing jobs use, the refund executor and the yearly purge included (R-30)", async () => {
     for (const kind of [
       "VERIFY_PAYMENT", "QUADERNO_RECORD_SALE", "QUADERNO_RECORD_REFUND", "SMARTBILL_INVOICE", "SMARTBILL_STORNO",
-      "EMAIL", "RENEWAL_NOTICE", "OWNER_TAX_SUMMARY", "XMONEY_REFUND", "RETENTION_PURGE"
+      "EMAIL", "RENEWAL_NOTICE", "OWNER_TAX_SUMMARY", "XMONEY_REFUND", "RETENTION_PURGE", "PAYMENT_REFUND"
     ]) {
       await asRuntime((client) => client.query(`INSERT INTO billing.outbox (job_id, kind, ref, payload, created_at, not_before)
         VALUES ($1, $2, $3, '{}'::jsonb, clock_timestamp(), clock_timestamp())`, [randomUUID(), kind, `kinds:${randomUUID()}`]));
@@ -292,9 +294,9 @@ describe("P1a — money invariants in SQL", () => {
     const seeded = await seedCharge();
     const renewal = (attempt: number) => database.pool.query(`
       INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start, period_end, quote_id,
-        net_micros, tax_micros, total_micros, currency, created_at, xmoney_environment)
+        net_micros, tax_micros, total_micros, currency, created_at, payment_provider, payment_environment)
       VALUES ($1, $2, $3, 'RENEWAL', $4, $5::timestamptz + interval '1 month', $5::timestamptz + interval '2 months', $6,
-        20000000, 4200000, 24200000, 'USD', $5, 'stage')
+        20000000, 4200000, 24200000, 'USD', $5, 'xmoney', 'stage')
     `, [chargeIdOf(), seeded.ownerRef, seeded.subscriptionId, attempt, RECENT, seeded.quoteId]);
     // The last retry a sealed policy can ask for (three retry days after the first attempt) inserts.
     expect((await renewal(4)).rowCount).toBe(1);
@@ -388,19 +390,19 @@ describe("P1a — money invariants in SQL", () => {
 
   it("keeps xMoney's own time only on a row that IS that xMoney transaction (the tax summary's date)", async () => {
     const seeded = await seedCharge();
-    const timeRefused = { code: "23514", constraint: "charge_event_xmoney_time_names_transaction" } as const;
+    const timeRefused = { code: "23514", constraint: "charge_event_provider_time_names_payment" } as const;
     const timed = (kind: string, transactionId: string | null, amountMicros: number | null, refunds: string | null) =>
-      database.pool.query<{ at: Date; xmoney_created_at: Date }>(`
-        INSERT INTO billing.charge_event (charge_id, kind, at, xmoney_transaction_id, amount_micros, error_code,
-          refunds_transaction_id, xmoney_environment, xmoney_created_at)
-        VALUES ($1, $2, $3::timestamptz + interval '1 hour', $4, $5, NULL, $6, 'stage', $3)
-        RETURNING at, xmoney_created_at
+      database.pool.query<{ at: Date; provider_created_at: Date }>(`
+        INSERT INTO billing.charge_event (charge_id, kind, at, provider_payment_id, amount_micros, error_code,
+          refunds_transaction_id, payment_provider, payment_environment, provider_created_at)
+        VALUES ($1, $2, $3::timestamptz + interval '1 hour', $4, $5, NULL, $6, 'xmoney', 'stage', $3)
+        RETURNING at, provider_created_at
       `, [seeded.chargeId, kind, RECENT, transactionId, amountMicros, refunds]);
     await expect(timed("REQUESTED", null, null, null)).rejects.toMatchObject(timeRefused);
     // Recorded an hour after xMoney took the money: both instants are kept, each in its own column.
     const written = await timed("SUCCEEDED", "9451", 24_200_000, null);
-    expect(written.rows[0]!.xmoney_created_at.toISOString()).toBe(new Date(RECENT).toISOString());
-    expect(written.rows[0]!.at.getTime() - written.rows[0]!.xmoney_created_at.getTime()).toBe(3_600_000);
+    expect(written.rows[0]!.provider_created_at.toISOString()).toBe(new Date(RECENT).toISOString());
+    expect(written.rows[0]!.at.getTime() - written.rows[0]!.provider_created_at.getTime()).toBe(3_600_000);
     // A status change of the payment itself (refund-ok, charge-back) names the PAYMENT's transaction, whose
     // creationDate is the payment's: such a row carries no xMoney time (the refund-sum trigger lets both through
     // first — 9451 paid 24.20 — so the refusal is this constraint's).
@@ -418,8 +420,8 @@ describe("P1a — money invariants in SQL", () => {
     const first = await database.pool.connect();
     const second = await database.pool.connect();
     const refundOf9201 = (refundTransaction: string) => `INSERT INTO billing.charge_event (charge_id, kind, at,
-        xmoney_transaction_id, amount_micros, refunds_transaction_id, xmoney_environment)
-      VALUES ($1, 'REFUNDED', clock_timestamp(), '${refundTransaction}', 20000000, '9201', 'stage')`;
+        provider_payment_id, amount_micros, refunds_transaction_id, payment_provider, payment_environment)
+      VALUES ($1, 'REFUNDED', clock_timestamp(), '${refundTransaction}', 20000000, '9201', 'xmoney', 'stage')`;
     try {
       await first.query("BEGIN");
       await second.query("BEGIN");
@@ -441,9 +443,9 @@ describe("P1a — money invariants in SQL", () => {
     const seeded = await seedCharge();
     await expect(database.pool.query(`
       INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start, period_end, quote_id,
-        net_micros, tax_micros, total_micros, currency, created_at, xmoney_environment)
+        net_micros, tax_micros, total_micros, currency, created_at, payment_provider, payment_environment)
       VALUES ($1, $2, $3, 'INITIAL', 1, $5::timestamptz, $5::timestamptz + interval '1 month', $4, 20000000, 4200000, 24200000, 'USD',
-        clock_timestamp(), 'stage')
+        clock_timestamp(), 'xmoney', 'stage')
     `, [chargeIdOf(), seeded.ownerRef, seeded.subscriptionId, seeded.quoteId, RECENT])).rejects.toMatchObject({ code: "23505" });
     await database.pool.query("INSERT INTO billing.quote_use (quote_id, used_at, charge_id) VALUES ($1, clock_timestamp(), $2)", [seeded.quoteId, seeded.chargeId]);
     await expect(database.pool.query("INSERT INTO billing.quote_use (quote_id, used_at, charge_id) VALUES ($1, clock_timestamp(), $2)", [seeded.quoteId, seeded.chargeId]))
@@ -716,7 +718,6 @@ describe("P2-M43 — migration 0092: an index for each recurring billing query (
       }
     });
     const billing = new BillingRepository(viaClient);
-    const jobs = new BillingJobQueries(viaClient);
     // Every index any plan node of the method's queries reads.
     const plans = async (run: () => Promise<unknown>): Promise<string[]> => {
       sent.length = 0;
@@ -750,20 +751,21 @@ describe("P2-M43 — migration 0092: an index for each recurring billing query (
       const txBase = 900_000_000_000 + Math.floor(Math.random() * 99_000_000_000);
       await client.query(`
         INSERT INTO billing.charge (charge_id, owner_ref, subscription_id, kind, attempt, period_start, period_end,
-          quote_id, net_micros, tax_micros, total_micros, currency, created_at, xmoney_environment)
+          quote_id, net_micros, tax_micros, total_micros, currency, created_at, payment_provider, payment_environment)
         SELECT md5($1 || i), gen_random_uuid(), gen_random_uuid(), 'CARD_CHECK', 1, now() - i * interval '1 hour',
-          now() - i * interval '1 hour' + interval '1 month', NULL, 0, 0, 0, 'USD', now() - i * interval '1 hour', 'stage'
+          now() - i * interval '1 hour' + interval '1 month', NULL, 0, 0, 0, 'USD', now() - i * interval '1 hour', 'xmoney', 'stage'
         FROM generate_series(1, 2000) AS i
       `, [seed]);
       await client.query(`
-        INSERT INTO billing.charge_event (charge_id, kind, at, xmoney_environment, xmoney_transaction_id, amount_micros)
-        SELECT md5($1 || i), 'SUCCEEDED', now() - i * interval '1 hour', 'stage', ($2::bigint + i)::text, 0
+        INSERT INTO billing.charge_event (charge_id, kind, at, payment_provider, payment_environment, provider_payment_id,
+          amount_micros)
+        SELECT md5($1 || i), 'SUCCEEDED', now() - i * interval '1 hour', 'xmoney', 'stage', ($2::bigint + i)::text, 0
         FROM generate_series(1, 2000) AS i
       `, [seed, txBase]);
       await client.query(`
-        INSERT INTO billing.charge_event (charge_id, kind, at, xmoney_environment, xmoney_transaction_id, amount_micros,
-          error_code)
-        SELECT md5($1 || i), 'REFUNDED', now() - i * interval '1 hour', 'stage', ($2::bigint + i)::text, 0,
+        INSERT INTO billing.charge_event (charge_id, kind, at, payment_provider, payment_environment, provider_payment_id,
+          amount_micros, error_code)
+        SELECT md5($1 || i), 'REFUNDED', now() - i * interval '1 hour', 'xmoney', 'stage', ($2::bigint + i)::text, 0,
           CASE WHEN i % 100 = 0 THEN 'PROVIDER_REFUND' END
         FROM generate_series(1, 2000) AS i WHERE i % 10 = 0
       `, [seed, txBase]);
@@ -806,10 +808,6 @@ describe("P2-M43 — migration 0092: an index for each recurring billing query (
       await client.query("ANALYZE billing.xmoney_notice, billing.outbox, billing.subscription_event, billing.charge, billing.charge_event, billing.entitlement_event");
       await client.query("SET LOCAL enable_seqscan = off");
       const now = new Date();
-      const checkout = await plans(() => jobs.checkoutPaymentSignals(recording as unknown as PoolClient, chargeIdOf(), "stage", now));
-      for (const index of ["xmoney_notice_external_order_idx", "xmoney_notice_id_text_idx", "outbox_live_verify_external_order_idx", "outbox_live_verify_charge_idx"]) {
-        expect(checkout, `checkoutPaymentSignals: ${index} in ${checkout.join(",")}`).toContain(index);
-      }
       expect(await plans(() => billing.withdrawalsAwaitingOwner())).toContain("subscription_event_withdrawn_by_owner_idx");
       expect(await plans(() => billing.deadRefunds())).toContain("outbox_dead_idx");
       const invoice = await plans(() => billing.invoiceUnknownItems());
