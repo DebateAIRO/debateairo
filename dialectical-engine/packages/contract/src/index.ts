@@ -758,14 +758,16 @@ export const UnpublishDebateRequestSchema = z.object({
 const StepUpGrantTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 export const AccountErasureScheduleRequestSchema = z.object({
   confirmation: z.literal("DELETE MY ACCOUNT"),
-  step_up_grant: StepUpGrantTokenSchema
+  step_up_grant: StepUpGrantTokenSchema,
+  delete_public_debates: z.boolean().optional()
 }).strict();
 export const AccountErasureStatusSchema = z.discriminatedUnion("status", [
   z.object({ status:z.literal("NONE") }).strict(),
   z.object({
     status:z.enum(["SCHEDULED","DUE","PROCESSING"]),
     execute_at:z.iso.datetime(),
-    cancellation_ref:z.uuid()
+    cancellation_ref:z.uuid(),
+    delete_public_debates:z.boolean()
   }).strict()
 ]);
 export const AccountErasureCancelRequestSchema = z.object({

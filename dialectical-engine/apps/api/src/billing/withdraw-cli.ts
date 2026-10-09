@@ -230,7 +230,7 @@ export function renderWithdrawResult(result: WithdrawResult, input: WithdrawArgu
     case "NOTHING_DUE":
       return `The withdrawal of ${owner} is recorded: the plan has ended and nothing was due back. M8 is queued.\n`;
     case "OWNER_REVIEW":
-      return `The withdrawal of ${owner} is recorded and the plan has ended, but a refund made in the xMoney dashboard`
+      return `The withdrawal of ${owner} is recorded and the plan has ended, but a refund made in the Netopia dashboard`
         + " touched a payment, so nothing was refunded. Check the dashboard: refund there what this command cannot take"
         + " back (a payment the dashboard refund touched), then, within 14 days of the withdrawal, run"
         + ` pnpm billing:withdraw --owner ${input.ownerRef} --refund <amount through this command>`

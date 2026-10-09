@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "In breve",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Raccogliamo ciò che serve a un account e ciò che scegli di digitare. Le tue domande vengono inviate ai fornitori di IA elencati nel nostro Registro; non sono utilizzate per addestrare i modelli. I dibattiti sono privati, salvo che tu non li pubblichi. La cancellazione dell'account distrugge le chiavi dei tuoi dati e rimuove i dibattiti pubblicati. Puoi contattarci all'indirizzo privacy@dezbatere.ro e le persone nominate in un dibattito possono chiederne la rimozione senza avere un account." }
+      { kind: "p", text: "Raccogliamo ciò che serve a un account e ciò che scegli di digitare. Le tue domande vengono inviate ai fornitori di IA elencati nel nostro Registro; non sono utilizzate per addestrare i modelli. I dibattiti sono privati, salvo che tu non li pubblichi. La cancellazione dell’account distrugge le chiavi dei tuoi dati privati; quando la programmi, scegli se rimuovere anche i dibattiti pubblicati o lasciarli pubblici con il tuo pseudonimo dismesso. Puoi contattarci all'indirizzo privacy@dezbatere.ro e le persone nominate in un dibattito possono chiederne la rimozione senza avere un account." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "I dibattiti sono privati fino a quando non li pubblichi. La pubblicazione è un'azione intenzionale e confermata separatamente. Un dibattito pubblicato mostra il tuo pseudonimo, la domanda così come l'hai formulata, l'albero argomentativo, i punteggi, il verdetto e la fascia di affidabilità e reca un'etichetta visibile che indica che il contenuto è generato dall'IA. Non mostra mai il tuo indirizzo email, i registri delle sessioni o la cronologia dell'account. I motori di ricerca possono indicizzare i dibattiti pubblicati." },
       { kind: "p", text: "La revoca della pubblicazione rimuove il dibattito da Dialectical Engine e distrugge la chiave della nostra copia pubblica. Le copie già effettuate da lettori, motori di ricerca o archivi sfuggono al nostro controllo e non possiamo richiamarle." },
-      { kind: "p", text: "Quando cancelli il tuo account, rimuoviamo dall'accesso pubblico ogni dibattito da te pubblicato senza ingiustificato ritardo e al più tardi entro 30 giorni, salvo che la legge ci imponga di conservare uno specifico elemento. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Quando programmi l’eliminazione del tuo account, scegli cosa accade ai dibattiti che hai pubblicato. Se selezioni \"Elimina anche i miei dibattiti pubblici\", rimuoviamo ciascuno dall’accesso pubblico e distruggiamo la chiave della nostra copia pubblica quando viene eseguita l’eliminazione, salvo che la legge ci imponga di conservare un elemento specifico. Se lasci la casella deselezionata, i dibattiti rimangono pubblici sotto il tuo pseudonimo dismesso." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Audit dei rifiuti per Paese dell’IP — Per tutta la vita del servizio — Di sola aggiunta; registra percorso, codice del rifiuto, Paese, intervallo di tempo e tipo di prova «indirizzo IP»; indirizzo IP e user-agent figurano solo come digest unidirezionali con chiave",
         "Indirizzo IP in chiaro per verificare il Paese alla registrazione o prima di un nuovo dibattito — Solo durante la relativa richiesta — Questa verifica non conserva l’IP leggibile; nell’audit del rifiuto l’indirizzo IP e lo user-agent figurano solo come digest unidirezionali con chiave e il Paese dell’IP può figurare nel record della verifica dell’età",
         "Contenuto dei dibattiti (privato) — Finché l'account esiste — Chiavi distrutte alla chiusura, rendendo il contenuto illeggibile",
-        "Contenuto dei dibattiti (pubblicato) — Finché è pubblicato e finché l'account esiste — Rimosso dall'accesso pubblico alla revoca della pubblicazione o alla chiusura; chiavi distrutte",
+        "Contenuto dei dibattiti (pubblicato) — Finché è pubblicato; se chiudi l’account e lasci \"Elimina anche i miei dibattiti pubblici\" deselezionato, un dibattito pubblicato rimane pubblico con il tuo pseudonimo dismesso — Rimosso dall’accesso pubblico e con la chiave distrutta quando ne revochi la pubblicazione, o alla chiusura se hai selezionato \"Elimina anche i miei dibattiti pubblici\"",
         "Registrazioni delle risposte dei fornitori e riferimenti di ricerca — Come il dibattito cui appartengono — Come per il dibattito cui appartengono",
         "Conversazioni e casi di assistenza — [Until closed plus 12 months] — Chiavi distrutte",
         "Registri di accettazione e consenso — Durata dell'account più 6 anni — il termine di prescrizione più lungo a noi applicabile — Cancellati",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Backup [pending] — [… days] dopo la cancellazione della copia attiva — Sovrascritti"
         ]
       },
-      { kind: "p", text: "Cosa comporta effettivamente la cancellazione. I tuoi dibattiti e i dati del tuo account sono cifrati mediante chiavi specifiche per il tuo account e per ogni dibattito. La cancellazione dell'account distrugge tali chiavi, dopodiché i record cifrati non possono più essere letti da noi o da chiunque altro, e cancelliamo il record del tuo account. Definiamo questa operazione cancellazione perché tale è il suo effetto e disponiamo di una valutazione documentata che la supporta; se desideri saperne di più, chiedicelo. Vi sono tre aspetti da conoscere: il registro di controllo della sicurezza è di sola aggiunta e non viene cancellato, ma non contiene identificativi leggibili che ti riguardino; un numero limitato di dibattiti meno recenti precede il nostro attuale sistema di cifratura e, se ciò riguarda il tuo account, ti comunicheremo quale effetto produce la chiusura su di essi; le copie dei dati già inviate a un fornitore di IA sono disciplinate dalle condizioni di conservazione di tale fornitore indicate nel Registro, non dalla nostra cancellazione." },
+      { kind: "p", text: "Cosa comporta effettivamente la cancellazione. I tuoi dibattiti privati e i dati del tuo account sono cifrati mediante chiavi specifiche per il tuo account e per ogni dibattito. La cancellazione dell'account distrugge tali chiavi, dopodiché i record cifrati non possono più essere letti da noi o da chiunque altro, e cancelliamo il record del tuo account. La chiave della copia pubblica di un dibattito pubblicato viene distrutta alla cancellazione solo se hai selezionato \"Elimina anche i miei dibattiti pubblici\" (sezione 6). Definiamo questa operazione cancellazione perché tale è il suo effetto e disponiamo di una valutazione documentata che la supporta; se desideri saperne di più, chiedicelo. Vi sono tre aspetti da conoscere: il registro di controllo della sicurezza è di sola aggiunta e non viene cancellato, ma non contiene identificativi leggibili che ti riguardino; un numero limitato di dibattiti meno recenti precede il nostro attuale sistema di cifratura e, se ciò riguarda il tuo account, ti comunicheremo quale effetto produce la chiusura su di essi; le copie dei dati già inviate a un fornitore di IA sono disciplinate dalle condizioni di conservazione di tale fornitore indicate nel Registro, non dalla nostra cancellazione." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "84b65830e41ae3087bbc446a2c4d8a00c85cd6d6760719811bd448a5d925fd96",
+  sha256: "124425939ab69f473542cc2797c96be5830b8a98397f73a162047c4ccdbb4303",
   eyebrow: "INFORMATIVA SULLA PRIVACY · v3.2 · IN VIGORE DAL [DATE]",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",

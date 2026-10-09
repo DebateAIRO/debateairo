@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Planımı şimdi başlatın. 14 gün içinde cayma hakkımı kullanırsam, kullanılmış kısmı ödeyeceğimi anlıyorum: kullanılan günler ile kullanılan krediden büyük olanı.",
   "billing.checkout.continueToCard": "Kart bilgilerine devam et",
   "billing.checkout.cardTitle": "Kart bilgileri",
-  "billing.checkout.cardNote": "Kartınızı xMoney’nin güvenli formuna girersiniz. Kart numaranız hiçbir zaman sunucularımıza ulaşmaz.",
+  "billing.checkout.cardNote": "Kartınızı NETOPIA Payments’in güvenli formuna girersiniz. Kart numaranız hiçbir zaman sunucularımıza ulaşmaz.",
   "billing.checkout.subscribeAndPay": "Ödeme yükümlülüğüyle sipariş ver",
   "billing.checkout.waitingForBank": "Bankanızın onayı bekleniyor…",
   "billing.checkout.willEmail": "Bankanız onaylar onaylamaz size e-posta göndereceğiz.",

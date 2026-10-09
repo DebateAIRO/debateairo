@@ -598,7 +598,7 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     const plan = await loadMigrationPlan();
     const migrateSource = await readFile(new URL("../../packages/db/src/index.ts", import.meta.url), "utf8");
     expect(plan.manifest.order).toHaveLength(128);
-    expect(files).toEqual([...plan.manifest.order, plan.forward108.name].sort());
+    expect(files).toEqual([...plan.manifest.order, plan.forward108.name, plan.forward110.name].sort());
     for (const name of ["0104_password_only_reset.sql", "0105_backup_email_verification.sql", "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"]) {
       expect(auditMigrationReplaySafety(`migrations/${name}`, plan.sources.get(name)!.sql, { plan, migrateSource })).toEqual([]);
     }
@@ -615,5 +615,6 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     expect(ordered.indexOf("0106_known_password_mfa_recovery.sql")).toBeLessThan(ordered.indexOf("0104_account_flow_recovery_bridge.sql"));
     expect(ordered.at(-1)).toBe("0107_auth_dev_integration.sql");
     expect(plan.forward108.name).toBe("0108_preview_recovery_verified_bindings.sql");
+    expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
   });
 });

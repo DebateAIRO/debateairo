@@ -26,7 +26,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Lyhyesti",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Keräämme tilin toimintaan tarvittavat tiedot sekä sen, mitä itse päätät kirjoittaa. Kysymyksesi lähetetään Rekisterissämme luetelluille tekoälypalveluntarjoajille; niitä ei käytetä mallien kouluttamiseen. Väittelyt ovat yksityisiä, ellet julkaise niitä. Tilisi poistaminen tuhoaa tietojesi avaimet ja poistaa julkaistut väittelysi näkyvistä. Voit ottaa meihin yhteyttä osoitteessa privacy@dezbatere.ro, ja väittelyssä nimetyt henkilöt voivat pyytää sisällön poistamista ilman tiliä." }
+      { kind: "p", text: "Keräämme tilin toimintaan tarvittavat tiedot sekä sen, mitä itse päätät kirjoittaa. Kysymyksesi lähetetään Rekisterissämme luetelluille tekoälypalveluntarjoajille; niitä ei käytetä mallien kouluttamiseen. Väittelyt ovat yksityisiä, ellet julkaise niitä. Tilisi poistaminen tuhoaa yksityisten tietojesi avaimet; kun ajastat poiston, valitset, poistetaanko myös julkaistut väittelysi näkyvistä vai pysyvätkö ne julkisina käytöstä poistetulla salanimelläsi. Voit ottaa meihin yhteyttä osoitteessa privacy@dezbatere.ro, ja väittelyssä nimetyt henkilöt voivat pyytää sisällön poistamista ilman tiliä." }
     ]
   },
   {
@@ -121,7 +121,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Väittelyt ovat yksityisiä, kunnes julkaiset ne. Julkaiseminen on tietoinen, erikseen vahvistettava toimi. Julkaistu väittely näyttää nimimerkkisi, kysymyksesi kirjoittamassasi muodossa, argumenttipuun, pisteet, ratkaisun ja luottamusvälin, ja siinä on näkyvä merkintä tekoälyn tuottamasta sisällöstä. Se ei koskaan näytä sähköpostiosoitettasi, istuntotietojasi tai tilihistoriaasi. Hakukoneet voivat indeksoida julkaistuja väittelyjä." },
       { kind: "p", text: "Julkaisun peruuttaminen poistaa väittelyn Dialectical Engine-palvelusta ja tuhoaa julkisen kopiomme avaimen. Lukijoiden, hakukoneiden tai arkistojen jo tekemät kopiot eivät ole hallinnassamme, emmekä voi kutsua niitä takaisin." },
-      { kind: "p", text: "Kun poistat tilisi, poistamme kaikki julkaisemasi väittelyt julkisesta käytöstä ilman aiheetonta viivytystä ja viimeistään 30 päivän kuluessa, ellei laki velvoita meitä säilyttämään tiettyä kohdetta. [Option B — a product change; see the Terms, section 9.]" }
+      { kind: "p", text: "Kun ajoitat tilisi poistamisen, valitset, mitä julkaisemillesi väittelyille tapahtuu. Jos valitset \"Poista myös julkiset väittelyni\", poistamme jokaisen julkisesta saatavuudesta ja tuhoamme julkisen kopiomme avaimen poistamisen yhteydessä, ellei laki edellytä tietyn kohteen säilyttämistä. Jos jätät valintaruudun valitsematta, väittelyt pysyvät julkisina käytöstä poistetulla salanimellä." }
     ]
   },
   {
@@ -142,7 +142,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Kirjautumisen ja palautuksen riskisignaalit — 90 päivää, tietokannan teknisesti valvomana — Hävitetään",
         "Turvallisuuden kirjausketju — Palvelun koko elinkaaren ajan — Vain lisäyksiä salliva; IP-osoite ja user-agent ovat yksisuuntaisia tiivisteitä, eikä niitä voi lukea takaisin",
         "Väittelyn sisältö (yksityinen) — Niin kauan kuin tili on olemassa — Avaimet tuhotaan tilin sulkemisen yhteydessä, jolloin sisältöä ei voi lukea",
-        "Väittelyn sisältö (julkaistu) — Niin kauan kuin se on julkaistu ja tili on olemassa — Poistetaan julkisesta käytöstä julkaisun peruuttamisen tai tilin sulkemisen yhteydessä; avaimet tuhotaan",
+        "Väittelyn sisältö (julkaistu) — Julkaisemisen ajan; jos suljet tilisi ja jätät kohdan \"Poista myös julkiset väittelyni\" valitsematta, julkaistu väittely pysyy julkisena käytöstä poistetulla salanimelläsi — Poistetaan julkisesta käytöstä ja sen avain tuhotaan, kun peruutat julkaisun, tai tilin sulkemisen yhteydessä, jos valitsit kohdan \"Poista myös julkiset väittelyni\"",
         "Palveluntarjoajan vastaustiedot ja hakuviitteet — Yhtä kauan kuin väittely, johon ne kuuluvat — Sama",
         "Tukikeskustelut ja -tapaukset — [Until closed plus 12 months] — Avaimet tuhotaan",
         "Hyväksyntä- ja suostumustiedot — Tilin elinkaari sekä 6 vuotta — pisin meihin sovellettava vanhentumisaika — Poistetaan",
@@ -150,7 +150,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Varmuuskopiot [pending] — [… days] aktiivisen kopion poistamisen jälkeen — Korvataan uusilla tiedoilla"
         ]
       },
-      { kind: "p", text: "Mitä poistaminen tosiasiassa tekee. Väittelysi ja tilitietosi salataan tilillesi ja kullekin väittelylle ominaisilla avaimilla. Tilisi poistaminen tuhoaa nämä avaimet, minkä jälkeen me tai kukaan muukaan ei voi lukea salattuja tietueita, ja poistamme tilitietueesi. Kutsumme tätä poistamiseksi, koska sen vaikutus on tämä, ja meillä on sen tueksi dokumentoitu arviointi; jos haluat lisätietoja, kysy meiltä. Kolme huomioitavaa asiaa: turvallisuuden kirjausketju on vain lisäyksiä salliva eikä sitä poisteta, mutta se ei sisällä luettavia tunnistetietojasi; pieni määrä vanhempia väittelyjä edeltää nykyistä salausjärjestelmäämme, ja jos tämä koskee tiliäsi, kerromme, mitä tilin sulkeminen niiden osalta saa aikaan; ja tekoälypalveluntarjoajalle jo lähetettyihin tietokopioihin sovelletaan kyseisen palveluntarjoajan Rekisterissä ilmoitettuja säilytysehtoja, ei meidän tekemäämme poistamista." },
+      { kind: "p", text: "Mitä poistaminen tosiasiassa tekee. Yksityiset väittelysi ja tilitietosi salataan tilillesi ja kullekin väittelylle ominaisilla avaimilla. Tilisi poistaminen tuhoaa nämä avaimet, minkä jälkeen me tai kukaan muukaan ei voi lukea salattuja tietueita, ja poistamme tilitietueesi. Julkaistun väittelyn julkisen kopion avain tuhotaan tilin poiston yhteydessä vain, jos valitsit kohdan \"Poista myös julkiset väittelyni\" (kohta 6). Kutsumme tätä poistamiseksi, koska sen vaikutus on tämä, ja meillä on sen tueksi dokumentoitu arviointi; jos haluat lisätietoja, kysy meiltä. Kolme huomioitavaa asiaa: turvallisuuden kirjausketju on vain lisäyksiä salliva eikä sitä poisteta, mutta se ei sisällä luettavia tunnistetietojasi; pieni määrä vanhempia väittelyjä edeltää nykyistä salausjärjestelmäämme, ja jos tämä koskee tiliäsi, kerromme, mitä tilin sulkeminen niiden osalta saa aikaan; ja tekoälypalveluntarjoajalle jo lähetettyihin tietokopioihin sovelletaan kyseisen palveluntarjoajan Rekisterissä ilmoitettuja säilytysehtoja, ei meidän tekemäämme poistamista." },
       { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
     ]
   },
@@ -357,7 +357,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.2",
-  sha256: "5782a8be731aef2277b11188e5da2fd0d4b36b4521c7074d45c8d6c9c8598439",
+  sha256: "f9fe824ca296d273d1e76fb29f9dcf0ef07869475081e827de0e82d82bd07071",
   eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.2 · VOIMASSA [DATE]",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",

@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "지금 요금제를 시작합니다. 14일 이내에 철회하면 이미 사용한 부분, 즉 사용한 일수와 사용한 크레딧 중 더 큰 쪽을 지불한다는 것을 이해합니다.",
   "billing.checkout.continueToCard": "카드 정보 입력으로 계속",
   "billing.checkout.cardTitle": "카드 정보",
-  "billing.checkout.cardNote": "카드는 xMoney의 안전한 양식에 입력합니다. 카드 번호는 당사 서버에 절대 전달되지 않습니다.",
+  "billing.checkout.cardNote": "카드는 NETOPIA Payments의 안전한 양식에 입력합니다. 카드 번호는 당사 서버에 절대 전달되지 않습니다.",
   "billing.checkout.subscribeAndPay": "결제 의무가 있는 주문하기",
   "billing.checkout.waitingForBank": "은행의 확인을 기다리고 있습니다…",
   "billing.checkout.willEmail": "은행이 확인하는 즉시 이메일로 알려 드립니다.",

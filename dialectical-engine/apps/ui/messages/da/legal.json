@@ -36,7 +36,7 @@
   "legal.notice.s04.title": "Pris og betaling",
   "legal.notice.s04.body": "{product} er gratis. Der findes endnu ingen betalte abonnementer. Før et betalt abonnement starter, vil dette afsnit oplyse prisen (inklusive skatter og afgifter), hvordan og hvornår du betaler, hvornår tjenesten starter, hvordan fornyelse fungerer, og hvordan du opsiger.",
   "legal.notice.s04.bodyPaid": "De betalte planer og deres månedspriser står på prissiden. Priserne der er uden moms og afgifter; før du betaler, viser kassen den fulde pris med dit lands skat. Du betaler med kort, hver måned forud. En plan starter, så snart din bank bekræfter betalingen, og fornyes hver måned, indtil du opsiger den. Du kan opsige den når som helst under Indstillinger eller på opsigelsessiden uden at logge ind.",
-  "legal.notice.s04.payments": "Kortbetalinger behandles af xMoney. Vi ser og gemmer aldrig dit kortnummer.",
+  "legal.notice.s04.payments": "Kortbetalinger behandles af NETOPIA Payments. Vi ser og gemmer aldrig dit kortnummer.",
   "legal.notice.s04.pricingLink": "Se planer og priser",
   "legal.notice.s04.cancelLink": "Opsig en plan",
   "legal.notice.s05.title": "Fortrydelse og refusion",

@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Pokrenite moj plan odmah. Razumijem da, ako raskinem ugovor u roku od 14 dana, plaćam već iskorišteni dio: veći od iskorištenih dana ili iskorištenog kredita.",
   "billing.checkout.continueToCard": "Nastavi na podatke o kartici",
   "billing.checkout.cardTitle": "Podaci o kartici",
-  "billing.checkout.cardNote": "Karticu unosite u sigurni obrazac tvrtke xMoney. Broj vaše kartice nikada ne dolazi do naših poslužitelja.",
+  "billing.checkout.cardNote": "Karticu unosite u sigurni obrazac tvrtke NETOPIA Payments. Broj vaše kartice nikada ne dolazi do naših poslužitelja.",
   "billing.checkout.subscribeAndPay": "Narudžba s obvezom plaćanja",
   "billing.checkout.waitingForBank": "Čekamo potvrdu vaše banke…",
   "billing.checkout.willEmail": "Poslat ćemo vam e-poruku čim vaša banka potvrdi.",

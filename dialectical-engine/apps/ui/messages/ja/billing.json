@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "今すぐプランを開始します。14 日以内に撤回した場合、すでに利用した分（利用した日数と利用したクレジットのうち大きい方）を支払うことを理解しています。",
   "billing.checkout.continueToCard": "カード情報の入力へ進む",
   "billing.checkout.cardTitle": "カード情報",
-  "billing.checkout.cardNote": "カードは xMoney の安全なフォームに入力します。カード番号が当社のサーバーに届くことはありません。",
+  "billing.checkout.cardNote": "カードは NETOPIA Payments の安全なフォームに入力します。カード番号が当社のサーバーに届くことはありません。",
   "billing.checkout.subscribeAndPay": "支払義務のある注文を確定する",
   "billing.checkout.waitingForBank": "銀行の確認を待っています…",
   "billing.checkout.willEmail": "銀行の確認が取れ次第、メールでお知らせします。",

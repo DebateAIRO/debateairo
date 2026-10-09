@@ -67,7 +67,7 @@
   "billing.consent.immediateStart": "Запустити мій план зараз. Я розумію, що якщо відмовлюся від договору протягом 14 днів, то сплачу вже використану частину: більшу з використаних днів або використаного кредиту.",
   "billing.checkout.continueToCard": "Перейти до даних картки",
   "billing.checkout.cardTitle": "Дані картки",
-  "billing.checkout.cardNote": "Ви вводите картку в захищену форму xMoney. Номер вашої картки ніколи не потрапляє на наші сервери.",
+  "billing.checkout.cardNote": "Ви вводите картку в захищену форму NETOPIA Payments. Номер вашої картки ніколи не потрапляє на наші сервери.",
   "billing.checkout.subscribeAndPay": "Замовлення з обов’язком оплати",
   "billing.checkout.waitingForBank": "Чекаємо на підтвердження від вашого банку…",
   "billing.checkout.willEmail": "Ми напишемо вам, щойно банк підтвердить.",
