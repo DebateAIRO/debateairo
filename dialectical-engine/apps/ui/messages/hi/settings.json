@@ -168,6 +168,7 @@
   "settings.security.title": "सुरक्षा",
   "settings.phone.reveal": "फ़ोन नंबर दिखाएँ",
   "settings.phone.change": "फ़ोन नंबर बदलें",
+  "settings.phone.purpose": "आगे चलकर हम आपको अपने खाते में वापस आने में मदद के लिए SMS से एक कोड भेज सकते हैं, और अगर आप हमसे मदद माँगें तो हम आपको कॉल या SMS कर सकते हैं। यह एन्क्रिप्ट करके रखा जाता है; इसे कभी साझा नहीं किया जाता और न ही मार्केटिंग के लिए इस्तेमाल किया जाता है।",
   "settings.security.lastPath": "इसे हटाने से पहले साइन इन का दूसरा तरीका जोड़ें।",
   "settings.security.remove": "हटाएँ",
   "settings.security.codesRemaining": "रिकवरी कोड: {count}",

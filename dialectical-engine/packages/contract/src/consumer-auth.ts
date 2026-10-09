@@ -1,12 +1,11 @@
 import { z } from "zod";
 import { parseDeclaredRegion } from "@debateai/kernel";
-import { LegalDocumentPairSchema, SessionSchema } from "./auth-shared.js";
+import { LegalDocumentPairSchema, SessionSchema, TurnstileTokenSchema } from "./auth-shared.js";
 
 import { CatalogLocaleCodeSchema, LocaleCodeSchema } from "./locale.js";
 export { CatalogLocaleCodeSchema, LocaleCodeSchema, type CatalogLocaleCode, type LocaleCode } from "./locale.js";
 
 const EmailSchema = z.email().max(254);
-const TurnstileTokenSchema = z.string().min(1).max(2048).regex(/\S/u);
 const LocalePreferenceShape = {
   locale: CatalogLocaleCodeSchema,
   ui_locale: LocaleCodeSchema,
@@ -74,6 +73,21 @@ export const LoginContinuationResponseSchema = z.object({ status: z.literal("mfa
   available_methods: z.array(z.enum(["passkey", "totp", "recovery_code"])).min(1).max(3)
 }).strict();
 export type LoginContinuationResponse = z.infer<typeof LoginContinuationResponseSchema>;
+/**
+ * POST /v1/auth/login, first step. `turnstile_token` is the sign-in widget's proof (action
+ * "login"): the server requires it only while TURNSTILE_LOGIN_REQUIRED is on (2026-10-09).
+ */
+export const LoginBeginRequestSchema = z.object({
+  email: z.string().min(1).max(320), password: z.string().min(1).max(1024),
+  turnstile_token: TurnstileTokenSchema.optional()
+}).strict();
+export type LoginBeginRequest = z.infer<typeof LoginBeginRequestSchema>;
+/** POST /v1/auth/login, second step: bound to the first by its challenge, so it carries no proof. */
+export const LoginCompleteRequestSchema = z.object({ challenge_token: HandleSchema, code: z.string().min(1).max(64) }).strict();
+export type LoginCompleteRequest = z.infer<typeof LoginCompleteRequestSchema>;
+/** POST /v1/auth/recovery/start; `turnstile_token` (action "account-recovery") as for sign-in, under TURNSTILE_RECOVERY_REQUIRED. */
+export const RecoveryStartRequestSchema = z.object({ email: z.string().min(1).max(320), turnstile_token: TurnstileTokenSchema.optional() }).strict();
+export type RecoveryStartRequest = z.infer<typeof RecoveryStartRequestSchema>;
 
 const TransportSchema = z.enum(["ble", "cable", "hybrid", "internal", "nfc", "smart-card", "usb"]);
 const TransportsSchema = z.array(TransportSchema).max(7).refine((values) => new Set(values).size === values.length);
@@ -199,6 +213,7 @@ export type OnboardingRequirementsResponse=z.infer<typeof OnboardingRequirements
 export const consumerAuthContractSchemas = Object.freeze({
  ConsumerRecoveryProveRequestSchema,ConsumerRecoveryProofResponseSchema,RecoveryEnrollmentBeginRequestSchema,RecoveryEnrollmentCompleteRequestSchema,RecoveryEnrollmentOptionsResponseSchema,PendingOnboardingStatusRequestSchema,PendingOnboardingCompleteRequestSchema,RecoveryEvidenceStatusRequestSchema,RecoveryEvidenceCompleteRequestSchema,OnboardingRequirementsResponseSchema,
   BeginTotpEnrollmentRequestSchema, CompleteTotpEnrollmentRequestSchema, TotpEnrollmentOptionsResponseSchema, TotpEnrollmentResponseSchema, LoginContinuationResponseSchema,
+  LoginBeginRequestSchema, LoginCompleteRequestSchema, RecoveryStartRequestSchema,
   BeginPasskeyEnrollmentRequestSchema, CompletePasskeyEnrollmentRequestSchema, BeginPasskeyLoginRequestSchema, CompletePasskeyLoginRequestSchema, PasskeyEnrollmentResponseSchema,
   CatalogLocaleCodeSchema, LocaleCodeSchema, RegisterRequestSchema, ResendVerificationRequestSchema,
   RegistrationVerificationAckSchema, ResendVerificationAckSchema, VerificationAckSchema, AuthenticationResponseSchema,

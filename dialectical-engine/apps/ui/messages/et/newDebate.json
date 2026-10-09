@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "Väljalogimine ei lõppenud. Palun proovige uuesti.",
   "newDebate.room.locationBlocked": "Teie praegusest asukohast ei saa uusi väitlusi alustada. Teie väitlused jäävad lugemiseks kättesaadavaks.",
   "newDebate.room.previewTeamOnly": "Selles eelvaates on väitlused avatud ainult meeskonnale.",
+  "newDebate.room.phoneRequired": "Lisage seadetes telefoninumber või proovige mõne minuti pärast uuesti.",
   "newDebate.room.siteFull": "Tänane piir on täis. Saate siiski küsida — teie väitlus algab ise, kui piir lähtestub.",
   "newDebate.room.siteClose": "Olete tänasele piirile lähedal. See väitlus toimub siiski täies mahus; hilisemad võivad jääda ootama lähtestumiseni.",
   "newDebate.room.alreadyWaiting": "Korraga saab oodata ainult üks küsimus. Teie oma algab {time}; esitage see küsimus pärast seda.",

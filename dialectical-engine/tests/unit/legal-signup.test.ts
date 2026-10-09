@@ -1,3 +1,4 @@
+import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 import { canonicalSignup, passedTurnstile } from "../support/turnstileFixtures.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
@@ -134,7 +135,7 @@ describe("sign-up records the Terms and Privacy pairs (paid plans L3b)", () => {
   it("carries a well-formed pair from the register body to the service's source, never into the frozen mount's input", async () => {
     const inputs: unknown[] = [];
     const seen: unknown[] = [];
-    const api = buildApi({
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN,
       application: {} as AskApplication,
       turnstile: passedTurnstile,
       registration: {
@@ -154,18 +155,18 @@ describe("sign-up records the Terms and Privacy pairs (paid plans L3b)", () => {
       email: "alice@example.test", password: "correct horse battery staple",
       phone: "+40722123456", country: "RO", date_of_birth: "1990-01-01"
     };
-    const stale = await api.inject({ method: "POST", url: "/v1/auth/register", payload: { ...body, terms: undefined } });
+    const stale = await api.inject({ headers: { origin: TEST_APP_ORIGIN }, method: "POST", url: "/v1/auth/register", payload: { ...body, terms: undefined } });
     expect(stale.statusCode).toBe(400);
     expect(stale.json()).toMatchObject({ error: "AUTH_INPUT_INVALID" });
     expect(inputs).toEqual([]);
-    const fresh = await api.inject({
+    const fresh = await api.inject({ headers: { origin: TEST_APP_ORIGIN },
       method: "POST", url: "/v1/auth/register",
       payload: { ...body, terms: terms("en"), privacy: privacy("en"), locale: "en" }
     });
     expect(fresh.statusCode).toBe(202);
     expect(seen[0]).toEqual({ terms: terms("en"), privacy: privacy("en"), locale: "en" });
     // Malformed legal facts are refused before proof or identity work.
-    const malformed = await api.inject({
+    const malformed = await api.inject({ headers: { origin: TEST_APP_ORIGIN },
       method: "POST", url: "/v1/auth/register",
       payload: { ...body, terms: { version: "v2", sha256: "x" }, privacy: privacy("en"), locale: "en" }
     });

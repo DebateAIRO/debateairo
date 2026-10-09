@@ -1,3 +1,4 @@
+import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 import { canonicalSignup, passedTurnstile } from "../support/turnstileFixtures.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
@@ -62,15 +63,16 @@ async function observedAuthSource(input: Readonly<{
       return RESEND_PUBLIC_RESPONSE;
     }
   };
-  const api = buildApi({ application: inertApplication(), turnstile: passedTurnstile, registration });
+  const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: inertApplication(), turnstile: passedTurnstile, registration });
   try {
     const response = await api.inject({
       method: "POST",
       url: "/v1/auth/register",
       remoteAddress: input.remoteAddress,
-      ...(input.xForwardedFor === undefined
-        ? {}
-        : { headers: { "x-forwarded-for": input.xForwardedFor } }),
+      headers: {
+        origin: TEST_APP_ORIGIN,
+        ...(input.xForwardedFor === undefined ? {} : { "x-forwarded-for": input.xForwardedFor })
+      },
       payload: {
         ...canonicalSignup,
         email: "alice@example.test",

@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "Oturum kapatma tamamlanamadı. Lütfen tekrar deneyin.",
   "newDebate.room.locationBlocked": "Bulunduğunuz konumdan yeni tartışma başlatılamaz. Tartışmalarınızı okumaya devam edebilirsiniz.",
   "newDebate.room.previewTeamOnly": "Bu önizleme sürümündeki tartışmalar yalnızca ekibe açıktır.",
+  "newDebate.room.phoneRequired": "Lütfen Ayarlar'dan bir telefon numarası ekleyin veya birkaç dakika sonra yeniden deneyin.",
   "newDebate.room.siteFull": "Bugünkü sınıra ulaşıldı. Yine de soru sorabilirsiniz — tartışmanız sınır sıfırlandığında kendiliğinden başlar.",
   "newDebate.room.siteClose": "Bugünkü sınıra yaklaştınız. Bu tartışma yine de eksiksiz yürütülecek; sonrakiler sıfırlanmaya kadar bekleyebilir.",
   "newDebate.room.alreadyWaiting": "Aynı anda yalnızca bir soru bekleyebilir. Sizinki {time} itibarıyla başlayacak; bu soruyu ondan sonra sorun.",

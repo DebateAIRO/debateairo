@@ -34,12 +34,12 @@ it('a person without a phone starts the debate straight away',async()=>{
  expect(state.push).toHaveBeenCalledWith('/debate/fixture-debate?starting=1');
  noPhoneStep();
 });
-it('an older server that still asks for a phone gets the ordinary failure line, never a phone step',async()=>{
+it('an older server that still asks for a phone gets a plain line saying what to do, never a phone step',async()=>{
  state.create.mockRejectedValue(new ContractHttpError('UNPROCESSABLE',422,'safe','ACCOUNT_PHONE_REQUIRED'));
  await submit();
  expect(state.create).toHaveBeenCalledTimes(1);
  expect(state.push).not.toHaveBeenCalled();
- expect(document.querySelector('.error')).not.toBeNull();
+ expect(document.querySelector('.error')?.textContent).toBe('Please add a phone number in Settings, or try again in a few minutes.');
  expect(document.querySelector<HTMLTextAreaElement>('textarea')!.value).toBe('My original question');
  expect(document.querySelector<HTMLButtonElement>('.ndStart')!.disabled).toBe(false);
  noPhoneStep();

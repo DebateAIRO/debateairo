@@ -307,7 +307,8 @@ export interface ContractClient {
   checkAge(dateOfBirth: string): Promise<AgeCheckResult>;
   register(input: RegisterRequest): Promise<VerificationAck>;
   resendVerification(input: ResendVerificationRequest): Promise<VerificationAck>;
-  startRecovery(email: string): Promise<Readonly<{
+  /** `turnstileToken`: the widget proof, required by the server only under TURNSTILE_RECOVERY_REQUIRED. */
+  startRecovery(email: string, turnstileToken?: string): Promise<Readonly<{
     message: typeof RECOVERY_START_PUBLIC_MESSAGE;
   }>>;
   beginSocialStepUp(provider:'google'|'apple'|'facebook'|'x',authorization:StepUpAuthorizationRequest):Promise<{authorization_url:string}>;
@@ -328,7 +329,8 @@ export interface ContractClient {
   completePasskeyLogin(input:CompletePasskeyLoginRequest):Promise<AuthenticationResponse>;
   beginTotpEnrollment(input:BeginTotpEnrollmentRequest):Promise<TotpEnrollmentOptionsResponse>;
   completeTotpEnrollment(input:CompleteTotpEnrollmentRequest):Promise<TotpEnrollmentResponse>;
-  beginLogin(email: string, password: string): Promise<LoginContinuationResponse>;
+  /** `turnstileToken`: the sign-in widget proof, required by the server only under TURNSTILE_LOGIN_REQUIRED. */
+  beginLogin(email: string, password: string, turnstileToken?: string): Promise<LoginContinuationResponse>;
   completeLogin(challengeToken: string, code: string): Promise<AuthenticationResponse>;
   logout(): Promise<void>;
   listSessions(): Promise<SessionList>;
@@ -535,15 +537,16 @@ export function createContractClient(
       { method: "POST", body: JSON.stringify({ notice_version: SENSITIVE_DATA_NOTICE_VERSION, locale }) }
     ),
     resendVerification,
-    startRecovery: (email: string) => request(
+    startRecovery: (email: string, turnstileToken?: string) => request(
       "/v1/auth/recovery/start",
       RecoveryStartPublicResponseSchema,
-      { method: "POST", body: JSON.stringify({ email }) },
+      { method: "POST", body: JSON.stringify({ email, ...(turnstileToken === undefined ? {} : { turnstile_token: turnstileToken }) }) },
       202
     ),
     beginTotpEnrollment:(input:BeginTotpEnrollmentRequest)=>request('/v1/auth/mfa/totp/begin',TotpEnrollmentOptionsResponseSchema,{method:'POST',body:JSON.stringify(BeginTotpEnrollmentRequestSchema.parse(input))}),
     completeTotpEnrollment:(input:CompleteTotpEnrollmentRequest)=>request('/v1/auth/mfa/totp/verify',TotpEnrollmentResponseSchema,{method:'POST',body:JSON.stringify(CompleteTotpEnrollmentRequestSchema.parse(input))}),
-    beginLogin:(email:string,password:string)=>request('/v1/auth/login',LoginContinuationResponseSchema,{method:'POST',body:JSON.stringify({email,password})}),
+    // The proof is sent only when the sign-in widget gave one (TURNSTILE_LOGIN_REQUIRED, 2026-10-09).
+    beginLogin:(email:string,password:string,turnstileToken?:string)=>request('/v1/auth/login',LoginContinuationResponseSchema,{method:'POST',body:JSON.stringify({email,password,...(turnstileToken===undefined?{}:{turnstile_token:turnstileToken})})}),
     completeLogin: (challengeToken: string, code: string) => request(
       "/v1/auth/login", AuthenticationResponseSchema,
       { method: "POST", body: JSON.stringify({ challenge_token: challengeToken, code }) }

@@ -168,6 +168,7 @@
   "settings.security.title": "Turvallisuus",
   "settings.phone.reveal": "Näytä puhelinnumero",
   "settings.phone.change": "Vaihda puhelinnumero",
+  "settings.phone.purpose": "Myöhemmin voimme lähettää sinulle tekstiviestillä koodin, joka auttaa sinua pääsemään takaisin tilillesi, ja jos pyydät meiltä apua, voimme soittaa sinulle tai lähettää tekstiviestin. Tallennetaan salattuna; numeroa ei koskaan jaeta eikä käytetä markkinointiin.",
   "settings.security.lastPath": "Lisää toinen kirjautumistapa ennen tämän poistamista.",
   "settings.security.remove": "Poista",
   "settings.security.codesRemaining": "Palautuskoodit: {count}",

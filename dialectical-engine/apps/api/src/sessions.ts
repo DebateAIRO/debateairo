@@ -27,7 +27,7 @@ import {
   type TokenKind
 } from "@debateai/crypto";
 import { AuthFlowError, consumerPasswordUsable, storedArgon2EnvelopeNotOverPolicy } from "./registration.js";
-import { MfaVerificationLimiter } from "./mfa.js";
+import { MfaVerificationLimiter, rateLimitSourceScope } from "./mfa.js";
 
 import { staffTokenHash } from "./staff/access.js";
 
@@ -94,7 +94,11 @@ export interface SessionApplication {
   authenticateErasureStatus?(sessionToken:string,source:AuthSourceContext):
     Promise<AuthenticatedSession|null>;
   verifyCsrf(session: AuthenticatedSession, suppliedToken: string): boolean;
-  beginLogin(input: Readonly<{ email: string; password: string }>, source: AuthSourceContext): Promise<Readonly<{
+  /**
+   * `proof` (TURNSTILE_LOGIN_REQUIRED) runs after the per-source budget and before the
+   * per-account budget and the password check; whatever it throws is the answer.
+   */
+  beginLogin(input: Readonly<{ email: string; password: string }>, source: AuthSourceContext, proof?: () => Promise<void>): Promise<Readonly<{
     status: "mfa_required";
     challengeToken: string;
     availableMethods?: readonly ("passkey"|"totp"|"recovery_code")[];
@@ -212,6 +216,23 @@ function deriveSessionPurposeKey(root: Uint8Array, label: SessionKdfLabel): Buff
   return createHmac("sha256", root).update(label, "utf8").digest();
 }
 
+/**
+ * Auth API hardening 2026-10-09: every route family keeps its account counters
+ * in its own table, so a flood on one family (say, enrollment ceremonies)
+ * cannot evict the counters of another (password sign-in). The per-source
+ * budget stays one table shared by every family.
+ */
+type SessionRateFamily = "password-login" | "passkey-login" | "social" | "recovery" | "enrollment" | "account-security";
+const CEREMONY_RATE_FAMILY: Readonly<Record<ConsumerCeremonyOperation, SessionRateFamily>> = Object.freeze({
+  LOGIN_BEGIN: "passkey-login", LOGIN_COMPLETE: "passkey-login",
+  SOCIAL_BEGIN: "social", SOCIAL_CALLBACK: "social", SOCIAL_SIGNUP: "social",
+  RECOVERY_PROVE: "recovery", RECOVERY_BEGIN: "recovery", RECOVERY_COMPLETE: "recovery",
+  ENROLLMENT_BEGIN: "enrollment", ENROLLMENT_COMPLETE: "enrollment",
+  ONBOARDING_STATUS: "enrollment", ONBOARDING_COMPLETE: "enrollment",
+  STEP_UP_BEGIN: "account-security", STEP_UP_COMPLETE: "account-security",
+  SECURITY_CODES: "account-security", AUTH_METHOD_REMOVE: "account-security"
+});
+
 function sameHash(left: string, right: string): boolean {
   const leftBytes = Buffer.from(left, "utf8");
   const rightBytes = Buffer.from(right, "utf8");
@@ -302,13 +323,20 @@ export class SessionService implements SessionApplication {
       .update("debateai:login-rate-key:v1\0", "utf8").update(input, "utf8").digest("hex");
   }
 
+  /** One IPv4 address or one IPv6 /64: the unit every per-source budget and scope counts. */
   private sourceIp(source: AuthSourceContext): string {
     const ip = typeof source?.ip === "string" ? source.ip.trim() : "";
-    return (ip === "" ? "unknown" : ip).slice(0, 64);
+    return rateLimitSourceScope((ip === "" ? "unknown" : ip).slice(0, 64));
   }
 
-  private async requireRateBudget(key: string, source: AuthSourceContext, now: Date): Promise<void> {
-    const decision = this.limiter.decide(key, this.sourceIp(source), now);
+  private async requireRateBudget(key: string, source: AuthSourceContext, now: Date, family: SessionRateFamily,
+    proof?: () => Promise<void>): Promise<void> {
+    // Source first (a spray across many accounts meets one ceiling), then the proof, then the
+    // account: a caller without a proof never spends the account's budget, so bots cannot use
+    // the temporary lock to keep its owner out.
+    const sourceDecision = this.limiter.decideSource(this.sourceIp(source), now);
+    if (sourceDecision.allowed && proof !== undefined) await proof();
+    const decision = sourceDecision.allowed ? this.limiter.decideAccount(key, now, family) : sourceDecision;
     if (decision.allowed) return;
     if (decision.auditRefusal) {
       await this.dependencies.repository.recordLoginFailure({
@@ -369,7 +397,8 @@ export class SessionService implements SessionApplication {
 
   async beginLogin(
     input: Readonly<{ email: string; password: string }>,
-    source: AuthSourceContext
+    source: AuthSourceContext,
+    proof?: () => Promise<void>
   ): Promise<Readonly<{ status: "mfa_required"; challengeToken: string; availableMethods:readonly ("passkey"|"totp"|"recovery_code")[] }>> {
     const now = this.now();
     let normalizedEmail = "";
@@ -379,7 +408,7 @@ export class SessionService implements SessionApplication {
       // Keep the same one-Argon verification shape with the process dummy.
     }
     const rateKey = this.challengeRateKey(normalizedEmail || "invalid-email");
-    await this.requireRateBudget(rateKey, source, now);
+    await this.requireRateBudget(rateKey, source, now, "password-login", proof);
     try {
       const identity = normalizedEmail === "" ? null : await this.dependencies.repository.findLoginIdentity(
         createEmailBlindIndex(this.dependencies.blindIndexKey, normalizedEmail)
@@ -449,7 +478,7 @@ export class SessionService implements SessionApplication {
   consumerProducer():ConsumerSessionProducer {
     return Object.freeze({
       admit:async(operation:ConsumerCeremonyOperation,scope:string,source:AuthSourceContext)=>{
-        await this.requireRateBudget(this.challengeRateKey(`consumer:${operation}:${scope==='discoverable'?`${scope}:${this.sourceIp(source)}`:scope}`),source,this.now());
+        await this.requireRateBudget(this.challengeRateKey(`consumer:${operation}:${scope==='discoverable'?`${scope}:${this.sourceIp(source)}`:scope}`),source,this.now(),CEREMONY_RATE_FAMILY[operation]);
         return Object.freeze({retentionKey:`sha256:${this.challengeRateKey(`consumer:retention:${this.sourceIp(source)}`)}`,
           challengeCapacity:this.dependencies.mfaPolicy.verificationLimits.capacity,
           challengesPerScope:this.dependencies.mfaPolicy.verificationLimits.perEnrollment});
@@ -505,7 +534,7 @@ export class SessionService implements SessionApplication {
     const now = this.now();
     const challengeTokenHash = safeTokenHash("login-challenge", input.challengeToken);
     const rateKey = this.challengeRateKey(challengeTokenHash ?? "invalid-challenge");
-    await this.requireRateBudget(rateKey, source, now);
+    await this.requireRateBudget(rateKey, source, now, "password-login");
     try {
       const challenge = challengeTokenHash === null ? null
         : await this.dependencies.repository.readLoginChallenge(challengeTokenHash);
@@ -575,7 +604,7 @@ export class SessionService implements SessionApplication {
         });
         throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
       }
-      this.limiter.clearEnrollment(rateKey);
+      this.limiter.clearEnrollment(rateKey, "password-login");
       const result=await this.consumerProducer().committed({...material,bindingHash,sessionBindingContext:context,occurredAt:now},challenge,source);
       return Object.freeze(result);
     } catch (error) {
@@ -692,7 +721,7 @@ export class SessionService implements SessionApplication {
     try {
       identity = await this.dependencies.repository.readStepUpIdentity(input.session.userId);
       const rateKey = this.challengeRateKey(`step-up:${input.session.userId}`);
-      const decision = this.limiter.decide(rateKey, this.sourceIp(source), now);
+      const decision = this.limiter.decide(rateKey, this.sourceIp(source), now, "account-security");
       if (!decision.allowed) {
         if (decision.auditRefusal) {
           await this.dependencies.repository.recordStepUpFailure({
@@ -781,7 +810,7 @@ export class SessionService implements SessionApplication {
                 } })
       }) : true;
       if (!rotated) throw new AuthFlowError("AUTH_CREDENTIALS_INVALID");
-      this.limiter.clearEnrollment(rateKey);
+      this.limiter.clearEnrollment(rateKey, "account-security");
       return Object.freeze({
         sessionToken: replacementToken,
         csrfToken: replacementCsrf,

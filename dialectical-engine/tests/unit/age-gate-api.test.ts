@@ -112,9 +112,9 @@ describe("POST /v1/auth/register behind the age gate", () => {
   it("passes an adult through with the canonical public acknowledgement", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: TODAY });
     const { app, calls } = registrationSpy();
-    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app });
+    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app, allowedOrigin: TEST_APP_ORIGIN });
     try {
-      const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: body("2008-09-28") });
+      const response = await api.inject({ method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN }, payload: body("2008-09-28") });
       expect(response.statusCode).toBe(202);
       expect(response.json()).toEqual({ ...REGISTRATION_PUBLIC_RESPONSE, retry_after_seconds: 60 });
       expect(response.body).toBe(
@@ -169,10 +169,10 @@ describe("POST /v1/auth/register behind the age gate", () => {
 
   it("records the edge country when one is reported, and nothing when it is unknown", async () => {
     const { app, sources } = registrationSpy();
-    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app });
+    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app, allowedOrigin: TEST_APP_ORIGIN });
     try {
-      await api.inject({ method: "POST", url: "/v1/auth/register", headers: { "cf-ipcountry": "RO" }, payload: body("1990-01-01") });
-      await api.inject({ method: "POST", url: "/v1/auth/register", headers: { "cf-ipcountry": "XX" }, payload: body("1990-01-01") });
+      await api.inject({ method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN, "cf-ipcountry": "RO" }, payload: body("1990-01-01") });
+      await api.inject({ method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN, "cf-ipcountry": "XX" }, payload: body("1990-01-01") });
       expect(sources.map((source) => source.countryCode)).toEqual(["RO", undefined]);
       expect(sources[1]).not.toHaveProperty("countryCode");
     } finally {
@@ -182,11 +182,11 @@ describe("POST /v1/auth/register behind the age gate", () => {
 
   it("never reaches registration while the lockout cookie is set", async () => {
     const { app, calls } = registrationSpy();
-    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app });
+    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app, allowedOrigin: TEST_APP_ORIGIN });
     try {
       const response = await api.inject({
         method: "POST", url: "/v1/auth/register",
-        headers: { cookie: `${AGE_REFUSAL_COOKIE_NAME}=refused` }, payload: body("1990-01-01")
+        headers: { origin: TEST_APP_ORIGIN, cookie: `${AGE_REFUSAL_COOKIE_NAME}=refused` }, payload: body("1990-01-01")
       });
       expect(response.statusCode).toBe(403);
       expect(response.json()).toEqual({ error: "AUTH_AGE_REFUSED", message: "AUTH_AGE_REFUSED" });
@@ -199,9 +199,9 @@ describe("POST /v1/auth/register behind the age gate", () => {
   it("refuses 18 tomorrow at register itself with 403 and the lockout cookie, never reaching the service", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: TODAY });
     const { app, calls } = registrationSpy();
-    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app });
+    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app, allowedOrigin: TEST_APP_ORIGIN });
     try {
-      const response = await api.inject({ method: "POST", url: "/v1/auth/register", payload: body("2008-09-29") });
+      const response = await api.inject({ method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN }, payload: body("2008-09-29") });
       expect(response.statusCode).toBe(403);
       expect(response.json()).toEqual({ error: "AUTH_AGE_REFUSED", message: "AUTH_AGE_REFUSED" });
       expect(setCookies(response)).toContain(LOCKOUT);
@@ -217,10 +217,10 @@ describe("POST /v1/auth/register behind the age gate", () => {
     ["a date in the wrong shape", { date_of_birth: "14/03/1998" }]
   ])("treats %s as invalid input and never reaches the service", async (_label, extra) => {
     const { app, calls } = registrationSpy();
-    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app });
+    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app, allowedOrigin: TEST_APP_ORIGIN });
     try {
       const response = await api.inject({
-        method: "POST", url: "/v1/auth/register",
+        method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN },
         payload: { email: "alice@example.test", password: "password-123", recovery_email: "recovery@example.test", ...extra }
       });
       expect(response.statusCode).toBe(400);

@@ -170,6 +170,7 @@
   "settings.security.title": "Zabezpečení",
   "settings.phone.reveal": "Zobrazit telefon",
   "settings.phone.change": "Změnit telefon",
+  "settings.phone.purpose": "V budoucnu vám můžeme poslat kód v SMS, který vám pomůže znovu se dostat do účtu, a pokud nás požádáte o pomoc, můžeme vám zavolat nebo napsat SMS. Uloženo šifrovaně; nikdy se nesdílí ani nepoužívá k marketingu.",
   "settings.security.lastPath": "Před odebráním této metody přidejte jiný způsob přihlášení.",
   "settings.security.remove": "Odebrat",
   "settings.security.codesRemaining": "Obnovovací kódy: {count}",

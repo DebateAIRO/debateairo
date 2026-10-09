@@ -169,6 +169,7 @@
   "settings.security.title": "Seguridad",
   "settings.phone.reveal": "Mostrar teléfono",
   "settings.phone.change": "Cambiar teléfono",
+  "settings.phone.purpose": "Más adelante, podríamos enviarle un código por SMS para ayudarle a recuperar el acceso a su cuenta y, si nos pide ayuda, podemos llamarle o escribirle por SMS. Se guarda cifrado; nunca se comparte ni se usa con fines de marketing.",
   "settings.security.lastPath": "Añade otro método de acceso antes de eliminar este.",
   "settings.security.remove": "Quitar",
   "settings.security.codesRemaining": "Códigos de recuperación: {count}",

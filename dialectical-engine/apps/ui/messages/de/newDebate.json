@@ -111,6 +111,7 @@
   "newDebate.legalGate.signOutFailed": "Die Abmeldung wurde nicht abgeschlossen. Bitte versuchen Sie es erneut.",
   "newDebate.room.locationBlocked": "Von Ihrem aktuellen Standort aus können keine neuen Debatten gestartet werden. Ihre Debatten können Sie weiterhin lesen.",
   "newDebate.room.previewTeamOnly": "Debatten in dieser Vorschauversion stehen nur dem Team offen.",
+  "newDebate.room.phoneRequired": "Bitte fügen Sie in den Einstellungen eine Telefonnummer hinzu oder versuchen Sie es in ein paar Minuten erneut.",
   "newDebate.room.siteFull": "Das heutige Limit ist erreicht. Sie können trotzdem fragen – Ihre Debatte startet von selbst, sobald das Limit zurückgesetzt wird.",
   "newDebate.room.siteClose": "Sie sind nah am heutigen Limit. Diese Debatte läuft trotzdem vollständig; spätere müssen womöglich bis zum Zurücksetzen warten.",
   "newDebate.room.alreadyWaiting": "Es kann immer nur eine Frage warten. Ihre startet um {time}; stellen Sie diese danach.",

@@ -7,10 +7,46 @@ export function deploymentHostname(publicAppUrl) {
   }
   return url.hostname;
 }
+/**
+ * The closed set of widget actions. Sign-in and the three public recovery starts were added on
+ * 2026-10-09 (auth API hardening); each proof is bound to exactly one of them.
+ */
+export const TURNSTILE_ACTIONS = Object.freeze(["signup", "resend-verification", "login", "password-reset", "mfa-recovery", "account-recovery"]);
+/**
+ * Auth API hardening 2026-10-09: the passed-proof memory is capped per action family — sign-up
+ * (sign-up and resend), sign-in, recovery (the three public starts) — so a flood of solved proofs
+ * for one family can never refuse the others.
+ */
+export const TURNSTILE_ACTION_FAMILIES = Object.freeze({
+  signup: "sign-up", "resend-verification": "sign-up", login: "sign-in",
+  "password-reset": "recovery", "mfa-recovery": "recovery", "account-recovery": "recovery"
+});
+export const TURNSTILE_PROOF_MEMORY_PER_FAMILY = 10_000;
+const PROOF_HOLD_MS = 300_000;
+/**
+ * Single-use memory of proof digests, shared by the API verifier and the relay. `reserve` answers
+ * "held" when any family still holds the digest (a proof is single-use across every action), "full"
+ * when this action's family holds its cap of proofs all still inside their window, else reserves it.
+ */
+export function createProofMemory(capPerFamily = TURNSTILE_PROOF_MEMORY_PER_FAMILY) {
+  const families = new Map(Object.values(TURNSTILE_ACTION_FAMILIES).map(family => [family, new Map()]));
+  const memoryFor = action => families.get(TURNSTILE_ACTION_FAMILIES[action]);
+  return Object.freeze({
+    reserve(digest, action, now) {
+      const memory = memoryFor(action);
+      for (const [held, until] of memory) if (until <= now) memory.delete(held);
+      for (const other of families.values()) { const until = other.get(digest); if (until !== undefined && until > now) return "held"; }
+      if (memory.size >= capPerFamily) return "full";
+      memory.set(digest, now + PROOF_HOLD_MS);
+      return "reserved";
+    },
+    release(digest, action) { memoryFor(action).delete(digest); }
+  });
+}
 export function validProof(input) {
   return input !== null && typeof input === "object" && typeof input.token === "string"
     && input.token.length >= 1 && input.token.length <= 2048 && /\S/u.test(input.token)
-    && (input.action === "signup" || input.action === "resend-verification");
+    && TURNSTILE_ACTIONS.includes(input.action);
 }
 export function siteverifyOutcome(value, action, hostname, now = Date.now()) {
   if (!value || typeof value !== "object" || typeof value.success !== "boolean") return "unavailable";

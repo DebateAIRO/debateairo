@@ -89,7 +89,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [stepUpStatus, setStepUpStatus] = useState<SocialStepUpStatusResponse | null>(null);
     const [flowExpiry, setFlowExpiry] = useState<string | null>(null);
     const [authenticated, setAuthenticated] = useState(false);
-    // Set once this flow's own MFA set-up has signed the person in: the "don't get locked out" card comes first.
+    // Set once this flow's own MFA set-up has signed the person in: the "don't get locked out" card comes first,
+    // still under the set-up heading (the flow's kind is cleared by then).
     const [secured, setSecured] = useState(false);
     const [privacyAccepted, setPrivacyAccepted] = useState(false);
     const [termsAccepted, setTermsAccepted] = useState(false);
@@ -377,7 +378,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         return <EmailPendingScreen email={pending} retryAfterSeconds={60} client={client} catalog={catalog} locale={uiLocale} turnstile={turnstile} onDifferentEmail={() => window.location.assign('/sign-up')}/>;
     const methods = kind === 'stepup' ? stepUpStatus?.available_methods ?? [] : loginStatus?.available_methods ?? [];
     const codeFormatError = !recoveryMode && (codeIncomplete || !readSixDigitCode(code).valid);
-    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
+    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' || secured ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
  {error ? <div className="authAlert" role="alert">{error}</div> : null}
  {returnToQuestion && !stepUpResult && !backup ? <a className="authPrimary" href="/new">{t(catalog, 'auth.continue')}</a> : null}
  {backup ? <div><EphemeralCodes codes={[backup]} catalog={catalog}/><button type="button" className="authPrimary" onClick={() => {
@@ -452,7 +453,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                         attempt.current.edited();
                     }}>{recoveryMode ? t(catalog, "auth.login.useAuthenticatorCode") : t(catalog, "auth.login.useRecoveryCode")}</button> : null}</> : null}
  </div> : null}
- {!token && !stepUpResult && !backup && !busy ? <a href="/login">{t(catalog, "auth.login.backToSignIn")}</a> : null}
+ {!token && !stepUpResult && !backup && !busy && !secured ? <a href="/login">{t(catalog, "auth.login.backToSignIn")}</a> : null}
  {policyOpen ? <PrivacyPolicyModal open mode="consent" onClose={() => setPolicyOpen(false)} onAcknowledge={() => {
                 setPrivacyAccepted(true);
                 setPolicyOpen(false);

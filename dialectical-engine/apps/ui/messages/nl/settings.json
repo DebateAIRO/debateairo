@@ -168,6 +168,7 @@
   "settings.security.title": "Beveiliging",
   "settings.phone.reveal": "Telefoonnummer tonen",
   "settings.phone.change": "Telefoonnummer wijzigen",
+  "settings.phone.purpose": "Later sturen we u mogelijk een code per sms om u te helpen weer in uw account te komen, en als u ons om hulp vraagt, kunnen we u bellen of een sms sturen. Versleuteld opgeslagen; nooit gedeeld en nooit gebruikt voor marketing.",
   "settings.security.lastPath": "Voeg een andere aanmeldmethode toe voordat je deze verwijdert.",
   "settings.security.remove": "Verwijderen",
   "settings.security.codesRemaining": "Herstelcodes: {count}",
