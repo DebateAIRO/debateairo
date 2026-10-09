@@ -40,6 +40,15 @@ describe('preview lifecycle systemd templates', () => {
     expect(Object.keys(value).filter(key => /ExecStart|Requires|BindsTo|Requisite/.test(key))).toEqual([]);
   });
 
+  it.each(['debateai-preview-api.service.d', 'debateai-preview-ui.service.d'])('%s: the release drop-in repeats exactly the restart settings of 50-lifecycle.conf', async folderName => {
+    const { LIFECYCLE_RESTART } = await import('../../deploy/' + 'preview-lifecycle/v1/prestart.mjs');
+    const value = parse(unit(`${folderName}/50-lifecycle.conf`));
+    const restartKeys = Object.keys(value).filter(key => /^\[(Unit|Service)\](Restart|StartLimit|OnFailure|TimeoutStart)/.test(key));
+    const repeated = [...LIFECYCLE_RESTART.unit.map(([key, v]: string[]) => [`[Unit]${key}`, v]), ...LIFECYCLE_RESTART.service.map(([key, v]: string[]) => [`[Service]${key}`, v])];
+    expect(repeated.map(([key]) => key).sort()).toEqual(restartKeys.sort());
+    for (const [key, v] of repeated) expect(value[key!]).toEqual([v]);
+  });
+
   it('API: hard dependencies become soft (Wants + After), never Requires', () => {
     const value = parse(unit('debateai-preview-api.service.d/50-lifecycle.conf'));
     expect(value['[Unit]Wants']!.join(' ').split(' ').sort()).toEqual([...SUPPORTING].sort());

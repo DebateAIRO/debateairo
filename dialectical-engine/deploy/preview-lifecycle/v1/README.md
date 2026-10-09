@@ -168,6 +168,11 @@ unit files before installing; nothing else names them.
    find /opt/debateai-v3-preview/operator/lifecycle-v1 -type f -exec chmod 0644 {} +
    ```
 
+   When updating an installed operator folder (for example to pick up a fix), copy both
+   folders from the same commit, never one alone: the lifecycle files import shared functions
+   from `preview-auth-dev` (for example `release-guard.mjs` imports `operatorManifestSha256`
+   from `source-manifest.mjs`), so a mix of commits refuses to load.
+
 2. **Root config folder, state folder, alert recipient and owner list.**
 
    In plain words: the failure email goes to one address. You type it once, into a root-only
@@ -331,6 +336,21 @@ unit files before installing; nothing else names them.
    is the last pre-step. The existing release drop-ins stay in place (they still carry
    User/Group/sandboxing); only their ExecStart is superseded.
 
+   The generated drop-in also repeats the restart settings of `50-lifecycle.conf`
+   (`Restart=on-failure`, `RestartMode=direct`, `RestartSec=30`, `TimeoutStartSec=300`,
+   `StartLimitIntervalSec=900`, `StartLimitBurst=4`, `OnFailure=debateai-preview-alert@%n.service`).
+   Plain words: several older drop-ins on the server say `Restart=no`, and they sort after `50-`,
+   so on their own they would switch the automatic restart off again. The ten-z drop-in sorts
+   last, so its copy wins. `tests/unit/preview-lifecycle-units.test.ts` keeps the two lists equal.
+
+   Exactly these keys are set by the generated drop-in, nothing else: `[Unit]`
+   `StartLimitIntervalSec`, `StartLimitBurst`, `OnFailure` (added to the list); `[Service]`
+   `Restart`, `RestartMode`, `RestartSec`, `TimeoutStartSec`, `WorkingDirectory`, one more
+   `ExecStartPre` (appended last), and `ExecStart` (reset, then set). It sets or resets no
+   sandbox or identity key, so whatever the older drop-ins set for `User`, `Group`, `ProcSubset`,
+   `RestrictAddressFamilies` (for example `AF_NETLINK`), `RestrictSUIDSGID`, `SystemCallFilter`,
+   `Environment`/`EnvironmentFile` and the rest stays in effect exactly as it was.
+
 7. **Soften the API's hard dependencies.** systemd cannot remove a `Requires=` from a drop-in.
    Find where it is declared and change it there (keep a root-only copy of the original):
 
@@ -381,8 +401,17 @@ unit files before installing; nothing else names them.
    `OnFailure=debateai-preview-alert@…`, the prestart as the **last** `ExecStartPre` (run through
    `/usr/bin/env -i PATH=…`, so it inherits none of the service's environment or secrets), and
    `--plan /opt/debateai-v3-preview/artifacts/lifecycle-current/…`.
-   If an older drop-in still sets `Restart=no` (it would win over `50-`), move that one setting
-   out of it. If `ExecStartPre` lists older one-time steps, review whether they should run on every
+   If `Restart` still shows `no`, the ten-z drop-in is missing or stale: regenerate it with
+   `dropin` (step 6) and `daemon-reload`. Do not edit the older drop-ins for this.
+   Older drop-ins could still set restart keys the release drop-in does not repeat. Check them:
+
+   ```sh
+   systemctl show -p RestartPreventExitStatus,RestartForceExitStatus,SuccessExitStatus,StartLimitAction,RestartSteps,RestartMaxDelayUSec debateai-preview-api debateai-preview-ui
+   ```
+
+   Expect the exit-status lists empty, `StartLimitAction=none`, `RestartSteps=0`; anything else
+   came from an older drop-in: show it to the owner before going on.
+   If `ExecStartPre` lists older one-time steps, review whether they should run on every
    restart; to drop them, add `ExecStartPre=` (empty) as the first `ExecStartPre` line of the
    generated release drop-in. Then:
 
