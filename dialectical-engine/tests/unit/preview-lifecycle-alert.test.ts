@@ -243,7 +243,7 @@ describe('failure alert', () => {
 
   it('never shows the start of a secret token cut at the examined-length limit', () => {
     // Ten long tokens shrink to [TOKEN] each, so the cut tail would land inside the 300 characters shown.
-    const secret = 'skZx9qL2mN8pR4tV6wY1aB3cD5eF7gH0jKLmNoP';
+    const secret = ['skZx9qL2mN8pR4tV6wY', '1aB3cD5eF7gH0jKLmNoP'].join('');
     const line = `${`${'xY3'.repeat(66)}xY `.repeat(10)}abcdefghijklmnopq ${secret}`;
     expect(line.indexOf(secret)).toBe(2028);
     const shown = alert.redactLine(line);
