@@ -1,7 +1,7 @@
 import { PostgresPasswordResetRepository } from '../../packages/db/src/password-reset.js';
 import { PostgresBackupEmailRepository,PostgresMfaRecoveryRepository } from '../../packages/db/src/email-mfa-recovery.js';
 import type { AuditContextHasher } from '@debateai/crypto';
-import { readFile,cp,mkdtemp,mkdir,writeFile,rm } from 'node:fs/promises';
+import { readFile,readdir,cp,mkdtemp,mkdir,writeFile,rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -17,6 +17,7 @@ import { startTestDatabase,type TestDatabase } from '../support/testDatabase.js'
 import { importHistoricalRegisterFixture,registerFixtureRow } from '../support/registerFixtures.js';
 import { describe, expect, it } from 'vitest';
 import { contractInventory } from '@debateai/contract';
+import { AUTH_DB_BATCH_MIGRATION } from '../../packages/db/src/migration-forward-auth-db-batch.js';
 // Losing schema/route inventories silently removes strict generated recovery contracts.
 describe('combined current authentication and preview recovery contract',()=>{
  it('inventories strict recovery schemas beside current authentication routes',()=>{
@@ -253,7 +254,10 @@ describe('closed original107 append and native atomicity',()=>{
    await Promise.all([migrate(db.pool),migrate(second)]);
    expect((await db.pool.query("SELECT count(*)::int n FROM public.debateai_schema_migration WHERE name='0108_preview_recovery_verified_bindings.sql'")).rows[0].n).toBe(1);
    expect((await db.pool.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n).toBe(1);
-   expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name<>'0108_preview_recovery_verified_bindings.sql' ORDER BY name")).rows).toEqual(before);
+   // The forward chain after 0108 (migrations/lineage/README.md) is appended exactly once too, with its own receipt.
+   expect((await db.pool.query('SELECT count(*)::int n FROM public.debateai_schema_migration WHERE name=$1',[AUTH_DB_BATCH_MIGRATION])).rows[0].n).toBe(1);
+   expect((await db.pool.query('SELECT source_name FROM public.debateai_schema_migration_step')).rows).toEqual([{source_name:AUTH_DB_BATCH_MIGRATION}]);
+   expect((await db.pool.query("SELECT * FROM public.debateai_schema_migration WHERE name<>'0108_preview_recovery_verified_bindings.sql' AND name<>$1 ORDER BY name",[AUTH_DB_BATCH_MIGRATION])).rows).toEqual(before);
   }finally{await second.end();await db.stop();}
  },120000);
  it('a late108 refusal rolls the function replacement/ledger/receipt back atomically',async()=>{
@@ -274,7 +278,8 @@ it('source/manifest/old recipe drift refuses from a bounded source copy before a
  const root=await mkdtemp(join(tmpdir(),'preview-source-108-'));
  try{
   await mkdir(join(root,'packages/db/src'),{recursive:true});
-  for(const name of ['migration-lineage.ts','migration-forward108.ts'])await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
+  // Every lineage module (the forward chain after 0108 included) is part of the bounded source copy.
+  for(const name of (await readdir(new URL('../../packages/db/src/',import.meta.url))).filter(entry=>/^migration-.*\.ts$/u.test(entry)))await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
   await cp(new URL('../../migrations',import.meta.url),join(root,'migrations'),{recursive:true});
   const script=join(root,'probe.mts');await writeFile(script,`import {loadMigrationPlan} from './packages/db/src/migration-lineage.ts'; await loadMigrationPlan();`);
   const run=()=>promisify(execFile)(process.execPath,['--import','tsx',script],{cwd:process.cwd(),timeout:30000,maxBuffer:100000});

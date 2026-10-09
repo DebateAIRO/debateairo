@@ -99,7 +99,8 @@ export function RecoveryFlow({ catalog, locale, client = contractClient, onAuthe
             setToken('');
             setCode('');
             setProof(result);
-            setBackup(result.replacement_recovery_code);
+            // Since 2026-10-09 a used code is never refilled, so the API sends no replacement; an older API still might.
+            setBackup(result.replacement_recovery_code ?? null);
             clearStoredSupportConversation();
             window.dispatchEvent(new Event('debateai:staff-session-ended'));
         }
