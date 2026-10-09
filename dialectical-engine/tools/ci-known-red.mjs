@@ -2,7 +2,8 @@
 // tools/ci-known-red.mjs — B31 recorded known-red CI gate.
 //
 // Runs `pnpm exec vitest run <dirs…> --reporter=json` (an `@<file>` argument expands to the test files
-// that file lists, see expandTargets) and compares the failing full test
+// that file lists — paths, one-directory globs, and `!` exclusions that are printed on every run; see
+// expandTargets) and compares the failing full test
 // names against tests/ci-known-red.txt:
 //   - a failure that is NOT on the list        -> printed, exit 1 (a NEW failure)
 //   - a failure that IS on the list            -> counted as "known red"
@@ -21,7 +22,7 @@
 //
 // Plain Node ESM, no dependencies beyond the Node standard library.
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -114,25 +115,78 @@ export function decide({ failed, allowlist, ran, flaky = [] }) {
   return { newFailures, knownFailures, flakyFailures, stale, exitCode: newFailures.length > 0 ? 1 : 0 };
 }
 
+/** A list line naming every test file of ONE directory: `tests/<dir>/*.test.ts` (or `.test.tsx`), nothing looser. */
+const DIRECTORY_GLOB_PATTERN = /^(tests\/[\w.-]+)\/\*(\.test\.tsx?)$/;
+
 /**
  * Expand `@<list file>` arguments into the test files that file names (one product-relative path per line, `#`
  * comments and blank lines ignored). A curated suite such as the auth integration list
  * (tests/ci-integration-auth.txt) is then gated by name, file by file. A listed path that does not look like a test
  * file or does not exist is returned in `invalid`, so a typo can never shrink the suite in silence.
+ *
+ * Two more line forms (2026-10-09, tests/ci-integration-all.txt):
+ *   - `tests/<dir>/*.test.ts` names every test file of that one directory, sorted, so a new suite joins without an
+ *     edit. A glob that matches no test file is `invalid` (a moved directory must not shrink the run to nothing).
+ *   - `!<path>` leaves out a file the SAME list named. The file comes back if another argument names it. Whatever
+ *     stays left out is returned in `excluded` (path and list) for the caller to print, so an exclusion is never
+ *     silent; a `!` line naming no file of its own list is `invalid`, so a stale exclusion cannot linger.
  */
-export function expandTargets(args, readText = (path) => readFileSync(resolve(PRODUCT_ROOT, path), "utf8"), exists = (path) => existsSync(resolve(PRODUCT_ROOT, path))) {
+export function expandTargets(
+  args,
+  readText = (path) => readFileSync(resolve(PRODUCT_ROOT, path), "utf8"),
+  exists = (path) => existsSync(resolve(PRODUCT_ROOT, path)),
+  listDirectory = (path) => (existsSync(resolve(PRODUCT_ROOT, path)) ? readdirSync(resolve(PRODUCT_ROOT, path)) : [])
+) {
   const targets = [];
   const invalid = [];
+  const exclusions = [];
   for (const arg of args) {
     if (!arg.startsWith("@")) { targets.push(arg); continue; }
-    for (const raw of readText(arg.slice(1)).split("\n")) {
+    const list = arg.slice(1);
+    const named = [];
+    const leftOut = [];
+    for (const raw of readText(list).split("\n")) {
       const line = raw.trim();
       if (line === "" || line.startsWith("#")) continue;
-      if (!TEST_FILE_PATTERN.test(line) || !exists(line)) invalid.push(line);
-      else targets.push(line);
+      const glob = DIRECTORY_GLOB_PATTERN.exec(line);
+      if (glob !== null) {
+        const [, directory, suffix] = glob;
+        const files = listDirectory(directory).filter((name) => name.endsWith(suffix)).sort()
+          .map((name) => `${directory}/${name}`).filter((path) => TEST_FILE_PATTERN.test(path));
+        if (files.length === 0) invalid.push(line);
+        else named.push(...files);
+      } else if (line.startsWith("!")) {
+        leftOut.push(line);
+      } else if (!TEST_FILE_PATTERN.test(line) || !exists(line)) invalid.push(line);
+      else named.push(line);
     }
+    const dropped = new Set();
+    for (const line of leftOut) {
+      const path = line.slice(1).trim();
+      if (!named.includes(path)) { invalid.push(line); continue; }
+      dropped.add(path);
+      exclusions.push({ path, list });
+    }
+    targets.push(...named.filter((path) => !dropped.has(path)));
   }
-  return { targets: [...new Set(targets)], invalid };
+  const unique = [...new Set(targets)];
+  const reported = new Set(unique);
+  const excluded = [];
+  for (const entry of exclusions) {
+    if (reported.has(entry.path)) continue;
+    reported.add(entry.path);
+    excluded.push(entry);
+  }
+  return { targets: unique, invalid, excluded };
+}
+
+/** The lines that say, before and after a run, which files its lists left out on purpose. */
+export function exclusionReport(excluded) {
+  if (excluded.length === 0) return [];
+  return [
+    `NOT RUN on purpose (${excluded.length}) — left out by a "!" line of the list named beside it:`,
+    ...excluded.map(({ path, list }) => `  ${path}  (${list})`)
+  ];
 }
 
 /**
@@ -194,14 +248,14 @@ function sweep(targets, reportPath) {
 }
 
 function main(args) {
-  const { targets: dirs, invalid: invalidTargets } = expandTargets(args);
+  const { targets: dirs, invalid: invalidTargets, excluded } = expandTargets(args);
   if (invalidTargets.length > 0) {
-    console.error("listed test files that do not exist or are not test files:");
+    console.error("list lines that name no test file (a missing or non-test path, a glob that matches nothing, or a \"!\" line naming no file of its own list):");
     for (const line of invalidTargets) console.error(`  ${line}`);
     return 2;
   }
   if (dirs.length === 0) {
-    console.error("usage: node tools/ci-known-red.mjs <test dir> [<test dir>…]");
+    console.error("usage: node tools/ci-known-red.mjs <test dir | @list file> [<test dir | @list file>…]");
     return 2;
   }
   if (!existsSync(ALLOWLIST_PATH)) {
@@ -222,6 +276,8 @@ function main(args) {
     return 2;
   }
   const flaky = flakyList.entries;
+  const notRun = exclusionReport(excluded);
+  for (const line of notRun) console.log(line);
 
   const scratch = mkdtempSync(join(tmpdir(), "ci-known-red-"));
   const reportPath = join(scratch, "vitest.json");
@@ -294,6 +350,7 @@ function main(args) {
         if (message.trim() !== "") console.error(message.replace(/^/gm, "      "));
       }
     }
+    for (const line of notRun) console.log(line);
     console.log(summary(decision));
     return gateExitCode({ newFailures: decision.newFailures, confirmedStale });
   } finally {

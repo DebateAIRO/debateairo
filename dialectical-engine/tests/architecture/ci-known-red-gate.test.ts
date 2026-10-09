@@ -1,7 +1,7 @@
 // tests/architecture/ci-known-red-gate.test.ts
 // B31 — the CI verify job fails only on NEW failures. The recorded known-red allowlist
 // (tests/ci-known-red.txt) and the gate that reads it (tools/ci-known-red.mjs) are pinned here.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -16,7 +16,10 @@ type GateModule = {
   failedNamesFromReport: (report: unknown, rootDir: string) => { failed: string[]; passed: string[]; ran: string[]; messages: Record<string, string> };
   summary: (decision: Pick<Decision, "newFailures" | "knownFailures" | "stale">) => string;
   rerunTargets: (stale: string[]) => string[];
-  expandTargets: (args: string[], readText?: (path: string) => string, exists?: (path: string) => boolean) => { targets: string[]; invalid: string[] };
+  expandTargets: (args: string[], readText?: (path: string) => string, exists?: (path: string) => boolean, listDirectory?: (path: string) => string[]) => {
+    targets: string[]; invalid: string[]; excluded: { path: string; list: string }[];
+  };
+  exclusionReport: (excluded: { path: string; list: string }[]) => string[];
   confirmStale: (input: { stale: string[]; rerunPasses: string[][] }) => { confirmed: string[]; cleared: string[] };
   gateExitCode: (input: { newFailures: string[]; confirmedStale: string[] }) => number;
   STALE_CONFIRMATION_RERUNS: number;
@@ -41,7 +44,8 @@ describe("CI known-red gate (B31)", () => {
       const parts = entry.split(" > ");
       expect(parts.length, entry).toBeGreaterThanOrEqual(3);
       const file = parts[0] ?? "";
-      expect(file, entry).toMatch(/^tests\/(unit|architecture)\/[\w.-]+\.test\.tsx?$/);
+      // tests/integration joined 2026-10-09 with `pnpm run test:integration-all` (tests/ci-integration-all.txt).
+      expect(file, entry).toMatch(/^tests\/(unit|architecture|integration)\/[\w.-]+\.test\.tsx?$/);
       expect(existsSync(resolve(productRoot, file)), `${file} (from ${entry})`).toBe(true);
       expect((parts.at(-1) ?? "").length, entry).toBeGreaterThan(0);
     }
@@ -200,14 +204,105 @@ describe("curated test lists (@file targets, 2026-10-09)", () => {
 
   it("expands a list file into its test files, ignoring comments and duplicates, and keeps plain directories", () => {
     expect(expand(["@tests/list.txt", "tests/unit"])).toEqual({
-      targets: ["tests/integration/a.test.ts", "tests/integration/b.test.ts", "tests/unit"], invalid: []
+      targets: ["tests/integration/a.test.ts", "tests/integration/b.test.ts", "tests/unit"], invalid: [], excluded: []
     });
   });
 
   it("reports a listed path that is missing or not a test file instead of dropping it", () => {
     expect(expand(["@tests/bad.txt"])).toEqual({
-      targets: ["tests/integration/a.test.ts"], invalid: ["tests/integration/missing.test.ts", "not-a-test.md"]
+      targets: ["tests/integration/a.test.ts"], invalid: ["tests/integration/missing.test.ts", "not-a-test.md"], excluded: []
     });
+  });
+});
+
+// 2026-10-09: `pnpm run test:integration-all` runs every integration suite in ONE vitest process. Its list
+// (tests/ci-integration-all.txt) names the directory by a one-directory glob, so a new suite joins without an edit, and
+// names each file it leaves out on a `!` line, so an exclusion is written down, printed on every run, and never silent.
+describe("directory globs and named exclusions in a list file (2026-10-09)", () => {
+  const lists: Record<string, string> = {
+    "tests/all.txt": "# every suite but the long one\ntests/integration/*.test.ts\n!tests/integration/long.test.ts\n",
+    "tests/long.txt": "tests/integration/long.test.ts\n",
+    "tests/stale-exclusion.txt": "tests/integration/a.test.ts\n!tests/integration/b.test.ts\n",
+    "tests/empty-glob.txt": "tests/nothing/*.test.ts\n",
+    "tests/bad-glob.txt": "tests/integration/*.ts\ntests/*/a.test.ts\ntests/integration/a*.test.ts\n"
+  };
+  const present = new Set(["tests/integration/a.test.ts", "tests/integration/b.test.ts", "tests/integration/long.test.ts"]);
+  const directories: Record<string, string[]> = {
+    "tests/integration": ["long.test.ts", "b.test.ts", "helper.ts", "a.test.ts", "s5-smoke.mjs"],
+    "tests/nothing": ["README.md"]
+  };
+  const expand = (args: string[]) => gate.expandTargets(args, (path) => lists[path]!, (path) => present.has(path),
+    (directory) => directories[directory] ?? []);
+
+  it("expands a glob into that directory's test files, sorted, minus the files named on `!` lines", () => {
+    expect(expand(["@tests/all.txt"])).toEqual({
+      targets: ["tests/integration/a.test.ts", "tests/integration/b.test.ts"], invalid: [],
+      excluded: [{ path: "tests/integration/long.test.ts", list: "tests/all.txt" }]
+    });
+  });
+
+  it("runs an excluded file again when another list names it, and then no longer reports it as excluded", () => {
+    expect(expand(["@tests/all.txt", "@tests/long.txt"])).toEqual({
+      targets: ["tests/integration/a.test.ts", "tests/integration/b.test.ts", "tests/integration/long.test.ts"], invalid: [], excluded: []
+    });
+  });
+
+  it("refuses an exclusion that names no file of its own list, so a stale `!` line cannot linger", () => {
+    expect(expand(["@tests/stale-exclusion.txt"]).invalid).toEqual(["!tests/integration/b.test.ts"]);
+  });
+
+  it("refuses a glob that matches no test file, so a moved directory cannot shrink the run to nothing", () => {
+    expect(expand(["@tests/empty-glob.txt"]).invalid).toEqual(["tests/nothing/*.test.ts"]);
+  });
+
+  it("accepts only the whole-file glob of one directory", () => {
+    expect(expand(["@tests/bad-glob.txt"]).invalid).toEqual(["tests/integration/*.ts", "tests/*/a.test.ts", "tests/integration/a*.test.ts"]);
+  });
+
+  it("prints every left-out file beside the list that left it out, and prints nothing when none was", () => {
+    expect(gate.exclusionReport(expand(["@tests/all.txt"]).excluded)).toEqual([
+      'NOT RUN on purpose (1) — left out by a "!" line of the list named beside it:',
+      "  tests/integration/long.test.ts  (tests/all.txt)"
+    ]);
+    expect(gate.exclusionReport([])).toEqual([]);
+  });
+});
+
+describe("the all-integration list tests/ci-integration-all.txt (2026-10-09)", () => {
+  const integrationFiles = () => readdirSync(resolve(productRoot, "tests/integration")).filter((name) => name.endsWith(".test.ts")).sort()
+    .map((name) => `tests/integration/${name}`);
+  const scripts = JSON.parse(readFileSync(resolve(productRoot, "package.json"), "utf8")).scripts as Record<string, string>;
+  const registration = "tests/integration/registration-database.test.ts";
+  const stageRehearsal = "tests/integration/preview-auth-dev-startup.test.ts";
+  const list = "tests/ci-integration-all.txt";
+
+  it("runs every integration suite except the two it names as excluded, each with its reason above it", () => {
+    expect(scripts["test:integration-all"]).toBe(`node tools/ci-known-red.mjs @${list}`);
+    const { targets, invalid, excluded } = gate.expandTargets([`@${list}`]);
+    expect(invalid).toEqual([]);
+    expect(excluded).toEqual([{ path: registration, list }, { path: stageRehearsal, list }]);
+    expect(targets).toEqual(integrationFiles().filter((file) => file !== registration && file !== stageRehearsal));
+    const lines = readFileSync(resolve(productRoot, list), "utf8").split("\n");
+    for (const { path } of excluded) {
+      const at = lines.indexOf(`!${path}`);
+      expect(lines[at - 1], `no comment above !${path}`).toMatch(/^# /);
+      expect(lines.slice(0, at).reverse().find((line) => line.startsWith("# EXCLUDED: ")), path).toContain(path.split("/").at(-1));
+    }
+  });
+
+  it("offers the same run with registration-database included", () => {
+    expect(scripts["test:integration-all:with-registration"])
+      .toBe(`node tools/ci-known-red.mjs @${list} @tests/ci-integration-registration.txt`);
+    const { targets, invalid, excluded } = gate.expandTargets([`@${list}`, "@tests/ci-integration-registration.txt"]);
+    expect(invalid).toEqual([]);
+    expect(excluded).toEqual([{ path: stageRehearsal, list }]);
+    expect([...targets].sort()).toEqual(integrationFiles().filter((file) => file !== stageRehearsal));
+  });
+
+  it("covers both curated CI lists, so the all-run is never narrower than a CI job", () => {
+    const { targets } = gate.expandTargets([`@${list}`, "@tests/ci-integration-registration.txt"]);
+    const curated = gate.expandTargets(["@tests/ci-integration-auth.txt", "@tests/ci-integration-registration.txt"]).targets;
+    for (const file of curated) expect(targets, file).toContain(file);
   });
 });
 
