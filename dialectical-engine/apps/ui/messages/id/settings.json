@@ -167,7 +167,6 @@
   "settings.security.title": "Keamanan",
   "settings.phone.reveal": "Tampilkan telepon",
   "settings.phone.change": "Ubah telepon",
-  "settings.phone.required": "Tambahkan telepon untuk melanjutkan. Pertanyaan dan opsi Anda tetap tersimpan.",
   "settings.security.lastPath": "Tambahkan metode masuk lain sebelum menghapus yang ini.",
   "settings.security.remove": "Hapus",
   "settings.security.codesRemaining": "Kode pemulihan: {count}",

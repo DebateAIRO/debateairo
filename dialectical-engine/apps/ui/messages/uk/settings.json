@@ -170,7 +170,6 @@
   "settings.security.title": "Безпека",
   "settings.phone.reveal": "Показати телефон",
   "settings.phone.change": "Змінити телефон",
-  "settings.phone.required": "Додайте телефон, щоб продовжити. Запитання й параметри зберігаються.",
   "settings.security.lastPath": "Додайте інший спосіб входу, перш ніж видаляти цей.",
   "settings.security.remove": "Видалити",
   "settings.security.codesRemaining": "Коди відновлення: {count}",

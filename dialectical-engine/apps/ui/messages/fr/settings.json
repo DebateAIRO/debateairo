@@ -169,7 +169,6 @@
   "settings.security.title": "Sécurité",
   "settings.phone.reveal": "Afficher le téléphone",
   "settings.phone.change": "Modifier le téléphone",
-  "settings.phone.required": "Ajoutez votre téléphone pour continuer. Votre question et vos options sont conservées.",
   "settings.security.lastPath": "Ajoutez une autre méthode de connexion avant de supprimer celle-ci.",
   "settings.security.remove": "Retirer",
   "settings.security.codesRemaining": "Codes de récupération : {count}",

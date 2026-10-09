@@ -169,7 +169,6 @@
   "settings.security.title": "Securitate",
   "settings.phone.reveal": "Afișați numărul",
   "settings.phone.change": "Schimbați numărul",
-  "settings.phone.required": "Adăugați numărul de telefon pentru a continua. Întrebarea și opțiunile se păstrează.",
   "settings.security.lastPath": "Adăugați o altă metodă de autentificare înainte de a o elimina pe aceasta.",
   "settings.security.remove": "Eliminați",
   "settings.security.codesRemaining": "Coduri de recuperare: {count}",

@@ -168,7 +168,6 @@
   "settings.security.title": "Turvallisuus",
   "settings.phone.reveal": "Näytä puhelinnumero",
   "settings.phone.change": "Vaihda puhelinnumero",
-  "settings.phone.required": "Lisää puhelinnumerosi jatkaaksesi. Kysymyksesi ja valintasi säilyvät.",
   "settings.security.lastPath": "Lisää toinen kirjautumistapa ennen tämän poistamista.",
   "settings.security.remove": "Poista",
   "settings.security.codesRemaining": "Palautuskoodit: {count}",

@@ -169,7 +169,6 @@
   "settings.security.title": "Sigurnost",
   "settings.phone.reveal": "Prikaži telefon",
   "settings.phone.change": "Promijeni telefon",
-  "settings.phone.required": "Dodajte telefon za nastavak. Pitanje i opcije ostaju spremljeni.",
   "settings.security.lastPath": "Dodajte drugi način prijave prije uklanjanja ovoga.",
   "settings.security.remove": "Ukloni",
   "settings.security.codesRemaining": "Kodovi za oporavak: {count}",

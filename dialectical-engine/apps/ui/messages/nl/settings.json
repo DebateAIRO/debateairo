@@ -168,7 +168,6 @@
   "settings.security.title": "Beveiliging",
   "settings.phone.reveal": "Telefoonnummer tonen",
   "settings.phone.change": "Telefoonnummer wijzigen",
-  "settings.phone.required": "Voeg je telefoonnummer toe om door te gaan. Je vraag en opties blijven bewaard.",
   "settings.security.lastPath": "Voeg een andere aanmeldmethode toe voordat je deze verwijdert.",
   "settings.security.remove": "Verwijderen",
   "settings.security.codesRemaining": "Herstelcodes: {count}",

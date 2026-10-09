@@ -168,7 +168,6 @@
   "settings.security.title": "Güvenlik",
   "settings.phone.reveal": "Telefonu göster",
   "settings.phone.change": "Telefonu değiştir",
-  "settings.phone.required": "Devam etmek için telefonunuzu ekleyin. Sorunuz ve seçenekleriniz korunur.",
   "settings.security.lastPath": "Bunu kaldırmadan önce başka bir giriş yöntemi ekleyin.",
   "settings.security.remove": "Kaldır",
   "settings.security.codesRemaining": "Kurtarma kodları: {count}",

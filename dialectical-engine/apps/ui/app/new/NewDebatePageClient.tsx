@@ -1,10 +1,5 @@
 "use client";
 
-import { ContractHttpError } from '@debateai/contract';
-import { clearPhoneCompletionDraft, phoneCompletionDraftForOwner, consumePhoneDraftUpdate, savePhoneCompletionDraft, type PhoneDraftForm, type SubmittedPhoneDraft } from '@/lib/phoneCompletionDraft';
-import { PhoneProfileCard } from '@/components/PhoneProfileCard';
-import settingsEnglish from '@/messages/en/settings.json';
-import authEnglish from '@/messages/en/auth.json';
 import newDebateEnglish from '@/messages/en/newDebate.json';
 import { AiNotice } from "@/components/AiNotice";
 
@@ -105,12 +100,8 @@ export default function NewDebatePageClient({
   chromeCatalog,
   locale = "en",
   billingCatalog = billingEnglish,
-  settingsCatalog = settingsEnglish,
-  authCatalog = authEnglish,
   crisisCountryHint = null
 }: {
-  settingsCatalog?: MessageCatalog;
-  authCatalog?: MessageCatalog;
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
   chromeCatalog: MessageCatalog;
@@ -124,15 +115,13 @@ export default function NewDebatePageClient({
   return (
     <Suspense fallback={null}>
       <AuthGate catalog={catalog}>{(token) => (
-        <NewDebateForm token={token} settingsCatalog={settingsCatalog} authCatalog={authCatalog} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} billingCatalog={billingCatalog} crisisCountryHint={crisisCountryHint} />
+        <NewDebateForm token={token} catalog={catalog} homeCatalog={homeCatalog} chromeCatalog={chromeCatalog} locale={locale} billingCatalog={billingCatalog} crisisCountryHint={crisisCountryHint} />
       )}</AuthGate>
     </Suspense>
   );
 }
 
 function NewDebateForm({
-  settingsCatalog,
-  authCatalog,
   token,
   catalog = newDebateEnglish,
   homeCatalog,
@@ -141,8 +130,6 @@ function NewDebateForm({
   billingCatalog,
   crisisCountryHint
 }: {
-  settingsCatalog: MessageCatalog;
-  authCatalog: MessageCatalog;
   token: string;
   catalog: MessageCatalog;
   homeCatalog: MessageCatalog;
@@ -177,13 +164,7 @@ function NewDebateForm({
   const [sessionDefaultsError, setSessionDefaultsError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  type SubmittedDraft = SubmittedPhoneDraft;
-  const [phoneCompletion, setPhoneCompletion] = useState<SubmittedDraft | null>(null);
-  const submittedDraft = useRef<SubmittedDraft | null>(null);
   const submitFlight = useRef(false);
-  const [providerRetry, setProviderRetry] = useState<SubmittedDraft | null>(null);
-  const formSnapshot = useRef<PhoneDraftForm>(null!);
-  formSnapshot.current = { topic, planTier, optionsOpen, depthMode, scrutiny, depth, branching, concurrency, maxTokens, riskTier, riskTierWasEdited, budgetTier, decisionScope, asOf };
   const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale });
   const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
   // Budget spec §2.11: the room for the ask this form would send. It is a
@@ -226,19 +207,6 @@ function NewDebateForm({
     let active = true;
     void contractClient.readSession().then((session) => {
       if (!active) return;
-      const preserved = phoneCompletionDraftForOwner(session.asker_id);
-      if (preserved) {
-        const v = preserved.form;
-        setTopic(v.topic); setPlanTier(v.planTier); followedTier.current = v.planTier;
-        setOptionsOpen(v.optionsOpen); setDepthMode(v.depthMode); setScrutiny(v.scrutiny);
-        setDepth(v.depth); setBranching(v.branching); setConcurrency(v.concurrency); setMaxTokens(v.maxTokens);
-        setRiskTier(v.riskTier); setRiskTierWasEdited(v.riskTierWasEdited); setBudgetTier(v.budgetTier); setDecisionScope(v.decisionScope); setAsOf(v.asOf);
-        submittedDraft.current = preserved.submitted;
-        if (preserved.phase === 'phone-required') setPhoneCompletion(preserved.submitted);
-        else if (preserved.phase === 'updated') setProviderRetry(consumePhoneDraftUpdate(preserved.id, session.asker_id));
-        setSessionDefaultsError(null);
-        return;
-      }
       const defaults = deriveSessionAskDefaults(session, new Date(), catalog);
       setModelScorecard(session.model_scorecard_in_force === true ? "IN_FORCE" : "NOT_IN_FORCE");
       setDecisionScope((current) => current.trim().length > 0 ? current : defaults.decisionScope);
@@ -246,7 +214,6 @@ function NewDebateForm({
       setSessionDefaultsError(null);
     }).catch((failure: unknown) => {
       if (!active) return;
-      if (failure instanceof ContractHttpError && (failure.status === 401 || failure.status === 403)) clearPhoneCompletionDraft();
       setModelScorecard("READ_FAILED");
       // DL3-F7: classified copy, never the contract client's server-authored text.
       setSessionDefaultsError(requestFailureMessage("SESSION_DEFAULTS",failure,catalog));
@@ -284,7 +251,7 @@ function NewDebateForm({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (submitFlight.current || phoneCompletion !== null) return;
+    if (submitFlight.current) return;
     // V, 2026-09-30: a question that reads as a person in crisis gets help numbers, never a
     // debate — and before anything else, the form's own rules and the consent screen included.
     if (crisis.offerIfCrisis(topic)) return;
@@ -312,7 +279,6 @@ function NewDebateForm({
         // A21 O4: a locked control sends nothing, so the deployment's own default applies.
         modelStrength: strengthControl.locked ? null : modelStrength
       }, submitTime, catalog);
-      submittedDraft.current = { topic: topic.trim(), config, query: { plan_tier: planTier, composition_budget_tier: budgetTier, depth } };
       let debate;
       try {
         debate = await createDebate(topic.trim(), config, token);
@@ -321,13 +287,8 @@ function NewDebateForm({
         if (!await consent.ensureConsent({ known: "required" })) return;
         debate = await createDebate(topic.trim(), config, token);
       }
-      clearPhoneCompletionDraft();
       router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
     } catch (exc) {
-      if (exc instanceof ContractHttpError && exc.serverCode === 'ACCOUNT_PHONE_REQUIRED' && submittedDraft.current) {
-        setPhoneCompletion(submittedDraft.current);
-        return;
-      }
       if (isCrisisSupportRefusal(exc)) {
         crisis.offer();
         return;
@@ -360,39 +321,6 @@ function NewDebateForm({
     void submit(event as unknown as FormEvent);
   }
 
-  async function retryCompletedPhone(restored?: SubmittedDraft) {
-    const draft = restored ?? phoneCompletion;
-    if (!draft || submitFlight.current) return;
-    submitFlight.current = true; setSubmitting(true); setError(null); setPhoneCompletion(null);
-    try {
-      if (crisis.offerIfCrisis(draft.topic)) return;
-      if (!await consent.ensureConsent()) return;
-      let debate;
-      try { debate = await createDebate(draft.topic, draft.config, token); }
-      catch (refusal) {
-        if (!isSensitiveDataConsentRefusal(refusal)) throw refusal;
-        if (!await consent.ensureConsent({ known: "required" })) return;
-        debate = await createDebate(draft.topic, draft.config, token);
-      }
-      clearPhoneCompletionDraft();
-      router.push(`/debate/${encodeURIComponent(debate.id)}?starting=1`);
-    } catch (failure) {
-      if (failure instanceof ContractHttpError && failure.serverCode === 'ACCOUNT_PHONE_REQUIRED') setPhoneCompletion(draft);
-      else if (isCrisisSupportRefusal(failure)) crisis.offer();
-      else if (classifyRequestFailure('DEBATE_CREATE', failure).kind === 'ALREADY_WAITING') {
-        const fresh = await readAskRoom(contractClient, draft.query);
-        const shown = fresh === null ? waitingRoomOf(failure) : fresh; setRoom(shown);
-        if (shown?.room !== 'ALREADY_WAITING') setError(requestFailureMessage('DEBATE_CREATE', failure, catalog));
-      } else setError(requestFailureMessage('DEBATE_CREATE', failure, catalog));
-    } finally { submitFlight.current = false; setSubmitting(false); }
-  }
-
-  useEffect(() => {
-    if (!providerRetry) return;
-    setProviderRetry(null);
-    void retryCompletedPhone(providerRetry);
-  }, [providerRetry]);
-
   return (
     <div className="screen scroll ndScreen">
       <div className="ndInner">
@@ -400,7 +328,6 @@ function NewDebateForm({
         <h1 className="ndTitle">{t(catalog, "newDebate.title")}</h1>
         <div className="ndAiDisclosure"><AiNotice catalog={noticeCatalog} body={t(catalog, "newDebate.aiNotice")} /></div>
         <UsageBars catalog={billingCatalog} locale={locale} onPlan={rememberPlan} onFunding={rememberFunding} />
-        {phoneCompletion ? <PhoneProfileCard completion catalog={settingsCatalog} authCatalog={authCatalog} onUpdated={retryCompletedPhone} onBeforeProviderRedirect={async ({isCurrent}) => { return phoneCompletion ? await savePhoneCompletionDraft(contractClient, () => formSnapshot.current, phoneCompletion, isCurrent) : false; }} onCancel={() => { clearPhoneCompletionDraft(); setPhoneCompletion(null); }}/> : null}
       <form onSubmit={submit} onKeyDown={onKeyDown}>
           {error ? <div className="error" style={{ marginTop: 16 }}>{error}</div> : null}
           {consent.declined ? (
@@ -606,7 +533,7 @@ function NewDebateForm({
 
           <RoomNotice room={room} catalog={{...catalog,...billingCatalog}} locale={locale} />
           <div className="ndActions">
-            <button data-support-primary-control type="submit" className="ndStart" disabled={!(ready || crisis.flags(topic)) || submitting || phoneCompletion !== null || (room?.room === "ALREADY_WAITING" && !crisis.flags(topic))}>
+            <button data-support-primary-control type="submit" className="ndStart" disabled={!(ready || crisis.flags(topic)) || submitting || (room?.room === "ALREADY_WAITING" && !crisis.flags(topic))}>
               {t(catalog, submitting ? "newDebate.starting" : "newDebate.startRun")} <span aria-hidden>→</span>
             </button>
             <button type="button" className="ndCancel" onClick={() => router.push("/")}>

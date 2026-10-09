@@ -170,7 +170,6 @@
   "settings.security.title": "Saugumas",
   "settings.phone.reveal": "Rodyti telefoną",
   "settings.phone.change": "Keisti telefoną",
-  "settings.phone.required": "Norėdami tęsti pridėkite telefoną. Klausimas ir parinktys išsaugomi.",
   "settings.security.lastPath": "Prieš pašalindami šį būdą pridėkite kitą prisijungimo būdą.",
   "settings.security.remove": "Pašalinti",
   "settings.security.codesRemaining": "Atkūrimo kodai: {count}",

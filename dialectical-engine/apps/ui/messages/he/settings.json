@@ -169,7 +169,6 @@
   "settings.security.title": "אבטחה",
   "settings.phone.reveal": "הצגת מספר הטלפון",
   "settings.phone.change": "שינוי מספר הטלפון",
-  "settings.phone.required": "יש להוסיף מספר טלפון כדי להמשיך. השאלה והאפשרויות נשמרות.",
   "settings.security.lastPath": "יש להוסיף שיטת כניסה נוספת לפני הסרת שיטה זו.",
   "settings.security.remove": "הסרה",
   "settings.security.codesRemaining": "קודי שחזור: {count}",

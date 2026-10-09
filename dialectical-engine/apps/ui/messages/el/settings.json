@@ -168,7 +168,6 @@
   "settings.security.title": "Ασφάλεια",
   "settings.phone.reveal": "Εμφάνιση τηλεφώνου",
   "settings.phone.change": "Αλλαγή τηλεφώνου",
-  "settings.phone.required": "Προσθέστε το τηλέφωνό σας για να συνεχίσετε. Η ερώτηση και οι επιλογές σας διατηρούνται.",
   "settings.security.lastPath": "Προσθέστε άλλη μέθοδο σύνδεσης πριν αφαιρέσετε αυτήν.",
   "settings.security.remove": "Αφαίρεση",
   "settings.security.codesRemaining": "Κωδικοί ανάκτησης: {count}",

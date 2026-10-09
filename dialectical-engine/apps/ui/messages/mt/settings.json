@@ -171,7 +171,6 @@
   "settings.security.title": "Sigurtà",
   "settings.phone.reveal": "Uri n-numru tat-telefon",
   "settings.phone.change": "Ibdel in-numru tat-telefon",
-  "settings.phone.required": "Żid it-telefon biex tkompli. Il-mistoqsija u l-għażliet tiegħek jinżammu.",
   "settings.security.lastPath": "Żid metodu ieħor ta’ dħul qabel tneħħi dan.",
   "settings.security.remove": "Neħħi",
   "settings.security.codesRemaining": "Kodiċijiet ta’ rkupru: {count}",

@@ -168,7 +168,6 @@
   "settings.security.title": "सुरक्षा",
   "settings.phone.reveal": "फ़ोन नंबर दिखाएँ",
   "settings.phone.change": "फ़ोन नंबर बदलें",
-  "settings.phone.required": "जारी रखने के लिए फ़ोन नंबर जोड़ें। आपका प्रश्न और विकल्प सुरक्षित रहेंगे।",
   "settings.security.lastPath": "इसे हटाने से पहले साइन इन का दूसरा तरीका जोड़ें।",
   "settings.security.remove": "हटाएँ",
   "settings.security.codesRemaining": "रिकवरी कोड: {count}",

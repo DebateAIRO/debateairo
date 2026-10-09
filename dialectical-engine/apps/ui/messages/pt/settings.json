@@ -169,7 +169,6 @@
   "settings.security.title": "Segurança",
   "settings.phone.reveal": "Mostrar telefone",
   "settings.phone.change": "Alterar telefone",
-  "settings.phone.required": "Adicione o telefone para continuar. A pergunta e as opções são mantidas.",
   "settings.security.lastPath": "Adicione outro método de início de sessão antes de remover este.",
   "settings.security.remove": "Remover",
   "settings.security.codesRemaining": "Códigos de recuperação: {count}",

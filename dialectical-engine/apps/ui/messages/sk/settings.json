@@ -170,7 +170,6 @@
   "settings.security.title": "Zabezpečenie",
   "settings.phone.reveal": "Zobraziť telefón",
   "settings.phone.change": "Zmeniť telefón",
-  "settings.phone.required": "Ak chcete pokračovať, pridajte telefón. Otázka a možnosti zostanú zachované.",
   "settings.security.lastPath": "Pred odstránením tejto metódy pridajte iný spôsob prihlásenia.",
   "settings.security.remove": "Odstrániť",
   "settings.security.codesRemaining": "Obnovovacie kódy: {count}",

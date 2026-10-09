@@ -167,7 +167,6 @@
   "settings.security.title": "Bảo mật",
   "settings.phone.reveal": "Hiện số điện thoại",
   "settings.phone.change": "Đổi số điện thoại",
-  "settings.phone.required": "Thêm số điện thoại để tiếp tục. Câu hỏi và tùy chọn của bạn được giữ lại.",
   "settings.security.lastPath": "Thêm cách đăng nhập khác trước khi xóa cách này.",
   "settings.security.remove": "Xóa",
   "settings.security.codesRemaining": "Mã khôi phục: {count}",

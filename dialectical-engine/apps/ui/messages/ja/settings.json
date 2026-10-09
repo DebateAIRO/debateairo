@@ -167,7 +167,6 @@
   "settings.security.title": "セキュリティ",
   "settings.phone.reveal": "電話番号を表示",
   "settings.phone.change": "電話番号を変更",
-  "settings.phone.required": "続行するには電話番号を追加してください。質問と設定は保持されます。",
   "settings.security.lastPath": "この方法を削除する前に、別のログイン方法を追加してください。",
   "settings.security.remove": "削除",
   "settings.security.codesRemaining": "復旧コード：{count}",

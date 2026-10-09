@@ -172,7 +172,6 @@
   "settings.security.title": "الأمان",
   "settings.phone.reveal": "إظهار رقم الهاتف",
   "settings.phone.change": "تغيير رقم الهاتف",
-  "settings.phone.required": "أضف رقم هاتفك للمتابعة. سيتم الاحتفاظ بسؤالك وخياراتك.",
   "settings.security.lastPath": "أضف طريقة أخرى لتسجيل الدخول قبل إزالة هذه الطريقة.",
   "settings.security.remove": "إزالة",
   "settings.security.codesRemaining": "رموز الاسترداد: {count}",

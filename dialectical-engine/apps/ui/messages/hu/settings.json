@@ -168,7 +168,6 @@
   "settings.security.title": "Biztonság",
   "settings.phone.reveal": "Telefonszám megjelenítése",
   "settings.phone.change": "Telefonszám módosítása",
-  "settings.phone.required": "A folytatáshoz adja meg a telefonszámát. A kérdés és a beállítások megmaradnak.",
   "settings.security.lastPath": "Az eltávolítás előtt adjon hozzá másik bejelentkezési módot.",
   "settings.security.remove": "Eltávolítás",
   "settings.security.codesRemaining": "Helyreállítási kódok: {count}",

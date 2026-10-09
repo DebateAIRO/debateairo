@@ -167,7 +167,6 @@
   "settings.security.title": "安全",
   "settings.phone.reveal": "显示电话号码",
   "settings.phone.change": "更改电话号码",
-  "settings.phone.required": "添加电话号码后继续。你的问题和选项会保留。",
   "settings.security.lastPath": "删除此方式前，请添加其他登录方式。",
   "settings.security.remove": "移除",
   "settings.security.codesRemaining": "恢复代码：{count}",

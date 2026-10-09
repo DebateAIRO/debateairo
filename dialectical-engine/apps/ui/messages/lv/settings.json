@@ -169,7 +169,6 @@
   "settings.security.title": "Drošība",
   "settings.phone.reveal": "Rādīt tālruņa numuru",
   "settings.phone.change": "Mainīt tālruņa numuru",
-  "settings.phone.required": "Pievienojiet tālruņa numuru, lai turpinātu. Jautājums un izvēles tiks saglabātas.",
   "settings.security.lastPath": "Pirms šīs metodes noņemšanas pievienojiet citu pierakstīšanās metodi.",
   "settings.security.remove": "Noņemt",
   "settings.security.codesRemaining": "Atkopšanas kodi: {count}",

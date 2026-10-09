@@ -168,7 +168,6 @@
   "settings.security.title": "Sikkerhed",
   "settings.phone.reveal": "Vis telefonnummer",
   "settings.phone.change": "Skift telefonnummer",
-  "settings.phone.required": "Tilføj dit telefonnummer for at fortsætte. Dit spørgsmål og dine valg bevares.",
   "settings.security.lastPath": "Tilføj en anden loginmetode, før du fjerner denne.",
   "settings.security.remove": "Fjern",
   "settings.security.codesRemaining": "Gendannelseskoder: {count}",
