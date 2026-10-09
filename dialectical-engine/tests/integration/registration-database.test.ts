@@ -1351,7 +1351,8 @@ setTimeout(() => undefined, 500);
       const state=(await database.pool.query(`SELECT u.state AS user_state,f.state AS factor_state FROM identity."user" u JOIN identity.mfa_factor f USING(user_id) WHERE user_id=$1`,[registered.user.user_id])).rows[0];
       expect(state).toEqual({user_state:"active",factor_state:"active"});
       const lifecycle=(await database.pool.query("SELECT count(*)::int total,count(*) FILTER(WHERE consumed_at IS NULL AND revoked_at IS NULL)::int active,count(consumed_at)::int consumed,count(revoked_at)::int revoked FROM identity.recovery_code WHERE user_id=$1",[registered.user.user_id])).rows[0];
-      expect(lifecycle).toEqual({total:21,active:10,consumed:1,revoked:10});
+      // Design note 2026-10-09 item 3: the used code is not refilled.
+      expect(lifecycle).toEqual({total:20,active:9,consumed:1,revoked:10});
       const observable=[...errors.mock.calls,...logs.mock.calls].flat().join(' ');expect(observable).not.toContain(begun.secret);for(const code of [...unseen,...recovery])expect(observable).not.toContain(code);
     } finally {errors.mockRestore();logs.mockRestore();await api.close();}
   },120000);

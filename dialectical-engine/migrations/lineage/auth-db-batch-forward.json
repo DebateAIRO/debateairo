@@ -1,0 +1,21 @@
+{
+  "version": "auth-db-batch-forward-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0108_preview_recovery_verified_bindings.sql",
+    "manifestSha256": "cf892973f467aa1260aeb5acd17941b5a8e1ca11ff7c61282528b20c41295eba",
+    "verifierSha256": "efeddf3d398eef8f6b47e1b1c5820f9ee5f551a7404e65135b5a4e0c70157944"
+  },
+  "migration": {
+    "name": "0109_auth_db_batch.sql",
+    "sha256": "cdd649d666f53b42dde987a1c4541fa1e757889c29b6da3d7885c730cfb72dea"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities.sql",
+    "sha256": "efeddf3d398eef8f6b47e1b1c5820f9ee5f551a7404e65135b5a4e0c70157944"
+  },
+  "supplementalVerifier": {
+    "path": "lineage/verify-auth-db-batch.sql",
+    "sha256": "73e7a057bba58bb74d1b006c077fddb8f954158124dace3ccd5fb896d641e63e"
+  }
+}
