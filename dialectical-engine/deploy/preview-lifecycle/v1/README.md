@@ -162,6 +162,11 @@ unit files before installing; nothing else names them.
    find /opt/debateai-v3-preview/operator/lifecycle-v1 -type f -exec chmod 0644 {} +
    ```
 
+   When updating an installed operator folder (for example to pick up a fix), copy all three
+   folders from the same commit, never one alone: the lifecycle files import shared functions
+   from `preview-auth-dev` (for example `release-guard.mjs` imports `operatorManifestSha256`
+   from `source-manifest.mjs`), so a mix of commits refuses to load.
+
 2. **Root config folder, state folder and alert recipient.** Put exactly one approved address in
    the file (type it; do not paste it into any command line that is logged):
 
@@ -278,6 +283,14 @@ unit files before installing; nothing else names them.
    so on their own they would switch the automatic restart off again. The ten-z drop-in sorts
    last, so its copy wins. `tests/unit/preview-lifecycle-units.test.ts` keeps the two lists equal.
 
+   Exactly these keys are set by the generated drop-in, nothing else: `[Unit]`
+   `StartLimitIntervalSec`, `StartLimitBurst`, `OnFailure` (added to the list); `[Service]`
+   `Restart`, `RestartMode`, `RestartSec`, `TimeoutStartSec`, `WorkingDirectory`, one more
+   `ExecStartPre` (appended last), and `ExecStart` (reset, then set). It sets or resets no
+   sandbox or identity key, so whatever the older drop-ins set for `User`, `Group`, `ProcSubset`,
+   `RestrictAddressFamilies` (for example `AF_NETLINK`), `RestrictSUIDSGID`, `SystemCallFilter`,
+   `Environment`/`EnvironmentFile` and the rest stays in effect exactly as it was.
+
 7. **Soften the API's hard dependencies.** systemd cannot remove a `Requires=` from a drop-in.
    Find where it is declared and change it there (keep a root-only copy of the original):
 
@@ -330,6 +343,14 @@ unit files before installing; nothing else names them.
    `--plan /opt/debateai-v3-preview/artifacts/lifecycle-current/…`.
    If `Restart` still shows `no`, the ten-z drop-in is missing or stale: regenerate it with
    `dropin` (step 6) and `daemon-reload`. Do not edit the older drop-ins for this.
+   Older drop-ins could still set restart keys the release drop-in does not repeat. Check them:
+
+   ```sh
+   systemctl show -p RestartPreventExitStatus,RestartForceExitStatus,SuccessExitStatus,StartLimitAction,RestartSteps,RestartMaxDelayUSec debateai-preview-api debateai-preview-ui
+   ```
+
+   Expect the exit-status lists empty, `StartLimitAction=none`, `RestartSteps=0`; anything else
+   came from an older drop-in: show it to the owner before going on.
    If `ExecStartPre` lists older one-time steps, review whether they should run on every
    restart; to drop them, add `ExecStartPre=` (empty) as the first `ExecStartPre` line of the
    generated release drop-in. Then:

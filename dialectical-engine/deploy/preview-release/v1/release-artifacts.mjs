@@ -57,6 +57,11 @@ export const UI_BUILD_ENVIRONMENT = Object.freeze({
   PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', TZ: 'UTC', CI: 'true', NEXT_TELEMETRY_DISABLED: '1',
   ...UI_PUBLIC_BUILD_VALUES
 });
+/**
+ * pnpm, next and the route check start `node` from PATH. Put the running Node's own folder first
+ * (as prestart.mjs nativeVerifyArgv does), so the build runs on the Node the manifest records.
+ */
+export const buildEnvironment = (execPath = process.execPath) => ({ ...UI_BUILD_ENVIRONMENT, PATH: `${dirname(execPath)}:${UI_BUILD_ENVIRONMENT.PATH}` });
 
 const MAX_PUBLIC_ARTIFACT_BYTES = 16_777_216; // readPublicArtifact's bound
 const MAX_PLAN_BYTES = 32_768; // prepareLaunch, prestart and native-operator read plans up to this size
@@ -110,6 +115,17 @@ async function assertDirectory(path, layout, flag) {
   } catch { refuse('DIRECTORY_REFUSED', [flag]); }
 }
 
+/** Git, running as root, obeys the clone's own config (e.g. core.fsmonitor runs a program): it must be root-only too. */
+async function assertRepository(path, layout) {
+  await assertDirectory(path, layout, '--repository');
+  try {
+    for (const [name, directory] of [['.git', true], ['.git/config', false]]) {
+      const stat = await lstat(join(path, name));
+      if (stat.isSymbolicLink() || stat.isDirectory() !== directory || (!directory && !stat.isFile()) || stat.uid !== layout.ownerUid || (stat.mode & 0o022) !== 0) throw new Error(name);
+    }
+  } catch { refuse('DIRECTORY_REFUSED', ['--repository']); }
+}
+
 /**
  * Reads one root-owned 0644 JSON file through the reviewed custody reader (no-follow, single link,
  * bounded, root-owned non-writable parent). `kind` selects the reviewed public-inventory parser.
@@ -133,6 +149,14 @@ async function readSource(path, { layout, flag }) {
 /** What verifySourceManifest must find: the manifest's own binding plus the exact bytes on disk. */
 const sourceBinding = file => ({ sourceRevision: file.value.sourceRevision, sourceTree: file.value.sourceTree, sourceRoot: file.value.sourceRoot, role: file.value.role, manifestSha256: file.sha256 });
 
+/** Checked before any long work (and again by writeArtifact): the shape, the folders, and that nothing is there yet. */
+export async function assertOutputFree(path, { layout = LAYOUT, name } = {}) {
+  if (!absolute(path) || !artifactPattern(layout).test(path) || dirname(path) === layout.currentDir || (name !== undefined && !path.endsWith(`/${name}`))) refuse('OUTPUT_PATH_REFUSED');
+  try { await protectedPath(path, { root: layout.artifactsRoot, uid: layout.ownerUid }); } catch { refuse('OUTPUT_PATH_REFUSED'); }
+  const present = await lstat(path).then(() => true, error => (error?.code === 'ENOENT' ? false : refuse('OUTPUT_PATH_REFUSED')));
+  if (present) refuse('OUTPUT_EXISTS');
+}
+
 /**
  * Compact JSON, no trailing newline, created with O_EXCL|O_NOFOLLOW (never replaces anything),
  * root:root 0644, fsynced, then read back through the reviewed custody reader.
@@ -142,7 +166,7 @@ export async function writeArtifact(path, value, { layout = LAYOUT, maxBytes = M
   if (bytes.length < 1 || bytes.length > maxBytes) refuse('OUTPUT_TOO_LARGE');
   if (!absolute(path) || !artifactPattern(layout).test(path) || dirname(path) === layout.currentDir || (name !== undefined && !path.endsWith(`/${name}`))) refuse('OUTPUT_PATH_REFUSED');
   try { await protectedPath(path, { root: layout.artifactsRoot, uid: layout.ownerUid }); } catch { refuse('OUTPUT_PATH_REFUSED'); }
-  let handle;
+  let handle, written = false;
   try {
     handle = await open(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o644);
   } catch (error) { refuse(error?.code === 'EEXIST' ? 'OUTPUT_EXISTS' : 'OUTPUT_PATH_REFUSED'); }
@@ -156,15 +180,16 @@ export async function writeArtifact(path, value, { layout = LAYOUT, maxBytes = M
     await handle.close(); handle = undefined;
     const folder = await open(dirname(path), constants.O_RDONLY);
     try { await folder.sync(); } catch { /* Some platforms refuse fsync on a directory. */ } finally { await folder.close(); }
-  } catch {
-    await handle?.close().catch(() => undefined);
-    // This process created the file a moment ago (O_EXCL) in a root-only folder: remove the partial copy.
-    await unlink(path).catch(() => undefined);
-    refuse('OUTPUT_WRITE_REFUSED');
-  }
+    written = true;
+  } catch { /* handled below */ }
   const digest = sha256(bytes);
-  const readBack = await withPrivateBytes(path, { root: dirname(path), uid: layout.ownerUid, gid: layout.ownerGid, mode: 0o644, maxBytes: bytes.length }, raw => sha256(raw)).catch(() => null);
-  if (readBack !== digest) refuse('OUTPUT_READBACK_REFUSED');
+  const readBack = written ? await withPrivateBytes(path, { root: dirname(path), uid: layout.ownerUid, gid: layout.ownerGid, mode: 0o644, maxBytes: bytes.length }, raw => sha256(raw)).catch(() => null) : null;
+  if (readBack !== digest) {
+    await handle?.close().catch(() => undefined);
+    // This process created the file a moment ago (O_EXCL) in a root-only folder: remove the bad copy.
+    await unlink(path).catch(() => undefined);
+    refuse(written ? 'OUTPUT_READBACK_REFUSED' : 'OUTPUT_WRITE_REFUSED');
+  }
   return { path, sha256: digest, bytes: bytes.length };
 }
 
@@ -172,9 +197,10 @@ async function sourceManifestCommand(options, { layout, deps }) {
   const role = options['--role'], root = options['--root'], repository = options['--repository'];
   if (!ROLES.includes(role)) refuse('ARGUMENTS_REFUSED', ['--role']);
   if (!releasePattern(layout).test(root)) refuse('RELEASE_ROOT_REFUSED');
-  await assertDirectory(repository, layout, '--repository');
+  await assertRepository(repository, layout);
   await assertDirectory(root, layout, '--root');
   if (repository === root || repository.startsWith(`${root}/`) || root.startsWith(`${repository}/`)) refuse('RELEASE_ROOT_REFUSED');
+  await assertOutputFree(options['--out'], { layout });
   const manifest = await (deps.generateSourceManifest ?? generateSourceManifest)({ repositoryRoot: repository, sourceRoot: root, role, uid: layout.ownerUid });
   if (manifest?.sourceRoot !== root || manifest.role !== role || manifest.uid !== layout.ownerUid) refuse('SOURCE_MANIFEST_REFUSED');
   return writeArtifact(options['--out'], manifest, { layout });
@@ -188,10 +214,14 @@ export function buildEnvironmentReport() {
 async function uiBuildCommand(options, { layout, deps }) {
   const source = await readSource(options['--source'], { layout, flag: '--source' });
   if (source.value.role !== 'ui') refuse('SOURCE_ROLE_REFUSED');
+  await assertOutputFree(options['--out'], { layout });
+  // A fresh build only: a folder that already has a build may be the one the live site serves.
+  const buildRoot = join(source.value.sourceRoot, 'dialectical-engine/apps/ui/.next');
+  if (await lstat(buildRoot).then(() => true, error => (error?.code === 'ENOENT' ? false : refuse('UI_BUILD_EXISTS')))) refuse('UI_BUILD_EXISTS');
   const verifySource = deps.verifySourceManifest ?? verifySourceManifest;
   // Before: the root is exactly what the manifest inventoried. After: the build changed none of it.
   await verifySource(source.value, sourceBinding(source));
-  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, { ...UI_BUILD_ENVIRONMENT });
+  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, buildEnvironment(deps.execPath));
   await verifySource(source.value, sourceBinding(source));
   await (deps.verifyUiBuildManifest ?? verifyUiBuildManifest)(JSON.parse(JSON.stringify(build)), source.value);
   return writeArtifact(options['--out'], build, { layout });
@@ -221,15 +251,16 @@ async function launchPlanCommand(options, { layout, deps }) {
   const validatePlan = deps.validateLaunchPlan ?? validateLaunchPlan;
   if (!ROLES.includes(service)) refuse('ARGUMENTS_REFUSED', ['--service']);
   const kind = releasePattern(layout).exec(root)?.[1] ?? refuse('RELEASE_ROOT_REFUSED');
+  await assertOutputFree(options['--out'], { layout, name: `${service}-launch.json` });
   const from = await readJson(options['--from'], { layout, flag: '--from', maxBytes: MAX_PLAN_BYTES, artifact: false });
   try { validatePlan(from.value); } catch { refuse('FROM_PLAN_INVALID'); }
   if (from.value.service !== service) refuse('FROM_PLAN_INVALID');
   const source = await readSource(options['--source-manifest'], { layout, flag: '--source-manifest' });
   if (source.value.role !== service || source.value.sourceRoot !== root) refuse('SOURCE_MANIFEST_MISMATCH');
-  let uiBuild = null;
+  let uiBuild = null, build = null;
   if ((service === 'ui') !== (options['--ui-build'] !== undefined)) refuse('ARGUMENTS_REFUSED', ['--ui-build']);
   if (service === 'ui') {
-    const build = await readJson(options['--ui-build'], { layout, flag: '--ui-build', maxBytes: MAX_PUBLIC_ARTIFACT_BYTES, kind: 'ui-build' });
+    build = await readJson(options['--ui-build'], { layout, flag: '--ui-build', maxBytes: MAX_PUBLIC_ARTIFACT_BYTES, kind: 'ui-build' });
     if (!['sourceRoot', 'sourceRevision', 'sourceTree', 'contractSha256'].every(key => build.value[key] === source.value[key])) refuse('UI_BUILD_MISMATCH');
     uiBuild = { path: build.path, sha256: build.sha256 };
   }
@@ -247,12 +278,16 @@ async function launchPlanCommand(options, { layout, deps }) {
     apiPort: from.value.apiPort, uiPort: from.value.uiPort, mailExecutable: join(root, 'dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs'), mailFrom: from.value.mailFrom
   };
   try { validatePlan(plan); } catch { refuse('LAUNCH_PLAN_INVALID'); }
+  // Last and slowest: the release folder still matches its manifests byte for byte (as the launcher will check).
+  await (deps.verifySourceManifest ?? verifySourceManifest)(source.value, sourceBinding(source));
+  if (build) await (deps.verifyUiBuildManifest ?? verifyUiBuildManifest)(build.value, source.value);
   return writeArtifact(options['--out'], plan, { layout, maxBytes: MAX_PLAN_BYTES, name: `${service}-launch.json` });
 }
 
 async function nativePlanCommand(options, { layout, deps }) {
   const operation = options['--operation'];
   if (!['apply-and-plan', 'verify'].includes(operation)) refuse('ARGUMENTS_REFUSED', ['--operation']);
+  await assertOutputFree(options['--out'], { layout });
   // Lazy: native-operator.mjs loads tsx and pg, which exist only in an installed release root.
   const validateNativePlan = deps.validateNativePlan ?? (await import('../../preview-auth-dev/v1/native-operator.mjs')).validateNativePlan;
   const from = await readJson(options['--from'], { layout, flag: '--from', maxBytes: MAX_PLAN_BYTES, artifact: false });
@@ -276,6 +311,7 @@ async function nativePlanCommand(options, { layout, deps }) {
     publicationId: from.value.publicationId, approval
   };
   try { validateNativePlan(plan); } catch { refuse('NATIVE_PLAN_INVALID'); }
+  await (deps.verifySourceManifest ?? verifySourceManifest)(source.value, sourceBinding(source));
   return writeArtifact(options['--out'], plan, { layout, maxBytes: MAX_PLAN_BYTES });
 }
 

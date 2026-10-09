@@ -27,18 +27,30 @@ the free model list, `NODE_ENV=production`). They are the same constants the rev
 check demands from `ui.env`, so the build and the running site cannot disagree. `build-env`
 prints them with their sha256 so you can compare `ui.env` by hash, without printing it.
 
+Only the values above are set. Three other public flags are read only at build time and are left
+unset, which means their built-in defaults: `NEXT_PUBLIC_VERDICT_FIRST_UI` (verdict-first layout
+off), `NEXT_PUBLIC_EVALUATOR_DEV_MENU_ENABLED` (off) and `NEXT_PUBLIC_API_BASE` (`/api`).
+`ui.env` cannot carry them, so changing one is a source change, not a server setting.
+
 Why a new folder and not `preview-auth-dev/v1`: every file in `preview-auth-dev/v1` is part of the
 operator digest (the fingerprint the launchers, the native operator and the release guard compare).
-Keeping this tool outside it means adding or fixing the tool never changes that file set; it stays
-the 23 files the earlier releases measured.
+Keeping this tool outside it means adding or fixing the tool never adds a file to that set (23
+files today). The digest itself still changes whenever any of those 23 files changes, as it does
+in this release.
 
 What it does **not** do: package the release folders, stop or start anything, touch the database,
 install `native-plan.json`, or pin a release. Those stay the operator steps below.
 
 ## Commands
 
-Run as root on the server. Every command prints one JSON line on success, or one line
-`{"event":"PREVIEW_RELEASE_REFUSED","reason":…}` on stderr and exits 1.
+Run as root on the server. Every command ends with one JSON line on stdout on success, or one
+line `{"event":"PREVIEW_RELEASE_REFUSED","reason":…}` on stderr and exit 1. `ui-build` and
+`source-manifest` also pass through the build's and git's own output before that line (paths, no
+secrets). Every check of `--out` runs before the slow work. A file left half-written by a killed
+run makes the next run refuse with `OUTPUT_EXISTS`: delete that one file by hand (no reader
+accepts it). `launch-plan` and `native-plan` re-check the release folder byte for byte before
+writing, so they take a few minutes each. `ui-build` refuses a folder that already has a build
+(`.next`), so it can never rebuild the website a running service serves.
 
 | Command | What it does |
 |---|---|
@@ -56,8 +68,8 @@ This follows the release runbook: steps 1-3 (package, build, fingerprints) need 
 the native-plan steps belong to its steps 5b and 7 (downtime, owner yes).
 
 **0. Names for this release.** Open one root shell first (`sudo -i`) and keep it for every
-step below. Change `LABEL` for each release (lower-case letters, digits, dashes); everything
-else is derived. The `rel` function runs the tool from the candidate API release, so the tool
+step below. `LABEL` below is the example of the release built from dev 23402d10e: change it for
+each release (lower-case letters, digits, dashes); everything else is derived. The `rel` function runs the tool from the candidate API release, so the tool
 that stages a release is that release's own reviewed copy.
 
 ```sh
@@ -154,9 +166,14 @@ rel launch-plan --service api --from "$OLDA" --root "$CAPI" --source-manifest "$
 rel launch-plan --service ui --from "$OLDU" --root "$CUI" --source-manifest "$ART/candidate-ui-source.json" --ui-build "$ART/candidate-ui-build.json" --native-attestation "$ART/native-first-verify.json" --out "$ART/ui-launch.json"
 ```
 
-Without the lifecycle, set `OLDA` and `OLDU` to the live plans named in the newest release
-drop-in instead. Fallback plans go in their own folder (the plan file name is fixed per
+`jq` must be installed (`command -v jq`); if it is missing, the variables come out empty and the
+tool refuses. Without the lifecycle, set `OLDA` and `OLDU` to the live plans named in the newest
+release drop-in instead. Fallback plans go in their own folder (the plan file name is fixed per
 service), with `--root` and `--source-manifest` of the fallback folders.
+
+The verify plan keeps the live register publication. Its `nodeRuntimeVersion` row therefore
+still names the earlier source revision and operator digest; the native verify does not compare
+that row, and a new publication is a separate, reviewed step.
 
 Then pin and restart exactly as `deploy/preview-lifecycle/v1/README.md` "Pinning a NEW release"
 says (`prestart.mjs pin --from "$ART/api-launch.json"`, the same for ui, regenerate both release

@@ -68,7 +68,9 @@ const realValidator = (layout: { artifactsRoot: string }) => (plan: any) => {
   const map = (file: any) => (file ? { ...file, path: file.path.replace(layout.artifactsRoot, '/opt/debateai-v3-preview/artifacts') } : file);
   return plans.validateLaunchPlan({ ...plan, sourceManifest: map(plan.sourceManifest), nativeAttestation: map(plan.nativeAttestation), uiBuild: map(plan.uiBuild) });
 };
-const run = (argv: string[], layout: any, deps: Record<string, unknown> = {}) => tool.runCommand(argv, { layout, deps });
+// The reviewed byte-for-byte verifiers need a real installed release; tests that are not about them pass.
+const passVerifiers = { verifySourceManifest: async () => true, verifyUiBuildManifest: async () => true };
+const run = (argv: string[], layout: any, deps: Record<string, unknown> = {}) => tool.runCommand(argv, { layout, deps: { ...passVerifiers, ...deps } });
 
 describe('command line', () => {
   it('accepts each subcommand with exactly its flags', () => {
@@ -152,7 +154,8 @@ describe('writing artifacts', () => {
 describe('source-manifest', () => {
   function release(s: ReturnType<typeof server>) {
     const releases = join(s.base, 'releases'), root = join(releases, 'auth-dev-candidate-new-api'), repository = join(s.layout.artifactsRoot, 'auth-dev-new-v1', 'source-reference');
-    for (const dir of [releases, root, repository]) { mkdirSync(dir, { recursive: true }); chmodSync(dir, 0o755); }
+    for (const dir of [releases, root, repository, join(repository, '.git')]) { mkdirSync(dir, { recursive: true }); chmodSync(dir, 0o755); }
+    writeFileSync(join(repository, '.git', 'config'), '[core]\n'); chmodSync(join(repository, '.git', 'config'), 0o644);
     return { root, repository, layout: { ...s.layout, releasesRoot: releases } };
   }
 
@@ -172,14 +175,16 @@ describe('source-manifest', () => {
     ['an unknown role', () => ({ role: 'worker' })],
     ['a linked root', (r: any, s: any) => { const link = join(s.base, 'releases', 'auth-dev-candidate-link-api'); symlinkSync(r.root, link); return { root: link }; }],
     ['a group-writable root', (r: any) => { chmodSync(r.root, 0o775); return {}; }],
-    ['a relative repository', () => ({ repository: 'source-reference' })]
+    ['a relative repository', () => ({ repository: 'source-reference' })],
+    ['a repository whose git config others can change (git obeys it as root)', (r: any) => { chmodSync(join(r.repository, '.git', 'config'), 0o664); return {}; }],
+    ['a repository whose .git is a link', (r: any, s: any) => { rmSync(join(r.repository, '.git'), { recursive: true }); mkdirSync(join(s.base, 'git'), { mode: 0o755 }); symlinkSync(join(s.base, 'git'), join(r.repository, '.git')); return {}; }],
+    ['an output that already exists (checked before the long work)', (_r: any, s: any) => { s.write(join(s.art, 'x.json'), '{}'); return {}; }]
   ])('refuses %s before generating anything', async (_name, patch) => {
     const s = server(), r = release(s);
     const input = { root: r.root, repository: r.repository, role: 'api', ...patch(r, s) };
     let called = false;
     await expect(run(['source-manifest', '--repository', input.repository, '--root', input.root, '--role', input.role, '--out', join(s.art, 'x.json')], r.layout, { generateSourceManifest: async () => { called = true; } })).rejects.toThrow();
     expect(called).toBe(false);
-    expect(existsSync(join(s.art, 'x.json'))).toBe(false);
   });
 
   it('refuses a generated manifest for another root, role or owner', async () => {
@@ -241,8 +246,8 @@ describe('ui-build and verify', () => {
     const out = join(s.art, 'candidate-ui-build.json');
     const result = await run(['ui-build', '--source', source.path, '--out', out], s.layout, {
       verifySourceManifest: async (_m: unknown, binding: any) => { events.push(`verify:${binding.manifestSha256}`); },
-      buildUiArtifact: async (m: any, env: unknown) => { events.push('build'); expect(m.role).toBe('ui'); expect(env).toEqual(tool.UI_BUILD_ENVIRONMENT); return build; },
-      verifyUiBuildManifest: async () => { events.push('verify-build'); }
+      buildUiArtifact: async (m: any, env: unknown) => { events.push('build'); expect(m.role).toBe('ui'); expect(env).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' }); return build; },
+      verifyUiBuildManifest: async () => { events.push('verify-build'); }, execPath: '/opt/node/bin/node'
     });
     expect(events).toEqual([`verify:${source.sha256}`, 'build', `verify:${source.sha256}`, 'verify-build']);
     expect(readFileSync(out, 'utf8')).toBe(JSON.stringify(build));
@@ -258,6 +263,18 @@ describe('ui-build and verify', () => {
       buildUiArtifact: async () => ({ schema: 'preview-auth-dev-ui-build-v1' }), verifyUiBuildManifest: async () => undefined
     })).rejects.toThrow('PREVIEW_SOURCE_INVENTORY_REFUSED');
     expect(existsSync(join(s.art, 'candidate-ui-build.json'))).toBe(false);
+  });
+
+  it('refuses to rebuild a folder that already has a build, or to build towards an existing output', async () => {
+    const s = server();
+    const releases = join(s.base, 'releases'), root = join(releases, 'auth-dev-candidate-new-ui');
+    mkdirSync(join(root, 'dialectical-engine/apps/ui/.next'), { recursive: true });
+    const layout = { ...s.layout, releasesRoot: releases };
+    const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui', { sourceRoot: root }));
+    const never = { buildUiArtifact: async () => { throw new Error('built'); }, verifySourceManifest: async () => { throw new Error('verified'); } };
+    await expect(run(['ui-build', '--source', source.path, '--out', join(s.art, 'candidate-ui-build.json')], layout, never)).rejects.toMatchObject({ code: 'UI_BUILD_EXISTS' });
+    const out = s.write(join(s.art, 'candidate-ui-build.json'), '{}').path;
+    await expect(run(['ui-build', '--source', source.path, '--out', out], layout, never)).rejects.toMatchObject({ code: 'OUTPUT_EXISTS' });
   });
 
   it('refuses to build from a non-UI manifest', async () => {
@@ -358,6 +375,16 @@ describe('launch-plan', () => {
     await expect(run(t.argv({ '--ui-build': other.path }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).rejects.toMatchObject({ code: 'UI_BUILD_MISMATCH' });
   });
 
+  it('re-verifies the release folder and the UI build byte for byte, last, and writes nothing on drift', async () => {
+    const t = staged('ui');
+    const seen: string[] = [];
+    await run(t.argv(), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout), verifySourceManifest: async (_m: unknown, b: any) => { seen.push(`source:${b.manifestSha256}`); }, verifyUiBuildManifest: async () => { seen.push('build'); } });
+    expect(seen).toEqual([`source:${t.source.sha256}`, 'build']);
+    const d = staged('api');
+    await expect(run(d.argv(), d.s.layout, { validateLaunchPlan: realValidator(d.s.layout), verifySourceManifest: async () => { throw new TypeError('PREVIEW_SOURCE_INVENTORY_REFUSED'); } })).rejects.toThrow('PREVIEW_SOURCE_INVENTORY_REFUSED');
+    expect(existsSync(join(d.s.art, 'api-launch.json'))).toBe(false);
+  });
+
   it('runs the reviewed validateLaunchPlan before writing', async () => {
     const t = staged('api');
     await expect(run(t.argv(), t.s.layout, { validateLaunchPlan: (plan: any) => { if (plan.sourceRoot === NEW_ROOT.api) throw new Error('no'); return plan; } })).rejects.toMatchObject({ code: 'LAUNCH_PLAN_INVALID' });
@@ -405,6 +432,12 @@ describe('native-plan', () => {
     const t = staged(fromPatch, manifestPatch);
     await expect(run(t.argv(operation), t.s.layout)).rejects.toMatchObject({ code });
     expect(existsSync(join(t.s.art, `native-plan-${operation}.json`))).toBe(false);
+  });
+
+  it('re-verifies the candidate API folder before writing', async () => {
+    const t = staged();
+    await expect(run(t.argv('verify'), t.s.layout, { verifySourceManifest: async () => { throw new TypeError('PREVIEW_SOURCE_INVENTORY_REFUSED'); } })).rejects.toThrow('PREVIEW_SOURCE_INVENTORY_REFUSED');
+    expect(existsSync(join(t.s.art, 'native-plan-verify.json'))).toBe(false);
   });
 
   it('accepts the old plan from a root-only archive folder outside the artifacts folder', async () => {
