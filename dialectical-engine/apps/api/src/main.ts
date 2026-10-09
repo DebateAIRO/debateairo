@@ -27,6 +27,13 @@ import { RecoveryEmailService } from "./recovery-email.js";
 import { PostgresAccountProfileRepository,PostgresRecoveryEmailRepository } from "@debateai/db";
 import { Hatchet } from "@hatchet-dev/typescript-sdk";
 import { randomUUID } from "node:crypto";
+import { DataExportApplication } from "./data-export/service.js";
+import { FileDataExportStore } from "./data-export/store.js";
+import { collectSnapshot } from "./data-export/snapshot.js";
+import { loadArchiveCatalog } from "./data-export/archive-catalog.js";
+import { OwnerViewAdapter } from "./data-export/owner-view-adapter.js";
+import { TemplatedDataExportMail } from "./data-export/mail.js";
+import { PostgresDataExportRepository, PostgresDataExportSource } from "@debateai/db";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
@@ -35,6 +42,8 @@ import {
   assertPublicationSecretDomains,
   configureCustodyGroup,
   ContentCipher,
+  decrypt,
+  openRecord,
   FilePublicationKeyStore,
   FileRunContentKeyStore,
   FileUserDekStore,
@@ -273,7 +282,8 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
   ],
   // Paid plans: the billing custody files are text, not 32-byte keys, so they cannot be pairwise compared
   // as key material — but they are refused here if they alias any key, store or each other by path or inode.
-  additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH, ...billingCustodyPaths(environment)]
+  additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH, ...billingCustodyPaths(environment),
+    ...(environment.DATA_EXPORT_STORE_PATH === undefined ? [] : [environment.DATA_EXPORT_STORE_PATH])]
 }));
 const pool = boot.hold(createPool(environment.DATABASE_URL));
 const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!));
@@ -1320,13 +1330,68 @@ const billingRouteOptions: BillingRouteOptions | undefined =
         ...(billingUsageReader === undefined ? {} : { usage: billingUsageReader }),
         ...(billingRuntime === undefined ? {} : billingRuntime.routes)
       });
+const DATA_EXPORT_TICK_MS = 15_000;
+const ownerStories = new RepositoryAnswerStoryApplication(storyRepository);
+const ownerDisclosures = new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(pool));
+let dataExport: DataExportApplication | undefined;
+let dataExportTimer: ReturnType<typeof setInterval> | undefined;
+let triggerDataExportWork = (): void => {};
+if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
+  const repository = new PostgresDataExportRepository(authorizationPool, auditContextHasher);
+  const source = new PostgresDataExportSource(authorizationPool);
+  const store = new FileDataExportStore({ directory: environment.DATA_EXPORT_STORE_PATH, users: dekStore });
+  const mail = new TemplatedDataExportMail(new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs
+  }));
+  const ownerDeps = { application, stories: ownerStories, disclosures: ownerDisclosures };
+  dataExport = new DataExportApplication({
+    repository, store, mail, archiveCatalog: loadArchiveCatalog,
+    publicAppUrl: environment.PUBLIC_APP_URL, workerId: randomUUID(),
+    collect: (claim, workerId) => collectSnapshot({
+      claim, workerId, source,
+      ownerView: new OwnerViewAdapter(ownerDeps, runKeyStore, claim.sessionId),
+      decrypt: {
+        openUserField: async (userId, field, envelope) => {
+          const dek = await dekStore.load(userId);
+          let plain: Buffer | undefined;
+          try {
+            plain = decrypt(dek, envelope as Parameters<typeof decrypt>[1],
+              ["identity", field, userId, "run:none", userId, `user-dek:${userId}`, "1"] as const);
+            return plain.toString("utf8");
+          } finally { plain?.fill(0); dek.fill(0); }
+        },
+        openRecord: (aad, ciphertext) => {
+          const plain = openRecord(recordsKey, aad, ciphertext);
+          try { return plain.toString("utf8"); } finally { plain.fill(0); }
+        },
+        openSupport: async (handle, wrapped, context, ciphertext) => {
+          const key = await supportKeys.unwrapDataKey(handle, wrapped);
+          let plain: Buffer | undefined;
+          try {
+            plain = supportKeys.openContent(context as Parameters<typeof supportKeys.openContent>[0], key, ciphertext);
+            return plain.toString("utf8");
+          } finally { plain?.fill(0); key.fill(0); }
+        }
+      },
+      now: () => new Date()
+    })
+  });
+  const app = dataExport;
+  triggerDataExportWork = createSingleFlightErasureReconciler(
+    () => app.runOnce(), () => console.error("[DATA_EXPORT_WORK_PENDING]"));
+  dataExportTimer = setInterval(triggerDataExportWork, DATA_EXPORT_TICK_MS);
+  dataExportTimer.unref();
+}
 const api = buildApi({
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig }),
   application,
-  stories: new RepositoryAnswerStoryApplication(storyRepository),
+  stories: ownerStories,
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
   // the content-free disclosure record, on the same runtime pool.
-  disclosures: new RepositoryAnswerDisclosureApplication(new ServeDisclosureRepository(pool)),
+  disclosures: ownerDisclosures,
+  ...(dataExport === undefined ? {} : { dataExport }),
   // A21 (owner decision O4): /new's yes/no, from the very picker admission asks — the
   // same test `evaluateAskAdmission` makes before it lets the scorecard choose.
   modelScorecardInForce: modelPicker.scorecard.state === "VALID",
@@ -1407,6 +1472,7 @@ if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
+api.addHook("onClose",async () => { if (dataExportTimer !== undefined) clearInterval(dataExportTimer); });
 api.addHook("onClose",async () => billingRuntime?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
@@ -1490,6 +1556,7 @@ await startup.run("listen", async () => {
 // can never hold readiness hostage, while the SQL ACK gate still prevents any
 // user-key destruction before completion delivery succeeds.
 triggerErasureReconciliation();
+triggerDataExportWork();
 triggerAuthenticationRiskCleanup();
 triggerRetentionPurge();
 billingRuntime?.start();

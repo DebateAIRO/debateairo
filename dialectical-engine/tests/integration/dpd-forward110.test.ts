@@ -118,7 +118,7 @@ it('L4-L6 source, manifest and prior-body drift refuse from a bounded source cop
  const root=await mkdtemp(join(tmpdir(),'dpd-forward110-'));
  try{
   await mkdir(join(root,'packages/db/src'),{recursive:true});
-  for(const name of ['migration-lineage.ts','migration-forward108.ts','migration-forward110.ts'])await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
+  for(const name of ['migration-lineage.ts','migration-forward108.ts','migration-forward110.ts','migration-forward111.ts'])await cp(new URL(`../../packages/db/src/${name}`,import.meta.url),join(root,'packages/db/src',name));
   await cp(new URL('../../migrations',import.meta.url),join(root,'migrations'),{recursive:true});
   const script=join(root,'probe.mts');await writeFile(script,`import {loadMigrationPlan} from './packages/db/src/migration-lineage.ts'; await loadMigrationPlan();`);
   const run=()=>promisify(execFile)(process.execPath,['--import','tsx',script],{cwd:process.cwd(),timeout:30000,maxBuffer:100000});
