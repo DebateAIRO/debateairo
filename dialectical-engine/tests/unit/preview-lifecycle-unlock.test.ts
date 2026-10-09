@@ -20,7 +20,7 @@ const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0
 const ready = (expiresAt: number, n = 1) => ({ configSha256: 'a'.repeat(64), generation: uuid(9), ackAdapterId: 'capture', rehearsalId: uuid(n), evidenceExpiresAt: new Date(expiresAt) });
 
 /** A fake clock that only moves when the loop sleeps, plus recording fakes for both interfaces. */
-function harness(options: { evidenceTtlMs?: number; staleAfterRefresh?: boolean; publish?: () => Promise<boolean>; open?: () => Promise<void>; close?: () => Promise<unknown>; abortAfterPublishes?: number } = {}) {
+function harness(options: { evidenceTtlMs?: number; staleAfterRefresh?: boolean; publish?: () => Promise<boolean>; open?: () => Promise<void>; close?: () => Promise<unknown>; abortAfterPublishes?: number; slowExtendMs?: number } = {}) {
   let clock = start;
   const calls: string[] = [], leases: { at: number; until: number }[] = [], logs: any[] = [];
   const controller = new AbortController();
@@ -28,7 +28,12 @@ function harness(options: { evidenceTtlMs?: number; staleAfterRefresh?: boolean;
   const writer = {
     kind: 'interim-recovery-login',
     open: options.open ?? (async ({ validUntil }: { validUntil: Date }) => { calls.push('open'); leases.push({ at: clock, until: validUntil.getTime() }); }),
-    extend: async ({ validUntil }: { validUntil: Date }) => { calls.push('extend'); leases.push({ at: clock, until: validUntil.getTime() }); },
+    extend: async ({ validUntil }: { validUntil: Date }) => {
+      calls.push('extend'); leases.push({ at: clock, until: validUntil.getTime() });
+      // Like the real actor: the renewal takes time, and a lease already in the past is refused.
+      clock += options.slowExtendMs ?? 0;
+      if (validUntil.getTime() <= clock) throw Object.assign(new Error('STAFF_JIT_LEASE_REFUSED'), { code: 'STAFF_JIT_LEASE_REFUSED' });
+    },
     publish: options.publish ?? (async () => { calls.push('publish'); publishes++; if (publishes === options.abortAfterPublishes) controller.abort(); return true; }),
     revoke: async (generation: string) => { calls.push(`revoke:${generation}`); return true; },
     close: options.close ?? (async () => { calls.push('close'); return { passwordNull: true, expiredMinusInfinity: true, noSessions: true }; })
@@ -68,6 +73,15 @@ describe('team tools unlock window', () => {
     }
     const gaps = h.leases.slice(1).map((lease, index) => lease.at - h.leases[index]!.at);
     expect(Math.max(...gaps)).toBeLessThanOrEqual(2 * MINUTE + 10_000);
+  });
+
+  it('does not renew the login in the last 30 seconds, so a slow renewal cannot turn the end into a failure', async () => {
+    const h = harness({ slowExtendMs: 15_000 });
+    const windowMs = 2 * MINUTE + 10_000;
+    const result = await unlock.runUnlockWindow({ writer: h.writer, evidence: h.evidence, deps: h.deps, windowMs });
+    expect(result).toMatchObject({ outcome: 'WINDOW_ENDED', roleReset: true });
+    expect(h.logs[1]).toMatchObject({ event: 'PREVIEW_TEAM_TOOLS_LOCKED', outcome: 'WINDOW_ENDED' });
+    for (const lease of h.leases) expect(start + windowMs - lease.at).toBeGreaterThanOrEqual(30_000);
   });
 
   it('re-captures ACK evidence before it expires', async () => {

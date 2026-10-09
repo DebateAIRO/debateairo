@@ -31,6 +31,8 @@ export const PUBLISH_EVERY_MS = 10_000;
 export const LEASE_MS = 4 * 60 * 1000;
 export const ROLL_EVERY_MS = 2 * 60 * 1000;
 export const REFRESH_BEFORE_MS = 60_000;
+/** No renewal this close to the end: the current lease already reaches it, and a slow renewal could fail the clean end. */
+export const NO_RENEWAL_BEFORE_END_MS = 30_000;
 const DATABASE_JIT_LIMIT_MS = 5 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const HASH = /^[a-f0-9]{64}$/;
@@ -78,7 +80,7 @@ export async function runUnlockWindow({ writer, evidence, deps = {}, windowMs = 
     for (;;) {
       const at = now();
       if (at >= endsAt || signal.aborted) break;
-      if (at - rolledAt >= rollEveryMs) { await writer.extend({ validUntil: lease(at) }); rolledAt = at; }
+      if (at - rolledAt >= rollEveryMs && endsAt - at >= NO_RENEWAL_BEFORE_END_MS) { await writer.extend({ validUntil: lease(at) }); rolledAt = at; }
       let ready = await evidence.current();
       if (!ready || ready.evidenceExpiresAt.getTime() - at < refreshBeforeMs) {
         const previous = ready;
