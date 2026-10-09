@@ -36,8 +36,6 @@ export function LandingHero({ catalog }: { catalog: MessageCatalog }): JSX.Eleme
       <ul aria-label={t(catalog, "home.practiceFacts")} className="lpStatBar">
         <li>{t(catalog, "home.fourTurns")}</li>
         <li aria-hidden="true" className="lpStatRule" />
-        <li>{t(catalog, "home.roundsThisWeek")}</li>
-        <li aria-hidden="true" className="lpStatRule" />
         <li>{t(catalog, "home.noAudience")}</li>
       </ul>
     </section>

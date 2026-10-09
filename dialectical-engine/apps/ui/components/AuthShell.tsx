@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
 import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
 import type { MessageCatalog } from "@/lib/i18n/translate";
 import authEnglish from "@/messages/en/auth.json";
@@ -38,7 +38,8 @@ export function AuthShell({
   title,
   description,
   children,
-  footer
+  footer,
+  focusTitle = false
 }: Readonly<{
   eyebrow: string;
   lang?: string;
@@ -46,7 +47,13 @@ export function AuthShell({
   description: string;
   children: ReactNode;
   footer: ReactNode;
+  /** Moves focus to the headline when the screen opens (it replaced a form whose control had focus). */
+  focusTitle?: boolean;
 }>) {
+  const headline = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (focusTitle) headline.current?.focus();
+  }, [focusTitle]);
   return (
     <main lang={lang} className="authScreen scroll" aria-labelledby="auth-title">
       <div className="authCard">
@@ -59,7 +66,7 @@ export function AuthShell({
           </div>
           <header className="authIntro">
             <p className="authEyebrow">{eyebrow}</p>
-            <h1 className="authHeadline" id="auth-title">{title}</h1>
+            <h1 className="authHeadline" id="auth-title" ref={headline} tabIndex={focusTitle ? -1 : undefined}>{title}</h1>
             <p className="authLede">{description}</p>
           </header>
           <div className="authPanel">

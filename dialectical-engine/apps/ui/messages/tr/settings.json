@@ -170,6 +170,7 @@
   "settings.phone.change": "Telefonu değiştir",
   "settings.phone.required": "Devam etmek için telefonunuzu ekleyin. Sorunuz ve seçenekleriniz korunur.",
   "settings.security.lastPath": "Bunu kaldırmadan önce başka bir giriş yöntemi ekleyin.",
+  "settings.security.remove": "Kaldır",
   "settings.security.codesRemaining": "Kurtarma kodları: {count}",
   "settings.security.regenerate": "Yeni kurtarma kodları oluştur",
   "settings.security.refreshFailed": "Güvenlik bilgileri yenilenemedi. Sayfayı yeniden yükleyin."

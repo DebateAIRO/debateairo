@@ -59,6 +59,7 @@
   "chrome.footer.cookiePreferences": "Sakladığımız çerezler",
   "chrome.security": "Güvenlik",
   "chrome.logout": "Çıkış yap",
+  "chrome.logIn": "Oturum aç",
   "chrome.accountError": "İşlem başarısız oldu. Sayfayı yeniden yükleyip tekrar deneyin.",
   "chrome.footer.pricing": "Fiyatlar",
   "chrome.footer.cancel": "Plan iptali",

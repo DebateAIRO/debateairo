@@ -33,6 +33,7 @@ import {
   planCardNamesRoster,
   type ScorecardSignal
 } from "@/lib/modelStrength";
+import { previewPlanRoster } from "@/lib/previewPlanRoster";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
   buildNewDebateAskConfig,
@@ -44,6 +45,9 @@ import {
   type RiskTier
 } from "./defaults";
 import billingEnglish from "@/messages/en/billing.json";
+
+// NEXT_PUBLIC is intentionally a direct reference so Next inlines this public build flag.
+const displayPlanTierRosters = previewPlanRoster(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, PLAN_TIER_ROSTERS);
 
 type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";
 
@@ -634,7 +638,7 @@ function PlanCardModels({ plan, scorecard, catalog }: { plan: PlanTier; scorecar
   }
   return (
     <span className="ndTierModels">
-      {PLAN_TIER_ROSTERS[plan].map((modelId) => (
+      {displayPlanTierRosters[plan].map((modelId) => (
         <span key={modelId} className="ndTierModel">
           <span
             className="modelDot"

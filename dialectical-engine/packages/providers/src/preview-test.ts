@@ -43,10 +43,39 @@ export function validatePreviewProviderTestConfig(value: unknown): PreviewProvid
  if(source===undefined)return refused();
  return parsePreviewProviderTestConfig(source);
 }
+/**
+ * Step 1 (owner, 2026-10-08): the identity user ids that may start debates on the private
+ * preview. Malformed refuses to boot; a value (even an empty one) without the preview
+ * configuration refuses to boot, so it never silently applies to the real site; missing or
+ * empty on the preview is an empty team and every ask is refused at request time.
+ */
+export const PREVIEW_TEAM_MAX_MEMBERS = 20 as const;
+const PREVIEW_TEAM_USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+export function parsePreviewTeamUserIds(source: string | undefined, previewConfigured: boolean): readonly string[] | undefined {
+  if (source !== undefined && !previewConfigured) throw new TypeError("PREVIEW_TEAM_USER_IDS_WITHOUT_PREVIEW");
+  if (!previewConfigured) return undefined;
+  if (source === undefined || source.trim() === "") return Object.freeze([]);
+  let value: unknown; try { value = JSON.parse(source); } catch { throw new TypeError("PREVIEW_TEAM_USER_IDS_INVALID"); }
+  if (!Array.isArray(value) || value.length > PREVIEW_TEAM_MAX_MEMBERS
+    || value.some(id => typeof id !== "string" || !PREVIEW_TEAM_USER_ID.test(id))
+    || new Set(value).size !== value.length) throw new TypeError("PREVIEW_TEAM_USER_IDS_INVALID");
+  return Object.freeze([...value as string[]]);
+}
+/** The refusal a person outside the preview's team gets, at the route (403) and in submit. */
+export const PREVIEW_TEAM_ONLY = "PREVIEW_TEAM_ONLY" as const;
+/** Off the preview there is no team rule; on it, only a listed identity user id may start a debate. */
+export function previewTeamAdmits(
+  config: PreviewProviderTestConfig | undefined, teamUserIds: readonly string[] | undefined, userId: string | undefined
+): boolean {
+  if (config === undefined) return true;
+  return userId !== undefined && teamUserIds !== undefined && teamUserIds.includes(userId);
+}
 export function previewPlanTierRosters<T extends Readonly<{ free: readonly string[]; premium: readonly string[] }>>(
   config: PreviewProviderTestConfig | undefined, defaults: T
 ): Readonly<{ free: readonly string[]; premium: readonly string[] }> {
-  return config === undefined ? defaults : Object.freeze({ free: config.free_model_ids, premium: defaults.premium });
+  // Step 1 (owner, 2026-10-08): Premium runs on the same single GLM on the private preview.
+  // One id, never [GLM, GLM]: admission maps each roster id to a panel member.
+  return config === undefined ? defaults : Object.freeze({ free: config.free_model_ids, premium: config.free_model_ids });
 }
 export function assertPreviewProviderTargets(config: PreviewProviderTestConfig | undefined, targets: readonly ProviderDiscoveryTarget[]): void {
   if (config === undefined) return;
@@ -120,6 +149,28 @@ export function createPreviewGuardedFetch(port: PreviewBudgetPort): typeof fetch
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
   };
 }
+/**
+ * Step 1 (owner, 2026-10-08): the v2 gate refuses with 409 and {"error": CODE}. The team's day
+ * being used up is the product's daily code (a run-level spend stop lifted by the next day).
+ * Too many calls in flight (CONCURRENCY_LIMIT_REACHED) is the gate's own 429: nothing was
+ * reserved, and the same call fits once one in flight settles, so it is the transient transport
+ * failure every vendor 429 already is (PROVIDER_CALL_FAILED: the gateway wraps it, the runner
+ * cools down and retries), never a money stop. Every other refusal, and any body that is not
+ * exactly that shape, keeps the per-run money code.
+ */
+const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_REACHED", "DAILY_CALL_LIMIT_REACHED"]);
+const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED"]);
+function previewAuthorityRefusal(status: number | undefined, row: unknown): TypedDomainError {
+  const code = status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
+    ? (row as Record<string, unknown>).error : undefined;
+  if (typeof code === "string" && PREVIEW_DAILY_REFUSALS.has(code)) {
+    return new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "Private preview team budget for today is used up");
+  }
+  if (typeof code === "string" && PREVIEW_TRANSIENT_REFUSALS.has(code)) {
+    return new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate is at its limit of calls in flight");
+  }
+  return new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");
+}
 /** Local IPC only: application principals never receive the provider credential or ledger write access. */
 export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig): PreviewBudgetPort {
   return Object.freeze({ execute(input: PreviewBudgetExecution, signal?: AbortSignal) {
@@ -128,13 +179,21 @@ export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig): P
       const request = httpRequest({ socketPath: config.budget_socket, path: "/complete", method: "POST",
         headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data) } }, response => {
         const chunks: Buffer[] = []; let bytes = 0;
-        response.on("data", (chunk: Buffer) => { bytes += chunk.length; if (bytes > 8 * 1024 * 1024) response.destroy(); else chunks.push(chunk); });
+        // A destroy without an error emits only 'close': settle first, so the call can never hang.
+        response.on("data", (chunk: Buffer) => {
+          bytes += chunk.length;
+          if (bytes <= 8 * 1024 * 1024) { chunks.push(chunk); return; }
+          reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response too large"));
+          response.destroy();
+        });
         response.on("error", () => reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response unavailable")));
+        // A reply that closes before its end is unreadable; after 'end' this reject is a no-op.
+        response.on("close", () => { if (!response.complete) reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response unavailable")); });
         response.on("end", () => {
           let result: unknown; try { result = JSON.parse(Buffer.concat(chunks).toString("utf8")); } catch { reject(new TypedDomainError("PROVIDER_USAGE_UNREPORTED", "Private preview authority response invalid")); return; }
           const row = result as Record<string, unknown>;
           if (response.statusCode !== 200 || typeof row !== "object" || row === null || !Number.isInteger(row.status) || typeof row.body !== "string") {
-            reject(new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request")); return;
+            reject(previewAuthorityRefusal(response.statusCode, row)); return;
           }
           resolve({ status: Number(row.status), body: row.body });
         });

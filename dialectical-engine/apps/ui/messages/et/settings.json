@@ -170,6 +170,7 @@
   "settings.phone.change": "Muuda telefoninumbrit",
   "settings.phone.required": "Jätkamiseks lisa telefoninumber. Küsimus ja valikud säilivad.",
   "settings.security.lastPath": "Lisa enne selle eemaldamist teine sisselogimisviis.",
+  "settings.security.remove": "Eemalda",
   "settings.security.codesRemaining": "Taastekoodid: {count}",
   "settings.security.regenerate": "Loo uued taastekoodid",
   "settings.security.refreshFailed": "Turbeandmeid ei saanud värskendada. Laadi leht uuesti."

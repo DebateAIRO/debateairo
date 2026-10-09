@@ -110,6 +110,7 @@
   "newDebate.legalGate.signOut": "Sign out",
   "newDebate.legalGate.signOutFailed": "Signing out did not complete. Please try again.",
   "newDebate.room.locationBlocked": "New debates can't be started from your current location. Your debates stay available to read.",
+  "newDebate.room.previewTeamOnly": "Debates on this preview are open only to the team.",
   "newDebate.room.siteFull": "Today's limit is reached. You can still ask — your debate will start by itself when the limit resets.",
   "newDebate.room.siteClose": "You're close to today's limit. This debate will still run in full; later ones may wait until the reset.",
   "newDebate.room.alreadyWaiting": "One question can wait at a time. Yours will start at {time}; ask this one after that.",
