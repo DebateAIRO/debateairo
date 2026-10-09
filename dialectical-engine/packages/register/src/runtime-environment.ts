@@ -636,6 +636,12 @@ function validateApiEnvironment(
     && (environment.GEOIP_COUNTRY_DB_PATH === undefined || environment.TOR_EXIT_LIST_PATH === undefined)) {
     throw new TypeError("GEOIP_PATHS_REQUIRED");
   }
+  // Auth API hardening 2026-10-09: hosted sign-up, resend and social sign-up need the Turnstile relay.
+  // Without its address every proof fails closed (TURNSTILE_UNAVAILABLE), a silent sign-up outage, so a
+  // hosted API refuses to start instead. Local mode keeps it optional.
+  if (deploymentMode === "hosted" && environment.TURNSTILE_SOCKET_PATH === undefined) {
+    throw new TypeError("TURNSTILE_SOCKET_PATH_REQUIRED");
+  }
   return { ...environment, DEPLOYMENT_MODE: deploymentMode };
 }
 
