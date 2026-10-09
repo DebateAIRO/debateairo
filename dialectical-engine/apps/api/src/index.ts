@@ -1268,9 +1268,12 @@ export const authorizationPolicyInventory = Object.freeze([
   {route:'POST /v1/account/social/unlink',auth:'user',origin:'trusted',resource:'identity',action:'social-unlink'},
   // Age gate (Turn 8): the browser-only pre-register check, like login held to the exact Origin.
   { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
-  { route: "POST /v1/auth/register", auth: "public", resource: "identity", action: "register" },
-  { route: "POST /v1/auth/verify-email", auth: "public", resource: "identity", action: "verify-email" },
-  { route: "POST /v1/auth/resend-verification", auth: "public", resource: "identity", action: "resend-verification" },
+  // Auth API hardening 2026-10-09: the four public account routes the site's own pages call with
+  // fetch POST (verify-email included — the mailed link opens a page that posts the token) take the
+  // same exact-Origin rule as login, so a browser on another site cannot drive them.
+  { route: "POST /v1/auth/register", auth: "public", origin: "trusted", resource: "identity", action: "register" },
+  { route: "POST /v1/auth/verify-email", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
+  { route: "POST /v1/auth/resend-verification", auth: "public", origin: "trusted", resource: "identity", action: "resend-verification" },
   { route:"POST /v1/auth/recovery/prove",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/recovery/enrollment/options",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/recovery/enrollment/complete",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
@@ -1278,7 +1281,7 @@ export const authorizationPolicyInventory = Object.freeze([
   { route:"POST /v1/auth/recovery/enrollment/complete-evidence",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/onboarding/status",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
   { route:"POST /v1/auth/onboarding/complete",auth:"public",origin:"trusted",resource:"identity",action:"restricted-onboarding" },
-  { route: "POST /v1/auth/recovery/start", auth: "public", resource: "identity", action: "start-recovery" },
+  { route: "POST /v1/auth/recovery/start", auth: "public", origin: "trusted", resource: "identity", action: "start-recovery" },
   { route: "POST /v1/auth/mfa/totp/begin", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "begin-totp" },
   { route: "POST /v1/auth/mfa/totp/verify", auth: "public", origin: "trusted", session: "optional", resource: "identity", action: "verify-totp" },
   { route: "POST /v1/auth/mfa/recovery-codes/generate", auth: "public", resource: "identity", action: "generate-recovery-codes" },

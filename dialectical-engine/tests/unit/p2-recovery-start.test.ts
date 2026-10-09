@@ -1,3 +1,4 @@
+import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 import { createEmailBlindIndex, normalizeEmailForBlindIndex } from "@debateai/crypto";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
@@ -165,9 +166,9 @@ describe("P2-04 enumeration-resistant recovery start", () => {
         return RECOVERY_START_PUBLIC_RESPONSE;
       }
     };
-    const api = buildApi({ application: {} as AskApplication, recovery });
+    const api = buildApi({ allowedOrigin: TEST_APP_ORIGIN, application: {} as AskApplication, recovery });
     try {
-      const response = await api.inject({
+      const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN },
         method: "POST",
         url: "/v1/auth/recovery/start",
         payload: { email: "person@example.test", ignored: "must-not-flow" }

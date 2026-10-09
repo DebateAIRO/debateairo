@@ -61,7 +61,7 @@ function harness(policy: AdmissionPolicy = POLICY) {
   return {
     api, start, refusalLog,
     advance: (ms: number) => { now = new Date(now.getTime() + ms); },
-    startRecovery: (remoteAddress: string, email = "alice@example.test") => api.inject({
+    startRecovery: (remoteAddress: string, email = "alice@example.test") => api.inject({ headers: { origin: TEST_APP_ORIGIN },
       method: "POST", url: "/v1/auth/recovery/start", remoteAddress, payload: { email }
     }),
     refusalLines: () => refusalLog.mock.calls.map((call) => JSON.parse(String(call[0])) as unknown),
@@ -151,7 +151,7 @@ describe("B25a recovery/start admission (L1-F3)", () => {
     });
     try {
       for (let attempt = 0; attempt < POLICY.recoveryStart.limit + 5; attempt += 1) {
-        const response = await api.inject({
+        const response = await api.inject({ headers: { origin: TEST_APP_ORIGIN },
           method: "POST", url: "/v1/auth/recovery/start",
           remoteAddress: SOURCE_A, payload: { email: "alice@example.test" }
         });
