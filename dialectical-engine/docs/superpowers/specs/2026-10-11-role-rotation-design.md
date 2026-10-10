@@ -59,7 +59,7 @@ The money check before a debate starts prices each job at the dearest model that
 A new code-owned register row, **`answerRoleRotationPolicy`**, alone in its own family (it is **not** added to `SYNTHESIS_ROLE_CONTROLS`, whose reader refuses any version missing a key, so every sealed version would stop parsing).
 
 ```json
-{ "kind": "ANSWER_ROLE_ROTATION_POLICY", "enabled": true, "rule": "LEAST_DONE_SEEDED_TIE_V1" }
+{ "kind": "ANSWER_ROLE_ROTATION_POLICY", "enabled": true, "rule": "LEAST_SHARE_SEEDED_TIE_V1" }
 ```
 
 - Strict schema: exactly these three keys; `enabled` a boolean; `rule` the one known rule name. A future rule is a new name and a new register version, never an edit.
@@ -71,7 +71,7 @@ A new code-owned register row, **`answerRoleRotationPolicy`**, alone in its own 
 
 **Hosted.** The hosted register file (`apps/runner/src/hosted-register-publish.ts`) gains an optional operator member, `answerRoleRotation: { "enabled": true | false }`, published as the row under the file's sourceRef; absent publishes no row. `verifyHostedRegisterBootReadiness` reads the row (absent is fine; malformed refuses). `pnpm hosted:publish-provider-set` copies its base version's rows, so the row survives a provider-set republish. Rotation names no provider ref of its own, so `assertHostedRoleProvidersKept` (`apps/runner/src/hosted-provider-set.ts:174-183`) needs no change: the four register refs stay required as the fallback.
 
-## Part 2: the rule (rule `LEAST_DONE_SEEDED_TIE_V1`)
+## Part 2: the rule (rule `LEAST_SHARE_SEEDED_TIE_V1`)
 
 A pure function, in a new module `packages/scorecard/src/role-rotation.ts` beside the scorecard picker (both pick models for roles; the picker can later read the same counts):
 
@@ -80,9 +80,9 @@ pickRotatedRoles({ panel, counts, seed }) -> RotatedRoles | null
 ```
 
 1. **Eligible members:** the panel, deduplicated by maker (first in panel order). Fewer than two makers: return `null` (today's fixed roles).
-2. **Counts:** for each role, how many earlier rotation pins name each model id in that role (all time, this database). A model never seen counts 0.
+2. **Shares (settled Q1):** for each role and model id, `picked` = earlier rotation pins naming it in that role, and `eligible` = earlier rotation pins whose `eligible_model_ids` contain it (all time, this database). Its share is `picked / eligible`; a model never eligible before has share 0. Ordering uses the share first, then `picked`, then the tie key, compared EXACTLY (cross-multiplied integers, never floating point). A newcomer is therefore picked once early, then rejoins the rotation in proportion to its chances instead of taking every debate until its total catches up.
 3. **Tie shuffle:** each candidate's tie key is `sha256("ROLE_ROTATION_V1" ␀ seed ␀ role ␀ model_id)` (hex), compared as text. Per-role salting means a tie does not always fall to the same model.
-4. **Order:** for each role, candidates by (count ascending, tie key ascending).
+4. **Order:** for each role, candidates by (share ascending, picked ascending, tie key ascending).
 5. **Picks:**
    - writer = first candidate for `ANSWER_WRITER`;
    - checker = first candidate for `ANSWER_CHECKER` whose maker differs from the writer's;
@@ -91,7 +91,7 @@ pickRotatedRoles({ panel, counts, seed }) -> RotatedRoles | null
    With two or more makers each pick always exists.
 6. **Seed (ask-derived, stable before the run id exists):** `seed = sha256(JSON.stringify([ask.as_of, ask.question_line]))`. `as_of` is the client-sent instant the ask is "as of" and `question_line` the question; both are required fields of `AskRequestSchema` (`packages/contract/src/index.ts:176-189`). The same ask resent with the same `as_of` gets the same seed. There is no ask id or idempotency key in the contract, and the run id is minted later inside `startRun`. The seed and the question are used only in memory: never stored, logged or sent (a stored digest of a short question would be reversible).
 
-The counts are read at admission with one query over the pin table (`SELECT role, model_id, count(*) ... GROUP BY`), before the estimate and so before the preview's admission lock is taken. Two debates admitted at the same instant may therefore read the same counts and pick the same model; the next debate evens it out (the rule is "balanced over time", not "exact").
+The counts are read at admission with one query over the pin table (`per role and model: picks and eligible appearances, two aggregates`), before the estimate and so before the preview's admission lock is taken. Two debates admitted at the same instant may therefore read the same counts and pick the same model; the next debate evens it out (the rule is "balanced over time", not "exact").
 
 ## Part 3: the per-run record and the story's repair count (migration 0114)
 
@@ -102,11 +102,12 @@ One migration, `migrations/0114_role_rotation.sql`, the fourth forward step of t
 | Column | Type | Rule |
 |---|---|---|
 | `run_id` | uuid | primary key, references `core.run(run_id)` |
-| `rule` | text | `= 'LEAST_DONE_SEEDED_TIE_V1'` |
+| `rule` | text | `= 'LEAST_SHARE_SEEDED_TIE_V1'` |
 | `writer_provider_ref`, `writer_model_id`, `writer_maker` | text | non-blank, at most 256 characters each |
 | `checker_provider_ref`, `checker_model_id`, `checker_maker` | text | same; `checker_maker <> writer_maker` |
 | `storyteller_provider_ref`, `storyteller_model_id`, `storyteller_maker` | text | same |
 | `story_checker_provider_ref`, `story_checker_model_id`, `story_checker_maker` | text | same; `story_checker_maker <> storyteller_maker` |
+| `eligible_model_ids` | text[] | the deduplicated eligible members' model ids at admission (2 to 16 entries, each non-blank, at most 256 characters); must contain all four picked model ids |
 | `created_at` | timestamptz | default `clock_timestamp()` |
 
 - Guards: `core.install_truncate_guard`, the `reject_mutation` trigger on UPDATE or DELETE, `GRANT SELECT, INSERT ... TO debateai_runtime`, `GRANT SELECT ... TO debateai_replay` (the 0090 pattern).
@@ -211,6 +212,8 @@ All tests use stand-in providers; no paid calls.
 - Rollback: republish without the row (a new register version) and restart; pinned debates keep their pins.
 
 ## Questions for the owner
+
+> **Settled by the orchestrator on 2026-10-11 under the owner's delegation** ("write the spec, then build the plan and implement the plan; no need to come back to me at each step"): Q1 → the SHARE rule below replaces the all-time count (it serves the owner's stated purpose, comparable data per AI per role, and stops a newcomer taking every debate); Q2 → unchanged (never cut a debate off); Q3 → unchanged; Q4, Q5 → information. The owner was told in chat and may overrule.
 
 Each has a default that this spec builds; none blocks the build.
 

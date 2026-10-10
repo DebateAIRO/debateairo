@@ -1,5 +1,7 @@
 # Per-debate role rotation Implementation Plan
 
+> **AMENDMENT 2026-10-11 (orchestrator, owner's delegation) — the spec wins where this plan differs:** the rule is `LEAST_SHARE_SEEDED_TIE_V1` (spec Part 2 step 2/4): order candidates by share = picked / eligible (exact integer cross-multiplication, never floats; never-eligible = share 0), then picked, then the tie key. The pin table gains `eligible_model_ids text[]` (spec Part 3: 2-16 non-blank entries <= 256 chars, containing all four picks), written at admission; the counts query returns per role and model both `picked` and `eligible`. Update Tasks 1, 3, 4 and 6 and their tests accordingly (a test: a model added after N debates is picked once, then rejoins proportionally).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give the four single-model roles (answer writer, answer checker, storyteller, story checker) to a different model of the debate's own panel per debate, least-done first, pinned once per debate, recorded for learning, priced safely and switched on by one register row.
@@ -21,7 +23,7 @@ All paths below are relative to `dialectical-engine/` in the worktree `.claude/w
 - Sealed register values are never edited (`register.bootstrap.json`, `tests/support/fixtures/register-development-v4.json`, the acceptance seeder's version 4, migrations 0000-0113 and their lineage files).
 - No hard-coded one-computer paths in code, tests or docs.
 - End-user text never shows scores, counts, rule names, thresholds, prices or internal codes. This plan adds no user-facing text.
-- The row key is `answerRoleRotationPolicy`; its value is `{ "kind": "ANSWER_ROLE_ROTATION_POLICY", "enabled": <boolean>, "rule": "LEAST_DONE_SEEDED_TIE_V1" }`.
+- The row key is `answerRoleRotationPolicy`; its value is `{ "kind": "ANSWER_ROLE_ROTATION_POLICY", "enabled": <boolean>, "rule": "LEAST_SHARE_SEEDED_TIE_V1" }`.
 - The pin table is `core.run_role_rotation`; the migration is `migrations/0114_role_rotation.sql` (renumber at merge time if `origin/dev` has taken 0114: check `git ls-tree --name-only origin/dev migrations/ | tail -3`).
 - The tie seed is `sha256(JSON.stringify([ask.as_of, ask.question_line]))`, used in memory only, never stored, logged or sent.
 - Without the row (or with `enabled: false`), with a one-maker panel, or with a scorecard assignment, behaviour is byte-for-byte today's.
@@ -76,7 +78,7 @@ All paths below are relative to `dialectical-engine/` in the worktree `.claude/w
 - Consumes: nothing.
 - Produces (exported from `@debateai/scorecard`):
   - `ROTATED_ROLES: readonly ["ANSWER_WRITER", "ANSWER_CHECKER", "STORYTELLER", "STORY_CHECKER"]`, `type RotatedRole`
-  - `ROLE_ROTATION_RULE = "LEAST_DONE_SEEDED_TIE_V1"`
+  - `ROLE_ROTATION_RULE = "LEAST_SHARE_SEEDED_TIE_V1"`
   - `type RotationPanelMember = Readonly<{ provider_ref: string; maker: string; model_id: string }>`
   - `type RotationPick = Readonly<{ providerRef: string; modelId: string; maker: string }>`
   - `type RotatedRoles = Readonly<{ rule: typeof ROLE_ROTATION_RULE; answerWriter: RotationPick; answerChecker: RotationPick; storyteller: RotationPick; storyChecker: RotationPick }>`
@@ -230,7 +232,7 @@ import { createHash } from "node:crypto";
  */
 export const ROTATED_ROLES = Object.freeze(["ANSWER_WRITER", "ANSWER_CHECKER", "STORYTELLER", "STORY_CHECKER"] as const);
 export type RotatedRole = typeof ROTATED_ROLES[number];
-export const ROLE_ROTATION_RULE = "LEAST_DONE_SEEDED_TIE_V1" as const;
+export const ROLE_ROTATION_RULE = "LEAST_SHARE_SEEDED_TIE_V1" as const;
 const TIE_SALT = "ROLE_ROTATION_V1";
 
 export type RotationPanelMember = Readonly<{ provider_ref: string; maker: string; model_id: string }>;
@@ -322,7 +324,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Consumes: `canonicalRegisterJson` (`packages/register/src/register-publication.ts:251`), `ROLE_ROTATION_RULE` (Task 1).
 - Produces (exported from `@debateai/register`):
   - `ANSWER_ROLE_ROTATION_POLICY_ROW_KEY = "answerRoleRotationPolicy"`
-  - `type AnswerRoleRotationPolicyState = Readonly<{ state: "ABSENT" }> | Readonly<{ state: "OFF" }> | Readonly<{ state: "ON"; rule: "LEAST_DONE_SEEDED_TIE_V1" }>`
+  - `type AnswerRoleRotationPolicyState = Readonly<{ state: "ABSENT" }> | Readonly<{ state: "OFF" }> | Readonly<{ state: "ON"; rule: "LEAST_SHARE_SEEDED_TIE_V1" }>`
   - `answerRoleRotationPolicyFromValue(value: unknown): AnswerRoleRotationPolicyState` (throws `TypeError("ANSWER_ROLE_ROTATION_POLICY_INVALID")`)
   - `readAnswerRoleRotationPolicy(pool: Pick<Pool, "query">, registerVersion: number): Promise<AnswerRoleRotationPolicyState>`
   - `answerRoleRotationPolicyRow(enabled: boolean, sourceRef: string): Readonly<{ rowKey: "answerRoleRotationPolicy"; valueJsonText: string; sourceRef: string }>`
@@ -336,7 +338,7 @@ import {
   ANSWER_ROLE_ROTATION_POLICY_ROW_KEY, answerRoleRotationPolicyFromValue, answerRoleRotationPolicyRow, readAnswerRoleRotationPolicy
 } from "@debateai/register";
 
-const ON = { kind: "ANSWER_ROLE_ROTATION_POLICY", enabled: true, rule: "LEAST_DONE_SEEDED_TIE_V1" };
+const ON = { kind: "ANSWER_ROLE_ROTATION_POLICY", enabled: true, rule: "LEAST_SHARE_SEEDED_TIE_V1" };
 const poolReturning = (rows: unknown[]) => {
   const calls: unknown[][] = [];
   return { calls, pool: { query: async (_sql: string, params: unknown[]) => { calls.push(params); return { rows }; } } as never };
@@ -344,12 +346,12 @@ const poolReturning = (rows: unknown[]) => {
 
 describe("answerRoleRotationPolicy: one optional row, absent means today's engine", () => {
   it("reads ON, OFF and ABSENT", async () => {
-    expect(answerRoleRotationPolicyFromValue(ON)).toEqual({ state: "ON", rule: "LEAST_DONE_SEEDED_TIE_V1" });
+    expect(answerRoleRotationPolicyFromValue(ON)).toEqual({ state: "ON", rule: "LEAST_SHARE_SEEDED_TIE_V1" });
     expect(answerRoleRotationPolicyFromValue({ ...ON, enabled: false })).toEqual({ state: "OFF" });
     const absent = poolReturning([]);
     await expect(readAnswerRoleRotationPolicy(absent.pool, 9)).resolves.toEqual({ state: "ABSENT" });
     expect(absent.calls).toEqual([[9, ANSWER_ROLE_ROTATION_POLICY_ROW_KEY]]);
-    await expect(readAnswerRoleRotationPolicy(poolReturning([{ value_json: ON }]).pool, 10)).resolves.toEqual({ state: "ON", rule: "LEAST_DONE_SEEDED_TIE_V1" });
+    await expect(readAnswerRoleRotationPolicy(poolReturning([{ value_json: ON }]).pool, 10)).resolves.toEqual({ state: "ON", rule: "LEAST_SHARE_SEEDED_TIE_V1" });
   });
   it.each([
     ["an extra key", { ...ON, extra: 1 }],
@@ -393,12 +395,12 @@ export const ANSWER_ROLE_ROTATION_POLICY_ROW_KEY = "answerRoleRotationPolicy" as
 const schema = z.object({
   kind: z.literal("ANSWER_ROLE_ROTATION_POLICY"),
   enabled: z.boolean(),
-  rule: z.literal("LEAST_DONE_SEEDED_TIE_V1")
+  rule: z.literal("LEAST_SHARE_SEEDED_TIE_V1")
 }).strict();
 export type AnswerRoleRotationPolicyState =
   | Readonly<{ state: "ABSENT" }>
   | Readonly<{ state: "OFF" }>
-  | Readonly<{ state: "ON"; rule: "LEAST_DONE_SEEDED_TIE_V1" }>;
+  | Readonly<{ state: "ON"; rule: "LEAST_SHARE_SEEDED_TIE_V1" }>;
 
 const invalid = (): never => { throw new TypeError("ANSWER_ROLE_ROTATION_POLICY_INVALID"); };
 
@@ -422,7 +424,7 @@ export function answerRoleRotationPolicyRow(enabled: boolean, sourceRef: string)
   rowKey: typeof ANSWER_ROLE_ROTATION_POLICY_ROW_KEY; valueJsonText: string; sourceRef: string;
 }> {
   if (typeof enabled !== "boolean" || typeof sourceRef !== "string" || sourceRef.trim() === "") return invalid();
-  const valueAst = Object.freeze({ kind: "ANSWER_ROLE_ROTATION_POLICY", enabled, rule: "LEAST_DONE_SEEDED_TIE_V1" });
+  const valueAst = Object.freeze({ kind: "ANSWER_ROLE_ROTATION_POLICY", enabled, rule: "LEAST_SHARE_SEEDED_TIE_V1" });
   return Object.freeze({ rowKey: ANSWER_ROLE_ROTATION_POLICY_ROW_KEY, valueJsonText: canonicalRegisterJson(valueAst), sourceRef });
 }
 ```
@@ -508,7 +510,7 @@ const COLUMNS = `run_id, rule, writer_provider_ref, writer_model_id, writer_make
   storyteller_provider_ref, storyteller_model_id, storyteller_maker, story_checker_provider_ref, story_checker_model_id, story_checker_maker`;
 const insert = (runId: string, overrides: Partial<Record<"writerMaker" | "checkerMaker" | "storytellerMaker" | "storyCheckerMaker" | "rule", string>> = {}) =>
   db().query(`INSERT INTO core.run_role_rotation (${COLUMNS}) VALUES ($1,$2,'p:a','model-a',$3,'p:b','model-b',$4,'p:b','model-b',$5,'p:a','model-a',$6)`,
-    [runId, overrides.rule ?? "LEAST_DONE_SEEDED_TIE_V1", overrides.writerMaker ?? "Maker A", overrides.checkerMaker ?? "Maker B",
+    [runId, overrides.rule ?? "LEAST_SHARE_SEEDED_TIE_V1", overrides.writerMaker ?? "Maker A", overrides.checkerMaker ?? "Maker B",
       overrides.storytellerMaker ?? "Maker B", overrides.storyCheckerMaker ?? "Maker A"]);
 
 beforeAll(async () => {
@@ -611,7 +613,7 @@ CREATE TABLE IF NOT EXISTS core.run_role_rotation (
   created_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 ALTER TABLE core.run_role_rotation DROP CONSTRAINT IF EXISTS run_role_rotation_rule_known;
-ALTER TABLE core.run_role_rotation ADD CONSTRAINT run_role_rotation_rule_known CHECK (rule = 'LEAST_DONE_SEEDED_TIE_V1');
+ALTER TABLE core.run_role_rotation ADD CONSTRAINT run_role_rotation_rule_known CHECK (rule = 'LEAST_SHARE_SEEDED_TIE_V1');
 ALTER TABLE core.run_role_rotation DROP CONSTRAINT IF EXISTS run_role_rotation_identities_present;
 ALTER TABLE core.run_role_rotation ADD CONSTRAINT run_role_rotation_identities_present CHECK (
   length(btrim(writer_provider_ref)) BETWEEN 1 AND 256 AND length(btrim(writer_model_id)) BETWEEN 1 AND 256
@@ -802,7 +804,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```ts
 export type RunRoleRotationRole = Readonly<{ providerRef: string; modelId: string; maker: string }>;
 export type RunRoleRotationInput = Readonly<{
-  runId: string; rule: "LEAST_DONE_SEEDED_TIE_V1";
+  runId: string; rule: "LEAST_SHARE_SEEDED_TIE_V1";
   answerWriter: RunRoleRotationRole; answerChecker: RunRoleRotationRole;
   storyteller: RunRoleRotationRole; storyChecker: RunRoleRotationRole;
 }>;
@@ -826,16 +828,16 @@ const C = role("p:c", "model-c", "Maker C");
 describe("insertRunRoleRotation / readRunRoleRotation", () => {
   it("round-trips one pin and answers null for a run without one", async () => {
     const runId = await createRun("round-trip");
-    await insertRunRoleRotation(db(), { runId, rule: "LEAST_DONE_SEEDED_TIE_V1", answerWriter: A, answerChecker: B, storyteller: C, storyChecker: A });
+    await insertRunRoleRotation(db(), { runId, rule: "LEAST_SHARE_SEEDED_TIE_V1", answerWriter: A, answerChecker: B, storyteller: C, storyChecker: A });
     const pinned = await readRunRoleRotation(db(), runId);
-    expect(pinned).toMatchObject({ runId, rule: "LEAST_DONE_SEEDED_TIE_V1", answerWriter: A, answerChecker: B, storyteller: C, storyChecker: A });
+    expect(pinned).toMatchObject({ runId, rule: "LEAST_SHARE_SEEDED_TIE_V1", answerWriter: A, answerChecker: B, storyteller: C, storyChecker: A });
     expect(pinned!.createdAt).toBeInstanceOf(Date);
     expect(Object.isFrozen(pinned)).toBe(true);
     expect(await readRunRoleRotation(db(), await createRun("none"))).toBeNull();
   });
   it("refuses a malformed input before the database does", async () => {
     const runId = await createRun("malformed");
-    await expect(insertRunRoleRotation(db(), { runId, rule: "LEAST_DONE_SEEDED_TIE_V1", answerWriter: A, answerChecker: A, storyteller: C, storyChecker: A }))
+    await expect(insertRunRoleRotation(db(), { runId, rule: "LEAST_SHARE_SEEDED_TIE_V1", answerWriter: A, answerChecker: A, storyteller: C, storyChecker: A }))
       .rejects.toThrow("RUN_ROLE_ROTATION_INVALID");
     await expect(insertRunRoleRotation(db(), { runId, rule: "OTHER" as never, answerWriter: A, answerChecker: B, storyteller: C, storyChecker: A }))
       .rejects.toThrow("RUN_ROLE_ROTATION_INVALID");
@@ -846,7 +848,7 @@ describe("readRoleRotationCounts", () => {
   it("counts each role's model ids over every pin", async () => {
     const before = await readRoleRotationCounts(db());
     for (const label of ["count-1", "count-2"]) {
-      await insertRunRoleRotation(db(), { runId: await createRun(label), rule: "LEAST_DONE_SEEDED_TIE_V1", answerWriter: C, answerChecker: B, storyteller: B, storyChecker: C });
+      await insertRunRoleRotation(db(), { runId: await createRun(label), rule: "LEAST_SHARE_SEEDED_TIE_V1", answerWriter: C, answerChecker: B, storyteller: B, storyChecker: C });
     }
     const after = await readRoleRotationCounts(db());
     expect((after.ANSWER_WRITER["model-c"] ?? 0) - (before.ANSWER_WRITER["model-c"] ?? 0)).toBe(2);
@@ -869,7 +871,7 @@ Expected: FAIL (the three functions are not exported).
 /** Role rotation (spec 2026-10-11, Part 3): one pinned role. */
 export type RunRoleRotationRole = Readonly<{ providerRef: string; modelId: string; maker: string }>;
 export type RunRoleRotationInput = Readonly<{
-  runId: string; rule: "LEAST_DONE_SEEDED_TIE_V1";
+  runId: string; rule: "LEAST_SHARE_SEEDED_TIE_V1";
   answerWriter: RunRoleRotationRole; answerChecker: RunRoleRotationRole;
   storyteller: RunRoleRotationRole; storyChecker: RunRoleRotationRole;
 }>;
@@ -883,7 +885,7 @@ const isRotationRole = (value: unknown): value is RunRoleRotationRole => typeof 
   });
 
 function assertRotationShape(input: Omit<RunRoleRotationInput, "runId">): void {
-  if (input.rule !== "LEAST_DONE_SEEDED_TIE_V1"
+  if (input.rule !== "LEAST_SHARE_SEEDED_TIE_V1"
     || ![input.answerWriter, input.answerChecker, input.storyteller, input.storyChecker].every(isRotationRole)
     || input.answerChecker.maker === input.answerWriter.maker
     || input.storyChecker.maker === input.storyteller.maker) {
@@ -918,7 +920,7 @@ export async function readRunRoleRotation(executor: Pick<Pool, "query"> | PoolCl
     providerRef: row[`${prefix}_provider_ref`]!, modelId: row[`${prefix}_model_id`]!, maker: row[`${prefix}_maker`]!
   });
   const record = {
-    runId: row.run_id!, rule: row.rule as "LEAST_DONE_SEEDED_TIE_V1",
+    runId: row.run_id!, rule: row.rule as "LEAST_SHARE_SEEDED_TIE_V1",
     answerWriter: pick("writer"), answerChecker: pick("checker"), storyteller: pick("storyteller"), storyChecker: pick("story_checker")
   };
   assertRotationShape(record);
@@ -1331,7 +1333,7 @@ with `pinning` hoisted as `{ order: [] as string[], reject: null as Error | null
 describe("role rotation: the pin is a setup step before anything is queued", () => {
   it("pins the four roles with the new run's id, after the run exists and before the memory question and the queue", async () => {
     await expect(submit()).resolves.toMatchObject({ run_ref: RUN_ID, status: "QUEUED" });
-    expect(pinning.rotations).toEqual([expect.objectContaining({ runId: RUN_ID, rule: "LEAST_DONE_SEEDED_TIE_V1" })]);
+    expect(pinning.rotations).toEqual([expect.objectContaining({ runId: RUN_ID, rule: "LEAST_SHARE_SEEDED_TIE_V1" })]);
     expect(pinning.order.indexOf("insertRunRoleRotation")).toBeLessThan(pinning.order.indexOf("recordMemoryQuestion"));
     expect(pinning.order.indexOf("insertRunRoleRotation")).toBeLessThan(pinning.order.indexOf("enqueue"));
   });
@@ -1442,7 +1444,7 @@ In `tests/integration/database.test.ts`:
 ```ts
 describe("role rotation (spec 2026-10-11 Part 6): a pinned debate's roles come from its pin", () => {
   const pick = (route: SeatRoute) => ({ providerRef: SEAT_ROUTES[route].providerRef, modelId: SEAT_ROUTES[route].model, maker: SEAT_ROUTES[route].maker });
-  const ROTATION = Object.freeze({ rule: "LEAST_DONE_SEEDED_TIE_V1" as const,
+  const ROTATION = Object.freeze({ rule: "LEAST_SHARE_SEEDED_TIE_V1" as const,
     answerWriter: pick("secondary"), answerChecker: pick("third"), storyteller: pick("third"), storyChecker: pick("primary") });
 
   it("the secondary writes the answer and the third checks it, recorded as planned (no false fallback)", async () => {
@@ -1656,7 +1658,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 `tests/unit/preview-register-publish-v2.test.ts`, in "builds exactly the reviewed key list": change `expect(rows).toHaveLength(66);` to `67`, change the `differing` expectation to `[...MULTI_MODEL_KEYS, "answerRoleRotationPolicy"]` (in row order; if the file sorts it, sort it), and add:
 
 ```ts
-    expect(value("answerRoleRotationPolicy")).toEqual({ kind: "ANSWER_ROLE_ROTATION_POLICY", enabled: true, rule: "LEAST_DONE_SEEDED_TIE_V1" });
+    expect(value("answerRoleRotationPolicy")).toEqual({ kind: "ANSWER_ROLE_ROTATION_POLICY", enabled: true, rule: "LEAST_SHARE_SEEDED_TIE_V1" });
 ```
 
 `tests/integration/hosted-register-publish.test.ts`: add a case that publishes a hosted file with `answerRoleRotation: { enabled: true }` and reads `readAnswerRoleRotationPolicy(pool, version)` as `{ state: "ON", ... }`; a file without the member publishes no such row (`ABSENT`); a file with `answerRoleRotation: { enabled: "yes" }` is refused before anything is sealed (`HOSTED_REGISTER_FILE_INVALID` or the file's existing refusal code for a malformed member: use the one the `taxAuthorities` cases expect). Follow the existing `taxAuthorities` cases in that file for the publish harness.
