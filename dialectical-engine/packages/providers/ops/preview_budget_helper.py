@@ -386,6 +386,9 @@ PriceStep = namedtuple('PriceStep', 'name prompt_tokens_up_to input_usd_per_m ca
 ANTHROPIC_USAGE_KEYS = frozenset({'input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens',
                                   'cache_creation', 'server_tool_use', 'service_tier', 'inference_geo'})
 ANTHROPIC_CACHE_SPLIT_KEYS = frozenset({'ephemeral_5m_input_tokens', 'ephemeral_1h_input_tokens'})
+# The characters JavaScript's String.prototype.trim() removes (WhiteSpace and LineTerminator):
+# the app's adapter refuses text that is only these, and body_valid refuses exactly the same text.
+JS_WHITESPACE = '\t\n\v\f\r \u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff'
 # The only content blocks a reply the gate settles may carry: text, and thinking it never shows.
 ANTHROPIC_CONTENT_BLOCKS = frozenset({'text', 'thinking', 'redacted_thinking'})
 # Top-level reply members that mean work the token usage may not cover (a code container, context
@@ -411,10 +414,13 @@ class AnthropicProfile:
     """api.anthropic.com, Messages API (POST /v1/messages), x-api-key plus anthropic-version.
     One reviewed row (Claude Haiku 5.5), 2026-10-10. The profile API is DeepInfraProfile's.
 
-    Reservation: the row's prices are the dearest the request can meet: the upper step's
-    5-minute cache-write price for every input token (0.625) and its output price (2.50), so a
-    full 256 KiB request reserves (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, under the
-    $0.25 cap. Settlement: the real step (prompt total <= 100,000 tokens: the lower one), each
+    Reservation: every request byte (+2048) at the upper step's 5-minute cache-write price (0.625)
+    and the output bound at its output price (2.50), so a full 256 KiB request reserves
+    (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, under the $0.25 cap. 0.625 is NOT the
+    dearest input price (a 1-hour cache write over 100,000 tokens is 1.00); it is enough because a
+    request cannot ask for caching (body_valid refuses cache_control) and bytes + 2048 over-count
+    tokens. A reply that still costs more than its hold is charged in full and halts
+    (charge_overrun). Settlement: the real step (prompt total <= 100,000 tokens: the lower one), each
     kind of input token at its own price. Anthropic reports no cost, so the guard charge is that
     list-price charge. Any usage field this profile does not know, any server-tool use, another
     service tier or region, or a tool block makes the usage invalid: uncertain, and the gate halts.
@@ -429,7 +435,10 @@ class AnthropicProfile:
     per_call_cap_usd = Decimal('0.25')
     max_request_bytes = 256 * 1024
     redaction_patterns = (r'sk-ant-[A-Za-z0-9_-]+',)
-    key_pattern = r'sk-ant-[A-Za-z0-9_-]+'
+    # Only the ordinary API form (sk-ant-api + two digits + '-', e.g. api03): an Admin form
+    # (sk-ant-admin...) or any other Anthropic credential is refused (platform.claude.com, Admin API
+    # and Authentication pages, read 2026-10-10).
+    key_pattern = r'sk-ant-api[0-9]{2}-[A-Za-z0-9_-]+'
     rows = {row.model: row for row in (
         ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.625'), Decimal('2.50'), 32768, 'high', False),)}
     settlement_steps = (
@@ -446,7 +455,8 @@ class AnthropicProfile:
 
     def reservation_prices(self, row, moment):
         """Anthropic's list prices do not change with the date; the row holds the upper step's
-        dearest input price and its output price, so the reservation covers either step."""
+        5-minute cache-write price (0.625, above any plain input price) and its output price; see
+        the class docstring for why that covers a request that cannot ask for caching."""
         return row.input_usd_per_m, row.output_usd_per_m
 
     def ceiling_prices(self, row):
@@ -459,9 +469,9 @@ class AnthropicProfile:
         """Exactly model, max_tokens and messages, an optional system string, and output_config
         {"effort": "high"} iff the row says so (then required). Nothing else anywhere
         (contract-BC-wire, Anthropic). It mirrors what the app's adapter (anthropic-messages.ts) can
-        send, no more: non-empty text content, roles alternating user/assistant starting AND ending
+        send, no more: text content that is not only whitespace (JavaScript's trim set), roles alternating user/assistant starting AND ending
         with a user turn (the adapter joins same-role turns and refuses a final assistant turn), and
-        a non-empty system text when present (the adapter joins non-empty system messages)."""
+        a system text that is not only whitespace when present."""
         if not isinstance(body, dict) or body.get('model') != row.model:
             return False
         required = {'model', 'max_tokens', 'messages'} | ({'output_config'} if row.effort else set())
@@ -473,14 +483,15 @@ class AnthropicProfile:
             if not (isinstance(config, dict) and set(config) == {'effort'} and isinstance(config['effort'], str)
                     and config['effort'] == row.effort):
                 return False
-        if 'system' in body and not (isinstance(body['system'], str) and body['system']):
+        if 'system' in body and not (isinstance(body['system'], str) and body['system'].strip(JS_WHITESPACE)):
             return False
         messages = body['messages']
         return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
                 and isinstance(messages, list) and len(messages) % 2 == 1
                 and all(isinstance(m, dict) and set(m) == {'role', 'content'}
                         and m['role'] == ('user' if index % 2 == 0 else 'assistant')
-                        and isinstance(m['content'], str) and m['content'] for index, m in enumerate(messages)))
+                        and isinstance(m['content'], str) and m['content'].strip(JS_WHITESPACE)
+                        for index, m in enumerate(messages)))
 
     def request_bytes(self, body):
         return canonical(body)

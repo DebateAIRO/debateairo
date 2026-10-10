@@ -11,8 +11,21 @@ local socket file. The gate sets aside the call's worst-case cost from today's A
 makes the call, records what it really cost, and answers. If anything about a call is unclear,
 the gate stops ("halts") until root opens it again with `activate`.
 
-The DeepInfra gate is not touched by any step here. Each gate has its own key, pot, records,
-socket and service.
+Each gate has its own key, pot, records, socket and service. The DeepInfra gate keeps its own key,
+pot and code. One step here changes it: its two units are re-installed from this release, so that
+they hide the Anthropic key folder (install step 3a, which comes BEFORE the Anthropic key is put in).
+
+### Which providers, now and later
+
+- **Now: DeepInfra and Anthropic only.** On 2026-10-10 the owner swapped Google's Gemini Flash for
+  Qwen3.8-Flash on DeepInfra ("Google is too expensive at the moment; we will use it in the
+  future"). So the near-term setup is two gates: DeepInfra (GLM, DeepSeek, MiMo, Qwen) and this
+  Anthropic gate (Claude Haiku). Google comes later, with its own gate.
+- **Proposed daily split of the $5 team total, for the owner to confirm:** DeepInfra $3.50,
+  Anthropic $1.50. This README proposes the Anthropic GO with `"1.50"`.
+- **Ready for Google later, already now:** every gate's unit hides a Google key folder and GO,
+  the key command knows `install google` (key shape `AIza...`), and the DeepInfra gate refuses a
+  key that starts with `AIza`. None of this needs a Google account today.
 
 ## The model and its prices
 
@@ -32,10 +45,17 @@ cache reads.
 | up to 100,000 tokens | $0.10 | $0.125 | $0.20 | $0.01 | $0.50 |
 | over 100,000 tokens | $0.50 | $0.625 | $1.00 | $0.05 | $2.50 |
 
-- **What a call sets aside** (before the call): every input token at $0.625 (the dearest input
-  price of the upper step) and the longest allowed answer at $2.50. So the largest question the
-  gate accepts (256 KiB) sets aside at most (264,192 x $0.625 + 32,768 x $2.50) / 1,000,000 =
-  **$0.24704**. No call may ever set aside more than **$0.25**; a test checks it.
+- **What a call sets aside** (before the call): every byte of the question, plus 2,048, at
+  $0.625 per million (the upper step's 5-minute cache-write price), and the longest allowed
+  answer at $2.50. So the largest question the gate accepts (256 KiB) sets aside at most
+  (264,192 x $0.625 + 32,768 x $2.50) / 1,000,000 = **$0.24704**. No call may ever set aside more
+  than **$0.25**; a test checks it.
+- **$0.625 is not the dearest input price.** A 1-hour cache write over 100,000 tokens costs $1.00
+  per million. The gate still sets aside at $0.625 because (1) a request through the gate cannot
+  ask for caching at all (caching marks are refused), so a cache write should never happen, and
+  (2) it counts every byte plus 2,048 as a token, more than the real token count. If Anthropic
+  ever reports a call costing more than its set-aside amount (for example a large 1-hour cache
+  write), that one call is charged in full and the gate halts with `charge_overrun`.
 - **What a call is charged** (after the call): Anthropic's real token counts, each kind at its
   own price, at the step the question length falls in. Exactly 100,000 tokens is still the lower
   step; 100,001 is the upper one. Anthropic does not report a cost, so this list-price charge is
@@ -83,9 +103,9 @@ cache reads.
   new range, that is a reviewed change of the unit file and of `anthropic_addresses.py`.
 - **2 calls at the same time, not 4.** Before a debate starts, the app sets aside room for the
   calls that may be running at once: calls in flight x the largest one-call hold. With 4 calls
-  that alone would be 4 x $0.24704 = $0.98816 of the $1.00 pot, so no debate using Haiku could
-  ever start. With 2 it is $0.49408, so a fresh pot admits a Haiku debate. A bigger pot allows
-  more calls in flight (each one needs $0.24704 of room).
+  that alone would be 4 x $0.24704 = $0.98816, all of a $1.00 pot, so no debate using Haiku
+  could start. With 2 it is $0.49408, so a fresh pot ($1.50 proposed) admits Haiku debates with
+  room to spare. A bigger pot allows more calls in flight (each one needs $0.24704 of room).
 - **The DeepInfra gate keeps its own copy of the code.** This gate's folder gets the new
   `preview_budget_helper.py` (the one that knows Anthropic). The DeepInfra gate's GO binds the
   hash of its own copy, so it keeps running unchanged. Updating the DeepInfra folder to this
@@ -97,9 +117,13 @@ cache reads.
   arrive as one email.
 - **Each gate sees only its own key.** Every gate's unit hides the other gates' private folders
   (keys, records) and GO files, and each watcher hides every key it does not need.
-- **The gate refuses a key of the wrong shape.** The Anthropic gate only sends a key that starts
-  with `sk-ant-`; the DeepInfra gate refuses a key that starts with `sk-ant-` or `AIza`. So a key
-  put into the wrong folder is never sent to the wrong company. The key command checks the same.
+- **The gate refuses a key of the wrong shape.** The Anthropic gate only sends an ordinary API
+  key: one that starts with `sk-ant-api`, two digits and a dash (today's keys start
+  `sk-ant-api03-`). An Admin key (`sk-ant-admin...`) or any other Anthropic credential is
+  refused, so a key that could manage the organisation is never used for model calls. The
+  DeepInfra gate refuses anything that starts with `sk-ant-` or `AIza`. So a key put into the
+  wrong folder is never sent to the wrong company. The key command checks the same. (Prefixes as
+  shown on platform.claude.com, Admin API and Authentication pages, read 2026-10-10.)
 
 ## Names
 
@@ -119,10 +143,13 @@ cache reads.
 
 **0. In the Anthropic Console (the OWNER, in a browser).**
 1. Create a separate workspace for the preview only (for example "debateai-preview").
-2. Give that workspace its own monthly spend limit. The gate's pot is $1.00 a day, so about
-   $35 a month leaves a small margin. This is Anthropic's own fuse, independent of the gate.
-3. Create one API key inside that workspace (not in the default workspace). Keep the browser tab
-   open until step 4; do not paste the key anywhere else.
+2. Give that workspace its own monthly spend limit. The gate's pot is proposed at $1.50 a day,
+   so about $50 a month leaves a small margin. This is Anthropic's own fuse, independent of the
+   gate.
+3. Create one API key scoped to that workspace only (not the default workspace, and not a key
+   for "all workspaces": Anthropic lets an unscoped personal or service-account key use the
+   Admin API). Never use an Admin key here. Keep the browser tab open until step 4; do not paste
+   the key anywhere else.
 
 **1. Gate folder.** First set `R` to the reviewed release's `dialectical-engine` folder on the
 server. Type the command yourself, putting the real release folder name in place of
@@ -170,6 +197,29 @@ install -d -o root -g root -m 0700 /var/lib/debateai-v3-preview/provider-anthrop
 stat -c '%a %U:%G' /var/lib/debateai-v3-preview/provider-anthropic-authority-v1
 ```
 
+**3a. Re-install the two DeepInfra units from this release, BEFORE the Anthropic key goes in.**
+This release's DeepInfra gate unit and its halt watcher hide the Anthropic (and future Google)
+key folders and GO files. The units installed today do not. So they are replaced first, then
+systemd re-reads them, they restart, and the hiding is checked as live. Only then does step 4
+put the Anthropic key on the server. (The DeepInfra gate's code, GO and key do not change.)
+
+```sh
+( set -eu; test -d "$R/deploy/preview-gate/v3"; S=$R/deploy/preview-gate/v3/systemd
+install -o root -g root -m 0644 $S/debateai-preview-provider-budget.service $S/debateai-preview-gate-halt-watch.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl restart debateai-preview-provider-budget.service
+systemctl is-active debateai-preview-provider-budget.service )
+systemctl show -p InaccessiblePaths debateai-preview-provider-budget.service
+systemctl show -p InaccessiblePaths debateai-preview-gate-halt-watch.service
+```
+
+What to expect: `active`, and each `InaccessiblePaths=` line names
+`/var/lib/debateai-v3-preview/provider-anthropic-authority-v1`,
+`/etc/debateai-v3-preview/provider-anthropic-go-v1.json` and the two Google paths. If a line does
+not, stop: do not install the Anthropic key. (The restart lets calls in flight finish first; do
+it when nobody is using the preview. The halt watcher is a timer job: its next run uses the new
+unit by itself.)
+
 **4. The Anthropic key. The OWNER runs this, at the server's terminal (an agent never does).**
 The command asks for the key with a hidden prompt: paste it and press Enter; nothing shows while
 you paste. It never takes the key from the command line, a pipe or the environment, and it never
@@ -184,8 +234,8 @@ What to expect: one line with `"status": "installed"`, `"mode": "600"`, `"owner"
 - `NOT_A_TERMINAL` or `ROOT_REQUIRED`: run it as root, typed at a real terminal (not in a script
   or a pipe).
 - `KEY_EXISTS`: there is already a key. To replace it on purpose, add `--replace` at the end.
-- `KEY_SHAPE_INVALID`: what was pasted does not look like an Anthropic key (`sk-ant-...`).
-  Nothing was written.
+- `KEY_SHAPE_INVALID`: what was pasted is not an ordinary Anthropic API key (`sk-ant-api03-...`),
+  for example an Admin key. Nothing was written.
 - `KEY_USED_BY_OTHER_PROVIDER`: this is the key of another provider's gate. Nothing was written.
 - `FOLDER_NOT_SAFE`: step 3 was not done, or the folder's owner or mode is wrong.
 
@@ -202,20 +252,20 @@ own folder.
 | `scope_id` | `preview-deepinfra-v3-20261010` | The SAME `scope_id` as the app's preview configuration (today the DeepInfra gate's). The app asks every gate with its one `scope_id`; a gate with another one refuses every call and every "how much is left" question. Each gate still keeps its own pot and records, in its own folder. |
 | `target_host` | `vps-a156d797` | The server's host name, as in the DeepInfra GO. The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as for DeepInfra. |
-| `daily_budget_usd` | `"1.00"` | Anthropic's share of the $5 team total. |
+| `daily_budget_usd` | `"1.50"` | Anthropic's proposed share of the $5 team total (DeepInfra $3.50); the owner confirms. |
 | `max_paid_posts_per_day` | `400` | A second fuse. |
 | `max_concurrent_calls` | `2` | See "2 calls at the same time" above. |
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 
 When the gate is opened (`activate`), it checks once more that the calls in flight, each setting
-aside the largest worst case, fit in the pot: 2 x $0.24704 = $0.49408, inside $1.00. (With 4 it
-would be 4 x 0.24704 = 0.98816: it would still pass, but no debate could start; see above.)
+aside the largest worst case, fit in the pot: 2 x $0.24704 = $0.49408, inside $1.50. (With 4 it
+would be 4 x 0.24704 = 0.98816: it would still pass, but almost no debate could start; see above.)
 
 ```sh
 G=/opt/debateai-v3-preview/operator/anthropic-budget-v1
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"anthropic",enabled_models:["claude-haiku-5-5"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"1.00",max_paid_posts_per_day:400,max_concurrent_calls:2,open_days:31}' > /root/preview-archive/provider-anthropic-go-v1.json
+jq -n --arg b "$BR" --arg h "$HE" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"anthropic",enabled_models:["claude-haiku-5-5"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"1.50",max_paid_posts_per_day:400,max_concurrent_calls:2,open_days:31}' > /root/preview-archive/provider-anthropic-go-v1.json
 install -o root -g root -m 0600 /root/preview-archive/provider-anthropic-go-v1.json /etc/debateai-v3-preview/provider-anthropic-go-v1.json
 jq -c . /etc/debateai-v3-preview/provider-anthropic-go-v1.json
 ```
@@ -230,7 +280,7 @@ P=/var/lib/debateai-v3-preview/provider-anthropic-authority-v1; GO=/etc/debateai
 ```
 
 What to expect: `init` prints `"state": "initialized"` and `"provider": "anthropic"`; `activate`
-prints `"state": "active"`, `"window_open": true` and `"daily_budget_usd": "1.00"`. A refusal is
+prints `"state": "active"`, `"window_open": true` and `"daily_budget_usd": "1.50"`. A refusal is
 one line with `"status": "refused"` and a code, for example `ROOT_GO_INVALID` (a GO field or a
 file hash), `CONCURRENCY_EXCEEDS_BUDGET` or `HELPER_CUSTODY_INVALID`.
 
@@ -262,7 +312,7 @@ The command runs the probe inside the same network fence as the service:
 
 ```sh
 P=/var/lib/debateai-v3-preview/provider-anthropic-authority-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json; A=/opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py
-systemd-run --quiet --wait --pipe --collect -p IPAddressDeny=any -p 'IPAddressAllow=127.0.0.53/32 160.79.104.0/23' -p 'RestrictAddressFamilies=AF_UNIX AF_INET' -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model claude-haiku-5-5
+systemd-run --quiet --wait --pipe --collect -p IPAddressDeny=any -p 'IPAddressAllow=127.0.0.53/32 160.79.104.0/23' -p 'RestrictAddressFamilies=AF_UNIX AF_INET' -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json -/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model claude-haiku-5-5
 ```
 
 It sends "Reply exactly: OK" with an answer limit of 1,024 tokens and the thinking setting
@@ -280,7 +330,11 @@ It sends "Reply exactly: OK" with an answer limit of 1,024 tokens and the thinki
 
 ## Switch it on
 
-Only after a good probe.
+**Only after the step-8 probe has passed**: every field in the table above shows its "Good" value.
+If the probe halts because Anthropic's answer carries a usage field the gate does not know
+(`usage.usage_valid` is `false`): stop. Report the probe's line and the journal lines to the
+reviewers, and change nothing on the server (no edit of the code, the GO or the units). The fix
+is a reviewed code change and a new release.
 
 **1. Start at boot, and the two watchers.** Each watcher run by hand should print `"status": "ok"`.
 

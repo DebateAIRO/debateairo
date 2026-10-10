@@ -436,6 +436,19 @@ so it accepts only a `glm-only` website.
 To go back, walk the same steps backwards: the website's list first (a `glm-only` build), then the
 app's model lists, then a register version without `--checker`, then the GO.
 
+## Before the Anthropic gate: re-install this gate's units first
+
+The Anthropic gate (README-anthropic.md, install step 3a) adds a second key to this server. This
+release's two DeepInfra units (`debateai-preview-provider-budget.service` and
+`debateai-preview-gate-halt-watch.service`) hide the Anthropic (and future Google) key folders and
+GO files; the units installed before this release do not. So, BEFORE the Anthropic key is
+installed, in this order: install both units from this release, run `systemctl daemon-reload`,
+restart them, and check with `systemctl show -p InaccessiblePaths <unit>` that each one lists
+`/var/lib/debateai-v3-preview/provider-anthropic-authority-v1` and
+`/etc/debateai-v3-preview/provider-anthropic-go-v1.json`. The exact commands are in
+README-anthropic.md, step 3a. The near-term setup is DeepInfra and Anthropic only (Google later);
+the proposed daily split for the owner to confirm is DeepInfra $3.50 and Anthropic $1.50.
+
 ## Daily operations
 
 **How much did we spend today? Is the gate open?** This only reads; it writes nothing. Look at:

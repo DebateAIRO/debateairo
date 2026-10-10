@@ -307,13 +307,13 @@ function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
   const effort = body.output_config;
   return Object.keys(body).length === required.length + optional
     && required.every(key => Object.hasOwn(body, key))
-    && (optional === 0 || (typeof body.system === "string" && body.system.length > 0))
+    && (optional === 0 || (typeof body.system === "string" && body.system.trim().length > 0))
     && (reviewed.effort === null || (isPlainObject(effort) && Object.keys(effort).length === 1 && effort.effort === reviewed.effort))
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
     && Array.isArray(messages) && messages.length % 2 === 1
     && messages.every((message, index) => isPlainObject(message) && Object.keys(message).length === 2
       && message.role === (index % 2 === 0 ? "user" : "assistant")
-      && typeof message.content === "string" && message.content.length > 0);
+      && typeof message.content === "string" && message.content.trim().length > 0);
 }
 /** No key ever leaves the app for a gate: a key header on the guarded fetch is refused. */
 function carriesKeyHeader(headers: RequestInit["headers"]): boolean {

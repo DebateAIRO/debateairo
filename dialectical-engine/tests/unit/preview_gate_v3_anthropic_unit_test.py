@@ -198,7 +198,7 @@ class GateUnitTests(unittest.TestCase):
 
     def test_readme_names_the_same_paths_the_proposed_go_and_the_key_command(self):
         readme = README.read_text()
-        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"anthropic"', '"1.00"', '400',
+        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"anthropic"', '"1.50"', '400', '$3.50', 'systemctl show -p InaccessiblePaths', '3a.',
                      'claude-haiku-5-5', '0.24704', '0.98816', '160.79.104.0/23', 'getent ahostsv4 api.anthropic.com',
                      'preview_key.py install anthropic', 'probe', '--model claude-haiku-5-5', 'model_echoed_exactly',
                      'completion_within_max_tokens', 'anthropic_budget_socket', '429', '529', UNIT.name, HALT_TIMER.name,

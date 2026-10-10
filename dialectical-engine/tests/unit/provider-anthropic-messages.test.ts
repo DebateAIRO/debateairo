@@ -167,7 +167,11 @@ describe("PR B — the Anthropic request on the wire", () => {
       [{ role: "user", content: "q" }, { role: "assistant", content: "prefill" }],
       [{ role: "system", content: "s" }, { role: "assistant", content: "a" }, { role: "user", content: "q" }],
       [{ role: "system", content: "only system" }],
-      [{ role: "user", content: "" }]
+      [{ role: "user", content: "" }],
+      // Judge review: whitespace-only text (JavaScript's trim set) is no text either.
+      [{ role: "user", content: " \n\t " }],
+      [{ role: "user", content: "\u3000\ufeff" }],
+      [{ role: "system", content: "s" }, { role: "user", content: "q" }, { role: "assistant", content: "  " }, { role: "user", content: "q" }]
     ] as PromptPacket["messages"][]) {
       expect(() => anthropicMessagesRequestBody({ model: MODEL, maxTokens: 10, thinkingLevel: "DEFAULT_ONLY", messages }))
         .toThrowError(expect.objectContaining({ code: PROVIDER_PACKET_UNSUPPORTED }));

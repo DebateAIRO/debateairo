@@ -151,6 +151,22 @@
     {
       "name": "a JSON-mode response_format",
       "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"S\",\"output_config\":{\"effort\":\"high\"},\"response_format\":{\"type\":\"json_object\"}}"
+    },
+    {
+      "name": "a whitespace-only message (the adapter trims and refuses it)",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\" \\n\\t \"}],\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "an ideographic-space-only message",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"　　\"}],\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "a byte-order-mark-only message",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"﻿\"}],\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "a whitespace-only system text",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"output_config\":{\"effort\":\"high\"},\"system\":\"  \\n\"}"
     }
   ]
 }

@@ -25,7 +25,7 @@ ANTHROPIC = bridge.helper.PROFILES['anthropic']
 _HTTPS = bridge.helper.HttpsTransport
 PARITY = Path(__file__).resolve().parent / 'fixtures/preview-model-rows-anthropic.json'
 HAIKU = 'claude-haiku-5-5'
-KEY = 'sk-' + 'ant-' + 'synthetic' + '-0123456789'  # A made-up test value, not a key.
+KEY = 'sk-' + 'ant-' + 'api03-' + 'synthetic' + '-0123456789'  # A made-up test value.
 OTHER_SHAPE = 'sk-' + 'ant-' + 'api03-LEAKED_value-42'  # Any other string of the same shape.
 # The reviewed row and Anthropic's two list-price steps, written out independently of the gate:
 # input reserve 0.625 (the upper step's 5-minute cache write), output 2.50, bound 32768.
@@ -424,6 +424,23 @@ class SettlementTests(AnthropicTest):
             self.call(gate, reply=message(), status=500)
         self.assertEqual((entry_of(gate)['state'], gate.status()['reason']), ('settled', 'provider_error_or_model_identity'))
 
+    def test_a_1h_cache_write_above_the_hold_is_charged_and_halts_with_charge_overrun(self):
+        # 0.625 is not the dearest input price: a 1-hour cache write over 100,000 tokens is 1.00.
+        # The request cannot ask for caching, but if Anthropic reports such a write anyway, the call
+        # is charged in full (no cap at the hold) and the gate halts with charge_overrun.
+        hour = {'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 200000}
+        reply = message(1000, 100, cache_creation_input_tokens=200000, cache_creation=hour)
+        expected = cost(UPPER, 1000, write_1h=200000, output=100)
+        self.assertEqual(expected, Decimal('0.20075'))
+        gate = self.ready()
+        with self.refused('AUTHORITY_HALTED'):
+            self.call(gate, reply=reply)
+        entry = entry_of(gate)
+        self.assertEqual((entry['state'], Decimal(entry['held_usd'])), ('settled', expected))
+        self.assertGreater(Decimal(entry['held_usd']), Decimal(entry['reserved_usd']))
+        self.assertEqual(Decimal(entry['overrun_usd']), expected - Decimal(entry['reserved_usd']))
+        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'charge_overrun'))
+
 
 class UnbilledAndUnsentTests(AnthropicTest):
     RATE = {'type': 'error', 'error': {'type': 'rate_limit_error', 'message': 'Number of requests has exceeded your rate limit'}}
@@ -662,7 +679,9 @@ class RequestShapeTests(AnthropicTest):
 
     def test_a_key_of_another_shape_is_never_sent_and_reserves_nothing(self):
         # A DeepInfra or Google key put in the Anthropic folder: refused before any reservation or call.
-        for wrong in ('synthetic-key-0123456789', 'AIza' + 'x' * 35, 'sk-ant-has space'):
+        admin_form = 'sk-' + 'ant-' + 'admin01-' + 'x' * 24  # Anthropic's Admin form: never used here.
+        for wrong in ('synthetic-key-0123456789', 'AIza' + 'x' * 35, 'sk-ant-has space', admin_form,
+                      'sk-' + 'ant-' + 'synthetic' + '-0123456789'):
             with self.subTest(key=wrong[:8]):
                 gate = self.ready()
                 calls = []

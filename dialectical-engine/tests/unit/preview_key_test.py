@@ -29,7 +29,7 @@ preview_key = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(preview_key)
 Refusal = preview_key.Refusal
 KEYS = {'deepinfra': ('synthetic' + '-deepinfra-' + '0123456789').encode(),
-        'anthropic': ('sk-' + 'ant-' + 'synthetic_test-' + '0123456789').encode(),
+        'anthropic': ('sk-' + 'ant-' + 'api03-' + 'synthetic_test-' + '0123456789').encode(),
         'google': ('AI' + 'za' + 'Synthetic_test-' + 'x' * 20).encode()}
 
 
@@ -75,7 +75,7 @@ class InstallTests(KeyCommandTest):
                 info = path.stat()
                 self.assertEqual(result, {'status': 'installed', 'provider': provider, 'mode': '600',
                                           'owner': '%d:%d' % (info.st_uid, info.st_gid), 'links': 1,
-                                          'size': len(KEYS[provider]) + 1})
+                                          'size': len(KEYS[provider]) + 1, 'stale_temporary_files_removed': 0})
                 self.assertEqual(path.read_bytes(), KEYS[provider] + b'\n')
                 self.assertEqual((oct(info.st_mode & 0o777), info.st_nlink), ('0o600', 1))
                 self.assertEqual(self.listing(provider), ['api-key.txt'])  # No temporary file left.
@@ -85,7 +85,7 @@ class InstallTests(KeyCommandTest):
 
     def test_an_existing_key_is_kept_without_replace_and_replaced_with_it(self):
         self.install('anthropic')
-        newer = ('sk-' + 'ant-' + 'synthetic_newer-' + '9876543210').encode()
+        newer = ('sk-' + 'ant-' + 'api03-' + 'synthetic_newer-' + '9876543210').encode()
         self.reads.clear()
         with self.refused('KEY_EXISTS'):
             self.install('anthropic', key=newer)
@@ -188,7 +188,12 @@ class RefusalTests(KeyCommandTest):
                     if key:
                         self.assertNotIn(key.decode('latin-1'), str(refused.exception))
                     self.assertEqual(self.listing(provider), [])
-        self.assertTrue(preview_key.shape_ok('anthropic', b'sk-ant-' + b'a' * 505))  # 512 characters in all.
+        api_form = b'sk-' + b'ant-' + b'api03-'
+        self.assertTrue(preview_key.shape_ok('anthropic', api_form + b'a' * (512 - len(api_form))))  # 512 in all.
+        # Judge review: only the ordinary API form; the Admin and other Anthropic forms are refused.
+        for other in (b'admin01-', b'oat01-', b'api-', b'apiXX-', b'api3-'):
+            self.assertFalse(preview_key.shape_ok('anthropic', b'sk-' + b'ant-' + other + b'x' * 24))
+            self.assertFalse(preview_key.shape_ok('deepinfra', b'sk-' + b'ant-' + other + b'x' * 24))
         self.assertTrue(preview_key.shape_ok('deepinfra', b'!' * 16))
         self.assertTrue(preview_key.shape_ok('deepinfra', b'sk-other-0123456789'))  # Only the known prefixes are refused.
 
@@ -206,6 +211,31 @@ class RefusalTests(KeyCommandTest):
         with self.refused('FOLDER_NOT_SAFE'):
             self.install('anthropic', owner_uid=os.getuid() + 1)
         self.assertEqual(self.reads, [])
+
+    def test_stale_temporary_files_are_removed_first_and_counted_links_never_followed(self):
+        folder = Path(self.folders['anthropic'])
+        (folder / '.api-key.txt.4242.tmp').write_bytes(b'left over')
+        (folder / '.api-key.txt.4243.tmp').write_bytes(b'')
+        outside = self.root / 'outside.txt'
+        outside.write_bytes(b'keep me')
+        os.symlink(outside, folder / '.api-key.txt.4244.tmp')
+        (folder / '.api-key.txt.4245.tmp').mkdir()
+        (folder / 'notes.tmp').write_bytes(b'not ours')
+        result = self.install('anthropic')
+        self.assertEqual(result['stale_temporary_files_removed'], 2)
+        self.assertEqual(sorted(os.listdir(folder)), ['.api-key.txt.4244.tmp', '.api-key.txt.4245.tmp', 'api-key.txt', 'notes.tmp'])
+        self.assertEqual(outside.read_bytes(), b'keep me')
+        # A refusal still says what was removed.
+        (folder / '.api-key.txt.4246.tmp').write_bytes(b'x')
+        with self.refused('KEY_EXISTS') as refused:
+            self.install('anthropic')
+        self.assertEqual(refused.exception.stale_temporary_files_removed, 1)
+
+    def test_a_fifo_in_another_providers_place_refuses_instead_of_hanging(self):
+        os.mkfifo(self.key_file('deepinfra'))
+        with self.refused('OTHER_KEY_UNREADABLE'):
+            self.install('anthropic')
+        self.assertEqual(self.listing('anthropic'), [])
 
     def test_the_script_reads_the_key_only_from_the_terminal(self):
         text = SCRIPT.read_text()

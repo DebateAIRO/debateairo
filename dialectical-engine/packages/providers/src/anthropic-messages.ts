@@ -83,7 +83,8 @@ function anthropicMessages(messages: PromptPacket["messages"]): Readonly<{
   const system: string[] = [];
   const turns: { role: WireRole; content: string }[] = [];
   for (const message of messages) {
-    if (typeof message.content !== "string" || message.content === "") {
+    // Judge review: whitespace-only text is no text (the vendor refuses it); the gate refuses it too.
+    if (typeof message.content !== "string" || message.content.trim() === "") {
       throw new TypedDomainError(PROVIDER_PACKET_UNSUPPORTED, "Every message must carry non-empty text");
     }
     if (message.role === "system") {

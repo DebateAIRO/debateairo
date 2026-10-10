@@ -8,7 +8,9 @@ Run by the owner, as root, at a real terminal:
 <provider> is one of deepinfra, anthropic, google; each has one fixed private folder (FOLDERS).
 The key is typed or pasted at a hidden prompt: it is read from /dev/tty with echo off, never
 from the command line, the environment or a pipe. It is never printed, nor its hash; what is
-printed at the end is only the new file's mode, owner, link count and size.
+printed at the end is only the new file's mode, owner, link count and size, and how many stale
+temporary files (`.api-key.txt.<pid>.tmp`, regular files only, links never followed) an
+interrupted earlier run had left in the folder and this run removed first.
 
 What it refuses (one JSON line, exit 2, the key never in it):
   - anything but `install <provider>` or `install <provider> --replace` (USAGE);
@@ -48,7 +50,9 @@ FOLDERS = {
 # provider's key (Anthropic sk-ant-, Google AIza) pasted at the wrong prompt.
 SHAPES = {
     'deepinfra': re.compile(r'(?!sk-ant-|AIza)[!-~]{16,512}'),
-    'anthropic': re.compile(r'(?=.{16,512}\Z)sk-ant-[A-Za-z0-9_-]+', re.ASCII),
+    # Only Anthropic's ordinary API form (sk-ant-api + two digits + '-'); an Admin form or any other
+    # Anthropic credential is refused, as the gate's AnthropicProfile.key_pattern does.
+    'anthropic': re.compile(r'(?=.{16,512}\Z)sk-ant-api[0-9]{2}-[A-Za-z0-9_-]+', re.ASCII),
     'google': re.compile(r'AIza[0-9A-Za-z_-]{35}', re.ASCII),
 }
 MAX_LINE_BYTES = 1024
@@ -128,20 +132,42 @@ def key_exists(dir_fd):
 
 
 def other_key_digests(provider, folders):
-    """sha256 of each other provider's key (stripped, as the gate reads it); only compared, never shown."""
+    """sha256 of each other provider's key (stripped, as the gate reads it); only compared, never shown.
+    Opened without following a link and without blocking, and read only if it is a regular file, so
+    a FIFO or device put in its place cannot hang the command."""
     digests = []
     for name, path in folders.items():
         if name == provider:
             continue
         try:
-            fd = os.open(os.path.join(path, KEY_NAME), os.O_RDONLY | os.O_NOFOLLOW)
+            fd = os.open(os.path.join(path, KEY_NAME), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
         except FileNotFoundError:
             continue
         except OSError:
             raise Refusal('OTHER_KEY_UNREADABLE') from None
         with os.fdopen(fd, 'rb') as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise Refusal('OTHER_KEY_UNREADABLE')
             digests.append(hashlib.sha256(stream.read(MAX_LINE_BYTES).strip()).digest())
     return digests
+
+
+STALE_TEMPORARY = re.compile(r'\.%s\.[0-9]+\.tmp' % re.escape(KEY_NAME))
+
+
+def remove_stale_temporaries(dir_fd):
+    """Remove temporary files an interrupted earlier run left in the private folder: regular files
+    named like this script's own temporary file only (never a link, folder or anything else, and
+    no link is followed). Returns how many were removed."""
+    removed = 0
+    for name in os.listdir(dir_fd):
+        if not STALE_TEMPORARY.fullmatch(name):
+            continue
+        info = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
+        if stat.S_ISREG(info.st_mode):
+            os.unlink(name, dir_fd=dir_fd)
+            removed += 1
+    return removed
 
 
 def write_key(dir_fd, raw, replace, owner_uid):
@@ -185,7 +211,9 @@ def install(provider, replace, *, read_line=read_hidden, euid=os.geteuid, stdin_
         raise Refusal('ROOT_REQUIRED')
     dir_fd = open_folder(folders[provider], owner_uid)
     raw = None
+    removed = 0
     try:
+        removed = remove_stale_temporaries(dir_fd)
         if key_exists(dir_fd) and not replace:
             raise Refusal('KEY_EXISTS')
         raw = bytearray(read_line(provider))
@@ -194,11 +222,14 @@ def install(provider, replace, *, read_line=read_hidden, euid=os.geteuid, stdin_
         if hashlib.sha256(bytes(raw)).digest() in other_key_digests(provider, folders):
             raise Refusal('KEY_USED_BY_OTHER_PROVIDER')
         info = write_key(dir_fd, bytes(raw), replace, owner_uid)
+    except Refusal as refusal:
+        refusal.stale_temporary_files_removed = removed
+        raise
     finally:
         if raw is not None:
             raw[:] = bytes(len(raw))  # Best effort: the copy this script holds is overwritten.
         os.close(dir_fd)
-    return {'status': 'installed', 'provider': provider,
+    return {'status': 'installed', 'provider': provider, 'stale_temporary_files_removed': removed,
             'mode': '%o' % stat.S_IMODE(info.st_mode), 'owner': '%d:%d' % (info.st_uid, info.st_gid),
             'links': info.st_nlink, 'size': info.st_size}
 
@@ -211,7 +242,9 @@ def main(argv=None):
         print(json.dumps(install(provider, replace)))
         return 0
     except Refusal as refusal:
-        print(json.dumps({'status': 'refused', 'error': str(refusal)}))
+        removed = getattr(refusal, 'stale_temporary_files_removed', None)
+        print(json.dumps({'status': 'refused', 'error': str(refusal),
+                          **({} if removed is None else {'stale_temporary_files_removed': removed})}))
         return 2
     except OSError as error:
         print(json.dumps({'status': 'refused', 'error': 'WRITE_FAILED', 'errno': errno.errorcode.get(error.errno)}))

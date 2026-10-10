@@ -31,7 +31,8 @@ export type PreviewModelRow = Readonly<{
   /**
    * Vendor list price in USD per million tokens, as the decimal string the gate reads: the price
    * every call reserves at and the estimate uses. For a vendor with price steps (Anthropic) it is
-   * the dearest per-token price of the upper step; the gate settles at the real step.
+   * the upper step's 5-minute cache-write price (above any plain input price; a request cannot ask
+   * for caching); the gate settles at the real step and halts on any overrun.
    */
   inputUsdPerM: string;
   outputUsdPerM: string;
@@ -107,9 +108,10 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
     row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
       outputBound: 131_072, effort: null, jsonObject: false })
   ]),
-  // PR B (lead, 2026-10-10). Reserve and estimate at the dearest per-input-token price of the upper
-  // step (5-minute cache write $0.625) and the upper output price ($2.50): a 256 KiB call holds at
-  // most $0.24704. The gate settles at the real step (list prices, read 2026-10-10).
+  // PR B (lead, 2026-10-10). Reserve and estimate at the upper step's 5-minute cache-write price
+  // ($0.625, above any plain input price; a request cannot ask for caching, so the dearer 1-hour
+  // write $1.00 should never occur) and the upper output price ($2.50): a 256 KiB call holds at
+  // most $0.24704. The gate settles at the real step and halts on an overrun (charge_overrun).
   anthropic: Object.freeze([
     row("anthropic", { model: "claude-haiku-5-5", maker: "Anthropic", inputUsdPerM: "0.625", outputUsdPerM: "2.50",
       outputBound: 32_768, effort: "high", jsonObject: false })
