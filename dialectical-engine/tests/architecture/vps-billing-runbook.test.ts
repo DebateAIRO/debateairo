@@ -1233,10 +1233,21 @@ describe("CF1 (Part C's final review): the runbook speaks the charge's currency 
       "buy Plus once as a German buyer",
       // ops-4: the status line names the currency, and the owner checks it.
       "`NETOPIA_SANDBOX_STATUS=PAID:3:1.00 USD`", "check that the line names the currency the payment was started in",
-      "`NO_CURRENCY`"
+      "`NO_CURRENCY`",
+      // CF1 fix round 1: one payment per currency to its fixture before the next, so the newest captures match.
+      "Take each currency's payment all the way to its fixture (start, pay on its page, `status --order`, `fixture --order`) before you start the next one"
     ]) {
       expect(sandbox, needle).toContain(needle);
     }
+    // CF1 fix round 1: "US" is added where the sandbox server's version is written, before the check command and step 1.
+    const bulletAt = sandbox.indexOf("**Register version with `countryPolicy`**");
+    const checkAt = sandbox.indexOf("Run the check command (§14.2) before step 1");
+    expect(bulletAt, "the register bullet in §14.9").toBeGreaterThanOrEqual(0);
+    expect(checkAt, "the check command comes after the register bullet").toBeGreaterThan(bulletAt);
+    const registerBullet = sandbox.slice(bulletAt, checkAt);
+    expect(registerBullet).toContain("add `\"US\"` to `withdrawal_countries`");
+    expect(registerBullet).toContain("in the version you publish on this server only");
+    expect(registerBullet).toContain("never on the live host");
     expect(sandbox).not.toContain("every line must show a tick.");
     expect(sandbox).not.toContain("Choose a country whose `pay` is on, for example Germany (DE)");
     // The claims stay true of the example files and the tool.

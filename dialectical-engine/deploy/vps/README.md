@@ -3173,7 +3173,10 @@ real accounts, and destroy it at the end (step 8). It needs its own:
   member the publish seals the version and refuses it
   (`HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE`, §14.8), and the server cannot start billing.
   Whether §5's four conditions for that member ("Country data") must hold on a throwaway server that only you use is
-  your call; they do hold for the live site.
+  your call; they do hold for the live site. Steps 1–5 buy as a buyer in the United States, and step 4's withdrawal is
+  open only to a country in `billingPolicy`'s `withdrawal_countries` (the EU, the EEA and the UK, none of which pays in
+  USD), so in the version you publish on this server only, add `"US"` to `withdrawal_countries`; never on the live
+  host.
 
 The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if a sandbox NETOPIA address sits beside anything
 but Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): the sandbox server
@@ -3207,9 +3210,8 @@ journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show -
 price list and whose `pay` is on in `deploy/vps/register/country-policy.example.json`. Pick the United States as your
 country, answer the "Do you live in …" question with yes, and give a state in the billing details. The invoice goes to
 Quaderno's sandbox. NETOPIA's sandbox may refuse EUR and RON until the settlement form is signed, so the EUR and RON
-payments come later, in step 7. Step 4's withdrawal is open only to a country in `billingPolicy`'s
-`withdrawal_countries` (the EU, the EEA and the UK, none of which pays in USD), so in the version you publish on this
-server only, add `"US"` to `withdrawal_countries`; never on the live host. The Romanian path (SmartBill, the attached
+payments come later, in step 7. Step 4's withdrawal needs the `"US"` you added to `withdrawal_countries` in this
+server's register version (above). The Romanian path (SmartBill, the attached
 PDF) is proven only by the fake stack in step 6 and by the SmartBill contract tests, never in this run. For go-live row
 74, ask once for a quote as a Romanian buyer and do not pay: on a fresh test account choose Plus, pick Romania, confirm
 it, fill in a Romanian address, write down the total the page shows in lei (Quaderno's sandbox calculation in RON), and
@@ -3365,7 +3367,10 @@ read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=de
    **Once NETOPIA's sandbox accepts EUR and RON**, also run `start --currency RON` and `start --currency EUR` (each then
    paid on its page, and `status --order` and `fixture --order` run for each, within the same 14 days), so the
    recording shows a payment's status and message in each currency; check that each status line names RON or EUR, the
-   currency that payment was started in. Then, on a fresh test account on the site, buy Plus once as a German buyer, as
+   currency that payment was started in. Take each currency's payment all the way to its fixture (start, pay on its
+   page, `status --order`, `fixture --order`) before you start the next one, so the newest start, status read and
+   first message all belong to one payment: turning the captures into fixtures keeps only the newest of each, and the
+   recorded suite compares them. Then, on a fresh test account on the site, buy Plus once as a German buyer, as
    in step 1 but with Germany as your country: it pays in EUR, and it is Quaderno's sandbox calculation and sale in EUR
    for go-live row 74. If NETOPIA's sandbox refuses them before the settlement form is signed, wait for the form.
 

@@ -72,6 +72,14 @@ describe.runIf(fixtures.length > 0)("N22 — recorded NETOPIA fixtures (OWNER-RU
 
   it("pin the currency (CF1, ops-4): the first paid message and the status answer name the currency the start asked", () => {
     // VERIFY_PAYMENT refuses a report whose currency is not the charge's (absent included), so NETOPIA must echo it.
+    // The scrubber keeps only the newest capture of each kind, so the three must come from one payment (README §14.9
+    // step 7: each currency's payment taken all the way to its fixture before the next one starts). Otherwise a correct
+    // recording would compare one payment's start with another's message.
+    const sameOrder = "start-request, notice-start and status-answer must come from one payment: the scrubber keeps the newest "
+      + "capture of each kind, so scrub captures where each currency's payment went all the way to its fixture before the next "
+      + "started (README §14.9 step 7)";
+    expect(orderIdOf("notice-start"), `notice-start: ${sameOrder}`).toBe(orderIdOf("start-request"));
+    expect(orderIdOf("status-answer"), `status-answer: ${sameOrder}`).toBe(orderIdOf("start-request"));
     const asked = String(valueAtPath(json("start-request"), "order.currency"));
     expect(asked).toMatch(/^[A-Z]{3}$/u);
     expect(parseNetopiaNotice(Buffer.from(fixture("notice-start").bodyText, "utf8"), recordedNow("notice-start")).currency).toBe(asked);

@@ -1203,8 +1203,12 @@ changes a price or the rule by publishing a new register version; a published ve
   whose `billingPlans` is v2: publish first (`pnpm register:publish-hosted`, which seals the engine's own v2 row when
   the hosted file has no `billingPlans`, or the owner's), pin the printed `REGISTER_VERSION` in both `api.env` and
   `runner.env`, then restart both. A hosted file that still carries a v1 `billingPlans` is refused by the dry run
-  (`BILLING_PLANS_INVALID`); README §14.4 says how to rewrite it. On the preview, the operator's `publish` seals the new
-  source rows and `apply-and-plan` (with the owner's yes) applies the migration step (PR-57).
+  (`BILLING_PLANS_INVALID`); README §14.4 says how to rewrite it. A host other than the preview migrates before it
+  publishes, following README §14.4 "Upgrading to Part C (migration 0113)": it opens the migrator window, runs
+  `pnpm db:migrate` (which applies 0113 and any pending forward step), then `hardening.sql`, because the API does not
+  check the schema when it starts; then it publishes, pins and restarts both services as above. On the preview, the
+  operator's `publish` seals the new source rows and `apply-and-plan` (with the owner's yes) applies the migration
+  step (PR-57).
 - Before billing goes on: NETOPIA's settlement form for RON, EUR and USD is signed, and the owner's price list is
   published (go-live row 73).
 
