@@ -45,7 +45,7 @@ describe("P14c the withdrawal command", () => {
 
   it("prints one plain line per outcome, and names the settling command when the owner must decide", () => {
     const record = parseWithdrawArguments(["--owner", OWNER, "--received", RECEIVED]);
-    expect(renderWithdrawResult({ kind: "REFUNDING", refundMicros: 18_150_000 }, record))
+    expect(renderWithdrawResult({ kind: "REFUNDING", refundMicros: 18_150_000, currency: "USD" }, record))
       .toContain("18.15 USD goes back to the card");
     expect(renderWithdrawResult({ kind: "NOTHING_DUE" }, record)).toContain("nothing was due back");
     const review = renderWithdrawResult({ kind: "OWNER_REVIEW" }, record);
@@ -64,11 +64,11 @@ describe("P14c the withdrawal command", () => {
       ["--dashboard <amount refunded in NETOPIA's admin>", '--dashboard "$DASHBOARD"']
     ]));
     const settle = parseWithdrawArguments(["--owner", OWNER, "--refund", "3.00", "--dashboard", "5.00"]);
-    expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 3_000_000, dashboardMicros: 5_000_000 }, settle))
+    expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 3_000_000, dashboardMicros: 5_000_000, currency: "USD" }, settle))
       .toContain("3.00 USD goes back to the card and 5.00 USD was refunded in NETOPIA's admin (M8 says 8.00)");
-    expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 17_590_000 }, settle))
+    expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 17_590_000, currency: "USD" }, settle))
       .toContain("17.59 USD was refunded in NETOPIA's admin. M8 is queued");
-    expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 0 }, settle)).toContain("nothing more goes back");
+    expect(renderWithdrawResult({ kind: "SETTLED", refundMicros: 0, dashboardMicros: 0, currency: "USD" }, settle)).toContain("nothing more goes back");
   });
 
   it("exits 2 on bad usage, 1 with one code on a refusal, 0 with the line on success", async () => {

@@ -2324,7 +2324,17 @@ with the spec's values and billing **off**: copy those two into `/etc/debateai/r
 also carries `taxAuthorities`, equal to the code-owned text; copy that member only to correct the text (the register
 README's `taxAuthorities` row says what carrying it costs). `countryPolicy` is not in that example: it lives in
 `deploy/vps/register/country-policy.example.json`, and goes into the hosted file only once every condition of §5
-"Country data" holds (go-live lines 27–30). Then, inside a migrator window (§4 steps 2 and 5), check and publish:
+"Country data" holds (go-live lines 27–30).
+
+**Your price list (Part C).** Every plan has a price in USD, EUR and RON, and `currency_by_country` says which one each
+buyer pays, by the country of the billing address: RON for Romania, EUR for the other 26 EU countries and Norway,
+Iceland, Liechtenstein, Switzerland and the United Kingdom, USD for everyone else. Set your prices in `net_prices`
+(micro-units: 100 lei is `100000000`; whole bani or cents only), keep `credit_currency` at `USD`, dry-run, publish, pin,
+restart. A subscription keeps its currency and its price for good; a new price list or a changed country reaches only
+new subscriptions. `pnpm billing:check` shows a cross while the published plans are the engine's own row or still carry
+its placeholder EUR and RON prices, as a copy of the kit's example does.
+
+Then, inside a migrator window (§4 steps 2 and 5), check and publish:
 
 ```sh
 pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json
@@ -2341,6 +2351,31 @@ below is the same: edit the file, dry-run, publish, pin, restart. A published ve
 `recurring_net_micros`) and renews at that price plus the current tax. So a `billingPlans` version with a new price
 reaches only new subscriptions; existing subscribers keep their price until a price-change command with the 30 days'
 notice of Terms §12 exists (it is not built yet).
+
+#### Upgrading to Part C (migration 0113)
+
+Part C prices every plan in RON, EUR and USD at once. Its migration `migrations/0113_billing_price_currencies.sql` adds
+each quote's currency and lets a charge be in RON or EUR as well as USD; Part C's code writes and reads that currency,
+and the API does not check the schema when it starts, so the migration must be applied before either service starts on
+this code. The engine also refuses to start on a register version whose `billingPlans` has one price per plan
+(`BILLING_PLANS_INVALID`). A host that runs an earlier release does these, in this order, in one sitting:
+
+1. **Put the new checkout in place**, with its dependencies installed, and restart nothing yet.
+2. **Open the migrator window** (§4 step 2).
+3. **Migrate**: `pnpm db:migrate`. It applies `migrations/0113_billing_price_currencies.sql` and any other pending
+   forward step, in order (on a host older than them, dev's 0110, 0111 and 0112 come first).
+4. **Run `hardening.sql`** (§4 step 3).
+5. **Close the window** (§4 step 5).
+6. **Publish the v2 `billingPlans`**: rewrite the hosted file's `billingPlans` in the new shape (your price list,
+   above; or remove the member to seal the engine's own row), then dry-run and publish with the two commands above.
+   The publish runs inside a migrator window (§4 steps 2 and 5): open one again for it, or do this step before
+   closing the window in step 5.
+7. **Pin it**: copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`.
+8. **Restart both**: `systemctl restart debateai-api debateai-runner`.
+
+**Rolling back** past Part C: before restarting the older code, pin the register version it ran on (the one you
+replaced) in both `api.env` and `runner.env`, because the forward migration stays applied and older code refuses a v2
+version (`BILLING_PLANS_INVALID`). The applied 0113 is harmless to older code while billing is off.
 
 ### 14.5 NETOPIA's message
 
@@ -2445,7 +2480,7 @@ version the person accepted from there, even after the Terms change. The site li
 
 **Switching billing on.** Before this, make sure:
 
-- every row of the go-live checklist from 13 to 73 is proven (its last column holds the proof), the void rows (20, 40
+- every row of the go-live checklist from 13 to 74 is proven (its last column holds the proof), the void rows (20, 40
   and 46) excepted. Some proofs can be read only after the switch-on: they are proven right after it, and their Proof
   cells are filled then. These are parts of four rows' "How to prove it" cells: row 17, the footer of `/pricing` on the
   live site; row 18, the API's start with billing on; row 19, the first real payment's message; row 23, the check run
@@ -3023,8 +3058,10 @@ For an invoice or a credit note, settle the line with `pnpm billing:invoice`, gi
 - `--record` with `--amount`, for a `DASHBOARD_REFUND` line only: a refund made in NETOPIA's admin that NETOPIA
   reported on the payment itself, so the site does not know its amount and queued no credit note. Issue the credit
   note by hand in SmartBill (a Romanian sale) or Quaderno, then record it with `--kind CREDIT_NOTE`, its document as
-  above, and the amount you refunded in dollars and cents (for example `12.10`). The amount can be at most what the
-  payment held (the "up to" figure the tax summary gives for that charge). The line then leaves the list, and the
+  above, and the amount you refunded, in the charge's own currency as the tax summary's "up to" line names it (lei for
+  a Romanian sale, euro or dollars otherwise), in units and cents or bani (for example `50.00` for 50.00 RON). Never
+  convert it to another currency. The amount can be at most what the payment held (the "up to" figure the tax summary
+  gives for that charge). The line then leaves the list, and the
   quarter's tax summary subtracts the refund at that amount instead of listing it as "amount unknown". A charge has
   one credit note at most: if it already has one, the command refuses (`BILLING_INVOICE_ALREADY_RECORDED`), and that
   refund goes to your accountant. A refund transaction of a payment whose dashboard-refund credit note is recorded is
@@ -3047,7 +3084,7 @@ read -r CHARGE_REF && read -r KIND && read -r DOCUMENT && systemd-run --pipe --w
 To record a dashboard refund's credit note with its amount (`DASHBOARD_REFUND` lines only):
 
 ```sh
-# Paste the charge reference as the summary prints it and press Enter; paste the credit note (for example DBAI-0042, or the Quaderno document id) and press Enter; then type the amount you refunded in NETOPIA's admin, in dollars and cents (for example 12.10), and press Enter.
+# Paste the charge reference as the summary prints it and press Enter; paste the credit note (for example DBAI-0042, or the Quaderno document id) and press Enter; then type the amount you refunded in NETOPIA's admin, in the charge's own currency as the summary's "up to" line names it, in units and cents or bani (for example 50.00 for 50.00 RON), and press Enter.
 read -r CHARGE_REF && read -r DOCUMENT && read -r AMOUNT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:invoice --charge "$CHARGE_REF" --kind CREDIT_NOTE --record "$DOCUMENT" --amount "$AMOUNT"
 ```
 
@@ -3069,8 +3106,9 @@ It prints one line saying what it recorded or queued; a re-queued job that fails
 A refusal is one code and nothing is written. What each code means, and what to do:
 
 - `BILLING_INVOICE_USAGE`: the command line is not one of the forms above (a missing or repeated value, a kind other
-  than INVOICE or CREDIT_NOTE, both `--record` and `--requeue`, or neither, or an `--amount` that is not dollars and
-  cents above zero, such as `12.10`, or that comes without `--record` and `--kind CREDIT_NOTE`). Run it again as shown.
+  than INVOICE or CREDIT_NOTE, both `--record` and `--requeue`, or neither, or an `--amount` that is not units and cents
+  (or bani) above zero, such as `50.00`, or that comes without `--record` and `--kind CREDIT_NOTE`). Run it again as
+  shown.
 - `BILLING_INVOICE_CHARGE_UNKNOWN`: no charge has that reference. Paste it again exactly as the summary prints it.
 - `BILLING_INVOICE_OTHER_PAYMENT_SYSTEM`: the charge was paid in another payment system than the one this host's
   `NETOPIA_API_BASE_URL` names (NETOPIA's sandbox or live, or the previous card processor). It owes no document here:
@@ -3135,15 +3173,19 @@ real accounts, and destroy it at the end (step 8). It needs its own:
   member the publish seals the version and refuses it
   (`HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE`, §14.8), and the server cannot start billing.
   Whether §5's four conditions for that member ("Country data") must hold on a throwaway server that only you use is
-  your call; they do hold for the live site.
+  your call; they do hold for the live site. Steps 1–5 buy as a buyer in the United States, and step 4's withdrawal is
+  open only to a country in `billingPolicy`'s `withdrawal_countries` (the EU, the EEA and the UK, none of which pays in
+  USD), so in the version you publish on this server only, add `"US"` to `withdrawal_countries`; never on the live
+  host.
 
 The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if a sandbox NETOPIA address sits beside anything
 but Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): the sandbox server
 builds the SmartBill connection too, so it also refuses to start with `BILLING_COMPANY_FACTS_UNVERIFIED:cui` while the
 CUI is still in square brackets, and likewise while the company's name, registered office or general email address is
 (`BILLING_COMPANY_FACTS_UNVERIFIED:registeredOffice`, for example), because the sandbox emails print them too. Run the
-check command (§14.2) before step 1: every line must show a tick. Write down what you see at each step; go-live row 15
-needs your notes.
+check command (§14.2) before step 1: every line must show a tick, except one. The plans line's cross ("…placeholders…")
+is expected on this server unless you publish a price list here too; on the live host it must be a tick (go-live row
+73). Write down what you see at each step; go-live row 15 needs your notes.
 
 **Before step 1: read the journal of the first start with billing on.** Two minutes after that start, run the command
 below. For the API's current start only, it prints the lines that say NETOPIA refused our key, a message did not pass,
@@ -3164,10 +3206,16 @@ needs nothing:
 journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show --property=InvocationID --value debateai-api)" | grep -E '"event":"billing\.|\[BILLING_'
 ```
 
-**Every purchase in steps 1–5 is made as a buyer outside Romania.** Choose a country whose `pay` is on, for example
-Germany (DE), and answer the "Do you live in …" question with yes. The tax then goes to Germany and the invoice to
-Quaderno's sandbox. The Romanian path (SmartBill, the attached PDF) is proven only by the fake stack in step 6 and by
-the SmartBill contract tests, never in this run.
+**Every purchase in steps 1–5 is made as a buyer in the United States (US)**, which pays in USD under the example's
+price list and whose `pay` is on in `deploy/vps/register/country-policy.example.json`. Pick the United States as your
+country, answer the "Do you live in …" question with yes, and give a state in the billing details. The invoice goes to
+Quaderno's sandbox. NETOPIA's sandbox may refuse EUR and RON until the settlement form is signed, so the EUR and RON
+payments come later, in step 7. Step 4's withdrawal needs the `"US"` you added to `withdrawal_countries` in this
+server's register version (above). The Romanian path (SmartBill, the attached
+PDF) is proven only by the fake stack in step 6 and by the SmartBill contract tests, never in this run. For go-live row
+74, ask once for a quote as a Romanian buyer and do not pay: on a fresh test account choose Plus, pick Romania, confirm
+it, fill in a Romanian address, write down the total the page shows in lei (Quaderno's sandbox calculation in RON), and
+leave without pressing **Continue to payment**.
 
 **The stage clock only ever goes up.** Step 2 sets `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, and it stays at 31 through
 steps 3, 4 and 5 (to see a second renewal, raise it to 62; never lower it or remove it during the run). While it is
@@ -3181,14 +3229,14 @@ not part of this run (the fake stack in step 6 proves the bars and the share). T
 it (step 8). A host must never go live holding rows written on a moved clock; a live start refuses while any is still
 dated ahead (`BILLING_RECORDS_DATED_AHEAD`, §14.8).
 
-1. **Pay.** Sign up from the pricing page, choose Plus, pick Germany as your country, confirm it, fill in the billing
-   details, and press **Continue to payment**. On NETOPIA's sandbox page pay with the test card 9900 0048 1022 5098
-   (any future expiry, CVV 111).
+1. **Pay.** Sign up from the pricing page, choose Plus, pick the United States as your country, confirm it, fill in the
+   billing details, and press **Continue to payment**. On NETOPIA's sandbox page pay with the test card
+   9900 0048 1022 5098 (any future expiry, CVV 111).
    - Expect: you come back to the site, the plan is active within seconds, and the confirmation (M1) and receipt (M2)
      emails arrive. Settings shows the saved card.
-   - Then, on a second test account (Germany again: this account already has Plus, so a second checkout on it is
-     refused with `ALREADY_SUBSCRIBED`), pay for Plus with the 3-D Secure test card 9900 0091 8421 4768 and write down
-     how the bank's check looked.
+   - Then, on a second test account (the United States again: this account already has Plus, so a second checkout on it
+     is refused with `ALREADY_SUBSCRIBED`), pay for Plus with the 3-D Secure test card 9900 0091 8421 4768 and write
+     down how the bank's check looked.
 2. **Renew.** Move the billing clock forward by a month.
    - Open `api.env` and add the line `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, then restart the API. Keep the line.
    - Two minutes after the restart, run the journal command from **Before step 1** again; it should print nothing
@@ -3212,14 +3260,14 @@ systemctl restart debateai-api
    - Expect: Settings shows the new card, and no money is taken or held. Write down whether NETOPIA showed 0.00 and
      whether the card was saved (go-live row N-11).
    - The "we couldn't take the payment" emails (M5a–c) and the move to Free (M6) are proven by the fake stack in step 6.
-4. **Withdraw.** On a fresh test account (Germany again), pay for Plus, then in Settings press Withdraw within 14 days
-   and confirm with your password and authenticator code.
+4. **Withdraw.** On a fresh test account (the United States again), pay for Plus, then in Settings press Withdraw within
+   14 days and confirm with your password and authenticator code.
    - Expect the acknowledgement email (M8_RECEIVED), the Free plan, and your own email O2_REFUND_DUE with the amount.
    - Refund exactly that amount on that payment in NETOPIA's sandbox admin, then record it with `pnpm billing:refund-done`
      (**A refund handed to you**, §14.8). Expect the refund email (M8).
-5. **Cancel through the emailed link.** On another test account (Germany again), pay for Plus first: a cancel link is
-   sent only for a plan that is paid and not cancelled yet. Then open `/cancel` signed out and enter the account's
-   email.
+5. **Cancel through the emailed link.** On another test account (the United States again), pay for Plus first: a cancel
+   link is sent only for a plan that is paid and not cancelled yet. Then open `/cancel` signed out and enter the
+   account's email.
    - Open the link in the email (M9) and press the button.
    - Expect the cancellation email (M7), and Settings saying when the plan ends.
 6. **What the sandbox cannot show.** The fake stack proves the rest: a failing card through the retries to Free, a
@@ -3279,7 +3327,11 @@ systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --prop
 systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox start --capture-dir /var/tmp/netopia-capture --amount 1.00
 ```
 
-   Once it is paid, read that order's status twice, with NETOPIA's payment number and without it:
+   Once it is paid, read that order's status twice, with NETOPIA's payment number and without it. Each read prints the
+   state, NETOPIA's status, the amount and the currency on one line, for example
+   `NETOPIA_SANDBOX_STATUS=PAID:3:1.00 USD`: check that the line names the currency the payment was started in. A line
+   ending in `NO_CURRENCY` means NETOPIA's answer named none; the site would count such a payment as a mismatch and give
+   no plan, so write it down and hand the capture folder to a developer session:
 
 ```sh
 # Paste the tool order's id the start printed and press Enter.
@@ -3312,6 +3364,16 @@ systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --prop
 read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:netopia-sandbox charge --capture-dir /var/tmp/netopia-capture --from-order "$ORDER"
 ```
 
+   **Once NETOPIA's sandbox accepts EUR and RON**, also run `start --currency RON` and `start --currency EUR` (each then
+   paid on its page, and `status --order` and `fixture --order` run for each, within the same 14 days), so the
+   recording shows a payment's status and message in each currency; check that each status line names RON or EUR, the
+   currency that payment was started in. Take each currency's payment all the way to its fixture (start, pay on its
+   page, `status --order`, `fixture --order`) before you start the next one, so the newest start, status read and
+   first message all belong to one payment: turning the captures into fixtures keeps only the newest of each, and the
+   recorded suite compares them. Then, on a fresh test account on the site, buy Plus once as a German buyer, as
+   in step 1 but with Germany as your country: it pays in EUR, and it is Quaderno's sandbox calculation and sale in EUR
+   for go-live row 74. If NETOPIA's sandbox refuses them before the settlement form is signed, wait for the form.
+
    Once NETOPIA's messages for the three orders have arrived, and within 14 days (the raw messages are deleted after
    that), store each order's messages: run this once for each of the three ids (the payment's, the card check's and
    the charge's):
@@ -3325,7 +3387,7 @@ read -r ORDER && systemd-run --pipe --wait --collect --uid=debateai-api --gid=de
    folder, turn it into fixtures:
 
 ```sh
-# Paste the path of the copied capture folder and press Enter; then the day you recorded, as YYYY-MM-DD (for example 2026-10-20), and press Enter.
+# Paste the path of the copied capture folder and press Enter; then the last day you recorded, as YYYY-MM-DD (for example 2026-10-20), and press Enter.
 read -r CAPTURE_DIR && read -r RECORDED_ON && pnpm exec tsx tools/billing/scrub-netopia-fixture.ts --capture-dir "$CAPTURE_DIR" --out tests/fixtures/netopia --recorded-on "$RECORDED_ON"
 ```
 
@@ -3338,9 +3400,13 @@ pnpm exec vitest run tests/unit/payments-netopia-recorded-fixtures.test.ts
    Commit the scrubbed fixtures only when that suite is green (go-live row for the recording). A red run means: do not
    commit, keep the raw folder private, and hand it to a developer session.
 8. **Destroy the sandbox server.** Once your notes are written and both fake-stack runs have passed, delete the server
-   and its disks at your hosting provider and remove the sandbox domain's DNS record. If you set up its nightly backup
-   (§9), it must have had its own storage: delete that too. Never copy its database, a backup of it or its `api.env` to
-   the live host, and never point the sandbox server at live: go live on the production host, as §14.8 says.
+   and its disks at your hosting provider and remove the sandbox domain's DNS record. Keep the server until step 7's RON
+   and EUR runs (`start --currency RON` and `start --currency EUR`) are done, with the German purchase; if NETOPIA's
+   sandbox accepts EUR and RON only after you destroyed it, build a sandbox server again as above for those runs
+   (go-live row 74). If you set up its nightly
+   backup (§9), it must have had its own storage: delete that too. Never copy its database, a backup of it or its
+   `api.env` to the live host, and never point the sandbox server at live: go live on the production host, as §14.8
+   says.
 
 **The small live test, with billing off.** NETOPIA says monthly payments can only be tested with a real card on live.
 Do it on the production host once NETOPIA has switched on recurring payments, before billing goes on (§1.6 item 6 of

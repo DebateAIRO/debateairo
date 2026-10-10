@@ -1,16 +1,19 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
-  BillingChargeStatusResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
-  BillingPlansResponseSchema, BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingUsageResponseSchema
+  BillingChargeStatusResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema, BillingCurrencySchema,
+  BillingPlansResponseSchema, BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingUsageResponseSchema,
+  type BillingCurrency
 } from "@debateai/contract";
 import { allowanceVsPlus, microsToDecimal } from "@debateai/billing-core";
-import type { BillingPlans, PlanId } from "@debateai/register";
+import type { GeoLookup } from "@debateai/geo";
+import { planNetPrice, type BillingPlans, type PlanId } from "@debateai/register";
 import { clientIpNetworkScope } from "../client-ip.js";
 import type { LegalAcceptanceApplication } from "../legal.js";
 import type { AuthenticatedSession } from "../sessions.js";
 import type { ChargeStatusPort } from "./charge-status.js";
 import type { CheckoutServicePort } from "./checkout.js";
 import type { NetopiaNoticeIntakePort } from "./netopia-intake.js";
+import { connectionCurrency } from "./place.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
 import { answerRefusal, BillingRefusal, billingNotFound } from "./refusal.js";
 import { installSubscriptionRoutes, SUBSCRIPTION_ROUTE_PATHS } from "./subscription-routes.js";
@@ -85,6 +88,8 @@ export type BillingRouteDeps = Readonly<{
   source?: BillingRequestSource;
   /** P8a: composed by the billing runtime, present only when hosted with billing on. */
   plans?: BillingPlans;
+  /** Part C: the connection's country for the plans' currency; absent, the rule's default. */
+  geo?: GeoLookup;
   legal?: BillingLegalGate;
   /** P8b. */
   quotes?: QuoteServicePort;
@@ -132,8 +137,11 @@ async function refuseUnconfirmedAge(read: BillingAgeConfirmation | undefined, se
   if (status !== "confirmed") throw new BillingRefusal(403, "AGE_CONFIRMATION_REQUIRED");
 }
 
-/** Spec §2.5.3: the public plans list may be cached by the browser and by any shared cache for 60 seconds. */
-const PLANS_CACHE_CONTROL = "public, max-age=60";
+/**
+ * Spec 2026-10-05 §2.16.5: the answer names the caller's currency, so only the browser may keep it for a minute; a
+ * shared cache would hand one country's currency to everyone.
+ */
+const PLANS_CACHE_CONTROL = "private, max-age=60";
 
 /** Quote, checkout and card bodies are small; each declares the 16 KiB credential-route ceiling. */
 const BILLING_BODY_LIMIT_BYTES = 16_384;
@@ -158,7 +166,7 @@ function quoteResponse(result: QuoteResult): Readonly<Record<string, unknown>> {
   return BillingQuoteResponseSchema.parse({
     quote_ref: quote.quoteId, plan_id: quote.planId,
     net: microsToDecimal(quote.netMicros), tax: microsToDecimal(quote.taxMicros), total: microsToDecimal(quote.totalMicros),
-    tax_name: quote.taxName, tax_rate_bp: quote.taxRateBasisPoints, tax_country: quote.taxCountry,
+    currency: quote.currency, tax_name: quote.taxName, tax_rate_bp: quote.taxRateBasisPoints, tax_country: quote.taxCountry,
     tax_region: quote.taxRegion, tax_status: quote.taxStatus, country: result.declaredCountry,
     ip_country: result.ipCountry, country_confirm_needed: result.countryConfirmNeeded,
     address_required: result.addressRequired, renews_on: result.renewsOn.toISOString(),
@@ -202,8 +210,8 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     }
   );
 
-  // The plans come from the register version read at boot, so one body serves every caller until restart.
-  let plansBody: Readonly<Record<string, unknown>> | null = null;
+  // The plans come from the register version read at boot, so one body per currency serves every caller until restart.
+  const plansBodies = new Map<BillingCurrency, Readonly<Record<string, unknown>>>();
   api.get("/v1/billing/plans", {
     ...deps.policy("GET /v1/billing/plans"),
     // Spec §2.5.3: "GET /v1/billing/plans (public; cached 60 s)". The house onSend hook of `buildApi`
@@ -219,15 +227,22 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     if (plans === undefined) return billingNotFound(reply);
     // A source-keyed scope counts the caller's network (DL5-F3: an IPv6 address is its /64), as G3a's does.
     if (!admit.gate(reply, "publicReads", "GET /v1/billing/plans", clientIpNetworkScope(source(request).ip))) return reply;
-    plansBody ??= BillingPlansResponseSchema.parse({
-      currency: plans.currency,
-      plans: plans.plans.map((plan) => ({
-        plan_id: plan.planId,
-        net_price: microsToDecimal(plan.netPriceMicros),
-        allowance_vs_plus: allowanceVsPlus(plans, plan.planId)
-      }))
-    });
-    return reply.send(plansBody);
+    // Spec 2026-10-05 §2.16.1: every plan's price in each currency, and the one this caller's connection pays in.
+    const currency = connectionCurrency({ geo: deps.geo, plans, ip: source(request).ip });
+    let body = plansBodies.get(currency);
+    if (body === undefined) {
+      body = BillingPlansResponseSchema.parse({
+        currency,
+        plans: plans.plans.map((plan) => ({
+          plan_id: plan.planId,
+          net_prices: Object.fromEntries(BillingCurrencySchema.options.map((priced) =>
+            [priced, microsToDecimal(planNetPrice(plan, priced))])),
+          allowance_vs_plus: allowanceVsPlus(plans, plan.planId)
+        }))
+      });
+      plansBodies.set(currency, body);
+    }
+    return reply.send(body);
   });
 
   api.post("/v1/billing/quote", { ...deps.policy("POST /v1/billing/quote"), bodyLimit: BILLING_BODY_LIMIT_BYTES }, async (request, reply) => {

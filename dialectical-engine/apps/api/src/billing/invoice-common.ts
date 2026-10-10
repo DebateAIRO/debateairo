@@ -1,4 +1,4 @@
-import { computeWindows, type RefundRecord, type SaleRecord } from "@debateai/billing-core";
+import { computeWindows, type PriceCurrency, type RefundRecord, type SaleRecord } from "@debateai/billing-core";
 import type {
   BillingRepository, ChargeEventRow, ChargeRow, InvoiceRow, OutboxJob, QuoteRow
 } from "@debateai/db";
@@ -115,12 +115,14 @@ export async function loadPaidCharge(
  */
 export type RecordedCharge = Readonly<{
   chargeId: string; customerId: string; planId: PlanId; chargeTotalMicros: number; paidAt: Date;
+  /** The charge's currency, the one M2 shows its total in (spec 2026-10-05 §2.16.5). */
+  currency: PriceCurrency;
 }>;
 
 export function recordedChargeOf(paid: PaidCharge): RecordedCharge {
   return Object.freeze({
     chargeId: paid.charge.chargeId, customerId: paid.customerId, planId: paid.quote.planId,
-    chargeTotalMicros: paid.charge.totalMicros, paidAt: paid.paid.at
+    chargeTotalMicros: paid.charge.totalMicros, paidAt: paid.paid.at, currency: paid.charge.currency
   });
 }
 
@@ -160,6 +162,7 @@ export function saleRecordOf(
     chargeId: paid.charge.chargeId,
     transactionId: paid.paid.providerPaymentId!,
     issuedOn: paid.paid.at,
+    currency: paid.charge.currency,
     customer: Object.freeze({
       name: company?.name ?? buyer.name, email: paid.profile.email, country: buyer.country,
       region, postalCode: buyer.postalCode, city: buyer.city,
@@ -278,6 +281,7 @@ export async function creditNoteContext(
     paid, original,
     refund: Object.freeze({
       chargeId: paid.charge.chargeId, transactionId: refund.transactionId, issuedOn: sale.refunded.at,
+      currency: paid.charge.currency,
       refundTotalMicros: sale.amountMicros, original: { documentId: original.externalRef, number: original.number },
       // RefundRecord.description (D5 Open question 4): the credited line in the buyer's language, the same sentence
       // the invoice carried for the period it credits (SmartBill's P5 still names its negative line itself).

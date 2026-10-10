@@ -342,15 +342,32 @@ const InternalBillingUsageResponseSchema = z.object({
 export const BillingUsageResponseSchema = z.union([CustomerBillingUsageResponseSchema,InternalBillingUsageResponseSchema]);
 export type BillingUsageResponse = z.infer<typeof BillingUsageResponseSchema>;
 
+/**
+ * Spec 2026-10-05 §2.16 (Part C): the price currencies. Every plan has a price in each; the buyer's tax country picks
+ * one (the register's `currency_by_country`), and each subscription keeps it for good. The AI credit is never priced
+ * here: it stays in US dollars.
+ */
+export const BillingCurrencySchema = z.enum(["USD", "EUR", "RON"]);
+export type BillingCurrency = z.infer<typeof BillingCurrencySchema>;
+
 /** Paid-plans spec §2.5.3: money crosses the wire as a decimal string with exactly two places, "20.00". */
 export const BillingDecimalMoneySchema = z.string().regex(/^(?:0|[1-9]\d{0,8})\.\d{2}$/);
 
-/** GET /v1/billing/plans (public). Credit is never shown in dollars: "4" reads "4× the Plus allowance". */
+/** Spec 2026-10-05 §2.16.5: a plan's net price in each currency. */
+export const BillingPricesSchema = z.object({
+  USD: BillingDecimalMoneySchema, EUR: BillingDecimalMoneySchema, RON: BillingDecimalMoneySchema
+}).strict();
+export type BillingPrices = z.infer<typeof BillingPricesSchema>;
+
+/**
+ * GET /v1/billing/plans (public). Every plan's price in each currency, and `currency`, the one the caller's connection
+ * pays in (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance".
+ */
 export const BillingPlansResponseSchema = z.object({
-  currency: z.literal("USD"),
+  currency: BillingCurrencySchema,
   plans: z.array(z.object({
     plan_id: PlanIdSchema,
-    net_price: BillingDecimalMoneySchema,
+    net_prices: BillingPricesSchema,
     allowance_vs_plus: z.string().regex(/^\d+(?:\.\d+)?$/)
   }).strict()).min(1)
 }).strict();
@@ -394,6 +411,7 @@ export const BillingQuoteResponseSchema = z.object({
   net: BillingDecimalMoneySchema,
   tax: BillingDecimalMoneySchema,
   total: BillingDecimalMoneySchema,
+  currency: BillingCurrencySchema,
   tax_name: z.string().min(1).max(64),
   /** Basis points; a US rate may be fractional (8.875 % = 887.5). */
   tax_rate_bp: z.number().min(0).max(10_000),
@@ -475,6 +493,8 @@ export const BillingSubscriptionResponseSchema = z.object({
     current_period_end: z.iso.datetime().nullable(),
     renews_on: z.iso.datetime().nullable(),
     renewal_total: BillingDecimalMoneySchema.nullable(),
+    /** Spec 2026-10-05 §2.16.3: the subscription's own currency; every amount about it is in it. */
+    currency: BillingCurrencySchema,
     scheduled_downgrade_plan_id: SubscribedPlanIdSchema.nullable(),
     withdrawal_open_until: z.iso.datetime().nullable(),
     /** The window's last day in the consumer's own calendar (the UI's "withdraw until {date}"); null with no window. */
@@ -495,6 +515,7 @@ export const BillingInvoicesResponseSchema = z.object({
     number: z.string().min(1).max(64),
     issued_on: z.iso.date(),
     total: BillingDecimalMoneySchema,
+    currency: BillingCurrencySchema,
     kind: z.enum(["INVOICE", "CREDIT_NOTE"]),
     url: z.url().nullable()
   }).strict())
@@ -514,6 +535,7 @@ export const BillingUpgradeQuoteResponseSchema = z.object({
   net: BillingDecimalMoneySchema,
   tax: BillingDecimalMoneySchema,
   total: BillingDecimalMoneySchema,
+  currency: BillingCurrencySchema,
   tax_name: z.string().min(1).max(64),
   tax_rate_basis_points: z.number().nonnegative().max(10_000),
   tax_country: z.string().regex(/^[A-Z]{2}$/u),
@@ -550,7 +572,9 @@ export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string()
  * `refund`: what goes back to the card. Null when a refund made in NETOPIA's admin already touched a payment:
  * the plan has ended, and the owner settles what is still due and writes (P14c; M8 follows).
  */
-export const BillingWithdrawResponseSchema = z.object({ refund: BillingDecimalMoneySchema.nullable() }).strict();
+export const BillingWithdrawResponseSchema = z.object({
+  refund: BillingDecimalMoneySchema.nullable(), currency: BillingCurrencySchema
+}).strict();
 export type BillingWithdrawResponse = z.infer<typeof BillingWithdrawResponseSchema>;
 /** N13 (spec §2.11): the billing details the card page pre-fills; country and region are the tax location (read-only). */
 export const BillingCardDetailsResponseSchema = z.object({

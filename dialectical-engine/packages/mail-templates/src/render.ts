@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SELLER_COMPANY, type SellerCompany } from "@debateai/billing-core";
+import type { PriceCurrency } from "@debateai/billing-core";
 import { MAIL_LOCALES, mailDirectionOf, mailLocaleOf, type MailLocale } from "./locales.js";
 import {
   MAIL_TEMPLATES,
@@ -109,6 +110,21 @@ function invalid(name: string): MailTemplateError {
 }
 
 /**
+ * Spec 2026-10-05 §2.16.5: an email's amounts are in its charge's currency, `params.currency`, which any template with
+ * an amount accepts without declaring it (one that prints the code, as O2_REFUND_DUE does, declares it too). An email
+ * queued before Part C names none: it was in US dollars.
+ */
+const AMOUNT_CURRENCY_PARAM = "currency";
+const PRICE_CURRENCIES: ReadonlySet<string> = new Set<PriceCurrency>(["USD", "EUR", "RON"]);
+
+function amountCurrencyOf(params: Readonly<Record<string, string>>): PriceCurrency {
+  const value = params[AMOUNT_CURRENCY_PARAM];
+  if (value === undefined) return "USD";
+  if (!PRICE_CURRENCIES.has(value)) throw invalid(AMOUNT_CURRENCY_PARAM);
+  return value as PriceCurrency;
+}
+
+/**
  * The one url rule of the emails: an https link with no user or password, in its canonical form (`URL#toString`), at
  * most 2,048 characters. Returns that canonical form, or null when the value is not such a link. A url param renders
  * only when it already equals its canonical form, so a caller holding a foreign link passes it through this first.
@@ -126,7 +142,9 @@ export function mailLinkOf(value: string): string | null {
 }
 
 /** The shown segment of a param, or null for a flag (checked, never printed). */
-function formatParam(kind: MailParamKind, name: string, value: string, locale: MailLocale, catalogue: Catalogue): Segment | null {
+function formatParam(
+  kind: MailParamKind, name: string, value: string, locale: MailLocale, catalogue: Catalogue, currency: PriceCurrency
+): Segment | null {
   switch (kind) {
     case "plan": {
       const label = PLAN_IDS.has(value) ? catalogue[`mail.plan.${value}`] : undefined;
@@ -135,7 +153,7 @@ function formatParam(kind: MailParamKind, name: string, value: string, locale: M
     }
     case "amount":
       if (!/^\d{1,9}\.\d{2}$/.test(value)) throw invalid(name);
-      return { kind: "text", value: new Intl.NumberFormat(locale, { style: "currency", currency: "USD" }).format(Number(value)) };
+      return { kind: "text", value: new Intl.NumberFormat(locale, { style: "currency", currency }).format(Number(value)) };
     case "date": {
       const at = new Date(value);
       if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(value) || !Number.isFinite(at.getTime())) throw invalid(name);
@@ -237,23 +255,26 @@ export function renderMail(
     ? Object.freeze({ ...mailCatalogues.en, ...owner })
     : mailCatalogues[mailLocale];
   const optional: Readonly<Record<string, MailParamKind>> = template.optional ?? {};
+  const showsAmount = Object.values({ ...template.params, ...optional }).includes("amount");
   for (const name of Object.keys(params)) {
+    if (showsAmount && name === AMOUNT_CURRENCY_PARAM) continue;
     if (!Object.hasOwn(template.params, name) && !Object.hasOwn(optional, name)) {
       throw new MailTemplateError("MAIL_TEMPLATE_PARAM_UNKNOWN", name);
     }
   }
+  const currency = amountCurrencyOf(params);
   const values = new Map<string, Segment>(merchantValues(company));
   for (const [name, kind] of Object.entries(template.params)) {
     const raw = params[name];
     if (raw === undefined) throw new MailTemplateError("MAIL_TEMPLATE_PARAM_MISSING", name);
-    const segment = formatParam(kind, name, raw, mailLocale, catalogue);
+    const segment = formatParam(kind, name, raw, mailLocale, catalogue, currency);
     if (segment !== null) values.set(name, segment);
   }
   // An optional param left out has no value, so only a sentence shown when it is present may name it.
   for (const [name, kind] of Object.entries(optional)) {
     const raw = params[name];
     if (raw === undefined) continue;
-    const segment = formatParam(kind, name, raw, mailLocale, catalogue);
+    const segment = formatParam(kind, name, raw, mailLocale, catalogue, currency);
     if (segment !== null) values.set(name, segment);
   }
   const lookup = (key: string): string => {
