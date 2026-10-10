@@ -118,6 +118,18 @@ it("U-6 disables the requesting button until requestDataExport resolves", async 
   expect(stub.requestDataExport).toHaveBeenCalledWith("g".repeat(43), "en");
   await act(async () => pending.resolve(PREPARING));
 });
+it("FIX-UI2 W-B2 sends the contract locale for regional English while keeping UI locale formatting", async () => {
+  for (const locale of ["en-US", "en-GB"] as const) {
+    const stub = client();
+    await mount(<DataExportCard catalog={settings} locale={locale} client={stub as never} />);
+    await click(settings["settings.export.request"]); await flush();
+    await click("Password");
+    await fill('[name="security-password"]', "correct");
+    await fill('[name="security-code"]', "123456");
+    expect(stub.requestDataExport).toHaveBeenCalledWith("g".repeat(43), "en");
+    await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  }
+});
 it("U-7 shows localized PREPARING time and no request control", async () => {
   await mount(<DataExportCard catalog={settings} locale="en" client={client(PREPARING) as never} />);
   expect(host?.textContent).toContain("Oct 8");
@@ -170,6 +182,34 @@ it("U-10 maps each refusal to a visible status then preserves the next read stat
     await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
   }
 });
+it("FIX-UI2 V-32 clears a refusal on the next click and blocks repeats after confirmation", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  const pending = deferred<typeof PREPARING>();
+  const stub = client();
+  stub.requestDataExport
+    .mockRejectedValueOnce(new ContractHttpError("HTTP_ERROR", 409, "busy", "EXPORT_IN_PROGRESS"))
+    .mockReturnValueOnce(pending.promise);
+  await mount(<DataExportCard catalog={settings} locale="en" client={stub as never} />);
+  await click(settings["settings.export.request"]); await flush();
+  await click("Password");
+  await fill('[name="security-password"]', "correct");
+  await fill('[name="security-code"]', "123456"); await flush();
+  expect(host?.textContent).toContain(settings["settings.export.inProgress"]);
+  await act(async () => { vi.advanceTimersByTime(5_000); }); await flush();
+  expect(host?.textContent).toContain(settings["settings.export.inProgress"]);
+  await click(settings["settings.export.request"]); await flush();
+  expect(host?.textContent).not.toContain(settings["settings.export.inProgress"]);
+  expect(button(settings["settings.export.request"]).disabled, "panel-open C2 state").toBe(false);
+  await click("Password");
+  await fill('[name="security-password"]', "correct");
+  await fill('[name="security-code"]', "123456");
+  expect(button(settings["settings.export.requesting"]).disabled).toBe(true);
+  button(settings["settings.export.requesting"]).click();
+  expect(stub.requestDataExport).toHaveBeenCalledTimes(2);
+  await act(async () => pending.resolve(PREPARING));
+  expect(host?.textContent).toContain(settings["settings.export.preparing"].split("{")[0]);
+  expect(host?.querySelector("button")).toBeNull();
+});
 it("U-11 shows statusUnavailable after a failed status read", async () => {
   const stub = client(); stub.readDataExportStatus.mockRejectedValue(new Error("OFFLINE"));
   await mount(<DataExportCard catalog={settings} locale="en" client={stub as never} />);
@@ -195,6 +235,19 @@ it("FIX-UI U-N2 shows one state line when a SENT poll fails", async () => {
   noMethodOffline = true;
   await act(async () => { vi.advanceTimersByTime(5_000); }); await flush();
   expect([...host!.querySelectorAll('[role="status"]')].map((line) => line.textContent)).toEqual([settings["settings.export.statusUnavailable"]]);
+});
+it("FIX-UI2 W-N5 hides stale PREPARING and FAILED lines when a poll fails", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  for (const current of [PREPARING, FAILED]) {
+    let offline = false;
+    const stub = client(current);
+    stub.readDataExportStatus.mockImplementation(async () => { if (offline) throw new Error("OFFLINE"); return current; });
+    await mount(<DataExportCard catalog={settings} locale="en" client={stub as never} />);
+    offline = true;
+    await act(async () => { vi.advanceTimersByTime(5_000); }); await flush();
+    expect([...host!.querySelectorAll('[role="status"]')].map((line) => line.textContent)).toEqual([settings["settings.export.statusUnavailable"]]);
+    await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  }
 });
 it("U-12 has a Security link and no confirmation when no proof method exists", async () => {
   const stub = client(); stub.authMethods.mockResolvedValue(methods([]) as never);
@@ -235,4 +288,14 @@ it("U-14 resumes EXPORT_DATA once with title only and maps in-progress refusal",
   expect(stub.requestDataExport).toHaveBeenCalledOnce();
   expect(stub.requestDataExport).toHaveBeenCalledWith("g".repeat(43), "en");
   expect(host?.textContent).toContain(settings["settings.export.inProgress"]);
+});
+it("FIX-UI2 W-B2 maps regional English on the provider-return export path", async () => {
+  for (const locale of ["en-US", "en-GB"] as const) {
+    const stub = client();
+    await mount(<SecurityActionResume catalog={auth} settingsCatalog={settings} publicCatalog={pub}
+      locale={locale} client={stub as never} takeProof={() => grant() as never} />);
+    await click("Confirm action"); await flush();
+    expect(stub.requestDataExport).toHaveBeenCalledWith("g".repeat(43), "en");
+    await act(async () => root!.unmount()); root = null; host?.remove(); host = null;
+  }
 });

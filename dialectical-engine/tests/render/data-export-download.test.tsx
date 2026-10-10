@@ -147,9 +147,31 @@ it("D-10 keeps an unavailable link, shows a status and no download control", asy
   expect(host?.querySelector("a[download]")).toBeNull();
   expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBe(token);
 });
-it("D-11 treats a direct visit without a token as invalid without downloading", async () => {
+it("D-11 tells a tokenless reload to reopen the emailed link without downloading", async () => {
   const client = stub(); await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
-  expect(host?.textContent).toContain(settings["settings.export.download.invalid"]);
+  expect(host?.textContent).toContain("Open the download link from your email again. It still works until it expires.");
+  expect(host?.textContent).not.toContain(settings["settings.export.download.invalid"]);
   expect(host?.querySelector('a.setBtn[href="/settings"]')).not.toBeNull();
   expect(client.downloadDataExport).not.toHaveBeenCalled();
+});
+
+it("D-12 accepts a new emailed fragment on the already open export page", async () => {
+  const client = stub();
+  sessionStorage.setItem(PENDING_EXPORT_KEY, token);
+  const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:export-fixture") });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+  await mount(<ExportDownloadClient catalog={settings} client={client as never} />);
+  expect(client.downloadDataExport).toHaveBeenCalledTimes(1);
+  expect(sessionStorage.getItem(PENDING_EXPORT_KEY)).toBeNull();
+  await act(async () => {
+    window.history.replaceState(null, "", `/export#${token}`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  });
+  expect(client.downloadDataExport).toHaveBeenCalledTimes(2);
+  expect(client.downloadDataExport).toHaveBeenLastCalledWith(token);
+  expect(window.location.hash).toBe("");
+  expect(click).toHaveBeenCalledTimes(2);
+  expect(host?.textContent).toContain(settings["settings.export.download.starting"]);
+  click.mockRestore();
 });

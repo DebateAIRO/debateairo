@@ -72,6 +72,7 @@
   "settings.export.download.starting": "İndirme başlıyor. Başlamazsa düğmeyi kullanın.",
   "settings.export.download.button": "ZIP dosyasını indir",
   "settings.export.download.invalid": "Bu indirme bağlantısının süresi doldu veya bağlantı yenisiyle değiştirildi. Ayarlar'dan yeni bir dışa aktarma isteyin.",
+  "settings.export.download.reopenFromEmail": "E-postanızdaki indirme bağlantısını yeniden açın. Süresi dolana kadar çalışmaya devam eder.",
   "settings.export.download.wrongAccount": "Bu indirme bağlantısı başka bir hesaba ait. Oturumu kapatıp dışa aktarmayı isteyen hesapta oturum açın.",
   "settings.export.download.backToSettings": "Ayarlar'a geri dön",
   "settings.sessions.operationFailed": "Oturum işlemi başarısız oldu",

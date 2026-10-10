@@ -5,7 +5,7 @@ import { contractClient } from "@/lib/api";
 import { useSelectedAuthCatalog } from "@/components/AuthShell";
 import { SecurityConfirmation } from "@/components/auth/SecurityConfirmation";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
-import type { LocaleCode } from "@/lib/i18n/locales";
+import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
 
 export function refusalMessage(failure: unknown, catalog: MessageCatalog, locale: LocaleCode): string {
   if (!(failure instanceof ContractHttpError)) return t(catalog, "settings.export.unavailable");
@@ -74,7 +74,7 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
     setRequesting(true);
     setMessage(null);
     try {
-      setStatus(await client.requestDataExport(grantToken, locale));
+      setStatus(await client.requestDataExport(grantToken, catalogLocale(locale)));
       setStatusUnavailable(false);
     } catch (failure) {
       setMessage(refusalMessage(failure, catalog, locale));

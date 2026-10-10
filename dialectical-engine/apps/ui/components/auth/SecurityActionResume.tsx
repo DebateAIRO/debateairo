@@ -101,7 +101,7 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
                 message = t(settingsCatalog, "settings.erasure.scheduled");
             }
             else if (action === 'EXPORT_DATA') {
-                const response = await client.requestDataExport(result.step_up_grant.token, locale);
+                const response = await client.requestDataExport(result.step_up_grant.token, locale === 'en-US' || locale === 'en-GB' ? 'en' : locale);
                 message = response.status === 'NONE' ? t(settingsCatalog, "settings.export.statusUnavailable") : t(settingsCatalog, "settings.export.preparing", {
                     time: formatDate(locale, response.requested_at, { dateStyle: 'medium', timeStyle: 'short' })
                 });

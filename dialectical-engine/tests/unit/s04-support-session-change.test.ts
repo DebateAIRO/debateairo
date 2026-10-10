@@ -418,21 +418,28 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
     const dispose = install();
     const resets = recordResets();
     const sender = probeChannel();
+    const pendingExportKey = "debateai.exportPending";
+    const pendingToken = "t".repeat(43);
     storeTranscript(false);
+    window.sessionStorage.setItem(pendingExportKey, pendingToken);
     sender.postMessage({ type: "session-change" });
     expect(await waitUntil(() => window.sessionStorage.getItem(KEY) === null, 100)).toBe(true);
+    expect(window.sessionStorage.getItem(pendingExportKey), "remote sign-out clears the pending export").toBeNull();
     expect(resets).toEqual(["session-change"]);
     for (const other of [{ type: "other" }, { type: "session-change", account: "x" }, "session-change", null]) {
       storeTranscript(false);
+      window.sessionStorage.setItem(pendingExportKey, pendingToken);
       sender.postMessage(other);
       await wait(60);
       expect(storedText(), JSON.stringify(other)).toBe("old conversation");
+      expect(window.sessionStorage.getItem(pendingExportKey), JSON.stringify(other)).toBe(pendingToken);
     }
     expect(resets).toEqual(["session-change"]);
     dispose();
     sender.postMessage({ type: "session-change" });
     await wait(60);
     expect(storedText()).toBe("old conversation");
+    expect(window.sessionStorage.getItem(pendingExportKey), "disposed receiver leaves token").toBe(pendingToken);
     expect(resets).toEqual(["session-change"]);
   });
 
