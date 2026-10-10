@@ -15,13 +15,21 @@ from preview_budget_authority_fixture import (  # noqa: E402
 
 bridge = load_bridge()
 SafetyError = bridge.helper.SafetyError
-GO = {'scope_id': SCOPE, 'target_host': HOST, 'allowed_peer_uids': [PEER], 'max_concurrent_calls': 4}
+GO = {'scope_id': SCOPE, 'target_host': HOST, 'allowed_peer_uids': [PEER], 'max_concurrent_calls': 4,
+      'provider': 'deepinfra', 'enabled_models': [MODEL]}
+DEEPINFRA = bridge.helper.PROFILES['deepinfra']
+GLM = DEEPINFRA.rows[MODEL]  # The one reviewed row with JSON mode allowed (v3 makes it per row).
+
+
+def valid_response_format(value):
+    return DEEPINFRA.body_valid(value, GLM)
 
 
 class RequestModeTests(unittest.TestCase):
     def test_existing_four_field_request_keeps_identical_body_and_reservation(self):
         request = envelope(body())
-        outgoing, reserved = bridge.validate_request(request, GO)
+        outgoing, reserved, row = bridge.validate_request(request, GO)
+        self.assertEqual(row, GLM)
         self.assertEqual(outgoing, bridge.helper.canonical(body()))
         self.assertEqual(json.loads(outgoing), body())
         self.assertEqual(str(reserved), request['reservedUsd'])
@@ -32,22 +40,22 @@ class RequestModeTests(unittest.TestCase):
         compact = envelope(value, separators=(',', ':'))
         spaced = envelope(value, indent=2)
         for request in (compact, spaced):
-            outgoing, reserved = bridge.validate_request(request, GO)
+            outgoing, reserved, _row = bridge.validate_request(request, GO)
             self.assertEqual(outgoing, bridge.helper.canonical(value))
             self.assertEqual(str(reserved), request['reservedUsd'])
         self.assertNotEqual(compact['requestSha256'], spaced['requestSha256'])
         self.assertNotEqual(compact['reservedUsd'], spaced['reservedUsd'])
 
     def test_mode_helper_accepts_only_absent_or_exact_object(self):
-        self.assertTrue(bridge.valid_response_format(body()))
-        self.assertTrue(bridge.valid_response_format({**body(), 'response_format': {'type': 'json_object'}}))
+        self.assertTrue(valid_response_format(body()))
+        self.assertTrue(valid_response_format({**body(), 'response_format': {'type': 'json_object'}}))
         for invalid in (None, True, False, 1, 'json_object', [], ['json_object'], {},
                         {'type': 'text'}, {'type': 'json_schema'}, {'type': None},
                         {'type': True}, {'type': 'JSON_OBJECT'},
                         {'type': 'json_object', 'json_schema': {}},
                         {'type': 'json_object', 'extra': False}):
             with self.subTest(invalid=invalid):
-                self.assertFalse(bridge.valid_response_format({**body(), 'response_format': invalid}))
+                self.assertFalse(valid_response_format({**body(), 'response_format': invalid}))
 
     def test_invalid_optional_mode_is_refused_before_any_authority_ledger_key_or_dispatch(self):
         invalid_modes = (None, 'json_object', [], {}, {'type': 'text'},
@@ -67,12 +75,15 @@ class RequestModeTests(unittest.TestCase):
 
     def test_other_body_fields_model_effort_and_token_bound_remain_refused(self):
         invalid = [{**body(), 'arbitrary': True}, {**body(), 'response_format': {'type': 'json_object'}, 'extra': True},
-                   {**body(), 'model': 'other-model'}, {**body(), 'reasoning_effort': 'low'},
+                   {**body(), 'reasoning_effort': 'low'},
                    {**body(), 'max_tokens': 163841}, {**body(), 'max_tokens': True},
                    {**body(), 'max_tokens': 1.5}, {**body(), 'max_tokens': 0}]
         for value in invalid:
             with self.subTest(value=value), self.assertRaisesRegex(SafetyError, '^REQUEST_PARAMETERS_INVALID$'):
                 bridge.validate_request(envelope(value), GO)
+        # v3: a model outside the reviewed table (or not enabled) has its own, earlier refusal.
+        with self.assertRaisesRegex(SafetyError, '^MODEL_NOT_ALLOWED$'):
+            bridge.validate_request(envelope({**body(), 'model': 'other-model'}), GO)
 
     def test_scope_hash_reservation_and_envelope_fields_remain_exact(self):
         for changes in ({'scope_id': 'other'}, {'requestSha256': '0' * 64},

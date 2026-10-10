@@ -1,9 +1,18 @@
-"""Custody, accounting and transport primitives for the private preview spending gate.
+"""Custody, accounting and transport primitives, and the provider profiles, for the private
+preview spending gate.
 
 Adapted from the reviewed DeepInfra benchmark helper; it keeps only what the gate needs.
 The gate runs this file from its own directory, only after checking that root owns it and no one
 else can write it, and that its hash is the one the GO binds. It is never imported on its own.
 No retries, external packages, environment proxies, redirects, or credential artifacts.
+
+A provider profile is everything the gate knows about one vendor: its host and path, its auth
+header, the exact request shape it forwards (and the bytes it sends), how a reply's usage is
+priced, where a reply names its model, extra key shapes to blank, and its reviewed model rows
+(prices, output bound, effort, JSON mode). The GO names one profile (`provider`) and the rows it
+enables; the GO binds this file's hash, so it binds every profile and every row too. A price
+change is a reviewed code change here (plus the app's parity fixture), never a GO edit. Adding a
+vendor means adding one profile class to PROFILES; the gate's core does not change.
 """
 import fcntl
 import http.client
@@ -14,11 +23,10 @@ import ssl
 import stat
 import threading
 import time
+from collections import namedtuple
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
-INPUT_PRICE = Decimal('0.15')
-OUTPUT_PRICE = Decimal('0.50')
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_TIMEOUT_SECONDS = 600
 CONNECT_TIMEOUT_SECONDS = 15  # TCP connect + TLS handshake; a black-holed address fails (unsent) fast.
@@ -163,7 +171,8 @@ def integer(value):
     return type(value) is int and value >= 0
 
 
-def account_response(response):
+def account_response(response, input_price, output_price):
+    """OpenAI-shape usage priced at one row's list prices (USD per million tokens)."""
     usage = response.get('usage')
     usage = usage if isinstance(usage, dict) else {}
     prompt, completion, total = usage.get('prompt_tokens'), usage.get('completion_tokens'), usage.get('total_tokens')
@@ -176,7 +185,7 @@ def account_response(response):
     valid = valid and (total is None or integer(total) and total == prompt + completion)
     valid = valid and (cached is None or integer(cached) and cached <= prompt)
     valid = valid and (reasoning is None or integer(reasoning) and reasoning <= completion)
-    configured = ((Decimal(prompt) * INPUT_PRICE + Decimal(completion) * OUTPUT_PRICE) / Decimal(1000000)) if valid else None
+    configured = ((Decimal(prompt) * input_price + Decimal(completion) * output_price) / Decimal(1000000)) if valid else None
     provider = decimal_amount(usage.get('estimated_cost', response.get('estimated_cost')))
     reliable = [value for value in (configured, provider) if value is not None]
     return {'prompt_tokens': prompt if integer(prompt) else None, 'completion_tokens': completion if integer(completion) else None,
@@ -188,21 +197,113 @@ def account_response(response):
             'cost_basis': 'max(configured uncached list-price usage, provider estimated cost)' if reliable else 'unknown; full reservation retained'}
 
 
-def redact(value, key):
-    sensitive = {'authorization', 'proxy-authorization', 'api_key', 'api-key', 'apikey', 'headers', 'request_headers', 'access_token', 'refresh_token', 'secret'}
+def redact(value, key, patterns=()):
+    """The key itself, any Bearer token and the profile's own key shapes are blanked everywhere."""
+    sensitive = {'authorization', 'proxy-authorization', 'api_key', 'api-key', 'apikey', 'x-api-key', 'x-goog-api-key',
+                 'headers', 'request_headers', 'access_token', 'refresh_token', 'secret'}
     if isinstance(value, dict):
-        return {redact(str(k), key): redact(v, key) for k, v in value.items() if str(k).lower() not in sensitive}
+        return {redact(str(k), key, patterns): redact(v, key, patterns) for k, v in value.items() if str(k).lower() not in sensitive}
     if isinstance(value, list):
-        return [redact(v, key) for v in value]
+        return [redact(v, key, patterns) for v in value]
     if isinstance(value, str):
-        return re.sub(r'(?i)bearer\s+[^\s"<>]+', 'Bearer [REDACTED]', value.replace(key, '[REDACTED]'))
+        text = re.sub(r'(?i)bearer\s+[^\s"<>]+', 'Bearer [REDACTED]', value.replace(key, '[REDACTED]'))
+        for pattern in patterns:
+            text = re.sub(pattern, '[REDACTED]', text)
+        return text
     return value
+
+
+# One reviewed model of a profile. Prices are the vendor's LIST prices in USD per million tokens
+# (the careful side while a vendor runs a promotion); the gate reserves and settles with them.
+# output_bound is both the max_tokens ceiling and what a call reserves for output. effort is
+# 'high' (the request must carry the profile's effort field with exactly that value) or None (the
+# request must not carry it at all). json_object says whether JSON mode may be asked for.
+ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound effort json_object')
+
+
+class DeepInfraProfile:
+    """api.deepinfra.com, OpenAI chat-completions shape, Bearer key. Rows reviewed 2026-10-10
+    (contract A section 1); whether each model takes reasoning_effort and echoes its exact id is
+    measured by the gate's root-only probe before a row is enabled."""
+    name = 'deepinfra'
+    host = 'api.deepinfra.com'
+    path = '/v1/openai/chat/completions'
+    redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
+    rows = {row.model: row for row in (
+        ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 163840, 'high', True),
+        ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 131072, 'high', False),
+        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 131072, None, False))}
+
+    def auth_headers(self, key):
+        return {'Authorization': 'Bearer ' + key}
+
+    def requested_model(self, body):
+        """Where the request names its model (looked up before anything else is checked)."""
+        return body.get('model') if isinstance(body, dict) else None
+
+    def body_valid(self, body, row):
+        """Exactly model, max_tokens and messages; reasoning_effort "high" iff the row says so; an
+        optional response_format {"type": "json_object"} only for a row that allows it."""
+        if not isinstance(body, dict) or body.get('model') != row.model:
+            return False
+        fields = {'model', 'max_tokens', 'messages'} | ({'reasoning_effort'} if row.effort else set())
+        extra = set(body) - fields
+        if not fields <= set(body) or extra - {'response_format'}:
+            return False
+        if extra:
+            mode = body['response_format']
+            if not row.json_object or not (isinstance(mode, dict) and set(mode) == {'type'} and mode['type'] == 'json_object'):
+                return False
+        if row.effort and body['reasoning_effort'] != row.effort:
+            return False
+        return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
+                and isinstance(body['messages'], list) and bool(body['messages'])
+                and all(isinstance(m, dict) and set(m) == {'role', 'content'} and m['role'] in ('system', 'user', 'assistant')
+                        and isinstance(m['content'], str) for m in body['messages']))
+
+    def request_bytes(self, body):
+        """The exact bytes sent upstream for a body that passed body_valid."""
+        return canonical(body)
+
+    def account(self, response, row):
+        return account_response(response, row.input_usd_per_m, row.output_usd_per_m)
+
+    def reply_model(self, response):
+        """Where the reply names the model that answered."""
+        return response.get('model')
+
+    def probe_body(self, row):
+        body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
+                'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
+        if row.effort:
+            body['reasoning_effort'] = row.effort
+        return body
+
+    def reply_text(self, response):
+        """The answer's text, or a provider error's message (for the probe's short excerpt only)."""
+        choices = response.get('choices')
+        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+            message = choices[0].get('message')
+            return message.get('content') if isinstance(message, dict) else None
+        error = response.get('error')
+        if isinstance(error, dict):
+            return error.get('message')
+        return error if isinstance(error, str) else None
+
+
+# The providers this gate can serve. Anthropic and Google are reserved names: a GO naming them is
+# refused until their reviewed profile is added here.
+PROFILES = {profile.name: profile for profile in (DeepInfraProfile(),)}
 
 
 class HttpsTransport:
     """Direct verified HTTPS only. http.client follows no redirects or env proxies."""
 
-    def __init__(self, timeout, max_response_bytes=MAX_RESPONSE_BYTES):
+    def __init__(self, timeout, profile, max_response_bytes=MAX_RESPONSE_BYTES):
+        # Host, path and auth header come from the GO's profile; the path carries no query (no key in a URL).
+        if '?' in profile.path or not profile.path.startswith('/'):
+            raise SafetyError('profile_path_invalid')  # noqa: F821 - provided by the gate
+        self.profile = profile
         self.max_response_bytes = min(max_response_bytes, MAX_RESPONSE_BYTES)
         self.timeout = min(timeout, MAX_TIMEOUT_SECONDS)
 
@@ -212,7 +313,7 @@ class HttpsTransport:
             raise SafetyError('request_bytes_required')
         deadline = time.monotonic() + self.timeout
         # The connect gets its own short timeout; remaining() then gives the socket the rest.
-        connection = http.client.HTTPSConnection('api.deepinfra.com', timeout=min(CONNECT_TIMEOUT_SECONDS, self.timeout),
+        connection = http.client.HTTPSConnection(self.profile.host, timeout=min(CONNECT_TIMEOUT_SECONDS, self.timeout),
                                                  context=ssl.create_default_context())
 
         def remaining():
@@ -229,8 +330,9 @@ class HttpsTransport:
                 remaining()
             except Exception:  # noqa: BLE001 - every failure before the request is the same fact
                 raise RequestNotSent('request_not_sent') from None
-            connection.request('POST', '/v1/openai/chat/completions', body=payload,
-                               headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Accept': 'application/json'})
+            connection.request('POST', self.profile.path, body=payload,
+                               headers={**self.profile.auth_headers(key), 'Content-Type': 'application/json',
+                                        'Accept': 'application/json'})
             remaining()
             response = connection.getresponse()
             chunks, size = [], 0
