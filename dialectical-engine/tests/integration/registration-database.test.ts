@@ -1018,7 +1018,9 @@ async function runPlateauDetectorChild(
     [
       "--import", "tsx", childPath,
       database.connectionString, childSecretRoot, String(retainMibPerWave),
-      `r${retainMibPerWave}-${randomUUID()}`
+      // Short enough that every address stays inside the RFC 5321 64-character local part the shared address
+      // rule enforces (open sign-up mail, 2026-10-09): "s3d-rss-refusal-recovery-" + this label + "-" + index.
+      `r${retainMibPerWave}-${randomUUID().slice(0, 8)}`
     ],
     { cwd: root, stdio: ["ignore", "pipe", "pipe"] }
   );
@@ -3228,7 +3230,7 @@ setTimeout(() => undefined, 500);
     const registration = flow.service.register({
       email,
       password: "correct horse battery staple",
-      phone: "+40722123456", recoveryEmail: `s3d-permit-before-store-recovery-${randomUUID()}@example.test`,
+      phone: "+40722123456", recoveryEmail: `s3d-pbs-recovery-${randomUUID()}@example.test`, // RFC 5321: local part <= 64
       adultAffirmed: true
     }, {
       ip: "2001:db8:4d:10::1",
@@ -5386,6 +5388,8 @@ setTimeout(() => undefined, 500);
     }
   }, 30_000);
 
+  // Open sign-up mail (2026-10-09): a leading dash is a refusal of the ADDRESS, so it answers the address's own
+  // stable code, EMAIL_INVALID, through the shared rule (packages/kernel/src/mail-address.ts).
   it("S3 rework4 fold-in rejects leading-dash mail recipients before persistence", async () => {
     const flow = buildService();
     await expect(flow.service.register({
@@ -5393,7 +5397,7 @@ setTimeout(() => undefined, 500);
       password: "correct horse battery staple",
       phone: "+40722123456", recoveryEmail: "safe-recovery@example.test",
       adultAffirmed: true
-    }, source)).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
+    }, source)).rejects.toMatchObject({ code: "EMAIL_INVALID" });
     const leaked = await database.pool.query(`
       SELECT 1 FROM identity."user" WHERE email_blind_index=$1
     `, [createEmailBlindIndex(blindIndexKey, "-option@example.test")]);

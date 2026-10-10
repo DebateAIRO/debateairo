@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { parseDeclaredRegion } from "@debateai/kernel";
+import { isMailAddress, parseDeclaredRegion } from "@debateai/kernel";
 import { LegalDocumentPairSchema, SessionSchema, TurnstileTokenSchema } from "./auth-shared.js";
 
 import { CatalogLocaleCodeSchema, LocaleCodeSchema } from "./locale.js";
 export { CatalogLocaleCodeSchema, LocaleCodeSchema, type CatalogLocaleCode, type LocaleCode } from "./locale.js";
 
-const EmailSchema = z.email().max(254);
+/** The one shared address rule (packages/kernel/src/mail-address.ts), the one the mail step asks before sending. */
+const EmailSchema = z.string().max(254).refine((value) => isMailAddress(value), { message: "Invalid email address" });
 const LocalePreferenceShape = {
   locale: CatalogLocaleCodeSchema,
   ui_locale: LocaleCodeSchema,
