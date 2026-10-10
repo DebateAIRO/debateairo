@@ -96,3 +96,10 @@ db89a5b0b7ade4a10aa7842032abedb8afdc5c32:dialectical-engine/tests/architecture/m
 912dc01de50cb9e0fab9bf970a5a81b03f2d58ab:dialectical-engine/tests/architecture/migration-forward-chain.test.ts:generic-api-key:54
 # Same squash (912dc01de): the forward-chain test's step-name list (0113 after 0112). A file name, not a key.
 912dc01de50cb9e0fab9bf970a5a81b03f2d58ab:dialectical-engine/tests/architecture/migration-forward-chain.test.ts:generic-api-key:94
+# 2026-10-10 — Anthropic gate (PR #126): generic-api-key matched a made-up DeepInfra-shaped test value
+# ('synthetic-key-...') that the Anthropic key-shape test checks the DeepInfra pattern against. Not a key.
+# Owner's ruling on 2026-10-10.
+fd422018e71b56b9826d8d6ce9f6a0fb4840b249:dialectical-engine/tests/unit/preview_budget_authority_anthropic_test.py:generic-api-key:677
+# 2026-10-10 — Anthropic gate (PR #126): generic-api-key matched a list of temporary file names
+# ('.api-key.txt.<pid>.tmp') in the key command's test. File names, not a key. Owner's ruling on 2026-10-10.
+523d0a3a0c8c6dad359b2c9138b9714eeca53917:dialectical-engine/tests/unit/preview_key_test.py:generic-api-key:226

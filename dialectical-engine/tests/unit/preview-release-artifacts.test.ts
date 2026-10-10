@@ -219,10 +219,17 @@ describe('UI build values', () => {
   const runtimeOnly = { PORT: '3100', DIALECTICAL_UI_HOST: '127.0.0.1', DIALECTICAL_API_BASE: 'http://127.0.0.1:3101' };
   it('are exactly what the reviewed runtime gate demands from ui.env, from the same constants', () => {
     expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual({ NODE_ENV: 'production', PUBLIC_APP_URL: turnstile.PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_FREE_MODEL_IDS_JSON, TURNSTILE_SITE_KEY: turnstile.PREVIEW_SITE_KEY });
-    expect(() => environment.narrowEnvironment('ui', { ...tool.UI_PUBLIC_BUILD_VALUES, ...runtimeOnly }, {}, null, { uiPort: '3100', apiPort: '3101' })).not.toThrow();
-    for (const key of Object.keys(tool.UI_PUBLIC_BUILD_VALUES)) {
-      expect(() => environment.narrowEnvironment('ui', { ...tool.UI_PUBLIC_BUILD_VALUES, ...runtimeOnly, [key]: 'other' }, {}, null, { uiPort: '3100', apiPort: '3101' })).toThrow();
+    expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual(tool.uiPublicBuildValues('glm-only'));
+    expect(tool.UI_MODEL_ROSTERS).toEqual(['glm-only', 'multi-model', 'all-models']);
+    for (const models of tool.UI_MODEL_ROSTERS) {
+      const values = tool.uiPublicBuildValues(models), built = { builtModelRosterFlag: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] };
+      expect(values).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] });
+      expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly }, built, null, { uiPort: '3100', apiPort: '3101' })).not.toThrow();
+      for (const key of Object.keys(values)) {
+        expect(() => environment.narrowEnvironment('ui', { ...values, ...runtimeOnly, [key]: 'other' }, built, null, { uiPort: '3100', apiPort: '3101' })).toThrow();
+      }
     }
+    for (const models of ['multi', '', 'GLM-ONLY', 'constructor']) expect(() => tool.uiPublicBuildValues(models)).toThrow(/ARGUMENTS_REFUSED/);
   });
 
   it('the build child gets only the public values plus fixed tool settings, never a secret path or a stray public flag', () => {
@@ -234,6 +241,12 @@ describe('UI build values', () => {
     const report = await run(['build-env'], tool.LAYOUT);
     expect(report.values.TURNSTILE_SITE_KEY).toEqual({ value: turnstile.PREVIEW_SITE_KEY, sha256: sha(turnstile.PREVIEW_SITE_KEY) });
     expect(Object.keys(report.values)).toEqual(Object.keys(tool.UI_PUBLIC_BUILD_VALUES));
+    expect(report.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON.value).toBe(environment.PREVIEW_MODEL_ROSTER_FLAGS['glm-only']);
+    const multi = await run(['build-env', '--models', 'multi-model'], tool.LAYOUT);
+    expect(multi.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toEqual({ value: environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model'], sha256: sha(environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model']) });
+    const all = await run(['build-env', '--models', 'all-models'], tool.LAYOUT);
+    expect(all.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toEqual({ value: environment.PREVIEW_MODEL_ROSTER_FLAGS['all-models'], sha256: sha(environment.PREVIEW_MODEL_ROSTER_FLAGS['all-models']) });
+    await expect(run(['build-env', '--models', 'everything'], tool.LAYOUT)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
   });
 });
 
@@ -252,6 +265,20 @@ describe('ui-build and verify', () => {
     expect(events).toEqual([`verify:${source.sha256}`, 'build', `verify:${source.sha256}`, 'verify-build']);
     expect(readFileSync(out, 'utf8')).toBe(JSON.stringify(build));
     expect(result.sha256).toBe(sha(JSON.stringify(build)));
+  });
+
+  it('--models multi-model builds with the reviewed two-list value; an unknown name refuses before anything runs', async () => {
+    const s = server();
+    const source = s.write(join(s.art, 'candidate-ui-source.json'), sourceManifest('ui'));
+    let seen: any;
+    await run(['ui-build', '--source', source.path, '--models', 'multi-model', '--out', join(s.art, 'candidate-ui-build.json')], s.layout, {
+      verifySourceManifest: async () => undefined, verifyUiBuildManifest: async () => undefined, execPath: '/opt/node/bin/node',
+      buildUiArtifact: async (_m: unknown, env: any) => { seen = env; return { schema: 'preview-auth-dev-ui-build-v1' }; }
+    });
+    expect(seen).toEqual({ ...tool.UI_BUILD_ENVIRONMENT, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model'], PATH: '/opt/node/bin:/usr/local/bin:/usr/bin:/bin' });
+    const never = { verifySourceManifest: async () => { throw new Error('ran'); }, buildUiArtifact: async () => { throw new Error('ran'); } };
+    await expect(run(['ui-build', '--source', source.path, '--models', 'all', '--out', join(s.art, 'other-ui-build.json')], s.layout, never)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    expect(existsSync(join(s.art, 'other-ui-build.json'))).toBe(false);
   });
 
   it('writes nothing when the build changed an inventoried source byte', async () => {
@@ -668,6 +695,46 @@ describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify
     const t = await staged();
     const published = t.s.write(join(t.s.art, 'native-publish.json'), JSON.stringify(attestation({ publication: t.newPublication })));
     await expect(run(t.nativePlan('verify', ['--publication', published.path]), t.s.layout)).rejects.toMatchObject({ code: 'FROM_PLAN_INVALID' });
+  });
+
+  it('plan --checker deepseek --deepseek-enabled-on-gate yes: the plan carries the choice, and publish carries it on', async () => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-deepseek.json');
+    const plan = read(await run(t.nativePlan('plan', ['--checker', 'deepseek', '--deepseek-enabled-on-gate', 'yes']).with(-1, out), t.s.layout));
+    expect(plan).toEqual({ ...t.plan, checkerChoice: { checker: 'deepseek', deepseekEnabledOnGate: true } });
+    expect(operator.validateNativePlan(plan)).toEqual(plan);
+    const proposal = t.writeProposal(t.proposalOf());
+    const publish = read(await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], out), t.s.layout, deps));
+    expect(publish.checkerChoice).toEqual({ checker: 'deepseek', deepseekEnabledOnGate: true });
+    expect(operator.validateNativePlan(publish)).toEqual(publish);
+    // --checker glm is the default: no field at all, the plan is the one without the flag.
+    const glm = read(await run(t.nativePlan('plan', ['--checker', 'glm']).with(-1, join(t.s.art, 'native-plan-glm.json')), t.s.layout));
+    expect(glm).toEqual(t.plan);
+  });
+
+  it.each([
+    ['deepseek without the acknowledgement', 'plan', ['--checker', 'deepseek'], 'CHECKER_DEEPSEEK_NOT_ENABLED_ON_GATE'],
+    ['deepseek with another acknowledgement', 'plan', ['--checker', 'deepseek', '--deepseek-enabled-on-gate', 'true'], 'CHECKER_DEEPSEEK_NOT_ENABLED_ON_GATE'],
+    ['an unknown checker', 'plan', ['--checker', 'mimo', '--deepseek-enabled-on-gate', 'yes'], 'ARGUMENTS_REFUSED'],
+    ['the acknowledgement without the checker', 'plan', ['--deepseek-enabled-on-gate', 'yes'], 'ARGUMENTS_REFUSED'],
+    ['the acknowledgement with the GLM checker', 'plan', ['--checker', 'glm', '--deepseek-enabled-on-gate', 'yes'], 'ARGUMENTS_REFUSED'],
+    ['a checker on verify', 'verify', ['--checker', 'deepseek', '--deepseek-enabled-on-gate', 'yes'], 'ARGUMENTS_REFUSED'],
+    ['a checker on apply-and-plan', 'apply-and-plan', ['--checker', 'deepseek', '--deepseek-enabled-on-gate', 'yes'], 'ARGUMENTS_REFUSED']
+  ])('refuses %s and writes nothing', async (_name, operation, extra, code) => {
+    const t = await staged();
+    const out = join(t.s.art, 'native-plan-refused.json');
+    await expect(run(t.nativePlan(operation, extra).with(-1, out), t.s.layout)).rejects.toMatchObject({ code });
+    expect(existsSync(out)).toBe(false);
+  });
+
+  it('the native plan check accepts the DeepSeek choice only exactly, and only on plan and publish', async () => {
+    const t = await staged();
+    const choice = { checker: 'deepseek', deepseekEnabledOnGate: true };
+    expect(operator.validateNativePlan({ ...t.plan, checkerChoice: { deepseekEnabledOnGate: true, checker: 'deepseek' } })).toBeTruthy();
+    for (const bad of [{ checker: 'deepseek' }, { checker: 'glm' }, { ...choice, deepseekEnabledOnGate: 'yes' }, { ...choice, extra: 1 }, null, 'deepseek']) {
+      expect(() => operator.validateNativePlan({ ...t.plan, checkerChoice: bad })).toThrow();
+    }
+    for (const operation of ['verify', 'apply-and-plan']) expect(() => operator.validateNativePlan({ ...t.plan, operation, checkerChoice: choice })).toThrow();
   });
 
   it('launch-plan --publication: the new publication replaces the old one and the proof must bind to it', async () => {
