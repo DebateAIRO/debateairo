@@ -1,4 +1,4 @@
-import { OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, PREVIEW_GLM_PROVIDER_REFS, PREVIEW_GLM_MODEL, PREVIEW_GLM_BASE_URL, PREVIEW_GLM_TARGET } from "@debateai/providers";
+import { OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, previewTargetJsonRow, previewModelRowForRef } from "@debateai/providers";
 import { createHash } from "node:crypto";
 import {
   CONFIGURED_PROVIDER_SET_DEPLOYMENT_SOURCE_REF,
@@ -62,6 +62,12 @@ const ROSTER_KEYS = [
   "input_price_micros_per_million", "output_price_micros_per_million"
 ] as const;
 const OPTIONAL_TARGET_KEYS = ["thinking_parameter", "thinking_levels", "context_window_tokens"] as const;
+/** Every target field of a root-broker row equals its reviewed row, and no other target field is set. */
+function rootBrokerTargetMatches(provider: Readonly<Record<string, unknown>>): boolean {
+  const reviewed = previewTargetJsonRow(provider.provider_ref as string);
+  const fields = ["base_url", "model", "input_price_micros_per_million", "output_price_micros_per_million", ...OPTIONAL_TARGET_KEYS];
+  return fields.every(key => JSON.stringify(provider[key]) === JSON.stringify(reviewed[key]));
+}
 const VETTING_KEYS = [
   "data_use_terms_reviewed_on", "retention_terms_reviewed_on", "named_in_privacy_notice"
 ] as const;
@@ -88,7 +94,11 @@ export function gateHostedRoster(text: string): HostedRoster {
     const required=rootBroker?ROSTER_KEYS.filter(key=>key!=="runner_authorization_file"&&key!=="api_authorization_file"):ROSTER_KEYS;
     if(!required.every(key=>Object.hasOwn(provider,key))||Object.keys(provider).some(key=>!([...ROSTER_KEYS,...OPTIONAL_TARGET_KEYS,"preview_budget_authority"] as readonly string[]).includes(key)))refuse();
     if(Object.hasOwn(provider,"preview_budget_authority")&&!rootBroker)refuse();
-    if(rootBroker&&(provider.adapter_kind!==OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND||!(PREVIEW_GLM_PROVIDER_REFS as readonly unknown[]).includes(provider.provider_ref)||provider.model!==PREVIEW_GLM_MODEL||provider.base_url!==PREVIEW_GLM_BASE_URL||provider.maker!=="Z.AI"||Object.hasOwn(provider,"runner_authorization_file")||Object.hasOwn(provider,"api_authorization_file")||provider.thinking_parameter!=="reasoning_effort"||JSON.stringify(provider.thinking_levels)!=='["high"]'||provider.context_window_tokens!==PREVIEW_GLM_TARGET.context_window_tokens||provider.input_price_micros_per_million!==150000||provider.output_price_micros_per_million!==500000))refuse();
+    // Preview multi-model (contract A §1): a root-broker provider is exactly one reviewed row (its
+    // ref's model, maker, DeepInfra URL, prices, window and effort switch), with no credential file.
+    if(rootBroker&&(provider.adapter_kind!==OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND||previewModelRowForRef(provider.provider_ref)===undefined
+      ||provider.maker!==previewModelRowForRef(provider.provider_ref)!.maker||Object.hasOwn(provider,"runner_authorization_file")||Object.hasOwn(provider,"api_authorization_file")
+      ||!rootBrokerTargetMatches(provider)))refuse();
     if (!BUILT_IN_PROVIDER_ADAPTERS.some(adapter => adapter.adapterKind === provider.adapter_kind)) refuse();
     if (!isRecord(provider.vetting)
       || !Object.keys(provider.vetting).every(key => (VETTING_KEYS as readonly string[]).includes(key))) refuse();

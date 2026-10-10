@@ -549,7 +549,7 @@ describe('spending-gate notices', () => {
     await expect(alert.runAlert({ ...args, layout, deps: h.deps })).resolves.toEqual({ event: 'PREVIEW_LIFECYCLE_ALERT_SENT', unit: halted });
     const mail = h.sent[0]!;
     expect(mail).toContain('Subject: Preview: spending gate stopped: provider_unreachable');
-    expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-team-authority-v2 --go /etc/debateai-v3-preview/provider-team-go-v2.json');
+    expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 --go /etc/debateai-v3-preview/provider-deepinfra-go-v3.json');
     expect(mail).toContain('systemctl status debateai-preview-provider-budget.service');
     expect(mail).not.toContain('journal lines');
     expect(mail).not.toMatch(/\$|usd/i);
@@ -565,7 +565,7 @@ describe('spending-gate notices', () => {
     expect(mail).toContain('Subject: Preview: spending gate address list needs an update (mismatch)');
     expect(mail).toContain('DEEPINFRA_ADDRESSES_CHANGED');
     expect(mail).not.toContain('38.101.151.31'); // The alert blanks addresses; the email says how to see them.
-    expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/deepinfra_addresses.py update --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf && systemctl restart debateai-preview-provider-budget');
+    expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/deepinfra_addresses.py update --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf && systemctl restart debateai-preview-provider-budget');
   });
 
   it('refuses a notice whose unit name does not match it, and rate-limits each notice name on its own', async () => {

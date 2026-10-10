@@ -7,8 +7,9 @@
 // produced, runs the reviewed checks before writing, and never overwrites a file.
 //
 //   release-artifacts.mjs source-manifest --repository <clean git clone> --root <release root> --role api|ui|runner --out <file>
-//   release-artifacts.mjs build-env
-//   release-artifacts.mjs ui-build --source <ui source manifest> --out <file>
+//   release-artifacts.mjs build-env [--models glm-only|multi-model]
+//   release-artifacts.mjs ui-build --source <ui source manifest> [--models glm-only|multi-model] --out <file>
+//       (--models picks the website's public model list; default glm-only, the legacy GLM-only list)
 //   release-artifacts.mjs verify --source <source manifest> [--ui-build <ui build manifest>]
 //   release-artifacts.mjs operator-digest --source <source manifest>
 //   release-artifacts.mjs launch-plan --service api|ui|runner --from <existing plan> --root <release root>
@@ -16,7 +17,8 @@
 //       --source-manifest <file> [--ui-build <file>] --native-attestation <file> [--publication <publish output>] --out <file>
 //   release-artifacts.mjs native-plan --operation apply-and-plan|plan|publish|verify --from <existing native plan>
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
-//       [--publication <publish output>] --out <file>
+//       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
+//       (--checker only with --operation plan; publish carries the plan's choice; default glm)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -32,7 +34,7 @@ import { parsePublicArtifactBytes, validateLaunchPlan } from '../../preview-auth
 import { validateNativeAttestation } from '../../preview-auth-dev/v1/native-attestation.mjs';
 import { validatePublication } from '../../preview-auth-dev/v1/runtime-receipt.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from '../../preview-auth-dev/v1/turnstile-custody.mjs';
-import { PREVIEW_FREE_MODEL_IDS_JSON } from '../../preview-auth-dev/v1/environment.mjs';
+import { PREVIEW_MODEL_ROSTER_FLAGS } from '../../preview-auth-dev/v1/environment.mjs';
 import { runBounded } from '../../preview-lifecycle/v1/common.mjs';
 
 /** The fixed server folders the reviewed launchers already require (launch-plan.mjs:6,17,37). */
@@ -45,17 +47,23 @@ export const LAYOUT = Object.freeze({
   ownerGid: 0
 });
 
+/** The reviewed public model lists, by stage name (environment.mjs PREVIEW_MODEL_ROSTER_FLAGS); glm-only is the default. */
+export const UI_MODEL_ROSTERS = Object.freeze(Object.keys(PREVIEW_MODEL_ROSTER_FLAGS));
+const DEFAULT_MODEL_ROSTER = 'glm-only';
+const publicBuildValues = flag => Object.freeze({ NODE_ENV: 'production', PUBLIC_APP_URL: PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: flag, TURNSTILE_SITE_KEY: PREVIEW_SITE_KEY });
 /**
  * Public values the website is BUILT with. Each one is the exact value the reviewed runtime gate
  * (environment.mjs narrowEnvironment, service ui) demands from ui.env, imported from the same
  * constants, so the build and the running site cannot disagree. Nothing here is read from ui.env.
+ * The model list is one of the reviewed lists, picked by stage name (`--models`); the build records
+ * which one (ui-build.mjs), and the UI launcher demands that ui.env names the same list.
  */
-export const UI_PUBLIC_BUILD_VALUES = Object.freeze({
-  NODE_ENV: 'production',
-  PUBLIC_APP_URL: PREVIEW_ORIGIN,
-  NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: PREVIEW_FREE_MODEL_IDS_JSON,
-  TURNSTILE_SITE_KEY: PREVIEW_SITE_KEY
-});
+export function uiPublicBuildValues(models = DEFAULT_MODEL_ROSTER) {
+  if (typeof models !== 'string' || !UI_MODEL_ROSTERS.includes(models)) refuse('ARGUMENTS_REFUSED', ['--models']);
+  return publicBuildValues(PREVIEW_MODEL_ROSTER_FLAGS[models]);
+}
+/** The default (glm-only) public build values. */
+export const UI_PUBLIC_BUILD_VALUES = publicBuildValues(PREVIEW_MODEL_ROSTER_FLAGS[DEFAULT_MODEL_ROSTER]);
 /** The complete environment of the build child: the public values plus fixed tool settings. */
 export const UI_BUILD_ENVIRONMENT = Object.freeze({
   PATH: '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8', TZ: 'UTC', CI: 'true', NEXT_TELEMETRY_DISABLED: '1',
@@ -65,7 +73,7 @@ export const UI_BUILD_ENVIRONMENT = Object.freeze({
  * pnpm, next and the route check start `node` from PATH. Put the running Node's own folder first
  * (as prestart.mjs nativeVerifyArgv does), so the build runs on the Node the manifest records.
  */
-export const buildEnvironment = (execPath = process.execPath) => ({ ...UI_BUILD_ENVIRONMENT, PATH: `${dirname(execPath)}:${UI_BUILD_ENVIRONMENT.PATH}` });
+export const buildEnvironment = (execPath = process.execPath, models = DEFAULT_MODEL_ROSTER) => ({ ...UI_BUILD_ENVIRONMENT, ...uiPublicBuildValues(models), PATH: `${dirname(execPath)}:${UI_BUILD_ENVIRONMENT.PATH}` });
 
 const MAX_PUBLIC_ARTIFACT_BYTES = 16_777_216; // readPublicArtifact's bound
 const MAX_PLAN_BYTES = 32_768; // prepareLaunch, prestart and native-operator read plans up to this size
@@ -73,12 +81,12 @@ const ROLES = ['api', 'ui', 'runner'];
 const ACTOR_ENV = ['PATH', 'LANG', 'LC_ALL', 'TZ'];
 const COMMANDS = Object.freeze({
   'source-manifest': { required: ['--repository', '--root', '--role', '--out'], optional: [] },
-  'build-env': { required: [], optional: [] },
-  'ui-build': { required: ['--source', '--out'], optional: [] },
+  'build-env': { required: [], optional: ['--models'] },
+  'ui-build': { required: ['--source', '--out'], optional: ['--models'] },
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication'] }
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate'] }
 });
 
 export class Refusal extends Error {
@@ -210,12 +218,14 @@ async function sourceManifestCommand(options, { layout, deps }) {
   return writeArtifact(options['--out'], manifest, { layout });
 }
 
-/** The public build values and their sha256, for comparing with ui.env without printing it. */
-export function buildEnvironmentReport() {
-  return { schema: 'preview-release-ui-build-values-v1', values: Object.fromEntries(Object.entries(UI_PUBLIC_BUILD_VALUES).map(([key, value]) => [key, { value, sha256: sha256(value) }])) };
+/** The public build values (for one reviewed model list) and their sha256, for comparing with ui.env without printing it. */
+export function buildEnvironmentReport(models = DEFAULT_MODEL_ROSTER) {
+  return { schema: 'preview-release-ui-build-values-v1', values: Object.fromEntries(Object.entries(uiPublicBuildValues(models)).map(([key, value]) => [key, { value, sha256: sha256(value) }])) };
 }
 
 async function uiBuildCommand(options, { layout, deps }) {
+  const models = options['--models'] ?? DEFAULT_MODEL_ROSTER;
+  uiPublicBuildValues(models);
   const source = await readSource(options['--source'], { layout, flag: '--source' });
   if (source.value.role !== 'ui') refuse('SOURCE_ROLE_REFUSED');
   await assertOutputFree(options['--out'], { layout });
@@ -225,7 +235,7 @@ async function uiBuildCommand(options, { layout, deps }) {
   const verifySource = deps.verifySourceManifest ?? verifySourceManifest;
   // Before: the root is exactly what the manifest inventoried. After: the build changed none of it.
   await verifySource(source.value, sourceBinding(source));
-  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, buildEnvironment(deps.execPath));
+  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, buildEnvironment(deps.execPath, models));
   await verifySource(source.value, sourceBinding(source));
   await (deps.verifyUiBuildManifest ?? verifyUiBuildManifest)(JSON.parse(JSON.stringify(build)), source.value);
   return writeArtifact(options['--out'], build, { layout });
@@ -396,6 +406,13 @@ async function nativePlanCommand(options, { layout, deps }) {
   // The owner's yes names the delta they read; a re-run plan (new runtime time, new hash) needs a new yes.
   if ((operation === 'publish') !== (options['--approved-delta-sha256'] !== undefined) || (operation === 'publish' && !HEX64.test(options['--approved-delta-sha256']))) refuse('ARGUMENTS_REFUSED', ['--approved-delta-sha256']);
   if (options['--publication'] !== undefined && operation !== 'verify') refuse('ARGUMENTS_REFUSED', ['--publication']);
+  // The register's checker stays GLM unless the operator chooses DeepSeek for a new `plan` AND states that
+  // the gate's GO switches DeepSeek on (publish-register-v2.ts previewCheckerRoleRef checks it again).
+  const checker = options['--checker'], acknowledged = options['--deepseek-enabled-on-gate'];
+  if (checker !== undefined && !['glm', 'deepseek'].includes(checker)) refuse('ARGUMENTS_REFUSED', ['--checker']);
+  if ((checker !== undefined || acknowledged !== undefined) && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--checker']);
+  if (checker === 'deepseek' && acknowledged !== 'yes') refuse('CHECKER_DEEPSEEK_NOT_ENABLED_ON_GATE');
+  if (acknowledged !== undefined && checker !== 'deepseek') refuse('ARGUMENTS_REFUSED', ['--deepseek-enabled-on-gate']);
   await assertOutputFree(options['--out'], { layout });
   // Lazy: native-operator.mjs loads tsx and pg, which exist only in an installed release root.
   const validateNativePlan = deps.validateNativePlan ?? (await import('../../preview-auth-dev/v1/native-operator.mjs')).validateNativePlan;
@@ -443,10 +460,14 @@ async function nativePlanCommand(options, { layout, deps }) {
     if (!plainObject(approval) || typeof approval.runtimeObservedAt !== 'string') refuse('NATIVE_APPROVAL_REQUIRED');
     try { validatePublication(approval.publication); } catch { refuse('NATIVE_APPROVAL_REQUIRED'); }
   }
+  // publish recomposes the snapshot the owner approved, so it carries the plan's checker choice unchanged.
+  const checkerChoice = operation === 'plan' ? (checker === 'deepseek' ? { checker: 'deepseek', deepseekEnabledOnGate: true } : undefined)
+    : operation === 'publish' ? from.value.checkerChoice : undefined;
   const plan = {
     schema: from.value.schema, operation, sourceRoot: source.value.sourceRoot, sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree,
     sourceManifest: { path: source.path, sha256: source.sha256 }, operatorManifestSha256: operatorDigest,
-    selectedBaseRegisterVersion, selectedBaseSnapshotSha256, publicationId, approval
+    selectedBaseRegisterVersion, selectedBaseSnapshotSha256, publicationId, approval,
+    ...(checkerChoice === undefined ? {} : { checkerChoice })
   };
   try { validateNativePlan(plan); } catch { refuse('NATIVE_PLAN_INVALID'); }
   await (deps.verifySourceManifest ?? verifySourceManifest)(source.value, sourceBinding(source));
@@ -461,7 +482,7 @@ export async function runCommand(argv, { layout = LAYOUT, deps = {} } = {}) {
   const context = { layout, deps };
   switch (command) {
     case 'source-manifest': return sourceManifestCommand(options, context);
-    case 'build-env': return buildEnvironmentReport();
+    case 'build-env': return buildEnvironmentReport(options['--models']);
     case 'ui-build': return uiBuildCommand(options, context);
     case 'verify': return verifyCommand(options, context);
     case 'operator-digest': return operatorDigestCommand(options, context);

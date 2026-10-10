@@ -28,15 +28,16 @@ const UNIT = /^[A-Za-z0-9][A-Za-z0-9:_.@\\-]{0,200}\.(service|socket|timer|targe
 const ADDRESS = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(\.[A-Za-z0-9-]{1,63})*\.[A-Za-z]{2,24}$/;
 
 const NOTICE = /^(gate-halted|gate-addresses)-([a-z0-9_]{1,64})$/;
-const GATE_FOLDER = '/opt/debateai-v3-preview/operator/team-budget-v2';
+// The DeepInfra spending gate v3 (deploy/preview-gate/v3): its folder, state and GO.
+const GATE_FOLDER = '/opt/debateai-v3-preview/operator/deepinfra-budget-v3';
 const GATE_UNIT = 'debateai-preview-provider-budget.service';
 const ADDRESS_UNIT = 'debateai-preview-gate-addresses.service';
 /** The fixed wording and the one fixing command of each notice kind. */
 const NOTICES = Object.freeze({
   'gate-halted': code => ({
     subject: `Preview: spending gate stopped: ${code}`,
-    lead: `The preview spending gate stopped taking paid model calls. Reason code: ${code}. Debates on the preview fail until it is re-opened. Check the reason first (deploy/preview-gate/v2/README.md, "Re-open after a halt"; status shows today's spend and every halt). Then re-open it with the one command below.`,
-    command: `/usr/bin/python3 -I ${GATE_FOLDER}/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-team-authority-v2 --go /etc/debateai-v3-preview/provider-team-go-v2.json`,
+    lead: `The preview spending gate stopped taking paid model calls. Reason code: ${code}. Debates on the preview fail until it is re-opened. Check the reason first (deploy/preview-gate/v3/README.md, "Re-open after a halt"; status shows today's spend and every halt). Then re-open it with the one command below.`,
+    command: `/usr/bin/python3 -I ${GATE_FOLDER}/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 --go /etc/debateai-v3-preview/provider-deepinfra-go-v3.json`,
     lookAt: GATE_UNIT, journal: null
   }),
   'gate-addresses': code => ({
