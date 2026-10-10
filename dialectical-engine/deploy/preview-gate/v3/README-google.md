@@ -35,14 +35,14 @@ The key is used only by the gate. The app never sees it.
 price before 2027. Google does not say which time zone its date change uses, so the gate is
 careful: a call is priced at the higher of the prices of its Bucharest day and of the next day.
 In practice the 2027 price starts at 00:00 Bucharest time on **31 December 2026**, one day early.
-The app computes the very same price for what it sets aside, so the two always agree.
+A call is charged at the prices of the moment it was priced, even when its answer arrives after
+midnight, so a long call over that midnight is never charged more than was set aside.
 
-Two things can happen only around that one midnight (30 to 31 December 2026, Bucharest):
-- A call the app prices a few milliseconds before midnight and the gate checks just after it is
-  refused (the gate says the amounts do not match). That one call fails; nothing is charged.
-- A call that starts before that midnight and ends after it is charged at the new price. If its
-  answer was very long (more than about half of the 16,384 tokens), the charge can exceed what was
-  set aside and the gate halts. Re-open it as below.
+The app sets aside a little more around that date: the highest prices of today and the next two
+days (so from 30 December it already sets aside at the 2027 price). The gate accepts a set-aside
+amount at or above its own figure, up to the same request at the 2027 prices, and holds what the
+app sent. So the few milliseconds between the app's clock and the gate's can never refuse a call
+at the price change. On every other day the two figures are the same.
 
 **Why one call at a time.** The worst case of one call is a full-size request (256 KiB + 64 bytes
 of framing) plus 16,384 output tokens, at the 2027 prices: **$0.519264**. Two at once would need

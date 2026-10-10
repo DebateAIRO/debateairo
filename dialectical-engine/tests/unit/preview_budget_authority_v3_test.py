@@ -761,9 +761,11 @@ class ProfileApiTests(GateTest):
         return {'scope_id': SCOPE, 'operationId': operation_id, 'requestBody': raw,
                 'requestSha256': hashlib.sha256(raw.encode()).hexdigest(), 'reservedUsd': str(reserved)}
 
-    def test_reservation_and_settlement_use_the_profile_prices_for_the_moment_and_the_entry_records_both(self):
+    def test_reservation_and_settlement_use_the_profile_prices_of_the_pricing_moment_and_the_entry_records_both(self):
         gate = self.dated_gate()
-        usage = {'prompt_tokens': 1000, 'completion_tokens': 0}  # $0.0002 at the risen price.
+        # $0.0001 at the reservation's price, $0.0002 at the risen one: a call settles at the prices
+        # of the moment it was priced (PR C core change a), never at a step it ran into.
+        usage = {'prompt_tokens': 1000, 'completion_tokens': 0}
         seen = []
 
         def dispatch(_sent, _key):
@@ -786,8 +788,8 @@ class ProfileApiTests(GateTest):
         self.assertEqual({k: entry[k] for k in ('reserve_input_usd_per_m', 'reserve_output_usd_per_m',
                                                 'settle_input_usd_per_m', 'settle_output_usd_per_m', 'held_usd')},
                          {'reserve_input_usd_per_m': '0.10', 'reserve_output_usd_per_m': '0.20',
-                          'settle_input_usd_per_m': '0.20', 'settle_output_usd_per_m': '0.40', 'held_usd': '0.0002'})
-        with self.refused('RESERVATION_MISMATCH'):  # After the rise, the old price is refused.
+                          'settle_input_usd_per_m': '0.10', 'settle_output_usd_per_m': '0.20', 'held_usd': '0.0001'})
+        with self.refused('RESERVATION_MISMATCH'):  # After the rise, the old (lower) price is refused.
             bridge.execute_request(gate.private, gate.go_path, self.dated_request('op-2', (Decimal('0.10'), Decimal('0.20'))),
                                    peer_uid=PEER, slots=gate.slots, dispatch=no_network, key_loader=no_network,
                                    host=HOST, platform='linux', now=gate.clock)

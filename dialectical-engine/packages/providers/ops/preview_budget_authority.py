@@ -9,7 +9,8 @@ helper_sha256 binds them: a price change is a reviewed code change, never a GO e
 fixed model) is refused. A model the GO does not enable is refused before any reservation or key
 read; each call reserves its own row's worst case ((request bytes + 2048) x input price + output
 bound x output price, per million, at the profile's reservation prices for that moment, never
-above the row's ceiling prices) and settles at the profile's prices for that row and moment (or
+above the row's ceiling prices; the caller may hold more, up to the request at ceiling prices)
+and settles at the profile's prices for that row at the moment it was priced (or
 the provider's reported cost, the larger); its ledger entry records the model, its maker, the
 reservation and settlement prices and the bound; and a reply naming any other model than that
 entry's halts. No reviewed row may reserve more than its profile's per_call_cap_usd for a
@@ -106,6 +107,8 @@ MAX_PRICE_USD_PER_M = Decimal('10.00')  # A price above this is a typo, not a pr
 MAX_OUTPUT_BOUND = 1048576
 MODEL_ID_PATTERN = re.compile(r'([A-Za-z0-9][A-Za-z0-9._-]{0,63}/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}')
 MAX_REMAINING_IPC_BYTES = 4096
+# A caller's hold above the gate's own figure: plain decimal text, at most 9 decimals (nano-USD).
+CLIENT_RESERVATION_PATTERN = re.compile(r'(0|[1-9][0-9]{0,2})\.[0-9]{1,9}')
 REMAINING_MIN_SECONDS = 1.0  # /remaining reads the state at most this often (see RemainingAnswers).
 TEAM_DAY_ZONE = 'Europe/Bucharest'
 CONTROL_NAME = 'team-control.json'
@@ -574,7 +577,8 @@ def validate_request(input, go, probe=False, moment=None):
     GO's profile, or (outside a probe) not in the GO's enabled_models, is refused here, so before
     any reservation or key read. Then the row's own request rules (effort, JSON mode, max_tokens
     bound) and the reservation at the profile's prices for this moment (never above the row's
-    ceiling), which must equal the caller's to the digit.
+    ceiling). The caller's figure must equal it, or exceed it by no more than the same request at
+    the row's ceiling prices (then the caller's figure is held).
     """
     profile = profile_of(go['provider'])
     if profile is None:
@@ -614,8 +618,19 @@ def validate_request(input, go, probe=False, moment=None):
     reserved = reservation_for(len(raw), row, prices)
     if reserved > profile.per_call_cap_usd:
         raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed row; checked anyway.
-    if helper.decimal_amount(input['reservedUsd']) != reserved:
-        raise SafetyError('RESERVATION_MISMATCH')
+    # The caller's hold must be at least the gate's own figure and at most this request's figure at
+    # the row's ceiling prices; the gate then holds the caller's figure. For a provider whose prices
+    # never change by date the two figures are equal, so this stays exact equality in practice. For
+    # dated prices it lets the app reserve a little ahead (Google: the next days' prices), so a few
+    # milliseconds between the app's clock and the gate's at a price step never refuse a call.
+    claimed = helper.decimal_amount(input['reservedUsd'])
+    if claimed != reserved:
+        ceiling = reservation_for(len(raw), row, profile.ceiling_prices(row))
+        text = input['reservedUsd']
+        if claimed is None or not (reserved < claimed <= ceiling) or not isinstance(text, str) \
+                or not CLIENT_RESERVATION_PATTERN.fullmatch(text):
+            raise SafetyError('RESERVATION_MISMATCH')
+        reserved = claimed
     return outgoing, reserved, row, prices
 
 
@@ -810,7 +825,10 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
     now = now or helper.utc_now
     go, go_sha = load_go(go_path)
     profile = profile_of(go['provider'])
-    outgoing, reserved, row, prices = validate_request(input, go, probe=probe, moment=current(now))
+    # The moment this call is priced: its reservation AND its settlement use this moment's prices,
+    # so a call that runs past a dated price step settles at the prices it was reserved at.
+    priced_at = current(now)
+    outgoing, reserved, row, prices = validate_request(input, go, probe=probe, moment=priced_at)
     host, platform = host or socket.gethostname(), platform or sys.platform
     if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int \
             or not (peer_uid in go['allowed_peer_uids'] or probe and peer_uid == 0):
@@ -867,7 +885,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         elapsed = round(time.monotonic() - started, 6)
         try:
             changes, halt_reason, charge, reply = assess_reply(status, response, reserved, elapsed, profile, row,
-                                                               current(now))
+                                                               priced_at)
         except BaseException:
             # Paid but unaccountable: keep the full hold and stop, as for a transport failure.
             changes, halt_reason, charge, reply = ({'state': 'uncertain', 'held_usd': str(reserved),
@@ -894,7 +912,8 @@ def bounded_model_name(value):
 
 def assess_reply(status, response, reserved, elapsed, profile, row, moment):
     """Ledger changes, halt reason, guard charge and caller reply for one redacted provider reply.
-    Settled at the profile's prices for this row and moment (recorded in the entry); the reply
+    Settled at the profile's prices for this row at moment, the moment the call was priced (its
+    reservation's), recorded in the entry; the reply
     must name this call's own model, not just any reviewed or enabled one."""
     accounting = bounded_accounting(profile.account(response, row, moment))
     charge = accounting.get('guard_charge_usd')

@@ -55,6 +55,13 @@ def careful(moment):
     return max(first[0], second[0]), max(first[1], second[1])
 
 
+def lookahead(moment):
+    """The app's hold: the highest prices of moment's Bucharest day and of the next two days."""
+    today = moment.astimezone(ZoneInfo('Europe/Bucharest')).date()
+    steps = [prices_on((today + timedelta(days=k)).isoformat()) for k in range(3)]
+    return max(p[0] for p in steps), max(p[1] for p in steps)
+
+
 def native(**changes):
     value = {'contents': [{'role': 'user', 'parts': [{'text': 'Offline synthetic test'}]}],
              'generationConfig': {'maxOutputTokens': 8192, 'thinkingConfig': {'thinkingLevel': 'high'}}}
@@ -179,6 +186,14 @@ class RowTests(GoogleTest):
                 self.assertEqual(prices, careful(moment))
                 reserved = bridge.reservation_for(case['request_bytes'], row, prices)
                 self.assertEqual('%.9f' % reserved, case['reserved_usd'])
+                # The app's lookahead hold: the highest prices of the day and the next two.
+                ahead = lookahead(moment)
+                self.assertEqual((str(ahead[0]), str(ahead[1])),
+                                 (case['lookahead_input_usd_per_m'], case['lookahead_output_usd_per_m']))
+                held = bridge.reservation_for(case['request_bytes'], row, ahead)
+                self.assertEqual('%.9f' % held, case['lookahead_reserved_usd'])
+                self.assertTrue(reserved <= held <= bridge.reservation_for(case['request_bytes'], row,
+                                                                           GOOGLE.ceiling_prices(row)))
 
     def test_worst_case_fits_the_cap_and_the_proposed_go_activates(self):
         worst = bridge.worst_case_reservation(GOOGLE, GOOGLE.rows[GEMINI])
@@ -227,16 +242,106 @@ class DatedPriceTests(GoogleTest):
                 self.assertEqual(GOOGLE.reservation_prices(row, moment), expected)
                 self.assertEqual(GOOGLE.account(reply(), row, moment)['input_usd_per_m'], price_in)
 
-    def test_2027_prices_are_never_charged_now_and_a_2027_reservation_is_refused_today(self):
+    def test_2027_prices_are_never_charged_now_even_when_the_app_reserves_ahead(self):
         gate = self.gate().ready()
         raw = framed(native())
         today = datetime.fromisoformat('2026-10-10T09:00:00+00:00')
         go = bridge.read_go(gate.go_path)
-        dearer = (Decimal(len(raw.encode()) + 2048) * Decimal('1.50') + BOUND * Decimal('7.50')) / Decimal(1000000)
-        with self.refused('RESERVATION_MISMATCH'):
-            bridge.validate_request(envelope(raw, today, reserved=dearer), go, moment=today)
         _, reserved, _, prices = bridge.validate_request(envelope(raw, today), go, moment=today)
         self.assertEqual((prices, reserved), ((Decimal('0.75'), Decimal('3.75')), reservation(raw, today)))
+        dearer = (Decimal(len(raw.encode()) + 2048) * Decimal('1.50') + BOUND * Decimal('7.50')) / Decimal(1000000)
+        # Core change b: a hold above the gate's own figure, up to the ceiling, is held as sent ...
+        _, held, _, _ = bridge.validate_request(envelope(raw, today, reserved='%.9f' % dearer), go, moment=today)
+        self.assertEqual(held, dearer)
+        result, _ = gate.gcall('op-1', response=reply(prompt=1000, candidates=200, thoughts=300))
+        self.assertEqual(result['status'], 200)
+        # ... and the call is still charged at the 2026 price.
+        entry = gate.entry('op-1')
+        self.assertEqual((entry['settle_input_usd_per_m'], entry['settle_output_usd_per_m'], Decimal(entry['held_usd'])),
+                         ('0.75', '3.75', (1000 * Decimal('0.75') + 500 * Decimal('3.75')) / Decimal(1000000)))
+
+
+class ClientReservationTests(GoogleTest):
+    """Core change b (PR C): the caller may hold more than the gate's own figure, never less, never
+    more than the request at the row's ceiling prices."""
+
+    def setUp(self):
+        super().setUp()
+        self.raw = framed(native())
+        self.moment = datetime.fromisoformat('2026-10-10T09:00:00+00:00')
+        self.go = bridge.read_go(self.gate().go_path)
+        self.own = reservation(self.raw, self.moment)
+        self.ceiling = (Decimal(len(self.raw.encode()) + 2048) * Decimal('1.50') + BOUND * Decimal('7.50')) / Decimal(1000000)
+
+    def check(self, text):
+        return bridge.validate_request(envelope(self.raw, self.moment, reserved=text), self.go, moment=self.moment)[1]
+
+    def test_an_under_reservation_is_refused(self):
+        for text in ('%.9f' % (self.own - Decimal('0.000000001')), '0', '0.000000001'):
+            with self.subTest(text=text), self.refused('RESERVATION_MISMATCH'):
+                self.check(text)
+
+    def test_an_over_reservation_up_to_the_ceiling_is_held_as_sent(self):
+        for amount in (self.own + Decimal('0.000000001'), (self.own + self.ceiling) / 2, self.ceiling):
+            text = '%.9f' % amount
+            with self.subTest(text=text):
+                self.assertEqual(self.check(text), Decimal(text))
+        self.assertEqual(self.check(str(self.own)), self.own)  # Exact equality still works.
+
+    def test_above_the_ceiling_or_in_another_notation_is_refused(self):
+        for text in ('%.9f' % (self.ceiling + Decimal('0.000000001')), '%.10f' % (self.own + Decimal('0.0000000001')),
+                     '%.6e' % self.ceiling, ' %.9f' % self.ceiling, '+%.9f' % self.ceiling, '0%.9f' % self.ceiling,
+                     '1000.000000000', '.5'):
+            with self.subTest(text=text), self.refused('RESERVATION_MISMATCH'):
+                self.check(text)
+        number = dict(envelope(self.raw, self.moment), reservedUsd=float(self.ceiling))  # A JSON number, not text.
+        with self.refused('RESERVATION_MISMATCH'):
+            bridge.validate_request(number, self.go, moment=self.moment)
+
+    def test_a_price_without_steps_keeps_exact_equality(self):
+        from preview_budget_authority_fixture import body, envelope as deepinfra_envelope
+        gate = Gate(bridge)
+        self.gates.append(gate)
+        go = bridge.read_go(gate.go_path)
+        request = deepinfra_envelope(body())
+        own = Decimal(request['reservedUsd'])
+        self.assertEqual(bridge.validate_request(request, go)[1], own)
+        for amount in (own + Decimal('0.000000001'), own - Decimal('0.000000001')):
+            with self.subTest(amount=amount), self.refused('RESERVATION_MISMATCH'):
+                bridge.validate_request(dict(request, reservedUsd='%.9f' % amount), go)
+
+    def test_the_app_lookahead_is_accepted_whatever_the_skew_across_the_price_step(self):
+        for app_text, gate_text in (('2026-12-30T21:59:59.999+00:00', '2026-12-30T22:00:00.001+00:00'),
+                                    ('2026-12-30T21:59:50+00:00', '2026-12-30T22:00:05+00:00'),
+                                    ('2026-12-29T21:59:59.999+00:00', '2026-12-29T22:00:00.001+00:00'),
+                                    ('2026-10-10T09:00:00+00:00', '2026-10-10T09:00:01+00:00')):
+            with self.subTest(app=app_text):
+                app, gate = datetime.fromisoformat(app_text), datetime.fromisoformat(gate_text)
+                held = bridge.reservation_for(len(self.raw.encode()), GOOGLE.rows[GEMINI], lookahead(app))
+                request = envelope(self.raw, app, reserved='%.9f' % held)
+                self.assertEqual(bridge.validate_request(request, self.go, moment=gate)[1], held)
+        # The plain two-day figure taken just before the step would have been refused just after it.
+        app, gate = datetime.fromisoformat('2026-12-30T21:59:59.999+00:00'), datetime.fromisoformat('2026-12-30T22:00:00.001+00:00')
+        with self.refused('RESERVATION_MISMATCH'):
+            bridge.validate_request(envelope(self.raw, app), self.go, moment=gate)
+
+    def test_a_call_over_the_price_step_midnight_settles_at_its_reservation_prices_and_never_halts(self):
+        gate = self.gate()
+        gate.clock.set('2026-12-30T21:59:59+00:00')  # 23:59:59 on 30 December in Bucharest.
+        gate.ready()
+        long_answer = reply(prompt=2000, candidates=6000, thoughts=BOUND - 6000)  # The whole bound.
+
+        def dispatch(_outgoing, _key):
+            gate.clock.set('2026-12-30T22:09:00+00:00')  # The answer comes after the price step.
+            return 200, long_answer
+        result, _ = gate.gcall('op-1', dispatch=dispatch)
+        self.assertEqual(result['status'], 200)
+        entry = gate.entry('op-1', day='2026-12-30')
+        self.assertEqual((entry['reserve_input_usd_per_m'], entry['settle_input_usd_per_m'], entry['state']),
+                         ('0.75', '0.75', 'settled'))
+        self.assertLessEqual(Decimal(entry['held_usd']), Decimal(entry['reserved_usd']))
+        self.assertEqual(gate.status()['state'], 'active')
+
 
     def test_on_the_last_bucharest_day_of_2026_the_reservation_is_already_at_the_2027_price(self):
         gate = self.gate()
