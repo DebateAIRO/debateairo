@@ -4277,7 +4277,8 @@ export async function evaluateAskAdmission(
       // Review finding 2: with the submit's lock, taken here and held until the debate is queued.
       await assertPreviewBudgetAdmits(settings.previewBudgetGate, {
         basis: envelopeBasis,
-        panel: filteredPanel
+        panel: filteredPanel,
+        storyTier: ask.composition_budget_tier
       }, undefined, previewAdmissionLock);
     } catch (error) {
       markAskRefusal(error);

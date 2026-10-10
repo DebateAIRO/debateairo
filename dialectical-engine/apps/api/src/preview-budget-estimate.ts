@@ -6,8 +6,9 @@
  * (each debate step once, the answer loop, the story with the storyteller's one repair, the runner's
  * health checks each time it picks the debate up, this ask's own health checks, and the one retry of
  * a call the gate proved unbilled), puts each call on the model that makes it (so each gate is
- * charged only for its own models' calls), prices each call at a REALISTIC WORST CASE (owner ruling,
- * 2026-10-10: its prompt at 64 KiB, its answer at the full max_tokens that call asks for; a health
+ * charged only for its own models' calls), prices each call at a REALISTIC WORST CASE (owner rulings,
+ * 2026-10-10: its prompt at 64 KiB, a story call's at its story size's largest measured request,
+ * converted at 3 bytes per token; its answer at the full max_tokens that call asks for; a health
  * check at its fixed one-line prompt) at the row's list price, adds 15%, adds what the gate may hold
  * at once for calls in flight (its concurrency limit x its largest reservation, from the gate's own
  * reply), and holds back the same figure for every earlier preview debate that has not finished (a
@@ -132,19 +133,48 @@ export const PREVIEW_CALIBRATION_WINDOW_DAYS = 14;
 /**
  * The strict upper bound's input side (STRICT_BOUND mode only, 6f62b6ba3): no per-call-type cap on a
  * prompt's size exists in the engine's code, so the one hard ceiling is the guarded fetch's: a body
- * above 128 KiB (owner ruling, 2026-10-10) is refused before it is sent, and the gate reserves (body bytes + 2048) x the input
+ * above 256 KiB (owner ruling, 2026-10-10) is refused before it is sent, and the gate reserves (body bytes + 2048) x the input
  * price. A health check's body is the fixed one-line probe, well under 1 KiB.
  */
 export const PREVIEW_STRICT_INPUT_TOKENS_PER_CALL = previewChargedInputTokens(PREVIEW_REQUEST_BODY_MAX_BYTES);
 const PREVIEW_PROBE_BODY_MAX_BYTES = 1024;
 export const PREVIEW_STRICT_PROBE_INPUT_TOKENS = previewChargedInputTokens(PREVIEW_PROBE_BODY_MAX_BYTES);
 /**
- * The realistic worst case's input side (owner ruling, 2026-10-10): a prompt of 64 KiB, plus the
- * gate's 2,048 template allowance (65,536 + 2,048 token-equivalents). The largest real request seen
- * on the preview was about 51 KB; the hard cap the guarded fetch and the gate enforce is 128 KiB.
+ * Owner ruling, 2026-10-10 (evening): the ESTIMATE turns a request's size into tokens at 3 bytes per
+ * token, because real text takes more than one byte per token (3 still covers text heavy in Chinese,
+ * Japanese or Korean); this is the estimate only, the gate's own reservation keeps one byte = one token.
+ * The gate's 2,048 template allowance is added to the bytes first.
+ */
+export const PREVIEW_ESTIMATE_BYTES_PER_TOKEN = 3;
+export function previewEstimateInputTokens(requestBytes: number): bigint {
+  const perToken = BigInt(PREVIEW_ESTIMATE_BYTES_PER_TOKEN);
+  return (previewChargedInputTokens(requestBytes) + perToken - 1n) / perToken;
+}
+/**
+ * The realistic worst case's ordinary prompt (owner ruling, 2026-10-10): 64 KiB, so (65,536 + 2,048) / 3
+ * = 22,528 tokens. The largest ordinary request seen on the preview was about 51 KB; the hard cap the
+ * guarded fetch and the gate enforce is 256 KiB.
  */
 export const PREVIEW_REALISTIC_INPUT_BYTES = 64 * 1024;
-export const PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL = previewChargedInputTokens(PREVIEW_REALISTIC_INPUT_BYTES);
+export const PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL = previewEstimateInputTokens(PREVIEW_REALISTIC_INPUT_BYTES);
+/** The ask's story size (composition_budget_tier): how much debate material the verdict story may read. */
+export type PreviewStoryTier = "low" | "medium" | "high";
+/**
+ * The largest story request of each story size, in bytes, measured on 2026-10-10 with the real prompt
+ * frame, today's story pack (storyteller instruction 29,514 B, checker 8,193 B), material filled to the
+ * size's budget (40,000 / 80,000 / 120,000 B) with dense quoting, and for the checker a 48 KB candidate
+ * story; each rounded up to whole KiB. The storyteller's repair is priced like its first attempt.
+ */
+export const PREVIEW_STORY_REQUEST_BYTES: Readonly<Record<PreviewStoryTier, Readonly<{ storyteller: number; storyChecker: number }>>> = Object.freeze({
+  low: Object.freeze({ storyteller: 96 * 1024, storyChecker: 119 * 1024 }),
+  medium: Object.freeze({ storyteller: 154 * 1024, storyChecker: 178 * 1024 }),
+  high: Object.freeze({ storyteller: 213 * 1024, storyChecker: 237 * 1024 })
+});
+/** An earlier debate whose story size is unknown is held at the largest (the careful side). */
+export const PREVIEW_STORY_TIER_FALLBACK: PreviewStoryTier = "high";
+function previewStoryTierOf(value: unknown): PreviewStoryTier {
+  return value === "low" || value === "medium" || value === "high" ? value : PREVIEW_STORY_TIER_FALLBACK;
+}
 /**
  * Review finding 3: a runner restart (a crash, a deploy) after the claim lapses re-claims the debate
  * and health-checks its whole panel again; nothing in the engine bounds how often that happens. The
@@ -169,6 +199,8 @@ export type PreviewPanelMember = Readonly<{ provider_ref: string; model_id: stri
  */
 export type PreviewUnfinishedRun = Readonly<{
   basis: Readonly<Record<string, unknown>>; panel: readonly PreviewPanelMember[]; phase?: "DEBATE" | "STORY";
+  /** Its ask's story size; absent: held at the largest. */
+  storyTier?: PreviewStoryTier;
 }>;
 
 /**
@@ -277,32 +309,39 @@ export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): Pr
   };
 }
 /**
- * Every call at `inputTokens` in and the max_tokens that call sends out (clamped to the row); a health
- * check at its fixed one-line body and the generation floor.
+ * Every call at its input tokens (`inputTokens` by kind) and the max_tokens that call sends out
+ * (clamped to the row); a health check at its fixed one-line body and the generation floor.
  */
-function sentOutputPricer(inputTokens: bigint, output: PreviewCallOutputTokens): PreviewCallPricer {
+function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, bigint>>,
+  output: PreviewCallOutputTokens): PreviewCallPricer {
   const sent: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, number>> = {
     DEBATE: output.debate, STORYTELLER: output.storyteller, STORYTELLER_RETRY: output.storytellerRetry, STORY_CHECKER: output.storyChecker
   };
   return (row, type) => type === "PROBE"
     ? previewCallNanoUsd(row, PREVIEW_STRICT_PROBE_INPUT_TOKENS, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
-    : previewCallNanoUsd(row, inputTokens, sent[type]);
+    : previewCallNanoUsd(row, inputTokens[type], sent[type]);
 }
+const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens });
 /**
  * STRICT_BOUND (6f62b6ba3): every call at its most, input at the largest body the gate accepts,
  * output at the max_tokens that call sends, clamped to the row; a health check at its fixed body and
  * the generation floor.
  */
 export function strictUpperBoundPricer(output: PreviewCallOutputTokens): PreviewCallPricer {
-  return sentOutputPricer(PREVIEW_STRICT_INPUT_TOKENS_PER_CALL, output);
+  return sentOutputPricer(everyCallAt(PREVIEW_STRICT_INPUT_TOKENS_PER_CALL), output);
 }
 /**
- * REALISTIC_WORST_CASE (owner ruling, 2026-10-10): every call's input at a realistic maximum of 64 KiB
- * (PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL), its output at the max_tokens that call asks for (clamped
- * to the row); a health check at its fixed body and the generation floor, as in the strict bound.
+ * REALISTIC_WORST_CASE (owner rulings, 2026-10-10): a debate call's input at a realistic 64 KiB, a
+ * story call's (the storyteller, its repair, the story check) at the largest measured request of the
+ * ask's story size (PREVIEW_STORY_REQUEST_BYTES), both at 3 bytes per token; its output at the
+ * max_tokens that call asks for (clamped to the row); a health check at its fixed body and the
+ * generation floor, as in the strict bound.
  */
-export function realisticWorstCasePricer(output: PreviewCallOutputTokens): PreviewCallPricer {
-  return sentOutputPricer(PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, output);
+export function realisticWorstCasePricer(output: PreviewCallOutputTokens, storyTier: PreviewStoryTier = PREVIEW_STORY_TIER_FALLBACK): PreviewCallPricer {
+  const story = PREVIEW_STORY_REQUEST_BYTES[previewStoryTierOf(storyTier)];
+  const storyteller = previewEstimateInputTokens(story.storyteller);
+  return sentOutputPricer({ DEBATE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, STORYTELLER: storyteller, STORYTELLER_RETRY: storyteller,
+    STORY_CHECKER: previewEstimateInputTokens(story.storyChecker) }, output);
 }
 
 export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" | "STRICT_BOUND";
@@ -316,10 +355,10 @@ export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" 
  */
 export const PREVIEW_ESTIMATE_PRICING_MODE: PreviewPricingMode = "REALISTIC_WORST_CASE";
 /** THE ONE PRICING SWITCH: the pricer for `mode` (default: the active mode above). */
-export function previewEstimatePricer(context: Readonly<{ measured: PreviewMeasuredCallUsage; callOutputTokens: PreviewCallOutputTokens }>,
-  mode: PreviewPricingMode = PREVIEW_ESTIMATE_PRICING_MODE): PreviewCallPricer {
+export function previewEstimatePricer(context: Readonly<{ measured: PreviewMeasuredCallUsage; callOutputTokens: PreviewCallOutputTokens;
+  storyTier?: PreviewStoryTier }>, mode: PreviewPricingMode = PREVIEW_ESTIMATE_PRICING_MODE): PreviewCallPricer {
   switch (mode) {
-    case "REALISTIC_WORST_CASE": return realisticWorstCasePricer(context.callOutputTokens);
+    case "REALISTIC_WORST_CASE": return realisticWorstCasePricer(context.callOutputTokens, context.storyTier);
     case "CALIBRATED_ESTIMATE": return calibratedEstimatePricer(context.measured);
     case "STRICT_BOUND": return strictUpperBoundPricer(context.callOutputTokens);
   }
@@ -675,7 +714,7 @@ export function createPreviewAdmissionLock(pool: Pick<Pool, "connect">): Preview
  */
 export async function assertPreviewBudgetAdmits(
   gate: PreviewBudgetGateSettings | undefined,
-  input: Readonly<{ basis: Readonly<Record<string, unknown>>; panel: readonly PreviewPanelMember[] }>,
+  input: Readonly<{ basis: Readonly<Record<string, unknown>>; panel: readonly PreviewPanelMember[]; storyTier?: PreviewStoryTier }>,
   clock: () => Date = () => new Date(),
   lock?: PreviewAdmissionLock
 ): Promise<void> {
@@ -700,14 +739,15 @@ export async function assertPreviewBudgetAdmits(
     // the same pricing and count hold back every unfinished debate, so a new debate and a running
     // one are counted alike.
     const measured = previewModeReadsMeasuredUsage() ? await gate!.readMeasuredCallUsage?.() ?? [] : [];
-    const pricer = previewEstimatePricer({ measured, callOutputTokens: gate!.callOutputTokens });
+    const pricerFor = (storyTier: PreviewStoryTier | undefined) =>
+      previewEstimatePricer({ measured, callOutputTokens: gate!.callOutputTokens, storyTier: storyTier ?? PREVIEW_STORY_TIER_FALLBACK });
     const debateCallCount = previewDebateCallCount();
-    needs = estimatePreviewGateNeeds({ ...input, ...gate!, pricer, debateCallCount });
+    needs = estimatePreviewGateNeeds({ basis: input.basis, panel: input.panel, ...gate!, pricer: pricerFor(input.storyTier), debateCallCount });
     const unfinished = await gate!.readUnfinishedRuns();
     if (unfinished.length > PREVIEW_UNFINISHED_RUNS_MAX) throw new TypeError("PREVIEW_UNFINISHED_RUNS_TOO_MANY");
     held = new Map();
     for (const run of unfinished) {
-      for (const hold of estimateUnfinishedRunHolds(run, gate!, pricer, debateCallCount)) {
+      for (const hold of estimateUnfinishedRunHolds(run, gate!, pricerFor(run.storyTier), debateCallCount)) {
         const sum = held.get(hold.gate) ?? { calls: 0, nanoUsd: 0n };
         held.set(hold.gate, { calls: sum.calls + hold.callsWithMargin, nanoUsd: sum.nanoUsd + hold.callsNanoUsd });
       }
@@ -738,7 +778,7 @@ export async function assertPreviewBudgetAdmits(
  * A debate between its start and its first job is never seen here: the admission lock is held until
  * that job is queued. Plain columns only; never content.
  */
-export const PREVIEW_UNFINISHED_RUNS_SQL = `SELECT run.envelope_basis, run.discovered_panel,
+export const PREVIEW_UNFINISHED_RUNS_SQL = `SELECT run.envelope_basis, run.discovered_panel, run.composition_budget_tier,
               CASE WHEN EXISTS (SELECT 1 FROM core.work_item AS work
                                 WHERE work.run_id = run.run_id AND work.state IN ('READY', 'CLAIMED'))
                    THEN 'DEBATE' ELSE 'STORY' END AS phase
@@ -755,7 +795,7 @@ export const PREVIEW_UNFINISHED_RUNS_SQL = `SELECT run.envelope_basis, run.disco
                                 AND entry.finished_at > clock_timestamp() - make_interval(secs => $2::integer))))
        LIMIT ${String(PREVIEW_UNFINISHED_RUNS_MAX + 1)}` as const;
 
-function unfinishedRunFrom(row: Readonly<{ envelope_basis: unknown; discovered_panel: unknown; phase?: unknown }>): PreviewUnfinishedRun {
+function unfinishedRunFrom(row: Readonly<{ envelope_basis: unknown; discovered_panel: unknown; phase?: unknown; composition_budget_tier?: unknown }>): PreviewUnfinishedRun {
   const basis = row.envelope_basis;
   const panel = row.discovered_panel;
   if (typeof basis !== "object" || basis === null || Array.isArray(basis) || !Array.isArray(panel)
@@ -769,7 +809,8 @@ function unfinishedRunFrom(row: Readonly<{ envelope_basis: unknown; discovered_p
     basis: basis as Readonly<Record<string, unknown>>,
     panel: Object.freeze((panel as Array<Record<string, string>>).map((member) =>
       Object.freeze({ provider_ref: member.provider_ref!, model_id: member.model_id! }))),
-    phase: row.phase
+    phase: row.phase,
+    storyTier: previewStoryTierOf(row.composition_budget_tier)
   });
 }
 
@@ -887,7 +928,7 @@ export async function readPreviewBudgetGateSettings(
     askProbeModelIds: Object.freeze([...askProbeModelIds]),
     maxCooldownHoldsPerRun: structural.maxCooldownHoldsPerRun,
     readUnfinishedRuns: async () => {
-      const result = await pool.query<{ envelope_basis: unknown; discovered_panel: unknown; phase: unknown }>(
+      const result = await pool.query<{ envelope_basis: unknown; discovered_panel: unknown; phase: unknown; composition_budget_tier: unknown }>(
         PREVIEW_UNFINISHED_RUNS_SQL, [storyRounds > 0, PREVIEW_STORY_HOLD_WINDOW_SECONDS]);
       return Object.freeze(result.rows.map(unfinishedRunFrom));
     },
