@@ -25,6 +25,44 @@ import { readStoryPolicyFromRegister, readSynthesisRoleControls } from "@debatea
 import type { Pool } from "pg";
 import { expectedCallsByRoleFromBasis } from "./ask-model-picker.js";
 
+/**
+ * The next midnight in Europe/Bucharest after `now` (DST-aware): the instant the gate's day, and so
+ * its pot and call count, resets. Romania changes clocks at 03:00/04:00 local time, never at
+ * midnight, so every local midnight exists exactly once; the offset (+02:00 or +03:00) is the one
+ * in force AT that midnight, found by checking which candidate formats back to 00:00 local.
+ */
+const BUCHAREST_PARTS = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/Bucharest", year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+});
+function bucharestParts(instant: Date): Readonly<Record<"year" | "month" | "day" | "hour" | "minute" | "second", number>> {
+  const parts = Object.fromEntries(BUCHAREST_PARTS.formatToParts(instant)
+    .filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
+  return parts as Record<"year" | "month" | "day" | "hour" | "minute" | "second", number>;
+}
+export function nextBucharestMidnight(now: Date): Date {
+  if (!Number.isFinite(now.getTime())) throw new TypeError("PREVIEW_CLOCK_INVALID");
+  const today = bucharestParts(now);
+  for (const offsetHours of [2, 3]) {
+    const candidate = new Date(Date.UTC(today.year, today.month - 1, today.day + 1) - offsetHours * 3_600_000);
+    const local = bucharestParts(candidate);
+    if (local.hour === 0 && local.minute === 0 && local.second === 0 && candidate.getTime() > now.getTime()) return candidate;
+  }
+  throw new TypeError("PREVIEW_BUCHAREST_MIDNIGHT_UNRESOLVED");
+}
+
+/**
+ * The preview's daily refusal: the product's existing daily code (429, the localized "today's
+ * limit is used up" sentence), carrying the gate's own reset instant for `Retry-After`.
+ */
+export class PreviewDailyLimitRefusal extends TypedDomainError {
+  readonly retryAt: Date;
+  constructor(message: string, retryAt: Date) {
+    super("DAILY_COST_ENVELOPE_REACHED", message);
+    this.retryAt = retryAt;
+  }
+}
+
 /** The gates the preview has; today only the DeepInfra gate on `budget_socket`. */
 export type PreviewGateKey = "deepinfra";
 
@@ -143,10 +181,11 @@ export function previewGateRefusalReason(need: PreviewGateNeed, remaining: Previ
  */
 export async function assertPreviewBudgetAdmits(
   gate: PreviewBudgetGateSettings | undefined,
-  input: Readonly<{ basis: Readonly<Record<string, unknown>>; panelModelIds: readonly string[] }>
+  input: Readonly<{ basis: Readonly<Record<string, unknown>>; panelModelIds: readonly string[] }>,
+  clock: () => Date = () => new Date()
 ): Promise<void> {
   const refuse = (reason: string): never => {
-    throw new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", `Private preview start-of-debate estimate refused: ${reason}`);
+    throw new PreviewDailyLimitRefusal(`Private preview start-of-debate estimate refused: ${reason}`, nextBucharestMidnight(clock()));
   };
   if (gate === undefined) refuse("no gate remaining port");
   let needs: readonly PreviewGateNeed[];

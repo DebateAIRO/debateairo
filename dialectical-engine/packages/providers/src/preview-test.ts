@@ -251,7 +251,14 @@ export function createPreviewGuardedFetch(port: PreviewBudgetPort): typeof fetch
  * exactly that shape, keeps the per-run money code.
  */
 const PREVIEW_DAILY_REFUSALS: ReadonlySet<string> = new Set(["TEAM_DAILY_BUDGET_REACHED", "DAILY_CALL_LIMIT_REACHED"]);
-const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED"]);
+/**
+ * Owner ruling 5 (2026-10-10): a call the gate proves never billed (PROVIDER_NOT_REACHED: the
+ * connect or TLS handshake failed before a byte was written; PROVIDER_REFUSED_UNBILLED: a vendor
+ * 429/529 with no usage and a provably unbilled body) released its hold, so it is the same
+ * transient failure as a busy gate: PROVIDER_CALL_FAILED, retried after the cooldown, never a
+ * money stop. The gate must list both codes as public refusals for them to arrive here.
+ */
+const PREVIEW_TRANSIENT_REFUSALS: ReadonlySet<string> = new Set(["CONCURRENCY_LIMIT_REACHED", "PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"]);
 function previewAuthorityRefusal(status: number | undefined, row: unknown): TypedDomainError {
   const code = status === 409 && typeof row === "object" && row !== null && !Array.isArray(row)
     ? (row as Record<string, unknown>).error : undefined;
@@ -259,7 +266,8 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
     return new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "Private preview team budget for today is used up");
   }
   if (typeof code === "string" && PREVIEW_TRANSIENT_REFUSALS.has(code)) {
-    return new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate is at its limit of calls in flight");
+    return new TypedDomainError("PROVIDER_CALL_FAILED", code === "CONCURRENCY_LIMIT_REACHED"
+      ? "Private preview gate is at its limit of calls in flight" : "Private preview call was not billed and did not reach an answer");
   }
   return new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");
 }

@@ -1791,9 +1791,13 @@ export function askRefusalPublicMessage(code: string, message: string): string {
   return code === "DAILY_COST_ENVELOPE_REACHED" ? code : message;
 }
 
-/** The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. */
-export function askRefusalRetryAfter(code: string, now: Date): string | null {
+/**
+ * The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. A refusal that
+ * names its own reset instant (the preview gate's day ends at Bucharest midnight) uses that one.
+ */
+export function askRefusalRetryAfter(code: string, now: Date, retryAt?: Date): string | null {
   if (askRefusalStatus(code) !== 429) return null;
+  if (retryAt !== undefined && Number.isFinite(retryAt.getTime()) && retryAt.getTime() > now.getTime()) return retryAt.toUTCString();
   const midnight = new Date(Date.UTC(
     now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1
   ));
@@ -1802,11 +1806,15 @@ export function askRefusalRetryAfter(code: string, now: Date): string | null {
 
 export class AskRefusal extends Error {
   readonly code: string;
+  /** The refusal's own reset instant, when it names one (the preview's Bucharest day). */
+  readonly retryAt?: Date;
 
   constructor(refusal: TypedDomainError) {
     super(refusal.message);
     this.name = "AskRefusal";
     this.code = refusal.code;
+    const retryAt = (refusal as TypedDomainError & Readonly<{ retryAt?: unknown }>).retryAt;
+    if (retryAt instanceof Date) this.retryAt = retryAt;
   }
 }
 
@@ -2494,7 +2502,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     // R1: `Retry-After` names the instant the daily envelope resets, so a client
     // library that honours the header waits exactly as long as it must.
-    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date()) : null;
+    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date(), knownError.retryAt) : null;
     if (retryAfter !== null) reply.header("retry-after", retryAfter);
     // I6: the spend figures the refusal carries are the OPERATOR's, so they are
     // logged here and withheld from the body below.

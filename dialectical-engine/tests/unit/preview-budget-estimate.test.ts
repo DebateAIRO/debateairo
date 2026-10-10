@@ -27,8 +27,11 @@ import {
   estimatePreviewGateNeeds,
   previewGateEstimateNanoUsd,
   previewExpectedCalls,
+  nextBucharestMidnight,
+  PreviewDailyLimitRefusal,
   type PreviewBudgetGateSettings
 } from "../../apps/api/src/preview-budget-estimate.js";
+import { AskRefusal, askRefusalRetryAfter } from "../../apps/api/src/index.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -222,8 +225,12 @@ describe("the real submit and the HTTP boundary", () => {
       application, sessions: testSessionApplication([member]), allowedOrigin: TEST_APP_ORIGIN
     });
     try {
+      const before = nextBucharestMidnight(new Date()).toUTCString();
       const response = await api.inject({ method: "POST", url: "/v1/asks", headers: testSessionHeaders(member, true), payload: ASK });
+      const after = nextBucharestMidnight(new Date()).toUTCString();
       expect(response.statusCode).toBe(429);
+      // The gate's day ends at Bucharest midnight, not UTC midnight.
+      expect([before, after]).toContain(response.headers["retry-after"]);
       // The public body is the code alone: no reason, no figures.
       expect(response.json()).toEqual({ error: "DAILY_COST_ENVELOPE_REACHED", message: "DAILY_COST_ENVELOPE_REACHED" });
       expect(response.headers["retry-after"]).toBeTruthy();
@@ -329,5 +336,39 @@ describe("the /remaining port reads the gate's reply strictly over a real unix s
     const pending = port.remaining(controller.signal);
     controller.abort();
     await expect(pending).rejects.toMatchObject({ code: PREVIEW_GATE_UNREACHABLE });
+  });
+});
+
+describe("Retry-After names the gate's reset: the next midnight in Bucharest, across clock changes", () => {
+  it.each([
+    // Summer time (+03:00), the day before clocks go back on 2026-10-25.
+    ["2026-10-24T12:00:00.000Z", "2026-10-24T21:00:00.000Z"],
+    // Just before and exactly at Bucharest midnight.
+    ["2026-10-24T20:59:59.999Z", "2026-10-24T21:00:00.000Z"],
+    ["2026-10-24T21:00:00.000Z", "2026-10-25T22:00:00.000Z"],
+    // The 25-hour day (04:00 summer time becomes 03:00 winter time): next midnight is at +02:00.
+    ["2026-10-25T00:30:00.000Z", "2026-10-25T22:00:00.000Z"],
+    ["2026-10-25T12:00:00.000Z", "2026-10-25T22:00:00.000Z"],
+    // Winter time (+02:00), the day before clocks go forward on 2027-03-28.
+    ["2027-03-27T12:00:00.000Z", "2027-03-27T22:00:00.000Z"],
+    // The 23-hour day (03:00 winter time becomes 04:00 summer time): next midnight is at +03:00.
+    ["2027-03-28T00:30:00.000Z", "2027-03-28T21:00:00.000Z"],
+    ["2027-03-28T12:00:00.000Z", "2027-03-28T21:00:00.000Z"],
+    // Year end, UTC still on the old day while Bucharest is on the new one.
+    ["2026-12-31T22:30:00.000Z", "2027-01-01T22:00:00.000Z"]
+  ])("at %s the gate's day resets at %s", (now, expected) => {
+    expect(nextBucharestMidnight(new Date(now)).toISOString()).toBe(expected);
+  });
+
+  it("the estimate's refusal carries that instant, and the boundary's Retry-After uses it", () => {
+    const now = new Date("2026-10-25T12:00:00.000Z");
+    const refusal = new AskRefusal(new PreviewDailyLimitRefusal("synthetic", nextBucharestMidnight(now)));
+    expect(refusal.code).toBe("DAILY_COST_ENVELOPE_REACHED");
+    expect(askRefusalRetryAfter(refusal.code, now, refusal.retryAt)).toBe("Sun, 25 Oct 2026 22:00:00 GMT");
+    // Off the preview the daily code keeps the UTC midnight it always had.
+    expect(askRefusalRetryAfter("DAILY_COST_ENVELOPE_REACHED", now)).toBe("Mon, 26 Oct 2026 00:00:00 GMT");
+    expect(new AskRefusal(new PreviewDailyLimitRefusal("synthetic", now)).retryAt).toEqual(now);
+    // A reset instant already past is ignored (never a Retry-After in the past).
+    expect(askRefusalRetryAfter(refusal.code, new Date("2026-10-26T00:00:00.000Z"), refusal.retryAt)).toBe("Tue, 27 Oct 2026 00:00:00 GMT");
   });
 });
