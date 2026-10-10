@@ -6,6 +6,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import re
 import shutil
 import socket
 import sys
@@ -42,6 +43,7 @@ def load(path, name):
 
 
 addresses = load(V3 / 'anthropic_addresses.py', 'anthropic_addresses')
+gate = load(GATE, 'production_preview_budget_authority_for_readme')
 
 
 def directives(path):
@@ -198,13 +200,74 @@ class GateUnitTests(unittest.TestCase):
 
     def test_readme_names_the_same_paths_the_proposed_go_and_the_key_command(self):
         readme = README.read_text()
-        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"anthropic"', '"1.50"', '400', '$3.50', 'systemctl show -p InaccessiblePaths', '3a.',
+        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"anthropic"', '"1.00"', '400', '$4.00', 'systemctl show -p InaccessiblePaths', '3a.',
                      'claude-haiku-5-5', '0.24704', '0.98816', '160.79.104.0/23', 'getent ahostsv4 api.anthropic.com',
                      'preview_key.py install anthropic', 'probe', '--model claude-haiku-5-5', 'model_echoed_exactly',
                      'completion_within_max_tokens', 'anthropic_budget_socket', '429', '529', UNIT.name, HALT_TIMER.name,
                      CHECK_TIMER.name, TARGET_DROPIN.name):
             self.assertIn(name, readme)
         self.assertIn('README-anthropic.md', (V3 / 'README.md').read_text())
+
+
+    def test_the_pot_is_the_owners_ruling_everywhere(self):
+        # Owner's ruling 2026-10-10: Anthropic $1.00, 400 calls, 2 at once; with DeepInfra's $4.00, $5.00.
+        readme, deepinfra = README.read_text(), (V3 / 'README.md').read_text()
+        go = re.search(r"jq -n [^\n]*provider:\"anthropic\"[^\n]*", readme).group(0)
+        for field in ('daily_budget_usd:"1.00"', 'max_paid_posts_per_day:400', 'max_concurrent_calls:2'):
+            self.assertIn(field, go)
+        for stale in ('1.50', '$3.50', '$50 a month'):
+            self.assertNotIn(stale, readme)
+        self.assertIn('DeepInfra $4.00 and Anthropic $1.00, $5.00 together', deepinfra)
+        self.assertNotIn('Anthropic $1.50', deepinfra)
+        self.assertIn('TEAM_TOTAL_BUDGET_EXCEEDED', readme)
+
+    def test_install_order_reinstalls_the_deepinfra_units_before_the_key_and_checks_them_live(self):
+        readme = README.read_text()
+        step3a, step4 = readme.index('**3a. Re-install the two DeepInfra units'), readme.index('**4. The Anthropic key.')
+        self.assertLess(step3a, step4)
+        block = readme[step3a:step4]
+        for needed in (DEEPINFRA_UNIT.name, DEEPINFRA_HALT.name, 'systemctl daemon-reload',
+                       'systemctl restart debateai-preview-provider-budget.service',
+                       'systemctl show -p InaccessiblePaths debateai-preview-provider-budget.service',
+                       'systemctl show -p InaccessiblePaths debateai-preview-gate-halt-watch.service', PRIVATE, GO):
+            self.assertIn(needed, block)
+
+    def test_the_probe_runs_in_the_generic_fence_and_must_pass_before_haiku_is_switched_on(self):
+        readme = README.read_text()
+        line = next(text for text in readme.splitlines() if text.startswith('systemd-run') and ' probe ' in text)
+        self.assertIn('--unit=' + gate.probe_unit_name('anthropic').removesuffix('.service') + ' ', line)
+        for needed in ('IPAddressDeny=any', 'NoNewPrivileges=yes', '-p CapabilityBoundingSet= ', '--model claude-haiku-5-5'):
+            self.assertIn(needed, line)
+        hidden = re.search(r"InaccessiblePaths=([^']*)'", line).group(1).split()
+        others = [path for name, pair in gate.GATE_PATHS.items() if name != 'anthropic' for path in pair]
+        for path in [*others, *gate.RETIRED_GATE_PATHS]:
+            self.assertIn('-' + path, hidden)
+        self.assertFalse(any(path in hidden or '-' + path in hidden for path in gate.GATE_PATHS['anthropic']))
+        probe, switch_on = readme.index('**8. Probe'), readme.index('## Switch it on')
+        self.assertLess(probe, switch_on)
+        self.assertIn('It must pass before Haiku is switched on.', readme[probe:switch_on])
+        self.assertIn('**Only after the step-8 probe has passed**', readme[switch_on:])
+        for code in ('PROBE_FENCE_REQUIRED', 'PROVIDER_REFUSED_UNBILLED', 'PROVIDER_NOT_REACHED'):
+            self.assertIn(code, readme[probe:switch_on])
+
+    def test_the_first_debate_config_is_all_five_and_matches_the_reviewed_ui_flag(self):
+        readme = README.read_text()
+        api = json.loads(re.search(r"`(\{\"deployment\":\"v3-preview\"[^`]*)`", readme).group(1))
+        five = ['zai-org/GLM-5.3-Flash', 'deepseek-ai/DeepSeek-V4.1-Flash', 'XiaomiMiMo/MiMo-V2.6-Pro',
+                'Qwen/Qwen3.8-Flash', 'claude-haiku-5-5']
+        self.assertEqual((api['free_model_ids'], api['premium_model_ids']), (five, five))
+        self.assertEqual((api['budget_socket'], api['anthropic_budget_socket']),
+                         ('/run/debateai-v3-preview/deepinfra-budget-v3.sock', SOCKET))
+        self.assertEqual(sorted(api), sorted(['deployment', 'requested_thinking_level', 'budget_socket',
+                                              'anthropic_budget_socket', 'scope_id', 'free_model_ids', 'premium_model_ids']))
+        self.assertIn('--models all-models', readme)
+        flag = re.search(r"NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON=(\{[^`]*)`", readme).group(1)
+        self.assertEqual(json.loads(flag), {'free': five, 'premium': five})
+        # The same text as the reviewed build value the website may be built with.
+        environment = (ROOT / 'deploy/preview-auth-dev/v1/environment.mjs').read_text()
+        self.assertEqual(re.search(r"'all-models':'([^']*)'", environment).group(1), flag)
+        go = re.search(r'scope_id:"([^"]+)"', readme).group(1)
+        self.assertEqual(api['scope_id'], go)  # Every gate is asked with the app's one scope_id.
 
 
 class AddressCheckTests(unittest.TestCase):

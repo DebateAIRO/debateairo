@@ -8,6 +8,7 @@ import contextlib
 import hashlib
 import io
 import json
+import os
 import re
 import sys
 import unittest
@@ -213,6 +214,26 @@ class ParityAndReservationTests(AnthropicTest):
 
 
 class GoAndActivateTests(AnthropicTest):
+    def test_the_owners_pots_add_up_to_the_team_total_and_one_cent_more_refuses(self):
+        # Owner's ruling 2026-10-10: Anthropic $1.00 (this GO) + DeepInfra $4.00 = the $5.00 team total.
+        def deepinfra_go(gate, budget):
+            path = gate.root / 'team-go-deepinfra.json'
+            path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'deepinfra',
+                                        'daily_budget_usd': budget}))
+            os.chmod(path, 0o600)
+        gate = self.gate()
+        self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], '1.00')
+        gate.init()
+        deepinfra_go(gate, '4.00')
+        self.assertEqual(gate.activate()['state'], 'active')  # 1.00 + 4.00 = 5.00 exactly.
+        for mine, theirs in (('1.01', '4.00'), ('1.00', '4.01')):
+            with self.subTest(anthropic=mine, deepinfra=theirs):
+                gate = self.gate(daily_budget_usd=mine)
+                gate.init()
+                deepinfra_go(gate, theirs)
+                with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):
+                    gate.activate()
+
     def test_a_go_for_anthropic_loads_only_with_its_own_reviewed_row(self):
         gate = self.gate()
         self.assertEqual((bridge.read_go(gate.go_path)['provider'], bridge.read_go(gate.go_path)['enabled_models']),
@@ -468,6 +489,45 @@ class UnbilledAndUnsentTests(AnthropicTest):
         self.assertEqual(json.loads(bridge.refusal_body(bridge.CallNotSent('PROVIDER_REFUSED_UNBILLED'))),
                          {'error': 'PROVIDER_REFUSED_UNBILLED'})
 
+    @staticmethod
+    def error(kind, **extra):
+        return {'type': 'error', 'error': {'type': kind, 'message': 'synthetic'}, **extra}
+
+    def test_other_well_formed_non_billing_errors_are_released_on_the_same_ledger_entry(self):
+        # Judge round on PR B: Anthropic's own error answers that bill nothing go through A's
+        # released_unbilled machinery (a $0 entry kept on the record, the daily ceiling, the streak).
+        for status, kind in ((400, 'invalid_request_error'), (404, 'not_found_error'),
+                             (413, 'request_too_large'), (500, 'api_error')):
+            with self.subTest(status=status):
+                reply = self.error(kind, request_id='req_synthetic')
+                self.assertTrue(ANTHROPIC.unbilled_refusal(status, reply))
+                gate = self.ready()
+                with self.refused('PROVIDER_REFUSED_UNBILLED'):
+                    self.call(gate, reply=reply, status=status)
+                entries = list(gate.day(DAY)['entries'].values())
+                self.assertEqual([(e['state'], e['held_usd'], e['http_status']) for e in entries],
+                                 [('released_unbilled', '0', status)])
+                now = gate.status()
+                self.assertEqual((now['state'], now['today_spend_usd'], now['today_unbilled_releases'], now['in_flight']),
+                                 ('active', '0', 1, 0))
+
+    def test_key_billing_and_timeout_errors_and_mismatched_types_still_halt(self):
+        cases = {'401_authentication': (401, self.error('authentication_error')),
+                 '403_permission': (403, self.error('permission_error')),
+                 '402_billing': (402, self.error('billing_error')),
+                 '504_timeout': (504, self.error('timeout_error')),
+                 '400_api_error': (400, self.error('api_error')),
+                 '500_invalid_request': (500, self.error('invalid_request_error')),
+                 '404_with_usage': (404, {**self.error('not_found_error'), 'usage': {'input_tokens': 1, 'output_tokens': 0}}),
+                 '400_with_content': (400, {**self.error('invalid_request_error'), 'content': []})}
+        for name, (status, reply) in cases.items():
+            with self.subTest(name):
+                self.assertFalse(ANTHROPIC.unbilled_refusal(status, reply))
+                gate = self.ready()
+                with self.refused('NEW_CHARGE_UNCERTAIN'):
+                    self.call(gate, reply=reply, status=status)
+                self.assert_uncertain_halt(gate)
+
     def test_five_unbilled_in_a_row_halt_as_unreachable(self):
         gate = self.ready()
         for number in range(1, 6):
@@ -543,9 +603,9 @@ class KeyCustodyTests(AnthropicTest):
         self.assertIn('echo [REDACTED] and [REDACTED]', reply['body'])
         # A halting reply and an unbilled one carry the shapes too.
         with self.refused('NEW_CHARGE_UNCERTAIN'):
-            self.call(gate, 'op-2', reply={'type': 'error', 'error': {'type': 'invalid_request_error',
+            self.call(gate, 'op-2', reply={'type': 'error', 'error': {'type': 'authentication_error',
                                                                        'message': 'bad key ' + KEY + ' ' + OTHER_SHAPE}},
-                      status=400)
+                      status=401)
         bridge.activate(gate.private, gate.go_path, host=HOST, platform='linux', now=gate.clock)
         with self.refused('PROVIDER_REFUSED_UNBILLED'):
             self.call(gate, 'op-3', reply={'type': 'error', 'error': {'type': 'rate_limit_error', 'message': KEY}}, status=429)
@@ -763,11 +823,22 @@ class RemainingAndProbeTests(AnthropicTest):
         self.assertEqual((summary['model_echoed_exactly'], summary['reply_model'], summary['completion_within_max_tokens'],
                           summary['halt_reason'], summary['authority']),
                          (False, 'claude-haiku-5-5-20261001', False, 'provider_error_or_model_identity', 'halted'))
+        # A well-formed 400 (Anthropic refused the request's shape) bills nothing: the probe is refused
+        # PROVIDER_REFUSED_UNBILLED and the day's record keeps the $0 entry with its HTTP status (the
+        # README's probe step says: that means stop and report).
         gate = self.ready()
         rejected = {'type': 'error', 'error': {'type': 'invalid_request_error', 'message': 'output_config:\nunknown field'}}
-        summary = self.probe(gate, lambda _r, _k: (400, rejected))
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            self.probe(gate, lambda _r, _k: (400, rejected))
+        self.assertEqual([(e['state'], e['http_status']) for e in gate.day(DAY)['entries'].values()],
+                         [('released_unbilled', 400)])
+        self.assertEqual(gate.status()['state'], 'active')
+        # An error that is not provably unbilled (a key Anthropic does not accept) halts, with its excerpt.
+        gate = self.ready()
+        denied = {'type': 'error', 'error': {'type': 'authentication_error', 'message': 'invalid x-api-key'}}
+        summary = self.probe(gate, lambda _r, _k: (401, denied))
         self.assertEqual((summary['http_status'], summary['entry_state'], summary['halt_reason'], summary['reply_excerpt']),
-                         (400, 'uncertain', 'uncertain_charge', 'output_config: unknown field'))
+                         (401, 'uncertain', 'uncertain_charge', 'invalid x-api-key'))
         self.assertEqual(gate.status()['state'], 'halted')
 
 

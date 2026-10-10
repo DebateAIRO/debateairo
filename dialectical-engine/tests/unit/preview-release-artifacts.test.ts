@@ -220,7 +220,7 @@ describe('UI build values', () => {
   it('are exactly what the reviewed runtime gate demands from ui.env, from the same constants', () => {
     expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual({ NODE_ENV: 'production', PUBLIC_APP_URL: turnstile.PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_FREE_MODEL_IDS_JSON, TURNSTILE_SITE_KEY: turnstile.PREVIEW_SITE_KEY });
     expect(tool.UI_PUBLIC_BUILD_VALUES).toEqual(tool.uiPublicBuildValues('glm-only'));
-    expect(tool.UI_MODEL_ROSTERS).toEqual(['glm-only', 'multi-model']);
+    expect(tool.UI_MODEL_ROSTERS).toEqual(['glm-only', 'multi-model', 'all-models']);
     for (const models of tool.UI_MODEL_ROSTERS) {
       const values = tool.uiPublicBuildValues(models), built = { builtModelRosterFlag: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] };
       expect(values).toEqual({ ...tool.UI_PUBLIC_BUILD_VALUES, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: environment.PREVIEW_MODEL_ROSTER_FLAGS[models] });
@@ -244,6 +244,8 @@ describe('UI build values', () => {
     expect(report.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON.value).toBe(environment.PREVIEW_MODEL_ROSTER_FLAGS['glm-only']);
     const multi = await run(['build-env', '--models', 'multi-model'], tool.LAYOUT);
     expect(multi.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toEqual({ value: environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model'], sha256: sha(environment.PREVIEW_MODEL_ROSTER_FLAGS['multi-model']) });
+    const all = await run(['build-env', '--models', 'all-models'], tool.LAYOUT);
+    expect(all.values.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON).toEqual({ value: environment.PREVIEW_MODEL_ROSTER_FLAGS['all-models'], sha256: sha(environment.PREVIEW_MODEL_ROSTER_FLAGS['all-models']) });
     await expect(run(['build-env', '--models', 'everything'], tool.LAYOUT)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
   });
 });

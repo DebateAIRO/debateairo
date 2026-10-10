@@ -497,7 +497,7 @@ restart them, and check with `systemctl show -p InaccessiblePaths <unit>` that e
 `/var/lib/debateai-v3-preview/provider-anthropic-authority-v1` and
 `/etc/debateai-v3-preview/provider-anthropic-go-v1.json`. The exact commands are in
 README-anthropic.md, step 3a. The near-term setup is DeepInfra and Anthropic only (Google later);
-the proposed daily split for the owner to confirm is DeepInfra $3.50 and Anthropic $1.50.
+the daily split (owner's ruling, 2026-10-10) is DeepInfra $4.00 and Anthropic $1.00, $5.00 together.
 
 ## Daily operations
 

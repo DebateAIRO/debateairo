@@ -7,8 +7,8 @@
 // produced, runs the reviewed checks before writing, and never overwrites a file.
 //
 //   release-artifacts.mjs source-manifest --repository <clean git clone> --root <release root> --role api|ui|runner --out <file>
-//   release-artifacts.mjs build-env [--models glm-only|multi-model]
-//   release-artifacts.mjs ui-build --source <ui source manifest> [--models glm-only|multi-model] --out <file>
+//   release-artifacts.mjs build-env [--models glm-only|multi-model|all-models]
+//   release-artifacts.mjs ui-build --source <ui source manifest> [--models glm-only|multi-model|all-models] --out <file>
 //       (--models picks the website's public model list; default glm-only, the legacy GLM-only list)
 //   release-artifacts.mjs verify --source <source manifest> [--ui-build <ui build manifest>]
 //   release-artifacts.mjs operator-digest --source <source manifest>

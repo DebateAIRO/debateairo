@@ -604,19 +604,35 @@ class AnthropicProfile:
     def reply_model(self, response):
         return response.get('model')
 
+    # Anthropic's well-formed error answers that bill nothing, by HTTP status: the error types each
+    # status may carry (platform.claude.com, API Errors page, read 2026-10-10). Judge round on PR B:
+    # the same released_unbilled entry and daily ceiling as DeepInfra's 429s. Never here, so they halt:
+    # 401 authentication_error and 403 permission_error (the key is wrong: root must look),
+    # 402 billing_error, 504 timeout_error (the work may have run), and any other status or type.
+    UNBILLED_ERRORS = {
+        400: frozenset({'invalid_request_error'}),
+        404: frozenset({'not_found_error'}),
+        413: frozenset({'request_too_large'}),
+        429: frozenset({'rate_limit_error', 'overloaded_error'}),
+        500: frozenset({'api_error'}),
+        529: frozenset({'rate_limit_error', 'overloaded_error'}),
+    }
+
     def unbilled_refusal(self, status, response):
-        """True only for Anthropic's own "slow down" answers (owner ruling 5, 2026-10-10): HTTP 429
-        or 529, a body of exactly type "error", error (and an optional request_id string), an
-        error type of rate_limit_error or overloaded_error, and no usage, content or model key, no
-        other billed key (BILLED_KEYS) and no tokens_* or *_tokens key at any depth. The core passes the RAW
-        reply (before redaction drops any subtree). Anything else is accounted (and halts) as before."""
-        if status not in (429, 529) or not isinstance(response, dict):
+        """True only for Anthropic's own well-formed error answers that bill nothing (owner ruling 5,
+        2026-10-10, widened by the judge round): a status in UNBILLED_ERRORS, a body of exactly
+        type "error", error (and an optional request_id string), an error type that status may
+        carry, and no usage, content or model key, no other billed key (BILLED_KEYS) and no
+        tokens_* or *_tokens key at any depth. The core passes the RAW reply (before redaction
+        drops any subtree), releases the hold and keeps a $0 'released_unbilled' entry (the daily
+        ceiling and the unsent streak count it). Anything else is accounted (and halts) as before."""
+        if status not in self.UNBILLED_ERRORS or not isinstance(response, dict):
             return False
         if set(response) not in ({'type', 'error'}, {'type', 'error', 'request_id'}):
             return False
         error = response['error']
         return (response['type'] == 'error' and isinstance(error, dict)
-                and error.get('type') in ('rate_limit_error', 'overloaded_error')
+                and error.get('type') in self.UNBILLED_ERRORS[status]
                 and isinstance(response.get('request_id', ''), str)
                 and not names_any_key(response, BILLED_KEYS + ('content', 'model'))
                 and not names_any_key_prefixed(response, 'tokens_')

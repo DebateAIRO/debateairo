@@ -21,8 +21,10 @@ they hide the Anthropic key folder (install step 3a, which comes BEFORE the Anth
   Qwen3.8-Flash on DeepInfra ("Google is too expensive at the moment; we will use it in the
   future"). So the near-term setup is two gates: DeepInfra (GLM, DeepSeek, MiMo, Qwen) and this
   Anthropic gate (Claude Haiku). Google comes later, with its own gate.
-- **Proposed daily split of the $5 team total, for the owner to confirm:** DeepInfra $3.50,
-  Anthropic $1.50. This README proposes the Anthropic GO with `"1.50"`.
+- **Daily split of the $5 team total (owner's ruling, 2026-10-10):** DeepInfra $4.00 (1,000 calls
+  a day, 10 at once), Anthropic $1.00 (400 calls a day, 2 at once). This README's Anthropic GO
+  says `"1.00"`. The DeepInfra gate's `activate` (and this one's) refuses if the GO files add up
+  to more than $5.00.
 - **Ready for Google later, already now:** every gate's unit hides a Google key folder and GO,
   the key command knows `install google` (key shape `AIza...`), and the DeepInfra gate refuses a
   key that starts with `AIza`. None of this needs a Google account today.
@@ -83,12 +85,18 @@ cache reads.
 - **The answer must name exactly `claude-haiku-5-5`.** A dated name (for example
   `claude-haiku-5-5-20261001`) or any other name halts the gate. The probe below shows which name
   Anthropic really uses before anyone relies on it.
-- **"Too many requests" and "overloaded" do not halt** (owner ruling of 2026-10-10). An answer
-  with status 429 (`rate_limit_error`) or 529 (`overloaded_error`), whose body is only Anthropic's
-  error message and carries no usage, no answer content and no model name anywhere, is treated
-  like a call that never reached Anthropic. Nothing is charged, that call alone fails, and the app
-  may try again later. Five such failures in a row halt with `provider_unreachable`. Any other
-  error answer (a 429 with anything else in it, a 500, an `invalid_request_error`) still halts.
+- **Anthropic's own error answers that bill nothing do not halt** (owner ruling of 2026-10-10,
+  widened after review). The answers: 429 or 529 (`rate_limit_error` or `overloaded_error`), 400
+  (`invalid_request_error`), 404 (`not_found_error`), 413 (`request_too_large`) and 500
+  (`api_error`), each with a body that is only Anthropic's error message (no usage, no answer
+  content, no model name anywhere). Such a call is released like DeepInfra's "too many requests":
+  nothing is charged, the day's record keeps it as a $0 `released_unbilled` entry with its HTTP
+  status, that call alone fails, and the app tries once more later. Five in a row halt with
+  `provider_unreachable`; the 20th on one day halts with `unbilled_release_ceiling`.
+- **These still halt:** 401 (`authentication_error`) and 403 (`permission_error`), because the key
+  is wrong or lacks a permission and root must look; 402 (`billing_error`); 504 (`timeout_error`),
+  because the work may already have run; any error type that does not belong to its status; and
+  any error answer with anything else in it.
 - **Start check: the addresses only.** Anthropic has no list of models that can be read without
   a key, so there is no model check at start. The start check never sends the key, or any
   request, to Anthropic. Before every start it checks that every address of `api.anthropic.com`
@@ -104,8 +112,8 @@ cache reads.
 - **2 calls at the same time, not 4.** Before a debate starts, the app sets aside room for the
   calls that may be running at once: calls in flight x the largest one-call hold. With 4 calls
   that alone would be 4 x $0.24704 = $0.98816, all of a $1.00 pot, so no debate using Haiku
-  could start. With 2 it is $0.49408, so a fresh pot ($1.50 proposed) admits Haiku debates with
-  room to spare. A bigger pot allows more calls in flight (each one needs $0.24704 of room).
+  could start. With 2 it is $0.49408, so a fresh $1.00 pot still admits Haiku debates (about half
+  the pot stays free for the debates' own calls). A bigger pot allows more calls in flight (each one needs $0.24704 of room).
 - **The DeepInfra gate keeps its own copy of the code.** This gate's folder gets the new
   `preview_budget_helper.py` (the one that knows Anthropic). The DeepInfra gate's GO binds the
   hash of its own copy, so it keeps running unchanged. Updating the DeepInfra folder to this
@@ -143,8 +151,8 @@ cache reads.
 
 **0. In the Anthropic Console (the OWNER, in a browser).**
 1. Create a separate workspace for the preview only (for example "debateai-preview").
-2. Give that workspace its own monthly spend limit. The gate's pot is proposed at $1.50 a day,
-   so about $50 a month leaves a small margin. This is Anthropic's own fuse, independent of the
+2. Give that workspace its own monthly spend limit. The gate's pot is $1.00 a day, so about $35
+   a month leaves a small margin. This is Anthropic's own fuse, independent of the
    gate.
 3. Create one API key scoped to that workspace only (not the default workspace, and not a key
    for "all workspaces": Anthropic lets an unscoped personal or service-account key use the
@@ -252,20 +260,20 @@ own folder.
 | `scope_id` | `preview-deepinfra-v3-20261010` | The SAME `scope_id` as the app's preview configuration (today the DeepInfra gate's). The app asks every gate with its one `scope_id`; a gate with another one refuses every call and every "how much is left" question. Each gate still keeps its own pot and records, in its own folder. |
 | `target_host` | `vps-a156d797` | The server's host name, as in the DeepInfra GO. The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as for DeepInfra. |
-| `daily_budget_usd` | `"1.50"` | Anthropic's proposed share of the $5 team total (DeepInfra $3.50); the owner confirms. |
+| `daily_budget_usd` | `"1.00"` | Anthropic's share of the $5 team total (DeepInfra $4.00), owner's ruling of 2026-10-10. `activate` refuses if all gates' GO files add up to more than $5.00. |
 | `max_paid_posts_per_day` | `400` | A second fuse. |
 | `max_concurrent_calls` | `2` | See "2 calls at the same time" above. |
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 
 When the gate is opened (`activate`), it checks once more that the calls in flight, each setting
-aside the largest worst case, fit in the pot: 2 x $0.24704 = $0.49408, inside $1.50. (With 4 it
+aside the largest worst case, fit in the pot: 2 x $0.24704 = $0.49408, inside $1.00. (With 4 it
 would be 4 x 0.24704 = 0.98816: it would still pass, but almost no debate could start; see above.)
 
 ```sh
 G=/opt/debateai-v3-preview/operator/anthropic-budget-v1
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"anthropic",enabled_models:["claude-haiku-5-5"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"1.50",max_paid_posts_per_day:400,max_concurrent_calls:2,open_days:31}' > /root/preview-archive/provider-anthropic-go-v1.json
+jq -n --arg b "$BR" --arg h "$HE" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"anthropic",enabled_models:["claude-haiku-5-5"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"1.00",max_paid_posts_per_day:400,max_concurrent_calls:2,open_days:31}' > /root/preview-archive/provider-anthropic-go-v1.json
 install -o root -g root -m 0600 /root/preview-archive/provider-anthropic-go-v1.json /etc/debateai-v3-preview/provider-anthropic-go-v1.json
 jq -c . /etc/debateai-v3-preview/provider-anthropic-go-v1.json
 ```
@@ -280,9 +288,10 @@ P=/var/lib/debateai-v3-preview/provider-anthropic-authority-v1; GO=/etc/debateai
 ```
 
 What to expect: `init` prints `"state": "initialized"` and `"provider": "anthropic"`; `activate`
-prints `"state": "active"`, `"window_open": true` and `"daily_budget_usd": "1.50"`. A refusal is
+prints `"state": "active"`, `"window_open": true` and `"daily_budget_usd": "1.00"`. A refusal is
 one line with `"status": "refused"` and a code, for example `ROOT_GO_INVALID` (a GO field or a
-file hash), `CONCURRENCY_EXCEEDS_BUDGET` or `HELPER_CUSTODY_INVALID`.
+file hash), `CONCURRENCY_EXCEEDS_BUDGET`, `HELPER_CUSTODY_INVALID`, or
+`TEAM_TOTAL_BUDGET_EXCEEDED` (this pot plus the other gates' pots is above $5.00: lower one first).
 
 **7. Install the units and start the gate.** The boot drop-in comes later ("Switch it on").
 
@@ -307,20 +316,36 @@ What to expect:
 - The socket is `666 root:root socket`. Anyone may connect, but the gate answers only uids 994
   and 992.
 
-**8. Probe (one paid call, a small fraction of a cent).** Probe when nobody is using the preview.
-The command runs the probe inside the same network fence as the service:
+**8. Probe (one paid call, a small fraction of a cent). It must pass before Haiku is switched on.**
+Probe when nobody is using the preview. The command runs the probe inside its own fence, the same
+one the DeepInfra probe uses (the DeepInfra README, "The probe is a real paid call"): its own unit
+name (`debateai-preview-probe-anthropic`), the service's network allow-list (only the resolver and
+Anthropic's range), no root powers, and every other gate's folder and GO hidden (DeepInfra's,
+Google's and the retired v1 and v2 gates'). Copy it whole: the probe checks its fence and refuses
+without it (`PROBE_FENCE_REQUIRED`, with `missing` naming what is absent; nothing is read or spent).
 
 ```sh
 P=/var/lib/debateai-v3-preview/provider-anthropic-authority-v1; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json; A=/opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py
-systemd-run --quiet --wait --pipe --collect -p IPAddressDeny=any -p 'IPAddressAllow=127.0.0.53/32 160.79.104.0/23' -p 'RestrictAddressFamilies=AF_UNIX AF_INET' -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json -/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model claude-haiku-5-5
+systemd-run --quiet --wait --pipe --collect --unit=debateai-preview-probe-anthropic -p IPAddressDeny=any -p 'IPAddressAllow=127.0.0.53/32 160.79.104.0/23' -p 'RestrictAddressFamilies=AF_UNIX AF_INET' -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json -/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json -/var/lib/debateai-v3-preview/provider-test-authority -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model claude-haiku-5-5
 ```
 
 It sends "Reply exactly: OK" with an answer limit of 1,024 tokens and the thinking setting
-"high", through the normal set-aside, charge and halt path. How to read the one line it prints:
+"high", through the normal set-aside, charge and halt path.
+
+If it prints `"status": "refused"` instead of a result, the probe did not pass:
+- `PROBE_FENCE_REQUIRED`: the command was not copied whole. Nothing was read or spent.
+- `PROVIDER_REFUSED_UNBILLED`: Anthropic answered with one of its errors that bill nothing (for
+  example 400, a setting it does not accept). The gate stays open; `status` shows today's
+  `released_unbilled` entry with its `http_status`. Do not switch Haiku on: report it to the
+  reviewers (the row or the request shape needs a reviewed code change).
+- `PROVIDER_NOT_REACHED`: the connection failed before anything was sent. Check step 2's
+  addresses, then probe again.
+
+How to read the one line it prints when the call went through:
 
 | Field | Good | If not |
 |---|---|---|
-| `http_status` | `200` | Anthropic refused the request; `reply_excerpt` usually says why. The gate halted. Do not switch the model on: the row needs a reviewed code change. |
+| `http_status` | `200` | Anthropic refused the request (for example 401: the key is not accepted); `reply_excerpt` usually says why. The gate halted. Do not switch the model on. |
 | `model_echoed_exactly` | `true` | The answer named another model (`reply_model` shows which, for example a dated name). The gate halted. Do not switch it on; the row needs a reviewed change. |
 | `usage.usage_valid` | `true` | Anthropic's usage had a field or value this gate does not know. The gate halted. Tell the reviewers what `reply_model` and the journal show. |
 | `completion_within_max_tokens` | `true` | Anthropic billed more answer than the limit allowed. In real use a call could cost more than it set aside. Do not switch it on. |
@@ -330,7 +355,8 @@ It sends "Reply exactly: OK" with an answer limit of 1,024 tokens and the thinki
 
 ## Switch it on
 
-**Only after the step-8 probe has passed**: every field in the table above shows its "Good" value.
+**Only after the step-8 probe has passed**: it printed a result (not a refusal) and every field in
+the table above shows its "Good" value. Until then, Haiku stays out of the app's model lists.
 If the probe halts because Anthropic's answer carries a usage field the gate does not know
 (`usage.usage_valid` is `false`): stop. Report the probe's line and the journal lines to the
 reviewers, and change nothing on the server (no edit of the code, the GO or the units). The fix
@@ -353,13 +379,27 @@ build flag, the register); in short:
 - In the preview configuration of the API and the runner, add the key `anthropic_budget_socket`
   with the value `/run/debateai-v3-preview/anthropic-budget-v1.sock`. The app's `scope_id` stays as
   it is; this gate's GO carries that same value.
-- Add `claude-haiku-5-5` to the model rosters (free and/or premium). Each roster must keep at
-  least two makers.
-- Showing Haiku on the website's new-debate form is a later, reviewed change: this release keeps
-  the website's model lists without Haiku (its build flag values are reviewed in the code).
-- Publish a new sealed register version that names the model. A sealed version is never edited:
-  a new version supersedes it.
+- Add `claude-haiku-5-5` to the model rosters. Each roster must keep at least two makers.
+- Publish a new sealed register version that names the model (`preview:claude-haiku-5-5`), and
+  give the API and runner its address in the same restart. A sealed version is never edited: a
+  new version supersedes it.
 - Restart the API and the runner.
+
+**The owner's first debate uses all five AIs** (owner's ruling, 2026-10-10). That needs, first:
+the DeepInfra gate's GO switches on all four DeepInfra models, each probed (DeepInfra README,
+"Switching on DeepSeek, MiMo and Qwen"); this gate's step-8 probe passed; and the register
+version above. Then the proposed configuration is free = premium = all five, in this order:
+
+- The API's and runner's `PREVIEW_PROVIDER_TEST_CONFIG_JSON` (one line):
+  `{"deployment":"v3-preview","requested_thinking_level":"high","budget_socket":"/run/debateai-v3-preview/deepinfra-budget-v3.sock","anthropic_budget_socket":"/run/debateai-v3-preview/anthropic-budget-v1.sock","scope_id":"preview-deepinfra-v3-20261010","free_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"],"premium_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"]}`
+- The website: build it with `--models all-models`, and set `ui.env` to the same list:
+  `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON={"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"]}`
+  (the reviewed value `all-models`; the website refuses to start when `ui.env` and its build
+  disagree, and the comparison in the DeepInfra README's switch-on section must print `match`).
+
+Five makers (Z.AI, DeepSeek, Xiaomi, Alibaba, Anthropic) in each list, so the two-maker rule holds.
+A debate's calls go to two gates: each gate is asked how much is left of its own pot before the
+debate starts.
 
 Before a debate that uses Haiku starts, the app asks this gate how much is left today
 (`/remaining`) and refuses the debate if the pot cannot carry it, instead of stopping half way.

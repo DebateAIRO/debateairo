@@ -33,6 +33,7 @@ const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
 const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
 const HAIKU = "claude-haiku-5-5";
+const QWEN = "Qwen/Qwen3.8-Flash";
 const HAIKU_REF = "preview:claude-haiku-5-5";
 const DEEPINFRA_URL = "https://api.deepinfra.com/v1/openai/chat/completions";
 const BASE = { deployment: "v3-preview", requested_thinking_level: "high",
@@ -92,7 +93,11 @@ describe("the Anthropic row equals its parity file and keeps the per-call cap", 
     expect(4n * worst <= 1_000_000_000n).toBe(true);
   });
   it("the UI's maker table mirrors every reviewed row", () => {
-    expect(PREVIEW_MODEL_MAKERS).toEqual(Object.fromEntries(PREVIEW_MODEL_ROWS.map(row => [row.model, row.maker])));
+    // The UI table already names Qwen3.8-Flash (Alibaba) so the all-models build flag parses; its
+    // TypeScript row arrives with A's next push. Until then, and only then, Qwen is the one extra
+    // entry allowed. Remove this allowance when A's Qwen row merges (it is inert from that moment).
+    const pending = previewModelRow(QWEN) === undefined ? { [QWEN]: "Alibaba" } : {};
+    expect(PREVIEW_MODEL_MAKERS).toEqual({ ...Object.fromEntries(PREVIEW_MODEL_ROWS.map(row => [row.model, row.maker])), ...pending });
   });
 });
 
@@ -133,6 +138,30 @@ describe("configuration names the Anthropic gate's socket", () => {
     expect(parsePreviewRosterFlag(JSON.stringify({ free: [GLM, HAIKU], premium: [GLM, DEEPSEEK, HAIKU] })))
       .toEqual({ free: [GLM, HAIKU], premium: [GLM, DEEPSEEK, HAIKU] });
     expect(parsePreviewRosterFlag(JSON.stringify({ free: [HAIKU], premium: [GLM, HAIKU] }))).toBeUndefined();
+  });
+});
+
+describe("the owner's first debate: every AI on Free and on Premium", () => {
+  const FOUR = [GLM, DEEPSEEK, MIMO, HAIKU];
+  const ALL_FIVE = [GLM, DEEPSEEK, MIMO, QWEN, HAIKU];
+  const everyone = (ids: readonly string[], socket: Record<string, string> = { anthropic_budget_socket: ANTHROPIC_SOCKET }) =>
+    ({ ...BASE, ...socket, free_model_ids: ids, premium_model_ids: ids });
+  it("the four rows this branch has, free = premium, parse with the Anthropic socket", () => {
+    const config = parse(everyone(FOUR))!;
+    expect([config.free_model_ids, config.premium_model_ids]).toEqual([FOUR, FOUR]);
+    expect(previewProviderSocket(config, "anthropic")).toBe(ANTHROPIC_SOCKET);
+    expect(previewProviderSocket(config, "deepinfra")).toBe(BASE.budget_socket);
+  });
+  it("the four rows refuse without the Anthropic socket (Haiku could never be called)", () => {
+    expect(() => parse(everyone(FOUR, {}))).toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+  });
+  // Qwen3.8-Flash's TypeScript row arrives with A's next push (contract A §1); until it exists this
+  // test is skipped. Remove the guard once A's Qwen row merges.
+  it.skipIf(previewModelRow(QWEN) === undefined)("all five, free = premium, parse with both sockets and refuse without Anthropic's", () => {
+    const config = parse(everyone(ALL_FIVE))!;
+    expect([config.free_model_ids, config.premium_model_ids]).toEqual([ALL_FIVE, ALL_FIVE]);
+    expect(previewProviderSocket(config, "anthropic")).toBe(ANTHROPIC_SOCKET);
+    expect(() => parse(everyone(ALL_FIVE, {}))).toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
   });
 });
 

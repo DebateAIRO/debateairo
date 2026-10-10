@@ -55,17 +55,17 @@ describe('production preview spending guard optional JSON mode', () => {
     expect(result.stderr).toContain('Ran 14 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
-  it('runs the Anthropic profile: parity, both price steps, usage shapes, unbilled 429/529 and probe offline', () => {
+  it('runs the Anthropic profile: parity, both price steps, usage shapes, unbilled errors and probe offline', () => {
     const result = runPython('tests/unit/preview_budget_authority_anthropic_test.py', 30000);
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
-    expect(result.stderr).toContain('Ran 30 tests');
+    expect(result.stderr).toContain('Ran 34 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the Anthropic gate systemd files and its address check offline', () => {
     const result = runPython('tests/unit/preview_gate_v3_anthropic_unit_test.py', 10000);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 15 tests');
+    expect(result.stderr).toContain('Ran 19 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the guided key command shared by all provider gates offline (fake terminal, no real key)', () => {
