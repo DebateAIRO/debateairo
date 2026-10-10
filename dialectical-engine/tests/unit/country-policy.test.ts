@@ -21,9 +21,9 @@ const GROUPS = [
   { codes: [...EU27, "NO", "IS"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
   { codes: ["US", "CA", "AU", "NZ", "SG", "JP"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
   { codes: ["LI"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
-  { codes: ["KR", "CH", "IL", "TW", "MD"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
+  { codes: ["KR", "CH", "TW", "MD"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
   { codes: ["GB", "UA"], rule: { signup: false, pay: false, reason: "NOT_OFFERED", blocked: false } },
-  { codes: ["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH"], rule: { signup: false, pay: false, reason: "TERMS_EXCLUDED", blocked: false } },
+  { codes: ["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH", "IL"], rule: { signup: false, pay: false, reason: "TERMS_EXCLUDED", blocked: false } },
   { codes: ["RU", "BY", "KP"], rule: { signup: false, pay: false, reason: "SANCTIONS", blocked: true } },
   { codes: ["CN", "HK", "MO", "IR", "CU", "SY", "VE", "VN"], rule: { signup: false, pay: false, reason: "PROVIDER_UNSUPPORTED", blocked: true } }
 ] as const;
@@ -140,8 +140,9 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
     // Owner's amendment of 2 October 2026: the UK ships after launch, not yet — not offered, not blocked.
     expect(countryRule(policy, "GB")).toEqual({ signup: false, pay: false, reason: "NOT_OFFERED", blocked: false });
     // Owner's amendment of 1 October 2026: the nine countries the Terms do not list are closed as
-    // Terms-excluded, not blocked; South Korea, which the Terms list, stays open.
-    for (const country of ["SA", "IN", "PH"]) {
+    // Terms-excluded, not blocked; South Korea, which the Terms list, stays open. Since the owner's
+    // amendment of 9 October 2026, Israel is closed the same way.
+    for (const country of ["SA", "IN", "PH", "IL"]) {
       expect(decideSignup(policy, { ipCountry: country, tor: false }), country)
         .toEqual({ kind: "REFUSE", code: "COUNTRY_SIGNUP_UNAVAILABLE" });
       expect(countryRule(policy, country), country)
@@ -149,9 +150,9 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
       expect(decideAsk(policy, { ipCountry: country }), country).toEqual({ kind: "ALLOW" });
     }
     expect(decideSignup(policy, { ipCountry: "KR", tor: false })).toEqual({ kind: "ALLOW" });
-    // Owner's amendment of 1 October 2026: Switzerland, Israel, Taiwan and Moldova open for sign-up;
+    // Owner's amendment of 1 October 2026: Switzerland, Taiwan and Moldova open for sign-up;
     // payment stays off until each country's tax registration is checked.
-    for (const country of ["CH", "IL", "TW", "MD"]) {
+    for (const country of ["CH", "TW", "MD"]) {
       expect(decideSignup(policy, { ipCountry: country, tor: false }), country).toEqual({ kind: "ALLOW" });
       expect(countryRule(policy, country), country)
         .toEqual({ signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false });

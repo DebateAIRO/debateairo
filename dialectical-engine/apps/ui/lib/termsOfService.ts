@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Where we offer DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "We offer DebateAI to people who live in [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
+      { kind: "p", text: "We offer DebateAI to people who live in the European Union (27 countries) and the European Economic Area (Norway, Iceland and Liechtenstein), Switzerland, Moldova, the United States (except Tennessee), Canada, Australia, New Zealand, Singapore, Japan, South Korea and Taiwan. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Accepting these Terms",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "You accept these Terms by ticking the box marked \"I have read and agree to the Terms of Service\" and clicking Create account. That creates a contract between you and DebateAIRO S.R.L. The Terms include the acceptable-use rules in section 7, the publication rules in section 9, the liability provisions in section 15, the governing-law and dispute provisions in section 18 and, if you live in the United States, the arbitration agreement in Annex A.3. We keep a record of the version you accepted and when, as our Privacy Policy explains." },
+      { kind: "p", text: "You accept these Terms by ticking the box marked \"I have read and agree to the Terms of Service\" and clicking Create account. That creates a contract between you and DebateAIRO S.R.L. The Terms include the acceptable-use rules in section 7, the publication rules in section 9, the liability provisions in section 15, the governing-law and dispute provisions in section 18 and, if you live in the United States, the arbitration agreement in Annex A.2. We keep a record of the version you accepted and when, as our Privacy Policy explains." },
       { kind: "p", text: "Our Privacy Policy at [dezbatere.ro/privacy] explains how we handle personal data. It is information we owe you, not a contract you agree to, and nothing in these Terms turns it into consent for processing. Our Cookie Policy at [dezbatere.ro/cookies] and our AI Provider Register at [dezbatere.ro/providers] are part of these Terms by reference." },
       { kind: "p", text: "Before you conclude any contract with us electronically, the interface shows you the steps involved, lets you review and correct what you have entered before you submit it, and tells you the languages in which the contract can be concluded. These Terms are available in a form you can save and print; when you buy a paid plan, we email you the version you accepted; and you can request a copy at any time. Nothing in these Terms limits rights you have under Romanian or EU consumer law, or the law of the country where you live, that cannot be limited by contract." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Your right of withdrawal",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "If you live in the EU, the EEA or the UK, you may withdraw from a paid subscription within 14 days of subscribing, without giving a reason. Use the Withdraw from contract page at [dezbatere.ro/withdraw], the model form in the confirmation email, or write to [support@dezbatere.ro]; we confirm receipt on a durable medium." },
+      { kind: "p", text: "If you live in the EU or the EEA, you may withdraw from a paid subscription within 14 days of subscribing, without giving a reason. Use the Withdraw from contract page at [dezbatere.ro/withdraw], the model form in the confirmation email, or write to [support@dezbatere.ro]; we confirm receipt on a durable medium." },
       { kind: "p", text: "If you asked us to start the service immediately — by ticking the box at checkout — and then withdraw, you pay for the part of the service provided up to the day you withdraw, calculated pro rata on the price for the billing period, and we refund the rest. You do not lose the right of withdrawal by using the service during the 14 days." },
       { kind: "p", text: "If you live elsewhere, Annex A states the withdrawal or cooling-off right that applies in your region, if any, and our refund policy otherwise. Statutory rights in your country always come first." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Governing law. These Terms, and any dispute or claim arising out of them or their subject matter, including non-contractual claims, are governed by the laws of Romania." },
-      { kind: "p", text: "Your local protections are not affected. If you are a consumer, choosing Romanian law does not take away the protection of any mandatory consumer-protection rules of the country where you habitually reside — for example rules on unfair terms, withdrawal and cancellation rights, or guarantees — where those rules apply regardless of this choice, including under Article 6(2) of Regulation (EC) No 593/2008 if you live in the EU, or the equivalent rules of the United Kingdom. You may rely on those rules in addition to Romanian law." },
-      { kind: "p", text: "Courts, if you live in the EU, EEA or UK. You may bring proceedings against us either in the courts of Romania or in the courts of the country where you live. We may bring proceedings against you only in the courts of the country where you live." },
-      { kind: "p", text: "Consumers elsewhere. If you live outside the EU, EEA and UK, nothing in these Terms limits any right you have under the law of your country to bring a claim in its courts, or any right under that law that cannot be waived — including, if you live in Australia or New Zealand, your consumer-guarantee rights; if you live in Brazil, the Código de Defesa do Consumidor; and if you live in the United States, the consumer-protection laws of your state." },
-      { kind: "p", text: "Residents of the United States. Annex A.3 contains an arbitration agreement and class-action waiver governed by the Federal Arbitration Act. It applies only to residents of the United States and only where enforceable. It does not apply to consumers in the EU, EEA or UK." },
+      { kind: "p", text: "Your local protections are not affected. If you are a consumer, choosing Romanian law does not take away the protection of any mandatory consumer-protection rules of the country where you habitually reside — for example rules on unfair terms, withdrawal and cancellation rights, or guarantees — where those rules apply regardless of this choice, including under Article 6(2) of Regulation (EC) No 593/2008 if you live in the EU. You may rely on those rules in addition to Romanian law." },
+      { kind: "p", text: "Courts, if you live in the EU or the EEA. You may bring proceedings against us either in the courts of Romania or in the courts of the country where you live. We may bring proceedings against you only in the courts of the country where you live." },
+      { kind: "p", text: "Consumers elsewhere. If you live outside the EU and the EEA, nothing in these Terms limits any right you have under the law of your country to bring a claim in its courts, or any right under that law that cannot be waived — including, if you live in Australia or New Zealand, your consumer-guarantee rights; if you live in Brazil, the Código de Defesa do Consumidor; and if you live in the United States, the consumer-protection laws of your state." },
+      { kind: "p", text: "Residents of the United States. Annex A.2 contains an arbitration agreement and class-action waiver governed by the Federal Arbitration Act. It applies only to residents of the United States and only where enforceable. It does not apply to consumers in the EU or the EEA." },
       { kind: "p", text: "Before going to court. Contact us at [legal@dezbatere.ro]; most things are fixable, and we aim to reply within [5] working days. If you are a consumer in Romania or the EU, you may use alternative dispute resolution through [the ANPC – named SAL entity, website]; we [do / do not] commit to participate in that procedure. Complaints about moderation decisions follow section 10, which is a separate route." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Annex A — Regional terms",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Each entry applies only if its region is listed in section 2, and only states what differs from the body. Where an entry and the body conflict, the entry applies to people in that region." }
+      { kind: "p", text: "Each entry applies to people who live in its region and only states what differs from the body. Where an entry and the body conflict, the entry applies to people in that region." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "United Kingdom (only if listed in section 2)",
+    title: "United States",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Our UK representative under Article 27 UK GDPR is [name, address, email]. The Consumer Rights Act 2015 applies to you and nothing in these Terms limits your rights under it; when the subscription rules of the Digital Markets, Competition and Consumers Act 2024 come into force (expected in 2027), they apply to paid plans, including a cooling-off period after renewals and after free trials. How we protect users from illegal content: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proactive technology we use: [describe, or \"none\"]. Age assurance: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. The complaints procedure in section 10 accepts complaints about illegal content, wrongful removal of your content, restrictions on your account, the use of automated tools affecting your content, and any age assessment that wrongly blocks you. It is open to people affected by content who are not users. Our Privacy Policy, Annex B.2, covers your data." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "United States (only if listed in section 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. We do not offer DebateAI to people who live in Tennessee." },
       { kind: "p", text: "Arbitration agreement and class-action waiver. If you live in the United States, you and DebateAIRO agree to resolve any dispute arising out of these Terms or the service by binding individual arbitration administered by [the American Arbitration Association / JAMS] under its consumer rules, rather than in court, except that either of us may bring an individual claim in small-claims court. You may opt out by emailing [address] within 30 days of first accepting these Terms. This agreement is governed by the Federal Arbitration Act. We pay the arbitration filing fees. Class, collective and representative actions are waived to the extent the law allows. This section applies prospectively only and does not apply to claims that arose before you accepted it." },
       { kind: "p", text: "Notices and takedowns. Non-consensual intimate imagery may be reported at [URL] without an account and is removed within 48 hours of a valid request. Copyright complaints go to our designated agent named in section 16." },
-      { kind: "p", text: "State-specific. California: the automatic-renewal terms in section 12 apply; you may cancel online at any time; we retain your consent to renewal terms for at least three years. New York: you may cancel within 14 days of any charge at an increased price and receive a pro-rata refund. Texas and Nebraska: we do not sell sensitive personal data. Washington: our Consumer Health Data Privacy Notice at [URL] applies to health-related information. Colorado: nothing in the service makes consequential decisions about you. Our Privacy Policy, Annex B.3, covers your data and your state privacy rights." }
+      { kind: "p", text: "State-specific. California: the automatic-renewal terms in section 12 apply; you may cancel online at any time; we retain your consent to renewal terms for at least three years. New York: you may cancel within 14 days of any charge at an increased price and receive a pro-rata refund. Texas and Nebraska: we do not sell sensitive personal data. Washington: our Consumer Health Data Privacy Notice at [URL] applies to health-related information. Colorado: nothing in the service makes consequential decisions about you. Our Privacy Policy, Annex B.2, covers your data and your state privacy rights." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Canada and Quebec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is [name], privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. Quebec: these Terms are available in French; choose French with the language switcher; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you; no arbitration agreement or class-action waiver applies to you." }
     ]
   },
   {
     no: "A.4",
-    title: "Canada and Quebec (only if listed)",
+    title: "Australia and New Zealand",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is [name], privacy@dezbatere.ro. Our Privacy Policy, Annex B.4, covers your data. Quebec: these Terms are available in French; choose French with the language switcher; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you; no arbitration agreement or class-action waiver applies to you." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Australia and New Zealand (only if listed)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Our services come with guarantees that cannot be excluded under the Australian Consumer Law. For major failures with the service you are entitled to cancel and to a refund for the unused portion, or to compensation for its reduced value; you are also entitled to compensation for any other reasonably foreseeable loss or damage. If the failure does not amount to a major failure, you are entitled to have problems with the service rectified in a reasonable time and, if this is not done, to cancel and obtain a refund. To the extent section 64A permits, our liability for breach of a guarantee is limited to supplying the service again or paying the cost of doing so. No cooling-off right applies to the paid plan beyond what section 12 gives you; our refund policy is […]. New Zealand: the Consumer Guarantees Act 1993 applies and nothing in these Terms excludes it; harmful digital communications may be reported to us under section 10 or to Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "Switzerland",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "The Swiss Federal Act on Data Protection applies to your data (Privacy Policy, Annex B.5). You may bring proceedings in the courts of the place in Switzerland where you live. No statutory withdrawal right applies to the paid plan; our refund policy is […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Switzerland (only if listed)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "The Swiss Federal Act on Data Protection applies to your data (Privacy Policy, Annex B.6). You may bring proceedings in the courts of the place in Switzerland where you live. No statutory withdrawal right applies to the paid plan; our refund policy is […]." }
+      { kind: "p", text: "You have the same rights under these Terms as a consumer in the European Union, including the 14-day withdrawal right in section 13. You may bring proceedings in the courts of Moldova. Moldova's Law No. 195/2024 on personal data protection applies to your data (Privacy Policy, Annex B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (only if listed)",
+    title: "Asia-Pacific",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "You have the same rights under these Terms as a consumer in the European Union, including the 14-day withdrawal right in section 13. You may bring proceedings in the courts of Moldova. Moldova's Law No. 195/2024 on personal data protection applies to your data (Privacy Policy, Annex B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukraine (only if listed)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "We offer DebateAI in Ukraine except in the areas not controlled by the Ukrainian government. The product and these Terms are available in Ukrainian. The Law of Ukraine \"On Personal Data Protection\" applies to your data (Privacy Policy, Annex B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israel (only if listed)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "You may cancel a paid plan as the Consumer Protection Law, 5741-1981, allows [state the cancellation terms]. These Terms and our Privacy Policy are available in Hebrew. Israel's Protection of Privacy Law applies to your data (Privacy Policy, Annex B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Asia-Pacific (only the lines for regions listed)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapore: our Data Protection Officer is [name, email]; transfers rest on contractual protections comparable to the PDPA; no statutory cooling-off applies to the paid plan and our refund policy is […]. Japan: the statutory disclosure under the Specified Commercial Transactions Act is at [URL]; no general cooling-off applies to online subscriptions, and our refund policy is […]; we send your content to AI providers in the United States and the European Union, each under a contract that requires protection equivalent to Japan's Act on the Protection of Personal Information, and on request we tell you what those measures are. South Korea: consents to optional processing and marketing are collected separately from the items needed to run the service; our privacy officer is [name], privacy@dezbatere.ro; you may withdraw from a paid plan within 7 days of subscribing subject to the E-Commerce Act; we obtain your fresh consent before any recurring price increase or free-to-paid conversion; the service uses generative AI, we tell you so before you use it, and we label AI-generated output. Taiwan: you may withdraw from a paid plan within 7 days of subscribing, under the Consumer Protection Act; Taiwan's Personal Data Protection Act applies to your data (Privacy Policy, Annex B.10). Thailand: our representative in Thailand is [name] [if appointed]. Philippines: our business identification and redress mechanism under the Internet Transactions Act are at [URL]; complaints may be lodged with the National Privacy Commission." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Reserved",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Turkey, Brazil and Indonesia each require a local-language annex, a representative or registration, and filings. They are not drafted here and are outside section 2 until entered deliberately. China, Vietnam and Russia are not offered." }
+      { kind: "p", text: "Singapore: our Data Protection Officer is [name, email]; transfers rest on contractual protections comparable to the PDPA; no statutory cooling-off applies to the paid plan and our refund policy is […]. Japan: the statutory disclosure under the Specified Commercial Transactions Act is at [URL]; no general cooling-off applies to online subscriptions, and our refund policy is […]; we send your content to AI providers in the United States and the European Union, each under a contract that requires protection equivalent to Japan's Act on the Protection of Personal Information, and on request we tell you what those measures are. South Korea: consents to optional processing and marketing are collected separately from the items needed to run the service; our privacy officer is [name], privacy@dezbatere.ro; you may withdraw from a paid plan within 7 days of subscribing subject to the E-Commerce Act; we obtain your fresh consent before any recurring price increase or free-to-paid conversion; the service uses generative AI, we tell you so before you use it, and we label AI-generated output. Taiwan: you may withdraw from a paid plan within 7 days of subscribing, under the Consumer Protection Act; Taiwan's Personal Data Protection Act applies to your data (Privacy Policy, Annex B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "34bab40dea5ccdcaba5dc167106e8b6d9bdc08c676f82a2c84e68fd9809c8b0c",
-  eyebrow: "TERMS OF SERVICE · v2.1 · EFFECTIVE [DATE]",
+  version: "2.2",
+  sha256: "f558faaeeb3061c1e2e601ea5d422a91be3dabc947cd5e1471666d0e7186b945",
+  eyebrow: "TERMS OF SERVICE · v2.2 · EFFECTIVE [DATE]",
   title: "What you agree to",
   lede: "The contract between you and DebateAIRO S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",
-  endMarker: "END OF TERMS · v2.1",
+  endMarker: "END OF TERMS · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Terms of Service text",
   sectionIdPrefix: "terms-section-",

@@ -1,4 +1,4 @@
-import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, type PreviewProviderTestConfig } from "@debateai/providers";
+import { validatePreviewProviderTestConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import type { PasswordResetApplication } from "./password-reset.js";
@@ -5023,20 +5023,7 @@ export class PostgresAskApplication implements AskApplication {
     if (teamUserIds.length === 0) return PREVIEW_TEAM_UNSET;
     if (runIds.length === 0) return new Set();
     const result = await this.pool.query<{ run_id: string }>(
-      `SELECT run.run_id::text AS run_id
-       FROM core.run AS run
-       LEFT JOIN LATERAL (
-         SELECT event.owner_ref
-         FROM core.run_ownership_event AS event
-         WHERE event.run_id = run.run_id
-         ORDER BY event.at_seq DESC
-         LIMIT 1
-       ) AS latest ON true
-       JOIN identity."user" AS account
-         ON account.user_id = ANY($2::uuid[])
-        AND (account.owner_ref = latest.owner_ref
-          OR (latest.owner_ref IS NULL AND run.asker_id = 'owner:' || account.owner_ref::text))
-       WHERE run.run_id = ANY($1::uuid[])`,
+      PREVIEW_TEAM_RUNS_SQL,
       [[...runIds], [...teamUserIds]]
     );
     return new Set(result.rows.map((row) => row.run_id));

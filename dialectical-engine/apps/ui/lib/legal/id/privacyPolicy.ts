@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Lampiran B — Ketentuan privasi regional",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Setiap entri hanya berlaku jika wilayahnya tercantum dalam bagian 2 Ketentuan, dan hanya menyatakan hal yang berbeda dari isi utama kebijakan ini." }
+      { kind: "p", text: "Setiap entri berlaku bagi orang yang tinggal di wilayahnya, dan hanya menyatakan hal yang berbeda dari isi utama kebijakan ini." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Britania Raya (hanya jika tercantum)",
+    title: "Amerika Serikat",
     accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Perwakilan kami di UK berdasarkan Pasal 27 UK GDPR adalah [name, address, email]; Anda dapat menghubungi mereka tentang apa pun dalam kebijakan ini. Otoritas pengawasnya adalah Kantor Komisioner Informasi, ico.org.uk. Untuk mengadu kepada kami, tulislah ke privacy@dezbatere.ro; kami mengonfirmasi penerimaan pengaduan Anda dalam 30 hari. Transfer data Anda dari UK kepada penyedia AI di Amerika Serikat didasarkan pada UK Extension to the EU–US Data Privacy Framework jika penyedia tersebut tersertifikasi, dan jika tidak, pada UK International Data Transfer Addendum atas klausul kontrak standar UE, dengan dukungan penilaian risiko transfer; Daftar menyebutkan instrumen yang digunakan untuk setiap penyedia. Kami melaporkan pelanggaran data pribadi kepada ICO dalam 72 jam jika diwajibkan oleh hukum, dan memberi tahu Anda tanpa penundaan yang tidak semestinya jika pelanggaran tersebut menimbulkan risiko tinggi bagi Anda. Kuki analitik, jika suatu saat kami memasangnya, akan tunduk pada opt-out dan bukan persetujuan di UK; saat ini kami tidak memasangnya. Jika Anda berusia di bawah 18 tahun dan mengakses layanan terlepas dari aturan usia kami, standar Kode Anak ICO berlaku atas cara kami memperlakukan data Anda." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Amerika Serikat (hanya jika tercantum)",
-    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Pemberitahuan saat pengumpulan. Tabel dalam bagian 2 mencantumkan kategori informasi pribadi yang kami kumpulkan dan sumbernya; tujuan pemrosesan dijelaskan dalam bagian 4 dan masa penyimpanannya dalam bagian 7. Kami hanya mengumpulkan kategori informasi pribadi sensitif berikut jika Anda menyertakannya dalam pertanyaan Anda sendiri tentang diri Anda: kesehatan, keyakinan agama atau filosofis, kehidupan seks atau orientasi seksual, pandangan politik, keanggotaan serikat pekerja, serta asal ras atau etnis. Kami hanya menggunakannya untuk menjalankan debat Anda, dan hanya setelah persetujuan terpisah dalam bagian 3. Kami tidak menjual atau membagikan informasi pribadi, dan tidak pernah melakukannya dalam dua belas bulan sebelumnya. Kami tidak menggunakan informasi pribadi untuk iklan bertarget, dan kami tidak menggunakan informasi pribadi sensitif untuk tujuan apa pun selain menyediakan layanan yang Anda minta. Sinyal preferensi opt-out: Karena saat ini kami tidak menjual atau membagikan informasi pribadi maupun menggunakannya untuk iklan bertarget, tidak ada pilihan keluar yang perlu dilakukan. Jika kelak kami mulai menjual atau membagikannya, kami akan menghormati sinyal Global Privacy Control sebagai permintaan untuk keluar. Hak Anda: mengetahui, menghapus, memperbaiki, melakukan opt-out, membatasi penggunaan informasi pribadi sensitif, dan tidak didiskriminasi karena menggunakannya; ajukan permintaan di privacy@dezbatere.ro. Insentif keuangan: kami tidak menawarkannya; tujuan dan perlindungan kami sama pada paket gratis dan berbayar. Retensi terdapat dalam bagian 7. Pelanggaran: kami memberi tahu penduduk dan otoritas negara bagian sebagaimana diwajibkan oleh undang-undang pelanggaran data di setiap negara bagian. Pemberitahuan ini diperbarui setidaknya setiap dua belas bulan; terakhir diperbarui [date]." },
       { kind: "p", text: "Connecticut: kami memproses data sensitif hanya dengan persetujuan opt-in Anda, yang diberikan pada layar terpisah sebelum debat pertama Anda (bagian 3); kami tidak menggunakan data pribadi Anda untuk melatih model AI. Washington: Pemberitahuan Privasi Data Kesehatan Konsumen kami di [URL] merupakan dokumen terpisah yang berlaku atas informasi terkait kesehatan, termasuk inferensi. Texas dan Nebraska: kami tidak menjual data pribadi sensitif. Colorado, Connecticut, Virginia, dan negara bagian lain dengan undang-undang privasi komprehensif: hak di atas berlaku bagi Anda jika hukum berlaku bagi kami. Jika kami menolak suatu permintaan, Anda dapat mengajukan banding dengan membalas jawaban kami di privacy@dezbatere.ro; jika kami menolak banding tersebut, Anda dapat menghubungi Jaksa Agung negara bagian Anda." }
     ]
   },
   {
-    no: "B.4",
-    title: "Kanada dan Quebec (hanya jika tercantum)",
-    accent: "--gold",
+    no: "B.3",
+    title: "Kanada dan Quebec",
+    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Petugas privasi kami, dan di Quebec orang yang bertanggung jawab atas perlindungan informasi pribadi, adalah [name], privacy@dezbatere.ro. Kami menjawab permintaan dalam 30 hari. Kami tetap bertanggung jawab atas informasi pribadi yang kami transfer kepada penyedia AI di luar Kanada, dan menggunakan kontrak untuk mewajibkan perlindungan yang sebanding; penyedia tersebut mungkin tunduk pada hukum negara tempat mereka beroperasi, termasuk akses yang sah oleh otoritas. Email pemasaran hanya dikirim dengan persetujuan tegas Anda berdasarkan CASL. Kami melaporkan pelanggaran pengamanan yang menimbulkan risiko nyata kerugian signifikan bagi Anda kepada Kantor Komisioner Privasi Kanada dan kepada Anda, dan kami menyimpan catatan setiap pelanggaran selama 24 bulan. Quebec: sebelum menyampaikan informasi pribadi ke luar Quebec, kami melakukan penilaian dampak privasi; kami melaporkan insiden kerahasiaan yang menimbulkan risiko kerugian serius kepada Commission d'accès à l'information dan kepada Anda, serta menyimpan catatan insiden; pengaturan yang menjaga debat Anda tetap privat diaktifkan secara default; Anda dapat meminta kami menghapus indeks atau berhenti menyebarkan informasi pribadi tentang Anda; Anda dapat meminta data dalam format terstruktur yang umum digunakan; bagian 8 menjelaskan pemrosesan otomatis kami." }
     ]
   },
   {
-    no: "B.5",
-    title: "Australia dan Selandia Baru (hanya jika tercantum)",
-    accent: "--reasoning",
+    no: "B.4",
+    title: "Australia dan Selandia Baru",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Australia. Penerima di luar negeri atas informasi pribadi Anda adalah penyedia AI dan pemroses yang tercantum dalam Daftar, yang berlokasi di [the United States and the European Union]; kami mengambil langkah wajar untuk memastikan mereka menanganinya sesuai dengan Prinsip Privasi Australia. Keputusan otomatis: mulai 10 Desember 2026, kebijakan ini mengidentifikasi jenis keputusan yang dibuat program komputer yang secara signifikan memengaruhi hak atau kepentingan Anda — tidak ada keputusan semacam itu; skor dan putusan menyangkut argumen, bukan Anda — dan informasi pribadi yang digunakan di dalamnya. Pengaduan dapat diajukan kepada Kantor Komisioner Informasi Australia. Selandia Baru. Petugas privasi kami adalah [name]. Jika kami mengumpulkan informasi pribadi tentang Anda secara tidak langsung — karena pengguna lain menyertakannya dalam pertanyaan — kebijakan ini dan bagian 11 merupakan pemberitahuan yang kami berikan. Kami mengungkapkannya kepada penyedia AI dalam Daftar sebagai agen kami, berdasarkan kontrak yang mewajibkan perlindungan sebanding. Pengaduan dapat diajukan kepada Kantor Komisioner Privasi." }
     ]
   },
   {
-    no: "B.6",
-    title: "Swiss (hanya jika tercantum)",
-    accent: "--con",
+    no: "B.5",
+    title: "Swiss",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Undang-Undang Federal Swiss tentang Perlindungan Data (FADP) berlaku. Otoritas pengawasnya adalah Komisioner Federal Perlindungan Data dan Informasi (FDPIC), edoeb.admin.ch. Data Anda dikirim ke negara-negara yang disebutkan dalam Daftar — negara-negara UE dan Amerika Serikat. Untuk Amerika Serikat, kami mengandalkan Swiss–US Data Privacy Framework jika penyedia tersebut tersertifikasi, dan jika tidak, pada klausul kontrak standar yang diakui oleh FDPIC. Kami melaporkan pelanggaran data yang kemungkinan besar menimbulkan risiko tinggi bagi Anda kepada FDPIC sesegera mungkin. Kami telah menilai bahwa kami tidak memerlukan perwakilan di Swiss (Art. 14 FADP). Kami meninjau hal ini setiap tahun." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldova (hanya jika tercantum)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Undang-Undang Moldova No. 195/2024 tentang perlindungan data pribadi berlaku. Undang-undang ini mengikuti GDPR, dan isi utama kebijakan ini menjelaskan hak Anda berdasarkan undang-undang tersebut. Otoritas pengawasnya adalah Pusat Nasional Perlindungan Data Pribadi (CNPDCP). Kami tidak memerlukan perwakilan di Moldova karena kami didirikan di Kawasan Ekonomi Eropa (Art. 27(2)(c) Undang-Undang No. 195/2024). Kami meninjau hal ini setiap tahun. Transfer data Anda ke Amerika Serikat didasarkan pada mekanisme yang disebutkan untuk setiap penyedia dalam Daftar. Kami melaporkan pelanggaran data pribadi kepada CNPDCP dalam 72 jam jika diwajibkan oleh hukum." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukraina (hanya jika tercantum)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Asia-Pasifik",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Undang-Undang Ukraina \"Tentang Perlindungan Data Pribadi\" berlaku. Kami tidak menawarkan Dialectical Engine di wilayah Ukraina yang tidak dikendalikan oleh pemerintahnya. Data Anda dikirim ke negara-negara UE dan Amerika Serikat (lihat Daftar). Anda dapat mengadu kepada Komisioner Parlemen Ukraina untuk Hak Asasi Manusia." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Israel (hanya jika tercantum)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Undang-Undang Perlindungan Privasi Israel berlaku. Pengendalinya adalah DebateAIRO S.R.L.; cara menghubungi kami tercantum dalam bagian 1. Anda tidak memiliki kewajiban hukum untuk memberikan data Anda kepada kami; tanpa data akun, kami tidak dapat membuka akun untuk Anda. Kami menggunakan data Anda untuk tujuan dalam bagian 4 dan memberikannya kepada penerima dalam bagian 5. Anda dapat meminta untuk melihat dan memperbaikinya (bagian 10). Otoritas pengawasnya adalah Otoritas Perlindungan Privasi." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Asia-Pasifik (hanya baris untuk wilayah yang tercantum)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapura: Petugas Perlindungan Data kami adalah [name, email]; transfer didasarkan pada kewajiban kontraktual yang memberikan perlindungan sebanding dengan PDPA; kami memberi tahu PDPC tentang pelanggaran yang wajib diberitahukan dalam 3 hari. Jepang: kami menggunakan informasi pribadi Anda untuk tujuan dalam bagian 4 dan bukan yang lain. Kami memberikannya kepada penyedia AI dan penyedia hosting dalam Daftar, yang berlokasi di Amerika Serikat dan negara-negara UE, berdasarkan kontrak yang mewajibkan mereka melindunginya sesuai standar Undang-Undang Perlindungan Informasi Pribadi Jepang; atas permintaan, kami memberi tahu Anda apa yang mereka lakukan untuk melindunginya dan tentang sistem privasi di negara mereka. Keyakinan Anda, termasuk keyakinan agama dan politik, serta kesehatan Anda merupakan informasi pribadi yang memerlukan perhatian khusus; kami hanya mengumpulkannya dengan persetujuan Anda sebelumnya (bagian 3). Nama dan alamat kami adalah DebateAIRO S.R.L., [address], Rumania, dan perwakilan kami adalah [name], direktur; cara mengajukan permintaan terdapat dalam bagian 10, langkah keamanan kami dalam bagian 9, dan pengaduan diajukan ke privacy@dezbatere.ro. Kami melaporkan pelanggaran kepada Komisi Perlindungan Informasi Pribadi sebagaimana diwajibkan oleh Undang-Undang tersebut. Korea Selatan: petugas privasi kami adalah [name], direktur, privacy@dezbatere.ro. Kami mentransfer informasi pribadi ke luar negeri karena menjalankan debat Anda, berdasarkan kontrak kami dengan Anda, memerlukannya: setiap kali debat berjalan, kami mengirimkan pertanyaan Anda dan pernyataan-pernyataan dalam debat, serta dalam obrolan dukungan pesan-pesan Anda, melalui koneksi terenkripsi kepada penyedia AI dan penyedia hosting dalam Daftar, yang menyebutkan setiap penerima, negaranya, kontaknya, tujuannya, dan berapa lama penerima tersebut menyimpan data. Anda dapat menolak transfer dengan tidak memulai debat atau dengan menghapus akun Anda; dalam hal itu kami tidak dapat menjalankan debat untuk Anda. Pendapat politik, keyakinan, dan kesehatan merupakan informasi sensitif; kami hanya memprosesnya dengan persetujuan terpisah Anda (bagian 3). Kami tidak membuat keputusan yang sepenuhnya otomatis tentang Anda (bagian 8). Kami menjawab permintaan dalam [10] hari, dan melaporkan pelanggaran kepada Komisi Perlindungan Informasi Pribadi dan kepada Anda sebagaimana diwajibkan oleh Undang-Undang Perlindungan Informasi Pribadi. Taiwan: Undang-Undang Perlindungan Data Pribadi Taiwan berlaku. Kami menyimpan data Anda selama jangka waktu dalam bagian 7; data tersebut digunakan di Rumania, negara-negara UE lainnya, dan Amerika Serikat (lihat Daftar); penerimanya tercantum dalam bagian 5; sistem dan model AI kami memprosesnya secara otomatis untuk menjalankan debat Anda. Anda dapat menanyakan data apa yang kami simpan, melihatnya, memperoleh salinannya, memperbaikinya, meminta kami berhenti menggunakannya, dan menghapusnya (bagian 10). Memberikan data akun kepada kami adalah pilihan Anda, tetapi tanpa data tersebut kami tidak dapat membuka akun untuk Anda. Kami menjawab permintaan untuk melihat data Anda atau memperoleh salinannya dalam 15 hari; jika kami memerlukan waktu lebih lama, kami dapat memperpanjang jangka waktu ini satu kali paling lama 15 hari dan memberi tahu Anda alasannya secara tertulis. Filipina: DPO kami adalah [name]; pengaduan dapat diajukan kepada Komisi Privasi Nasional; bagian 8 menjelaskan pemrosesan otomatis. Thailand: perwakilan kami adalah [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Dicadangkan",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Turki, Brasil, dan Indonesia masing-masing memerlukan pemberitahuan berbahasa lokal, perwakilan atau pendaftaran, serta pengajuan, dan belum dirancang di sini. Tiongkok, Vietnam, dan Rusia tidak dilayani." }
+      { kind: "p", text: "Singapura: Petugas Perlindungan Data kami adalah [name, email]; transfer didasarkan pada kewajiban kontraktual yang memberikan perlindungan sebanding dengan PDPA; kami memberi tahu PDPC tentang pelanggaran yang wajib diberitahukan dalam 3 hari. Jepang: kami menggunakan informasi pribadi Anda untuk tujuan dalam bagian 4 dan bukan yang lain. Kami memberikannya kepada penyedia AI dan penyedia hosting dalam Daftar, yang berlokasi di Amerika Serikat dan negara-negara UE, berdasarkan kontrak yang mewajibkan mereka melindunginya sesuai standar Undang-Undang Perlindungan Informasi Pribadi Jepang; atas permintaan, kami memberi tahu Anda apa yang mereka lakukan untuk melindunginya dan tentang sistem privasi di negara mereka. Keyakinan Anda, termasuk keyakinan agama dan politik, serta kesehatan Anda merupakan informasi pribadi yang memerlukan perhatian khusus; kami hanya mengumpulkannya dengan persetujuan Anda sebelumnya (bagian 3). Nama dan alamat kami adalah DebateAIRO S.R.L., [address], Rumania, dan perwakilan kami adalah [name], direktur; cara mengajukan permintaan terdapat dalam bagian 10, langkah keamanan kami dalam bagian 9, dan pengaduan diajukan ke privacy@dezbatere.ro. Kami melaporkan pelanggaran kepada Komisi Perlindungan Informasi Pribadi sebagaimana diwajibkan oleh Undang-Undang tersebut. Korea Selatan: petugas privasi kami adalah [name], direktur, privacy@dezbatere.ro. Kami mentransfer informasi pribadi ke luar negeri karena menjalankan debat Anda, berdasarkan kontrak kami dengan Anda, memerlukannya: setiap kali debat berjalan, kami mengirimkan pertanyaan Anda dan pernyataan-pernyataan dalam debat, serta dalam obrolan dukungan pesan-pesan Anda, melalui koneksi terenkripsi kepada penyedia AI dan penyedia hosting dalam Daftar, yang menyebutkan setiap penerima, negaranya, kontaknya, tujuannya, dan berapa lama penerima tersebut menyimpan data. Anda dapat menolak transfer dengan tidak memulai debat atau dengan menghapus akun Anda; dalam hal itu kami tidak dapat menjalankan debat untuk Anda. Pendapat politik, keyakinan, dan kesehatan merupakan informasi sensitif; kami hanya memprosesnya dengan persetujuan terpisah Anda (bagian 3). Kami tidak membuat keputusan yang sepenuhnya otomatis tentang Anda (bagian 8). Kami menjawab permintaan dalam 10 hari, dan melaporkan pelanggaran kepada Komisi Perlindungan Informasi Pribadi dan kepada Anda sebagaimana diwajibkan oleh Undang-Undang Perlindungan Informasi Pribadi. Taiwan: Undang-Undang Perlindungan Data Pribadi Taiwan berlaku. Kami menyimpan data Anda selama jangka waktu dalam bagian 7; data tersebut digunakan di Rumania, negara-negara UE lainnya, dan Amerika Serikat (lihat Daftar); penerimanya tercantum dalam bagian 5; sistem dan model AI kami memprosesnya secara otomatis untuk menjalankan debat Anda. Anda dapat menanyakan data apa yang kami simpan, melihatnya, memperoleh salinannya, memperbaikinya, meminta kami berhenti menggunakannya, dan menghapusnya (bagian 10). Memberikan data akun kepada kami adalah pilihan Anda, tetapi tanpa data tersebut kami tidak dapat membuka akun untuk Anda. Kami menjawab permintaan untuk melihat data Anda atau memperoleh salinannya dalam 15 hari; jika kami memerlukan waktu lebih lama, kami dapat memperpanjang jangka waktu ini satu kali paling lama 15 hari dan memberi tahu Anda alasannya secara tertulis." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "1ced56cef0dd6edb50f347449f9c3c858e5296cd5829ee04ee0ae72c508b6372",
-  eyebrow: "KEBIJAKAN PRIVASI · v3.2 · BERLAKU [DATE]",
+  version: "3.3",
+  sha256: "9a9d1c31ef1885710b849b30a32ecc3f8f774ce59447543c526026c787ab386c",
+  eyebrow: "KEBIJAKAN PRIVASI · v3.3 · BERLAKU [DATE]",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",
-  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Teks Kebijakan Privasi",
   sectionIdPrefix: "policy-section-",

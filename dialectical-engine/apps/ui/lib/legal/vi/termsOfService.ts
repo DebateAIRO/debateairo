@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Nơi chúng tôi cung cấp DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Chúng tôi cung cấp DebateAI cho những người sống tại [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ." }
+      { kind: "p", text: "Chúng tôi cung cấp DebateAI cho những người sống tại Liên minh Châu Âu (27 quốc gia) và Khu vực Kinh tế Châu Âu (Na Uy, Iceland và Liechtenstein), Thụy Sĩ, Moldova, Hoa Kỳ (trừ Tennessee), Canada, Australia, New Zealand, Singapore, Nhật Bản, Hàn Quốc và Đài Loan. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Chấp nhận các Điều khoản này",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Bạn chấp nhận các Điều khoản này bằng cách đánh dấu vào ô \"Tôi đã đọc và đồng ý với Điều khoản dịch vụ\" và nhấp vào Tạo tài khoản. Việc đó tạo lập hợp đồng giữa bạn và DebateAIRO S.R.L. Các Điều khoản bao gồm quy tắc sử dụng được chấp nhận tại mục 7, quy tắc công khai tại mục 9, quy định về trách nhiệm tại mục 15, quy định về luật điều chỉnh và tranh chấp tại mục 18 và, nếu bạn sống tại Hoa Kỳ, thỏa thuận trọng tài trong Phụ lục A.3. Chúng tôi lưu hồ sơ về phiên bản bạn đã chấp nhận và thời điểm chấp nhận, như được giải thích trong Chính sách quyền riêng tư." },
+      { kind: "p", text: "Bạn chấp nhận các Điều khoản này bằng cách đánh dấu vào ô \"Tôi đã đọc và đồng ý với Điều khoản dịch vụ\" và nhấp vào Tạo tài khoản. Việc đó tạo lập hợp đồng giữa bạn và DebateAIRO S.R.L. Các Điều khoản bao gồm quy tắc sử dụng được chấp nhận tại mục 7, quy tắc công khai tại mục 9, quy định về trách nhiệm tại mục 15, quy định về luật điều chỉnh và tranh chấp tại mục 18 và, nếu bạn sống tại Hoa Kỳ, thỏa thuận trọng tài trong Phụ lục A.2. Chúng tôi lưu hồ sơ về phiên bản bạn đã chấp nhận và thời điểm chấp nhận, như được giải thích trong Chính sách quyền riêng tư." },
       { kind: "p", text: "Chính sách quyền riêng tư của chúng tôi tại [dezbatere.ro/privacy] giải thích cách chúng tôi xử lý dữ liệu cá nhân. Đây là thông tin chúng tôi có nghĩa vụ cung cấp cho bạn, không phải một hợp đồng để bạn đồng ý, và không nội dung nào trong các Điều khoản này biến chính sách đó thành sự đồng ý cho hoạt động xử lý. Chính sách cookie của chúng tôi tại [dezbatere.ro/cookies] và Sổ đăng ký nhà cung cấp AI tại [dezbatere.ro/providers] được dẫn chiếu và cấu thành một phần của các Điều khoản này." },
       { kind: "p", text: "Trước khi bạn giao kết bất kỳ hợp đồng điện tử nào với chúng tôi, giao diện sẽ hiển thị các bước liên quan, cho phép bạn xem lại và sửa nội dung đã nhập trước khi gửi, đồng thời cho biết các ngôn ngữ có thể dùng để giao kết hợp đồng. Các Điều khoản này được cung cấp dưới hình thức bạn có thể lưu và in; khi bạn mua gói trả phí, chúng tôi gửi qua email phiên bản bạn đã chấp nhận, và bạn có thể yêu cầu bản sao bất kỳ lúc nào. Không nội dung nào trong các Điều khoản này hạn chế những quyền không thể bị hạn chế bằng hợp đồng mà bạn có theo pháp luật bảo vệ người tiêu dùng của Romania hoặc EU, hoặc pháp luật của quốc gia nơi bạn sinh sống." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Quyền rút lui của bạn",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Nếu sống tại EU, EEA hoặc Vương quốc Anh, bạn có thể rút khỏi gói đăng ký trả phí trong vòng 14 ngày kể từ khi đăng ký mà không cần nêu lý do. Hãy sử dụng trang Rút khỏi hợp đồng tại [dezbatere.ro/withdraw], biểu mẫu mẫu trong email xác nhận, hoặc viết đến [support@dezbatere.ro]; chúng tôi xác nhận đã nhận trên một phương tiện bền vững." },
+      { kind: "p", text: "Nếu sống tại EU hoặc EEA, bạn có thể rút khỏi gói đăng ký trả phí trong vòng 14 ngày kể từ khi đăng ký mà không cần nêu lý do. Hãy sử dụng trang Rút khỏi hợp đồng tại [dezbatere.ro/withdraw], biểu mẫu mẫu trong email xác nhận, hoặc viết đến [support@dezbatere.ro]; chúng tôi xác nhận đã nhận trên một phương tiện bền vững." },
       { kind: "p", text: "Nếu bạn yêu cầu chúng tôi bắt đầu dịch vụ ngay lập tức — bằng cách đánh dấu vào ô khi thanh toán — rồi sau đó rút lui, bạn phải thanh toán phần dịch vụ đã được cung cấp cho đến ngày rút lui, được tính theo tỷ lệ trên giá của kỳ thanh toán, và chúng tôi hoàn trả phần còn lại. Bạn không mất quyền rút lui do sử dụng dịch vụ trong 14 ngày đó." },
       { kind: "p", text: "Nếu sống tại nơi khác, Phụ lục A quy định quyền rút lui hoặc khoảng thời gian cân nhắc áp dụng tại khu vực của bạn, nếu có, và chính sách hoàn tiền của chúng tôi trong trường hợp khác. Các quyền theo luật định tại quốc gia của bạn luôn được ưu tiên." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Luật điều chỉnh. Các Điều khoản này và mọi tranh chấp hoặc khiếu kiện phát sinh từ các Điều khoản hay đối tượng của chúng, bao gồm khiếu kiện ngoài hợp đồng, chịu sự điều chỉnh của pháp luật Romania." },
-      { kind: "p", text: "Các biện pháp bảo vệ tại địa phương của bạn không bị ảnh hưởng. Nếu bạn là người tiêu dùng, việc lựa chọn pháp luật Romania không tước đi sự bảo vệ của bất kỳ quy tắc bảo vệ người tiêu dùng bắt buộc nào tại quốc gia nơi bạn thường trú — ví dụ quy tắc về điều khoản không công bằng, quyền rút lui và hủy bỏ hoặc bảo đảm — khi các quy tắc đó được áp dụng bất kể lựa chọn này, bao gồm theo Điều 6(2) của Quy định (EC) số 593/2008 nếu bạn sống tại EU, hoặc các quy tắc tương đương của Vương quốc Anh. Bạn có thể dựa vào các quy tắc đó bên cạnh pháp luật Romania." },
-      { kind: "p", text: "Tòa án, nếu bạn sống tại EU, EEA hoặc Vương quốc Anh. Bạn có thể khởi kiện chúng tôi tại tòa án Romania hoặc tòa án của quốc gia nơi bạn sống. Chúng tôi chỉ có thể khởi kiện bạn tại tòa án của quốc gia nơi bạn sống." },
-      { kind: "p", text: "Người tiêu dùng tại nơi khác. Nếu sống ngoài EU, EEA và Vương quốc Anh, không nội dung nào trong các Điều khoản này hạn chế bất kỳ quyền nào bạn có theo pháp luật quốc gia của mình để khởi kiện tại tòa án của quốc gia đó, hoặc bất kỳ quyền nào theo pháp luật đó mà không thể từ bỏ — bao gồm quyền bảo đảm của người tiêu dùng nếu bạn sống tại Australia hoặc New Zealand; Código de Defesa do Consumidor nếu bạn sống tại Brazil; và luật bảo vệ người tiêu dùng của tiểu bang nếu bạn sống tại Hoa Kỳ." },
-      { kind: "p", text: "Cư dân Hoa Kỳ. Phụ lục A.3 có thỏa thuận trọng tài và điều khoản từ bỏ khởi kiện tập thể chịu sự điều chỉnh của Đạo luật Trọng tài Liên bang. Thỏa thuận chỉ áp dụng cho cư dân Hoa Kỳ và chỉ tại nơi có thể thi hành. Thỏa thuận không áp dụng cho người tiêu dùng tại EU, EEA hoặc Vương quốc Anh." },
+      { kind: "p", text: "Các biện pháp bảo vệ tại địa phương của bạn không bị ảnh hưởng. Nếu bạn là người tiêu dùng, việc lựa chọn pháp luật Romania không tước đi sự bảo vệ của bất kỳ quy tắc bảo vệ người tiêu dùng bắt buộc nào tại quốc gia nơi bạn thường trú — ví dụ quy tắc về điều khoản không công bằng, quyền rút lui và hủy bỏ hoặc bảo đảm — khi các quy tắc đó được áp dụng bất kể lựa chọn này, bao gồm theo Điều 6(2) của Quy định (EC) số 593/2008 nếu bạn sống tại EU. Bạn có thể dựa vào các quy tắc đó bên cạnh pháp luật Romania." },
+      { kind: "p", text: "Tòa án, nếu bạn sống tại EU hoặc EEA. Bạn có thể khởi kiện chúng tôi tại tòa án Romania hoặc tòa án của quốc gia nơi bạn sống. Chúng tôi chỉ có thể khởi kiện bạn tại tòa án của quốc gia nơi bạn sống." },
+      { kind: "p", text: "Người tiêu dùng tại nơi khác. Nếu sống ngoài EU và EEA, không nội dung nào trong các Điều khoản này hạn chế bất kỳ quyền nào bạn có theo pháp luật quốc gia của mình để khởi kiện tại tòa án của quốc gia đó, hoặc bất kỳ quyền nào theo pháp luật đó mà không thể từ bỏ — bao gồm quyền bảo đảm của người tiêu dùng nếu bạn sống tại Australia hoặc New Zealand; Código de Defesa do Consumidor nếu bạn sống tại Brazil; và luật bảo vệ người tiêu dùng của tiểu bang nếu bạn sống tại Hoa Kỳ." },
+      { kind: "p", text: "Cư dân Hoa Kỳ. Phụ lục A.2 có thỏa thuận trọng tài và điều khoản từ bỏ khởi kiện tập thể chịu sự điều chỉnh của Đạo luật Trọng tài Liên bang. Thỏa thuận chỉ áp dụng cho cư dân Hoa Kỳ và chỉ tại nơi có thể thi hành. Thỏa thuận không áp dụng cho người tiêu dùng tại EU hoặc EEA." },
       { kind: "p", text: "Trước khi khởi kiện ra tòa. Hãy liên hệ với chúng tôi tại [legal@dezbatere.ro]; hầu hết vấn đề đều có thể khắc phục, và chúng tôi đặt mục tiêu trả lời trong vòng [5] ngày làm việc. Nếu là người tiêu dùng tại Romania hoặc EU, bạn có thể sử dụng phương thức giải quyết tranh chấp thay thế thông qua [the ANPC – named SAL entity, website]; chúng tôi [do / do not] cam kết tham gia thủ tục đó. Khiếu nại về quyết định kiểm duyệt tuân theo mục 10, là một kênh riêng biệt." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Phụ lục A — Điều khoản theo khu vực",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Mỗi mục chỉ áp dụng nếu khu vực tương ứng được liệt kê tại mục 2 và chỉ nêu những nội dung khác với phần nội dung chung. Khi một mục trong phụ lục mâu thuẫn với phần nội dung chung, mục trong phụ lục áp dụng cho người ở khu vực đó." }
+      { kind: "p", text: "Mỗi mục áp dụng cho người sống tại khu vực tương ứng và chỉ nêu những nội dung khác với phần nội dung chung. Khi một mục trong phụ lục mâu thuẫn với phần nội dung chung, mục trong phụ lục áp dụng cho người ở khu vực đó." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Vương quốc Anh (chỉ khi được liệt kê tại mục 2)",
+    title: "Hoa Kỳ",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Đại diện của chúng tôi tại Vương quốc Anh theo Điều 27 UK GDPR là [name, address, email]. Đạo luật Quyền của Người tiêu dùng năm 2015 áp dụng cho bạn và không nội dung nào trong các Điều khoản này hạn chế các quyền của bạn theo đạo luật đó; khi các quy tắc về gói đăng ký trong Đạo luật Thị trường Kỹ thuật số, Cạnh tranh và Người tiêu dùng năm 2024 có hiệu lực (dự kiến vào năm 2027), các quy tắc này sẽ áp dụng cho các gói trả phí, bao gồm khoảng thời gian cân nhắc sau khi gia hạn và sau thời gian dùng thử miễn phí. Cách chúng tôi bảo vệ người dùng khỏi nội dung bất hợp pháp: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Công nghệ chủ động chúng tôi sử dụng: [describe, or \"none\"]. Bảo đảm độ tuổi: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Thủ tục khiếu nại tại mục 10 tiếp nhận khiếu nại về nội dung bất hợp pháp, việc gỡ bỏ sai nội dung của bạn, hạn chế đối với tài khoản của bạn, việc sử dụng công cụ tự động ảnh hưởng đến nội dung của bạn và mọi đánh giá độ tuổi chặn bạn một cách sai trái. Thủ tục này dành cho cả người bị ảnh hưởng bởi nội dung nhưng không phải người dùng. Phụ lục B.2 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Hoa Kỳ (chỉ khi được liệt kê tại mục 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. Chúng tôi không cung cấp DebateAI cho những người sống tại Tennessee." },
       { kind: "p", text: "Thỏa thuận trọng tài và từ bỏ khởi kiện tập thể. Nếu sống tại Hoa Kỳ, bạn và DebateAIRO đồng ý giải quyết mọi tranh chấp phát sinh từ các Điều khoản này hoặc dịch vụ bằng trọng tài cá nhân có tính ràng buộc do [the American Arbitration Association / JAMS] quản lý theo quy tắc dành cho người tiêu dùng của tổ chức đó, thay vì tại tòa án, ngoại trừ việc mỗi bên có thể đưa khiếu kiện cá nhân ra tòa tiểu ngạch. Bạn có thể từ chối tham gia bằng cách gửi email đến [address] trong vòng 30 ngày kể từ lần đầu chấp nhận các Điều khoản này. Thỏa thuận này chịu sự điều chỉnh của Đạo luật Trọng tài Liên bang. Chúng tôi thanh toán phí nộp đơn trọng tài. Việc khởi kiện tập thể, khởi kiện chung và khởi kiện đại diện bị từ bỏ trong phạm vi pháp luật cho phép. Mục này chỉ áp dụng trong tương lai và không áp dụng cho các khiếu kiện phát sinh trước khi bạn chấp nhận mục này." },
       { kind: "p", text: "Thông báo và gỡ bỏ. Hình ảnh riêng tư không có sự đồng thuận có thể được báo cáo tại [URL] mà không cần tài khoản và được gỡ bỏ trong vòng 48 giờ kể từ khi nhận yêu cầu hợp lệ. Khiếu nại về quyền tác giả được gửi đến đại diện được chỉ định của chúng tôi nêu tại mục 16." },
-      { kind: "p", text: "Quy định riêng theo tiểu bang. California: điều khoản tự động gia hạn tại mục 12 được áp dụng; bạn có thể hủy trực tuyến bất kỳ lúc nào; chúng tôi lưu giữ sự đồng ý của bạn với điều khoản gia hạn trong ít nhất ba năm. New York: bạn có thể hủy trong vòng 14 ngày kể từ bất kỳ khoản thu nào theo giá đã tăng và nhận khoản hoàn tiền theo tỷ lệ. Texas và Nebraska: chúng tôi không bán dữ liệu cá nhân nhạy cảm. Washington: Thông báo quyền riêng tư về dữ liệu sức khỏe người tiêu dùng của chúng tôi tại [URL] áp dụng cho thông tin liên quan đến sức khỏe. Colorado: không nội dung nào trong dịch vụ đưa ra quyết định có hậu quả đối với bạn. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn và các quyền riêng tư của bạn theo luật tiểu bang." }
+      { kind: "p", text: "Quy định riêng theo tiểu bang. California: điều khoản tự động gia hạn tại mục 12 được áp dụng; bạn có thể hủy trực tuyến bất kỳ lúc nào; chúng tôi lưu giữ sự đồng ý của bạn với điều khoản gia hạn trong ít nhất ba năm. New York: bạn có thể hủy trong vòng 14 ngày kể từ bất kỳ khoản thu nào theo giá đã tăng và nhận khoản hoàn tiền theo tỷ lệ. Texas và Nebraska: chúng tôi không bán dữ liệu cá nhân nhạy cảm. Washington: Thông báo quyền riêng tư về dữ liệu sức khỏe người tiêu dùng của chúng tôi tại [URL] áp dụng cho thông tin liên quan đến sức khỏe. Colorado: không nội dung nào trong dịch vụ đưa ra quyết định có hậu quả đối với bạn. Phụ lục B.2 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn và các quyền riêng tư của bạn theo luật tiểu bang." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Canada và Quebec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là [name], privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. Quebec: các Điều khoản này được cung cấp bằng tiếng Pháp; hãy chọn tiếng Pháp bằng bộ chuyển đổi ngôn ngữ; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình; không có thỏa thuận trọng tài hay điều khoản từ bỏ khởi kiện tập thể nào áp dụng cho bạn." }
     ]
   },
   {
     no: "A.4",
-    title: "Canada và Quebec (chỉ khi được liệt kê)",
+    title: "Australia và New Zealand",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là [name], privacy@dezbatere.ro. Phụ lục B.4 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. Quebec: các Điều khoản này được cung cấp bằng tiếng Pháp; hãy chọn tiếng Pháp bằng bộ chuyển đổi ngôn ngữ; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình; không có thỏa thuận trọng tài hay điều khoản từ bỏ khởi kiện tập thể nào áp dụng cho bạn." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Australia và New Zealand (chỉ khi được liệt kê)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Dịch vụ của chúng tôi đi kèm các bảo đảm không thể bị loại trừ theo Luật Người tiêu dùng Australia. Đối với lỗi nghiêm trọng của dịch vụ, bạn có quyền hủy và được hoàn tiền cho phần chưa sử dụng, hoặc được bồi thường cho phần giá trị bị giảm; bạn cũng có quyền được bồi thường đối với mọi mất mát hoặc thiệt hại khác có thể dự liệu một cách hợp lý. Nếu lỗi không đến mức nghiêm trọng, bạn có quyền yêu cầu khắc phục vấn đề với dịch vụ trong thời gian hợp lý và, nếu việc đó không được thực hiện, được hủy và hoàn tiền. Trong phạm vi mục 64A cho phép, trách nhiệm của chúng tôi đối với việc vi phạm bảo đảm được giới hạn ở việc cung cấp lại dịch vụ hoặc thanh toán chi phí để thực hiện việc đó. Không có quyền cân nhắc áp dụng cho gói trả phí ngoài quyền được trao cho bạn tại mục 12; chính sách hoàn tiền của chúng tôi là […]. New Zealand: Đạo luật Bảo đảm Người tiêu dùng năm 1993 được áp dụng và không nội dung nào trong các Điều khoản này loại trừ đạo luật đó; thông tin liên lạc kỹ thuật số có hại có thể được báo cáo cho chúng tôi theo mục 10 hoặc cho Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "Thụy Sĩ",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "Đạo luật Liên bang Thụy Sĩ về Bảo vệ Dữ liệu áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.5). Bạn có thể khởi kiện tại tòa án nơi bạn sinh sống ở Thụy Sĩ. Gói trả phí không có quyền rút lại theo luật định; chính sách hoàn tiền của chúng tôi là […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Thụy Sĩ (chỉ khi được liệt kê)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Đạo luật Liên bang Thụy Sĩ về Bảo vệ Dữ liệu áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.6). Bạn có thể khởi kiện tại tòa án nơi bạn sinh sống ở Thụy Sĩ. Gói trả phí không có quyền rút lại theo luật định; chính sách hoàn tiền của chúng tôi là […]." }
+      { kind: "p", text: "Theo các Điều khoản này, bạn có các quyền giống như người tiêu dùng tại Liên minh Châu Âu, bao gồm quyền rút lại trong 14 ngày tại mục 13. Bạn có thể khởi kiện tại tòa án của Moldova. Luật số 195/2024 của Moldova về bảo vệ dữ liệu cá nhân áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (chỉ khi được liệt kê)",
+    title: "Châu Á–Thái Bình Dương",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Theo các Điều khoản này, bạn có các quyền giống như người tiêu dùng tại Liên minh Châu Âu, bao gồm quyền rút lại trong 14 ngày tại mục 13. Bạn có thể khởi kiện tại tòa án của Moldova. Luật số 195/2024 của Moldova về bảo vệ dữ liệu cá nhân áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukraine (chỉ khi được liệt kê)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Chúng tôi cung cấp DebateAI tại Ukraine, trừ các khu vực không do chính phủ Ukraine kiểm soát. Sản phẩm và các Điều khoản này được cung cấp bằng tiếng Ukraine. Luật của Ukraine \"Về bảo vệ dữ liệu cá nhân\" áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israel (chỉ khi được liệt kê)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Bạn có thể hủy gói trả phí theo những gì Luật Bảo vệ Người tiêu dùng 5741-1981 cho phép [state the cancellation terms]. Các Điều khoản này và Chính sách quyền riêng tư của chúng tôi được cung cấp bằng tiếng Do Thái. Luật Bảo vệ Quyền riêng tư của Israel áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Châu Á–Thái Bình Dương (chỉ những dòng dành cho các khu vực được liệt kê)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapore: Cán bộ Bảo vệ Dữ liệu của chúng tôi là [name, email]; việc chuyển dữ liệu dựa trên biện pháp bảo vệ theo hợp đồng tương đương với PDPA; gói trả phí không có thời gian cân nhắc theo luật định và chính sách hoàn tiền của chúng tôi là […]. Nhật Bản: thông tin công bố theo luật định theo Đạo luật Giao dịch Thương mại Đặc định có tại [URL]; gói đăng ký trực tuyến không có thời gian cân nhắc chung và chính sách hoàn tiền của chúng tôi là […]; chúng tôi gửi nội dung của bạn đến các nhà cung cấp AI tại Hoa Kỳ và Liên minh Châu Âu, mỗi nhà cung cấp theo một hợp đồng yêu cầu mức bảo vệ tương đương với Đạo luật Bảo vệ Thông tin Cá nhân của Nhật Bản, và khi được yêu cầu, chúng tôi cho bạn biết các biện pháp đó là gì. Hàn Quốc: sự đồng ý đối với hoạt động xử lý tùy chọn và hoạt động tiếp thị được thu thập riêng với các nội dung cần thiết để vận hành dịch vụ; cán bộ phụ trách quyền riêng tư của chúng tôi là [name], privacy@dezbatere.ro; bạn có thể rút khỏi gói trả phí trong vòng 7 ngày kể từ khi đăng ký theo Đạo luật Thương mại Điện tử; chúng tôi xin lại sự đồng ý của bạn trước mỗi lần tăng giá định kỳ hoặc chuyển đổi từ miễn phí sang trả phí; dịch vụ sử dụng AI tạo sinh, chúng tôi cho bạn biết điều đó trước khi bạn sử dụng và gắn nhãn kết quả do AI tạo ra. Đài Loan: bạn có thể rút khỏi gói trả phí trong vòng 7 ngày kể từ khi đăng ký theo Đạo luật Bảo vệ Người tiêu dùng; Đạo luật Bảo vệ Dữ liệu Cá nhân của Đài Loan áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.10). Thái Lan: đại diện của chúng tôi tại Thái Lan là [name] [if appointed]. Philippines: thông tin định danh doanh nghiệp và cơ chế khiếu nại của chúng tôi theo Đạo luật Giao dịch Internet có tại [URL]; khiếu nại có thể được gửi đến Ủy ban Quyền riêng tư Quốc gia." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Dành riêng",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Mỗi quốc gia Thổ Nhĩ Kỳ, Brazil và Indonesia đều yêu cầu phụ lục bằng ngôn ngữ địa phương, đại diện hoặc đăng ký, cùng các hồ sơ phải nộp. Các nội dung đó chưa được soạn thảo tại đây và nằm ngoài mục 2 cho đến khi được chủ động bổ sung. Dịch vụ không được cung cấp tại Trung Quốc, Việt Nam và Nga." }
+      { kind: "p", text: "Singapore: Cán bộ Bảo vệ Dữ liệu của chúng tôi là [name, email]; việc chuyển dữ liệu dựa trên biện pháp bảo vệ theo hợp đồng tương đương với PDPA; gói trả phí không có thời gian cân nhắc theo luật định và chính sách hoàn tiền của chúng tôi là […]. Nhật Bản: thông tin công bố theo luật định theo Đạo luật Giao dịch Thương mại Đặc định có tại [URL]; gói đăng ký trực tuyến không có thời gian cân nhắc chung và chính sách hoàn tiền của chúng tôi là […]; chúng tôi gửi nội dung của bạn đến các nhà cung cấp AI tại Hoa Kỳ và Liên minh Châu Âu, mỗi nhà cung cấp theo một hợp đồng yêu cầu mức bảo vệ tương đương với Đạo luật Bảo vệ Thông tin Cá nhân của Nhật Bản, và khi được yêu cầu, chúng tôi cho bạn biết các biện pháp đó là gì. Hàn Quốc: sự đồng ý đối với hoạt động xử lý tùy chọn và hoạt động tiếp thị được thu thập riêng với các nội dung cần thiết để vận hành dịch vụ; cán bộ phụ trách quyền riêng tư của chúng tôi là [name], privacy@dezbatere.ro; bạn có thể rút khỏi gói trả phí trong vòng 7 ngày kể từ khi đăng ký theo Đạo luật Thương mại Điện tử; chúng tôi xin lại sự đồng ý của bạn trước mỗi lần tăng giá định kỳ hoặc chuyển đổi từ miễn phí sang trả phí; dịch vụ sử dụng AI tạo sinh, chúng tôi cho bạn biết điều đó trước khi bạn sử dụng và gắn nhãn kết quả do AI tạo ra. Đài Loan: bạn có thể rút khỏi gói trả phí trong vòng 7 ngày kể từ khi đăng ký theo Đạo luật Bảo vệ Người tiêu dùng; Đạo luật Bảo vệ Dữ liệu Cá nhân của Đài Loan áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "bed7340ec646ced667cfa0da590fb9d8add1f0367469319439fa9ea2c5df235f",
-  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.1 · CÓ HIỆU LỰC [DATE]",
+  version: "2.2",
+  sha256: "a506af59edd4b3a0d1e4185dcd203b742fc7df19957e9c0ee76c5521c3ebe945",
+  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.2 · CÓ HIỆU LỰC [DATE]",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DebateAIRO S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",
-  endMarker: "HẾT ĐIỀU KHOẢN · v2.1",
+  endMarker: "HẾT ĐIỀU KHOẢN · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Nội dung Điều khoản dịch vụ",
   sectionIdPrefix: "terms-section-",

@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Onde disponibilizamos a DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Disponibilizamos a DebateAI a pessoas que residam na [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Não a disponibilizamos noutros locais. Se residir fora desses países, poderá conseguir aceder ao sítio, mas não dirigimos o serviço a si, não aceitamos pagamentos seus e estes Termos e a nossa Política de Privacidade não estão adaptados à legislação do seu país. O Anexo A estabelece o que se aplica em cada região que servimos." }
+      { kind: "p", text: "Disponibilizamos a DebateAI a pessoas que residam na União Europeia (27 países) e no Espaço Económico Europeu (Noruega, Islândia e Liechtenstein), na Suíça, na Moldávia, nos Estados Unidos (exceto o Tennessee), no Canadá, na Austrália, na Nova Zelândia, em Singapura, no Japão, na Coreia do Sul e em Taiwan. Não a disponibilizamos noutros locais. Se residir fora desses países, poderá conseguir aceder ao sítio, mas não dirigimos o serviço a si, não aceitamos pagamentos seus e estes Termos e a nossa Política de Privacidade não estão adaptados à legislação do seu país. O Anexo A estabelece o que se aplica em cada região que servimos." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Aceitação destes Termos",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Aceita estes Termos ao assinalar a caixa «Li e aceito os Termos de Serviço» e clicar em Criar conta. Isto cria um contrato entre si e a DebateAIRO S.R.L. Os Termos incluem as regras de utilização aceitável da secção 7, as regras de publicação da secção 9, as disposições sobre responsabilidade da secção 15, as disposições sobre lei aplicável e litígios da secção 18 e, caso resida nos Estados Unidos, a convenção de arbitragem constante do Anexo A.3. Conservamos um registo da versão que aceitou e do momento em que a aceitou, conforme explicado na nossa Política de Privacidade." },
+      { kind: "p", text: "Aceita estes Termos ao assinalar a caixa «Li e aceito os Termos de Serviço» e clicar em Criar conta. Isto cria um contrato entre si e a DebateAIRO S.R.L. Os Termos incluem as regras de utilização aceitável da secção 7, as regras de publicação da secção 9, as disposições sobre responsabilidade da secção 15, as disposições sobre lei aplicável e litígios da secção 18 e, caso resida nos Estados Unidos, a convenção de arbitragem constante do Anexo A.2. Conservamos um registo da versão que aceitou e do momento em que a aceitou, conforme explicado na nossa Política de Privacidade." },
       { kind: "p", text: "A nossa Política de Privacidade, disponível em [dezbatere.ro/privacy], explica como tratamos os dados pessoais. Trata-se de informação que lhe devemos prestar, não de um contrato que aceite, e nada nestes Termos a transforma em consentimento para o tratamento. A nossa Política de Cookies, disponível em [dezbatere.ro/cookies], e o nosso Registo de Fornecedores de IA, disponível em [dezbatere.ro/providers], fazem parte destes Termos por remissão." },
       { kind: "p", text: "Antes de celebrar eletronicamente qualquer contrato connosco, a interface mostra-lhe as etapas envolvidas, permite-lhe rever e corrigir o que introduziu antes de o enviar e informa-o dos idiomas em que o contrato pode ser celebrado. Estes Termos são disponibilizados num formato que pode guardar e imprimir. Quando adquirir um plano pago, enviamos-lhe por correio eletrónico a versão que aceitou. Pode também solicitar uma cópia a qualquer momento. Nada nestes Termos limita os direitos de que beneficia ao abrigo do direito romeno ou da UE em matéria de consumo, ou do direito do país onde reside, que não possam ser limitados por contrato." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "O seu direito de retratação",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Se residir na UE, no EEE ou no Reino Unido, pode retratar-se de uma subscrição paga no prazo de 14 dias após a subscrição, sem necessidade de indicar um motivo. Utilize a página Retratar-se do contrato, disponível em [dezbatere.ro/withdraw], o formulário-modelo constante da mensagem de confirmação, ou escreva para [support@dezbatere.ro]; confirmamos a receção num suporte duradouro." },
+      { kind: "p", text: "Se residir na UE ou no EEE, pode retratar-se de uma subscrição paga no prazo de 14 dias após a subscrição, sem necessidade de indicar um motivo. Utilize a página Retratar-se do contrato, disponível em [dezbatere.ro/withdraw], o formulário-modelo constante da mensagem de confirmação, ou escreva para [support@dezbatere.ro]; confirmamos a receção num suporte duradouro." },
       { kind: "p", text: "Se nos tiver solicitado que iniciássemos o serviço imediatamente — assinalando a caixa no momento do pagamento — e depois exercer o direito de retratação, pagará a parte do serviço prestada até ao dia em que se retratar, calculada proporcionalmente com base no preço do período de faturação, e reembolsaremos o restante. Não perde o direito de retratação por utilizar o serviço durante os 14 dias." },
       { kind: "p", text: "Se residir noutro local, o Anexo A indica o direito de retratação ou o período de reflexão aplicável na sua região, caso exista, e, nos restantes casos, a nossa política de reembolso. Os direitos legais vigentes no seu país prevalecem sempre." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Lei aplicável. Estes Termos, bem como qualquer litígio ou pretensão deles decorrente ou relacionado com o respetivo objeto, incluindo pretensões extracontratuais, são regidos pela legislação da Roménia." },
-      { kind: "p", text: "As suas proteções locais não são afetadas. Se for consumidor, a escolha da lei romena não o priva da proteção conferida por quaisquer normas imperativas de defesa do consumidor do país da sua residência habitual — por exemplo, normas sobre cláusulas abusivas, direitos de retratação e cancelamento ou garantias — quando essas normas se apliquem independentemente desta escolha, incluindo nos termos do artigo 6.º, n.º 2, do Regulamento (CE) n.º 593/2008, caso resida na UE, ou das normas equivalentes do Reino Unido. Pode invocar essas normas para além da lei romena." },
-      { kind: "p", text: "Tribunais, se residir na UE, no EEE ou no Reino Unido. Pode intentar uma ação contra nós nos tribunais da Roménia ou nos tribunais do país onde reside. Só podemos intentar uma ação contra si nos tribunais do país onde reside." },
-      { kind: "p", text: "Consumidores noutros locais. Se residir fora da UE, do EEE e do Reino Unido, nada nestes Termos limita qualquer direito que detenha ao abrigo da legislação do seu país de intentar uma ação nos respetivos tribunais, ou qualquer direito conferido por essa legislação que não possa ser objeto de renúncia — incluindo, se residir na Austrália ou na Nova Zelândia, os seus direitos relativos a garantias do consumidor; se residir no Brasil, o Código de Defesa do Consumidor; e, se residir nos Estados Unidos, as leis de defesa do consumidor do seu estado." },
-      { kind: "p", text: "Residentes nos Estados Unidos. O Anexo A.3 contém uma convenção de arbitragem e uma renúncia a ações coletivas regidas pelo Federal Arbitration Act. Aplica-se apenas a residentes nos Estados Unidos e apenas quando for exequível. Não se aplica a consumidores na UE, no EEE ou no Reino Unido." },
+      { kind: "p", text: "As suas proteções locais não são afetadas. Se for consumidor, a escolha da lei romena não o priva da proteção conferida por quaisquer normas imperativas de defesa do consumidor do país da sua residência habitual — por exemplo, normas sobre cláusulas abusivas, direitos de retratação e cancelamento ou garantias — quando essas normas se apliquem independentemente desta escolha, incluindo nos termos do artigo 6.º, n.º 2, do Regulamento (CE) n.º 593/2008, caso resida na UE. Pode invocar essas normas para além da lei romena." },
+      { kind: "p", text: "Tribunais, se residir na UE ou no EEE. Pode intentar uma ação contra nós nos tribunais da Roménia ou nos tribunais do país onde reside. Só podemos intentar uma ação contra si nos tribunais do país onde reside." },
+      { kind: "p", text: "Consumidores noutros locais. Se residir fora da UE e do EEE, nada nestes Termos limita qualquer direito que detenha ao abrigo da legislação do seu país de intentar uma ação nos respetivos tribunais, ou qualquer direito conferido por essa legislação que não possa ser objeto de renúncia — incluindo, se residir na Austrália ou na Nova Zelândia, os seus direitos relativos a garantias do consumidor; se residir no Brasil, o Código de Defesa do Consumidor; e, se residir nos Estados Unidos, as leis de defesa do consumidor do seu estado." },
+      { kind: "p", text: "Residentes nos Estados Unidos. O Anexo A.2 contém uma convenção de arbitragem e uma renúncia a ações coletivas regidas pelo Federal Arbitration Act. Aplica-se apenas a residentes nos Estados Unidos e apenas quando for exequível. Não se aplica a consumidores na UE ou no EEE." },
       { kind: "p", text: "Antes de recorrer aos tribunais. Contacte-nos através de [legal@dezbatere.ro]; a maioria das questões pode ser resolvida e procuramos responder no prazo de [5] dias úteis. Se for consumidor na Roménia ou na UE, pode recorrer à resolução alternativa de litígios através de [the ANPC – named SAL entity, website]; comprometemo-nos [do / do not] a participar nesse procedimento. As reclamações relativas a decisões de moderação seguem a secção 10, que constitui uma via separada." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Anexo A — Termos regionais",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Cada entrada aplica-se apenas se a respetiva região estiver indicada na secção 2 e estabelece somente aquilo que difere do corpo do documento. Em caso de conflito entre uma entrada e o corpo, a entrada aplica-se às pessoas dessa região." }
+      { kind: "p", text: "Cada entrada aplica-se às pessoas que residam na respetiva região e estabelece somente aquilo que difere do corpo do documento. Em caso de conflito entre uma entrada e o corpo, a entrada aplica-se às pessoas dessa região." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Reino Unido (apenas se indicado na secção 2)",
+    title: "Estados Unidos",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "O nosso representante no Reino Unido ao abrigo do artigo 27.º do RGPD do Reino Unido é [name, address, email]. O Consumer Rights Act 2015 é-lhe aplicável e nada nestes Termos limita os direitos que lhe confere; quando as regras relativas a subscrições do Digital Markets, Competition and Consumers Act 2024 entrarem em vigor (o que se prevê para 2027), aplicar-se-ão aos planos pagos, incluindo um período de reflexão após renovações e períodos experimentais gratuitos. Como protegemos os utilizadores contra conteúdos ilegais: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Tecnologia proativa que utilizamos: [describe, or \"none\"]. Verificação da idade: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. O procedimento de reclamação da secção 10 aceita reclamações relativas a conteúdos ilegais, remoção indevida do seu conteúdo, restrições à sua conta, utilização de ferramentas automatizadas que afetem o seu conteúdo e qualquer avaliação etária que o bloqueie indevidamente. Está disponível a pessoas afetadas por conteúdos que não sejam utilizadores. O Anexo B.2 da nossa Política de Privacidade abrange os seus dados." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Estados Unidos (apenas se indicados na secção 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. Não disponibilizamos a DebateAI a pessoas que residam no Tennessee." },
       { kind: "p", text: "Convenção de arbitragem e renúncia a ações coletivas. Se residir nos Estados Unidos, o utilizador e a DebateAIRO concordam em resolver qualquer litígio decorrente destes Termos ou do serviço através de arbitragem individual vinculativa administrada por [the American Arbitration Association / JAMS] ao abrigo das respetivas regras de arbitragem de consumo, em vez de recorrer aos tribunais, com a exceção de que qualquer uma das partes pode apresentar uma pretensão individual num tribunal de pequenas causas. Pode optar pela não aplicação enviando uma mensagem para [address] no prazo de 30 dias após a primeira aceitação destes Termos. Esta convenção é regida pelo Federal Arbitration Act. Suportamos as taxas de apresentação da arbitragem. Há renúncia a ações coletivas, conjuntas e representativas na medida permitida por lei. Esta secção aplica-se apenas para o futuro e não se aplica a pretensões surgidas antes da sua aceitação." },
       { kind: "p", text: "Notificações e remoções. As imagens íntimas não consentidas podem ser denunciadas em [URL] sem uma conta e são removidas no prazo de 48 horas após um pedido válido. As reclamações relativas a direitos de autor são dirigidas ao nosso agente designado referido na secção 16." },
-      { kind: "p", text: "Disposições específicas de cada estado. Califórnia: aplicam-se as condições de renovação automática da secção 12; pode cancelar em linha a qualquer momento; conservamos o seu consentimento para as condições de renovação durante pelo menos três anos. Nova Iorque: pode cancelar no prazo de 14 dias após qualquer cobrança a um preço aumentado e receber um reembolso proporcional. Texas e Nebraska: não vendemos dados pessoais sensíveis. Washington: o nosso Aviso de Privacidade de Dados de Saúde dos Consumidores, disponível em [URL], aplica-se a informações relacionadas com a saúde. Colorado: nada no serviço toma decisões com consequências significativas a seu respeito. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados e os direitos de privacidade previstos no seu estado." }
+      { kind: "p", text: "Disposições específicas de cada estado. Califórnia: aplicam-se as condições de renovação automática da secção 12; pode cancelar em linha a qualquer momento; conservamos o seu consentimento para as condições de renovação durante pelo menos três anos. Nova Iorque: pode cancelar no prazo de 14 dias após qualquer cobrança a um preço aumentado e receber um reembolso proporcional. Texas e Nebraska: não vendemos dados pessoais sensíveis. Washington: o nosso Aviso de Privacidade de Dados de Saúde dos Consumidores, disponível em [URL], aplica-se a informações relacionadas com a saúde. Colorado: nada no serviço toma decisões com consequências significativas a seu respeito. O Anexo B.2 da nossa Política de Privacidade abrange os seus dados e os direitos de privacidade previstos no seu estado." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Canadá e Quebeque",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é [name], privacy@dezbatere.ro. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados. Quebeque: estes Termos estão disponíveis em francês; escolha francês no seletor de idioma; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito; não se lhe aplica qualquer convenção de arbitragem nem renúncia a ações coletivas." }
     ]
   },
   {
     no: "A.4",
-    title: "Canadá e Quebeque (apenas se indicados)",
+    title: "Austrália e Nova Zelândia",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é [name], privacy@dezbatere.ro. O Anexo B.4 da nossa Política de Privacidade abrange os seus dados. Quebeque: estes Termos estão disponíveis em francês; escolha francês no seletor de idioma; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito; não se lhe aplica qualquer convenção de arbitragem nem renúncia a ações coletivas." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Austrália e Nova Zelândia (apenas se indicadas)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Os nossos serviços beneficiam de garantias que não podem ser excluídas ao abrigo da Australian Consumer Law. Em caso de falhas graves do serviço, tem direito a cancelar e a obter o reembolso da parte não utilizada, ou a uma indemnização pela redução do seu valor; tem igualmente direito a indemnização por quaisquer outros prejuízos ou danos razoavelmente previsíveis. Se a falha não constituir uma falha grave, tem direito a que os problemas do serviço sejam corrigidos num prazo razoável e, se isso não acontecer, a cancelar e obter um reembolso. Na medida permitida pela secção 64A, a nossa responsabilidade por violação de uma garantia limita-se a prestar novamente o serviço ou a pagar o custo dessa nova prestação. Não se aplica ao plano pago qualquer período de reflexão além do concedido pela secção 12; a nossa política de reembolso é […]. Nova Zelândia: o Consumer Guarantees Act 1993 é aplicável e nada nestes Termos o exclui; as comunicações digitais prejudiciais podem ser-nos denunciadas ao abrigo da secção 10 ou comunicadas à Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "Suíça",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "A Lei Federal suíça sobre a Proteção de Dados aplica-se aos seus dados (Política de Privacidade, Anexo B.5). Pode intentar ações nos tribunais do local da Suíça onde reside. Não se aplica ao plano pago qualquer direito legal de retratação; a nossa política de reembolso é […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Suíça (apenas se indicada)",
+    title: "Moldávia",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "A Lei Federal suíça sobre a Proteção de Dados aplica-se aos seus dados (Política de Privacidade, Anexo B.6). Pode intentar ações nos tribunais do local da Suíça onde reside. Não se aplica ao plano pago qualquer direito legal de retratação; a nossa política de reembolso é […]." }
+      { kind: "p", text: "Ao abrigo destes Termos, tem os mesmos direitos que um consumidor na União Europeia, incluindo o direito de retratação de 14 dias previsto na secção 13. Pode intentar ações nos tribunais da Moldávia. A Lei n.º 195/2024 da Moldávia relativa à proteção de dados pessoais aplica-se aos seus dados (Política de Privacidade, Anexo B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldávia (apenas se indicada)",
+    title: "Ásia-Pacífico",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Ao abrigo destes Termos, tem os mesmos direitos que um consumidor na União Europeia, incluindo o direito de retratação de 14 dias previsto na secção 13. Pode intentar ações nos tribunais da Moldávia. A Lei n.º 195/2024 da Moldávia relativa à proteção de dados pessoais aplica-se aos seus dados (Política de Privacidade, Anexo B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ucrânia (apenas se indicada)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Disponibilizamos a DebateAI na Ucrânia, exceto nas zonas que não são controladas pelo governo ucraniano. O produto e estes Termos estão disponíveis em ucraniano. A Lei da Ucrânia «Sobre a Proteção de Dados Pessoais» aplica-se aos seus dados (Política de Privacidade, Anexo B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israel (apenas se indicado)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Pode cancelar um plano pago nos termos permitidos pela Consumer Protection Law, 5741-1981 [state the cancellation terms]. Estes Termos e a nossa Política de Privacidade estão disponíveis em hebraico. A Protection of Privacy Law de Israel aplica-se aos seus dados (Política de Privacidade, Anexo B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Ásia-Pacífico (apenas as linhas relativas às regiões indicadas)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapura: o nosso Encarregado da Proteção de Dados é [name, email]; as transferências assentam em proteções contratuais comparáveis às da PDPA; não se aplica ao plano pago qualquer período legal de reflexão e a nossa política de reembolso é […]. Japão: a divulgação legal ao abrigo do Specified Commercial Transactions Act está disponível em [URL]; não se aplica um período geral de reflexão às subscrições em linha e a nossa política de reembolso é […]; enviamos o seu conteúdo para fornecedores de IA nos Estados Unidos e na União Europeia, cada um ao abrigo de um contrato que exige uma proteção equivalente à da Act on the Protection of Personal Information do Japão, e, mediante pedido, informamo-lo sobre essas medidas. Coreia do Sul: os consentimentos para tratamento facultativo e marketing são recolhidos separadamente dos elementos necessários ao funcionamento do serviço; o nosso responsável pela privacidade é [name], privacy@dezbatere.ro; pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do E-Commerce Act; obtemos novamente o seu consentimento antes de qualquer aumento de preço recorrente ou conversão de gratuito para pago; o serviço utiliza IA generativa, informamo-lo disso antes de o utilizar e identificamos os resultados gerados por IA. Taiwan: pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do Consumer Protection Act; a Personal Data Protection Act de Taiwan aplica-se aos seus dados (Política de Privacidade, Anexo B.10). Tailândia: o nosso representante na Tailândia é [name] [if appointed]. Filipinas: a nossa identificação comercial e o mecanismo de reparação ao abrigo do Internet Transactions Act estão disponíveis em [URL]; podem ser apresentadas reclamações à National Privacy Commission." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Reservado",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "A Turquia, o Brasil e a Indonésia exigem, cada um, um anexo no idioma local, um representante ou registo e formalidades. Esses elementos não estão aqui redigidos e esses países permanecem fora da secção 2 até serem deliberadamente incluídos. A China, o Vietname e a Rússia não são abrangidos pela oferta." }
+      { kind: "p", text: "Singapura: o nosso Encarregado da Proteção de Dados é [name, email]; as transferências assentam em proteções contratuais comparáveis às da PDPA; não se aplica ao plano pago qualquer período legal de reflexão e a nossa política de reembolso é […]. Japão: a divulgação legal ao abrigo do Specified Commercial Transactions Act está disponível em [URL]; não se aplica um período geral de reflexão às subscrições em linha e a nossa política de reembolso é […]; enviamos o seu conteúdo para fornecedores de IA nos Estados Unidos e na União Europeia, cada um ao abrigo de um contrato que exige uma proteção equivalente à da Act on the Protection of Personal Information do Japão, e, mediante pedido, informamo-lo sobre essas medidas. Coreia do Sul: os consentimentos para tratamento facultativo e marketing são recolhidos separadamente dos elementos necessários ao funcionamento do serviço; o nosso responsável pela privacidade é [name], privacy@dezbatere.ro; pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do E-Commerce Act; obtemos novamente o seu consentimento antes de qualquer aumento de preço recorrente ou conversão de gratuito para pago; o serviço utiliza IA generativa, informamo-lo disso antes de o utilizar e identificamos os resultados gerados por IA. Taiwan: pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do Consumer Protection Act; a Personal Data Protection Act de Taiwan aplica-se aos seus dados (Política de Privacidade, Anexo B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "851dbfc0a49355e7f434511c9bdc48b3a249917415c8e80526555b99388292d0",
-  eyebrow: "TERMOS DE SERVIÇO · v2.1 · EM VIGOR DESDE [DATE]",
+  version: "2.2",
+  sha256: "a7b4574eb4e57c2c88b8a5e0566297020797f58b80a17b9ef73d394575cc1259",
+  eyebrow: "TERMOS DE SERVIÇO · v2.2 · EM VIGOR DESDE [DATE]",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DebateAIRO S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",
-  endMarker: "FIM DOS TERMOS · v2.1",
+  endMarker: "FIM DOS TERMOS · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Texto dos Termos de Serviço",
   sectionIdPrefix: "terms-section-",

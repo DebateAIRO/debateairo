@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Annexe B — Dispositions régionales relatives à la confidentialité",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Chaque entrée s'applique uniquement si sa région figure à la section 2 des Conditions et indique seulement ce qui diffère du corps de la présente politique." }
+      { kind: "p", text: "Chaque entrée s'applique aux personnes qui résident dans sa région et indique seulement ce qui diffère du corps de la présente politique." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Royaume-Uni (uniquement s'il est répertorié)",
+    title: "États-Unis",
     accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Notre représentant au Royaume-Uni au titre de l'article 27 du UK GDPR est [name, address, email] ; vous pouvez le contacter pour toute question relative à la présente politique. L'autorité de contrôle est l'Information Commissioner's Office, ico.org.uk. Pour nous adresser une réclamation, écrivez à privacy@dezbatere.ro ; nous accusons réception de votre réclamation dans un délai de 30 jours. Les transferts de vos données depuis le Royaume-Uni vers les fournisseurs d'IA situés aux États-Unis reposent sur l'extension britannique du cadre de protection des données UE–États-Unis lorsque le fournisseur est certifié, et à défaut sur l'addendum britannique relatif aux transferts internationaux de données annexé aux clauses contractuelles types de l'UE, accompagnés d'une évaluation des risques du transfert ; le Registre indique l'outil retenu pour chaque fournisseur. Nous notifions à l'ICO toute violation de données à caractère personnel dans un délai de 72 heures lorsque la loi l'exige, et vous en informons dans les meilleurs délais si elle vous expose à un risque élevé. Si nous déposions un jour des cookies d'analyse, ils seraient soumis au Royaume-Uni à un mécanisme de refus plutôt qu'au consentement ; nous n'en déposons actuellement aucun. Si vous avez moins de 18 ans et accédez au service malgré notre règle d'âge, les normes du Children's Code de l'ICO s'appliquent à la manière dont nous traitons vos données." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "États-Unis (uniquement s'ils sont répertoriés)",
-    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Information au moment de la collecte. Le tableau de la section 2 présente les catégories de données à caractère personnel que nous collectons et leurs sources. Les finalités et bases juridiques du traitement figurent à la section 4, et les durées de conservation à la section 7. Nous ne collectons les catégories suivantes de données à caractère personnel sensibles que si vous les incluez dans vos propres questions vous concernant : santé, convictions religieuses ou philosophiques, vie sexuelle ou orientation sexuelle, opinions politiques, appartenance syndicale et origine raciale ou ethnique. Nous les utilisons uniquement pour exécuter vos débats, et seulement après le consentement distinct prévu à la section 3. Nous ne vendons ni ne partageons de données à caractère personnel, et nous ne l'avons pas fait au cours des douze mois précédents. Nous n'utilisons pas les données à caractère personnel à des fins de publicité ciblée, et nous n'utilisons pas les données à caractère personnel sensibles à d'autres fins que la fourniture du service demandé. Signaux exprimant une préférence de refus : Il n’y a actuellement rien à refuser, car nous ne vendons ni ne partageons de données personnelles. Si nous commençons un jour à les vendre ou à les partager, nous respecterons les signaux Global Privacy Control comme une demande de refus. Vos droits : connaître, supprimer, corriger, refuser, limiter l'utilisation des données à caractère personnel sensibles et ne pas subir de discrimination pour avoir exercé ces droits ; présentez une demande à privacy@dezbatere.ro. Incitations financières : nous n'en proposons aucune ; nos finalités et nos protections sont les mêmes pour les formules gratuites et payantes. La conservation est décrite à la section 7. Violations : nous informons les résidents et les autorités des États conformément à la loi de chaque État relative aux violations de données. La présente information est mise à jour au moins tous les douze mois ; dernière mise à jour le [date]." },
       { kind: "p", text: "Connecticut : nous ne traitons des données sensibles qu'avec votre consentement exprès, donné sur l'écran distinct qui précède votre premier débat (section 3) ; nous n'utilisons pas vos données à caractère personnel pour entraîner des modèles d'IA. Washington : notre Consumer Health Data Privacy Notice, disponible à l'adresse [URL], est un document distinct qui s'applique à toute information relative à la santé, y compris les inférences. Texas et Nebraska : nous ne vendons pas de données à caractère personnel sensibles. Colorado, Connecticut, Virginie et autres États dotés de lois générales sur la confidentialité : les droits ci-dessus vous sont applicables lorsque la loi s'applique à nous. Si nous refusons une demande, vous pouvez faire appel en répondant à notre réponse à privacy@dezbatere.ro ; si nous rejetons l'appel, vous pouvez vous adresser au procureur général (Attorney General) de votre État." }
     ]
   },
   {
-    no: "B.4",
-    title: "Canada et Québec (uniquement s'ils sont répertoriés)",
-    accent: "--gold",
+    no: "B.3",
+    title: "Canada et Québec",
+    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Notre responsable de la protection de la vie privée, qui est aussi, au Québec, la personne responsable de la protection des renseignements personnels, est [name], privacy@dezbatere.ro. Nous répondons aux demandes dans un délai de 30 jours. Nous demeurons responsables des renseignements personnels que nous transférons à des fournisseurs d'IA situés hors du Canada et exigeons par contrat une protection comparable ; ces fournisseurs peuvent être soumis aux lois des pays dans lesquels ils exercent leurs activités, y compris à l'accès légal des autorités. Les e-mails de prospection ne sont envoyés qu'avec votre consentement exprès conformément à la LCAP. Nous déclarons toute atteinte aux mesures de sécurité présentant un risque réel de préjudice grave pour vous au Commissariat à la protection de la vie privée du Canada et à vous-même, et nous tenons un registre de chaque atteinte pendant 24 mois. Québec : avant de communiquer des renseignements personnels hors du Québec, nous procédons à une évaluation des facteurs relatifs à la vie privée ; nous déclarons tout incident de confidentialité présentant un risque de préjudice sérieux à la Commission d'accès à l'information et à vous-même, et tenons un registre des incidents ; les paramètres qui gardent vos débats privés sont activés par défaut ; vous pouvez nous demander de désindexer ou de cesser de diffuser des renseignements personnels vous concernant ; vous pouvez demander vos données dans un format structuré et couramment utilisé ; la section 8 décrit notre traitement automatisé." }
     ]
   },
   {
-    no: "B.5",
-    title: "Australie et Nouvelle-Zélande (uniquement si elles sont répertoriées)",
-    accent: "--reasoning",
+    no: "B.4",
+    title: "Australie et Nouvelle-Zélande",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Australie. Les destinataires étrangers de vos données à caractère personnel sont les fournisseurs d'IA et les sous-traitants répertoriés dans le Registre, situés dans [the United States and the European Union] ; nous prenons des mesures raisonnables pour nous assurer qu'ils les traitent conformément aux Australian Privacy Principles. Décisions automatisées : à compter du 10 décembre 2026, la présente politique identifie les types de décisions prises par des programmes informatiques qui affectent de manière significative vos droits ou vos intérêts — il n'y en a aucune ; les scores et les verdicts concernent les arguments, pas vous — ainsi que les données à caractère personnel utilisées pour les prendre. Les réclamations peuvent être adressées à l'Office of the Australian Information Commissioner. Nouvelle-Zélande. Notre responsable de la protection de la vie privée est [name]. Lorsque nous collectons indirectement des données à caractère personnel vous concernant — parce qu'un autre utilisateur les a incluses dans une question — la présente politique et la section 11 constituent l'information que nous vous fournissons. Nous les divulguons aux fournisseurs d'IA inscrits au Registre qui agissent en qualité de mandataires, en vertu de contrats imposant des garanties comparables. Les réclamations peuvent être adressées à l'Office of the Privacy Commissioner." }
     ]
   },
   {
-    no: "B.6",
-    title: "Suisse (uniquement si elle est répertoriée)",
-    accent: "--con",
+    no: "B.5",
+    title: "Suisse",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "La loi fédérale suisse sur la protection des données (LPD) s'applique. L'autorité de contrôle est le Préposé fédéral à la protection des données et à la transparence (PFPDT), edoeb.admin.ch. Vos données sont transférées vers les pays indiqués dans le Registre — des pays de l'UE et les États-Unis. Pour les États-Unis, nous nous appuyons sur le Swiss–US Data Privacy Framework lorsque le fournisseur est certifié, et à défaut sur des clauses contractuelles types reconnues par le PFPDT. Nous annonçons au PFPDT dans les meilleurs délais toute violation de la sécurité des données susceptible de vous exposer à un risque élevé. Nous avons estimé ne pas avoir besoin d'un représentant en Suisse (Art. 14 LPD). Nous réexaminons ce point chaque année." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldavie (uniquement si elle est répertoriée)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldavie",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "La loi moldave n° 195/2024 sur la protection des données à caractère personnel s'applique. Elle s'aligne sur le RGPD, et le corps de la présente politique décrit les droits qu'elle vous confère. L'autorité de contrôle est le Centre national pour la protection des données à caractère personnel (CNPDCP). Nous n'avons pas besoin d'un représentant en Moldavie, car nous sommes établis dans l'Espace économique européen (Art. 27(2)(c) de la loi n° 195/2024). Nous réexaminons ce point chaque année. Les transferts de vos données vers les États-Unis reposent sur le mécanisme indiqué pour chaque fournisseur dans le Registre. Nous notifions au CNPDCP toute violation de données à caractère personnel dans un délai de 72 heures lorsque la loi l'exige." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukraine (uniquement si elle est répertoriée)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Asie-Pacifique",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "La loi ukrainienne « sur la protection des données à caractère personnel » s'applique. Nous ne proposons pas Dialectical Engine dans les zones d'Ukraine qui ne sont pas contrôlées par son gouvernement. Vos données sont transférées vers des pays de l'UE et les États-Unis (voir le Registre). Vous pouvez adresser une réclamation au Commissaire aux droits de l'homme du Parlement ukrainien." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Israël (uniquement s'il est répertorié)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "La loi israélienne sur la protection de la vie privée s'applique. Le responsable du traitement est DebateAIRO S.R.L. ; nos coordonnées figurent à la section 1. Vous n'êtes soumis à aucune obligation légale de nous fournir vos données ; sans les données de compte, nous ne pouvons pas vous ouvrir de compte. Nous utilisons vos données aux fins indiquées à la section 4 et les communiquons aux destinataires mentionnés à la section 5. Vous pouvez demander à les consulter et à les rectifier (section 10). L'autorité de contrôle est l'Autorité de protection de la vie privée (Privacy Protection Authority)." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Asie-Pacifique (uniquement les lignes correspondant aux régions répertoriées)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapour : notre délégué à la protection des données est [name, email] ; les transferts reposent sur des obligations contractuelles offrant une protection comparable à celle de la PDPA ; nous notifions à la PDPC les violations soumises à notification dans un délai de 3 jours. Japon : nous utilisons vos données à caractère personnel aux seules fins indiquées à la section 4. Nous les communiquons aux fournisseurs d'IA et aux hébergeurs figurant dans le Registre, situés aux États-Unis et dans des pays de l'UE, en vertu de contrats qui les obligent à les protéger conformément au niveau exigé par la loi japonaise sur la protection des informations personnelles (APPI) ; sur demande, nous vous indiquons ce qu'ils font pour les protéger et vous informons du régime de protection de la vie privée de leur pays. Vos convictions, y compris religieuses et politiques, et votre santé sont des informations personnelles nécessitant une attention particulière ; nous ne les collectons qu'avec votre consentement préalable (section 3). Notre dénomination et notre adresse sont DebateAIRO S.R.L., [address], Roumanie, et notre représentant est [name], administrateur ; la manière de présenter une demande figure à la section 10, nos mesures de sécurité à la section 9, et les réclamations sont à adresser à privacy@dezbatere.ro. Nous signalons les violations à la Personal Information Protection Commission conformément à la loi. Corée du Sud : notre responsable de la protection de la vie privée est [name], administrateur, privacy@dezbatere.ro. Nous transférons des informations personnelles à l'étranger parce que l'exécution de vos débats, en vertu de notre contrat avec vous, l'exige : chaque fois qu'un débat s'exécute, nous envoyons votre question et les interventions du débat, ainsi que, dans le chat d'assistance, vos messages, par une connexion chiffrée aux fournisseurs d'IA et aux hébergeurs figurant dans le Registre, qui indique pour chaque destinataire son pays, ses coordonnées, la finalité et la durée de conservation des données. Vous pouvez refuser le transfert en ne lançant pas de débats ou en supprimant votre compte ; nous ne pouvons alors pas exécuter de débats pour vous. Les opinions politiques, les convictions et la santé sont des informations sensibles ; nous ne les traitons qu'avec votre consentement distinct (section 3). Nous ne prenons aucune décision entièrement automatisée à votre égard (section 8). Nous répondons aux demandes dans un délai de [10] jours et signalons les violations à la Personal Information Protection Commission et à vous-même comme l'exige le Personal Information Protection Act. Taïwan : le Personal Data Protection Act de Taïwan s'applique. Nous conservons vos données pendant les durées indiquées à la section 7 ; elles sont utilisées en Roumanie, dans d'autres pays de l'UE et aux États-Unis (voir le Registre) ; les destinataires figurent à la section 5 ; nos systèmes et nos modèles d'IA les traitent automatiquement pour exécuter vos débats. Vous pouvez demander quelles données nous détenons, les consulter, en obtenir une copie, les rectifier, nous faire cesser de les utiliser et les supprimer (section 10). La fourniture des données de compte est facultative, mais sans elles nous ne pouvons pas vous ouvrir de compte. Nous répondons à toute demande de consultation ou de copie de vos données dans un délai de 15 jours ; si nous avons besoin de plus de temps, nous pouvons prolonger ce délai une seule fois de 15 jours au plus, en vous en indiquant les motifs par écrit. Philippines : notre délégué à la protection des données est [name] ; les réclamations peuvent être déposées auprès de la National Privacy Commission ; la section 8 décrit le traitement automatisé. Thaïlande : notre représentant est [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Réservé",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "La Turquie, le Brésil et l'Indonésie exigent chacun une information en langue locale, un représentant ou un enregistrement, ainsi que des formalités déclaratives ; ces pays ne sont pas traités ici. La Chine, le Viêt Nam et la Russie ne sont pas desservis." }
+      { kind: "p", text: "Singapour : notre délégué à la protection des données est [name, email] ; les transferts reposent sur des obligations contractuelles offrant une protection comparable à celle de la PDPA ; nous notifions à la PDPC les violations soumises à notification dans un délai de 3 jours. Japon : nous utilisons vos données à caractère personnel aux seules fins indiquées à la section 4. Nous les communiquons aux fournisseurs d'IA et aux hébergeurs figurant dans le Registre, situés aux États-Unis et dans des pays de l'UE, en vertu de contrats qui les obligent à les protéger conformément au niveau exigé par la loi japonaise sur la protection des informations personnelles (APPI) ; sur demande, nous vous indiquons ce qu'ils font pour les protéger et vous informons du régime de protection de la vie privée de leur pays. Vos convictions, y compris religieuses et politiques, et votre santé sont des informations personnelles nécessitant une attention particulière ; nous ne les collectons qu'avec votre consentement préalable (section 3). Notre dénomination et notre adresse sont DebateAIRO S.R.L., [address], Roumanie, et notre représentant est [name], administrateur ; la manière de présenter une demande figure à la section 10, nos mesures de sécurité à la section 9, et les réclamations sont à adresser à privacy@dezbatere.ro. Nous signalons les violations à la Personal Information Protection Commission conformément à la loi. Corée du Sud : notre responsable de la protection de la vie privée est [name], administrateur, privacy@dezbatere.ro. Nous transférons des informations personnelles à l'étranger parce que l'exécution de vos débats, en vertu de notre contrat avec vous, l'exige : chaque fois qu'un débat s'exécute, nous envoyons votre question et les interventions du débat, ainsi que, dans le chat d'assistance, vos messages, par une connexion chiffrée aux fournisseurs d'IA et aux hébergeurs figurant dans le Registre, qui indique pour chaque destinataire son pays, ses coordonnées, la finalité et la durée de conservation des données. Vous pouvez refuser le transfert en ne lançant pas de débats ou en supprimant votre compte ; nous ne pouvons alors pas exécuter de débats pour vous. Les opinions politiques, les convictions et la santé sont des informations sensibles ; nous ne les traitons qu'avec votre consentement distinct (section 3). Nous ne prenons aucune décision entièrement automatisée à votre égard (section 8). Nous répondons aux demandes dans un délai de 10 jours et signalons les violations à la Personal Information Protection Commission et à vous-même comme l'exige le Personal Information Protection Act. Taïwan : le Personal Data Protection Act de Taïwan s'applique. Nous conservons vos données pendant les durées indiquées à la section 7 ; elles sont utilisées en Roumanie, dans d'autres pays de l'UE et aux États-Unis (voir le Registre) ; les destinataires figurent à la section 5 ; nos systèmes et nos modèles d'IA les traitent automatiquement pour exécuter vos débats. Vous pouvez demander quelles données nous détenons, les consulter, en obtenir une copie, les rectifier, nous faire cesser de les utiliser et les supprimer (section 10). La fourniture des données de compte est facultative, mais sans elles nous ne pouvons pas vous ouvrir de compte. Nous répondons à toute demande de consultation ou de copie de vos données dans un délai de 15 jours ; si nous avons besoin de plus de temps, nous pouvons prolonger ce délai une seule fois de 15 jours au plus, en vous en indiquant les motifs par écrit." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "c07ed336946b87d5e2461fd0cc36e274910fdab2730de824291f35d66f4a65ef",
-  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.2 · EN VIGUEUR LE [DATE]",
+  version: "3.3",
+  sha256: "98020fc9ce401e29d088259ed08e49a59c43a52e777a681b2a9bb27cc1fa6019",
+  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.3 · EN VIGUEUR LE [DATE]",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",
-  endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Texte de la Politique de confidentialité",
   sectionIdPrefix: "policy-section-",

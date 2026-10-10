@@ -69,12 +69,12 @@ describe("legal documents — generated data", () => {
   describe("Terms of Service", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(TERMS_OF_SERVICE.key).toBe("terms");
-      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.1 · EFFECTIVE [DATE]");
+      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.2 · EFFECTIVE [DATE]");
       expect(TERMS_OF_SERVICE.title).toBe("What you agree to");
       expect(TERMS_OF_SERVICE.lede).toBe(
         "The contract between you and DebateAIRO S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
       );
-      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.1");
+      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.2");
       expect(TERMS_OF_SERVICE.contact).toBe("[legal@dezbatere.ro]");
       expect(TERMS_OF_SERVICE.bodyLabel).toBe("Terms of Service text");
       expect(TERMS_OF_SERVICE.sectionIdPrefix).toBe("terms-section-");
@@ -84,12 +84,12 @@ describe("legal documents — generated data", () => {
       expect(TERMS_OF_SERVICE.sections).toBe(TERMS_SECTIONS);
     });
 
-    it("numbers the summary 00, the nineteen sections 01–19, the annex A and its parts A.1–A.11", () => {
+    it("numbers the summary 00, the nineteen sections 01–19, the annex A and its parts A.1–A.7", () => {
       expect(TERMS_SECTIONS.map((entry) => entry.no)).toEqual([
         "00",
         ...twoDigit(19),
         "A",
-        ...Array.from({ length: 11 }, (_, index) => `A.${index + 1}`)
+        ...Array.from({ length: 7 }, (_, index) => `A.${index + 1}`)
       ]);
       const titles = TERMS_SECTIONS.map((entry) => entry.title);
       expect(titles[0]).toBe("In short");
@@ -97,10 +97,9 @@ describe("legal documents — generated data", () => {
       expect(titles[19]).toBe("Other terms");
       expect(titles[20]).toBe("Annex A — Regional terms");
       expect(titles[21]).toBe("European Union and European Economic Area");
-      expect(titles[22]).toBe("United Kingdom (only if listed in section 2)");
-      expect(titles[26]).toBe("Switzerland (only if listed)");
-      expect(titles[30]).toBe("Asia-Pacific (only the lines for regions listed)");
-      expect(titles[31]).toBe("Reserved");
+      expect(titles[22]).toBe("United States");
+      expect(titles[25]).toBe("Switzerland");
+      expect(titles[27]).toBe("Asia-Pacific");
     });
 
     it("keeps the summary paragraph without its bold lead-in", () => {
@@ -156,9 +155,24 @@ describe("legal documents — generated data", () => {
       );
     });
 
-    it("keeps Tennessee out: section 2 lists the United States without it, and Annex A.3 says so first", () => {
-      expect(texts(section(TERMS_OF_SERVICE, "02"))[0]).toContain("[and: the United States (except Tennessee) / Canada");
-      expect(texts(section(TERMS_OF_SERVICE, "A.3"))[0]).toBe("Tennessee. We do not offer DebateAI to people who live in Tennessee.");
+    it("keeps Tennessee out: section 2 lists the United States without it, and Annex A.2 says so first", () => {
+      expect(texts(section(TERMS_OF_SERVICE, "02"))[0]).toContain("Moldova, the United States (except Tennessee), Canada,");
+      expect(texts(section(TERMS_OF_SERVICE, "A.2"))[0]).toBe("Tennessee. We do not offer DebateAI to people who live in Tennessee.");
+    });
+
+    it("lists the countries served in plain prose, and names none it does not serve (owner's ruling of 9 October 2026)", () => {
+      expect(texts(section(TERMS_OF_SERVICE, "02"))[0]).toBe(
+        "We offer DebateAI to people who live in the European Union (27 countries) and the European Economic Area"
+          + " (Norway, Iceland and Liechtenstein), Switzerland, Moldova, the United States (except Tennessee), Canada,"
+          + " Australia, New Zealand, Singapore, Japan, South Korea and Taiwan. We do not offer it elsewhere."
+          + " If you live outside those countries you may be able to reach the site, but we do not direct the service to you,"
+          + " we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your"
+          + " country. Annex A sets out what applies in each region we serve."
+      );
+      for (const document of [TERMS_OF_SERVICE, PRIVACY_POLICY]) {
+        const all = [...document.sections.map((entry) => entry.title), ...allTexts(document)].join("\n");
+        expect(all).not.toMatch(/United Kingdom|\bUK\b|Ukrain|Israel|Thailand|Philippines|only if listed|Reserved/u);
+      }
     });
 
     it("says the support chat sends text to a model too, right after the debate paragraph", () => {
@@ -219,12 +233,12 @@ describe("legal documents — generated data", () => {
   describe("Privacy Policy", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(PRIVACY_POLICY.key).toBe("privacy");
-      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.2 · EFFECTIVE [DATE]");
+      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.3 · EFFECTIVE [DATE]");
       expect(PRIVACY_POLICY.title).toBe("What we store, and why");
       expect(PRIVACY_POLICY.lede).toBe(
         "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end."
       );
-      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.2");
+      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.3");
       expect(PRIVACY_POLICY.contact).toBe("privacy@dezbatere.ro");
       expect(PRIVACY_POLICY.bodyLabel).toBe("Privacy Policy text");
       expect(PRIVACY_POLICY.sectionIdPrefix).toBe("policy-section-");
@@ -234,12 +248,12 @@ describe("legal documents — generated data", () => {
       expect(PRIVACY_POLICY.sections).toBe(POLICY_SECTIONS);
     });
 
-    it("numbers the summary 00, the fourteen sections 01–14, the annex B and its parts B.1–B.11", () => {
+    it("numbers the summary 00, the fourteen sections 01–14, the annex B and its parts B.1–B.7", () => {
       expect(POLICY_SECTIONS.map((entry) => entry.no)).toEqual([
         "00",
         ...twoDigit(14),
         "B",
-        ...Array.from({ length: 11 }, (_, index) => `B.${index + 1}`)
+        ...Array.from({ length: 7 }, (_, index) => `B.${index + 1}`)
       ]);
       const titles = POLICY_SECTIONS.map((entry) => entry.title);
       expect(titles[0]).toBe("In short");
@@ -247,9 +261,8 @@ describe("legal documents — generated data", () => {
       expect(titles[14]).toBe("Changes to this policy");
       expect(titles[15]).toBe("Annex B — Regional privacy terms");
       expect(titles[16]).toBe("European Union and European Economic Area");
-      expect(titles[21]).toBe("Switzerland (only if listed)");
-      expect(titles[25]).toBe("Asia-Pacific (only the lines for regions listed)");
-      expect(titles[26]).toBe("Reserved");
+      expect(titles[20]).toBe("Switzerland");
+      expect(titles[22]).toBe("Asia-Pacific");
       expect(texts(section(PRIVACY_POLICY, "00"))[0]!.startsWith("We collect what an account needs")).toBe(true);
     });
 
@@ -267,9 +280,9 @@ describe("legal documents — generated data", () => {
       const rights = texts(section(PRIVACY_POLICY, "10")).join("\n");
       expect(rights).toContain("anspdcp@dataprotection.ro");
       expect(rights).not.toContain("<anspdcp");
-      const uk = texts(section(PRIVACY_POLICY, "B.2")).join("\n");
-      expect(uk).toContain("ico.org.uk");
-      expect(uk).not.toContain("](https://");
+      const swiss = texts(section(PRIVACY_POLICY, "B.5")).join("\n");
+      expect(swiss).toContain("edoeb.admin.ch");
+      expect(swiss).not.toContain("](https://");
     });
 
     it("leaves no markdown syntax in any string a reader sees", () => {

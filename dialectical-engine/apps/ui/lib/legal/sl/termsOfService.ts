@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kje ponujamo DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI ponujamo osebam, ki živijo v [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
+      { kind: "p", text: "DebateAI ponujamo osebam, ki živijo v naslednjih državah in regijah: Evropska unija (27 držav) in Evropski gospodarski prostor (Norveška, Islandija in Lihtenštajn), Švica, Moldavija, Združene države Amerike (razen zvezne države Tennessee), Kanada, Avstralija, Nova Zelandija, Singapur, Japonska, Južna Koreja in Tajvan. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Sprejetje teh Pogojev",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Te Pogoje sprejmete tako, da označite polje »Prebral/-a sem in se strinjam s pogoji uporabe.« ter kliknete Ustvari račun. S tem med vami in družbo DebateAIRO S.R.L. nastane pogodba. Pogoji vključujejo pravila dopustne uporabe iz razdelka 7, pravila objavljanja iz razdelka 9, določbe o odgovornosti iz razdelka 15, določbe o pravu, ki se uporablja, in sporih iz razdelka 18 ter, če živite v Združenih državah Amerike, arbitražni sporazum iz Priloge A.3. Hranimo zapis o tem, katero različico ste sprejeli in kdaj, kot je pojasnjeno v našem Pravilniku o zasebnosti." },
+      { kind: "p", text: "Te Pogoje sprejmete tako, da označite polje »Prebral/-a sem in se strinjam s pogoji uporabe.« ter kliknete Ustvari račun. S tem med vami in družbo DebateAIRO S.R.L. nastane pogodba. Pogoji vključujejo pravila dopustne uporabe iz razdelka 7, pravila objavljanja iz razdelka 9, določbe o odgovornosti iz razdelka 15, določbe o pravu, ki se uporablja, in sporih iz razdelka 18 ter, če živite v Združenih državah Amerike, arbitražni sporazum iz Priloge A.2. Hranimo zapis o tem, katero različico ste sprejeli in kdaj, kot je pojasnjeno v našem Pravilniku o zasebnosti." },
       { kind: "p", text: "Naš Pravilnik o zasebnosti na [dezbatere.ro/privacy] pojasnjuje, kako ravnamo z osebnimi podatki. To so informacije, ki vam jih moramo zagotoviti, in ne pogodba, s katero soglašate, nič v teh Pogojih pa jih ne spremeni v privolitev za obdelavo. Naš Pravilnik o piškotkih na [dezbatere.ro/cookies] in naš Register ponudnikov umetne inteligence na [dezbatere.ro/providers] sta s sklicevanjem vključena v te Pogoje." },
       { kind: "p", text: "Preden z nami elektronsko sklenete katero koli pogodbo, vam vmesnik prikaže potrebne korake, omogoči pregled in popravek vnesenih podatkov pred oddajo ter vas obvesti o jezikih, v katerih je mogoče skleniti pogodbo. Ti Pogoji so na voljo v obliki, ki jo lahko shranite in natisnete. Ob nakupu plačljivega paketa vam sprejeto različico pošljemo po e-pošti. Izvod lahko zahtevate kadar koli. Nič v teh Pogojih ne omejuje pravic, ki jih imate po romunskem pravu ali pravu EU o varstvu potrošnikov oziroma po pravu države, v kateri živite, in ki jih ni mogoče omejiti s pogodbo." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Vaša pravica do odstopa",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Če živite v EU, EGP ali Združenem kraljestvu, lahko od plačljive naročnine odstopite v 14 dneh po sklenitvi brez navedbe razloga. Uporabite stran Odstop od pogodbe na [dezbatere.ro/withdraw], vzorčni obrazec v potrditvenem e-poštnem sporočilu ali pišite na [support@dezbatere.ro]; prejem potrdimo na trajnem nosilcu." },
+      { kind: "p", text: "Če živite v EU ali EGP, lahko od plačljive naročnine odstopite v 14 dneh po sklenitvi brez navedbe razloga. Uporabite stran Odstop od pogodbe na [dezbatere.ro/withdraw], vzorčni obrazec v potrditvenem e-poštnem sporočilu ali pišite na [support@dezbatere.ro]; prejem potrdimo na trajnem nosilcu." },
       { kind: "p", text: "Če ste nas z označitvijo polja ob plačilu prosili, naj storitev začnemo izvajati takoj, in nato odstopite, plačate del storitve, zagotovljen do dneva odstopa, ki se izračuna sorazmerno s ceno za obračunsko obdobje, preostanek pa vam vrnemo. Z uporabo storitve v 14-dnevnem obdobju ne izgubite pravice do odstopa." },
       { kind: "p", text: "Če živite drugje, Priloga A določa pravico do odstopa ali obdobje za premislek, ki velja v vaši regiji, če obstaja, sicer pa naš pravilnik o vračilih. Zakonske pravice v vaši državi imajo vedno prednost." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Pravo, ki se uporablja. Za te Pogoje ter vse spore ali zahtevke, ki izhajajo iz njih ali njihove vsebine, vključno z nepogodbenimi zahtevki, se uporablja pravo Romunije." },
-      { kind: "p", text: "Vaše lokalno varstvo ostaja nespremenjeno. Če ste potrošnik, vam izbira romunskega prava ne odvzema varstva po obveznih pravilih o varstvu potrošnikov v državi vašega običajnega prebivališča — na primer pravilih o nepoštenih pogojih, pravicah do odstopa in preklica ali jamstvih — kadar se ta pravila uporabljajo ne glede na to izbiro, tudi po členu 6(2) Uredbe (ES) št. 593/2008, če živite v EU, ali po enakovrednih pravilih Združenega kraljestva. Na ta pravila se lahko sklicujete poleg romunskega prava." },
-      { kind: "p", text: "Sodišča, če živite v EU, EGP ali Združenem kraljestvu. Postopek proti nam lahko začnete na sodiščih v Romuniji ali na sodiščih države, v kateri živite. Mi lahko postopek proti vam začnemo samo na sodiščih države, v kateri živite." },
-      { kind: "p", text: "Potrošniki drugje. Če živite zunaj EU, EGP in Združenega kraljestva, nič v teh Pogojih ne omejuje pravice, ki jo imate po pravu svoje države, da vložite zahtevek pri njenih sodiščih, ali katere koli pravice po tem pravu, ki se ji ni mogoče odpovedati — vključno s pravicami iz jamstev za potrošnike, če živite v Avstraliji ali Novi Zelandiji; zakonikom Código de Defesa do Consumidor, če živite v Braziliji; in zakoni o varstvu potrošnikov vaše zvezne države, če živite v Združenih državah Amerike." },
-      { kind: "p", text: "Prebivalci Združenih držav Amerike. Priloga A.3 vsebuje arbitražni sporazum in odpoved skupinski tožbi, ki ju ureja zvezni zakon o arbitraži. Velja samo za prebivalce Združenih držav Amerike in samo tam, kjer je izvršljiv. Ne velja za potrošnike v EU, EGP ali Združenem kraljestvu." },
+      { kind: "p", text: "Vaše lokalno varstvo ostaja nespremenjeno. Če ste potrošnik, vam izbira romunskega prava ne odvzema varstva po obveznih pravilih o varstvu potrošnikov v državi vašega običajnega prebivališča — na primer pravilih o nepoštenih pogojih, pravicah do odstopa in preklica ali jamstvih — kadar se ta pravila uporabljajo ne glede na to izbiro, tudi po členu 6(2) Uredbe (ES) št. 593/2008, če živite v EU. Na ta pravila se lahko sklicujete poleg romunskega prava." },
+      { kind: "p", text: "Sodišča, če živite v EU ali EGP. Postopek proti nam lahko začnete na sodiščih v Romuniji ali na sodiščih države, v kateri živite. Mi lahko postopek proti vam začnemo samo na sodiščih države, v kateri živite." },
+      { kind: "p", text: "Potrošniki drugje. Če živite zunaj EU in EGP, nič v teh Pogojih ne omejuje pravice, ki jo imate po pravu svoje države, da vložite zahtevek pri njenih sodiščih, ali katere koli pravice po tem pravu, ki se ji ni mogoče odpovedati — vključno s pravicami iz jamstev za potrošnike, če živite v Avstraliji ali Novi Zelandiji; zakonikom Código de Defesa do Consumidor, če živite v Braziliji; in zakoni o varstvu potrošnikov vaše zvezne države, če živite v Združenih državah Amerike." },
+      { kind: "p", text: "Prebivalci Združenih držav Amerike. Priloga A.2 vsebuje arbitražni sporazum in odpoved skupinski tožbi, ki ju ureja zvezni zakon o arbitraži. Velja samo za prebivalce Združenih držav Amerike in samo tam, kjer je izvršljiv. Ne velja za potrošnike v EU ali EGP." },
       { kind: "p", text: "Pred sodnim postopkom. Obrnite se na nas na [legal@dezbatere.ro]; večino težav je mogoče odpraviti, odgovoriti pa si prizadevamo v [5] delovnih dneh. Če ste potrošnik v Romuniji ali EU, lahko uporabite alternativno reševanje sporov prek [the ANPC – named SAL entity, website]; k sodelovanju v tem postopku se [do / do not] zavezujemo. Pritožbe zoper odločitve o moderiranju sledijo razdelku 10, ki je ločen postopek." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Priloga A — Regionalni pogoji",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vsak vnos velja samo, če je njegova regija navedena v razdelku 2, in navaja samo razlike od splošnega dela. Če sta vnos in splošni del v nasprotju, za osebe v tej regiji velja vnos." }
+      { kind: "p", text: "Vsak vnos velja za osebe, ki živijo v njegovi regiji, in navaja samo razlike od splošnega dela. Če sta vnos in splošni del v nasprotju, za osebe v tej regiji velja vnos." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Združeno kraljestvo (samo če je navedeno v razdelku 2)",
+    title: "Združene države Amerike",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Naš predstavnik v Združenem kraljestvu po členu 27 UK GDPR je [name, address, email]. Za vas velja zakon Consumer Rights Act 2015 in nič v teh Pogojih ne omejuje vaših pravic po njem; ko začnejo veljati pravila o naročninah iz zakona Digital Markets, Competition and Consumers Act 2024 (pričakovano leta 2027), bodo veljala za plačljive pakete, vključno z obdobjem za premislek po podaljšanjih in brezplačnih preskusnih obdobjih. Kako uporabnike varujemo pred nezakonito vsebino: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktivna tehnologija, ki jo uporabljamo: [describe, or \"none\"]. Preverjanje starosti: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Pritožbeni postopek iz razdelka 10 sprejema pritožbe glede nezakonite vsebine, neupravičene odstranitve vaše vsebine, omejitev vašega računa, uporabe avtomatiziranih orodij, ki vplivajo na vašo vsebino, in vsake ocene starosti, ki vas neupravičeno blokira. Na voljo je osebam, na katere vpliva vsebina in ki niso uporabniki. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.2." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Združene države Amerike (samo če so navedene v razdelku 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. DebateAI ne ponujamo osebam, ki živijo v Tennesseeju." },
       { kind: "p", text: "Arbitražni sporazum in odpoved skupinski tožbi. Če živite v Združenih državah Amerike, se vi in DebateAIRO strinjate, da boste vsak spor, ki izhaja iz teh Pogojev ali storitve, namesto na sodišču reševali z zavezujočo posamično arbitražo, ki jo vodi [the American Arbitration Association / JAMS] po svojih pravilih za potrošnike, pri čemer lahko vsak od naju vloži posamični zahtevek pri sodišču za spore majhne vrednosti. Sodelovanje lahko zavrnete tako, da v 30 dneh od prvega sprejetja teh Pogojev pošljete e-poštno sporočilo na [address]. Ta sporazum ureja zvezni zakon o arbitraži. Plačamo pristojbine za vložitev arbitražnega postopka. Skupinske, kolektivne in zastopniške tožbe so izključene v obsegu, ki ga dovoljuje zakon. Ta razdelek velja samo za naprej in ne velja za zahtevke, ki so nastali, preden ste ga sprejeli." },
       { kind: "p", text: "Obvestila in odstranitve. Intimne posnetke brez privolitve je mogoče brez računa prijaviti na [URL], odstranijo pa se v 48 urah od veljavne zahteve. Pritožbe glede avtorskih pravic se naslovijo na našega imenovanega zastopnika iz razdelka 16." },
-      { kind: "p", text: "Posebnosti zveznih držav. Kalifornija: veljajo pogoji samodejnega podaljšanja iz razdelka 12; prek spleta lahko kadar koli prekličete; vašo privolitev v pogoje podaljšanja hranimo najmanj tri leta. New York: v 14 dneh od vsake bremenitve po zvišani ceni lahko prekličete in prejmete sorazmerno vračilo. Teksas in Nebraska: občutljivih osebnih podatkov ne prodajamo. Washington: za zdravstvene podatke velja naše Obvestilo o zasebnosti zdravstvenih podatkov potrošnikov na [URL]. Kolorado: nič v storitvi ne sprejema odločitev z znatnimi posledicami za vas. Vaše podatke in vaše pravice glede zasebnosti po zakonodaji vaše zvezne države ureja naš Pravilnik o zasebnosti, Priloga B.3." }
+      { kind: "p", text: "Posebnosti zveznih držav. Kalifornija: veljajo pogoji samodejnega podaljšanja iz razdelka 12; prek spleta lahko kadar koli prekličete; vašo privolitev v pogoje podaljšanja hranimo najmanj tri leta. New York: v 14 dneh od vsake bremenitve po zvišani ceni lahko prekličete in prejmete sorazmerno vračilo. Teksas in Nebraska: občutljivih osebnih podatkov ne prodajamo. Washington: za zdravstvene podatke velja naše Obvestilo o zasebnosti zdravstvenih podatkov potrošnikov na [URL]. Kolorado: nič v storitvi ne sprejema odločitev z znatnimi posledicami za vas. Vaše podatke in vaše pravice glede zasebnosti po zakonodaji vaše zvezne države ureja naš Pravilnik o zasebnosti, Priloga B.2." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Kanada in Quebec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je [name], privacy@dezbatere.ro. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.3. Quebec: ti Pogoji so na voljo v francoščini; francoščino izberite v izbirniku jezika; nastavitve, ki ohranjajo zasebnost vaših razprav, so privzeto vključene; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja; za vas ne velja noben arbitražni sporazum ali odpoved skupinski tožbi." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanada in Quebec (samo če sta navedena)",
+    title: "Avstralija in Nova Zelandija",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je [name], privacy@dezbatere.ro. Vaše podatke ureja naš Pravilnik o zasebnosti, Priloga B.4. Quebec: ti Pogoji so na voljo v francoščini; francoščino izberite v izbirniku jezika; nastavitve, ki ohranjajo zasebnost vaših razprav, so privzeto vključene; zahtevate lahko odstranitev osebnih podatkov o sebi iz rezultatov iskanja; za vas ne velja noben arbitražni sporazum ali odpoved skupinski tožbi." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Avstralija in Nova Zelandija (samo če sta navedeni)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Za naše storitve veljajo jamstva, ki jih po avstralskem pravu varstva potrošnikov ni mogoče izključiti. Pri večjih napakah storitve imate pravico do preklica in vračila za neizkoriščeni del ali do nadomestila za zmanjšano vrednost; prav tako imate pravico do nadomestila za vse druge razumno predvidljive izgube ali škodo. Če napaka ni večja, imate pravico, da se težave s storitvijo odpravijo v razumnem času, če se to ne zgodi, pa do preklica in vračila. V obsegu, ki ga dovoljuje člen 64A, je naša odgovornost za kršitev jamstva omejena na ponovno zagotovitev storitve ali plačilo stroškov ponovne zagotovitve. Za plačljivi paket poleg tega, kar vam zagotavlja razdelek 12, ne velja pravica do obdobja za premislek; naš pravilnik o vračilih je […]. Nova Zelandija: velja zakon Consumer Guarantees Act 1993 in nič v teh Pogojih ga ne izključuje; škodljive digitalne komunikacije lahko prijavite nam po razdelku 10 ali organizaciji Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "Švica",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "Za vaše podatke velja švicarski zvezni zakon o varstvu podatkov (Pravilnik o zasebnosti, Priloga B.5). Postopek lahko sprožite pred sodišči v kraju v Švici, kjer živite. Za plačljivi paket ne velja zakonska pravica do odstopa; naš pravilnik o vračilih je […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Švica (samo če je navedena)",
+    title: "Moldavija",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Za vaše podatke velja švicarski zvezni zakon o varstvu podatkov (Pravilnik o zasebnosti, Priloga B.6). Postopek lahko sprožite pred sodišči v kraju v Švici, kjer živite. Za plačljivi paket ne velja zakonska pravica do odstopa; naš pravilnik o vračilih je […]." }
+      { kind: "p", text: "Po teh Pogojih imate enake pravice kot potrošnik v Evropski uniji, vključno s 14-dnevno pravico do odstopa iz razdelka 13. Postopek lahko sprožite pred sodišči v Moldaviji. Za vaše podatke velja moldavski zakon št. 195/2024 o varstvu osebnih podatkov (Pravilnik o zasebnosti, Priloga B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldavija (samo če je navedena)",
+    title: "Azijsko-pacifiška regija",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Po teh Pogojih imate enake pravice kot potrošnik v Evropski uniji, vključno s 14-dnevno pravico do odstopa iz razdelka 13. Postopek lahko sprožite pred sodišči v Moldaviji. Za vaše podatke velja moldavski zakon št. 195/2024 o varstvu osebnih podatkov (Pravilnik o zasebnosti, Priloga B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukrajina (samo če je navedena)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "DebateAI ponujamo v Ukrajini, razen na območjih, ki jih ukrajinska vlada ne nadzoruje. Izdelek in ti Pogoji so na voljo v ukrajinščini. Za vaše podatke velja zakon Ukrajine »O varstvu osebnih podatkov« (Pravilnik o zasebnosti, Priloga B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Izrael (samo če je naveden)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Plačljivi paket lahko prekličete, kot to dovoljuje izraelski zakon o varstvu potrošnikov 5741-1981 [state the cancellation terms]. Ti Pogoji in naš Pravilnik o zasebnosti so na voljo v hebrejščini. Za vaše podatke velja izraelski zakon o varstvu zasebnosti (Pravilnik o zasebnosti, Priloga B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Azijsko-pacifiška regija (samo vrstice za navedene regije)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapur: naša pooblaščena oseba za varstvo podatkov je [name, email]; prenosi temeljijo na pogodbenih zaščitnih ukrepih, primerljivih s PDPA; za plačljivi paket ne velja zakonsko obdobje za premislek, naš pravilnik o vračilih pa je […]. Japonska: zakonsko razkritje po zakonu Specified Commercial Transactions Act je na [URL]; za spletne naročnine ne velja splošno obdobje za premislek, naš pravilnik o vračilih pa je […]; vašo vsebino pošiljamo ponudnikom umetne inteligence v Združenih državah Amerike in Evropski uniji, vsakemu na podlagi pogodbe, ki zahteva zaščito, enakovredno japonskemu zakonu Act on the Protection of Personal Information, na zahtevo pa vam povemo, kateri so ti ukrepi. Južna Koreja: privolitve za neobvezno obdelavo in trženje se zbirajo ločeno od postavk, potrebnih za izvajanje storitve; naša oseba, odgovorna za zasebnost, je [name], privacy@dezbatere.ro; od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine ob upoštevanju zakona E-Commerce Act; pred vsakim ponavljajočim se zvišanjem cene ali prehodom z brezplačnega na plačljivi paket pridobimo vašo novo privolitev; storitev uporablja generativno umetno inteligenco, o čemer vas obvestimo, preden jo začnete uporabljati, rezultate, ki jih ustvari umetna inteligenca, pa označimo. Tajvan: od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine po zakonu Consumer Protection Act; za vaše podatke velja tajvanski zakon Personal Data Protection Act (Pravilnik o zasebnosti, Priloga B.10). Tajska: naš predstavnik na Tajskem je [name] [if appointed]. Filipini: naši poslovni identifikacijski podatki in mehanizem pravnega varstva po zakonu Internet Transactions Act so na [URL]; pritožbe se lahko vložijo pri nacionalni komisiji za zasebnost." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Pridržano",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Turčija, Brazilija in Indonezija zahtevajo prilogo v lokalnem jeziku, predstavnika ali registracijo ter vložitve. Določbe zanje tukaj niso pripravljene, te države pa niso vključene v razdelek 2, dokler jih izrecno ne dodamo. Storitve ne ponujamo na Kitajskem, v Vietnamu ali Rusiji." }
+      { kind: "p", text: "Singapur: naša pooblaščena oseba za varstvo podatkov je [name, email]; prenosi temeljijo na pogodbenih zaščitnih ukrepih, primerljivih s PDPA; za plačljivi paket ne velja zakonsko obdobje za premislek, naš pravilnik o vračilih pa je […]. Japonska: zakonsko razkritje po zakonu Specified Commercial Transactions Act je na [URL]; za spletne naročnine ne velja splošno obdobje za premislek, naš pravilnik o vračilih pa je […]; vašo vsebino pošiljamo ponudnikom umetne inteligence v Združenih državah Amerike in Evropski uniji, vsakemu na podlagi pogodbe, ki zahteva zaščito, enakovredno japonskemu zakonu Act on the Protection of Personal Information, na zahtevo pa vam povemo, kateri so ti ukrepi. Južna Koreja: privolitve za neobvezno obdelavo in trženje se zbirajo ločeno od postavk, potrebnih za izvajanje storitve; naša oseba, odgovorna za zasebnost, je [name], privacy@dezbatere.ro; od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine ob upoštevanju zakona E-Commerce Act; pred vsakim ponavljajočim se zvišanjem cene ali prehodom z brezplačnega na plačljivi paket pridobimo vašo novo privolitev; storitev uporablja generativno umetno inteligenco, o čemer vas obvestimo, preden jo začnete uporabljati, rezultate, ki jih ustvari umetna inteligenca, pa označimo. Tajvan: od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine po zakonu Consumer Protection Act; za vaše podatke velja tajvanski zakon Personal Data Protection Act (Pravilnik o zasebnosti, Priloga B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "1cd216c10904c06be8da825b6c270e38ebe2fc9ecdfb32d789dd8a3ab2f2c434",
-  eyebrow: "POGOJI UPORABE · v2.1 · VELJAVNI OD [DATE]",
+  version: "2.2",
+  sha256: "7b3a4c034699a3f0e643a6d223123682e51eccb880ca8061153932ad2664d538",
+  eyebrow: "POGOJI UPORABE · v2.2 · VELJAVNI OD [DATE]",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DebateAIRO S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",
-  endMarker: "KONEC POGOJEV · v2.1",
+  endMarker: "KONEC POGOJEV · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Besedilo Pogojev uporabe",
   sectionIdPrefix: "terms-section-",

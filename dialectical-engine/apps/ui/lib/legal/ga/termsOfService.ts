@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Na háiteanna ina gcuirimid DebateAI ar fáil",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Cuirimid DebateAI ar fáil do dhaoine a bhfuil cónaí orthu san [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid." }
+      { kind: "p", text: "Cuirimid DebateAI ar fáil do dhaoine a bhfuil cónaí orthu san Aontas Eorpach (27 tír) agus sa Limistéar Eorpach Eacnamaíoch (an Iorua, an Íoslainn agus an Lichtinstéin), san Eilvéis, sa Mholdóiv, sna Stáit Aontaithe (ach amháin Tennessee), i gCeanada, san Astráil, sa Nua-Shéalainn, i Singeapór, sa tSeapáin, sa Chóiré Theas agus sa Téaváin. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Glacadh leis na Téarmaí seo",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Glacann tú leis na Téarmaí seo tríd an mbosca ar a bhfuil \"Tá an méid seo a leanas léite agam agus aontaím leis: Téarmaí Seirbhíse\" a thiceáil agus Cruthaigh cuntas a chliceáil. Cruthaíonn sé sin conradh idir tú agus DebateAIRO S.R.L. Áirítear sna Téarmaí na rialacha maidir le húsáid inghlactha i rannán 7, na rialacha foilsithe i rannán 9, na forálacha dliteanais i rannán 15, na forálacha maidir leis an dlí rialaithe agus díospóidí i rannán 18 agus, má tá cónaí ort sna Stáit Aontaithe, an comhaontú eadrána in Iarscríbhinn A.3. Coinnímid taifead den leagan ar ghlac tú leis agus den uair a ghlac tú leis, mar a mhínítear inár mBeartas Príobháideachais." },
+      { kind: "p", text: "Glacann tú leis na Téarmaí seo tríd an mbosca ar a bhfuil \"Tá an méid seo a leanas léite agam agus aontaím leis: Téarmaí Seirbhíse\" a thiceáil agus Cruthaigh cuntas a chliceáil. Cruthaíonn sé sin conradh idir tú agus DebateAIRO S.R.L. Áirítear sna Téarmaí na rialacha maidir le húsáid inghlactha i rannán 7, na rialacha foilsithe i rannán 9, na forálacha dliteanais i rannán 15, na forálacha maidir leis an dlí rialaithe agus díospóidí i rannán 18 agus, má tá cónaí ort sna Stáit Aontaithe, an comhaontú eadrána in Iarscríbhinn A.2. Coinnímid taifead den leagan ar ghlac tú leis agus den uair a ghlac tú leis, mar a mhínítear inár mBeartas Príobháideachais." },
       { kind: "p", text: "Mínítear inár mBeartas Príobháideachais ag [dezbatere.ro/privacy] conas a láimhseálaimid sonraí pearsanta. Is faisnéis í atá dlite againn duit, ní conradh lena n-aontaíonn tú, agus ní dhéanann aon ní sna Téarmaí seo toiliú le próiseáil di. Is cuid de na Téarmaí seo trí thagairt iad ár mBeartas Fianán ag [dezbatere.ro/cookies] agus ár gClár Soláthraithe IS ag [dezbatere.ro/providers]." },
       { kind: "p", text: "Sula dtabharfaidh tú aon chonradh linn i gcrích go leictreonach, taispeánann an comhéadan duit na céimeanna atá i gceist, ligeann sé duit an méid a chuir tú isteach a athbhreithniú agus a cheartú sula gcuireann tú isteach é, agus insíonn sé duit na teangacha inar féidir an conradh a thabhairt i gcrích. Tá na Téarmaí seo ar fáil i bhfoirm is féidir leat a shábháil agus a phriontáil. Nuair a cheannaíonn tú plean íoctha, seolaimid chugat le ríomhphost an leagan ar ghlac tú leis. Is féidir leat cóip a iarraidh am ar bith. Ní chuireann aon ní sna Téarmaí seo teorainn le cearta atá agat faoi dhlí tomhaltóirí na Rómáine nó an AE, ná faoi dhlí na tíre ina bhfuil cónaí ort, nach féidir a theorannú le conradh." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Do cheart tarraingt siar",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Má tá cónaí ort san AE, sa LEE nó sa Ríocht Aontaithe, féadfaidh tú tarraingt siar ó shíntiús íoctha laistigh de 14 lá tar éis liostála, gan cúis a thabhairt. Úsáid an leathanach Tarraing siar ón gconradh ag [dezbatere.ro/withdraw], an fhoirm shamplach sa ríomhphost deimhnithe, nó scríobh chuig [support@dezbatere.ro]; deimhnímid go bhfuarthas é ar mheán marthanach." },
+      { kind: "p", text: "Má tá cónaí ort san AE nó sa LEE, féadfaidh tú tarraingt siar ó shíntiús íoctha laistigh de 14 lá tar éis liostála, gan cúis a thabhairt. Úsáid an leathanach Tarraing siar ón gconradh ag [dezbatere.ro/withdraw], an fhoirm shamplach sa ríomhphost deimhnithe, nó scríobh chuig [support@dezbatere.ro]; deimhnímid go bhfuarthas é ar mheán marthanach." },
       { kind: "p", text: "Má d'iarr tú orainn tús a chur leis an tseirbhís láithreach — tríd an mbosca ag an tseiceáil amach a thiceáil — agus má tharraingíonn tú siar ansin, íocann tú as an gcuid den tseirbhís a cuireadh ar fáil suas go dtí an lá a tharraingíonn tú siar, arna ríomh go pro rata ar an bpraghas don tréimhse bhilleála, agus aisíocaimid an chuid eile. Ní chailleann tú an ceart tarraingt siar trí úsáid a bhaint as an tseirbhís le linn na 14 lá." },
       { kind: "p", text: "Má tá cónaí ort in áit eile, sonraítear in Iarscríbhinn A cibé ceart tarraingt siar nó tréimhse mhachnaimh atá i bhfeidhm i do réigiún, más ann dá leithéid, agus ár mbeartas aisíocaíochta murach sin. Bíonn tosaíocht i gcónaí ag cearta reachtúla i do thír." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "An dlí rialaithe. Tá na Téarmaí seo, agus aon díospóid nó éileamh a eascraíonn astu nó as a n-ábhar, lena n-áirítear éilimh neamhchonarthacha, faoi rialú dlíthe na Rómáine." },
-      { kind: "p", text: "Ní dhéantar difear do do chosaintí áitiúla. Más tomhaltóir thú, ní bhaineann roghnú dlí na Rómáine díot an chosaint a thugann aon riail éigeantach um chosaint tomhaltóirí de chuid na tíre ina bhfuil gnáthchónaí ort — mar shampla rialacha maidir le téarmaí éagóracha, cearta tarraingthe siar agus cealaithe, nó ráthaíochtaí — nuair a bhíonn feidhm ag na rialacha sin beag beann ar an rogha seo, lena n-áirítear faoi Airteagal 6(2) de Rialachán (CE) Uimh. 593/2008 má tá cónaí ort san AE, nó rialacha coibhéiseacha na Ríochta Aontaithe. Féadfaidh tú brath ar na rialacha sin sa bhreis ar dhlí na Rómáine." },
-      { kind: "p", text: "Cúirteanna, má tá cónaí ort san AE, sa LEE nó sa Ríocht Aontaithe. Féadfaidh tú imeachtaí a thionscnamh inár gcoinne i gcúirteanna na Rómáine nó i gcúirteanna na tíre ina bhfuil cónaí ort. Ní fhéadfaimid imeachtaí a thionscnamh i do choinne ach i gcúirteanna na tíre ina bhfuil cónaí ort." },
-      { kind: "p", text: "Tomhaltóirí in áiteanna eile. Má tá cónaí ort lasmuigh den AE, den LEE agus den Ríocht Aontaithe, ní chuireann aon ní sna Téarmaí seo teorainn le haon cheart atá agat faoi dhlí do thíre éileamh a thabhairt os comhair a cúirteanna, ná le haon cheart faoin dlí sin nach féidir a tharscaoileadh — lena n-áirítear, má tá cónaí ort san Astráil nó sa Nua-Shéalainn, do chearta ráthaíochta tomhaltóra; má tá cónaí ort sa Bhrasaíl, an Código de Defesa do Consumidor; agus má tá cónaí ort sna Stáit Aontaithe, dlíthe cosanta tomhaltóirí do stáit." },
-      { kind: "p", text: "Cónaitheoirí na Stát Aontaithe. Tá comhaontú eadrána agus tarscaoileadh caingean aicme in Iarscríbhinn A.3 atá faoi rialú an Federal Arbitration Act. Ní bhaineann sé ach le cónaitheoirí na Stát Aontaithe agus nuair is infhorfheidhmithe é. Ní bhaineann sé le tomhaltóirí san AE, sa LEE ná sa Ríocht Aontaithe." },
+      { kind: "p", text: "Ní dhéantar difear do do chosaintí áitiúla. Más tomhaltóir thú, ní bhaineann roghnú dlí na Rómáine díot an chosaint a thugann aon riail éigeantach um chosaint tomhaltóirí de chuid na tíre ina bhfuil gnáthchónaí ort — mar shampla rialacha maidir le téarmaí éagóracha, cearta tarraingthe siar agus cealaithe, nó ráthaíochtaí — nuair a bhíonn feidhm ag na rialacha sin beag beann ar an rogha seo, lena n-áirítear faoi Airteagal 6(2) de Rialachán (CE) Uimh. 593/2008 má tá cónaí ort san AE. Féadfaidh tú brath ar na rialacha sin sa bhreis ar dhlí na Rómáine." },
+      { kind: "p", text: "Cúirteanna, má tá cónaí ort san AE nó sa LEE. Féadfaidh tú imeachtaí a thionscnamh inár gcoinne i gcúirteanna na Rómáine nó i gcúirteanna na tíre ina bhfuil cónaí ort. Ní fhéadfaimid imeachtaí a thionscnamh i do choinne ach i gcúirteanna na tíre ina bhfuil cónaí ort." },
+      { kind: "p", text: "Tomhaltóirí in áiteanna eile. Má tá cónaí ort lasmuigh den AE agus den LEE, ní chuireann aon ní sna Téarmaí seo teorainn le haon cheart atá agat faoi dhlí do thíre éileamh a thabhairt os comhair a cúirteanna, ná le haon cheart faoin dlí sin nach féidir a tharscaoileadh — lena n-áirítear, má tá cónaí ort san Astráil nó sa Nua-Shéalainn, do chearta ráthaíochta tomhaltóra; má tá cónaí ort sa Bhrasaíl, an Código de Defesa do Consumidor; agus má tá cónaí ort sna Stáit Aontaithe, dlíthe cosanta tomhaltóirí do stáit." },
+      { kind: "p", text: "Cónaitheoirí na Stát Aontaithe. Tá comhaontú eadrána agus tarscaoileadh caingean aicme in Iarscríbhinn A.2 atá faoi rialú an Federal Arbitration Act. Ní bhaineann sé ach le cónaitheoirí na Stát Aontaithe agus nuair is infhorfheidhmithe é. Ní bhaineann sé le tomhaltóirí san AE ná sa LEE." },
       { kind: "p", text: "Sula dtéann tú chun cúirte. Déan teagmháil linn ag [legal@dezbatere.ro]; is féidir formhór na nithe a réiteach, agus tá sé mar aidhm againn freagra a thabhairt laistigh de [5] lá oibre. Más tomhaltóir thú sa Rómáin nó san AE, féadfaidh tú réiteach malartach díospóidí a úsáid trí [the ANPC – named SAL entity, website]; tugaimid [do / do not] gealltanas páirt a ghlacadh sa nós imeachta sin. Leanann gearáin faoi chinntí modhnóireachta rannán 10, ar bealach ar leith é." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Iarscríbhinn A — Téarmaí réigiúnacha",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Ní bhaineann aon iontráil leat ach amháin má tá a réigiún liostaithe i rannán 2, agus ní luaitear inti ach an méid atá éagsúil leis an bpríomhchorp. Nuair a bhíonn iontráil agus an príomhchorp ar neamhréir, baineann an iontráil le daoine sa réigiún sin." }
+      { kind: "p", text: "Baineann gach iontráil le daoine a bhfuil cónaí orthu sa réigiún lena mbaineann sí, agus ní luaitear inti ach an méid atá éagsúil leis an bpríomhchorp. Nuair a bhíonn iontráil agus an príomhchorp ar neamhréir, baineann an iontráil le daoine sa réigiún sin." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "An Ríocht Aontaithe (ach amháin má tá sí liostaithe i rannán 2)",
+    title: "Stáit Aontaithe Mheiriceá",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Is é [name, address, email] ár n-ionadaí sa Ríocht Aontaithe faoi Airteagal 27 UK GDPR. Tá feidhm ag an Consumer Rights Act 2015 maidir leat agus ní chuireann aon ní sna Téarmaí seo teorainn le do chearta faoi; nuair a thiocfaidh rialacha síntiúis an Digital Markets, Competition and Consumers Act 2024 i bhfeidhm (táthar ag súil leis sin in 2027), beidh feidhm acu maidir le pleananna íoctha, lena n-áirítear tréimhse mhachnaimh tar éis athnuachana agus tar éis trialacha saor in aisce. An chaoi a gcosnaímid úsáideoirí ar ábhar neamhdhleathach: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Teicneolaíocht réamhghníomhach a úsáidimid: [describe, or \"none\"]. Dearbhú aoise: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Glacann an nós imeachta gearán i rannán 10 le gearáin faoi ábhar neamhdhleathach, baint éagórach d'ábhair, srianta ar do chuntas, úsáid uirlisí uathoibrithe a dhéanann difear do d'ábhar, agus aon mheasúnú aoise a chuireann bac ort go héagórach. Tá sé ar oscailt do dhaoine a ndéanann ábhar difear dóibh nach úsáideoirí iad. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.2, le do shonraí." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Stáit Aontaithe Mheiriceá (ach amháin má tá siad liostaithe i rannán 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. Ní chuirimid DebateAI ar fáil do dhaoine a bhfuil cónaí orthu i Tennessee." },
       { kind: "p", text: "Comhaontú eadrána agus tarscaoileadh caingean aicme. Má tá cónaí ort sna Stáit Aontaithe, aontaíonn tú féin agus DebateAIRO aon díospóid a eascraíonn as na Téarmaí seo nó as an tseirbhís a réiteach trí eadráin aonair cheangailteach arna riar ag [the American Arbitration Association / JAMS] faoina rialacha tomhaltóirí, seachas sa chúirt, ach amháin go bhféadfaidh ceachtar againn éileamh aonair a thabhairt os comhair cúirte mionéileamh. Féadfaidh tú roghnú gan a bheith páirteach trí ríomhphost a sheoladh chuig [address] laistigh de 30 lá tar éis duit glacadh leis na Téarmaí seo den chéad uair. Tá an comhaontú seo faoi rialú an Federal Arbitration Act. Íocaimid táillí comhdaithe na headrána. Tarscaoiltear caingne aicme, comhchaingne agus caingne ionadaíocha a mhéid a cheadaíonn an dlí. Ní bhaineann an rannán seo ach leis an todhchaí agus ní bhaineann sé le héilimh a tháinig chun cinn sular ghlac tú leis." },
       { kind: "p", text: "Fógraí agus baint anuas. Féadfar íomhánna dlúthchaidrimh neamhthoiliúla a thuairisciú ag [URL] gan cuntas agus baintear iad laistigh de 48 uair an chloig ó iarratas bailí. Téann gearáin chóipchirt chuig ár ngníomhaire ainmnithe a ainmnítear i rannán 16." },
-      { kind: "p", text: "Sonrach do stát. California: tá feidhm ag na téarmaí athnuachana uathoibríche i rannán 12; féadfaidh tú cealú ar líne am ar bith; coinnímid do thoiliú leis na téarmaí athnuachana ar feadh trí bliana ar a laghad. Nua-Eabhrac: féadfaidh tú cealú laistigh de 14 lá ó aon mhuirear ar phraghas méadaithe agus aisíocaíocht pro rata a fháil. Texas agus Nebraska: ní dhíolaimid sonraí pearsanta íogaire. Washington: tá feidhm ag ár bhFógra Príobháideachais Sonraí Sláinte Tomhaltóirí ag [URL] maidir le faisnéis a bhaineann le sláinte. Colorado: ní dhéanann aon ní sa tseirbhís cinntí iarmhartacha fút. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí agus le do chearta príobháideachais stáit." }
+      { kind: "p", text: "Sonrach do stát. California: tá feidhm ag na téarmaí athnuachana uathoibríche i rannán 12; féadfaidh tú cealú ar líne am ar bith; coinnímid do thoiliú leis na téarmaí athnuachana ar feadh trí bliana ar a laghad. Nua-Eabhrac: féadfaidh tú cealú laistigh de 14 lá ó aon mhuirear ar phraghas méadaithe agus aisíocaíocht pro rata a fháil. Texas agus Nebraska: ní dhíolaimid sonraí pearsanta íogaire. Washington: tá feidhm ag ár bhFógra Príobháideachais Sonraí Sláinte Tomhaltóirí ag [URL] maidir le faisnéis a bhaineann le sláinte. Colorado: ní dhéanann aon ní sa tseirbhís cinntí iarmhartacha fút. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.2, le do shonraí agus le do chearta príobháideachais stáit." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Ceanada agus Québec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Is é [name], privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí. Québec: tá na Téarmaí seo ar fáil i bhFraincis; roghnaigh an Fhraincis leis an roghnóir teanga; tá na socruithe a choinníonn do dhíospóireachtaí príobháideach curtha ar siúl mar réamhshocrú; féadfaidh tú dí-innéacsú faisnéise pearsanta fút a iarraidh; ní bhaineann aon chomhaontú eadrána ná aon tarscaoileadh caingne aicme leat." }
     ]
   },
   {
     no: "A.4",
-    title: "Ceanada agus Québec (ach amháin má tá siad liostaithe)",
+    title: "An Astráil agus an Nua-Shéalainn",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Is é [name], privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.4, le do shonraí. Québec: tá na Téarmaí seo ar fáil i bhFraincis; roghnaigh an Fhraincis leis an roghnóir teanga; tá na socruithe a choinníonn do dhíospóireachtaí príobháideach curtha ar siúl mar réamhshocrú; féadfaidh tú dí-innéacsú faisnéise pearsanta fút a iarraidh; ní bhaineann aon chomhaontú eadrána ná aon tarscaoileadh caingne aicme leat." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "An Astráil agus an Nua-Shéalainn (ach amháin má tá siad liostaithe)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Tagann ár seirbhísí le ráthaíochtaí nach féidir a eisiamh faoi Dhlí Tomhaltóirí na hAstráile. I gcás mórtheipeanna sa tseirbhís, tá tú i dteideal cealú agus aisíocaíocht a fháil don chuid nár úsáideadh, nó cúiteamh a fháil as a luach laghdaithe; tá tú i dteideal cúitimh freisin i leith aon chaillteanais nó damáiste eile ab fhéidir a thuar go réasúnta. Mura mórtheip í an teip, tá tú i dteideal go gcuirfí fadhbanna leis an tseirbhís ina gceart laistigh d'am réasúnta agus, mura ndéantar é sin, tá tú i dteideal cealú agus aisíocaíocht a fháil. A mhéid a cheadaíonn rannán 64A, tá ár ndliteanas i leith sáraithe ráthaíochta teoranta don tseirbhís a sholáthar arís nó don chostas a bhaineann lena soláthar arís a íoc. Níl feidhm ag aon cheart tréimhse machnaimh maidir leis an bplean íoctha thar an méid a thugann rannán 12 duit; is é ár mbeartas aisíocaíochta […]. An Nua-Shéalainn: tá feidhm ag an Consumer Guarantees Act 1993 agus ní eisiann aon ní sna Téarmaí seo é; féadfar cumarsáid dhigiteach dhíobhálach a thuairisciú dúinn faoi rannán 10 nó do Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "An Eilvéis",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "Tá feidhm ag an Swiss Federal Act on Data Protection maidir le do shonraí (Beartas Príobháideachais, Iarscríbhinn B.5). Féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na háite san Eilvéis ina bhfuil cónaí ort. Níl feidhm ag aon cheart reachtúil tarraingthe siar maidir leis an bplean íoctha; is é ár mbeartas aisíocaíochta […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "An Eilvéis (ach amháin má tá sí liostaithe)",
+    title: "An Mholdóiv",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Tá feidhm ag an Swiss Federal Act on Data Protection maidir le do shonraí (Beartas Príobháideachais, Iarscríbhinn B.6). Féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na háite san Eilvéis ina bhfuil cónaí ort. Níl feidhm ag aon cheart reachtúil tarraingthe siar maidir leis an bplean íoctha; is é ár mbeartas aisíocaíochta […]." }
+      { kind: "p", text: "Tá na cearta céanna agat faoi na Téarmaí seo agus atá ag tomhaltóir san Aontas Eorpach, lena n-áirítear an ceart tarraingt siar laistigh de 14 lá i rannán 13. Féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na Moldóive. Tá feidhm ag Dlí Uimh. 195/2024 na Moldóive maidir le cosaint sonraí pearsanta i leith do shonraí (Beartas Príobháideachais, Iarscríbhinn B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "An Mholdóiv (ach amháin má tá sí liostaithe)",
+    title: "An Áise agus an tAigéan Ciúin",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Tá na cearta céanna agat faoi na Téarmaí seo agus atá ag tomhaltóir san Aontas Eorpach, lena n-áirítear an ceart tarraingt siar laistigh de 14 lá i rannán 13. Féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na Moldóive. Tá feidhm ag Dlí Uimh. 195/2024 na Moldóive maidir le cosaint sonraí pearsanta i leith do shonraí (Beartas Príobháideachais, Iarscríbhinn B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "An Úcráin (ach amháin má tá sí liostaithe)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Cuirimid DebateAI ar fáil san Úcráin, ach amháin sna ceantair nach bhfuil faoi smacht rialtas na hÚcráine. Tá an táirge agus na Téarmaí seo ar fáil san Úcráinis. Tá feidhm ag Dlí na hÚcráine \"Maidir le Cosaint Sonraí Pearsanta\" maidir le do shonraí (Beartas Príobháideachais, Iarscríbhinn B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Iosrael (ach amháin má tá sé liostaithe)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Féadfaidh tú plean íoctha a chealú mar a cheadaíonn an Consumer Protection Law, 5741-1981 [state the cancellation terms]. Tá na Téarmaí seo agus ár mBeartas Príobháideachais ar fáil san Eabhrais. Tá feidhm ag Protection of Privacy Law Iosrael maidir le do shonraí (Beartas Príobháideachais, Iarscríbhinn B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "An Áise agus an tAigéan Ciúin (na línte do réigiúin liostaithe amháin)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singeapór: is é [name, email] ár nOifigeach Cosanta Sonraí; tá aistrithe bunaithe ar chosaintí conarthacha atá inchomparáide leis an PDPA; ní bhaineann aon tréimhse mhachnaimh reachtúil leis an bplean íoctha agus is é ár mbeartas aisíocaíochta […]. An tSeapáin: tá an nochtadh reachtúil faoin Specified Commercial Transactions Act ag [URL]; níl feidhm ag aon tréimhse mhachnaimh ghinearálta maidir le síntiúis ar líne, agus is é ár mbeartas aisíocaíochta […]; seolaimid d'ábhar chuig soláthraithe IS sna Stáit Aontaithe agus san Aontas Eorpach, gach ceann acu faoi chonradh a éilíonn cosaint atá coibhéiseach leis an gcosaint faoi Act on the Protection of Personal Information na Seapáine, agus ar iarratas insímid duit cad iad na bearta sin. An Chóiré Theas: bailítear toilithe le próiseáil roghnach agus margaíocht ar leithligh ó na míreanna a theastaíonn chun an tseirbhís a reáchtáil; is é [name], privacy@dezbatere.ro, ár n-oifigeach príobháideachais; féadfaidh tú tarraingt siar ó phlean íoctha laistigh de 7 lá tar éis liostála faoi réir an E-Commerce Act; faighimid do thoiliú úr roimh aon mhéadú praghais athfhillteach nó tiontú ó phlean saor in aisce go plean íoctha; úsáideann an tseirbhís IS ghiniúnach, insímid é sin duit sula n-úsáideann tú í, agus lipéadaímid aschur a ghintear le IS. An Téaváin: féadfaidh tú tarraingt siar ó phlean íoctha laistigh de 7 lá tar éis liostála, faoin Consumer Protection Act; tá feidhm ag Personal Data Protection Act na Téaváine maidir le do shonraí (Beartas Príobháideachais, Iarscríbhinn B.10). An Téalainn: is é [name] ár n-ionadaí sa Téalainn [if appointed]. Na hOileáin Fhilipíneacha: tá ár sainaithint ghnó agus ár sásra sásaimh faoin Internet Transactions Act ag [URL]; féadfar gearáin a dhéanamh leis an National Privacy Commission." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Forchoimeádta",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Éilíonn an Tuirc, an Bhrasaíl agus an Indinéis iarscríbhinn sa teanga áitiúil, ionadaí nó clárú, agus comhduithe. Níl siad dréachtaithe anseo agus tá siad lasmuigh de rannán 2 go dtí go gcuirtear isteach d'aon ghnó iad. Ní chuirtear seirbhís ar fáil sa tSín, i Vítneam ná sa Rúis." }
+      { kind: "p", text: "Singeapór: is é [name, email] ár nOifigeach Cosanta Sonraí; tá aistrithe bunaithe ar chosaintí conarthacha atá inchomparáide leis an PDPA; ní bhaineann aon tréimhse mhachnaimh reachtúil leis an bplean íoctha agus is é ár mbeartas aisíocaíochta […]. An tSeapáin: tá an nochtadh reachtúil faoin Specified Commercial Transactions Act ag [URL]; níl feidhm ag aon tréimhse mhachnaimh ghinearálta maidir le síntiúis ar líne, agus is é ár mbeartas aisíocaíochta […]; seolaimid d'ábhar chuig soláthraithe IS sna Stáit Aontaithe agus san Aontas Eorpach, gach ceann acu faoi chonradh a éilíonn cosaint atá coibhéiseach leis an gcosaint faoi Act on the Protection of Personal Information na Seapáine, agus ar iarratas insímid duit cad iad na bearta sin. An Chóiré Theas: bailítear toilithe le próiseáil roghnach agus margaíocht ar leithligh ó na míreanna a theastaíonn chun an tseirbhís a reáchtáil; is é [name], privacy@dezbatere.ro, ár n-oifigeach príobháideachais; féadfaidh tú tarraingt siar ó phlean íoctha laistigh de 7 lá tar éis liostála faoi réir an E-Commerce Act; faighimid do thoiliú úr roimh aon mhéadú praghais athfhillteach nó tiontú ó phlean saor in aisce go plean íoctha; úsáideann an tseirbhís IS ghiniúnach, insímid é sin duit sula n-úsáideann tú í, agus lipéadaímid aschur a ghintear le IS. An Téaváin: féadfaidh tú tarraingt siar ó phlean íoctha laistigh de 7 lá tar éis liostála, faoin Consumer Protection Act; tá feidhm ag Personal Data Protection Act na Téaváine maidir le do shonraí (Beartas Príobháideachais, Iarscríbhinn B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "6adb98ce98d6c385249a65b0c9795bac2c34d70e2f4dce54dab95fdd874eb52f",
-  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.1 · I bhFEIDHM [DATE]",
+  version: "2.2",
+  sha256: "40ab4822b4199a9092c344138a0dfa97a0dcad65c5462d0e31eacd8468b2162c",
+  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.2 · I bhFEIDHM [DATE]",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DebateAIRO S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH NA dTÉARMAÍ · v2.1",
+  endMarker: "DEIREADH NA dTÉARMAÍ · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Téacs na dTéarmaí Seirbhíse",
   sectionIdPrefix: "terms-section-",

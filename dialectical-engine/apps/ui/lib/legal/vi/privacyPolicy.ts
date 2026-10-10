@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Phụ lục B — Điều khoản quyền riêng tư theo khu vực",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Mỗi mục chỉ áp dụng nếu khu vực tương ứng được liệt kê tại mục 2 của Điều khoản và chỉ nêu những điểm khác với nội dung chính của chính sách này." }
+      { kind: "p", text: "Mỗi mục áp dụng cho người sống tại khu vực tương ứng và chỉ nêu những điểm khác với nội dung chính của chính sách này." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Vương quốc Anh (chỉ khi được liệt kê)",
+    title: "Hoa Kỳ",
     accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Đại diện của chúng tôi tại Vương quốc Anh theo Điều 27 UK GDPR là [name, address, email]; bạn có thể liên hệ với họ về bất kỳ vấn đề nào trong chính sách này. Cơ quan giám sát là Văn phòng Ủy viên Thông tin, ico.org.uk. Để khiếu nại với chúng tôi, hãy viết đến privacy@dezbatere.ro; chúng tôi xác nhận tiếp nhận khiếu nại của bạn trong vòng 30 ngày. Việc chuyển dữ liệu của bạn từ Vương quốc Anh đến các nhà cung cấp AI tại Hoa Kỳ dựa trên Phần mở rộng Vương quốc Anh của Khung Quyền riêng tư Dữ liệu EU–Hoa Kỳ khi nhà cung cấp đã được chứng nhận, và trong trường hợp khác dựa trên Phụ lục Chuyển dữ liệu Quốc tế của Vương quốc Anh bổ sung cho các điều khoản hợp đồng tiêu chuẩn của EU, được hỗ trợ bởi đánh giá rủi ro chuyển dữ liệu; Sổ đăng ký nêu rõ công cụ áp dụng cho từng nhà cung cấp. Chúng tôi báo cáo vi phạm dữ liệu cá nhân cho ICO trong vòng 72 giờ khi pháp luật yêu cầu, và thông báo cho bạn không chậm trễ quá mức nếu vi phạm đó gây rủi ro cao cho bạn. Nếu sau này chúng tôi đặt cookie phân tích, tại Vương quốc Anh chúng sẽ thuộc cơ chế từ chối tham gia thay vì xin sự đồng ý; hiện nay chúng tôi không đặt cookie đó. Nếu bạn dưới 18 tuổi và vẫn truy cập dịch vụ bất chấp quy tắc độ tuổi của chúng tôi, các tiêu chuẩn trong Bộ quy tắc Trẻ em của ICO sẽ được áp dụng cho cách chúng tôi xử lý dữ liệu của bạn." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Hoa Kỳ (chỉ khi được liệt kê)",
-    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Thông báo tại thời điểm thu thập. Bảng tại mục 2 liệt kê các loại thông tin cá nhân chúng tôi thu thập và nguồn của chúng. Mục đích và cơ sở pháp lý được nêu tại mục 4; thời hạn lưu giữ được nêu tại mục 7. Chúng tôi chỉ thu thập các loại thông tin cá nhân nhạy cảm sau đây khi bạn đưa chúng vào câu hỏi của chính mình về bản thân: sức khỏe, niềm tin tôn giáo hoặc triết học, đời sống tình dục hoặc xu hướng tính dục, quan điểm chính trị, tư cách thành viên công đoàn, và nguồn gốc chủng tộc hoặc dân tộc. Chúng tôi chỉ sử dụng chúng để vận hành các cuộc tranh luận của bạn, và chỉ sau khi có sự đồng ý riêng tại mục 3. Chúng tôi không bán hoặc chia sẻ thông tin cá nhân và đã không làm như vậy trong mười hai tháng trước đó. Chúng tôi không sử dụng thông tin cá nhân cho quảng cáo nhắm mục tiêu, và không sử dụng thông tin cá nhân nhạy cảm cho bất kỳ mục đích nào ngoài việc cung cấp dịch vụ bạn yêu cầu. Tín hiệu tùy chọn từ chối tham gia: vì chúng tôi không bán hoặc chia sẻ thông tin cá nhân hay sử dụng thông tin đó cho quảng cáo nhắm mục tiêu, không có gì để từ chối tham gia. Nếu sau này bắt đầu bán hoặc chia sẻ thông tin đó, chúng tôi sẽ tôn trọng tín hiệu Global Privacy Control như yêu cầu từ chối tham gia. Các quyền của bạn: quyền được biết, xóa, sửa, từ chối tham gia, hạn chế việc sử dụng thông tin cá nhân nhạy cảm và không bị phân biệt đối xử vì thực hiện các quyền đó; hãy gửi yêu cầu tại privacy@dezbatere.ro. Ưu đãi tài chính: chúng tôi không cung cấp ưu đãi nào; mục đích và biện pháp bảo vệ của chúng tôi là như nhau đối với gói miễn phí và gói trả phí. Thời hạn lưu giữ được nêu tại mục 7. Vi phạm dữ liệu: chúng tôi thông báo cho cư dân và cơ quan chức năng của tiểu bang theo yêu cầu của luật về vi phạm dữ liệu của từng tiểu bang. Thông báo này được cập nhật ít nhất mỗi mười hai tháng; cập nhật lần cuối [date]." },
       { kind: "p", text: "Connecticut: chúng tôi chỉ xử lý dữ liệu nhạy cảm khi có sự đồng ý chủ động của bạn, được đưa ra trên màn hình riêng trước cuộc tranh luận đầu tiên của bạn (mục 3); chúng tôi không sử dụng dữ liệu cá nhân của bạn để huấn luyện mô hình AI. Washington: Thông báo Quyền riêng tư về Dữ liệu Sức khỏe Người tiêu dùng của chúng tôi tại [URL] là một tài liệu riêng áp dụng cho mọi thông tin liên quan đến sức khỏe, bao gồm cả các suy luận. Texas và Nebraska: chúng tôi không bán dữ liệu cá nhân nhạy cảm. Colorado, Connecticut, Virginia và các tiểu bang khác có luật quyền riêng tư toàn diện: các quyền nêu trên áp dụng cho bạn khi pháp luật áp dụng cho chúng tôi. Nếu chúng tôi từ chối một yêu cầu, bạn có thể khiếu nại bằng cách trả lời câu trả lời của chúng tôi tại privacy@dezbatere.ro; nếu chúng tôi bác khiếu nại đó, bạn có thể liên hệ với Tổng Chưởng lý của tiểu bang mình." }
     ]
   },
   {
-    no: "B.4",
-    title: "Canada và Quebec (chỉ khi được liệt kê)",
-    accent: "--gold",
+    no: "B.3",
+    title: "Canada và Quebec",
+    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là [name], privacy@dezbatere.ro. Chúng tôi trả lời yêu cầu trong vòng 30 ngày. Chúng tôi vẫn chịu trách nhiệm đối với thông tin cá nhân được chuyển đến các nhà cung cấp AI ngoài Canada và sử dụng hợp đồng để yêu cầu mức bảo vệ tương đương; các nhà cung cấp đó có thể chịu sự điều chỉnh của pháp luật tại quốc gia nơi họ hoạt động, bao gồm quyền tiếp cận hợp pháp của cơ quan công quyền. Email tiếp thị chỉ được gửi khi có sự đồng ý rõ ràng của bạn theo CASL. Chúng tôi báo cáo vi phạm biện pháp bảo vệ an ninh gây ra rủi ro thực sự về tổn hại đáng kể cho bạn đến Văn phòng Ủy viên Quyền riêng tư Canada và cho bạn, và lưu hồ sơ về mọi vi phạm trong 24 tháng. Quebec: trước khi truyền đạt thông tin cá nhân ra ngoài Quebec, chúng tôi thực hiện đánh giá tác động về quyền riêng tư; chúng tôi báo cáo sự cố bảo mật có nguy cơ gây tổn hại nghiêm trọng đến Commission d'accès à l'information và cho bạn, và lưu sổ đăng ký sự cố; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật mặc định; bạn có thể yêu cầu chúng tôi gỡ khỏi chỉ mục hoặc ngừng phổ biến thông tin cá nhân về bạn; bạn có thể yêu cầu dữ liệu ở định dạng có cấu trúc, thông dụng; mục 8 mô tả hoạt động xử lý tự động của chúng tôi." }
     ]
   },
   {
-    no: "B.5",
-    title: "Australia và New Zealand (chỉ khi được liệt kê)",
-    accent: "--reasoning",
+    no: "B.4",
+    title: "Australia và New Zealand",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Australia. Bên nhận thông tin cá nhân của bạn ở nước ngoài là các nhà cung cấp AI và bên xử lý được liệt kê trong Sổ đăng ký, đặt tại [the United States and the European Union]; chúng tôi thực hiện các bước hợp lý để bảo đảm họ xử lý dữ liệu phù hợp với Các Nguyên tắc Quyền riêng tư của Australia. Quyết định tự động: kể từ ngày 10 tháng 12 năm 2026, chính sách này xác định các loại quyết định do chương trình máy tính đưa ra có ảnh hưởng đáng kể đến quyền hoặc lợi ích của bạn — không có quyết định nào như vậy; điểm số và phán quyết liên quan đến lập luận chứ không phải bạn — và thông tin cá nhân được sử dụng trong đó. Có thể gửi khiếu nại đến Văn phòng Ủy viên Thông tin Australia. New Zealand. Cán bộ phụ trách quyền riêng tư của chúng tôi là [name]. Khi chúng tôi thu thập thông tin cá nhân về bạn một cách gián tiếp — vì người dùng khác đưa thông tin đó vào câu hỏi — chính sách này và mục 11 là thông báo chúng tôi cung cấp. Chúng tôi tiết lộ dữ liệu cho các nhà cung cấp AI trong Sổ đăng ký với tư cách đại lý của mình, theo hợp đồng yêu cầu biện pháp bảo đảm tương đương. Có thể gửi khiếu nại đến Văn phòng Ủy viên Quyền riêng tư." }
     ]
   },
   {
-    no: "B.6",
-    title: "Thụy Sĩ (chỉ khi được liệt kê)",
-    accent: "--con",
+    no: "B.5",
+    title: "Thụy Sĩ",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Đạo luật Liên bang Thụy Sĩ về Bảo vệ Dữ liệu (FADP) được áp dụng. Cơ quan giám sát là Ủy viên Liên bang về Bảo vệ Dữ liệu và Thông tin (FDPIC), edoeb.admin.ch. Dữ liệu của bạn được chuyển đến các quốc gia nêu trong Sổ đăng ký — các quốc gia EU và Hoa Kỳ. Đối với Hoa Kỳ, chúng tôi dựa trên Khung Quyền riêng tư Dữ liệu Thụy Sĩ–Hoa Kỳ khi nhà cung cấp đã được chứng nhận, và trong trường hợp khác dựa trên các điều khoản hợp đồng tiêu chuẩn được FDPIC công nhận. Chúng tôi báo cáo cho FDPIC càng sớm càng tốt về vi phạm dữ liệu có khả năng gây rủi ro cao cho bạn. Chúng tôi đã đánh giá và xác định rằng chúng tôi không cần chỉ định đại diện tại Thụy Sĩ (Art. 14 FADP). Chúng tôi xem xét lại vấn đề này hằng năm." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldova (chỉ khi được liệt kê)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Luật số 195/2024 của Moldova về bảo vệ dữ liệu cá nhân được áp dụng. Luật này tuân theo GDPR, và phần chính của chính sách này mô tả các quyền của bạn theo luật đó. Cơ quan giám sát là Trung tâm Quốc gia về Bảo vệ Dữ liệu Cá nhân (CNPDCP). Chúng tôi không cần chỉ định đại diện tại Moldova vì chúng tôi được thành lập tại Khu vực Kinh tế Châu Âu (Art. 27(2)(c) Luật số 195/2024). Chúng tôi xem xét lại vấn đề này hằng năm. Việc chuyển dữ liệu của bạn đến Hoa Kỳ dựa trên cơ chế được nêu cho từng nhà cung cấp trong Sổ đăng ký. Chúng tôi báo cáo vi phạm dữ liệu cá nhân cho CNPDCP trong vòng 72 giờ khi pháp luật yêu cầu." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukraine (chỉ khi được liệt kê)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Châu Á–Thái Bình Dương",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Luật của Ukraine \"Về bảo vệ dữ liệu cá nhân\" được áp dụng. Chúng tôi không cung cấp Dialectical Engine tại các khu vực của Ukraine không do chính phủ nước này kiểm soát. Dữ liệu của bạn được chuyển đến các quốc gia EU và Hoa Kỳ (xem Sổ đăng ký). Bạn có thể khiếu nại đến Ủy viên Quốc hội Ukraine về Nhân quyền." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Israel (chỉ khi được liệt kê)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Luật Bảo vệ Quyền riêng tư của Israel được áp dụng. Bên kiểm soát là DebateAIRO S.R.L.; cách liên hệ với chúng tôi được nêu tại mục 1. Bạn không có nghĩa vụ pháp lý phải cung cấp dữ liệu cho chúng tôi; nếu không có dữ liệu tài khoản, chúng tôi không thể mở tài khoản cho bạn. Chúng tôi sử dụng dữ liệu của bạn cho các mục đích tại mục 4 và cung cấp dữ liệu đó cho các bên nhận tại mục 5. Bạn có thể yêu cầu xem và sửa dữ liệu đó (mục 10). Cơ quan giám sát là Cơ quan Bảo vệ Quyền riêng tư." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Châu Á–Thái Bình Dương (chỉ các dòng dành cho khu vực được liệt kê)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapore: Cán bộ Bảo vệ Dữ liệu của chúng tôi là [name, email]; hoạt động chuyển dữ liệu dựa trên các nghĩa vụ hợp đồng đem lại mức bảo vệ tương đương với PDPA; chúng tôi thông báo cho PDPC về các vi phạm phải thông báo trong vòng 3 ngày. Nhật Bản: chúng tôi sử dụng thông tin cá nhân của bạn cho các mục đích tại mục 4 và không cho mục đích nào khác. Chúng tôi cung cấp thông tin đó cho các nhà cung cấp AI và nhà cung cấp dịch vụ lưu trữ trong Sổ đăng ký, đặt tại Hoa Kỳ và các quốc gia EU, theo hợp đồng yêu cầu họ bảo vệ thông tin theo tiêu chuẩn của Đạo luật Bảo vệ Thông tin Cá nhân của Nhật Bản; khi được yêu cầu, chúng tôi cho bạn biết những gì họ làm để bảo vệ thông tin đó và về hệ thống quyền riêng tư của quốc gia họ. Niềm tin của bạn, bao gồm niềm tin tôn giáo và chính trị, và sức khỏe của bạn là thông tin cá nhân cần được chú ý đặc biệt; chúng tôi chỉ thu thập chúng khi có sự đồng ý trước của bạn (mục 3). Tên và địa chỉ của chúng tôi là DebateAIRO S.R.L., [address], Romania, và người đại diện của chúng tôi là [name], giám đốc; cách gửi yêu cầu được nêu tại mục 10, các biện pháp bảo mật của chúng tôi tại mục 9, và khiếu nại được gửi đến privacy@dezbatere.ro. Chúng tôi báo cáo vi phạm cho Ủy ban Bảo vệ Thông tin Cá nhân theo yêu cầu của Đạo luật. Hàn Quốc: cán bộ phụ trách quyền riêng tư của chúng tôi là [name], giám đốc, privacy@dezbatere.ro. Chúng tôi chuyển thông tin cá nhân ra nước ngoài vì việc vận hành các cuộc tranh luận của bạn theo hợp đồng giữa chúng tôi với bạn đòi hỏi điều đó: mỗi lần một cuộc tranh luận chạy, chúng tôi gửi câu hỏi của bạn và các phát biểu của cuộc tranh luận, và trong trò chuyện hỗ trợ là tin nhắn của bạn, qua kết nối được mã hóa đến các nhà cung cấp AI và nhà cung cấp dịch vụ lưu trữ trong Sổ đăng ký; Sổ đăng ký nêu tên từng bên nhận, quốc gia, thông tin liên hệ, mục đích và thời gian bên đó lưu giữ dữ liệu. Bạn có thể từ chối việc chuyển dữ liệu bằng cách không bắt đầu cuộc tranh luận hoặc xóa tài khoản; khi đó chúng tôi không thể vận hành các cuộc tranh luận cho bạn. Quan điểm chính trị, niềm tin và sức khỏe là thông tin nhạy cảm; chúng tôi chỉ xử lý chúng khi có sự đồng ý riêng của bạn (mục 3). Chúng tôi không đưa ra quyết định hoàn toàn tự động nào về bạn (mục 8). Chúng tôi trả lời yêu cầu trong vòng [10] ngày, và báo cáo vi phạm cho Ủy ban Bảo vệ Thông tin Cá nhân và cho bạn theo yêu cầu của Đạo luật Bảo vệ Thông tin Cá nhân. Đài Loan: Đạo luật Bảo vệ Dữ liệu Cá nhân của Đài Loan được áp dụng. Chúng tôi lưu giữ dữ liệu của bạn trong các thời hạn tại mục 7; dữ liệu được sử dụng tại Romania, các quốc gia EU khác và Hoa Kỳ (xem Sổ đăng ký); các bên nhận được nêu tại mục 5; hệ thống và mô hình AI của chúng tôi xử lý dữ liệu tự động để vận hành các cuộc tranh luận của bạn. Bạn có thể hỏi chúng tôi lưu giữ những dữ liệu gì, xem dữ liệu, nhận bản sao, sửa dữ liệu, yêu cầu chúng tôi ngừng sử dụng và xóa dữ liệu (mục 10). Việc cung cấp dữ liệu tài khoản cho chúng tôi là lựa chọn của bạn, nhưng nếu không có dữ liệu đó, chúng tôi không thể mở tài khoản cho bạn. Chúng tôi trả lời yêu cầu xem hoặc nhận bản sao dữ liệu của bạn trong vòng 15 ngày; nếu cần thêm thời gian, chúng tôi có thể gia hạn một lần, tối đa 15 ngày, và thông báo lý do cho bạn bằng văn bản. Philippines: DPO của chúng tôi là [name]; có thể nộp khiếu nại lên Ủy ban Quyền riêng tư Quốc gia; mục 8 mô tả hoạt động xử lý tự động. Thái Lan: đại diện của chúng tôi là [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Dành riêng",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Thổ Nhĩ Kỳ, Brazil và Indonesia đều yêu cầu thông báo bằng ngôn ngữ địa phương, đại diện hoặc đăng ký và các thủ tục nộp hồ sơ; các nội dung đó chưa được soạn tại đây. Trung Quốc, Việt Nam và Nga không thuộc phạm vi phục vụ." }
+      { kind: "p", text: "Singapore: Cán bộ Bảo vệ Dữ liệu của chúng tôi là [name, email]; hoạt động chuyển dữ liệu dựa trên các nghĩa vụ hợp đồng đem lại mức bảo vệ tương đương với PDPA; chúng tôi thông báo cho PDPC về các vi phạm phải thông báo trong vòng 3 ngày. Nhật Bản: chúng tôi sử dụng thông tin cá nhân của bạn cho các mục đích tại mục 4 và không cho mục đích nào khác. Chúng tôi cung cấp thông tin đó cho các nhà cung cấp AI và nhà cung cấp dịch vụ lưu trữ trong Sổ đăng ký, đặt tại Hoa Kỳ và các quốc gia EU, theo hợp đồng yêu cầu họ bảo vệ thông tin theo tiêu chuẩn của Đạo luật Bảo vệ Thông tin Cá nhân của Nhật Bản; khi được yêu cầu, chúng tôi cho bạn biết những gì họ làm để bảo vệ thông tin đó và về hệ thống quyền riêng tư của quốc gia họ. Niềm tin của bạn, bao gồm niềm tin tôn giáo và chính trị, và sức khỏe của bạn là thông tin cá nhân cần được chú ý đặc biệt; chúng tôi chỉ thu thập chúng khi có sự đồng ý trước của bạn (mục 3). Tên và địa chỉ của chúng tôi là DebateAIRO S.R.L., [address], Romania, và người đại diện của chúng tôi là [name], giám đốc; cách gửi yêu cầu được nêu tại mục 10, các biện pháp bảo mật của chúng tôi tại mục 9, và khiếu nại được gửi đến privacy@dezbatere.ro. Chúng tôi báo cáo vi phạm cho Ủy ban Bảo vệ Thông tin Cá nhân theo yêu cầu của Đạo luật. Hàn Quốc: cán bộ phụ trách quyền riêng tư của chúng tôi là [name], giám đốc, privacy@dezbatere.ro. Chúng tôi chuyển thông tin cá nhân ra nước ngoài vì việc vận hành các cuộc tranh luận của bạn theo hợp đồng giữa chúng tôi với bạn đòi hỏi điều đó: mỗi lần một cuộc tranh luận chạy, chúng tôi gửi câu hỏi của bạn và các phát biểu của cuộc tranh luận, và trong trò chuyện hỗ trợ là tin nhắn của bạn, qua kết nối được mã hóa đến các nhà cung cấp AI và nhà cung cấp dịch vụ lưu trữ trong Sổ đăng ký; Sổ đăng ký nêu tên từng bên nhận, quốc gia, thông tin liên hệ, mục đích và thời gian bên đó lưu giữ dữ liệu. Bạn có thể từ chối việc chuyển dữ liệu bằng cách không bắt đầu cuộc tranh luận hoặc xóa tài khoản; khi đó chúng tôi không thể vận hành các cuộc tranh luận cho bạn. Quan điểm chính trị, niềm tin và sức khỏe là thông tin nhạy cảm; chúng tôi chỉ xử lý chúng khi có sự đồng ý riêng của bạn (mục 3). Chúng tôi không đưa ra quyết định hoàn toàn tự động nào về bạn (mục 8). Chúng tôi trả lời yêu cầu trong vòng 10 ngày, và báo cáo vi phạm cho Ủy ban Bảo vệ Thông tin Cá nhân và cho bạn theo yêu cầu của Đạo luật Bảo vệ Thông tin Cá nhân. Đài Loan: Đạo luật Bảo vệ Dữ liệu Cá nhân của Đài Loan được áp dụng. Chúng tôi lưu giữ dữ liệu của bạn trong các thời hạn tại mục 7; dữ liệu được sử dụng tại Romania, các quốc gia EU khác và Hoa Kỳ (xem Sổ đăng ký); các bên nhận được nêu tại mục 5; hệ thống và mô hình AI của chúng tôi xử lý dữ liệu tự động để vận hành các cuộc tranh luận của bạn. Bạn có thể hỏi chúng tôi lưu giữ những dữ liệu gì, xem dữ liệu, nhận bản sao, sửa dữ liệu, yêu cầu chúng tôi ngừng sử dụng và xóa dữ liệu (mục 10). Việc cung cấp dữ liệu tài khoản cho chúng tôi là lựa chọn của bạn, nhưng nếu không có dữ liệu đó, chúng tôi không thể mở tài khoản cho bạn. Chúng tôi trả lời yêu cầu xem hoặc nhận bản sao dữ liệu của bạn trong vòng 15 ngày; nếu cần thêm thời gian, chúng tôi có thể gia hạn một lần, tối đa 15 ngày, và thông báo lý do cho bạn bằng văn bản." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "57daa3848f8e53a10c89e7601c429862e834e6830917b5aaf8851e5ddfa2c1d4",
-  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.2 · CÓ HIỆU LỰC [DATE]",
+  version: "3.3",
+  sha256: "381f399340b1b3e01823d03733210b77df2174035b44d2030a5d7bc859506c19",
+  eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.3 · CÓ HIỆU LỰC [DATE]",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",
-  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "HẾT CHÍNH SÁCH · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Nội dung Chính sách quyền riêng tư",
   sectionIdPrefix: "policy-section-",

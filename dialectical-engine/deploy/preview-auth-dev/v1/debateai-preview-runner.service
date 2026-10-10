@@ -1,0 +1,90 @@
+# Install as /etc/systemd/system/debateai-preview-runner.service (root 0644), replacing the archived
+# old base unit, with NO older runner drop-ins left in debateai-preview-runner.service.d/.
+# Release-specific lines come only from the generated drop-in, which sorts last:
+#   prestart.mjs dropin --service runner
+#   -> debateai-preview-runner.service.d/zzzzzzzzzz-lifecycle-release.conf
+# It sets WorkingDirectory=, the root ExecStartPre (fresh native proof + plan for the PINNED runner
+# release, which must share the native plan's source revision) and
+#   ExecStart=<node> <release>/dialectical-engine/deploy/preview-auth-dev/v1/launch-runner.mjs --start --plan /opt/debateai-v3-preview/artifacts/lifecycle-current/runner-launch.json
+# Without that drop-in this unit has no ExecStart and does not load: nothing starts by accident.
+#
+# Started BY HAND only (`systemctl start debateai-preview-runner`); there is no [Install] section and
+# debateai-preview.target deliberately does not want it. See README "Runner start".
+[Unit]
+Description=DebateAI V3 private preview runner (reviewed launcher, started by hand)
+# Soft ordering only: a missing or failed supporting unit makes the launcher or the runner refuse on
+# its own, and a Requires= would stop the runner whenever one of them restarts. The old base unit's
+# Requires= on the fake-model fixtures a/b is gone: no current runner.env names them.
+Wants=debateai-preview-postgresql.service debateai-preview-hatchet.service debateai-preview-hatchet-gateway.service debateai-preview-provider-budget.service
+After=debateai-preview-postgresql.service debateai-preview-hatchet.service debateai-preview-hatchet-gateway.service debateai-preview-provider-budget.service
+OnFailure=debateai-preview-alert@%n.service
+
+[Service]
+Type=simple
+User=debateai-preview-runner
+Group=debateai-preview-runner
+# Reads the API's user-DEK store as the custody group (V-19). It never writes that store.
+SupplementaryGroups=debateai-preview-custody
+# The launcher reads runner.env itself (root:debateai-preview-runner 0640, custody-checked) and
+# installs only the narrowed runner keys; nothing is loaded from the unit's environment.
+Environment=
+EnvironmentFile=
+PassEnvironment=
+UnsetEnvironment=
+UnsetEnvironment=LD_LIBRARY_PATH LD_PRELOAD NODE_OPTIONS NODE_PATH
+# NODE_EXTRA_CA_CERTS is read by Node at process start (the Hatchet gateway's CA); it is not a
+# runner key, so it lives here and the narrowed environment drops it after start.
+Environment=PATH=/usr/local/bin:/usr/bin:/bin NODE_ENV=production NODE_EXTRA_CA_CERTS=/etc/debateai-v3-preview/hatchet-tls/ca.crt
+ReadOnlyPaths=/etc/debateai-v3-preview/auth-dev-v1/runner.env -/etc/debateai-v3-preview/runner /etc/debateai-v3-preview/postgres-tls/ca.crt /etc/debateai-v3-preview/hatchet-tls/ca.crt /var/lib/debateai-v3-preview/api/user-deks
+# API-only and root-only material. The DeepInfra key stays with the root spending gate; the runner
+# reaches the model only through the gate's Unix socket under /run/debateai-v3-preview.
+InaccessiblePaths=/root -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/turnstile -/etc/debateai -/var/lib/debateai-v3-preview/api/audit-keys -/var/lib/debateai-v3-preview/api/mail -/var/lib/debateai-v3-preview/capture -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/provider-team-authority-v2 -/var/spool/postfix
+# Loopback only: PostgreSQL over TLS on 127.0.0.1:5434 (the CA above is required), the Hatchet
+# gateway on localhost, the gate's Unix socket. No Internet.
+IPAddressDeny=any
+IPAddressAllow=localhost
+# AF_NETLINK: kept deliberately. glibc getaddrinfo (Node's dns.lookup for the Hatchet "localhost"
+# endpoint) opens a netlink route socket to learn the configured address families; the live runner
+# has it through 42-provider-sdk-interfaces.conf. Netlink is kernel-local, not IP egress.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+UMask=0077
+NoNewPrivileges=true
+ProtectProc=invisible
+# ProcSubset=all: kept deliberately, as on the API (owner-approved 2026-10-09). The launcher's
+# content-free PREVIEW_RUNNER_STARTED event carries the Linux boot id from
+# /proc/sys/kernel/random/boot_id, which ProcSubset=pid hides; ProtectKernelTunables keeps it read-only.
+ProcSubset=all
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+# RestrictSUIDSGID stays ON and there is no fchown allowance, unlike the API (owner-approved
+# 2026-10-04 for the API only): those exist for the API's group-custody WRITES of user DEKs
+# (fchown to the custody group). The runner only reads that store.
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete
+# Restart=no: a crash during a model call leaves a lost reply, which HALTS the spending gate until
+# root re-activates it; automatic restarts would then only re-dispatch the team's open jobs into a
+# halted gate and fail them. The start-up re-dispatch is also the one path that runs a debate
+# without a fresh ask, so each start stays a person's decision. OnFailure= emails the owner.
+Restart=no
+# The root ExecStartPre (native verify, about 12 s; capped at 150 s) runs before the launcher.
+TimeoutStartSec=300
+TimeoutStopSec=30
+KillMode=mixed
+LimitNOFILE=8192
+LimitCORE=0
+TasksMax=256
