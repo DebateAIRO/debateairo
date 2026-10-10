@@ -202,10 +202,14 @@ export const SMARTBILL_WRITE_STEPS = Object.freeze([
 /** When the accountant allows no real test invoice: the issue shape alone, as a SmartBill draft. */
 export const SMARTBILL_DRAFT_STEPS = Object.freeze(["issue-draft"] as const);
 
-/** The synthetic Romanian sale of the recording (one line: 1.00 net + 0.21 VAT, the charged gross 1.21). */
+/**
+ * The synthetic Romanian sale of the recording (one line: 1.00 net + 0.21 VAT in lei, the charged gross 1.21 RON; no
+ * exchangeRate is sent). Spec 2026-10-05 §2.16.1 and §2.16.4: every Romanian sale is RON, and only Romanian sales are
+ * SmartBill's to invoice.
+ */
 export function smartbillRecordingSale(chargeId: string, issuedOn: Date): SaleRecord {
   return {
-    chargeId, transactionId: "0", issuedOn, currency: "USD",
+    chargeId, transactionId: "0", issuedOn, currency: "RON",
     customer: {
       name: "Test Person", email: "person@example.test", country: "RO", region: "Cluj", postalCode: "400001",
       city: "Cluj-Napoca", street: "Str. Exemplu 1", taxId: null, locale: "ro"
@@ -217,11 +221,12 @@ export function smartbillRecordingSale(chargeId: string, issuedOn: Date): SaleRe
   };
 }
 
+/** A refund of the recording's Romanian sale, in RON like the sale (no exchangeRate is sent). */
 export function smartbillRecordingRefund(
   chargeId: string, issuedOn: Date, original: Readonly<{ externalRef: string; number: string }>, refundTotalMicros: number
 ): RefundRecord {
   return {
-    chargeId, transactionId: "0", issuedOn, currency: "USD", refundTotalMicros,
+    chargeId, transactionId: "0", issuedOn, currency: "RON", refundTotalMicros,
     original: { documentId: original.externalRef, number: original.number },
     description: "Rambursare DebateAI Plus",
     processor: "netopia"

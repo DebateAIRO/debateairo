@@ -5,6 +5,7 @@ import { QuadernoTaxEngine } from "@debateai/tax-quaderno";
 import { FakeTaxEngine } from "../support/fake-tax-engine.js";
 import { startFakeQuaderno, type FakeQuaderno } from "../support/fake-quaderno.js";
 import { startFakeSmartBill, type FakeSmartBill } from "../support/fake-smartbill.js";
+import { smartbillRecordingRefund, smartbillRecordingSale } from "../../tools/billing/record-connector.js";
 
 /**
  * Spec 2026-10-05 §2.16.4 (Part C): the tax is asked in the subscription's currency, and the answer is priced in the
@@ -133,5 +134,20 @@ describe("SmartBill invoices in the charge's currency, never with an exchange ra
     const body = smartBill.invoices.get(partial.externalRef)!.body;
     expect(body).toMatchObject({ currency: "RON", products: [{ currency: "RON", quantity: -1, price: 60.5 }] });
     noExchangeRate(body);
+  });
+
+  it("the owner's SmartBill recording issues its Romanian sale and part-credits it in RON (spec 2026-10-05 §2.16.1)", async () => {
+    const chargeId = "e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5";
+    const sale = smartbillRecordingSale(chargeId, DATE);
+    const issued = await issuer.issue(sale);
+    const partial = await issuer.creditPartial({
+      ...smartbillRecordingRefund(chargeId, DATE, issued, 500_000), series: issued.series, number: issued.number,
+      taxRateBasisPoints: 2100, customer: sale.customer
+    });
+    for (const externalRef of [issued.externalRef, partial.externalRef]) {
+      const body = smartBill.invoices.get(externalRef)!.body;
+      expect(body).toMatchObject({ currency: "RON", products: [{ currency: "RON" }] });
+      noExchangeRate(body);
+    }
   });
 });
