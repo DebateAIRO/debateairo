@@ -35,7 +35,9 @@ explicitly named socket.
 IPC (one Unix socket, the same peer-uid allow-list for both paths): POST /complete makes one
 paid call; POST /remaining is read-only (shared lock, no file created or written, the key never
 read) and answers what is left of today's pot and call count, the concurrency, the largest
-enabled reservation and the enabled models, so the app can refuse a debate before it starts.
+enabled reservation and the enabled models, so the app can refuse a debate before it starts. It
+reads the state at most once per REMAINING_MIN_SECONDS (answers in between reuse that read), so
+peers asking in a loop cannot starve the exclusive lock that reservations and halts need.
 
 Stopping and restarting serve: SIGTERM (systemctl stop) closes the socket at once, reserves
 nothing more, lets the calls already in flight finish and settle (a reply that cannot be written
@@ -91,6 +93,7 @@ MAX_PRICE_USD_PER_M = Decimal('10.00')  # A price above this is a typo, not a pr
 MAX_OUTPUT_BOUND = 1048576
 MODEL_ID_PATTERN = re.compile(r'([A-Za-z0-9][A-Za-z0-9._-]{0,63}/)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}')
 MAX_REMAINING_IPC_BYTES = 4096
+REMAINING_MIN_SECONDS = 1.0  # /remaining reads the state at most this often (see RemainingAnswers).
 TEAM_DAY_ZONE = 'Europe/Bucharest'
 CONTROL_NAME = 'team-control.json'
 LOCK_NAME = 'team.lock'
@@ -347,9 +350,14 @@ def day_spend(ledger):
 
 
 def validate_control(control):
+    # Only the shape of provider and enabled_models: a later code change that drops a row must never
+    # make the state unreadable, or stop and status (the emergency switch) would refuse too. The
+    # GO check, run before every paid call, is where rows are judged.
     in_flight = control.get('in_flight') if isinstance(control, dict) else None
+    models = control.get('enabled_models') if isinstance(control, dict) else None
     if not (isinstance(control, dict) and control.get('schema') == CONTROL_SCHEMA
-            and enabled_models_valid(control.get('enabled_models'), profile_of(control.get('provider')))
+            and isinstance(control.get('provider'), str) and isinstance(models, list) and models
+            and all(isinstance(model, str) for model in models)
             and control.get('state') in ('initialized', 'active', 'halted') and isinstance(control.get('limits'), dict)
             and isinstance(in_flight, dict) and all(isinstance(k, str) and isinstance(v, str) and DAY_PATTERN.fullmatch(v)
                                                     for k, v in in_flight.items())):
@@ -827,21 +835,21 @@ def assess_reply(status, response, reserved, elapsed, profile, row):
     return changes, halt_reason, charge, {'status': status, 'body': json.dumps(response, ensure_ascii=True, default=str)}
 
 
-def remaining_report(private, go_path, input, slots=None, now=None):
-    """POST /remaining: what is left today, read-only (shared lock; no file is created or written;
-    the key is never read). Input is exactly {"scope_id": <this state's scope>}.
+def remaining_input_valid(input):
+    return isinstance(input, dict) and set(input) == {'scope_id'} and isinstance(input['scope_id'], str)
+
+
+def remaining_snapshot(private, go_path, slots=None, now=None):
+    """(scope_id, reply) for POST /remaining: what is left today, read-only (shared lock; no file is
+    created or written; the key is never read).
 
     window_open says whether a call could be reserved right now apart from money and count: the
     state is active, the window has not run out, the GO on disk is the one activated, and this
     server has not stopped reserving (a stop, a trip, or a concurrency change awaiting restart).
     """
     now = now or helper.utc_now
-    if not isinstance(input, dict) or set(input) != {'scope_id'} or not isinstance(input['scope_id'], str):
-        raise SafetyError('REMAINING_REQUEST_INVALID')
     with TeamStore(private, shared=True) as store:
         control = store.control()
-        if input['scope_id'] != control['scope_id']:
-            raise SafetyError('REMAINING_REQUEST_INVALID')
         moment = current(now)
         ledger = store.ledger(bucharest_day(moment))
     try:
@@ -852,12 +860,54 @@ def remaining_report(private, go_path, input, slots=None, now=None):
     serving = slots is None or (not slots.tripped and slots.limit == limits['max_concurrent_calls'])
     budget, spend = Decimal(limits['daily_budget_usd']), day_spend(ledger)
     profile = profile_of(control['provider'])
-    return {'state': control['state'], 'window_open': bool(window_open(control, moment) and go_current and serving),
+    if profile is None or not all(model in profile.rows for model in control['enabled_models']):
+        raise SafetyError('REMAINING_UNAVAILABLE')  # The state names a row this code no longer reviews.
+    return control['scope_id'], {
+            'state': control['state'], 'window_open': bool(window_open(control, moment) and go_current and serving),
             'remaining_usd': format(max(Decimal(0), budget - spend), 'f'),
             'remaining_calls': max(0, limits['max_paid_posts_per_day'] - len(ledger['entries'])),
             'max_concurrent_calls': limits['max_concurrent_calls'],
             'largest_reservation_usd': format(largest_reservation(profile, control['enabled_models']), 'f'),
             'enabled_models': list(control['enabled_models'])}
+
+
+def remaining_report(private, go_path, input, slots=None, now=None):
+    """One /remaining answer for exactly {"scope_id": <this state's scope>}; anything else refuses."""
+    if not remaining_input_valid(input):
+        raise SafetyError('REMAINING_REQUEST_INVALID')
+    scope_id, reply = remaining_snapshot(private, go_path, slots, now)
+    if input['scope_id'] != scope_id:
+        raise SafetyError('REMAINING_REQUEST_INVALID')
+    return reply
+
+
+class RemainingAnswers:
+    """serve's /remaining: the state is read at most once per REMAINING_MIN_SECONDS, by one thread
+    at a time, and every answer in between reuses that read (or its refusal). So a peer asking in a
+    loop, even on every connection slot, cannot keep the shared lock held and starve the exclusive
+    lock that reservations, settlements and halts need. The input is checked on every request."""
+
+    def __init__(self, private, go_path, slots, min_seconds=None, clock=time.monotonic, now=None):
+        self.private, self.go_path, self.slots, self.clock, self.now = private, go_path, slots, clock, now
+        self.min_seconds = REMAINING_MIN_SECONDS if min_seconds is None else min_seconds
+        self._lock, self._at, self._snapshot = threading.Lock(), None, None
+
+    def __call__(self, input):
+        if not remaining_input_valid(input):
+            raise SafetyError('REMAINING_REQUEST_INVALID')
+        with self._lock:
+            if self._at is None or self.clock() - self._at >= self.min_seconds:
+                try:
+                    self._snapshot = remaining_snapshot(self.private, self.go_path, self.slots, self.now)
+                except SafetyError:
+                    self._snapshot = None
+                self._at = self.clock()
+            snapshot = self._snapshot
+        if snapshot is None:
+            raise SafetyError('REMAINING_UNAVAILABLE')
+        if input['scope_id'] != snapshot[0]:
+            raise SafetyError('REMAINING_REQUEST_INVALID')
+        return snapshot[1]
 
 
 def probe_summary(observed, profile):
@@ -1209,10 +1259,8 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None, own
         # this (main) thread takes them with sigwait: no Python signal handler runs at all. A stop
         # signal that came earlier ended the process the default way (the next start recovers).
         signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
-        def remaining(data):
-            return remaining_report(private, go_path, data, slots=slots)
         server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots,
-                                                                    remaining=remaining),
+                                                                    remaining=RemainingAnswers(private, go_path, slots)),
                                      allowed_uids=frozenset(go['allowed_peer_uids']))
         info = os.stat(socket_path, follow_symlinks=False)
         bound, failure = (info.st_dev, info.st_ino), []

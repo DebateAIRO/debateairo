@@ -477,8 +477,49 @@ class RemainingTests(GateTest):
     def test_serve_wires_remaining_to_the_same_socket_and_uid_list(self):
         source = SOURCE.read_text()
         self.assertIn("if self.path == '/remaining':", source)
-        self.assertIn('remaining_report(private, go_path, data, slots=slots)', source)
-        self.assertIn('make_handler(private, go[\'allowed_peer_uids\'], execute, slots,', source)
+        self.assertIn("make_handler(private, go['allowed_peer_uids'], execute, slots,\n", source)
+        self.assertIn('remaining=RemainingAnswers(private, go_path, slots)),', source)
+        self.assertEqual(bridge.REMAINING_MIN_SECONDS, 1.0)
+
+    def test_serve_reads_the_state_at_most_once_a_second_however_often_peers_ask(self):
+        gate = self.gate().ready()
+        clock, reads = [100.0], []
+        real = bridge.remaining_snapshot
+
+        def counted(*args):
+            reads.append(clock[0])
+            return real(*args)
+        answers = bridge.RemainingAnswers(gate.private, gate.go_path, gate.slots, clock=lambda: clock[0], now=gate.clock)
+        with patch.object(bridge, 'remaining_snapshot', counted):
+            first = [answers({'scope_id': SCOPE}) for _ in range(20)]
+            for data in ({'scope_id': 'other-scope'}, {}, {'scope_id': SCOPE, 'x': 1}):
+                with self.subTest(data=data), self.refused('REMAINING_REQUEST_INVALID'):
+                    answers(data)
+            self.assertEqual(reads, [100.0])
+            gate.call('op-1', charge='0.05')
+            clock[0] = 100.9
+            self.assertEqual(answers({'scope_id': SCOPE})['remaining_usd'], '5.00')  # Still the cached read.
+            clock[0] = 101.0
+            self.assertEqual(answers({'scope_id': SCOPE})['remaining_usd'], '4.95')
+            self.assertEqual(reads, [100.0, 101.0])
+        self.assertEqual(first[0], self.report(gate, slots=gate.slots) | {'remaining_usd': '5.00', 'remaining_calls': 500})
+        broken = bridge.RemainingAnswers(self.gate().private, gate.go_path, gate.slots, clock=lambda: clock[0])
+        with patch.object(bridge, 'remaining_snapshot', counted):
+            for _ in range(3):
+                with self.refused('REMAINING_UNAVAILABLE'):
+                    broken({'scope_id': SCOPE})  # No state there: refused, and the refusal is reused too.
+        self.assertEqual(reads, [100.0, 101.0, 101.0])
+
+    def test_a_state_naming_a_row_the_code_dropped_still_stops_and_reports(self):
+        gate = self.gate(enabled_models=[MODEL, MIMO]).ready()
+        rows = {model: row for model, row in DEEPINFRA.rows.items() if model != MIMO}
+        with patch.object(DEEPINFRA, 'rows', rows):
+            self.assertEqual(gate.status()['enabled_models'], [MODEL, MIMO])
+            with self.refused('REMAINING_UNAVAILABLE'):
+                self.report(gate)
+            with self.refused('ROOT_GO_INVALID'):
+                gate.call('op-1')
+            self.assertEqual(bridge.stop_authority(gate.private, now=gate.clock)['state'], 'halted')
 
 
 class ProbeTests(GateTest):
