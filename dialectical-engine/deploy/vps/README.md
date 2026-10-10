@@ -2460,7 +2460,7 @@ version the person accepted from there, even after the Terms change. The site li
 
 **Switching billing on.** Before this, make sure:
 
-- every row of the go-live checklist from 13 to 73 is proven (its last column holds the proof), the void rows (20, 40
+- every row of the go-live checklist from 13 to 74 is proven (its last column holds the proof), the void rows (20, 40
   and 46) excepted. Some proofs can be read only after the switch-on: they are proven right after it, and their Proof
   cells are filled then. These are parts of four rows' "How to prove it" cells: row 17, the footer of `/pricing` on the
   live site; row 18, the API's start with billing on; row 19, the first real payment's message; row 23, the check run

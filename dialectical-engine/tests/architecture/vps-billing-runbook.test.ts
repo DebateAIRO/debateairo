@@ -769,11 +769,11 @@ describe("P22 the Billing runbook", () => {
     expect(registerReadme).not.toMatch(/the site does not show\s+it yet/u);
   });
 
-  it("the go-live checklist carries the billing rows 14–73 after B11b's row 13, each with a way to prove it", () => {
+  it("the go-live checklist carries the billing rows 14–74 after B11b's row 13, each with a way to prove it", () => {
     const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
     const rows = [...checklist.matchAll(/^\| (\d+) \|/gmu)].map((match) => Number(match[1]));
     // Numbered in order with no gap: a void row keeps its number so the later lines keep theirs.
-    expect(rows).toEqual(Array.from({ length: 73 }, (_unused, index) => index + 1));
+    expect(rows).toEqual(Array.from({ length: 74 }, (_unused, index) => index + 1));
     // The needles must be in the table itself: the dated notes under it repeat some of these words (P16a's note names
     // the One-Stop Shop), and a note never stands in for a row.
     const table = checklist.split("\n").filter((line) => /^\| \d+ \|/u.test(line)).join("\n");
@@ -914,7 +914,10 @@ describe("P22 the Billing runbook", () => {
         "`catalog.sha256`", "§1.6 item 9"]],
       [71, ["native reader", "`apps/ui/lib/billing/callingCodes.ts`", "calling code"]],
       [72, ["PR-41", "keeps it or changes it", "`--despite-chargeback`", "`REFUND_HELD_BY_CHARGEBACK`"]],
-      [73, ["Part C", "N-14"]]
+      [73, ["Part C", "N-14"]],
+      [74, ["the three currencies are proven at each service", "SmartBill invoice and partial credit note (no exchange rate)",
+        "a Quaderno calculation in RON and in EUR and a Quaderno sale in EUR", "`start --currency`", "README §14.9 step 7",
+        "the accountant has checked the RON invoice and credit note", "`status --order`"]]
     ] as const) {
       const line = row(number);
       for (const needle of [`| ${number} | Before billing is switched on`, "**Decided by:**", "**Proven by:**", ...needles]) {

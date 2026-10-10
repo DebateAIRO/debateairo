@@ -559,6 +559,10 @@ timers, refused by the commands. Two job kinds need their own handler so that ol
 live boot's refusal while records of another system are open (`BILLING_STAGE_RECORDS_OPEN`) becomes
 `BILLING_OTHER_SYSTEM_RECORDS_OPEN` and covers xMoney-era rows too.
 
+The reverse direction is refused too: a sandbox boot with billing on is refused while live NETOPIA plans are open, with
+the same code `BILLING_OTHER_SYSTEM_RECORDS_OPEN`, so a sandbox API never runs over live customers' plans and cards
+(final review data-2, task F7).
+
 #### 2.5.5 The subscription fold (`packages/billing-core/src/subscription.ts`)
 
 - The provider and environment come from CREATED: `data.payment_provider` and `data.payment_environment`, or, for an
@@ -711,8 +715,8 @@ transaction: the sales contact says NETOPIA never sends it again.
 
 **Provider-only mode (ruling C-9).** When the deployment is hosted, the NETOPIA settings are complete and billing is
 off, the API builds the NETOPIA connector and serves only this route. The intake then handles tool orders only; every
-other verified message is stored with the outcome `BILLING_OFF`, with no token and no job. The test tool and the check
-command work in this mode; nothing else of billing runs.
+other verified message is stored with the outcome `BILLING_OFF`, with no token and no job. The test tool, the check
+command and the daily card cleanup (the sweep and both purges, §2.15.4) work in this mode; nothing else of billing runs.
 
 #### 2.7.4 A message that fails verification
 
@@ -944,6 +948,10 @@ not yet record. Each read writes a `billing.status_read` row, and each charge's 
 | SUCCEEDED | at 1, 7, 30, 60, 90 and 120 days after the payment, to catch refunds and charge-backs whose message was missed |
 | with an open owner refund (§2.12.2) | daily until recorded |
 
+A declined 0.00 card check (CARD_CHECK) is not read on this schedule: its card comes only with NETOPIA's message
+(§2.11), so a read could never complete it, and starting VERIFY_PAYMENT's card wait on a read would close a check whose
+message is only late (task F5).
+
 - The frequent pass (every 10 minutes) takes the charges whose next read is due, **newest due first**, with a cursor
   across passes, at most 200 reads a pass; the rest wait for the next pass and none is starved (the cursor goes round).
 - Each read is isolated: one that fails writes `billing.reconcile.status_failed {code}` and the pass goes on;
@@ -992,6 +1000,9 @@ before then." or "We couldn't keep your card from your last payment." and a link
   SUSPENDED): the reason is `PLAN_ENDED`, `REPLACED`, `NOT_ADOPTED`, `TOOL_ORDER`, `OTHER_SYSTEM` or `ERASURE`, as it
   applies. A token whose source charge is not yet decided (no SUCCEEDED or final FAILED) is kept up to 30 days, so A8
   (c)'s late activation can still adopt it. An erasure commit revokes the owner's tokens at once.
+- A sandbox API leaves live NETOPIA tokens alone, whatever they are: its sweep never revokes (and so its purge never
+  deletes) a live customer's card. `OTHER_SYSTEM` is for the other direction only: a sandbox token seen by a live API,
+  and the previous card processor's tokens (final review data-2, task F7).
 - The daily owner job then calls `billing.purge_revoked_card_tokens`, so a revoked token is gone within about a day,
   and `billing.purge_short_lived`, which deletes raw messages and the quarantine after 14 days.
 - The nightly backups keep deleted rows until the backups themselves expire; the Privacy Policy note says how long
