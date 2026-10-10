@@ -73,22 +73,22 @@ export type Company = Readonly<{
  * draft company table (`apps/ui/legal/en/terms-of-service.md` §1).
  */
 export const COMPANY: Company = Object.freeze({
-  legalName: "DebateAIRO S.R.L.",
+  legalName: "DMS Merchandise Shop S.R.L.",
   tradingNames: Object.freeze(["DebateAI", "Dialectical Engine"]),
-  registeredOffice: "[…], București, România",
-  tradeRegisterNo: "[J40/…/…]",
-  cui: "[…]",
-  // The company is VAT-registered (owner, 29 September 2026); the RO VAT code stays bracketed until the owner fills it.
-  vat: Object.freeze({ kind: "registered", number: "[RO…]" }),
-  shareCapital: "[RON …]",
-  representative: "[…]",
-  phone: "[+40 …]",
+  registeredOffice: "Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, județul Neamț, România",
+  tradeRegisterNo: "J2022000426271",
+  cui: "45935221",
+  // The company is VAT-registered (owner, 29 September 2026; ANAF: VAT-registered since 1 February 2023).
+  vat: Object.freeze({ kind: "registered", number: "RO45935221" }),
+  shareCapital: "5.000 RON",
+  representative: "Dedita Ionut Ciprian",
+  phone: "+40 748 793 490",
   emails: Object.freeze({
-    general: "[hello@dezbatere.ro]",
-    legal: "[legal@dezbatere.ro]",
+    general: "support@dezbatere.ro",
+    legal: "support@dezbatere.ro",
     privacy: "privacy@dezbatere.ro",
-    reports: "[abuse@dezbatere.ro]",
-    authorities: "[dsa@dezbatere.ro]"
+    reports: "support@dezbatere.ro",
+    authorities: "office@dezbatere.ro"
   }),
   languages: Object.freeze<LocaleCode[]>(["ro", "en"])
 });

@@ -203,6 +203,6 @@
   "public.publication.contentCheck.groundIllegal": "Tekst može biti i nezakonit.",
   "public.publication.contentCheck.automated": "Ovu je odluku donio automatizirani alat. Nijedna je osoba još nije pregledala.",
   "public.publication.contentCheck.stillPrivate": "Vaša rasprava ostaje privatna i nepromijenjena. Samo je vi možete vidjeti.",
-  "public.publication.contentCheck.appeal": "Da biste zatražili da osoba preispita ovu odluku, pišite na [appeals@dezbatere.ro] u roku od šest mjeseci.",
+  "public.publication.contentCheck.appeal": "Da biste zatražili da osoba preispita ovu odluku, pišite na office@dezbatere.ro u roku od šest mjeseci.",
   "public.publication.contentCheck.unavailable": "Provjera sadržaja trenutačno nije dostupna, pa ništa nije objavljeno. Vaša rasprava ostaje privatna. Pokušajte ponovno za nekoliko minuta."
 }
