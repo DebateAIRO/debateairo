@@ -34,7 +34,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Who is responsible for your data",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "The controller of your personal data is DebateAIRO S.R.L., [address], Bucharest, Romania, Trade Register [J40/…], CUI […]. Write to privacy@dezbatere.ro for anything in this policy; we answer within one month. We have not appointed a data protection officer because the law does not require us to; this address is monitored by [role]. Where we have appointed a representative or a privacy officer for a particular country, Annex B names them." }
+      { kind: "p", text: "The controller of your personal data is DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania, Trade Register J2022000426271, CUI 45935221. Write to privacy@dezbatere.ro for anything in this policy; we answer within one month. We have not appointed a data protection officer because the law does not require us to; this address is monitored by our director. Where we have appointed a representative or a privacy officer for a particular country, Annex B names them." }
     ]
   },
   {
@@ -107,10 +107,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "What is sent. To run a debate we send text to one or more external AI providers: your question, the steering annotations you set, and statements the engine composes as the debate develops. A provider therefore sees text derived from and built around what you typed. If you use the support chat, what you type there goes to the support chat's model. A provider never receives your email address, your account or session identifiers, your IP address or your payment details." },
-      { kind: "p", text: "Which providers. They are listed in our AI Provider Register at [dezbatere.ro/providers], which is part of this policy. The Register applies to every user, wherever you live. For each provider it states its legal entity and country of establishment; what it receives and for what purpose — writing the debate's arguments, judging and checking them, writing the verdict story, or answering you in the support chat; the countries or regions where it processes; its retention terms, and whether zero-data-retention is active for the endpoint and features we use; whether it may use inputs for training under our contract; the transfer mechanism we rely on; how to contact it about your data; and the date we last verified each entry. Providers may change; the Register is versioned and the change is noted there." },
+      { kind: "p", text: "Which providers. They are listed in our AI Provider Register at dezbatere.ro/providers, which is part of this policy. The Register applies to every user, wherever you live. For each provider it states its legal entity and country of establishment; what it receives and for what purpose — writing the debate's arguments, judging and checking them, writing the verdict story, or answering you in the support chat; the countries or regions where it processes; its retention terms, and whether zero-data-retention is active for the endpoint and features we use; whether it may use inputs for training under our contract; the transfer mechanism we rely on; how to contact it about your data; and the date we last verified each entry. Providers may change; the Register is versioned and the change is noted there." },
       { kind: "p", text: "Training and retention are different things. Our contracts with providers exclude the use of your content to train or improve their models. [Publish only once verified per route.] Some providers keep prompts and responses for a limited period for security, abuse prevention or their own legal obligations; the Register says how long and why. Where zero-data-retention is active, the Register says so and for which features. We will not describe content as unretained when it is not." },
       { kind: "p", text: "Transfers outside the EEA. Providers established in the United States receive data under one of the mechanisms in Chapter V GDPR: the EU–US Data Privacy Framework where the specific contracting entity is certified for this data, or the European Commission's standard contractual clauses (Module Two, controller to processor) supported by a transfer risk assessment and supplementary measures. The Register names the mechanism for each provider. You can obtain a copy of the clauses we rely on by writing to privacy@dezbatere.ro. If a mechanism we rely on is invalidated, we switch to another before continuing transfers, and we tell you." },
-      { kind: "p", text: "Other recipients. Our hosting provider [Hetzner, Germany — region …]; our content-delivery and transport provider [Cloudflare]; our email relay […]; [our payment provider, once a paid plan exists]. Each acts on our documented instructions under a data-processing agreement with the safeguards Article 28 requires, and each is in the Register with its location and transfer mechanism. We do not permit any processor to use your data for its own purposes. Where a provider would do so, it is a controller in its own right, and we do not send it your data." },
+      { kind: "p", text: "Other recipients. Our hosting provider [Hetzner, Germany — region …]; our content-delivery and transport provider Cloudflare; our email relay […]; our payment provider, NETOPIA Payments, once a paid plan exists. Each acts on our documented instructions under a data-processing agreement with the safeguards Article 28 requires, and each is in the Register with its location and transfer mechanism. We do not permit any processor to use your data for its own purposes. Where a provider would do so, it is a controller in its own right, and we do not send it your data." },
       { kind: "p", text: "Public authorities. We disclose personal data to courts, regulators or law-enforcement authorities where the law requires it, and we tell you unless the law prevents us." }
     ]
   },
@@ -144,7 +144,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Debate content (private) — While the account exists — Keys destroyed on closure, making the content unreadable",
         "Debate content (published) — While published; if you close your account and leave \"Also delete my public debates\" unticked, a published debate stays published under your retired pseudonym — Removed from public access, and its key destroyed, when you unpublish it, or at closure if you ticked \"Also delete my public debates\"",
         "Provider return records and retrieval references — Same as the debate they belong to — Same",
-        "Support conversations and cases — [Until closed plus 12 months] — Keys destroyed",
+        "Support conversations and cases — Until closed plus 12 months — Keys destroyed",
         "Acceptance and consent records — Life of the account plus 6 years — the longest limitation period that applies to us — Deleted",
         "Payment records [pending] — 10 years, as Romanian accounting law requires — Deleted",
         "Backups [pending] — [… days] after the live copy is deleted — Overwritten"
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine uses 18 items, all strictly necessary for the service you asked for and all set only by Dialectical Engine: 13 cookies and 5 entries in your browser's storage. We set no analytics, advertising or tracking cookies. The Cookie Policy at [dezbatere.ro/cookies] lists them with what each one does and who receives it, and will change before anything else is added." },
+      { kind: "p", text: "Dialectical Engine uses 18 items, all strictly necessary for the service you asked for and all set only by Dialectical Engine: 13 cookies and 5 entries in your browser's storage. We set no analytics, advertising or tracking cookies. The Cookie Policy at dezbatere.ro/cookies lists them with what each one does and who receives it, and will change before anything else is added." },
       {
         kind: "list",
         items: [
@@ -251,8 +251,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Changes to this policy",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at [dezbatere.ro/privacy/versions]. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version." },
-      { kind: "p", text: "This policy was last updated on [date]. Version 3.2 replaced version 2.1, which described session data, retention periods, analytics, export and the effect of deletion on published debates in ways that no longer reflected the service." }
+      { kind: "p", text: "When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version." },
+      { kind: "p", text: "This policy was last updated on 12 October 2026. Version 3.2 replaced version 2.1, which described session data, retention periods, analytics, export and the effect of deletion on published debates in ways that no longer reflected the service." }
     ]
   },
   {
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Annex B — Regional privacy terms",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Each entry applies only if its region is listed in section 2 of the Terms, and states only what differs from the body of this policy." }
+      { kind: "p", text: "Each entry applies to people who live in its region and states only what differs from the body of this policy." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "United Kingdom (only if listed)",
+    title: "United States",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Our representative in the UK under Article 27 UK GDPR is [name, address, email]; you may contact them about anything in this policy. The supervisory authority is the Information Commissioner's Office, ico.org.uk. To complain to us, write to privacy@dezbatere.ro; we acknowledge your complaint within 30 days. Transfers of your data from the UK to AI providers in the United States rest on the UK Extension to the EU–US Data Privacy Framework where the provider is certified, and otherwise on the UK International Data Transfer Addendum to the EU standard contractual clauses, supported by a transfer risk assessment; the Register names the tool for each provider. We report a personal data breach to the ICO within 72 hours where the law requires it, and tell you without undue delay if it puts you at high risk. Analytics cookies, if we ever set them, would be subject to an opt-out rather than consent in the UK; today we set none. If you are under 18 and reach the service despite our age rule, the standards of the ICO's Children's Code apply to how we treat your data." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "United States (only if listed)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Notice at collection. The table in section 2 lists the categories of personal information we collect, what they contain and where they come from. Section 4 explains the purposes and legal bases; section 7 says how long we keep the data. We collect these categories of sensitive personal information only where you include them in your own questions about yourself: health, religious or philosophical beliefs, sex life or sexual orientation, political views, union membership, and racial or ethnic origin. We use them only to run your debates, and only after the separate consent in section 3. We do not sell or share personal information, and have not done so in the preceding twelve months. We do not use personal information for targeted advertising, and we do not use sensitive personal information for any purpose beyond providing the service you request. Opt-out preference signals: because we do not sell or share personal information or use it for targeted advertising, there is nothing to opt out of. If we ever start selling or sharing, we will honour Global Privacy Control signals as an opt-out. Your rights: to know, to delete, to correct, to opt out, to limit use of sensitive personal information, and not to be discriminated against for exercising them; make a request at privacy@dezbatere.ro. Financial incentives: we offer none; our purposes and protections are the same on the free and paid plans. Retention is in section 7. Breaches: we notify residents and state authorities as each state's breach law requires. This notice is updated at least every twelve months; last updated [date]." },
+      { kind: "p", text: "Notice at collection. The table in section 2 lists the categories of personal information we collect, what they contain and where they come from. Section 4 explains the purposes and legal bases; section 7 says how long we keep the data. We collect these categories of sensitive personal information only where you include them in your own questions about yourself: health, religious or philosophical beliefs, sex life or sexual orientation, political views, union membership, and racial or ethnic origin. We use them only to run your debates, and only after the separate consent in section 3. We do not sell or share personal information, and have not done so in the preceding twelve months. We do not use personal information for targeted advertising, and we do not use sensitive personal information for any purpose beyond providing the service you request. Opt-out preference signals: because we do not sell or share personal information or use it for targeted advertising, there is nothing to opt out of. If we ever start selling or sharing, we will honour Global Privacy Control signals as an opt-out. Your rights: to know, to delete, to correct, to opt out, to limit use of sensitive personal information, and not to be discriminated against for exercising them; make a request at privacy@dezbatere.ro. Financial incentives: we offer none; our purposes and protections are the same on the free and paid plans. Retention is in section 7. Breaches: we notify residents and state authorities as each state's breach law requires. This notice is updated at least every twelve months; last updated 12 October 2026." },
       { kind: "p", text: "Connecticut: we process sensitive data only with your opt-in consent, given on the separate screen before your first debate (section 3); we do not use your personal data to train AI models. Washington: our Consumer Health Data Privacy Notice at [URL] is a separate document that applies to any health-related information, including inferences. Texas and Nebraska: we do not sell sensitive personal data. Colorado, Connecticut, Virginia and other states with comprehensive privacy laws: the rights above apply to you where the law applies to us. If we refuse a request, you can appeal by replying to our answer at privacy@dezbatere.ro; if we refuse the appeal, you can contact the Attorney General of your state." }
     ]
   },
   {
+    no: "B.3",
+    title: "Canada and Quebec",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. We answer requests within 30 days. We remain accountable for personal information we transfer to AI providers outside Canada, and use contracts to require comparable protection; those providers may be subject to the laws of the countries where they operate, including lawful access by authorities. Marketing email is sent only with your express consent under CASL. We report a breach of security safeguards that creates a real risk of significant harm to you to the Office of the Privacy Commissioner of Canada and to you, and we keep a record of every breach for 24 months. Quebec: before communicating personal information outside Quebec we conduct a privacy impact assessment; we report a confidentiality incident that presents a risk of serious injury to the Commission d'accès à l'information and to you, and keep a register of incidents; the settings that keep your debates private are on by default; you may ask us to de-index or cease disseminating personal information about you; you may request your data in a structured, commonly used format; section 8 describes our automated processing." }
+    ]
+  },
+  {
     no: "B.4",
-    title: "Canada and Quebec (only if listed)",
+    title: "Australia and New Zealand",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is [name], privacy@dezbatere.ro. We answer requests within 30 days. We remain accountable for personal information we transfer to AI providers outside Canada, and use contracts to require comparable protection; those providers may be subject to the laws of the countries where they operate, including lawful access by authorities. Marketing email is sent only with your express consent under CASL. We report a breach of security safeguards that creates a real risk of significant harm to you to the Office of the Privacy Commissioner of Canada and to you, and we keep a record of every breach for 24 months. Quebec: before communicating personal information outside Quebec we conduct a privacy impact assessment; we report a confidentiality incident that presents a risk of serious injury to the Commission d'accès à l'information and to you, and keep a register of incidents; the settings that keep your debates private are on by default; you may ask us to de-index or cease disseminating personal information about you; you may request your data in a structured, commonly used format; section 8 describes our automated processing." }
+      { kind: "p", text: "Australia. Overseas recipients of your personal information are the AI providers and processors listed in the Register, located in the United States and the European Union; we take reasonable steps to ensure they handle it in accordance with the Australian Privacy Principles. Automated decisions: from 10 December 2026 this policy identifies the kinds of decisions made by computer programs that significantly affect your rights or interests — there are none; scores and verdicts concern arguments, not you — and the personal information used in them. Complaints may be made to the Office of the Australian Information Commissioner. New Zealand. Our privacy officer is our director, reachable at privacy@dezbatere.ro. Where we collect personal information about you indirectly — because another user included it in a question — this policy and section 11 are the notice we give. We disclose to the AI providers in the Register as our agents, under contracts requiring comparable safeguards. Complaints may be made to the Office of the Privacy Commissioner." }
     ]
   },
   {
     no: "B.5",
-    title: "Australia and New Zealand (only if listed)",
+    title: "Switzerland",
     accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Australia. Overseas recipients of your personal information are the AI providers and processors listed in the Register, located in [the United States and the European Union]; we take reasonable steps to ensure they handle it in accordance with the Australian Privacy Principles. Automated decisions: from 10 December 2026 this policy identifies the kinds of decisions made by computer programs that significantly affect your rights or interests — there are none; scores and verdicts concern arguments, not you — and the personal information used in them. Complaints may be made to the Office of the Australian Information Commissioner. New Zealand. Our privacy officer is [name]. Where we collect personal information about you indirectly — because another user included it in a question — this policy and section 11 are the notice we give. We disclose to the AI providers in the Register as our agents, under contracts requiring comparable safeguards. Complaints may be made to the Office of the Privacy Commissioner." }
-    ]
-  },
-  {
-    no: "B.6",
-    title: "Switzerland (only if listed)",
-    accent: "--con",
     blocks: [
       { kind: "p", text: "The Swiss Federal Act on Data Protection (FADP) applies. The supervisory authority is the Federal Data Protection and Information Commissioner (FDPIC), edoeb.admin.ch. Your data goes to the countries named in the Register — EU countries and the United States. For the United States we rely on the Swiss–US Data Privacy Framework where the provider is certified, and otherwise on standard contractual clauses recognised by the FDPIC. We report a data breach that is likely to put you at high risk to the FDPIC as soon as possible. We have assessed that we do not need a representative in Switzerland (Art. 14 FADP). We review this every year." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldova (only if listed)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Moldova's Law No. 195/2024 on personal data protection applies. It follows the GDPR, and the body of this policy describes your rights under it. The supervisory authority is the National Center for Personal Data Protection (CNPDCP). We do not need a representative in Moldova, because we are established in the European Economic Area (Art. 27(2)(c) of Law No. 195/2024). We review this every year. Transfers of your data to the United States rest on the mechanism named for each provider in the Register. We report a personal data breach to the CNPDCP within 72 hours where the law requires it." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukraine (only if listed)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Asia-Pacific",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "The Law of Ukraine \"On Personal Data Protection\" applies. We do not offer Dialectical Engine in the areas of Ukraine not controlled by its government. Your data goes to EU countries and the United States (see the Register). You can complain to the Ukrainian Parliament Commissioner for Human Rights." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Israel (only if listed)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Israel's Protection of Privacy Law applies. The controller is DebateAIRO S.R.L.; how to reach us is in section 1. You are under no legal duty to give us your data; without the account data we cannot open an account for you. We use your data for the purposes in section 4 and give it to the recipients in section 5. You can ask to see it and to correct it (section 10). The supervisory authority is the Privacy Protection Authority." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Asia-Pacific (only the lines for regions listed)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapore: our Data Protection Officer is [name, email]; transfers rest on contractual obligations giving comparable protection to the PDPA; we notify the PDPC of notifiable breaches within 3 days. Japan: we use your personal information for the purposes in section 4 and no others. We give it to the AI providers and hosts in the Register, located in the United States and EU countries, under contracts that require them to protect it to the standard of Japan's Act on the Protection of Personal Information; on request we tell you what they do to protect it and about the privacy system of their country. Your beliefs, including religious and political beliefs, and your health are special care-required personal information; we collect them only with your prior consent (section 3). Our name and address are DebateAIRO S.R.L., [address], Romania, and our representative is [name], director; how to make a request is in section 10, our security measures are in section 9, and complaints go to privacy@dezbatere.ro. We report breaches to the Personal Information Protection Commission as the Act requires. South Korea: our privacy officer is [name], director, privacy@dezbatere.ro. We transfer personal information overseas because running your debates, under our contract with you, requires it: each time a debate runs, we send your question and the debate's statements, and in the support chat your messages, over an encrypted connection to the AI providers and hosts in the Register, which names each recipient, its country, its contact, the purpose and how long it keeps the data. You can refuse the transfer by not starting debates or by deleting your account; we then cannot run debates for you. Political opinions, beliefs and health are sensitive information; we process them only with your separate consent (section 3). We make no fully automated decisions about you (section 8). We answer requests within [10] days, and report breaches to the Personal Information Protection Commission and to you as the Personal Information Protection Act requires. Taiwan: Taiwan's Personal Data Protection Act applies. We keep your data for the periods in section 7; it is used in Romania, other EU countries and the United States (see the Register); the recipients are in section 5; our systems and AI models process it automatically to run your debates. You can ask what we hold, see it, get a copy, correct it, have us stop using it and delete it (section 10). Giving us the account data is your choice, but without it we cannot open an account for you. We answer a request to see or copy your data within 15 days; if we need longer, we may extend this once by up to 15 days and tell you why in writing. Philippines: our DPO is [name]; complaints may be lodged with the National Privacy Commission; section 8 describes automated processing. Thailand: our representative is [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Reserved",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Turkey, Brazil and Indonesia each require a local-language notice, a representative or registration, and filings, and are not drafted here. China, Vietnam and Russia are not served." }
+      { kind: "p", text: "Singapore: our Data Protection Officer is our director, reachable at privacy@dezbatere.ro; transfers rest on contractual obligations giving comparable protection to the PDPA; we notify the PDPC of notifiable breaches within 3 days. Japan: we use your personal information for the purposes in section 4 and no others. We give it to the AI providers and hosts in the Register, located in the United States and EU countries, under contracts that require them to protect it to the standard of Japan's Act on the Protection of Personal Information; on request we tell you what they do to protect it and about the privacy system of their country. Your beliefs, including religious and political beliefs, and your health are special care-required personal information; we collect them only with your prior consent (section 3). Our name and address are DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania, and our representative is Dedita Ionut Ciprian, director; how to make a request is in section 10, our security measures are in section 9, and complaints go to privacy@dezbatere.ro. We report breaches to the Personal Information Protection Commission as the Act requires. South Korea: our privacy officer is our director, reachable at privacy@dezbatere.ro. We transfer personal information overseas because running your debates, under our contract with you, requires it: each time a debate runs, we send your question and the debate's statements, and in the support chat your messages, over an encrypted connection to the AI providers and hosts in the Register, which names each recipient, its country, its contact, the purpose and how long it keeps the data. You can refuse the transfer by not starting debates or by deleting your account; we then cannot run debates for you. Political opinions, beliefs and health are sensitive information; we process them only with your separate consent (section 3). We make no fully automated decisions about you (section 8). We answer requests within 10 days, and report breaches to the Personal Information Protection Commission and to you as the Personal Information Protection Act requires. Taiwan: Taiwan's Personal Data Protection Act applies. We keep your data for the periods in section 7; it is used in Romania, other EU countries and the United States (see the Register); the recipients are in section 5; our systems and AI models process it automatically to run your debates. You can ask what we hold, see it, get a copy, correct it, have us stop using it and delete it (section 10). Giving us the account data is your choice, but without it we cannot open an account for you. We answer a request to see or copy your data within 15 days; if we need longer, we may extend this once by up to 15 days and tell you why in writing." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "7ffd7d728f3885cf5e3c6529e0054473e795899bb6b1685c719175bcfb5b2ff0",
-  eyebrow: "PRIVACY POLICY · v3.2 · EFFECTIVE [DATE]",
+  version: "3.3",
+  sha256: "f7cc63b07ed356a4ecbef056177922d9d84127aea3996752c4182e53efc3959b",
+  eyebrow: "PRIVACY POLICY · v3.3 · EFFECTIVE 12 OCTOBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",
-  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privacy Policy text",
   sectionIdPrefix: "policy-section-",

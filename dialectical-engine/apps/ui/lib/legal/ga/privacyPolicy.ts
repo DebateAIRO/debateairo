@@ -34,7 +34,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cé atá freagrach as do shonraí",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Is é DebateAIRO S.R.L., [address], Búcairist, an Rómáin, Clár Trádála [J40/…], CUI […], rialaitheoir do shonraí pearsanta. Scríobh chuig privacy@dezbatere.ro faoi aon ní sa bheartas seo; freagraímid laistigh de mhí amháin. Níor cheapamar oifigeach cosanta sonraí toisc nach gceanglaíonn an dlí orainn é sin a dhéanamh; déanann [role] monatóireacht ar an seoladh seo. Má tá ionadaí nó oifigeach príobháideachais ceaptha againn do thír ar leith, ainmnítear iad in Iarscríbhinn B." }
+      { kind: "p", text: "Is é DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, an Rómáin, Clár Trádála J2022000426271, CUI 45935221, rialaitheoir do shonraí pearsanta. Scríobh chuig privacy@dezbatere.ro faoi aon ní sa bheartas seo; freagraímid laistigh de mhí amháin. Níor cheapamar oifigeach cosanta sonraí toisc nach gceanglaíonn an dlí orainn é sin a dhéanamh; déanann ár stiúrthóir monatóireacht ar an seoladh seo. Má tá ionadaí nó oifigeach príobháideachais ceaptha againn do thír ar leith, ainmnítear iad in Iarscríbhinn B." }
     ]
   },
   {
@@ -107,10 +107,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "An méid a sheoltar. Chun díospóireacht a reáchtáil, seolaimid téacs chuig soláthraí seachtrach IS amháin nó níos mó: do cheist, na nótaí stiúrtha a shocraíonn tú, agus ráitis a chumann an t-inneall de réir mar a fhorbraíonn an díospóireacht. Dá bhrí sin, feiceann soláthraí téacs a dhíorthaítear ón méid a chlóscríobh tú agus a tógadh timpeall air. Má úsáideann tú an comhrá tacaíochta, téann an méid a chlóscríobhann tú ann chuig samhail an chomhrá tacaíochta. Ní fhaigheann soláthraí do sheoladh ríomhphoist, d'aitheantóirí cuntais ná seisiúin, do sheoladh IP ná do shonraí íocaíochta riamh." },
-      { kind: "p", text: "Cé hiad na soláthraithe. Tá siad liostaithe inár gClár Soláthraithe IS ag [dezbatere.ro/providers], atá mar chuid den bheartas seo. Baineann an Clár le gach úsáideoir, cibé áit ina bhfuil cónaí ort. I gcás gach soláthraí, luann sé a eintiteas dlíthiúil agus a thír bhunaíochta; an méid a fhaigheann sé agus an cuspóir — argóintí na díospóireachta a scríobh, breithiúnas a thabhairt orthu agus iad a sheiceáil, scéal an bhreithiúnais a scríobh, nó freagra a thabhairt ort sa chomhrá tacaíochta; na tíortha nó na réigiúin ina bpróiseálann sé; a théarmaí coinneála, agus an bhfuil coinneáil nialasach sonraí gníomhach don chríochphointe agus do na gnéithe a úsáidimid; an bhféadfaidh sé ionchuir a úsáid le haghaidh oiliúna faoinár gconradh; an sásra aistrithe ar a mbraithimid; conas teagmháil a dhéanamh leis faoi do shonraí; agus an dáta ar dheimhníomar gach iontráil an uair dheireanach. Féadfaidh soláthraithe athrú; coinnítear leaganacha den Chlár agus taifeadtar an t-athrú ann." },
+      { kind: "p", text: "Cé hiad na soláthraithe. Tá siad liostaithe inár gClár Soláthraithe IS ag dezbatere.ro/providers, atá mar chuid den bheartas seo. Baineann an Clár le gach úsáideoir, cibé áit ina bhfuil cónaí ort. I gcás gach soláthraí, luann sé a eintiteas dlíthiúil agus a thír bhunaíochta; an méid a fhaigheann sé agus an cuspóir — argóintí na díospóireachta a scríobh, breithiúnas a thabhairt orthu agus iad a sheiceáil, scéal an bhreithiúnais a scríobh, nó freagra a thabhairt ort sa chomhrá tacaíochta; na tíortha nó na réigiúin ina bpróiseálann sé; a théarmaí coinneála, agus an bhfuil coinneáil nialasach sonraí gníomhach don chríochphointe agus do na gnéithe a úsáidimid; an bhféadfaidh sé ionchuir a úsáid le haghaidh oiliúna faoinár gconradh; an sásra aistrithe ar a mbraithimid; conas teagmháil a dhéanamh leis faoi do shonraí; agus an dáta ar dheimhníomar gach iontráil an uair dheireanach. Féadfaidh soláthraithe athrú; coinnítear leaganacha den Chlár agus taifeadtar an t-athrú ann." },
       { kind: "p", text: "Ní hionann oiliúint agus coinneáil. Eisiatar inár gconarthaí le soláthraithe úsáid d'ábhair chun a samhlacha a oiliúint nó a fheabhsú. [Publish only once verified per route.] Coinníonn roinnt soláthraithe leideanna agus freagraí ar feadh tréimhse teoranta ar mhaithe le slándáil nó le cosc ar mhí-úsáid, nó chun a n-oibleagáidí dlíthiúla féin a chomhlíonadh; deir an Clár cé chomh fada agus cén fáth. Sa chás ina bhfuil coinneáil nialasach sonraí gníomhach, deir an Clár é sin agus luaitear ann na gnéithe lena mbaineann. Ní chuirfimid síos ar ábhar mar ábhar nach gcoinnítear nuair a choinnítear é." },
       { kind: "p", text: "Aistrithe lasmuigh den LEE. Faigheann soláthraithe atá bunaithe sna Stáit Aontaithe sonraí faoi cheann de na sásraí i gCaibidil V GDPR: Creat Príobháideachais Sonraí AE–SAM nuair atá an t-eintiteas conarthach ar leith deimhnithe i leith na sonraí seo, nó clásail chaighdeánacha chonarthacha an Choimisiúin Eorpaigh (Modúl a Dó, rialaitheoir chuig próiseálaí), le measúnú riosca aistrithe agus bearta forlíontacha mar thaca leo. Ainmnítear sa Chlár an sásra do gach soláthraí. Is féidir leat cóip de na clásail ar a mbraithimid a fháil trí scríobh chuig privacy@dezbatere.ro. Má chuirtear sásra ar a mbraithimid ó bhail, aistrímid chuig sásra eile sula leanaimid d'aistrithe, agus insímid duit." },
-      { kind: "p", text: "Faighteoirí eile. Ár soláthraí óstála [Hetzner, Germany — region …]; ár soláthraí seachadta inneachair agus iompair [Cloudflare]; ár n-athsheachadán ríomhphoist […]; [our payment provider, once a paid plan exists]. Gníomhaíonn gach ceann acu de réir ár dtreoracha doiciméadaithe faoi chomhaontú próiseála sonraí lena ngabhann na coimircí a cheanglaítear le hAirteagal 28, agus tá gach ceann acu sa Chlár lena shuíomh agus lena shásra aistrithe. Ní cheadaímid d'aon phróiseálaí do shonraí a úsáid chun a chuspóirí féin. Dá ndéanfadh soláthraí é sin, bheadh sé ina rialaitheoir as a stuaim féin, agus ní sheolaimid do shonraí chuige." },
+      { kind: "p", text: "Faighteoirí eile. Ár soláthraí óstála [Hetzner, Germany — region …]; ár soláthraí seachadta inneachair agus iompair Cloudflare; ár n-athsheachadán ríomhphoist […]; ár soláthraí íocaíochta, NETOPIA Payments, nuair a bheidh plean íoctha ann. Gníomhaíonn gach ceann acu de réir ár dtreoracha doiciméadaithe faoi chomhaontú próiseála sonraí lena ngabhann na coimircí a cheanglaítear le hAirteagal 28, agus tá gach ceann acu sa Chlár lena shuíomh agus lena shásra aistrithe. Ní cheadaímid d'aon phróiseálaí do shonraí a úsáid chun a chuspóirí féin. Dá ndéanfadh soláthraí é sin, bheadh sé ina rialaitheoir as a stuaim féin, agus ní sheolaimid do shonraí chuige." },
       { kind: "p", text: "Údaráis phoiblí. Nochtaimid sonraí pearsanta do chúirteanna, rialálaithe nó údaráis fhorfheidhmithe dlí nuair a éilíonn an dlí é, agus insímid duit mura gcuireann an dlí cosc orainn." }
     ]
   },
@@ -144,7 +144,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Ábhar díospóireachta (príobháideach) — Fad atá an cuntas ann — Scriostar eochracha tráth dúnta, rud a fhágann nach féidir an t-ábhar a léamh",
         "Ábhar díospóireachta (foilsithe) — Fad atá sé foilsithe; má dhúnann tú do chuntas agus má fhágann tú \"Scrios mo dhíospóireachtaí poiblí freisin\" gan tic, fanann díospóireacht fhoilsithe poiblí faoi d'ainm cleite scortha — Baintear ó rochtain phoiblí é agus scriostar a eochair nuair a dhífhoilsíonn tú é, nó ag dúnadh an chuntais má chuir tú tic le \"Scrios mo dhíospóireachtaí poiblí freisin\"",
         "Taifid den mhéid a thug soláthraithe IS ar ais agus tagairtí aisghabhála — Chomh fada leis an díospóireacht lena mbaineann siad — Mar an gcéanna",
-        "Comhráite agus cásanna tacaíochta — [Until closed plus 12 months] — Scriostar na heochracha",
+        "Comhráite agus cásanna tacaíochta — Go dtí go ndúnfar é, móide 12 mhí — Scriostar na heochracha",
         "Taifid ghlactha agus toilithe — Saolré an chuntais móide 6 bliana — an tréimhse theorann is faide a bhfuil feidhm aici maidir linn — Scriostar iad",
         "Taifid íocaíochta [pending] — 10 mbliana, mar a cheanglaíonn dlí cuntasaíochta na Rómáine — Scriostar iad",
         "Cúltacaí [pending] — [… days] tar éis don chóip bheo a bheith scriosta — Forscríobhtar iad"
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Fianáin",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Úsáideann Dialectical Engine 18 mír, agus tá géarghá le gach ceann acu don tseirbhís a d'iarr tú agus ní shocraíonn ach Dialectical Engine iad: 13 fhianán agus 5 iontráil i stóras do bhrabhsálaí. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad sa Bheartas Fianán ag [dezbatere.ro/cookies], mar aon leis an méid a dhéanann gach ceann acu agus cé a fhaigheann é, agus athrófar é sula gcuirfear aon rud eile leis." },
+      { kind: "p", text: "Úsáideann Dialectical Engine 18 mír, agus tá géarghá le gach ceann acu don tseirbhís a d'iarr tú agus ní shocraíonn ach Dialectical Engine iad: 13 fhianán agus 5 iontráil i stóras do bhrabhsálaí. Ní shocraímid aon fhianán anailísíochta, fógraíochta ná rianaithe. Liostaítear iad sa Bheartas Fianán ag dezbatere.ro/cookies, mar aon leis an méid a dhéanann gach ceann acu agus cé a fhaigheann é, agus athrófar é sula gcuirfear aon rud eile leis." },
       {
         kind: "list",
         items: [
@@ -251,8 +251,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Athruithe ar an mbeartas seo",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag [dezbatere.ro/privacy/versions]. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú." },
-      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar [date]. Tháinig Leagan 3.2 in ionad leagan 2.1, ina ndearnadh cur síos ar shonraí seisiúin, tréimhsí coinneála, anailísíocht, easpórtáil agus éifeacht an scriosta ar dhíospóireachtaí foilsithe ar bhealaí nár léirigh an tseirbhís a thuilleadh." }
+      { kind: "p", text: "Nuair a athraímid an beartas seo, cuirimid an leagan nua ar fáil mar aon le hachoimre ar an méid a d'athraigh agus dáta nua teachta i bhfeidhm, agus coinnímid na leaganacha roimhe seo ag dezbatere.ro/privacy/versions. I gcás athraithe lena gcuirtear cuspóir nua nó faighteoir nua leis, insímid duit sula dtosaíonn an phróiseáil nua, trí ríomhphost agus sa táirge, agus tugaimid am duit agóid a dhéanamh. Sa chás ina mbraitheann cuspóir nua ar do thoiliú — mar shampla, dá mba mhian linn riamh ábhar a úsáid chun samhlacha a fheabhsú — iarraimid an toiliú sin ar leithligh agus go sonrach; ní chaithimid riamh le glacadh le Téarmaí nuashonraithe mar thoiliú le próiseáil nua. I gcás soiléirithe nach n-athraíonn aon ní faoin méid a dhéanaimid, ní dhéanaimid ach an leagan nua a fhoilsiú." },
+      { kind: "p", text: "Nuashonraíodh an beartas seo an uair dheireanach ar 12 Deireadh Fómhair 2026. Tháinig Leagan 3.2 in ionad leagan 2.1, ina ndearnadh cur síos ar shonraí seisiúin, tréimhsí coinneála, anailísíocht, easpórtáil agus éifeacht an scriosta ar dhíospóireachtaí foilsithe ar bhealaí nár léirigh an tseirbhís a thuilleadh." }
     ]
   },
   {
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Iarscríbhinn B — Téarmaí príobháideachais réigiúnacha",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Ní bhaineann aon iontráil leat ach amháin má tá a réigiún liostaithe i rannán 2 de na Téarmaí, agus ní luaitear inti ach an méid atá éagsúil le príomhchorp an bheartais seo." }
+      { kind: "p", text: "Baineann gach iontráil le daoine a bhfuil cónaí orthu sa réigiún lena mbaineann sí, agus ní luaitear inti ach an méid atá éagsúil le príomhchorp an bheartais seo." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "An Ríocht Aontaithe (ach amháin má tá sí liostaithe)",
+    title: "Stáit Aontaithe Mheiriceá",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Is é [name, address, email] ár n-ionadaí sa Ríocht Aontaithe faoi Airteagal 27 UK GDPR; is féidir leat teagmháil a dhéanamh leis faoi aon ní sa bheartas seo. Is é an Information Commissioner's Office, ico.org.uk, an t-údarás maoirseachta. Chun gearán a dhéanamh linn, scríobh chuig privacy@dezbatere.ro; admhaímid do ghearán laistigh de 30 lá. Tá aistrithe do shonraí ón Ríocht Aontaithe chuig soláthraithe IS sna Stáit Aontaithe bunaithe ar an UK Extension to the EU–US Data Privacy Framework nuair atá an soláthraí deimhnithe, agus ar shlí eile ar an UK International Data Transfer Addendum to the EU standard contractual clauses, agus tacaíonn measúnú riosca aistrithe leo; ainmnítear sa Chlár an uirlis a úsáidtear do gach soláthraí. Tuairiscímid sárú ar shonraí pearsanta don ICO laistigh de 72 uair an chloig nuair a éilíonn an dlí é, agus insímid duit gan moill mhíchuí má chuireann sé i mbaol ard thú. Dá socróimis fianáin anailísíochta riamh, bheidís faoi réir rogha an diúltaithe seachas toilithe sa Ríocht Aontaithe; ní shocraímid aon cheann inniu. Má tá tú faoi 18 mbliana d'aois agus má bhaineann tú an tseirbhís amach in ainneoin ár rialach aoise, tá caighdeáin Chód Leanaí an ICO i bhfeidhm maidir leis an gcaoi a gcaithimid le do shonraí." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Stáit Aontaithe Mheiriceá (ach amháin má tá siad liostaithe)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Fógra tráth bailithe. Liostaítear sa tábla i rannán 2 na catagóirí faisnéise pearsanta a bhailímid agus a bhfoinsí. Tá críocha agus bunúis dlí na próiseála i rannán 4, agus tá na tréimhsí coinneála i rannán 7. Ní bhailímid na catagóirí seo d'fhaisnéis phearsanta íogair ach amháin nuair a chuireann tú isteach i do cheisteanna fút féin iad: sláinte, creidimh reiligiúnacha nó fealsúnacha, saol gnéasach nó claonadh gnéasach, tuairimí polaitiúla, ballraíocht i gceardchumann, agus bunadh ciníoch nó eitneach. Ní úsáidimid iad ach chun do dhíospóireachtaí a reáchtáil, agus ní dhéanaimid amhlaidh ach tar éis an toilithe ar leith i rannán 3. Ní dhíolaimid ná ní roinnimid faisnéis phearsanta, agus ní dhearnamar é sin le linn an dá mhí dhéag roimhe seo. Ní úsáidimid faisnéis phearsanta le haghaidh fógraíochta spriocdhírithe, agus ní úsáidimid faisnéis phearsanta íogair chun aon chríche seachas an tseirbhís a iarrann tú a sholáthar. Comharthaí rogha an diúltaithe: Faoi láthair níl aon ní le diúltú dó, mar ní dhíolaimid ná ní roinnimid faisnéis phearsanta. Má thosaímid á díol nó á roinnt amach anseo, urramóimid comharthaí Global Privacy Control mar dhiúltú. Do chearta: eolas a fháil, scriosadh a iarraidh, ceartú a iarraidh, diúltú, úsáid faisnéise pearsanta íogaire a theorannú, agus gan idirdhealú a fhulaingt mar gheall ar iad a fheidhmiú; déan iarratas ag privacy@dezbatere.ro. Dreasachtaí airgeadais: ní thairgimid aon cheann; is ionann ár gcuspóirí agus ár gcosaintí ar na pleananna saor in aisce agus íoctha. Tá an choinneáil i rannán 7. Sáruithe: tugaimid fógra do chónaitheoirí agus d'údaráis stáit mar a éilíonn dlí sáraithe gach stáit. Nuashonraítear an fógra seo gach dhá mhí dhéag ar a laghad; nuashonraíodh é an uair dheireanach ar [date]." },
+      { kind: "p", text: "Fógra tráth bailithe. Liostaítear sa tábla i rannán 2 na catagóirí faisnéise pearsanta a bhailímid agus a bhfoinsí. Tá críocha agus bunúis dlí na próiseála i rannán 4, agus tá na tréimhsí coinneála i rannán 7. Ní bhailímid na catagóirí seo d'fhaisnéis phearsanta íogair ach amháin nuair a chuireann tú isteach i do cheisteanna fút féin iad: sláinte, creidimh reiligiúnacha nó fealsúnacha, saol gnéasach nó claonadh gnéasach, tuairimí polaitiúla, ballraíocht i gceardchumann, agus bunadh ciníoch nó eitneach. Ní úsáidimid iad ach chun do dhíospóireachtaí a reáchtáil, agus ní dhéanaimid amhlaidh ach tar éis an toilithe ar leith i rannán 3. Ní dhíolaimid ná ní roinnimid faisnéis phearsanta, agus ní dhearnamar é sin le linn an dá mhí dhéag roimhe seo. Ní úsáidimid faisnéis phearsanta le haghaidh fógraíochta spriocdhírithe, agus ní úsáidimid faisnéis phearsanta íogair chun aon chríche seachas an tseirbhís a iarrann tú a sholáthar. Comharthaí rogha an diúltaithe: Faoi láthair níl aon ní le diúltú dó, mar ní dhíolaimid ná ní roinnimid faisnéis phearsanta. Má thosaímid á díol nó á roinnt amach anseo, urramóimid comharthaí Global Privacy Control mar dhiúltú. Do chearta: eolas a fháil, scriosadh a iarraidh, ceartú a iarraidh, diúltú, úsáid faisnéise pearsanta íogaire a theorannú, agus gan idirdhealú a fhulaingt mar gheall ar iad a fheidhmiú; déan iarratas ag privacy@dezbatere.ro. Dreasachtaí airgeadais: ní thairgimid aon cheann; is ionann ár gcuspóirí agus ár gcosaintí ar na pleananna saor in aisce agus íoctha. Tá an choinneáil i rannán 7. Sáruithe: tugaimid fógra do chónaitheoirí agus d'údaráis stáit mar a éilíonn dlí sáraithe gach stáit. Nuashonraítear an fógra seo gach dhá mhí dhéag ar a laghad; nuashonraíodh é an uair dheireanach ar 12 Deireadh Fómhair 2026." },
       { kind: "p", text: "Connecticut: ní phróiseálaimid sonraí íogaire ach amháin le do thoiliú sainráite (roghnú isteach), a thugann tú ar an scáileán ar leith roimh do chéad díospóireacht (rannán 3); ní úsáidimid do shonraí pearsanta chun samhlacha IS a oiliúint. Washington: is doiciméad ar leith é ár bhFógra Príobháideachais Sonraí Sláinte Tomhaltóirí ag [URL] a bhfuil feidhm aige maidir le haon fhaisnéis a bhaineann le sláinte, tátail san áireamh. Texas agus Nebraska: ní dhíolaimid sonraí pearsanta íogaire. Colorado, Connecticut, Virginia agus stáit eile a bhfuil dlíthe cuimsitheacha príobháideachais acu: baineann na cearta thuas leat sa chás ina mbaineann an dlí linne. Má dhiúltaímid d'iarratas, is féidir leat achomharc a dhéanamh trí fhreagra a thabhairt ar ár bhfreagra ag privacy@dezbatere.ro; má dhiúltaímid don achomharc, is féidir leat teagmháil a dhéanamh le hArd-Aighne do stáit." }
     ]
   },
   {
+    no: "B.3",
+    title: "Ceanada agus Québec",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Freagraímid iarrataí laistigh de 30 lá. Táimid fós freagrach as faisnéis phearsanta a aistrímid chuig soláthraithe IS lasmuigh de Cheanada, agus úsáidimid conarthaí chun cosaint inchomparáide a éileamh; féadfaidh na soláthraithe sin a bheith faoi réir dhlíthe na dtíortha ina n-oibríonn siad, lena n-áirítear rochtain dhleathach ag údaráis. Ní sheoltar ríomhphost margaíochta ach amháin le do thoiliú sainráite faoi CASL. Tuairiscímid don Office of the Privacy Commissioner of Canada agus duitse aon sárú ar choimircí slándála a chruthaíonn fíor-riosca díobhála suntasaí duit, agus coinnímid taifead ar gach sárú ar feadh 24 mí. Québec: sula gcuirimid faisnéis phearsanta in iúl lasmuigh de Québec, déanaimid measúnú tionchair príobháideachais; tuairiscímid don Commission d'accès à l'information agus duitse aon teagmhas rúndachta a bhfuil riosca díobhála tromchúisí ag baint leis, agus coinnímid taifead de theagmhais; tá na socruithe a choinníonn do dhíospóireachtaí príobháideach curtha ar siúl mar réamhshocrú; féadfaidh tú iarraidh orainn faisnéis phearsanta fút a dhí-innéacsú nó scor dá scaipeadh; féadfaidh tú do shonraí a iarraidh i bhformáid struchtúrtha a úsáidtear go coitianta; déantar cur síos i rannán 8 ar ár bpróiseáil uathoibrithe." }
+    ]
+  },
+  {
     no: "B.4",
-    title: "Ceanada agus Québec (ach amháin má tá siad liostaithe)",
+    title: "An Astráil agus an Nua-Shéalainn",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Is é [name], privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Freagraímid iarrataí laistigh de 30 lá. Táimid fós freagrach as faisnéis phearsanta a aistrímid chuig soláthraithe IS lasmuigh de Cheanada, agus úsáidimid conarthaí chun cosaint inchomparáide a éileamh; féadfaidh na soláthraithe sin a bheith faoi réir dhlíthe na dtíortha ina n-oibríonn siad, lena n-áirítear rochtain dhleathach ag údaráis. Ní sheoltar ríomhphost margaíochta ach amháin le do thoiliú sainráite faoi CASL. Tuairiscímid don Office of the Privacy Commissioner of Canada agus duitse aon sárú ar choimircí slándála a chruthaíonn fíor-riosca díobhála suntasaí duit, agus coinnímid taifead ar gach sárú ar feadh 24 mí. Québec: sula gcuirimid faisnéis phearsanta in iúl lasmuigh de Québec, déanaimid measúnú tionchair príobháideachais; tuairiscímid don Commission d'accès à l'information agus duitse aon teagmhas rúndachta a bhfuil riosca díobhála tromchúisí ag baint leis, agus coinnímid taifead de theagmhais; tá na socruithe a choinníonn do dhíospóireachtaí príobháideach curtha ar siúl mar réamhshocrú; féadfaidh tú iarraidh orainn faisnéis phearsanta fút a dhí-innéacsú nó scor dá scaipeadh; féadfaidh tú do shonraí a iarraidh i bhformáid struchtúrtha a úsáidtear go coitianta; déantar cur síos i rannán 8 ar ár bpróiseáil uathoibrithe." }
+      { kind: "p", text: "An Astráil. Is iad na soláthraithe IS agus na próiseálaithe a liostaítear sa Chlár, atá lonnaithe sna Stáit Aontaithe agus san Aontas Eorpach, faighteoirí thar lear do chuid faisnéise pearsanta; glacaimid céimeanna réasúnacha chun a chinntiú go láimhseálann siad í de réir Prionsabal Príobháideachais na hAstráile. Cinntí uathoibrithe: ón 10 Nollaig 2026 ar aghaidh, sainaithnítear sa bheartas seo na cineálacha cinntí a dhéanann ríomhchláir agus a dhéanann difear suntasach do do chearta nó do do leasanna — níl aon cheann ann; baineann scóir agus breithiúnais le hargóintí, ní leatsa — agus an fhaisnéis phearsanta a úsáidtear iontu. Is féidir gearáin a dhéanamh leis an Office of the Australian Information Commissioner. An Nua-Shéalainn. Is é ár stiúrthóir ár n-oifigeach príobháideachais, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro. Sa chás ina mbailímid faisnéis phearsanta fút go hindíreach — toisc gur luaigh úsáideoir eile í ina cheist — is é an beartas seo agus rannán 11 an fógra a thugaimid. Nochtaimid do na soláthraithe IS sa Chlár mar ár ngníomhairí, faoi chonarthaí a éilíonn coimircí inchomparáide. Is féidir gearáin a dhéanamh leis an Office of the Privacy Commissioner." }
     ]
   },
   {
     no: "B.5",
-    title: "An Astráil agus an Nua-Shéalainn (ach amháin má tá siad liostaithe)",
+    title: "An Eilvéis",
     accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "An Astráil. Is iad na soláthraithe IS agus na próiseálaithe a liostaítear sa Chlár, atá lonnaithe in [the United States and the European Union], faighteoirí thar lear do chuid faisnéise pearsanta; glacaimid céimeanna réasúnacha chun a chinntiú go láimhseálann siad í de réir Prionsabal Príobháideachais na hAstráile. Cinntí uathoibrithe: ón 10 Nollaig 2026 ar aghaidh, sainaithnítear sa bheartas seo na cineálacha cinntí a dhéanann ríomhchláir agus a dhéanann difear suntasach do do chearta nó do do leasanna — níl aon cheann ann; baineann scóir agus breithiúnais le hargóintí, ní leatsa — agus an fhaisnéis phearsanta a úsáidtear iontu. Is féidir gearáin a dhéanamh leis an Office of the Australian Information Commissioner. An Nua-Shéalainn. Is é [name] ár n-oifigeach príobháideachais. Sa chás ina mbailímid faisnéis phearsanta fút go hindíreach — toisc gur luaigh úsáideoir eile í ina cheist — is é an beartas seo agus rannán 11 an fógra a thugaimid. Nochtaimid do na soláthraithe IS sa Chlár mar ár ngníomhairí, faoi chonarthaí a éilíonn coimircí inchomparáide. Is féidir gearáin a dhéanamh leis an Office of the Privacy Commissioner." }
-    ]
-  },
-  {
-    no: "B.6",
-    title: "An Eilvéis (ach amháin má tá sí liostaithe)",
-    accent: "--con",
     blocks: [
       { kind: "p", text: "Tá feidhm ag an Swiss Federal Act on Data Protection (FADP). Is é an Federal Data Protection and Information Commissioner (FDPIC), edoeb.admin.ch, an t-údarás maoirseachta. Téann do shonraí chuig na tíortha a ainmnítear sa Chlár — tíortha an Aontais Eorpaigh agus na Stáit Aontaithe. I gcás na Stát Aontaithe, braithimid ar an Swiss–US Data Privacy Framework nuair atá an soláthraí deimhnithe, agus ar shlí eile ar chlásail chonarthacha chaighdeánacha atá aitheanta ag an FDPIC. Tuairiscímid don FDPIC a luaithe is féidir aon sárú sonraí ar dócha go gcuirfidh sé i mbaol ard thú. Tá measúnú déanta againn nach bhfuil ionadaí de dhíth orainn san Eilvéis (Art. 14 FADP). Déanaimid athbhreithniú air sin gach bliain." }
     ]
   },
   {
-    no: "B.7",
-    title: "An Mholdóiv (ach amháin má tá sí liostaithe)",
-    accent: "--ink",
+    no: "B.6",
+    title: "An Mholdóiv",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Tá feidhm ag Dlí Uimh. 195/2024 na Moldóive maidir le cosaint sonraí pearsanta. Leanann sé an GDPR, agus déantar cur síos i bpríomhchorp an bheartais seo ar do chearta faoi. Is é an National Center for Personal Data Protection (CNPDCP) an t-údarás maoirseachta. Níl ionadaí de dhíth orainn sa Mholdóiv, toisc go bhfuilimid bunaithe sa Limistéar Eorpach Eacnamaíochta (Art. 27(2)(c) de Dhlí Uimh. 195/2024). Déanaimid athbhreithniú air sin gach bliain. Tá aistrithe do shonraí chuig na Stáit Aontaithe bunaithe ar an sásra a ainmnítear sa Chlár do gach soláthraí. Tuairiscímid sárú ar shonraí pearsanta don CNPDCP laistigh de 72 uair an chloig nuair a éilíonn an dlí é." }
     ]
   },
   {
-    no: "B.8",
-    title: "An Úcráin (ach amháin má tá sí liostaithe)",
-    accent: "--muted",
+    no: "B.7",
+    title: "An Áise agus an tAigéan Ciúin",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Tá feidhm ag Dlí na hÚcráine \"Maidir le Cosaint Sonraí Pearsanta\". Ní chuirimid Dialectical Engine ar fáil sna ceantair den Úcráin nach bhfuil faoi smacht a rialtais. Téann do shonraí chuig tíortha an Aontais Eorpaigh agus chuig na Stáit Aontaithe (féach an Clár). Is féidir leat gearán a dhéanamh leis an Ukrainian Parliament Commissioner for Human Rights." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Iosrael (ach amháin má tá sé liostaithe)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Tá feidhm ag Protection of Privacy Law Iosrael. Is é DebateAIRO S.R.L. an rialaitheoir; tá ár sonraí teagmhála i rannán 1. Níl aon dualgas dlíthiúil ort do shonraí a thabhairt dúinn; gan sonraí an chuntais ní féidir linn cuntas a oscailt duit. Úsáidimid do shonraí chun na gcríoch i rannán 4 agus tugaimid iad do na faighteoirí i rannán 5. Is féidir leat iarraidh orainn iad a fheiceáil agus a cheartú (rannán 10). Is é an Privacy Protection Authority an t-údarás maoirseachta." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "An Áise agus an tAigéan Ciúin (na línte do réigiúin liostaithe amháin)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singeapór: is é [name, email] ár nOifigeach Cosanta Sonraí; tá aistrithe bunaithe ar oibleagáidí conarthacha lena dtugtar cosaint inchomparáide leis an PDPA; tugaimid fógra don PDPC faoi sháruithe infhógartha laistigh de 3 lá. An tSeapáin: úsáidimid do chuid faisnéise pearsanta chun na gcríoch i rannán 4 agus ní chun aon chríche eile. Tugaimid í do na soláthraithe IS agus do na hóstaigh sa Chlár, atá lonnaithe sna Stáit Aontaithe agus i dtíortha an Aontais Eorpaigh, faoi chonarthaí a éilíonn orthu í a chosaint de réir chaighdeán Act on the Protection of Personal Information na Seapáine; ar iarratas, insímid duit cad a dhéanann siad chun í a chosaint agus faoi chóras príobháideachais a dtíre. Is faisnéis phearsanta a éilíonn cúram speisialta iad do chreidimh, lena n-áirítear creidimh reiligiúnacha agus pholaitiúla, agus do shláinte; ní bhailímid iad ach le do thoiliú roimh ré (rannán 3). Is iad ár n-ainm agus ár seoladh DebateAIRO S.R.L., [address], an Rómáin, agus is é [name], stiúrthóir, ár n-ionadaí; tá an bealach le hiarratas a dhéanamh i rannán 10, tá ár mbearta slándála i rannán 9, agus téann gearáin chuig privacy@dezbatere.ro. Tuairiscímid sáruithe don Personal Information Protection Commission mar a éilíonn an tAcht. An Chóiré Theas: is é [name], stiúrthóir, privacy@dezbatere.ro, ár n-oifigeach príobháideachais. Aistrímid faisnéis phearsanta thar lear toisc go n-éilíonn reáchtáil do dhíospóireachtaí é, faoinár gconradh leat: gach uair a reáchtáiltear díospóireacht, seolaimid do cheist agus ráitis na díospóireachta, agus sa chomhrá tacaíochta do theachtaireachtaí, thar nasc criptithe chuig na soláthraithe IS agus na hóstaigh sa Chlár, a ainmníonn gach faighteoir, a thír, a shonraí teagmhála, an cuspóir agus cá fhad a choinníonn sé na sonraí. Is féidir leat an t-aistriú a dhiúltú trí gan díospóireachtaí a thosú nó trí do chuntas a scriosadh; ansin ní féidir linn díospóireachtaí a reáchtáil duit. Is faisnéis íogair iad tuairimí polaitiúla, creidimh agus sláinte; ní phróiseálaimid iad ach le do thoiliú ar leith (rannán 3). Ní dhéanaimid aon chinntí lán-uathoibrithe fút (rannán 8). Freagraímid iarrataí laistigh de [10] lá, agus tuairiscímid sáruithe don Personal Information Protection Commission agus duitse mar a éilíonn an Personal Information Protection Act. An Téaváin: tá feidhm ag Personal Data Protection Act na Téaváine. Coinnímid do shonraí ar feadh na dtréimhsí i rannán 7; úsáidtear iad sa Rómáin, i dtíortha eile an Aontais Eorpaigh agus sna Stáit Aontaithe (féach an Clár); tá na faighteoirí i rannán 5; próiseálann ár gcórais agus ár samhlacha IS iad go huathoibríoch chun do dhíospóireachtaí a reáchtáil. Is féidir leat a fhiafraí cad atá againn, é a fheiceáil, cóip de a fháil, é a cheartú, iarraidh orainn stop a chur lena úsáid agus é a scriosadh (rannán 10). Is fútsa atá sé sonraí an chuntais a thabhairt dúinn, ach gan iad ní féidir linn cuntas a oscailt duit. Freagraímid iarratas ar do shonraí a fheiceáil nó cóip díobh a fháil laistigh de 15 lá; má bhíonn tuilleadh ama de dhíth orainn, féadfaimid an tréimhse sin a fhadú uair amháin suas le 15 lá eile agus an chúis a chur in iúl duit i scríbhinn. Na hOileáin Fhilipíneacha: is é [name] ár DPO; is féidir gearáin a chur faoi bhráid an National Privacy Commission; déantar cur síos i rannán 8 ar phróiseáil uathoibrithe. An Téalainn: is é [name] ár n-ionadaí [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Forchoimeádta",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Éilíonn an Tuirc, an Bhrasaíl agus an Indinéis fógra sa teanga áitiúil, ionadaí nó clárú, agus comhduithe, agus níl siad dréachtaithe anseo. Ní chuirtear seirbhís ar fáil sa tSín, i Vítneam ná sa Rúis." }
+      { kind: "p", text: "Singeapór: is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár nOifigeach Cosanta Sonraí; tá aistrithe bunaithe ar oibleagáidí conarthacha lena dtugtar cosaint inchomparáide leis an PDPA; tugaimid fógra don PDPC faoi sháruithe infhógartha laistigh de 3 lá. An tSeapáin: úsáidimid do chuid faisnéise pearsanta chun na gcríoch i rannán 4 agus ní chun aon chríche eile. Tugaimid í do na soláthraithe IS agus do na hóstaigh sa Chlár, atá lonnaithe sna Stáit Aontaithe agus i dtíortha an Aontais Eorpaigh, faoi chonarthaí a éilíonn orthu í a chosaint de réir chaighdeán Act on the Protection of Personal Information na Seapáine; ar iarratas, insímid duit cad a dhéanann siad chun í a chosaint agus faoi chóras príobháideachais a dtíre. Is faisnéis phearsanta a éilíonn cúram speisialta iad do chreidimh, lena n-áirítear creidimh reiligiúnacha agus pholaitiúla, agus do shláinte; ní bhailímid iad ach le do thoiliú roimh ré (rannán 3). Is iad ár n-ainm agus ár seoladh DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, an Rómáin, agus is é Dedita Ionut Ciprian, stiúrthóir, ár n-ionadaí; tá an bealach le hiarratas a dhéanamh i rannán 10, tá ár mbearta slándála i rannán 9, agus téann gearáin chuig privacy@dezbatere.ro. Tuairiscímid sáruithe don Personal Information Protection Commission mar a éilíonn an tAcht. An Chóiré Theas: is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais. Aistrímid faisnéis phearsanta thar lear toisc go n-éilíonn reáchtáil do dhíospóireachtaí é, faoinár gconradh leat: gach uair a reáchtáiltear díospóireacht, seolaimid do cheist agus ráitis na díospóireachta, agus sa chomhrá tacaíochta do theachtaireachtaí, thar nasc criptithe chuig na soláthraithe IS agus na hóstaigh sa Chlár, a ainmníonn gach faighteoir, a thír, a shonraí teagmhála, an cuspóir agus cá fhad a choinníonn sé na sonraí. Is féidir leat an t-aistriú a dhiúltú trí gan díospóireachtaí a thosú nó trí do chuntas a scriosadh; ansin ní féidir linn díospóireachtaí a reáchtáil duit. Is faisnéis íogair iad tuairimí polaitiúla, creidimh agus sláinte; ní phróiseálaimid iad ach le do thoiliú ar leith (rannán 3). Ní dhéanaimid aon chinntí lán-uathoibrithe fút (rannán 8). Freagraímid iarrataí laistigh de 10 lá, agus tuairiscímid sáruithe don Personal Information Protection Commission agus duitse mar a éilíonn an Personal Information Protection Act. An Téaváin: tá feidhm ag Personal Data Protection Act na Téaváine. Coinnímid do shonraí ar feadh na dtréimhsí i rannán 7; úsáidtear iad sa Rómáin, i dtíortha eile an Aontais Eorpaigh agus sna Stáit Aontaithe (féach an Clár); tá na faighteoirí i rannán 5; próiseálann ár gcórais agus ár samhlacha IS iad go huathoibríoch chun do dhíospóireachtaí a reáchtáil. Is féidir leat a fhiafraí cad atá againn, é a fheiceáil, cóip de a fháil, é a cheartú, iarraidh orainn stop a chur lena úsáid agus é a scriosadh (rannán 10). Is fútsa atá sé sonraí an chuntais a thabhairt dúinn, ach gan iad ní féidir linn cuntas a oscailt duit. Freagraímid iarratas ar do shonraí a fheiceáil nó cóip díobh a fháil laistigh de 15 lá; má bhíonn tuilleadh ama de dhíth orainn, féadfaimid an tréimhse sin a fhadú uair amháin suas le 15 lá eile agus an chúis a chur in iúl duit i scríbhinn." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "925b1ce3900bbc264441754da5f74dc4d1f2e78b2ec56dda7cfc2dc1bdd1910b",
-  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.2 · I bhFEIDHM [DATE]",
+  version: "3.3",
+  sha256: "378c14876bb1ec5313fae4190e90571fddd89c54b25929fc1aa8368d6b9bbdbe",
+  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.3 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Téacs an Bheartais Príobháideachais",
   sectionIdPrefix: "policy-section-",

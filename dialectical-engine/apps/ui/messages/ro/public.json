@@ -203,6 +203,6 @@
   "public.publication.contentCheck.groundIllegal": "Textul ar putea fi și ilegal.",
   "public.publication.contentCheck.automated": "Această decizie a fost luată de un instrument automat. Nicio persoană nu a examinat-o încă.",
   "public.publication.contentCheck.stillPrivate": "Dezbaterea dumneavoastră rămâne privată și neschimbată. Doar dumneavoastră o puteți vedea.",
-  "public.publication.contentCheck.appeal": "Pentru a solicita unei persoane să examineze această decizie, scrieți la [appeals@dezbatere.ro] în termen de șase luni.",
+  "public.publication.contentCheck.appeal": "Pentru a solicita unei persoane să examineze această decizie, scrieți la office@dezbatere.ro în termen de șase luni.",
   "public.publication.contentCheck.unavailable": "Verificarea conținutului nu este disponibilă momentan, așa că nu s-a publicat nimic. Dezbaterea dumneavoastră rămâne privată. Încercați din nou peste câteva minute."
 }

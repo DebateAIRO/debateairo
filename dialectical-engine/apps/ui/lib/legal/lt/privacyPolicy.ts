@@ -34,7 +34,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kas atsako už jūsų duomenis",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Jūsų asmens duomenų valdytojas yra DebateAIRO S.R.L., [address], Bukareštas, Rumunija, Prekybos registras [J40/…], CUI […]. Visais su šia politika susijusiais klausimais rašykite privacy@dezbatere.ro; atsakome per vieną mėnesį. Duomenų apsaugos pareigūno nepaskyrėme, nes teisės aktai to nereikalauja; šį adresą prižiūri [role]. Jei konkrečioje šalyje esame paskyrę atstovą ar privatumo pareigūną, jis nurodytas B priede." }
+      { kind: "p", text: "Jūsų asmens duomenų valdytojas yra DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumunija, Prekybos registras J2022000426271, CUI 45935221. Visais su šia politika susijusiais klausimais rašykite privacy@dezbatere.ro; atsakome per vieną mėnesį. Duomenų apsaugos pareigūno nepaskyrėme, nes teisės aktai to nereikalauja; šį adresą prižiūri mūsų direktorius. Jei konkrečioje šalyje esame paskyrę atstovą ar privatumo pareigūną, jis nurodytas B priede." }
     ]
   },
   {
@@ -107,10 +107,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Kas siunčiama. Debatams vykdyti tekstą siunčiame vienam ar keliems išoriniams DI paslaugų teikėjams: jūsų klausimą, jūsų nustatytas valdymo pastabas ir teiginius, kuriuos variklis sudaro plėtojantis debatams. Todėl paslaugų teikėjas mato iš jūsų įvesto teksto išvestą ir aplink jį sudarytą tekstą. Jei naudojatės pagalbos pokalbiu, tai, ką jame įvedate, perduodama pagalbos pokalbio modeliui. Paslaugų teikėjas niekada negauna jūsų el. pašto adreso, paskyros ar seanso identifikatorių, IP adreso ar mokėjimo duomenų." },
-      { kind: "p", text: "Kurie paslaugų teikėjai. Jie išvardyti mūsų DI paslaugų teikėjų registre adresu [dezbatere.ro/providers], kuris yra šios politikos dalis. Registras taikomas kiekvienam naudotojui, nesvarbu, kur gyvenate. Apie kiekvieną teikėją jame nurodomas jo juridinis asmuo ir įsisteigimo šalis; ką ir kokiu tikslu jis gauna — debatų argumentams rašyti, jiems vertinti ir tikrinti, verdikto istorijai parašyti ar jums atsakyti pagalbos pokalbyje; šalys ar regionai, kuriuose jis tvarko duomenis; jo saugojimo sąlygos ir ar mūsų naudojamam prieigos taškui bei funkcijoms taikomas visiškas duomenų nesaugojimas; ar pagal sutartį jis gali naudoti įvestis mokymui; perdavimo mechanizmas, kuriuo remiamės; kaip su juo susisiekti dėl jūsų duomenų; ir data, kada paskutinį kartą patikrinome kiekvieną įrašą. Teikėjai gali keistis; Registro versijos išsaugomos, o pakeitimas jame pažymimas." },
+      { kind: "p", text: "Kurie paslaugų teikėjai. Jie išvardyti mūsų DI paslaugų teikėjų registre adresu dezbatere.ro/providers, kuris yra šios politikos dalis. Registras taikomas kiekvienam naudotojui, nesvarbu, kur gyvenate. Apie kiekvieną teikėją jame nurodomas jo juridinis asmuo ir įsisteigimo šalis; ką ir kokiu tikslu jis gauna — debatų argumentams rašyti, jiems vertinti ir tikrinti, verdikto istorijai parašyti ar jums atsakyti pagalbos pokalbyje; šalys ar regionai, kuriuose jis tvarko duomenis; jo saugojimo sąlygos ir ar mūsų naudojamam prieigos taškui bei funkcijoms taikomas visiškas duomenų nesaugojimas; ar pagal sutartį jis gali naudoti įvestis mokymui; perdavimo mechanizmas, kuriuo remiamės; kaip su juo susisiekti dėl jūsų duomenų; ir data, kada paskutinį kartą patikrinome kiekvieną įrašą. Teikėjai gali keistis; Registro versijos išsaugomos, o pakeitimas jame pažymimas." },
       { kind: "p", text: "Mokymas ir saugojimas yra skirtingi dalykai. Mūsų sutartys su paslaugų teikėjais draudžia naudoti jūsų turinį jų modeliams mokyti ar tobulinti. [Publish only once verified per route.] Kai kurie teikėjai ribotą laiką saugo užklausas ir atsakymus saugumo, piktnaudžiavimo prevencijos arba savo teisinių prievolių tikslais; Registre nurodyta, kiek laiko ir kodėl. Kai taikomas visiškas duomenų nesaugojimas, Registre nurodoma, kurioms funkcijoms jis taikomas. Neapibūdinsime turinio kaip nesaugomo, jei jis iš tiesų saugomas." },
       { kind: "p", text: "Perdavimas už EEE ribų. Jungtinėse Amerikos Valstijose įsisteigę paslaugų teikėjai gauna duomenis pagal vieną iš GDPR V skyriuje numatytų mechanizmų: ES ir JAV duomenų privatumo sistemą, jei konkretus sutartį sudarantis subjektas yra sertifikuotas šiems duomenims, arba Europos Komisijos standartines sutarčių sąlygas (antras modulis, valdytojo perdavimas tvarkytojui), paremtas perdavimo rizikos vertinimu ir papildomomis priemonėmis. Registre įvardytas kiekvienam teikėjui taikomas mechanizmas. Sąlygų, kuriomis remiamės, kopiją galite gauti parašę privacy@dezbatere.ro. Jei mechanizmas, kuriuo remiamės, pripažįstamas negaliojančiu, prieš tęsdami perdavimą pereiname prie kito mechanizmo ir jus informuojame." },
-      { kind: "p", text: "Kiti gavėjai. Mūsų prieglobos paslaugų teikėjas [Hetzner, Germany — region …]; mūsų turinio pristatymo ir perdavimo paslaugų teikėjas [Cloudflare]; mūsų el. pašto perdavimo paslauga […]; [our payment provider, once a paid plan exists]. Kiekvienas jų veikia pagal mūsų dokumentuotus nurodymus, vadovaudamasis duomenų tvarkymo sutartimi, kurioje numatytos 28 straipsnyje reikalaujamos apsaugos priemonės, ir kiekvienas nurodytas Registre kartu su savo vieta bei perdavimo mechanizmu. Neleidžiame jokiam duomenų tvarkytojui naudoti jūsų duomenų savais tikslais. Jei teikėjas taip darytų, jis būtų savarankiškas duomenų valdytojas, ir mes jam jūsų duomenų nesiunčiame." },
+      { kind: "p", text: "Kiti gavėjai. Mūsų prieglobos paslaugų teikėjas [Hetzner, Germany — region …]; mūsų turinio pristatymo ir perdavimo paslaugų teikėjas Cloudflare; mūsų el. pašto perdavimo paslauga […]; mūsų mokėjimo paslaugų teikėjas NETOPIA Payments, kai atsiras mokamas planas. Kiekvienas jų veikia pagal mūsų dokumentuotus nurodymus, vadovaudamasis duomenų tvarkymo sutartimi, kurioje numatytos 28 straipsnyje reikalaujamos apsaugos priemonės, ir kiekvienas nurodytas Registre kartu su savo vieta bei perdavimo mechanizmu. Neleidžiame jokiam duomenų tvarkytojui naudoti jūsų duomenų savais tikslais. Jei teikėjas taip darytų, jis būtų savarankiškas duomenų valdytojas, ir mes jam jūsų duomenų nesiunčiame." },
       { kind: "p", text: "Valdžios institucijos. Asmens duomenis atskleidžiame teismams, reguliavimo ar teisėsaugos institucijoms, kai to reikalauja įstatymai, ir jus informuojame, nebent įstatymai mums tai draudžia." }
     ]
   },
@@ -144,7 +144,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Debatų turinys (privatus) — Kol paskyra egzistuoja — Uždarius paskyrą raktai sunaikinami ir turinio perskaityti nebegalima",
         "Debatų turinys (paskelbtas) — Kol yra paskelbtas; jei uždarote paskyrą ir nepažymite „Taip pat ištrinti mano viešus debatus“, paskelbti debatai lieka vieši su jūsų nebenaudojamu slapyvardžiu — Pašalinamas iš viešos prieigos, o jo raktas sunaikinamas atšaukus paskelbimą arba uždarant paskyrą, jei pažymėjote „Taip pat ištrinti mano viešus debatus“",
         "Paslaugų teikėjų atsakymų įrašai ir paieškos nuorodos — Tiek pat, kiek saugomi debatai, kuriems jie priklauso — Tas pats",
-        "Pagalbos pokalbiai ir atvejai — [Until closed plus 12 months] — Raktai sunaikinami",
+        "Pagalbos pokalbiai ir atvejai — Iki uždarymo ir dar 12 mėnesių — Raktai sunaikinami",
         "Sutikimo su sąlygomis ir kitų sutikimų įrašai — Paskyros gyvavimo laiką ir dar 6 metus — ilgiausią mums taikomą senaties terminą — Ištrinami",
         "Mokėjimų įrašai [pending] — 10 metų, kaip reikalauja Rumunijos apskaitos teisė — Ištrinami",
         "Atsarginės kopijos [pending] — [… days] po to, kai aktyvioji kopija ištrinama — Perrašomos"
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Slapukai",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine naudoja 18 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 5 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. Slapukų politikoje adresu [dezbatere.ro/cookies] jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita." },
+      { kind: "p", text: "Dialectical Engine naudoja 18 elementų – visi jie yra griežtai būtini jūsų užsakytai paslaugai ir visus juos nustato tik Dialectical Engine: 13 slapukų ir 5 įrašus jūsų naršyklės saugykloje. Nenustatome analitikos, reklamos ar sekimo slapukų. Slapukų politikoje adresu dezbatere.ro/cookies jie išvardyti nurodant, ką kiekvienas iš jų daro ir kas jį gauna, ir ši politika bus pakeista prieš pridedant ką nors kita." },
       {
         kind: "list",
         items: [
@@ -251,8 +251,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Šios politikos pakeitimai",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Pakeitę šią politiką paskelbiame naują versiją kartu su pakeitimų santrauka ir nauja įsigaliojimo data, o ankstesnes versijas saugome adresu [dezbatere.ro/privacy/versions]. Jei pakeitimu pridedamas naujas tikslas ar naujas gavėjas, prieš pradėdami naują tvarkymą informuojame jus el. paštu ir produkte bei suteikiame laiko nesutikti. Jei naujas tikslas priklauso nuo jūsų sutikimo — pavyzdžiui, jei kada nors norėtume naudoti turinį modeliams tobulinti — tokio sutikimo prašome atskirai ir konkrečiai; atnaujintų Sąlygų priėmimo niekada nelaikome sutikimu su nauju duomenų tvarkymu. Jei paaiškinimai nieko nekeičia mūsų veikloje, tiesiog paskelbiame naują versiją." },
-      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta [date]. 3.2 versija pakeitė 2.1 versiją, kurioje seanso duomenys, saugojimo laikotarpiai, analitika, eksportas ir ištrynimo poveikis paskelbtiems debatams buvo aprašyti taip, kad tai nebeatitiko paslaugos." }
+      { kind: "p", text: "Pakeitę šią politiką paskelbiame naują versiją kartu su pakeitimų santrauka ir nauja įsigaliojimo data, o ankstesnes versijas saugome adresu dezbatere.ro/privacy/versions. Jei pakeitimu pridedamas naujas tikslas ar naujas gavėjas, prieš pradėdami naują tvarkymą informuojame jus el. paštu ir produkte bei suteikiame laiko nesutikti. Jei naujas tikslas priklauso nuo jūsų sutikimo — pavyzdžiui, jei kada nors norėtume naudoti turinį modeliams tobulinti — tokio sutikimo prašome atskirai ir konkrečiai; atnaujintų Sąlygų priėmimo niekada nelaikome sutikimu su nauju duomenų tvarkymu. Jei paaiškinimai nieko nekeičia mūsų veikloje, tiesiog paskelbiame naują versiją." },
+      { kind: "p", text: "Ši politika paskutinį kartą atnaujinta 2026 m. spalio 12 d. 3.2 versija pakeitė 2.1 versiją, kurioje seanso duomenys, saugojimo laikotarpiai, analitika, eksportas ir ištrynimo poveikis paskelbtiems debatams buvo aprašyti taip, kad tai nebeatitiko paslaugos." }
     ]
   },
   {
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "B priedas — Regioninės privatumo sąlygos",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Kiekvienas įrašas taikomas tik tuo atveju, jei jo regionas nurodytas Sąlygų 2 skyriuje, ir jame nurodoma tik tai, kas skiriasi nuo pagrindinės šios politikos dalies." }
+      { kind: "p", text: "Kiekvienas įrašas taikomas žmonėms, gyvenantiems jo regione, ir jame nurodoma tik tai, kas skiriasi nuo pagrindinės šios politikos dalies." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Jungtinė Karalystė (tik jei nurodyta)",
+    title: "Jungtinės Amerikos Valstijos",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Mūsų atstovas Jungtinėje Karalystėje pagal JK GDPR 27 straipsnį yra [name, address, email]; su juo galite susisiekti bet kokiu su šia politika susijusiu klausimu. Priežiūros institucija yra Informacijos komisaro biuras ico.org.uk. Norėdami pateikti mums skundą, rašykite adresu privacy@dezbatere.ro; jūsų skundo gavimą patvirtinsime per 30 dienų. Duomenų perdavimas iš Jungtinės Karalystės DI paslaugų teikėjams Jungtinėse Amerikos Valstijose grindžiamas JK ES ir JAV duomenų privatumo sistemos išplėtimu, kai paslaugų teikėjas yra sertifikuotas, o kitais atvejais — JK tarptautinio duomenų perdavimo priedu prie ES standartinių sutarčių sąlygų, ir perdavimo rizikos vertinimu; Registre nurodyta kiekvienam paslaugų teikėjui taikoma priemonė. Apie asmens duomenų saugumo pažeidimą ICO pranešame per 72 valandas, kai to reikalauja teisės aktai, o jus informuojame nepagrįstai nedelsdami, jei dėl jo jums kyla didelė rizika. Jei kada nors nustatytume analitikos slapukus, Jungtinėje Karalystėje jiems būtų taikoma teisė atsisakyti, o ne sutikimo reikalavimas; šiandien jų nenustatome. Jei esate jaunesni nei 18 metų ir, nepaisydami mūsų amžiaus taisyklės, pasiekiate paslaugą, jūsų duomenis tvarkome pagal ICO Vaikų kodekso standartus." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Jungtinės Amerikos Valstijos (tik jei nurodyta)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Pranešimas duomenų rinkimo metu. 2 skyriaus lentelėje nurodytos mūsų renkamos asmeninės informacijos kategorijos ir jų šaltiniai; tvarkymo tikslai pateikti 4 skyriuje, o saugojimo terminai – 7 skyriuje. Šių kategorijų neskelbtiną asmeninę informaciją renkame tik tada, kai ją įtraukiate į savo klausimus apie save: sveikata, religiniai ar filosofiniai įsitikinimai, lytinis gyvenimas ar lytinė orientacija, politinės pažiūros, narystė profesinėse sąjungose ir rasinė ar etninė kilmė. Ją naudojame tik jūsų debatams vykdyti ir tik gavę atskirą sutikimą, nurodytą 3 skyriuje. Asmeninės informacijos neparduodame ir neperduodame dalijimosi tikslais, taip pat to nedarėme per ankstesnius dvylika mėnesių. Asmeninės informacijos nenaudojame tikslinei reklamai, o neskelbtinos asmeninės informacijos nenaudojame jokiam kitam tikslui, išskyrus jūsų prašomos paslaugos teikimą. Atsisakymo nuostatos signalai: Kadangi šiuo metu asmens informacijos neparduodame, nesidalijame ja ir nenaudojame tikslinei reklamai, nėra ko atsisakyti. Jei ateityje pradėtume ją parduoti arba ja dalytis, Global Privacy Control signalus laikysime atsisakymo prašymu. Jūsų teisės: žinoti, ištrinti, ištaisyti, atsisakyti, apriboti neskelbtinos asmeninės informacijos naudojimą ir nepatirti diskriminacijos naudojantis šiomis teisėmis; pateikite prašymą adresu privacy@dezbatere.ro. Finansinės paskatos: jų nesiūlome; mūsų tikslai ir apsaugos priemonės nemokamame ir mokamame planuose yra tokie patys. Saugojimas aprašytas 7 skyriuje. Pažeidimai: gyventojams ir valstijų institucijoms pranešame taip, kaip reikalauja kiekvienos valstijos įstatymas dėl duomenų saugumo pažeidimų. Šis pranešimas atnaujinamas bent kas dvylika mėnesių; paskutinį kartą atnaujintas [date]." },
+      { kind: "p", text: "Pranešimas duomenų rinkimo metu. 2 skyriaus lentelėje nurodytos mūsų renkamos asmeninės informacijos kategorijos ir jų šaltiniai; tvarkymo tikslai pateikti 4 skyriuje, o saugojimo terminai – 7 skyriuje. Šių kategorijų neskelbtiną asmeninę informaciją renkame tik tada, kai ją įtraukiate į savo klausimus apie save: sveikata, religiniai ar filosofiniai įsitikinimai, lytinis gyvenimas ar lytinė orientacija, politinės pažiūros, narystė profesinėse sąjungose ir rasinė ar etninė kilmė. Ją naudojame tik jūsų debatams vykdyti ir tik gavę atskirą sutikimą, nurodytą 3 skyriuje. Asmeninės informacijos neparduodame ir neperduodame dalijimosi tikslais, taip pat to nedarėme per ankstesnius dvylika mėnesių. Asmeninės informacijos nenaudojame tikslinei reklamai, o neskelbtinos asmeninės informacijos nenaudojame jokiam kitam tikslui, išskyrus jūsų prašomos paslaugos teikimą. Atsisakymo nuostatos signalai: Kadangi šiuo metu asmens informacijos neparduodame, nesidalijame ja ir nenaudojame tikslinei reklamai, nėra ko atsisakyti. Jei ateityje pradėtume ją parduoti arba ja dalytis, Global Privacy Control signalus laikysime atsisakymo prašymu. Jūsų teisės: žinoti, ištrinti, ištaisyti, atsisakyti, apriboti neskelbtinos asmeninės informacijos naudojimą ir nepatirti diskriminacijos naudojantis šiomis teisėmis; pateikite prašymą adresu privacy@dezbatere.ro. Finansinės paskatos: jų nesiūlome; mūsų tikslai ir apsaugos priemonės nemokamame ir mokamame planuose yra tokie patys. Saugojimas aprašytas 7 skyriuje. Pažeidimai: gyventojams ir valstijų institucijoms pranešame taip, kaip reikalauja kiekvienos valstijos įstatymas dėl duomenų saugumo pažeidimų. Šis pranešimas atnaujinamas bent kas dvylika mėnesių; paskutinį kartą atnaujintas 2026 m. spalio 12 d." },
       { kind: "p", text: "Konektikutas: neskelbtinus duomenis tvarkome tik gavę jūsų aktyvų sutikimą, kurį duodate atskirame ekrane prieš pirmuosius savo debatus (3 skyrius); jūsų asmens duomenų nenaudojame DI modeliams mokyti. Vašingtonas: mūsų atskiras Vartotojų sveikatos duomenų privatumo pranešimas adresu [URL] taikomas visai su sveikata susijusiai informacijai, įskaitant išvadas. Teksasas ir Nebraska: neparduodame neskelbtinų asmens duomenų. Koloradas, Konektikutas, Virdžinija ir kitos išsamius privatumo įstatymus turinčios valstijos: pirmiau nurodytos teisės taikomos jums, kai mums taikomas atitinkamas įstatymas. Jei atsisakome patenkinti prašymą, galite tai apskųsti atsakydami į mūsų atsakymą adresu privacy@dezbatere.ro; jei jūsų skundą atmetame, galite kreiptis į savo valstijos generalinį prokurorą." }
     ]
   },
   {
+    no: "B.3",
+    title: "Kanada ir Kvebekas",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Į prašymus atsakome per 30 dienų. Mes ir toliau atsakome už asmeninę informaciją, kurią perduodame DI paslaugų teikėjams už Kanados ribų, ir sutartimis reikalaujame lygiavertės apsaugos; tiems teikėjams gali būti taikomi jų veiklos šalių įstatymai, įskaitant teisėtą valdžios institucijų prieigą. Rinkodaros el. laiškai siunčiami tik gavus jūsų aiškų sutikimą pagal CASL. Apie saugumo priemonių pažeidimą, dėl kurio jums kyla reali didelės žalos rizika, pranešame Kanados privatumo komisaro biurui ir jums, o kiekvieno pažeidimo įrašą saugome 24 mėnesius. Kvebekas: prieš perduodami asmeninę informaciją už Kvebeko ribų atliekame poveikio privatumui vertinimą; apie konfidencialumo incidentą, dėl kurio kyla rimtos žalos rizika, pranešame Commission d'accès à l'information ir jums bei tvarkome incidentų registrą; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti panaikinti jūsų asmeninės informacijos indeksavimą arba nustoti ją platinti; galite prašyti pateikti savo duomenis struktūrizuotu, įprastai naudojamu formatu; 8 skyriuje aprašytas mūsų automatizuotas tvarkymas." }
+    ]
+  },
+  {
     no: "B.4",
-    title: "Kanada ir Kvebekas (tik jei nurodyta)",
+    title: "Australija ir Naujoji Zelandija",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra [name], privacy@dezbatere.ro. Į prašymus atsakome per 30 dienų. Mes ir toliau atsakome už asmeninę informaciją, kurią perduodame DI paslaugų teikėjams už Kanados ribų, ir sutartimis reikalaujame lygiavertės apsaugos; tiems teikėjams gali būti taikomi jų veiklos šalių įstatymai, įskaitant teisėtą valdžios institucijų prieigą. Rinkodaros el. laiškai siunčiami tik gavus jūsų aiškų sutikimą pagal CASL. Apie saugumo priemonių pažeidimą, dėl kurio jums kyla reali didelės žalos rizika, pranešame Kanados privatumo komisaro biurui ir jums, o kiekvieno pažeidimo įrašą saugome 24 mėnesius. Kvebekas: prieš perduodami asmeninę informaciją už Kvebeko ribų atliekame poveikio privatumui vertinimą; apie konfidencialumo incidentą, dėl kurio kyla rimtos žalos rizika, pranešame Commission d'accès à l'information ir jums bei tvarkome incidentų registrą; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti panaikinti jūsų asmeninės informacijos indeksavimą arba nustoti ją platinti; galite prašyti pateikti savo duomenis struktūrizuotu, įprastai naudojamu formatu; 8 skyriuje aprašytas mūsų automatizuotas tvarkymas." }
+      { kind: "p", text: "Australija. Jūsų asmeninės informacijos gavėjai užsienyje yra Registre nurodyti DI paslaugų teikėjai ir duomenų tvarkytojai, esantys Jungtinėse Amerikos Valstijose ir Europos Sąjungoje; imamės pagrįstų veiksmų užtikrinti, kad jie tvarkytų šią informaciją laikydamiesi Australijos privatumo principų. Automatizuoti sprendimai: nuo 2026 m. gruodžio 10 d. šioje politikoje nurodomos kompiuterių programų priimamų sprendimų, darančių reikšmingą poveikį jūsų teisėms ar interesams, rūšys — tokių sprendimų nėra; įverčiai ir verdiktai susiję su argumentais, o ne su jumis — ir juose naudojama asmeninė informacija. Skundus galima teikti Australijos informacijos komisaro biurui. Naujoji Zelandija. Mūsų privatumo pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Kai jūsų asmeninę informaciją renkame netiesiogiai — nes kitas naudotojas įtraukė ją į klausimą — šia politika ir 11 skyriumi pateikiame jums pranešimą. Informaciją Registre nurodytiems DI paslaugų teikėjams atskleidžiame kaip savo atstovams pagal sutartis, kuriose reikalaujama lygiaverčių apsaugos priemonių. Skundus galima teikti Privatumo komisaro biurui." }
     ]
   },
   {
     no: "B.5",
-    title: "Australija ir Naujoji Zelandija (tik jei nurodyta)",
+    title: "Šveicarija",
     accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Australija. Jūsų asmeninės informacijos gavėjai užsienyje yra Registre nurodyti DI paslaugų teikėjai ir duomenų tvarkytojai, esantys [the United States and the European Union]; imamės pagrįstų veiksmų užtikrinti, kad jie tvarkytų šią informaciją laikydamiesi Australijos privatumo principų. Automatizuoti sprendimai: nuo 2026 m. gruodžio 10 d. šioje politikoje nurodomos kompiuterių programų priimamų sprendimų, darančių reikšmingą poveikį jūsų teisėms ar interesams, rūšys — tokių sprendimų nėra; įverčiai ir verdiktai susiję su argumentais, o ne su jumis — ir juose naudojama asmeninė informacija. Skundus galima teikti Australijos informacijos komisaro biurui. Naujoji Zelandija. Mūsų privatumo pareigūnas yra [name]. Kai jūsų asmeninę informaciją renkame netiesiogiai — nes kitas naudotojas įtraukė ją į klausimą — šia politika ir 11 skyriumi pateikiame jums pranešimą. Informaciją Registre nurodytiems DI paslaugų teikėjams atskleidžiame kaip savo atstovams pagal sutartis, kuriose reikalaujama lygiaverčių apsaugos priemonių. Skundus galima teikti Privatumo komisaro biurui." }
-    ]
-  },
-  {
-    no: "B.6",
-    title: "Šveicarija (tik jei nurodyta)",
-    accent: "--con",
     blocks: [
       { kind: "p", text: "Taikomas Šveicarijos federalinis duomenų apsaugos įstatymas (FADP). Priežiūros institucija yra Federalinis duomenų apsaugos ir informacijos komisaras (FDPIC) edoeb.admin.ch. Jūsų duomenys perduodami į Registre nurodytas šalis — ES šalis ir Jungtines Amerikos Valstijas. Perduodami duomenis į Jungtines Amerikos Valstijas remiamės Šveicarijos ir JAV duomenų privatumo sistema, kai paslaugų teikėjas yra sertifikuotas, o kitais atvejais — FDPIC pripažintomis standartinėmis sutarčių sąlygomis. Apie duomenų saugumo pažeidimą, dėl kurio jums gali kilti didelė rizika, FDPIC pranešame kuo skubiau. Įvertinome, kad mums nereikia skirti atstovo Šveicarijoje (Art. 14 FADP). Šį vertinimą peržiūrime kasmet." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldova (tik jei nurodyta)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Taikomas Moldovos įstatymas Nr. 195/2024 dėl asmens duomenų apsaugos. Jis parengtas pagal GDPR, o pagal jį jums priklausančios teisės aprašytos pagrindinėje šios politikos dalyje. Priežiūros institucija yra Nacionalinis asmens duomenų apsaugos centras (CNPDCP). Atstovo Moldovoje mums nereikia, nes esame įsisteigę Europos ekonominėje erdvėje (Įstatymo Nr. 195/2024 Art. 27(2)(c)). Šį vertinimą peržiūrime kasmet. Jūsų duomenų perdavimas į Jungtines Amerikos Valstijas grindžiamas Registre kiekvienam teikėjui nurodytu mechanizmu. Apie asmens duomenų saugumo pažeidimą CNPDCP pranešame per 72 valandas, kai to reikalauja teisės aktai." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukraina (tik jei nurodyta)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Azijos ir Ramiojo vandenyno regionas",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Taikomas Ukrainos įstatymas „Dėl asmens duomenų apsaugos“. Dialectical Engine nesiūlome tose Ukrainos teritorijose, kurių nekontroliuoja jos vyriausybė. Jūsų duomenys perduodami į ES šalis ir Jungtines Amerikos Valstijas (žr. Registrą). Skundą galite pateikti Ukrainos Aukščiausiosios Rados žmogaus teisių komisarui." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Izraelis (tik jei nurodyta)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Taikomas Izraelio privatumo apsaugos įstatymas. Duomenų valdytojas yra DebateAIRO S.R.L.; kaip su mumis susisiekti, nurodyta 1 skyriuje. Neturite teisinės pareigos pateikti mums savo duomenų; tačiau be paskyros duomenų negalime jums sukurti paskyros. Jūsų duomenis naudojame 4 skyriuje nurodytais tikslais ir teikiame 5 skyriuje nurodytiems gavėjams. Galite prašyti leisti su jais susipažinti ir juos ištaisyti (10 skyrius). Priežiūros institucija yra Privatumo apsaugos tarnyba." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Azijos ir Ramiojo vandenyno regionas (tik išvardytų regionų eilutės)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapūras: mūsų duomenų apsaugos pareigūnas yra [name, email]; perdavimas grindžiamas sutartinėmis prievolėmis, užtikrinančiomis PDPA lygiavertę apsaugą; apie pažeidimus, apie kuriuos privaloma pranešti, PDPC informuojame per 3 dienas. Japonija: jūsų asmeninę informaciją naudojame tik 4 skyriuje nurodytais tikslais ir jokiais kitais. Ją teikiame Registre nurodytiems DI paslaugų ir prieglobos paslaugų teikėjams, esantiems Jungtinėse Amerikos Valstijose ir ES šalyse, pagal sutartis, kuriomis reikalaujama ją saugoti pagal Japonijos Asmeninės informacijos apsaugos įstatymo standartą; paprašius informuojame, ką jie daro jai apsaugoti ir kokia yra jų šalies privatumo apsaugos sistema. Jūsų įsitikinimai, įskaitant religinius ir politinius, ir jūsų sveikata yra ypatingo dėmesio reikalaujanti asmeninė informacija; ją renkame tik iš anksto gavę jūsų sutikimą (3 skyrius). Mūsų pavadinimas ir adresas: DebateAIRO S.R.L., [address], Rumunija, o mūsų atstovas yra [name], direktorius; kaip pateikti prašymą, nurodyta 10 skyriuje, mūsų saugumo priemonės aprašytos 9 skyriuje, o skundus siųskite adresu privacy@dezbatere.ro. Apie pažeidimus Asmeninės informacijos apsaugos komisijai pranešame taip, kaip reikalauja šis įstatymas. Pietų Korėja: mūsų privatumo pareigūnas yra [name], direktorius, privacy@dezbatere.ro. Asmeninę informaciją perduodame į užsienį, nes to reikia jūsų debatams vykdyti pagal mūsų su jumis sudarytą sutartį: kiekvieną kartą vykstant debatams jūsų klausimą ir debatų teiginius, o pagalbos pokalbyje — jūsų žinutes šifruotu ryšiu siunčiame Registre nurodytiems DI paslaugų ir prieglobos paslaugų teikėjams; Registre nurodytas kiekvienas gavėjas, jo šalis, kontaktiniai duomenys, tikslas ir duomenų saugojimo trukmė. Galite atsisakyti perdavimo nepradėdami debatų arba ištrindami paskyrą; tada negalėsime jums vykdyti debatų. Politinės pažiūros, įsitikinimai ir sveikata yra neskelbtina informacija; ją tvarkome tik gavę atskirą jūsų sutikimą (3 skyrius). Nepriimame dėl jūsų jokių visiškai automatizuotų sprendimų (8 skyrius). Į prašymus atsakome per [10] dienų, o apie pažeidimus pranešame Asmeninės informacijos apsaugos komisijai ir jums, kaip reikalauja Asmeninės informacijos apsaugos įstatymas. Taivanas: taikomas Taivano asmens duomenų apsaugos įstatymas. Jūsų duomenis saugome 7 skyriuje nurodytais laikotarpiais; jie naudojami Rumunijoje, kitose ES šalyse ir Jungtinėse Amerikos Valstijose (žr. Registrą); gavėjai nurodyti 5 skyriuje; mūsų sistemos ir DI modeliai juos tvarko automatiškai jūsų debatams vykdyti. Galite paklausti, kokius duomenis turime, su jais susipažinti, gauti jų kopiją, juos ištaisyti, reikalauti, kad nustotume juos naudoti, ir juos ištrinti (10 skyrius). Paskyros duomenų pateikimas yra jūsų pasirinkimas, tačiau be jų negalime jums sukurti paskyros. Į prašymą susipažinti su savo duomenimis ar gauti jų kopiją atsakome per 15 dienų; jei mums reikia daugiau laiko, šį terminą galime vieną kartą pratęsti ne daugiau kaip 15 dienų, raštu nurodę jums priežastį. Filipinai: mūsų duomenų apsaugos pareigūnas yra [name]; skundai gali būti teikiami Nacionalinei privatumo komisijai; 8 skyriuje aprašytas automatizuotas tvarkymas. Tailandas: mūsų atstovas yra [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Rezervuota",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Turkijai, Brazilijai ir Indonezijai reikia pranešimo vietos kalba, atstovo arba registracijos ir dokumentų pateikimo, todėl jų projektai čia neparengti. Kinijoje, Vietname ir Rusijoje paslaugos neteikiamos." }
+      { kind: "p", text: "Singapūras: mūsų duomenų apsaugos pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro; perdavimas grindžiamas sutartinėmis prievolėmis, užtikrinančiomis PDPA lygiavertę apsaugą; apie pažeidimus, apie kuriuos privaloma pranešti, PDPC informuojame per 3 dienas. Japonija: jūsų asmeninę informaciją naudojame tik 4 skyriuje nurodytais tikslais ir jokiais kitais. Ją teikiame Registre nurodytiems DI paslaugų ir prieglobos paslaugų teikėjams, esantiems Jungtinėse Amerikos Valstijose ir ES šalyse, pagal sutartis, kuriomis reikalaujama ją saugoti pagal Japonijos Asmeninės informacijos apsaugos įstatymo standartą; paprašius informuojame, ką jie daro jai apsaugoti ir kokia yra jų šalies privatumo apsaugos sistema. Jūsų įsitikinimai, įskaitant religinius ir politinius, ir jūsų sveikata yra ypatingo dėmesio reikalaujanti asmeninė informacija; ją renkame tik iš anksto gavę jūsų sutikimą (3 skyrius). Mūsų pavadinimas ir adresas: DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumunija, o mūsų atstovas yra Dedita Ionut Ciprian, direktorius; kaip pateikti prašymą, nurodyta 10 skyriuje, mūsų saugumo priemonės aprašytos 9 skyriuje, o skundus siųskite adresu privacy@dezbatere.ro. Apie pažeidimus Asmeninės informacijos apsaugos komisijai pranešame taip, kaip reikalauja šis įstatymas. Pietų Korėja: mūsų privatumo pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Asmeninę informaciją perduodame į užsienį, nes to reikia jūsų debatams vykdyti pagal mūsų su jumis sudarytą sutartį: kiekvieną kartą vykstant debatams jūsų klausimą ir debatų teiginius, o pagalbos pokalbyje — jūsų žinutes šifruotu ryšiu siunčiame Registre nurodytiems DI paslaugų ir prieglobos paslaugų teikėjams; Registre nurodytas kiekvienas gavėjas, jo šalis, kontaktiniai duomenys, tikslas ir duomenų saugojimo trukmė. Galite atsisakyti perdavimo nepradėdami debatų arba ištrindami paskyrą; tada negalėsime jums vykdyti debatų. Politinės pažiūros, įsitikinimai ir sveikata yra neskelbtina informacija; ją tvarkome tik gavę atskirą jūsų sutikimą (3 skyrius). Nepriimame dėl jūsų jokių visiškai automatizuotų sprendimų (8 skyrius). Į prašymus atsakome per 10 dienų, o apie pažeidimus pranešame Asmeninės informacijos apsaugos komisijai ir jums, kaip reikalauja Asmeninės informacijos apsaugos įstatymas. Taivanas: taikomas Taivano asmens duomenų apsaugos įstatymas. Jūsų duomenis saugome 7 skyriuje nurodytais laikotarpiais; jie naudojami Rumunijoje, kitose ES šalyse ir Jungtinėse Amerikos Valstijose (žr. Registrą); gavėjai nurodyti 5 skyriuje; mūsų sistemos ir DI modeliai juos tvarko automatiškai jūsų debatams vykdyti. Galite paklausti, kokius duomenis turime, su jais susipažinti, gauti jų kopiją, juos ištaisyti, reikalauti, kad nustotume juos naudoti, ir juos ištrinti (10 skyrius). Paskyros duomenų pateikimas yra jūsų pasirinkimas, tačiau be jų negalime jums sukurti paskyros. Į prašymą susipažinti su savo duomenimis ar gauti jų kopiją atsakome per 15 dienų; jei mums reikia daugiau laiko, šį terminą galime vieną kartą pratęsti ne daugiau kaip 15 dienų, raštu nurodę jums priežastį." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "f39f05d3ad50b1170136d753a2a3e11880ac087f1bbcaea95b74d772072803ff",
-  eyebrow: "PRIVATUMO POLITIKA · v3.2 · ĮSIGALIOJA [DATE]",
+  version: "3.3",
+  sha256: "544c4378eee4b0f9b9530f497ce32e9aef3ba26f744c86a24dd853021932e92a",
+  eyebrow: "PRIVATUMO POLITIKA · v3.3 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",
-  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatumo politikos tekstas",
   sectionIdPrefix: "policy-section-",

@@ -27,6 +27,8 @@ const COMPANY: SellerCompany = Object.freeze({
   vat: Object.freeze({ kind: "registered", number: "RO12345678" } as const),
   emails: Object.freeze({ ...SELLER_COMPANY.emails, general: "hello@dezbatere.ro" })
 });
+// A CUI the owner has not filled in yet: the notice's square-bracket placeholder.
+const UNFILLED: SellerCompany = Object.freeze({ ...COMPANY, cui: "[…]" });
 const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const PEM = publicKey.export({ type: "spki", format: "pem" }).toString();
 const FINGERPRINT = createHash("sha256").update(publicKey.export({ type: "spki", format: "der" })).digest("hex");
@@ -149,7 +151,7 @@ describe("N21 pnpm billing:check", () => {
     const lines = await runBillingCheck(depsFor({ ...incomplete, NETOPIA_API_BASE_URL: "https://secure.netopia-payments.com/api" }, {
       notify: () => new Response(null, { status: 301, headers: { location: "https://www.dezbatere.test/" } }),
       register: async () => ({ registerVersion: 8, billingEnabled: true, plans: null, countryPolicy: false }),
-      company: SELLER_COMPANY
+      company: UNFILLED
     }));
     const crosses = texts(lines, false);
     expect(crosses).toEqual(expect.arrayContaining([
@@ -268,7 +270,7 @@ describe("N21 pnpm billing:check", () => {
     const output = { stdout: (text: string) => { out.push(text); }, stderr: (text: string) => { err.push(text); } };
     const open = (deps: BillingCheckDeps) => async () => Object.freeze({ ...deps, close: async () => undefined });
     expect(await runBillingCheckCli([], output, open(depsFor(environment)))).toBe(0);
-    expect(await runBillingCheckCli([], output, open(depsFor(environment, { company: SELLER_COMPANY })))).toBe(1);
+    expect(await runBillingCheckCli([], output, open(depsFor(environment, { company: UNFILLED })))).toBe(1);
     expect(await runBillingCheckCli(["--verbose"], output, open(depsFor(environment)))).toBe(2);
     expect(await runBillingCheckCli([], output, async () => { throw new TypeError("DATABASE_URL_MISSING"); })).toBe(1);
     expect(err).toEqual(["BILLING_CHECK_USAGE\n", "DATABASE_URL_MISSING\n"]);

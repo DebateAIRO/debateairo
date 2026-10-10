@@ -10,7 +10,6 @@ import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import { confirmationPhraseMatches } from '../AccountErasureControls';
 import type { LocaleCode } from '@/lib/i18n/locales';
 import { SecurityConfirmation } from './SecurityConfirmation';
-import { EphemeralCodes } from './EphemeralCodes';
 import { emailShape } from '@/lib/authFormValidation';
 export type SecurityResumeHandler = (authorization: StepUpAuthorizationRequest, initialProof: ConfirmedSecurityAction) => void | Promise<void>;
 /** Task12 consumes onResume for its profile/method/provider panels; proof remains one-use and exact. */
@@ -27,7 +26,6 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
     const consumed = useRef(false);
     const active = useRef(true);
     const [proof, setProof] = useState<ConfirmedSecurityAction | null>(null);
-    const [backup, setBackup] = useState<string | null>(null);
     const [email, setEmail] = useState('');
     const [phrase, setPhrase] = useState('');
     const [acknowledged, setAcknowledged] = useState(false);
@@ -41,10 +39,8 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
             const value = takeProof();
             if (value?.step_up_grant) {
                 const { token, expires_at, ...authorization } = value.step_up_grant;
-                if (matchingSecurityGrant(value, authorization)) {
+                if (matchingSecurityGrant(value, authorization))
                     setProof(value);
-                    setBackup(value.replacement_recovery_code ?? null);
-                }
             }
         }
         return () => {
@@ -61,7 +57,7 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
         return () => clearTimeout(timer);
     }, [proof, catalog]);
     if (!proof)
-        return <section>{statement ? <PublicationStatement statement={statement} catalog={publicCatalog}/> : null}{status ? <p role="status">{status}</p> : <p>{t(catalog, "auth.security.resumeEmpty")}</p>}{backup ? <EphemeralCodes catalog={catalog} codes={[backup]}/> : null}{cancellation ? <button type="button" onClick={async () => {
+        return <section>{statement ? <PublicationStatement statement={statement} catalog={publicCatalog}/> : null}{status ? <p role="status">{status}</p> : <p>{t(catalog, "auth.security.resumeEmpty")}</p>}{cancellation ? <button type="button" onClick={async () => {
                     try {
                         await client.cancelAccountErasure(cancellation);
                         setCancellation(null);
@@ -130,7 +126,7 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
                 else if (action === 'DELETE_ACCOUNT')
                     setStatus(t(settingsCatalog, failure instanceof ContractHttpError && failure.serverCode === 'ACCOUNT_NOTIFICATION_CHANNEL_REQUIRED' ? 'settings.erasure.notificationChannelRequired' : 'settings.erasure.notAuthorized'));
                 else if (action === 'CHANGE_EMAIL')
-                    setStatus(t(settingsCatalog, 'settings.emailChange.failed'));
+                    setStatus(failure instanceof ContractHttpError && failure.serverCode === 'EMAIL_INVALID' ? t(catalog, 'auth.emailUndeliverable') : t(settingsCatalog, 'settings.emailChange.failed'));
                 else
                     setStatus(t(catalog, 'auth.security.unavailable'));
             }
@@ -140,11 +136,9 @@ export function SecurityActionResume({ catalog, settingsCatalog, publicCatalog, 
  {destructive ? <label className="authCheck"><input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)}/>{t(publicCatalog, action === 'PUBLISH' ? 'public.publication.acknowledgePublish' : action === 'UNPUBLISH' ? 'public.publication.acknowledgeUnpublish' : 'public.publication.deleteAcknowledgement')}</label> : null}
  {action === 'DELETE_ACCOUNT' ? <div className="authField"><label htmlFor="resume-erasure-phrase">{t(settingsCatalog, "settings.erasure.typeConfirmation", { confirmation: t(settingsCatalog, "settings.erasure.confirmationPhrase") })}</label><input id="resume-erasure-phrase" value={phrase} onChange={e => setPhrase(e.target.value)} autoComplete="off"/></div> : null}
  {action === 'CHANGE_EMAIL' ? <div className="authField"><label htmlFor="resume-new-email">{t(settingsCatalog, "settings.emailChange.newLabel")}</label><input id="resume-new-email" type="email" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email"/></div> : null}
- {backup ? <EphemeralCodes catalog={catalog} codes={[backup]}/> : null}
  <SecurityConfirmation catalog={catalog} client={client} authorization={authorization} initialProof={proof} disabled={!allowed} onConfirmed={confirm} onCancel={() => {
             consumed.current = true;
             setProof(null);
-            setBackup(null);
         }}/>
  </section>;
 }

@@ -67,9 +67,10 @@ describe("manual phone profile", () => {
     expect(JSON.stringify(record)).not.toContain(phone);
     expect(originalKeys.every(key => key.every(byte => byte === 0))).toBe(true);
     const key = keys.get(record.userId)!;
-    expect(decrypt(key, record.phoneCiphertext, aad(record.userId)).toString("utf8")).toBe(canonical);
-    expect(() => decrypt(key, record.phoneCiphertext, aad(randomUUID()))).toThrow();
-    const changed: CryptoEnvelope = { ...record.phoneCiphertext, ct: (record.phoneCiphertext.ct.startsWith("A") ? "B" : "A") + record.phoneCiphertext.ct.slice(1) };
+    const envelope = record.phoneCiphertext!;
+    expect(decrypt(key, envelope, aad(record.userId)).toString("utf8")).toBe(canonical);
+    expect(() => decrypt(key, envelope, aad(randomUUID()))).toThrow();
+    const changed: CryptoEnvelope = { ...envelope, ct: (envelope.ct.startsWith("A") ? "B" : "A") + envelope.ct.slice(1) };
     expect(() => decrypt(key, changed, aad(record.userId))).toThrow();
     for (const stored of keys.values()) stored.fill(0);
   });
@@ -87,11 +88,19 @@ describe("manual phone profile", () => {
     } finally { logging.mockRestore(); }
   });
 
-  it("rejects legacy registration without a phone before any identity mutation", async () => {
+  // Owner ruling 2026-10-09: the phone is optional. Without one, no phone profile is created at all.
+  it("registers without a phone and creates no phone profile", async () => {
     const { service, records } = harness();
-    const { phone: _phone, ...legacy } = validInput;
-    await expect(service.register({ ...legacy, recoveryEmail: "recovery@example.test" } as never, source))
-      .rejects.toBeInstanceOf(AuthFlowError);
+    const { phone: _phone, ...withoutPhone } = validInput;
+    await service.register({ ...withoutPhone, recoveryEmail: "recovery@example.test" }, source);
+    await service.drainMailDispatches();
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ phoneCiphertext: null, phoneSource: null, phoneVerificationStatus: null, phoneUpdatedAt: null });
+  });
+
+  it("still refuses a malformed phone before any identity mutation", async () => {
+    const { service, records } = harness();
+    await expect(service.register({ ...validInput, phone: "0722 123 456" }, source)).rejects.toBeInstanceOf(AuthFlowError);
     expect(records).toHaveLength(0);
   });
 });

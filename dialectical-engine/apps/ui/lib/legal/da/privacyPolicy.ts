@@ -34,7 +34,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Hvem er ansvarlig for dine data",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Den dataansvarlige for dine personoplysninger er DebateAIRO S.R.L., [address], Bukarest, Rumænien, handelsregister [J40/…], CUI […]. Skriv til privacy@dezbatere.ro om ethvert spørgsmål vedrørende denne politik; vi svarer inden for en måned. Vi har ikke udpeget en databeskyttelsesrådgiver, fordi loven ikke kræver det af os; denne adresse overvåges af [role]. Hvor vi har udpeget en repræsentant eller en privatlivsansvarlig for et bestemt land, er vedkommende angivet i bilag B." }
+      { kind: "p", text: "Den dataansvarlige for dine personoplysninger er DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumænien, handelsregister J2022000426271, CUI 45935221. Skriv til privacy@dezbatere.ro om ethvert spørgsmål vedrørende denne politik; vi svarer inden for en måned. Vi har ikke udpeget en databeskyttelsesrådgiver, fordi loven ikke kræver det af os; denne adresse overvåges af vores direktør. Hvor vi har udpeget en repræsentant eller en privatlivsansvarlig for et bestemt land, er vedkommende angivet i bilag B." }
     ]
   },
   {
@@ -107,10 +107,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Hvad der sendes. For at gennemføre en debat sender vi tekst til en eller flere eksterne AI-udbydere: dit spørgsmål, de styrende annotationer, du angiver, og udsagn, som systemet udarbejder, efterhånden som debatten udvikler sig. En udbyder ser derfor tekst, som er afledt af og bygget op omkring det, du skrev. Hvis du bruger supportsamtalen, går det, du skriver der, til supportsamtalens model. En udbyder modtager aldrig din e-mailadresse, dine konto- eller sessionsidentifikatorer, din IP-adresse eller dine betalingsoplysninger." },
-      { kind: "p", text: "Hvilke udbydere. De er anført i vores Register over AI-udbydere på [dezbatere.ro/providers], som er en del af denne politik. Registret gælder for alle brugere, uanset hvor du bor. For hver udbyder angiver det den juridiske enhed og etableringslandet; hvad udbyderen modtager og til hvilket formål — at skrive debattens argumenter, bedømme og kontrollere dem, skrive historien om konklusionen eller svare dig i supportsamtalen; de lande eller regioner, hvor behandlingen finder sted; udbyderens opbevaringsvilkår, og om nuldataopbevaring er aktiv for det slutpunkt og de funktioner, vi bruger; om udbyderen må bruge input til træning i henhold til vores kontrakt; den overførselsmekanisme, vi støtter os på; hvordan du kontakter udbyderen om dine data; og datoen for vores seneste kontrol af hver registrering. Udbydere kan ændre sig; Registret er versionsstyret, og ændringen noteres deri." },
+      { kind: "p", text: "Hvilke udbydere. De er anført i vores Register over AI-udbydere på dezbatere.ro/providers, som er en del af denne politik. Registret gælder for alle brugere, uanset hvor du bor. For hver udbyder angiver det den juridiske enhed og etableringslandet; hvad udbyderen modtager og til hvilket formål — at skrive debattens argumenter, bedømme og kontrollere dem, skrive historien om konklusionen eller svare dig i supportsamtalen; de lande eller regioner, hvor behandlingen finder sted; udbyderens opbevaringsvilkår, og om nuldataopbevaring er aktiv for det slutpunkt og de funktioner, vi bruger; om udbyderen må bruge input til træning i henhold til vores kontrakt; den overførselsmekanisme, vi støtter os på; hvordan du kontakter udbyderen om dine data; og datoen for vores seneste kontrol af hver registrering. Udbydere kan ændre sig; Registret er versionsstyret, og ændringen noteres deri." },
       { kind: "p", text: "Træning og opbevaring er forskellige ting. Vores kontrakter med udbyderne udelukker brug af dit indhold til at træne eller forbedre deres modeller. [Publish only once verified per route.] Nogle udbydere opbevarer prompts og svar i en begrænset periode af hensyn til sikkerhed, forebyggelse af misbrug eller deres egne retlige forpligtelser; Registret angiver hvor længe og hvorfor. Hvor nuldataopbevaring er aktiv, angiver Registret dette og de funktioner, det gælder for. Vi beskriver ikke indhold som uopbevaret, når det ikke er tilfældet." },
       { kind: "p", text: "Overførsler uden for EØS. Udbydere, der er etableret i USA, modtager data efter en af mekanismerne i kapitel V i GDPR: EU-USA-databeskyttelsesrammen, hvor den konkrete kontraherende enhed er certificeret for disse data, eller Europa-Kommissionens standardkontraktbestemmelser (modul to, dataansvarlig til databehandler), understøttet af en vurdering af overførselsrisikoen og supplerende foranstaltninger. Registret angiver mekanismen for hver udbyder. Du kan få en kopi af de bestemmelser, vi støtter os på, ved at skrive til privacy@dezbatere.ro. Hvis en mekanisme, vi støtter os på, erklæres ugyldig, skifter vi til en anden, før overførslerne fortsætter, og vi underretter dig." },
-      { kind: "p", text: "Andre modtagere. Vores hostingudbyder [Hetzner, Germany — region …]; vores udbyder af indholdslevering og transport [Cloudflare]; vores e-mailrelæ […]; [our payment provider, once a paid plan exists]. De handler alle efter vores dokumenterede instrukser i henhold til en databehandleraftale med de garantier, som artikel 28 kræver, og er alle anført i Registret med deres placering og overførselsmekanisme. Vi tillader ikke nogen databehandler at bruge dine data til egne formål. Hvis en udbyder gjorde det, ville vedkommende være selvstændig dataansvarlig, og vi ville ikke sende dine data til denne udbyder." },
+      { kind: "p", text: "Andre modtagere. Vores hostingudbyder [Hetzner, Germany — region …]; vores udbyder af indholdslevering og transport Cloudflare; vores e-mailrelæ […]; vores betalingsudbyder, NETOPIA Payments, når der findes et betalt abonnement. De handler alle efter vores dokumenterede instrukser i henhold til en databehandleraftale med de garantier, som artikel 28 kræver, og er alle anført i Registret med deres placering og overførselsmekanisme. Vi tillader ikke nogen databehandler at bruge dine data til egne formål. Hvis en udbyder gjorde det, ville vedkommende være selvstændig dataansvarlig, og vi ville ikke sende dine data til denne udbyder." },
       { kind: "p", text: "Offentlige myndigheder. Vi videregiver personoplysninger til domstole, tilsynsmyndigheder eller retshåndhævende myndigheder, hvor loven kræver det, og vi underretter dig, medmindre loven forhindrer os i det." }
     ]
   },
@@ -144,7 +144,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Debatindhold (privat) — Mens kontoen findes — Nøgler destrueres ved lukning, så indholdet bliver ulæseligt",
         "Debatindhold (offentliggjort) — Mens det er offentliggjort; hvis du lukker din konto og lader \"Slet også mine offentlige debatter\" være umarkeret, forbliver en offentliggjort debat offentlig under dit udfasede pseudonym — Fjernes fra offentlig adgang, og dens nøgle destrueres, når du ophæver offentliggørelsen, eller ved lukning, hvis du har markeret \"Slet også mine offentlige debatter\"",
         "Registreringer af udbydersvar og søgehenvisninger — Samme periode som den debat, de tilhører — Det samme",
-        "Supportsamtaler og -sager — [Until closed plus 12 months] — Nøgler destrueres",
+        "Supportsamtaler og -sager — Indtil sagen er lukket plus 12 måneder — Nøgler destrueres",
         "Registreringer af accept og samtykke — Kontoens levetid plus 6 år — den længste forældelsesfrist, der gælder for os — Slettes",
         "Betalingsregistreringer [pending] — 10 år, som krævet efter rumænsk regnskabslovgivning — Slettes",
         "Sikkerhedskopier [pending] — [… days] efter at den aktive kopi er slettet — Overskrives"
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine bruger 18 elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af Dialectical Engine: 13 cookies og 5 poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. Cookiepolitikken på [dezbatere.ro/cookies] angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes." },
+      { kind: "p", text: "Dialectical Engine bruger 18 elementer, som alle er strengt nødvendige for den tjeneste, du har bedt om, og som alle kun sættes af Dialectical Engine: 13 cookies og 5 poster i din browsers lager. Vi sætter ingen cookies til analyse, reklame eller sporing. Cookiepolitikken på dezbatere.ro/cookies angiver dem med, hvad hver af dem gør, og hvem der modtager den, og ændres, før noget andet tilføjes." },
       {
         kind: "list",
         items: [
@@ -251,8 +251,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ændringer af denne politik",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Når vi ændrer denne politik, offentliggør vi den nye version med en oversigt over ændringerne og en ny ikrafttrædelsesdato og beholder de tidligere versioner på [dezbatere.ro/privacy/versions]. Ved en ændring, der tilføjer et nyt formål eller en ny modtager, underretter vi dig via e-mail og i produktet, før den nye behandling begynder, og giver dig tid til at gøre indsigelse. Hvor et nyt formål afhænger af dit samtykke — eksempelvis hvis vi nogensinde ønskede at bruge indhold til at forbedre modeller — beder vi særskilt og specifikt om dette samtykke; vi behandler aldrig accept af opdaterede Vilkår som samtykke til ny behandling. Ved præciseringer, der ikke ændrer noget ved det, vi gør, offentliggør vi blot den nye version." },
-      { kind: "p", text: "Denne politik blev senest opdateret den [date]. Version 3.2 erstattede version 2.1, som beskrev sessionsdata, opbevaringsperioder, analyse, eksport og virkningen af sletning på offentliggjorte debatter på måder, der ikke længere afspejlede tjenesten." }
+      { kind: "p", text: "Når vi ændrer denne politik, offentliggør vi den nye version med en oversigt over ændringerne og en ny ikrafttrædelsesdato og beholder de tidligere versioner på dezbatere.ro/privacy/versions. Ved en ændring, der tilføjer et nyt formål eller en ny modtager, underretter vi dig via e-mail og i produktet, før den nye behandling begynder, og giver dig tid til at gøre indsigelse. Hvor et nyt formål afhænger af dit samtykke — eksempelvis hvis vi nogensinde ønskede at bruge indhold til at forbedre modeller — beder vi særskilt og specifikt om dette samtykke; vi behandler aldrig accept af opdaterede Vilkår som samtykke til ny behandling. Ved præciseringer, der ikke ændrer noget ved det, vi gør, offentliggør vi blot den nye version." },
+      { kind: "p", text: "Denne politik blev senest opdateret den 12. oktober 2026. Version 3.2 erstattede version 2.1, som beskrev sessionsdata, opbevaringsperioder, analyse, eksport og virkningen af sletning på offentliggjorte debatter på måder, der ikke længere afspejlede tjenesten." }
     ]
   },
   {
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Bilag B — Regionale privatlivsvilkår",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Hvert punkt finder kun anvendelse, hvis dets region er anført i Vilkårenes afsnit 2, og angiver kun det, der afviger fra denne politiks hovedtekst." }
+      { kind: "p", text: "Hvert punkt finder anvendelse på personer, der bor i den pågældende region, og angiver kun det, der afviger fra denne politiks hovedtekst." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Det Forenede Kongerige (kun hvis anført)",
+    title: "USA",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Vores repræsentant i Storbritannien efter artikel 27 i britisk GDPR er [name, address, email]; du kan kontakte repræsentanten om alt vedrørende denne politik. Tilsynsmyndigheden er Information Commissioner's Office, ico.org.uk. Hvis du vil klage til os, skal du skrive til privacy@dezbatere.ro; vi bekræfter modtagelsen af din klage inden for 30 dage. Overførsler af dine data fra Storbritannien til AI-udbydere i USA er baseret på UK Extension to the EU–US Data Privacy Framework, hvor udbyderen er certificeret, og ellers på UK International Data Transfer Addendum til EU's standardkontraktbestemmelser, understøttet af en vurdering af overførselsrisikoen; Registret angiver værktøjet for hver udbyder. Vi anmelder brud på persondatasikkerheden til ICO inden for 72 timer, hvor loven kræver det, og underretter dig uden unødig forsinkelse, hvis bruddet indebærer en høj risiko for dig. Hvis vi nogensinde satte analysecookies, ville de i Storbritannien være underlagt fravalg frem for samtykke; i dag sætter vi ingen. Hvis du er under 18 år og får adgang til tjenesten på trods af vores aldersregel, finder standarderne i ICO's Children's Code anvendelse på vores behandling af dine data." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "USA (kun hvis anført)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Meddelelse ved indsamling. Tabellen i afsnit 2 angiver de kategorier af personoplysninger, vi indsamler, og deres kilder. Formål og retsgrundlag står i afsnit 4, og opbevaringsperioderne står i afsnit 7. Vi indsamler kun disse kategorier af følsomme personoplysninger, hvor du medtager dem i dine egne spørgsmål om dig selv: helbred, religiøs eller filosofisk overbevisning, seksuelle forhold eller seksuel orientering, politiske holdninger, fagforeningsmedlemskab og race eller etnisk oprindelse. Vi bruger dem kun til at gennemføre dine debatter og kun efter det særskilte samtykke i afsnit 3. Vi sælger eller deler ikke personoplysninger og har ikke gjort det i de foregående tolv måneder. Vi bruger ikke personoplysninger til målrettet annoncering, og vi bruger ikke følsomme personoplysninger til noget formål ud over at levere den tjeneste, du anmoder om. Præferencesignaler for fravalg: Der er i øjeblikket intet at fravælge, da vi ikke sælger eller deler personoplysninger. Hvis vi senere begynder at sælge eller dele dem, respekterer vi Global Privacy Control-signaler som fravalg. Dine rettigheder: til at få oplyst, slette, rette, fravælge, begrænse brugen af følsomme personoplysninger og ikke blive forskelsbehandlet for at udøve dem; fremsæt en anmodning på privacy@dezbatere.ro. Økonomiske incitamenter: Vi tilbyder ingen; vores formål og beskyttelse er de samme for gratis og betalte abonnementer. Opbevaring fremgår af afsnit 7. Brud: Vi underretter beboere og delstatsmyndigheder, som hver delstats lov om sikkerhedsbrud kræver. Denne meddelelse opdateres mindst hver tolvte måned; senest opdateret [date]." },
+      { kind: "p", text: "Meddelelse ved indsamling. Tabellen i afsnit 2 angiver de kategorier af personoplysninger, vi indsamler, og deres kilder. Formål og retsgrundlag står i afsnit 4, og opbevaringsperioderne står i afsnit 7. Vi indsamler kun disse kategorier af følsomme personoplysninger, hvor du medtager dem i dine egne spørgsmål om dig selv: helbred, religiøs eller filosofisk overbevisning, seksuelle forhold eller seksuel orientering, politiske holdninger, fagforeningsmedlemskab og race eller etnisk oprindelse. Vi bruger dem kun til at gennemføre dine debatter og kun efter det særskilte samtykke i afsnit 3. Vi sælger eller deler ikke personoplysninger og har ikke gjort det i de foregående tolv måneder. Vi bruger ikke personoplysninger til målrettet annoncering, og vi bruger ikke følsomme personoplysninger til noget formål ud over at levere den tjeneste, du anmoder om. Præferencesignaler for fravalg: Der er i øjeblikket intet at fravælge, da vi ikke sælger eller deler personoplysninger. Hvis vi senere begynder at sælge eller dele dem, respekterer vi Global Privacy Control-signaler som fravalg. Dine rettigheder: til at få oplyst, slette, rette, fravælge, begrænse brugen af følsomme personoplysninger og ikke blive forskelsbehandlet for at udøve dem; fremsæt en anmodning på privacy@dezbatere.ro. Økonomiske incitamenter: Vi tilbyder ingen; vores formål og beskyttelse er de samme for gratis og betalte abonnementer. Opbevaring fremgår af afsnit 7. Brud: Vi underretter beboere og delstatsmyndigheder, som hver delstats lov om sikkerhedsbrud kræver. Denne meddelelse opdateres mindst hver tolvte måned; senest opdateret den 12. oktober 2026." },
       { kind: "p", text: "Connecticut: Vi behandler kun følsomme oplysninger med dit aktive samtykke (opt-in), som du giver på den særskilte skærm før din første debat (afsnit 3); vi bruger ikke dine personoplysninger til at træne AI-modeller. Washington: Vores særskilte meddelelse om beskyttelse af forbrugeres helbredsoplysninger på [URL] gælder for alle helbredsrelaterede oplysninger, herunder følgeslutninger. Texas og Nebraska: Vi sælger ikke følsomme personoplysninger. Colorado, Connecticut, Virginia og andre stater med omfattende privatlivslove: Ovenstående rettigheder gælder for dig, hvor loven gælder for os. Hvis vi afslår en anmodning, kan du klage ved at svare på vores svar på privacy@dezbatere.ro; hvis vi afviser klagen, kan du kontakte din delstats Attorney General." }
     ]
   },
   {
+    no: "B.3",
+    title: "Canada og Quebec",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vi besvarer anmodninger inden for 30 dage. Vi er fortsat ansvarlige for personoplysninger, som vi overfører til AI-udbydere uden for Canada, og bruger kontrakter til at kræve tilsvarende beskyttelse; disse udbydere kan være underlagt lovgivningen i de lande, hvor de opererer, herunder myndigheders lovlige adgang. Markedsføringsmails sendes kun med dit udtrykkelige samtykke efter CASL. Vi anmelder et brud på sikkerhedsforanstaltningerne, der skaber en reel risiko for betydelig skade for dig, til Office of the Privacy Commissioner of Canada og til dig, og vi registrerer hvert brud i 24 måneder. Quebec: Før vi videregiver personoplysninger uden for Quebec, foretager vi en konsekvensanalyse vedrørende privatliv; vi anmelder en fortrolighedshændelse, der indebærer en risiko for alvorlig skade, til Commission d'accès à l'information og til dig og fører et register over hændelser; de indstillinger, der holder dine debatter private, er som standard slået til; du kan bede os om at afindeksere eller ophøre med at udbrede personoplysninger om dig; du kan anmode om dine data i et struktureret, almindeligt anvendt format; afsnit 8 beskriver vores automatiserede behandling." }
+    ]
+  },
+  {
     no: "B.4",
-    title: "Canada og Quebec (kun hvis anført)",
+    title: "Australien og New Zealand",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er [name], privacy@dezbatere.ro. Vi besvarer anmodninger inden for 30 dage. Vi er fortsat ansvarlige for personoplysninger, som vi overfører til AI-udbydere uden for Canada, og bruger kontrakter til at kræve tilsvarende beskyttelse; disse udbydere kan være underlagt lovgivningen i de lande, hvor de opererer, herunder myndigheders lovlige adgang. Markedsføringsmails sendes kun med dit udtrykkelige samtykke efter CASL. Vi anmelder et brud på sikkerhedsforanstaltningerne, der skaber en reel risiko for betydelig skade for dig, til Office of the Privacy Commissioner of Canada og til dig, og vi registrerer hvert brud i 24 måneder. Quebec: Før vi videregiver personoplysninger uden for Quebec, foretager vi en konsekvensanalyse vedrørende privatliv; vi anmelder en fortrolighedshændelse, der indebærer en risiko for alvorlig skade, til Commission d'accès à l'information og til dig og fører et register over hændelser; de indstillinger, der holder dine debatter private, er som standard slået til; du kan bede os om at afindeksere eller ophøre med at udbrede personoplysninger om dig; du kan anmode om dine data i et struktureret, almindeligt anvendt format; afsnit 8 beskriver vores automatiserede behandling." }
+      { kind: "p", text: "Australien. Udenlandske modtagere af dine personoplysninger er de AI-udbydere og databehandlere, der er anført i Registret, og som befinder sig i USA og Den Europæiske Union; vi træffer rimelige foranstaltninger for at sikre, at de behandler oplysningerne i overensstemmelse med de australske principper om privatliv. Automatiserede afgørelser: Fra den 10. december 2026 angiver denne politik de typer afgørelser, der træffes af computerprogrammer, og som påvirker dine rettigheder eller interesser væsentligt — der er ingen; bedømmelser og konklusioner vedrører argumenter, ikke dig — samt de personoplysninger, der anvendes i dem. Klager kan indgives til Office of the Australian Information Commissioner. New Zealand. Vores privatlivsansvarlige er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Hvor vi indsamler personoplysninger om dig indirekte — fordi en anden bruger medtog dem i et spørgsmål — udgør denne politik og afsnit 11 den meddelelse, vi giver dig. Vi videregiver til AI-udbyderne i Registret som vores agenter i henhold til kontrakter, der kræver tilsvarende garantier. Klager kan indgives til Office of the Privacy Commissioner." }
     ]
   },
   {
     no: "B.5",
-    title: "Australien og New Zealand (kun hvis anført)",
+    title: "Schweiz",
     accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Australien. Udenlandske modtagere af dine personoplysninger er de AI-udbydere og databehandlere, der er anført i Registret, og som befinder sig i [the United States and the European Union]; vi træffer rimelige foranstaltninger for at sikre, at de behandler oplysningerne i overensstemmelse med de australske principper om privatliv. Automatiserede afgørelser: Fra den 10. december 2026 angiver denne politik de typer afgørelser, der træffes af computerprogrammer, og som påvirker dine rettigheder eller interesser væsentligt — der er ingen; bedømmelser og konklusioner vedrører argumenter, ikke dig — samt de personoplysninger, der anvendes i dem. Klager kan indgives til Office of the Australian Information Commissioner. New Zealand. Vores privatlivsansvarlige er [name]. Hvor vi indsamler personoplysninger om dig indirekte — fordi en anden bruger medtog dem i et spørgsmål — udgør denne politik og afsnit 11 den meddelelse, vi giver dig. Vi videregiver til AI-udbyderne i Registret som vores agenter i henhold til kontrakter, der kræver tilsvarende garantier. Klager kan indgives til Office of the Privacy Commissioner." }
-    ]
-  },
-  {
-    no: "B.6",
-    title: "Schweiz (kun hvis anført)",
-    accent: "--con",
     blocks: [
       { kind: "p", text: "Den schweiziske forbundslov om databeskyttelse (FADP) gælder. Tilsynsmyndigheden er Federal Data Protection and Information Commissioner (FDPIC), edoeb.admin.ch. Dine data sendes til de lande, der er angivet i Registret — EU-lande og USA. For USA støtter vi os på Swiss–US Data Privacy Framework, hvor udbyderen er certificeret, og ellers på standardkontraktbestemmelser anerkendt af FDPIC. Vi anmelder et brud på datasikkerheden, der sandsynligvis indebærer en høj risiko for dig, til FDPIC så hurtigt som muligt. Vi har vurderet, at vi ikke har brug for en repræsentant i Schweiz (Art. 14 FADP). Vi tager dette op til fornyet vurdering hvert år." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldova (kun hvis anført)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Moldovas lov nr. 195/2024 om beskyttelse af personoplysninger gælder. Den følger GDPR, og denne politiks hovedtekst beskriver dine rettigheder efter den. Tilsynsmyndigheden er Det Nationale Center for Beskyttelse af Personoplysninger (CNPDCP). Vi har ikke brug for en repræsentant i Moldova, fordi vi er etableret i Det Europæiske Økonomiske Samarbejdsområde (Art. 27(2)(c) i lov nr. 195/2024). Vi tager dette op til fornyet vurdering hvert år. Overførsler af dine data til USA er baseret på den mekanisme, der for hver udbyder er angivet i Registret. Vi anmelder brud på persondatasikkerheden til CNPDCP inden for 72 timer, hvor loven kræver det." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukraine (kun hvis anført)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Asien og Stillehavsområdet",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Ukraines lov \"Om beskyttelse af personoplysninger\" gælder. Vi tilbyder ikke Dialectical Engine i de områder af Ukraine, der ikke kontrolleres af landets regering. Dine data sendes til EU-lande og USA (se Registret). Du kan klage til det ukrainske parlaments kommissær for menneskerettigheder." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Israel (kun hvis anført)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Israels Protection of Privacy Law gælder. Den dataansvarlige er DebateAIRO S.R.L.; hvordan du kontakter os, fremgår af afsnit 1. Du har ingen lovmæssig pligt til at give os dine data; uden kontooplysningerne kan vi ikke oprette en konto til dig. Vi bruger dine data til formålene i afsnit 4 og giver dem til modtagerne i afsnit 5. Du kan bede om at se dem og få dem rettet (afsnit 10). Tilsynsmyndigheden er Privacy Protection Authority." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Asien og Stillehavsområdet (kun linjerne for anførte regioner)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapore: Vores databeskyttelsesrådgiver er [name, email]; overførsler er baseret på kontraktlige forpligtelser, der giver en beskyttelse svarende til PDPA; vi underretter PDPC om anmeldelsespligtige brud inden for 3 dage. Japan: Vi bruger dine personoplysninger til formålene i afsnit 4 og ingen andre. Vi giver dem til AI-udbyderne og hostingudbyderne i Registret, som befinder sig i USA og EU-lande, i henhold til kontrakter, der kræver, at de beskytter dem på det niveau, som Japans Act on the Protection of Personal Information fastsætter; på anmodning fortæller vi dig, hvad de gør for at beskytte dem, og om privatlivsordningen i deres land. Din overbevisning, herunder religiøs og politisk overbevisning, og dit helbred er personoplysninger, der kræver særlig omhu; vi indsamler dem kun med dit forudgående samtykke (afsnit 3). Vores navn og adresse er DebateAIRO S.R.L., [address], Rumænien, og vores repræsentant er [name], direktør; hvordan du fremsætter en anmodning, fremgår af afsnit 10, vores sikkerhedsforanstaltninger af afsnit 9, og klager sendes til privacy@dezbatere.ro. Vi anmelder brud til Personal Information Protection Commission, som loven kræver. Sydkorea: Vores privatlivsansvarlige er [name], direktør, privacy@dezbatere.ro. Vi overfører personoplysninger til udlandet, fordi det er nødvendigt for at gennemføre dine debatter i henhold til vores aftale med dig: Hver gang en debat kører, sender vi dit spørgsmål og debattens udsagn, og i supportsamtalen dine beskeder, via en krypteret forbindelse til AI-udbyderne og hostingudbyderne i Registret, som angiver hver modtager, dens land, dens kontaktoplysninger, formålet og hvor længe den opbevarer dataene. Du kan afvise overførslen ved ikke at starte debatter eller ved at slette din konto; så kan vi ikke gennemføre debatter for dig. Politiske holdninger, overbevisning og helbred er følsomme oplysninger; vi behandler dem kun med dit særskilte samtykke (afsnit 3). Vi træffer ingen fuldt automatiserede afgørelser om dig (afsnit 8). Vi besvarer anmodninger inden for [10] dage og anmelder brud til Personal Information Protection Commission og til dig, som Personal Information Protection Act kræver. Taiwan: Taiwans Personal Data Protection Act gælder. Vi opbevarer dine data i de perioder, der er angivet i afsnit 7; de bruges i Rumænien, andre EU-lande og USA (se Registret); modtagerne fremgår af afsnit 5; vores systemer og AI-modeller behandler dem automatisk for at gennemføre dine debatter. Du kan spørge, hvilke data vi har om dig, se dem, få en kopi, rette dem, få os til at stoppe med at bruge dem og slette dem (afsnit 10). Det er frivilligt at give os kontooplysningerne, men uden dem kan vi ikke oprette en konto til dig. Vi besvarer en anmodning om at se eller få en kopi af dine data inden for 15 dage; har vi brug for længere tid, kan vi forlænge fristen én gang med op til 15 dage og giver dig i så fald en skriftlig begrundelse. Filippinerne: Vores DPO er [name]; klager kan indgives til National Privacy Commission; afsnit 8 beskriver automatiseret behandling. Thailand: Vores repræsentant er [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Reserveret",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Tyrkiet, Brasilien og Indonesien kræver hver især en meddelelse på det lokale sprog, en repræsentant eller registrering og indberetninger, og de er ikke udarbejdet her. Kina, Vietnam og Rusland betjenes ikke." }
+      { kind: "p", text: "Singapore: Vores databeskyttelsesrådgiver er vores direktør, som kan kontaktes på privacy@dezbatere.ro; overførsler er baseret på kontraktlige forpligtelser, der giver en beskyttelse svarende til PDPA; vi underretter PDPC om anmeldelsespligtige brud inden for 3 dage. Japan: Vi bruger dine personoplysninger til formålene i afsnit 4 og ingen andre. Vi giver dem til AI-udbyderne og hostingudbyderne i Registret, som befinder sig i USA og EU-lande, i henhold til kontrakter, der kræver, at de beskytter dem på det niveau, som Japans Act on the Protection of Personal Information fastsætter; på anmodning fortæller vi dig, hvad de gør for at beskytte dem, og om privatlivsordningen i deres land. Din overbevisning, herunder religiøs og politisk overbevisning, og dit helbred er personoplysninger, der kræver særlig omhu; vi indsamler dem kun med dit forudgående samtykke (afsnit 3). Vores navn og adresse er DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumænien, og vores repræsentant er Dedita Ionut Ciprian, direktør; hvordan du fremsætter en anmodning, fremgår af afsnit 10, vores sikkerhedsforanstaltninger af afsnit 9, og klager sendes til privacy@dezbatere.ro. Vi anmelder brud til Personal Information Protection Commission, som loven kræver. Sydkorea: Vores privatlivsansvarlige er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vi overfører personoplysninger til udlandet, fordi det er nødvendigt for at gennemføre dine debatter i henhold til vores aftale med dig: Hver gang en debat kører, sender vi dit spørgsmål og debattens udsagn, og i supportsamtalen dine beskeder, via en krypteret forbindelse til AI-udbyderne og hostingudbyderne i Registret, som angiver hver modtager, dens land, dens kontaktoplysninger, formålet og hvor længe den opbevarer dataene. Du kan afvise overførslen ved ikke at starte debatter eller ved at slette din konto; så kan vi ikke gennemføre debatter for dig. Politiske holdninger, overbevisning og helbred er følsomme oplysninger; vi behandler dem kun med dit særskilte samtykke (afsnit 3). Vi træffer ingen fuldt automatiserede afgørelser om dig (afsnit 8). Vi besvarer anmodninger inden for 10 dage og anmelder brud til Personal Information Protection Commission og til dig, som Personal Information Protection Act kræver. Taiwan: Taiwans Personal Data Protection Act gælder. Vi opbevarer dine data i de perioder, der er angivet i afsnit 7; de bruges i Rumænien, andre EU-lande og USA (se Registret); modtagerne fremgår af afsnit 5; vores systemer og AI-modeller behandler dem automatisk for at gennemføre dine debatter. Du kan spørge, hvilke data vi har om dig, se dem, få en kopi, rette dem, få os til at stoppe med at bruge dem og slette dem (afsnit 10). Det er frivilligt at give os kontooplysningerne, men uden dem kan vi ikke oprette en konto til dig. Vi besvarer en anmodning om at se eller få en kopi af dine data inden for 15 dage; har vi brug for længere tid, kan vi forlænge fristen én gang med op til 15 dage og giver dig i så fald en skriftlig begrundelse." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "3fb3fbd7ac36b649fe5327f17e6dbb5c5205b1505c3a0093d9ea16be427519b4",
-  eyebrow: "PRIVATLIVSPOLITIK · v3.2 · GÆLDENDE FRA [DATE]",
+  version: "3.3",
+  sha256: "29bbe4df1a6dd56c2785b794cb44f5b951b43f14ea6db22bda5ccb265f337d5e",
+  eyebrow: "PRIVATLIVSPOLITIK · v3.3 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",
-  endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privatlivspolitikkens tekst",
   sectionIdPrefix: "policy-section-",

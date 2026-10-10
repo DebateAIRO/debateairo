@@ -10,7 +10,7 @@ import legalEnglish from "../../apps/ui/messages/en/legal.json" with { type: "js
 import { CONSENT_KEY, subscribeToPreferenceRequests } from "../../apps/ui/lib/consent.js";
 import { LOCALE_COOKIE } from "../../apps/ui/lib/i18n/locales.js";
 import {
-  ANPC_ADR_URL,
+  ADR_URL,
   COMPANY,
   isUnverified,
   LEGAL_BROWSER_STORAGE,
@@ -131,6 +131,13 @@ describe("the legal notice states the company and seller details from one consta
     render(
       <LegalNoticeBody legalCatalog={catalog(locale, "legal")} chromeCatalog={catalog(locale, "chrome")} locale={locale as never} />
     );
+  it("ends the seller sentence with one full stop, though the company name already ends in one", () => {
+    const view = render(
+      <LegalNoticeBody legalCatalog={catalog("en", "legal")} chromeCatalog={catalog("en", "chrome")} locale="en" billingOn />
+    );
+    expect(view.textContent).toContain("your invoices are with DMS Merchandise Shop S.R.L.");
+    expect(view.textContent).not.toContain("S.R.L..");
+  });
   const factCell = (view: HTMLElement, labelKey: string, locale = "en") =>
     [...view.querySelectorAll(".legalFactTable tr")]
       .find((row) => row.querySelector("th")?.textContent === catalog(locale, "legal")[labelKey])
@@ -180,18 +187,21 @@ describe("the legal notice states the company and seller details from one consta
     }
   });
 
-  it("renders unverified facts bracketed, and never links a bracketed address", () => {
+  it("renders the owner's facts as written, and never links a bracketed address", () => {
     const view = renderNotice("en");
-    expect(COMPANY.tradeRegisterNo).toBe("[J40/…/…]");
-    expect(factCell(view, "legal.notice.company.register")?.textContent).toBe("[J40/…/…]");
-    // Paid plans (P21, R3-4): the owner confirmed on 29 September 2026 that the company is VAT-registered; the number
-    // itself stays bracketed (R4) until the owner fills it.
-    expect(COMPANY.vat).toEqual({ kind: "registered", number: "[RO…]" });
-    expect(factCell(view, "legal.notice.company.vat")?.textContent).toBe("[RO…]");
-    expect(factCell(view, "legal.notice.company.vat")?.textContent).toMatch(/^\[.+\]$/);
+    // The owner filled the company facts on 9 October 2026 (Date-de-completat-Termeni-Confidentialitate.docx; ANAF record).
+    expect(COMPANY.legalName).toBe("DMS Merchandise Shop S.R.L.");
+    expect(COMPANY.tradeRegisterNo).toBe("J2022000426271");
+    expect(factCell(view, "legal.notice.company.register")?.textContent).toBe("J2022000426271");
+    // Paid plans (P21, R3-4): VAT-registered; the RO VAT code is RO + the CUI.
+    expect(COMPANY.vat).toEqual({ kind: "registered", number: "RO45935221" });
+    expect(factCell(view, "legal.notice.company.vat")?.textContent).toBe("RO45935221");
+    for (const fact of [COMPANY.registeredOffice, COMPANY.cui, COMPANY.shareCapital, COMPANY.representative, COMPANY.phone]) {
+      expect(isUnverified(fact), fact).toBe(false);
+    }
     const mailto = [...view.querySelectorAll("a[href^='mailto:']")].map((link) => link.getAttribute("href"));
-    expect(mailto).toEqual(
-      Object.values(COMPANY.emails).filter((address) => !isUnverified(address)).map((address) => `mailto:${address}`)
+    expect([...mailto].sort()).toEqual(
+      Object.values(COMPANY.emails).filter((address) => !isUnverified(address)).map((address) => `mailto:${address}`).sort()
     );
     expect(mailto).toContain("mailto:privacy@dezbatere.ro");
     expect(view.querySelector("a[href^='mailto:[']")).toBeNull();
@@ -210,11 +220,11 @@ describe("the legal notice states the company and seller details from one consta
     expect(factCell(ro, "legal.notice.contact.languages", "ro")?.textContent).toBe("Română și engleză");
   });
 
-  it("links ANPC's dispute resolution, the terms, AI transparency and the reading list — and not the closed EU ODR platform", () => {
+  it("links the dispute resolution route the Terms name, the terms, AI transparency and the reading list — and not the closed EU ODR platform", () => {
     const view = renderNotice("en");
     const hrefs = [...view.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "");
-    expect(hrefs).toContain(ANPC_ADR_URL);
-    expect(ANPC_ADR_URL).toBe("https://reclamatiisal.anpc.ro");
+    expect(hrefs).toContain(ADR_URL);
+    expect(ADR_URL).toBe("https://www.onoratainstanta.ro");
     expect(hrefs).toEqual(
       expect.arrayContaining(["/ai-transparency", "/terms#legal-section-13", "/terms#legal-section-18", "/terms", "/privacy", "/cookies", "/providers"])
     );
@@ -307,11 +317,11 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 
 describe("the terms versions page lists only versions that exist", () => {
   it("names the current and previous versions, linking each to its text", () => {
-    expect(TERMS_VERSIONS).toHaveLength(2);
+    expect(TERMS_VERSIONS).toHaveLength(3);
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
-    expect(rows).toHaveLength(2);
+    expect(rows).toHaveLength(3);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
     expect(rows[1]?.querySelector("a")?.getAttribute("href")).toBe(TERMS_VERSIONS[1]?.href);
     expect(view.querySelector(".legalVersionsNone")).toBeNull();

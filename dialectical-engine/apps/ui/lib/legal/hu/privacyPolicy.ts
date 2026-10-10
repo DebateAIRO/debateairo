@@ -34,7 +34,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Ki felelős az Ön adataiért",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Az Ön személyes adatainak adatkezelője a DebateAIRO S.R.L., [address], Bukarest, Románia, cégjegyzékszám: [J40/…], CUI: […]. A szabályzattal kapcsolatos bármely ügyben írjon a privacy@dezbatere.ro címre; egy hónapon belül válaszolunk. Nem neveztünk ki adatvédelmi tisztviselőt, mert erre a jogszabály nem kötelez bennünket; ezt a címet [role] felügyeli. Ha egy adott országban képviselőt vagy adatvédelmi tisztviselőt neveztünk ki, a B. melléklet megnevezi őket." }
+      { kind: "p", text: "Az Ön személyes adatainak adatkezelője a DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Románia, cégjegyzékszám: J2022000426271, CUI: 45935221. A szabályzattal kapcsolatos bármely ügyben írjon a privacy@dezbatere.ro címre; egy hónapon belül válaszolunk. Nem neveztünk ki adatvédelmi tisztviselőt, mert erre a jogszabály nem kötelez bennünket; ezt a címet az ügyvezetőnk felügyeli. Ha egy adott országban képviselőt vagy adatvédelmi tisztviselőt neveztünk ki, a B. melléklet megnevezi őket." }
     ]
   },
   {
@@ -107,10 +107,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Mit továbbítunk. Egy vita futtatásához szöveget küldünk egy vagy több külső MI-szolgáltatónak: az Ön kérdését, az Ön által megadott irányító megjegyzéseket és a motor által a vita alakulása során összeállított állításokat. A szolgáltató tehát az Ön által beírt szövegből származó és aköré épített szöveget lát. Ha Ön az ügyfélszolgálati csevegést használja, az ott beírt szöveget az ügyfélszolgálati csevegés modellje kapja meg. A szolgáltató soha nem kapja meg az Ön e-mail-címét, fiók- vagy munkamenet-azonosítóit, IP-címét vagy fizetési adatait." },
-      { kind: "p", text: "Mely szolgáltatók. Ezeket a szabályzat részét képező MI-szolgáltatói Nyilvántartásunk sorolja fel itt: [dezbatere.ro/providers]. A Nyilvántartás minden felhasználóra vonatkozik, bárhol éljen is. Minden szolgáltatónál feltünteti annak jogi személyét és letelepedési országát; hogy mit és milyen célból kap meg — a vita érveinek megírása, azok elbírálása és ellenőrzése, az ítélet történetének megírása vagy az Önnek adott válasz az ügyfélszolgálati csevegésben; az adatkezelés országait vagy régióit; megőrzési feltételeit, továbbá azt, hogy aktív-e a zéró adatmegőrzés az általunk használt végpont és funkciók esetében; hogy szerződésünk alapján használhat-e bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; azt, hogy az adatait érintő ügyekben hogyan veheti fel vele a kapcsolatot; valamint az egyes bejegyzések utolsó ellenőrzésének dátumát. A szolgáltatók változhatnak; a Nyilvántartás verziózott, és a változást ott jelezzük." },
+      { kind: "p", text: "Mely szolgáltatók. Ezeket a szabályzat részét képező MI-szolgáltatói Nyilvántartásunk sorolja fel itt: dezbatere.ro/providers. A Nyilvántartás minden felhasználóra vonatkozik, bárhol éljen is. Minden szolgáltatónál feltünteti annak jogi személyét és letelepedési országát; hogy mit és milyen célból kap meg — a vita érveinek megírása, azok elbírálása és ellenőrzése, az ítélet történetének megírása vagy az Önnek adott válasz az ügyfélszolgálati csevegésben; az adatkezelés országait vagy régióit; megőrzési feltételeit, továbbá azt, hogy aktív-e a zéró adatmegőrzés az általunk használt végpont és funkciók esetében; hogy szerződésünk alapján használhat-e bemeneteket betanításra; az általunk alkalmazott adattovábbítási mechanizmust; azt, hogy az adatait érintő ügyekben hogyan veheti fel vele a kapcsolatot; valamint az egyes bejegyzések utolsó ellenőrzésének dátumát. A szolgáltatók változhatnak; a Nyilvántartás verziózott, és a változást ott jelezzük." },
       { kind: "p", text: "A betanítás és a megőrzés különböző dolgok. A szolgáltatókkal kötött szerződéseink kizárják, hogy az Ön tartalmát modelljeik betanítására vagy fejlesztésére használják. [Publish only once verified per route.] Egyes szolgáltatók biztonsági, visszaélés-megelőzési vagy saját jogi kötelezettségeik miatt korlátozott ideig megőrzik a promptokat és válaszokat; a Nyilvántartás közli, hogy meddig és miért. Ahol zéró adatmegőrzés aktív, a Nyilvántartás ezt és az érintett funkciókat is feltünteti. A tartalmat nem minősítjük meg nem őrzöttnek, ha ez nem igaz." },
       { kind: "p", text: "Az EGT-n kívüli adattovábbítások. Az Egyesült Államokban letelepedett szolgáltatók a GDPR V. fejezetében meghatározott mechanizmusok egyike alapján kapnak adatokat: az EU–USA adatvédelmi keret alapján, ha a konkrét szerződő jogalany erre az adatra tanúsítással rendelkezik, vagy az Európai Bizottság általános szerződési feltételei (második modul, adatkezelőtől adatfeldolgozóhoz) alapján, adattovábbítási kockázatértékeléssel és kiegészítő intézkedésekkel alátámasztva. A Nyilvántartás minden szolgáltató esetében megnevezi a mechanizmust. Az általunk alkalmazott kikötések másolatát a privacy@dezbatere.ro címre írva kérheti. Ha egy általunk alkalmazott mechanizmust érvénytelenítenek, az adattovábbítás folytatása előtt másikra váltunk, és erről tájékoztatjuk Önt." },
-      { kind: "p", text: "További címzettek. Tárhelyszolgáltatónk [Hetzner, Germany — region …]; tartalomkézbesítési és átviteli szolgáltatónk [Cloudflare]; e-mail-továbbítónk […]; [our payment provider, once a paid plan exists]. Mindegyik dokumentált utasításaink alapján jár el, a 28. cikkben előírt garanciákat tartalmazó adatfeldolgozási megállapodás szerint, és mindegyik szerepel a Nyilvántartásban a helyével és adattovábbítási mechanizmusával együtt. Egyetlen adatfeldolgozónak sem engedjük, hogy az Ön adatait saját céljaira használja. Ha egy szolgáltató ezt tenné, önálló adatkezelő lenne, és nem küldjük el neki az Ön adatait." },
+      { kind: "p", text: "További címzettek. Tárhelyszolgáltatónk [Hetzner, Germany — region …]; tartalomkézbesítési és átviteli szolgáltatónk Cloudflare; e-mail-továbbítónk […]; fizetési szolgáltatónk, a NETOPIA Payments, amint elérhető lesz a fizetős csomag. Mindegyik dokumentált utasításaink alapján jár el, a 28. cikkben előírt garanciákat tartalmazó adatfeldolgozási megállapodás szerint, és mindegyik szerepel a Nyilvántartásban a helyével és adattovábbítási mechanizmusával együtt. Egyetlen adatfeldolgozónak sem engedjük, hogy az Ön adatait saját céljaira használja. Ha egy szolgáltató ezt tenné, önálló adatkezelő lenne, és nem küldjük el neki az Ön adatait." },
       { kind: "p", text: "Hatóságok. Személyes adatokat bíróságokkal, szabályozó vagy bűnüldöző hatóságokkal akkor közlünk, ha ezt a jog előírja, és erről tájékoztatjuk Önt, kivéve, ha ezt a jog tiltja." }
     ]
   },
@@ -144,7 +144,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Vitatartalom (magánjellegű) — A fiók fennállásáig — Megszüntetéskor megsemmisítjük a kulcsokat, így a tartalom olvashatatlanná válik",
         "Vitatartalom (közzétett) — A közzététel idején; ha megszünteti fiókját, és nem jelöli be a „Töröljék a nyilvános vitáimat is” lehetőséget, a közzétett vita visszavont álneve alatt nyilvános marad — A nyilvános hozzáférésből eltávolítjuk, és kulcsát megsemmisítjük a közzététel visszavonásakor vagy a fiók megszüntetésekor, ha bejelölte a „Töröljék a nyilvános vitáimat is” lehetőséget",
         "Szolgáltatói válasznyilvántartások és visszakeresési hivatkozások — Ugyanaddig, mint a vita, amelyhez tartoznak — Ugyanaz",
-        "Támogatási beszélgetések és ügyek — [Until closed plus 12 months] — A kulcsokat megsemmisítjük",
+        "Támogatási beszélgetések és ügyek — A lezárásig plusz 12 hónap — A kulcsokat megsemmisítjük",
         "Elfogadási és hozzájárulási nyilvántartások — A fiók élettartama plusz 6 év — a ránk alkalmazandó leghosszabb elévülési idő — Töröljük",
         "Fizetési nyilvántartások [pending] — 10 évig, a román számviteli jogszabályok előírása szerint — Töröljük",
         "Biztonsági mentések [pending] — [… days] az élő példány törlése után — Felülírjuk"
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Sütik",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "A Dialectical Engine 18 elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a Dialectical Engine helyezi el: 13 sütit és 5 bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A [dezbatere.ro/cookies] címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
+      { kind: "p", text: "A Dialectical Engine 18 elemet használ, amelyek mind feltétlenül szükségesek az Ön által kért szolgáltatáshoz, és mindegyiket kizárólag a Dialectical Engine helyezi el: 13 sütit és 5 bejegyzést a böngészője tárhelyén. Nem helyezünk el analitikai, reklám- vagy nyomkövető sütiket. A dezbatere.ro/cookies címen található Sütiszabályzat felsorolja őket, azzal együtt, hogy mire szolgál mindegyik és ki kapja meg, és bármi más hozzáadása előtt módosulni fog." },
       {
         kind: "list",
         items: [
@@ -251,8 +251,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "A szabályzat módosításai",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a [dezbatere.ro/privacy/versions] címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot." },
-      { kind: "p", text: "Ezt a szabályzatot legutóbb [date] napján frissítettük. A 3.2-s verzió a 2.1-es verzió helyébe lépett, amely a munkamenetadatokat, a megőrzési időket, az analitikát, az exportálást és a törlés közzétett vitákra gyakorolt hatását már nem a szolgáltatásnak megfelelő módon írta le." }
+      { kind: "p", text: "Amikor módosítjuk ezt a szabályzatot, közzétesszük az új változatot a változások összefoglalásával és új hatálybalépési dátummal, a korábbi változatokat pedig a dezbatere.ro/privacy/versions címen őrizzük meg. Új célt vagy új címzettet bevezető változásról az új adatkezelés megkezdése előtt e-mailben és a termékben tájékoztatjuk Önt, és időt biztosítunk a tiltakozásra. Ha egy új cél az Ön hozzájárulásától függ — például ha valaha tartalmat kívánnánk használni modellek fejlesztésére —, ezt a hozzájárulást külön és kifejezetten kérjük; a frissített Feltételek elfogadását soha nem tekintjük új adatkezeléshez való hozzájárulásnak. Az olyan pontosítások esetében, amelyek semmit nem változtatnak tevékenységünkön, egyszerűen közzétesszük az új változatot." },
+      { kind: "p", text: "Ezt a szabályzatot legutóbb 2026. október 12. napján frissítettük. A 3.2-s verzió a 2.1-es verzió helyébe lépett, amely a munkamenetadatokat, a megőrzési időket, az analitikát, az exportálást és a törlés közzétett vitákra gyakorolt hatását már nem a szolgáltatásnak megfelelő módon írta le." }
     ]
   },
   {
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "B. melléklet — Regionális adatvédelmi feltételek",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Minden bejegyzés csak akkor alkalmazandó, ha régiója szerepel a Feltételek 2. szakaszában, és kizárólag azt közli, ami eltér e szabályzat törzsszövegétől." }
+      { kind: "p", text: "Minden bejegyzés az adott régióban élő személyekre alkalmazandó, és kizárólag azt közli, ami eltér e szabályzat törzsszövegétől." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Egyesült Királyság (csak ha fel van sorolva)",
+    title: "Egyesült Államok",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Az Egyesült Királyságban az UK GDPR 27. cikke szerinti képviselőnk [name, address, email]; a szabályzattal kapcsolatos bármely ügyben kapcsolatba léphet vele. A felügyeleti hatóság az Information Commissioner's Office, ico.org.uk. Ha panaszt kíván tenni nálunk, írjon a privacy@dezbatere.ro címre; panaszát 30 napon belül visszaigazoljuk. Adatainak az Egyesült Királyságból az Egyesült Államokbeli MI-szolgáltatókhoz továbbítása, ha a szolgáltató tanúsítvánnyal rendelkezik, az EU–USA adatvédelmi keretrendszer egyesült királysági kiterjesztésén (UK Extension to the EU–US Data Privacy Framework), egyébként az uniós általános adatvédelmi kikötésekhez fűzött egyesült királysági nemzetközi adattovábbítási kiegészítésen (UK International Data Transfer Addendum) alapul, adattovábbítási kockázatértékeléssel alátámasztva; a Nyilvántartás szolgáltatónként megnevezi az alkalmazott eszközt. A személyesadat-sértést, ha a jogszabály előírja, 72 órán belül bejelentjük az ICO-nak, és ha az Önre nézve magas kockázattal jár, indokolatlan késedelem nélkül tájékoztatjuk Önt. Ha valaha analitikai sütiket helyeznénk el, az Egyesült Királyságban azok hozzájárulás helyett leiratkozás tárgyát képeznék; jelenleg egyet sem helyezünk el. Ha 18 éven aluli, és életkori szabályunk ellenére hozzáfér a szolgáltatáshoz, az ICO Gyermekekre vonatkozó Kódexének normái alkalmazandók arra, hogyan kezeljük adatait." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Egyesült Államok (csak ha fel van sorolva)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Tájékoztatás az adatgyűjtéskor. A 2. szakasz táblázata az általunk gyűjtött személyes adatok kategóriáit és forrásait sorolja fel; az adatkezelés céljait a 4., a megőrzési időket a 7. szakasz tartalmazza. A különleges személyes adatok következő kategóriáit csak akkor gyűjtjük, ha Ön a saját magára vonatkozó kérdéseiben megadja őket: egészségi állapot, vallási vagy világnézeti meggyőződés, szexuális élet vagy szexuális irányultság, politikai vélemény, szakszervezeti tagság, valamint faji vagy etnikai származás. Ezeket kizárólag vitái futtatására használjuk fel, és csak a 3. szakaszban leírt külön hozzájárulás után. Nem értékesítünk és nem osztunk meg személyes adatokat, és az előző tizenkét hónapban sem tettünk ilyet. Személyes adatokat nem használunk célzott hirdetésre, különleges személyes adatokat pedig nem használunk az Ön által kért szolgáltatás nyújtásán túli célra. Leiratkozási preferenciajelzések: Mivel jelenleg nem értékesítünk és nem osztunk meg személyes adatokat, továbbá nem használjuk őket célzott hirdetésre, nincs miről leiratkozni. Ha valaha értékesíteni vagy megosztani kezdjük őket, a Global Privacy Control jelzéseit leiratkozási kérelemként fogjuk tiszteletben tartani. Az Ön jogai: a megismeréshez, törléshez, helyesbítéshez, leiratkozáshoz, a különleges személyes adatok felhasználásának korlátozásához való jog, valamint az, hogy e jogok gyakorlása miatt ne érje hátrányos megkülönböztetés; kérelmet a privacy@dezbatere.ro címen nyújthat be. Pénzügyi ösztönzők: nem kínálunk ilyeneket; adatkezelési céljaink és garanciáink az ingyenes és a fizetős csomagokban azonosak. A megőrzés szabályait a 7. szakasz tartalmazza. Incidensek: az egyes államok adatvédelmi incidensekre vonatkozó jogszabályai szerint értesítjük az érintett lakosokat és az állami hatóságokat. E tájékoztatást legalább tizenkét havonta frissítjük; utoljára frissítve: [date]." },
+      { kind: "p", text: "Tájékoztatás az adatgyűjtéskor. A 2. szakasz táblázata az általunk gyűjtött személyes adatok kategóriáit és forrásait sorolja fel; az adatkezelés céljait a 4., a megőrzési időket a 7. szakasz tartalmazza. A különleges személyes adatok következő kategóriáit csak akkor gyűjtjük, ha Ön a saját magára vonatkozó kérdéseiben megadja őket: egészségi állapot, vallási vagy világnézeti meggyőződés, szexuális élet vagy szexuális irányultság, politikai vélemény, szakszervezeti tagság, valamint faji vagy etnikai származás. Ezeket kizárólag vitái futtatására használjuk fel, és csak a 3. szakaszban leírt külön hozzájárulás után. Nem értékesítünk és nem osztunk meg személyes adatokat, és az előző tizenkét hónapban sem tettünk ilyet. Személyes adatokat nem használunk célzott hirdetésre, különleges személyes adatokat pedig nem használunk az Ön által kért szolgáltatás nyújtásán túli célra. Leiratkozási preferenciajelzések: Mivel jelenleg nem értékesítünk és nem osztunk meg személyes adatokat, továbbá nem használjuk őket célzott hirdetésre, nincs miről leiratkozni. Ha valaha értékesíteni vagy megosztani kezdjük őket, a Global Privacy Control jelzéseit leiratkozási kérelemként fogjuk tiszteletben tartani. Az Ön jogai: a megismeréshez, törléshez, helyesbítéshez, leiratkozáshoz, a különleges személyes adatok felhasználásának korlátozásához való jog, valamint az, hogy e jogok gyakorlása miatt ne érje hátrányos megkülönböztetés; kérelmet a privacy@dezbatere.ro címen nyújthat be. Pénzügyi ösztönzők: nem kínálunk ilyeneket; adatkezelési céljaink és garanciáink az ingyenes és a fizetős csomagokban azonosak. A megőrzés szabályait a 7. szakasz tartalmazza. Incidensek: az egyes államok adatvédelmi incidensekre vonatkozó jogszabályai szerint értesítjük az érintett lakosokat és az állami hatóságokat. E tájékoztatást legalább tizenkét havonta frissítjük; utoljára frissítve: 2026. október 12." },
       { kind: "p", text: "Connecticut: különleges adatokat csak az Ön kifejezett, előzetes (opt-in) hozzájárulásával kezelünk, amelyet első vitája előtt a külön képernyőn ad meg (3. szakasz); személyes adatait nem használjuk MI-modellek betanítására. Washington: a [URL] címen található Fogyasztói egészségügyi adatokra vonatkozó adatvédelmi tájékoztatónk külön dokumentum, amely minden egészséggel kapcsolatos információra, beleértve a következtetéseket is, alkalmazandó. Texas és Nebraska: nem értékesítünk különleges személyes adatokat. Colorado, Connecticut, Virginia és más, átfogó adatvédelmi jogszabályokkal rendelkező államok: a fenti jogok megilletik Önt, ahol a jogszabály ránk alkalmazandó. Ha egy kérelmet elutasítunk, válaszunkra a privacy@dezbatere.ro címen válaszolva fellebbezhet; ha a fellebbezést is elutasítjuk, államának főügyészéhez (Attorney General) fordulhat." }
     ]
   },
   {
+    no: "B.3",
+    title: "Kanada és Québec",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. A kérelmekre 30 napon belül válaszolunk. Továbbra is felelősek maradunk a Kanadán kívüli MI-szolgáltatóknak továbbított személyes adatokért, és szerződésekben követelünk meg összehasonlítható védelmet; ezekre a szolgáltatókra a működési országuk jogszabályai vonatkozhatnak, beleértve a hatóságok jogszerű hozzáférését. Marketing e-mailt kizárólag az Ön CASL szerinti kifejezett hozzájárulásával küldünk. A biztonsági intézkedések olyan megsértését, amely valós kockázatát jelenti annak, hogy Önt jelentős kár éri, bejelentjük az Office of the Privacy Commissioner of Canada hivatalnak és Önnek, és minden ilyen esetről 24 hónapig nyilvántartást vezetünk. Québec: személyes adatok Québecen kívüli közlése előtt adatvédelmi hatásvizsgálatot végzünk; a súlyos kár kockázatával járó titoktartási incidenst bejelentjük a Commission d'accès à l'information szervnek és Önnek, és az incidensekről nyilvántartást vezetünk; a vitáit magánjellegűként megőrző beállítások alapértelmezés szerint be vannak kapcsolva; kérheti, hogy szüntessük meg az Önre vonatkozó személyes adatok indexelését vagy terjesztését; adatait strukturált, széles körben használt formátumban kérheti; a 8. szakasz ismerteti automatizált adatkezelésünket." }
+    ]
+  },
+  {
     no: "B.4",
-    title: "Kanada és Québec (csak ha fel van sorolva)",
+    title: "Ausztrália és Új-Zéland",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: [name], privacy@dezbatere.ro. A kérelmekre 30 napon belül válaszolunk. Továbbra is felelősek maradunk a Kanadán kívüli MI-szolgáltatóknak továbbított személyes adatokért, és szerződésekben követelünk meg összehasonlítható védelmet; ezekre a szolgáltatókra a működési országuk jogszabályai vonatkozhatnak, beleértve a hatóságok jogszerű hozzáférését. Marketing e-mailt kizárólag az Ön CASL szerinti kifejezett hozzájárulásával küldünk. A biztonsági intézkedések olyan megsértését, amely valós kockázatát jelenti annak, hogy Önt jelentős kár éri, bejelentjük az Office of the Privacy Commissioner of Canada hivatalnak és Önnek, és minden ilyen esetről 24 hónapig nyilvántartást vezetünk. Québec: személyes adatok Québecen kívüli közlése előtt adatvédelmi hatásvizsgálatot végzünk; a súlyos kár kockázatával járó titoktartási incidenst bejelentjük a Commission d'accès à l'information szervnek és Önnek, és az incidensekről nyilvántartást vezetünk; a vitáit magánjellegűként megőrző beállítások alapértelmezés szerint be vannak kapcsolva; kérheti, hogy szüntessük meg az Önre vonatkozó személyes adatok indexelését vagy terjesztését; adatait strukturált, széles körben használt formátumban kérheti; a 8. szakasz ismerteti automatizált adatkezelésünket." }
+      { kind: "p", text: "Ausztrália. Személyes adatainak tengerentúli címzettjei a Nyilvántartásban felsorolt MI-szolgáltatók és adatfeldolgozók, amelyek az Egyesült Államok és az Európai Unió területén találhatók; észszerű lépéseket teszünk annak biztosítására, hogy azokat az ausztrál adatvédelmi alapelvekkel összhangban kezeljék. Automatizált döntések: 2026. december 10-től ez a szabályzat azonosítja a számítógépes programok által hozott, az Ön jogait vagy érdekeit jelentősen érintő döntések típusait — ilyenek nincsenek; a pontszámok és döntések az érvekre, nem Önre vonatkoznak —, valamint az ezekhez felhasznált személyes adatokat. Panasz az Office of the Australian Information Commissioner hivatalánál tehető. Új-Zéland. Adatvédelmi tisztviselőnk az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Ha Önről közvetve gyűjtünk személyes adatokat — mert egy másik felhasználó belefoglalta azokat egy kérdésbe —, ez a szabályzat és a 11. szakasz az általunk nyújtott tájékoztatás. A Nyilvántartásban szereplő MI-szolgáltatóknak ügynökeinkként, összehasonlítható garanciákat előíró szerződések alapján továbbítunk adatokat. Panasz az Office of the Privacy Commissioner hivatalánál tehető." }
     ]
   },
   {
     no: "B.5",
-    title: "Ausztrália és Új-Zéland (csak ha fel van sorolva)",
+    title: "Svájc",
     accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Ausztrália. Személyes adatainak tengerentúli címzettjei a Nyilvántartásban felsorolt MI-szolgáltatók és adatfeldolgozók, amelyek [the United States and the European Union] területén találhatók; észszerű lépéseket teszünk annak biztosítására, hogy azokat az ausztrál adatvédelmi alapelvekkel összhangban kezeljék. Automatizált döntések: 2026. december 10-től ez a szabályzat azonosítja a számítógépes programok által hozott, az Ön jogait vagy érdekeit jelentősen érintő döntések típusait — ilyenek nincsenek; a pontszámok és döntések az érvekre, nem Önre vonatkoznak —, valamint az ezekhez felhasznált személyes adatokat. Panasz az Office of the Australian Information Commissioner hivatalánál tehető. Új-Zéland. Adatvédelmi tisztviselőnk [name]. Ha Önről közvetve gyűjtünk személyes adatokat — mert egy másik felhasználó belefoglalta azokat egy kérdésbe —, ez a szabályzat és a 11. szakasz az általunk nyújtott tájékoztatás. A Nyilvántartásban szereplő MI-szolgáltatóknak ügynökeinkként, összehasonlítható garanciákat előíró szerződések alapján továbbítunk adatokat. Panasz az Office of the Privacy Commissioner hivatalánál tehető." }
-    ]
-  },
-  {
-    no: "B.6",
-    title: "Svájc (csak ha fel van sorolva)",
-    accent: "--con",
     blocks: [
       { kind: "p", text: "A svájci szövetségi adatvédelmi törvény (FADP) alkalmazandó. A felügyeleti hatóság a Federal Data Protection and Information Commissioner (FDPIC), edoeb.admin.ch. Adatai a Nyilvántartásban megnevezett országokba kerülnek: uniós országokba és az Egyesült Államokba. Az Egyesült Államok esetében, ha a szolgáltató tanúsítvánnyal rendelkezik, a svájci–amerikai adatvédelmi keretrendszerre (Swiss–US Data Privacy Framework), egyébként az FDPIC által elismert általános adatvédelmi kikötésekre támaszkodunk. Az olyan adatvédelmi incidenst, amely valószínűleg magas kockázattal jár Önre nézve, a lehető leghamarabb bejelentjük az FDPIC-nek. Felmérésünk szerint nincs szükségünk svájci képviselőre (Art. 14 FADP). Ezt évente felülvizsgáljuk." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldova (csak ha fel van sorolva)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Moldova személyes adatok védelméről szóló 195/2024. számú törvénye alkalmazandó. A törvény a GDPR-t követi, és e szabályzat törzsszövege ismerteti az abból eredő jogait. A felügyeleti hatóság a National Center for Personal Data Protection (CNPDCP). Nincs szükségünk moldovai képviselőre, mivel az Európai Gazdasági Térségben letelepedett vállalkozás vagyunk (195/2024. számú törvény, Art. 27(2)(c)). Ezt évente felülvizsgáljuk. Adatainak az Egyesült Államokba történő továbbítása a Nyilvántartásban az egyes szolgáltatóknál megnevezett mechanizmus alapján történik. A személyesadat-sértést, ha a jogszabály előírja, 72 órán belül bejelentjük a CNPDCP-nek." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukrajna (csak ha fel van sorolva)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Ázsia és a csendes-óceáni térség",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Ukrajna „A személyes adatok védelméről” szóló törvénye alkalmazandó. A Dialectical Engine szolgáltatást nem kínáljuk Ukrajna azon területein, amelyek nem állnak a kormánya ellenőrzése alatt. Adatai uniós országokba és az Egyesült Államokba kerülnek (lásd a Nyilvántartást). Panaszt az Ukrainian Parliament Commissioner for Human Rights hivatalánál tehet." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Izrael (csak ha fel van sorolva)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Izrael magánszféra védelméről szóló törvénye (Protection of Privacy Law) alkalmazandó. Az adatkezelő a DebateAIRO S.R.L.; elérhetőségeinket az 1. szakasz tartalmazza. Önt nem terheli jogi kötelezettség arra, hogy adatait megadja nekünk; a fiókadatok nélkül azonban nem tudunk fiókot nyitni Önnek. Adatait a 4. szakaszban foglalt célokra használjuk, és az 5. szakaszban felsorolt címzetteknek adjuk át. Kérheti, hogy megtekinthesse és helyesbíthesse őket (10. szakasz). A felügyeleti hatóság a Privacy Protection Authority." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Ázsia és a csendes-óceáni térség (csak a felsorolt régiók sorai)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Szingapúr: adatvédelmi tisztviselőnk [name, email]; az adattovábbítások a PDPA-val összehasonlítható védelmet biztosító szerződéses kötelezettségeken alapulnak; a bejelentendő incidensekről 3 napon belül értesítjük a PDPC-t. Japán: személyes adatait a 4. szakaszban foglalt célokra használjuk, másra nem. Azokat a Nyilvántartásban szereplő, az Egyesült Államokban és uniós országokban található MI-szolgáltatóknak és tárhelyszolgáltatóknak adjuk át olyan szerződések alapján, amelyek előírják számukra, hogy az adatokat a japán személyesinformáció-védelmi törvény (Act on the Protection of Personal Information) szintjén védjék; kérésre tájékoztatjuk arról, mit tesznek az adatok védelmében, és országuk adatvédelmi rendszeréről. Meggyőződése, ideértve vallási és politikai meggyőződését, valamint egészségi állapota különös gondosságot igénylő személyes információnak minősül; ezeket csak az Ön előzetes hozzájárulásával gyűjtjük (3. szakasz). Nevünk és címünk: DebateAIRO S.R.L., [address], Románia; képviselőnk [name], ügyvezető; a kérelem benyújtásának módját a 10. szakasz, biztonsági intézkedéseinket a 9. szakasz ismerteti, panaszát pedig a privacy@dezbatere.ro címre küldheti. Az incidenseket a törvény előírásai szerint jelentjük a Personal Information Protection Commissionnek. Dél-Korea: adatvédelmi tisztviselőnk [name], ügyvezető, privacy@dezbatere.ro. Személyes adatokat azért továbbítunk külföldre, mert vitái futtatása az Önnel kötött szerződésünk alapján ezt megköveteli: minden vita futtatásakor az Ön kérdését és a vita állításait, a támogatási csevegésben pedig üzeneteit titkosított kapcsolaton keresztül elküldjük a Nyilvántartásban szereplő MI-szolgáltatóknak és tárhelyszolgáltatóknak; a Nyilvántartás minden címzettnél megnevezi annak országát, elérhetőségét, az adatkezelés célját és az adatok megőrzési idejét. Az adattovábbítást megtagadhatja, ha nem indít vitát, vagy ha törli fiókját; ebben az esetben nem tudunk vitát futtatni Önnek. A politikai vélemény, a meggyőződés és az egészségi állapot különleges információ; ezeket csak az Ön külön hozzájárulásával kezeljük (3. szakasz). Önről nem hozunk kizárólag automatizált döntést (8. szakasz). A kérelmekre [10] napon belül válaszolunk, az incidenseket pedig a Personal Information Protection Act előírásai szerint jelentjük a Personal Information Protection Commissionnek és Önnek. Tajvan: Tajvan személyes adatok védelméről szóló törvénye (Personal Data Protection Act) alkalmazandó. Adatait a 7. szakaszban meghatározott ideig őrizzük meg; azokat Romániában, más uniós országokban és az Egyesült Államokban használjuk (lásd a Nyilvántartást); a címzetteket az 5. szakasz sorolja fel; rendszereink és MI-modelljeink vitái futtatása érdekében automatikusan kezelik őket. Megkérdezheti, milyen adatokat tárolunk Önről, megtekintheti őket, másolatot kaphat róluk, helyesbítheti őket, kérheti, hogy ne használjuk tovább őket, és kérheti a törlésüket (10. szakasz). A fiókadatok megadása az Ön döntése, de nélkülük nem tudunk fiókot nyitni Önnek. Az adatainak megtekintésére vagy azokról másolat kiadására irányuló kérelmekre 15 napon belül válaszolunk; ha több időre van szükségünk, ezt a határidőt egy alkalommal legfeljebb 15 nappal meghosszabbíthatjuk, és ennek okáról írásban tájékoztatjuk Önt. Fülöp-szigetek: DPO-nk [name]; panasz a National Privacy Commissionnél tehető; a 8. szakasz ismerteti automatizált adatkezelésünket. Thaiföld: képviselőnk [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Fenntartva",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Törökország, Brazília és Indonézia egyaránt helyi nyelvű tájékoztatást, képviselőt vagy nyilvántartásba vételt és bejelentéseket követel meg, és itt nincsenek kidolgozva. Kínát, Vietnamot és Oroszországot nem szolgáljuk ki." }
+      { kind: "p", text: "Szingapúr: adatvédelmi tisztviselőnk az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen; az adattovábbítások a PDPA-val összehasonlítható védelmet biztosító szerződéses kötelezettségeken alapulnak; a bejelentendő incidensekről 3 napon belül értesítjük a PDPC-t. Japán: személyes adatait a 4. szakaszban foglalt célokra használjuk, másra nem. Azokat a Nyilvántartásban szereplő, az Egyesült Államokban és uniós országokban található MI-szolgáltatóknak és tárhelyszolgáltatóknak adjuk át olyan szerződések alapján, amelyek előírják számukra, hogy az adatokat a japán személyesinformáció-védelmi törvény (Act on the Protection of Personal Information) szintjén védjék; kérésre tájékoztatjuk arról, mit tesznek az adatok védelmében, és országuk adatvédelmi rendszeréről. Meggyőződése, ideértve vallási és politikai meggyőződését, valamint egészségi állapota különös gondosságot igénylő személyes információnak minősül; ezeket csak az Ön előzetes hozzájárulásával gyűjtjük (3. szakasz). Nevünk és címünk: DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Románia; képviselőnk Dedita Ionut Ciprian, ügyvezető; a kérelem benyújtásának módját a 10. szakasz, biztonsági intézkedéseinket a 9. szakasz ismerteti, panaszát pedig a privacy@dezbatere.ro címre küldheti. Az incidenseket a törvény előírásai szerint jelentjük a Personal Information Protection Commissionnek. Dél-Korea: adatvédelmi tisztviselőnk az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Személyes adatokat azért továbbítunk külföldre, mert vitái futtatása az Önnel kötött szerződésünk alapján ezt megköveteli: minden vita futtatásakor az Ön kérdését és a vita állításait, a támogatási csevegésben pedig üzeneteit titkosított kapcsolaton keresztül elküldjük a Nyilvántartásban szereplő MI-szolgáltatóknak és tárhelyszolgáltatóknak; a Nyilvántartás minden címzettnél megnevezi annak országát, elérhetőségét, az adatkezelés célját és az adatok megőrzési idejét. Az adattovábbítást megtagadhatja, ha nem indít vitát, vagy ha törli fiókját; ebben az esetben nem tudunk vitát futtatni Önnek. A politikai vélemény, a meggyőződés és az egészségi állapot különleges információ; ezeket csak az Ön külön hozzájárulásával kezeljük (3. szakasz). Önről nem hozunk kizárólag automatizált döntést (8. szakasz). A kérelmekre 10 napon belül válaszolunk, az incidenseket pedig a Personal Information Protection Act előírásai szerint jelentjük a Personal Information Protection Commissionnek és Önnek. Tajvan: Tajvan személyes adatok védelméről szóló törvénye (Personal Data Protection Act) alkalmazandó. Adatait a 7. szakaszban meghatározott ideig őrizzük meg; azokat Romániában, más uniós országokban és az Egyesült Államokban használjuk (lásd a Nyilvántartást); a címzetteket az 5. szakasz sorolja fel; rendszereink és MI-modelljeink vitái futtatása érdekében automatikusan kezelik őket. Megkérdezheti, milyen adatokat tárolunk Önről, megtekintheti őket, másolatot kaphat róluk, helyesbítheti őket, kérheti, hogy ne használjuk tovább őket, és kérheti a törlésüket (10. szakasz). A fiókadatok megadása az Ön döntése, de nélkülük nem tudunk fiókot nyitni Önnek. Az adatainak megtekintésére vagy azokról másolat kiadására irányuló kérelmekre 15 napon belül válaszolunk; ha több időre van szükségünk, ezt a határidőt egy alkalommal legfeljebb 15 nappal meghosszabbíthatjuk, és ennek okáról írásban tájékoztatjuk Önt." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "de1da86b83032aaacb8f70f8731dcf671cb3cc62d9e1541c4a527c38f560d66b",
-  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.2 · HATÁLYOS [DATE]",
+  version: "3.3",
+  sha256: "2267cf39fea3be4be41d4c3ecb94d037c1432d79010593dc56f0a33ec0351890",
+  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.3 · HATÁLYOS 2026. OKTÓBER 12.",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",
-  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Az Adatvédelmi szabályzat szövege",
   sectionIdPrefix: "policy-section-",

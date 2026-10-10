@@ -28,7 +28,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kısaca",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "En az 18 yaşında olmalısınız. DebateAI, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri [abuse@dezbatere.ro] adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır." }
+      { kind: "p", text: "En az 18 yaşında olmalısınız. DebateAI, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Tartışmalarınız, siz yayımlamadıkça özeldir; yayımlarsanız herkes okuyabilir. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına iletilir ve modelleri eğitmek için kullanılmaz. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır." }
     ]
   },
   {
@@ -36,24 +36,25 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Biz kimiz ve bize nasıl ulaşabilirsiniz",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI, Romanya'da tescilli bir şirket olan DebateAIRO S.R.L. tarafından işletilmektedir." },
+      { kind: "p", text: "DebateAI, Romanya'da tescilli bir şirket olan DMS Merchandise Shop S.R.L. tarafından işletilmektedir." },
       {
         kind: "list",
         items: [
-        "Tescilli merkez — [street, number, sector, postal code], Bükreş, Romanya",
-        "Ticaret Sicili numarası — [J40/…/…]",
-        "Tekil tescil kodu (CUI) — […] · KDV: [RO… / not VAT-registered]",
-        "Sermaye — [RON …]",
-        "Genel iletişim — [hello@dezbatere.ro]",
-        "Hukuki bildirimler — [legal@dezbatere.ro]",
+        "Tescilli merkez — Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romanya",
+        "Ticaret Sicili numarası — J2022000426271",
+        "Tekil tescil kodu (CUI) — 45935221 · KDV: RO45935221",
+        "Sermaye — RON 5.000",
+        "Genel iletişim — support@dezbatere.ro",
+        "Telefon — +40 748 793 490",
+        "Hukuki bildirimler — support@dezbatere.ro",
         "Gizlilik ve veri koruma — privacy@dezbatere.ro",
-        "Hukuka aykırı içerik bildirimi — [abuse@dezbatere.ro] — 10. bölüme bakınız",
-        "Yetkili makamlar için irtibat noktası — [dsa@dezbatere.ro] — Romence ve İngilizce",
-        "Terör içeriğine yönelik kaldırma emirleri (2021/784 sayılı AB Tüzüğü) — [dsa@dezbatere.ro] — bu emirler için irtibat noktamız; Romence ve İngilizce; 10. bölüme bakınız",
+        "Hukuka aykırı içerik bildirimi — support@dezbatere.ro — 10. bölüme bakınız",
+        "Yetkili makamlar için irtibat noktası — office@dezbatere.ro — Romence ve İngilizce",
+        "Terör içeriğine yönelik kaldırma emirleri (2021/784 sayılı AB Tüzüğü) — office@dezbatere.ro — bu emirler için irtibat noktamız; Romence ve İngilizce; 10. bölüme bakınız",
         "Diğer ülkelerdeki temsilciler — Temsilci atadığımız bölgeler için Ek A'da listelenmiştir"
         ]
       },
-      { kind: "p", text: "Bu bilgiler ayrıca [dezbatere.ro/legal] adresindeki sitede kalıcı olarak gösterilir. Yalnızca asistanımıza değil, her zaman bir kişiye ulaşabilirsiniz; bunun nasıl yapılacağı 10. bölümde açıklanmıştır." }
+      { kind: "p", text: "Bu bilgiler ayrıca dezbatere.ro/legal adresindeki sitede kalıcı olarak gösterilir. Yalnızca asistanımıza değil, her zaman bir kişiye ulaşabilirsiniz; bunun nasıl yapılacağı 10. bölümde açıklanmıştır." }
     ]
   },
   {
@@ -61,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "DebateAI'ı nerelerde sunuyoruz",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI'ı [the European Union and the European Economic Area] sınırları içinde [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan] yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir." }
+      { kind: "p", text: "DebateAI'ı Avrupa Birliği'nde (27 ülke) ve Avrupa Ekonomik Alanı'nda (Norveç, İzlanda, Lihtenştayn), İsviçre'de, Moldova'da, Amerika Birleşik Devletleri'nde (Tennessee hariç), Kanada'da, Avustralya'da, Yeni Zelanda'da, Singapur'da, Japonya'da, Güney Kore'de ve Tayvan'da yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir." }
     ]
   },
   {
@@ -69,8 +70,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Bu Koşulların kabulü",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "\"Hizmet Koşullarını okudum ve kabul ediyorum\" yazılı kutuyu işaretleyip Hesap oluştur düğmesine tıklayarak bu Koşulları kabul edersiniz. Böylece sizinle DebateAIRO S.R.L. arasında bir sözleşme kurulur. Koşullar; 7. bölümdeki kabul edilebilir kullanım kurallarını, 9. bölümdeki yayımlama kurallarını, 15. bölümdeki sorumluluk hükümlerini, 18. bölümdeki uygulanacak hukuk ve uyuşmazlık hükümlerini ve Amerika Birleşik Devletleri'nde yaşıyorsanız Ek A.3'teki tahkim anlaşmasını içerir. Gizlilik Politikamızda açıklandığı üzere, kabul ettiğiniz sürümün ve kabul zamanının kaydını tutarız." },
-      { kind: "p", text: "[dezbatere.ro/privacy] adresindeki Gizlilik Politikamız, kişisel verileri nasıl işlediğimizi açıklar. Bu, size sunmakla yükümlü olduğumuz bir bilgilendirmedir; kabul ettiğiniz bir sözleşme değildir ve bu Koşullardaki hiçbir hüküm onu veri işleme rızasına dönüştürmez. [dezbatere.ro/cookies] adresindeki Çerez Politikamız ile [dezbatere.ro/providers] adresindeki Yapay Zekâ Sağlayıcı Sicilimiz, atıf yoluyla bu Koşulların bir parçasıdır." },
+      { kind: "p", text: "\"Hizmet Koşullarını okudum ve kabul ediyorum\" yazılı kutuyu işaretleyip Hesap oluştur düğmesine tıklayarak bu Koşulları kabul edersiniz. Böylece sizinle DMS Merchandise Shop S.R.L. arasında bir sözleşme kurulur. Koşullar; 7. bölümdeki kabul edilebilir kullanım kurallarını, 9. bölümdeki yayımlama kurallarını, 15. bölümdeki sorumluluk hükümlerini ve 18. bölümdeki uygulanacak hukuk ve uyuşmazlık hükümlerini içerir. Gizlilik Politikamızda açıklandığı üzere, kabul ettiğiniz sürümün ve kabul zamanının kaydını tutarız." },
+      { kind: "p", text: "dezbatere.ro/privacy adresindeki Gizlilik Politikamız, kişisel verileri nasıl işlediğimizi açıklar. Bu, size sunmakla yükümlü olduğumuz bir bilgilendirmedir; kabul ettiğiniz bir sözleşme değildir ve bu Koşullardaki hiçbir hüküm onu veri işleme rızasına dönüştürmez. dezbatere.ro/cookies adresindeki Çerez Politikamız ile dezbatere.ro/providers adresindeki Yapay Zekâ Sağlayıcı Sicilimiz, atıf yoluyla bu Koşulların bir parçasıdır." },
       { kind: "p", text: "Bizimle elektronik ortamda herhangi bir sözleşme kurmadan önce arayüz, ilgili adımları size gösterir, göndermeden önce girdiğiniz bilgileri inceleyip düzeltmenize olanak tanır ve sözleşmenin hangi dillerde kurulabileceğini bildirir. Bu Koşullar, kaydedebileceğiniz ve yazdırabileceğiniz bir biçimde sunulur; ücretli bir plan satın aldığınızda kabul ettiğiniz sürümü size e-postayla göndeririz ve istediğiniz zaman bir kopyasını talep edebilirsiniz. Bu Koşullardaki hiçbir hüküm, Romanya veya AB tüketici hukukundan ya da yaşadığınız ülkenin hukukundan doğan ve sözleşmeyle sınırlandırılamayan haklarınızı sınırlandırmaz." }
     ]
   },
@@ -133,7 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "İçeriğinizle eğitim yapmayız. Modelleri içeriğinizle eğitmeyiz ve yapay zekâ sağlayıcılarıyla yaptığımız sözleşmeler, içeriğinizi kendi modellerini eğitmek veya iyileştirmek için kullanmalarını yasaklar. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "İçeriğiniz yapay zekâ sağlayıcılarına nasıl ulaşır. Bir tartışmayı yürütmek için metni bir veya daha fazla harici model sağlayıcısına göndeririz. Sağlayıcının aldığı içerik; sorunuz, belirlediğiniz yönlendirme açıklamaları ve motorun tartışma sırasında oluşturduğu ifadelerdir — dolayısıyla sağlayıcı yalnızca ilk yazdığınız sözcükleri değil, yazdıklarınızdan türetilen ve bunların çevresinde oluşturulan metni de görür. E-posta adresinizi, hesap tanımlayıcılarınızı, oturum kayıtlarınızı veya ödeme bilgilerinizi hiçbir zaman almaz." },
       { kind: "p", text: "Destek sohbeti neleri gönderir. Destek asistanı da bir yapay zekâ modelidir. Ona yazdığınızda, modelin yanıt verebilmesi için mesajınızı, modelin yanıtını dayandırdığı yardım makaleleriyle birlikte harici bir model sağlayıcısına göndeririz. Göndermeden önce parolaya, tek kullanımlık koda veya anahtara benzeyen her şeyi maskeleriz. Bir kişiyle görüşmeyi talep ederseniz, modelin talebinizi devralan ekip üyemiz için kısa bir özet yazabilmesi amacıyla konuşmayı da aynı şekilde maskelenmiş olarak modele göndeririz. E-posta adresinizi, hesap tanımlayıcılarınızı veya ödeme bilgilerinizi eklemeyiz, ancak model sohbete yazdığınız diğer her şeyi alır; bu nedenle orada modelin okumasını istemeyeceğiniz hiçbir şey yazmayın." },
-      { kind: "p", text: "Hangi sağlayıcılar ve nerede. [dezbatere.ro/providers] adresindeki Yapay Zekâ Sağlayıcı Sicilimiz bu Koşulların bir parçasıdır. Sicil, kullanabileceğimiz her sağlayıcı için şu hususları listeler: tüzel kişiliği ve ülkesi; neyi, neden aldığı; işlemenin nerede yapıldığı; saklama koşulları; kullandığımız uç nokta için sıfır veri saklamanın etkin olup olmadığı; sözleşmemiz kapsamında girdileri eğitim için kullanıp kullanamayacağı; dayandığımız aktarım mekanizması ve her kaydı son doğruladığımız tarih. Sağlayıcılar ülkenizin ve Avrupa Ekonomik Alanı'nın dışında bulunabilir. Güvenceler Gizlilik Politikamızda açıklanmıştır." },
+      { kind: "p", text: "Hangi sağlayıcılar ve nerede. dezbatere.ro/providers adresindeki Yapay Zekâ Sağlayıcı Sicilimiz bu Koşulların bir parçasıdır. Sicil, kullanabileceğimiz her sağlayıcı için şu hususları listeler: tüzel kişiliği ve ülkesi; neyi, neden aldığı; işlemenin nerede yapıldığı; saklama koşulları; kullandığımız uç nokta için sıfır veri saklamanın etkin olup olmadığı; sözleşmemiz kapsamında girdileri eğitim için kullanıp kullanamayacağı; dayandığımız aktarım mekanizması ve her kaydı son doğruladığımız tarih. Sağlayıcılar ülkenizin ve Avrupa Ekonomik Alanı'nın dışında bulunabilir. Güvenceler Gizlilik Politikamızda açıklanmıştır." },
       { kind: "p", text: "Birbirinden farklı üç husus. \"Modelleri eğitmek için kullanılmama\", \"güvenlik, kötüye kullanımı önleme veya hukuki nedenlerle sınırlı bir süre saklanma\" ve \"sıfır veri saklama — işleme sonrasında kalıcı olarak saklanmama\" birbirinden farklıdır. Bir sağlayıcı istemleri sınırlı bir süre saklıyorsa Sicil, bunun ne kadar süreyle ve neden yapıldığını belirtir. Sıfır veri saklamanın etkin olduğu durumlarda Sicil, bunu ve hangi özellikler için geçerli olduğunu belirtir. İçeriğin saklanmadığı doğru değilse size böyle söylemeyiz." },
       { kind: "p", text: "Çıktılar. Sizinle aramızdaki ilişki bakımından, kendi tartışmalarınızın çıktısını hukuka uygun her amaçla kullanabilirsiniz ve üretilen metin üzerinde mülkiyet iddiasında bulunmayız. Üretilen çıktının birçok yargı çevresinde telif hakkıyla korunamayabileceğini; benzer çıktının başka kullanıcılar için de üretilebileceğini; çıktıların üçüncü taraf materyallerini çoğaltabileceğini veya bunlara benzeyebileceğini ve bir yapay zekâ sağlayıcısının eriştiği bazı kaynak materyallerin yeniden kullanım kısıtlamalarına tabi olabileceğini göz önünde bulundurun. Çıktılara dayanmadan veya onları yeniden yayımlamadan önce kontrol etmek sizin sorumluluğunuzdadır." }
     ]
@@ -157,7 +158,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "İçerik bildirimi, moderasyon ve şikâyetler",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Herkes içerik bildirebilir. Hesabınızın olması gerekmez. [abuse@dezbatere.ro] adresine yazın veya yayımlanmış herhangi bir tartışmadaki Bildir kontrolünü kullanın. İşlem yapabilmemiz için bize şunları bildirin: içeriğin neden hukuka aykırı olduğuna veya bu Koşulları ihlal ettiğine inandığınızı, iddiayı anlayabilmemiz için yeterli ayrıntıyla; tam konumu — tam URL'yi ve mümkünse ilgili kısmı; adınızı ve e-posta adresinizi (çocukların cinsel istismarına ilişkin materyal bildirimlerinde gerekli değildir) ve bildiriminizin doğru ve eksiksiz olduğuna iyi niyetle inandığınızı." },
+      { kind: "p", text: "Herkes içerik bildirebilir. Hesabınızın olması gerekmez. support@dezbatere.ro adresine yazın veya yayımlanmış herhangi bir tartışmadaki Bildir kontrolünü kullanın. İşlem yapabilmemiz için bize şunları bildirin: içeriğin neden hukuka aykırı olduğuna veya bu Koşulları ihlal ettiğine inandığınızı, iddiayı anlayabilmemiz için yeterli ayrıntıyla; tam konumu — tam URL'yi ve mümkünse ilgili kısmı; adınızı ve e-posta adresinizi (çocukların cinsel istismarına ilişkin materyal bildirimlerinde gerekli değildir) ve bildiriminizin doğru ve eksiksiz olduğuna iyi niyetle inandığınızı." },
       { kind: "p", text: "Her bildirimi gereksiz gecikme olmaksızın aldığımızı teyit ederiz. Bildirimleri zamanında, özenli, keyfî olmayan ve nesnel bir biçimde ele alır; kararımızı ve buna nasıl itiraz edebileceğinizi size bildiririz. Bir bildirimi işlemek veya karara bağlamak için otomatik araçlar kullandığımızda bunu belirtiriz. Rıza olmaksızın paylaşılan mahrem görüntülere ilişkin bildirimler, geçerli bir talepten itibaren 48 saat içinde işleme alınır." },
       { kind: "p", text: "Birbirinden ayrı tutulan iki tür otomatik karar." },
       {
@@ -168,7 +169,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Gerekçe bildirimi. İçeriğinizi kaldırdığımızda veya görünürlüğünü kısıtladığımızda ya da hesabınızı askıya aldığımızda veya kapattığımızda size bir gerekçe bildirimi sunarız: ne yaptığımız ve bunun kapsamı, dayandığımız olgular ve bunların bir bildirimden mi yoksa kendi kontrollerimizden mi kaynaklandığı, otomatik araçların kullanılıp kullanılmadığı, hukuki veya sözleşmesel dayanak ve karara nasıl itiraz edebileceğiniz — aşağıda açıklanan şikâyet yolumuz, AB Dijital Hizmetler Yasası kapsamında sertifikalandırılmış bir mahkeme dışı uyuşmazlık çözüm organı veya mahkeme yoluyla." },
-      { kind: "p", text: "Bir karara ilişkin şikâyet. Bir moderasyon kararına katılmıyorsanız gerekçe bildirimine yanıt verin veya altı ay içinde [appeals@dezbatere.ro] adresine yazın. İlk kararda görev almamış bir kişi kararı inceler ve sonucu gerekçeleriyle size bildiririz. Bu, mahkemeye başvurma veya 18. bölüm kapsamındaki alternatif uyuşmazlık çözümünü kullanma hakkınızı etkilemez. Şikâyet yolu; bir bildirim üzerine işlem yapmadığımız, içeriğin haksız biçimde kaldırıldığı, bir hesabın haksız biçimde kısıtlandığı veya otomatik bir aracın içeriğinizi haksız biçimde etkilediği yönündeki şikâyetleri de kabul eder." },
+      { kind: "p", text: "Bir karara ilişkin şikâyet. Bir moderasyon kararına katılmıyorsanız gerekçe bildirimine yanıt verin veya altı ay içinde office@dezbatere.ro adresine yazın. İlk kararda görev almamış bir kişi kararı inceler ve sonucu gerekçeleriyle size bildiririz. Bu, mahkemeye başvurma veya 18. bölüm kapsamındaki alternatif uyuşmazlık çözümünü kullanma hakkınızı etkilemez. Şikâyet yolu; bir bildirim üzerine işlem yapmadığımız, içeriğin haksız biçimde kaldırıldığı, bir hesabın haksız biçimde kısıtlandığı veya otomatik bir aracın içeriğinizi haksız biçimde etkilediği yönündeki şikâyetleri de kabul eder." },
       { kind: "p", text: "Mahkeme dışı uyuşmazlık çözümü. Avrupa Birliği'nde bulunuyorsanız, moderasyon kararlarımızdan birine ilişkin bir uyuşmazlığı, AB Dijital Hizmetler Yasası'nın (2022/2065 sayılı (AB) Tüzük) 21. maddesi uyarınca sertifikalandırılmış bir mahkeme dışı uyuşmazlık çözüm organına taşıyabilirsiniz. Bu, içeriğiniz veya hesabınız hakkındaki bir kararı ve yaptığınız bir bildirim üzerine verdiğimiz kararı kapsar. Organı, Avrupa Komisyonu'nun digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement adresinde yayımladığı listeden siz seçersiniz ve önce şikâyet yolumuzu kullanmak zorunda değilsiniz. İyi niyetle katılırız ve yalnızca aynı uyuşmazlığın, aynı içerik hakkında ve aynı gerekçelerle hâlihazırda çözülmüş olması durumunda katılmayı reddederiz. Organın kararı taraflardan hiçbirini bağlamaz ve mahkemeye başvurma hakkınız devam eder. Organ sizden küçük bir ücret talep edebilir veya hiç ücret almayabilir. Karar sizin lehinize verilirse organın ücretlerini öder, makul giderlerinizi de size iade ederiz; karar bizim lehimize verilirse, organ açıkça kötü niyetle hareket ettiğinizi tespit etmedikçe bizim ücretlerimizi veya giderlerimizi ödemezsiniz." },
       { kind: "p", text: "Bir kişiyle iletişim kurma. Destek asistanımız bir yapay zekâ sistemidir ve bunu belirtir. İstediğiniz zaman bir kişiyle görüşmeyi talep edebilirsiniz ve her destek görüşmesi bu yolu sunar. Sizinle iletişim kurarken yalnızca otomatik araçlara dayanmayız." },
       { kind: "p", text: "Terör içeriği. Terör içeriği hukuka aykırıdır ve DebateAI'da buna izin verilmez (7. bölüm). Avrupa Birliği'ndeki yetkili makamlar, 2021/784 sayılı (AB) Tüzük kapsamında kaldırma emirlerini 1. bölümde belirtilen irtibat noktamız aracılığıyla bize gönderebilir. Böyle bir emir aldığımızda bir saat içinde içeriği kaldırır veya tüm AB ülkelerinde içeriğe erişimi engelleriz. İçeriği yayımlayan kişiye içeriğin kaldırıldığını ve talep etmesi hâlinde nedenini ve emre nasıl itiraz edebileceğini bildiririz; makamın, kamu güvenliğinin sınırlı bir süre için bilgi verilmemesini gerektirdiğine karar vermesi hâli bunun dışındadır. Tüzüğün gerektirdiği üzere, kaldırmanın gözden geçirilebilmesi ve hatalı olması hâlinde geri alınabilmesi için kaldırılan içeriği ve ilgili verileri altı ay süreyle saklarız. İçeriği yayımlayan kişi, emri veren makamın bulunduğu ülkenin mahkemelerinde itiraz edebilir ve ayrıca şikâyet yolumuzu kullanabilir. Hiçbir makam, Tüzük kapsamında bizi terör içeriğine karşı belirli tedbirler almakla yükümlü tutmamıştır; bir makam bunu yaparsa, otomatik araçlar dahil bu tedbirleri burada açıklayacağız." },
@@ -181,7 +182,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Sizin tarafınızdan. 6. bölümde açıklandığı üzere hesabınızı istediğiniz zaman Ayarlar bölümünden kapatın. Gerekçe göstermeniz gerekmez. Hesabınızı kapatmanız bu Koşulları sona erdirir. Koşullar, kapatmanın hüküm doğurduğu anda, yani 7 günlük ek sürenin bitiminde sona erer; bu bölümün sonunda sayılan bölümler bundan sonra da uygulanmaya devam eder." },
-      { kind: "p", text: "Bizim tarafımızdan. Şu durumlarda hesabınızı askıya alabilir veya kapatabilir ya da içeriğinizi kaldırabilir veya kısıtlayabiliriz: bu Koşulları, özellikle 7. bölümü esaslı biçimde ihlal etmeniz; içeriğinizin hukuka aykırı olması veya hukukun, bir mahkemenin ya da bir makamın işlem yapmamızı gerektirmesi; kullanımınızın hizmetin güvenliğini, bütünlüğünü veya kullanılabilirliğini ya da başkalarının haklarını tehdit etmesi; hesabınızın [24 months] boyunca etkin olmaması ve size bildirimde bulunmuş olmamız ya da hizmeti tamamen veya ülkenizde sunmayı bırakmamız." },
+      { kind: "p", text: "Bizim tarafımızdan. Şu durumlarda hesabınızı askıya alabilir veya kapatabilir ya da içeriğinizi kaldırabilir veya kısıtlayabiliriz: bu Koşulları, özellikle 7. bölümü esaslı biçimde ihlal etmeniz; içeriğinizin hukuka aykırı olması veya hukukun, bir mahkemenin ya da bir makamın işlem yapmamızı gerektirmesi; kullanımınızın hizmetin güvenliğini, bütünlüğünü veya kullanılabilirliğini ya da başkalarının haklarını tehdit etmesi; hesabınızın 24 ay boyunca etkin olmaması ve size bildirimde bulunmuş olmamız ya da hizmeti tamamen veya ülkenizde sunmayı bırakmamız." },
       { kind: "p", text: "İhlalin ciddi olduğu, hukukun derhâl işlem yapmamızı gerektirdiği veya gecikmenin zarara yol açacağı durumlar dışında, hesabı askıya almadan veya kapatmadan önce sorunun ne olduğunu size bildirir ve düzeltmeniz için makul bir fırsat veririz. Her zaman 10. bölüm uyarınca gerekçe bildirimi sunarız ve karara itiraz edebilirsiniz." },
       { kind: "p", text: "Hizmeti tamamen kapatırsak veya ülkenizden çekersek en az 30 gün önceden bildirimde bulunur, kapanış sonrasındaki dönem için önceden ödenmiş tutarları iade eder ve önce tartışmalarınızı dışa aktarmanız için bir yol sunarız." },
       { kind: "p", text: "Kapatmanın sonuçları. Bir hesap kapatıldığında hesap verilerinizin ve özel tartışmalarınızın şifreleme anahtarlarını yok ederiz; bu işlem onları kalıcı olarak okunamaz hâle getirir. Ayrıca hesap kaydınızı siler ve bunu seçtiyseniz 9. bölümde açıklandığı üzere yayımlanmış tartışmalarınızı kamusal erişimden kaldırırız. Bazı şeyler varlığını sürdürür ve hangileri olduğunu bilmelisiniz: yalnızca ekleme yapılabilen ve kendi hukuki yükümlülüklerimizi ve güvenlik yükümlülüklerimizi yerine getirmek için saklanan denetim ve güvenlik günlüklerimizdeki kayıtlar; kabul ve rıza kayıtları dahil, hukuken saklamakla yükümlü olduğumuz kayıtlar ve şifreleme düzenimizden önceki az sayıdaki eski tartışma bakımından silinmesi daha sınırlı olan kayıtlar — bunun hesabınız için geçerli olup olmadığını size bildiririz. Gizlilik Politikası tüm bunları veri koruma kavramlarıyla açıklar ve silme hakkınızı belirtir." },
@@ -194,13 +195,13 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "DebateAI ücretsiz bir plan sunar. Model listesinin tamamının kilidini açan ve tartışma göstergelerini kendiniz belirlemenize olanak tanıyan ücretli bir Premium plan [is / will be] mevcuttur." },
+      { kind: "p", text: "DebateAI ücretsiz bir plan sunar. Model listesinin tamamının kilidini açan ve tartışma göstergelerini kendiniz belirlemenize olanak tanıyan ücretli bir Premium plan sunulacaktır." },
       { kind: "p", text: "Ödeme yapmadan önce size ödeme düğmesinin hemen üzerinde şunları gösteririz: planı; geçerli vergiler dahil toplam fiyatı; faturalandırma dönemini; planın iptal edilene kadar otomatik yenileneceğini; varsa ücretsiz denemenin sona ereceği tarihi ve sonrasında tahsil edilecek tutarı ve nasıl iptal edileceğini. Ayrı bir kutuyu işaretleyerek yenileme koşullarını teyit edersiniz. Düğmenin üzerinde Abone ol ve öde (Romence, Comandă cu obligație de plată) yazar. Aynı bilgileri, bu Koşulları ve cayma formunu içeren bir teyidi kalıcı veri saklayıcısıyla size göndeririz." },
-      { kind: "p", text: "Hatırlatmalar. Ücretsiz denemenin ücretli plana dönüşmesinden en az [5] gün önce; devam eden planlar için yılda en az bir kez ve on iki ay veya daha uzun süreli bir dönemin yenilenmesinden 30 ila 45 gün önce size e-posta göndeririz. Her hatırlatma fiyatı, tarihi ve iptal bağlantısını içerir." },
-      { kind: "p", text: "İptal. İstediğiniz zaman Ayarlar → Abonelik bölümünden tek bir teyit tıklamasıyla veya oturum açmanızı gerektirmeyen [dezbatere.ro/cancel] adresindeki iptal sayfasından iptal edebilirsiniz. İptal, mevcut faturalandırma döneminin sonunda hüküm doğurur ve o zamana kadar erişiminiz sürer. İptal işlemini abone olmaktan daha zor hâle getirmeyiz." },
+      { kind: "p", text: "Hatırlatmalar. Ücretsiz denemenin ücretli plana dönüşmesinden en az 5 gün önce; devam eden planlar için yılda en az bir kez ve on iki ay veya daha uzun süreli bir dönemin yenilenmesinden 30 ila 45 gün önce size e-posta göndeririz. Her hatırlatma fiyatı, tarihi ve iptal bağlantısını içerir." },
+      { kind: "p", text: "İptal. İstediğiniz zaman Ayarlar → Abonelik bölümünden tek bir teyit tıklamasıyla veya oturum açmanızı gerektirmeyen dezbatere.ro/cancel adresindeki iptal sayfasından iptal edebilirsiniz. İptal, mevcut faturalandırma döneminin sonunda hüküm doğurur ve o zamana kadar erişiminiz sürer. İptal işlemini abone olmaktan daha zor hâle getirmeyiz." },
       { kind: "p", text: "Fiyat değişiklikleri yalnızca yenilemede hüküm doğurur. Yeni fiyatı ve bir iptal bağlantısını içeren e-postayı en az 30 gün önceden göndeririz. Ülkenizin hukuku bir fiyat değişikliği için açık rızanızı gerektiriyorsa bunu isteriz; aksi takdirde hiçbir şey yapmazsanız yeni fiyat bir sonraki yenilemeden itibaren uygulanır. Bölgesel kurallar Ek A'da belirtilmiştir." },
-      { kind: "p", text: "Başarısız ödemeler. Ödeme başarısız olursa [7] gün boyunca yeniden dener ve hesabınızı ücretsiz plana düşürmeden önce sizi e-postayla uyarırız. Ödeme başarısız olduğu için tartışmalarınızı silmeyiz." },
-      { kind: "p", text: "Vergiler ve ödemeyi kime yaptığınız. Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi [include / exclude]. [If a merchant of record is used: Your purchase is processed by [Paddle / …], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.]" },
+      { kind: "p", text: "Başarısız ödemeler. Ödeme başarısız olursa 7 gün boyunca yeniden dener ve hesabınızı ücretsiz plana düşürmeden önce sizi e-postayla uyarırız. Ödeme başarısız olduğu için tartışmalarınızı silmeyiz." },
+      { kind: "p", text: "Vergiler ve ödemeyi kime yaptığınız. Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir." },
       { kind: "p", text: "Ters ibrazlar. Kartı düzenleyen kuruluş nezdinde bir tahsilata itiraz ederseniz uyuşmazlık çözülene kadar ücretli özellikleri askıya alabiliriz. Bunun için ücret almayız." },
       { kind: "p", text: "Öncelik kanuni haklardadır. Hizmet taahhüt ettiğimiz niteliklere uygun değilse hukukun öngördüğü şekilde uygunluğun sağlanmasını veya orantılı bir fiyat indirimi ya da geri ödeme talep etme hakkına sahipsiniz. Bunun ötesinde, [state your discretionary refund policy]. Her iki planın kullanım sınırları da üründe yayımlanır; sizi esaslı biçimde etkileyen bir sıkılaştırmadan önce bildirimde bulunuruz." }
     ]
@@ -210,7 +211,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Cayma hakkınız",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "AB, AEA veya Birleşik Krallık'ta yaşıyorsanız ücretli bir aboneliğe abone olduktan sonra 14 gün içinde gerekçe göstermeksizin cayabilirsiniz. [dezbatere.ro/withdraw] adresindeki Sözleşmeden cay sayfasını, teyit e-postasındaki örnek formu kullanın veya [support@dezbatere.ro] adresine yazın; alındığını kalıcı veri saklayıcısıyla teyit ederiz." },
+      { kind: "p", text: "AB veya AEA'da yaşıyorsanız ücretli bir aboneliğe abone olduktan sonra 14 gün içinde gerekçe göstermeksizin cayabilirsiniz. dezbatere.ro/withdraw adresindeki Sözleşmeden cay sayfasını, teyit e-postasındaki örnek formu kullanın veya support@dezbatere.ro adresine yazın; alındığını kalıcı veri saklayıcısıyla teyit ederiz." },
       { kind: "p", text: "Ödeme sayfasındaki kutuyu işaretleyerek hizmeti derhâl başlatmamızı istediyseniz ve ardından cayarsanız, cayma gününe kadar sunulan hizmet kısmının faturalandırma dönemi fiyatı üzerinden orantılı olarak hesaplanan bedelini ödersiniz ve kalanını iade ederiz. Hizmeti 14 günlük süre içinde kullanmanız cayma hakkınızı ortadan kaldırmaz." },
       { kind: "p", text: "Başka bir yerde yaşıyorsanız bölgenizde geçerli olan cayma veya vazgeçme hakkı varsa Ek A'da, aksi hâlde geri ödeme politikamız belirtilmiştir. Ülkenizdeki kanuni haklar her zaman önceliklidir." }
     ]
@@ -222,7 +223,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Hizmette. DebateAI'ı sürekli geliştiririz; rutin iyileştirmeler, düzeltmeler ve model listesi değişiklikleri bildirimsiz yapılır. Hizmeti açıklandığı şekilde çalışır tutmanın ötesine geçen bir değişiklik yaptığımızda bunu yalnızca şu nedenlerden biriyle yaparız: hukuki veya düzenleyici bir gerekliliğe uymak; bir güvenlik veya kötüye kullanım sorununa müdahale etmek; bir model sağlayıcısının bağlı olduğumuz bir modeli veya özelliği değiştirmesi, kısıtlaması veya geri çekmesi; denetlemediğimiz teknik bir ortama uyum sağlamak ya da size ek maliyet getirmeyecek şekilde bir özellik eklemek, iyileştirmek veya kullanımdan kaldırmak." },
       { kind: "p", text: "Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren 30 gün içinde ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz." },
-      { kind: "p", text: "Bu Koşullarda. Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az 30 gün önce size e-posta göndeririz; o tarihten sonra DebateAI'ı kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler [dezbatere.ro/terms/versions] adresinde erişilebilir kalır." }
+      { kind: "p", text: "Bu Koşullarda. Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az 30 gün önce size e-posta göndeririz; o tarihten sonra DebateAI'ı kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır." }
     ]
   },
   {
@@ -244,7 +245,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Hizmetin kendisi — yazılım, motor, puanlama yöntemi, arayüz, DebateAI ve DebateAIRO adları ve logolarımız — bize veya lisans verenlerimize aittir. Bu Koşullar size hizmeti kullanma izni verir; hizmet üzerinde mülkiyet hakkı vermez." },
       { kind: "p", text: "Yayımlanmış tartışmalardan, DebateAI'a atıfta bulunarak ve özgün sayfaya bağlantı vererek alıntı yapabilir ve bağlantı paylaşabilirsiniz. Kamusal külliyatın toplu kopyalanmasına, sistematik biçimde çoğaltılmasına ve yayımlanmış tartışmaların eğitim verisi olarak kullanılmasına yazılı mutabakatımız olmadan izin verilmez." },
-      { kind: "p", text: "8. bölüm içeriğinizi ve üretilen çıktıların statüsünü düzenler. DebateAI'daki bir içeriğin fikrî mülkiyetinizi ihlal ettiğine inanıyorsanız 10. bölümdeki bildirim yolunu kullanın. [If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is [name, address, email], registered with the US Copyright Office; we terminate the accounts of repeat infringers.]" }
+      { kind: "p", text: "8. bölüm içeriğinizi ve üretilen çıktıların statüsünü düzenler. DebateAI'daki bir içeriğin fikrî mülkiyetinizi ihlal ettiğine inanıyorsanız 10. bölümdeki bildirim yolunu kullanın." }
     ]
   },
   {
@@ -252,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kişisel veriler",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Kişisel verileri nasıl işlediğimiz [dezbatere.ro/privacy] adresindeki Gizlilik Politikası'nda açıklanmıştır. Bu politika; neleri topladığımızı, her amaç için hukuki dayanağı, verileri ne kadar süreyle sakladığımızı, verilerin kimlere aktarıldığını, söz konusu aktarımları ve haklarınızı nasıl kullanacağınızı açıklar. Üç husus burada da belirtilmelidir. 7. bölüm, başka kişilere ait kişisel verileri bir soruya dahil etmemenizi ister; bunu yaparsanız sorumluluk size aittir ve içeriği kaldırabiliriz. DebateAI'da yayımlanan bir tartışma hakkınızda kişisel veri içeriyorsa hesap sahibi olmadan kaldırılmasını isteyebilirsiniz (9. bölüm). Ayrıca Gizlilik Politikası'nda açıklandığı üzere, sözleşmenin kanıtı olarak bu Koşulları kabulünüze ilişkin sürüm, zaman ve oturumun teknik ayrıntılarından oluşan bir kayıt tutarız." }
+      { kind: "p", text: "Kişisel verileri nasıl işlediğimiz dezbatere.ro/privacy adresindeki Gizlilik Politikası'nda açıklanmıştır. Bu politika; neleri topladığımızı, her amaç için hukuki dayanağı, verileri ne kadar süreyle sakladığımızı, verilerin kimlere aktarıldığını, söz konusu aktarımları ve haklarınızı nasıl kullanacağınızı açıklar. Üç husus burada da belirtilmelidir. 7. bölüm, başka kişilere ait kişisel verileri bir soruya dahil etmemenizi ister; bunu yaparsanız sorumluluk size aittir ve içeriği kaldırabiliriz. DebateAI'da yayımlanan bir tartışma hakkınızda kişisel veri içeriyorsa hesap sahibi olmadan kaldırılmasını isteyebilirsiniz (9. bölüm). Ayrıca Gizlilik Politikası'nda açıklandığı üzere, sözleşmenin kanıtı olarak bu Koşulları kabulünüze ilişkin sürüm, zaman ve oturumun teknik ayrıntılarından oluşan bir kayıt tutarız." }
     ]
   },
   {
@@ -261,11 +262,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Uygulanacak hukuk. Bu Koşullar ve bunlardan veya konusundan doğan, sözleşme dışı talepler dahil her türlü uyuşmazlık veya talep Romanya hukukuna tabidir." },
-      { kind: "p", text: "Yerel korumalarınız etkilenmez. Tüketiciyseniz Romanya hukukunun seçilmesi, mutad meskeninizin bulunduğu ülkenin emredici tüketiciyi koruma kurallarının — örneğin haksız şartlara, cayma ve iptal haklarına veya güvencelere ilişkin kuralların — bu seçimden bağımsız olarak uygulandığı durumlarda sağladığı korumayı ortadan kaldırmaz; AB'de yaşıyorsanız 593/2008 sayılı (AT) Tüzüğün 6(2). maddesi veya Birleşik Krallık'taki eşdeğer kurallar buna dahildir. Romanya hukukuna ek olarak bu kurallara dayanabilirsiniz." },
-      { kind: "p", text: "AB, AEA veya Birleşik Krallık'ta yaşıyorsanız mahkemeler. Bize karşı Romanya mahkemelerinde veya yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz. Biz size karşı yalnızca yaşadığınız ülkenin mahkemelerinde dava açabiliriz." },
-      { kind: "p", text: "Başka yerlerdeki tüketiciler. AB, AEA ve Birleşik Krallık dışında yaşıyorsanız bu Koşullardaki hiçbir hüküm, ülkenizin hukuku uyarınca o ülkenin mahkemelerinde talepte bulunma hakkınızı veya o hukuk uyarınca vazgeçilemeyecek herhangi bir hakkınızı sınırlandırmaz — Avustralya veya Yeni Zelanda'da yaşıyorsanız tüketici güvencesi haklarınız; Brezilya'da yaşıyorsanız Código de Defesa do Consumidor ve Amerika Birleşik Devletleri'nde yaşıyorsanız eyaletinizin tüketiciyi koruma kanunları buna dahildir." },
-      { kind: "p", text: "Amerika Birleşik Devletleri'nde ikamet edenler. Ek A.3, Federal Arbitration Act'e tabi bir tahkim anlaşması ve toplu dava hakkından feragat içerir. Yalnızca Amerika Birleşik Devletleri'nde ikamet edenlere ve icra edilebilir olduğu ölçüde uygulanır. AB, AEA veya Birleşik Krallık'taki tüketicilere uygulanmaz." },
-      { kind: "p", text: "Mahkemeye gitmeden önce. [legal@dezbatere.ro] adresinden bizimle iletişime geçin; çoğu sorun çözülebilir ve [5] iş günü içinde yanıt vermeyi hedefleriz. Romanya'da veya AB'de bir tüketiciyseniz [the ANPC – named SAL entity, website] üzerinden alternatif uyuşmazlık çözümünden yararlanabilirsiniz; bu usule katılmayı [do / do not] taahhüt ediyoruz. Moderasyon kararlarına ilişkin şikâyetler ayrı bir yol olan 10. bölüme tabidir." }
+      { kind: "p", text: "Yerel korumalarınız etkilenmez. Tüketiciyseniz Romanya hukukunun seçilmesi, mutad meskeninizin bulunduğu ülkenin emredici tüketiciyi koruma kurallarının — örneğin haksız şartlara, cayma ve iptal haklarına veya güvencelere ilişkin kuralların — bu seçimden bağımsız olarak uygulandığı durumlarda sağladığı korumayı ortadan kaldırmaz; AB'de yaşıyorsanız 593/2008 sayılı (AT) Tüzüğün 6(2). maddesi buna dahildir. Romanya hukukuna ek olarak bu kurallara dayanabilirsiniz." },
+      { kind: "p", text: "AB veya AEA'da yaşıyorsanız mahkemeler. Bize karşı Romanya mahkemelerinde veya yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz. Biz size karşı yalnızca yaşadığınız ülkenin mahkemelerinde dava açabiliriz." },
+      { kind: "p", text: "Başka yerlerdeki tüketiciler. AB ve AEA dışında yaşıyorsanız bu Koşullardaki hiçbir hüküm, ülkenizin hukuku uyarınca o ülkenin mahkemelerinde talepte bulunma hakkınızı veya o hukuk uyarınca vazgeçilemeyecek herhangi bir hakkınızı sınırlandırmaz — Avustralya veya Yeni Zelanda'da yaşıyorsanız tüketici güvencesi haklarınız; Brezilya'da yaşıyorsanız Código de Defesa do Consumidor ve Amerika Birleşik Devletleri'nde yaşıyorsanız eyaletinizin tüketiciyi koruma kanunları buna dahildir." },
+      { kind: "p", text: "Mahkemeye gitmeden önce. support@dezbatere.ro adresinden bizimle iletişime geçin; çoğu sorun çözülebilir ve 5 iş günü içinde yanıt vermeyi hedefleriz. Romanya'da veya AB'de bir tüketiciyseniz www.onoratainstanta.ro üzerinden alternatif uyuşmazlık çözümünden yararlanabilirsiniz; bu usule katılmayı taahhüt etmiyoruz. Moderasyon kararlarına ilişkin şikâyetler ayrı bir yol olan 10. bölüme tabidir." }
     ]
   },
   {
@@ -278,7 +278,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Feragat yoktur. Bir hükmü derhâl uygulamamamız, onu daha sonra uygulama hakkımızı kaybettiğimiz anlamına gelmez." },
       { kind: "p", text: "Sözleşmenin tamamı. Bu Koşullar, Çerez Politikası ve Yapay Zekâ Sağlayıcı Sicili ile birlikte hizmet hakkında aramızdaki sözleşmenin tamamını oluşturur. Gizlilik Politikası'nda verdiğimiz taahhütler bizi bağlar. Bu paragraftaki hiçbir hüküm hileli yanlış beyandan doğan sorumluluğu ortadan kaldırmaz." },
       { kind: "p", text: "Dil. Bu Koşullar, sitenin sunduğu her dilde yayımlanır. Sözleşmenin dili, kayıt olduğunuz dildir; yani kabul ettiğiniz ve kabul kaydımızda yer alan sürümün dilidir. Daha sonra başka bir dildeki yeni bir sürümü kabul ederseniz sözleşme o dilde devam eder. Diğer dillerdeki sürümler çeviridir. Yaşadığınız ülkenin hukuku, o ülkenin dilindeki sürümün esas alınacağını öngörüyorsa, o sürüm esas alınır. İki dil sürümü arasında fark olması hâlinde, sizin için daha elverişli olan anlamı uygularız." },
-      { kind: "p", text: "İletişim. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bükreş, Romanya." }
+      { kind: "p", text: "İletişim. support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romanya." }
     ]
   },
   {
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Ek A — Bölgesel koşullar",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Her bir madde yalnızca bölgesi 2. bölümde sayılmışsa uygulanır ve yalnızca ana metinden farklı olan hususları belirtir. Bir madde ile ana metin çelişirse ilgili bölgedeki kişiler bakımından madde uygulanır." }
+      { kind: "p", text: "Her bir madde, bölgesinde yaşayan kişilere uygulanır ve yalnızca ana metinden farklı olan hususları belirtir. Bir madde ile ana metin çelişirse ilgili bölgedeki kişiler bakımından madde uygulanır." }
     ]
   },
   {
@@ -294,103 +294,70 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Avrupa Birliği ve Avrupa Ekonomik Alanı",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz; 13. bölümdeki cayma hakkı uygulanır; [the ANPC – named entity, website] üzerinden alternatif uyuşmazlık çözümü kullanılabilir. Almanya: [dezbatere.ro/cancel] adresindeki iptal düğmesi, oturum açmadan aboneliği sona erdirmenize olanak tanır; abonelik süreleri, yenileme dönemleri ve bildirim süreleri §309(9) BGB'ye uygundur [state them]. Fransa: [URL] adresinden üç adımda çevrim içi abonelik iptali yapabilirsiniz; [the mediator named at URL] hizmetinizdedir. İtalya: sorumluluk (15), askıya alma (11), değişiklikler (14) ve uygulanacak hukuk (18) hakkındaki hükümler özel onayınızı gerektirir; kayıt sırasında ayrı bir teyitle bu onayı verirsiniz. Hollanda: bu Koşullar sözleşme kurulmadan önce saklanabilir bir biçimde sunulur. Polonya: Lehçe sürüm [URL] adresindedir." }
+      { kind: "p", text: "Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz; 13. bölümdeki cayma hakkı uygulanır; www.onoratainstanta.ro üzerinden alternatif uyuşmazlık çözümü kullanılabilir. Almanya: dezbatere.ro/cancel adresindeki iptal düğmesi, oturum açmadan aboneliği sona erdirmenize olanak tanır; abonelik süreleri, yenileme dönemleri ve bildirim süreleri §309(9) BGB'ye uygundur [state them]. Fransa: [URL] adresinden üç adımda çevrim içi abonelik iptali yapabilirsiniz. İtalya: sorumluluk (15), askıya alma (11), değişiklikler (14) ve uygulanacak hukuk (18) hakkındaki hükümler özel onayınızı gerektirir; kayıt sırasında ayrı bir teyitle bu onayı verirsiniz. Hollanda: bu Koşullar sözleşme kurulmadan önce saklanabilir bir biçimde sunulur. Polonya: Lehçe sürüm [URL] adresindedir." }
     ]
   },
   {
     no: "A.2",
-    title: "Birleşik Krallık (yalnızca 2. bölümde sayılmışsa)",
+    title: "Amerika Birleşik Devletleri",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "UK GDPR'nin 27. maddesi uyarınca Birleşik Krallık temsilcimiz [name, address, email]'dir. Consumer Rights Act 2015 size uygulanır ve bu Koşullardaki hiçbir hüküm bu Kanun kapsamındaki haklarınızı sınırlandırmaz; Digital Markets, Competition and Consumers Act 2024'ün abonelik kuralları yürürlüğe girdiğinde (2027'de bekleniyor), yenilemelerden ve ücretsiz denemelerden sonraki vazgeçme süresi dahil, ücretli planlara uygulanır. Kullanıcıları hukuka aykırı içerikten nasıl koruyoruz: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Kullandığımız proaktif teknoloji: [describe, or \"none\"]. Yaş güvencesi: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. 10. bölümdeki şikâyet usulü; hukuka aykırı içerik, içeriğinizin haksız yere kaldırılması, hesabınıza getirilen kısıtlamalar, içeriğinizi etkileyen otomatik araçların kullanımı ve sizi haksız yere engelleyen yaş değerlendirmeleri hakkındaki şikâyetleri kabul eder. Bu yol, içerikten etkilenen ve kullanıcı olmayan kişilere de açıktır. Verileriniz Gizlilik Politikamızın Ek B.2'sinde ele alınır." }
+      { kind: "p", text: "Tennessee. DebateAI'ı Tennessee'de yaşayan kişilere sunmuyoruz." },
+      { kind: "p", text: "Bildirimler ve kaldırmalar. Rıza olmaksızın paylaşılan mahrem görüntüler, hesap olmaksızın [URL] adresinden bildirilebilir ve geçerli bir talebin ardından 48 saat içinde kaldırılır. Telif hakkı şikâyetleri 10. bölümdeki bildirim yolu üzerinden iletilir." },
+      { kind: "p", text: "Eyalete özgü hükümler. Kaliforniya: 12. bölümdeki otomatik yenileme koşulları uygulanır; istediğiniz zaman çevrim içi iptal yapabilirsiniz; yenileme koşullarına verdiğiniz rızayı en az üç yıl saklarız. New York: artan fiyat üzerinden yapılan herhangi bir tahsilattan itibaren 14 gün içinde iptal edebilir ve orantılı geri ödeme alabilirsiniz. Teksas ve Nebraska: hassas kişisel veri satmayız. Washington: [URL] adresindeki Tüketici Sağlık Verileri Gizlilik Bildirimimiz sağlıkla ilgili bilgilere uygulanır. Colorado: hizmet sizin hakkınızda önemli sonuç doğuran kararlar almaz. Verileriniz ve eyalet gizlilik haklarınız Gizlilik Politikamızın Ek B.2'sinde ele alınır." }
     ]
   },
   {
     no: "A.3",
-    title: "Amerika Birleşik Devletleri (yalnızca 2. bölümde sayılmışsa)",
+    title: "Kanada ve Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tennessee. DebateAI'ı Tennessee'de yaşayan kişilere sunmuyoruz." },
-      { kind: "p", text: "Tahkim anlaşması ve toplu dava hakkından feragat. Amerika Birleşik Devletleri'nde yaşıyorsanız siz ve DebateAIRO, bu Koşullardan veya hizmetten doğan her türlü uyuşmazlığı, taraflardan herhangi birinin küçük talepler mahkemesinde bireysel talepte bulunabilmesi dışında, mahkeme yerine [the American Arbitration Association / JAMS] tarafından kendi tüketici kuralları uyarınca yürütülen bağlayıcı bireysel tahkim yoluyla çözmeyi kabul edersiniz. Bu Koşulları ilk kez kabul etmenizden itibaren 30 gün içinde [address] adresine e-posta göndererek kapsam dışında kalmayı tercih edebilirsiniz. Bu anlaşma Federal Arbitration Act'e tabidir. Tahkim başvuru ücretlerini biz öderiz. Toplu, kolektif ve temsili davalardan hukukun izin verdiği ölçüde feragat edilir. Bu bölüm yalnızca ileriye dönük uygulanır ve kabulünüzden önce doğmuş taleplere uygulanmaz." },
-      { kind: "p", text: "Bildirimler ve kaldırmalar. Rıza olmaksızın paylaşılan mahrem görüntüler, hesap olmaksızın [URL] adresinden bildirilebilir ve geçerli bir talebin ardından 48 saat içinde kaldırılır. Telif hakkı şikâyetleri 16. bölümde belirtilen atanmış temsilcimize iletilir." },
-      { kind: "p", text: "Eyalete özgü hükümler. Kaliforniya: 12. bölümdeki otomatik yenileme koşulları uygulanır; istediğiniz zaman çevrim içi iptal yapabilirsiniz; yenileme koşullarına verdiğiniz rızayı en az üç yıl saklarız. New York: artan fiyat üzerinden yapılan herhangi bir tahsilattan itibaren 14 gün içinde iptal edebilir ve orantılı geri ödeme alabilirsiniz. Teksas ve Nebraska: hassas kişisel veri satmayız. Washington: [URL] adresindeki Tüketici Sağlık Verileri Gizlilik Bildirimimiz sağlıkla ilgili bilgilere uygulanır. Colorado: hizmet sizin hakkınızda önemli sonuç doğuran kararlar almaz. Verileriniz ve eyalet gizlilik haklarınız Gizlilik Politikamızın Ek B.3'ünde ele alınır." }
+      { kind: "p", text: "Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. Quebec: bu Koşullar Fransızca olarak sunulur; dil seçiciden Fransızcayı seçin; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanada ve Quebec (yalnızca sayılmışsa)",
+    title: "Avustralya ve Yeni Zelanda",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi [name]'dir (privacy@dezbatere.ro). Verileriniz Gizlilik Politikamızın Ek B.4'ünde ele alınır. Quebec: bu Koşullar Fransızca olarak sunulur; dil seçiciden Fransızcayı seçin; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz; size hiçbir tahkim anlaşması veya toplu dava hakkından feragat uygulanmaz." }
+      { kind: "p", text: "Hizmetlerimiz, Avustralya Tüketici Hukuku uyarınca ortadan kaldırılamayacak güvencelerle sunulur. Hizmetteki önemli ayıplar bakımından iptal ve kullanılmayan kısım için geri ödeme ya da hizmetin azalan değeri için tazminat hakkına sahipsiniz; ayrıca makul biçimde öngörülebilir diğer kayıp veya zararlar için tazminat hakkına da sahipsiniz. Ayıp önemli ayıp düzeyinde değilse hizmetteki sorunların makul bir sürede giderilmesini; bu yapılmazsa iptal ve geri ödeme hakkına sahipsiniz. 64A bölümünün izin verdiği ölçüde, bir güvencenin ihlalinden doğan sorumluluğumuz hizmeti yeniden sunmak veya bunun maliyetini ödemekle sınırlıdır. Ücretli plan için 12. bölümün size sağladıklarının ötesinde bir vazgeçme hakkı uygulanmaz; iade talepleri support@dezbatere.ro adresinden değerlendirilir. Yeni Zelanda: Consumer Guarantees Act 1993 uygulanır ve bu Koşullardaki hiçbir hüküm bu Kanunu hariç tutmaz; zararlı dijital iletişimler 10. bölüm uyarınca bize veya Netsafe'e bildirilebilir." }
     ]
   },
   {
     no: "A.5",
-    title: "Avustralya ve Yeni Zelanda (yalnızca sayılmışsa)",
+    title: "İsviçre",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Hizmetlerimiz, Avustralya Tüketici Hukuku uyarınca ortadan kaldırılamayacak güvencelerle sunulur. Hizmetteki önemli ayıplar bakımından iptal ve kullanılmayan kısım için geri ödeme ya da hizmetin azalan değeri için tazminat hakkına sahipsiniz; ayrıca makul biçimde öngörülebilir diğer kayıp veya zararlar için tazminat hakkına da sahipsiniz. Ayıp önemli ayıp düzeyinde değilse hizmetteki sorunların makul bir sürede giderilmesini; bu yapılmazsa iptal ve geri ödeme hakkına sahipsiniz. 64A bölümünün izin verdiği ölçüde, bir güvencenin ihlalinden doğan sorumluluğumuz hizmeti yeniden sunmak veya bunun maliyetini ödemekle sınırlıdır. Ücretli plan için 12. bölümün size sağladıklarının ötesinde bir vazgeçme hakkı uygulanmaz; geri ödeme politikamız […]. Yeni Zelanda: Consumer Guarantees Act 1993 uygulanır ve bu Koşullardaki hiçbir hüküm bu Kanunu hariç tutmaz; zararlı dijital iletişimler 10. bölüm uyarınca bize veya Netsafe'e bildirilebilir." }
+      { kind: "p", text: "İsviçre Federal Veri Koruma Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.5). İsviçre'de yaşadığınız yerin mahkemelerinde dava açabilirsiniz. Ücretli plan için kanuni bir cayma hakkı uygulanmaz; iade talepleri support@dezbatere.ro adresinden değerlendirilir." }
     ]
   },
   {
     no: "A.6",
-    title: "İsviçre (yalnızca sayılmışsa)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "İsviçre Federal Veri Koruma Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.6). İsviçre'de yaşadığınız yerin mahkemelerinde dava açabilirsiniz. Ücretli plan için kanuni bir cayma hakkı uygulanmaz; geri ödeme politikamız […]." }
+      { kind: "p", text: "Bu Koşullar kapsamında, 13. bölümdeki 14 günlük cayma hakkı dahil, Avrupa Birliği'ndeki bir tüketiciyle aynı haklara sahipsiniz. Moldova mahkemelerinde dava açabilirsiniz. Moldova'nın kişisel verilerin korunmasına ilişkin 195/2024 sayılı Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (yalnızca sayılmışsa)",
+    title: "Asya-Pasifik",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Bu Koşullar kapsamında, 13. bölümdeki 14 günlük cayma hakkı dahil, Avrupa Birliği'ndeki bir tüketiciyle aynı haklara sahipsiniz. Moldova mahkemelerinde dava açabilirsiniz. Moldova'nın kişisel verilerin korunmasına ilişkin 195/2024 sayılı Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukrayna (yalnızca sayılmışsa)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "DebateAI'ı, Ukrayna hükümetinin kontrolünde olmayan bölgeler dışında Ukrayna'da sunuyoruz. Ürün ve bu Koşullar Ukraynaca olarak sunulur. Ukrayna'nın \"Kişisel Verilerin Korunması Hakkında\" Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "İsrail (yalnızca sayılmışsa)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Ücretli bir planı Consumer Protection Law, 5741-1981'in izin verdiği şekilde iptal edebilirsiniz [state the cancellation terms]. Bu Koşullar ve Gizlilik Politikamız İbranice olarak sunulur. İsrail'in Özel Hayatın Gizliliğinin Korunması Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Asya-Pasifik (yalnızca sayılan bölgelere ilişkin satırlar)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapur: Veri Koruma Görevlimiz [name, email]'dir; aktarımlar PDPA ile karşılaştırılabilir sözleşmesel korumalara dayanır; ücretli plan için kanuni bir vazgeçme hakkı uygulanmaz ve geri ödeme politikamız […]. Japonya: Specified Commercial Transactions Act kapsamındaki kanuni açıklama [URL] adresindedir; çevrim içi abonelikler için genel bir vazgeçme hakkı uygulanmaz ve geri ödeme politikamız […]; içeriğinizi Amerika Birleşik Devletleri ve Avrupa Birliği'ndeki yapay zekâ sağlayıcılarına, her biri Japonya'nın Kişisel Bilgilerin Korunması Hakkında Kanunu'na eşdeğer koruma gerektiren bir sözleşme kapsamında göndeririz ve talep üzerine bu önlemlerin neler olduğunu size bildiririz. Güney Kore: isteğe bağlı işleme ve pazarlama rızaları, hizmeti yürütmek için gerekli unsurlardan ayrı alınır; gizlilik görevlimiz [name]'dir (privacy@dezbatere.ro); E-Commerce Act uyarınca, abone olduktan sonra 7 gün içinde ücretli plandan cayabilirsiniz; yinelenen her fiyat artışından veya ücretsiz plandan ücretli plana geçişten önce yeniden rızanızı alırız; hizmet üretken yapay zekâ kullanır, bunu siz kullanmadan önce size bildiririz ve yapay zekâ tarafından üretilen çıktıları etiketleriz. Tayvan: Consumer Protection Act uyarınca, abone olduktan sonra 7 gün içinde ücretli plandan cayabilirsiniz; Tayvan'ın Kişisel Verilerin Korunması Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.10). Tayland: Tayland'daki temsilcimiz [name] [if appointed]. Filipinler: Internet Transactions Act kapsamındaki işletme kimliğimiz ve giderim mekanizmamız [URL] adresindedir; şikâyetler National Privacy Commission'a iletilebilir." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Ayrılmıştır",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Türkiye, Brezilya ve Endonezya'nın her biri yerel dilde bir ek, temsilci veya tescil ve bildirimler gerektirir. Bunlar burada taslak hâline getirilmemiştir ve bilinçli olarak eklenene kadar 2. bölümün kapsamı dışındadır. Çin, Vietnam ve Rusya'da hizmet sunulmaz." }
+      { kind: "p", text: "Singapur: Veri Koruma Görevlimiz müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir; aktarımlar PDPA ile karşılaştırılabilir sözleşmesel korumalara dayanır; ücretli plan için kanuni bir vazgeçme hakkı uygulanmaz ve iade talepleri support@dezbatere.ro adresinden değerlendirilir. Japonya: Specified Commercial Transactions Act kapsamındaki kanuni açıklama [URL] adresindedir; çevrim içi abonelikler için genel bir vazgeçme hakkı uygulanmaz ve iade talepleri support@dezbatere.ro adresinden değerlendirilir; içeriğinizi Amerika Birleşik Devletleri ve Avrupa Birliği'ndeki yapay zekâ sağlayıcılarına, her biri Japonya'nın Kişisel Bilgilerin Korunması Hakkında Kanunu'na eşdeğer koruma gerektiren bir sözleşme kapsamında göndeririz ve talep üzerine bu önlemlerin neler olduğunu size bildiririz. Güney Kore: isteğe bağlı işleme ve pazarlama rızaları, hizmeti yürütmek için gerekli unsurlardan ayrı alınır; gizlilik görevlimiz müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir; E-Commerce Act uyarınca, abone olduktan sonra 7 gün içinde ücretli plandan cayabilirsiniz; yinelenen her fiyat artışından veya ücretsiz plandan ücretli plana geçişten önce yeniden rızanızı alırız; hizmet üretken yapay zekâ kullanır, bunu siz kullanmadan önce size bildiririz ve yapay zekâ tarafından üretilen çıktıları etiketleriz. Tayvan: Consumer Protection Act uyarınca, abone olduktan sonra 7 gün içinde ücretli plandan cayabilirsiniz; Tayvan'ın Kişisel Verilerin Korunması Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "59c6b2fea7d8943d86fe42eb87e24cd0fbb36b47545d49e7cb94cd505a0b4e8d",
-  eyebrow: "HİZMET KOŞULLARI · v2.1 · YÜRÜRLÜK TARİHİ [DATE]",
+  version: "2.2",
+  sha256: "7d4e8721e9f75775a46bd15b835b47b541ec897df9aa9a2d0e1393815e119ad4",
+  eyebrow: "HİZMET KOŞULLARI · v2.2 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
   title: "Kabul ettiğiniz hükümler",
-  lede: "Sizinle DebateAIRO S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",
-  endMarker: "KOŞULLARIN SONU · v2.1",
-  contact: "[legal@dezbatere.ro]",
+  lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",
+  endMarker: "KOŞULLARIN SONU · v2.2",
+  contact: "support@dezbatere.ro",
   bodyLabel: "Hizmet Koşulları metni",
   sectionIdPrefix: "terms-section-",
   titleId: "terms-modal-title",

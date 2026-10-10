@@ -205,6 +205,6 @@
   "public.publication.contentCheck.groundIllegal": "It-test jista’ jkun ukoll illegali.",
   "public.publication.contentCheck.automated": "Din id-deċiżjoni ttieħdet minn għodda awtomatika. Għadha ma ġiet riveduta minn ebda persuna.",
   "public.publication.contentCheck.stillPrivate": "Id-dibattitu tiegħek jibqa’ privat u ma jinbidilx. Int biss tista’ tarah.",
-  "public.publication.contentCheck.appeal": "Biex titlob lil persuna tirrevedi din id-deċiżjoni, ikteb lil [appeals@dezbatere.ro] fi żmien sitt xhur.",
+  "public.publication.contentCheck.appeal": "Biex titlob lil persuna tirrevedi din id-deċiżjoni, ikteb lil office@dezbatere.ro fi żmien sitt xhur.",
   "public.publication.contentCheck.unavailable": "Il-verifika tal-kontenut mhijiex disponibbli bħalissa, għalhekk ma ġie ppubblikat xejn. Id-dibattitu tiegħek jibqa’ privat. Erġa’ pprova fi ftit minuti."
 }

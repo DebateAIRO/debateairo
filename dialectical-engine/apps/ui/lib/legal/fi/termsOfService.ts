@@ -28,7 +28,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Lyhyesti",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Sinun on oltava vähintään 18-vuotias. DebateAI muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen [abuse@dezbatere.ro] riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy." }
+      { kind: "p", text: "Sinun on oltava vähintään 18-vuotias. DebateAI muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Väittelysi ovat yksityisiä, ellet julkaise niitä; jos julkaiset ne, kuka tahansa voi lukea niitä. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, eikä sitä käytetä mallien kouluttamiseen. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy." }
     ]
   },
   {
@@ -36,24 +36,25 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Keitä olemme ja miten saat meihin yhteyden",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "DebateAI-palvelua ylläpitää DebateAIRO S.R.L., Romaniaan rekisteröity yhtiö." },
+      { kind: "p", text: "DebateAI-palvelua ylläpitää DMS Merchandise Shop S.R.L., Romaniaan rekisteröity yhtiö." },
       {
         kind: "list",
         items: [
-        "Rekisteröity toimipaikka — [street, number, sector, postal code], Bukarest, Romania",
-        "Kaupparekisterinumero — [J40/…/…]",
-        "Yksilöllinen rekisteröintitunnus (CUI) — […] · ALV: [RO… / not VAT-registered]",
-        "Osakepääoma — [RON …]",
-        "Yleinen yhteydenotto — [hello@dezbatere.ro]",
-        "Oikeudelliset tiedoksiannot — [legal@dezbatere.ro]",
+        "Rekisteröity toimipaikka — Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania",
+        "Kaupparekisterinumero — J2022000426271",
+        "Yksilöllinen rekisteröintitunnus (CUI) — 45935221 · ALV: RO45935221",
+        "Osakepääoma — 5 000 RON",
+        "Yleinen yhteydenotto — support@dezbatere.ro",
+        "Puhelin — +40 748 793 490",
+        "Oikeudelliset tiedoksiannot — support@dezbatere.ro",
         "Yksityisyys ja tietosuoja — privacy@dezbatere.ro",
-        "Lainvastaisesta sisällöstä ilmoittaminen — [abuse@dezbatere.ro] — katso kohta 10",
-        "Viranomaisten yhteyspiste — [dsa@dezbatere.ro] — romaniaksi ja englanniksi",
-        "Terroristisen sisällön poistamismääräykset (asetus (EU) 2021/784) — [dsa@dezbatere.ro] — yhteyspisteemme näitä määräyksiä varten; romaniaksi ja englanniksi; katso kohta 10",
+        "Lainvastaisesta sisällöstä ilmoittaminen — support@dezbatere.ro — katso kohta 10",
+        "Viranomaisten yhteyspiste — office@dezbatere.ro — romaniaksi ja englanniksi",
+        "Terroristisen sisällön poistamismääräykset (asetus (EU) 2021/784) — office@dezbatere.ro — yhteyspisteemme näitä määräyksiä varten; romaniaksi ja englanniksi; katso kohta 10",
         "Edustajat muissa maissa — Lueteltu liitteessä A niiden alueiden osalta, joille olemme nimittäneet edustajan"
         ]
       },
-      { kind: "p", text: "Nämä tiedot ovat myös pysyvästi nähtävillä sivustolla osoitteessa [dezbatere.ro/legal]. Saat aina yhteyden henkilöön etkä ainoastaan avustajaamme; kohdassa 10 kerrotaan, miten." }
+      { kind: "p", text: "Nämä tiedot ovat myös pysyvästi nähtävillä sivustolla osoitteessa dezbatere.ro/legal. Saat aina yhteyden henkilöön etkä ainoastaan avustajaamme; kohdassa 10 kerrotaan, miten." }
     ]
   },
   {
@@ -61,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Missä tarjoamme DebateAI-palvelua",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Tarjoamme DebateAI-palvelua henkilöille, jotka asuvat [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan." }
+      { kind: "p", text: "Tarjoamme DebateAI-palvelua henkilöille, jotka asuvat Euroopan unionissa (27 maata) ja Euroopan talousalueella (Norja, Islanti ja Liechtenstein), Sveitsissä, Moldovassa, Yhdysvalloissa (lukuun ottamatta Tennesseetä), Kanadassa, Australiassa, Uudessa-Seelannissa, Singaporessa, Japanissa, Etelä-Koreassa ja Taiwanissa. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan." }
     ]
   },
   {
@@ -69,8 +70,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Näiden käyttöehtojen hyväksyminen",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Hyväksyt nämä käyttöehdot valitsemalla valintaruudun ”Olen lukenut käyttöehdot ja hyväksyn ne” ja napsauttamalla Luo tili. Tällöin sinun ja DebateAIRO S.R.L.:n välille syntyy sopimus. Käyttöehtoihin sisältyvät kohdan 7 hyväksyttävää käyttöä koskevat säännöt, kohdan 9 julkaisemista koskevat säännöt, kohdan 15 vastuusäännökset, kohdan 18 sovellettavaa lakia ja riitoja koskevat määräykset sekä, jos asut Yhdysvalloissa, liitteen A.3 välityssopimus. Säilytämme tietosuojakäytännössämme kuvatulla tavalla tiedon hyväksymästäsi versiosta ja hyväksymisajankohdasta." },
-      { kind: "p", text: "Osoitteessa [dezbatere.ro/privacy] oleva tietosuojakäytäntömme kertoo, miten käsittelemme henkilötietoja. Se on sinulle annettavaa tietoa, ei sopimus, jonka hyväksyt, eikä mikään näissä käyttöehdoissa muuta sitä käsittelyä koskevaksi suostumukseksi. Osoitteessa [dezbatere.ro/cookies] oleva evästekäytäntömme ja osoitteessa [dezbatere.ro/providers] oleva tekoälypalveluntarjoajarekisterimme sisällytetään viittauksella osaksi näitä käyttöehtoja." },
+      { kind: "p", text: "Hyväksyt nämä käyttöehdot valitsemalla valintaruudun ”Olen lukenut käyttöehdot ja hyväksyn ne” ja napsauttamalla Luo tili. Tällöin sinun ja DMS Merchandise Shop S.R.L.:n välille syntyy sopimus. Käyttöehtoihin sisältyvät kohdan 7 hyväksyttävää käyttöä koskevat säännöt, kohdan 9 julkaisemista koskevat säännöt, kohdan 15 vastuusäännökset sekä kohdan 18 sovellettavaa lakia ja riitoja koskevat määräykset. Säilytämme tietosuojakäytännössämme kuvatulla tavalla tiedon hyväksymästäsi versiosta ja hyväksymisajankohdasta." },
+      { kind: "p", text: "Osoitteessa dezbatere.ro/privacy oleva tietosuojakäytäntömme kertoo, miten käsittelemme henkilötietoja. Se on sinulle annettavaa tietoa, ei sopimus, jonka hyväksyt, eikä mikään näissä käyttöehdoissa muuta sitä käsittelyä koskevaksi suostumukseksi. Osoitteessa dezbatere.ro/cookies oleva evästekäytäntömme ja osoitteessa dezbatere.ro/providers oleva tekoälypalveluntarjoajarekisterimme sisällytetään viittauksella osaksi näitä käyttöehtoja." },
       { kind: "p", text: "Ennen kuin teet kanssamme sopimuksen sähköisesti, käyttöliittymä näyttää sopimuksen tekemiseen liittyvät vaiheet, antaa sinun tarkistaa ja korjata syöttämäsi tiedot ennen niiden lähettämistä sekä ilmoittaa kielet, joilla sopimus voidaan tehdä. Nämä käyttöehdot ovat saatavilla tallennettavassa ja tulostettavassa muodossa. Kun ostat maksullisen tilauksen, lähetämme sinulle sähköpostitse hyväksymäsi version. Voit pyytää siitä jäljennöstä milloin tahansa. Mikään näissä käyttöehdoissa ei rajoita Romanian tai EU:n kuluttajansuojalainsäädäntöön taikka asuinmaasi lainsäädäntöön perustuvia oikeuksiasi, joita ei voida rajoittaa sopimuksella." }
     ]
   },
@@ -133,7 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Emme kouluta malleja sisällölläsi. Emme kouluta malleja sisällölläsi, ja tekoälypalveluntarjoajien kanssa tekemämme sopimukset estävät niitä käyttämästä sisältöäsi malliensa kouluttamiseen tai parantamiseen. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "Miten sisältösi päätyy tekoälypalveluntarjoajille. Lähetämme väittelyn suorittamiseksi tekstiä yhdelle tai useammalle ulkoiselle mallipalveluntarjoajalle. Palveluntarjoaja saa kysymyksesi, asettamasi ohjaavat huomautukset ja väittelyn aikana järjestelmän koostamat lausumat — joten palveluntarjoaja näkee kirjoittamastasi tekstistä johdettua ja sen ympärille rakennettua tekstiä, ei ainoastaan alkuperäisiä sanojasi. Se ei koskaan saa sähköpostiosoitettasi, tilitunnisteitasi, istuntotietojasi tai maksutietojasi." },
       { kind: "p", text: "Mitä tukipalvelun chat lähettää. Tukipalveluavustaja on myös tekoälymalli. Kun kirjoitat sille, lähetämme viestisi ulkoiselle mallipalveluntarjoajalle, jotta malli voi vastata, yhdessä niiden ohjeartikkelien kanssa, joihin se perustaa vastauksensa. Ennen lähettämistä peitämme kaiken, mikä näyttää salasanalta, kertakäyttökoodilta tai avaimelta. Jos pyydät saada keskustella henkilön kanssa, lähetämme mallille myös keskustelun samalla tavalla peitettynä, jotta se voi kirjoittaa lyhyen yhteenvedon tapauksesi vastaanottavalle tiimimme jäsenelle. Emme liitä mukaan sähköpostiosoitettasi, tilitunnisteitasi tai maksutietojasi, mutta malli saa kaiken muun, mitä kirjoitat chattiin, joten älä kirjoita sinne mitään, mitä et halua sen lukevan." },
-      { kind: "p", text: "Mitkä palveluntarjoajat ja missä. Osoitteessa [dezbatere.ro/providers] oleva tekoälypalveluntarjoajarekisterimme on osa näitä käyttöehtoja. Siinä luetellaan jokainen palveluntarjoaja, jota voimme käyttää: sen oikeushenkilö ja kotimaa; sen saamat tiedot ja niiden käyttötarkoitus; käsittelypaikat; tietojen säilytysehdot; onko käyttämässämme rajapinnassa käytössä tietojen säilyttämättömyys; voiko se sopimuksemme nojalla käyttää syötteitä kouluttamiseen; käyttämämme siirtomekanismi sekä kunkin merkinnän viimeisin tarkistuspäivä. Palveluntarjoajat voivat sijaita maasi ja Euroopan talousalueen ulkopuolella. Suojatoimet kuvataan tietosuojakäytännössämme." },
+      { kind: "p", text: "Mitkä palveluntarjoajat ja missä. Osoitteessa dezbatere.ro/providers oleva tekoälypalveluntarjoajarekisterimme on osa näitä käyttöehtoja. Siinä luetellaan jokainen palveluntarjoaja, jota voimme käyttää: sen oikeushenkilö ja kotimaa; sen saamat tiedot ja niiden käyttötarkoitus; käsittelypaikat; tietojen säilytysehdot; onko käyttämässämme rajapinnassa käytössä tietojen säilyttämättömyys; voiko se sopimuksemme nojalla käyttää syötteitä kouluttamiseen; käyttämämme siirtomekanismi sekä kunkin merkinnän viimeisin tarkistuspäivä. Palveluntarjoajat voivat sijaita maasi ja Euroopan talousalueen ulkopuolella. Suojatoimet kuvataan tietosuojakäytännössämme." },
       { kind: "p", text: "Kolme eri asiaa. ”Ei käytetä mallien kouluttamiseen”, ”säilytetään rajoitetun ajan turvallisuus-, väärinkäytösten ehkäisy- tai oikeudellisista syistä” ja ”tietoja ei säilytetä — niitä ei tallenneta käsittelyn jälkeen” ovat eri asioita. Jos palveluntarjoaja säilyttää kehotteita rajoitetun ajan, rekisterissä ilmoitetaan säilytysaika ja syy. Jos tietojen säilyttämättömyys on käytössä, se ja sitä koskevat ominaisuudet ilmoitetaan rekisterissä. Emme väitä, ettei sisältöä säilytetä, jos sitä tosiasiassa säilytetään." },
       { kind: "p", text: "Tuotokset. Sinun ja meidän välisessä suhteessa saat käyttää omien väittelyidesi tuotoksia mihin tahansa lailliseen tarkoitukseen, emmekä vaadi tuotetun tekstin omistusoikeutta. Huomaa, ettei tuotettu sisältö välttämättä saa tekijänoikeussuojaa monilla lainkäyttöalueilla; muille käyttäjille voidaan tuottaa samankaltaista sisältöä; tuotokset voivat toisintaa kolmannen osapuolen aineistoa tai muistuttaa sitä; ja joihinkin tekoälypalveluntarjoajan hakemiin lähdeaineistoihin voi kohdistua uudelleenkäyttörajoituksia. Vastaat tarkistamisesta ennen tuotoksiin luottamista tai niiden julkaisemista uudelleen." }
     ]
@@ -157,7 +158,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Sisällöstä ilmoittaminen, moderointi ja valitukset",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Kuka tahansa voi ilmoittaa sisällöstä. Et tarvitse tiliä. Kirjoita osoitteeseen [abuse@dezbatere.ro] tai käytä minkä tahansa julkaistun väittelyn Ilmoita-toimintoa. Jotta voimme toimia, ilmoita meille: riittävän yksityiskohtaisesti, miksi katsot sisällön olevan lainvastainen tai rikkovan näitä käyttöehtoja; tarkka sijainti — täydellinen URL-osoite ja mahdollisuuksien mukaan kyseinen kohta; nimesi ja sähköpostiosoitteesi (niitä ei edellytetä lasten seksuaaliseen hyväksikäyttöön liittyvää aineistoa koskevissa ilmoituksissa); sekä vakuutus siitä, että vilpittömän käsityksesi mukaan ilmoituksesi on täsmällinen ja täydellinen." },
+      { kind: "p", text: "Kuka tahansa voi ilmoittaa sisällöstä. Et tarvitse tiliä. Kirjoita osoitteeseen support@dezbatere.ro tai käytä minkä tahansa julkaistun väittelyn Ilmoita-toimintoa. Jotta voimme toimia, ilmoita meille: riittävän yksityiskohtaisesti, miksi katsot sisällön olevan lainvastainen tai rikkovan näitä käyttöehtoja; tarkka sijainti — täydellinen URL-osoite ja mahdollisuuksien mukaan kyseinen kohta; nimesi ja sähköpostiosoitteesi (niitä ei edellytetä lasten seksuaaliseen hyväksikäyttöön liittyvää aineistoa koskevissa ilmoituksissa); sekä vakuutus siitä, että vilpittömän käsityksesi mukaan ilmoituksesi on täsmällinen ja täydellinen." },
       { kind: "p", text: "Vahvistamme jokaisen ilmoituksen vastaanottamisen ilman aiheetonta viivytystä. Käsittelemme ilmoitukset oikea-aikaisesti, huolellisesti, ilman mielivaltaa ja objektiivisesti, ilmoitamme sinulle päätöksestämme ja kerromme, miten voit riitauttaa sen. Jos käytämme automatisoituja keinoja ilmoituksen käsittelyyn tai ratkaisemiseen, kerromme siitä. Ilman suostumusta jaettua intiimiä kuva-aineistoa koskeviin ilmoituksiin reagoidaan 48 tunnin kuluessa pätevästä pyynnöstä." },
       { kind: "p", text: "Kaksi erilaista automatisoitua päätöstä, jotka pidetään erillään." },
       {
@@ -168,7 +169,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Perustelut. Aina kun poistamme sisältösi tai rajoitamme sen näkyvyyttä taikka keskeytämme tai päätämme tilisi, annamme sinulle perustelut: mitä teimme ja kuinka laajalle toimi ulottuu, tosiseikat, joihin nojauduimme, ja olivatko ne peräisin ilmoituksesta vai omista tarkastuksistamme, käytettiinkö automatisoituja keinoja, oikeudellinen tai sopimukseen perustuva peruste sekä se, miten voit riitauttaa päätöksen: jäljempänä kuvatun valitusreittimme kautta, EU:n digipalvelusäädöksen nojalla sertifioidussa tuomioistuinten ulkopuolisessa riidanratkaisuelimessä tai tuomioistuimessa." },
-      { kind: "p", text: "Päätöstä koskevan valituksen tekeminen. Jos olet eri mieltä moderointipäätöksestä, vastaa perusteluihin tai kirjoita osoitteeseen [appeals@dezbatere.ro] kuuden kuukauden kuluessa. Alkuperäiseen päätökseen osallistumaton henkilö tarkastaa asian, ja ilmoitamme sinulle perustellun lopputuloksen. Tämä ei vaikuta oikeuteesi saattaa asia tuomioistuimeen tai käyttää kohdassa 18 tarkoitettua vaihtoehtoista riidanratkaisua. Valitusreittiä voi käyttää myös, jos emme ole toimineet ilmoituksen perusteella, sisältö on poistettu virheellisesti, tiliä on rajoitettu virheellisesti tai automatisoitu työkalu on virheellisesti vaikuttanut sisältöösi." },
+      { kind: "p", text: "Päätöstä koskevan valituksen tekeminen. Jos olet eri mieltä moderointipäätöksestä, vastaa perusteluihin tai kirjoita osoitteeseen office@dezbatere.ro kuuden kuukauden kuluessa. Alkuperäiseen päätökseen osallistumaton henkilö tarkastaa asian, ja ilmoitamme sinulle perustellun lopputuloksen. Tämä ei vaikuta oikeuteesi saattaa asia tuomioistuimeen tai käyttää kohdassa 18 tarkoitettua vaihtoehtoista riidanratkaisua. Valitusreittiä voi käyttää myös, jos emme ole toimineet ilmoituksen perusteella, sisältö on poistettu virheellisesti, tiliä on rajoitettu virheellisesti tai automatisoitu työkalu on virheellisesti vaikuttanut sisältöösi." },
       { kind: "p", text: "Tuomioistuinten ulkopuolinen riidanratkaisu. Jos olet Euroopan unionissa, voit saattaa yhtä moderointipäätöksistämme koskevan riidan EU:n digipalvelusäädöksen (asetus (EU) 2022/2065) 21 artiklan nojalla sertifioidun tuomioistuinten ulkopuolisen riidanratkaisuelimen käsiteltäväksi. Tämä kattaa sisältöäsi tai tiliäsi koskevan päätöksen sekä päätöksemme tekemästäsi ilmoituksesta. Valitset elimen Euroopan komission osoitteessa digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement julkaisemasta luettelosta, eikä sinun tarvitse käyttää ensin valitusreittiämme. Osallistumme menettelyyn vilpittömässä mielessä ja kieltäydymme osallistumisesta vain, jos sama riita, joka koskee samaa sisältöä ja perustuu samoihin perusteisiin, on jo ratkaistu. Elimen päätös ei sido kumpaakaan osapuolta, ja säilytät oikeutesi viedä asia tuomioistuimeen. Elin voi periä sinulta pienen maksun, tai menettely voi olla sinulle maksuton. Jos se ratkaisee asian eduksesi, maksamme sen palkkiot ja korvaamme kohtuulliset kulusi; jos se ratkaisee asian meidän eduksemme, sinun ei tarvitse maksaa palkkioitamme tai kulujamme, ellei elin katso, että toimit ilmeisen vilpillisessä mielessä." },
       { kind: "p", text: "Yhteyden saaminen henkilöön. Tukipalveluavustajamme on tekoälyjärjestelmä ja ilmoittaa siitä. Voit milloin tahansa pyytää saada keskustella henkilön kanssa, ja tämä vaihtoehto tarjotaan jokaisessa tukikeskustelussa. Emme käytä viestinnässäsi pelkästään automatisoituja työkaluja." },
       { kind: "p", text: "Terroristinen sisältö. Terroristinen sisältö on laitonta, ja se on kiellettyä DebateAI-palvelussa (kohta 7). Euroopan unionin toimivaltaiset viranomaiset voivat lähettää meille poistamismääräyksiä asetuksen (EU) 2021/784 nojalla kohdassa 1 ilmoitettuun yhteyspisteeseen. Kun saamme tällaisen määräyksen, poistamme sisällön tai estämme pääsyn siihen kaikissa EU-maissa tunnin kuluessa. Ilmoitamme sisällön julkaisseelle henkilölle, että sisältö on poistettu, ja hänen pyynnöstään kerromme poistamisen syyt ja sen, miten määräyksen voi riitauttaa, paitsi jos viranomainen päättää, että yleinen turvallisuus edellyttää, ettei tietoja anneta rajoitettuna aikana. Asetuksen edellyttämällä tavalla säilytämme poistetun sisällön ja siihen liittyvät tiedot kuuden kuukauden ajan, jotta poistaminen voidaan tarkastaa ja peruuttaa, jos se oli virheellinen. Sisällön julkaissut henkilö voi riitauttaa määräyksen sen maan tuomioistuimissa, jonka viranomainen antoi määräyksen, ja voi myös käyttää valitusreittiämme. Mikään viranomainen ei ole edellyttänyt meiltä erityisiä toimenpiteitä terroristista sisältöä vastaan asetuksen nojalla; jos jokin viranomainen niin tekee, kuvaamme nämä toimenpiteet tässä, mukaan lukien mahdolliset automatisoidut työkalut." },
@@ -181,7 +182,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Sinun toimestasi. Sulje tilisi milloin tahansa asetuksista kohdassa 6 kuvatulla tavalla. Et tarvitse siihen perustetta. Tilisi sulkeminen päättää nämä käyttöehdot. Ne päättyvät, kun sulkeminen tulee voimaan, 7 päivän odotusajan jälkeen; tämän kohdan lopussa luetellut kohdat jäävät voimaan sen jälkeen." },
-      { kind: "p", text: "Meidän toimestamme. Voimme keskeyttää tai sulkea tilisi taikka poistaa sisältösi tai rajoittaa sitä, jos: rikot olennaisesti näitä käyttöehtoja, erityisesti kohtaa 7; sisältösi on lainvastaista tai laki, tuomioistuin tai viranomainen edellyttää meiltä toimia; käyttötapasi uhkaa palvelun turvallisuutta, eheyttä tai saatavuutta taikka muiden oikeuksia; tilisi on ollut käyttämättä [24 months] ja olemme ilmoittaneet siitä sinulle; tai lopetamme palvelun tarjoamisen kokonaan tai maassasi." },
+      { kind: "p", text: "Meidän toimestamme. Voimme keskeyttää tai sulkea tilisi taikka poistaa sisältösi tai rajoittaa sitä, jos: rikot olennaisesti näitä käyttöehtoja, erityisesti kohtaa 7; sisältösi on lainvastaista tai laki, tuomioistuin tai viranomainen edellyttää meiltä toimia; käyttötapasi uhkaa palvelun turvallisuutta, eheyttä tai saatavuutta taikka muiden oikeuksia; tilisi on ollut käyttämättä 24 kuukautta ja olemme ilmoittaneet siitä sinulle; tai lopetamme palvelun tarjoamisen kokonaan tai maassasi." },
       { kind: "p", text: "Paitsi jos rikkomus on vakava, laki edellyttää välittömiä toimia tai viivytys aiheuttaisi vahinkoa, ilmoitamme ongelmasta ja annamme sinulle kohtuullisen mahdollisuuden korjata sen ennen tilin keskeyttämistä tai sulkemista. Annamme aina kohdassa 10 tarkoitetut perustelut, ja voit riitauttaa päätöksen." },
       { kind: "p", text: "Jos suljemme palvelun kokonaan tai lopetamme sen tarjoamisen maassasi, ilmoitamme siitä vähintään 30 päivää etukäteen, palautamme sulkemisen jälkeiseen aikaan kohdistuvat ennakkomaksut ja tarjoamme ensin mahdollisuuden viedä väittelysi." },
       { kind: "p", text: "Sulkemisen vaikutukset. Kun tili suljetaan, tuhoamme tilitietojesi ja yksityisten väittelyidesi salausavaimet, minkä jälkeen niitä ei voi pysyvästi lukea, poistamme tilitietueesi ja, jos valitsit sen, poistamme julkaisemasi väittelyt julkisesta saatavuudesta kohdassa 9 kuvatulla tavalla. Joitakin tietoja säilyy, ja sinun on tiedettävä mitkä: tarkastus- ja turvallisuuslokeissamme olevat merkinnät, joihin voi ainoastaan lisätä tietoja ja joita säilytetään omien oikeudellisten ja turvallisuusvelvoitteidemme täyttämiseksi; tiedot, jotka meidän on lain nojalla säilytettävä, mukaan lukien hyväksymis- ja suostumustiedot; sekä pienen määrän salausjärjestelmäämme edeltäviä vanhempia väittelyitä koskevat tiedot, joiden poistaminen on rajallisempaa — ilmoitamme sinulle, jos tämä koskee tiliäsi. Tietosuojakäytännössä tämä kaikki kuvataan tietosuojan käsittein ja selitetään oikeutesi tietojen poistamiseen." },
@@ -194,13 +195,13 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "DebateAI tarjoaa maksuttoman tilauksen. Saatavilla [is / will be] maksullinen Premium-tilaus, joka avaa koko mallivalikoiman ja antaa sinun asettaa väittelyn mittarit itse." },
+      { kind: "p", text: "DebateAI tarjoaa maksuttoman tilauksen. Tarjolle tulee maksullinen Premium-tilaus, joka avaa koko mallivalikoiman ja antaa sinun asettaa väittelyn mittarit itse." },
       { kind: "p", text: "Ennen maksamista näytämme suoraan maksupainikkeen yläpuolella: tilauksen; kokonaishinnan sovellettavine veroineen; laskutuskauden; tiedon siitä, että tilaus uusiutuu automaattisesti peruuttamiseen asti; maksuttoman kokeilujakson päättymispäivän ja sen jälkeen veloitettavan määrän; sekä peruutustavan. Vahvistat uusimisehdot valitsemalla erillisen valintaruudun. Painikkeessa lukee Tilaa ja maksa (romaniaksi Comandă cu obligație de plată). Lähetämme sinulle pysyvällä välineellä vahvistuksen, joka sisältää samat tiedot, nämä käyttöehdot ja peruuttamislomakkeen." },
-      { kind: "p", text: "Muistutukset. Lähetämme sinulle sähköpostia vähintään [5] päivää ennen kuin maksuton kokeilujakso muuttuu maksulliseksi tilaukseksi; vähintään kerran vuodessa jatkuvien tilausten osalta; ja 30–45 päivää ennen vähintään 12 kuukauden pituisen kauden uusimista. Jokainen muistutus sisältää hinnan, päivämäärän ja peruutuslinkin." },
-      { kind: "p", text: "Peruuttaminen. Peruuta milloin tahansa kohdassa Asetukset → Tilaus yhdellä vahvistusnapsautuksella tai osoitteessa [dezbatere.ro/cancel] olevalla peruutussivulla, joka ei edellytä kirjautumista. Peruutus tulee voimaan kuluvan laskutuskauden lopussa, ja käyttöoikeutesi säilyy siihen asti. Emme tee peruuttamisesta tilaamista vaikeampaa." },
+      { kind: "p", text: "Muistutukset. Lähetämme sinulle sähköpostia vähintään 5 päivää ennen kuin maksuton kokeilujakso muuttuu maksulliseksi tilaukseksi; vähintään kerran vuodessa jatkuvien tilausten osalta; ja 30–45 päivää ennen vähintään 12 kuukauden pituisen kauden uusimista. Jokainen muistutus sisältää hinnan, päivämäärän ja peruutuslinkin." },
+      { kind: "p", text: "Peruuttaminen. Peruuta milloin tahansa kohdassa Asetukset → Tilaus yhdellä vahvistusnapsautuksella tai osoitteessa dezbatere.ro/cancel olevalla peruutussivulla, joka ei edellytä kirjautumista. Peruutus tulee voimaan kuluvan laskutuskauden lopussa, ja käyttöoikeutesi säilyy siihen asti. Emme tee peruuttamisesta tilaamista vaikeampaa." },
       { kind: "p", text: "Hinnanmuutokset tulevat voimaan vain tilauksen uusiutuessa. Ilmoitamme uudesta hinnasta sähköpostitse vähintään 30 päivää etukäteen ja liitämme mukaan peruutuslinkin. Jos maasi laki edellyttää nimenomaista suostumustasi hinnanmuutokseen, pyydämme sitä; muussa tapauksessa uusi hinta tulee seuraavasta uusimisesta alkaen sovellettavaksi, jos et ryhdy toimiin. Alueelliset säännöt kuvataan liitteessä A." },
-      { kind: "p", text: "Epäonnistuneet maksut. Jos maksu epäonnistuu, yritämme sitä uudelleen [7] päivän ajan ja varoitamme sinua sähköpostitse ennen tilisi muuttamista maksuttomaksi tilaukseksi. Emme poista väittelyitäsi epäonnistuneen maksun vuoksi." },
-      { kind: "p", text: "Verot ja maksunsaaja. Hinnat [include / exclude] arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. [If a merchant of record is used: Your purchase is processed by [Paddle / …], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.]" },
+      { kind: "p", text: "Epäonnistuneet maksut. Jos maksu epäonnistuu, yritämme sitä uudelleen 7 päivän ajan ja varoitamme sinua sähköpostitse ennen tilisi muuttamista maksuttomaksi tilaukseksi. Emme poista väittelyitäsi epäonnistuneen maksun vuoksi." },
+      { kind: "p", text: "Verot ja maksunsaaja. Hinnat sisältävät arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. Korttimaksut käsittelee NETOPIA Payments (netopia-payments.com). Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista." },
       { kind: "p", text: "Takaisinveloitukset. Jos riitautat veloituksen kortinmyöntäjän kanssa, voimme keskeyttää maksulliset ominaisuudet riidan ratkaisemisen ajaksi. Emme peri tästä maksuja." },
       { kind: "p", text: "Lakisääteiset oikeudet ensisijaisesti. Jos palvelu ei vastaa lupaamaamme, sinulla on lain mukaisesti oikeus saada se saatetuksi vaatimusten mukaiseksi taikka oikeus hinnan suhteelliseen alentamiseen tai palautukseen. Tämän lisäksi sovelletaan kohtaa [state your discretionary refund policy]. Kummankin tilauksen käyttörajat julkaistaan tuotteessa; ilmoitamme ennen niiden tiukentamista tavalla, joka vaikuttaa sinuun olennaisesti." }
     ]
@@ -210,7 +211,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Peruuttamisoikeutesi",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Jos asut EU:ssa, ETA:ssa tai Yhdistyneessä kuningaskunnassa, voit peruuttaa maksullisen tilauksen 14 päivän kuluessa tilaamisesta perustetta ilmoittamatta. Käytä osoitteessa [dezbatere.ro/withdraw] olevaa Peruuta sopimus -sivua tai vahvistussähköpostissa olevaa mallilomaketta taikka kirjoita osoitteeseen [support@dezbatere.ro]; vahvistamme vastaanoton pysyvällä välineellä." },
+      { kind: "p", text: "Jos asut EU:ssa tai ETA:ssa, voit peruuttaa maksullisen tilauksen 14 päivän kuluessa tilaamisesta perustetta ilmoittamatta. Käytä osoitteessa dezbatere.ro/withdraw olevaa Peruuta sopimus -sivua tai vahvistussähköpostissa olevaa mallilomaketta taikka kirjoita osoitteeseen support@dezbatere.ro; vahvistamme vastaanoton pysyvällä välineellä." },
       { kind: "p", text: "Jos pyysit meitä aloittamaan palvelun välittömästi — valitsemalla valintaruudun kassalla — ja peruutat sen jälkeen, maksat peruuttamispäivään mennessä toimitetusta palvelun osasta suhteutettuna laskutuskauden hintaan, ja palautamme loppuosan. Et menetä peruuttamisoikeutta käyttämällä palvelua 14 päivän aikana." },
       { kind: "p", text: "Jos asut muualla, liitteessä A ilmoitetaan alueellasi mahdollisesti sovellettava peruuttamis- tai harkinta-aika ja muussa tapauksessa palautuskäytäntömme. Maasi lakisääteiset oikeudet ovat aina ensisijaisia." }
     ]
@@ -222,7 +223,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Palvelun muutokset. Kehitämme DebateAI-palvelua jatkuvasti, ja tavanomaiset parannukset, korjaukset ja mallivalikoiman muutokset tehdään ilman ilmoitusta. Jos muutos ylittää sen, mikä on tarpeen palvelun pitämiseksi kuvatulla tavalla toimivana, teemme sen vain jostakin seuraavista syistä: oikeudellisen tai sääntelyvaatimuksen noudattamiseksi; turvallisuus- tai väärinkäytösongelmaan reagoimiseksi; koska mallipalveluntarjoaja muuttaa tai rajoittaa mallia tai ominaisuutta, johon tukeudumme, taikka poistaa sen; mukautuaksemme tekniseen ympäristöön, jota emme hallitse; tai lisätäksemme, parantaaksemme tai poistaaksemme ominaisuuden tavalla, josta ei aiheudu sinulle kustannuksia." },
       { kind: "p", text: "Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin. Jos muutoksella on vähäistä suurempi kielteinen vaikutus mahdollisuuteesi käyttää palvelua tai palvelun käyttöösi, voit päättää sopimuksen maksutta 30 päivän kuluessa ilmoituksesta tai muutoksen voimaantulosta sen mukaan, kumpi ajankohta on myöhäisempi, ja palautamme käyttämättömään aikaan kohdistuvat ennakkomaksut." },
-      { kind: "p", text: "Näiden käyttöehtojen muutokset. Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään 30 päivää ennen sen voimaantuloa; DebateAI-palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa [dezbatere.ro/terms/versions]." }
+      { kind: "p", text: "Näiden käyttöehtojen muutokset. Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään 30 päivää ennen sen voimaantuloa; DebateAI-palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions." }
     ]
   },
   {
@@ -244,7 +245,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Itse palvelu — ohjelmisto, järjestelmä, pisteytysmenetelmä, käyttöliittymä, nimet DebateAI ja DebateAIRO sekä logomme — kuuluu meille tai lisenssinantajillemme. Nämä käyttöehdot antavat sinulle luvan käyttää palvelua, eivät sen omistusoikeutta." },
       { kind: "p", text: "Voit lainata julkaistuja väittelyitä ja linkittää niihin, kun mainitset DebateAI-palvelun lähteenä ja lisäät linkin alkuperäiselle sivulle. Julkisen aineiston massakopiointi ja järjestelmällinen jäljentäminen sekä julkaistujen väittelyiden käyttö koulutusaineistona on kielletty ilman kirjallista sopimustamme." },
-      { kind: "p", text: "Kohdassa 8 käsitellään sisältöäsi ja tuotettujen sisältöjen asemaa. Jos katsot jonkin DebateAI-palvelussa loukkaavan immateriaalioikeuksiasi, käytä kohdassa 10 tarkoitettua ilmoitusreittiä. [If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is [name, address, email], registered with the US Copyright Office; we terminate the accounts of repeat infringers.]" }
+      { kind: "p", text: "Kohdassa 8 käsitellään sisältöäsi ja tuotettujen sisältöjen asemaa. Jos katsot jonkin DebateAI-palvelussa loukkaavan immateriaalioikeuksiasi, käytä kohdassa 10 tarkoitettua ilmoitusreittiä." }
     ]
   },
   {
@@ -252,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Henkilötiedot",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Henkilötietojen käsittelymme kuvataan osoitteessa [dezbatere.ro/privacy] olevassa tietosuojakäytännössä. Siinä kerrotaan, mitä keräämme, kunkin tarkoituksen oikeusperuste, tietojen säilytysaika, tietojen vastaanottajat, tietojen siirrot ja oikeuksiesi käyttäminen. Myös kolme seuraavaa seikkaa kuuluvat tähän. Kohdassa 7 pyydetään, ettet sisällytä kysymykseen muiden henkilötietoja; jos teet niin, vastaat siitä, ja voimme poistaa sisällön. Jos DebateAI-palvelussa julkaistu väittely sisältää sinua koskevia henkilötietoja, voit pyytää niiden poistamista ilman tiliä (kohta 9). Lisäksi säilytämme sopimuksen todisteena tiedon näiden käyttöehtojen hyväksymisestäsi — version, ajankohdan ja istunnon tekniset tiedot — tietosuojakäytännössä kuvatulla tavalla." }
+      { kind: "p", text: "Henkilötietojen käsittelymme kuvataan osoitteessa dezbatere.ro/privacy olevassa tietosuojakäytännössä. Siinä kerrotaan, mitä keräämme, kunkin tarkoituksen oikeusperuste, tietojen säilytysaika, tietojen vastaanottajat, tietojen siirrot ja oikeuksiesi käyttäminen. Myös kolme seuraavaa seikkaa kuuluvat tähän. Kohdassa 7 pyydetään, ettet sisällytä kysymykseen muiden henkilötietoja; jos teet niin, vastaat siitä, ja voimme poistaa sisällön. Jos DebateAI-palvelussa julkaistu väittely sisältää sinua koskevia henkilötietoja, voit pyytää niiden poistamista ilman tiliä (kohta 9). Lisäksi säilytämme sopimuksen todisteena tiedon näiden käyttöehtojen hyväksymisestäsi — version, ajankohdan ja istunnon tekniset tiedot — tietosuojakäytännössä kuvatulla tavalla." }
     ]
   },
   {
@@ -261,11 +262,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Sovellettava laki. Näihin käyttöehtoihin sekä niistä tai niiden kohteesta johtuviin riitoihin ja vaatimuksiin, mukaan lukien sopimukseen perustumattomat vaatimukset, sovelletaan Romanian lakia." },
-      { kind: "p", text: "Paikalliseen lainsäädäntöön perustuva suojasi ei muutu. Jos olet kuluttaja, Romanian lain valinta ei poista vakituisen asuinmaasi pakottavien kuluttajansuojasäännösten antamaa suojaa — esimerkiksi kohtuuttomia sopimusehtoja, peruuttamis- ja irtisanomisoikeuksia tai takuita koskevaa suojaa — jos kyseisiä sääntöjä sovelletaan tästä lainvalinnasta riippumatta, mukaan lukien asetuksen (EY) N:o 593/2008 6 artiklan 2 kohdan nojalla, jos asut EU:ssa, tai Yhdistyneen kuningaskunnan vastaavien sääntöjen nojalla. Voit vedota näihin sääntöihin Romanian lain lisäksi." },
-      { kind: "p", text: "Tuomioistuimet, jos asut EU:ssa, ETA:ssa tai Yhdistyneessä kuningaskunnassa. Voit nostaa meitä vastaan kanteen joko Romanian tuomioistuimissa tai asuinmaasi tuomioistuimissa. Me voimme nostaa sinua vastaan kanteen vain asuinmaasi tuomioistuimissa." },
-      { kind: "p", text: "Muualla asuvat kuluttajat. Jos asut EU:n, ETA:n ja Yhdistyneen kuningaskunnan ulkopuolella, mikään näissä käyttöehdoissa ei rajoita maasi lainsäädäntöön perustuvaa oikeuttasi nostaa kanne sen tuomioistuimissa tai mitään kyseiseen lainsäädäntöön perustuvaa oikeutta, josta ei voida luopua — mukaan lukien Australiassa tai Uudessa-Seelannissa asuvien kuluttajantakuuoikeudet, Brasiliassa asuvien Código de Defesa do Consumidor -lain mukaiset oikeudet ja Yhdysvalloissa asuvien oman osavaltion kuluttajansuojalainsäädäntöön perustuvat oikeudet." },
-      { kind: "p", text: "Yhdysvaltojen asukkaat. Liite A.3 sisältää Federal Arbitration Act -lakiin perustuvan välityssopimuksen ja ryhmäkanneoikeudesta luopumisen. Sitä sovelletaan vain Yhdysvaltojen asukkaisiin ja vain, jos se on täytäntöönpanokelpoinen. Sitä ei sovelleta EU:ssa, ETA:ssa tai Yhdistyneessä kuningaskunnassa oleviin kuluttajiin." },
-      { kind: "p", text: "Ennen asian viemistä tuomioistuimeen. Ota meihin yhteyttä osoitteessa [legal@dezbatere.ro]; useimmat asiat voidaan korjata, ja pyrimme vastaamaan [5] työpäivän kuluessa. Jos olet kuluttaja Romaniassa tai EU:ssa, voit käyttää vaihtoehtoista riidanratkaisua tahon [the ANPC – named SAL entity, website] kautta; [do / do not] sitoudumme osallistumaan kyseiseen menettelyyn. Moderointipäätöksiä koskeviin valituksiin sovelletaan kohdan 10 erillistä reittiä." }
+      { kind: "p", text: "Paikalliseen lainsäädäntöön perustuva suojasi ei muutu. Jos olet kuluttaja, Romanian lain valinta ei poista vakituisen asuinmaasi pakottavien kuluttajansuojasäännösten antamaa suojaa — esimerkiksi kohtuuttomia sopimusehtoja, peruuttamis- ja irtisanomisoikeuksia tai takuita koskevaa suojaa — jos kyseisiä sääntöjä sovelletaan tästä lainvalinnasta riippumatta, mukaan lukien asetuksen (EY) N:o 593/2008 6 artiklan 2 kohdan nojalla, jos asut EU:ssa. Voit vedota näihin sääntöihin Romanian lain lisäksi." },
+      { kind: "p", text: "Tuomioistuimet, jos asut EU:ssa tai ETA:ssa. Voit nostaa meitä vastaan kanteen joko Romanian tuomioistuimissa tai asuinmaasi tuomioistuimissa. Me voimme nostaa sinua vastaan kanteen vain asuinmaasi tuomioistuimissa." },
+      { kind: "p", text: "Muualla asuvat kuluttajat. Jos asut EU:n ja ETA:n ulkopuolella, mikään näissä käyttöehdoissa ei rajoita maasi lainsäädäntöön perustuvaa oikeuttasi nostaa kanne sen tuomioistuimissa tai mitään kyseiseen lainsäädäntöön perustuvaa oikeutta, josta ei voida luopua — mukaan lukien Australiassa tai Uudessa-Seelannissa asuvien kuluttajantakuuoikeudet, Brasiliassa asuvien Código de Defesa do Consumidor -lain mukaiset oikeudet ja Yhdysvalloissa asuvien oman osavaltion kuluttajansuojalainsäädäntöön perustuvat oikeudet." },
+      { kind: "p", text: "Ennen asian viemistä tuomioistuimeen. Ota meihin yhteyttä osoitteessa support@dezbatere.ro; useimmat asiat voidaan korjata, ja pyrimme vastaamaan 5 työpäivän kuluessa. Jos olet kuluttaja Romaniassa tai EU:ssa, voit käyttää vaihtoehtoista riidanratkaisua sivuston www.onoratainstanta.ro kautta; emme sitoudu osallistumaan kyseiseen menettelyyn. Moderointipäätöksiä koskeviin valituksiin sovelletaan kohdan 10 erillistä reittiä." }
     ]
   },
   {
@@ -278,7 +278,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Oikeudesta luopumattomuus. Jos emme pane ehtoa heti täytäntöön, emme menetä oikeutta panna sitä myöhemmin täytäntöön." },
       { kind: "p", text: "Koko sopimus. Nämä käyttöehdot muodostavat yhdessä evästekäytännön ja tekoälypalveluntarjoajarekisterin kanssa koko palvelua koskevan sopimuksen välillämme. Tietosuojakäytännössä tekemämme sitoumukset sitovat meitä. Mikään tässä kappaleessa ei sulje pois vastuuta vilpillisestä harhaanjohtamisesta." },
       { kind: "p", text: "Kieli. Nämä käyttöehdot julkaistaan kaikilla kielillä, joita sivusto tarjoaa. Sopimuksen kieli on se kieli, jolla rekisteröidyit: hyväksymäsi version kieli, joka käy ilmi tiedosta, jonka säilytämme hyväksymisestäsi. Jos hyväksyt myöhemmin uuden version toisella kielellä, sopimus jatkuu sillä kielellä. Muut kieliversiot ovat käännöksiä. Jos asuinmaasi laissa säädetään, että maan omalla kielellä laadittu versio on ensisijainen, kyseinen versio on ensisijainen. Jos kahden kieliversion sisällöt eroavat toisistaan, sovellamme tulkintaa, joka on sinulle edullisempi." },
-      { kind: "p", text: "Yhteystiedot. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bukarest, Romania." }
+      { kind: "p", text: "Yhteystiedot. support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania." }
     ]
   },
   {
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Liite A — Alueelliset ehdot",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Kutakin kohtaa sovelletaan vain, jos sen alue on lueteltu kohdassa 2, ja siinä todetaan ainoastaan poikkeamat yleiseen osaan. Jos kohta on ristiriidassa yleisen osan kanssa, kyseiseen alueeseen sovelletaan kohtaa." }
+      { kind: "p", text: "Kutakin kohtaa sovelletaan henkilöihin, jotka asuvat sen alueella, ja siinä todetaan ainoastaan poikkeamat yleiseen osaan. Jos kohta on ristiriidassa yleisen osan kanssa, kyseiseen alueeseen sovelletaan kohtaa." }
     ]
   },
   {
@@ -294,103 +294,70 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Euroopan unioni ja Euroopan talousalue",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Näiden käyttöehtojen yleinen osa on laadittu sinua varten. Lisäksi: voit nostaa kanteen asuinmaasi tuomioistuimissa; kohdan 13 peruuttamisoikeutta sovelletaan; vaihtoehtoinen riidanratkaisu on saatavilla tahon [the ANPC – named entity, website] kautta. Saksa: osoitteessa [dezbatere.ro/cancel] olevalla peruutuspainikkeella voit päättää tilauksen kirjautumatta; tilauskaudet, uusimisjaksot ja irtisanomisajat ovat BGB:n §309(9):n mukaisia [state them]. Ranska: voit päättää tilauksen verkossa kolmessa vaiheessa osoitteessa [URL]; [the mediator named at URL] on käytettävissäsi. Italia: vastuuta (15), keskeyttämistä (11), muutoksia (14) ja sovellettavaa lakia (18) koskevat ehdot edellyttävät erillistä hyväksyntääsi, jonka annat rekisteröitymisen yhteydessä erillisellä vahvistuksella. Alankomaat: nämä käyttöehdot toimitetaan ennen sopimuksen tekemistä tallennettavassa muodossa. Puola: puolankielinen versio on osoitteessa [URL]." }
+      { kind: "p", text: "Näiden käyttöehtojen yleinen osa on laadittu sinua varten. Lisäksi: voit nostaa kanteen asuinmaasi tuomioistuimissa; kohdan 13 peruuttamisoikeutta sovelletaan; vaihtoehtoinen riidanratkaisu on saatavilla sivuston www.onoratainstanta.ro kautta. Saksa: osoitteessa dezbatere.ro/cancel olevalla peruutuspainikkeella voit päättää tilauksen kirjautumatta; tilauskaudet, uusimisjaksot ja irtisanomisajat ovat BGB:n §309(9):n mukaisia [state them]. Ranska: voit päättää tilauksen verkossa kolmessa vaiheessa osoitteessa [URL]. Italia: vastuuta (15), keskeyttämistä (11), muutoksia (14) ja sovellettavaa lakia (18) koskevat ehdot edellyttävät erillistä hyväksyntääsi, jonka annat rekisteröitymisen yhteydessä erillisellä vahvistuksella. Alankomaat: nämä käyttöehdot toimitetaan ennen sopimuksen tekemistä tallennettavassa muodossa. Puola: puolankielinen versio on osoitteessa [URL]." }
     ]
   },
   {
     no: "A.2",
-    title: "Yhdistynyt kuningaskunta (vain jos se on lueteltu kohdassa 2)",
+    title: "Yhdysvallat",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "UK GDPR:n 27 artiklan mukainen edustajamme Yhdistyneessä kuningaskunnassa on [name, address, email]. Consumer Rights Act 2015 -lakia sovelletaan sinuun, eikä mikään näissä käyttöehdoissa rajoita siihen perustuvia oikeuksiasi; kun Digital Markets, Competition and Consumers Act 2024 -lain tilaussäännöt tulevat voimaan (odotettavasti vuonna 2027), niitä sovelletaan maksullisiin tilauksiin, mukaan lukien uusimisten ja maksuttomien kokeilujaksojen jälkeinen harkinta-aika. Miten suojaamme käyttäjiä lainvastaiselta sisällöltä: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Käyttämämme ennakoiva teknologia: [describe, or \"none\"]. Iän varmistaminen: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Kohdan 10 valitusmenettelyssä voi valittaa lainvastaisesta sisällöstä, sisältösi aiheettomasta poistamisesta, tiliisi kohdistuvista rajoituksista, sisältöösi vaikuttavien automatisoitujen työkalujen käytöstä ja ikäarvioinnista, joka estää pääsysi virheellisesti. Menettely on niiden sisällöstä kärsivien käytettävissä, jotka eivät ole käyttäjiä. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.2." }
+      { kind: "p", text: "Tennessee. Emme tarjoa DebateAI-palvelua henkilöille, jotka asuvat Tennesseessä." },
+      { kind: "p", text: "Ilmoitukset ja poistot. Ilman suostumusta jaetusta intiimistä kuva-aineistosta voi ilmoittaa ilman tiliä osoitteessa [URL], ja se poistetaan 48 tunnin kuluessa pätevästä pyynnöstä. Tekijänoikeusvalitukset käsitellään kohdassa 10 tarkoitetun ilmoitusreitin kautta." },
+      { kind: "p", text: "Osavaltiokohtaiset ehdot. Kalifornia: kohdan 12 automaattista uusimista koskevia ehtoja sovelletaan; voit peruuttaa verkossa milloin tahansa; säilytämme uusimisehtoja koskevan suostumuksesi vähintään kolme vuotta. New York: voit peruuttaa 14 päivän kuluessa korotetulla hinnalla tehdystä veloituksesta ja saada suhteutetun palautuksen. Texas ja Nebraska: emme myy arkaluonteisia henkilötietoja. Washington: osoitteessa [URL] oleva Consumer Health Data Privacy Notice -ilmoituksemme koskee terveyteen liittyviä tietoja. Colorado: palvelussa ei tehdä sinua koskevia merkittäviä päätöksiä. Tietojasi ja osavaltiosi lainsäädäntöön perustuvia tietosuojaoikeuksiasi käsitellään tietosuojakäytäntömme liitteessä B.2." }
     ]
   },
   {
     no: "A.3",
-    title: "Yhdysvallat (vain jos ne on lueteltu kohdassa 2)",
+    title: "Kanada ja Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tennessee. Emme tarjoa DebateAI-palvelua henkilöille, jotka asuvat Tennesseessä." },
-      { kind: "p", text: "Välityssopimus ja ryhmäkanneoikeudesta luopuminen. Jos asut Yhdysvalloissa, sinä ja DebateAIRO sovitte ratkaisevanne kaikki näistä käyttöehdoista tai palvelusta johtuvat riidat tuomioistuinkäsittelyn sijasta sitovassa yksilöllisessä välimiesmenettelyssä, jota [the American Arbitration Association / JAMS] hallinnoi kuluttajasääntöjensä mukaisesti, paitsi että kumpikin meistä voi nostaa yksilöllisen kanteen vähäisiä vaatimuksia käsittelevässä tuomioistuimessa. Voit jättäytyä sopimuksen ulkopuolelle lähettämällä sähköpostia osoitteeseen [address] 30 päivän kuluessa näiden käyttöehtojen ensimmäisestä hyväksymisestä. Tähän sopimukseen sovelletaan Federal Arbitration Act -lakia. Maksamme välimiesmenettelyn vireillepanomaksut. Ryhmä-, kollektiivi- ja edustajakanteista luovutaan lain sallimissa rajoissa. Tätä kohtaa sovelletaan vain tulevaisuuteen, eikä sitä sovelleta ennen hyväksymistäsi syntyneisiin vaatimuksiin." },
-      { kind: "p", text: "Ilmoitukset ja poistot. Ilman suostumusta jaetusta intiimistä kuva-aineistosta voi ilmoittaa ilman tiliä osoitteessa [URL], ja se poistetaan 48 tunnin kuluessa pätevästä pyynnöstä. Tekijänoikeusvalitukset osoitetaan kohdassa 16 nimetylle edustajallemme." },
-      { kind: "p", text: "Osavaltiokohtaiset ehdot. Kalifornia: kohdan 12 automaattista uusimista koskevia ehtoja sovelletaan; voit peruuttaa verkossa milloin tahansa; säilytämme uusimisehtoja koskevan suostumuksesi vähintään kolme vuotta. New York: voit peruuttaa 14 päivän kuluessa korotetulla hinnalla tehdystä veloituksesta ja saada suhteutetun palautuksen. Texas ja Nebraska: emme myy arkaluonteisia henkilötietoja. Washington: osoitteessa [URL] oleva Consumer Health Data Privacy Notice -ilmoituksemme koskee terveyteen liittyviä tietoja. Colorado: palvelussa ei tehdä sinua koskevia merkittäviä päätöksiä. Tietojasi ja osavaltiosi lainsäädäntöön perustuvia tietosuojaoikeuksiasi käsitellään tietosuojakäytäntömme liitteessä B.3." }
+      { kind: "p", text: "Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.3. Quebec: nämä käyttöehdot ovat saatavilla ranskaksi; valitse ranska kielivalitsimesta; väittelysi yksityisinä pitävät asetukset ovat oletusarvoisesti käytössä; voit pyytää sinua koskevien henkilötietojen poistamista hakemistosta." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanada ja Quebec (vain jos ne on lueteltu)",
+    title: "Australia ja Uusi-Seelanti",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on [name], privacy@dezbatere.ro. Tietojasi käsitellään tietosuojakäytäntömme liitteessä B.4. Quebec: nämä käyttöehdot ovat saatavilla ranskaksi; valitse ranska kielivalitsimesta; väittelysi yksityisinä pitävät asetukset ovat oletusarvoisesti käytössä; voit pyytää sinua koskevien henkilötietojen poistamista hakemistosta; sinuun ei sovelleta välityssopimusta eikä ryhmäkanneoikeudesta luopumista." }
+      { kind: "p", text: "Palveluihimme liittyy Australian Consumer Law -lakiin perustuvia takuita, joita ei voida sulkea pois. Palvelun vakavan virheen tapauksessa sinulla on oikeus peruuttaa palvelu ja saada palautus käyttämättömästä osasta tai korvaus palvelun arvon alentumisesta; sinulla on myös oikeus korvaukseen muista kohtuudella ennakoitavista menetyksistä tai vahingoista. Jos virhe ei ole vakava, sinulla on oikeus saada palvelun ongelmat korjatuiksi kohtuullisessa ajassa ja, jos näin ei tehdä, peruuttaa palvelu ja saada palautus. Kohdan 64A sallimissa rajoissa vastuumme takuun rikkomisesta rajoittuu palvelun toimittamiseen uudelleen tai siitä aiheutuvien kustannusten maksamiseen. Maksulliseen tilaukseen ei sovelleta muuta harkinta-aikaa kuin kohdassa 12 annettu; palautuspyynnöt käsitellään osoitteessa support@dezbatere.ro. Uusi-Seelanti: Consumer Guarantees Act 1993 -lakia sovelletaan, eikä mikään näissä käyttöehdoissa sulje sitä pois; haitallisesta digitaalisesta viestinnästä voi ilmoittaa meille kohdan 10 mukaisesti tai Netsafelle." }
     ]
   },
   {
     no: "A.5",
-    title: "Australia ja Uusi-Seelanti (vain jos ne on lueteltu)",
+    title: "Sveitsi",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Palveluihimme liittyy Australian Consumer Law -lakiin perustuvia takuita, joita ei voida sulkea pois. Palvelun vakavan virheen tapauksessa sinulla on oikeus peruuttaa palvelu ja saada palautus käyttämättömästä osasta tai korvaus palvelun arvon alentumisesta; sinulla on myös oikeus korvaukseen muista kohtuudella ennakoitavista menetyksistä tai vahingoista. Jos virhe ei ole vakava, sinulla on oikeus saada palvelun ongelmat korjatuiksi kohtuullisessa ajassa ja, jos näin ei tehdä, peruuttaa palvelu ja saada palautus. Kohdan 64A sallimissa rajoissa vastuumme takuun rikkomisesta rajoittuu palvelun toimittamiseen uudelleen tai siitä aiheutuvien kustannusten maksamiseen. Maksulliseen tilaukseen ei sovelleta muuta harkinta-aikaa kuin kohdassa 12 annettu; palautuskäytäntömme on […]. Uusi-Seelanti: Consumer Guarantees Act 1993 -lakia sovelletaan, eikä mikään näissä käyttöehdoissa sulje sitä pois; haitallisesta digitaalisesta viestinnästä voi ilmoittaa meille kohdan 10 mukaisesti tai Netsafelle." }
+      { kind: "p", text: "Tietoihisi sovelletaan Sveitsin liittovaltion tietosuojalakia (tietosuojakäytäntö, liite B.5). Voit nostaa kanteen sen sveitsiläisen paikkakunnan tuomioistuimessa, jossa asut. Maksulliseen tilaukseen ei sovelleta lakisääteistä peruuttamisoikeutta; palautuspyynnöt käsitellään osoitteessa support@dezbatere.ro." }
     ]
   },
   {
     no: "A.6",
-    title: "Sveitsi (vain jos se on lueteltu)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Tietoihisi sovelletaan Sveitsin liittovaltion tietosuojalakia (tietosuojakäytäntö, liite B.6). Voit nostaa kanteen sen sveitsiläisen paikkakunnan tuomioistuimessa, jossa asut. Maksulliseen tilaukseen ei sovelleta lakisääteistä peruuttamisoikeutta; palautuskäytäntömme on […]." }
+      { kind: "p", text: "Sinulla on näiden käyttöehtojen nojalla samat oikeudet kuin Euroopan unionissa asuvalla kuluttajalla, mukaan lukien kohdan 13 mukainen 14 päivän peruuttamisoikeus. Voit nostaa kanteen Moldovan tuomioistuimissa. Tietoihisi sovelletaan Moldovan henkilötietojen suojasta annettua lakia nro 195/2024 (tietosuojakäytäntö, liite B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (vain jos se on lueteltu)",
+    title: "Aasian ja Tyynenmeren alue",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Sinulla on näiden käyttöehtojen nojalla samat oikeudet kuin Euroopan unionissa asuvalla kuluttajalla, mukaan lukien kohdan 13 mukainen 14 päivän peruuttamisoikeus. Voit nostaa kanteen Moldovan tuomioistuimissa. Tietoihisi sovelletaan Moldovan henkilötietojen suojasta annettua lakia nro 195/2024 (tietosuojakäytäntö, liite B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukraina (vain jos se on lueteltu)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Tarjoamme DebateAI-palvelua Ukrainassa lukuun ottamatta alueita, jotka eivät ole Ukrainan hallituksen hallinnassa. Tuote ja nämä käyttöehdot ovat saatavilla ukrainaksi. Tietoihisi sovelletaan Ukrainan lakia ”Henkilötietojen suojasta” (tietosuojakäytäntö, liite B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israel (vain jos se on lueteltu)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Voit peruuttaa maksullisen tilauksen kuluttajansuojalain 5741-1981 sallimalla tavalla [state the cancellation terms]. Nämä käyttöehdot ja tietosuojakäytäntömme ovat saatavilla hepreaksi. Tietoihisi sovelletaan Israelin yksityisyyden suojaa koskevaa lakia (tietosuojakäytäntö, liite B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Aasian ja Tyynenmeren alue (vain lueteltujen alueiden rivit)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapore: tietosuojavastaavamme on [name, email]; siirrot perustuvat PDPA:han verrattavissa olevaan sopimusperusteiseen suojaan; maksulliseen tilaukseen ei sovelleta lakisääteistä harkinta-aikaa, ja palautuskäytäntömme on […]. Japani: Specified Commercial Transactions Act -lain edellyttämä ilmoitus on osoitteessa [URL]; verkkotilauksiin ei sovelleta yleistä harkinta-aikaa, ja palautuskäytäntömme on […]; lähetämme sisältösi tekoälypalveluntarjoajille Yhdysvaltoihin ja Euroopan unioniin, kullekin sopimuksen nojalla, joka edellyttää Japanin Act on the Protection of Personal Information -lakia vastaavaa suojaa, ja kerromme pyynnöstä, mitä nämä toimenpiteet ovat. Etelä-Korea: vapaaehtoista käsittelyä ja markkinointia koskevat suostumukset kerätään erillään palvelun tarjoamiseen tarvittavista tiedoista; tietosuojavastaavamme on [name], privacy@dezbatere.ro; voit peruuttaa maksullisen tilauksen seitsemän päivän kuluessa tilaamisesta E-Commerce Act -lain mukaisesti; hankimme uuden suostumuksesi ennen toistuvaa hinnankorotusta tai maksuttoman tilauksen muuttamista maksulliseksi; palvelu käyttää generatiivista tekoälyä, kerromme siitä ennen kuin käytät sitä, ja merkitsemme tekoälyn tuottamat tuotokset. Taiwan: voit peruuttaa maksullisen tilauksen seitsemän päivän kuluessa tilaamisesta Consumer Protection Act -lain nojalla; tietoihisi sovelletaan Taiwanin Personal Data Protection Act -lakia (tietosuojakäytäntö, liite B.10). Thaimaa: edustajamme Thaimaassa on [name] [if appointed]. Filippiinit: Internet Transactions Act -lain mukainen yritystunnisteemme ja oikeussuojamekanismimme ovat osoitteessa [URL]; valituksia voi tehdä National Privacy Commissionille." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Varattu",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Turkki, Brasilia ja Indonesia edellyttävät kukin paikalliskielistä liitettä, edustajaa tai rekisteröintiä ja viranomaisilmoituksia. Niitä ei ole laadittu tähän, ja ne jäävät kohdan 2 ulkopuolelle, kunnes ne lisätään tarkoituksellisesti. Palvelua ei tarjota Kiinassa, Vietnamissa eikä Venäjällä." }
+      { kind: "p", text: "Singapore: tietosuojavastaavamme on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro; siirrot perustuvat PDPA:han verrattavissa olevaan sopimusperusteiseen suojaan; maksulliseen tilaukseen ei sovelleta lakisääteistä harkinta-aikaa, ja palautuspyynnöt käsitellään osoitteessa support@dezbatere.ro. Japani: Specified Commercial Transactions Act -lain edellyttämä ilmoitus on osoitteessa [URL]; verkkotilauksiin ei sovelleta yleistä harkinta-aikaa, ja palautuspyynnöt käsitellään osoitteessa support@dezbatere.ro; lähetämme sisältösi tekoälypalveluntarjoajille Yhdysvaltoihin ja Euroopan unioniin, kullekin sopimuksen nojalla, joka edellyttää Japanin Act on the Protection of Personal Information -lakia vastaavaa suojaa, ja kerromme pyynnöstä, mitä nämä toimenpiteet ovat. Etelä-Korea: vapaaehtoista käsittelyä ja markkinointia koskevat suostumukset kerätään erillään palvelun tarjoamiseen tarvittavista tiedoista; tietosuojavastaavamme on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro; voit peruuttaa maksullisen tilauksen seitsemän päivän kuluessa tilaamisesta E-Commerce Act -lain mukaisesti; hankimme uuden suostumuksesi ennen toistuvaa hinnankorotusta tai maksuttoman tilauksen muuttamista maksulliseksi; palvelu käyttää generatiivista tekoälyä, kerromme siitä ennen kuin käytät sitä, ja merkitsemme tekoälyn tuottamat tuotokset. Taiwan: voit peruuttaa maksullisen tilauksen seitsemän päivän kuluessa tilaamisesta Consumer Protection Act -lain nojalla; tietoihisi sovelletaan Taiwanin Personal Data Protection Act -lakia (tietosuojakäytäntö, liite B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "65428e1dc667bfd5f29dc0058167914049e5bd6cbe22262b3a7897f3bec26ab5",
-  eyebrow: "KÄYTTÖEHDOT · v2.1 · VOIMASSA [DATE]",
+  version: "2.2",
+  sha256: "9939447a7c9beb5dad53cd671be13c9c949cd9e862166e04bab90b4737f5208b",
+  eyebrow: "KÄYTTÖEHDOT · v2.2 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
-  lede: "Sinun ja DebateAIRO S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",
-  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.1",
-  contact: "[legal@dezbatere.ro]",
+  lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",
+  endMarker: "KÄYTTÖEHTOJEN LOPPU · v2.2",
+  contact: "support@dezbatere.ro",
   bodyLabel: "Käyttöehtojen teksti",
   sectionIdPrefix: "terms-section-",
   titleId: "terms-modal-title",

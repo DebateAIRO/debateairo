@@ -34,7 +34,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Min hu responsabbli għad-data tiegħek",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Il-kontrollur tad-data personali tiegħek huwa DebateAIRO S.R.L., [address], Bukarest, ir-Rumanija, Reġistru tal-Kummerċ [J40/…], CUI […]. Iktbilna fuq privacy@dezbatere.ro dwar kwalunkwe ħaġa f’din il-politika; inwieġbu fi żmien xahar. Ma ħtarniex uffiċjal tal-protezzjoni tad-data għax il-liġi ma titlobniex nagħmlu dan; dan l-indirizz huwa mmonitorjat minn [role]. Fejn ħtarna rappreżentant jew uffiċjal tal-privatezza għal pajjiż partikolari, dawn jissemmew fl-Anness B." }
+      { kind: "p", text: "Il-kontrollur tad-data personali tiegħek huwa DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, ir-Rumanija, Reġistru tal-Kummerċ J2022000426271, CUI 45935221. Iktbilna fuq privacy@dezbatere.ro dwar kwalunkwe ħaġa f’din il-politika; inwieġbu fi żmien xahar. Ma ħtarniex uffiċjal tal-protezzjoni tad-data għax il-liġi ma titlobniex nagħmlu dan; dan l-indirizz huwa mmonitorjat mid-direttur tagħna. Fejn ħtarna rappreżentant jew uffiċjal tal-privatezza għal pajjiż partikolari, dawn jissemmew fl-Anness B." }
     ]
   },
   {
@@ -107,10 +107,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "X’jintbagħat. Biex inħaddmu dibattitu nibagħtu test lil fornitur estern wieħed jew aktar tal-IA: il-mistoqsija tiegħek, l-annotazzjonijiet ta’ direzzjoni li tagħti, u dikjarazzjonijiet li tikkomponi l-magna hekk kif jiżviluppa d-dibattitu. Għalhekk fornitur jara test derivat minn dak li ttajpjajt u mibni madwaru. Jekk tuża l-konverżazzjoni tal-appoġġ, dak li tikteb hemmhekk imur għand il-mudell tal-konverżazzjoni tal-appoġġ. Fornitur qatt ma jirċievi l-indirizz elettroniku tiegħek, l-identifikaturi tal-kont jew tas-sessjoni tiegħek, l-indirizz IP tiegħek jew id-dettalji tal-pagament tiegħek." },
-      { kind: "p", text: "Liema fornituri. Dawn huma elenkati fir-Reġistru tal-Fornituri tal-IA tagħna fuq [dezbatere.ro/providers], li huwa parti minn din il-politika. Ir-Reġistru japplika għal kull utent, kull fejn tgħix. Għal kull fornitur jiddikjara l-entità ġuridika u l-pajjiż ta’ stabbiliment tiegħu; x’jirċievi u għal liema skop — il-kitba tal-argumenti tad-dibattitu, il-ġudizzju u l-verifika tagħhom, il-kitba tal-istorja tal-verdett, jew it-tweġiba lilek fil-konverżazzjoni tal-appoġġ; il-pajjiżi jew ir-reġjuni fejn jipproċessa; it-termini taż-żamma tiegħu, u jekk iż-żamma żero tad-data hijiex attiva għall-punt aħħari u l-funzjonalitajiet li nużaw; jekk jistax juża d-data mdaħħla għat-taħriġ skont il-kuntratt tagħna; il-mekkaniżmu tat-trasferiment li niddependu fuqu; kif tista’ tikkuntattjah dwar id-data tiegħek; u d-data meta vverifikajna l-aħħar kull entrata. Il-fornituri jistgħu jinbidlu; ir-Reġistru għandu verżjonijiet u l-bidla tiġi nnotata fih." },
+      { kind: "p", text: "Liema fornituri. Dawn huma elenkati fir-Reġistru tal-Fornituri tal-IA tagħna fuq dezbatere.ro/providers, li huwa parti minn din il-politika. Ir-Reġistru japplika għal kull utent, kull fejn tgħix. Għal kull fornitur jiddikjara l-entità ġuridika u l-pajjiż ta’ stabbiliment tiegħu; x’jirċievi u għal liema skop — il-kitba tal-argumenti tad-dibattitu, il-ġudizzju u l-verifika tagħhom, il-kitba tal-istorja tal-verdett, jew it-tweġiba lilek fil-konverżazzjoni tal-appoġġ; il-pajjiżi jew ir-reġjuni fejn jipproċessa; it-termini taż-żamma tiegħu, u jekk iż-żamma żero tad-data hijiex attiva għall-punt aħħari u l-funzjonalitajiet li nużaw; jekk jistax juża d-data mdaħħla għat-taħriġ skont il-kuntratt tagħna; il-mekkaniżmu tat-trasferiment li niddependu fuqu; kif tista’ tikkuntattjah dwar id-data tiegħek; u d-data meta vverifikajna l-aħħar kull entrata. Il-fornituri jistgħu jinbidlu; ir-Reġistru għandu verżjonijiet u l-bidla tiġi nnotata fih." },
       { kind: "p", text: "It-taħriġ u ż-żamma huma affarijiet differenti. Il-kuntratti tagħna mal-fornituri jeskludu l-użu tal-kontenut tiegħek biex iħarrġu jew itejbu l-mudelli tagħhom. [Publish only once verified per route.] Xi fornituri jżommu messaġġi ta’ istruzzjoni u tweġibiet għal perjodu limitat għas-sigurtà, għall-prevenzjoni tal-abbuż jew għall-obbligi legali tagħhom stess; ir-Reġistru jgħid għal kemm żmien u għaliex. Fejn tkun attiva ż-żamma żero tad-data, ir-Reġistru jgħid dan u għal liema funzjonalitajiet. Mhux se niddeskrivu kontenut bħala mhux miżmum meta jkun jinżamm." },
       { kind: "p", text: "Trasferimenti barra ż-ŻEE. Fornituri stabbiliti fl-Istati Uniti jirċievu data skont wieħed mill-mekkaniżmi fil-Kapitolu V tal-GDPR: il-Qafas dwar il-Privatezza tad-Data bejn l-UE u l-Istati Uniti meta l-entità kontraenti speċifika tkun iċċertifikata għal din id-data, jew il-klawżoli kuntrattwali standard tal-Kummissjoni Ewropea (Modulu Tnejn, minn kontrollur għal proċessur) appoġġati minn valutazzjoni tar-riskju tat-trasferiment u miżuri supplimentari. Ir-Reġistru jsemmi l-mekkaniżmu għal kull fornitur. Tista’ tikseb kopja tal-klawżoli li niddependu fuqhom billi tikteb lil privacy@dezbatere.ro. Jekk mekkaniżmu li niddependu fuqu jiġi invalidat, naqilbu għal ieħor qabel inkomplu t-trasferimenti, u ngħarrfuk." },
-      { kind: "p", text: "Riċevituri oħra. Il-fornitur tal-ospitar tagħna [Hetzner, Germany — region …]; il-fornitur tagħna tat-twassil u t-trasport tal-kontenut [Cloudflare]; is-servizz tagħna għat-trażmissjoni tal-posta elettronika […]; [our payment provider, once a paid plan exists]. Kull wieħed jaġixxi fuq l-istruzzjonijiet dokumentati tagħna skont ftehim dwar l-ipproċessar tad-data bis-salvagwardji meħtieġa mill-Artikolu 28, u kull wieħed jinsab fir-Reġistru bil-post u l-mekkaniżmu tat-trasferiment tiegħu. Ma nippermettu lil ebda proċessur juża d-data tiegħek għall-finijiet tiegħu stess. Fejn fornitur jagħmel dan, ikun kontrollur għalih innifsu, u ma nibagħtulux id-data tiegħek." },
+      { kind: "p", text: "Riċevituri oħra. Il-fornitur tal-ospitar tagħna [Hetzner, Germany — region …]; il-fornitur tagħna tat-twassil u t-trasport tal-kontenut Cloudflare; is-servizz tagħna għat-trażmissjoni tal-posta elettronika […]; il-fornitur tagħna tal-ħlasijiet, NETOPIA Payments, ladarba jkun hemm pjan bi ħlas. Kull wieħed jaġixxi fuq l-istruzzjonijiet dokumentati tagħna skont ftehim dwar l-ipproċessar tad-data bis-salvagwardji meħtieġa mill-Artikolu 28, u kull wieħed jinsab fir-Reġistru bil-post u l-mekkaniżmu tat-trasferiment tiegħu. Ma nippermettu lil ebda proċessur juża d-data tiegħek għall-finijiet tiegħu stess. Fejn fornitur jagħmel dan, ikun kontrollur għalih innifsu, u ma nibagħtulux id-data tiegħek." },
       { kind: "p", text: "Awtoritajiet pubbliċi. Niżvelaw data personali lill-qrati, lir-regolaturi jew lill-awtoritajiet tal-infurzar tal-liġi fejn titlob dan il-liġi, u ngħarrfuk sakemm il-liġi ma żżommniex milli nagħmlu dan." }
     ]
   },
@@ -144,7 +144,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Kontenut tad-dibattitu (privat) — Sakemm jeżisti l-kont — Jinqerdu ċ-ċwievet mal-għeluq, u b’hekk il-kontenut ma jkunx jista’ jinqara",
         "Kontenut tad-dibattitu (ippubblikat) — Sakemm ikun ippubblikat; jekk tagħlaq il-kont u tħalli \"Ħassar ukoll id-dibattiti pubbliċi tiegħi\" mingħajr marka, dibattitu ppubblikat jibqa’ pubbliku taħt il-psewdonimu rtirat tiegħek — Jitneħħa mill-aċċess pubbliku u ċ-ċavetta tiegħu tinqered meta tneħħi l-pubblikazzjoni, jew waqt l-għeluq jekk immarkajt \"Ħassar ukoll id-dibattiti pubbliċi tiegħi\"",
         "Rekords tat-tweġibiet tal-fornituri u referenzi tas-sorsi miġjuba — L-istess bħad-dibattitu li jappartjenu għalih — L-istess",
-        "Konverżazzjonijiet u każijiet tal-appoġġ — [Until closed plus 12 months] — Jinqerdu ċ-ċwievet",
+        "Konverżazzjonijiet u każijiet tal-appoġġ — Sakemm jingħalqu, flimkien ma’ 12-il xahar — Jinqerdu ċ-ċwievet",
         "Rekords tal-aċċettazzjoni u tal-kunsens — Il-ħajja tal-kont flimkien ma’ 6 snin — l-itwal perjodu ta’ preskrizzjoni li japplika għalina — Jitħassru",
         "Rekords tal-pagamenti [pending] — 10 snin, kif titlob il-liġi Rumena dwar il-kontabbiltà — Jitħassru",
         "Kopji ta’ riżerva [pending] — [… days] wara li titħassar il-kopja attiva — Jinkitbu fuqhom"
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Cookies",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine juża 18-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 5 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-Politika dwar il-Cookies fuq [dezbatere.ro/cookies] telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra." },
+      { kind: "p", text: "Dialectical Engine juża 18-il element, ilkoll strettament meħtieġa għas-servizz li tlabt u ilkoll issettjati biss minn Dialectical Engine: 13-il cookie u 5 entrati fil-ħażna tal-browser tiegħek. Ma nużaw ebda cookies tal-analitika, tar-reklamar jew tat-traċċar. Il-Politika dwar il-Cookies fuq dezbatere.ro/cookies telenkahom flimkien ma’ x’jagħmel kull wieħed u min jirċevih, u tinbidel qabel ma tiżdied kwalunkwe ħaġa oħra." },
       {
         kind: "list",
         items: [
@@ -251,8 +251,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Bidliet f’din il-politika",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Meta nibdlu din il-politika nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u data effettiva ġdida, u nżommu l-verżjonijiet preċedenti fuq [dezbatere.ro/privacy/versions]. Għal bidla li żżid skop ġdid jew riċevitur ġdid, ngħarrfuk qabel jibda l-ipproċessar il-ġdid, bil-posta elettronika u fil-prodott, u nagħtuk żmien biex toġġezzjona. Fejn skop ġdid jiddependi mill-kunsens tiegħek — pereżempju jekk xi darba nkunu rridu nużaw il-kontenut biex intejbu l-mudelli — nitolbu dak il-kunsens separatament u b’mod speċifiku; qatt ma nqisu l-aċċettazzjoni ta’ Termini aġġornati bħala kunsens għal ipproċessar ġdid. Għal kjarifiki li ma jbiddlu xejn dwar dak li nagħmlu, sempliċement nippubblikaw il-verżjoni l-ġdida." },
-      { kind: "p", text: "Din il-politika ġiet aġġornata l-aħħar fi [date]. Il-Verżjoni 3.2 issostitwiet il-verżjoni 2.1, li kienet tiddeskrivi d-data tas-sessjoni, il-perjodi taż-żamma, l-analitika, l-esportazzjoni u l-effett tat-tħassir fuq id-dibattiti ppubblikati b’modi li ma baqgħux jirriflettu s-servizz." }
+      { kind: "p", text: "Meta nibdlu din il-politika nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u data effettiva ġdida, u nżommu l-verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions. Għal bidla li żżid skop ġdid jew riċevitur ġdid, ngħarrfuk qabel jibda l-ipproċessar il-ġdid, bil-posta elettronika u fil-prodott, u nagħtuk żmien biex toġġezzjona. Fejn skop ġdid jiddependi mill-kunsens tiegħek — pereżempju jekk xi darba nkunu rridu nużaw il-kontenut biex intejbu l-mudelli — nitolbu dak il-kunsens separatament u b’mod speċifiku; qatt ma nqisu l-aċċettazzjoni ta’ Termini aġġornati bħala kunsens għal ipproċessar ġdid. Għal kjarifiki li ma jbiddlu xejn dwar dak li nagħmlu, sempliċement nippubblikaw il-verżjoni l-ġdida." },
+      { kind: "p", text: "Din il-politika ġiet aġġornata l-aħħar fit-12 ta’ Ottubru 2026. Il-Verżjoni 3.2 issostitwiet il-verżjoni 2.1, li kienet tiddeskrivi d-data tas-sessjoni, il-perjodi taż-żamma, l-analitika, l-esportazzjoni u l-effett tat-tħassir fuq id-dibattiti ppubblikati b’modi li ma baqgħux jirriflettu s-servizz." }
     ]
   },
   {
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Anness B — Termini reġjonali dwar il-privatezza",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Kull entrata tapplika biss jekk ir-reġjun tagħha jkun elenkat fit-taqsima 2 tat-Termini, u tiddikjara biss dak li huwa differenti mill-parti ewlenija ta’ din il-politika." }
+      { kind: "p", text: "Kull entrata tapplika għall-persuni li jgħixu fir-reġjun tagħha, u tiddikjara biss dak li huwa differenti mill-parti ewlenija ta’ din il-politika." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Ir-Renju Unit (biss jekk elenkat)",
+    title: "L-Istati Uniti",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Ir-rappreżentant tagħna fir-Renju Unit skont l-Artikolu 27 tal-GDPR tar-Renju Unit huwa [name, address, email]; tista’ tikkuntattjah dwar kwalunkwe ħaġa f’din il-politika. L-awtorità superviżorja hija l-Uffiċċju tal-Kummissarju għall-Informazzjoni, ico.org.uk. Biex tilmenta magħna, ikteb lil privacy@dezbatere.ro; nikkonfermaw li rċevejna l-ilment tiegħek fi żmien 30 jum. It-trasferimenti tad-data tiegħek mir-Renju Unit lil fornituri tal-IA fl-Istati Uniti jiddependu fuq l-UK Extension to the EU–US Data Privacy Framework fejn il-fornitur ikun iċċertifikat, u f’każijiet oħra fuq l-UK International Data Transfer Addendum għall-klawżoli kuntrattwali standard tal-UE, appoġġati minn valutazzjoni tar-riskju tat-trasferiment; ir-Reġistru jsemmi l-għodda użata għal kull fornitur. Nirrappurtaw ksur ta’ data personali lill-ICO fi żmien 72 siegħa fejn il-liġi tirrikjedi dan, u ninfurmawk mingħajr dewmien żejjed jekk il-ksur ipoġġik f’riskju għoli. Jekk xi darba nużaw cookies tal-analitika, dawn ikunu soġġetti għal għażla li wieħed ma jipparteċipax aktar milli għal kunsens fir-Renju Unit; illum ma nużaw ebda waħda. Jekk għandek inqas minn 18-il sena u tasal għas-servizz minkejja r-regola tal-età tagħna, l-istandards tal-Kodiċi tat-Tfal tal-ICO japplikaw għal kif nittrattaw id-data tiegħek." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "L-Istati Uniti (biss jekk elenkati)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Avviż waqt il-ġbir. It-tabella fit-taqsima 2 telenka l-kategoriji tal-informazzjoni personali li niġbru u s-sorsi tagħhom; l-iskopijiet tal-ipproċessar jinsabu fit-taqsima 4 u l-perjodi taż-żamma fit-taqsima 7. Niġbru dawn il-kategoriji ta’ informazzjoni personali sensittiva biss fejn tinkludihom fil-mistoqsijiet tiegħek stess dwarek innifsek: saħħa, twemmin reliġjuż jew filosofiku, ħajja sesswali jew orjentazzjoni sesswali, fehmiet politiċi, sħubija f’unjin, u oriġini razzjali jew etnika. Nużawhom biss biex inħaddmu d-dibattiti tiegħek, u biss wara l-kunsens separat fit-taqsima 3. Ma nbigħux jew naqsmu informazzjoni personali, u lanqas għamilna dan fit-tnax-il xahar preċedenti. Ma nużawx informazzjoni personali għal reklamar immirat, u ma nużawx informazzjoni personali sensittiva għal xi skop lil hinn milli nipprovdu s-servizz li titlob. Sinjali tal-preferenza li wieħed ma jipparteċipax: Billi bħalissa ma nbigħux u ma naqsmux informazzjoni personali u ma nużawhiex għal reklamar immirat, ma hemm xejn li minnu teskludi ruħek. Jekk xi darba nibdew inbigħuha jew naqsmuha, se nirrispettaw is-sinjali ta’ Global Privacy Control bħala talbiet biex wieħed jeskludi ruħu. Id-drittijiet tiegħek: li tkun taf, li tħassar, li tikkoreġi, li teskludi ruħek, li tillimita l-użu ta’ informazzjoni personali sensittiva, u li ma tiġix diskriminat talli teżerċitahom; agħmel talba fuq privacy@dezbatere.ro. Inċentivi finanzjarji: ma noffru ebda wieħed; l-iskopijiet u l-protezzjonijiet tagħna huma l-istess fuq il-pjanijiet bla ħlas u dawk bi ħlas. Iż-żamma tinsab fit-taqsima 7. Ksur: ninnotifikaw lir-residenti u lill-awtoritajiet tal-istat kif teħtieġ il-liġi dwar il-ksur tad-data ta’ kull stat. Dan l-avviż jiġi aġġornat mill-inqas kull tnax-il xahar; aġġornat l-aħħar fi [date]." },
+      { kind: "p", text: "Avviż waqt il-ġbir. It-tabella fit-taqsima 2 telenka l-kategoriji tal-informazzjoni personali li niġbru u s-sorsi tagħhom; l-iskopijiet tal-ipproċessar jinsabu fit-taqsima 4 u l-perjodi taż-żamma fit-taqsima 7. Niġbru dawn il-kategoriji ta’ informazzjoni personali sensittiva biss fejn tinkludihom fil-mistoqsijiet tiegħek stess dwarek innifsek: saħħa, twemmin reliġjuż jew filosofiku, ħajja sesswali jew orjentazzjoni sesswali, fehmiet politiċi, sħubija f’unjin, u oriġini razzjali jew etnika. Nużawhom biss biex inħaddmu d-dibattiti tiegħek, u biss wara l-kunsens separat fit-taqsima 3. Ma nbigħux jew naqsmu informazzjoni personali, u lanqas għamilna dan fit-tnax-il xahar preċedenti. Ma nużawx informazzjoni personali għal reklamar immirat, u ma nużawx informazzjoni personali sensittiva għal xi skop lil hinn milli nipprovdu s-servizz li titlob. Sinjali tal-preferenza li wieħed ma jipparteċipax: Billi bħalissa ma nbigħux u ma naqsmux informazzjoni personali u ma nużawhiex għal reklamar immirat, ma hemm xejn li minnu teskludi ruħek. Jekk xi darba nibdew inbigħuha jew naqsmuha, se nirrispettaw is-sinjali ta’ Global Privacy Control bħala talbiet biex wieħed jeskludi ruħu. Id-drittijiet tiegħek: li tkun taf, li tħassar, li tikkoreġi, li teskludi ruħek, li tillimita l-użu ta’ informazzjoni personali sensittiva, u li ma tiġix diskriminat talli teżerċitahom; agħmel talba fuq privacy@dezbatere.ro. Inċentivi finanzjarji: ma noffru ebda wieħed; l-iskopijiet u l-protezzjonijiet tagħna huma l-istess fuq il-pjanijiet bla ħlas u dawk bi ħlas. Iż-żamma tinsab fit-taqsima 7. Ksur: ninnotifikaw lir-residenti u lill-awtoritajiet tal-istat kif teħtieġ il-liġi dwar il-ksur tad-data ta’ kull stat. Dan l-avviż jiġi aġġornat mill-inqas kull tnax-il xahar; aġġornat l-aħħar fit-12 ta’ Ottubru 2026." },
       { kind: "p", text: "Connecticut: nipproċessaw data sensittiva biss bil-kunsens espliċitu tiegħek (opt-in), mogħti fuq l-iskrin separat qabel l-ewwel dibattitu tiegħek (it-taqsima 3); ma nużawx id-data personali tiegħek biex inħarrġu mudelli tal-IA. Washington: l-Avviż dwar il-Privatezza tad-Data tas-Saħħa tal-Konsumatur tagħna fuq [URL] huwa dokument separat li japplika għal kwalunkwe informazzjoni relatata mas-saħħa, inklużi inferenzi. Texas u Nebraska: ma nbigħux data personali sensittiva. Colorado, Connecticut, Virginia u stati oħra b’liġijiet komprensivi dwar il-privatezza: id-drittijiet ta’ hawn fuq japplikaw għalik fejn il-liġi tapplika għalina. Jekk niċħdu talba, tista’ tappella billi twieġeb għat-tweġiba tagħna fuq privacy@dezbatere.ro; jekk niċħdu l-appell, tista’ tikkuntattja lill-Avukat Ġenerali (Attorney General) tal-istat tiegħek." }
     ]
   },
   {
+    no: "B.3",
+    title: "Il-Kanada u Quebec",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Inwieġbu t-talbiet fi żmien 30 jum. Nibqgħu responsabbli għall-informazzjoni personali li nittrasferixxu lill-fornituri tal-IA barra l-Kanada, u nużaw kuntratti biex nitolbu protezzjoni komparabbli; dawk il-fornituri jistgħu jkunu soġġetti għal-liġijiet tal-pajjiżi fejn joperaw, inkluż aċċess legali mill-awtoritajiet. Il-messaġġi elettroniċi ta’ kummerċjalizzazzjoni jintbagħtu biss bil-kunsens espliċitu tiegħek skont il-CASL. Nirrappurtaw ksur tas-salvagwardji tas-sigurtà li joħloq riskju reali ta’ ħsara sinifikanti għalik lill-Uffiċċju tal-Kummissarju għall-Privatezza tal-Kanada u lilek, u nżommu rekord ta’ kull ksur għal 24 xahar. Quebec: qabel ma nikkomunikaw informazzjoni personali barra Quebec inwettqu valutazzjoni tal-impatt fuq il-privatezza; nirrappurtaw inċident ta’ kunfidenzjalità li jippreżenta riskju ta’ preġudizzju serju lill-Commission d'accès à l'information u lilek, u nżommu reġistru tal-inċidenti; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi jew nieqfu nxerrdu informazzjoni personali dwarek; tista’ titlob id-data tiegħek f’format strutturat u użat komunement; it-taqsima 8 tiddeskrivi l-ipproċessar awtomatizzat tagħna." }
+    ]
+  },
+  {
     no: "B.4",
-    title: "Il-Kanada u Quebec (biss jekk elenkati)",
+    title: "L-Awstralja u ż-Żelanda l-Ġdida",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa [name], privacy@dezbatere.ro. Inwieġbu t-talbiet fi żmien 30 jum. Nibqgħu responsabbli għall-informazzjoni personali li nittrasferixxu lill-fornituri tal-IA barra l-Kanada, u nużaw kuntratti biex nitolbu protezzjoni komparabbli; dawk il-fornituri jistgħu jkunu soġġetti għal-liġijiet tal-pajjiżi fejn joperaw, inkluż aċċess legali mill-awtoritajiet. Il-messaġġi elettroniċi ta’ kummerċjalizzazzjoni jintbagħtu biss bil-kunsens espliċitu tiegħek skont il-CASL. Nirrappurtaw ksur tas-salvagwardji tas-sigurtà li joħloq riskju reali ta’ ħsara sinifikanti għalik lill-Uffiċċju tal-Kummissarju għall-Privatezza tal-Kanada u lilek, u nżommu rekord ta’ kull ksur għal 24 xahar. Quebec: qabel ma nikkomunikaw informazzjoni personali barra Quebec inwettqu valutazzjoni tal-impatt fuq il-privatezza; nirrappurtaw inċident ta’ kunfidenzjalità li jippreżenta riskju ta’ preġudizzju serju lill-Commission d'accès à l'information u lilek, u nżommu reġistru tal-inċidenti; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi jew nieqfu nxerrdu informazzjoni personali dwarek; tista’ titlob id-data tiegħek f’format strutturat u użat komunement; it-taqsima 8 tiddeskrivi l-ipproċessar awtomatizzat tagħna." }
+      { kind: "p", text: "L-Awstralja. Dawk li jirċievu l-informazzjoni personali tiegħek barra l-Awstralja huma l-fornituri u l-proċessuri tal-IA elenkati fir-Reġistru, li jinsabu fl-Istati Uniti u fl-Unjoni Ewropea; nieħdu passi raġonevoli biex niżguraw li jittrattawha skont il-Prinċipji Awstraljani dwar il-Privatezza. Deċiżjonijiet awtomatizzati: mill-10 ta’ Diċembru 2026 din il-politika tidentifika t-tipi ta’ deċiżjonijiet li jittieħdu minn programmi tal-kompjuter u li jaffettwaw b’mod sinifikanti d-drittijiet jew l-interessi tiegħek — ma hemm ebda waħda; il-punteġġi u l-verdett jikkonċernaw argumenti, mhux lilek — u l-informazzjoni personali użata fihom. L-ilmenti jistgħu jsiru lill-Uffiċċju tal-Kummissarju Awstraljan għall-Informazzjoni. Iż-Żelanda l-Ġdida. L-uffiċjal tal-privatezza tagħna huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Fejn niġbru informazzjoni personali dwarek indirettament — għax utent ieħor inkludiha f’mistoqsija — din il-politika u t-taqsima 11 huma l-avviż li nagħtuk. Niżvelawha lill-fornituri tal-IA fir-Reġistru bħala l-aġenti tagħna, skont kuntratti li jitolbu salvagwardji komparabbli. L-ilmenti jistgħu jsiru lill-Uffiċċju tal-Kummissarju għall-Privatezza." }
     ]
   },
   {
     no: "B.5",
-    title: "L-Awstralja u ż-Żelanda l-Ġdida (biss jekk elenkati)",
+    title: "L-Iżvizzera",
     accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "L-Awstralja. Dawk li jirċievu l-informazzjoni personali tiegħek barra l-Awstralja huma l-fornituri u l-proċessuri tal-IA elenkati fir-Reġistru, li jinsabu fi [the United States and the European Union]; nieħdu passi raġonevoli biex niżguraw li jittrattawha skont il-Prinċipji Awstraljani dwar il-Privatezza. Deċiżjonijiet awtomatizzati: mill-10 ta’ Diċembru 2026 din il-politika tidentifika t-tipi ta’ deċiżjonijiet li jittieħdu minn programmi tal-kompjuter u li jaffettwaw b’mod sinifikanti d-drittijiet jew l-interessi tiegħek — ma hemm ebda waħda; il-punteġġi u l-verdett jikkonċernaw argumenti, mhux lilek — u l-informazzjoni personali użata fihom. L-ilmenti jistgħu jsiru lill-Uffiċċju tal-Kummissarju Awstraljan għall-Informazzjoni. Iż-Żelanda l-Ġdida. L-uffiċjal tal-privatezza tagħna huwa [name]. Fejn niġbru informazzjoni personali dwarek indirettament — għax utent ieħor inkludiha f’mistoqsija — din il-politika u t-taqsima 11 huma l-avviż li nagħtuk. Niżvelawha lill-fornituri tal-IA fir-Reġistru bħala l-aġenti tagħna, skont kuntratti li jitolbu salvagwardji komparabbli. L-ilmenti jistgħu jsiru lill-Uffiċċju tal-Kummissarju għall-Privatezza." }
-    ]
-  },
-  {
-    no: "B.6",
-    title: "L-Iżvizzera (biss jekk elenkata)",
-    accent: "--con",
     blocks: [
       { kind: "p", text: "Japplika l-Att Federali Żvizzeru dwar il-Protezzjoni tad-Data (FADP). L-awtorità superviżorja hija l-Kummissarju Federali għall-Protezzjoni tad-Data u l-Informazzjoni (FDPIC), edoeb.admin.ch. Id-data tiegħek tmur lejn il-pajjiżi msemmija fir-Reġistru — pajjiżi tal-UE u l-Istati Uniti. Għall-Istati Uniti niddependu fuq is-Swiss–US Data Privacy Framework fejn il-fornitur ikun iċċertifikat, u f’każijiet oħra fuq klawżoli kuntrattwali standard rikonoxxuti mill-FDPIC. Nirrappurtaw lill-FDPIC ksur tad-data li x’aktarx ipoġġik f’riskju għoli mill-aktar fis possibbli. Ivvalutajna li m’għandniex bżonn rappreżentant fl-Iżvizzera (Art. 14 FADP). Nerġgħu nirrevedu dan kull sena." }
     ]
   },
   {
-    no: "B.7",
-    title: "Il-Moldova (biss jekk elenkata)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Il-Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Tapplika l-Liġi tal-Moldova Nru 195/2024 dwar il-protezzjoni tad-data personali. Hija timxi mal-GDPR, u l-parti ewlenija ta’ din il-politika tiddeskrivi d-drittijiet tiegħek taħtha. L-awtorità superviżorja hija ċ-Ċentru Nazzjonali għall-Protezzjoni tad-Data Personali (CNPDCP). M’għandniex bżonn rappreżentant fil-Moldova, għax aħna stabbiliti fiż-Żona Ekonomika Ewropea (Art. 27(2)(c) tal-Liġi Nru 195/2024). Nerġgħu nirrevedu dan kull sena. It-trasferimenti tad-data tiegħek lejn l-Istati Uniti jiddependu fuq il-mekkaniżmu msemmi għal kull fornitur fir-Reġistru. Nirrappurtaw ksur ta’ data personali lis-CNPDCP fi żmien 72 siegħa fejn il-liġi tirrikjedi dan." }
     ]
   },
   {
-    no: "B.8",
-    title: "L-Ukrajna (biss jekk elenkata)",
-    accent: "--muted",
+    no: "B.7",
+    title: "L-Asja-Paċifiku",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Tapplika l-Liġi tal-Ukrajna “Dwar il-Protezzjoni tad-Data Personali”. Ma noffrux Dialectical Engine fiż-żoni tal-Ukrajna li mhumiex ikkontrollati mill-gvern tagħha. Id-data tiegħek tmur lejn pajjiżi tal-UE u l-Istati Uniti (ara r-Reġistru). Tista’ tilmenta mal-Kummissarju tal-Parlament Ukren għad-Drittijiet tal-Bniedem." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "L-Iżrael (biss jekk elenkat)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Tapplika l-Liġi dwar il-Protezzjoni tal-Privatezza tal-Iżrael. Il-kontrollur huwa DebateAIRO S.R.L.; id-dettalji ta’ kuntatt tagħna jinsabu fit-taqsima 1. M’għandek l-ebda obbligu legali li tagħtina d-data tiegħek; mingħajr id-data tal-kont ma nistgħux niftħulek kont. Nużaw id-data tiegħek għall-iskopijiet fit-taqsima 4 u nagħtuha lir-riċevituri fit-taqsima 5. Tista’ titlob li taraha u li tikkoreġiha (it-taqsima 10). L-awtorità superviżorja hija l-Awtorità għall-Protezzjoni tal-Privatezza." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "L-Asja-Paċifiku (biss il-linji għar-reġjuni elenkati)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapor: l-Uffiċjal tal-Protezzjoni tad-Data tagħna huwa [name, email]; it-trasferimenti jiddependu fuq obbligi kuntrattwali li jagħtu protezzjoni komparabbli mal-PDPA; navżaw lill-PDPC bi ksur notifikabbli fi żmien 3 ijiem. Il-Ġappun: nużaw l-informazzjoni personali tiegħek għall-iskopijiet fit-taqsima 4 u għal ebda skop ieħor. Nagħtuha lill-fornituri tal-IA u lill-fornituri tal-ospitar fir-Reġistru, li jinsabu fl-Istati Uniti u f’pajjiżi tal-UE, taħt kuntratti li jirrikjedu li jipproteġuha skont l-istandard tal-Act on the Protection of Personal Information tal-Ġappun; fuq talba ngħidulek x’jagħmlu biex jipproteġuha u dwar is-sistema tal-privatezza ta’ pajjiżhom. It-twemmin tiegħek, inkluż it-twemmin reliġjuż u politiku, u s-saħħa tiegħek huma informazzjoni personali li teħtieġ kura speċjali; niġbruhom biss bil-kunsens minn qabel tiegħek (it-taqsima 3). L-isem u l-indirizz tagħna huma DebateAIRO S.R.L., [address], ir-Rumanija, u r-rappreżentant tagħna huwa [name], direttur; kif tagħmel talba tinsab fit-taqsima 10, il-miżuri tas-sigurtà tagħna fit-taqsima 9, u l-ilmenti jmorru lil privacy@dezbatere.ro. Nirrappurtaw il-ksur lill-Kummissjoni għall-Protezzjoni tal-Informazzjoni Personali kif jeħtieġ l-Att. Il-Korea t’Isfel: l-uffiċjal tal-privatezza tagħna huwa [name], direttur, privacy@dezbatere.ro. Nittrasferixxu informazzjoni personali barra l-pajjiż għax it-tħaddim tad-dibattiti tiegħek, taħt il-kuntratt tagħna miegħek, jeħtieġ dan: kull darba li jitħaddem dibattitu, nibagħtu l-mistoqsija tiegħek u d-dikjarazzjonijiet tad-dibattitu, u fil-konverżazzjoni tal-appoġġ il-messaġġi tiegħek, permezz ta’ konnessjoni kriptata lill-fornituri tal-IA u lill-fornituri tal-ospitar fir-Reġistru, li jsemmi kull riċevitur, il-pajjiż tiegħu, il-kuntatt tiegħu, l-iskop u għal kemm żmien iżomm id-data. Tista’ tirrifjuta t-trasferiment billi ma tibdiex dibattiti jew billi tħassar il-kont tiegħek; imbagħad ma nistgħux inħaddmu dibattiti għalik. L-opinjonijiet politiċi, it-twemmin u s-saħħa huma informazzjoni sensittiva; nipproċessawhom biss bil-kunsens separat tiegħek (it-taqsima 3). Ma nieħdu ebda deċiżjoni kompletament awtomatizzata dwarek (it-taqsima 8). Inwieġbu t-talbiet fi żmien [10] ijiem, u nirrappurtaw il-ksur lill-Kummissjoni għall-Protezzjoni tal-Informazzjoni Personali u lilek kif jeħtieġ il-Personal Information Protection Act. It-Tajwan: japplika l-Personal Data Protection Act tat-Tajwan. Inżommu d-data tiegħek għall-perjodi fit-taqsima 7; tintuża fir-Rumanija, f’pajjiżi oħra tal-UE u fl-Istati Uniti (ara r-Reġistru); ir-riċevituri huma fit-taqsima 5; is-sistemi u l-mudelli tal-IA tagħna jipproċessawha awtomatikament biex inħaddmu d-dibattiti tiegħek. Tista’ tistaqsi x’data għandna dwarek, taraha, tieħu kopja tagħha, tikkoreġiha, titlobna nieqfu nużawha u tħassarha (it-taqsima 10). Li tagħtina d-data tal-kont hija għażla tiegħek, iżda mingħajrha ma nistgħux niftħulek kont. Inwieġbu talba biex tara d-data tiegħek jew tikseb kopja tagħha fi żmien 15-il jum; jekk ikollna bżonn aktar żmien, nistgħu nestendu dan il-perjodu darba biss b’mhux aktar minn 15-il jum ieħor, u ngħidulek bil-miktub għaliex. Il-Filippini: id-DPO tagħna huwa [name]; l-ilmenti jistgħu jitressqu quddiem il-Kummissjoni Nazzjonali tal-Privatezza; it-taqsima 8 tiddeskrivi l-ipproċessar awtomatizzat. It-Tajlandja: ir-rappreżentant tagħna huwa [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Riżervata",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "It-Turkija, il-Brażil u l-Indoneżja kollha jeħtieġu avviż bil-lingwa lokali, rappreżentant jew reġistrazzjoni, u preżentazzjoni ta’ dokumenti, u mhumiex abbozzati hawn. Iċ-Ċina, il-Vjetnam u r-Russja ma jiġux moqdija." }
+      { kind: "p", text: "Singapor: l-Uffiċjal tal-Protezzjoni tad-Data tagħna huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro; it-trasferimenti jiddependu fuq obbligi kuntrattwali li jagħtu protezzjoni komparabbli mal-PDPA; navżaw lill-PDPC bi ksur notifikabbli fi żmien 3 ijiem. Il-Ġappun: nużaw l-informazzjoni personali tiegħek għall-iskopijiet fit-taqsima 4 u għal ebda skop ieħor. Nagħtuha lill-fornituri tal-IA u lill-fornituri tal-ospitar fir-Reġistru, li jinsabu fl-Istati Uniti u f’pajjiżi tal-UE, taħt kuntratti li jirrikjedu li jipproteġuha skont l-istandard tal-Act on the Protection of Personal Information tal-Ġappun; fuq talba ngħidulek x’jagħmlu biex jipproteġuha u dwar is-sistema tal-privatezza ta’ pajjiżhom. It-twemmin tiegħek, inkluż it-twemmin reliġjuż u politiku, u s-saħħa tiegħek huma informazzjoni personali li teħtieġ kura speċjali; niġbruhom biss bil-kunsens minn qabel tiegħek (it-taqsima 3). L-isem u l-indirizz tagħna huma DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, ir-Rumanija, u r-rappreżentant tagħna huwa Dedita Ionut Ciprian, direttur; kif tagħmel talba tinsab fit-taqsima 10, il-miżuri tas-sigurtà tagħna fit-taqsima 9, u l-ilmenti jmorru lil privacy@dezbatere.ro. Nirrappurtaw il-ksur lill-Kummissjoni għall-Protezzjoni tal-Informazzjoni Personali kif jeħtieġ l-Att. Il-Korea t’Isfel: l-uffiċjal tal-privatezza tagħna huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Nittrasferixxu informazzjoni personali barra l-pajjiż għax it-tħaddim tad-dibattiti tiegħek, taħt il-kuntratt tagħna miegħek, jeħtieġ dan: kull darba li jitħaddem dibattitu, nibagħtu l-mistoqsija tiegħek u d-dikjarazzjonijiet tad-dibattitu, u fil-konverżazzjoni tal-appoġġ il-messaġġi tiegħek, permezz ta’ konnessjoni kriptata lill-fornituri tal-IA u lill-fornituri tal-ospitar fir-Reġistru, li jsemmi kull riċevitur, il-pajjiż tiegħu, il-kuntatt tiegħu, l-iskop u għal kemm żmien iżomm id-data. Tista’ tirrifjuta t-trasferiment billi ma tibdiex dibattiti jew billi tħassar il-kont tiegħek; imbagħad ma nistgħux inħaddmu dibattiti għalik. L-opinjonijiet politiċi, it-twemmin u s-saħħa huma informazzjoni sensittiva; nipproċessawhom biss bil-kunsens separat tiegħek (it-taqsima 3). Ma nieħdu ebda deċiżjoni kompletament awtomatizzata dwarek (it-taqsima 8). Inwieġbu t-talbiet fi żmien 10 ijiem, u nirrappurtaw il-ksur lill-Kummissjoni għall-Protezzjoni tal-Informazzjoni Personali u lilek kif jeħtieġ il-Personal Information Protection Act. It-Tajwan: japplika l-Personal Data Protection Act tat-Tajwan. Inżommu d-data tiegħek għall-perjodi fit-taqsima 7; tintuża fir-Rumanija, f’pajjiżi oħra tal-UE u fl-Istati Uniti (ara r-Reġistru); ir-riċevituri huma fit-taqsima 5; is-sistemi u l-mudelli tal-IA tagħna jipproċessawha awtomatikament biex inħaddmu d-dibattiti tiegħek. Tista’ tistaqsi x’data għandna dwarek, taraha, tieħu kopja tagħha, tikkoreġiha, titlobna nieqfu nużawha u tħassarha (it-taqsima 10). Li tagħtina d-data tal-kont hija għażla tiegħek, iżda mingħajrha ma nistgħux niftħulek kont. Inwieġbu talba biex tara d-data tiegħek jew tikseb kopja tagħha fi żmien 15-il jum; jekk ikollna bżonn aktar żmien, nistgħu nestendu dan il-perjodu darba biss b’mhux aktar minn 15-il jum ieħor, u ngħidulek bil-miktub għaliex." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "76d2a64fbe23e0c393017064efa6929e0b8865f428c4e3f58c195c7e2a5d6d3e",
-  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.2 · EFFETTIVA [DATE]",
+  version: "3.3",
+  sha256: "8f4e82a7bac66be089483edb480badcd365a00767d7b4fa964a1c65302cd0c81",
+  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.3 · EFFETTIVA 12 TA’ OTTUBRU 2026",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",
-  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Test tal-Politika dwar il-Privatezza",
   sectionIdPrefix: "policy-section-",

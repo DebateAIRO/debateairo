@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { MigrationPlan } from './migration-lineage.js';
 import { loadForward111 } from './migration-forward111.js';
+import { loadForwardAuthDbBatch } from './migration-forward-auth-db-batch.js';
 import { loadForward0113 } from './migration-forward0113.js';
 
 /**
@@ -17,16 +18,21 @@ export type ForwardStepPlan=Readonly<{
  name:string; version:string; manifestSha256:string; sourceSha256:string; sql:string;
  previousName:string; previousManifestSha256:string; previousVerifierSha256:string;
  verifierPath:string; verifierSha256:string; verifierSql:string;
- /** A digest of the catalog objects the step creates, recorded at apply and compared while it is the last step. */
+ /** A digest of the catalog objects the step creates, recorded at apply and compared on every later migrate(). */
  postconditionEvidence(client:PoolClient):Promise<string>;
+ /**
+  * The step's own security checks (SQL that raises on drift), re-run on EVERY later migrate() for as long as the step
+  * is applied — not only while it is the last one — so appending a step never retires an earlier step's promises.
+  */
+ replayVerifierSql?:string;
 }>;
 type StepLoader=(anchor:ForwardStepAnchor)=>Promise<ForwardStepPlan>;
 
 /**
- * The chain, in order: 0111 (NETOPIA), 0113 (Part C's prices; renumbered and re-chained at merge time if dev moved, spec
- * 2026-10-05 §2.16.6). A step adds its loader here (README); nothing else in this file changes.
+ * The chain, in order: 0111 (NETOPIA), then the auth DB batch (0112), then Part C's prices (0113, spec 2026-10-05
+ * §2.16.6). A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111, loadForward0113]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113]);
 
 const STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD_CHAIN_${detail}`);};
@@ -145,8 +151,12 @@ export async function applyForwardChain(client:PoolClient,plan:MigrationPlan,app
    ||receipt.forward_manifest_sha256!==step.manifestSha256||receipt.source_sha256!==step.sourceSha256||receipt.verifier_sha256!==step.verifierSha256
    ||receipt.precondition_evidence_digest!==preconditionDigest(plan,step,owner))return fail(`RECEIPT_BINDING_DRIFT ${step.name}`);
  }
- const last=done.at(-1);
- if(last!==undefined&&receipts.at(-1)?.postcondition_evidence_digest!==await last.postconditionEvidence(client))return fail(`POSTCONDITION_DRIFT ${last.name}`);
+ // Every applied step's own checks run on every replay, whichever step is last.
+ for(const step of done)if(step.replayVerifierSql!==undefined)await client.query(step.replayVerifierSql);
+ // Every applied step's postcondition digest is compared, not only the last one's: appending a step must not retire
+ // the check of an earlier step's objects (a later step never changes an earlier step's objects without its own design).
+ const postconditions=async()=>{for(const [index,step] of done.entries())if(receipts[index]?.postcondition_evidence_digest!==await step.postconditionEvidence(client))return fail(`POSTCONDITION_DRIFT ${step.name}`);};
+ await postconditions();
  for(const step of plan.forwardChain.slice(done.length)){
   await client.query(step.sql);
   await client.query(step.verifierSql);
@@ -154,6 +164,12 @@ export async function applyForwardChain(client:PoolClient,plan:MigrationPlan,app
   await client.query('INSERT INTO public.debateai_schema_migration(name,applied_at) VALUES($1,statement_timestamp())',[step.name]);
   await client.query(`INSERT INTO public.debateai_schema_migration_step(source_name,base_recipe_sha256,previous_manifest_sha256,forward_manifest_sha256,source_sha256,verifier_sha256,precondition_evidence_digest,postcondition_evidence_digest,executed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,statement_timestamp())`,
    [step.name,plan.recipeSha256,step.previousManifestSha256,step.manifestSha256,step.sourceSha256,step.verifierSha256,preconditionDigest(plan,step,owner),post]);
+ }
+ // A step applied in THIS run must keep every earlier step's rules too: all applied steps' own checks run again here,
+ // before the caller commits, so a breaking step is rolled back instead of caught on the next migrate().
+ if(plan.forwardChain.length>done.length){
+  for(const step of plan.forwardChain)if(step.replayVerifierSql!==undefined)await client.query(step.replayVerifierSql);
+  await postconditions();
  }
  await assertReceiptAcl(client,owner);
 }

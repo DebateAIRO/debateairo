@@ -34,7 +34,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kas atbild par jūsu datiem",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Jūsu personas datu pārzinis ir DebateAIRO S.R.L., [address], Bukareste, Rumānija, Komercreģistra numurs [J40/…], CUI […]. Par jebkuru ar šo politiku saistītu jautājumu rakstiet uz privacy@dezbatere.ro; mēs atbildēsim viena mēneša laikā. Mēs neesam iecēluši datu aizsardzības speciālistu, jo tiesību akti to no mums neprasa; šo adresi uzrauga [role]. Ja esam iecēluši pārstāvi vai privātuma speciālistu konkrētā valstī, tas ir norādīts B pielikumā." }
+      { kind: "p", text: "Jūsu personas datu pārzinis ir DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumānija, Komercreģistra numurs J2022000426271, CUI 45935221. Par jebkuru ar šo politiku saistītu jautājumu rakstiet uz privacy@dezbatere.ro; mēs atbildēsim viena mēneša laikā. Mēs neesam iecēluši datu aizsardzības speciālistu, jo tiesību akti to no mums neprasa; šo adresi uzrauga mūsu direktors. Ja esam iecēluši pārstāvi vai privātuma speciālistu konkrētā valstī, tas ir norādīts B pielikumā." }
     ]
   },
   {
@@ -107,10 +107,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Kas tiek nosūtīts. Lai vadītu debates, mēs nosūtām tekstu vienam vai vairākiem ārējiem MI pakalpojumu sniedzējiem: jūsu jautājumu, jūsu iestatītās vadības piezīmes un apgalvojumus, kurus dzinējs izveido debašu gaitā. Tādējādi pakalpojumu sniedzējs redz tekstu, kas ir atvasināts no jūsu ievadītā satura un veidots ap to. Ja izmantojat atbalsta sarunu, tas, ko tajā ievadāt, tiek nosūtīts atbalsta sarunas modelim. Pakalpojumu sniedzējs nekad nesaņem jūsu e-pasta adresi, konta vai sesijas identifikatorus, IP adresi vai maksājumu datus." },
-      { kind: "p", text: "Kuri pakalpojumu sniedzēji. Tie ir norādīti mūsu MI pakalpojumu sniedzēju reģistrā vietnē [dezbatere.ro/providers], kas ir šīs politikas daļa. Reģistrs attiecas uz ikvienu lietotāju neatkarīgi no tā, kur jūs dzīvojat. Par katru pakalpojumu sniedzēju tajā ir norādīta tā juridiskā persona un dibināšanas valsts; ko tas saņem un kādam nolūkam — debašu argumentu rakstīšanai, to vērtēšanai un pārbaudei, sprieduma stāsta rakstīšanai vai atbildēm jums atbalsta sarunā; valstis vai reģioni, kuros tas apstrādā datus; tā glabāšanas noteikumi un tas, vai mūsu izmantotajam galapunktam un funkcijām ir ieslēgts datu neglabāšanas režīms; vai saskaņā ar mūsu līgumu tas var izmantot ievaddatus apmācībai; mūsu izmantotais datu nosūtīšanas mehānisms; kā ar to sazināties saistībā ar jūsu datiem; kā arī katra ieraksta pēdējās pārbaudes datums. Pakalpojumu sniedzēji var mainīties; Reģistram ir versijas, un izmaiņas tajā tiek atzīmētas." },
+      { kind: "p", text: "Kuri pakalpojumu sniedzēji. Tie ir norādīti mūsu MI pakalpojumu sniedzēju reģistrā vietnē dezbatere.ro/providers, kas ir šīs politikas daļa. Reģistrs attiecas uz ikvienu lietotāju neatkarīgi no tā, kur jūs dzīvojat. Par katru pakalpojumu sniedzēju tajā ir norādīta tā juridiskā persona un dibināšanas valsts; ko tas saņem un kādam nolūkam — debašu argumentu rakstīšanai, to vērtēšanai un pārbaudei, sprieduma stāsta rakstīšanai vai atbildēm jums atbalsta sarunā; valstis vai reģioni, kuros tas apstrādā datus; tā glabāšanas noteikumi un tas, vai mūsu izmantotajam galapunktam un funkcijām ir ieslēgts datu neglabāšanas režīms; vai saskaņā ar mūsu līgumu tas var izmantot ievaddatus apmācībai; mūsu izmantotais datu nosūtīšanas mehānisms; kā ar to sazināties saistībā ar jūsu datiem; kā arī katra ieraksta pēdējās pārbaudes datums. Pakalpojumu sniedzēji var mainīties; Reģistram ir versijas, un izmaiņas tajā tiek atzīmētas." },
       { kind: "p", text: "Apmācība un glabāšana ir atšķirīgas lietas. Mūsu līgumi ar pakalpojumu sniedzējiem izslēdz jūsu satura izmantošanu to modeļu apmācībai vai uzlabošanai. [Publish only once verified per route.] Daži pakalpojumu sniedzēji ierobežotu laiku glabā uzvednes un atbildes drošības, ļaunprātīgas izmantošanas novēršanas vai savu juridisko pienākumu dēļ; Reģistrā ir norādīts, cik ilgi un kāpēc. Ja ir ieslēgts datu neglabāšanas režīms, Reģistrā tas ir norādīts, kā arī funkcijas, uz kurām tas attiecas. Mēs neapgalvosim, ka saturs netiek glabāts, ja tas neatbilst patiesībai." },
       { kind: "p", text: "Datu nosūtīšana ārpus EEZ. Amerikas Savienotajās Valstīs reģistrēti pakalpojumu sniedzēji saņem datus saskaņā ar vienu no GDPR V nodaļā paredzētajiem mehānismiem: ES un ASV datu privātuma regulējumu, ja konkrētā līgumslēdzēja vienība ir sertificēta attiecībā uz šiem datiem, vai Eiropas Komisijas līguma standartklauzulām (otrais modulis, nosūtīšana no pārziņa apstrādātājam), ko papildina datu nosūtīšanas riska novērtējums un papildu pasākumi. Reģistrā ir norādīts katram pakalpojumu sniedzējam piemērojamais mehānisms. Rakstot uz privacy@dezbatere.ro, varat saņemt mūsu izmantoto klauzulu kopiju. Ja mūsu izmantotais mehānisms tiek atzīts par spēkā neesošu, pirms datu nosūtīšanas turpināšanas mēs pārejam uz citu mehānismu un jūs par to informējam." },
-      { kind: "p", text: "Citi saņēmēji. Mūsu mitināšanas pakalpojumu sniedzējs [Hetzner, Germany — region …]; mūsu satura piegādes un pārraides pakalpojumu sniedzējs [Cloudflare]; mūsu e-pasta pārsūtīšanas pakalpojums […]; [our payment provider, once a paid plan exists]. Katrs no tiem rīkojas saskaņā ar mūsu dokumentētajiem norādījumiem un datu apstrādes līgumu, kurā paredzētas 28. pantā noteiktās garantijas, un katrs ir iekļauts Reģistrā, norādot tā atrašanās vietu un datu nosūtīšanas mehānismu. Mēs nevienam apstrādātājam neatļaujam izmantot jūsu datus saviem nolūkiem. Ja pakalpojumu sniedzējs to darītu, tas būtu patstāvīgs pārzinis, un mēs tam jūsu datus nesūtītu." },
+      { kind: "p", text: "Citi saņēmēji. Mūsu mitināšanas pakalpojumu sniedzējs [Hetzner, Germany — region …]; mūsu satura piegādes un pārraides pakalpojumu sniedzējs Cloudflare; mūsu e-pasta pārsūtīšanas pakalpojums […]; mūsu maksājumu pakalpojumu sniedzējs NETOPIA Payments, kad būs pieejams maksas plāns. Katrs no tiem rīkojas saskaņā ar mūsu dokumentētajiem norādījumiem un datu apstrādes līgumu, kurā paredzētas 28. pantā noteiktās garantijas, un katrs ir iekļauts Reģistrā, norādot tā atrašanās vietu un datu nosūtīšanas mehānismu. Mēs nevienam apstrādātājam neatļaujam izmantot jūsu datus saviem nolūkiem. Ja pakalpojumu sniedzējs to darītu, tas būtu patstāvīgs pārzinis, un mēs tam jūsu datus nesūtītu." },
       { kind: "p", text: "Publiskās iestādes. Mēs izpaužam personas datus tiesām, regulatoriem vai tiesībaizsardzības iestādēm, ja to prasa tiesību akti, un par to jūs informējam, ja vien tiesību akti mums to neaizliedz." }
     ]
   },
@@ -144,7 +144,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Debašu saturs (privāts) — Kamēr konts pastāv — Slēgšanas brīdī atslēgas tiek iznīcinātas, padarot saturu nenolasāmu",
         "Debašu saturs (publicēts) — Kamēr tas ir publicēts; ja slēdzat kontu un neatzīmējat „Dzēst arī manas publiskās debates”, publicētas debates paliek publiskas ar jūsu vairs neizmantoto pseidonīmu — Tiek noņemts no publiskas piekļuves un tā atslēga iznīcināta, kad atceļat publikāciju vai konta slēgšanas laikā, ja atzīmējāt „Dzēst arī manas publiskās debates”",
         "Pakalpojumu sniedzēju atbilžu ieraksti un izguves atsauces — Tikpat ilgi kā debates, uz kurām tie attiecas — Tas pats",
-        "Atbalsta sarunas un lietas — [Until closed plus 12 months] — Atslēgas tiek iznīcinātas",
+        "Atbalsta sarunas un lietas — Līdz slēgšanai plus 12 mēneši — Atslēgas tiek iznīcinātas",
         "Piekrišanas un akceptēšanas ieraksti — Konta darbības laiks plus 6 gadi — ilgākais mums piemērojamais noilguma termiņš — Tiek dzēsti",
         "Maksājumu ieraksti [pending] — 10 gadu, kā to prasa Rumānijas grāmatvedības tiesību akti — Tiek dzēsti",
         "Dublējumkopijas [pending] — [… days] pēc aktīvās kopijas dzēšanas — Tiek pārrakstītas"
@@ -217,7 +217,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Sīkdatnes",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Dialectical Engine izmanto 18 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 5 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. Sīkdatņu politikā vietnē [dezbatere.ro/cookies] tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits." },
+      { kind: "p", text: "Dialectical Engine izmanto 18 elementus, kas visi ir absolūti nepieciešami jūsu pieprasītajam pakalpojumam un kurus visus iestata tikai Dialectical Engine: 13 sīkdatnes un 5 ierakstus jūsu pārlūkprogrammas krātuvē. Mēs neiestatām analītikas, reklāmas vai izsekošanas sīkdatnes. Sīkdatņu politikā vietnē dezbatere.ro/cookies tie ir uzskaitīti kopā ar to, ko katrs dara un kas to saņem, un Sīkdatņu politika tiks mainīta, pirms tiek pievienots jebkas cits." },
       {
         kind: "list",
         items: [
@@ -251,8 +251,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Šīs politikas izmaiņas",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē [dezbatere.ro/privacy/versions]. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju." },
-      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta [date]. Versija 3.2 aizstāja versiju 2.1, kurā sesiju dati, glabāšanas termiņi, analītika, eksportēšana un dzēšanas ietekme uz publicētajām debatēm bija aprakstīti veidā, kas vairs neatspoguļoja pakalpojumu." }
+      { kind: "p", text: "Mainot šo politiku, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un jaunu spēkā stāšanās datumu un saglabājam iepriekšējās versijas vietnē dezbatere.ro/privacy/versions. Par izmaiņām, ar kurām tiek pievienots jauns nolūks vai jauns saņēmējs, mēs jūs informējam pa e-pastu un produktā pirms jaunās apstrādes sākšanas un dodam laiku iebilst. Ja jauns nolūks ir atkarīgs no jūsu piekrišanas — piemēram, ja mēs kādreiz vēlētos izmantot saturu modeļu uzlabošanai —, mēs šādu piekrišanu lūdzam atsevišķi un konkrēti; atjaunināto Noteikumu akceptēšanu mēs nekad neuzskatām par piekrišanu jaunai apstrādei. Ja precizējumi neko nemaina mūsu darbībās, mēs vienkārši publicējam jauno versiju." },
+      { kind: "p", text: "Šī politika pēdējo reizi atjaunināta 2026. gada 12. oktobrī. Versija 3.2 aizstāja versiju 2.1, kurā sesiju dati, glabāšanas termiņi, analītika, eksportēšana un dzēšanas ietekme uz publicētajām debatēm bija aprakstīti veidā, kas vairs neatspoguļoja pakalpojumu." }
     ]
   },
   {
@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "B pielikums — Reģionālie privātuma noteikumi",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Katrs ieraksts ir piemērojams tikai tad, ja tā reģions ir norādīts Noteikumu 2. sadaļā, un tajā ir norādītas tikai atšķirības no šīs politikas pamatdaļas." }
+      { kind: "p", text: "Katrs ieraksts ir piemērojams personām, kuras dzīvo attiecīgajā reģionā, un tajā ir norādītas tikai atšķirības no šīs politikas pamatdaļas." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Apvienotā Karaliste (tikai tad, ja norādīta)",
+    title: "Amerikas Savienotās Valstis",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Mūsu pārstāvis Apvienotajā Karalistē saskaņā ar UK GDPR 27. pantu ir [name, address, email]; varat ar to sazināties par jebkuru jautājumu saistībā ar šo politiku. Uzraudzības iestāde ir Information Commissioner's Office, ico.org.uk. Lai iesniegtu mums sūdzību, rakstiet uz privacy@dezbatere.ro; mēs 30 dienu laikā apstiprināsim jūsu sūdzības saņemšanu. Jūsu datu nosūtīšana no Apvienotās Karalistes uz MI pakalpojumu sniedzējiem Amerikas Savienotajās Valstīs balstās uz UK Extension to the EU–US Data Privacy Framework, ja pakalpojumu sniedzējs ir sertificēts, bet citos gadījumos — uz UK International Data Transfer Addendum pie ES standarta līguma klauzulām, ko papildina datu nosūtīšanas riska novērtējums; Reģistrā katram pakalpojumu sniedzējam ir norādīts izmantotais instruments. Par personas datu aizsardzības pārkāpumu mēs ziņojam ICO 72 stundu laikā, ja to prasa tiesību akti, un bez nepamatotas kavēšanās informējam jūs, ja tas jums rada augstu risku. Ja mēs kādreiz iestatītu analītikas sīkdatnes, Apvienotajā Karalistē uz tām attiektos atteikšanās, nevis piekrišanas prasība; pašlaik mēs tādas neiestatām. Ja esat jaunāks par 18 gadiem un piekļūstat pakalpojumam, neraugoties uz mūsu vecuma ierobežojumu, uz mūsu veikto jūsu datu apstrādi attiecas ICO Bērnu kodeksa standarti." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Amerikas Savienotās Valstis (tikai tad, ja norādītas)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Paziņojums datu vākšanas brīdī. 2. sadaļas tabulā norādītas mūsu vāktās personas informācijas kategorijas un to avoti; apstrādes nolūki ir aprakstīti 4. sadaļā, bet glabāšanas termiņi — 7. sadaļā. Mēs vācam šādas sensitīvas personas informācijas kategorijas tikai tad, ja tās iekļaujat savos jautājumos par sevi: veselība, reliģiskā vai filozofiskā pārliecība, dzimumdzīve vai seksuālā orientācija, politiskie uzskati, dalība arodbiedrībā un rasiskā vai etniskā izcelsme. Mēs tās izmantojam tikai jūsu debašu vadīšanai un tikai pēc 3. sadaļā minētās atsevišķās piekrišanas. Mēs nepārdodam un nekopīgojam personas informāciju un neesam to darījuši iepriekšējos divpadsmit mēnešos. Mēs neizmantojam personas informāciju mērķētai reklāmai un neizmantojam sensitīvu personas informāciju nekādiem nolūkiem, izņemot jūsu pieprasītā pakalpojuma sniegšanu. Atteikšanās izvēles signāli: Tā kā pašlaik nepārdodam un nekopīgojam personas informāciju un neizmantojam to mērķētai reklāmai, nav no kā atteikties. Ja nākotnē sāksim to pārdot vai kopīgot, ievērosim Global Privacy Control signālus kā atteikšanās pieprasījumus. Jūsu tiesības: zināt, dzēst, labot, atteikties, ierobežot sensitīvas personas informācijas izmantošanu un netikt diskriminētam šo tiesību izmantošanas dēļ; iesniedziet pieprasījumu, rakstot uz privacy@dezbatere.ro. Finansiāli stimuli: mēs tādus nepiedāvājam; bezmaksas un maksas plānos mūsu nolūki un aizsardzības pasākumi ir vienādi. Glabāšana ir aprakstīta 7. sadaļā. Pārkāpumi: mēs informējam iedzīvotājus un štatu iestādes, kā to prasa katra štata tiesību akti par datu aizsardzības pārkāpumiem. Šis paziņojums tiek atjaunināts vismaz reizi divpadsmit mēnešos; pēdējo reizi atjaunināts [date]." },
+      { kind: "p", text: "Paziņojums datu vākšanas brīdī. 2. sadaļas tabulā norādītas mūsu vāktās personas informācijas kategorijas un to avoti; apstrādes nolūki ir aprakstīti 4. sadaļā, bet glabāšanas termiņi — 7. sadaļā. Mēs vācam šādas sensitīvas personas informācijas kategorijas tikai tad, ja tās iekļaujat savos jautājumos par sevi: veselība, reliģiskā vai filozofiskā pārliecība, dzimumdzīve vai seksuālā orientācija, politiskie uzskati, dalība arodbiedrībā un rasiskā vai etniskā izcelsme. Mēs tās izmantojam tikai jūsu debašu vadīšanai un tikai pēc 3. sadaļā minētās atsevišķās piekrišanas. Mēs nepārdodam un nekopīgojam personas informāciju un neesam to darījuši iepriekšējos divpadsmit mēnešos. Mēs neizmantojam personas informāciju mērķētai reklāmai un neizmantojam sensitīvu personas informāciju nekādiem nolūkiem, izņemot jūsu pieprasītā pakalpojuma sniegšanu. Atteikšanās izvēles signāli: Tā kā pašlaik nepārdodam un nekopīgojam personas informāciju un neizmantojam to mērķētai reklāmai, nav no kā atteikties. Ja nākotnē sāksim to pārdot vai kopīgot, ievērosim Global Privacy Control signālus kā atteikšanās pieprasījumus. Jūsu tiesības: zināt, dzēst, labot, atteikties, ierobežot sensitīvas personas informācijas izmantošanu un netikt diskriminētam šo tiesību izmantošanas dēļ; iesniedziet pieprasījumu, rakstot uz privacy@dezbatere.ro. Finansiāli stimuli: mēs tādus nepiedāvājam; bezmaksas un maksas plānos mūsu nolūki un aizsardzības pasākumi ir vienādi. Glabāšana ir aprakstīta 7. sadaļā. Pārkāpumi: mēs informējam iedzīvotājus un štatu iestādes, kā to prasa katra štata tiesību akti par datu aizsardzības pārkāpumiem. Šis paziņojums tiek atjaunināts vismaz reizi divpadsmit mēnešos; pēdējo reizi atjaunināts 2026. gada 12. oktobrī." },
       { kind: "p", text: "Konektikuta: mēs apstrādājam sensitīvus datus tikai ar jūsu aktīvi sniegtu piekrišanu, ko sniedzat atsevišķā ekrānā pirms savām pirmajām debatēm (3. sadaļa); mēs neizmantojam jūsu personas datus MI modeļu apmācībai. Vašingtona: mūsu atsevišķais dokuments Patērētāju veselības datu privātuma paziņojums vietnē [URL] attiecas uz jebkādu ar veselību saistītu informāciju, tostarp secinājumiem. Teksasa un Nebraska: mēs nepārdodam sensitīvus personas datus. Kolorādo, Konektikuta, Virdžīnija un citi štati ar visaptverošiem privātuma tiesību aktiem: iepriekš minētās tiesības jums ir piemērojamas, ja attiecīgie tiesību akti ir piemērojami mums. Ja mēs atsakāmies izpildīt pieprasījumu, varat to pārsūdzēt, atbildot uz mūsu atbildi adresē privacy@dezbatere.ro; ja mēs pārsūdzību noraidām, varat vērsties sava štata ģenerālprokurorā (Attorney General)." }
     ]
   },
   {
+    no: "B.3",
+    title: "Kanāda un Kvebeka",
+    accent: "--ok-dot",
+    blocks: [
+      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Uz pieprasījumiem mēs atbildam 30 dienu laikā. Mēs saglabājam atbildību par personas informāciju, ko nosūtām MI pakalpojumu sniedzējiem ārpus Kanādas, un ar līgumiem pieprasām līdzvērtīgu aizsardzību; uz šiem pakalpojumu sniedzējiem var attiekties to darbības valstu tiesību akti, tostarp iestāžu likumīga piekļuve. Tirgvedības e-pasta ziņojumi tiek sūtīti tikai ar jūsu nepārprotamu piekrišanu saskaņā ar CASL. Par drošības pasākumu pārkāpumu, kas rada reālu būtiska kaitējuma risku jums, mēs ziņojam Office of the Privacy Commissioner of Canada un jums, un mēs glabājam ierakstu par katru pārkāpumu 24 mēnešus. Kvebeka: pirms personas informācijas nosūtīšanas ārpus Kvebekas mēs veicam privātuma ietekmes novērtējumu; par konfidencialitātes incidentu, kas rada nopietna kaitējuma risku, mēs ziņojam Commission d'accès à l'information un jums un uzturam incidentu reģistru; iestatījumi, kas nodrošina jūsu debašu privātumu, ir ieslēgti pēc noklusējuma; varat mums lūgt atcelt indeksēšanu vai pārtraukt personas informācijas izplatīšanu par jums; varat pieprasīt savus datus strukturētā, plaši izmantotā formātā; 8. sadaļā ir aprakstīta mūsu automatizētā apstrāde." }
+    ]
+  },
+  {
     no: "B.4",
-    title: "Kanāda un Kvebeka (tikai tad, ja norādītas)",
+    title: "Austrālija un Jaunzēlande",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir [name], privacy@dezbatere.ro. Uz pieprasījumiem mēs atbildam 30 dienu laikā. Mēs saglabājam atbildību par personas informāciju, ko nosūtām MI pakalpojumu sniedzējiem ārpus Kanādas, un ar līgumiem pieprasām līdzvērtīgu aizsardzību; uz šiem pakalpojumu sniedzējiem var attiekties to darbības valstu tiesību akti, tostarp iestāžu likumīga piekļuve. Tirgvedības e-pasta ziņojumi tiek sūtīti tikai ar jūsu nepārprotamu piekrišanu saskaņā ar CASL. Par drošības pasākumu pārkāpumu, kas rada reālu būtiska kaitējuma risku jums, mēs ziņojam Office of the Privacy Commissioner of Canada un jums, un mēs glabājam ierakstu par katru pārkāpumu 24 mēnešus. Kvebeka: pirms personas informācijas nosūtīšanas ārpus Kvebekas mēs veicam privātuma ietekmes novērtējumu; par konfidencialitātes incidentu, kas rada nopietna kaitējuma risku, mēs ziņojam Commission d'accès à l'information un jums un uzturam incidentu reģistru; iestatījumi, kas nodrošina jūsu debašu privātumu, ir ieslēgti pēc noklusējuma; varat mums lūgt atcelt indeksēšanu vai pārtraukt personas informācijas izplatīšanu par jums; varat pieprasīt savus datus strukturētā, plaši izmantotā formātā; 8. sadaļā ir aprakstīta mūsu automatizētā apstrāde." }
+      { kind: "p", text: "Austrālija. Jūsu personas informācijas saņēmēji ārvalstīs ir Reģistrā norādītie MI pakalpojumu sniedzēji un apstrādātāji, kas atrodas Amerikas Savienotajās Valstīs un Eiropas Savienībā; mēs veicam pamatotus pasākumus, lai nodrošinātu, ka tie apstrādā šo informāciju saskaņā ar Austrālijas privātuma principiem. Automatizēti lēmumi: no 2026. gada 10. decembra šajā politikā ir norādīti datorprogrammu pieņemto lēmumu veidi, kas būtiski ietekmē jūsu tiesības vai intereses — tādu nav; vērtējumi un spriedumi attiecas uz argumentiem, nevis jums —, kā arī tajos izmantotā personas informācija. Sūdzības var iesniegt Office of the Australian Information Commissioner. Jaunzēlande. Mūsu privātuma speciālists ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Ja mēs personas informāciju par jums vācam netieši — jo cits lietotājs to ir iekļāvis jautājumā —, šī politika un 11. sadaļa ir paziņojums, ko jums sniedzam. Mēs izpaužam datus Reģistrā norādītajiem MI pakalpojumu sniedzējiem kā apstrādātājiem, kas rīkojas mūsu vārdā, saskaņā ar līgumiem, kuros noteiktas līdzvērtīgas garantijas. Sūdzības var iesniegt Office of the Privacy Commissioner." }
     ]
   },
   {
     no: "B.5",
-    title: "Austrālija un Jaunzēlande (tikai tad, ja norādītas)",
+    title: "Šveice",
     accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Austrālija. Jūsu personas informācijas saņēmēji ārvalstīs ir Reģistrā norādītie MI pakalpojumu sniedzēji un apstrādātāji, kas atrodas [the United States and the European Union]; mēs veicam pamatotus pasākumus, lai nodrošinātu, ka tie apstrādā šo informāciju saskaņā ar Austrālijas privātuma principiem. Automatizēti lēmumi: no 2026. gada 10. decembra šajā politikā ir norādīti datorprogrammu pieņemto lēmumu veidi, kas būtiski ietekmē jūsu tiesības vai intereses — tādu nav; vērtējumi un spriedumi attiecas uz argumentiem, nevis jums —, kā arī tajos izmantotā personas informācija. Sūdzības var iesniegt Office of the Australian Information Commissioner. Jaunzēlande. Mūsu privātuma speciālists ir [name]. Ja mēs personas informāciju par jums vācam netieši — jo cits lietotājs to ir iekļāvis jautājumā —, šī politika un 11. sadaļa ir paziņojums, ko jums sniedzam. Mēs izpaužam datus Reģistrā norādītajiem MI pakalpojumu sniedzējiem kā apstrādātājiem, kas rīkojas mūsu vārdā, saskaņā ar līgumiem, kuros noteiktas līdzvērtīgas garantijas. Sūdzības var iesniegt Office of the Privacy Commissioner." }
-    ]
-  },
-  {
-    no: "B.6",
-    title: "Šveice (tikai tad, ja norādīta)",
-    accent: "--con",
     blocks: [
       { kind: "p", text: "Piemēro Šveices Federālo datu aizsardzības likumu (FADP). Uzraudzības iestāde ir Federal Data Protection and Information Commissioner (FDPIC), edoeb.admin.ch. Jūsu dati tiek nosūtīti uz Reģistrā norādītajām valstīm — ES valstīm un Amerikas Savienotajām Valstīm. Attiecībā uz Amerikas Savienotajām Valstīm mēs balstāmies uz Swiss–US Data Privacy Framework, ja pakalpojumu sniedzējs ir sertificēts, bet citos gadījumos — uz FDPIC atzītām standarta līguma klauzulām. Par datu aizsardzības pārkāpumu, kas, visticamāk, jums radīs augstu risku, mēs ziņojam FDPIC, cik drīz vien iespējams. Esam izvērtējuši, ka mums nav jāieceļ pārstāvis Šveicē (Art. 14 FADP). Šo izvērtējumu mēs pārskatām katru gadu." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldova (tikai tad, ja norādīta)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Piemēro Moldovas Likumu Nr. 195/2024 par personas datu aizsardzību. Tas ir veidots pēc GDPR parauga, un jūsu tiesības saskaņā ar to ir aprakstītas šīs politikas pamatdaļā. Uzraudzības iestāde ir National Center for Personal Data Protection (CNPDCP). Mums nav nepieciešams pārstāvis Moldovā, jo mūsu uzņēmējdarbības vieta ir Eiropas Ekonomikas zonā (Likuma Nr. 195/2024 Art. 27(2)(c)). Šo izvērtējumu mēs pārskatām katru gadu. Jūsu datu nosūtīšana uz Amerikas Savienotajām Valstīm balstās uz mehānismu, kas Reģistrā norādīts katram pakalpojumu sniedzējam. Par personas datu aizsardzības pārkāpumu mēs ziņojam CNPDCP 72 stundu laikā, ja to prasa tiesību akti." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukraina (tikai tad, ja norādīta)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Āzijas un Klusā okeāna reģions",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Piemēro Ukrainas likumu „Par personas datu aizsardzību”. Mēs nepiedāvājam Dialectical Engine tajās Ukrainas teritorijās, kuras nekontrolē tās valdība. Jūsu dati tiek nosūtīti uz ES valstīm un Amerikas Savienotajām Valstīm (skatīt Reģistru). Jūs varat iesniegt sūdzību Ukrainian Parliament Commissioner for Human Rights." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Izraēla (tikai tad, ja norādīta)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Piemēro Izraēlas Privātuma aizsardzības likumu (Protection of Privacy Law). Pārzinis ir DebateAIRO S.R.L.; kā ar mums sazināties, ir norādīts 1. sadaļā. Jums nav juridiska pienākuma sniegt mums savus datus; bez konta datiem mēs nevaram jums atvērt kontu. Mēs izmantojam jūsu datus 4. sadaļā minētajiem nolūkiem un nododam tos 5. sadaļā minētajiem saņēmējiem. Jūs varat lūgt tos apskatīt un labot (10. sadaļa). Uzraudzības iestāde ir Privacy Protection Authority." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Āzijas un Klusā okeāna reģions (tikai rindas par norādītajiem reģioniem)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapūra: mūsu datu aizsardzības speciālists ir [name, email]; datu nosūtīšanas pamatā ir līgumiskas saistības, kas nodrošina PDPA līdzvērtīgu aizsardzību; par paziņojamiem pārkāpumiem mēs informējam PDPC 3 dienu laikā. Japāna: mēs izmantojam jūsu personas informāciju 4. sadaļā minētajiem nolūkiem un nekādiem citiem. Mēs to nododam Reģistrā norādītajiem MI pakalpojumu sniedzējiem un mitināšanas pakalpojumu sniedzējiem, kas atrodas Amerikas Savienotajās Valstīs un ES valstīs, saskaņā ar līgumiem, kas tiem uzliek pienākumu to aizsargāt atbilstoši Japānas Act on the Protection of Personal Information standartam; pēc pieprasījuma mēs jums pastāstām, ko tie dara tās aizsardzībai, un par to valsts privātuma sistēmu. Jūsu uzskati, tostarp reliģiskie un politiskie uzskati, un jūsu veselība ir īpaši aizsargājama personas informācija (special care-required personal information); mēs to vācam tikai ar jūsu iepriekšēju piekrišanu (3. sadaļa). Mūsu nosaukums un adrese ir DebateAIRO S.R.L., [address], Rumānija, un mūsu pārstāvis ir [name], direktors; kā iesniegt pieprasījumu, ir aprakstīts 10. sadaļā, mūsu drošības pasākumi — 9. sadaļā, un sūdzības jāsūta uz privacy@dezbatere.ro. Par pārkāpumiem mēs ziņojam Personal Information Protection Commission, kā to prasa minētais likums. Dienvidkoreja: mūsu privātuma speciālists ir [name], direktors, privacy@dezbatere.ro. Mēs nosūtām personas informāciju uz ārvalstīm, jo tas ir nepieciešams jūsu debašu vadīšanai saskaņā ar mūsu līgumu ar jums: katru reizi, kad notiek debates, mēs pa šifrētu savienojumu nosūtām jūsu jautājumu un debašu izteikumus, bet atbalsta sarunā — jūsu ziņojumus, Reģistrā norādītajiem MI pakalpojumu sniedzējiem un mitināšanas pakalpojumu sniedzējiem; Reģistrā ir norādīts katrs saņēmējs, tā valsts, kontaktinformācija, nolūks un tas, cik ilgi tas glabā datus. Jūs varat atteikties no nosūtīšanas, nesākot debates vai dzēšot savu kontu; tad mēs nevaram jums vadīt debates. Politiskie uzskati, pārliecība un veselība ir sensitīva informācija; mēs tos apstrādājam tikai ar jūsu atsevišķu piekrišanu (3. sadaļa). Mēs nepieņemam par jums pilnībā automatizētus lēmumus (8. sadaļa). Uz pieprasījumiem mēs atbildam [10] dienu laikā un par pārkāpumiem ziņojam Personal Information Protection Commission un jums, kā to prasa Personal Information Protection Act. Taivāna: piemēro Taivānas Personal Data Protection Act. Mēs glabājam jūsu datus 7. sadaļā norādītos termiņus; tie tiek izmantoti Rumānijā, citās ES valstīs un Amerikas Savienotajās Valstīs (skatīt Reģistru); saņēmēji ir norādīti 5. sadaļā; mūsu sistēmas un MI modeļi tos apstrādā automātiski, lai vadītu jūsu debates. Jūs varat jautāt, kādus datus mēs par jums glabājam, tos apskatīt, saņemt to kopiju, tos labot, likt mums pārtraukt to izmantošanu un tos dzēst (10. sadaļa). Konta datu sniegšana ir jūsu izvēle, taču bez tiem mēs nevaram jums atvērt kontu. Uz pieprasījumu apskatīt jūsu datus vai saņemt to kopiju mēs atbildam 15 dienu laikā; ja mums nepieciešams ilgāks laiks, mēs varam šo termiņu vienu reizi pagarināt ne vairāk kā par 15 dienām un rakstiski jums paskaidrot iemeslu. Filipīnas: mūsu datu aizsardzības speciālists ir [name]; sūdzības var iesniegt National Privacy Commission; 8. sadaļā ir aprakstīta automatizētā apstrāde. Taizeme: mūsu pārstāvis ir [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Rezervēts",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Katrā no šīm valstīm — Turcijā, Brazīlijā un Indonēzijā — ir vajadzīgs paziņojums vietējā valodā, pārstāvis vai reģistrācija un dokumentu iesniegšana; šīs valstis šeit nav aplūkotas. Ķīnā, Vjetnamā un Krievijā pakalpojums netiek sniegts." }
+      { kind: "p", text: "Singapūra: mūsu datu aizsardzības speciālists ir mūsu direktors, sasniedzams privacy@dezbatere.ro; datu nosūtīšanas pamatā ir līgumiskas saistības, kas nodrošina PDPA līdzvērtīgu aizsardzību; par paziņojamiem pārkāpumiem mēs informējam PDPC 3 dienu laikā. Japāna: mēs izmantojam jūsu personas informāciju 4. sadaļā minētajiem nolūkiem un nekādiem citiem. Mēs to nododam Reģistrā norādītajiem MI pakalpojumu sniedzējiem un mitināšanas pakalpojumu sniedzējiem, kas atrodas Amerikas Savienotajās Valstīs un ES valstīs, saskaņā ar līgumiem, kas tiem uzliek pienākumu to aizsargāt atbilstoši Japānas Act on the Protection of Personal Information standartam; pēc pieprasījuma mēs jums pastāstām, ko tie dara tās aizsardzībai, un par to valsts privātuma sistēmu. Jūsu uzskati, tostarp reliģiskie un politiskie uzskati, un jūsu veselība ir īpaši aizsargājama personas informācija (special care-required personal information); mēs to vācam tikai ar jūsu iepriekšēju piekrišanu (3. sadaļa). Mūsu nosaukums un adrese ir DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumānija, un mūsu pārstāvis ir Dedita Ionut Ciprian, direktors; kā iesniegt pieprasījumu, ir aprakstīts 10. sadaļā, mūsu drošības pasākumi — 9. sadaļā, un sūdzības jāsūta uz privacy@dezbatere.ro. Par pārkāpumiem mēs ziņojam Personal Information Protection Commission, kā to prasa minētais likums. Dienvidkoreja: mūsu privātuma speciālists ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Mēs nosūtām personas informāciju uz ārvalstīm, jo tas ir nepieciešams jūsu debašu vadīšanai saskaņā ar mūsu līgumu ar jums: katru reizi, kad notiek debates, mēs pa šifrētu savienojumu nosūtām jūsu jautājumu un debašu izteikumus, bet atbalsta sarunā — jūsu ziņojumus, Reģistrā norādītajiem MI pakalpojumu sniedzējiem un mitināšanas pakalpojumu sniedzējiem; Reģistrā ir norādīts katrs saņēmējs, tā valsts, kontaktinformācija, nolūks un tas, cik ilgi tas glabā datus. Jūs varat atteikties no nosūtīšanas, nesākot debates vai dzēšot savu kontu; tad mēs nevaram jums vadīt debates. Politiskie uzskati, pārliecība un veselība ir sensitīva informācija; mēs tos apstrādājam tikai ar jūsu atsevišķu piekrišanu (3. sadaļa). Mēs nepieņemam par jums pilnībā automatizētus lēmumus (8. sadaļa). Uz pieprasījumiem mēs atbildam 10 dienu laikā un par pārkāpumiem ziņojam Personal Information Protection Commission un jums, kā to prasa Personal Information Protection Act. Taivāna: piemēro Taivānas Personal Data Protection Act. Mēs glabājam jūsu datus 7. sadaļā norādītos termiņus; tie tiek izmantoti Rumānijā, citās ES valstīs un Amerikas Savienotajās Valstīs (skatīt Reģistru); saņēmēji ir norādīti 5. sadaļā; mūsu sistēmas un MI modeļi tos apstrādā automātiski, lai vadītu jūsu debates. Jūs varat jautāt, kādus datus mēs par jums glabājam, tos apskatīt, saņemt to kopiju, tos labot, likt mums pārtraukt to izmantošanu un tos dzēst (10. sadaļa). Konta datu sniegšana ir jūsu izvēle, taču bez tiem mēs nevaram jums atvērt kontu. Uz pieprasījumu apskatīt jūsu datus vai saņemt to kopiju mēs atbildam 15 dienu laikā; ja mums nepieciešams ilgāks laiks, mēs varam šo termiņu vienu reizi pagarināt ne vairāk kā par 15 dienām un rakstiski jums paskaidrot iemeslu." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "3eff569175a23ea114600766766cb4e8106c32d815b957bafef90cf81c4a2d64",
-  eyebrow: "PRIVĀTUMA POLITIKA · v3.2 · SPĒKĀ NO [DATE]",
+  version: "3.3",
+  sha256: "e1ea1c07364d29ccc26518134a0dc27535f34dc556d03eb7cf50e9ac786ef009",
+  eyebrow: "PRIVĀTUMA POLITIKA · v3.3 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",
-  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "POLITIKAS BEIGAS · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privātuma politikas teksts",
   sectionIdPrefix: "policy-section-",

@@ -3,6 +3,7 @@ import { normalizeMailDisplay, serializeAccountMail, singleRecipient, type MailD
 import { randomUUID } from "node:crypto";
 import { MailTemplateError, mailAttachmentFactsOf, renderMail as renderTemplatedMail, type MailTemplateId } from "@debateai/mail-templates";
 import { buildTemplatedMessage, type MailAttachment } from "./mail-mime.js";
+import { isMailAddress } from "@debateai/kernel";
 
 // With `sendmail -t` the MTA reads every recipient out of the header block on
 // stdin, so no address reaches argv, which any local user can read with `ps`
@@ -10,9 +11,12 @@ import { buildTemplatedMessage, type MailAttachment } from "./mail-mime.js";
 // the address would make the MTA deliver a second copy to a mailbox nobody
 // vetted. The shape below rejects whitespace through `\s` but not those
 // separators, so each is checked explicitly and stays checked if the shape is
-// ever widened.
+// ever widened. Since 2026-10-09 (open sign-up mail, PR 2) the guard also asks the one shared address rule
+// (@debateai/kernel canonicalMailAddress) that sign-up, the recovery address and email change ask, so an
+// account can never hold an address this step would refuse. The template's own grammar stays as the floor:
+// the shared rule is strictly narrower.
 export function isSingleDeliverableRecipient(recipient: string): boolean {
-  return singleRecipient(recipient);
+  return singleRecipient(recipient) && isMailAddress(recipient);
 }
 
 /** Composition-owned URL only; public display metadata never supplies an origin. */
@@ -286,7 +290,7 @@ export class SendmailRecoveryEmailMailSender implements RecoveryEmailMailSender 
   }
 }
 
-export type ConsumerSecurityNoticeKind='METHOD_CHANGED'|'CODES_REGENERATED'|'RECOVERY_PROVED'|'RECOVERY_COMPLETED';
+export type ConsumerSecurityNoticeKind='METHOD_CHANGED'|'CODES_REGENERATED'|'RECOVERY_PROVED'|'RECOVERY_COMPLETED'|'RECOVERY_CODE_USED';
 export interface ConsumerSecurityNoticeSender {
   sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date}>):Promise<void>;
 }
@@ -301,7 +305,7 @@ export class SendmailConsumerAccountSender implements ConsumerSecurityNoticeSend
     await sendRenderedMail(renderMail({template:'consumer-recovery-v1',recipient:mail.recipient,url,expiresAt:mail.expiresAt},this.options.from),this.options);
   }
   async sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date}>):Promise<void>{
-    const templates={METHOD_CHANGED:'security-method-changed-v1',CODES_REGENERATED:'security-codes-regenerated-v1',RECOVERY_PROVED:'security-recovery-proved-v1',RECOVERY_COMPLETED:'security-recovery-completed-v1'} as const;
+    const templates={METHOD_CHANGED:'security-method-changed-v1',CODES_REGENERATED:'security-codes-regenerated-v1',RECOVERY_PROVED:'security-recovery-proved-v1',RECOVERY_COMPLETED:'security-recovery-completed-v1',RECOVERY_CODE_USED:'security-recovery-code-used-v1'} as const;
     const template=templates[mail.eventKind];if(!template)throw new MailDeliveryError('MAIL_INPUT_INVALID');
     await sendRenderedMail(renderMail({template,recipient:mail.recipient,messageId:mail.messageId,expiresAt:mail.happenedAt},this.options.from),this.options);
   }

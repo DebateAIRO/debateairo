@@ -202,6 +202,6 @@
   "public.publication.contentCheck.groundIllegal": "The text may also be illegal.",
   "public.publication.contentCheck.automated": "This decision was made by an automated tool. No person has reviewed it yet.",
   "public.publication.contentCheck.stillPrivate": "Your debate stays private and unchanged. Only you can see it.",
-  "public.publication.contentCheck.appeal": "To ask a person to review this decision, write to [appeals@dezbatere.ro] within six months.",
+  "public.publication.contentCheck.appeal": "To ask a person to review this decision, write to office@dezbatere.ro within six months.",
   "public.publication.contentCheck.unavailable": "The content check is not available right now, so nothing was published. Your debate stays private. Try again in a few minutes."
 }

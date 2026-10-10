@@ -138,7 +138,7 @@ describe("P17 renderMail", () => {
     );
     expect(mail.text).toContain("https://dezbatere.ro/cancel");
     expect(mail.text).toContain("you may withdraw within 14 days");
-    expect(mail.text).toContain("DebateAIRO S.R.L.");
+    expect(mail.text).toContain("DMS Merchandise Shop S.R.L.");
     expect(mail.html).toMatch(/^<!doctype html>\n<html lang="en" dir="ltr">/);
   });
 
@@ -568,7 +568,7 @@ describe("P17 renderMail", () => {
   it("renders the model withdrawal form with the company (COMPANY's facts, through SELLER_COMPANY) filled in", () => {
     const english = renderWithdrawalForm("en");
     expect(english).toContain("Model withdrawal form");
-    expect(english).toContain("To: DebateAIRO S.R.L.");
+    expect(english).toContain("To: DMS Merchandise Shop S.R.L.");
     expect(renderWithdrawalForm("ro")).not.toBe(english);
     expect(renderWithdrawalForm("xx")).toBe(english);
   });

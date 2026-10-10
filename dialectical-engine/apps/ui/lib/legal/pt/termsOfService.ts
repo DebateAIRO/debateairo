@@ -28,7 +28,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Em resumo",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Tem de ter pelo menos 18 anos. A DebateAI constrói argumentos com modelos de IA e tudo o que gera pode estar errado — não constitui aconselhamento. Os seus debates são privados, a menos que os publique; se os publicar, qualquer pessoa poderá lê-los. O texto que envia é transmitido aos fornecedores de IA indicados no nosso Registo de Fornecedores e não é utilizado para treinar modelos. Denuncie conteúdos ilegais através de [abuse@dezbatere.ro], tenha ou não uma conta. É aplicável a lei romena, mas as proteções locais de que beneficia enquanto consumidor mantêm-se." }
+      { kind: "p", text: "Tem de ter pelo menos 18 anos. A DebateAI constrói argumentos com modelos de IA e tudo o que gera pode estar errado — não constitui aconselhamento. Os seus debates são privados, a menos que os publique; se os publicar, qualquer pessoa poderá lê-los. O texto que envia é transmitido aos fornecedores de IA indicados no nosso Registo de Fornecedores e não é utilizado para treinar modelos. Denuncie conteúdos ilegais através de support@dezbatere.ro, tenha ou não uma conta. É aplicável a lei romena, mas as proteções locais de que beneficia enquanto consumidor mantêm-se." }
     ]
   },
   {
@@ -36,24 +36,25 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Quem somos e como nos contactar",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "A DebateAI é operada pela DebateAIRO S.R.L., uma sociedade registada na Roménia." },
+      { kind: "p", text: "A DebateAI é operada pela DMS Merchandise Shop S.R.L., uma sociedade registada na Roménia." },
       {
         kind: "list",
         items: [
-        "Sede social — [street, number, sector, postal code], Bucareste, Roménia",
-        "Número do Registo Comercial — [J40/…/…]",
-        "Código único de registo (CUI) — […] · IVA: [RO… / not VAT-registered]",
-        "Capital social — [RON …]",
-        "Contacto geral — [hello@dezbatere.ro]",
-        "Notificações legais — [legal@dezbatere.ro]",
+        "Sede social — Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Roménia",
+        "Número do Registo Comercial — J2022000426271",
+        "Código único de registo (CUI) — 45935221 · IVA: RO45935221",
+        "Capital social — RON 5.000",
+        "Contacto geral — support@dezbatere.ro",
+        "Telefone — +40 748 793 490",
+        "Notificações legais — support@dezbatere.ro",
         "Privacidade e proteção de dados — privacy@dezbatere.ro",
-        "Denúncia de conteúdos ilegais — [abuse@dezbatere.ro] — consulte a secção 10",
-        "Ponto de contacto para autoridades — [dsa@dezbatere.ro] — romeno e inglês",
-        "Decisões de remoção de conteúdos terroristas (Regulamento (UE) 2021/784) — [dsa@dezbatere.ro] — o nosso ponto de contacto para estas decisões; romeno e inglês; ver a secção 10",
+        "Denúncia de conteúdos ilegais — support@dezbatere.ro — consulte a secção 10",
+        "Ponto de contacto para autoridades — office@dezbatere.ro — romeno e inglês",
+        "Decisões de remoção de conteúdos terroristas (Regulamento (UE) 2021/784) — office@dezbatere.ro — o nosso ponto de contacto para estas decisões; romeno e inglês; ver a secção 10",
         "Representantes noutros países — Indicados no Anexo A relativamente às regiões em que nomeámos um representante"
         ]
       },
-      { kind: "p", text: "Estes dados também são apresentados permanentemente no sítio, em [dezbatere.ro/legal]. Pode sempre contactar uma pessoa, e não apenas o nosso assistente; a secção 10 explica como." }
+      { kind: "p", text: "Estes dados também são apresentados permanentemente no sítio, em dezbatere.ro/legal. Pode sempre contactar uma pessoa, e não apenas o nosso assistente; a secção 10 explica como." }
     ]
   },
   {
@@ -61,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Onde disponibilizamos a DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Disponibilizamos a DebateAI a pessoas que residam na [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Não a disponibilizamos noutros locais. Se residir fora desses países, poderá conseguir aceder ao sítio, mas não dirigimos o serviço a si, não aceitamos pagamentos seus e estes Termos e a nossa Política de Privacidade não estão adaptados à legislação do seu país. O Anexo A estabelece o que se aplica em cada região que servimos." }
+      { kind: "p", text: "Disponibilizamos a DebateAI a pessoas que residam na União Europeia (27 países) e no Espaço Económico Europeu (Noruega, Islândia e Liechtenstein), na Suíça, na Moldávia, nos Estados Unidos (exceto o Tennessee), no Canadá, na Austrália, na Nova Zelândia, em Singapura, no Japão, na Coreia do Sul e em Taiwan. Não a disponibilizamos noutros locais. Se residir fora desses países, poderá conseguir aceder ao sítio, mas não dirigimos o serviço a si, não aceitamos pagamentos seus e estes Termos e a nossa Política de Privacidade não estão adaptados à legislação do seu país. O Anexo A estabelece o que se aplica em cada região que servimos." }
     ]
   },
   {
@@ -69,8 +70,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Aceitação destes Termos",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Aceita estes Termos ao assinalar a caixa «Li e aceito os Termos de Serviço» e clicar em Criar conta. Isto cria um contrato entre si e a DebateAIRO S.R.L. Os Termos incluem as regras de utilização aceitável da secção 7, as regras de publicação da secção 9, as disposições sobre responsabilidade da secção 15, as disposições sobre lei aplicável e litígios da secção 18 e, caso resida nos Estados Unidos, a convenção de arbitragem constante do Anexo A.3. Conservamos um registo da versão que aceitou e do momento em que a aceitou, conforme explicado na nossa Política de Privacidade." },
-      { kind: "p", text: "A nossa Política de Privacidade, disponível em [dezbatere.ro/privacy], explica como tratamos os dados pessoais. Trata-se de informação que lhe devemos prestar, não de um contrato que aceite, e nada nestes Termos a transforma em consentimento para o tratamento. A nossa Política de Cookies, disponível em [dezbatere.ro/cookies], e o nosso Registo de Fornecedores de IA, disponível em [dezbatere.ro/providers], fazem parte destes Termos por remissão." },
+      { kind: "p", text: "Aceita estes Termos ao assinalar a caixa «Li e aceito os Termos de Serviço» e clicar em Criar conta. Isto cria um contrato entre si e a DMS Merchandise Shop S.R.L. Os Termos incluem as regras de utilização aceitável da secção 7, as regras de publicação da secção 9, as disposições sobre responsabilidade da secção 15 e as disposições sobre lei aplicável e litígios da secção 18. Conservamos um registo da versão que aceitou e do momento em que a aceitou, conforme explicado na nossa Política de Privacidade." },
+      { kind: "p", text: "A nossa Política de Privacidade, disponível em dezbatere.ro/privacy, explica como tratamos os dados pessoais. Trata-se de informação que lhe devemos prestar, não de um contrato que aceite, e nada nestes Termos a transforma em consentimento para o tratamento. A nossa Política de Cookies, disponível em dezbatere.ro/cookies, e o nosso Registo de Fornecedores de IA, disponível em dezbatere.ro/providers, fazem parte destes Termos por remissão." },
       { kind: "p", text: "Antes de celebrar eletronicamente qualquer contrato connosco, a interface mostra-lhe as etapas envolvidas, permite-lhe rever e corrigir o que introduziu antes de o enviar e informa-o dos idiomas em que o contrato pode ser celebrado. Estes Termos são disponibilizados num formato que pode guardar e imprimir. Quando adquirir um plano pago, enviamos-lhe por correio eletrónico a versão que aceitou. Pode também solicitar uma cópia a qualquer momento. Nada nestes Termos limita os direitos de que beneficia ao abrigo do direito romeno ou da UE em matéria de consumo, ou do direito do país onde reside, que não possam ser limitados por contrato." }
     ]
   },
@@ -133,7 +134,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Não treinamos modelos com o seu conteúdo. Não treinamos modelos com o seu conteúdo e os nossos contratos com fornecedores de IA excluem a utilização do seu conteúdo para treinar ou melhorar os respetivos modelos. [Publish this paragraph only once every active provider route has been verified against its signed terms and account settings — see the Provider Register.]" },
       { kind: "p", text: "Como o seu conteúdo chega aos fornecedores de IA. Para executar um debate, enviamos texto a um ou mais fornecedores externos de modelos. O que um fornecedor recebe é a sua pergunta, as anotações de orientação que definiu e as alegações que o motor compõe durante o debate — pelo que o fornecedor vê texto derivado e construído em torno do que escreveu, e não apenas as suas palavras originais. Nunca recebe o seu endereço de correio eletrónico, os identificadores da sua conta, os registos de sessão ou os dados de pagamento." },
       { kind: "p", text: "O que o chat de apoio envia. O assistente de apoio é também um modelo de IA. Quando lhe escreve, enviamos a sua mensagem a um fornecedor externo de modelos para que o modelo possa responder, juntamente com os artigos de ajuda em que baseia a resposta. Antes do envio, ocultamos tudo o que pareça uma palavra-passe, um código de utilização única ou uma chave. Se pedir para falar com uma pessoa, enviamos também ao modelo a conversa, ocultada da mesma forma, para que redija um breve resumo para o membro da nossa equipa que assumir o seu caso. Não anexamos o seu endereço de correio eletrónico, os identificadores da sua conta nem os seus dados de pagamento, mas o modelo recebe tudo o resto que escrever no chat, pelo que não escreva aí nada que não queira que ele leia." },
-      { kind: "p", text: "Quais os fornecedores e onde operam. O nosso Registo de Fornecedores de IA, disponível em [dezbatere.ro/providers], faz parte destes Termos. Indica, para cada fornecedor que podemos utilizar: a respetiva entidade jurídica e país; o que recebe e porquê; onde efetua o tratamento; as respetivas condições de conservação; se está ativa a conservação zero de dados para o ponto terminal que utilizamos; se pode utilizar dados de entrada para treino ao abrigo do nosso contrato; o mecanismo de transferência em que nos baseamos; e a data em que verificámos pela última vez cada entrada. Os fornecedores podem estar localizados fora do seu país e fora do Espaço Económico Europeu. A nossa Política de Privacidade explica as salvaguardas." },
+      { kind: "p", text: "Quais os fornecedores e onde operam. O nosso Registo de Fornecedores de IA, disponível em dezbatere.ro/providers, faz parte destes Termos. Indica, para cada fornecedor que podemos utilizar: a respetiva entidade jurídica e país; o que recebe e porquê; onde efetua o tratamento; as respetivas condições de conservação; se está ativa a conservação zero de dados para o ponto terminal que utilizamos; se pode utilizar dados de entrada para treino ao abrigo do nosso contrato; o mecanismo de transferência em que nos baseamos; e a data em que verificámos pela última vez cada entrada. Os fornecedores podem estar localizados fora do seu país e fora do Espaço Económico Europeu. A nossa Política de Privacidade explica as salvaguardas." },
       { kind: "p", text: "Três coisas diferentes. «Não utilizado para treinar modelos», «conservado durante um período limitado por motivos de segurança, prevenção de abusos ou razões legais» e «conservação zero de dados — não persistem após o tratamento» são situações diferentes. Quando um fornecedor conserva comandos durante um período limitado, o Registo indica por quanto tempo e porquê. Quando está ativa a conservação zero de dados, o Registo indica esse facto e as funcionalidades a que se aplica. Não afirmaremos que um conteúdo não é conservado quando este for efetivamente conservado." },
       { kind: "p", text: "Resultados. Na relação entre o utilizador e nós, pode utilizar os resultados dos seus próprios debates para qualquer finalidade lícita e não reivindicamos a titularidade do texto gerado. Tenha em conta que os resultados gerados podem não ser protegidos por direitos de autor em muitas jurisdições; que podem ser gerados resultados semelhantes para outros utilizadores; que os resultados podem reproduzir ou assemelhar-se a materiais de terceiros; e que alguns materiais de origem obtidos por um fornecedor de IA podem estar sujeitos a restrições de reutilização. É responsável por efetuar verificações antes de se basear nos resultados ou de os voltar a publicar." }
     ]
@@ -157,7 +158,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Denúncia de conteúdos, moderação e reclamações",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "Qualquer pessoa pode denunciar conteúdos. Não necessita de uma conta. Escreva para [abuse@dezbatere.ro] ou utilize o controlo Denunciar em qualquer debate publicado. Para que possamos agir, indique-nos: por que motivo considera que o conteúdo é ilegal ou viola estes Termos, com pormenor suficiente para compreendermos o fundamento da denúncia; a localização exata — o URL completo e, se possível, a passagem; o seu nome e endereço de correio eletrónico (não exigidos para denúncias de material de abuso sexual de crianças); e que acredita, de boa-fé, que a sua denúncia é exata e completa." },
+      { kind: "p", text: "Qualquer pessoa pode denunciar conteúdos. Não necessita de uma conta. Escreva para support@dezbatere.ro ou utilize o controlo Denunciar em qualquer debate publicado. Para que possamos agir, indique-nos: por que motivo considera que o conteúdo é ilegal ou viola estes Termos, com pormenor suficiente para compreendermos o fundamento da denúncia; a localização exata — o URL completo e, se possível, a passagem; o seu nome e endereço de correio eletrónico (não exigidos para denúncias de material de abuso sexual de crianças); e que acredita, de boa-fé, que a sua denúncia é exata e completa." },
       { kind: "p", text: "Acusamos a receção de todas as denúncias sem demora injustificada. Tratamos as denúncias de forma atempada, diligente, não arbitrária e objetiva, comunicamos-lhe a nossa decisão e indicamos-lhe como a pode contestar. Quando utilizamos meios automatizados para tratar uma denúncia ou tomar uma decisão sobre a mesma, informamo-lo desse facto. Atuamos relativamente às denúncias de imagens íntimas partilhadas sem consentimento no prazo de 48 horas após um pedido válido." },
       { kind: "p", text: "Dois tipos de decisão automatizada, mantidos separados." },
       {
@@ -168,7 +169,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         ]
       },
       { kind: "p", text: "Exposição dos motivos. Sempre que removemos ou restringimos a visibilidade do seu conteúdo, ou suspendemos ou encerramos a sua conta, fornecemos-lhe uma exposição dos motivos: o que fizemos e o respetivo alcance, os factos em que nos baseámos e se provêm de uma denúncia ou das nossas próprias verificações, se foram utilizados meios automatizados, o fundamento legal ou contratual e a forma como pode contestar a decisão: através da nossa via de reclamação descrita abaixo, de um organismo de resolução extrajudicial de litígios certificado ao abrigo da Regulamento dos Serviços Digitais da UE, ou junto dos tribunais." },
-      { kind: "p", text: "Reclamação de uma decisão. Se discordar de uma decisão de moderação, responda à exposição dos motivos ou escreva para [appeals@dezbatere.ro] no prazo de seis meses. Uma pessoa que não tenha participado na decisão original procederá à sua revisão e comunicar-lhe-emos o resultado, com a respetiva fundamentação. Isto não afeta o seu direito de recorrer aos tribunais ou a mecanismos de resolução alternativa de litígios ao abrigo da secção 18. A via de reclamação aceita igualmente reclamações de que não demos seguimento a uma denúncia, de que um conteúdo foi indevidamente removido, de que uma conta foi indevidamente restringida ou de que uma ferramenta automatizada afetou indevidamente o seu conteúdo." },
+      { kind: "p", text: "Reclamação de uma decisão. Se discordar de uma decisão de moderação, responda à exposição dos motivos ou escreva para office@dezbatere.ro no prazo de seis meses. Uma pessoa que não tenha participado na decisão original procederá à sua revisão e comunicar-lhe-emos o resultado, com a respetiva fundamentação. Isto não afeta o seu direito de recorrer aos tribunais ou a mecanismos de resolução alternativa de litígios ao abrigo da secção 18. A via de reclamação aceita igualmente reclamações de que não demos seguimento a uma denúncia, de que um conteúdo foi indevidamente removido, de que uma conta foi indevidamente restringida ou de que uma ferramenta automatizada afetou indevidamente o seu conteúdo." },
       { kind: "p", text: "Resolução extrajudicial de litígios. Se se encontrar na União Europeia, pode submeter um litígio relativo a uma das nossas decisões de moderação a um organismo de resolução extrajudicial de litígios certificado ao abrigo do artigo 21.º da Regulamento dos Serviços Digitais da UE (Regulamento (UE) 2022/2065). Isto abrange uma decisão sobre o seu conteúdo ou a sua conta, e a nossa decisão sobre uma denúncia que tenha apresentado. Escolhe o organismo a partir da lista publicada pela Comissão Europeia em digital-strategy.ec.europa.eu/en/policies/dsa-out-court-dispute-settlement, e não tem de recorrer primeiro à nossa via de reclamação. Participamos de boa-fé e só recusamos fazê-lo quando o mesmo litígio, sobre o mesmo conteúdo e com os mesmos fundamentos, já tiver sido resolvido. A decisão do organismo não vincula nenhuma das partes, e o utilizador mantém o seu direito de recorrer aos tribunais. O organismo pode cobrar-lhe uma taxa reduzida ou não lhe cobrar nada. Se decidir a seu favor, pagamos as taxas do organismo e reembolsamos as suas despesas razoáveis; se decidir a nosso favor, não paga as nossas taxas nem despesas, salvo se o organismo concluir que agiu manifestamente de má-fé." },
       { kind: "p", text: "Contactar uma pessoa. O nosso assistente de apoio é um sistema de IA e identifica-se como tal. Pode pedir para falar com uma pessoa a qualquer momento, e todas as conversas com o apoio disponibilizam essa opção. Não dependemos exclusivamente de ferramentas automatizadas para comunicar consigo." },
       { kind: "p", text: "Conteúdo terrorista. O conteúdo terrorista é ilegal e não é permitido na DebateAI (secção 7). As autoridades competentes da União Europeia podem enviar-nos decisões de remoção ao abrigo do Regulamento (UE) 2021/784 para o ponto de contacto indicado na secção 1. Quando recebemos uma, removemos o conteúdo, ou bloqueamos o acesso ao mesmo em todos os países da UE, no prazo de uma hora. Informamos a pessoa que o publicou de que foi removido e, se o solicitar, dos motivos e da forma de contestar a decisão de remoção, salvo se a autoridade decidir que a segurança pública exige sigilo durante um período limitado. Conforme exigido pelo Regulamento, conservamos o conteúdo removido e os dados conexos durante seis meses, para que a remoção possa ser revista e, se tiver sido incorreta, revertida. A pessoa que publicou o conteúdo pode contestar a decisão de remoção nos tribunais do país cuja autoridade a emitiu, e pode também utilizar a nossa via de reclamação. Nenhuma autoridade nos exigiu a adoção de medidas específicas contra conteúdos terroristas ao abrigo do Regulamento; se alguma o fizer, descreveremos aqui essas medidas, incluindo quaisquer ferramentas automatizadas." },
@@ -181,7 +182,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--muted",
     blocks: [
       { kind: "p", text: "Pelo utilizador. Encerre a sua conta a qualquer momento nas Definições, conforme descrito na secção 6. Não necessita de apresentar um motivo. O encerramento da sua conta põe fim a estes Termos. Os Termos cessam quando o encerramento produz efeitos, após o período de tolerância de 7 dias; as secções indicadas no final desta secção continuam a aplicar-se depois disso." },
-      { kind: "p", text: "Por nós. Podemos suspender ou encerrar a sua conta, ou remover ou restringir o seu conteúdo, quando: violar substancialmente estes Termos, em especial a secção 7; o seu conteúdo for ilegal, ou a lei, um tribunal ou uma autoridade nos obrigar a agir; a sua utilização ameaçar a segurança, a integridade ou a disponibilidade do serviço, ou os direitos de terceiros; a sua conta estiver inativa há [24 months] e o tivermos notificado; ou deixarmos de prestar o serviço, ou de o prestar no seu país." },
+      { kind: "p", text: "Por nós. Podemos suspender ou encerrar a sua conta, ou remover ou restringir o seu conteúdo, quando: violar substancialmente estes Termos, em especial a secção 7; o seu conteúdo for ilegal, ou a lei, um tribunal ou uma autoridade nos obrigar a agir; a sua utilização ameaçar a segurança, a integridade ou a disponibilidade do serviço, ou os direitos de terceiros; a sua conta estiver inativa há 24 meses e o tivermos notificado; ou deixarmos de prestar o serviço, ou de o prestar no seu país." },
       { kind: "p", text: "Salvo quando a violação for grave, a lei exigir uma ação imediata ou um atraso puder causar danos, informá-lo-emos do problema e dar-lhe-emos uma oportunidade razoável para o corrigir antes de suspendermos ou encerrarmos a conta. Forneceremos sempre uma exposição dos motivos nos termos da secção 10, e poderá contestar a decisão." },
       { kind: "p", text: "Se encerrarmos totalmente o serviço ou deixarmos de o disponibilizar no seu país, daremos um pré-aviso de pelo menos 30 dias, reembolsaremos qualquer montante pré-pago relativo ao período posterior ao encerramento e disponibilizaremos previamente uma forma de exportar os seus debates." },
       { kind: "p", text: "Efeitos do encerramento. Quando uma conta é encerrada, destruímos as chaves de cifragem dos dados da sua conta e dos seus debates privados, tornando-os permanentemente ilegíveis, eliminamos o registo da sua conta e, se assim o tiver escolhido, removemos os seus debates publicados do acesso público, conforme descrito na secção 9. Alguns elementos subsistem, e deve saber quais: entradas nos nossos registos de auditoria e segurança, que são exclusivamente aditivos, conservadas para cumprirmos as nossas próprias obrigações legais e de segurança; registos que a lei nos obriga a conservar, incluindo registos de aceitação e consentimento; e, relativamente a um pequeno número de debates antigos anteriores ao nosso sistema de cifragem, registos cuja eliminação é mais limitada — informá-lo-emos se isto se aplicar à sua conta. A Política de Privacidade descreve tudo isto em termos de proteção de dados e explica o seu direito ao apagamento." },
@@ -194,13 +195,13 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]" },
-      { kind: "p", text: "A DebateAI oferece um plano gratuito. Está [is / will be] disponível um plano Premium pago, que desbloqueia o conjunto completo de modelos e lhe permite definir diretamente os parâmetros do debate." },
+      { kind: "p", text: "A DebateAI oferece um plano gratuito. Estará disponível um plano Premium pago, que desbloqueia o conjunto completo de modelos e lhe permite definir diretamente os parâmetros do debate." },
       { kind: "p", text: "Antes do pagamento, mostramos-lhe, imediatamente acima do botão de pagamento: o plano; o preço total, incluindo os impostos aplicáveis; o período de faturação; o facto de o plano se renovar automaticamente até ser cancelado; a data em que termina qualquer período experimental gratuito e o montante que lhe será então cobrado; e como cancelar. Confirma as condições de renovação assinalando uma caixa separada. O botão contém a indicação Subscrever e pagar (em romeno, Comandă cu obligație de plată). Enviamos-lhe uma confirmação num suporte duradouro que contém as mesmas informações, estes Termos e o formulário de retratação." },
-      { kind: "p", text: "Lembretes. Enviamos-lhe uma mensagem de correio eletrónico pelo menos [5] dias antes de um período experimental gratuito se converter num plano pago; pelo menos uma vez por ano para planos contínuos; e entre 30 e 45 dias antes de qualquer renovação de um prazo igual ou superior a doze meses. Cada lembrete inclui o preço, a data e uma ligação de cancelamento." },
-      { kind: "p", text: "Cancelamento. Cancele a qualquer momento em Definições → Subscrição, com um clique de confirmação, ou através da página de cancelamento em [dezbatere.ro/cancel], que não exige que inicie sessão. O cancelamento produz efeitos no final do período de faturação em curso, e o utilizador mantém o acesso até essa data. Não tornaremos o cancelamento mais difícil do que a subscrição." },
+      { kind: "p", text: "Lembretes. Enviamos-lhe uma mensagem de correio eletrónico pelo menos 5 dias antes de um período experimental gratuito se converter num plano pago; pelo menos uma vez por ano para planos contínuos; e entre 30 e 45 dias antes de qualquer renovação de um prazo igual ou superior a doze meses. Cada lembrete inclui o preço, a data e uma ligação de cancelamento." },
+      { kind: "p", text: "Cancelamento. Cancele a qualquer momento em Definições → Subscrição, com um clique de confirmação, ou através da página de cancelamento em dezbatere.ro/cancel, que não exige que inicie sessão. O cancelamento produz efeitos no final do período de faturação em curso, e o utilizador mantém o acesso até essa data. Não tornaremos o cancelamento mais difícil do que a subscrição." },
       { kind: "p", text: "Alterações de preço só produzem efeitos aquando de uma renovação. Damos um pré-aviso de pelo menos 30 dias por correio eletrónico, com o novo preço e uma ligação de cancelamento. Quando a legislação do seu país exigir o seu consentimento expresso para uma alteração de preço, solicitá-lo-emos; caso contrário, se nada fizer, o novo preço será aplicável a partir da renovação seguinte. O Anexo A assinala as regras regionais." },
-      { kind: "p", text: "Pagamentos falhados. Se um pagamento falhar, repetiremos a tentativa durante [7] dias e avisá-lo-emos por correio eletrónico antes de convertermos a sua conta para o plano gratuito. Não eliminaremos os seus debates devido a uma falha de pagamento." },
-      { kind: "p", text: "Impostos e entidade a quem paga. Os preços [include / exclude] IVA, GST ou imposto sobre vendas, conforme o local onde reside, sendo essa informação apresentada antes do pagamento. [If a merchant of record is used: Your purchase is processed by [Paddle / …], which is the seller of record for the transaction; its terms apply to payment, tax, invoicing, refunds and payment disputes. DebateAIRO remains responsible for the service itself and for these Terms.]" },
+      { kind: "p", text: "Pagamentos falhados. Se um pagamento falhar, repetiremos a tentativa durante 7 dias e avisá-lo-emos por correio eletrónico antes de convertermos a sua conta para o plano gratuito. Não eliminaremos os seus debates devido a uma falha de pagamento." },
+      { kind: "p", text: "Impostos e entidade a quem paga. Os preços incluem IVA, GST ou imposto sobre vendas, conforme o local onde reside, sendo essa informação apresentada antes do pagamento. Os pagamentos com cartão são processados pela NETOPIA Payments (netopia-payments.com). A vendedora é a DMS Merchandise Shop S.R.L., que emite a sua fatura e continua responsável pelo serviço em si e por estes Termos." },
       { kind: "p", text: "Estornos. Se contestar uma cobrança junto do emissor do seu cartão, podemos suspender as funcionalidades pagas enquanto o litígio estiver a ser resolvido. Não cobramos taxas por esse motivo." },
       { kind: "p", text: "Prevalência dos direitos legais. Quando o serviço não estiver em conformidade com o que prometemos, tem direito a que seja reposta a conformidade, ou a uma redução proporcional do preço ou a um reembolso, nos termos previstos na lei. Além disso, [state your discretionary refund policy]. Os limites de utilização de qualquer dos planos são publicados no produto; avisá-lo-emos antes de os restringir de uma forma que o afete substancialmente." }
     ]
@@ -210,7 +211,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "O seu direito de retratação",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Se residir na UE, no EEE ou no Reino Unido, pode retratar-se de uma subscrição paga no prazo de 14 dias após a subscrição, sem necessidade de indicar um motivo. Utilize a página Retratar-se do contrato, disponível em [dezbatere.ro/withdraw], o formulário-modelo constante da mensagem de confirmação, ou escreva para [support@dezbatere.ro]; confirmamos a receção num suporte duradouro." },
+      { kind: "p", text: "Se residir na UE ou no EEE, pode retratar-se de uma subscrição paga no prazo de 14 dias após a subscrição, sem necessidade de indicar um motivo. Utilize a página Retratar-se do contrato, disponível em dezbatere.ro/withdraw, o formulário-modelo constante da mensagem de confirmação, ou escreva para support@dezbatere.ro; confirmamos a receção num suporte duradouro." },
       { kind: "p", text: "Se nos tiver solicitado que iniciássemos o serviço imediatamente — assinalando a caixa no momento do pagamento — e depois exercer o direito de retratação, pagará a parte do serviço prestada até ao dia em que se retratar, calculada proporcionalmente com base no preço do período de faturação, e reembolsaremos o restante. Não perde o direito de retratação por utilizar o serviço durante os 14 dias." },
       { kind: "p", text: "Se residir noutro local, o Anexo A indica o direito de retratação ou o período de reflexão aplicável na sua região, caso exista, e, nos restantes casos, a nossa política de reembolso. Os direitos legais vigentes no seu país prevalecem sempre." }
     ]
@@ -222,7 +223,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "Ao serviço. Desenvolvemos continuamente a DebateAI, e as melhorias de rotina, correções e alterações ao conjunto de modelos ocorrem sem aviso. Quando introduzimos uma alteração que vai além da manutenção do funcionamento do serviço conforme descrito, fazemo-lo apenas por um dos seguintes motivos: cumprir um requisito legal ou regulamentar; responder a um problema de segurança ou abuso; um fornecedor de modelos alterar, restringir ou retirar um modelo ou uma funcionalidade de que dependemos; adaptar o serviço a um ambiente técnico que não controlamos; ou adicionar, melhorar ou retirar uma funcionalidade sem lhe impor custos." },
       { kind: "p", text: "Informá-lo-emos previamente, num suporte duradouro, sobre o que será alterado e quando. Se a alteração tiver um efeito negativo mais do que ligeiro no seu acesso ao serviço ou na sua utilização, poderá resolver o contrato sem encargos no prazo de 30 dias após ser informado, ou após a produção de efeitos da alteração, consoante a data que for posterior, e reembolsaremos qualquer montante pré-pago relativo ao período não utilizado." },
-      { kind: "p", text: "A estes Termos. Podemos alterar estes Termos pelos mesmos tipos de motivos. No caso de alterações que não reduzam os seus direitos, publicamos a nova versão com um resumo das alterações e enviamos-lhe uma mensagem de correio eletrónico pelo menos 30 dias antes de produzir efeitos; a utilização continuada da DebateAI depois dessa data significa que a aceita; pode encerrar a sua conta antes dessa data. No caso de alterações que reduzam os seus direitos — incluindo aumentos de preço de um plano existente, redução de limites, remoção de funcionalidades, novas utilizações do seu conteúdo ou alterações relativas à responsabilidade, à lei aplicável ou à resolução de litígios — pedimos-lhe que aceite expressamente a nova versão quando voltar a iniciar sessão, e a alteração só se aplica daí em diante. Nunca aplicamos uma alteração retroativamente e nunca utilizamos esta secção para alterar, durante o respetivo prazo, o essencial daquilo por que pagou sem lhe oferecer uma forma de sair. As versões anteriores permanecem disponíveis em [dezbatere.ro/terms/versions]." }
+      { kind: "p", text: "A estes Termos. Podemos alterar estes Termos pelos mesmos tipos de motivos. No caso de alterações que não reduzam os seus direitos, publicamos a nova versão com um resumo das alterações e enviamos-lhe uma mensagem de correio eletrónico pelo menos 30 dias antes de produzir efeitos; a utilização continuada da DebateAI depois dessa data significa que a aceita; pode encerrar a sua conta antes dessa data. No caso de alterações que reduzam os seus direitos — incluindo aumentos de preço de um plano existente, redução de limites, remoção de funcionalidades, novas utilizações do seu conteúdo ou alterações relativas à responsabilidade, à lei aplicável ou à resolução de litígios — pedimos-lhe que aceite expressamente a nova versão quando voltar a iniciar sessão, e a alteração só se aplica daí em diante. Nunca aplicamos uma alteração retroativamente e nunca utilizamos esta secção para alterar, durante o respetivo prazo, o essencial daquilo por que pagou sem lhe oferecer uma forma de sair. As versões anteriores permanecem disponíveis em dezbatere.ro/terms/versions." }
     ]
   },
   {
@@ -244,7 +245,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", text: "O próprio serviço — o software, o motor, o método de pontuação, a interface, os nomes DebateAI e DebateAIRO e os nossos logótipos — pertence-nos ou aos nossos licenciantes. Estes Termos concedem-lhe autorização para utilizar o serviço, não a propriedade do mesmo." },
       { kind: "p", text: "Pode citar debates publicados e incluir ligações para os mesmos, com atribuição à DebateAI e uma ligação para a página original. A cópia em massa, a reprodução sistemática do acervo público e a utilização de debates publicados como dados de treino não são permitidas sem o nosso acordo escrito." },
-      { kind: "p", text: "A secção 8 abrange o seu conteúdo e o estatuto dos resultados gerados. Se considerar que algo na DebateAI viola os seus direitos de propriedade intelectual, utilize a via de denúncia indicada na secção 10. [If the United States is inside section 2: our designated agent under the Digital Millennium Copyright Act is [name, address, email], registered with the US Copyright Office; we terminate the accounts of repeat infringers.]" }
+      { kind: "p", text: "A secção 8 abrange o seu conteúdo e o estatuto dos resultados gerados. Se considerar que algo na DebateAI viola os seus direitos de propriedade intelectual, utilize a via de denúncia indicada na secção 10." }
     ]
   },
   {
@@ -252,7 +253,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dados pessoais",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "A forma como tratamos dados pessoais é estabelecida na Política de Privacidade, disponível em [dezbatere.ro/privacy]. Esta explica o que recolhemos, o fundamento jurídico de cada finalidade, durante quanto tempo conservamos os elementos, quem recebe os dados, as transferências envolvidas e como exercer os seus direitos. Há também três pontos que pertencem a esta secção. A secção 7 pede-lhe que não inclua dados pessoais de terceiros numa pergunta; se o fizer, será responsável por esses dados e poderemos remover o conteúdo. Se um debate publicado na DebateAI contiver dados pessoais a seu respeito, pode pedir-nos que os removamos sem ter uma conta (secção 9). Conservamos ainda um registo da sua aceitação destes Termos — a versão, a hora e os dados técnicos da sessão — como prova do contrato, conforme explicado na Política de Privacidade." }
+      { kind: "p", text: "A forma como tratamos dados pessoais é estabelecida na Política de Privacidade, disponível em dezbatere.ro/privacy. Esta explica o que recolhemos, o fundamento jurídico de cada finalidade, durante quanto tempo conservamos os elementos, quem recebe os dados, as transferências envolvidas e como exercer os seus direitos. Há também três pontos que pertencem a esta secção. A secção 7 pede-lhe que não inclua dados pessoais de terceiros numa pergunta; se o fizer, será responsável por esses dados e poderemos remover o conteúdo. Se um debate publicado na DebateAI contiver dados pessoais a seu respeito, pode pedir-nos que os removamos sem ter uma conta (secção 9). Conservamos ainda um registo da sua aceitação destes Termos — a versão, a hora e os dados técnicos da sessão — como prova do contrato, conforme explicado na Política de Privacidade." }
     ]
   },
   {
@@ -261,11 +262,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Lei aplicável. Estes Termos, bem como qualquer litígio ou pretensão deles decorrente ou relacionado com o respetivo objeto, incluindo pretensões extracontratuais, são regidos pela legislação da Roménia." },
-      { kind: "p", text: "As suas proteções locais não são afetadas. Se for consumidor, a escolha da lei romena não o priva da proteção conferida por quaisquer normas imperativas de defesa do consumidor do país da sua residência habitual — por exemplo, normas sobre cláusulas abusivas, direitos de retratação e cancelamento ou garantias — quando essas normas se apliquem independentemente desta escolha, incluindo nos termos do artigo 6.º, n.º 2, do Regulamento (CE) n.º 593/2008, caso resida na UE, ou das normas equivalentes do Reino Unido. Pode invocar essas normas para além da lei romena." },
-      { kind: "p", text: "Tribunais, se residir na UE, no EEE ou no Reino Unido. Pode intentar uma ação contra nós nos tribunais da Roménia ou nos tribunais do país onde reside. Só podemos intentar uma ação contra si nos tribunais do país onde reside." },
-      { kind: "p", text: "Consumidores noutros locais. Se residir fora da UE, do EEE e do Reino Unido, nada nestes Termos limita qualquer direito que detenha ao abrigo da legislação do seu país de intentar uma ação nos respetivos tribunais, ou qualquer direito conferido por essa legislação que não possa ser objeto de renúncia — incluindo, se residir na Austrália ou na Nova Zelândia, os seus direitos relativos a garantias do consumidor; se residir no Brasil, o Código de Defesa do Consumidor; e, se residir nos Estados Unidos, as leis de defesa do consumidor do seu estado." },
-      { kind: "p", text: "Residentes nos Estados Unidos. O Anexo A.3 contém uma convenção de arbitragem e uma renúncia a ações coletivas regidas pelo Federal Arbitration Act. Aplica-se apenas a residentes nos Estados Unidos e apenas quando for exequível. Não se aplica a consumidores na UE, no EEE ou no Reino Unido." },
-      { kind: "p", text: "Antes de recorrer aos tribunais. Contacte-nos através de [legal@dezbatere.ro]; a maioria das questões pode ser resolvida e procuramos responder no prazo de [5] dias úteis. Se for consumidor na Roménia ou na UE, pode recorrer à resolução alternativa de litígios através de [the ANPC – named SAL entity, website]; comprometemo-nos [do / do not] a participar nesse procedimento. As reclamações relativas a decisões de moderação seguem a secção 10, que constitui uma via separada." }
+      { kind: "p", text: "As suas proteções locais não são afetadas. Se for consumidor, a escolha da lei romena não o priva da proteção conferida por quaisquer normas imperativas de defesa do consumidor do país da sua residência habitual — por exemplo, normas sobre cláusulas abusivas, direitos de retratação e cancelamento ou garantias — quando essas normas se apliquem independentemente desta escolha, incluindo nos termos do artigo 6.º, n.º 2, do Regulamento (CE) n.º 593/2008, caso resida na UE. Pode invocar essas normas para além da lei romena." },
+      { kind: "p", text: "Tribunais, se residir na UE ou no EEE. Pode intentar uma ação contra nós nos tribunais da Roménia ou nos tribunais do país onde reside. Só podemos intentar uma ação contra si nos tribunais do país onde reside." },
+      { kind: "p", text: "Consumidores noutros locais. Se residir fora da UE e do EEE, nada nestes Termos limita qualquer direito que detenha ao abrigo da legislação do seu país de intentar uma ação nos respetivos tribunais, ou qualquer direito conferido por essa legislação que não possa ser objeto de renúncia — incluindo, se residir na Austrália ou na Nova Zelândia, os seus direitos relativos a garantias do consumidor; se residir no Brasil, o Código de Defesa do Consumidor; e, se residir nos Estados Unidos, as leis de defesa do consumidor do seu estado." },
+      { kind: "p", text: "Antes de recorrer aos tribunais. Contacte-nos através de support@dezbatere.ro; a maioria das questões pode ser resolvida e procuramos responder no prazo de 5 dias úteis. Se for consumidor na Roménia ou na UE, pode recorrer à resolução alternativa de litígios através de www.onoratainstanta.ro; não nos comprometemos a participar nesse procedimento. As reclamações relativas a decisões de moderação seguem a secção 10, que constitui uma via separada." }
     ]
   },
   {
@@ -278,7 +278,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Não renúncia. Se não exigirmos de imediato o cumprimento de uma disposição, não perdemos o direito de exigir o seu cumprimento posteriormente." },
       { kind: "p", text: "Acordo integral. Estes Termos, juntamente com a Política de Cookies e o Registo de Fornecedores de IA, constituem o acordo integral entre nós relativamente ao serviço. Os compromissos que assumimos na Política de Privacidade vinculam-nos. Nada neste parágrafo exclui a responsabilidade por declaração fraudulenta." },
       { kind: "p", text: "Idioma. Estes Termos são publicados em todos os idiomas disponibilizados no sítio. O contrato é celebrado no idioma em que se registou: o idioma da versão que aceitou, que o nosso registo de aceitação conserva. Se posteriormente aceitar uma nova versão noutro idioma, o contrato prossegue nesse idioma. As restantes versões linguísticas são traduções. Quando a legislação do país onde reside determinar que prevalece a versão no idioma desse país, essa versão prevalece. Se duas versões linguísticas divergirem, aplicamos o sentido que lhe seja mais favorável." },
-      { kind: "p", text: "Contacto. [legal@dezbatere.ro] · DebateAIRO S.R.L., [address], Bucareste, Roménia." }
+      { kind: "p", text: "Contacto. support@dezbatere.ro · DMS Merchandise Shop S.R.L., Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Roménia." }
     ]
   },
   {
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Anexo A — Termos regionais",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Cada entrada aplica-se apenas se a respetiva região estiver indicada na secção 2 e estabelece somente aquilo que difere do corpo do documento. Em caso de conflito entre uma entrada e o corpo, a entrada aplica-se às pessoas dessa região." }
+      { kind: "p", text: "Cada entrada aplica-se às pessoas que residam na respetiva região e estabelece somente aquilo que difere do corpo do documento. Em caso de conflito entre uma entrada e o corpo, a entrada aplica-se às pessoas dessa região." }
     ]
   },
   {
@@ -294,103 +294,70 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "União Europeia e Espaço Económico Europeu",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "O corpo destes Termos foi redigido para si. Adicionalmente: pode intentar ações nos tribunais do país onde reside; aplica-se o direito de retratação previsto na secção 13; a resolução alternativa de litígios está disponível através de [the ANPC – named entity, website]. Alemanha: o botão de cancelamento em [dezbatere.ro/cancel] permite-lhe terminar uma subscrição sem iniciar sessão; os prazos da subscrição, os períodos de renovação e os prazos de pré-aviso cumprem o §309(9) BGB [state them]. França: pode terminar uma subscrição em linha em três passos, em [URL]; [the mediator named at URL] está à sua disposição. Itália: as cláusulas relativas a responsabilidade (15), suspensão (11), alterações (14) e lei aplicável (18) exigem a sua aprovação específica, que presta através da confirmação separada no momento do registo. Países Baixos: estes Termos são disponibilizados num formato suscetível de conservação antes da celebração. Polónia: está disponível uma versão em polaco em [URL]." }
+      { kind: "p", text: "O corpo destes Termos foi redigido para si. Adicionalmente: pode intentar ações nos tribunais do país onde reside; aplica-se o direito de retratação previsto na secção 13; a resolução alternativa de litígios está disponível através de www.onoratainstanta.ro. Alemanha: o botão de cancelamento em dezbatere.ro/cancel permite-lhe terminar uma subscrição sem iniciar sessão; os prazos da subscrição, os períodos de renovação e os prazos de pré-aviso cumprem o §309(9) BGB [state them]. França: pode terminar uma subscrição em linha em três passos, em [URL]. Itália: as cláusulas relativas a responsabilidade (15), suspensão (11), alterações (14) e lei aplicável (18) exigem a sua aprovação específica, que presta através da confirmação separada no momento do registo. Países Baixos: estes Termos são disponibilizados num formato suscetível de conservação antes da celebração. Polónia: está disponível uma versão em polaco em [URL]." }
     ]
   },
   {
     no: "A.2",
-    title: "Reino Unido (apenas se indicado na secção 2)",
+    title: "Estados Unidos",
     accent: "--ink",
     blocks: [
-      { kind: "p", text: "O nosso representante no Reino Unido ao abrigo do artigo 27.º do RGPD do Reino Unido é [name, address, email]. O Consumer Rights Act 2015 é-lhe aplicável e nada nestes Termos limita os direitos que lhe confere; quando as regras relativas a subscrições do Digital Markets, Competition and Consumers Act 2024 entrarem em vigor (o que se prevê para 2027), aplicar-se-ão aos planos pagos, incluindo um período de reflexão após renovações e períodos experimentais gratuitos. Como protegemos os utilizadores contra conteúdos ilegais: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Tecnologia proativa que utilizamos: [describe, or \"none\"]. Verificação da idade: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. O procedimento de reclamação da secção 10 aceita reclamações relativas a conteúdos ilegais, remoção indevida do seu conteúdo, restrições à sua conta, utilização de ferramentas automatizadas que afetem o seu conteúdo e qualquer avaliação etária que o bloqueie indevidamente. Está disponível a pessoas afetadas por conteúdos que não sejam utilizadores. O Anexo B.2 da nossa Política de Privacidade abrange os seus dados." }
+      { kind: "p", text: "Tennessee. Não disponibilizamos a DebateAI a pessoas que residam no Tennessee." },
+      { kind: "p", text: "Notificações e remoções. As imagens íntimas não consentidas podem ser denunciadas em [URL] sem uma conta e são removidas no prazo de 48 horas após um pedido válido. As reclamações relativas a direitos de autor seguem a via de denúncia da secção 10." },
+      { kind: "p", text: "Disposições específicas de cada estado. Califórnia: aplicam-se as condições de renovação automática da secção 12; pode cancelar em linha a qualquer momento; conservamos o seu consentimento para as condições de renovação durante pelo menos três anos. Nova Iorque: pode cancelar no prazo de 14 dias após qualquer cobrança a um preço aumentado e receber um reembolso proporcional. Texas e Nebraska: não vendemos dados pessoais sensíveis. Washington: o nosso Aviso de Privacidade de Dados de Saúde dos Consumidores, disponível em [URL], aplica-se a informações relacionadas com a saúde. Colorado: nada no serviço toma decisões com consequências significativas a seu respeito. O Anexo B.2 da nossa Política de Privacidade abrange os seus dados e os direitos de privacidade previstos no seu estado." }
     ]
   },
   {
     no: "A.3",
-    title: "Estados Unidos (apenas se indicados na secção 2)",
+    title: "Canadá e Quebeque",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Tennessee. Não disponibilizamos a DebateAI a pessoas que residam no Tennessee." },
-      { kind: "p", text: "Convenção de arbitragem e renúncia a ações coletivas. Se residir nos Estados Unidos, o utilizador e a DebateAIRO concordam em resolver qualquer litígio decorrente destes Termos ou do serviço através de arbitragem individual vinculativa administrada por [the American Arbitration Association / JAMS] ao abrigo das respetivas regras de arbitragem de consumo, em vez de recorrer aos tribunais, com a exceção de que qualquer uma das partes pode apresentar uma pretensão individual num tribunal de pequenas causas. Pode optar pela não aplicação enviando uma mensagem para [address] no prazo de 30 dias após a primeira aceitação destes Termos. Esta convenção é regida pelo Federal Arbitration Act. Suportamos as taxas de apresentação da arbitragem. Há renúncia a ações coletivas, conjuntas e representativas na medida permitida por lei. Esta secção aplica-se apenas para o futuro e não se aplica a pretensões surgidas antes da sua aceitação." },
-      { kind: "p", text: "Notificações e remoções. As imagens íntimas não consentidas podem ser denunciadas em [URL] sem uma conta e são removidas no prazo de 48 horas após um pedido válido. As reclamações relativas a direitos de autor são dirigidas ao nosso agente designado referido na secção 16." },
-      { kind: "p", text: "Disposições específicas de cada estado. Califórnia: aplicam-se as condições de renovação automática da secção 12; pode cancelar em linha a qualquer momento; conservamos o seu consentimento para as condições de renovação durante pelo menos três anos. Nova Iorque: pode cancelar no prazo de 14 dias após qualquer cobrança a um preço aumentado e receber um reembolso proporcional. Texas e Nebraska: não vendemos dados pessoais sensíveis. Washington: o nosso Aviso de Privacidade de Dados de Saúde dos Consumidores, disponível em [URL], aplica-se a informações relacionadas com a saúde. Colorado: nada no serviço toma decisões com consequências significativas a seu respeito. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados e os direitos de privacidade previstos no seu estado." }
+      { kind: "p", text: "O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é o nosso administrador, contactável em privacy@dezbatere.ro. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados. Quebeque: estes Termos estão disponíveis em francês; escolha francês no seletor de idioma; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito." }
     ]
   },
   {
     no: "A.4",
-    title: "Canadá e Quebeque (apenas se indicados)",
+    title: "Austrália e Nova Zelândia",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é [name], privacy@dezbatere.ro. O Anexo B.4 da nossa Política de Privacidade abrange os seus dados. Quebeque: estes Termos estão disponíveis em francês; escolha francês no seletor de idioma; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito; não se lhe aplica qualquer convenção de arbitragem nem renúncia a ações coletivas." }
+      { kind: "p", text: "Os nossos serviços beneficiam de garantias que não podem ser excluídas ao abrigo da Australian Consumer Law. Em caso de falhas graves do serviço, tem direito a cancelar e a obter o reembolso da parte não utilizada, ou a uma indemnização pela redução do seu valor; tem igualmente direito a indemnização por quaisquer outros prejuízos ou danos razoavelmente previsíveis. Se a falha não constituir uma falha grave, tem direito a que os problemas do serviço sejam corrigidos num prazo razoável e, se isso não acontecer, a cancelar e obter um reembolso. Na medida permitida pela secção 64A, a nossa responsabilidade por violação de uma garantia limita-se a prestar novamente o serviço ou a pagar o custo dessa nova prestação. Não se aplica ao plano pago qualquer período de reflexão além do concedido pela secção 12; os pedidos de reembolso são tratados em support@dezbatere.ro. Nova Zelândia: o Consumer Guarantees Act 1993 é aplicável e nada nestes Termos o exclui; as comunicações digitais prejudiciais podem ser-nos denunciadas ao abrigo da secção 10 ou comunicadas à Netsafe." }
     ]
   },
   {
     no: "A.5",
-    title: "Austrália e Nova Zelândia (apenas se indicadas)",
+    title: "Suíça",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Os nossos serviços beneficiam de garantias que não podem ser excluídas ao abrigo da Australian Consumer Law. Em caso de falhas graves do serviço, tem direito a cancelar e a obter o reembolso da parte não utilizada, ou a uma indemnização pela redução do seu valor; tem igualmente direito a indemnização por quaisquer outros prejuízos ou danos razoavelmente previsíveis. Se a falha não constituir uma falha grave, tem direito a que os problemas do serviço sejam corrigidos num prazo razoável e, se isso não acontecer, a cancelar e obter um reembolso. Na medida permitida pela secção 64A, a nossa responsabilidade por violação de uma garantia limita-se a prestar novamente o serviço ou a pagar o custo dessa nova prestação. Não se aplica ao plano pago qualquer período de reflexão além do concedido pela secção 12; a nossa política de reembolso é […]. Nova Zelândia: o Consumer Guarantees Act 1993 é aplicável e nada nestes Termos o exclui; as comunicações digitais prejudiciais podem ser-nos denunciadas ao abrigo da secção 10 ou comunicadas à Netsafe." }
+      { kind: "p", text: "A Lei Federal suíça sobre a Proteção de Dados aplica-se aos seus dados (Política de Privacidade, Anexo B.5). Pode intentar ações nos tribunais do local da Suíça onde reside. Não se aplica ao plano pago qualquer direito legal de retratação; os pedidos de reembolso são tratados em support@dezbatere.ro." }
     ]
   },
   {
     no: "A.6",
-    title: "Suíça (apenas se indicada)",
+    title: "Moldávia",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "A Lei Federal suíça sobre a Proteção de Dados aplica-se aos seus dados (Política de Privacidade, Anexo B.6). Pode intentar ações nos tribunais do local da Suíça onde reside. Não se aplica ao plano pago qualquer direito legal de retratação; a nossa política de reembolso é […]." }
+      { kind: "p", text: "Ao abrigo destes Termos, tem os mesmos direitos que um consumidor na União Europeia, incluindo o direito de retratação de 14 dias previsto na secção 13. Pode intentar ações nos tribunais da Moldávia. A Lei n.º 195/2024 da Moldávia relativa à proteção de dados pessoais aplica-se aos seus dados (Política de Privacidade, Anexo B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldávia (apenas se indicada)",
+    title: "Ásia-Pacífico",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Ao abrigo destes Termos, tem os mesmos direitos que um consumidor na União Europeia, incluindo o direito de retratação de 14 dias previsto na secção 13. Pode intentar ações nos tribunais da Moldávia. A Lei n.º 195/2024 da Moldávia relativa à proteção de dados pessoais aplica-se aos seus dados (Política de Privacidade, Anexo B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ucrânia (apenas se indicada)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Disponibilizamos a DebateAI na Ucrânia, exceto nas zonas que não são controladas pelo governo ucraniano. O produto e estes Termos estão disponíveis em ucraniano. A Lei da Ucrânia «Sobre a Proteção de Dados Pessoais» aplica-se aos seus dados (Política de Privacidade, Anexo B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israel (apenas se indicado)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Pode cancelar um plano pago nos termos permitidos pela Consumer Protection Law, 5741-1981 [state the cancellation terms]. Estes Termos e a nossa Política de Privacidade estão disponíveis em hebraico. A Protection of Privacy Law de Israel aplica-se aos seus dados (Política de Privacidade, Anexo B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Ásia-Pacífico (apenas as linhas relativas às regiões indicadas)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapura: o nosso Encarregado da Proteção de Dados é [name, email]; as transferências assentam em proteções contratuais comparáveis às da PDPA; não se aplica ao plano pago qualquer período legal de reflexão e a nossa política de reembolso é […]. Japão: a divulgação legal ao abrigo do Specified Commercial Transactions Act está disponível em [URL]; não se aplica um período geral de reflexão às subscrições em linha e a nossa política de reembolso é […]; enviamos o seu conteúdo para fornecedores de IA nos Estados Unidos e na União Europeia, cada um ao abrigo de um contrato que exige uma proteção equivalente à da Act on the Protection of Personal Information do Japão, e, mediante pedido, informamo-lo sobre essas medidas. Coreia do Sul: os consentimentos para tratamento facultativo e marketing são recolhidos separadamente dos elementos necessários ao funcionamento do serviço; o nosso responsável pela privacidade é [name], privacy@dezbatere.ro; pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do E-Commerce Act; obtemos novamente o seu consentimento antes de qualquer aumento de preço recorrente ou conversão de gratuito para pago; o serviço utiliza IA generativa, informamo-lo disso antes de o utilizar e identificamos os resultados gerados por IA. Taiwan: pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do Consumer Protection Act; a Personal Data Protection Act de Taiwan aplica-se aos seus dados (Política de Privacidade, Anexo B.10). Tailândia: o nosso representante na Tailândia é [name] [if appointed]. Filipinas: a nossa identificação comercial e o mecanismo de reparação ao abrigo do Internet Transactions Act estão disponíveis em [URL]; podem ser apresentadas reclamações à National Privacy Commission." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Reservado",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "A Turquia, o Brasil e a Indonésia exigem, cada um, um anexo no idioma local, um representante ou registo e formalidades. Esses elementos não estão aqui redigidos e esses países permanecem fora da secção 2 até serem deliberadamente incluídos. A China, o Vietname e a Rússia não são abrangidos pela oferta." }
+      { kind: "p", text: "Singapura: o nosso Encarregado da Proteção de Dados é o nosso administrador, contactável em privacy@dezbatere.ro; as transferências assentam em proteções contratuais comparáveis às da PDPA; não se aplica ao plano pago qualquer período legal de reflexão, e os pedidos de reembolso são tratados em support@dezbatere.ro. Japão: a divulgação legal ao abrigo do Specified Commercial Transactions Act está disponível em [URL]; não se aplica um período geral de reflexão às subscrições em linha, e os pedidos de reembolso são tratados em support@dezbatere.ro; enviamos o seu conteúdo para fornecedores de IA nos Estados Unidos e na União Europeia, cada um ao abrigo de um contrato que exige uma proteção equivalente à da Act on the Protection of Personal Information do Japão, e, mediante pedido, informamo-lo sobre essas medidas. Coreia do Sul: os consentimentos para tratamento facultativo e marketing são recolhidos separadamente dos elementos necessários ao funcionamento do serviço; o nosso responsável pela privacidade é o nosso administrador, contactável em privacy@dezbatere.ro; pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do E-Commerce Act; obtemos novamente o seu consentimento antes de qualquer aumento de preço recorrente ou conversão de gratuito para pago; o serviço utiliza IA generativa, informamo-lo disso antes de o utilizar e identificamos os resultados gerados por IA. Taiwan: pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do Consumer Protection Act; a Personal Data Protection Act de Taiwan aplica-se aos seus dados (Política de Privacidade, Anexo B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "851dbfc0a49355e7f434511c9bdc48b3a249917415c8e80526555b99388292d0",
-  eyebrow: "TERMOS DE SERVIÇO · v2.1 · EM VIGOR DESDE [DATE]",
+  version: "2.2",
+  sha256: "88ea1ed7907332516a2ff15f60abc8f593e82b2a723c6bd4dccc34b36843e027",
+  eyebrow: "TERMOS DE SERVIÇO · v2.2 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
   title: "Aquilo com que concorda",
-  lede: "O contrato entre si e a DebateAIRO S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",
-  endMarker: "FIM DOS TERMOS · v2.1",
-  contact: "[legal@dezbatere.ro]",
+  lede: "O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",
+  endMarker: "FIM DOS TERMOS · v2.2",
+  contact: "support@dezbatere.ro",
   bodyLabel: "Texto dos Termos de Serviço",
   sectionIdPrefix: "terms-section-",
   titleId: "terms-modal-title",

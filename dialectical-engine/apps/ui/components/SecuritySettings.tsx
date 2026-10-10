@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import type { AuthMethodsResponse, AuthProvidersResponse, ContractClient, RecoveryEmailSettings, SocialLinksResponse, StepUpAuthorizationRequest } from '@debateai/contract';
+import { ContractHttpError, type AuthMethodsResponse, type AuthProvidersResponse, type ContractClient, type MfaRecoveryPendingResponse, type RecoveryEmailSettings, type SocialLinksResponse, type StepUpAuthorizationRequest } from '@debateai/contract';
 import { contractClient } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { ownedPhoneCompletionDraft, acknowledgePhoneDraftUpdate } from '@/lib/phoneCompletionDraft';
 import { emailShape } from '@/lib/authFormValidation';
 import { matchingSecurityGrant, type ConfirmedSecurityAction } from '@/lib/securityConfirmation';
-import { t, type MessageCatalog } from '@/lib/i18n/translate';
+import { formatDate, t, type MessageCatalog } from '@/lib/i18n/translate';
 import type { LocaleCode } from '@/lib/i18n/locales';
 import { PhoneProfileCard, type SecurityResume } from './PhoneProfileCard';
 import { BackupEmailVerification } from './BackupEmailVerification';
@@ -37,6 +37,12 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    // Owner ruling 2026-10-09: an authenticator recovery waiting its 24 hours, which any signed-in session can cancel.
+    const [pendingRecovery, setPendingRecovery] = useState<MfaRecoveryPendingResponse['pending']>(null);
+    const [recoveryCancelled, setRecoveryCancelled] = useState(false);
+    const [recoveryError, setRecoveryError] = useState<string | null>(null);
+    const [recoveryBusy, setRecoveryBusy] = useState(false);
+    const recoveryFlight = useRef(false);
     const generation = useRef(0);
     const metadataSequence = useRef(0);
     const active = useRef(true);
@@ -71,6 +77,31 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         const timer = setTimeout(() => { cancel(); setError(t(authCatalog, 'auth.security.expired')); }, Math.max(0, Date.parse(deadline) - Date.now()));
         return () => clearTimeout(timer);
     }, [held, enrollment, authCatalog]);
+    useEffect(() => {
+        let current = true;
+        void Promise.resolve().then(() => client.pendingMfaRecovery()).then(value => { if (current) setPendingRecovery(value.pending); }).catch(() => { /* No banner when the state cannot be read; nothing is changed. */ });
+        return () => { current = false; };
+    }, [client]);
+    async function cancelPendingRecovery() {
+        if (recoveryFlight.current) return;
+        recoveryFlight.current = true; setRecoveryBusy(true); setRecoveryError(null);
+        const failed = t(catalog, 'settings.security.pendingRecovery.failed');
+        try {
+            await client.cancelPendingMfaRecovery();
+            if (active.current) { setPendingRecovery(null); setRecoveryCancelled(true); }
+        } catch (failure) {
+            if (!active.current) return;
+            // Nothing left to cancel: the recovery already ended (finished, cancelled elsewhere or expired). Read it again.
+            if (failure instanceof ContractHttpError && failure.status === 409) {
+                try { const value = await client.pendingMfaRecovery(); if (active.current) { setPendingRecovery(value.pending); if (value.pending) setRecoveryError(failed); } }
+                catch { if (active.current) setRecoveryError(failed); }
+            } else setRecoveryError(failed);
+        } finally { recoveryFlight.current = false; if (active.current) setRecoveryBusy(false); }
+    }
+    function withTime(message: string, iso: string) {
+        const time = <time dateTime={iso}>{formatDate(locale, iso, { dateStyle: 'medium', timeStyle: 'short' })}</time>, at = message.indexOf('{time}');
+        return at < 0 ? <>{message} {time}</> : <>{message.slice(0, at)}{time}{message.slice(at + '{time}'.length)}</>;
+    }
     useEffect(() => {
         let current = true;
         void ownedPhoneCompletionDraft(client, () => current).then(value => { if (current) setReturnToQuestion(!!value); });
@@ -129,12 +160,22 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         } catch (failure) {
             if (active.current && epoch === generation.current) {
                 setSelected(null); setEmail('');
-                setError(t(catalog, 'settings.email.actionFailed'));
+                // A recovery address the server refused (its domain takes no mail) says so; anything else stays generic.
+                setError(authorization.action === 'CHANGE_RECOVERY_EMAIL' && failure instanceof ContractHttpError && failure.serverCode === 'EMAIL_INVALID'
+                    ? t(authCatalog, 'auth.emailUndeliverable') : t(catalog, 'settings.email.actionFailed'));
             }
         } finally { if (active.current && epoch === generation.current) { flight.current = false; setBusy(false); } }
     }
     return <div className="screen scroll setScreen"><div className="setBody"><div className="setInner">
         <h1 className="setTitle">{t(catalog, 'settings.security.title')}</h1>
+        {pendingRecovery ? <section className="setCard" data-pending-recovery aria-label={t(catalog, 'settings.security.pendingRecovery.title')}>
+            <p className="setCardTitle">{t(catalog, 'settings.security.pendingRecovery.title')}</p>
+            {/* Review M2 2026-10-09: it never finishes by itself; say from when it can be finished, and "now" once that time has passed. */}
+            <p className="setStatus">{Date.parse(pendingRecovery.not_before) <= Date.now() ? t(catalog, 'settings.security.pendingRecovery.bodyReady') : withTime(t(catalog, 'settings.security.pendingRecovery.body'), pendingRecovery.not_before)}</p>
+            <p className="setStatus">{t(catalog, 'settings.security.pendingRecovery.keep')}</p>
+            {recoveryError ? <p className="setError" role="alert">{recoveryError}</p> : null}
+            <div className="setCardRow"><button type="button" className="setBtn setBtnRevoke" disabled={recoveryBusy} onClick={() => void cancelPendingRecovery()}>{t(catalog, 'settings.security.pendingRecovery.cancel')}</button></div>
+        </section> : recoveryCancelled ? <p className="setStatus" role="status">{t(catalog, 'settings.security.pendingRecovery.cancelled')}</p> : null}
         <SecurityActionResume catalog={authCatalog} settingsCatalog={catalog} publicCatalog={publicCatalog} locale={locale} client={client} onResume={receive}/>
         {notice ? <p className="setStatus" role="status">{notice}</p> : null}
         {error ? <p className="setError" role="alert">{error}</p> : null}
@@ -150,7 +191,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
             </div>
             {methods ? <p className="setStatus">{t(catalog, 'settings.security.codesRemaining', { count: methods.recovery_codes_remaining })}</p> : null}
             <div className="setListActions"><button type="button" className="setBtn" disabled={busy || !methods} onClick={() => choose({ action: 'REGENERATE_RECOVERY_CODES' })}>{t(catalog, 'settings.security.regenerate')}</button></div>
-            {codes ? <EphemeralCodes kind="new" catalog={authCatalog} codes={codes}/> : null}
+            {codes ? <EphemeralCodes catalog={authCatalog} codes={codes}/> : null}
         </section>
         <div className="setSectionHead"><h2 className="setSectionTitle">{t(authCatalog, 'auth.recovery.emailTitle')}</h2></div>
         <section className="setList">

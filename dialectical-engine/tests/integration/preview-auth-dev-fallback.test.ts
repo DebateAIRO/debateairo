@@ -152,14 +152,14 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
  // Each lineage is built as the suites build it: integrated-original-108 is dev's state (devLineage108.ts) taken through
  // this branch's migrate(); integrated-compatibility-108 is an installed AUTH106 database (auth106.ts, the preservation
  // suite's base) taken through migrate(); integrated-fresh-resolutions-108 is an empty database taken through migrate().
- // Each ends with 0108, 0110 and 0111 applied: the live preview's shape after apply-and-plan, which must not be refused.
+ // Each ends with 0108, 0110, 0111 and the auth DB batch (0112) applied: the live preview's shape after apply-and-plan, which must not be refused.
  const lineages:ReadonlyArray<readonly [string,(pool:pg.Pool)=>Promise<void>]>=[
   ['integrated-original-108',seedDevLineage108],['integrated-compatibility-108',seedInstalledAuth106],['integrated-fresh-resolutions-108',async()=>{}]];
  for(const [lineage,seed] of lineages)it(`resolves on a complete ${lineage} database, and refuses naming 0110 and 0111 when the ledger lacks them without changing it`,async()=>{
   const db=await startTestDatabase();
   try{
    const plan=await loadMigrationPlan(),pending=[plan.forward110.name,...plan.forwardChain.map(step=>step.name)];
-   expect(pending).toEqual(['0110_account_erasure_public_debates.sql','0111_billing_netopia.sql','0113_billing_price_currencies.sql']);
+   expect(pending).toEqual(['0110_account_erasure_public_debates.sql','0111_billing_netopia.sql','0112_auth_db_batch.sql','0113_billing_price_currencies.sql']);
    const ledger=async(client:{query:pg.Pool['query']}=db.pool)=>(await client.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
    const resolutionTable=async()=>(await db.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0].present as boolean;
    await seed(db.pool);
@@ -179,8 +179,8 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
    expect(complete.map(row=>row.name)).toEqual(expect.arrayContaining([plan.forward108.name,...pending]));
    await expect(refusePendingForwardSteps(db.pool,plan)).resolves.toBeUndefined();
    await expect(refusePendingForwardSteps(db.pool)).resolves.toBeUndefined();
-   // The same database with 0110 and 0111 taken out of the ledger inside a transaction that is rolled back: the guard
-   // refuses naming both, in that order, and changes nothing (the ledger it saw is the ledger after it).
+   // The same database with 0110 and the chain (0111, 0112) taken out of the ledger inside a transaction that is rolled
+   // back: the guard refuses naming them, in that order, and changes nothing (the ledger it saw is the ledger after it).
    const client=await db.pool.connect();
    try{
     await client.query('BEGIN');

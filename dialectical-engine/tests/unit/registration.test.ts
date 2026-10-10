@@ -46,6 +46,7 @@ import {
 import { channelBinding, mfaFactor } from "../../packages/db/src/schema.js";
 import { buildApi, type AskApplication } from "@debateai/api";
 import { currentDocument } from "@debateai/legal-manifest";
+import type { MailDomainCheck } from "../../apps/api/src/mail-domain-check.js";
 
 type TestAuthRoute = "register" | "verify" | "resend";
 const execFileAsync = promisify(execFile);
@@ -1778,6 +1779,7 @@ function rework7Harness(options: {
   readonly password?: string;
   readonly deferHash?: boolean;
   readonly legalAcceptance?: boolean;
+  readonly mailDomainCheck?: MailDomainCheck;
 } = {}): Rework7Harness {
   const base = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS);
   const policy = Object.freeze({
@@ -1933,7 +1935,8 @@ function rework7Harness(options: {
       counters.tokenMint += 1;
       return "r7".padEnd(43, "T");
     },
-    ...(options.legalAcceptance === true ? { legalAcceptance: { recordsKey: Buffer.alloc(32, 0x7d) } } : {})
+    ...(options.legalAcceptance === true ? { legalAcceptance: { recordsKey: Buffer.alloc(32, 0x7d) } } : {}),
+    ...(options.mailDomainCheck === undefined ? {} : { mailDomainCheck: options.mailDomainCheck })
   });
 
   interface Rework7Inspected {
@@ -2048,6 +2051,93 @@ function rework7Harness(options: {
   };
 }
 
+describe("open sign-up mail: the domain question at sign-up (G5)", () => {
+  const input = { phone: "+40722123456", email: "dns@example.test", recoveryEmail: null, password: REWORK7_PASSWORD, adultAffirmed: true };
+  const source = (requestId: string) => ({ ip: "81.196.1.9", userAgent: "test/1", requestId });
+  it("refuses a domain that takes no mail with EMAIL_INVALID after the limiter, before any hash or account", async () => {
+    const asked: string[] = [];
+    const harness = rework7Harness({ mailDomainCheck: async (domain) => { asked.push(domain); return "UNDELIVERABLE"; } });
+    try {
+      await expect(harness.service.register({ ...input, email: "Person@Example.TEST" }, source("dns-refused")))
+        .rejects.toMatchObject({ code: "EMAIL_INVALID", statusCode: 422 });
+      expect(asked).toEqual(["example.test"]);
+      expect(harness.counters.limiterConsume).toBe(1);
+      expect(harness.counters.passwordHash).toBe(0);
+      expect(harness.counters.mutation).toBe(0);
+      expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
+  });
+  it("fails open: an UNKNOWN answer (timeout, resolver failure) registers as before", async () => {
+    const harness = rework7Harness({ mailDomainCheck: async () => "UNKNOWN" });
+    try {
+      await harness.service.register(input, source("dns-unknown"));
+      expect(harness.createdInputs).toHaveLength(1);
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+  it("fails open when the check itself throws", async () => {
+    const harness = rework7Harness({ mailDomainCheck: async () => { throw new Error("RESOLVER_BROKEN"); } });
+    try {
+      await harness.service.register(input, source("dns-throws"));
+      expect(harness.createdInputs).toHaveLength(1);
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+  it("asks about the recovery address too", async () => {
+    const asked: string[] = [];
+    const harness = rework7Harness({ mailDomainCheck: async (domain) => { asked.push(domain); return domain === "gone.test" ? "UNDELIVERABLE" : "DELIVERABLE"; } });
+    try {
+      await expect(harness.service.register({ ...input, recoveryEmail: "backup@gone.test" }, source("dns-recovery")))
+        .rejects.toMatchObject({ code: "EMAIL_INVALID" });
+      expect(asked).toEqual(["example.test", "gone.test"]);
+      expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
+  });
+});
+
+// Owner ruling 2026-10-09: the phone is optional. Without one, the repository is handed no phone
+// at all (no ciphertext, source, status or time); a given phone is still normalized and encrypted.
+describe("phone at the registration service", () => {
+  const base = { email: "phone@example.test", recoveryEmail: null, password: REWORK7_PASSWORD, adultAffirmed: true };
+  const source = (requestId: string) => ({ ip: "81.196.1.2", userAgent: "test/1", requestId });
+  it("P1 registers without a phone and stores none", async () => {
+    const harness = rework7Harness();
+    try {
+      await harness.service.register(base, source("phone-p1"));
+      await harness.service.register({ ...base, email: "phone-null@example.test", phone: null }, source("phone-p1-null"));
+      // The byte-pinned S04 register mount hands "" when the request carried no phone.
+      await harness.service.register({ ...base, email: "phone-blank@example.test", phone: "" }, source("phone-p1-blank"));
+      expect(harness.createdInputs).toHaveLength(3);
+      for (const created of harness.createdInputs) {
+        expect(created).toMatchObject({ phoneCiphertext: null, phoneSource: null, phoneVerificationStatus: null, phoneUpdatedAt: null });
+      }
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+  it("P2 normalizes and encrypts a given phone", async () => {
+    const harness = rework7Harness();
+    try {
+      await harness.service.register({ ...base, phone: "+40 722 123 456" }, source("phone-p2"));
+      const created = harness.createdInputs[0] as { phoneCiphertext: unknown; phoneSource: unknown; phoneVerificationStatus: unknown; phoneUpdatedAt: unknown };
+      expect(created.phoneCiphertext).toEqual(expect.objectContaining({}));
+      expect(JSON.stringify(created.phoneCiphertext)).not.toContain("722123456");
+      expect(created).toMatchObject({ phoneSource: "manual", phoneVerificationStatus: "unverified" });
+      expect(created.phoneUpdatedAt).toBeInstanceOf(Date);
+      await harness.service.drainMailDispatches();
+    } finally { harness.restore(); }
+  });
+  it("P3 refuses a malformed phone before admission and repository work", async () => {
+    const harness = rework7Harness();
+    try {
+      for (const phone of ["0712345678", "+40 12"]) {
+        await expect(harness.service.register({ ...base, phone }, source(`phone-p3-${phone.length}`))).rejects.toMatchObject({ code: "AUTH_INPUT_INVALID" });
+      }
+      expect(harness.counters.repository).toBe(0);
+      expect(harness.createdInputs).toEqual([]);
+    } finally { harness.restore(); }
+  });
+});
+
 describe("region at the registration service", () => {
   const input = { phone: "+40722123456", email: "region@example.test", recoveryEmail: "region-recovery@example.test", password: REWORK7_PASSWORD, adultAffirmed: true };
   it("D1 maps the declared region to the repository without changing the edge country", async () => {
@@ -2138,7 +2228,8 @@ describe("T1 rework7 A1 — the structural admission budget is exactly 103", () 
         phone: "+40722123456", recoveryEmail: "r7-invalid-recovery@example.test", adultAffirmed: true
       }, { ip: "2001:db8:7ea::ffff", userAgent: "vitest", requestId: "request:invalid" })
         .then(() => "ADMITTED", (error: unknown) => rework7Code(error));
-      expect(invalidInput).toBe("AUTH_INPUT_INVALID");
+      // Open sign-up mail (2026-10-09): an address refusal has its own stable code, still before admission.
+      expect(invalidInput).toBe("EMAIL_INVALID");
       const invalidSource = await harness.service.register({
         email: "r7-valid@example.test", password: REWORK7_PASSWORD,
         phone: "+40722123456", recoveryEmail: "r7-valid-recovery@example.test", adultAffirmed: true

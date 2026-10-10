@@ -51,10 +51,10 @@ const DOCUMENTS = {
     draft: "privacy-policy.md",
     module: "privacyPolicy.ts",
     englishOutput: "apps/ui/lib/privacyPolicy.ts",
-    versionAnchor: "Version 3.2",
+    versionAnchor: "Version 3.3",
     numberedSections: 14,
     annexLetter: "B",
-    annexParts: 11,
+    annexParts: 7,
     contact: { constant: "privacy@dezbatere.ro" },
     sectionIdPrefix: "policy-section-",
     titleId: "policy-modal-title",
@@ -68,12 +68,12 @@ const DOCUMENTS = {
     draft: "terms-of-service.md",
     module: "termsOfService.ts",
     englishOutput: "apps/ui/lib/termsOfService.ts",
-    versionAnchor: "Version 2.1",
+    versionAnchor: "Version 2.2",
     numberedSections: 19,
     annexLetter: "A",
-    annexParts: 11,
+    annexParts: 7,
     // This frozen token is found in the table without depending on the translated row label.
-    contact: { tableToken: "[legal@dezbatere.ro]" },
+    contact: { tableToken: "support@dezbatere.ro" },
     sectionIdPrefix: "terms-section-",
     titleId: "terms-modal-title",
     gateHintId: "terms-modal-gate-hint",
@@ -390,8 +390,9 @@ function validateFrozenAnchors(markdown, config) {
     .filter((block) => block.kind === "p")
     .map((block) => block.text);
   const versionLine = paragraphs.find((text) => text.startsWith(config.versionAnchor));
-  if (versionLine === undefined || !versionLine.includes("Effective [date]")) {
-    throw new Error(`Frozen version anchor must start \`${config.versionAnchor}\` and contain \`Effective [date]\``);
+  // The effective date is the owner's to fill (`Effective [date]` until then); it may never be left empty.
+  if (versionLine === undefined || !/Effective\s+[^·\s]/.test(versionLine)) {
+    throw new Error(`Frozen version anchor must start \`${config.versionAnchor}\` and contain \`Effective <date>\``);
   }
   if (!paragraphs.some((text) => text.startsWith("In short."))) {
     throw new Error("Frozen summary anchor must start `In short.`");

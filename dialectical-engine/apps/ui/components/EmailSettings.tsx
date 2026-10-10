@@ -11,6 +11,7 @@ import { contractClient } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {SecurityConfirmation,type SecurityConfirmationClient} from '@/components/auth/SecurityConfirmation';
 import {useSelectedAuthCatalog} from '@/components/AuthShell';
+import { isMailAddress } from "@debateai/kernel";
 import {useChromeI18n} from '@/lib/i18n/I18nProvider';
 import type {ConfirmedSecurityAction} from '@/lib/securityConfirmation';
 import settingsEnglish from "@/messages/en/settings.json";
@@ -30,7 +31,6 @@ type LinkClient = Pick<ContractClient, "confirmEmailChange" | "cancelEmailChange
 export type EmailChangeLink = Readonly<{ action: "confirm" | "cancel"; token: string }>;
 
 const LINK_FRAGMENT = /^#email-change=(confirm|cancel)&token=([A-Za-z0-9_-]{43})$/;
-const ADDRESS_SHAPE = /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;.]+$/;
 
 export function takeEmailChangeLink(
   target: Pick<Window, "location" | "history"> = window
@@ -198,7 +198,7 @@ export function ChangeEmailScreen({
   const normalized = normalizedAddress(newEmail);
   const newCheck: FieldCheck = newEmail.trim() === ""
     ? "empty"
-    : !ADDRESS_SHAPE.test(normalized) || normalized.length > 254
+    : !isMailAddress(normalized)
       ? "invalid"
       : normalized === normalizedAddress(currentEmail) ? "same" : "valid";
   const confirmCheck: FieldCheck = confirmEmail.trim() === ""
@@ -223,7 +223,8 @@ export function ChangeEmailScreen({
       setMessage(reason === "EMAIL_UNCHANGED"
         ? t(catalog, "settings.emailChange.sameAsCurrent")
         : reason === "EMAIL_INVALID"
-          ? t(catalog, "settings.emailChange.invalid")
+          // The form's own check already passed, so the server refused the domain itself (no mail can reach it).
+          ? t(authCatalog, "auth.emailUndeliverable")
           : reason === "STEP_UP_REQUIRED"
             ? t(catalog, "settings.emailChange.stepUpExpired")
             : t(catalog, "settings.emailChange.failed"));

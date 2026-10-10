@@ -178,5 +178,12 @@
   "settings.security.codesRemaining": "Helyreállítási kódok: {count}",
   "settings.security.regenerate": "Új helyreállítási kódok létrehozása",
   "settings.security.lockoutReminder": "Még nincsenek helyreállítási kódjai, és hozzáférési kulcsa sincs. Ha elveszíti a telefonját, ezekkel azonnal visszajut a fiókjába.",
-  "settings.security.refreshFailed": "A biztonsági adatokat nem sikerült frissíteni. Töltse be újra az oldalt."
+  "settings.security.refreshFailed": "A biztonsági adatokat nem sikerült frissíteni. Töltse be újra az oldalt.",
+  "settings.security.pendingRecovery.title": "Valaki elkezdte kicserélni a hitelesítő alkalmazását",
+  "settings.security.pendingRecovery.body": "Valaki az Ön jelszavával és egy e-mailben kapott linkkel elkezdte kicserélni a hitelesítő alkalmazást ezen a fiókon. Ekkortól fejezheti be: {time}.",
+  "settings.security.pendingRecovery.bodyReady": "Valaki az Ön jelszavával és egy e-mailben kapott linkkel elkezdte kicserélni a hitelesítő alkalmazást ezen a fiókon. Most befejezheti: használja az e-mailben kapott linket.",
+  "settings.security.pendingRecovery.keep": "Amíg nincs befejezve, a jelenlegi hitelesítő alkalmazása, a helyreállítási kódok és a munkamenetek továbbra is működnek. Ha ez nem Ön volt, szakítsa meg a cserét.",
+  "settings.security.pendingRecovery.cancel": "Mégse",
+  "settings.security.pendingRecovery.cancelled": "A csere megszakítva.",
+  "settings.security.pendingRecovery.failed": "A cserét nem sikerült megszakítani. Töltse újra az oldalt, és próbálja meg újra."
 }
