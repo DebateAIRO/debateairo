@@ -28,7 +28,7 @@ import {
   planCardNamesRoster,
   type ScorecardSignal
 } from "@/lib/modelStrength";
-import { previewPlanRoster } from "@/lib/previewPlanRoster";
+import { previewDepthMax, previewPlanRoster } from "@/lib/previewPlanRoster";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import {
   buildNewDebateAskConfig,
@@ -43,6 +43,8 @@ import billingEnglish from "@/messages/en/billing.json";
 
 // NEXT_PUBLIC is intentionally a direct reference so Next inlines this public build flag.
 const displayPlanTierRosters = previewPlanRoster(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, PLAN_TIER_ROSTERS);
+// Owner ruling 2026-10-10: the private preview offers depth 1 to 3 for now; hosted builds keep 1 to 5.
+const depthMax = previewDepthMax(process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, EXPANSION_DEPTH_MAX);
 
 type AdaptiveDepthMode = "fixed" | "manual" | "recommended" | "adaptive";
 
@@ -242,7 +244,7 @@ function NewDebateForm({
   // UX-01 makes machine-derived values visible and editable rather than hidden.
   const ready =
     topic.trim().length > 6 &&
-    depth >= EXPANSION_DEPTH_MIN && depth <= EXPANSION_DEPTH_MAX &&
+    depth >= EXPANSION_DEPTH_MIN && depth <= depthMax &&
     riskTier.length > 0 &&
     budgetTier.length > 0 &&
     decisionScope.trim().length > 0 &&
@@ -420,7 +422,7 @@ function NewDebateForm({
               label={t(catalog, "newDebate.treeDepth")}
               hint={t(catalog, "newDebate.treeDepthHint")}
               min={EXPANSION_DEPTH_MIN}
-              max={EXPANSION_DEPTH_MAX}
+              max={depthMax}
               value={depth}
               disabled={planTier === "free"}
               onChange={setDepth}

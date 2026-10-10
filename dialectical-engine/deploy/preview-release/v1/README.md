@@ -29,7 +29,7 @@ prints them with their sha256 so you can compare `ui.env` by hash, without print
 
 The model list is one of two reviewed lists, picked by name with `--models` (on `build-env` and
 `ui-build`): `glm-only` (the default: GLM only, the list the preview has used so far) or
-`multi-model` (Free: GLM and DeepSeek; Premium: GLM, DeepSeek and MiMo). The list is baked into
+`multi-model` (Free: GLM and DeepSeek; Premium: GLM, DeepSeek, MiMo and Qwen). The list is baked into
 the website when it is built, so changing it means a new build. The build writes the list it used
 into `.next/preview-model-roster.json` (covered by the build manifest), and the UI start-up check
 refuses unless `ui.env` names the same list. Which list belongs at which moment is in

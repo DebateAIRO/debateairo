@@ -3,7 +3,9 @@
  *
  * Plain words: the preview may call exactly these models, each at its own list price, with its
  * own largest answer size ("output bound"), its own "effort" thinking switch and its own
- * JSON-answer switch. The root gate holds the same table in Python; a parity test reads
+ * JSON-answer switch. Every prompt token is charged at the full input price, cached or not (the
+ * cheaper cached-input price some vendors list is never used, so a reservation never undercounts).
+ * The root gate holds the same table in Python; a parity test reads
  * tests/unit/fixtures/preview-model-rows.json so the two copies cannot drift. Changing a row is a
  * reviewed code change on both sides, never a configuration edit.
  *
@@ -55,20 +57,31 @@ export type PreviewModelRow = Readonly<{
 
 /** The DeepInfra connection's base URL and window, shared by every DeepInfra row. */
 export const PREVIEW_DEEPINFRA_BASE_URL = "https://api.deepinfra.com/v1/openai" as const;
+/** The window of every DeepInfra row that does not state its own (GLM, DeepSeek, MiMo). */
 export const PREVIEW_CONTEXT_WINDOW_TOKENS = 1_048_576 as const;
 /** The Anthropic Messages connection's base URL (the adapter's one lawful base) and its exact call URL. */
 export const PREVIEW_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1" as const;
 export const PREVIEW_ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages" as const;
 /** Claude Haiku 5.5's window (1M tokens). */
 export const PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
-/** Request bodies above this are refused before any reservation (contract A §2). */
+/**
+ * Request bodies above this are refused before any reservation (contract A §2). Owner ruling
+ * 2026-10-10 (evening): a HARD cap of 256 KiB for every row, because a story request at the "high"
+ * story size reaches about 236 KiB (the largest ordinary request seen was about 51 KB).
+ */
 export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
+/**
+ * Owner ruling 2026-10-10: every reviewed row's answer cap (its max_tokens ceiling and the output side
+ * of every reservation). No call the app makes asks for more than 24,000 today (debate calls and health
+ * checks 8,192, the storyteller 12,000 then 24,000 on its retry).
+ */
+export const PREVIEW_ANSWER_CAP_TOKENS = 32_768;
 /** Template allowance added to the body's bytes on the input side of a reservation (contract A §3). */
 const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 
 type RowInput = Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
-  outputBound: number; effort: "high" | null; jsonObject: boolean;
+  outputBound: number; effort: "high" | null; jsonObject: boolean; contextWindowTokens?: number;
 }>;
 const PROVIDER_CONNECTIONS = Object.freeze({
   deepinfra: Object.freeze({ provider: "deepinfra", baseUrl: PREVIEW_DEEPINFRA_BASE_URL,
@@ -77,7 +90,7 @@ const PROVIDER_CONNECTIONS = Object.freeze({
     adapterKind: "anthropic-messages-http", contextWindowTokens: PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS })
 } as const);
 function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
-  // USD per million with two or three decimals ("0.15", "0.625") as whole nano-USD per token.
+  // USD per million with two or three decimals ("0.15", "0.113") is a whole nano-USD per token.
   const nano = (usdPerM: string): bigint => {
     const match = /^(\d+)\.(\d{2,3})$/u.exec(usdPerM);
     if (match === null) throw new TypeError("PREVIEW_MODEL_ROW_PRICE_INVALID");
@@ -88,6 +101,7 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
   return Object.freeze({
     ...PROVIDER_CONNECTIONS[provider],
     ...input,
+    contextWindowTokens: input.contextWindowTokens ?? PROVIDER_CONNECTIONS[provider].contextWindowTokens,
     inputNanoUsdPerToken,
     outputNanoUsdPerToken,
     inputPriceMicrosPerMillion: Number(inputNanoUsdPerToken) * 1000,
@@ -102,11 +116,14 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
 export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName, readonly PreviewModelRow[]>> = Object.freeze({
   deepinfra: Object.freeze([
     row("deepinfra", { model: "zai-org/GLM-5.3-Flash", maker: "Z.AI", inputUsdPerM: "0.15", outputUsdPerM: "0.50",
-      outputBound: 163_840, effort: "high", jsonObject: true }),
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: true }),
     row("deepinfra", { model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek", inputUsdPerM: "0.20", outputUsdPerM: "0.60",
-      outputBound: 131_072, effort: "high", jsonObject: false }),
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false }),
     row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
-      outputBound: 131_072, effort: null, jsonObject: false })
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false }),
+    // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
+    row("deepinfra", { model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 })
   ]),
   // PR B (lead, 2026-10-10). Reserve and estimate at the upper step's 5-minute cache-write price
   // ($0.625, above any plain input price; a request cannot ask for caching, so the dearer 1-hour
@@ -114,7 +131,7 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
   // most $0.24704. The gate settles at the real step and halts on an overrun (charge_overrun).
   anthropic: Object.freeze([
     row("anthropic", { model: "claude-haiku-5-5", maker: "Anthropic", inputUsdPerM: "0.625", outputUsdPerM: "2.50",
-      outputBound: 32_768, effort: "high", jsonObject: false })
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false })
   ])
 });
 /** Every reviewed row, providers in the order above. */
@@ -144,6 +161,7 @@ export const PREVIEW_PROVIDER_REF_MODELS: Readonly<Record<string, string>> = Obj
   "preview:fixture-b": "zai-org/GLM-5.3-Flash",
   "preview:deepseek-v4-1-flash": "deepseek-ai/DeepSeek-V4.1-Flash",
   "preview:mimo-v2-6-pro": "XiaomiMiMo/MiMo-V2.6-Pro",
+  "preview:qwen-3-8-flash": "Qwen/Qwen3.8-Flash",
   "preview:claude-haiku-5-5": "claude-haiku-5-5"
 });
 /** The reviewed provider set, in register order. */
@@ -188,10 +206,15 @@ export function previewNanoUsdText(value: bigint): string {
   return `${source.slice(0, -9)}.${source.slice(-9)}`;
 }
 
+/** The input tokens the gate reserves for a body of `bodyBytes`: the bytes plus its 2048-token template allowance. */
+export function previewChargedInputTokens(bodyBytes: number): bigint {
+  if (!Number.isSafeInteger(bodyBytes) || bodyBytes < 0) throw new TypeError("PREVIEW_BODY_BYTES_INVALID");
+  return BigInt(bodyBytes + PREVIEW_RESERVATION_TEMPLATE_BYTES);
+}
+
 /** Contract A §3: ((body bytes + 2048) x input + output_bound x output), in nano-USD. */
 export function previewReservationNanoUsd(reviewed: PreviewModelRow, bodyBytes: number): bigint {
-  if (!Number.isSafeInteger(bodyBytes) || bodyBytes < 0) throw new TypeError("PREVIEW_BODY_BYTES_INVALID");
-  return BigInt(bodyBytes + PREVIEW_RESERVATION_TEMPLATE_BYTES) * reviewed.inputNanoUsdPerToken
+  return previewChargedInputTokens(bodyBytes) * reviewed.inputNanoUsdPerToken
     + BigInt(reviewed.outputBound) * reviewed.outputNanoUsdPerToken;
 }
 

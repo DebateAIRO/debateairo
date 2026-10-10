@@ -20,11 +20,15 @@ import {
   PROVIDER_COST_ENVELOPE_REFUSAL_CODES,
   providerTargetGatewayControls,
   withPreviewProviderCallPolicy,
+  PreviewUnbilledRefusal,
+  type PreviewBudgetPort,
   type PreviewProviderTestConfig
 } from "@debateai/providers";
 import { framedFixturePacket } from "../support/framed-packet.js";
 
 type Reply = Readonly<{ status: number; body: string }>;
+/** Owner ruling 5's cooldown before the one retry of an unbilled call (preview-test.ts): one minute. */
+const COOLDOWN_MS = 60_000;
 const servers: Server[] = [];
 const directories: string[] = [];
 
@@ -136,6 +140,7 @@ describe("the preview spending gate's 409 refusal body", () => {
       deployment: "v3-preview", free_model_ids: [MODEL], requested_thinking_level: "high",
       budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture-scope"
     }))!;
+    const slept: number[] = [];
     const call = async (code: string): Promise<unknown> => {
       const { port } = await gate({ status: 409, body: JSON.stringify({ error: code }) });
       const gateway = withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
@@ -143,7 +148,7 @@ describe("the preview spending gate's 409 refusal body", () => {
         fetchImplementation: createPreviewGuardedFetch(port),
         persistRawArtifact: async (artifact) => artifact.artifactId, appendLedgerEntry: async (entry) => entry.attemptId,
         assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
-      }), preview, target);
+      }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); } });
       return gateway.call({
         runId: "run:synthetic", subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
         bound: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 }, contractHash: "contract:test", providerRef: REF,
@@ -153,12 +158,86 @@ describe("the preview spending gate's 409 refusal body", () => {
     const busy = await call("CONCURRENCY_LIMIT_REACHED");
     expect(busy).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
     expect(isRunLevelSpendStop(busy)).toBe(false);
+    // A busy gate is not retried here (the runner's own cooldown is).
+    expect(slept).toEqual([]);
     for (const unsent of ["PROVIDER_NOT_REACHED", "PROVIDER_REFUSED_UNBILLED"]) {
       const refusal = await call(unsent);
       expect(refusal).toMatchObject({ code: "PROVIDER_CALL_FAILED" });
       expect(isRunLevelSpendStop(refusal)).toBe(false);
     }
+    // Owner ruling 5: each unbilled refusal is sent once more after the cooldown, and only once.
+    expect(slept).toEqual([COOLDOWN_MS, COOLDOWN_MS]);
     await expect(call("PREVIEW_TEST_AUTHORITY_STOPPED")).resolves.toMatchObject({ code: "RUN_COST_ENVELOPE_MONEY_REACHED" });
+    expect(slept).toHaveLength(2);
+  });
+
+  describe("owner ruling 5: one retry after the cooldown, only for a call the gate proved unbilled", () => {
+    const MODEL = "zai-org/GLM-5.3-Flash";
+    const REF = "preview:fixture-a";
+    const preview = parsePreviewProviderTestConfig(JSON.stringify({
+      deployment: "v3-preview", free_model_ids: [MODEL], requested_thinking_level: "high",
+      budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture-scope"
+    }))!;
+    const usage = { prompt_tokens: 10, completion_tokens: 20 };
+    const choices = [{ message: { content: "{}" }, finish_reason: "stop" }];
+    const answer = JSON.stringify({ status: 200, body: JSON.stringify({ id: "synthetic", model: MODEL, choices, usage }) });
+    /** A port that answers each execution from `script`: an Error is thrown, a string is the gate's reply. */
+    const scripted = (script: Array<Error | string>) => {
+      const sent: string[] = [];
+      const port: PreviewBudgetPort = { execute: async (input) => {
+        sent.push(input.requestBody);
+        const next = script.shift() ?? new Error("script exhausted");
+        if (next instanceof Error) throw next;
+        const reply = JSON.parse(next) as { status: number; body: string };
+        return reply;
+      } };
+      return { sent, port };
+    };
+    const gatewayFor = (port: PreviewBudgetPort, slept: number[]) => {
+      const thinking = { thinking_parameter: "reasoning_effort", thinking_levels: ["high"] };
+      const target = parseProviderDiscoveryTargets(JSON.stringify([{
+        provider_ref: REF, base_url: "https://api.deepinfra.com/v1/openai", model: MODEL,
+        input_price_micros_per_million: 150000, output_price_micros_per_million: 500000,
+        ...thinking, context_window_tokens: 1048576
+      }]), [{ providerRef: REF, maker: "Z.AI" }])[0]!;
+      return withPreviewProviderCallPolicy(new OpenAICompatibleProviderGateway({
+        endpoint: target.baseUrl, model: target.model, maker: target.maker, ...providerTargetGatewayControls(target),
+        fetchImplementation: createPreviewGuardedFetch(port),
+        persistRawArtifact: async (artifact) => artifact.artifactId, appendLedgerEntry: async (entry) => entry.attemptId,
+        assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
+      }), preview, target, { sleep: async (milliseconds) => { slept.push(milliseconds); } });
+    };
+    const site = "fixture:judge";
+    const contract = "contract:test";
+    const bound = { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 };
+    const request = {
+      runId: "run:synthetic", subjectItemId: "node:test", role: "JUDGE" as const, lane: "served" as const,
+      callSiteKey: site,
+      bound, contractHash: contract, providerRef: REF,
+      packet: framedFixturePacket("Synthetic school phone policy; no personal data.")
+    };
+
+    it("an unbilled refusal then an answer: the call succeeds on its one retry, after the cooldown", async () => {
+      const slept: number[] = [];
+      const { sent, port } = scripted([new PreviewUnbilledRefusal(), answer]);
+      await expect(gatewayFor(port, slept).call(request)).resolves.toBeDefined();
+      expect(sent).toHaveLength(2);
+      expect(sent[1]).toBe(sent[0]);
+      expect(slept).toEqual([COOLDOWN_MS]);
+    });
+
+    it("never a second retry, never for any other failure", async () => {
+      const twice: number[] = [];
+      const again = scripted([new PreviewUnbilledRefusal(), new PreviewUnbilledRefusal(), answer]);
+      await expect(gatewayFor(again.port, twice).call(request)).rejects.toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+      expect(again.sent).toHaveLength(2);
+      expect(twice).toHaveLength(1);
+      const other: number[] = [];
+      const failed = scripted([new Error("connection reset"), answer]);
+      await expect(gatewayFor(failed.port, other).call(request)).rejects.toMatchObject({ code: "PROVIDER_CALL_FAILED" });
+      expect(failed.sent).toHaveLength(1);
+      expect(other).toEqual([]);
+    });
   });
 
   it("an unreadable 409 body keeps today's answer and throws nothing else", async () => {

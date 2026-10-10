@@ -113,8 +113,8 @@ class AnthropicTest(unittest.TestCase):
             gate.close()
 
     def gate(self, **changes):
-        # The proposed GO (README-anthropic.md): $1.00 and 400 calls a day, 2 calls in flight.
-        go = {'provider': 'anthropic', 'enabled_models': [HAIKU], 'daily_budget_usd': '1.00',
+        # The proposed GO (README-anthropic.md): $2.00 and 400 calls a day, 2 calls in flight.
+        go = {'provider': 'anthropic', 'enabled_models': [HAIKU], 'daily_budget_usd': '2.00',
               'max_paid_posts_per_day': 400, 'max_concurrent_calls': 2, **changes}
         gate = Gate(bridge, **go)
         self.gates.append(gate)
@@ -215,20 +215,24 @@ class ParityAndReservationTests(AnthropicTest):
 
 class GoAndActivateTests(AnthropicTest):
     def test_the_owners_pots_add_up_to_the_team_total_and_one_cent_more_refuses(self):
-        # Owner's ruling 2026-10-10: Anthropic $1.00 (this GO) + DeepInfra $4.00 = the $5.00 team total.
+        # Owner's ruling 2026-10-10 (evening): Anthropic $2.00 (this GO) + DeepInfra $10.00 = the $12.00
+        # team total. Each GO alone may ask up to the $10.00 per-GO ceiling, so a $2.01 Anthropic GO is
+        # itself valid: what refuses it is the team-total check at activate.
         def deepinfra_go(gate, budget):
             path = gate.root / 'team-go-deepinfra.json'
             path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'deepinfra',
                                         'daily_budget_usd': budget}))
             os.chmod(path, 0o600)
+        self.assertEqual((bridge.TEAM_TOTAL_BUDGET_USD, bridge.MAX_GO_BUDGET_USD), (Decimal('12.00'), Decimal('10.00')))
         gate = self.gate()
-        self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], '1.00')
+        self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], '2.00')
         gate.init()
-        deepinfra_go(gate, '4.00')
-        self.assertEqual(gate.activate()['state'], 'active')  # 1.00 + 4.00 = 5.00 exactly.
-        for mine, theirs in (('1.01', '4.00'), ('1.00', '4.01')):
+        deepinfra_go(gate, '10.00')
+        self.assertEqual(gate.activate()['state'], 'active')  # 2.00 + 10.00 = 12.00 exactly.
+        for mine, theirs in (('2.01', '10.00'), ('2.02', '9.99')):
             with self.subTest(anthropic=mine, deepinfra=theirs):
                 gate = self.gate(daily_budget_usd=mine)
+                self.assertEqual(bridge.read_go(gate.go_path)['daily_budget_usd'], mine)  # Valid on its own.
                 gate.init()
                 deepinfra_go(gate, theirs)
                 with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):
@@ -791,7 +795,7 @@ class RemainingAndProbeTests(AnthropicTest):
                          {'state': 'active', 'window_open': True, 'remaining_calls': 399, 'max_concurrent_calls': 2,
                           'enabled_models': [HAIKU]})
         self.assertEqual((Decimal(report['remaining_usd']), Decimal(report['largest_reservation_usd'])),
-                         (Decimal('0.99965'), Decimal('0.24704')))
+                         (Decimal('1.99965'), Decimal('0.24704')))
 
     def test_probe_sends_the_tiny_request_and_reports_what_it_measured(self):
         gate = self.ready()

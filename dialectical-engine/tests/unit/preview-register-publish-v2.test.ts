@@ -21,11 +21,12 @@ const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(
 
 /**
  * Multi-model (2026-10-10): by default the only rows the reviewed DeepInfra rows change against the sealed
- * two-GLM shape are the provider set (four refs, three makers) and the family map that follows it. The
+ * two-GLM shape are the provider set (five refs, four makers; Qwen joined 2026-10-10) and the family map that follows it. The
  * writer stays fixture-a and the checker fixture-b (both GLM), as in the sealed version, so the version
  * can be published while the gate has only GLM switched on.
  */
 const MULTI_MODEL_KEYS = ['configuredProviderSet', 'providerFamilyMap'];
+const PROVIDER_SET_ROW = 'configuredProviderSet';
 /** With the explicit DeepSeek checker choice, the checker and the story checker that follows it move too. */
 const DEEPSEEK_CHECKER_KEYS = ['configuredProviderSet', 'evaluatorRoleRef', 'providerFamilyMap', 'storyCheckerRoleRef'];
 const DEEPSEEK = { checker: 'deepseek', deepseekEnabledOnGate: true } as const;
@@ -34,11 +35,12 @@ const REVIEWED_PROVIDER_SET = { kind: 'CONFIGURED_PROVIDER_SET', requiredDistinc
   { providerRef: 'preview:fixture-b', adapterKind: 'openai-compatible-http', maker: 'Z.AI' },
   { providerRef: 'preview:deepseek-v4-1-flash', adapterKind: 'openai-compatible-http', maker: 'DeepSeek' },
   { providerRef: 'preview:mimo-v2-6-pro', adapterKind: 'openai-compatible-http', maker: 'Xiaomi' },
+  { providerRef: 'preview:qwen-3-8-flash', adapterKind: 'openai-compatible-http', maker: 'Alibaba' },
   // PR B: Anthropic's reviewed ref, on the native Anthropic Messages adapter.
   { providerRef: 'preview:claude-haiku-5-5', adapterKind: 'anthropic-messages-http', maker: 'Anthropic' }
 ] };
-/** The set A's kit published before PR B (DeepInfra's four refs): still a lawful base. */
-const DEEPINFRA_PROVIDER_SET = { ...REVIEWED_PROVIDER_SET, providers: REVIEWED_PROVIDER_SET.providers.slice(0, 4) };
+/** The set A's kit published before PR B (DeepInfra's five refs): still a lawful base. */
+const DEEPINFRA_PROVIDER_SET = { ...REVIEWED_PROVIDER_SET, providers: REVIEWED_PROVIDER_SET.providers.slice(0, 5) };
 
 /** The two real preview shapes (both two-GLM, built by v1): the 65-row base v1 was written for (live v8) and the 68-row result (live v9). */
 async function fixture() {
@@ -72,6 +74,7 @@ describe('publish kit v2: source closure', () => {
       { familyRef: 'Z.AI', providerRefs: ['preview:fixture-a', 'preview:fixture-b'] },
       { familyRef: 'DeepSeek', providerRefs: ['preview:deepseek-v4-1-flash'] },
       { familyRef: 'Xiaomi', providerRefs: ['preview:mimo-v2-6-pro'] },
+      { familyRef: 'Alibaba', providerRefs: ['preview:qwen-3-8-flash'] },
       { familyRef: 'Anthropic', providerRefs: ['preview:claude-haiku-5-5'] }
     ]);
     for (const key of PREVIEW_BASE_OWNED_KEYS) expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(key);
@@ -107,6 +110,11 @@ describe('publish kit v2: composing from the current version', () => {
     expect(plan.rows).toHaveLength(68);
     expect(plan.addedKeys).toEqual([]);
     expect(plan.changedKeys).toEqual(['composerContractHash', ...MULTI_MODEL_KEYS]);
+    const providerSet = plan.delta.find(row => row.rowKey === PROVIDER_SET_ROW)!;
+    const refsOf = (text: string) => JSON.parse(text).providers.map((p: any) => p.providerRef);
+    expect(refsOf(providerSet.newValueJsonText))
+      .toEqual(['preview:fixture-a', 'preview:fixture-b', 'preview:deepseek-v4-1-flash', 'preview:mimo-v2-6-pro', 'preview:qwen-3-8-flash']);
+    expect(refsOf(providerSet.oldValueJsonText!)).toEqual(['preview:fixture-a', 'preview:fixture-b']);
     for (const key of MULTI_MODEL_KEYS) {
       const entry = plan.delta.find(row => row.rowKey === key)!;
       expect(entry).toMatchObject({ change: 'changed', reason: 'reviewed-current-source-facet',
@@ -138,7 +146,7 @@ describe('publish kit v2: composing from the current version', () => {
     expect(plan.rows.find(row => row.rowKey === 'taxAuthorities')).toEqual(f.source.find(row => row.rowKey === 'taxAuthorities'));
   });
 
-  it('the base may also be a version this kit published (the reviewed four-ref set)', async () => {
+  it('the base may also be a version this kit published (the reviewed five-ref set)', async () => {
     const f = await fixture();
     const first = compose(f.source, f.v9);
     expect(JSON.parse(first.rows.find(row => row.rowKey === 'configuredProviderSet')!.valueJsonText)).toEqual(REVIEWED_PROVIDER_SET);
@@ -184,6 +192,8 @@ describe('publish kit v2: composing from the current version', () => {
     ['a source with a wrong maker for a reviewed ref', (f: any) => ({ source: patchValue(f.source, 'configuredProviderSet', v => { v.providers[2].maker = 'Z.AI'; }) })],
     ['a source missing a reviewed ref', (f: any) => ({ source: patchValue(f.source, 'configuredProviderSet', v => { v.providers.pop(); }) })],
     ['a source with an unreviewed ref', (f: any) => ({ source: patchValue(f.source, 'configuredProviderSet', v => { v.providers[3].providerRef = 'preview:other'; }) })],
+    ['a source with Qwen under another maker', (f: any) => ({ source: patchValue(f.source, 'configuredProviderSet', v => { v.providers[4].maker = 'Qwen'; }) })],
+    ['a base with the reviewed set before Qwen (never published)', (f: any) => ({ base: patchValue(f.v9, 'configuredProviderSet', v => { v.providers = REVIEWED_PROVIDER_SET.providers.slice(0, 4); }) })],
     ['a source requiring two makers', (f: any) => ({ source: patchValue(f.source, 'configuredProviderSet', v => { v.requiredDistinctMakers = 2; }) })]
   ])('refuses %s', async (_name, change) => {
     const f = await fixture();
@@ -226,7 +236,7 @@ describe('publish kit v2: the checker choice (GLM by default, DeepSeek only on t
     expect(JSON.parse(plan.delta.find(entry => entry.rowKey === 'evaluatorRoleRef')!.newValueJsonText).providerRef).toBe('preview:deepseek-v4-1-flash');
   });
 
-  it('switching on in two versions: the default four-ref version first, then the DeepSeek checker (only the two role rows), and back', async () => {
+  it('switching on in two versions: the default five-ref version first, then the DeepSeek checker (only the two role rows), and back', async () => {
     const f = await fixture();
     const first = compose(f.source, f.v9);
     const second = compose(await build(DEEPSEEK), [...first.rows] as Row[], '10');
@@ -241,6 +251,7 @@ describe('publish kit v2: the checker choice (GLM by default, DeepSeek only on t
     ['deepseek with the acknowledgement false', { checker: 'deepseek', deepseekEnabledOnGate: false }, 'checker-deepseek-not-enabled-on-gate'],
     ['deepseek with the acknowledgement as text', { checker: 'deepseek', deepseekEnabledOnGate: 'true' }, 'checker-deepseek-not-enabled-on-gate'],
     ['an unknown checker', { checker: 'mimo' }, 'checker-choice'],
+    ['Qwen as checker (the default stays GLM)', { checker: 'qwen' }, 'checker-choice'],
     ['an unknown checker with the acknowledgement', { checker: 'mimo', deepseekEnabledOnGate: true }, 'checker-choice'],
     ['glm with a stray acknowledgement', { checker: 'glm', deepseekEnabledOnGate: true }, 'checker-choice'],
     ['deepseek with an extra field', { ...DEEPSEEK, maker: 'DeepSeek' }, 'checker-choice'],

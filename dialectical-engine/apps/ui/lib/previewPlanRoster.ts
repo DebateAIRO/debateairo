@@ -65,3 +65,13 @@ export function previewPlanRoster<T extends PreviewRosters>(
   if (rosters === undefined) throw new TypeError("PREVIEW_FREE_MODEL_ROSTER_BUILD_FLAG_INVALID");
   return rosters;
 }
+
+/**
+ * Owner ruling 2026-10-10: on the private preview a debate goes at most 3 levels deep for now, because
+ * depth 4 and 5 do not fit the preview's daily money. Hosted builds keep the contract's own range.
+ */
+export const PREVIEW_DEPTH_MAX = 3;
+/** The deepest debate the form offers: PREVIEW_DEPTH_MAX on a preview build (the public flag is set), else `contractMax`. */
+export function previewDepthMax(source: string | undefined, contractMax: number): number {
+  return source === undefined ? contractMax : Math.min(PREVIEW_DEPTH_MAX, contractMax);
+}

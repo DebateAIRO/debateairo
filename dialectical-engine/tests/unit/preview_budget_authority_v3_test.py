@@ -105,10 +105,12 @@ class ReviewedTableTests(GateTest):
                                                    row.output_bound, row.effort, row.json_object))
 
     def test_every_reviewed_row_fits_the_per_call_cap_for_a_full_size_request(self):
+        # Owner rulings 2026-10-10: a hard 256 KiB body cap and output bound 32768 for every row.
         self.assertEqual((DEEPINFRA.per_call_cap_usd, DEEPINFRA.max_request_bytes), (Decimal('0.25'), 256 * 1024))
+        self.assertEqual({row.output_bound for row in DEEPINFRA.rows.values()}, {32768})
         self.assertLessEqual(DEEPINFRA.per_call_cap_usd, bridge.MAX_PROFILE_CALL_CAP_USD)
-        expected = {MODEL: Decimal('0.1215488'), DEEPSEEK: Decimal('0.1314816'), MIMO: Decimal('0.2276352'),
-                    QWEN: Decimal('0.0799232')}
+        expected = {MODEL: Decimal('0.0560128'), DEEPSEEK: Decimal('0.0724992'), MIMO: Decimal('0.14211072'),
+                    QWEN: Decimal('0.042371072')}
         for name, profile in bridge.helper.PROFILES.items():
             for model, row in profile.rows.items():
                 with self.subTest(provider=name, model=model):
@@ -195,10 +197,11 @@ class GoV3Tests(GateTest):
                 bridge.read_go(gate.write_go(name='bad.json', **changes))
 
     def test_activate_refuses_concurrency_times_the_largest_enabled_worst_case_over_the_pot(self):
-        # GLM worst case 0.1215488 (x4 = 0.4861952); MiMo 0.2276352 (x4 = 0.9105408).
-        for enabled, budget, ok in (([MODEL], '0.48', False), ([MODEL], '0.49', True),
-                                    ([MODEL, MIMO], '0.91', False), ([MODEL, MIMO], '0.92', True),
-                                    ([MODEL, DEEPSEEK], '0.52', False), ([MODEL, DEEPSEEK], '0.53', True)):
+        # GLM worst case 0.0560128 (x4 = 0.2240512); MiMo 0.14211072 (x4 = 0.56844288);
+        # DeepSeek 0.0724992 (x4 = 0.2899968).
+        for enabled, budget, ok in (([MODEL], '0.22', False), ([MODEL], '0.23', True),
+                                    ([MODEL, MIMO], '0.56', False), ([MODEL, MIMO], '0.57', True),
+                                    ([MODEL, DEEPSEEK], '0.28', False), ([MODEL, DEEPSEEK], '0.29', True)):
             with self.subTest(enabled=enabled, budget=budget):
                 gate = self.gate(enabled_models=enabled, daily_budget_usd=budget)
                 gate.init()  # init does not judge the pot; activate does.
@@ -208,10 +211,55 @@ class GoV3Tests(GateTest):
                     with self.refused('CONCURRENCY_EXCEEDS_BUDGET'):
                         gate.activate()
                     self.assertEqual(gate.control()['state'], 'initialized')
-        gate = self.gate(enabled_models=[MIMO], daily_budget_usd='0.22', max_concurrent_calls=1)
+        gate = self.gate(enabled_models=[MIMO], daily_budget_usd='0.14', max_concurrent_calls=1)
         gate.init()
         with self.refused('CONCURRENCY_EXCEEDS_BUDGET'):
             gate.activate()
+
+    def test_ten_at_once_is_the_v3_bound_and_eleven_is_refused(self):
+        # Owner ruling 2026-10-10: "10 at once" for the DeepInfra gate.
+        self.assertEqual(bridge.MAX_CONCURRENT_CALLS, 10)
+        gate = self.gate()
+        for limit in (1, 9, 10):
+            with self.subTest(limit=limit):
+                self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', max_concurrent_calls=limit))
+                                 ['max_concurrent_calls'], limit)
+        for limit in (0, 11, 12, 100, True, 10.0, '10'):
+            with self.subTest(limit=limit), self.refused('ROOT_GO_INVALID'):
+                bridge.read_go(gate.write_go(name='bad.json', max_concurrent_calls=limit))
+        # The pot check still holds at 10: 10 x MiMo's worst case (0.14211072) = 1.4211072, which
+        # the owner's $10.00 DeepInfra pot (ruling 2026-10-10) holds.
+        for budget, ok in (('1.42', False), ('1.43', True), ('10.00', True)):
+            with self.subTest(budget=budget):
+                gate = self.gate(enabled_models=ALL, daily_budget_usd=budget, max_concurrent_calls=10)
+                gate.init()
+                if ok:
+                    self.assertEqual(gate.activate()['state'], 'active')
+                else:
+                    with self.refused('CONCURRENCY_EXCEEDS_BUDGET'):
+                        gate.activate()
+        # Ten slots really serve ten calls at once (the serve side takes the GO's figure).
+        gate = self.gate(max_concurrent_calls=10).ready()
+        self.assertEqual(gate.slots.limit, 10)
+        self.assertEqual(bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, slots=gate.slots,
+                                                 now=gate.clock)['max_concurrent_calls'], 10)
+
+    def test_a_v2_go_is_refused_whatever_its_concurrency_so_v2s_own_bound_of_8_is_untouched(self):
+        # Gate v2 runs its own installed bytes (bound by its GO's hashes) with max_concurrent_calls
+        # 1 to 8. This code has no v2 path: a v2 GO with 9 (or the new 10) is refused here too.
+        gate = self.gate()
+        v2 = {**{k: v for k, v in gate.go.items() if k not in ('provider', 'enabled_models')},
+              'schema': 'preview-provider-budget-go-v2', 'model': MODEL, 'requested_effort': 'high'}
+        path = gate.root / 'v2.json'
+        for limit in (8, 9, 10):
+            with self.subTest(limit=limit), self.refused('ROOT_GO_INVALID'):
+                path.write_text(json.dumps({**v2, 'max_concurrent_calls': limit}))
+                bridge.read_go(path)
+
+    def test_the_serve_socket_backlog_holds_every_slot_at_once(self):
+        # socketserver's default listen backlog is 5; ten callers connecting together must all queue.
+        self.assertGreaterEqual(bridge.UnixThreadingServer.request_queue_size, bridge.MAX_CONCURRENT_CALLS + 1)
+        self.assertEqual(bridge.UnixThreadingServer.request_queue_size, bridge.MAX_IPC_CONNECTIONS)
 
     def test_enabling_another_model_takes_a_new_go_and_activate(self):
         gate = self.gate().ready()
@@ -259,9 +307,9 @@ class ModelCallTests(GateTest):
 
     def test_each_call_reserves_and_settles_at_its_own_row_and_the_entry_records_it(self):
         gate = self.gate(enabled_models=ALL).ready()
-        usage = {'prompt_tokens': 100000, 'completion_tokens': 20000}
-        # 100k in + 20k out at each row's list prices.
-        expected = {MODEL: Decimal('0.025'), DEEPSEEK: Decimal('0.032'), MIMO: Decimal('0.0604'), QWEN: Decimal('0.01894')}
+        usage = {'prompt_tokens': 10000, 'completion_tokens': 5000}
+        # 10k in + 5k out at each row's list prices (under each row's reservation for this small body).
+        expected = {MODEL: Decimal('0.004'), DEEPSEEK: Decimal('0.005'), MIMO: Decimal('0.00865'), QWEN: Decimal('0.00304')}
         for model in ALL:
             with self.subTest(model=model):
                 seen = {}
@@ -305,11 +353,11 @@ class ModelCallTests(GateTest):
             with self.subTest(asked=asked, named=named):
                 gate = self.gate(enabled_models=ALL).ready()
                 with self.refused('AUTHORITY_HALTED'):
-                    gate.call('op-1', value=body(model=asked), model=named, charge='0.02')
+                    gate.call('op-1', value=body(model=asked), model=named, charge='0.01')
                 status = gate.status()
                 self.assertEqual((status['state'], status['reason']), ('halted', 'provider_error_or_model_identity'))
                 entry = entry_of(gate, 'op-1')
-                self.assertEqual((entry['state'], entry['held_usd'], entry['model']), ('settled', '0.02', asked))
+                self.assertEqual((entry['state'], entry['held_usd'], entry['model']), ('settled', '0.01', asked))
                 self.assertEqual(entry['reply_model'], named if isinstance(named, str) else None)
 
     def test_a_long_model_name_in_a_reply_is_not_stored(self):
@@ -321,16 +369,19 @@ class ModelCallTests(GateTest):
     def test_effort_json_mode_and_token_bound_follow_each_row(self):
         go = bridge.read_go(self.gate(enabled_models=ALL).go_path)
         json_mode = {'type': 'json_object'}
-        allowed = [body(model=MODEL), body(model=MODEL, response_format=json_mode), body(model=MODEL, max_tokens=163840),
-                   body(model=DEEPSEEK), body(model=DEEPSEEK, max_tokens=131072),
-                   body(model=MIMO), body(model=MIMO, max_tokens=131072)]
-        refused = [{k: v for k, v in body(model=MODEL).items() if k != 'reasoning_effort'},
-                   body(model=MODEL, max_tokens=163841),
+        # Owner ruling 2026-10-10: max_tokens is at most 32768 for every row; 32769 is refused.
+        allowed = [body(model=MODEL), body(model=MODEL, response_format=json_mode), body(model=MODEL, max_tokens=32768),
+                   body(model=DEEPSEEK), body(model=DEEPSEEK, max_tokens=32768),
+                   body(model=MIMO), body(model=MIMO, max_tokens=32768),
+                   body(model=QWEN), body(model=QWEN, max_tokens=32768)]
+        refused = [body(model=model, max_tokens=32769) for model in ALL] + [
+                   {k: v for k, v in body(model=MODEL).items() if k != 'reasoning_effort'},
+                   body(model=MODEL, max_tokens=163840),
                    {k: v for k, v in body(model=DEEPSEEK).items() if k != 'reasoning_effort'},
                    body(model=DEEPSEEK, reasoning_effort='medium'), body(model=DEEPSEEK, response_format=json_mode),
-                   body(model=DEEPSEEK, max_tokens=131073),
+                   body(model=DEEPSEEK, max_tokens=131072),
                    body(model=MIMO, reasoning_effort='high'), body(model=MIMO, reasoning_effort=None),
-                   body(model=MIMO, response_format=json_mode), body(model=MIMO, max_tokens=131073),
+                   body(model=MIMO, response_format=json_mode), body(model=MIMO, max_tokens=131072),
                    body(model=MIMO, max_tokens=0)]
         for value in allowed:
             with self.subTest(allowed=value):
@@ -355,7 +406,7 @@ class ModelCallTests(GateTest):
 
     def test_typescript_nano_usd_strings_are_accepted_for_every_row(self):
         go = bridge.read_go(self.gate(enabled_models=ALL).go_path)
-        nano = {MODEL: (150, 500, 163840), DEEPSEEK: (200, 600, 131072), MIMO: (430, 870, 131072)}
+        nano = {MODEL: (150, 500, 32768), DEEPSEEK: (200, 600, 32768), MIMO: (430, 870, 32768), QWEN: (113, 382, 32768)}
         for model, (price_in, price_out, bound) in nano.items():
             with self.subTest(model=model):
                 raw = json.dumps(body(model=model), separators=(',', ':'))
@@ -373,13 +424,13 @@ class RemainingTests(GateTest):
 
     def test_reply_has_exactly_the_contract_shape(self):
         gate = self.gate().ready()
-        gate.call('op-1', charge='0.05')
+        gate.call('op-1', charge='0.01')
         self.assertEqual(self.report(gate, slots=gate.slots), {
-            'state': 'active', 'window_open': True, 'remaining_usd': '4.95', 'remaining_calls': 499,
-            'max_concurrent_calls': 4, 'largest_reservation_usd': '0.1215488', 'enabled_models': [MODEL]})
+            'state': 'active', 'window_open': True, 'remaining_usd': '4.99', 'remaining_calls': 499,
+            'max_concurrent_calls': 4, 'largest_reservation_usd': '0.0560128', 'enabled_models': [MODEL]})
         gate = self.gate(enabled_models=[MODEL, MIMO]).ready()
         self.assertEqual((self.report(gate)['largest_reservation_usd'], self.report(gate)['remaining_usd']),
-                         ('0.2276352', '5.00'))
+                         ('0.14211072', '5.00'))
 
     def test_it_never_writes_creates_or_reads_the_key(self):
         gate = self.gate().ready()
@@ -476,7 +527,7 @@ class RemainingTests(GateTest):
 
     def test_ipc_answers_the_allowed_peers_only_and_writes_nothing(self):
         gate = self.gate().ready()
-        gate.call('op-1', charge='0.05')
+        gate.call('op-1', charge='0.01')
         before = gate.snapshot()
         line, reply = self.exchange(gate, {'scope_id': SCOPE})
         self.assertEqual(line, b'HTTP/1.0 200 OK')
@@ -512,11 +563,11 @@ class RemainingTests(GateTest):
                 with self.subTest(data=data), self.refused('REMAINING_REQUEST_INVALID'):
                     answers(data)
             self.assertEqual(reads, [100.0])
-            gate.call('op-1', charge='0.05')
+            gate.call('op-1', charge='0.01')
             clock[0] = 100.9
             self.assertEqual(answers({'scope_id': SCOPE})['remaining_usd'], '5.00')  # Still the cached read.
             clock[0] = 101.0
-            self.assertEqual(answers({'scope_id': SCOPE})['remaining_usd'], '4.95')
+            self.assertEqual(answers({'scope_id': SCOPE})['remaining_usd'], '4.99')
             self.assertEqual(reads, [100.0, 101.0])
         self.assertEqual(first[0], self.report(gate, slots=gate.slots) | {'remaining_usd': '5.00', 'remaining_calls': 500})
         broken = bridge.RemainingAnswers(self.gate().private, gate.go_path, gate.slots, clock=lambda: clock[0])
@@ -1000,9 +1051,9 @@ class QwenRowTests(GateTest):
         self.assertEqual(list(DEEPINFRA.rows), [MODEL, DEEPSEEK, MIMO, QWEN])
         row = DEEPINFRA.rows[QWEN]
         self.assertEqual((row.maker, row.input_usd_per_m, row.output_usd_per_m, row.output_bound, row.effort, row.json_object),
-                         ('Alibaba', Decimal('0.113'), Decimal('0.382'), 131072, None, False))
-        # ((262144 + 2048) x 0.113 + 131072 x 0.382) / 1e6, under the $0.25 cap.
-        self.assertEqual(bridge.worst_case_reservation(DEEPINFRA, row), Decimal('0.0799232'))
+                         ('Alibaba', Decimal('0.113'), Decimal('0.382'), 32768, None, False))
+        # ((262144 + 2048) x 0.113 + 32768 x 0.382) / 1e6, under the $0.25 cap (caps: owner, 2026-10-10).
+        self.assertEqual(bridge.worst_case_reservation(DEEPINFRA, row), Decimal('0.042371072'))
         self.assertTrue(bridge.row_reviewed(DEEPINFRA, QWEN, row))
 
     def test_qwen_takes_no_effort_and_no_json_mode(self):
@@ -1078,12 +1129,33 @@ class UnbilledLedgerTests(GateTest):
         self.assertEqual(gate.status()['today_unbilled_releases'], 1)
         self.assertEqual(len(gate.day('2026-10-08')['entries']), 3)
 
+    def test_a_release_across_midnight_counts_on_the_day_it_was_reserved(self):
+        gate = self.gate().ready()
+        for number in range(19):
+            self.refuse(gate, 'u-%d' % number)
+            if number % 4 == 3:
+                gate.call('ok-%d' % number)  # Keeps the in-a-row streak (5) from halting first.
+        gate.clock.set('2026-10-08T20:59:59+00:00')  # 23:59:59 in Bucharest on 8 October.
+
+        def after_midnight(_body, _key):
+            gate.clock.set('2026-10-08T21:00:01+00:00')  # 00:00:01 on 9 October when the 429 comes back.
+            return 429, dict(self.RATE_LIMITED)
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('u-late', dispatch=after_midnight)
+        # The 20th release of 8 October: it halts, and it sits on 8 October's record at $0.
+        self.assertEqual(entry_of(gate, 'u-late')['state'], 'released_unbilled')
+        self.assertEqual(gate.status()['reason'], 'unbilled_release_ceiling')
+        self.assertEqual((gate.status()['today'], gate.status()['today_unbilled_releases']), ('2026-10-09', 0))
+        gate.activate()  # The new day's ceiling is untouched: its first release does not halt.
+        self.refuse(gate, 'next-day')
+        self.assertEqual((gate.status()['state'], gate.status()['today_unbilled_releases']), ('active', 1))
+
     def test_recovery_and_day_spend_ignore_the_zero_holds(self):
         gate = self.gate().ready()
         self.refuse(gate, 'op-1')
-        gate.call('op-2', charge='0.02')
+        gate.call('op-2', charge='0.01')
         self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 0, 'unrecorded_uncertain': 0})
-        self.assertEqual((gate.status()['state'], gate.status()['today_spend_usd']), ('active', '0.02'))
+        self.assertEqual((gate.status()['state'], gate.status()['today_spend_usd']), ('active', '0.01'))
         broken = gate.day('2026-10-08')
         broken['entries']['preview-test:' + SCOPE + ':op-1']['held_usd'] = '0.01'
         with self.assertRaisesRegex(SafetyError, '^LEDGER_ENTRY_INVALID$'):
@@ -1175,8 +1247,9 @@ class ReasoningTokenTests(GateTest):
 
 
 class TeamTotalTests(GateTest):
-    """Round 2 review: one GO is at most the owner's $5.00 team total, and activate adds the other
-    gates' GOs (a fixed, reviewed list; tests reach it only through activate's seam)."""
+    """Round 2 review, figures from the owner's ruling of 2026-10-10: one GO is at most $10.00 a
+    day (MAX_GO_BUDGET_USD), and activate adds the other gates' GOs to stay within the $12.00 team
+    total (DeepInfra $10.00 + Anthropic $2.00) (a fixed, reviewed list; tests reach it only through activate's seam)."""
 
     def other_go(self, gate, provider, budget='1.50', **fields):
         path = gate.root / ('team-go-' + provider + '.json')
@@ -1185,28 +1258,28 @@ class TeamTotalTests(GateTest):
         os.chmod(path, 0o600)
         return path
 
-    def test_one_go_is_capped_at_the_team_total(self):
-        self.assertEqual(bridge.TEAM_TOTAL_BUDGET_USD, Decimal('5.00'))
+    def test_one_go_is_capped_at_ten_dollars_and_the_team_total_is_twelve(self):
+        self.assertEqual((bridge.MAX_GO_BUDGET_USD, bridge.TEAM_TOTAL_BUDGET_USD), (Decimal('10.00'), Decimal('12.00')))
         gate = self.gate()
-        self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', daily_budget_usd='5.00'))['daily_budget_usd'], '5.00')
-        for budget in ('5.01', '6.00', '50.00'):
+        self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', daily_budget_usd='10.00'))['daily_budget_usd'], '10.00')
+        for budget in ('10.01', '12.00', '50.00'):
             with self.subTest(budget=budget), self.refused('ROOT_GO_INVALID'):
                 bridge.read_go(gate.write_go(name='bad.json', daily_budget_usd=budget))
 
     def test_missing_other_gos_count_zero_and_the_sum_may_reach_the_total(self):
-        gate = self.gate(daily_budget_usd='3.50').ready()  # No other GO exists.
+        gate = self.gate(daily_budget_usd='10.00').ready()  # No other GO exists.
         self.assertEqual(gate.status()['state'], 'active')
-        self.other_go(gate, 'anthropic', '1.50')
+        self.other_go(gate, 'anthropic', '2.00')
         bridge.stop_authority(gate.private, now=gate.clock)
-        self.assertEqual(gate.activate()['state'], 'active')  # 3.50 + 1.50 = 5.00 exactly.
+        self.assertEqual(gate.activate()['state'], 'active')  # 10.00 + 2.00 = 12.00 exactly.
         self.assertEqual(bridge.team_total(gate.go, {'deepinfra': str(gate.go_path),
                                                      'anthropic': str(gate.root / 'team-go-anthropic.json')},
-                                           os.getuid()), Decimal('5.00'))
+                                           os.getuid()), Decimal('12.00'))
 
     def test_a_sum_over_the_team_total_refuses(self):
-        for others in ({'anthropic': '1.51'}, {'anthropic': '1.00', 'google': '0.51'}, {'google': '5.00'}):
+        for others in ({'anthropic': '2.01'}, {'anthropic': '1.50', 'google': '0.51'}, {'google': '10.00'}):
             with self.subTest(others=others):
-                gate = self.gate(daily_budget_usd='3.50')
+                gate = self.gate(daily_budget_usd='10.00')
                 gate.init()
                 for provider, budget in others.items():
                     self.other_go(gate, provider, budget)
@@ -1214,10 +1287,33 @@ class TeamTotalTests(GateTest):
                     gate.activate()
                 self.assertEqual(gate.control()['state'], 'initialized')
 
-    def test_this_providers_own_listed_go_is_not_counted_twice(self):
-        gate = self.gate(daily_budget_usd='4.00')
+    def test_the_owners_pots_ten_plus_two_reach_the_total_and_one_cent_more_refuses(self):
+        # Owner ruling 2026-10-10: DeepInfra $10.00 (2,000 calls, 10 at once, all four models),
+        # Anthropic $2.00.
+        proposed = {'daily_budget_usd': '10.00', 'max_paid_posts_per_day': 2000, 'max_concurrent_calls': 10,
+                    'enabled_models': ALL}
+        gate = self.gate(**proposed)
         gate.init()
-        self.other_go(gate, 'deepinfra', '3.00')  # The old GO of this same gate: replaced, not added.
+        self.other_go(gate, 'anthropic', '2.00')
+        self.assertEqual(gate.activate()['state'], 'active')  # 10.00 + 2.00 = 12.00 exactly.
+        gate = self.gate(**proposed)
+        gate.init()
+        self.other_go(gate, 'anthropic', '2.01')
+        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):  # 10.00 + 2.01 = 12.01.
+            gate.activate()
+        self.assertEqual(gate.control()['state'], 'initialized')
+        # A DeepInfra GO of 10.01 never gets as far as the sum: one GO is at most $10.00.
+        with self.refused('ROOT_GO_INVALID'):
+            bridge.read_go(gate.write_go(name='over.json', **{**proposed, 'daily_budget_usd': '10.01'}))
+        # The same sum seen from the Anthropic side: its 2.01 beside DeepInfra's 10.00 is over too.
+        anthropic = {'provider': 'anthropic', 'daily_budget_usd': '2.01'}
+        self.assertEqual(bridge.team_total(anthropic, {'deepinfra': str(self.other_go(gate, 'deepinfra', '10.00'))},
+                                           os.getuid()), Decimal('12.01'))
+
+    def test_this_providers_own_listed_go_is_not_counted_twice(self):
+        gate = self.gate(daily_budget_usd='10.00')
+        gate.init()
+        self.other_go(gate, 'deepinfra', '10.00')  # The old GO of this same gate: replaced, not added.
         self.assertEqual(gate.activate()['state'], 'active')
 
     def test_an_unreadable_or_invalid_other_go_refuses(self):
@@ -1240,6 +1336,9 @@ class TeamTotalTests(GateTest):
                 elif name == 'budget_over_cap':
                     path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'anthropic',
                                                 'daily_budget_usd': '50.00'}))
+                elif name == 'budget_over_go_cap':  # One cent over the $10.00 a single GO may ask for.
+                    path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'anthropic',
+                                                'daily_budget_usd': '10.01'}))
                 elif name == 'too_large':
                     path.write_text(' ' * (bridge.TEAM_GO_BYTES + 1))
                 elif name == 'group_writable':
@@ -1255,7 +1354,7 @@ class TeamTotalTests(GateTest):
                     os.chmod(path, 0o000)
             return apply
         names = ['not_json', 'not_object', 'wrong_provider', 'wrong_schema', 'budget_number', 'budget_over_cap',
-                 'too_large', 'group_writable', 'symlink', 'folder']
+                 'budget_over_go_cap', 'too_large', 'group_writable', 'symlink', 'folder']
         if os.getuid() != 0:
             names.append('unreadable')  # Root reads a mode-0000 file.
         for name in names:
