@@ -917,7 +917,14 @@ describe("P22 the Billing runbook", () => {
       [73, ["Part C", "N-14"]],
       [74, ["the three currencies are proven at each service", "SmartBill invoice and partial credit note (no exchange rate)",
         "a Quaderno calculation in RON and in EUR and a Quaderno sale in EUR", "`start --currency`", "README §14.9 step 7",
-        "the accountant has checked the RON invoice and credit note", "`status --order`"]]
+        "the accountant has checked the RON invoice and credit note", "`status --order`",
+        // C5a fix round 1: SmartBill has no sandbox, so its RON documents come from the owner's recording (row 25), and
+        // the credit note only from its write run; Quaderno's RON and EUR come from the §14.9 sandbox server.
+        "come from the owner's SmartBill recording", "`tools/billing/record-connector.ts smartbill`",
+        "SmartBill has none", "The credit note needs a write run (`--allow-writes`)",
+        "a draft or reads-only run cannot show it", "made in Quaderno's sandbox on the README §14.9 sandbox server",
+        "one quote asked as a Romanian buyer and not paid", "kept or built again for those runs (§14.9 step 8)",
+        "the RON invoice and partial credit note of the SmartBill recording"]]
     ] as const) {
       const line = row(number);
       for (const needle of [`| ${number} | Before billing is switched on`, "**Decided by:**", "**Proven by:**", ...needles]) {
@@ -1034,6 +1041,12 @@ describe("P22 the Billing runbook", () => {
       "Do this on a **separate, throwaway server**", "**Domain and `PUBLIC_APP_URL`**",
       "**Register version with `countryPolicy`**", "`sandbox@example.invalid:not-a-token`",
       "8. **Destroy the sandbox server.**", "The line never comes out",
+      // C5a fix round 1 (go-live row 74): Quaderno's RON calculation is one unpaid Romanian quote on this server, and
+      // the server is kept, or built again, for step 7's RON and EUR payments.
+      "ask once for a quote as a Romanian buyer and do not pay",
+      "leave without pressing **Continue to payment**",
+      "Keep the server until step 7's RON and EUR runs (`start --currency RON` and `start --currency EUR`) are done",
+      "build a sandbox server again as above for those runs (go-live row 74)",
       "pay for Plus first: a cancel link is sent only for a plan that is paid",
       "u.kind = 'SUBMIT_UNKNOWN') AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED'))",
       "**NETOPIA's own test of our flow.**", "**The small live test, with billing off.**",

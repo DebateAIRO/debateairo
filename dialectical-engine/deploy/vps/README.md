@@ -3182,7 +3182,9 @@ journalctl --no-pager -u debateai-api _SYSTEMD_INVOCATION_ID="$(systemctl show -
 **Every purchase in steps 1–5 is made as a buyer outside Romania.** Choose a country whose `pay` is on, for example
 Germany (DE), and answer the "Do you live in …" question with yes. The tax then goes to Germany and the invoice to
 Quaderno's sandbox. The Romanian path (SmartBill, the attached PDF) is proven only by the fake stack in step 6 and by
-the SmartBill contract tests, never in this run.
+the SmartBill contract tests, never in this run. For go-live row 74, ask once for a quote as a Romanian buyer and do
+not pay: on a fresh test account choose Plus, pick Romania, confirm it, fill in a Romanian address, write down the
+total the page shows in lei (Quaderno's sandbox calculation in RON), and leave without pressing **Continue to payment**.
 
 **The stage clock only ever goes up.** Step 2 sets `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, and it stays at 31 through
 steps 3, 4 and 5 (to see a second renewal, raise it to 62; never lower it or remove it during the run). While it is
@@ -3357,9 +3359,12 @@ pnpm exec vitest run tests/unit/payments-netopia-recorded-fixtures.test.ts
    Commit the scrubbed fixtures only when that suite is green (go-live row for the recording). A red run means: do not
    commit, keep the raw folder private, and hand it to a developer session.
 8. **Destroy the sandbox server.** Once your notes are written and both fake-stack runs have passed, delete the server
-   and its disks at your hosting provider and remove the sandbox domain's DNS record. If you set up its nightly backup
-   (§9), it must have had its own storage: delete that too. Never copy its database, a backup of it or its `api.env` to
-   the live host, and never point the sandbox server at live: go live on the production host, as §14.8 says.
+   and its disks at your hosting provider and remove the sandbox domain's DNS record. Keep the server until step 7's RON
+   and EUR runs (`start --currency RON` and `start --currency EUR`) are done; if NETOPIA's settlement form comes after
+   you destroyed it, build a sandbox server again as above for those runs (go-live row 74). If you set up its nightly
+   backup (§9), it must have had its own storage: delete that too. Never copy its database, a backup of it or its
+   `api.env` to the live host, and never point the sandbox server at live: go live on the production host, as §14.8
+   says.
 
 **The small live test, with billing off.** NETOPIA says monthly payments can only be tested with a real card on live.
 Do it on the production host once NETOPIA has switched on recurring payments, before billing goes on (§1.6 item 6 of
