@@ -1,0 +1,149 @@
+/**
+ * 0114: the rotation pin is insert-once and immutable, the two maker laws and the eligible-list rules hold in the
+ * database, and the story gains its storyteller repair count (spec 2026-10-11, Part 3; rulings C and E).
+ */
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { RunRepository, migrate } from "@debateai/db";
+import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
+import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+
+const MIGRATIONS = new URL("../../migrations/", import.meta.url);
+const STEP = "0114_role_rotation.sql";
+let database: TestDatabase;
+const db = () => database.pool;
+
+async function createRun(label: string): Promise<string> {
+  return new RunRepository(db()).startRun({
+    questionLine: `Which models rotate in the ${label} debate?`,
+    principal: { kind: "legacy", legacyAskerId: "asker:0114" },
+    sessionId: `session:${label}`, callerScope: "ASKER",
+    asOf: new Date("2026-10-11T00:00:00.000Z"), askerRiskTier: "casual", effectiveRiskTier: "casual",
+    tierSource: "ASKER", tierProvenanceRef: `asker:${label}`, compositionBudgetTier: "low",
+    depthParams: { depth: 1 }, discoveredPanel: fixtureDiscoveredPanel(2), strangerSampleRate: 1,
+    envelopeBasis: { source: "test-layer" }, registerVersion: 1, batteryVersion: "0114-test-layer", batteryRows: []
+  });
+}
+const COLUMNS = `run_id, rule, writer_provider_ref, writer_model_id, writer_maker, checker_provider_ref, checker_model_id, checker_maker,
+  storyteller_provider_ref, storyteller_model_id, storyteller_maker, story_checker_provider_ref, story_checker_model_id, story_checker_maker,
+  eligible_model_ids`;
+type Overrides = Partial<Record<"writerMaker" | "checkerMaker" | "storytellerMaker" | "storyCheckerMaker" | "rule", string>>
+  & Readonly<{ eligible?: unknown }>;
+const insert = (runId: string, overrides: Overrides = {}) =>
+  db().query(`INSERT INTO core.run_role_rotation (${COLUMNS}) VALUES ($1,$2,'p:a','model-a',$3,'p:b','model-b',$4,'p:b','model-b',$5,'p:a','model-a',$6,$7::text[])`,
+    [runId, overrides.rule ?? "LEAST_SHARE_SEEDED_TIE_V1", overrides.writerMaker ?? "Maker A", overrides.checkerMaker ?? "Maker B",
+      overrides.storytellerMaker ?? "Maker B", overrides.storyCheckerMaker ?? "Maker A",
+      "eligible" in overrides ? overrides.eligible : ["model-a", "model-b"]]);
+const others = (count: number) => Array.from({ length: count }, (_, index) => `model-${index + 3}`);
+
+beforeAll(async () => {
+  database = await startTestDatabase();
+  await migrate(database.pool);
+}, 600_000);
+afterAll(async () => database?.stop());
+
+describe("0114: core.run_role_rotation is pinned once", () => {
+  it("takes one row per run and never changes it", async () => {
+    const runId = await createRun("pinned");
+    await insert(runId);
+    const row = (await db().query("SELECT writer_maker, checker_maker, eligible_model_ids, created_at FROM core.run_role_rotation WHERE run_id=$1", [runId])).rows[0];
+    expect(row).toMatchObject({ writer_maker: "Maker A", checker_maker: "Maker B", eligible_model_ids: ["model-a", "model-b"] });
+    expect(row.created_at).toBeInstanceOf(Date);
+    await expect(insert(runId)).rejects.toThrow(/run_role_rotation_pkey/u);
+    await expect(db().query("UPDATE core.run_role_rotation SET writer_maker='x' WHERE run_id=$1", [runId])).rejects.toThrow();
+    await expect(db().query("DELETE FROM core.run_role_rotation WHERE run_id=$1", [runId])).rejects.toThrow();
+    await expect(db().query("TRUNCATE core.run_role_rotation")).rejects.toThrow(/TRUNCATE_REJECTED/u);
+  });
+  it("refuses a checker of its writer's maker, for the answer and for the story", async () => {
+    await expect(insert(await createRun("same-answer"), { checkerMaker: "Maker A" })).rejects.toThrow(/run_role_rotation_checker_other_maker/u);
+    await expect(insert(await createRun("same-story"), { storyCheckerMaker: "Maker B" })).rejects.toThrow(/run_role_rotation_story_checker_other_maker/u);
+  });
+  it("refuses an unknown rule, a blank identity and an unknown run", async () => {
+    await expect(insert(await createRun("rule"), { rule: "LEAST_DONE_SEEDED_TIE_V2" })).rejects.toThrow(/run_role_rotation_rule_known/u);
+    await expect(insert(await createRun("blank"), { writerMaker: " " })).rejects.toThrow(/run_role_rotation_identities_present/u);
+    await expect(insert(randomUUID())).rejects.toThrow(/run_role_rotation_run_id_fkey/u);
+  });
+  it("the runtime role inserts and reads, never updates; replay reads", async () => {
+    const privileges = (await db().query(`SELECT
+      has_table_privilege('debateai_runtime','core.run_role_rotation','SELECT') AS runtime_select,
+      has_table_privilege('debateai_runtime','core.run_role_rotation','INSERT') AS runtime_insert,
+      has_table_privilege('debateai_runtime','core.run_role_rotation','UPDATE') AS runtime_update,
+      has_table_privilege('debateai_runtime','core.run_role_rotation','DELETE') AS runtime_delete,
+      has_table_privilege('debateai_replay','core.run_role_rotation','SELECT') AS replay_select`)).rows[0];
+    expect(privileges).toEqual({ runtime_select: true, runtime_insert: true, runtime_update: false, runtime_delete: false, replay_select: true });
+  });
+});
+
+describe("0114: the eligible model ids (spec Part 3; rulings C and E)", () => {
+  it("accepts 2 to 16 entries, each at most 256 characters, with repeats (two makers may share a model id)", async () => {
+    await expect(insert(await createRun("eligible-16"), { eligible: ["model-a", "model-b", ...others(14)] })).resolves.toBeDefined();
+    await expect(insert(await createRun("eligible-256"), { eligible: ["model-a", "model-b", "x".repeat(256)] })).resolves.toBeDefined();
+    await expect(insert(await createRun("eligible-repeat"), { eligible: ["model-a", "model-b", "model-a"] })).resolves.toBeDefined();
+  });
+  it("refuses too few, too many, or more than one dimension", async () => {
+    await expect(insert(await createRun("eligible-one"), { eligible: ["model-a"] })).rejects.toThrow(/run_role_rotation_eligible_count/u);
+    await expect(insert(await createRun("eligible-none"), { eligible: [] })).rejects.toThrow(/run_role_rotation_eligible_count/u);
+    await expect(insert(await createRun("eligible-17"), { eligible: ["model-a", "model-b", ...others(15)] }))
+      .rejects.toThrow(/run_role_rotation_eligible_count/u);
+    await expect(insert(await createRun("eligible-2d"), { eligible: [["model-a", "model-b"], ["model-a", "model-b"]] }))
+      .rejects.toThrow(/run_role_rotation_eligible_count/u);
+  });
+  it("refuses a list missing one of the four picks", async () => {
+    await expect(insert(await createRun("eligible-missing"), { eligible: ["model-a", "model-c"] }))
+      .rejects.toThrow(/run_role_rotation_eligible_has_picks/u);
+  });
+  it("refuses a blank entry and an entry over 256 characters", async () => {
+    await expect(insert(await createRun("eligible-blank"), { eligible: ["model-a", "model-b", "  "] }))
+      .rejects.toThrow(/run_role_rotation_eligible_entries/u);
+    await expect(insert(await createRun("eligible-empty"), { eligible: ["model-a", "model-b", ""] }))
+      .rejects.toThrow(/run_role_rotation_eligible_entries/u);
+    await expect(insert(await createRun("eligible-long"), { eligible: ["model-a", "model-b", "x".repeat(257)] }))
+      .rejects.toThrow(/run_role_rotation_eligible_entries/u);
+    // The sixteenth entry is checked too (the last place the list can hold one).
+    await expect(insert(await createRun("eligible-last-blank"), { eligible: ["model-a", "model-b", ...others(13), " "] }))
+      .rejects.toThrow(/run_role_rotation_eligible_entries/u);
+  });
+  it("refuses a NULL entry and a NULL list", async () => {
+    await expect(insert(await createRun("eligible-null-entry"), { eligible: ["model-a", "model-b", null] }))
+      .rejects.toThrow(/run_role_rotation_eligible_no_null/u);
+    await expect(insert(await createRun("eligible-null"), { eligible: null })).rejects.toMatchObject({ code: "23502" });
+  });
+});
+
+describe("0114: serve.answer_story.storyteller_repairs", () => {
+  it("is a nullable integer from 0 to 32", async () => {
+    const column = (await db().query(`SELECT data_type, is_nullable FROM information_schema.columns
+      WHERE table_schema='serve' AND table_name='answer_story' AND column_name='storyteller_repairs'`)).rows[0];
+    expect(column).toEqual({ data_type: "integer", is_nullable: "YES" });
+    const check = (await db().query(`SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+      WHERE conrelid='serve.answer_story'::regclass AND conname='answer_story_storyteller_repairs_bounded'`)).rows[0];
+    expect(check.definition).toMatch(/storyteller_repairs >= 0/u);
+    expect(check.definition).toMatch(/storyteller_repairs <= 32/u);
+  });
+});
+
+describe("0114: a forward step, applied once", () => {
+  it("is recorded after 0113 and a second migrate() changes nothing", async () => {
+    const steps = (await db().query("SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name")).rows
+      .map((row) => row.source_name);
+    expect(steps.slice(-2)).toEqual(["0113_billing_price_currencies.sql", STEP]);
+    const ledger = async () => (await db().query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
+    const before = await ledger();
+    expect(before.filter((row) => row.name === STEP)).toHaveLength(1);
+    await migrate(database.pool);
+    const again = (await db().query("SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name")).rows
+      .map((row) => row.source_name);
+    expect(again).toEqual(steps);
+    expect(await ledger()).toEqual(before);
+  });
+  it("replays: the SQL run twice more by hand leaves the same constraints", async () => {
+    const constraints = async () => (await db().query(`SELECT conrelid::regclass::text AS relation, conname, pg_get_constraintdef(oid) AS definition
+      FROM pg_constraint WHERE conrelid IN ('core.run_role_rotation'::regclass, 'serve.answer_story'::regclass) ORDER BY 1, 2`)).rows;
+    const before = await constraints();
+    const sql = await readFile(new URL(STEP, MIGRATIONS), "utf8");
+    await db().query(sql);
+    await db().query(sql);
+    expect(await constraints()).toEqual(before);
+  });
+});

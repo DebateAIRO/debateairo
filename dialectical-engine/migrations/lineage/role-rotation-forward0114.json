@@ -1,0 +1,17 @@
+{
+  "version": "role-rotation-forward0114-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0113_billing_price_currencies.sql",
+    "manifestSha256": "5ab83aaf39ed688306b8bc0d6a0cc5ad3c37b0468bb823f4ebf11f04d1614d4e",
+    "verifierSha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  },
+  "migration": {
+    "name": "0114_role_rotation.sql",
+    "sha256": "464bc3b96379090722fbdcd83900c6b4329f14483528bfc40013655ae1a1bd39"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}

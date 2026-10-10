@@ -50,8 +50,10 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains 0111 to the recipe, to 0110's manifest and to the verifier in force after 0110 (the sealed one)", async () => {
     const plan = await loadMigrationPlan();
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
-    // The auth DB batch (0112) follows 0111, and Part C's 0113 follows it (migrations/lineage/README.md).
-    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql", "0113_billing_price_currencies.sql"]);
+    // The auth DB batch (0112) follows 0111, Part C's 0113 follows it, and role rotation's 0114 follows 0113
+    // (migrations/lineage/README.md).
+    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql", "0113_billing_price_currencies.sql",
+      "0114_role_rotation.sql"]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
     // as its base verifier: after 0110, the sealed verifier is the one in force.
@@ -91,7 +93,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains Part C's 0113 after dev's 0112: the recipe, 0112's manifest and the effective verifier 0112 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
     const [netopia, batch, step] = plan.forwardChain;
-    expect(plan.forwardChain.map((entry) => entry.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql", "0113_billing_price_currencies.sql"]);
+    expect(plan.forwardChain.map((entry) => entry.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql", "0113_billing_price_currencies.sql",
+      "0114_role_rotation.sql"]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
     expect(batchManifest.verifier.path).toBe("lineage/verify-effective-capabilities-111.sql");
@@ -119,6 +122,37 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(step!.verifierSql).toBe((await bytesOf("lineage/verify-effective-capabilities-111.sql")).toString("utf8"));
     // Its checks are its postcondition (the quote's column and the three CHECKs, compared on every replay); it has no
     // supplemental verifier of its own.
+    expect(step!.replayVerifierSql).toBeUndefined();
+  });
+
+  it("chains role rotation's 0114 after 0113: the recipe, 0113's manifest and the effective verifier 0113 keeps (0111's)", async () => {
+    const plan = await loadMigrationPlan();
+    const [netopia, , partC, step] = plan.forwardChain;
+    expect(plan.forwardChain.map((entry) => entry.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql", "0113_billing_price_currencies.sql",
+      "0114_role_rotation.sql"]);
+    expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
+    const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
+    expect(manifest).toEqual({
+      version: "role-rotation-forward0114-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: {
+        name: "0113_billing_price_currencies.sql",
+        manifestSha256: sha256(await bytesOf("lineage/billing-price-currencies-forward0113.json")),
+        verifierSha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql"))
+      },
+      migration: { name: "0114_role_rotation.sql", sha256: sha256(await bytesOf("0114_role_rotation.sql")) },
+      verifier: {
+        path: "lineage/verify-effective-capabilities-111.sql",
+        sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql"))
+      }
+    });
+    expect(step!.manifestSha256).toBe(sha256(await bytesOf("lineage/role-rotation-forward0114.json")));
+    expect(step!.previousName).toBe(partC!.name);
+    expect(step!.previousManifestSha256).toBe(partC!.manifestSha256);
+    expect(step!.previousVerifierSha256).toBe(partC!.verifierSha256);
+    expect(step!.verifierSql).toBe((await bytesOf("lineage/verify-effective-capabilities-111.sql")).toString("utf8"));
+    // Its checks are its postcondition (the pin table's columns, the story column and the nine CHECKs, compared on
+    // every replay); it has no supplemental verifier of its own.
     expect(step!.replayVerifierSql).toBeUndefined();
   });
 
@@ -162,7 +196,18 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(readme).not.toContain("else renumbered 0112");
   });
 
-  it("refuses a changed 0111 or 0113, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
+  it("documents role rotation's 0114 as the step after 0113, with its manifest, its loader and the verifier it keeps", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## Role rotation (0114)"));
+    expect(section.startsWith("## Role rotation (0114)")).toBe(true);
+    for (const needle of ["0113", "0114_role_rotation.sql", "role-rotation-forward0114.json",
+      "verify-effective-capabilities-111.sql", "packages/db/src/migration-forward0114.ts", "replayVerifierSql",
+      "core.run_role_rotation", "serve.answer_story.storyteller_repairs", "renumber"
+    ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain("role rotation (0114, below) the fourth");
+  });
+
+  it("refuses a changed 0111, 0113 or 0114, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
     const root = await mkdtemp(join(tmpdir(), "forward-chain-111-"));
     try {
       await mkdir(join(root, "packages/db/src"), { recursive: true });
@@ -213,6 +258,18 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }, "MIGRATION_FORWARD0113_MANIFEST");
       // The same refusal when 0112's own manifest changes under 0113 (its bytes are what 0113 is bound to).
       await refusal("lineage/auth-db-batch-forward.json", (text) => `${text}\n`, "MIGRATION_FORWARD0113_MANIFEST");
+      // Role rotation's 0114 changed by one character, and its manifest bound to 0112 instead of 0113.
+      await refusal("0114_role_rotation.sql", (text) => text.replace("LEAST_SHARE_SEEDED_TIE_V1", "LEAST_SHARE_SEEDED_TIE_V2"),
+        "MIGRATION_FORWARD0114_SOURCE_DIGEST");
+      const batchDigest = sha256(await bytesOf("lineage/auth-db-batch-forward.json"));
+      await refusal("lineage/role-rotation-forward0114.json", (text) => {
+        const manifest = JSON.parse(text);
+        manifest.previous.name = "0112_auth_db_batch.sql";
+        manifest.previous.manifestSha256 = batchDigest;
+        return `${JSON.stringify(manifest, null, 2)}\n`;
+      }, "MIGRATION_FORWARD0114_MANIFEST");
+      // The same refusal when 0113's own manifest changes under 0114 (its bytes are what 0114 is bound to).
+      await refusal("lineage/billing-price-currencies-forward0113.json", (text) => `${text}\n`, "MIGRATION_FORWARD0114_MANIFEST");
       const extra = join(root, "migrations/0199_unbound_step.sql");
       await writeFile(extra, "SELECT 1;\n");
       await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_LINEAGE_REFUSED SOURCE_INVENTORY") });
