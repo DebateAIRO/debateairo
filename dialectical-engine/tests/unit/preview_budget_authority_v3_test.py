@@ -213,6 +213,50 @@ class GoV3Tests(GateTest):
         with self.refused('CONCURRENCY_EXCEEDS_BUDGET'):
             gate.activate()
 
+    def test_ten_at_once_is_the_v3_bound_and_eleven_is_refused(self):
+        # Owner ruling 2026-10-10: "10 at once" for the DeepInfra gate.
+        self.assertEqual(bridge.MAX_CONCURRENT_CALLS, 10)
+        gate = self.gate()
+        for limit in (1, 9, 10):
+            with self.subTest(limit=limit):
+                self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', max_concurrent_calls=limit))
+                                 ['max_concurrent_calls'], limit)
+        for limit in (0, 11, 12, 100, True, 10.0, '10'):
+            with self.subTest(limit=limit), self.refused('ROOT_GO_INVALID'):
+                bridge.read_go(gate.write_go(name='bad.json', max_concurrent_calls=limit))
+        # The pot check still holds at 10: 10 x MiMo's worst case (0.2276352) = 2.276352.
+        for budget, ok in (('2.27', False), ('2.28', True), ('4.00', True)):
+            with self.subTest(budget=budget):
+                gate = self.gate(enabled_models=ALL, daily_budget_usd=budget, max_concurrent_calls=10)
+                gate.init()
+                if ok:
+                    self.assertEqual(gate.activate()['state'], 'active')
+                else:
+                    with self.refused('CONCURRENCY_EXCEEDS_BUDGET'):
+                        gate.activate()
+        # Ten slots really serve ten calls at once (the serve side takes the GO's figure).
+        gate = self.gate(max_concurrent_calls=10).ready()
+        self.assertEqual(gate.slots.limit, 10)
+        self.assertEqual(bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, slots=gate.slots,
+                                                 now=gate.clock)['max_concurrent_calls'], 10)
+
+    def test_a_v2_go_is_refused_whatever_its_concurrency_so_v2s_own_bound_of_8_is_untouched(self):
+        # Gate v2 runs its own installed bytes (bound by its GO's hashes) with max_concurrent_calls
+        # 1 to 8. This code has no v2 path: a v2 GO with 9 (or the new 10) is refused here too.
+        gate = self.gate()
+        v2 = {**{k: v for k, v in gate.go.items() if k not in ('provider', 'enabled_models')},
+              'schema': 'preview-provider-budget-go-v2', 'model': MODEL, 'requested_effort': 'high'}
+        path = gate.root / 'v2.json'
+        for limit in (8, 9, 10):
+            with self.subTest(limit=limit), self.refused('ROOT_GO_INVALID'):
+                path.write_text(json.dumps({**v2, 'max_concurrent_calls': limit}))
+                bridge.read_go(path)
+
+    def test_the_serve_socket_backlog_holds_every_slot_at_once(self):
+        # socketserver's default listen backlog is 5; ten callers connecting together must all queue.
+        self.assertGreaterEqual(bridge.UnixThreadingServer.request_queue_size, bridge.MAX_CONCURRENT_CALLS + 1)
+        self.assertEqual(bridge.UnixThreadingServer.request_queue_size, bridge.MAX_IPC_CONNECTIONS)
+
     def test_enabling_another_model_takes_a_new_go_and_activate(self):
         gate = self.gate().ready()
         with self.refused('MODEL_NOT_ALLOWED'):
@@ -1076,6 +1120,27 @@ class UnbilledLedgerTests(GateTest):
         self.assertEqual(gate.status()['today_unbilled_releases'], 1)
         self.assertEqual(len(gate.day('2026-10-08')['entries']), 3)
 
+    def test_a_release_across_midnight_counts_on_the_day_it_was_reserved(self):
+        gate = self.gate().ready()
+        for number in range(19):
+            self.refuse(gate, 'u-%d' % number)
+            if number % 4 == 3:
+                gate.call('ok-%d' % number)  # Keeps the in-a-row streak (5) from halting first.
+        gate.clock.set('2026-10-08T20:59:59+00:00')  # 23:59:59 in Bucharest on 8 October.
+
+        def after_midnight(_body, _key):
+            gate.clock.set('2026-10-08T21:00:01+00:00')  # 00:00:01 on 9 October when the 429 comes back.
+            return 429, dict(self.RATE_LIMITED)
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call('u-late', dispatch=after_midnight)
+        # The 20th release of 8 October: it halts, and it sits on 8 October's record at $0.
+        self.assertEqual(entry_of(gate, 'u-late')['state'], 'released_unbilled')
+        self.assertEqual(gate.status()['reason'], 'unbilled_release_ceiling')
+        self.assertEqual((gate.status()['today'], gate.status()['today_unbilled_releases']), ('2026-10-09', 0))
+        gate.activate()  # The new day's ceiling is untouched: its first release does not halt.
+        self.refuse(gate, 'next-day')
+        self.assertEqual((gate.status()['state'], gate.status()['today_unbilled_releases']), ('active', 1))
+
     def test_recovery_and_day_spend_ignore_the_zero_holds(self):
         gate = self.gate().ready()
         self.refuse(gate, 'op-1')
@@ -1211,6 +1276,25 @@ class TeamTotalTests(GateTest):
                 with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):
                     gate.activate()
                 self.assertEqual(gate.control()['state'], 'initialized')
+
+    def test_the_owners_pots_four_plus_one_reach_the_total_and_one_cent_more_refuses(self):
+        # Owner ruling 2026-10-10: DeepInfra $4.00 (1,000 calls, 10 at once), Anthropic $1.00.
+        proposed = {'daily_budget_usd': '4.00', 'max_paid_posts_per_day': 1000, 'max_concurrent_calls': 10,
+                    'enabled_models': ALL}
+        gate = self.gate(**proposed)
+        gate.init()
+        self.other_go(gate, 'anthropic', '1.00')
+        self.assertEqual(gate.activate()['state'], 'active')  # 4.00 + 1.00 = 5.00 exactly.
+        gate = self.gate(**{**proposed, 'daily_budget_usd': '4.01'})
+        gate.init()
+        self.other_go(gate, 'anthropic', '1.00')
+        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):  # 4.01 + 1.00 = 5.01.
+            gate.activate()
+        self.assertEqual(gate.control()['state'], 'initialized')
+        # The same sum seen from the Anthropic side: its 1.01 beside DeepInfra's 4.00 refuses too.
+        anthropic = {'provider': 'anthropic', 'daily_budget_usd': '1.01'}
+        self.assertEqual(bridge.team_total(anthropic, {'deepinfra': str(self.other_go(gate, 'deepinfra', '4.00'))},
+                                           os.getuid()), Decimal('5.01'))
 
     def test_this_providers_own_listed_go_is_not_counted_twice(self):
         gate = self.gate(daily_budget_usd='4.00')

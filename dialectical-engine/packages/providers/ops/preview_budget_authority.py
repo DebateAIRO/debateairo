@@ -143,6 +143,9 @@ MAX_IPC_BYTES = 1024 * 1024
 IPC_READ_TIMEOUT_SECONDS = 10  # Each header or body read on the 0666 socket.
 MAX_IPC_CONNECTIONS = 32  # Connections beyond this are closed unread, without a thread.
 UNSENT_HALT_STREAK = 5  # Provably unsent calls in a row before the gate halts (provider_unreachable).
+# A GO's max_concurrent_calls is 1 to this (owner ruling, 2026-10-10: "10 at once"). Gate v2 kept its
+# own bound of 8 in its own installed bytes (its GO binds them by hash); this code refuses every v2 GO.
+MAX_CONCURRENT_CALLS = 10
 STOPPED = 'PREVIEW_TEST_AUTHORITY_STOPPED'
 # Codes the caller may see. The last two mean this call's hold is already released and nothing was
 # billed (not reached; an unbilled refusal), so the app may treat them as a transient failure.
@@ -376,7 +379,7 @@ def valid_go(go):
         and isinstance(uids, list) and uids and all(type(uid) is int and uid >= 0 for uid in uids)
         and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
         and Decimal('0.01') <= Decimal(budget) <= TEAM_TOTAL_BUDGET_USD
-        and _int_in(go['max_paid_posts_per_day'], 1, 5000) and _int_in(go['max_concurrent_calls'], 1, 8)
+        and _int_in(go['max_paid_posts_per_day'], 1, 5000) and _int_in(go['max_concurrent_calls'], 1, MAX_CONCURRENT_CALLS)
         and _int_in(go['open_days'], 1, 31)
         and isinstance(predecessor, str) and re.fullmatch(r'[0-9a-f]{64}', predecessor))
 
@@ -1506,6 +1509,9 @@ class UnixThreadingServer(ThreadingMixIn, HTTPServer):
     address_family = socket.AF_UNIX
     daemon_threads = False
     max_connections = MAX_IPC_CONNECTIONS
+    # listen() backlog: socketserver's default (5) is below MAX_CONCURRENT_CALLS, and a full backlog
+    # refuses a non-blocking Unix connect at once (EAGAIN) instead of queueing it.
+    request_queue_size = MAX_IPC_CONNECTIONS
 
     def __init__(self, *args, allowed_uids=None, peer_uid_of=None, **kwargs):
         self.connection_slots = threading.BoundedSemaphore(self.max_connections)

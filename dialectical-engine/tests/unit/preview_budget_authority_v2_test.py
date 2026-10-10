@@ -201,7 +201,7 @@ class GoValidationTests(GateTest):
     def test_valid_go_is_accepted_with_bounds_inclusive(self):
         for changes in ({}, {'daily_budget_usd': '0.01'}, {'daily_budget_usd': '5.00'},
                         {'max_paid_posts_per_day': 1}, {'max_paid_posts_per_day': 5000},
-                        {'max_concurrent_calls': 1}, {'max_concurrent_calls': 8},
+                        {'max_concurrent_calls': 1}, {'max_concurrent_calls': 10},
                         {'open_days': 1}, {'open_days': 31}, {'scope_id': 'a'}, {'scope_id': 'a' + 'b' * 95},
                         {'allowed_peer_uids': [0, 992, 994]}, {'predecessor_ledger_sha256': 'ab' * 32}):
             with self.subTest(changes=changes):
@@ -221,7 +221,7 @@ class GoValidationTests(GateTest):
             {'daily_budget_usd': '5.001'}, {'daily_budget_usd': 5.0}, {'daily_budget_usd': '-1.00'},
             {'daily_budget_usd': 'NaN'}, {'daily_budget_usd': '1e1'}, {'max_paid_posts_per_day': 0},
             {'max_paid_posts_per_day': 5001}, {'max_paid_posts_per_day': True}, {'max_paid_posts_per_day': 2.0},
-            {'max_concurrent_calls': 0}, {'max_concurrent_calls': 9}, {'max_concurrent_calls': True},
+            {'max_concurrent_calls': 0}, {'max_concurrent_calls': 11}, {'max_concurrent_calls': True},
             {'open_days': 0}, {'open_days': 32}, {'open_days': '7'}, {'predecessor_ledger_sha256': 'abc'},
             {'predecessor_ledger_sha256': 'AB' * 32}, {'predecessor_ledger_sha256': None},
             {'total_budget_usd': '1.00'}, {'unknown': True}]
