@@ -61,6 +61,10 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
 | `launch-plan --service api\|ui\|runner --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, runner.env custody); `validateLaunchPlan` before writing |
 | `native-plan --operation apply-and-plan\|verify --from <existing native plan> --source-manifest <candidate api manifest> --out <file>` | new native plan for a candidate API root; `verify` carries the `approval` of `--from` over unchanged; the reviewed `validateNativePlan` before writing |
+| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval |
+| `native-plan --operation publish --from <the plan above> --proposal <what the native operator printed for it> --source-manifest <same manifest> --out <file>` | step 2, after the owner reviewed the proposal: re-hashes every value the proposal shows and its `deltaSha256`, checks it belongs to that plan (release, operator digest, base), copies the approval from it, picks a fresh `publicationId`, and prints the approval it wrote |
+| `native-plan --operation verify --from <the publish plan> --publication <what the native operator printed for publish> --source-manifest <manifest> --out <file>` | step 3: the verify plan for the NEW publication (same id, base and snapshot as the publish plan) |
+| `launch-plan … --publication <what the native operator printed for publish>` | launch plans that carry the new publication instead of the old plan's; the `--native-attestation` proof must already name it |
 
 ## Operator sequence for one release
 
@@ -188,8 +192,140 @@ service), with `--root` and `--source-manifest` of the fallback folders.
 
 The verify plan keeps the live register publication. Its `nodeRuntimeVersion` row therefore
 still names the earlier source revision and operator digest; the native verify does not compare
-that row, and a new publication is a separate, reviewed step.
+that row, and a new publication is a separate, reviewed step. That step is "Publishing a new register version"
+below; when the release changes the register, do it instead of this step 7.
 
 Then pin and restart exactly as `deploy/preview-lifecycle/v1/README.md` "Pinning a NEW release"
 says (`prestart.mjs pin --from "$ART/api-launch.json"`, the same for ui, regenerate both release
 drop-ins, `daemon-reload`, restart api then ui).
+
+## Publishing a new register version on the preview (publish kit v2)
+
+**When.** Whenever the release's code builds a register different from the version the preview runs:
+a changed value (e.g. dev b75e4c294: `composerContractHash` moved to the answer-writer prompt v2, and
+`countryPolicy` closed Tennessee) or a new key (e.g. `outboundMailPolicy`, which must also be added
+to `PREVIEW_SOURCE_ROW_KEYS_V2` in `deploy/preview-auth-dev/v1/publish-register-v2.ts`).
+
+**What changed from v1.** The v1 composer (`publish-register.ts`, kept unchanged) could make only one
+publication: 66 source rows on a 65-row base, adding three fixed keys. It refuses the live 68-row
+version. Kit v2 (`publish-register-v2.ts`) composes from the version the preview runs now. The
+proposal it prints lists every added or changed row with its old and new value in full. A base row
+the source no longer builds is refused, except `staffAccessPolicy` and `internalAllowancePolicy`,
+which are carried over unchanged. `plan` and `publish` refuse a base that is not the newest sealed
+version. Nothing sealed is edited: each publication is a new version.
+
+**Why the approval cannot drift from the review.** The release tool recomputes every hash in the
+proposal from the values it shows, plus `deltaSha256`, before copying the approval into the publish
+plan. At `publish`, the native operator rebuilds the snapshot from the database and the release.
+It refuses unless the base, the snapshot hash and the delta hash all equal the approved ones. A
+proposal file edited after review therefore fails in one of two places:
+- in the tool, if its hashes no longer match what it shows;
+- in the operator, if its hashes no longer match what the code builds.
+
+**The sequence.** It runs in one root shell with the names from step 0 above. The release must
+already be staged up to step 5. Define `nat` once. It is the exact native-operator call of step 7,
+writing its one output line to the file you name:
+
+```sh
+NP=/etc/debateai-v3-preview/auth-dev-v1/native-plan.json
+nat() { ( cd "$CAPI/dialectical-engine" && /bin/sh -c 'exec 5<&0; p=$1; shift; printf %s "$p" 5<&- | "$@" 3<&0 0<&5 5<&-' sh '{"peerUrl":"postgresql://postgres@localhost/debateai?host=/run/debateai-v3-preview/postgresql&port=5434"}' /usr/sbin/runuser -u postgres -- /usr/bin/env -i PATH=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin:/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/native-operator.mjs" --credential-fd 3 < /dev/null > "$1" ); echo "exit $?"; }
+put() { install -o root -g root -m 0644 "$1" "$NP.new" && mv "$NP.new" "$NP" && cmp "$1" "$NP"; }
+cp -a "$NP" "$S/native-plan.before.json"
+```
+
+1. **Plan** (read-only; the services can stay up). The base is the live publication:
+
+   ```sh
+   rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-plan.json"
+   put "$ART/native-plan-plan.json" && nat "$ART/register-proposal.json"
+   put "$S/native-plan.before.json"   # at once: a restart's prestart accepts only a verify plan
+   jq '{baseRegisterVersion,addedKeys,changedKeys,deltaSha256}' "$ART/register-proposal.json"
+   ```
+
+2. **The owner reviews the delta.** Read every entry, old value against new:
+
+   ```sh
+   jq -r '.delta[] | "\(.change) \(.rowKey) (\(.reason))\n  old: \(.oldValueJsonText)\n  new: \(.newValueJsonText)"' "$ART/register-proposal.json"
+   ```
+
+   For dev b75e4c294 on the live v9, expect exactly three changed rows:
+   - `composerContractHash`: `d96e7cc9…c866` becomes `340e11a6…8b70`;
+   - `countryPolicy`: gains `us_states.TN`;
+   - `nodeRuntimeVersion`: its source reference only.
+
+   Anything else means stop and ask. The owner's yes names the printed `deltaSha256`; keep it as
+   `YES=<that hash>`. Re-running `plan` gives a new time, so a new hash, and needs a new yes.
+
+3. **Downtime, then publish.** Choose a moment when no debate is writing its answer: run the
+   `unfinished` count of `deploy/vps/README.md` §"Upgrading to the answer-writer prompt v2 release"
+   and wait for 0, because the answer writer's fingerprint keys the runner's earlier writer
+   attempts. Then stop the API and the UI, exactly as the release runbook's downtime step does:
+
+   ```sh
+   rel native-plan --operation publish --from "$ART/native-plan-plan.json" --proposal "$ART/register-proposal.json" --approved-delta-sha256 "$YES" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-publish.json"
+   ```
+
+   It refuses with `PROPOSAL_NOT_APPROVED` unless the proposal's `deltaSha256` is `$YES`, and it
+   prints the approval it wrote. Then:
+
+   ```sh
+   put "$ART/native-plan-publish.json" && nat "$ART/register-published.json"
+   V=$(jq -r .publication.registerVersion "$ART/register-published.json"); echo "new REGISTER_VERSION=$V"
+   ```
+
+   Re-running `nat` with the same publish plan after a crash replays the same version. It never
+   makes a second one. Never make a second publish plan for a run that may have committed: a fresh
+   `publicationId` meets the version already written and refuses.
+
+   **If `nat` refuses here**, nothing was written:
+   - put the verify plan back with `put "$S/native-plan.before.json"`;
+   - start the old release unchanged;
+   - read the refusal line.
+   `PREVIEW_REGISTER_BASE_NOT_CURRENT: …` means a version newer than the plan's base exists: plan
+   again (step 1) from the verify plan that names the newest publication.
+
+4. **Verify the new publication and make launch plans that carry it:**
+
+   ```sh
+   rel native-plan --operation verify --from "$ART/native-plan-publish.json" --publication "$ART/register-published.json" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-verify.json"
+   put "$ART/native-plan-verify.json" && nat "$ART/native-first-verify.json"
+   rel launch-plan --service api --from "$OLDA" --root "$CAPI" --source-manifest "$ART/candidate-api-source.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/api-launch.json"
+   rel launch-plan --service ui --from "$OLDU" --root "$CUI" --source-manifest "$ART/candidate-ui-source.json" --ui-build "$ART/candidate-ui-build.json" --native-attestation "$ART/native-first-verify.json" --publication "$ART/register-published.json" --out "$ART/ui-launch.json"
+   ```
+
+5. **Point both environment files at the new version.** In `api.env`, and in the runner's
+   environment file if this preview has one, replace the `REGISTER_VERSION=` line with `$V`.
+   (The runner is masked on the preview, and `/etc/debateai-v3-preview/auth-dev-v1` holds no
+   `runner.env` today. If the runner is ever unmasked, its own launch plan needs the same
+   `--publication`.) The edit does not print the file:
+
+   ```sh
+   sed -i "s/^REGISTER_VERSION=.*/REGISTER_VERSION=$V/" /etc/debateai-v3-preview/auth-dev-v1/api.env
+   grep -c "^REGISTER_VERSION=$V\$" /etc/debateai-v3-preview/auth-dev-v1/api.env   # must print 1
+   ```
+
+6. **Pin and restart together.** Follow `deploy/preview-lifecycle/v1/README.md` §"Pinning a NEW
+   release": `prestart.mjs pin --from "$ART/api-launch.json"` and the same for the UI; regenerate
+   both drop-ins; `daemon-reload`; then restart the API and the UI (and the runner, if it is
+   active) in one step. Each start's prestart re-verifies natively against the verify plan of
+   step 4. The API refuses to start if `REGISTER_VERSION` differs from the pinned publication.
+
+**Rolling back.** Re-install the archived `$S/native-plan.before.json`, set `REGISTER_VERSION` back
+to the old version, and re-pin the old launch plans. The new version stays sealed, unused. Later
+publications must then be based on that newest version, not on the one running after the
+rollback, because `plan` and `publish` refuse a base with a newer version above it. So run the next
+`plan` with `--from` set to the kept `$ART/native-plan-verify.json` of step 4, which names it. The
+proposal's delta is then measured against that unused version, not against the running one: the
+owner reviews it knowing that. A
+fallback release built before kit v2 cannot verify on a base above 65 rows. Roll back to it only
+together with its own old native plan.
+
+**What only the server proves:**
+- the operator run itself: peer identity, `refusePendingForwardSteps`, the real `publishGeneral`
+  receipt and `verifyNativeState`;
+- that the API boots on the new version;
+- that the answer writer then records under `340e11a6…`.
+
+The unit tests (`preview-register-publish-v2`, `preview-release-artifacts`) and the PostgreSQL 18
+integration test (`tests/integration/preview-register-publish-v2.test.ts`: add keys, change a value,
+replay, stale base, wrong delta) are source evidence only.

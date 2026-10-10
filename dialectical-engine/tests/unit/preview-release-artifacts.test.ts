@@ -505,7 +505,7 @@ describe('native-plan', () => {
     ['a fallback root', {}, { sourceRoot: '/opt/debateai-v3-preview/releases/auth-dev-fallback-new-api' }, 'apply-and-plan', 'NATIVE_ROOT_NOT_CANDIDATE'],
     ['a UI manifest', {}, { role: 'ui', sourceRoot: NEW_ROOT.ui }, 'apply-and-plan', 'SOURCE_ROLE_REFUSED'],
     ['an old plan failing the reviewed schema check', { extra: true }, {}, 'apply-and-plan', 'FROM_PLAN_INVALID'],
-    ['publish (not a staging operation)', {}, {}, 'publish', 'ARGUMENTS_REFUSED']
+    ['publish without a reviewed proposal', {}, {}, 'publish', 'ARGUMENTS_REFUSED']
   ])('refuses %s', async (_name, fromPatch, manifestPatch, operation, code) => {
     const t = staged(fromPatch, manifestPatch);
     await expect(run(t.argv(operation), t.s.layout)).rejects.toMatchObject({ code });
@@ -526,5 +526,161 @@ describe('native-plan', () => {
     const plan = read(await run(['native-plan', '--operation', 'verify', '--from', copy.path, '--source-manifest', t.source.path, '--out', join(t.s.art, 'native-plan-verify.json')], t.s.layout));
     expect(plan.approval).toEqual(oldNativePlan().approval);
     expect(lstatSync(join(t.s.art, 'native-plan-verify.json')).isFile()).toBe(true);
+  });
+});
+
+describe('native-plan: publish kit v2 (plan -> owner review -> publish -> verify)', async () => {
+  const kit = await import('../../deploy/' + 'preview-auth-dev/v1/publish-register-v2.ts');
+  const registerModule = await import('@debateai/register');
+  const observedAt = '2026-10-10T12:00:00.000Z';
+  const newId = '33333333-3333-4333-8333-333333333333';
+  const operatorDigest = manifestModule.operatorManifestSha256(sourceManifest('api'));
+  /** A real v2 composition: the live 68-row shape with the answer-writer fingerprint still at v1. */
+  async function composed() {
+    const sourceRows = [...await kit.buildPreviewSourceRowsV2(await registerModule.loadBootstrapRegister(), { nodeVersion: 'v26.8.2', pnpmVersion: '11.20.0', sourceRevision: newRevision, sourceTree: newTree, operatorSha256: operatorDigest, observedAt })];
+    const owned = await import('../../packages/register/src/staff-access-policy.js');
+    // The live shape: the answer-writer fingerprint still at v1, and the Node row measured by the previous release.
+    const base = [...sourceRows.map((row: any) => row.rowKey === 'composerContractHash' ? { ...row, valueJsonText: '"d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866"' }
+      : row.rowKey === 'nodeRuntimeVersion' ? { ...row, sourceRef: `preview-auth-dev-v1 actual Node v26.8.2; measured 2026-10-08T09:34:59.910Z; source ${revision}/${tree}; operator sha256:${'f'.repeat(64)}` } : row),
+      ...[owned.STAFF_ACCESS_POLICY_REGISTER_ROW, owned.INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map((row: any) => ({ rowKey: row.rowKey, valueJsonText: registerModule.canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }))];
+    const baseSha = registerModule.computeRegisterSnapshotSha256([...base].sort((a: any, b: any) => a.rowKey.localeCompare(b.rowKey, 'en')));
+    return kit.composePreviewSnapshotV2({ sourceRows, baseRows: base, baseRegisterVersion: '9', baseSnapshotSha256: baseSha });
+  }
+  const read = (result: { path: string }) => JSON.parse(readFileSync(result.path, 'utf8'));
+  async function staged() {
+    const snapshot = await composed();
+    const live = { ...publication, registerVersion: '9', snapshotSha256: snapshot.baseSnapshotSha256 };
+    const s = server();
+    const from = s.write(join(s.art, 'native-plan-before.json'), oldNativePlan({ approval: { ...oldNativePlan().approval, publication: live } }));
+    const source = s.write(join(s.art, 'candidate-api-source.json'), sourceManifest('api'));
+    const nativePlan = (operation: string, extra: string[] = [], fromPath = from.path) => ['native-plan', '--operation', operation, '--from', fromPath, '--source-manifest', source.path, ...extra, '--out', join(s.art, `native-plan-${operation}.json`)];
+    const plan = read(await run(nativePlan('plan'), s.layout));
+    // What native-operator.mjs prints for `plan`, redirected to a file by the root shell (trailing newline).
+    const proposalOf = (patch: (p: any) => void = () => {}) => { const p = JSON.parse(JSON.stringify(operator.snapshotProposal({ runtimeObservedAt: observedAt, source: sourceManifest('api'), plan, snapshot }))); patch(p); return p; };
+    const writeProposal = (value: unknown, name = 'native-proposal.json') => s.write(join(s.art, name), `${JSON.stringify(value)}\n`);
+    const newPublication = { publicationId: newId, publicationKind: 'GENERAL', baseRegisterVersion: '9', registerVersion: '10', requestSha256: digest, snapshotSha256: snapshot.snapshotSha256, rowCount: 68, recordedAt: '2026-10-10T12:05:00.000Z' };
+    return { s, from, source, nativePlan, plan, snapshot, live, proposalOf, writeProposal, newPublication };
+  }
+  const deps = { randomUUID: () => newId };
+
+  it('plan: composes from the publication the preview runs now, derived from the live verify plan', async () => {
+    const t = await staged();
+    expect(t.plan).toEqual({ ...oldNativePlan(), operation: 'plan', sourceRoot: NEW_ROOT.api, sourceRevision: newRevision, sourceTree: newTree,
+      sourceManifest: { path: t.source.path, sha256: t.source.sha256 }, operatorManifestSha256: operatorDigest,
+      selectedBaseRegisterVersion: '9', selectedBaseSnapshotSha256: t.live.snapshotSha256, approval: null });
+    expect(operator.validateNativePlan(t.plan)).toEqual(t.plan);
+  });
+
+  it('publish: the approval is copied from the reviewed proposal, with a fresh publication id, and echoed', async () => {
+    const t = await staged();
+    const proposal = t.writeProposal(t.proposalOf());
+    const result = await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], join(t.s.art, 'native-plan-plan.json')), t.s.layout, deps);
+    const approval = { runtimeObservedAt: observedAt, baseRegisterVersion: '9', baseSnapshotSha256: t.snapshot.baseSnapshotSha256, snapshotSha256: t.snapshot.snapshotSha256, deltaSha256: t.snapshot.deltaSha256 };
+    expect(read(result)).toEqual({ ...t.plan, operation: 'publish', publicationId: newId, approval });
+    expect(result).toMatchObject({ publicationId: newId, approval });
+    expect(t.proposalOf().changedKeys).toEqual(['composerContractHash', 'nodeRuntimeVersion']);
+    // The approval has exactly the four keys publishPreviewRegister demands, plus runtimeObservedAt.
+    const { runtimeObservedAt, ...binding } = read(result).approval;
+    expect(Object.keys(binding).sort()).toEqual(['baseRegisterVersion', 'baseSnapshotSha256', 'deltaSha256', 'snapshotSha256']);
+    expect(operator.validateNativePlan(read(result))).toBeTruthy();
+  });
+
+  it.each([
+    ['a shown value changed after hashing', (p: any) => { p.delta[0].newValueJsonText = '"0000"'; }, 'PROPOSAL_REFUSED'],
+    ['a shown value changed with its own hash redone (deltaSha256 stale)', (p: any) => { p.delta[0].newValueJsonText = '"0000"'; p.delta[0].newValueSha256 = sha('"0000"'); }, 'PROPOSAL_REFUSED'],
+    ['a dropped delta entry', (p: any) => { p.delta = p.delta.slice(1); p.changedKeys = ['nodeRuntimeVersion']; }, 'PROPOSAL_REFUSED'],
+    ['a mislabelled added key', (p: any) => { p.addedKeys = ['composerContractHash']; }, 'PROPOSAL_REFUSED'],
+    ['an added entry that claims an old value', (p: any) => { p.delta[0].change = 'added'; p.addedKeys = ['composerContractHash']; p.changedKeys = ['nodeRuntimeVersion']; }, 'PROPOSAL_REFUSED'],
+    ['a v1 proposal', (p: any) => { p.schema = 'preview-auth-dev-snapshot-proposal-v1'; }, 'PROPOSAL_REFUSED'],
+    ['an unknown field', (p: any) => { p.extra = true; }, 'PROPOSAL_REFUSED'],
+    ['a runtime time that is not the printed ISO form', (p: any) => { p.runtimeObservedAt = '2026-10-10T12:00:00Z'; }, 'PROPOSAL_REFUSED'],
+    ['a runtime time edited after review', (p: any) => { p.runtimeObservedAt = '2026-10-10T12:00:01.000Z'; }, 'PROPOSAL_REFUSED'],
+    ['a row count that disagrees with the keys', (p: any) => { p.rowCount = 67; }, 'PROPOSAL_REFUSED'],
+    ['another base version', (p: any) => { p.baseRegisterVersion = '8'; }, 'PROPOSAL_MISMATCH'],
+    ['another base snapshot', (p: any) => { p.baseSnapshotSha256 = digest; }, 'PROPOSAL_MISMATCH'],
+    ['another operator digest', (p: any) => { p.operatorManifestSha256 = digest; }, 'PROPOSAL_MISMATCH'],
+    ['another source revision', (p: any) => { p.sourceRevision = revision; }, 'PROPOSAL_MISMATCH']
+  ])('publish refuses %s and writes nothing', async (_name, patch, code) => {
+    const t = await staged();
+    const proposal = t.writeProposal(t.proposalOf(patch));
+    await expect(run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], join(t.s.art, 'native-plan-plan.json')), t.s.layout, deps)).rejects.toMatchObject({ code });
+    expect(existsSync(join(t.s.art, 'native-plan-publish.json'))).toBe(false);
+  });
+
+  it.each([
+    ['a publish from the live verify plan (no plan step)', (t: any) => t.from.path, 'FROM_PLAN_INVALID'],
+    ['a publish from a plan of another source manifest', (t: any) => t.s.write(join(t.s.art, 'other-plan.json'), { ...t.plan, sourceManifest: { ...t.plan.sourceManifest, sha256: digest } }).path, 'PROPOSAL_MISMATCH'],
+    ['a publish from a plan that already holds an approval', (t: any) => t.s.write(join(t.s.art, 'approved-plan.json'), { ...t.plan, approval: oldNativePlan().approval }).path, 'FROM_PLAN_INVALID']
+  ])('refuses %s', async (_name, fromPath, code) => {
+    const t = await staged();
+    const proposal = t.writeProposal(t.proposalOf());
+    await expect(run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], fromPath(t)), t.s.layout, deps)).rejects.toMatchObject({ code });
+  });
+
+  it('publish needs the owner\'s yes for exactly this delta', async () => {
+    const t = await staged();
+    const proposal = t.writeProposal(t.proposalOf());
+    const planPath = join(t.s.art, 'native-plan-plan.json');
+    await expect(run(t.nativePlan('publish', ['--proposal', proposal.path], planPath), t.s.layout, deps)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    await expect(run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', 'yes'], planPath), t.s.layout, deps)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    await expect(run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', digest], planPath), t.s.layout, deps)).rejects.toMatchObject({ code: 'PROPOSAL_NOT_APPROVED' });
+    await expect(run(t.nativePlan('verify', ['--approved-delta-sha256', t.snapshot.deltaSha256]), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    expect(existsSync(join(t.s.art, 'native-plan-publish.json'))).toBe(false);
+  });
+
+  it('plan refuses an apply-and-plan source plan, a proposal, or a publication flag', async () => {
+    const t = await staged();
+    const applied = t.s.write(join(t.s.art, 'applied-plan.json'), { ...oldNativePlan(), operation: 'apply-and-plan', approval: null });
+    await expect(run(t.nativePlan('plan', [], applied.path).with(-1, join(t.s.art, 'plan-2.json')), t.s.layout)).rejects.toMatchObject({ code: 'FROM_PLAN_INVALID' });
+    const proposal = t.writeProposal(t.proposalOf());
+    await expect(run(t.nativePlan('plan', ['--proposal', proposal.path]).with(-1, join(t.s.art, 'plan-3.json')), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    await expect(run(t.nativePlan('plan', ['--publication', proposal.path]).with(-1, join(t.s.art, 'plan-4.json')), t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED' });
+    for (const name of ['plan-2.json', 'plan-3.json', 'plan-4.json']) expect(existsSync(join(t.s.art, name))).toBe(false);
+  });
+
+  it('verify after publish: carries the new publication, so pin accepts the new launch plans', async () => {
+    const t = await staged();
+    const proposal = t.writeProposal(t.proposalOf());
+    const publishPlan = await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], join(t.s.art, 'native-plan-plan.json')), t.s.layout, deps);
+    const published = t.s.write(join(t.s.art, 'native-publish.json'), `${JSON.stringify(attestation({ publication: t.newPublication }))}\n`);
+    const verify = read(await run(t.nativePlan('verify', ['--publication', published.path], publishPlan.path), t.s.layout));
+    expect(verify).toEqual({ ...read(publishPlan), operation: 'verify', approval: { ...read(publishPlan).approval, publication: t.newPublication } });
+    const entry = { sourceRevision: newRevision, sourceTree: newTree, operatorManifestSha256: operatorDigest, publication: t.newPublication };
+    expect(prestart.checkNativePlan(verify, entry)).toEqual([]);
+    expect(prestart.checkNativePlan(verify, { ...entry, publication: t.live })).toEqual(['publication']);
+  });
+
+  it.each([
+    ['another publication id', (p: any) => ({ ...p, publicationId: '22222222-2222-4222-8222-222222222222' }), {}],
+    ['another snapshot', (p: any) => ({ ...p, snapshotSha256: digest }), {}],
+    ['another base', (p: any) => ({ ...p, baseRegisterVersion: '8' }), {}],
+    ['another release', (p: any) => p, { sourceRevision: revision }]
+  ])('verify refuses a publish output with %s', async (_name, change, attestationPatch) => {
+    const t = await staged();
+    const proposal = t.writeProposal(t.proposalOf());
+    const publishPlan = await run(t.nativePlan('publish', ['--proposal', proposal.path, '--approved-delta-sha256', t.snapshot.deltaSha256], join(t.s.art, 'native-plan-plan.json')), t.s.layout, deps);
+    const published = t.s.write(join(t.s.art, 'native-publish.json'), JSON.stringify(attestation({ publication: change(t.newPublication), ...attestationPatch })));
+    await expect(run(t.nativePlan('verify', ['--publication', published.path], publishPlan.path), t.s.layout)).rejects.toMatchObject({ code: 'PUBLICATION_MISMATCH' });
+    expect(existsSync(join(t.s.art, 'native-plan-verify.json'))).toBe(false);
+  });
+
+  it('verify with a publication refuses a source plan that did not publish', async () => {
+    const t = await staged();
+    const published = t.s.write(join(t.s.art, 'native-publish.json'), JSON.stringify(attestation({ publication: t.newPublication })));
+    await expect(run(t.nativePlan('verify', ['--publication', published.path]), t.s.layout)).rejects.toMatchObject({ code: 'FROM_PLAN_INVALID' });
+  });
+
+  it('launch-plan --publication: the new publication replaces the old one and the proof must bind to it', async () => {
+    const t = await staged();
+    const published = t.s.write(join(t.s.art, 'native-publish.json'), JSON.stringify(attestation({ publication: t.newPublication })));
+    const from = t.s.write(join(t.s.art, 'old-runner-launch.json'), oldPlan('runner'));
+    const source = t.s.write(join(t.s.art, 'candidate-runner-source.json'), sourceManifest('runner'));
+    const argv = (proof: string) => ['launch-plan', '--service', 'runner', '--from', from.path, '--root', NEW_ROOT.runner, '--source-manifest', source.path, '--native-attestation', proof, '--publication', published.path, '--out', join(t.s.art, 'runner-launch.json')];
+    const stale = t.s.write(join(t.s.art, 'native-old-verify.json'), JSON.stringify(attestation()));
+    await expect(run(argv(stale.path), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) })).rejects.toMatchObject({ code: 'NATIVE_ATTESTATION_MISMATCH' });
+    const fresh = t.s.write(join(t.s.art, 'native-first-verify.json'), JSON.stringify(attestation({ publication: t.newPublication })));
+    const plan = read(await run(argv(fresh.path), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout) }));
+    expect(plan.publication).toEqual(t.newPublication);
+    expect(plan).toMatchObject({ service: 'runner', sourceRoot: NEW_ROOT.runner, nativeAttestation: { path: fresh.path, sha256: fresh.sha256 } });
   });
 });
