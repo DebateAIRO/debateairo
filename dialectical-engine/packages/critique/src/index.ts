@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
+import { ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND, BUILT_IN_PROVIDER_ADAPTERS } from "@debateai/providers";
 import { allocateSequence, withRunContentLease, withWriteTransaction } from "@debateai/db";
 import {
   LEDGER_ACTION_SCOPE,
@@ -236,7 +237,19 @@ export interface MakerAvailability {
 export interface DeploymentMakerCapability {
   readonly deploymentMakerCapability: boolean;
   readonly configuredMakers: readonly string[];
-  readonly configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[];
+  /**
+   * `adapterKind` is carried ONLY when it is not one of the two OpenAI-compatible
+   * kinds: the native wire (multi-model preview, PR B: `anthropic-messages-http`),
+   * so the target parser can pick it from the sealed row, or a kind no shipped
+   * adapter serves, so the target parser refuses it by name instead of the
+   * engine silently using the OpenAI wire. Every OpenAI-compatible entry keeps
+   * its exact two-member shape.
+   */
+  readonly configuredProviders: readonly {
+    readonly providerRef: string;
+    readonly maker: string;
+    readonly adapterKind?: string;
+  }[];
   readonly registerRef: string;
 }
 
@@ -285,8 +298,15 @@ export async function readDeploymentMakerCapability(
   return Object.freeze({
     deploymentMakerCapability: configuredMakers.length >= (requiredDistinctMakers as number),
     configuredMakers: Object.freeze(configuredMakers),
-    configuredProviders: Object.freeze(typedProviders.map(({ providerRef, maker }) =>
-      Object.freeze({ providerRef, maker })
+    configuredProviders: Object.freeze(typedProviders.map(({ providerRef, maker, adapterKind }) =>
+      Object.freeze({
+        providerRef,
+        maker,
+        ...(adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND
+          || !BUILT_IN_PROVIDER_ADAPTERS.some((adapter) => adapter.adapterKind === adapterKind)
+          ? { adapterKind }
+          : {})
+      })
     )),
     registerRef: `${CONFIGURED_PROVIDER_SET_ROW_KEY}@${registerVersion}:${row.source_ref}`
   });

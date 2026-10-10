@@ -4,6 +4,20 @@ import { z } from "zod";
 import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
+import {
+  ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  ANTHROPIC_MESSAGES_PATH,
+  PROVIDER_CONTENT_REFUSED,
+  PROVIDER_PACKET_UNSUPPORTED,
+  PROVIDER_REPLY_UNSUPPORTED,
+  anthropicMessagesRequestBody,
+  anthropicMessagesRequestHeaders,
+  assertAnthropicCredentialShape,
+  isAnthropicHostPairing,
+  isAnthropicThinkingControl,
+  readAnthropicMessagesReply
+} from "./anthropic-messages.js";
+import { previewModelRowForEndpoint } from "./preview-models.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -187,11 +201,17 @@ export class ProviderContentUnacceptedError extends TypedDomainError {
   }
 }
 
+/**
+ * Multi-model preview, PR B: the wire a call went out on. Recorded on the call
+ * result and the raw artifact (`raw_artifact.provider` is free text).
+ */
+export type ProviderWireKind = "openai-compatible-http" | typeof ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
+
 export interface ProviderCallResult {
   readonly rawArtifactRef: string;
   readonly ledgerEntryRef: string;
   readonly content: string;
-  readonly provider: "openai-compatible-http";
+  readonly provider: ProviderWireKind;
   readonly model: string;
   readonly maker: string;
   readonly modelVersion: string;
@@ -248,6 +268,13 @@ export type ProviderDiscoveryTarget = Readonly<{
    * GLM relay declares 1 000 000). Absent = no pre-send window check.
    */
   contextWindowTokens?: number;
+  /**
+   * Multi-model preview, PR B: the NATIVE wire this target speaks, taken from
+   * its configuredProviderSet register row (never from the target JSON, so the
+   * sealed register stays the one authority on which adapter serves a vendor).
+   * Absent = the OpenAI-compatible wire, which is every target before this.
+   */
+  adapterKind?: typeof ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
 }>;
 
 /**
@@ -278,10 +305,16 @@ export type ProviderTargetGatewayControls = Readonly<{
   thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
   contextWindowTokens?: number;
   supportsJsonObjectResponse?: boolean;
+  adapterKind?: typeof ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
 }>;
 
+/** The reviewed preview row behind an endpoint and model, if any (contract A §1; PR B adds Anthropic's). */
+function reviewedPreviewRow(endpoint:string,model:string) {
+  return previewModelRowForEndpoint(endpoint,model);
+}
+/** Row-driven: only a reviewed row whose json_object is true (a DeepInfra row) may send response_format. */
 function isJsonObjectResponseTarget(endpoint:string,model:string):boolean {
-  return endpoint === "https://api.deepinfra.com/v1/openai" && model === "zai-org/GLM-5.3-Flash";
+  return reviewedPreviewRow(endpoint,model)?.jsonObject === true;
 }
 export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): ProviderTargetGatewayControls {
   return Object.freeze({
@@ -289,7 +322,8 @@ export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): 
       thinking: Object.freeze({ parameter: target.thinkingParameter, levels: target.thinkingLevels })
     }),
     ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens }),
-    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{})
+    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{}),
+    ...(target.adapterKind === undefined ? {} : { adapterKind: target.adapterKind })
   });
 }
 
@@ -370,7 +404,13 @@ function normalizedProviderBaseUrl(value: unknown): string {
 
 export function parseProviderDiscoveryTargets(
   source: string,
-  configuredProviders: readonly Readonly<{ providerRef: string; maker: string }>[]
+  /**
+   * `adapterKind` is the register row's. `anthropic-messages-http` marks the
+   * target native; an OpenAI-compatible kind (or none) keeps the OpenAI wire,
+   * exactly as before PR B; any other kind is refused rather than silently sent
+   * over the OpenAI wire (review fix, 2026-10-10).
+   */
+  configuredProviders: readonly Readonly<{ providerRef: string; maker: string; adapterKind?: string }>[]
 ): readonly ProviderDiscoveryTarget[] {
   if (Buffer.byteLength(source, "utf8") > MAX_PROVIDER_TARGET_CONFIG_BYTES) {
     throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
@@ -385,6 +425,7 @@ export function parseProviderDiscoveryTargets(
     throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
   }
   const configuredByRef = new Map<string, string>();
+  const nativeRefs = new Set<string>();
   for (const configured of configuredProviders) {
     const providerRef = requiredProviderTargetText(
       configured.providerRef,
@@ -393,6 +434,11 @@ export function parseProviderDiscoveryTargets(
     const maker = requiredProviderTargetText(configured.maker, "CONFIGURED_PROVIDER_INVALID");
     if (configuredByRef.has(providerRef)) throw new TypeError("CONFIGURED_PROVIDER_DUPLICATE");
     configuredByRef.set(providerRef, maker);
+    if (configured.adapterKind !== undefined
+      && !BUILT_IN_PROVIDER_ADAPTERS.some((adapter) => adapter.adapterKind === configured.adapterKind)) {
+      throw new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN");
+    }
+    if (configured.adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) nativeRefs.add(providerRef);
   }
   const targetsByRef = new Map<string, ProviderDiscoveryTarget>();
   for (const candidate of decoded) {
@@ -451,6 +497,21 @@ export function parseProviderDiscoveryTargets(
     }
     const maker = configuredByRef.get(providerRef);
     if (maker === undefined) throw new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
+    const native = nativeRefs.has(providerRef);
+    const baseUrl = normalizedProviderBaseUrl(row.base_url);
+    // Review fix: the wire and the host are tied both ways, so a vendor key is
+    // never sent over the wrong wire and this wire's body never to another host.
+    if (!isAnthropicHostPairing(native, baseUrl)) {
+      throw new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH");
+    }
+    // PR B: the Anthropic wire carries a level as `output_config.effort`, and
+    // only the levels its contract lists; anything else is an operator's
+    // declaration the vendor (or the preview gate) would refuse on every call.
+    if (native && thinking !== undefined && !isAnthropicThinkingControl({
+      parameter: thinking.thinkingParameter, levels: thinking.thinkingLevels
+    })) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_THINKING_INVALID");
+    }
     const authorizationHeader = row.authorization_header === undefined
       ? undefined
       : requiredProviderTargetText(
@@ -477,13 +538,14 @@ export function parseProviderDiscoveryTargets(
     targetsByRef.set(providerRef, Object.freeze({
       providerRef,
       maker,
-      baseUrl: normalizedProviderBaseUrl(row.base_url),
+      baseUrl,
       model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
       ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
       ...(authorizationFile === undefined ? {} : { authorizationFile }),
       ...(price === undefined ? {} : price),
       ...(thinking === undefined ? {} : thinking),
-      ...(contextWindow === undefined ? {} : contextWindow)
+      ...(contextWindow === undefined ? {} : contextWindow),
+      ...(native ? { adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND } : {})
     }));
   }
   if (targetsByRef.size !== configuredByRef.size) {
@@ -966,7 +1028,9 @@ export interface ProviderAdapterRegistration {
 export const OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND = "openai-compatible-http" as const;
 export const BUILT_IN_PROVIDER_ADAPTERS = Object.freeze([
   Object.freeze({ adapterKind: OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, implementation: "OpenAICompatibleProviderGateway" }),
-  Object.freeze({ adapterKind: "vllm-openai-compatible-http", implementation: "VllmOpenAICompatibleProviderGateway" })
+  Object.freeze({ adapterKind: "vllm-openai-compatible-http", implementation: "VllmOpenAICompatibleProviderGateway" }),
+  // Multi-model preview, PR B: the native Messages wire (./anthropic-messages.ts).
+  Object.freeze({ adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND, implementation: "AnthropicMessagesProviderGateway" })
 ] as const);
 
 export function selectProviderAdapter(
@@ -986,7 +1050,7 @@ export interface RawArtifactInput {
   readonly attemptId: string;
   readonly runId: string | null;
   readonly providerRef: string;
-  readonly provider: "openai-compatible-http";
+  readonly provider: ProviderWireKind;
   readonly model: string;
   readonly maker: string;
   readonly modelVersion: string | null;
@@ -1102,6 +1166,15 @@ export interface ProviderCostEnvelopeSeam {
 
 export interface OpenAICompatibleGatewayOptions {
   readonly supportsJsonObjectResponse?: boolean;
+  /**
+   * Multi-model preview, PR B: the wire this gateway speaks. Absent = the
+   * OpenAI-compatible `/chat/completions` wire, byte for byte as before. With
+   * `anthropic-messages-http` the SAME attempt loop posts the Messages body to
+   * `/messages` and reads the reply through ./anthropic-messages.ts; nothing
+   * else about the loop changes. `providerTargetGatewayControls` sets it from
+   * the target, so a composition root needs no change of its own.
+   */
+  readonly adapterKind?: typeof ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
   readonly endpoint: string;
   readonly model: string;
   readonly maker: string;
@@ -1120,6 +1193,12 @@ export interface OpenAICompatibleGatewayOptions {
   readonly thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
   /** Model scorecard §2.10: from the target's `context_window_tokens`. Absent = no window check. */
   readonly contextWindowTokens?: number;
+  /**
+   * Contract A §2 (preview multi-model, 2026-10-10): the target's largest `max_tokens`. Every
+   * attempt's bound, a length retry's raised one included, is clamped to it before the body is
+   * built, so the guarded fetch never sees a bound its row refuses. Absent = no clamp.
+   */
+  readonly maxOutputTokens?: number;
   /**
    * Model scorecard §2.3: records each attempt's prompt just before it is sent.
    * Optional: the unit doubles and a gateway with no debate run record none.
@@ -1463,8 +1542,34 @@ function assertJsonObjectResponseCapability(options:OpenAICompatibleGatewayOptio
   throw new TypedDomainError("PROVIDER_RESPONSE_FORMAT_CAPABILITY_INVALID","Invalid JSON object response capability");
 }
 
+/**
+ * PR B: the Anthropic wire's construction rules, checked once. A level outside
+ * the wire's list, a JSON-object capability, or a credential that is not a bare
+ * key would each fail at the vendor on every call, so each is refused here.
+ */
+function assertGatewayWire(options: OpenAICompatibleGatewayOptions): boolean {
+  if (options.adapterKind !== undefined && options.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) {
+    throw new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN");
+  }
+  const native = options.adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
+  if (!isAnthropicHostPairing(native, options.endpoint)) {
+    throw new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH");
+  }
+  if (!native) return false;
+  if (!isAnthropicThinkingControl(options.thinking)) {
+    throw new TypeError("PROVIDER_GATEWAY_THINKING_INVALID");
+  }
+  if (options.supportsJsonObjectResponse === true) {
+    throw new TypedDomainError("PROVIDER_RESPONSE_FORMAT_CAPABILITY_INVALID", "Invalid JSON object response capability");
+  }
+  assertAnthropicCredentialShape(options.authorizationHeader);
+  return true;
+}
+
 export class OpenAICompatibleProviderGateway implements ProviderGateway {
   readonly #options: OpenAICompatibleGatewayOptions;
+  /** PR B: true when this gateway speaks the Anthropic Messages wire. */
+  readonly #anthropic: boolean;
 
   constructor(options: OpenAICompatibleGatewayOptions) {
     /**
@@ -1477,7 +1582,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     if (options.contextWindowTokens !== undefined && !isContextWindowTokens(options.contextWindowTokens)) {
       throw new TypeError("PROVIDER_GATEWAY_CONTEXT_WINDOW_INVALID");
     }
+    if (options.maxOutputTokens !== undefined
+      && (!Number.isSafeInteger(options.maxOutputTokens) || options.maxOutputTokens < 1)) {
+      throw new TypeError("PROVIDER_GATEWAY_MAX_OUTPUT_TOKENS_INVALID");
+    }
     assertJsonObjectResponseCapability(options);
+    this.#anthropic = assertGatewayWire(options);
     this.#options = options;
   }
 
@@ -1519,6 +1629,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     let lastOutcome: "TIMED_OUT" | "FAILED" = "FAILED";
     let lastLedgerEntryRef = "PROVIDER_LEDGER_ENTRY_UNRESOLVED";
     let attemptPacket = request.packet;
+    /**
+     * PR B review: a packet the Anthropic wire cannot say (no user turn first, a final assistant
+     * turn, an empty message) is refused HERE, before the loop: nothing is sent, so nothing is
+     * ledgered, exactly as the frame refusal above. A later attempt's packet (a repair) that the
+     * wire cannot say ends the loop below as exhaustion does, never as an escape mid-attempt.
+     */
+    if (this.#anthropic) {
+      anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: 1, thinkingLevel: thinking.sent, messages: attemptPacket.messages });
+    }
     /** W10/2: how many attempts of THIS call were cut off at the bound. */
     let lengthFailures = 0;
     let lastContentRejection: {
@@ -1541,7 +1660,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
 
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
-      const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
+      const attemptTokenCeiling = Math.min(
+        lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures),
+        this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER
+      );
       /**
        * Task review fix round 1, finding 3. PROVIDER_CONTEXT_WINDOW_EXCEEDED
        * means "this prompt is over this candidate's window", and the picker
@@ -1562,7 +1684,26 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // per-attempt bound a length retry raised (W10/2).
       // Model scorecard §2.2: with no level asked this is today's three-member
       // body byte for byte; with one, the target's own member carries it.
-      const body = JSON.stringify({
+      // PR B: the Anthropic wire builds its own contract body; a packet it
+      // cannot say is refused here, before anything is sent or recorded.
+      let anthropicBody: string | undefined;
+      if (this.#anthropic) {
+        try {
+          anthropicBody = anthropicMessagesRequestBody({
+            model: this.#options.model,
+            maxTokens: attemptTokenCeiling,
+            thinkingLevel: thinking.sent,
+            messages: attemptPacket.messages
+          });
+        } catch (error) {
+          // Only a later attempt can get here (the first packet was checked before the loop).
+          if (attempt > 1 && error instanceof TypedDomainError && error.code === PROVIDER_PACKET_UNSUPPORTED) break;
+          throw error;
+        }
+      }
+      const body = anthropicBody !== undefined
+        ? anthropicBody
+        : JSON.stringify({
         model: this.#options.model,
         max_tokens: attemptTokenCeiling,
         ...thinking.wire,
@@ -1597,8 +1738,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // catch below lets that failure leave unsent, unledgered and unretried.
       let promptRecordFailed = false;
       try {
-        const headers: Record<string, string> = { "content-type": "application/json" };
-        if (this.#options.authorizationHeader !== undefined) {
+        const headers: Record<string, string> = this.#anthropic
+          ? anthropicMessagesRequestHeaders(this.#options.authorizationHeader)
+          : { "content-type": "application/json" };
+        if (!this.#anthropic && this.#options.authorizationHeader !== undefined) {
           headers.authorization = this.#options.authorizationHeader;
         }
         if (Buffer.byteLength(body, "utf8") > MAX_PROVIDER_REQUEST_PACKET_BYTES) {
@@ -1639,7 +1782,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             throw promptError;
           }
         }
-        const response = await fetcher(`${this.#options.endpoint}/chat/completions`, {
+        const response = await fetcher(`${this.#options.endpoint}${this.#anthropic ? ANTHROPIC_MESSAGES_PATH : "/chat/completions"}`, {
           method: "POST",
           headers,
           signal: AbortSignal.timeout(request.bound.deadlineMs),
@@ -1652,6 +1795,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         } catch {
           decoded = null;
         }
+        // PR B: the Anthropic reply is read into the shape every line below
+        // already reads; `rawText` (the artifact) keeps the vendor's own bytes.
+        const nativeReply = this.#anthropic ? readAnthropicMessagesReply(decoded) : null;
+        if (nativeReply !== null) decoded = nativeReply.normalized;
         const candidate = z.object({ id: z.string(), model: modelIdSchema }).passthrough().safeParse(decoded);
         const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
           .passthrough().safeParse(decoded);
@@ -1726,7 +1873,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           attemptId,
           runId: request.runId,
           providerRef: request.providerRef,
-          provider: "openai-compatible-http",
+          provider: this.#anthropic ? ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND : "openai-compatible-http",
           model: candidate.success ? candidate.data.model : this.#options.model,
           maker: this.#options.maker,
           modelVersion: candidate.success ? candidate.data.model : null,
@@ -1866,6 +2013,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           providerRef: request.providerRef,
           usage: reportedUsage
         });
+        /**
+         * PR B: a refusal or an unusable reply (a tool call), raised only now —
+         * after the artifact, the charge, the bounded-response check and the
+         * hosted usage requirement — so its usage is always recorded and judged
+         * first, exactly as a usable reply's is (review fix, 2026-10-10). The
+         * model-identity check stays below, after these as before.
+         */
+        if (nativeReply?.failure) throw nativeReply.failure;
         // W10/1: a refusal that arrived with `finish_reason: "length"` is a
         // TRUNCATION, and it is named as one. The classifier's own verdict
         // (PARSE_FAILED on a half-written object) describes the symptom; the
@@ -1983,7 +2138,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           rawArtifactRef,
           ledgerEntryRef,
           content: responseJson.choices[0]!.message.content,
-          provider: "openai-compatible-http",
+          provider: this.#anthropic ? ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND : "openai-compatible-http",
           model: responseJson.model,
           maker: this.#options.maker,
           modelVersion: responseJson.model,
@@ -2070,6 +2225,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * and switches to the runner-up at once (A16a).
          */
         if (error instanceof TypedDomainError && error.code === PROVIDER_USAGE_CAP) break;
+        /**
+         * PR B: a vendor refusal and a reply this engine cannot use (a tool
+         * call it never offered) were both billed, and asking again is most
+         * likely a second bill for the same answer. Stopped like the usage
+         * cap: after the FAILED row, wrapped as PROVIDER_CALL_FAILED with the
+         * reason as its `cause`, so every caller handles it as it handles any
+         * failed member today.
+         */
+        if (error instanceof TypedDomainError
+          && (error.code === PROVIDER_CONTENT_REFUSED || error.code === PROVIDER_REPLY_UNSUPPORTED)) break;
       }
       // L4-F2: an oversized packet is deterministic — resending it would burn the ceiling for
       // an identical refusal, so the loop stops on the attempt that refused it.
@@ -2098,6 +2263,25 @@ export class VllmOpenAICompatibleProviderGateway implements ProviderGateway {
 
   constructor(options: OpenAICompatibleGatewayOptions) {
     this.#delegate = new OpenAICompatibleProviderGateway(options);
+  }
+
+  call(request: ProviderCallRequest): Promise<ProviderCallResult> {
+    return this.#delegate.call(request);
+  }
+}
+
+/**
+ * Multi-model preview, PR B: the native Anthropic Messages adapter. The wire is
+ * ./anthropic-messages.ts; the attempt loop is the shared one above.
+ */
+export class AnthropicMessagesProviderGateway implements ProviderGateway {
+  readonly #delegate: OpenAICompatibleProviderGateway;
+
+  constructor(options: Omit<OpenAICompatibleGatewayOptions, "adapterKind">) {
+    this.#delegate = new OpenAICompatibleProviderGateway({
+      ...options,
+      adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND
+    });
   }
 
   call(request: ProviderCallRequest): Promise<ProviderCallResult> {
@@ -2144,3 +2328,21 @@ export {
 } from "./provider-probe.js";
 
 export * from "./preview-test.js";
+
+// Multi-model preview, PR B: the native Anthropic Messages wire.
+export {
+  ANTHROPIC_API_VERSION,
+  ANTHROPIC_EFFORT_LEVELS,
+  ANTHROPIC_MESSAGES_BASE_URL,
+  ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  ANTHROPIC_MESSAGES_PATH,
+  PROVIDER_CONTENT_REFUSED,
+  PROVIDER_PACKET_UNSUPPORTED,
+  PROVIDER_REPLY_UNSUPPORTED,
+  anthropicMessagesRequestBody,
+  anthropicUsageAsEngineUsage,
+  readAnthropicMessagesReply,
+  type AnthropicMessagesReply
+} from "./anthropic-messages.js";
+export * from "./preview-models.js";
+export * from "./preview-remaining.js";

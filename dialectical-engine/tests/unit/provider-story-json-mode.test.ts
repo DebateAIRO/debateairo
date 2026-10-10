@@ -43,6 +43,11 @@ describe("story JSON mode is an effective, target-specific wire control", () => 
   it("infers support only for the exact verified endpoint and model", () => {
     const target = { providerRef: "synthetic", maker: "Z.AI", baseUrl: ENDPOINT, model: MODEL };
     expect(providerTargetGatewayControls(target)).toEqual({ supportsJsonObjectResponse: true });
+    // Contract A §1: JSON mode is row-driven; the three other reviewed rows refuse it. The row's output
+    // cap is the preview's alone (previewTargetGatewayControls), never added to an ordinary target.
+    for (const model of ["deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro", "Qwen/Qwen3.8-Flash"]) {
+      expect(providerTargetGatewayControls({ ...target, model })).toEqual({});
+    }
     for (const other of [
       { ...target, baseUrl: "https://other.example/v1/openai" },
       { ...target, baseUrl: `${ENDPOINT}/` },
@@ -123,7 +128,7 @@ describe("preview budget transport admits only the exact optional JSON mode", ()
     await fetcher(`${ENDPOINT}/chat/completions`, { method: "POST", body });
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({ requestBody: body, requestSha256: sha(body) });
-    const nano = BigInt(Buffer.byteLength(body) + 2048) * 150n + 163840n * 500n;
+    const nano = BigInt(Buffer.byteLength(body) + 2048) * 150n + 32_768n * 500n;
     expect(calls[0]?.reservedUsd).toBe(`${nano / 1_000_000_000n}.${(nano % 1_000_000_000n).toString().padStart(9, "0")}`);
   });
 
@@ -135,7 +140,7 @@ describe("preview budget transport admits only the exact optional JSON mode", ()
         .map(response_format => ({ ...base, response_format })),
       { ...base, response_format: { type: "json_object" }, stream: false },
       { ...base, response_format: { type: "json_object" }, reasoning_effort: "medium" },
-      { ...base, response_format: { type: "json_object" }, max_tokens: 163841 },
+      { ...base, response_format: { type: "json_object" }, max_tokens: 32_769 },
       { ...base, response_format: { type: "json_object" }, model: "other/model" }
     ]) await expect(fetcher(`${ENDPOINT}/chat/completions`, { method: "POST", body: JSON.stringify(body) })).rejects.toThrow();
     expect(calls).toBe(0);

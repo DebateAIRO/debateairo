@@ -136,6 +136,13 @@ export const NODE_LIFECYCLE_EVENT_CONSUMERS = Object.freeze({
 // the range, so moving the bound is a one-line change with no second literal.
 export const EXPANSION_DEPTH_MIN = 1;
 export const EXPANSION_DEPTH_MAX = 5;
+// Owner ruling 2026-10-10: the private preview offers depth 1 to 3 for now, because deeper debates do not
+// fit its daily money; hosted deployments keep the whole range. Module-private (the source-purity law).
+const PREVIEW_EXPANSION_DEPTH_CEILING = 3;
+/** The deepest debate a composer offers: on the private preview its ceiling, elsewhere EXPANSION_DEPTH_MAX. */
+export function expansionDepthMaxFor(preview: boolean): number {
+  return preview ? Math.min(PREVIEW_EXPANSION_DEPTH_CEILING, EXPANSION_DEPTH_MAX) : EXPANSION_DEPTH_MAX;
+}
 
 export const ExpansionDepthSchema = z.number().int().min(EXPANSION_DEPTH_MIN).max(EXPANSION_DEPTH_MAX);
 export type ExpansionDepth = z.infer<typeof ExpansionDepthSchema>;
