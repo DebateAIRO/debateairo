@@ -6,7 +6,7 @@ import type { BillingUpgradeQuoteResponse, BillingUpgradeResponse } from "@debat
 import type { BillingRepository, ChargeRow, EntitlementRepository, QuoteRow } from "@debateai/db";
 import { netopiaLanguageOf } from "@debateai/payments-netopia";
 import { planById, type BillingPlans, type PlanId } from "@debateai/register";
-import type { ConsentPair } from "./checkout.js";
+import { reuseWindowMs, type ConsentPair } from "./checkout.js";
 import {
   assertCurrentAgreement, bestPaymentId, closeUnpaidHostedCharge, hostedStartDeps, paidOrAlmost, readPaymentStatus,
   recordCardAgreement, servedByNetopia, startHostedCharge, stillPayable
@@ -210,8 +210,9 @@ export async function startUpgrade(deps: SubscriptionRouteDeps, input: UpgradeIn
 /**
  * Spec §2.10's one open upgrade, before any lock, newest first, from our rows and one logged status read each: paid or
  * almost, unreadable, or a start in flight → PENDING (PAID also queues VERIFY_PAYMENT); the same quote within its
- * lifetime on a payable page → REUSE; anything else is closed FAILED(NO_TRANSACTION) (SR-23: reuse is for the same quote
- * only; the settlement still decides a late payment). A declined upgrade blocks nothing.
+ * lifetime on a payable page opened less than `reuseWindowMs()` ago → REUSE (NETOPIA's page lasts 20 minutes, N-25);
+ * anything else is closed FAILED(NO_TRANSACTION) (SR-23: reuse is for the same quote only; the settlement still decides
+ * a late payment), and the same quote is then refused 409 QUOTE_EXPIRED. A declined upgrade blocks nothing.
  */
 async function openUpgrade(
   deps: SubscriptionRouteDeps, state: SubscriptionState, quoteRef: string, now: Date
@@ -246,7 +247,8 @@ async function openUpgrade(
     }
     const quote = charge.quoteId === null ? null : await deps.billing.quote(charge.quoteId, state.ownerRef);
     const live = quote !== null && now.getTime() < quote.expiresAt.getTime();
-    if (sameQuote && live && answer !== "NO_SUCH_ORDER" && stillPayable(answer)) {
+    const young = now.getTime() - hosted.startedAt.getTime() < reuseWindowMs();
+    if (sameQuote && live && young && answer !== "NO_SUCH_ORDER" && stillPayable(answer)) {
       return Object.freeze({
         kind: "REUSE" as const, chargeId: charge.chargeId,
         redirectUrl: openPaymentUrl(deps.recordsKey, charge.chargeId, hosted.redirectCiphertext)

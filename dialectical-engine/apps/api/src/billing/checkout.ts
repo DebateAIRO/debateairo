@@ -86,9 +86,12 @@ export function inFlightAttemptLifeMs(): number {
   return 20 * 60_000;
 }
 
-/** A3 (b): an open checkout is reused only while it is this young (from its CREATED event). */
-function reuseWindowMs(): number {
-  return 30 * 60_000;
+/**
+ * A3 (b): an open checkout is reused only while it is this young (from its CREATED event). NETOPIA's payment page lasts
+ * 20 minutes (N-25, answered 9 October 2026), so a page handed back always has at least 5 minutes left.
+ */
+export function reuseWindowMs(): number {
+  return 15 * 60_000;
 }
 
 /** A start whose page has not come back yet may still be on its way: above the 15-second start timeout (§2.4.1). */

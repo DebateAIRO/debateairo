@@ -180,6 +180,28 @@ describe("N12 an upgrade on NETOPIA's page (spec §2.10)", () => {
     await run.api.close();
   });
 
+  it("hands the same quote's page back only within 15 minutes of its start, then asks for a fresh price (N-25)", async () => {
+    const run = await start("n12-reuse-window");
+    const quoted = await run.quote("PRO");
+    const first = BillingUpgradeResponseSchema.parse((await run.upgrade("PRO", quoted.quote_ref)).json());
+    run.payments.scriptStatus(first.charge_ref, stubPaymentReport(first.charge_ref, "PENDING", { providerStatus: "1" }));
+    // NETOPIA's page lasts 20 minutes; 16 minutes on, the quote (30 minutes) still lives but its page is not handed back.
+    run.clock.now = new Date(run.clock.now.getTime() + 16 * MINUTE);
+    const refused = await run.upgrade("PRO", quoted.quote_ref);
+    expect(refused.statusCode, refused.body).toBe(409);
+    expect(refused.json()).toMatchObject({ error: "QUOTE_EXPIRED" });
+    expect((await trail(first.charge_ref)).at(-1)).toEqual(["FAILED", "NO_TRANSACTION"]);
+    expect(run.payments.startCalls).toBe(1);
+    // A fresh price opens a second page.
+    const fresh = await run.upgrade("PRO", (await run.quote("PRO")).quote_ref);
+    expect(fresh.statusCode, fresh.body).toBe(200);
+    const second = BillingUpgradeResponseSchema.parse(fresh.json());
+    expect(second.charge_ref).not.toBe(first.charge_ref);
+    expect(second.redirect_url).not.toBe(first.redirect_url);
+    expect(run.payments.startCalls).toBe(2);
+    await run.api.close();
+  });
+
   it("answers 409 UPGRADE_PENDING while an upgrade is paid or almost, or its status cannot be read", async () => {
     const run = await start("n12-pending");
     const quoted = await run.quote("PRO");
