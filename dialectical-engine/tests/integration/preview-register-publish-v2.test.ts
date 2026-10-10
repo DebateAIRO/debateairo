@@ -18,7 +18,7 @@ describe('publish kit v2 on PostgreSQL 18 (source evidence, not the Linux operat
       const pool = db.pool;
       const source = [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), observation)];
       const owned = [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
-      // A 65-row historical base without the four keys the live version lacks (synthetic fixture setup only; the operator never imports history).
+      // A 65-row historical base with v8's key set: the source without v1's three additions and the role rotation row (the live v9 lacks only the rotation row). Synthetic fixture setup only; the operator never imports history.
       const base = [...source.filter(row => !['consumerRecoveryPolicy', 'publicationCheckPolicy', 'taxAuthorities', 'answerRoleRotationPolicy'].includes(row.rowKey)), ...owned];
       await createPostgresRegisterPublicationPort(pool).importHistorical({ registerVersion: parseRegisterVersionText('4'), rows: base });
       const v4 = await readSealedSnapshot(pool, '4');

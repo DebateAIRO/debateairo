@@ -1880,8 +1880,14 @@ checker, the storyteller and the story checker) to a model of that debate's own 
 job least often so far. The choice is written down for the debate when it is accepted, and it never changes after
 that. The rotation is off until the register says otherwise: without the `answerRoleRotation` member the engine keeps
 its fixed roles, exactly as before. This release adds migration `migrations/0114_role_rotation.sql` (a new table,
-`core.run_role_rotation`, and a new column on `serve.answer_story`), so the migration comes first. In this order,
-before the API and the runner next start on this code:
+`core.run_role_rotation`, and a new column on `serve.answer_story`), so the migration comes first.
+
+**Step 1 is required on every host that takes this release, even with the rotation left off.** This code reads
+and writes the new table and column whatever the register says: the budget estimate's query of unfinished
+debates reads the table, the runner reads a debate's pin when it claims the debate, and every story is saved with
+the new `storyteller_repairs` column. Without the migration those reads and writes fail and debates do not run.
+Steps 2 and 3 only turn the rotation on; skip them to keep it off. In this order, before the API and the runner
+next start on this code:
 
 1. **Apply the migration.** Open the migrator window (§4 step 2), run `pnpm db:migrate` and then `hardening.sql` as
    §4 step 3 does, and close the window (§4 step 5).
