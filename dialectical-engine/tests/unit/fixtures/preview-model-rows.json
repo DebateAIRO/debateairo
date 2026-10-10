@@ -44,6 +44,18 @@
       "effort": null,
       "json_object": false,
       "worst_case_reservation_usd": "0.227635200"
+    },
+    {
+      "model": "Qwen/Qwen3.8-Flash",
+      "maker": "Alibaba",
+      "input_usd_per_m": "0.113",
+      "output_usd_per_m": "0.382",
+      "input_nano_usd_per_token": 113,
+      "output_nano_usd_per_token": 382,
+      "output_bound": 131072,
+      "effort": null,
+      "json_object": false,
+      "worst_case_reservation_usd": "0.079923200"
     }
   ]
 }

@@ -25,43 +25,59 @@ What is new in v3:
   makes one tiny paid call to it ("Reply exactly: OK") and sees whether it works as expected.
 - **`status` shows today's spend per model.**
 
-### The three reviewed models
+### The four reviewed models
 
 | Model | Maker | Price the gate charges (per million tokens, in / out) | Longest answer allowed (tokens) | Thinking | JSON mode | Most one call can set aside |
 |---|---|---|---|---|---|---|
 | `zai-org/GLM-5.3-Flash` | Z.AI | $0.15 / $0.50 | 163,840 | "high" | allowed | $0.1216 |
 | `deepseek-ai/DeepSeek-V4.1-Flash` | DeepSeek | $0.20 / $0.60 | 131,072 | "high" | not allowed | $0.1315 |
 | `XiaomiMiMo/MiMo-V2.6-Pro` | Xiaomi | $0.43 / $0.87 | 131,072 | none sent | not allowed | $0.2276 |
+| `Qwen/Qwen3.8-Flash` | Alibaba | $0.113 / $0.382 | 131,072 | none sent | not allowed | $0.0799 |
 
 - The prices are DeepInfra's list prices. GLM and DeepSeek are on promotion today (50% and 30%
-  off), so the gate counts more than the real bill. That is the careful side.
+  off), so the gate counts more than the real bill. That is the careful side. Qwen3.8-Flash (not
+  the larger, dearer "Qwen3.8") has one flat price over its whole 1,000,000-token window, with no
+  promotion.
+- "Thinking" tokens are charged as answer tokens. If the answer does not prove that they are
+  already inside its answer count, the gate charges them on top. That is the careful side too.
 - "Most one call can set aside" is for the largest question the gate accepts (256 KiB). No
   model may ever set aside more than $0.25 for one call; a test checks every row.
-- Whether DeepSeek and MiMo accept these settings, and whether they name themselves exactly in
-  their answers, is not yet measured. The `probe` measures it with one paid call each, before
+- Whether DeepSeek, MiMo and Qwen accept these settings, and whether they name themselves exactly
+  in their answers, is not yet measured. The `probe` measures it with one paid call each, before
   they are switched on.
 - A price change is a reviewed code change (the gate, the app and their shared test file),
   never an edit of the GO.
 
 ### Money: DeepInfra's share of the $5 team total
 
-The owner's team limit stays $5 a day. With more providers coming, it is split into one pot per
-provider, each with its own gate. Proposed shares:
+The owner's team limit stays $5 a day. It is split into one pot per provider, each with its own
+gate. For now there are two: DeepInfra and Anthropic. Google comes later. Proposed split, **for the
+owner to confirm**:
 
 | Gate | Pot per day | Calls per day | Status |
 |---|---|---|---|
-| DeepInfra (this gate) | $3.00 | 1,200 | this README |
+| DeepInfra (this gate) | $4.00 | 1,000 | this README |
 | Anthropic (Claude Haiku) | $1.00 | 400 | its own gate: README-anthropic.md |
-| Google (Gemini Flash) | $1.00 | 400 | later, its own gate |
-| **Total** | **$5.00** | **2,000** | |
+| Google | none yet | - | parked; the split is set again if it comes back |
+| **Total** | **$5.00** | **1,400** | |
 
-Until the other two gates exist, the preview spends at most $3.00 a day. If the owner prefers to
-keep the full $5 on DeepInfra until then, put `"5.00"` in the GO now and lower it when the other
-gates arrive (a new GO and `activate`).
+Until the Anthropic gate is open, the preview spends at most $3.50 a day.
+
+The gate itself keeps the $5 total:
+- One GO may never ask for more than $5.00 a day.
+- `activate` adds this GO's pot to the pots in the other gates' GO files (Anthropic's and
+  Google's, at their fixed places in `/etc/debateai-v3-preview/`) and refuses when the sum is
+  above $5.00 (`TEAM_TOTAL_BUDGET_EXCEEDED`). A gate that is not installed (no GO file) counts as
+  $0. A GO file that is there but cannot be read, is not root's, can be written by others, or is
+  not a proper GO refuses (`TEAM_TOTAL_UNVERIFIABLE`): the gate never guesses the total.
+- `activate` can see the other GO files because root runs it in a shell. The running gates
+  cannot: each one's sandbox hides the other gates' files.
+- So to move money from one pot to another: first lower one (its new GO, `stop`, `activate`),
+  then raise the other.
 
 Each pot is checked once more when it is opened: 4 calls at the same time, each setting aside the
-largest worst case of the switched-on models, must fit in the pot. With all three models that is
-4 x $0.2276 = $0.91, well inside $3.00. `activate` refuses a GO that does not pass
+largest worst case of the switched-on models, must fit in the pot. With all four models that is
+4 x $0.2276 = $0.91 (MiMo's), well inside $3.50. `activate` refuses a GO that does not pass
 (`CONCURRENCY_EXCEEDS_BUDGET`).
 
 ## Decisions you should know about
@@ -86,9 +102,16 @@ largest worst case of the switched-on models, must fit in the pot. With all thre
 - **A new state folder and a fresh pot.** v3 keeps its records in its own folder, in a new format
   that v2 cannot read and that cannot read v2's. v2's records are kept and never opened again.
   - On the day of the switch-over, what v2 already spent that day is not counted in the v3 pot.
-    So that day the real total can reach v2's spend plus $3.00. Switching over early in the
+    So that day the real total can reach v2's spend plus $3.50. Switching over early in the
     Bucharest day keeps that small. `status` of v2 (step 0) shows that day's spend.
-  - The GO can record which v2 state this pot follows (`predecessor_ledger_sha256`, step 4).
+  - The GO can record which v2 state this pot follows (`predecessor_ledger_sha256`, step 4). The
+    gate only writes that value down (`init` prints it). It never checks it against v2's files, so
+    it is a note for people, not a lock.
+- **Midnight overlap.** The pot is per Bucharest day, and a call is charged to the day it
+  started. A call that starts just before midnight is paid just after it, while the new day's pot
+  is already open. So within one calendar day the real bill can go above the pot by up to
+  4 calls (the number that may run at once) x the largest amount one call may set aside: at most
+  4 x $0.2276 = $0.91 with all four models switched on. The probe adds one more call to that.
 - **The gate code binds the model list.** The list lives in `preview_budget_helper.py`, whose
   hash the GO carries (`helper_sha256`), as does `preview_budget_authority.py`
   (`bridge_sha256`). Change one byte of either and the GO is refused until a new GO is written
@@ -120,13 +143,29 @@ largest worst case of the switched-on models, must fit in the pot. With all thre
     `activate`.
   - It prints the answer's status, whether the answer named the exact model, the token counts,
     the charge, and at most 80 characters of the answer (on one line). Never the key.
+  - It runs only inside its own fence, the `systemd-run` command below. Run any other way, it
+    refuses before it reads the key or sets anything aside (`PROBE_FENCE_REQUIRED`), and
+    `missing` says what is absent: `unit` (not the probe's own unit name), `privileges` (it still
+    has root's powers), `other_gates` (another gate's folder or GO is visible) or `network` (a
+    test message to an address outside the allow-list was not blocked; the address is a
+    documentation-only one that leads nowhere).
 - **The halt email names the v3 command.** The lifecycle alert (`alert.mjs`) now gives the v3
   `activate` command. Step 9 installs the new copy.
 - **DeepInfra saying "too many requests" no longer halts.** Owner ruling of 2026-10-10: an answer
-  429 that carries an error and no token counts, no answer and no cost anywhere is treated like a
-  call that never reached DeepInfra. Nothing is charged, that call alone fails, and the app may
-  try again later. Five such failures in a row (or mixed with unreachable calls) halt with
-  `provider_unreachable`. Any other error answer still halts.
+  429 that carries an error and no token counts, no answer and no cost anywhere is treated as not
+  billed. Nothing is charged, that call alone fails, and the app may try again later. Any other
+  error answer still halts. Two limits keep this safe in case DeepInfra did bill such answers
+  after all:
+  - Each one stays in the day's record with $0 charged, its status (429), the reason and the
+    time, so it can be checked against DeepInfra's billing page. `status` shows today's number
+    (`today_unbilled_releases`). They do not count toward the 1,200 calls a day.
+  - At most 20 a day. The 20th on one Bucharest day halts the gate
+    (`unbilled_release_ceiling`). A normal answer in between does not reset that count; only the
+    next Bucharest day starts again at 0.
+  - Also, five in a row (or mixed with calls that never reached DeepInfra) halt with
+    `provider_unreachable`; a normal answer resets that one.
+  - A call that never reached DeepInfra at all (the connection failed before anything was sent)
+    leaves no entry: nothing was sent, so there is nothing DeepInfra could bill.
 - **The model check script has no custody check of its own.** Like the address script, it is
   protected only by being root-owned in the root-owned gate folder (step 1 checks that with
   `namei`). It never reads the key.
@@ -211,15 +250,15 @@ stat -c '%a %U:%G %h %s' /var/lib/debateai-v3-preview/provider-deepinfra-authori
 |---|---|---|
 | `schema` | `preview-provider-budget-go-v3` | A v2 GO is refused; there is no silent upgrade. |
 | `provider` | `deepinfra` | This gate's provider. `anthropic` and `google` are refused until their gates exist. |
-| `enabled_models` | `["zai-org/GLM-5.3-Flash"]` | GLM only at first. The other two are added after their probe (see below). |
+| `enabled_models` | `["zai-org/GLM-5.3-Flash"]` | GLM only at first. The other three are added after their probe (see below). |
 | `scope_id` | `preview-deepinfra-v3-20261010` | A new name for the new pot (use the switch-over date). The app's configuration must carry the same `scope_id`. |
 | `target_host` | `vps-a156d797` | The server's host name (measured for v2). The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as in v2. No one else may ask. |
-| `daily_budget_usd` | `"3.00"` | DeepInfra's share of the $5 team total. A string with two decimals. |
-| `max_paid_posts_per_day` | `1200` | A second fuse. A call sets aside at least about $0.08, so $3.00 is reached before 1,200 calls. |
+| `daily_budget_usd` | `"3.50"` | DeepInfra's proposed share of the $5 team total (owner to confirm). A string with two decimals; at most `"5.00"`, and `activate` checks the sum with the other gates' GOs. |
+| `max_paid_posts_per_day` | `1200` | A second fuse on the number of paid calls. Refusals kept as unbilled ($0) do not count. |
 | `max_concurrent_calls` | `4` | As in v2 (owner ruling). |
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
-| `predecessor_ledger_sha256` | v2 state hash | Optional. Records which v2 state this pot follows. |
+| `predecessor_ledger_sha256` | v2 state hash | Optional. Records which v2 state this pot follows. Written down only; never checked. |
 
 The two file hashes (`bridge_sha256`, `helper_sha256`) are computed here from the installed files.
 
@@ -228,7 +267,7 @@ G=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
 PRED=$(sha256sum /var/lib/debateai-v3-preview/provider-team-authority-v2/team-control.json | cut -d' ' -f1)
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" --arg p "$PRED" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"deepinfra",enabled_models:["zai-org/GLM-5.3-Flash"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"3.00",max_paid_posts_per_day:1200,max_concurrent_calls:4,open_days:31,predecessor_ledger_sha256:$p}' > /root/preview-archive/provider-deepinfra-go-v3.json
+jq -n --arg b "$BR" --arg h "$HE" --arg p "$PRED" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"deepinfra",enabled_models:["zai-org/GLM-5.3-Flash"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"3.50",max_paid_posts_per_day:1200,max_concurrent_calls:4,open_days:31,predecessor_ledger_sha256:$p}' > /root/preview-archive/provider-deepinfra-go-v3.json
 install -o root -g root -m 0600 /root/preview-archive/provider-deepinfra-go-v3.json /etc/debateai-v3-preview/provider-deepinfra-go-v3.json
 jq -c . /etc/debateai-v3-preview/provider-deepinfra-go-v3.json
 ```
@@ -245,11 +284,13 @@ What to expect:
 - `init` prints one line with `"state": "initialized"`, `"provider": "deepinfra"` and the
   switched-on models.
 - `activate` prints a summary with `"state": "active"`, `"window_open": true`,
-  `"daily_budget_usd": "3.00"` and `"today_by_model": {}`.
+  `"daily_budget_usd": "3.50"` and `"today_by_model": {}`.
 - A refusal is one line `{"status": "refused", "error": "<CODE>"}`. For example,
-  `HELPER_CUSTODY_INVALID` (file owners or modes), `ROOT_GO_INVALID` (a GO field or hash, or a v2
-  GO), `CONCURRENCY_EXCEEDS_BUDGET` (the pot is too small for 4 worst-case calls) or
-  `ACTIVATION_REFUSED` (wrong host or state).
+  `HELPER_CUSTODY_INVALID` (file owners or modes), `ROOT_GO_INVALID` (a GO field or hash, a pot
+  above $5.00, or a v2 GO), `CONCURRENCY_EXCEEDS_BUDGET` (the pot is too small for 4 worst-case
+  calls), `TEAM_TOTAL_BUDGET_EXCEEDED` (with the other gates' pots it would be above $5.00),
+  `TEAM_TOTAL_UNVERIFIABLE` (another gate's GO file is there but cannot be trusted; check its owner,
+  mode and contents) or `ACTIVATION_REFUSED` (wrong host or state).
 
 **6. Stop v2 for good, then put the v3 unit files in place.** First halt v2 (so it can never take
 a paid call again, even if something restarts it), then stop its service. The stop waits for calls
@@ -315,7 +356,7 @@ systemctl start debateai-preview-gate-halt-watch.service; journalctl -u debateai
 systemctl start debateai-preview-gate-addresses.service; journalctl -u debateai-preview-gate-addresses -n 2 -o cat
 ```
 
-**Rollback (before any DeepSeek or MiMo call).**
+**Rollback (before any DeepSeek, MiMo or Qwen call).**
 1. `systemctl stop debateai-preview-provider-budget`.
 2. Copy the three `.v2` unit files back from `/root/preview-archive/` to `/etc/systemd/system/`
    (without the `.v2` ending), then `systemctl daemon-reload`.
@@ -325,21 +366,26 @@ systemctl start debateai-preview-gate-addresses.service; journalctl -u debateai-
 
 v3's records stay in its own folder and are not lost.
 
-## Switching on DeepSeek and MiMo
+## Switching on DeepSeek, MiMo and Qwen
 
 Do this for one model at a time, after the switch-over works with GLM.
 
 **1. Probe the model (one paid call, a small fraction of a cent).** Probe when nobody is using the
 preview: an error answer halts the gate. The command runs the probe inside the same network fence
-as the service (only the resolver and DeepInfra's listed addresses), with its own copy of the
-main protections.
+as the service (only the resolver and DeepInfra's listed addresses), under its own unit name, with
+its own copy of the main protections, and with every other gate's folder and GO hidden. Copy it
+whole: the probe checks its fence and refuses without it (`PROBE_FENCE_REQUIRED`; nothing is read
+or spent).
 
 ```sh
 P=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3; GO=/etc/debateai-v3-preview/provider-deepinfra-go-v3.json; A=/opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py
-systemd-run --quiet --wait --pipe --collect -p IPAddressDeny=any -p IPAddressAllow=127.0.0.53/32 $(sed -n 's#^IPAddressAllow=#-p IPAddressAllow=#p' /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf) -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6' -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model deepseek-ai/DeepSeek-V4.1-Flash
+systemd-run --quiet --wait --pipe --collect --unit=debateai-preview-probe-deepinfra -p IPAddressDeny=any -p IPAddressAllow=127.0.0.53/32 $(sed -n 's#^IPAddressAllow=#-p IPAddressAllow=#p' /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf) -p ProtectSystem=strict -p ReadWritePaths=$P -p ProtectHome=yes -p PrivateTmp=yes -p PrivateDevices=yes -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p LimitCORE=0 -p UMask=0077 -p 'RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6' -p 'InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/provider-anthropic-authority-v1 -/etc/debateai-v3-preview/provider-anthropic-go-v1.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json -/etc/debateai-v3-preview/api.env -/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/root' /usr/bin/python3 -I $A probe --private $P --go $GO --model deepseek-ai/DeepSeek-V4.1-Flash
 ```
 
-For MiMo, use `--model XiaomiMiMo/MiMo-V2.6-Pro` instead.
+For MiMo, use `--model XiaomiMiMo/MiMo-V2.6-Pro` instead; for Qwen, `--model Qwen/Qwen3.8-Flash`.
+
+If it prints `PROBE_FENCE_REQUIRED`, the command was not copied whole: `missing` names what is
+absent (see "The probe is a real paid call" above). Nothing was read or spent.
 
 How to read the one line it prints:
 
@@ -349,14 +395,15 @@ How to read the one line it prints:
 | `model_echoed_exactly` | `true` | The answer named another model (`reply_model` shows which). The gate halted. Do not switch it on. |
 | `usage.usage_valid` | `true` | DeepInfra did not report usable token counts. The gate halted. Do not switch it on. |
 | `usage.reasoning_tokens` | above 0 for DeepSeek | DeepSeek ignored the thinking setting. Not a halt, but tell the reviewers before switching it on. |
+| `usage.billed_output_tokens` | equal to `completion_tokens` | It is larger when the answer did not prove that its thinking tokens are inside its answer count; the gate then charges them on top. Not a halt, but tell the reviewers. |
 | `completion_within_max_tokens` | `true` | The model was billed for more answer than it was allowed. In real use it could cost more than the gate sets aside. Do not switch it on. |
 | `reply_excerpt` | `OK` (or close) | Not a halt. A thinking model may spend its 1,024 tokens on thinking and answer nothing. |
 | `guard_charge_usd` | a few hundredths of a cent | What the call was charged in the pot. |
 | `authority` | `active` | `halted`: read the line, then re-open with `activate` (Daily operations). |
 
 **2. Switch it on (a new GO, then `activate`).** Write the GO again (install step 4) with the model
-added to `enabled_models`, and the SAME `scope_id`. For all three models:
-`enabled_models:["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]`.
+added to `enabled_models`, and the SAME `scope_id`. For all four models:
+`enabled_models:["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"]`.
 Then:
 
 ```sh
@@ -392,19 +439,22 @@ uses a model before the step that makes it safe.
    current register version and the two GLM addresses. Build the website with the default list
    (`ui-build` without `--models`, which means `--models glm-only`); `ui.env` keeps
    `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON=["zai-org/GLM-5.3-Flash"]`.
-3. **A new register version with the four reviewed model references, the checker still on GLM,
-   and the four model addresses, in ONE restart.** Plan the register version without `--checker`
+3. **A new register version with the five reviewed model references (now with
+   `preview:qwen-3-8-flash`), the checker still on GLM, and the five model addresses, in ONE
+   restart.** Plan the register version without `--checker`
    (deploy/preview-release/v1/README.md, register publication); its delta shows only
    `configuredProviderSet` and `providerFamilyMap` (plus any row the release itself changes). In
    the same restart, set the API's and runner's `REGISTER_VERSION` to it and their
-   `PROVIDER_DISCOVERY_TARGETS_JSON` to the four addresses. Why one restart: the app refuses to
+   `PROVIDER_DISCOVERY_TARGETS_JSON` to the five addresses. Why one restart: the app refuses to
    start when its list of addresses is not exactly the register's list of models.
 4. **The website's list stays the old one** (`glm-only`).
-5. **Probe DeepSeek, then MiMo** ("Switching on DeepSeek and MiMo", step 1, one model at a time).
-6. **A new GO that switches them on, then `activate`** ("Switching on DeepSeek and MiMo", step 2).
-7. **The API's and runner's model lists: the six-key form.** Free: GLM and DeepSeek. Premium: all
-   three:
-   `"free_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]`
+5. **Probe DeepSeek, then MiMo, then Qwen** ("Switching on DeepSeek, MiMo and Qwen", step 1, one
+   model at a time).
+6. **A new GO that switches them on, then `activate`** ("Switching on DeepSeek, MiMo and Qwen",
+   step 2).
+7. **The API's and runner's model lists: the six-key form.** Free: GLM and DeepSeek. Premium (the
+   default): all four:
+   `"free_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium_model_ids":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"]`
    (the other four keys unchanged). This needs step 6: before a debate starts, the app refuses a
    model the gate has not switched on.
 8. **A new register version with the checker on DeepSeek.** Plan it with
@@ -415,7 +465,7 @@ uses a model before the step that makes it safe.
    the gate refuses, every debate would be refused. Steps 7 and 8 may swap.
 9. **The website's new list.** Build the website again with `--models multi-model`, and set
    `ui.env` to the same list:
-   `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON={"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]}`.
+   `NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON={"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"]}`.
    The website refuses to start when `ui.env` and its build disagree. Best in the same restart as
    step 7. If not, step 7 first: a website that offers fewer models than the API is harmless; one
    that offers a model the API refuses is not.
@@ -454,6 +504,7 @@ the proposed daily split for the owner to confirm is DeepInfra $3.50 and Anthrop
 **How much did we spend today? Is the gate open?** This only reads; it writes nothing. Look at:
 - `today_spend_usd` and `remaining_today_usd` (the day is the Bucharest day);
 - `today_by_model`: spend and number of calls per model today;
+- `today_unbilled_releases`: today's "too many requests" answers kept at $0 (the gate halts at 20);
 - `state`, `reason` and `halts`;
 - `window_open` and `open_until_utc`;
 - `enabled_models`.
@@ -469,7 +520,12 @@ the proposed daily split for the owner to confirm is DeepInfra $3.50 and Anthrop
    counted in that day's pot.
 3. If the reason is `provider_error_or_model_identity`, the entry's `reply_model` in that day's
    record shows which model the answer named.
-4. Then run this (owner's yes):
+4. If the reason is `unbilled_release_ceiling`, DeepInfra refused 20 calls today with "too many
+   requests". Each one is in the day's record (`released_unbilled`, with its time). Check on
+   DeepInfra's billing page that they really cost nothing. If they were billed, do not re-open:
+   tell the reviewers. Re-opening the same day is possible, but the next such refusal halts again
+   at once; the count starts at 0 on the next Bucharest day.
+5. Then run this (owner's yes):
 
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 --go /etc/debateai-v3-preview/provider-deepinfra-go-v3.json
@@ -523,7 +579,10 @@ ss -xlp | grep deepinfra-budget-v3
 - A real call reaches DeepInfra; `status` shows it under `today_by_model`.
 - The API (uid 994) can ask `/remaining` on the new socket and gets the six fields plus
   `enabled_models`; any other account is closed at once.
-- The probe through `systemd-run` reaches DeepInfra and prints one line. For DeepSeek and MiMo it
-  answers the open questions: thinking setting accepted, exact model name in the answer, usage
-  reported.
+- The probe through `systemd-run` passes its own fence check (unit name, no root powers, other
+  gates hidden, the test message to the documentation address blocked), reaches DeepInfra and
+  prints one line. For DeepSeek, MiMo and Qwen it answers the open questions: thinking setting
+  accepted, exact model name in the answer, usage reported.
+- Run without `systemd-run`, the probe refuses with `PROBE_FENCE_REQUIRED`.
+- `activate` reads the Anthropic GO (once that gate exists) and refuses a total above $5.00.
 - The halt email names the v3 `activate` command (one `stop` gives one email).

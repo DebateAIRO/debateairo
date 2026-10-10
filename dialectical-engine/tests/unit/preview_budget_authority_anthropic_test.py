@@ -459,7 +459,11 @@ class UnbilledAndUnsentTests(AnthropicTest):
                 status_now = gate.status()
                 self.assertEqual((status_now['state'], status_now['unsent_streak'], status_now['today_posts'],
                                   status_now['today_spend_usd'], status_now['in_flight']), ('active', 1, 0, '0', 0))
-                self.assertEqual(gate.day(DAY)['entries'], {})
+                # A's machinery: the entry stays on the record at $0 as 'released_unbilled'.
+                entries = gate.day(DAY)['entries']
+                self.assertEqual([(e['state'], e['held_usd'], e['http_status'], e['reason']) for e in entries.values()],
+                                 [('released_unbilled', '0', status, 'unbilled_refusal')])
+                self.assertEqual(status_now['today_unbilled_releases'], 1)
                 self.assertIn('"reason": "unbilled_refusal"', self.out.getvalue())
         self.assertEqual(json.loads(bridge.refusal_body(bridge.CallNotSent('PROVIDER_REFUSED_UNBILLED'))),
                          {'error': 'PROVIDER_REFUSED_UNBILLED'})
@@ -699,9 +703,22 @@ class RequestShapeTests(AnthropicTest):
 class RemainingAndProbeTests(AnthropicTest):
     def probe(self, gate, dispatch, **kwargs):
         options = {'dispatch': dispatch, 'key_loader': lambda _private: KEY, 'host': HOST, 'platform': 'linux', 'uid': 0,
-                   'now': gate.clock}
+                   'now': gate.clock, 'fence': lambda _provider: None}  # The fence itself: test_probe_runs_the_anthropic_fence.
         options.update(kwargs)
         return bridge.probe(gate.private, gate.go_path, HAIKU, **options)
+
+    def test_probe_runs_the_anthropic_fence_first(self):
+        gate = self.ready()
+        asked, sent = [], []
+
+        def fence(provider):
+            asked.append(provider)
+            raise bridge.FenceRequired(['unit'])
+
+        with self.assertRaises(bridge.FenceRequired):
+            self.probe(gate, lambda request, _k: sent.append(request) or (200, message(12, 3)), fence=fence)
+        self.assertEqual((asked, sent), (['anthropic'], []))  # Refused before any call or hold.
+        self.assertEqual((gate.day(DAY) or {}).get('entries', {}), {})
 
     def test_remaining_answers_for_the_anthropic_pot(self):
         gate = self.ready()
