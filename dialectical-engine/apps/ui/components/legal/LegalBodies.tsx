@@ -4,7 +4,7 @@ import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { LegalBlock, LegalDocument } from "@/lib/legalDocument";
 import {
-  ANPC_ADR_URL,
+  ADR_URL,
   COMPANY,
   isUnverified,
   LEGAL_BROWSER_STORAGE,
@@ -96,9 +96,16 @@ function Email({ address }: { address: string }) {
 
 /** A catalogue sentence whose placeholders are facts, each fact isolated in `<bdi>`. */
 function withFacts(template: string, facts: Readonly<Record<string, string>>): ReactNode[] {
-  return template.split(/(\{[A-Za-z][A-Za-z0-9_]*\})/).map((part, index) => {
-    const name = /^\{(.+)\}$/.exec(part)?.[1];
-    return name !== undefined && Object.hasOwn(facts, name) ? <bdi key={index}>{facts[name]}</bdi> : part;
+  const parts = template.split(/(\{[A-Za-z][A-Za-z0-9_]*\})/);
+  const factOf = (part: string | undefined): string | undefined => {
+    const name = /^\{(.+)\}$/.exec(part ?? "")?.[1];
+    return name !== undefined && Object.hasOwn(facts, name) ? facts[name] : undefined;
+  };
+  return parts.map((part, index) => {
+    const fact = factOf(part);
+    if (fact !== undefined) return <bdi key={index}>{fact}</bdi>;
+    // A fact that ends in its own full stop ("… S.R.L.") also ends the sentence: no second stop after it.
+    return factOf(parts[index - 1])?.endsWith(".") === true && part.startsWith(".") ? part.slice(1) : part;
   });
 }
 
@@ -244,9 +251,9 @@ export function LegalNoticeBody({
       <LegalSection no="06" title={t(legalCatalog, "legal.notice.s06.title")}>
         <p>{withFacts(t(legalCatalog, "legal.notice.s06.body"), { reports: COMPANY.emails.reports, legal: COMPANY.emails.legal })}</p>
         <p>
-          {t(legalCatalog, "legal.notice.s06.anpc")}{" "}
+          {t(legalCatalog, "legal.notice.s06.adr")}{" "}
           <bdi>
-            <a href={ANPC_ADR_URL}>{new URL(ANPC_ADR_URL).host}</a>
+            <a href={ADR_URL}>{new URL(ADR_URL).host}</a>
           </bdi>
         </p>
         <p>
