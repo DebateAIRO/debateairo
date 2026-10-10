@@ -42,7 +42,8 @@ export const PREVIEW_BASE_OWNED_KEYS = Object.freeze(['internalAllowancePolicy',
 const FORBIDDEN_KEYS = Object.freeze(['modelScorecard','supportActivation']);
 /**
  * The reviewed source closure: exactly the keys buildPreviewSourceRowsV2 must produce (66 at
- * dev b75e4c294, the same keys the live v9 holds minus the two base-owned ones).
+ * dev b75e4c294, the same keys the live v9 holds minus the two base-owned ones; 67 since the
+ * outbound mail gate added outboundMailPolicy, open sign-up mail PR 3, 2026-10-10).
  * A new register row reaches the preview only by being added here.
  */
 export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
@@ -51,7 +52,7 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
   'configuredProviderSet','conformanceContractHash','consumerRecoveryPolicy','costEnvelopePolicy','countryPolicy','disagreementQuantity',
   'disagreementThreshold','dispersionScale','downgradeBands','envelopeFormulaInputs','evaluatorCallBound','evaluatorLoopMaxRounds',
   'evaluatorRoleRef','globalStopDelta','hiddenNodeScoreThreshold','judgeContractHash','judgementSelectionPolicy','livenessPolicy',
-  'mfaPolicy','mfaRecoveryPolicy','nodeRuntimeVersion','panelDiscoveryPolicy','passwordPolicy','passwordResetPolicy',
+  'mfaPolicy','mfaRecoveryPolicy','nodeRuntimeVersion','outboundMailPolicy','panelDiscoveryPolicy','passwordPolicy','passwordResetPolicy',
   'pnpmVersion','postgresMajorVersion','productRolePolicy','propagationContractHash','providerFamilyMap','publicationCheckPolicy',
   'rateLimitPolicy','recoveryPolicy','repeatedFamilyMultiplier','riskTier','runDeathPolicy','scoringOperator',
   'serveContractHash','sessionPolicy','storyCheckerCallBound','storyCheckerRoleRef','storyLoopMaxRounds','storyMaterialBudget',

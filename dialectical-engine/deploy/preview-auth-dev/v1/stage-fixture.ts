@@ -39,7 +39,7 @@ export async function createSyntheticSourceFixture(input:Readonly<{admin:Pool;pr
  await migrate(admin);
  }
  const source=await buildPreviewSourceRows(await loadBootstrapRegister(),input.runtimeObservation);
- const base=[...source.filter(row=>!['consumerRecoveryPolicy','outboundMailPolicy','publicationCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+ const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
  await createPostgresRegisterPublicationPort(admin).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
  const snapshot=composePreviewSnapshot({sourceRows:source,baseRows:base,baseRegisterVersion:'4',baseSnapshotSha256:computeRegisterSnapshotSha256(base)});
  const publication=await publishPreviewRegister(admin,{publicationId:randomUUID(),sourceRef:'synthetic stage fixture; not active release provenance',snapshot,approval:{baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256}});

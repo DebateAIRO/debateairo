@@ -4,13 +4,20 @@ import pg from 'pg';
 import { migrate } from '@debateai/db';
 import { loadBootstrapRegister,createPostgresRegisterPublicationPort,canonicalRegisterJson,computeRegisterSnapshotSha256,parseRegisterVersionText } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
-import { buildPreviewSourceRows,composePreviewSnapshot,publishPreviewRegister,readSealedSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
+import { composePreviewSnapshot,publishPreviewRegister,readSealedSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import { refusePendingForwardSteps,verifyNativeState } from '../../deploy/preview-auth-dev/v1/verify-native.js';
 import { startTestDatabase } from '../support/testDatabase.js';
 import { seedInstalledAuth106 } from '../support/auth106.js';
 import { seedDevLineage108 } from '../support/devLineage108.js';
 import { identifyLineage,loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
 import { createPreviewRecoveryApiFixture } from '../support/previewRecoveryPrincipal.js';
+import { buildPreviewSourceRowsV2 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
+/**
+ * Kit v1 can never add a register key (its source is closed at 66 rows), so since outboundMailPolicy (open sign-up
+ * mail PR 3) its own builder refuses today's source. These tests replay the preview's v1 history, so they use the
+ * source as it was then: today's reviewed v2 source without the key that arrived later.
+ */
+const v1ShapedSource=async(...args:Parameters<typeof buildPreviewSourceRowsV2>)=>(await buildPreviewSourceRowsV2(...args)).filter(row=>row.rowKey!=='outboundMailPolicy');
 const native=await import('../../deploy/'+'preview-auth-dev/v1/native-peer.mjs');
 const observation={nodeVersion:process.version,pnpmVersion:'11.20.0',sourceRevision:'a'.repeat(40),sourceTree:'b'.repeat(40),operatorSha256:'c'.repeat(64),observedAt:'2026-10-06T12:00:00.000Z'};
 describe('isolated PG18 stage metadata principals',()=>{
@@ -74,8 +81,8 @@ describe('isolated PG18 native preview publication (source evidence, not Linux s
     expect((await pool.query("SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(stableLedger);
     await migrate(pool);
     expect((await pool.query('SELECT name,applied_at FROM public.debateai_schema_migration WHERE name=ANY($1::text[]) ORDER BY name',[history.map(row=>row.name)])).rows).toEqual(history);
-    const source=await buildPreviewSourceRows(await loadBootstrapRegister(),observation);
-    const base=[...source.filter(row=>!['consumerRecoveryPolicy','outboundMailPolicy','publicationCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+    const source=await v1ShapedSource(await loadBootstrapRegister(),observation);
+    const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
     // Historical import is synthetic fixture setup only; the operator never seeds development/bootstrap.
     await createPostgresRegisterPublicationPort(pool).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
     const sealedBefore=await readSealedSnapshot(pool,'4');
@@ -83,7 +90,7 @@ describe('isolated PG18 native preview publication (source evidence, not Linux s
     const approval={baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256};
     const input={publicationId:randomUUID(),sourceRef:'isolated native preview operator fixture',snapshot,approval};
     const receipt=await publishPreviewRegister(pool,input);
-    expect(receipt.registerVersion).toBe('5');expect(receipt.rowCount).toBe(69);expect(receipt.publicationKind).toBe('GENERAL');expect(receipt.requestSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(receipt.registerVersion).toBe('5');expect(receipt.rowCount).toBe(68);expect(receipt.publicationKind).toBe('GENERAL');expect(receipt.requestSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(await publishPreviewRegister(pool,input)).toEqual(receipt);
     const singleConnection=new pg.Pool({connectionString:db.connectionString,options:'-c role=debateai_prod_migrator',max:1,connectionTimeoutMillis:5000});
     await native.withGuardedPool(singleConnection,async(c:any)=>{acquisitions++;await native.assertNativeConnection(c,target,plan.manifest.cohorts.auth106);},async(verifierPool:any)=>{
@@ -123,7 +130,7 @@ describe('the preview verify never applies a database step (PR-57)',()=>{
     ?(await selected!.query('SELECT source_name FROM public.debateai_schema_migration_step ORDER BY source_name')).rows:[];
    const forward108=async()=>(await selected!.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n;
    // The register is already published on the preview; verify replays the actual receipt.
-   const source=await buildPreviewSourceRows(await loadBootstrapRegister(),observation);
+   const source=await v1ShapedSource(await loadBootstrapRegister(),observation);
    const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
    await createPostgresRegisterPublicationPort(selected).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
    const sealed=await readSealedSnapshot(selected,'4');
