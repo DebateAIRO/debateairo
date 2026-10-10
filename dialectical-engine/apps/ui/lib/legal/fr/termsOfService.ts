@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Échecs de paiement. En cas d’échec d’un paiement, nous le réessayons pendant 7 jours et vous avertissons par e-mail avant de rétrograder votre compte vers la formule gratuite. Nous ne supprimons pas vos débats en raison d’un échec de paiement." },
       { kind: "p", text: "Taxes et bénéficiaire de votre paiement. Les prix incluent la TVA, la TPS ou la taxe sur les ventes, selon votre lieu de résidence, ce qui est indiqué avant votre paiement. Les paiements par carte sont traités par NETOPIA Payments (netopia-payments.com). Le vendeur est DMS Merchandise Shop S.R.L., qui établit votre facture et demeure responsable du service lui-même et des présentes Conditions." },
       { kind: "p", text: "Rétrofacturations. Si vous contestez une opération auprès de l’émetteur de votre carte, nous pouvons suspendre les fonctionnalités payantes pendant le règlement du litige. Nous ne facturons aucuns frais à ce titre." },
-      { kind: "p", text: "Priorité aux droits légaux. Lorsque le service n’est pas conforme à nos engagements, vous avez droit à sa mise en conformité ou, selon les dispositions légales applicables, à une réduction proportionnelle du prix ou à un remboursement. Au-delà, nous ne remboursons pas une période de facturation entamée, sauf lorsque la loi l’exige. Les limites d’utilisation de chaque formule sont publiées dans le produit ; nous vous informons avant de les resserrer d’une manière qui vous affecte substantiellement." }
+      { kind: "p", text: "Priorité aux droits légaux. Lorsque le service n’est pas conforme à nos engagements, vous avez droit à sa mise en conformité ou, selon les dispositions légales applicables, à une réduction proportionnelle du prix ou à un remboursement. Au-delà, si vous résiliez une formule payante en cours de période de facturation, nous vous remboursons la part du prix de cette période que vous n’avez pas utilisée, mesurée à l’usage de la formule, quel que soit le nombre de jours écoulés : si vous en avez utilisé 30 %, nous vous remboursons 70 % ; si vous n’en avez rien utilisé, nous vous remboursons la totalité du prix. Demandez-le à support@dezbatere.ro ; dès que nous vous remboursons, la formule prend fin. Si le droit de rétractation prévu à la section 13 s’applique également, vous obtenez le remboursement le plus élevé des deux. Les limites d’utilisation de chaque formule sont publiées dans le produit ; nous vous informons avant de les resserrer d’une manière qui vous affecte substantiellement." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "39e381dfd5afbe7655b0f3ae08536051e5c7c85ef82a830d5d9851d20aaf9108",
+  sha256: "55ceebeffbd1b778230420486d70c19ca772099e4eba7bbcbc66556f2e5d9b6e",
   eyebrow: "CONDITIONS D’UTILISATION · v2.2 · PRISE D’EFFET 12 OCTOBRE 2026",
   title: "Ce que vous acceptez",
   lede: "Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.",

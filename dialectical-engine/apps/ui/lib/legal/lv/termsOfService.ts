@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Neizdevušies maksājumi. Ja maksājums neizdodas, mēs atkārtojam mēģinājumus 7 dienas un pirms jūsu konta pazemināšanas uz bezmaksas plānu brīdinām jūs pa e-pastu. Mēs nedzēšam jūsu debates neizdevušās apmaksas dēļ." },
       { kind: "p", text: "Nodokļi un maksājuma saņēmējs. Cenās ir iekļauts PVN, GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas, un tas tiek parādīts pirms maksājuma veikšanas. Kartes maksājumus apstrādā NETOPIA Payments (netopia-payments.com). Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem." },
       { kind: "p", text: "Maksājumu apstrīdēšana. Ja apstrīdat maksājumu pie savas kartes izdevēja, mēs varam apturēt maksas funkcijas, kamēr strīds tiek atrisināts. Par to mēs neiekasējam maksu." },
-      { kind: "p", text: "Vispirms likumā noteiktās tiesības. Ja pakalpojums neatbilst mūsu solītajam, jums ir tiesības panākt tā atbilstību vai saņemt samērīgu cenas samazinājumu vai atmaksu, kā noteikts tiesību aktos. Papildus tam mēs neatmaksājam jau sāktu norēķinu periodu, ja vien to neprasa tiesību akti. Abu plānu lietošanas ierobežojumi ir publicēti produktā; mēs jūs brīdinām, pirms tos pastiprinām tādā veidā, kas jūs būtiski ietekmē." }
+      { kind: "p", text: "Vispirms likumā noteiktās tiesības. Ja pakalpojums neatbilst mūsu solītajam, jums ir tiesības panākt tā atbilstību vai saņemt samērīgu cenas samazinājumu vai atmaksu, kā noteikts tiesību aktos. Papildus tam, ja jūs maksas plānu izbeidzat norēķinu perioda laikā, mēs atmaksājam to perioda cenas daļu, kuru neesat izmantojis, mērot pēc plāna lietojuma, neatkarīgi no tā, cik dienu ir pagājis: ja esat izmantojis 30 %, mēs atmaksājam 70 %; ja neesat izmantojis neko, mēs atmaksājam pilnu cenu. Atmaksu varat pieprasīt, rakstot uz support@dezbatere.ro; kad atmaksa ir veikta, plāns beidzas. Ja piemēro arī 13. sadaļā noteiktās atteikuma tiesības, jūs saņemat lielāko no abām atmaksām. Abu plānu lietošanas ierobežojumi ir publicēti produktā; mēs jūs brīdinām, pirms tos pastiprinām tādā veidā, kas jūs būtiski ietekmē." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "f28eb7755f85a125947ee1eb916be94a742dcbc8ffed3a2c7faea0efac7957c2",
+  sha256: "9bab076e312e1e4768fe4c9894d47feab8e0f4e98a3e4703c2a1b3248310bbbc",
   eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.2 · SPĒKĀ NO 2026. GADA 12. OKTOBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",

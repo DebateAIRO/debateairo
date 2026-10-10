@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pagamenti non riusciti. Se un pagamento non va a buon fine, riproviamo per 7 giorni e ti avvertiamo tramite email prima di riportare il tuo account al piano gratuito. Non cancelliamo i tuoi dibattiti a causa di un pagamento non riuscito." },
       { kind: "p", text: "Imposte e soggetto a cui effettui il pagamento. I prezzi includono IVA, GST o imposta sulle vendite, a seconda del luogo in cui vivi, e ciò viene indicato prima del pagamento. I pagamenti con carta sono elaborati da NETOPIA Payments (netopia-payments.com). Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni." },
       { kind: "p", text: "Storni. Se contesti un addebito presso l'emittente della tua carta, possiamo sospendere le funzionalità a pagamento mentre la controversia viene risolta. Non addebitiamo commissioni a tale titolo." },
-      { kind: "p", text: "Prevalenza dei diritti previsti dalla legge. Qualora il servizio non sia conforme a quanto promesso, hai diritto a ottenerne la conformità oppure a una riduzione proporzionata del prezzo o a un rimborso, come previsto dalla legge. Oltre a ciò, non rimborsiamo un periodo di fatturazione già iniziato, salvo che la legge lo richieda. I limiti di utilizzo di ciascun piano sono pubblicati nel prodotto; diamo preavviso prima di renderli più restrittivi in modo tale da incidere significativamente su di te." }
+      { kind: "p", text: "Prevalenza dei diritti previsti dalla legge. Qualora il servizio non sia conforme a quanto promesso, hai diritto a ottenerne la conformità oppure a una riduzione proporzionata del prezzo o a un rimborso, come previsto dalla legge. Oltre a ciò, se disdici un piano a pagamento durante un periodo di fatturazione, ti rimborsiamo la quota del prezzo di quel periodo che non hai utilizzato, misurata in base all'utilizzo del piano, indipendentemente dal numero di giorni trascorsi: se ne hai utilizzato il 30%, ti rimborsiamo il 70%; se non ne hai utilizzato nulla, ti rimborsiamo l'intero prezzo. Chiedilo a support@dezbatere.ro; una volta effettuato il rimborso, il piano termina. Se si applica anche il diritto di recesso di cui alla sezione 13, ottieni il rimborso più elevato tra i due. I limiti di utilizzo di ciascun piano sono pubblicati nel prodotto; diamo preavviso prima di renderli più restrittivi in modo tale da incidere significativamente su di te." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "a61f2ec2977178bcac49fe1b471d36122f8d530e089d0e07eb72ef4691a9d620",
+  sha256: "dede8b14a703b3e7dbb1f3cf2347e8efdaf3ccccb706cffa80343496aa7b71c6",
   eyebrow: "CONDIZIONI DI SERVIZIO · v2.2 · IN VIGORE DAL 12 OTTOBRE 2026",
   title: "Ciò che accetti",
   lede: "Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.",

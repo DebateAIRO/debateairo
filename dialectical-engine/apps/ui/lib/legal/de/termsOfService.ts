@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Fehlgeschlagene Zahlungen. Wenn eine Zahlung fehlschlägt, versuchen wir sie 7 Tage lang erneut und warnen Sie per E-Mail, bevor wir Ihr Konto auf den kostenlosen Tarif herabstufen. Wir löschen Ihre Debatten nicht wegen einer fehlgeschlagenen Zahlung." },
       { kind: "p", text: "Steuern und Zahlungsempfänger. Die Preise enthalten Mehrwertsteuer, GST oder Umsatzsteuer; dies hängt von Ihrem Wohnort ab und wird vor der Zahlung angezeigt. Kartenzahlungen werden von NETOPIA Payments (netopia-payments.com) abgewickelt. Verkäuferin ist die DMS Merchandise Shop S.R.L., die Ihre Rechnung ausstellt und weiterhin für den Dienst selbst und für diese Nutzungsbedingungen verantwortlich bleibt." },
       { kind: "p", text: "Rückbuchungen. Wenn Sie eine Belastung bei Ihrem Kartenaussteller beanstanden, können wir kostenpflichtige Funktionen aussetzen, solange die Streitigkeit geklärt wird. Hierfür erheben wir keine Gebühren." },
-      { kind: "p", text: "Gesetzliche Rechte gehen vor. Wenn der Dienst nicht dem entspricht, was wir zugesagt haben, haben Sie nach Maßgabe des Gesetzes Anspruch auf Herstellung der Vertragsmäßigkeit oder auf eine verhältnismäßige Preisminderung oder Erstattung. Darüber hinaus erstatten wir einen bereits begonnenen Abrechnungszeitraum nicht, es sei denn, das Gesetz verlangt es. Die Nutzungslimits beider Tarife werden im Produkt veröffentlicht; wir informieren Sie, bevor wir sie in einer Weise verschärfen, die Sie wesentlich beeinträchtigt." }
+      { kind: "p", text: "Gesetzliche Rechte gehen vor. Wenn der Dienst nicht dem entspricht, was wir zugesagt haben, haben Sie nach Maßgabe des Gesetzes Anspruch auf Herstellung der Vertragsmäßigkeit oder auf eine verhältnismäßige Preisminderung oder Erstattung. Darüber hinaus erstatten wir Ihnen, wenn Sie einen kostenpflichtigen Tarif während eines Abrechnungszeitraums kündigen, den Anteil des Preises dieses Zeitraums, den Sie nicht genutzt haben, bemessen nach der Nutzung des Tarifs, unabhängig davon, wie viele Tage vergangen sind: Haben Sie 30 % genutzt, erstatten wir 70 %; haben Sie nichts genutzt, erstatten wir den vollen Preis. Bitten Sie darum unter support@dezbatere.ro; sobald wir erstatten, endet der Tarif. Gilt zusätzlich das Widerrufsrecht nach Abschnitt 13, erhalten Sie die jeweils höhere Erstattung. Die Nutzungslimits beider Tarife werden im Produkt veröffentlicht; wir informieren Sie, bevor wir sie in einer Weise verschärfen, die Sie wesentlich beeinträchtigt." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "bce01e2e49f9f5f8183aa39ceaf35e124ba3986c3dd5ffce6e54d9f59a83e2c0",
+  sha256: "8b09a9ecb3f171dcda9eb6835f35c57fdcdfed7067adffbcd92cee6fc1c23373",
   eyebrow: "NUTZUNGSBEDINGUNGEN · v2.2 · GÜLTIG AB 12. OKTOBER 2026",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",

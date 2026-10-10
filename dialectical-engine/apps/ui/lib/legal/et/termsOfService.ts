@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ebaõnnestunud maksed. Kui makse ebaõnnestub, proovime seda 7 päeva jooksul uuesti ning hoiatame teid e-posti teel enne konto tasuta paketile üleviimist. Me ei kustuta teie väitlusi makse ebaõnnestumise tõttu." },
       { kind: "p", text: "Maksud ja makse saaja. Hinnad sisaldavad käibemaksu, GST-d või müügimaksu, mis sõltub teie elukohast ja mida näidatakse enne maksmist. Kaardimakseid töötleb NETOPIA Payments (netopia-payments.com). Müüja on DMS Merchandise Shop S.R.L., kes väljastab teie arve ja vastutab jätkuvalt teenuse enda ja käesolevate Tingimuste eest." },
       { kind: "p", text: "Makse tagasinõuded. Kui vaidlustate tasu oma kaardi väljaandja juures, võime tasulised funktsioonid vaidluse lahendamiseni peatada. Me ei võta selle eest tasu." },
-      { kind: "p", text: "Seadusest tulenevad õigused on esikohal. Kui teenus ei vasta meie lubatule, on teil õigus nõuda selle vastavusse viimist või seaduses ette nähtud proportsionaalset hinnaalandust või tagasimakset. Peale selle me ei tagasta juba alanud arveldusperioodi eest makstud summat, välja arvatud juhul, kui seadus seda nõuab. Mõlema paketi kasutuslimiidid avaldatakse tootes; teatame ette nende karmistamisest viisil, mis teid oluliselt mõjutab." }
+      { kind: "p", text: "Seadusest tulenevad õigused on esikohal. Kui teenus ei vasta meie lubatule, on teil õigus nõuda selle vastavusse viimist või seaduses ette nähtud proportsionaalset hinnaalandust või tagasimakset. Peale selle, kui te tasulise paketi arveldusperioodi jooksul lõpetate, tagastame teile selle perioodi hinna selle osa, mida te pole kasutanud, mõõdetuna paketi kasutuse järgi, olenemata sellest, mitu päeva on möödunud: kui olete kasutanud 30 %, tagastame 70 %; kui te pole kasutanud midagi, tagastame kogu hinna. Paluge seda aadressil support@dezbatere.ro; kui oleme raha tagastanud, pakett lõpeb. Kui kohaldub ka jaotise 13 taganemisõigus, saate suurema tagasimakse. Mõlema paketi kasutuslimiidid avaldatakse tootes; teatame ette nende karmistamisest viisil, mis teid oluliselt mõjutab." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "b6b58dc04bd61b02bf6653b9fa39acaca9de60a12524fa02d5ea51b7115cbf3f",
+  sha256: "a10b0908579fc73b3e4e699606bd3318a13eed4743316156de7f252f1ec72f38",
   eyebrow: "TEENUSETINGIMUSED · v2.2 · KEHTIB ALATES 12. OKTOOBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",

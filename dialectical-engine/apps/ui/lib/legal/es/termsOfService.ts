@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pagos fallidos. Si un pago falla, volveremos a intentarlo durante 7 días y le avisaremos por correo electrónico antes de cambiar su cuenta al plan gratuito. No eliminamos sus debates porque un pago haya fallado." },
       { kind: "p", text: "Impuestos y destinatario del pago. Los precios incluyen el IVA, el GST o el impuesto sobre las ventas, según el lugar donde viva, y esto se indica antes de que pague. Los pagos con tarjeta son procesados por NETOPIA Payments (netopia-payments.com). El vendedor es DMS Merchandise Shop S.R.L., que emite su factura y sigue siendo responsable del servicio en sí y de estos Términos." },
       { kind: "p", text: "Contracargos. Si impugna un cargo ante el emisor de su tarjeta, podemos suspender las funciones de pago mientras se resuelve la controversia. No cobramos comisiones por ello." },
-      { kind: "p", text: "Primero, los derechos legales. Cuando el servicio no sea conforme con lo que prometimos, tendrá derecho a que se restablezca su conformidad o a una reducción proporcional del precio o un reembolso, según disponga la ley. Además de lo anterior, no reembolsamos un período de facturación ya iniciado, salvo que la ley lo exija. Los límites de uso de cada plan se publican en el producto; le avisaremos antes de endurecerlos de una manera que le afecte sustancialmente." }
+      { kind: "p", text: "Primero, los derechos legales. Cuando el servicio no sea conforme con lo que prometimos, tendrá derecho a que se restablezca su conformidad o a una reducción proporcional del precio o un reembolso, según disponga la ley. Además de lo anterior, si cancela un plan de pago durante un período de facturación, le reembolsamos la parte del precio de ese período que no haya utilizado, medida según el uso del plan, con independencia de cuántos días hayan pasado: si ha utilizado el 30 %, le reembolsamos el 70 %; si no ha utilizado nada, le reembolsamos el precio íntegro. Solicítelo en support@dezbatere.ro; una vez efectuado el reembolso, el plan finaliza. Si además se aplica el derecho de desistimiento de la sección 13, recibirá el reembolso que sea mayor. Los límites de uso de cada plan se publican en el producto; le avisaremos antes de endurecerlos de una manera que le afecte sustancialmente." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "eb56384fb19f7d8cf958837d1e82ddab987f933e64c49bdd8f7b0eda8fbf20d1",
+  sha256: "c3c768d160e7fb599a740b1a1f96d9b607ef1001bf9be39b728cc6fcbbb669ff",
   eyebrow: "TÉRMINOS DE SERVICIO · v2.2 · EN VIGOR DESDE 12 DE OCTUBRE DE 2026",
   title: "Lo que usted acepta",
   lede: "El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.",

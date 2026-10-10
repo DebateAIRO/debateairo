@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Mislukte betalingen. Als een betaling mislukt, proberen wij deze gedurende 7 dagen opnieuw uit te voeren en waarschuwen wij u per e-mail voordat wij uw account naar het gratis abonnement terugzetten. Wij verwijderen uw debatten niet omdat een betaling is mislukt." },
       { kind: "p", text: "Belastingen en aan wie u betaalt. Prijzen zijn inclusief BTW, GST of omzetbelasting, afhankelijk van waar u woont; dit wordt getoond voordat u betaalt. Kaartbetalingen worden verwerkt door NETOPIA Payments (netopia-payments.com). De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden." },
       { kind: "p", text: "Terugboeking. Als u een afschrijving bij uw kaartuitgever betwist, kunnen wij betaalde functies opschorten terwijl het geschil wordt opgelost. Wij brengen hiervoor geen kosten in rekening." },
-      { kind: "p", text: "Wettelijke rechten gaan voor. Wanneer de dienst niet beantwoordt aan wat wij hebben beloofd, hebt u het recht hem in overeenstemming te laten brengen of, zoals de wet bepaalt, een evenredige prijsvermindering of terugbetaling te ontvangen. Daarnaast betalen wij een reeds gestarte factureringsperiode niet terug, behalve wanneer de wet dat vereist. Gebruiksbeperkingen voor elk abonnement worden in het product gepubliceerd; wij stellen u op de hoogte voordat wij ze aanscherpen op een wijze die u wezenlijk raakt." }
+      { kind: "p", text: "Wettelijke rechten gaan voor. Wanneer de dienst niet beantwoordt aan wat wij hebben beloofd, hebt u het recht hem in overeenstemming te laten brengen of, zoals de wet bepaalt, een evenredige prijsvermindering of terugbetaling te ontvangen. Daarnaast betalen wij, als u een betaald abonnement opzegt tijdens een factureringsperiode, het deel van de prijs van die periode terug dat u niet hebt gebruikt, gemeten naar het gebruik van het abonnement, ongeacht hoeveel dagen er zijn verstreken: hebt u 30 % gebruikt, dan betalen wij 70 % terug; hebt u niets gebruikt, dan betalen wij de volledige prijs terug. Vraag het aan via support@dezbatere.ro; zodra wij terugbetalen, eindigt het abonnement. Geldt ook het herroepingsrecht van hoofdstuk 13, dan ontvangt u de hoogste van beide terugbetalingen. Gebruiksbeperkingen voor elk abonnement worden in het product gepubliceerd; wij stellen u op de hoogte voordat wij ze aanscherpen op een wijze die u wezenlijk raakt." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "d26be5cca7034b04871678033a37b774c505cb747d2aeb3803d722723b5ec049",
+  sha256: "ff8a10181bf63beec012325b134e7c31ada34b384a287709df785f701682160e",
   eyebrow: "SERVICEVOORWAARDEN · v2.2 · VAN KRACHT OP 12 OKTOBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",

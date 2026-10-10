@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Neuspjela plaćanja. Ako plaćanje ne uspije, ponovno ga pokušavamo provesti tijekom 7 dana i upozoravamo vas e-poštom prije prebacivanja vašeg računa na besplatni plan. Ne brišemo vaše rasprave zbog neuspjelog plaćanja." },
       { kind: "p", text: "Porezi i kome plaćate. Cijene uključuju PDV, GST ili porez na promet, što ovisi o tome gdje živite i prikazuje se prije plaćanja. Plaćanja karticom obrađuje NETOPIA Payments (netopia-payments.com). Prodavatelj je DMS Merchandise Shop S.R.L., koji vam izdaje račun i ostaje odgovoran za samu uslugu i za ove Uvjete." },
       { kind: "p", text: "Osporavanje kartičnih transakcija. Ako osporite terećenje kod izdavatelja kartice, možemo suspendirati plaćene značajke dok se spor ne riješi. Za to ne naplaćujemo naknade." },
-      { kind: "p", text: "Zakonska prava imaju prednost. Kada usluga nije u skladu s onim što smo obećali, imate pravo na usklađivanje usluge ili na razmjerno sniženje cijene ili povrat, kako je predviđeno zakonom. Osim toga ne vraćamo novac za obračunsko razdoblje koje je već počelo, osim ako to zakon zahtijeva. Ograničenja uporabe za oba plana objavljena su u proizvodu; obavijestit ćemo vas prije njihova pooštravanja na način koji bitno utječe na vas." }
+      { kind: "p", text: "Zakonska prava imaju prednost. Kada usluga nije u skladu s onim što smo obećali, imate pravo na usklađivanje usluge ili na razmjerno sniženje cijene ili povrat, kako je predviđeno zakonom. Osim toga, ako tijekom obračunskog razdoblja otkažete plaćeni plan, vraćamo vam dio cijene tog razdoblja koji niste iskoristili, mjeren uporabom plana, bez obzira na to koliko je dana prošlo: ako ste iskoristili 30 %, vraćamo vam 70 %; ako niste iskoristili ništa, vraćamo vam punu cijenu. Zatražite to na support@dezbatere.ro; čim vam vratimo novac, plan prestaje. Ako se primjenjuje i pravo na odustanak iz odjeljka 13, dobivate veći od ta dva povrata. Ograničenja uporabe za oba plana objavljena su u proizvodu; obavijestit ćemo vas prije njihova pooštravanja na način koji bitno utječe na vas." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "59c8578c4ed5234d78df4f804072f6d4130e9e0b05c48e2b8b674a398d972618",
+  sha256: "0a746f32e925fa16eee275a3be0c0e9ee06e33fb7b5d9f77b6ac086ca734dd9e",
   eyebrow: "UVJETI KORIŠTENJA · v2.2 · NA SNAZI OD 12. LISTOPADA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",

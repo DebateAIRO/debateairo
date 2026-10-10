@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Başarısız ödemeler. Ödeme başarısız olursa 7 gün boyunca yeniden dener ve hesabınızı ücretsiz plana düşürmeden önce sizi e-postayla uyarırız. Ödeme başarısız olduğu için tartışmalarınızı silmeyiz." },
       { kind: "p", text: "Vergiler ve ödemeyi kime yaptığınız. Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir." },
       { kind: "p", text: "Ters ibrazlar. Kartı düzenleyen kuruluş nezdinde bir tahsilata itiraz ederseniz uyuşmazlık çözülene kadar ücretli özellikleri askıya alabiliriz. Bunun için ücret almayız." },
-      { kind: "p", text: "Öncelik kanuni haklardadır. Hizmet taahhüt ettiğimiz niteliklere uygun değilse hukukun öngördüğü şekilde uygunluğun sağlanmasını veya orantılı bir fiyat indirimi ya da geri ödeme talep etme hakkına sahipsiniz. Bunun ötesinde, kanunun gerektirdiği haller dışında, başlamış olduğunuz bir faturalandırma dönemi için geri ödeme yapmayız. Her iki planın kullanım sınırları da üründe yayımlanır; sizi esaslı biçimde etkileyen bir sıkılaştırmadan önce bildirimde bulunuruz." }
+      { kind: "p", text: "Öncelik kanuni haklardadır. Hizmet taahhüt ettiğimiz niteliklere uygun değilse hukukun öngördüğü şekilde uygunluğun sağlanmasını veya orantılı bir fiyat indirimi ya da geri ödeme talep etme hakkına sahipsiniz. Bunun ötesinde, ücretli bir planı bir faturalandırma dönemi içinde iptal ederseniz, o dönemin ücretinden planı kullanmadığınız oranda, kullanıma göre ölçerek ve kaç gün geçmiş olursa olsun, geri ödeme yaparız: planı %30 oranında kullandıysanız ücretin %70'ini, hiç kullanmadıysanız ücretin tamamını geri öderiz. Talebinizi support@dezbatere.ro adresine iletin; geri ödeme yaptığımızda plan sona erer. Bölüm 13'teki cayma hakkı da uygulanıyorsa, iki geri ödemeden hangisi daha yüksekse onu alırsınız. Her iki planın kullanım sınırları da üründe yayımlanır; sizi esaslı biçimde etkileyen bir sıkılaştırmadan önce bildirimde bulunuruz." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "0f654e91adb735acc7df74d1901ec5644545ebbbf8a9b933e865f31a42e55a94",
+  sha256: "3454ca179aee836ffffe3c4489b7ae286f5fc868134da2c320a26ab84c0e2fa0",
   eyebrow: "HİZMET KOŞULLARI · v2.2 · YÜRÜRLÜK TARİHİ 12 EKİM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",

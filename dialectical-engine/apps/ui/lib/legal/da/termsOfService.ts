@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Mislykkede betalinger. Hvis en betaling mislykkes, forsøger vi igen i 7 dage og advarer dig pr. e-mail, før vi nedgraderer din konto til det gratis abonnement. Vi sletter ikke dine debatter, fordi en betaling mislykkedes." },
       { kind: "p", text: "Afgifter og betalingsmodtager. Priserne er inklusive moms, GST eller omsætningsafgift, hvilket afhænger af, hvor du bor, og vises, før du betaler. Kortbetalinger behandles af NETOPIA Payments (netopia-payments.com). Sælgeren er DMS Merchandise Shop S.R.L., som udsteder din faktura og forbliver ansvarlig for selve tjenesten og for disse vilkår." },
       { kind: "p", text: "Tilbageførsler. Hvis du bestrider en debitering hos din kortudsteder, kan vi suspendere betalingsfunktionerne, mens tvisten behandles. Vi opkræver ikke gebyrer herfor." },
-      { kind: "p", text: "Lovbestemte rettigheder først. Hvis tjenesten ikke er i overensstemmelse med det, vi har lovet, har du ret til at få den bragt i overensstemmelse eller til et forholdsmæssigt afslag eller en tilbagebetaling i henhold til lovgivningen. Derudover refunderer vi ikke en faktureringsperiode, der er påbegyndt, medmindre loven kræver det. Brugsgrænserne for begge abonnementer offentliggøres i produktet; vi giver meddelelse, før vi skærper dem på en måde, der påvirker dig væsentligt." }
+      { kind: "p", text: "Lovbestemte rettigheder først. Hvis tjenesten ikke er i overensstemmelse med det, vi har lovet, har du ret til at få den bragt i overensstemmelse eller til et forholdsmæssigt afslag eller en tilbagebetaling i henhold til lovgivningen. Derudover gælder det, at hvis du opsiger et betalt abonnement i løbet af en faktureringsperiode, refunderer vi den andel af periodens pris, som du ikke har brugt, målt efter abonnementets forbrug, uanset hvor mange dage der er gået: Har du brugt 30 %, refunderer vi 70 %; har du ikke brugt noget, refunderer vi hele prisen. Bed om det på support@dezbatere.ro; når vi har refunderet, ophører abonnementet. Gælder fortrydelsesretten i afsnit 13 også, får du den refusion, der er størst. Brugsgrænserne for begge abonnementer offentliggøres i produktet; vi giver meddelelse, før vi skærper dem på en måde, der påvirker dig væsentligt." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "bded4fd36a9703cb294d8f17b67341653d78399fafabe5f3c4e1259fc1760fbf",
+  sha256: "f803ce389f36c5d869284b133e6e14fd36d3ffececbf916b22a96cf08efbae62",
   eyebrow: "TJENESTEVILKÅR · v2.2 · GÆLDENDE FRA 12. OKTOBER 2026",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",

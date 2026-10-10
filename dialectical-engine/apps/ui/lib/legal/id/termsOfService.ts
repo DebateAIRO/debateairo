@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pembayaran gagal. Jika pembayaran gagal, kami mencoba kembali selama 7 hari dan memperingatkan Anda melalui email sebelum menurunkan akun Anda ke paket gratis. Kami tidak menghapus debat Anda karena pembayaran gagal." },
       { kind: "p", text: "Pajak, dan pihak yang Anda bayar. Harga mencakup PPN, GST, atau pajak penjualan, yang bergantung pada tempat tinggal Anda dan ditampilkan sebelum Anda membayar. Pembayaran kartu diproses oleh NETOPIA Payments (netopia-payments.com). Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini." },
       { kind: "p", text: "Sanggahan transaksi. Jika Anda menyanggah suatu tagihan kepada penerbit kartu, kami dapat menangguhkan fitur berbayar selama sengketa diselesaikan. Kami tidak mengenakan biaya untuk hal ini." },
-      { kind: "p", text: "Hak berdasarkan undang-undang didahulukan. Jika layanan tidak sesuai dengan yang kami janjikan, Anda berhak agar layanan dibuat sesuai, atau menerima pengurangan harga maupun pengembalian dana yang proporsional, sebagaimana ditentukan hukum. Di luar itu, kami tidak mengembalikan dana untuk periode penagihan yang sudah dimulai, kecuali jika hukum mewajibkannya. Batas penggunaan untuk kedua paket dipublikasikan dalam produk; kami memberi tahu Anda sebelum memperketat batas tersebut dengan cara yang berdampak material bagi Anda." }
+      { kind: "p", text: "Hak berdasarkan undang-undang didahulukan. Jika layanan tidak sesuai dengan yang kami janjikan, Anda berhak agar layanan dibuat sesuai, atau menerima pengurangan harga maupun pengembalian dana yang proporsional, sebagaimana ditentukan hukum. Di luar itu, jika Anda membatalkan paket berbayar selama periode penagihan, kami mengembalikan dana sebesar bagian harga periode itu yang belum Anda gunakan, diukur dari penggunaan paket, berapa pun hari yang telah berlalu: jika Anda telah menggunakan 30%, kami mengembalikan 70%; jika Anda belum menggunakan sama sekali, kami mengembalikan harga penuh. Ajukan permintaan ke support@dezbatere.ro; begitu kami mengembalikan dana, paket berakhir. Jika hak penarikan diri dalam bagian 13 juga berlaku, Anda menerima pengembalian dana yang lebih besar di antara keduanya. Batas penggunaan untuk kedua paket dipublikasikan dalam produk; kami memberi tahu Anda sebelum memperketat batas tersebut dengan cara yang berdampak material bagi Anda." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "02cbae788d2fd02f6d5e2d9dc4db8a0f8fdd60eb36587030ce442a7fc642a6b4",
+  sha256: "4809b1c366e64d98feb9a30b26d13303ea50a08caef46795878fcc27bc243932",
   eyebrow: "KETENTUAN LAYANAN · v2.2 · BERLAKU 12 OKTOBER 2026",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",

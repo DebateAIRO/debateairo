@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Epäonnistuneet maksut. Jos maksu epäonnistuu, yritämme sitä uudelleen 7 päivän ajan ja varoitamme sinua sähköpostitse ennen tilisi muuttamista maksuttomaksi tilaukseksi. Emme poista väittelyitäsi epäonnistuneen maksun vuoksi." },
       { kind: "p", text: "Verot ja maksunsaaja. Hinnat sisältävät arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. Korttimaksut käsittelee NETOPIA Payments (netopia-payments.com). Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista." },
       { kind: "p", text: "Takaisinveloitukset. Jos riitautat veloituksen kortinmyöntäjän kanssa, voimme keskeyttää maksulliset ominaisuudet riidan ratkaisemisen ajaksi. Emme peri tästä maksuja." },
-      { kind: "p", text: "Lakisääteiset oikeudet ensisijaisesti. Jos palvelu ei vastaa lupaamaamme, sinulla on lain mukaisesti oikeus saada se saatetuksi vaatimusten mukaiseksi taikka oikeus hinnan suhteelliseen alentamiseen tai palautukseen. Tämän lisäksi emme palauta maksua jo alkaneesta laskutuskaudesta, ellei laki sitä edellytä. Kummankin tilauksen käyttörajat julkaistaan tuotteessa; ilmoitamme ennen niiden tiukentamista tavalla, joka vaikuttaa sinuun olennaisesti." }
+      { kind: "p", text: "Lakisääteiset oikeudet ensisijaisesti. Jos palvelu ei vastaa lupaamaamme, sinulla on lain mukaisesti oikeus saada se saatetuksi vaatimusten mukaiseksi taikka oikeus hinnan suhteelliseen alentamiseen tai palautukseen. Tämän lisäksi, jos peruutat maksullisen tilauksen laskutuskauden aikana, palautamme sen osan kauden hinnasta, jota et ole käyttänyt, mitattuna tilauksen käytön mukaan, riippumatta siitä, kuinka monta päivää on kulunut: jos olet käyttänyt 30 %, palautamme 70 %; jos et ole käyttänyt mitään, palautamme koko hinnan. Pyydä palautusta kirjoittamalla osoitteeseen support@dezbatere.ro; kun olemme palauttaneet maksun, tilaus päättyy. Jos myös osion 13 peruuttamisoikeus soveltuu, saat suuremman palautuksen. Kummankin tilauksen käyttörajat julkaistaan tuotteessa; ilmoitamme ennen niiden tiukentamista tavalla, joka vaikuttaa sinuun olennaisesti." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "c695f185197602092189d74cd5b4ea3484951b1d052be2985ff128d1a7149327",
+  sha256: "c5adff7577620fd0d77b282f2e1edd10c669bc8acddc3c5ed9792bc49da874f0",
   eyebrow: "KÄYTTÖEHDOT · v2.2 · VOIMASSA 12. LOKAKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",

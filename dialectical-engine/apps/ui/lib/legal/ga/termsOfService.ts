@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Íocaíochtaí teipthe. Má theipeann ar íocaíocht, bainimid triail eile as ar feadh 7 lá agus tugaimid rabhadh duit ar ríomhphost sula n-íosghrádaímid do chuntas go dtí an plean saor in aisce. Ní scriosaimid do dhíospóireachtaí toisc gur theip ar íocaíocht." },
       { kind: "p", text: "Cánacha, agus cé leis a n-íocann tú. Áirítear CBL, GST nó cáin díolacháin sna praghsanna, rud a bhraitheann ar an áit ina bhfuil cónaí ort agus a thaispeántar sula n-íocann tú. Próiseálann NETOPIA Payments (netopia-payments.com) íocaíochtaí cárta. Is é DMS Merchandise Shop S.R.L. an díoltóir, a eisíonn do shonrasc agus a fhanann freagrach as an tseirbhís féin agus as na Téarmaí seo." },
       { kind: "p", text: "Aisghairmeacha íocaíochta. Má dhéanann tú agóid i gcoinne muirir le d'eisitheoir cárta, féadfaimid gnéithe íoctha a chur ar fionraí fad a réitítear an díospóid. Ní ghearraimid táillí as seo." },
-      { kind: "p", text: "Cearta reachtúla ar dtús. Sa chás nach gcomhlíonann an tseirbhís an méid a gheallamar, tá tú i dteideal go dtabharfaí chun comhréireachta í, nó go bhfaighfeá laghdú comhréireach ar an bpraghas nó aisíocaíocht, de réir mar a fhoráiltear sa dlí. Thairis sin, ní aisíocaimid tréimhse bhilleála atá tosaithe, ach amháin nuair a cheanglaíonn an dlí sin. Foilsítear teorainneacha úsáide ar cheachtar plean sa táirge; tugaimid fógra sula ndéanaimid níos déine iad ar bhealach a théann i bhfeidhm go hábhartha ort." }
+      { kind: "p", text: "Cearta reachtúla ar dtús. Sa chás nach gcomhlíonann an tseirbhís an méid a gheallamar, tá tú i dteideal go dtabharfaí chun comhréireachta í, nó go bhfaighfeá laghdú comhréireach ar an bpraghas nó aisíocaíocht, de réir mar a fhoráiltear sa dlí. Thairis sin, má chuireann tú plean íoctha ar ceal i rith tréimhse bhilleála, aisíocaimid duit an chuid de phraghas na tréimhse sin nár úsáid tú, arna tomhas de réir úsáide an phlean, is cuma cé mhéad lá atá caite: má úsáid tú 30% di, aisíocaimid 70%; mura bhfuil aon chuid di úsáidte agat, aisíocaimid an praghas iomlán. Iarr é ag support@dezbatere.ro; chomh luath agus a aisíocaimid, tagann deireadh leis an bplean. Má bhaineann an ceart tarraingthe siar i rannán 13 leis freisin, gheobhaidh tú cibé aisíocaíocht is mó. Foilsítear teorainneacha úsáide ar cheachtar plean sa táirge; tugaimid fógra sula ndéanaimid níos déine iad ar bhealach a théann i bhfeidhm go hábhartha ort." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "9bb0c2e76b038e200e4712a20e1d08e32d6b2b9d27ce8b75e5434dbc3347d0ea",
+  sha256: "432d802921803181c1559bd45cd6194d8f69c2ee269697fc47c647099f0d15d4",
   eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.2 · I bhFEIDHM 12 DEIREADH FÓMHAIR 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",

@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pagamentos falhados. Se um pagamento falhar, repetiremos a tentativa durante 7 dias e avisá-lo-emos por correio eletrónico antes de convertermos a sua conta para o plano gratuito. Não eliminaremos os seus debates devido a uma falha de pagamento." },
       { kind: "p", text: "Impostos e entidade a quem paga. Os preços incluem IVA, GST ou imposto sobre vendas, conforme o local onde reside, sendo essa informação apresentada antes do pagamento. Os pagamentos com cartão são processados pela NETOPIA Payments (netopia-payments.com). A vendedora é a DMS Merchandise Shop S.R.L., que emite a sua fatura e continua responsável pelo serviço em si e por estes Termos." },
       { kind: "p", text: "Estornos. Se contestar uma cobrança junto do emissor do seu cartão, podemos suspender as funcionalidades pagas enquanto o litígio estiver a ser resolvido. Não cobramos taxas por esse motivo." },
-      { kind: "p", text: "Prevalência dos direitos legais. Quando o serviço não estiver em conformidade com o que prometemos, tem direito a que seja reposta a conformidade, ou a uma redução proporcional do preço ou a um reembolso, nos termos previstos na lei. Além disso, não reembolsamos um período de faturação já iniciado, exceto quando a lei o exija. Os limites de utilização de qualquer dos planos são publicados no produto; avisá-lo-emos antes de os restringir de uma forma que o afete substancialmente." }
+      { kind: "p", text: "Prevalência dos direitos legais. Quando o serviço não estiver em conformidade com o que prometemos, tem direito a que seja reposta a conformidade, ou a uma redução proporcional do preço ou a um reembolso, nos termos previstos na lei. Além disso, se cancelar um plano pago durante um período de faturação, reembolsamos a parte do preço desse período que não utilizou, medida pela utilização do plano, independentemente de quantos dias tenham decorrido: se tiver utilizado 30 %, reembolsamos 70 %; se não tiver utilizado nada, reembolsamos o preço total. Peça o reembolso em support@dezbatere.ro; depois de reembolsarmos, o plano termina. Se o direito de retratação previsto na secção 13 também se aplicar, recebe o reembolso que for maior. Os limites de utilização de qualquer dos planos são publicados no produto; avisá-lo-emos antes de os restringir de uma forma que o afete substancialmente." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "766fd4507ca55132ab5ddfce66d44cfc5bba69a1a88e10d9d0a7fb69be504712",
+  sha256: "79514defe456062a6c7cbfdf2189fe00b7f19bd92edeb9108d525c08dd631d63",
   eyebrow: "TERMOS DE SERVIÇO · v2.2 · EM VIGOR DESDE 12 DE OUTUBRO DE 2026",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",

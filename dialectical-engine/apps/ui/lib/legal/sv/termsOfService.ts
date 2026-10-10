@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Misslyckade betalningar. Om en betalning misslyckas försöker vi igen under 7 dagar och varnar dig via e-post innan vi nedgraderar ditt konto till det kostnadsfria abonnemanget. Vi raderar inte dina debatter på grund av en misslyckad betalning." },
       { kind: "p", text: "Skatter och vem du betalar till. Priserna inkluderar moms, GST eller omsättningsskatt, vilket beror på var du bor och visas innan du betalar. Kortbetalningar hanteras av NETOPIA Payments (netopia-payments.com). Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor." },
       { kind: "p", text: "Kortreklamationer. Om du bestrider en debitering hos din kortutgivare kan vi stänga av avgiftsbelagda funktioner medan tvisten handläggs. Vi tar inte ut någon avgift för detta." },
-      { kind: "p", text: "Lagstadgade rättigheter först. Om tjänsten inte överensstämmer med vad vi har utlovat har du rätt att få den återställd till avtalsenligt skick eller till ett proportionellt prisavdrag eller en återbetalning, i enlighet med lagen. Därutöver återbetalar vi inte en faktureringsperiod som du har påbörjat, utom när lagen kräver det. Användningsgränserna för båda abonnemangen offentliggörs i produkten; vi underrättar dig innan de skärps på ett sätt som väsentligt påverkar dig." }
+      { kind: "p", text: "Lagstadgade rättigheter först. Om tjänsten inte överensstämmer med vad vi har utlovat har du rätt att få den återställd till avtalsenligt skick eller till ett proportionellt prisavdrag eller en återbetalning, i enlighet med lagen. Därutöver, om du säger upp ett betalabonnemang under en faktureringsperiod, återbetalar vi den andel av periodens pris som du inte har använt, mätt efter abonnemangets användning, oavsett hur många dagar som har gått: har du använt 30 % av det återbetalar vi 70 %; har du inte använt något av det återbetalar vi hela priset. Fråga på support@dezbatere.ro; när vi har återbetalat upphör abonnemanget. Om ångerrätten i avsnitt 13 också gäller får du den återbetalning som är störst. Användningsgränserna för båda abonnemangen offentliggörs i produkten; vi underrättar dig innan de skärps på ett sätt som väsentligt påverkar dig." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "a7f2f8a75a846d39509df9278c2057e15b197866437a9071f984447d78c840c7",
+  sha256: "4ff112341ab459e2e6356a43cee721dd05374b12798af124f519f5c2ee4fbce0",
   eyebrow: "ANVÄNDARVILLKOR · v2.2 · GÄLLER FRÅN 12 OKTOBER 2026",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",

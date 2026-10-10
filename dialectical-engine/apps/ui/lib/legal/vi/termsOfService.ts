@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Thanh toán không thành công. Nếu một khoản thanh toán không thành công, chúng tôi thử lại trong 7 ngày và cảnh báo bạn qua email trước khi hạ tài khoản xuống gói miễn phí. Chúng tôi không xóa các cuộc tranh luận của bạn vì một khoản thanh toán không thành công." },
       { kind: "p", text: "Thuế và bên bạn thanh toán. Giá đã bao gồm VAT, GST hoặc thuế bán hàng, tùy thuộc nơi bạn sống và được hiển thị trước khi thanh toán. Thanh toán bằng thẻ được xử lý bởi NETOPIA Payments (netopia-payments.com). Bên bán là DMS Merchandise Shop S.R.L., đơn vị phát hành hóa đơn cho bạn và tiếp tục chịu trách nhiệm về bản thân dịch vụ cũng như các Điều khoản này." },
       { kind: "p", text: "Yêu cầu hoàn tiền qua tổ chức phát hành thẻ. Nếu bạn tranh chấp một khoản phí với tổ chức phát hành thẻ, chúng tôi có thể đình chỉ các tính năng trả phí trong khi tranh chấp được giải quyết. Chúng tôi không thu phí cho việc này." },
-      { kind: "p", text: "Quyền theo luật định được ưu tiên. Khi dịch vụ không phù hợp với những gì chúng tôi cam kết, bạn có quyền yêu cầu đưa dịch vụ về trạng thái phù hợp, hoặc được giảm giá tương ứng hay hoàn tiền, theo quy định pháp luật. Ngoài ra, chúng tôi không hoàn tiền cho kỳ thanh toán mà bạn đã bắt đầu, trừ khi pháp luật yêu cầu. Giới hạn sử dụng của từng gói được công bố trong sản phẩm; chúng tôi sẽ thông báo trước khi siết chặt các giới hạn theo cách ảnh hưởng đáng kể đến bạn." }
+      { kind: "p", text: "Quyền theo luật định được ưu tiên. Khi dịch vụ không phù hợp với những gì chúng tôi cam kết, bạn có quyền yêu cầu đưa dịch vụ về trạng thái phù hợp, hoặc được giảm giá tương ứng hay hoàn tiền, theo quy định pháp luật. Ngoài ra, nếu bạn hủy gói trả phí trong một kỳ thanh toán, chúng tôi hoàn lại phần giá của kỳ đó mà bạn chưa dùng, tính theo mức sử dụng gói, dù đã trôi qua bao nhiêu ngày: nếu bạn đã dùng 30% gói, chúng tôi hoàn lại 70%; nếu bạn chưa dùng gì, chúng tôi hoàn lại toàn bộ giá. Hãy yêu cầu tại support@dezbatere.ro; khi chúng tôi đã hoàn tiền, gói sẽ chấm dứt. Nếu quyền rút lui tại mục 13 cũng được áp dụng, bạn nhận khoản hoàn tiền nào lớn hơn. Giới hạn sử dụng của từng gói được công bố trong sản phẩm; chúng tôi sẽ thông báo trước khi siết chặt các giới hạn theo cách ảnh hưởng đáng kể đến bạn." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "84472719e1e00868f1f355bd37d85b662b586fdeaf536bb1d408ddb2a4918c3f",
+  sha256: "94ccfc0bc27d1c404bec2178015ee5a3545622ae0bcbefbb6f563d95bffc09ae",
   eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.2 · CÓ HIỆU LỰC 12 THÁNG 10 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",

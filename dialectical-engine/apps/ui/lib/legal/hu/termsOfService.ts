@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Sikertelen fizetések. Ha egy fizetés sikertelen, 7 napig újra megkíséreljük, és e-mailben figyelmeztetjük Önt, mielőtt fiókját ingyenes csomagra állítanánk vissza. Sikertelen fizetés miatt nem töröljük vitáit." },
       { kind: "p", text: "Adók és a fizetés kedvezményezettje. Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért." },
       { kind: "p", text: "Visszaterhelések. Ha Ön vitat egy terhelést a kártyakibocsátójánál, a vita rendezéséig felfüggeszthetjük a fizetős funkciókat. Ezért nem számítunk fel díjat." },
-      { kind: "p", text: "A törvényes jogok elsőbbsége. Ha a szolgáltatás nem felel meg vállalásainknak, Ön jogosult a szerződésszerű állapot helyreállítására, illetve a jogszabályban meghatározott arányos árleszállításra vagy visszatérítésre. Ezen túlmenően nem térítjük vissza a megkezdett számlázási időszak díját, kivéve, ha a jogszabály ezt előírja. Mindkét csomag használati korlátait közzétesszük a termékben; előzetesen értesítjük Önt, mielőtt az Ön számára lényeges módon szigorítanánk azokat." }
+      { kind: "p", text: "A törvényes jogok elsőbbsége. Ha a szolgáltatás nem felel meg vállalásainknak, Ön jogosult a szerződésszerű állapot helyreállítására, illetve a jogszabályban meghatározott arányos árleszállításra vagy visszatérítésre. Ezen túlmenően, ha a számlázási időszak közben lemondja a fizetős csomagot, visszatérítjük az időszak díjának azt a részét, amelyet Ön nem használt fel, a csomag használata alapján mérve, függetlenül attól, hogy hány nap telt el: ha a díj 30%-át használta fel, 70%-át térítjük vissza; ha semmit nem használt fel, a teljes díjat visszatérítjük. Kérje a support@dezbatere.ro címen; amint visszatérítjük a díjat, a csomag megszűnik. Ha a 13. szakasz szerinti elállási jog is alkalmazandó, a kettő közül a nagyobb visszatérítést kapja. Mindkét csomag használati korlátait közzétesszük a termékben; előzetesen értesítjük Önt, mielőtt az Ön számára lényeges módon szigorítanánk azokat." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "b1420351969b64e34dc88a123bdbbc4fdcce0b4f4b8a596fbbb102bfd68700f3",
+  sha256: "fc48edb6336962c735fc5d46262df170e6ad071ef5f9934d68407d6f4283efd2",
   eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.2 · HATÁLYOS 2026. OKTÓBER 12.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",

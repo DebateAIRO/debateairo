@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Failed payments. If a payment fails we retry for 7 days and warn you by email before downgrading your account to the free plan. We do not delete your debates because a payment failed." },
       { kind: "p", text: "Taxes, and who you pay. Prices include VAT, GST or sales tax, which depends on where you live and is shown before you pay. Card payments are processed by NETOPIA Payments (netopia-payments.com). The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms." },
       { kind: "p", text: "Chargebacks. If you dispute a charge with your card issuer, we may suspend paid features while the dispute is resolved. We do not charge fees for this." },
-      { kind: "p", text: "Statutory rights first. Where the service does not conform to what we promised, you are entitled to have it brought into conformity, or to a proportionate price reduction or refund, as the law provides. Beyond that, we do not refund a billing period you have started, except where the law requires it. Usage limits on either plan are published in the product; we give notice before tightening them in a way that materially affects you." }
+      { kind: "p", text: "Statutory rights first. Where the service does not conform to what we promised, you are entitled to have it brought into conformity, or to a proportionate price reduction or refund, as the law provides. Beyond that, if you cancel a paid plan during a billing period, we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed: if you have used 30% of it, we refund 70%; if you have used none of it, we refund the full price. Ask at support@dezbatere.ro; once we refund, the plan ends. If the withdrawal right in section 13 also applies, you get whichever refund is larger. Usage limits on either plan are published in the product; we give notice before tightening them in a way that materially affects you." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "41dd43b2694e73c7c4e9798c788642252bdc2ced9fb9ad41d8d6fc1a4c6c46e5",
+  sha256: "fcffb706c7ab2dcbfa09594dd5b0686e274cc5ba3e3a4377573f5b771c07a660",
   eyebrow: "TERMS OF SERVICE · v2.2 · EFFECTIVE 12 OCTOBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",

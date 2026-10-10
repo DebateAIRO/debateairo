@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Neúspěšné platby. Pokud platba selže, budeme její provedení opakovat po dobu 7 dnů a před převedením účtu na bezplatný tarif vás upozorníme e-mailem. Kvůli neúspěšné platbě vaše debaty nemažeme." },
       { kind: "p", text: "Daně a komu platíte. Ceny zahrnují DPH, GST nebo daň z prodeje v závislosti na místě vašeho bydliště, což se zobrazí před zaplacením. Platby kartou zpracovává NETOPIA Payments (netopia-payments.com). Prodejcem je DMS Merchandise Shop S.R.L., která vystavuje vaši fakturu a zůstává odpovědná za samotnou službu a za tyto Podmínky." },
       { kind: "p", text: "Reklamace platby. Pokud platbu zpochybníte u vydavatele karty, můžeme placené funkce po dobu řešení sporu pozastavit. Neúčtujeme za to žádné poplatky." },
-      { kind: "p", text: "Zákonná práva mají přednost. Pokud služba neodpovídá tomu, co jsme slíbili, máte právo na uvedení do souladu nebo na přiměřené snížení ceny či vrácení peněz podle zákona. Nad tento rámec nevracíme platbu za fakturační období, které již začalo, s výjimkou případů, kdy to vyžaduje zákon. Limity používání jednotlivých tarifů jsou zveřejněny v produktu; před jejich zpřísněním způsobem, který vás podstatně ovlivní, vás upozorníme." }
+      { kind: "p", text: "Zákonná práva mají přednost. Pokud služba neodpovídá tomu, co jsme slíbili, máte právo na uvedení do souladu nebo na přiměřené snížení ceny či vrácení peněz podle zákona. Nad tento rámec, pokud placený tarif zrušíte během fakturačního období, vrátíme vám tu část ceny tohoto období, kterou jste nevyužili, měřenou podle využití tarifu, bez ohledu na to, kolik dní uplynulo: pokud jste využili 30 %, vrátíme vám 70 %; pokud jste nevyužili nic, vrátíme vám celou cenu. Požádejte o to na adrese support@dezbatere.ro; jakmile peníze vrátíme, tarif skončí. Platí-li zároveň právo na odstoupení podle oddílu 13, získáte vyšší z obou vrácených částek. Limity používání jednotlivých tarifů jsou zveřejněny v produktu; před jejich zpřísněním způsobem, který vás podstatně ovlivní, vás upozorníme." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "f74397d7d137ce21453f51328ebdf3741fc5be6925cef0a2c118b36dac3684fd",
+  sha256: "ac96c5ea6656f291c80a444369c927e7db177c1f3cc7e77cdd138d89a4bb9307",
   eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.2 · ÚČINNÉ OD 12. ŘÍJNA 2026",
   title: "S čím souhlasíte",
   lede: "Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.",

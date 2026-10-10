@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Nieudane płatności. Jeżeli płatność nie powiedzie się, ponawiamy próbę przez 7 dni i przed obniżeniem planu Twojego konta do planu bezpłatnego wysyłamy ostrzeżenie pocztą elektroniczną. Nie usuwamy debat z powodu nieudanej płatności." },
       { kind: "p", text: "Podatki i odbiorca płatności. Ceny obejmują VAT, GST lub podatek od sprzedaży, zależnie od miejsca zamieszkania, co zostaje wskazane przed dokonaniem płatności. Płatności kartą obsługuje NETOPIA Payments (netopia-payments.com). Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki." },
       { kind: "p", text: "Obciążenia zwrotne. Jeżeli zakwestionujesz obciążenie u wystawcy karty, możemy zawiesić funkcje płatne do czasu rozstrzygnięcia sporu. Nie pobieramy z tego tytułu opłat." },
-      { kind: "p", text: "Pierwszeństwo praw ustawowych. Jeżeli usługa nie jest zgodna z tym, co obiecaliśmy, przysługuje Ci prawo do doprowadzenia jej do zgodności albo do proporcjonalnego obniżenia ceny lub zwrotu, zgodnie z prawem. Ponadto nie zwracamy opłaty za rozpoczęty okres rozliczeniowy, chyba że wymaga tego prawo. Limity korzystania w obu planach są publikowane w produkcie; poinformujemy Cię przed zaostrzeniem ich w sposób, który wywiera na Ciebie istotny wpływ." }
+      { kind: "p", text: "Pierwszeństwo praw ustawowych. Jeżeli usługa nie jest zgodna z tym, co obiecaliśmy, przysługuje Ci prawo do doprowadzenia jej do zgodności albo do proporcjonalnego obniżenia ceny lub zwrotu, zgodnie z prawem. Ponadto, jeżeli zrezygnujesz z planu płatnego w trakcie okresu rozliczeniowego, zwrócimy Ci tę część ceny za ten okres, która nie została wykorzystana, mierzoną zużyciem planu, niezależnie od tego, ile dni minęło: jeżeli wykorzystano 30%, zwrócimy 70%; jeżeli nic nie wykorzystano, zwrócimy całą cenę. Wniosek o zwrot wyślij na support@dezbatere.ro; po dokonaniu zwrotu plan wygasa. Jeżeli ma zastosowanie także prawo odstąpienia opisane w sekcji 13, otrzymasz wyższy z dwóch zwrotów. Limity korzystania w obu planach są publikowane w produkcie; poinformujemy Cię przed zaostrzeniem ich w sposób, który wywiera na Ciebie istotny wpływ." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "9a5d35059612e87d383408ea1e16e97df9125deb0c3eb537662e525665148a27",
+  sha256: "3a67064c9235e57d41da53017c20f1c4a76d61825ae5c6068ccfa568f9d7eeb4",
   eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.2 · OBOWIĄZUJĄ OD 12 PAŹDZIERNIKA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",

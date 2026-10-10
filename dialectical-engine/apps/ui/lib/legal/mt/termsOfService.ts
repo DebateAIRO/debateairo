@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ħlasijiet li jfallu. Jekk ħlas ifalli nerġgħu nippruvaw għal 7 ijiem u nwissuk bil-posta elettronika qabel inniżżlu l-kont tiegħek għall-pjan bla ħlas. Ma nħassrux id-dibattiti tiegħek għax ħlas ikun falla." },
       { kind: "p", text: "Taxxi, u lil min tħallas. Il-prezzijiet jinkludu l-VAT, il-GST jew it-taxxa fuq il-bejgħ, li tiddependi minn fejn tgħix u tintwera qabel ma tħallas. Il-ħlasijiet bil-karta jiġu pproċessati minn NETOPIA Payments (netopia-payments.com). Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini." },
       { kind: "p", text: "Treġġigħ lura ta’ ħlasijiet. Jekk tikkontesta ħlas mal-emittent tal-karta tiegħek, nistgħu nissospendu l-funzjonalitajiet bi ħlas sakemm tissolva t-tilwima. Ma nitolbux tariffi għal dan." },
-      { kind: "p", text: "L-ewwel id-drittijiet statutorji. Fejn is-servizz ma jikkonformax ma’ dak li wegħedna, għandek id-dritt li jinġieb f’konformità, jew għal tnaqqis proporzjonat fil-prezz jew ħlas lura, kif tipprovdi l-liġi. Lil hinn minn dan, ma nagħtux ħlas lura għal perjodu tal-kontijiet li jkun beda, ħlief fejn il-liġi titlob dan. Il-limiti tal-użu ta’ kull pjan jiġu ppubblikati fil-prodott; nagħtu avviż qabel nissikkawhom b’mod li jaffettwak materjalment." }
+      { kind: "p", text: "L-ewwel id-drittijiet statutorji. Fejn is-servizz ma jikkonformax ma’ dak li wegħedna, għandek id-dritt li jinġieb f’konformità, jew għal tnaqqis proporzjonat fil-prezz jew ħlas lura, kif tipprovdi l-liġi. Lil hinn minn dan, jekk tikkanċella pjan bi ħlas matul perjodu tal-kontijiet, nagħtuk ħlas lura tas-sehem mill-prezz ta’ dak il-perjodu li ma użajtx, imkejjel skont l-użu tal-pjan, ikun xi jkun in-numru ta’ jiem li jkunu għaddew: jekk użajt 30 %, nagħtuk ħlas lura ta’ 70 %; jekk ma użajt xejn, nagħtuk ħlas lura tal-prezz kollu. Itlob il-ħlas lura fuq support@dezbatere.ro; ladarba nagħtu ħlas lura, il-pjan jintemm. Jekk japplika wkoll id-dritt ta’ rtirar fit-taqsima 13, tieħu l-akbar wieħed mill-ħlasijiet lura. Il-limiti tal-użu ta’ kull pjan jiġu ppubblikati fil-prodott; nagħtu avviż qabel nissikkawhom b’mod li jaffettwak materjalment." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "78d1979d127a71645065228fd342f97bef01105ac979fb059fb3cad0e2e66a47",
+  sha256: "4993b5a5d7d90d50955a185dd21cb0ac695f327e1f78e1fbabcd275fef6425fc",
   eyebrow: "TERMINI TAS-SERVIZZ · v2.2 · EFFETTIVI 12 TA’ OTTUBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",

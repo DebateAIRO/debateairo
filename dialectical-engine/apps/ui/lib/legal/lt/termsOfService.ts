@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Nepavykę mokėjimai. Jei mokėjimas nepavyksta, 7 dienas bandome dar kartą ir prieš pakeisdami paskyrą į nemokamą planą įspėjame jus el. paštu. Debatų dėl nepavykusio mokėjimo neištriname." },
       { kind: "p", text: "Mokesčiai ir kam mokate. Į kainas įskaičiuotas PVM, GST ar pardavimo mokestis, priklausantis nuo jūsų gyvenamosios vietos ir parodomas prieš jums mokant. Mokėjimus kortele tvarko NETOPIA Payments (netopia-payments.com). Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas." },
       { kind: "p", text: "Mokėjimo grąžinimo ginčai. Jei mokėjimą užginčijate savo kortelės išdavėjui, kol ginčas sprendžiamas, galime sustabdyti mokamas funkcijas. Už tai mokesčių netaikome." },
-      { kind: "p", text: "Pirmiausia — įstatymų nustatytos teisės. Kai paslauga neatitinka mūsų pažadų, turite teisę reikalauti, kad ji būtų suderinta su sutartimi, proporcingai sumažinti kainą arba susigrąžinti pinigus, kaip nustatyta įstatymuose. Be to, pinigų už jau pradėtą atsiskaitymo laikotarpį negrąžiname, nebent to reikalauja įstatymai. Abiejų planų naudojimo ribos skelbiamos produkte; prieš jas sugriežtindami taip, kad tai turėtų jums reikšmingą poveikį, apie tai pranešame." }
+      { kind: "p", text: "Pirmiausia — įstatymų nustatytos teisės. Kai paslauga neatitinka mūsų pažadų, turite teisę reikalauti, kad ji būtų suderinta su sutartimi, proporcingai sumažinti kainą arba susigrąžinti pinigus, kaip nustatyta įstatymuose. Be to, jei mokamą planą nutraukiate atsiskaitymo laikotarpiu, grąžiname tą laikotarpio kainos dalį, kurios nepanaudojote, matuojamą pagal plano naudojimą, nepaisant to, kiek dienų praėjo: jei panaudojote 30 %, grąžiname 70 %; jei nepanaudojote nieko, grąžiname visą kainą. Prašymą teikite adresu support@dezbatere.ro; kai grąžiname pinigus, planas baigiasi. Jei taikoma ir 13 skyriuje nustatyta atsisakymo teisė, gaunate didesnę iš šių grąžinamų sumų. Abiejų planų naudojimo ribos skelbiamos produkte; prieš jas sugriežtindami taip, kad tai turėtų jums reikšmingą poveikį, apie tai pranešame." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "b8560a9cb47bb49bd56b32cb8ba2b9f1ab26bf4a03f62f6a39586bd4ee2539f7",
+  sha256: "1539a57f3df45cf6990fe7cfe518286daaae53e60eb508dc13a6a4a46974a055",
   eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.2 · ĮSIGALIOJA 2026 M. SPALIO 12 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",

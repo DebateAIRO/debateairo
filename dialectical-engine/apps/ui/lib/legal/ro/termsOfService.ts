@@ -203,7 +203,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Plăți nereușite. Dacă o plată eșuează, reîncercăm timp de 7 zile și vă avertizăm prin e-mail înainte de a trece contul la planul gratuit. Nu vă ștergem dezbaterile din cauza unei plăți nereușite." },
       { kind: "p", text: "Taxe și beneficiarul plății. Prețurile includ TVA, GST sau taxa pe vânzări, în funcție de locul în care locuiți, iar acest lucru este afișat înainte de plată. Plățile cu cardul sunt procesate de NETOPIA Payments (netopia-payments.com). Vânzătorul este DMS Merchandise Shop S.R.L., care emite factura dumneavoastră și rămâne responsabil pentru serviciul în sine și pentru acești Termeni." },
       { kind: "p", text: "Refuzuri la plată. Dacă contestați o plată la emitentul cardului, putem suspenda funcțiile cu plată până la soluționarea contestației. Nu percepem comisioane pentru aceasta." },
-      { kind: "p", text: "Drepturile legale au prioritate. Atunci când serviciul nu corespunde celor promise, aveți dreptul la aducerea sa în conformitate sau la o reducere proporțională a prețului ori la rambursare, astfel cum prevede legea. În plus, nu rambursăm o perioadă de facturare începută, cu excepția cazurilor în care legea impune acest lucru. Limitele de utilizare pentru fiecare plan sunt publicate în produs; vă notificăm înainte de a le restrânge într-un mod care vă afectează în mod semnificativ." }
+      { kind: "p", text: "Drepturile legale au prioritate. Atunci când serviciul nu corespunde celor promise, aveți dreptul la aducerea sa în conformitate sau la o reducere proporțională a prețului ori la rambursare, astfel cum prevede legea. În plus, dacă anulați un plan cu plată în cursul unei perioade de facturare, vă rambursăm partea din prețul perioadei respective pe care nu ați folosit-o, măsurată după utilizarea planului, indiferent câte zile au trecut: dacă ați folosit 30% din plan, vă rambursăm 70%; dacă nu ați folosit nimic din el, vă rambursăm prețul integral. Solicitați rambursarea la support@dezbatere.ro; odată ce am rambursat, planul încetează. Dacă se aplică și dreptul de retragere din secțiunea 13, primiți rambursarea mai mare dintre cele două. Limitele de utilizare pentru fiecare plan sunt publicate în produs; vă notificăm înainte de a le restrânge într-un mod care vă afectează în mod semnificativ." }
     ]
   },
   {
@@ -352,7 +352,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.2",
-  sha256: "83a905a212da0f4ac14f9676d0895e12ff29e843f5f353c8a9b814a9a1622b6d",
+  sha256: "38067eacc9cb1e14e42a2d78ee4af0881228b250d65ef2cb9694e88089be7e9e",
   eyebrow: "TERMENII SERVICIULUI · v2.2 · ÎN VIGOARE DE LA 12 OCTOMBRIE 2026",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",
