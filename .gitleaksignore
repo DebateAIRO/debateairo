@@ -86,3 +86,10 @@ aa15f4e9e63d2fab63b6c8d103802b42051b41d3:dialectical-engine/tests/unit/billing-c
 # forward-chain test's list of step names (the word "auth" in 0112's name just before it). A file name, not a key.
 # Owner's ruling on PR #122.
 db89a5b0b7ade4a10aa7842032abedb8afdc5c32:dialectical-engine/tests/architecture/migration-forward-chain.test.ts:generic-api-key:94
+# 2026-10-10 — PR #122 was squash-merged as 912dc01de, so four already-reviewed lines got a new commit id.
+# generic-api-key matched lists of migration file names (e.g. 0112_auth_db_batch.sql: the word "auth"),
+# not keys. Owner's ruling on 2026-10-10.
+912dc01de50cb9e0fab9bf970a5a81b03f2d58ab:dialectical-engine/tests/integration/preview-auth-dev-fallback.test.ts:generic-api-key:162
+912dc01de50cb9e0fab9bf970a5a81b03f2d58ab:dialectical-engine/tests/architecture/security-migration-0065.test.ts:generic-api-key:624
+912dc01de50cb9e0fab9bf970a5a81b03f2d58ab:dialectical-engine/tests/architecture/migration-forward-chain.test.ts:generic-api-key:54
+912dc01de50cb9e0fab9bf970a5a81b03f2d58ab:dialectical-engine/tests/architecture/migration-forward-chain.test.ts:generic-api-key:94
