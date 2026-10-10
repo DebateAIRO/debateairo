@@ -97,10 +97,11 @@ export const COMPANY: Company = Object.freeze({
 export const isUnverified = (value: string): boolean => value.includes("[");
 
 /**
- * The Romanian consumer authority's (ANPC) alternative dispute resolution service. The EU online
- * dispute resolution platform closed on 20 July 2025 and is deliberately not linked.
+ * The alternative dispute resolution route Terms section 18 and Annex A.1 name (owner's worksheet,
+ * 9 October 2026). The EU online dispute resolution platform closed on 20 July 2025 and is
+ * deliberately not linked.
  */
-export const ANPC_ADR_URL = "https://reclamatiisal.anpc.ro";
+export const ADR_URL = "https://www.onoratainstanta.ro";
 
 /**
  * One stored item /cookies and the storage card list: its name as the code writes it, and the
