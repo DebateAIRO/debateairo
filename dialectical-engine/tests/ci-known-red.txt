@@ -220,13 +220,6 @@ tests/integration/support-cases.test.ts > SUP-02 cases > returns a shredded case
 #   30-day case-token lifetime (5e05905cc, PR #8) made that token expired from 2026-10-07 12:00 UTC. A calendar time
 #   bomb in the test, not a product change; fix: pass clock: () => shreddedAt.
 #   blinds: the rest of that one case (no unwrap, ciphertext bytes preserved); the other 34 cases run.
-tests/integration/support-upgrade-catalog.test.ts > support migration upgrade convergence > repairs a ledgered historical 0050 in a later migration and replays idempotently
-#   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
-#   tests/ci-integration-all.txt; the same
-#   message file by file on dev@c8cf8e063 the same day).
-#   MIGRATION_LINEAGE_REFUSED UNKNOWN_MIXED_LINEAGE: the test deletes the 0054 and 0055 ledger rows (line 85), drops
-#   columns, then calls migrate() (see above).
-#   blinds: the whole file (its only test): the repair of a ledgered historical 0050 and its idempotent replay.
 tests/integration/t6-legacy-audit-residual-database.test.ts > T6 legacy audit erasure residual on real PostgreSQL > preserves legacy rows, reports only exact counts, and denies application roles
 #   source: measured red on clean origin/dev@23402d10e, 2026-10-09 (one vitest process over
 #   tests/ci-integration-all.txt; the same
