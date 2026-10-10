@@ -4,6 +4,7 @@ import { z } from "zod";
 import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
+import { GEMINI_MODEL_ID_PATTERN, GeminiGenerateProviderGateway } from "./gemini-generate.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -191,7 +192,7 @@ export interface ProviderCallResult {
   readonly rawArtifactRef: string;
   readonly ledgerEntryRef: string;
   readonly content: string;
-  readonly provider: "openai-compatible-http";
+  readonly provider: ProviderWireKind;
   readonly model: string;
   readonly maker: string;
   readonly modelVersion: string;
@@ -248,6 +249,14 @@ export type ProviderDiscoveryTarget = Readonly<{
    * GLM relay declares 1 000 000). Absent = no pre-send window check.
    */
   contextWindowTokens?: number;
+  /**
+   * PR C (preview multi-model build): the wire this target speaks, when it is
+   * not the OpenAI-compatible one. Set by `parseProviderDiscoveryTargets` from
+   * the base URL (each native wire has exactly one) and checked against the
+   * configured provider's `adapterKind` when the caller passes it. Absent =
+   * `openai-compatible-http`, so every existing target is unchanged.
+   */
+  adapterKind?: string;
 }>;
 
 /**
@@ -278,6 +287,8 @@ export type ProviderTargetGatewayControls = Readonly<{
   thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
   contextWindowTokens?: number;
   supportsJsonObjectResponse?: boolean;
+  /** PR C: the target's native wire, for `createProviderGatewayForAdapter`; absent = OpenAI-compatible. */
+  adapterKind?: string;
 }>;
 
 function isJsonObjectResponseTarget(endpoint:string,model:string):boolean {
@@ -289,7 +300,8 @@ export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): 
       thinking: Object.freeze({ parameter: target.thinkingParameter, levels: target.thinkingLevels })
     }),
     ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens }),
-    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{})
+    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{}),
+    ...(target.adapterKind === undefined ? {} : { adapterKind: target.adapterKind })
   });
 }
 
@@ -325,7 +337,7 @@ function providerTargetThinkingLevels(value: unknown): readonly string[] {
  * usage-counter bound. One rule for the target parser and the gateway
  * constructor (task review fix round 1, finding 4).
  */
-function isContextWindowTokens(value: unknown): value is number {
+export function isContextWindowTokens(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= MAX_USAGE_COUNTER;
 }
 
@@ -362,15 +374,46 @@ function normalizedProviderBaseUrl(value: unknown): string {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
   }
   parsed.pathname = parsed.pathname.replace(/\/+$/u, "");
-  if (!parsed.pathname.endsWith("/v1") && parsed.toString() !== "https://api.deepinfra.com/v1/openai") {
+  // PR C: the Gemini API base is admitted as this ONE exact string (no other
+  // path, scheme, port or host), like DeepInfra's; it selects the native wire.
+  if (!parsed.pathname.endsWith("/v1") && parsed.toString() !== "https://api.deepinfra.com/v1/openai"
+    && parsed.toString() !== GOOGLE_GEMINI_BASE_URL) {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
   }
   return parsed.toString().replace(/\/$/u, "");
 }
 
+/**
+ * PR C — WHICH WIRE A TARGET SPEAKS, decided by its base URL and cross-checked
+ * with the configured provider's adapter kind. The Gemini base URL means the
+ * native Gemini wire and nothing else; the Gemini adapter kind needs that base
+ * URL. A mismatch either way is an operator's half-finished edit and is
+ * refused, never guessed. A Gemini target that declares a thinking capability
+ * uses the vendor spelling (`reasoning_effort`): it is an API vendor, which
+ * never echoes a level, and the gateway carries the level as
+ * `generationConfig.thinkingConfig.thinkingLevel`. Every other target is left
+ * exactly as it was (no `adapterKind` member).
+ */
+function providerTargetAdapterKind(
+  baseUrl: string,
+  configuredAdapterKind: string | undefined,
+  thinking: Readonly<{ thinkingParameter: ThinkingParameter }> | undefined
+): string | undefined {
+  const geminiUrl = baseUrl === GOOGLE_GEMINI_BASE_URL;
+  const geminiKind = configuredAdapterKind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND;
+  if (configuredAdapterKind !== undefined && geminiUrl !== geminiKind) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_ADAPTER_MISMATCH");
+  }
+  if (!geminiUrl) return undefined;
+  if (thinking !== undefined && thinking.thinkingParameter !== "reasoning_effort") {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_THINKING_INVALID");
+  }
+  return GOOGLE_GEMINI_HTTP_ADAPTER_KIND;
+}
+
 export function parseProviderDiscoveryTargets(
   source: string,
-  configuredProviders: readonly Readonly<{ providerRef: string; maker: string }>[]
+  configuredProviders: readonly Readonly<{ providerRef: string; maker: string; adapterKind?: string }>[]
 ): readonly ProviderDiscoveryTarget[] {
   if (Buffer.byteLength(source, "utf8") > MAX_PROVIDER_TARGET_CONFIG_BYTES) {
     throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
@@ -385,6 +428,7 @@ export function parseProviderDiscoveryTargets(
     throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
   }
   const configuredByRef = new Map<string, string>();
+  const configuredAdapterByRef = new Map<string, string>();
   for (const configured of configuredProviders) {
     const providerRef = requiredProviderTargetText(
       configured.providerRef,
@@ -393,6 +437,7 @@ export function parseProviderDiscoveryTargets(
     const maker = requiredProviderTargetText(configured.maker, "CONFIGURED_PROVIDER_INVALID");
     if (configuredByRef.has(providerRef)) throw new TypeError("CONFIGURED_PROVIDER_DUPLICATE");
     configuredByRef.set(providerRef, maker);
+    if (typeof configured.adapterKind === "string") configuredAdapterByRef.set(providerRef, configured.adapterKind);
   }
   const targetsByRef = new Map<string, ProviderDiscoveryTarget>();
   for (const candidate of decoded) {
@@ -474,16 +519,24 @@ export function parseProviderDiscoveryTargets(
     if (authorizationFile !== undefined && !authorizationFile.startsWith("/")) {
       throw new TypeError("PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID");
     }
+    const baseUrl = normalizedProviderBaseUrl(row.base_url);
+    const adapterKind = providerTargetAdapterKind(baseUrl, configuredAdapterByRef.get(providerRef), thinking);
+    const model = requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID");
+    // PR C: a Gemini model id is placed in the request PATH, so it is one plain token.
+    if (adapterKind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND && !GEMINI_MODEL_ID_PATTERN.test(model)) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_MODEL_INVALID");
+    }
     targetsByRef.set(providerRef, Object.freeze({
       providerRef,
       maker,
-      baseUrl: normalizedProviderBaseUrl(row.base_url),
-      model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
+      baseUrl,
+      model,
       ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
       ...(authorizationFile === undefined ? {} : { authorizationFile }),
       ...(price === undefined ? {} : price),
       ...(thinking === undefined ? {} : thinking),
-      ...(contextWindow === undefined ? {} : contextWindow)
+      ...(contextWindow === undefined ? {} : contextWindow),
+      ...(adapterKind === undefined ? {} : { adapterKind })
     }));
   }
   if (targetsByRef.size !== configuredByRef.size) {
@@ -813,6 +866,14 @@ export function assertHostedProviderTargets(
     if (target.authorizationHeader !== undefined) {
       throw new TypeError(`PROVIDER_INLINE_CREDENTIAL_REFUSED:${target.providerRef}`);
     }
+    // PR C: the native Gemini wire is not yet wired through the hosted
+    // preview's guarded fetch and gate (and the hosted register file admits
+    // only the OpenAI-compatible adapter), so a hosted boot refuses it by name
+    // until that step lands, rather than sending native bytes where a gate
+    // expects another shape.
+    if (target.adapterKind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND) {
+      throw new TypeError(`PROVIDER_ADAPTER_NOT_HOSTED:${target.providerRef}`);
+    }
   }
 }
 
@@ -964,9 +1025,16 @@ export interface ProviderAdapterRegistration {
 }
 
 export const OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND = "openai-compatible-http" as const;
+/** PR C: the native Google Gemini `generateContent` wire (./gemini-generate.ts). */
+export const GOOGLE_GEMINI_HTTP_ADAPTER_KIND = "google-gemini-http" as const;
+/** PR C: the one base URL a `google-gemini-http` target may name. */
+export const GOOGLE_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta" as const;
+/** What a raw artifact and a call result record as the wire that carried the call. */
+export type ProviderWireKind = typeof OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND | typeof GOOGLE_GEMINI_HTTP_ADAPTER_KIND;
 export const BUILT_IN_PROVIDER_ADAPTERS = Object.freeze([
   Object.freeze({ adapterKind: OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, implementation: "OpenAICompatibleProviderGateway" }),
-  Object.freeze({ adapterKind: "vllm-openai-compatible-http", implementation: "VllmOpenAICompatibleProviderGateway" })
+  Object.freeze({ adapterKind: "vllm-openai-compatible-http", implementation: "VllmOpenAICompatibleProviderGateway" }),
+  Object.freeze({ adapterKind: GOOGLE_GEMINI_HTTP_ADAPTER_KIND, implementation: "GeminiGenerateProviderGateway" })
 ] as const);
 
 export function selectProviderAdapter(
@@ -986,7 +1054,7 @@ export interface RawArtifactInput {
   readonly attemptId: string;
   readonly runId: string | null;
   readonly providerRef: string;
-  readonly provider: "openai-compatible-http";
+  readonly provider: ProviderWireKind;
   readonly model: string;
   readonly maker: string;
   readonly modelVersion: string | null;
@@ -1161,12 +1229,12 @@ const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
  * attempts, not tokens, so an unbounded packet turns one ask into unbounded model spend. An
  * oversized packet is a refused attempt — recorded, never sent, never retried.
  */
-const MAX_PROVIDER_REQUEST_PACKET_BYTES = 256 * 1024;
+export const MAX_PROVIDER_REQUEST_PACKET_BYTES = 256 * 1024;
 /** L4-F8: bounded exponential backoff between HTTP attempts — 250 ms x 2^n, capped at 4 s. */
 const PROVIDER_BACKOFF_BASE_MS = 250;
 const PROVIDER_BACKOFF_CAP_MS = 4_000;
 const MAX_PROVIDER_MODEL_CHARS = 256;
-const MAX_USAGE_COUNTER = 2 ** 31 - 1;
+export const MAX_USAGE_COUNTER = 2 ** 31 - 1;
 
 /**
  * Model scorecard §2.10 — THE ONE LOCAL PROMPT-SIZE ESTIMATE: characters / 4,
@@ -1234,7 +1302,7 @@ type ResolvedThinkingLevel = Readonly<{
 }>;
 
 /** Model scorecard §2.2: the one body member a requested level becomes, or the refusal. */
-function resolveThinkingLevel(
+export function resolveThinkingLevel(
   requested: string | undefined,
   control: OpenAICompatibleGatewayOptions["thinking"],
   providerRef: string
@@ -1283,7 +1351,7 @@ const CANDIDATE_ID_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$/u;
  * sent. The ledger's CHECKs would otherwise refuse the row only after a paid
  * call, and an unrecorded paid call is the one thing this ledger must not have.
  */
-function assertProviderCallRecord(request: ProviderCallRequest): void {
+export function assertProviderCallRecord(request: ProviderCallRequest): void {
   const role = request.modelRole;
   const candidate = request.candidateId;
   const version = request.scorecardVersion;
@@ -1296,11 +1364,11 @@ function assertProviderCallRecord(request: ProviderCallRequest): void {
 }
 
 /** Delay before `attempt` (only attempts after the first back off). */
-function providerBackoffMs(attempt: number): number {
+export function providerBackoffMs(attempt: number): number {
   return Math.min(PROVIDER_BACKOFF_BASE_MS * 2 ** (attempt - 2), PROVIDER_BACKOFF_CAP_MS);
 }
 
-function realSleep(milliseconds: number): Promise<void> {
+export function realSleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => { setTimeout(resolve, milliseconds); });
 }
 
@@ -1332,6 +1400,11 @@ const usageSchema = z.object({
 });
 
 const modelIdSchema = z.string().min(1).max(MAX_PROVIDER_MODEL_CHARS);
+
+/** L4-F3: the one bound on a model id a vendor asserts (shared with ./gemini-generate.ts). */
+export function isBoundedProviderModelId(value: string): boolean {
+  return modelIdSchema.safeParse(value).success;
+}
 
 const responseSchema = z.object({
   id: z.string().min(1),
@@ -1403,7 +1476,7 @@ function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function contentParseStatus(content: string): "PARSED" | "UNPARSED" {
+export function contentParseStatus(content: string): "PARSED" | "UNPARSED" {
   try {
     JSON.parse(content);
     return "PARSED";
@@ -1413,7 +1486,7 @@ function contentParseStatus(content: string): "PARSED" | "UNPARSED" {
 }
 
 /** Reads the body through its stream and cancels it the moment the cap is crossed (L4-F3). */
-async function readBoundedResponseText(response: Response): Promise<string> {
+export async function readBoundedResponseText(response: Response): Promise<string> {
   if (response.body === null) return "";
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -2104,6 +2177,27 @@ export class VllmOpenAICompatibleProviderGateway implements ProviderGateway {
     return this.#delegate.call(request);
   }
 }
+
+/**
+ * PR C — THE ONE ADAPTER DISPATCH. One plain test per configured adapter
+ * kind (an if-chain: the source-purity law refuses a switch without an
+ * exhaustive fall-through, and a kind is an open string) (absent = OpenAI-compatible, so every existing composition is
+ * unchanged); a further native wire joins it as one more case. An unknown
+ * kind is refused by name rather than sent down another wire.
+ */
+export function createProviderGatewayForAdapter(
+  adapterKind: string | undefined,
+  options: OpenAICompatibleGatewayOptions
+): ProviderGateway {
+  const kind = adapterKind ?? OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND;
+  if (kind === OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND) return new OpenAICompatibleProviderGateway(options);
+  if (kind === "vllm-openai-compatible-http") return new VllmOpenAICompatibleProviderGateway(options);
+  if (kind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND) return new GeminiGenerateProviderGateway(options);
+  throw new TypeError("PROVIDER_ADAPTER_KIND_UNSUPPORTED");
+}
+
+// PR C: the native Gemini adapter. See ./gemini-generate.ts.
+export * from "./gemini-generate.js";
 
 // V-11 addendum layers 1-3: THE one frame every hand-off is built with, and the
 // door that refuses a packet built any other way. See ./prompt-frame.ts.

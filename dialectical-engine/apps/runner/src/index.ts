@@ -93,7 +93,7 @@ import {
   schemaFailureLocator,
   type FramedPrompt,
   type PromptContract,
-  OpenAICompatibleProviderGateway,
+  createProviderGatewayForAdapter,
   PROVIDER_USAGE_CAP,
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -9438,6 +9438,11 @@ export function createPostgresProviderGateway(
   options: Omit<OpenAICompatibleGatewayOptions, "persistRawArtifact" | "appendLedgerEntry" | "assertNoOpenWriteTransaction" | "persistCallPrompt">
     & {
       /**
+       * PR C: the target's native wire (`providerTargetGatewayControls`), picked
+       * by `createProviderGatewayForAdapter`. Absent = OpenAI-compatible.
+       */
+      readonly adapterKind?: string;
+      /**
        * V-28 (DL4-F2): the money bound, built per CALL from the run the gateway
        * was handed. A gateway is constructed once per target — the price is the
        * target's — but the spend belongs to the run, and one gateway serves
@@ -9465,10 +9470,10 @@ export function createPostgresProviderGateway(
     }
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
-  const { buildStoryCostEnvelopeSeam, ...httpOptions } = gatewayOptions;
+  const { buildStoryCostEnvelopeSeam, adapterKind, ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
-  const http = new OpenAICompatibleProviderGateway({
+  const http = createProviderGatewayForAdapter(adapterKind, {
     ...httpOptions,
     assertNoOpenWriteTransaction,
     persistRawArtifact: (artifact) => ledger.appendRawArtifact(artifact),

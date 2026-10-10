@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { THINKING_LEVEL_TOKEN } from "./index.js";
+import { GOOGLE_GEMINI_HTTP_ADAPTER_KIND, OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, THINKING_LEVEL_TOKEN } from "./index.js";
+import {
+  geminiGenerateContentBody,
+  geminiGenerateContentUrl,
+  geminiRequestHeaders,
+  readGeminiReply
+} from "./gemini-generate.js";
 import { PREVIEW_GLM_OUTPUT_RESERVATION } from "./preview-test.js";
 import type { ProviderDiscoveryTarget } from "./index.js";
 
@@ -41,6 +47,92 @@ export type ProviderProbeRecorder = Readonly<{
 }>;
 
 const MAX_PROBE_RESPONSE_BYTES = 64 * 1024;
+/**
+ * PR C: the Gemini probe's default bound when the caller gives none. Not 8 as
+ * on the OpenAI wire: a thinking model spends output tokens on thought before
+ * it writes "OK", and Google's thinking guide states the output limit includes
+ * thought tokens.
+ */
+const GEMINI_PROBE_DEFAULT_TOKEN_CEILING = 1024;
+
+type ProbeInput = Readonly<{
+  target: ProviderDiscoveryTarget;
+  timeoutMs: number;
+  thinkingLevel?: string;
+  tokenCeiling?: number;
+  fetchImplementation: typeof fetch;
+}>;
+
+/** The OpenAI-compatible probe, unchanged: `chat/completions`, reply exactly "OK", echoed `model`. */
+async function observeOpenAICompatibleAnswer(input: ProbeInput): Promise<void> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (input.target.authorizationHeader !== undefined) {
+    headers.authorization = input.target.authorizationHeader;
+  }
+  const response = await input.fetchImplementation(
+    `${input.target.baseUrl}/chat/completions`,
+    {
+      method: "POST",
+      headers,
+      signal: AbortSignal.timeout(input.timeoutMs),
+      body: JSON.stringify({
+        model: input.target.model,
+        max_tokens: input.tokenCeiling ?? 8,
+        ...(input.thinkingLevel===undefined?{}:{[input.target.thinkingParameter!]:input.thinkingLevel}),
+        messages: [{
+          role: "user",
+          content: "DR-181 discovery health probe. Reply exactly: OK"
+        }]
+      })
+    }
+  );
+  const raw = await response.text();
+  if (!response.ok || Buffer.byteLength(raw, "utf8") > MAX_PROBE_RESPONSE_BYTES) {
+    throw new TypeError("PROVIDER_PROBE_UNAVAILABLE");
+  }
+  const decoded = JSON.parse(raw) as Readonly<Record<string, unknown>>;
+  const choices = decoded.choices;
+  const first = Array.isArray(choices) ? choices[0] : undefined;
+  const message = typeof first === "object" && first !== null
+    ? (first as Readonly<Record<string, unknown>>).message
+    : undefined;
+  const content = typeof message === "object" && message !== null
+    ? (message as Readonly<Record<string, unknown>>).content
+    : undefined;
+  if (decoded.model !== input.target.model || content !== "OK") {
+    throw new TypeError("PROVIDER_PROBE_RESPONSE_INVALID");
+  }
+}
+
+/**
+ * PR C — the Gemini probe: the same question on the native wire, the key in
+ * `x-goog-api-key`, never a query. Healthy only on a clean STOP whose text is
+ * exactly "OK" and whose `modelVersion` is exactly the pinned id.
+ */
+async function observeGeminiAnswer(input: ProbeInput): Promise<void> {
+  const body = geminiGenerateContentBody({
+    messages: [{ role: "user", content: "DR-181 discovery health probe. Reply exactly: OK" }],
+    maxOutputTokens: input.tokenCeiling ?? GEMINI_PROBE_DEFAULT_TOKEN_CEILING,
+    ...(input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel })
+  });
+  const response = await input.fetchImplementation(
+    geminiGenerateContentUrl(input.target.baseUrl, input.target.model),
+    {
+      method: "POST",
+      headers: geminiRequestHeaders(input.target.authorizationHeader),
+      signal: AbortSignal.timeout(input.timeoutMs),
+      body
+    }
+  );
+  const raw = await response.text();
+  if (!response.ok || Buffer.byteLength(raw, "utf8") > MAX_PROBE_RESPONSE_BYTES) {
+    throw new TypeError("PROVIDER_PROBE_UNAVAILABLE");
+  }
+  const reading = readGeminiReply(JSON.parse(raw));
+  if (reading.verdict !== "STOP" || reading.modelVersion !== input.target.model || reading.content !== "OK") {
+    throw new TypeError("PROVIDER_PROBE_RESPONSE_INVALID");
+  }
+}
 
 /**
  * The network probe ONLY — it observes and returns, and persists nothing.
@@ -73,43 +165,12 @@ export async function observeProviderTarget(input: Readonly<{
   try {
     if(input.tokenCeiling!==undefined&&(!Number.isSafeInteger(input.tokenCeiling)||input.tokenCeiling<1||input.tokenCeiling>PREVIEW_GLM_OUTPUT_RESERVATION))throw new TypeError("PROVIDER_PROBE_TOKEN_CEILING_INVALID");
     if(input.thinkingLevel!==undefined&&(!THINKING_LEVEL_TOKEN.test(input.thinkingLevel)||input.target.thinkingParameter===undefined||!input.target.thinkingLevels?.includes(input.thinkingLevel)))throw new TypeError("PROVIDER_PROBE_THINKING_INVALID");
-    const headers: Record<string, string> = { "content-type": "application/json" };
-    if (input.target.authorizationHeader !== undefined) {
-      headers.authorization = input.target.authorizationHeader;
-    }
-    const response = await input.fetchImplementation(
-      `${input.target.baseUrl}/chat/completions`,
-      {
-        method: "POST",
-        headers,
-        signal: AbortSignal.timeout(input.timeoutMs),
-        body: JSON.stringify({
-          model: input.target.model,
-          max_tokens: input.tokenCeiling ?? 8,
-          ...(input.thinkingLevel===undefined?{}:{[input.target.thinkingParameter!]:input.thinkingLevel}),
-          messages: [{
-            role: "user",
-            content: "DR-181 discovery health probe. Reply exactly: OK"
-          }]
-        })
-      }
-    );
-    const raw = await response.text();
-    if (!response.ok || Buffer.byteLength(raw, "utf8") > MAX_PROBE_RESPONSE_BYTES) {
-      throw new TypeError("PROVIDER_PROBE_UNAVAILABLE");
-    }
-    const decoded = JSON.parse(raw) as Readonly<Record<string, unknown>>;
-    const choices = decoded.choices;
-    const first = Array.isArray(choices) ? choices[0] : undefined;
-    const message = typeof first === "object" && first !== null
-      ? (first as Readonly<Record<string, unknown>>).message
-      : undefined;
-    const content = typeof message === "object" && message !== null
-      ? (message as Readonly<Record<string, unknown>>).content
-      : undefined;
-    if (decoded.model !== input.target.model || content !== "OK") {
-      throw new TypeError("PROVIDER_PROBE_RESPONSE_INVALID");
-    }
+    // PR C: one probe per wire, picked by the target's adapter kind (absent =
+    // OpenAI-compatible). Each asks for exactly "OK" and checks the echoed model.
+    const adapterKind = input.target.adapterKind ?? OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND;
+    if (adapterKind === OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND) await observeOpenAICompatibleAnswer(input);
+    else if (adapterKind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND) await observeGeminiAnswer(input);
+    else throw new TypeError("PROVIDER_PROBE_ADAPTER_UNSUPPORTED");
     state = Object.freeze({
       probeEvidenceRef,
       providerRef: input.target.providerRef,
