@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Priloga B — Regionalne določbe o zasebnosti",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Vsak vnos velja le, če je njegova regija navedena v razdelku 2 Pogojev, in navaja samo razlike glede na glavni del tega pravilnika." }
+      { kind: "p", text: "Vsak vnos velja za osebe, ki živijo v njegovi regiji, in navaja samo razlike glede na glavni del tega pravilnika." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Združeno kraljestvo (samo če je navedeno)",
+    title: "Združene države",
     accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Naš predstavnik v Združenem kraljestvu po členu 27 UK GDPR je [name, address, email]; z njim lahko stopite v stik glede česar koli iz tega pravilnika. Nadzorni organ je Information Commissioner's Office, ico.org.uk. Če se želite pritožiti, nam pišite na privacy@dezbatere.ro; prejem vaše pritožbe potrdimo v 30 dneh. Prenosi vaših podatkov iz Združenega kraljestva ponudnikom umetne inteligence v Združenih državah temeljijo na razširitvi Združenega kraljestva okvira EU-ZDA za zasebnost podatkov, kadar je ponudnik certificiran, sicer pa na mednarodnem dodatku Združenega kraljestva o prenosu podatkov k standardnim pogodbenim klavzulam EU, in jih podpira ocena tveganja prenosa; Register za vsakega ponudnika navaja uporabljeni instrument. Kršitev varstva osebnih podatkov prijavimo ICO v 72 urah, kadar to zahteva zakon, vas pa brez nepotrebnega odlašanja obvestimo, če za vas pomeni veliko tveganje. Če bi kdaj nastavili analitične piškotke, bi v Združenem kraljestvu zanje veljala možnost zavrnitve namesto privolitve; danes jih ne nastavljamo. Če ste mlajši od 18 let in kljub našemu starostnemu pravilu dostopate do storitve, se za ravnanje z vašimi podatki uporabljajo standardi kodeksa ICO za otroke." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Združene države (samo če so navedene)",
-    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Obvestilo ob zbiranju. Preglednica v razdelku 2 navaja kategorije osebnih podatkov, ki jih zbiramo, in njihove vire. Nameni in pravne podlage obdelave so v razdelku 4, obdobja hrambe pa v razdelku 7. Te kategorije občutljivih osebnih podatkov zbiramo le, kadar jih vključite v svoja vprašanja o sebi: zdravje, verska ali filozofska prepričanja, spolno življenje ali spolna usmerjenost, politična stališča, članstvo v sindikatu ter rasno ali etnično poreklo. Uporabljamo jih samo za izvajanje vaših razprav in šele po ločeni privolitvi iz razdelka 3. Osebnih podatkov ne prodajamo ali delimo in tega nismo storili niti v preteklih dvanajstih mesecih. Osebnih podatkov ne uporabljamo za ciljno oglaševanje, občutljivih osebnih podatkov pa ne uporabljamo za noben namen, ki presega zagotavljanje storitve, ki jo zahtevate. Signali želje za zavrnitev: ker osebnih podatkov ne prodajamo ali delimo in jih ne uporabljamo za ciljno oglaševanje, ni ničesar, kar bi lahko zavrnili. Če bi jih kdaj začeli prodajati ali deliti, bomo signale Global Privacy Control upoštevali kot zavrnitev. Vaše pravice: izvedeti, izbrisati, popraviti, zavrniti, omejiti uporabo občutljivih osebnih podatkov in ne biti diskriminirani zaradi njihovega uveljavljanja; zahtevo vložite na privacy@dezbatere.ro. Finančne spodbude: ne ponujamo jih; naši nameni in zaščitni ukrepi so pri brezplačnih in plačljivih paketih enaki. Hramba je navedena v razdelku 7. Kršitve: prebivalce in organe zveznih držav obveščamo, kot zahteva zakon o kršitvah varnosti podatkov posamezne zvezne države. To obvestilo se posodobi najmanj vsakih dvanajst mesecev; nazadnje posodobljeno [date]." },
       { kind: "p", text: "Connecticut: občutljive podatke obdelujemo samo z vašo izrecno privolitvijo, dano na ločenem zaslonu pred vašo prvo razpravo (razdelek 3); vaših osebnih podatkov ne uporabljamo za učenje modelov umetne inteligence. Washington: naše Obvestilo o zasebnosti zdravstvenih podatkov potrošnikov na [URL] je ločen dokument, ki velja za vse podatke, povezane z zdravjem, vključno z izpeljanimi sklepi. Teksas in Nebraska: občutljivih osebnih podatkov ne prodajamo. Kolorado, Connecticut, Virginija in druge zvezne države s celovitimi zakoni o zasebnosti: navedene pravice veljajo za vas, kjer zakon velja za nas. Če zahtevo zavrnemo, se lahko pritožite tako, da odgovorite na naš odgovor na privacy@dezbatere.ro; če zavrnemo pritožbo, se lahko obrnete na generalnega državnega tožilca (Attorney General) svoje zvezne države." }
     ]
   },
   {
-    no: "B.4",
-    title: "Kanada in Quebec (samo če sta navedena)",
-    accent: "--gold",
+    no: "B.3",
+    title: "Kanada in Quebec",
+    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je [name], privacy@dezbatere.ro. Na zahteve odgovorimo v 30 dneh. Še naprej smo odgovorni za osebne podatke, ki jih prenašamo ponudnikom umetne inteligence zunaj Kanade, in s pogodbami zahtevamo primerljivo zaščito; za te ponudnike lahko veljajo zakoni držav, v katerih poslujejo, vključno z zakonitim dostopom organov. Trženjska e-pošta se pošilja samo z vašo izrecno privolitvijo v skladu s CASL. Kršitev varnostnih ukrepov, ki za vas pomeni resnično tveganje znatne škode, prijavimo Uradu kanadskega pooblaščenca za zasebnost in vam ter o vsaki kršitvi 24 mesecev hranimo evidenco. Quebec: pred posredovanjem osebnih podatkov zunaj Quebeca izvedemo oceno učinka na zasebnost; incident zaupnosti, ki pomeni tveganje resne škode, prijavimo Commission d'accès à l'information in vam ter vodimo register incidentov; nastavitve, ki vaše razprave ohranjajo zasebne, so privzeto vključene; zahtevate lahko, da vaše osebne podatke odstranimo iz indeksov ali prenehamo razširjati; zahtevate lahko svoje podatke v strukturirani, splošno uporabljani obliki; razdelek 8 opisuje našo avtomatizirano obdelavo." }
     ]
   },
   {
-    no: "B.5",
-    title: "Avstralija in Nova Zelandija (samo če sta navedeni)",
-    accent: "--reasoning",
+    no: "B.4",
+    title: "Avstralija in Nova Zelandija",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Avstralija. Čezmorski prejemniki vaših osebnih podatkov so ponudniki umetne inteligence in obdelovalci, navedeni v Registru, ki se nahajajo v [the United States and the European Union]; sprejemamo razumne ukrepe, da z njimi ravnajo v skladu z avstralskimi načeli zasebnosti. Avtomatizirane odločitve: od 10. decembra 2026 ta pravilnik opredeljuje vrste odločitev, ki jih sprejemajo računalniški programi in pomembno vplivajo na vaše pravice ali interese — takih odločitev ni; ocene in razsodbe se nanašajo na argumente, ne na vas — ter osebne podatke, uporabljene pri njih. Pritožbe se lahko vložijo pri Uradu avstralskega informacijskega pooblaščenca. Nova Zelandija. Naša oseba, odgovorna za zasebnost, je [name]. Kadar osebne podatke o vas zbiramo posredno — ker jih je drug uporabnik vključil v vprašanje — sta ta pravilnik in razdelek 11 obvestilo, ki vam ga zagotovimo. Ponudnikom umetne inteligence v Registru jih razkrijemo kot svojim zastopnikom na podlagi pogodb, ki zahtevajo primerljive zaščitne ukrepe. Pritožbe se lahko vložijo pri Uradu pooblaščenca za zasebnost." }
     ]
   },
   {
-    no: "B.6",
-    title: "Švica (samo če je navedena)",
-    accent: "--con",
+    no: "B.5",
+    title: "Švica",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Velja švicarski zvezni zakon o varstvu podatkov (FADP). Nadzorni organ je Zvezni pooblaščenec za varstvo podatkov in informacij (FDPIC), edoeb.admin.ch. Vaši podatki gredo v države, navedene v Registru — države EU in Združene države. Za Združene države se opiramo na okvir Švica-ZDA za zasebnost podatkov, kadar je ponudnik certificiran, sicer pa na standardne pogodbene klavzule, ki jih priznava FDPIC. Kršitev varstva podatkov, ki bo za vas verjetno pomenila veliko tveganje, čim prej prijavimo FDPIC. Ocenili smo, da predstavnika v Švici ne potrebujemo (Art. 14 FADP). To oceno vsako leto ponovno preverimo." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldavija (samo če je navedena)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldavija",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Velja moldavski zakon št. 195/2024 o varstvu osebnih podatkov. Sledi GDPR, osrednji del tega pravilnika pa opisuje vaše pravice po njem. Nadzorni organ je Nacionalni center za varstvo osebnih podatkov (CNPDCP). Predstavnika v Moldaviji ne potrebujemo, ker smo ustanovljeni v Evropskem gospodarskem prostoru (Art. 27(2)(c) zakona št. 195/2024). To oceno vsako leto ponovno preverimo. Prenosi vaših podatkov v Združene države temeljijo na mehanizmu, ki je v Registru naveden za vsakega ponudnika. Kršitev varstva osebnih podatkov prijavimo CNPDCP v 72 urah, kadar to zahteva zakon." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukrajina (samo če je navedena)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Azijsko-pacifiška regija",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Velja zakon Ukrajine »O varstvu osebnih podatkov«. Dialectical Engine ne ponujamo na območjih Ukrajine, ki jih njena vlada ne nadzoruje. Vaši podatki gredo v države EU in Združene države (glejte Register). Pritožbo lahko vložite pri Pooblaščencu Vrhovne rade Ukrajine za človekove pravice." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Izrael (samo če je naveden)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Velja izraelski zakon o varstvu zasebnosti. Upravljavec je DebateAIRO S.R.L.; kako stopite v stik z nami, je opisano v razdelku 1. Zakonsko nam niste dolžni dati svojih podatkov; brez podatkov računa vam ne moremo odpreti računa. Vaše podatke uporabljamo za namene iz razdelka 4 in jih posredujemo prejemnikom iz razdelka 5. Zahtevate lahko vpogled vanje in njihov popravek (razdelek 10). Nadzorni organ je Urad za varstvo zasebnosti." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Azijsko-pacifiška regija (samo vrstice za navedene regije)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapur: naša pooblaščena oseba za varstvo podatkov je [name, email]; prenosi temeljijo na pogodbenih obveznostih, ki zagotavljajo zaščito, primerljivo s PDPA; o kršitvah, za katere velja obveznost obvestila, obvestimo PDPC v 3 dneh. Japonska: vaše osebne podatke uporabljamo za namene iz razdelka 4 in za nobene druge. Posredujemo jih ponudnikom umetne inteligence in gostovanja iz Registra, ki se nahajajo v Združenih državah in državah EU, na podlagi pogodb, ki od njih zahtevajo, da jih varujejo v skladu s standardom japonskega zakona o varstvu osebnih podatkov; na zahtevo vam povemo, kaj storijo za njihovo varstvo, in vas obvestimo o sistemu varstva zasebnosti v njihovi državi. Vaša prepričanja, vključno z verskimi in političnimi, ter vaše zdravje so osebni podatki, ki zahtevajo posebno skrbnost; zbiramo jih samo z vašo predhodno privolitvijo (razdelek 3). Naše ime in naslov sta DebateAIRO S.R.L., [address], Romunija, naš predstavnik pa je [name], direktor; kako vložiti zahtevo, je opisano v razdelku 10, naši varnostni ukrepi v razdelku 9, pritožbe pa pošljite na privacy@dezbatere.ro. Kršitve prijavimo Komisiji za varstvo osebnih podatkov, kot zahteva zakon. Južna Koreja: naša oseba, odgovorna za zasebnost, je [name], direktor, privacy@dezbatere.ro. Osebne podatke prenašamo v tujino, ker to zahteva izvajanje vaših razprav po naši pogodbi z vami: ob vsakem zagonu razprave vaše vprašanje in trditve razprave, v klepetu s podporo pa vaša sporočila, prek šifrirane povezave pošljemo ponudnikom umetne inteligence in gostovanja iz Registra, ki za vsakega prejemnika navaja njegovo državo, kontakt, namen in čas hrambe podatkov. Prenos lahko zavrnete tako, da ne začenjate razprav ali izbrišete svoj račun; takrat za vas ne moremo izvajati razprav. Politična mnenja, prepričanja in zdravje so občutljivi podatki; obdelujemo jih samo z vašo ločeno privolitvijo (razdelek 3). O vas ne sprejemamo popolnoma avtomatiziranih odločitev (razdelek 8). Na zahteve odgovorimo v [10] dneh, kršitve pa prijavimo Komisiji za varstvo osebnih podatkov in vam, kot zahteva zakon o varstvu osebnih podatkov. Tajvan: velja tajvanski zakon o varstvu osebnih podatkov. Vaše podatke hranimo v obdobjih iz razdelka 7; uporabljajo se v Romuniji, drugih državah EU in Združenih državah (glejte Register); prejemniki so navedeni v razdelku 5; naši sistemi in modeli umetne inteligence jih samodejno obdelujejo za izvajanje vaših razprav. Zahtevate lahko, da izveste, katere podatke hranimo, vpogled vanje, kopijo, popravek, prenehanje njihove uporabe in izbris (razdelek 10). Posredovanje podatkov računa je vaša izbira, vendar vam brez njih ne moremo odpreti računa. Na zahtevo za vpogled v vaše podatke ali njihovo kopijo odgovorimo v 15 dneh; če potrebujemo več časa, lahko ta rok enkrat podaljšamo za največ 15 dni in vam razlog pisno sporočimo. Filipini: naša pooblaščena oseba za varstvo podatkov je [name]; pritožbe se lahko vložijo pri nacionalni komisiji za zasebnost; razdelek 8 opisuje avtomatizirano obdelavo. Tajska: naš predstavnik je [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Pridržano",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Turčija, Brazilija in Indonezija zahtevajo obvestilo v lokalnem jeziku, predstavnika ali registracijo ter vložitve; določbe zanje tukaj niso pripravljene. Storitve ne ponujamo na Kitajskem, v Vietnamu ali Rusiji." }
+      { kind: "p", text: "Singapur: naša pooblaščena oseba za varstvo podatkov je [name, email]; prenosi temeljijo na pogodbenih obveznostih, ki zagotavljajo zaščito, primerljivo s PDPA; o kršitvah, za katere velja obveznost obvestila, obvestimo PDPC v 3 dneh. Japonska: vaše osebne podatke uporabljamo za namene iz razdelka 4 in za nobene druge. Posredujemo jih ponudnikom umetne inteligence in gostovanja iz Registra, ki se nahajajo v Združenih državah in državah EU, na podlagi pogodb, ki od njih zahtevajo, da jih varujejo v skladu s standardom japonskega zakona o varstvu osebnih podatkov; na zahtevo vam povemo, kaj storijo za njihovo varstvo, in vas obvestimo o sistemu varstva zasebnosti v njihovi državi. Vaša prepričanja, vključno z verskimi in političnimi, ter vaše zdravje so osebni podatki, ki zahtevajo posebno skrbnost; zbiramo jih samo z vašo predhodno privolitvijo (razdelek 3). Naše ime in naslov sta DebateAIRO S.R.L., [address], Romunija, naš predstavnik pa je [name], direktor; kako vložiti zahtevo, je opisano v razdelku 10, naši varnostni ukrepi v razdelku 9, pritožbe pa pošljite na privacy@dezbatere.ro. Kršitve prijavimo Komisiji za varstvo osebnih podatkov, kot zahteva zakon. Južna Koreja: naša oseba, odgovorna za zasebnost, je [name], direktor, privacy@dezbatere.ro. Osebne podatke prenašamo v tujino, ker to zahteva izvajanje vaših razprav po naši pogodbi z vami: ob vsakem zagonu razprave vaše vprašanje in trditve razprave, v klepetu s podporo pa vaša sporočila, prek šifrirane povezave pošljemo ponudnikom umetne inteligence in gostovanja iz Registra, ki za vsakega prejemnika navaja njegovo državo, kontakt, namen in čas hrambe podatkov. Prenos lahko zavrnete tako, da ne začenjate razprav ali izbrišete svoj račun; takrat za vas ne moremo izvajati razprav. Politična mnenja, prepričanja in zdravje so občutljivi podatki; obdelujemo jih samo z vašo ločeno privolitvijo (razdelek 3). O vas ne sprejemamo popolnoma avtomatiziranih odločitev (razdelek 8). Na zahteve odgovorimo v 10 dneh, kršitve pa prijavimo Komisiji za varstvo osebnih podatkov in vam, kot zahteva zakon o varstvu osebnih podatkov. Tajvan: velja tajvanski zakon o varstvu osebnih podatkov. Vaše podatke hranimo v obdobjih iz razdelka 7; uporabljajo se v Romuniji, drugih državah EU in Združenih državah (glejte Register); prejemniki so navedeni v razdelku 5; naši sistemi in modeli umetne inteligence jih samodejno obdelujejo za izvajanje vaših razprav. Zahtevate lahko, da izveste, katere podatke hranimo, vpogled vanje, kopijo, popravek, prenehanje njihove uporabe in izbris (razdelek 10). Posredovanje podatkov računa je vaša izbira, vendar vam brez njih ne moremo odpreti računa. Na zahtevo za vpogled v vaše podatke ali njihovo kopijo odgovorimo v 15 dneh; če potrebujemo več časa, lahko ta rok enkrat podaljšamo za največ 15 dni in vam razlog pisno sporočimo." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "22dc6f6cf970937a0b600ed544c318cdffb4c902ca522738c84b6b16e975dd3f",
-  eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.2 · VELJA OD [DATE]",
+  version: "3.3",
+  sha256: "98c974cd8bef190d6db9b89f936e9ef2266bb38392295e9175887052a4ce1234",
+  eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.3 · VELJA OD [DATE]",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",
-  endMarker: "KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Besedilo pravilnika o zasebnosti",
   sectionIdPrefix: "policy-section-",

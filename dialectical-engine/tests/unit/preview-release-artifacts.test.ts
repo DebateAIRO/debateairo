@@ -385,6 +385,84 @@ describe('launch-plan', () => {
     expect(existsSync(join(d.s.art, 'api-launch.json'))).toBe(false);
   });
 
+  // GAP-RUNNER B1: no runner plan exists on the server, so the first one is derived from the API plan.
+  describe('runner plan derived from the API plan', () => {
+    const account = { uid: 992, gid: 975 };
+    function fromApi() {
+      const t = staged('runner');
+      const api = t.s.write(join(t.s.art, 'live-api-launch.json'), oldPlan('api'));
+      return { ...t, api, argv: (patch: Record<string, string | null> = {}) => t.argv({ '--from': api.path, ...patch }) };
+    }
+    it('takes UID/GID from the runner OS account, the runner env custody, and everything else as for the API', async () => {
+      const t = fromApi();
+      let lookups = 0;
+      const result = await run(t.argv(), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout), lookupRunnerAccount: async () => { lookups++; return account; } });
+      const plan = JSON.parse(readFileSync(result.path, 'utf8'));
+      expect(lookups).toBe(1);
+      expect(plan).toEqual({ ...oldPlan('api'), service: 'runner', serviceUid: 992, serviceGid: 975, uiBuild: null,
+        environment: { path: '/etc/debateai-v3-preview/auth-dev-v1/runner.env', root: '/etc/debateai-v3-preview/auth-dev-v1', uid: 0, gid: 975, mode: 0o640, parentUid: 0 },
+        sourceRoot: NEW_ROOT.runner, sourceRevision: newRevision, sourceTree: newTree,
+        sourceManifest: { path: t.source.path, sha256: t.source.sha256 }, nativeAttestation: { path: t.attest.path, sha256: t.attest.sha256 },
+        operatorManifestSha256: manifestModule.operatorManifestSha256(sourceManifest('runner')), mailExecutable: `${NEW_ROOT.runner}/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs` });
+      expect(plan.environment.mode).toBe(416);
+    });
+    it('a runner plan as --from keeps its own identity and never asks the account', async () => {
+      const t = staged('runner');
+      const plan = JSON.parse(readFileSync((await run(t.argv(), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout), lookupRunnerAccount: async () => { throw new Error('asked'); } })).path, 'utf8'));
+      expect(plan).toMatchObject({ serviceUid: 994, serviceGid: 977, environment: oldPlan('runner').environment });
+    });
+    it('refuses a UI plan as --from', async () => {
+      const t = fromApi();
+      const ui = t.s.write(join(t.s.art, 'live-ui-launch.json'), oldPlan('ui'));
+      await expect(run(t.argv({ '--from': ui.path }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout), lookupRunnerAccount: async () => account })).rejects.toMatchObject({ code: 'FROM_PLAN_INVALID' });
+      expect(existsSync(join(t.s.art, 'runner-launch.json'))).toBe(false);
+    });
+    it.each(['RUNNER_ACCOUNT_MISSING', 'RUNNER_ACCOUNT_REFUSED'])('writes nothing when the account lookup refuses (%s)', async code => {
+      const t = fromApi();
+      await expect(run(t.argv(), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout), lookupRunnerAccount: async () => { throw new tool.Refusal(code); } })).rejects.toMatchObject({ code });
+      expect(existsSync(join(t.s.art, 'runner-launch.json'))).toBe(false);
+    });
+    it('the API plan is not a source for any other service', async () => {
+      const t = staged('ui');
+      const api = t.s.write(join(t.s.art, 'live-api-launch.json'), oldPlan('api'));
+      await expect(run(t.argv({ '--from': api.path }), t.s.layout, { validateLaunchPlan: realValidator(t.s.layout), lookupRunnerAccount: async () => account })).rejects.toMatchObject({ code: 'FROM_PLAN_INVALID' });
+    });
+  });
+
+  describe('runner OS account lookup', () => {
+    const PASSWD = 'debateai-preview-runner:x:992:975::/var/lib/debateai-v3-preview/runner:/usr/sbin/nologin\n'; // live 2026-10-09
+    const GROUP = 'debateai-preview-runner:x:975:\n';
+    const answers = (passwd: { code: number; out: string }, group: { code: number; out: string } = { code: 0, out: GROUP }) => {
+      const calls: unknown[] = [];
+      const fake = async (argv: string[], options: { env: Record<string, string> }) => {
+        calls.push([argv, options.env]);
+        const answer = argv[1] === 'passwd' ? passwd : group;
+        return { code: answer.code, timedOut: false, overflow: false, stdout: Buffer.from(answer.out), stderr: Buffer.alloc(0) };
+      };
+      return { calls, fake };
+    };
+    it('reads passwd and group through getent with an empty environment', async () => {
+      const a = answers({ code: 0, out: PASSWD });
+      expect(await tool.lookupRunnerAccount({ run: a.fake })).toEqual({ uid: 992, gid: 975 });
+      expect(a.calls).toEqual([[['/usr/bin/getent', 'passwd', 'debateai-preview-runner'], {}], [['/usr/bin/getent', 'group', 'debateai-preview-runner'], {}]]);
+    });
+    it('refuses a missing account', async () => {
+      await expect(tool.lookupRunnerAccount({ run: answers({ code: 2, out: '' }).fake })).rejects.toMatchObject({ code: 'RUNNER_ACCOUNT_MISSING' });
+      await expect(tool.lookupRunnerAccount({ run: answers({ code: 0, out: PASSWD }, { code: 2, out: '' }).fake })).rejects.toMatchObject({ code: 'RUNNER_ACCOUNT_MISSING' });
+    });
+    it.each([
+      ['root uid', 'debateai-preview-runner:x:0:975::/var/lib/x:/usr/sbin/nologin', GROUP],
+      ['root gid', 'debateai-preview-runner:x:992:0::/var/lib/x:/usr/sbin/nologin', 'debateai-preview-runner:x:0:'],
+      ['nobody', 'debateai-preview-runner:x:65534:975::/var/lib/x:/usr/sbin/nologin', GROUP],
+      ['another name', 'debateai-preview-api:x:994:977::/var/lib/x:/usr/sbin/nologin', GROUP],
+      ['a login shell', 'debateai-preview-runner:x:992:975::/var/lib/x:/bin/bash', GROUP],
+      ['a group gid that differs', PASSWD, 'debateai-preview-runner:x:976:'],
+      ['two entries', PASSWD + PASSWD, GROUP]
+    ])('refuses %s', (_name, passwd, group) => {
+      expect(() => tool.parseRunnerAccount(passwd, group)).toThrow('RUNNER_ACCOUNT_REFUSED');
+    });
+  });
+
   it('runs the reviewed validateLaunchPlan before writing', async () => {
     const t = staged('api');
     await expect(run(t.argv(), t.s.layout, { validateLaunchPlan: (plan: any) => { if (plan.sourceRoot === NEW_ROOT.api) throw new Error('no'); return plan; } })).rejects.toMatchObject({ code: 'LAUNCH_PLAN_INVALID' });

@@ -899,6 +899,12 @@ export function loadRunnerEnvironment() {
 
 const runnerEnvironmentShape = {
     PREVIEW_PROVIDER_TEST_CONFIG_JSON: z.string().min(1).max(8192).optional(),
+    /**
+     * Step 1 (GAP-RUNNER, 2026-10-09): the same team list as the API's key, so the runner's
+     * start-up can refuse work no team member owns before it hands any job to the job system.
+     * Same rules as the API's (parsed with the preview configuration below).
+     */
+    PREVIEW_TEAM_USER_IDS_JSON: z.string().max(4096).optional(),
     KEK_PATH: kekPath,
     /**
      * V-3, fix wave A-C2. The runner's half of a changeover. It holds ONE
@@ -973,9 +979,11 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     throw new TypeError("RUNNER_PRIMARY_PROVIDER_KEYS_INCOMPLETE");
   }
   assertProductionFloors(environment);
+  const previewConfig = parsePreviewProviderTestConfig(environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
   return {
     ...environment,
-    PREVIEW_PROVIDER_TEST_CONFIG: parsePreviewProviderTestConfig(environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON),
+    PREVIEW_PROVIDER_TEST_CONFIG: previewConfig,
+    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, previewConfig !== undefined),
     DEPLOYMENT_MODE: resolveDeploymentMode(
       environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV
     )

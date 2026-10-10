@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Liite B — Alueelliset tietosuojaehdot",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Kukin kohta soveltuu vain, jos sen alue on lueteltu Ehtojen osiossa 2, ja siinä ilmoitetaan vain, mikä poikkeaa tämän käytännön varsinaisesta osasta." }
+      { kind: "p", text: "Kukin kohta soveltuu henkilöihin, jotka asuvat sen alueella, ja siinä ilmoitetaan vain, mikä poikkeaa tämän käytännön varsinaisesta osasta." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Yhdistynyt kuningaskunta (vain jos lueteltu)",
+    title: "Yhdysvallat",
     accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Yhdistyneessä kuningaskunnassa UK GDPR:n 27 artiklan mukainen edustajamme on [name, address, email]; voit ottaa häneen yhteyttä kaikissa tätä käytäntöä koskevissa asioissa. Valvontaviranomainen on Information Commissioner's Office, ico.org.uk. Jos haluat tehdä meille valituksen, kirjoita osoitteeseen privacy@dezbatere.ro; vahvistamme valituksesi vastaanoton 30 päivän kuluessa. Tietojesi siirrot Yhdistyneestä kuningaskunnasta Yhdysvalloissa toimiville tekoälypalveluntarjoajille perustuvat EU:n ja Yhdysvaltojen tietosuojakehyksen Yhdistyneen kuningaskunnan laajennukseen, jos palveluntarjoaja on sertifioitu, ja muussa tapauksessa Yhdistyneen kuningaskunnan kansainvälistä tiedonsiirtoa koskevaan lisäykseen EU:n vakiosopimuslausekkeisiin, ja niitä tukee siirtoriskiä koskeva arviointi; Rekisterissä mainitaan kunkin palveluntarjoajan kohdalla käytetty siirtoväline. Ilmoitamme henkilötietojen tietoturvaloukkauksesta ICO:lle 72 tunnin kuluessa, kun laki sitä edellyttää, ja kerromme siitä sinulle ilman aiheetonta viivytystä, jos siitä aiheutuu sinulle suuri riski. Jos joskus asettaisimme analytiikkaevästeitä, niihin sovellettaisiin Yhdistyneessä kuningaskunnassa kieltäytymisoikeutta suostumuksen sijasta; tällä hetkellä emme aseta niitä. Jos olet alle 18-vuotias ja pääset palveluun ikäsäännöstämme huolimatta, tietojesi käsittelyyn sovelletaan ICO:n Children's Code -säännöstön vaatimuksia." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Yhdysvallat (vain jos lueteltu)",
-    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Ilmoitus tietojen keräämisen yhteydessä. Kohdan 2 taulukossa luetellaan keräämiemme henkilötietojen luokat ja niiden lähteet. Käsittelyn tarkoitukset ja oikeusperusteet esitetään kohdassa 4 ja säilytysajat kohdassa 7. Keräämme seuraavia arkaluonteisten henkilötietojen luokkia vain, jos sisällytät niitä omiin itseäsi koskeviin kysymyksiisi: terveys, uskonnollinen tai filosofinen vakaumus, seksuaalinen käyttäytyminen tai suuntautuminen, poliittiset mielipiteet, ammattiliiton jäsenyys sekä rotu tai etninen alkuperä. Käytämme niitä vain väittelyjesi toteuttamiseen ja vasta osiossa 3 tarkoitetun erillisen suostumuksen jälkeen. Emme myy tai jaa henkilötietoja emmekä ole tehneet niin edeltävien kahdentoista kuukauden aikana. Emme käytä henkilötietoja kohdennettuun mainontaan, emmekä käytä arkaluonteisia henkilötietoja muuhun tarkoitukseen kuin pyytämäsi palvelun tarjoamiseen. Kieltäytymisvalintaa ilmaisevat signaalit: Tällä hetkellä ei ole mitään, mistä kieltäytyä, koska emme myy tai jaa henkilötietoja. Jos alamme tulevaisuudessa myydä tai jakaa niitä, kunnioitamme Global Privacy Control -signaaleja kieltäytymisilmoituksina. Oikeutesi: oikeus saada tietää, poistaa ja oikaista tietoja, kieltäytyä käsittelystä, rajoittaa arkaluonteisten henkilötietojen käyttöä sekä olla joutumatta syrjityksi näiden oikeuksien käyttämisen vuoksi; esitä pyyntö osoitteessa privacy@dezbatere.ro. Taloudelliset kannustimet: emme tarjoa niitä; tarkoituksemme ja suojatoimemme ovat samat ilmaisissa ja maksullisissa tilauksissa. Säilytysajat esitetään osiossa 7. Tietoturvaloukkaukset: ilmoitamme asukkaille ja osavaltioiden viranomaisille kunkin osavaltion tietoturvaloukkauksia koskevan lain edellyttämällä tavalla. Tämä ilmoitus päivitetään vähintään kahdentoista kuukauden välein; viimeksi päivitetty [date]." },
       { kind: "p", text: "Connecticut: käsittelemme arkaluonteisia tietoja vain nimenomaisella suostumuksellasi, jonka annat erillisessä näkymässä ennen ensimmäistä väittelyäsi (osio 3); emme käytä henkilötietojasi tekoälymallien kouluttamiseen. Washington: erillinen Consumer Health Data Privacy Notice -asiakirjamme osoitteessa [URL] koskee kaikkia terveyteen liittyviä tietoja, päätelmät mukaan lukien. Texas ja Nebraska: emme myy arkaluonteisia henkilötietoja. Colorado, Connecticut, Virginia ja muut osavaltiot, joissa on kattava tietosuojalainsäädäntö: edellä mainitut oikeudet koskevat sinua, jos meihin sovellettava laki niin määrää. Jos hylkäämme pyynnön, voit hakea siihen muutosta vastaamalla vastaukseemme osoitteeseen privacy@dezbatere.ro; jos hylkäämme muutoksenhaun, voit ottaa yhteyttä osavaltiosi oikeusministeriin (Attorney General)." }
     ]
   },
   {
-    no: "B.4",
-    title: "Kanada ja Quebec (vain jos lueteltu)",
-    accent: "--gold",
+    no: "B.3",
+    title: "Kanada ja Quebec",
+    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Tietosuojavastaavamme, joka Quebecissa on myös henkilötietojen suojaamisesta vastaava henkilö, on [name], privacy@dezbatere.ro. Vastaamme pyyntöihin 30 päivän kuluessa. Vastaamme edelleen Kanadan ulkopuolella toimiville tekoälypalveluntarjoajille siirtämistämme henkilötiedoista ja edellytämme sopimuksilla vastaavaa suojaa; näihin palveluntarjoajiin voidaan soveltaa niiden toimintamaiden lakeja, mukaan lukien viranomaisten laillinen pääsy tietoihin. Markkinointisähköpostia lähetetään vain CASL:n mukaisella nimenomaisella suostumuksellasi. Ilmoitamme turvatoimien loukkauksesta, josta aiheutuu sinulle todellinen merkittävän haitan riski, Kanadan tietosuojavaltuutetun toimistolle (Office of the Privacy Commissioner of Canada) ja sinulle, ja säilytämme kirjauksen jokaisesta loukkauksesta 24 kuukauden ajan. Quebec: ennen henkilötietojen välittämistä Quebecin ulkopuolelle teemme tietosuojaa koskevan vaikutustenarvioinnin; ilmoitamme luottamuksellisuuteen kohdistuvasta vaaratilanteesta, josta aiheutuu vakavan haitan riski, Commission d'accès à l'information -viranomaiselle ja sinulle, ja pidämme vaaratilanteista rekisteriä; väittelysi yksityisinä pitävät asetukset ovat oletusarvoisesti käytössä; voit pyytää meitä poistamaan sinua koskevat henkilötiedot hakemistoista tai lopettamaan niiden levittämisen; voit pyytää tietosi jäsennellyssä, yleisesti käytetyssä muodossa; osiossa 8 kuvataan automaattinen käsittelymme." }
     ]
   },
   {
-    no: "B.5",
-    title: "Australia ja Uusi-Seelanti (vain jos lueteltu)",
-    accent: "--reasoning",
+    no: "B.4",
+    title: "Australia ja Uusi-Seelanti",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Australia. Henkilötietojesi ulkomaiset vastaanottajat ovat Rekisterissä luetellut tekoälypalveluntarjoajat ja henkilötietojen käsittelijät, jotka sijaitsevat [the United States and the European Union]; ryhdymme kohtuullisiin toimiin varmistaaksemme, että ne käsittelevät tietoja Australian Privacy Principles -periaatteiden mukaisesti. Automaattiset päätökset: 10. joulukuuta 2026 alkaen tässä käytännössä yksilöidään tietokoneohjelmien tekemät päätöstyypit, jotka vaikuttavat merkittävästi oikeuksiisi tai etuihisi — sellaisia ei ole; pisteet ja ratkaisut koskevat argumentteja, eivät sinua — sekä niissä käytetyt henkilötiedot. Valituksia voi tehdä Office of the Australian Information Commissioner -viranomaiselle. Uusi-Seelanti. Tietosuojavastaavamme on [name]. Kun keräämme sinua koskevia henkilötietoja välillisesti — koska toinen käyttäjä sisällytti niitä kysymykseen — tämä käytäntö ja osio 11 ovat sinulle antamamme ilmoitus. Luovutamme tietoja Rekisterissä luetelluille tekoälypalveluntarjoajille edustajinamme sellaisten sopimusten nojalla, joissa edellytetään vastaavia suojatoimia. Valituksia voi tehdä Office of the Privacy Commissioner -viranomaiselle." }
     ]
   },
   {
-    no: "B.6",
-    title: "Sveitsi (vain jos lueteltu)",
-    accent: "--con",
+    no: "B.5",
+    title: "Sveitsi",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Sovelletaan Sveitsin liittovaltion tietosuojalakia (FADP). Valvontaviranomainen on liittovaltion tietosuoja- ja tiedonsaantivaltuutettu (FDPIC), edoeb.admin.ch. Tietosi siirretään Rekisterissä nimettyihin maihin – EU-maihin ja Yhdysvaltoihin. Yhdysvaltojen osalta tukeudumme Sveitsin ja Yhdysvaltojen tietosuojakehykseen, jos palveluntarjoaja on sertifioitu, ja muussa tapauksessa FDPIC:n hyväksymiin vakiosopimuslausekkeisiin. Ilmoitamme FDPIC:lle mahdollisimman pian tietoturvaloukkauksesta, joka todennäköisesti aiheuttaa sinulle suuren riskin. Olemme arvioineet, ettemme tarvitse edustajaa Sveitsissä (Art. 14 FADP). Tarkistamme asian vuosittain." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldova (vain jos lueteltu)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Sovelletaan Moldovan henkilötietojen suojasta annettua lakia nro 195/2024. Se noudattaa GDPR:ää, ja tämän käytännön pääosassa kuvataan sen mukaiset oikeutesi. Valvontaviranomainen on kansallinen henkilötietojen suojakeskus (CNPDCP). Emme tarvitse edustajaa Moldovassa, koska olemme sijoittautuneet Euroopan talousalueelle (lain nro 195/2024 Art. 27(2)(c)). Tarkistamme asian vuosittain. Tietojesi siirrot Yhdysvaltoihin perustuvat mekanismiin, joka on nimetty Rekisterissä kunkin palveluntarjoajan kohdalla. Ilmoitamme henkilötietojen tietoturvaloukkauksesta CNPDCP:lle 72 tunnin kuluessa, kun laki sitä edellyttää." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukraina (vain jos lueteltu)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Aasian ja Tyynenmeren alue",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Sovelletaan Ukrainan lakia ”Henkilötietojen suojasta”. Emme tarjoa Dialectical Engine-palvelua niillä Ukrainan alueilla, jotka eivät ole sen hallituksen hallinnassa. Tietosi siirretään EU-maihin ja Yhdysvaltoihin (ks. Rekisteri). Voit tehdä valituksen Ukrainan parlamentin ihmisoikeusvaltuutetulle." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Israel (vain jos lueteltu)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Sovelletaan Israelin yksityisyyden suojaa koskevaa lakia. Rekisterinpitäjä on DebateAIRO S.R.L.; yhteystietomme ovat osiossa 1. Sinulla ei ole lakisääteistä velvollisuutta antaa meille tietojasi; ilman tilitietoja emme voi avata sinulle tiliä. Käytämme tietojasi osiossa 4 mainittuihin tarkoituksiin ja luovutamme niitä osiossa 5 mainituille vastaanottajille. Voit pyytää saada nähdä ne ja oikaista ne (osio 10). Valvontaviranomainen on Privacy Protection Authority (yksityisyydensuojaviranomainen)." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Aasian ja Tyynenmeren alue (vain lueteltuja alueita koskevat rivit)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapore: tietosuojavastaavamme on [name, email]; siirrot perustuvat sopimusvelvoitteisiin, jotka tarjoavat PDPA:ta vastaavan suojan; ilmoitamme PDPC:lle ilmoitettavista tietoturvaloukkauksista 3 päivän kuluessa. Japani: käytämme henkilötietojasi osiossa 4 tarkoitettuihin tarkoituksiin emmekä muihin. Luovutamme niitä Rekisterissä mainituille tekoälypalveluntarjoajille ja palvelinpalvelujen tarjoajille, jotka sijaitsevat Yhdysvalloissa ja EU-maissa, sopimusten nojalla, jotka velvoittavat ne suojaamaan tiedot Japanin henkilötietojen suojaa koskevan lain (Act on the Protection of Personal Information) tasoisesti; kerromme pyynnöstä, mitä ne tekevät tietojen suojaamiseksi, sekä niiden maan tietosuojajärjestelmästä. Vakaumuksesi, mukaan lukien uskonnollinen ja poliittinen vakaumus, sekä terveytesi ovat erityistä huolellisuutta edellyttäviä henkilötietoja; keräämme niitä vain etukäteen antamallasi suostumuksella (osio 3). Nimemme ja osoitteemme on DebateAIRO S.R.L., [address], Romania, ja edustajamme on toimitusjohtaja [name]; pyynnön tekemisestä kerrotaan osiossa 10, turvatoimistamme osiossa 9, ja valitukset osoitetaan osoitteeseen privacy@dezbatere.ro. Ilmoitamme tietoturvaloukkauksista Personal Information Protection Commission -viranomaiselle lain edellyttämällä tavalla. Etelä-Korea: tietosuojavastaavamme on toimitusjohtaja [name], privacy@dezbatere.ro. Siirrämme henkilötietoja ulkomaille, koska väittelyjesi toteuttaminen kanssasi tekemämme sopimuksen mukaisesti edellyttää sitä: aina kun väittely suoritetaan, lähetämme kysymyksesi ja väittelyn puheenvuorot sekä tukichatissa viestisi salatun yhteyden kautta Rekisterissä mainituille tekoälypalveluntarjoajille ja palvelinpalvelujen tarjoajille; Rekisterissä nimetään kukin vastaanottaja, sen maa, yhteystiedot, tarkoitus ja se, kuinka kauan se säilyttää tietoja. Voit kieltäytyä siirrosta olemalla aloittamatta väittelyitä tai poistamalla tilisi; tällöin emme voi toteuttaa väittelyitä puolestasi. Poliittiset mielipiteet, vakaumukset ja terveys ovat arkaluonteisia tietoja; käsittelemme niitä vain erillisellä suostumuksellasi (osio 3). Emme tee sinusta täysin automatisoituja päätöksiä (osio 8). Vastaamme pyyntöihin [10] päivän kuluessa ja ilmoitamme tietoturvaloukkauksista Personal Information Protection Commission -viranomaiselle ja sinulle Personal Information Protection Act -lain edellyttämällä tavalla. Taiwan: sovelletaan Taiwanin henkilötietojen suojaa koskevaa lakia (Personal Data Protection Act). Säilytämme tietojasi osiossa 7 mainittujen aikojen ajan; niitä käytetään Romaniassa, muissa EU-maissa ja Yhdysvalloissa (ks. Rekisteri); vastaanottajat mainitaan osiossa 5; järjestelmämme ja tekoälymallit käsittelevät niitä automaattisesti väittelyjesi toteuttamiseksi. Voit kysyä, mitä tietoja meillä on, nähdä ne, saada niistä jäljennöksen, oikaista ne, vaatia meitä lopettamaan niiden käytön ja poistaa ne (osio 10). Tilitietojen antaminen on valinnaista, mutta ilman niitä emme voi avata sinulle tiliä. Vastaamme pyyntöön saada nähdä tietosi tai saada niistä jäljennös 15 päivän kuluessa; jos tarvitsemme enemmän aikaa, voimme pidentää määräaikaa kerran enintään 15 päivällä, ja ilmoitamme sinulle syyn kirjallisesti. Filippiinit: tietosuojavastaavamme on [name]; valituksia voi tehdä National Privacy Commission -viranomaiselle; osiossa 8 kuvataan automaattinen käsittelymme. Thaimaa: edustajamme on [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Varattu",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Turkki, Brasilia ja Indonesia edellyttävät kukin paikalliskielistä ilmoitusta, edustajaa tai rekisteröintiä sekä viranomaisilmoituksia, eikä niitä ole laadittu tähän. Kiinaa, Vietnamia ja Venäjää ei palvella." }
+      { kind: "p", text: "Singapore: tietosuojavastaavamme on [name, email]; siirrot perustuvat sopimusvelvoitteisiin, jotka tarjoavat PDPA:ta vastaavan suojan; ilmoitamme PDPC:lle ilmoitettavista tietoturvaloukkauksista 3 päivän kuluessa. Japani: käytämme henkilötietojasi osiossa 4 tarkoitettuihin tarkoituksiin emmekä muihin. Luovutamme niitä Rekisterissä mainituille tekoälypalveluntarjoajille ja palvelinpalvelujen tarjoajille, jotka sijaitsevat Yhdysvalloissa ja EU-maissa, sopimusten nojalla, jotka velvoittavat ne suojaamaan tiedot Japanin henkilötietojen suojaa koskevan lain (Act on the Protection of Personal Information) tasoisesti; kerromme pyynnöstä, mitä ne tekevät tietojen suojaamiseksi, sekä niiden maan tietosuojajärjestelmästä. Vakaumuksesi, mukaan lukien uskonnollinen ja poliittinen vakaumus, sekä terveytesi ovat erityistä huolellisuutta edellyttäviä henkilötietoja; keräämme niitä vain etukäteen antamallasi suostumuksella (osio 3). Nimemme ja osoitteemme on DebateAIRO S.R.L., [address], Romania, ja edustajamme on toimitusjohtaja [name]; pyynnön tekemisestä kerrotaan osiossa 10, turvatoimistamme osiossa 9, ja valitukset osoitetaan osoitteeseen privacy@dezbatere.ro. Ilmoitamme tietoturvaloukkauksista Personal Information Protection Commission -viranomaiselle lain edellyttämällä tavalla. Etelä-Korea: tietosuojavastaavamme on toimitusjohtaja [name], privacy@dezbatere.ro. Siirrämme henkilötietoja ulkomaille, koska väittelyjesi toteuttaminen kanssasi tekemämme sopimuksen mukaisesti edellyttää sitä: aina kun väittely suoritetaan, lähetämme kysymyksesi ja väittelyn puheenvuorot sekä tukichatissa viestisi salatun yhteyden kautta Rekisterissä mainituille tekoälypalveluntarjoajille ja palvelinpalvelujen tarjoajille; Rekisterissä nimetään kukin vastaanottaja, sen maa, yhteystiedot, tarkoitus ja se, kuinka kauan se säilyttää tietoja. Voit kieltäytyä siirrosta olemalla aloittamatta väittelyitä tai poistamalla tilisi; tällöin emme voi toteuttaa väittelyitä puolestasi. Poliittiset mielipiteet, vakaumukset ja terveys ovat arkaluonteisia tietoja; käsittelemme niitä vain erillisellä suostumuksellasi (osio 3). Emme tee sinusta täysin automatisoituja päätöksiä (osio 8). Vastaamme pyyntöihin 10 päivän kuluessa ja ilmoitamme tietoturvaloukkauksista Personal Information Protection Commission -viranomaiselle ja sinulle Personal Information Protection Act -lain edellyttämällä tavalla. Taiwan: sovelletaan Taiwanin henkilötietojen suojaa koskevaa lakia (Personal Data Protection Act). Säilytämme tietojasi osiossa 7 mainittujen aikojen ajan; niitä käytetään Romaniassa, muissa EU-maissa ja Yhdysvalloissa (ks. Rekisteri); vastaanottajat mainitaan osiossa 5; järjestelmämme ja tekoälymallit käsittelevät niitä automaattisesti väittelyjesi toteuttamiseksi. Voit kysyä, mitä tietoja meillä on, nähdä ne, saada niistä jäljennöksen, oikaista ne, vaatia meitä lopettamaan niiden käytön ja poistaa ne (osio 10). Tilitietojen antaminen on valinnaista, mutta ilman niitä emme voi avata sinulle tiliä. Vastaamme pyyntöön saada nähdä tietosi tai saada niistä jäljennös 15 päivän kuluessa; jos tarvitsemme enemmän aikaa, voimme pidentää määräaikaa kerran enintään 15 päivällä, ja ilmoitamme sinulle syyn kirjallisesti." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "f9fe824ca296d273d1e76fb29f9dcf0ef07869475081e827de0e82d82bd07071",
-  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.2 · VOIMASSA [DATE]",
+  version: "3.3",
+  sha256: "9b99ad8f4d53bed479ae5d83b367a351f2b3c6e2ced573fc0afeec5abc51bbfc",
+  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.3 · VOIMASSA [DATE]",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",
-  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Tietosuojakäytännön teksti",
   sectionIdPrefix: "policy-section-",
