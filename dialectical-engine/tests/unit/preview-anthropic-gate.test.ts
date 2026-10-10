@@ -25,6 +25,7 @@ import {
   assertPreviewBudgetAdmits, estimatePreviewGateNeeds, estimateUnfinishedRunHolds, previewGateKeyOf, previewRemainingPorts,
   type PreviewBudgetGateSettings
 } from "../../apps/api/src/preview-budget-estimate.js";
+import { computeStructuralCeilingBasis } from "@debateai/register";
 import { gateHostedRoster } from "../../apps/runner/src/hosted-provider-set.js";
 import { PREVIEW_MODEL_MAKERS, parsePreviewRosterFlag } from "../../apps/ui/lib/previewPlanRoster.js";
 import { framedFixturePacket } from "../support/framed-packet.js";
@@ -66,16 +67,17 @@ const haikuReply = (text = "OK") => JSON.stringify({ id: "msg_synthetic", type: 
   content: [{ type: "text", text }], stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 20 } });
 
 describe("the Anthropic row equals its parity file and keeps the per-call cap", () => {
-  it("is a provider-keyed addition: DeepInfra's three rows first, then Claude Haiku", () => {
-    expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.map(row => row.model)).toEqual([GLM, DEEPSEEK, MIMO]);
+  it("is a provider-keyed addition: DeepInfra's four rows first, then Claude Haiku", () => {
+    expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.map(row => row.model)).toEqual([GLM, DEEPSEEK, MIMO, QWEN]);
     expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.anthropic.map(row => row.model)).toEqual([HAIKU]);
-    expect(PREVIEW_MODEL_ROWS.map(row => row.model)).toEqual([GLM, DEEPSEEK, MIMO, HAIKU]);
+    expect(PREVIEW_MODEL_ROWS.map(row => row.model)).toEqual([GLM, DEEPSEEK, MIMO, QWEN, HAIKU]);
     expect(PREVIEW_REVIEWED_PROVIDER_REFS.at(-1)).toBe(HAIKU_REF);
   });
   it("field for field, the row the gate reserves at", () => {
     expect(fixtureFile.schema).toBe("preview-model-rows-v1");
     expect(fixtureFile.provider).toBe("anthropic");
-    expect(fixtureFile.reservation).toEqual({ formula: expect.any(String), overhead_bytes: 2048, worst_case_request_bytes: 256 * 1024, per_call_cap_usd: "0.25" });
+    expect(fixtureFile.reservation).toEqual({ formula: expect.any(String), overhead_bytes: 2048, step_tokens: 100_000, step_rule: expect.any(String),
+      ceiling_input_usd_per_m: "0.50", ceiling_output_usd_per_m: "2.50", worst_case_request_bytes: 256 * 1024, per_call_cap_usd: "0.25" });
     expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.anthropic.map(row => ({ model: row.model, maker: row.maker, input_usd_per_m: row.inputUsdPerM,
       output_usd_per_m: row.outputUsdPerM, input_nano_usd_per_token: Number(row.inputNanoUsdPerToken),
       output_nano_usd_per_token: Number(row.outputNanoUsdPerToken), output_bound: row.outputBound, effort: row.effort,
@@ -84,20 +86,29 @@ describe("the Anthropic row equals its parity file and keeps the per-call cap", 
     const haiku = previewModelRow(HAIKU)!;
     expect([haiku.provider, haiku.baseUrl, haiku.adapterKind, haiku.contextWindowTokens])
       .toEqual(["anthropic", "https://api.anthropic.com/v1", "anthropic-messages-http", 1_000_000]);
-    expect([haiku.inputPriceMicrosPerMillion, haiku.outputPriceMicrosPerMillion]).toEqual([625_000, 2_500_000]);
+    // The row is the lower step (what the estimate prices at); the upper step is what a large request reserves at.
+    expect([haiku.inputPriceMicrosPerMillion, haiku.outputPriceMicrosPerMillion]).toEqual([100_000, 500_000]);
+    expect(haiku.upperStep).toEqual({ aboveChargedInputTokens: fixtureFile.reservation.step_tokens, inputUsdPerM: "0.50", outputUsdPerM: "2.50",
+      inputNanoUsdPerToken: 500n, outputNanoUsdPerToken: 2_500n });
+    expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.every(row => row.upperStep === undefined)).toBe(true);
   });
-  it("a full-size request reserves $0.24704, under the $0.25 cap; 4 at once fit the proposed $1.00 pot", () => {
+  it("a full-size request reserves $0.214016 at the upper step, under the $0.25 cap; 2 at once fit the $2.00 pot", () => {
     const worst = previewReservationNanoUsd(previewModelRow(HAIKU)!, 256 * 1024);
-    expect(worst).toBe(247_040_000n);
+    expect(worst).toBe(214_016_000n);
     expect(worst < 250_000_000n).toBe(true);
-    expect(4n * worst <= 1_000_000_000n).toBe(true);
+    expect(2n * worst).toBe(428_032_000n);
+    expect(2n * worst <= 2_000_000_000n).toBe(true);
+  });
+  it("bytes + 2048 up to 100,000 reserve at the lower step; one byte more at the upper step (the gate's own rule)", () => {
+    const haiku = previewModelRow(HAIKU)!;
+    expect(previewReservationNanoUsd(haiku, 97_952)).toBe(100_000n * 100n + 32_768n * 500n); // $0.026384
+    expect(previewReservationNanoUsd(haiku, 97_953)).toBe(100_001n * 500n + 32_768n * 2_500n); // $0.1319205
+    // A DeepInfra row has one price whatever the size.
+    const glm = previewModelRow(GLM)!;
+    expect(previewReservationNanoUsd(glm, 97_953)).toBe(100_001n * glm.inputNanoUsdPerToken + 32_768n * glm.outputNanoUsdPerToken);
   });
   it("the UI's maker table mirrors every reviewed row", () => {
-    // The UI table already names Qwen3.8-Flash (Alibaba) so the all-models build flag parses; its
-    // TypeScript row arrives with A's next push. Until then, and only then, Qwen is the one extra
-    // entry allowed. Remove this allowance when A's Qwen row merges (it is inert from that moment).
-    const pending = previewModelRow(QWEN) === undefined ? { [QWEN]: "Alibaba" } : {};
-    expect(PREVIEW_MODEL_MAKERS).toEqual({ ...Object.fromEntries(PREVIEW_MODEL_ROWS.map(row => [row.model, row.maker])), ...pending });
+    expect(PREVIEW_MODEL_MAKERS).toEqual(Object.fromEntries(PREVIEW_MODEL_ROWS.map(row => [row.model, row.maker])));
   });
 });
 
@@ -142,11 +153,11 @@ describe("configuration names the Anthropic gate's socket", () => {
 });
 
 describe("the owner's first debate: every AI on Free and on Premium", () => {
-  const FOUR = [GLM, DEEPSEEK, MIMO, HAIKU];
+  const FOUR = [GLM, DEEPSEEK, MIMO, HAIKU]; // Qwen left out: still a lawful roster.
   const ALL_FIVE = [GLM, DEEPSEEK, MIMO, QWEN, HAIKU];
   const everyone = (ids: readonly string[], socket: Record<string, string> = { anthropic_budget_socket: ANTHROPIC_SOCKET }) =>
     ({ ...BASE, ...socket, free_model_ids: ids, premium_model_ids: ids });
-  it("the four rows this branch has, free = premium, parse with the Anthropic socket", () => {
+  it("four of the rows, free = premium, parse with the Anthropic socket", () => {
     const config = parse(everyone(FOUR))!;
     expect([config.free_model_ids, config.premium_model_ids]).toEqual([FOUR, FOUR]);
     expect(previewProviderSocket(config, "anthropic")).toBe(ANTHROPIC_SOCKET);
@@ -155,9 +166,7 @@ describe("the owner's first debate: every AI on Free and on Premium", () => {
   it("the four rows refuse without the Anthropic socket (Haiku could never be called)", () => {
     expect(() => parse(everyone(FOUR, {}))).toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
   });
-  // Qwen3.8-Flash's TypeScript row arrives with A's next push (contract A §1); until it exists this
-  // test is skipped. Remove the guard once A's Qwen row merges.
-  it.skipIf(previewModelRow(QWEN) === undefined)("all five, free = premium, parse with both sockets and refuse without Anthropic's", () => {
+  it("all five, free = premium, parse with both sockets and refuse without Anthropic's", () => {
     const config = parse(everyone(ALL_FIVE))!;
     expect([config.free_model_ids, config.premium_model_ids]).toEqual([ALL_FIVE, ALL_FIVE]);
     expect(previewProviderSocket(config, "anthropic")).toBe(ANTHROPIC_SOCKET);
@@ -190,7 +199,7 @@ describe("the Haiku target is checked against its row, and older reviewed sets k
   });
   it.each([
     ["another window", { context_window_tokens: 1_048_576 }],
-    ["another price", { input_price_micros_per_million: 100_000 }],
+    ["another price", { input_price_micros_per_million: 625_000 }],
     ["no thinking switch", { thinking_parameter: undefined, thinking_levels: undefined }],
     ["a credential header", { authorization_header: "synthetic-not-a-key" }]
   ])("refuses a Haiku target with %s", (_name, change) => {
@@ -228,15 +237,18 @@ describe("the guarded fetch routes by exact URL, each call only to its own provi
     expect(executions.anthropic).toHaveLength(1);
     expect(executions.deepinfra).toHaveLength(1);
   });
-  it("reserves a Haiku call at (bytes + 2048) x $0.625 + 32,768 x $2.50 per million, with the exact body", async () => {
+  it("reserves a Haiku call at its step's prices, (bytes + 2048) x input + 32,768 x output per million, with the exact body", async () => {
     const { executions, port } = recordingPorts();
     const fetcher = createPreviewGuardedFetch({ anthropic: port("anthropic", () => haikuReply()) });
-    const text = JSON.stringify(anthropicBody({ max_tokens: 32_768 }));
-    await fetcher(PREVIEW_ANTHROPIC_MESSAGES_URL, { method: "POST", body: text });
-    const execution = executions.anthropic![0]!;
-    expect(execution.requestBody).toBe(text);
-    const nano = BigInt(Buffer.byteLength(text) + 2048) * 625n + 32_768n * 2_500n;
-    expect(execution.reservedUsd).toBe(previewNanoUsdText(nano));
+    const small = JSON.stringify(anthropicBody({ max_tokens: 32_768 }));
+    // A body whose bytes + 2048 are above 100,000: the upper step.
+    const large = JSON.stringify(anthropicBody({ max_tokens: 32_768, messages: [{ role: "user", content: "x".repeat(100_000) }] }));
+    await fetcher(PREVIEW_ANTHROPIC_MESSAGES_URL, { method: "POST", body: small });
+    await fetcher(PREVIEW_ANTHROPIC_MESSAGES_URL, { method: "POST", body: large });
+    const [first, second] = executions.anthropic!;
+    expect([first!.requestBody, second!.requestBody]).toEqual([small, large]);
+    expect(first!.reservedUsd).toBe(previewNanoUsdText(BigInt(Buffer.byteLength(small) + 2048) * 100n + 32_768n * 500n));
+    expect(second!.reservedUsd).toBe(previewNanoUsdText(BigInt(Buffer.byteLength(large) + 2048) * 500n + 32_768n * 2_500n));
   });
   it.each([
     ["thinking", { thinking: { type: "adaptive" } }],
@@ -312,8 +324,8 @@ describe("each gate's IPC goes to its own socket", () => {
   it("/complete for Haiku reaches only the Anthropic socket; /remaining asks each configured gate", async () => {
     folder = await mkdtemp(join(tmpdir(), "pb-"));
     const deepinfraSocket = join(folder, "d.sock"), anthropicSocket = join(folder, "a.sock");
-    const remaining = (models: string[]) => JSON.stringify({ state: "active", window_open: true, remaining_usd: "1.00",
-      remaining_calls: 400, max_concurrent_calls: 4, largest_reservation_usd: "0.24704", enabled_models: models });
+    const remaining = (models: string[]) => JSON.stringify({ state: "active", window_open: true, remaining_usd: "2.00",
+      remaining_calls: 400, max_concurrent_calls: 2, largest_reservation_usd: "0.214016", enabled_models: models });
     const deepinfraSeen = await listen(deepinfraSocket, () => remaining([GLM]));
     const anthropicSeen = await listen(anthropicSocket, body => body.includes("requestBody")
       ? JSON.stringify({ status: 200, body: haikuReply() }) : remaining([HAIKU]));
@@ -336,68 +348,91 @@ describe("each gate's IPC goes to its own socket", () => {
 });
 
 describe("the estimate asks every gate the debate uses, unfinished debates included (never stop half-way)", () => {
-  // Sites 8 + 8 + 8 + 6 = 30 = the ceiling; with 4 story calls and no hold cap: probes = 3 panel + 1 off-panel role.
-  const basis = Object.freeze({ kind: "COMPUTED_STRUCTURAL_CEILING", panel_size: 3, depth: 1, max_model_attempts: 30,
-    call_sites: { author: 8, panel: 8, reviewer: 8, serve: 6 }, serve_leg: { synthesis_loop_sites: 6, selected: "SYNTHESIS_LOOP" } });
-  const PANEL = Object.freeze([{ provider_ref: "preview:fixture-a", model_id: GLM }, { provider_ref: "preview:deepseek-v4-1-flash", model_id: DEEPSEEK },
-    { provider_ref: HAIKU_REF, model_id: HAIKU }]);
+  // A's realistic worst case (owner ruling 2026-10-10, evening), each gate charged only its own models' calls.
+  const basisFor = (panelSize: number, depth: number) => computeStructuralCeilingBasis({ panelSize, depth, judgeMaxAttempts: 3, organMaxAttempts: 3,
+    maxRecompose: 2, maxCooldownHoldsPerRun: 2, finalRetryAttempts: 1, branchingFactor: 2, compositionSegmentCap: 2, fixedOrgansPerComposition: 4,
+    reviewerCallsPerNode: 1, synthesizerMaxRounds: 3, evaluatorMaxRounds: 3, maxDepth: 5 }) as unknown as Readonly<Record<string, unknown>>;
+  const member = (provider_ref: string, model_id: string) => ({ provider_ref, model_id });
+  const PANEL = Object.freeze([member("preview:fixture-a", GLM), member("preview:deepseek-v4-1-flash", DEEPSEEK), member(HAIKU_REF, HAIKU)]);
   const DEEPINFRA_PANEL = Object.freeze(PANEL.slice(0, 2));
+  const ALL_FIVE = Object.freeze([...DEEPINFRA_PANEL, member("preview:mimo-v2-6-pro", MIMO), member("preview:qwen-3-8-flash", QWEN), member(HAIKU_REF, HAIKU)]);
+  const roleModels = Object.freeze({ answerWriter: GLM, answerChecker: DEEPSEEK, storyteller: GLM, storyChecker: GLM });
+  const callOutputTokens = Object.freeze({ debate: 8192, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 });
+  const estimateSettings = Object.freeze({ roleModels, roleProviderRefs: ["preview:fixture-a", "preview:deepseek-v4-1-flash", "preview:fixture-b"],
+    storyRounds: 2, callOutputTokens, maxCooldownHoldsPerRun: 2 });
+  /** The Anthropic gate's /remaining under the owner's GO: $2.00, 400 calls, 2 at once x $0.214016. */
   const answer = (models: string[], change: Partial<PreviewGateRemaining> = {}): PreviewGateRemaining => Object.freeze({
-    state: "active", windowOpen: true, remainingNanoUsd: 1_000_000_000n, remainingCalls: 400, maxConcurrentCalls: 2,
-    largestReservationNanoUsd: 247_040_000n, enabledModels: models, ...change });
+    state: "active", windowOpen: true, remainingNanoUsd: 2_000_000_000n, remainingCalls: 400, maxConcurrentCalls: 2,
+    largestReservationNanoUsd: 214_016_000n, enabledModels: models, ...change });
+  /** The DeepInfra gate's: $10.00, 2,000 calls, 10 at once x MiMo's worst case. */
+  const deepinfra = async () => answer([GLM, DEEPSEEK, MIMO, QWEN], { remainingNanoUsd: 10_000_000_000n, remainingCalls: 2000,
+    maxConcurrentCalls: 10, largestReservationNanoUsd: 142_110_720n });
   const settings = (remaining: PreviewBudgetGateSettings["remaining"], change: Partial<PreviewBudgetGateSettings> = {}): PreviewBudgetGateSettings =>
-    Object.freeze({ remaining, roleModelIds: [GLM, GLM], roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"], storyCalls: 4,
-      maxCooldownHoldsPerRun: 0, readUnfinishedRuns: async () => [], ...change });
-  const deepinfra = async () => answer([GLM, DEEPSEEK], { remainingNanoUsd: 3_000_000_000n, remainingCalls: 1200, maxConcurrentCalls: 4,
-    largestReservationNanoUsd: 131_481_600n });
+    Object.freeze({ ...estimateSettings, askProbeModelIds: [], remaining, readUnfinishedRuns: async () => [], ...change });
+  const needsOf = (panel: readonly { provider_ref: string; model_id: string }[], depth = 1) =>
+    estimatePreviewGateNeeds({ basis: basisFor(panel.length, depth), panel, ...estimateSettings });
   it("maps Haiku to the Anthropic gate and splits a three-maker panel over both gates", () => {
     expect(previewGateKeyOf(HAIKU)).toBe("anthropic");
     expect(previewGateKeyOf(GLM)).toBe("deepinfra");
-    const needs = estimatePreviewGateNeeds({ basis, panel: PANEL, roleModelIds: [GLM, GLM], roleProviderRefs: ["preview:fixture-a", "preview:fixture-b"],
-      storyCalls: 4, maxCooldownHoldsPerRun: 0 });
+    expect(previewGateKeyOf(QWEN)).toBe("deepinfra");
+    const needs = needsOf(PANEL);
     expect(needs.map(need => [need.gate, need.modelIds])).toEqual([["deepinfra", [GLM, DEEPSEEK]], ["anthropic", [HAIKU]]]);
-    // 30 + 4 + 4 = 38 calls; x 1.15 = 44 calls; 38 x (4,000 x 625 + 1,200 x 2,500) nano-USD x 1.15 = $0.24035.
-    expect([needs[1]!.expectedCalls, needs[1]!.callsWithMargin, needs[1]!.callsNanoUsd]).toEqual([38, 44, 240_350_000n]);
+    // Haiku's share alone: fewer calls than the DeepInfra share (it is one of three panel members, no roles).
+    expect(needs[1]!.callsWithMargin).toBeLessThan(needs[0]!.callsWithMargin);
+    expect(needs[1]!.callsNanoUsd > 0n).toBe(true);
+  });
+  it("the owner's all-five debate fits both pots at depths 1 to 3 (the preview's most)", async () => {
+    for (const depth of [1, 2, 3]) {
+      const [deepinfraNeed, anthropicNeed] = needsOf(ALL_FIVE, depth);
+      expect([deepinfraNeed!.gate, anthropicNeed!.gate]).toEqual(["deepinfra", "anthropic"]);
+      // Calls x 1.15 + 2 in flight within 400; money x 1.15 + 2 x $0.214016 within $2.00.
+      expect(anthropicNeed!.callsWithMargin + 2).toBeLessThanOrEqual(400);
+      expect(anthropicNeed!.callsNanoUsd + 428_032_000n <= 2_000_000_000n).toBe(true);
+      await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU]) },
+        { askProbeModelIds: [GLM, DEEPSEEK, MIMO, QWEN, HAIKU] }), { basis: basisFor(ALL_FIVE.length, depth), panel: ALL_FIVE })).resolves.toBeUndefined();
+    }
   });
   it("admits a three-maker debate only when both gates answer and fit", async () => {
-    const panel = { basis, panel: PANEL };
-    // $0.24035 for the calls + 2 in flight x $0.24704 = $0.73443: a fresh $1.00 pot carries it.
+    const panel = { basis: basisFor(3, 1), panel: PANEL };
+    const need = needsOf(PANEL)[1]!;
     await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU]) }), panel)).resolves.toBeUndefined();
-    // With 4 in flight (the first proposed GO), the holds alone are $0.98816: no Haiku debate could start.
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU], { maxConcurrentCalls: 4 }) }), panel))
+    // One nano-USD short of the share plus the hold: refused before it starts (retry after the reset).
+    const exact = need.callsNanoUsd + 428_032_000n;
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU], { remainingNanoUsd: exact }) }), panel))
+      .resolves.toBeUndefined();
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU], { remainingNanoUsd: exact - 1n }) }), panel))
       .rejects.toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED" });
     // No Anthropic gate configured, or Haiku not switched on there: "not available right now".
     await expect(assertPreviewBudgetAdmits(settings({ deepinfra }), panel)).rejects.toMatchObject({ code: "ASK_MODEL_CANDIDATE_UNAVAILABLE" });
     await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([]) }), panel))
       .rejects.toMatchObject({ code: "ASK_MODEL_CANDIDATE_UNAVAILABLE" });
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU], { remainingNanoUsd: 700_000_000n }) }), panel))
-      .rejects.toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED" });
     // A role model on Haiku needs the Anthropic gate even when the panel does not use it.
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra }, { roleModelIds: [GLM, HAIKU], roleProviderRefs: ["preview:fixture-a", HAIKU_REF] }),
-      { basis, panel: DEEPINFRA_PANEL })).rejects.toMatchObject({ code: "ASK_MODEL_CANDIDATE_UNAVAILABLE" });
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra }, { roleModels: { ...roleModels, answerChecker: HAIKU },
+      roleProviderRefs: ["preview:fixture-a", HAIKU_REF, "preview:fixture-b"] }),
+    { basis: basisFor(2, 1), panel: DEEPINFRA_PANEL })).rejects.toMatchObject({ code: "ASK_MODEL_CANDIDATE_UNAVAILABLE" });
     // A DeepInfra-only debate never asks the Anthropic gate.
     let asked = 0;
     await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => { asked += 1; return answer([HAIKU]); } }),
-      { basis, panel: DEEPINFRA_PANEL })).resolves.toBeUndefined();
+      { basis: basisFor(2, 1), panel: DEEPINFRA_PANEL })).resolves.toBeUndefined();
     expect(asked).toBe(0);
   });
   it("an unfinished Haiku debate is held on the Anthropic gate, not on DeepInfra's", async () => {
-    const unfinished = [{ basis, panel: PANEL }];
-    const held = estimateUnfinishedRunHolds(unfinished[0]!, settings({}));
+    const run = { basis: basisFor(3, 1), panel: PANEL };
+    const held = estimateUnfinishedRunHolds(run, estimateSettings);
     expect(held.map(hold => hold.gate)).toEqual(["deepinfra", "anthropic"]);
-    expect(held[1]!.callsNanoUsd).toBe(240_350_000n);
-    const panel = { basis, panel: PANEL };
-    // One unfinished Haiku debate holds $0.24035: $0.24035 + $0.24035 + $0.49408 = $0.97478 still fits $1.00 ...
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU]) },
-      { readUnfinishedRuns: async () => unfinished }), panel)).resolves.toBeUndefined();
-    // ... two do not ($1.21513).
-    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU]) },
-      { readUnfinishedRuns: async () => [...unfinished, ...unfinished] }), panel)).rejects.toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED" });
+    const share = held[1]!.callsNanoUsd;
+    expect(share).toBe(needsOf(PANEL)[1]!.callsNanoUsd); // Its whole estimate again (no ask-time probes on this panel's own gate).
+    const panel = { basis: basisFor(3, 1), panel: PANEL };
+    const pot = 2n * share + 428_032_000n;
+    // One unfinished Haiku debate plus the new one plus the hold: exactly the pot fits, one nano-USD less does not.
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU], { remainingNanoUsd: pot }) },
+      { readUnfinishedRuns: async () => [run] }), panel)).resolves.toBeUndefined();
+    await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU], { remainingNanoUsd: pot - 1n }) },
+      { readUnfinishedRuns: async () => [run] }), panel)).rejects.toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED" });
     // An unfinished DeepInfra-only debate holds nothing on the Anthropic gate.
-    const deepinfraOnly = estimateUnfinishedRunHolds({ basis, panel: DEEPINFRA_PANEL }, settings({}));
-    expect(deepinfraOnly.map(hold => hold.gate)).toEqual(["deepinfra"]);
+    expect(estimateUnfinishedRunHolds({ basis: basisFor(2, 1), panel: DEEPINFRA_PANEL }, estimateSettings).map(hold => hold.gate)).toEqual(["deepinfra"]);
     // An older run naming a model off the reviewed rows is held on DeepInfra, never on Anthropic.
-    const older = estimateUnfinishedRunHolds({ basis, panel: [{ provider_ref: "preview:old", model_id: "retired/model" }] }, settings({}));
+    const older = estimateUnfinishedRunHolds({ basis: basisFor(1, 1), panel: [member("preview:old", "retired/model")] }, estimateSettings);
     expect(older.map(hold => hold.gate)).toEqual(["deepinfra"]);
   });
 });

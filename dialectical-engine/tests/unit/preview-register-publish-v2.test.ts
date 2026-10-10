@@ -113,7 +113,7 @@ describe('publish kit v2: composing from the current version', () => {
     const providerSet = plan.delta.find(row => row.rowKey === PROVIDER_SET_ROW)!;
     const refsOf = (text: string) => JSON.parse(text).providers.map((p: any) => p.providerRef);
     expect(refsOf(providerSet.newValueJsonText))
-      .toEqual(['preview:fixture-a', 'preview:fixture-b', 'preview:deepseek-v4-1-flash', 'preview:mimo-v2-6-pro', 'preview:qwen-3-8-flash']);
+      .toEqual(['preview:fixture-a', 'preview:fixture-b', 'preview:deepseek-v4-1-flash', 'preview:mimo-v2-6-pro', 'preview:qwen-3-8-flash', 'preview:claude-haiku-5-5']);
     expect(refsOf(providerSet.oldValueJsonText!)).toEqual(['preview:fixture-a', 'preview:fixture-b']);
     for (const key of MULTI_MODEL_KEYS) {
       const entry = plan.delta.find(row => row.rowKey === key)!;

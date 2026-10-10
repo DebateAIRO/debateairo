@@ -959,10 +959,12 @@ describe("what one debate is estimated at with today's register (realistic worst
     const pricer = realisticWorstCasePricer(sent, "high");
     const sums = { deepinfra: { calls: 0n, money: 0n }, anthropic: { calls: 0n, money: 0n } };
     for (const share of shares.shares) {
-      const row = previewModelRow(share.model);
-      const sum = row === undefined ? sums.anthropic : sums.deepinfra;
+      // PR B: Haiku has a reviewed row of its own, on the Anthropic gate; it is priced here independently.
+      const haiku = share.model === HAIKU;
+      expect(previewModelRow(share.model)!.provider).toBe(haiku ? "anthropic" : "deepinfra");
+      const sum = haiku ? sums.anthropic : sums.deepinfra;
       sum.calls += share.numerator;
-      if (share.type !== "UNBILLED_RETRY") sum.money += share.numerator * (row === undefined ? haikuCall(share.type) : pricer(row, share.type));
+      if (share.type !== "UNBILLED_RETRY") sum.money += share.numerator * (haiku ? haikuCall(share.type) : pricer(previewModelRow(share.model)!, share.type));
     }
     const ceil = (value: bigint) => (value + shares.denominator - 1n) / shares.denominator;
     const figure = (sum: { calls: bigint; money: bigint }, inFlight: number, hold: bigint) =>
@@ -999,6 +1001,16 @@ describe("what one debate is estimated at with today's register (realistic worst
       [[2.19, 167], [4.06, 528], [4.78, 675], [0.94, 161]],
       [[2.66, 277], [5.87, 896], [6.96, 1117], [1.29, 272]]
     ]);
+    // PR B: the real estimate gives each gate exactly its share (the Anthropic gate's hold from its own /remaining).
+    for (const depth of [1, 2, 3]) {
+      const needs = estimatePreviewGateNeeds({ basis: basisFor(ALL_FIVE.length, depth), panel: ALL_FIVE, roleModels, roleProviderRefs,
+        storyRounds: 2, callOutputTokens: sent, askProbeModelIds: [...ASK_PROBE_MODELS, HAIKU], maxCooldownHoldsPerRun: 2 });
+      const five = gateFigures(ALL_FIVE, depth);
+      expect(needs.map((need) => need.gate)).toEqual(["deepinfra", "anthropic"]);
+      expect(needs.map((need) => [need.callsWithMargin, need.callsNanoUsd])).toEqual([
+        [five.deepinfra.calls - 10, five.deepinfra.nanoUsd - HOLD], [five.anthropic!.calls - 2, five.anthropic!.nanoUsd - ANTHROPIC_HOLD]]);
+      expect(needs[1]!.modelIds).toEqual([HAIKU]);
+    }
     for (const [freeFigure, premiumFigure, fiveDeepinfra, fiveAnthropic] of table) {
       for (const [dollars, calls] of [freeFigure!, premiumFigure!, fiveDeepinfra!]) {
         expect(dollars).toBeLessThanOrEqual(10);
