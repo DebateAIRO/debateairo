@@ -6,8 +6,9 @@ import en from "../../apps/ui/messages/en/legal.json";
 import ro from "../../apps/ui/messages/ro/legal.json";
 
 /**
- * The private preview offers five models: three open-weight models served by DeepInfra, Claude
- * Haiku 5.5 through Anthropic's API, and Gemini 3.8 Flash through Google's paid Gemini API. Its
+ * The private preview offers open-weight models served by DeepInfra (GLM, DeepSeek, MiMo and, since
+ * the owner swapped it in for Gemini on 10 October 2026, Qwen3.8-Flash), Claude Haiku 5.5 through
+ * Anthropic's API, and, kept for later, Gemini 3.8 Flash through Google's paid Gemini API. Its
  * build flag (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) names them either as the first preview's
  * list or as a per-plan object. The Model providers page must name every company that receives
  * text on that build, and a bad flag must disclose every preview provider rather than hide one.
@@ -19,7 +20,10 @@ const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
 const MIMO = "XiaomiMiMo/MiMo-V2.6-Pro";
 const HAIKU = "claude-haiku-5-5";
 const GEMINI = "gemini-3.8-flash";
-const ALL_DEEPINFRA = "GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek), MiMo-V2.6-Pro (Xiaomi)";
+const QWEN = "Qwen/Qwen3.8-Flash";
+const ALL_DEEPINFRA = "GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek), MiMo-V2.6-Pro (Xiaomi), Qwen3.8-Flash (Alibaba)";
+/** The multi-model flag the A branch reviews: Free on GLM and DeepSeek, Premium adds MiMo and Qwen. */
+const REVIEWED_QWEN_FLAG = JSON.stringify({ free: [GLM, DEEPSEEK], premium: [GLM, DEEPSEEK, MIMO, QWEN] });
 const NEW_KEYS = [
   "legal.providers.ireland",
   "legal.providers.locationAnthropic",
@@ -51,6 +55,8 @@ async function build(flag: string | undefined) {
 
 const HOSTED_KEYS = ["claude", "gpt", "gemini", "grok", "qwen", "support"];
 const PREVIEW_KEYS = ["claude", "gpt", "gemini", "grok", "qwen", "deepinfra", "support"];
+/** A build that sends Qwen to DeepInfra drops the hosted "runs on our own servers" Qwen row. */
+const PREVIEW_KEYS_QWEN_VIA_DEEPINFRA = ["claude", "gpt", "gemini", "grok", "deepinfra", "support"];
 
 describe("off the preview (flag unset) the Register is the hosted site's, unchanged", () => {
   it("lists the hosted rows and no preview company", async () => {
@@ -101,11 +107,11 @@ describe("the per-plan object form", () => {
     }
   });
 
-  it("with all five models, shows every maker once and the checked Anthropic and Google rows", async () => {
+  it("with every preview model, shows every maker once and the checked Anthropic and Google rows", async () => {
     const { keys, row, LegalProvidersBody } = await build(
-      JSON.stringify({ free: [GLM, DEEPSEEK, MIMO], premium: [HAIKU, GEMINI] })
+      JSON.stringify({ free: [GLM, DEEPSEEK, MIMO, QWEN], premium: [HAIKU, GEMINI] })
     );
-    expect(keys).toEqual(PREVIEW_KEYS);
+    expect(keys).toEqual(PREVIEW_KEYS_QWEN_VIA_DEEPINFRA);
     expect(new Set(keys).size).toBe(keys.length);
     expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
     expect(row("claude")).toMatchObject({
@@ -152,6 +158,54 @@ describe("the per-plan object form", () => {
 
 });
 
+describe("Qwen3.8-Flash through DeepInfra (owner, 10 October 2026: Qwen instead of Gemini)", () => {
+  it("the reviewed flag names Qwen inside the DeepInfra row, and shows Qwen nowhere else", async () => {
+    const { keys, row, LegalProvidersBody } = await build(REVIEWED_QWEN_FLAG);
+    expect(keys).toEqual(PREVIEW_KEYS_QWEN_VIA_DEEPINFRA);
+    expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
+    for (const catalog of [en, ro]) {
+      const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} />);
+      expect(html).toContain("Qwen3.8-Flash (Alibaba)");
+      // The hosted row would say Qwen runs on our own servers in London: not true on this build.
+      expect(html).not.toContain('id="legal-provider-qwen"');
+      expect(html).not.toContain(escaped(catalog["legal.providers.ownServers"]));
+      expect(html).not.toContain(escaped(catalog["legal.providers.ownLocation"]));
+      expect(html.match(/Qwen/g)?.length).toBe(html.match(/Qwen3\.8-Flash \(Alibaba\)/g)?.length);
+    }
+  });
+
+  it("a flag without Qwen keeps the hosted Qwen row and leaves Qwen out of the DeepInfra row", async () => {
+    const { keys, row, pages } = await build(JSON.stringify({ free: [GLM, DEEPSEEK], premium: [GLM, DEEPSEEK, MIMO] }));
+    expect(keys).toEqual(PREVIEW_KEYS);
+    expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek), MiMo-V2.6-Pro (Xiaomi)");
+    expect(row("qwen")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "qwen"));
+  });
+
+  it("the GLM-only flag keeps the hosted Qwen row and names GLM alone", async () => {
+    const { keys, row } = await build(JSON.stringify([GLM]));
+    expect(keys).toEqual(PREVIEW_KEYS);
+    expect(row("deepinfra")?.models).toBe("GLM-5.3-Flash (Z.AI)");
+  });
+
+  it("nothing about the preview's Gemini shows unless a flag names gemini-3.8-flash", async () => {
+    const reviewed = [
+      JSON.stringify([GLM]),
+      REVIEWED_QWEN_FLAG,
+      JSON.stringify({ free: [GLM, DEEPSEEK], premium: [GLM, DEEPSEEK, MIMO] }),
+      "not json"
+    ];
+    for (const flag of reviewed) {
+      const { row, pages, LegalProvidersBody } = await build(flag);
+      expect(row("gemini"), flag).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "gemini"));
+      const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} />);
+      expect(html, flag).not.toContain("Gemini 3.8 Flash");
+      expect(html, flag).not.toContain("legal-notices@google.com");
+      expect(html, flag).not.toContain(escaped(en["legal.providers.retentionGoogle"]));
+      expect(html, flag).not.toContain(escaped(en["legal.providers.locationGoogle"]));
+    }
+  });
+});
+
 describe("a malformed flag discloses every preview provider and never throws", () => {
   const MALFORMED = [
     "not json", "null", "42", "\"x\"", "{}", "[]", "[1]", "{\"free\":\"x\"}",
@@ -171,11 +225,12 @@ describe("a malformed flag discloses every preview provider and never throws", (
   ];
   for (const flag of MALFORMED) {
     it(`flag ${flag}`, async () => {
-      const { keys, row } = await build(flag);
-      expect(keys).toEqual(PREVIEW_KEYS);
+      const { keys, row, pages } = await build(flag);
+      expect(keys).toEqual(PREVIEW_KEYS_QWEN_VIA_DEEPINFRA);
       expect(row("deepinfra")?.models).toBe(ALL_DEEPINFRA);
       expect(row("claude")?.models).toBe("Claude Haiku 5.5");
-      expect(row("gemini")?.models).toBe("Gemini 3.8 Flash");
+      // Gemini shows only when a flag names it; a bad flag keeps the hosted Google row as it is.
+      expect(row("gemini")).toBe(pages.MODEL_PROVIDERS.find((entry) => entry.key === "gemini"));
     });
   }
 });

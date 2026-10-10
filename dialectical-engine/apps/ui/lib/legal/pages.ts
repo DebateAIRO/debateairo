@@ -286,15 +286,18 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
 
 /**
  * The models the private preview offers, by the id its build flag names them with. DeepInfra
- * serves the first three (each made by another company, named in brackets); Anthropic and Google
- * serve their own. Facts checked against the vendors' published terms: see
+ * serves the first four (each made by another company, named in brackets); Anthropic and Google
+ * serve their own. Gemini is kept for later: the owner swapped it for Qwen on 10 October 2026, so
+ * no reviewed preview flag offers it, and nothing about it shows unless one does. Facts checked against the vendors' published terms: see
  * `docs/legal/2026-10-10-preview-provider-facts.md`.
  */
 const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: string]> = Object.freeze([
   ["zai-org/GLM-5.3-Flash", "GLM-5.3-Flash (Z.AI)"],
   ["deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek-V4.1-Flash (DeepSeek)"],
-  ["XiaomiMiMo/MiMo-V2.6-Pro", "MiMo-V2.6-Pro (Xiaomi)"]
+  ["XiaomiMiMo/MiMo-V2.6-Pro", "MiMo-V2.6-Pro (Xiaomi)"],
+  ["Qwen/Qwen3.8-Flash", "Qwen3.8-Flash (Alibaba)"]
 ] as const);
+const PREVIEW_DEEPINFRA_QWEN = "Qwen/Qwen3.8-Flash";
 const PREVIEW_ANTHROPIC_MODEL = "claude-haiku-5-5";
 const PREVIEW_GOOGLE_MODEL = "gemini-3.8-flash";
 /** Every preview model id and its maker, as the new-debate form's roster reader knows them. */
@@ -302,6 +305,7 @@ const PREVIEW_MODEL_MAKERS: ReadonlyMap<string, string> = new Map([
   ["zai-org/GLM-5.3-Flash", "Z.AI"],
   ["deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek"],
   ["XiaomiMiMo/MiMo-V2.6-Pro", "Xiaomi"],
+  [PREVIEW_DEEPINFRA_QWEN, "Alibaba"],
   [PREVIEW_ANTHROPIC_MODEL, "Anthropic"],
   [PREVIEW_GOOGLE_MODEL, "Google"]
 ]);
@@ -433,9 +437,11 @@ function previewModelIds(flag: string): ReadonlySet<string> | null {
  * `previewPlanRoster`); every other build, the real site included, sets none and gets the
  * hosted-site rows unchanged. A preview build lists DeepInfra just before the support chat's
  * model, naming the DeepInfra models its plans offer plus, on a per-plan build, the two role models
- * (GLM writes, DeepSeek checks); it swaps the Claude and Gemini placeholder rows for the checked
- * preview rows when it offers Claude Haiku 5.5 or Gemini 3.8 Flash. A flag the new-debate form would
- * refuse lists every preview provider. Never throws.
+ * (GLM writes, DeepSeek checks); it swaps the Claude and Gemini hosted rows for the checked preview
+ * rows when it offers Claude Haiku 5.5 or Gemini 3.8 Flash, and drops the hosted "own servers" Qwen
+ * row when it sends Qwen3.8-Flash to DeepInfra, so no maker is shown twice or where it does not run.
+ * A flag the new-debate form would refuse lists every DeepInfra model and the Anthropic preview row
+ * (never Gemini, which only a flag naming it shows). Never throws.
  */
 export function providerRegister(previewFreeModelIdsJson: string | undefined): readonly ProviderRegisterEntry[] {
   if (previewFreeModelIdsJson === undefined) return Object.freeze([...MODEL_PROVIDERS, SUPPORT_PROVIDER]);
@@ -444,10 +450,13 @@ export function providerRegister(previewFreeModelIdsJson: string | undefined): r
   // A per-plan build always uses the role models; the first preview's build (GLM alone) has no others.
   const roleModels = ids !== null && ids.size === 1 && ids.has(LEGACY_PREVIEW_MODEL) ? new Set<string>() : PREVIEW_ROLE_MODELS;
   const deepInfraModels = PREVIEW_DEEPINFRA_MODELS.filter(([id]) => offers(id) || roleModels.has(id)).map(([, label]) => label);
-  const rows = MODEL_PROVIDERS.map((row) => {
-    if (row.key === "claude" && offers(PREVIEW_ANTHROPIC_MODEL)) return ANTHROPIC_PREVIEW_PROVIDER;
-    if (row.key === "gemini" && offers(PREVIEW_GOOGLE_MODEL)) return GOOGLE_PREVIEW_PROVIDER;
-    return row;
+  const rows = MODEL_PROVIDERS.flatMap((row) => {
+    if (row.key === "claude" && offers(PREVIEW_ANTHROPIC_MODEL)) return [ANTHROPIC_PREVIEW_PROVIDER];
+    // Gemini only when the flag names it: a bad flag must not invent a Google model the preview never offers.
+    if (row.key === "gemini" && ids?.has(PREVIEW_GOOGLE_MODEL) === true) return [GOOGLE_PREVIEW_PROVIDER];
+    // The hosted row says Qwen runs on our own servers; a build that sends Qwen to DeepInfra names it there instead.
+    if (row.key === "qwen" && offers(PREVIEW_DEEPINFRA_QWEN)) return [];
+    return [row];
   });
   return Object.freeze([
     ...rows,

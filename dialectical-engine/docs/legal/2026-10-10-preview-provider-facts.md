@@ -1,9 +1,14 @@
 # Private preview: provider facts for the Model providers page
 
 Read on 2026-10-10 from the vendors' public pages, for the private preview's model list:
-GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek) and MiMo-V2.6-Pro (Xiaomi), all served by
-DeepInfra; Claude Haiku 5.5 through Anthropic's own API; Gemini 3.8 Flash through Google's
-Gemini API, paid tier only.
+GLM-5.3-Flash (Z.AI), DeepSeek-V4.1-Flash (DeepSeek), MiMo-V2.6-Pro (Xiaomi) and Qwen3.8-Flash
+(Alibaba), all served by DeepInfra; Claude Haiku 5.5 through Anthropic's own API; and, kept for
+later, Gemini 3.8 Flash through Google's Gemini API, paid tier only.
+
+On 10 October 2026 the owner swapped Gemini for Qwen: "please change the Google Gemeni-3.8-flash
+with Qwen3.8-Flash from DeepInfra, since Google is too expensive at the moment (we will use it in
+the future)". The Gemini facts below stay for that future; the page shows them only on a build
+whose flag names `gemini-3.8-flash`, and no reviewed flag does.
 
 The facts below are what `apps/ui/lib/legal/pages.ts` shows on `/providers` when a preview build
 offers the model. A fact we could not check on a public page stays "[to confirm]" on the page.
@@ -57,6 +62,24 @@ policy@deepinfra.com; location, retention, zero retention and transfer basis bra
 The retention and location findings are candidates for filling those two bracketed facts; the
 2026-10-05 review deliberately left them for operational and contract checks, so this change does
 not fill them.
+
+## Qwen3.8-Flash through DeepInfra
+
+| Fact | Finding | Source (read 2026-10-10) |
+| --- | --- | --- |
+| Model id and maker | `Qwen/Qwen3.8-Flash`, described as "Qwen's fast, low-cost model"; the page names the Qwen team, not Alibaba, and the register labels it "Qwen3.8-Flash (Alibaba)" (Qwen is Alibaba's model family) | https://deepinfra.com/Qwen/Qwen3.8-Flash |
+| Context window | 1,000,000 tokens | https://deepinfra.com/Qwen/Qwen3.8-Flash |
+| Price | $0.113 per million input tokens, $0.382 output, $0.014 cached | https://deepinfra.com/Qwen/Qwen3.8-Flash |
+| Licence, data handling, hosting place | Not stated on the model page | https://deepinfra.com/Qwen/Qwen3.8-Flash |
+| "Partner" badge | The page shows a "Partner" badge next to the price, with no explanation. DeepInfra's data page says it forwards data to other companies only for Google and Anthropic models; it names neither Qwen nor Alibaba nor "Partner" models | https://deepinfra.com/Qwen/Qwen3.8-Flash; https://docs.deepinfra.com/account/data-privacy |
+
+**Owner to confirm with DeepInfra:** whether "Partner" means DeepInfra forwards Qwen3.8-Flash
+requests to another company (for example Alibaba Cloud). If it does, that company receives debate
+text and needs its own row on the page before Qwen is switched on. Until then the page names Qwen
+only inside the DeepInfra row, under DeepInfra's terms.
+
+On a build that sends Qwen to DeepInfra, the page drops the hosted-site Qwen row, which says Qwen
+runs on our own servers in London: on the preview it does not, and showing both would mislead.
 
 ## Which jobs each preview provider gets
 
