@@ -12,12 +12,14 @@
 //   release-artifacts.mjs verify --source <source manifest> [--ui-build <ui build manifest>]
 //   release-artifacts.mjs operator-digest --source <source manifest>
 //   release-artifacts.mjs launch-plan --service api|ui|runner --from <existing plan> --root <release root>
-//       --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <file>
-//   release-artifacts.mjs native-plan --operation apply-and-plan|verify --from <existing native plan>
-//       --source-manifest <candidate api source manifest> --out <file>
+//       --source-manifest <file> [--ui-build <file>] --native-attestation <file> [--publication <publish output>] --out <file>
+//   release-artifacts.mjs native-plan --operation apply-and-plan|plan|publish|verify --from <existing native plan>
+//       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
+//       [--publication <publish output>] --out <file>
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
+import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, open, realpath, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, join, normalize } from 'node:path';
@@ -73,8 +75,8 @@ const COMMANDS = Object.freeze({
   'ui-build': { required: ['--source', '--out'], optional: [] },
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
-  'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: [] }
+  'launch-plan': { required: ['--service', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication'] }
 });
 
 export class Refusal extends Error {
@@ -264,17 +266,20 @@ async function launchPlanCommand(options, { layout, deps }) {
     if (!['sourceRoot', 'sourceRevision', 'sourceTree', 'contractSha256'].every(key => build.value[key] === source.value[key])) refuse('UI_BUILD_MISMATCH');
     uiBuild = { path: build.path, sha256: build.sha256 };
   }
+  // A new register publication (after native-plan publish) replaces the old plan's; otherwise it is carried over.
+  const publication = options['--publication'] === undefined ? from.value.publication
+    : (await readPublishedPublication(options['--publication'], { layout })).publication;
   const native = await readJson(options['--native-attestation'], { layout, flag: '--native-attestation', maxBytes: MAX_PUBLIC_ARTIFACT_BYTES });
   // The base plan's proof only has to be the right proof: prestart replaces it with a fresh one on
   // every start, and the launcher checks its age. So check the binding at the proof's own time.
   try {
-    validateNativeAttestation(native.value, { sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree, nativeSourceSha256: source.value.nativeSha256, publication: from.value.publication }, Date.parse(native.value?.verifiedAt));
+    validateNativeAttestation(native.value, { sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree, nativeSourceSha256: source.value.nativeSha256, publication }, Date.parse(native.value?.verifiedAt));
   } catch { refuse('NATIVE_ATTESTATION_MISMATCH'); }
   const plan = {
     schema: from.value.schema, service, artifact: kind, sourceRoot: root, sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree,
     serviceUid: from.value.serviceUid, serviceGid: from.value.serviceGid,
     sourceManifest: { path: source.path, sha256: source.sha256 }, nativeAttestation: { path: native.path, sha256: native.sha256 }, uiBuild,
-    publication: from.value.publication, operatorManifestSha256: operatorManifestSha256(source.value), environment: from.value.environment,
+    publication, operatorManifestSha256: operatorManifestSha256(source.value), environment: from.value.environment,
     apiPort: from.value.apiPort, uiPort: from.value.uiPort, mailExecutable: join(root, 'dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs'), mailFrom: from.value.mailFrom
   };
   try { validatePlan(plan); } catch { refuse('LAUNCH_PLAN_INVALID'); }
@@ -284,9 +289,73 @@ async function launchPlanCommand(options, { layout, deps }) {
   return writeArtifact(options['--out'], plan, { layout, maxBytes: MAX_PLAN_BYTES, name: `${service}-launch.json` });
 }
 
+const HEX64 = /^[a-f0-9]{64}$/;
+const GIT40 = /^[a-f0-9]{40}$/;
+const PROPOSAL_KEYS = ['schema', 'composer', 'runtimeObservedAt', 'sourceRevision', 'sourceTree', 'operatorManifestSha256', 'baseRegisterVersion', 'baseSnapshotSha256',
+  'snapshotSha256', 'deltaSha256', 'rowCount', 'rowKeys', 'addedKeys', 'changedKeys', 'delta'];
+const DELTA_KEYS = ['rowKey', 'change', 'reason', 'oldValueJsonText', 'newValueJsonText', 'oldSourceRef', 'newSourceRef', 'oldValueSha256', 'newValueSha256', 'oldSourceRefSha256', 'newSourceRefSha256'];
+const sameKeySet = (value, keys) => plainObject(value) && Object.keys(value).sort().join('\0') === [...keys].sort().join('\0');
+const sameList = (a, b) => Array.isArray(a) && a.length === b.length && a.every((item, index) => item === b[index]);
+
+/**
+ * The snapshot proposal the native operator printed for `plan` (schema v2), checked against the
+ * plan that produced it. Every hash it shows is recomputed here from the values it shows, so the
+ * delta the owner read is exactly the delta `deltaSha256` names. Returns the publish approval.
+ */
+export function proposalApproval(proposal, plan) {
+  const bad = () => refuse('PROPOSAL_REFUSED');
+  if (!sameKeySet(proposal, PROPOSAL_KEYS) || proposal.schema !== 'preview-auth-dev-snapshot-proposal-v2' || proposal.composer !== 'preview-register-composer-v2') bad();
+  if (proposal.sourceRevision !== plan.sourceRevision || proposal.sourceTree !== plan.sourceTree || proposal.operatorManifestSha256 !== plan.operatorManifestSha256
+    || proposal.baseRegisterVersion !== plan.selectedBaseRegisterVersion || proposal.baseSnapshotSha256 !== plan.selectedBaseSnapshotSha256) refuse('PROPOSAL_MISMATCH');
+  if (!GIT40.test(proposal.sourceRevision) || !GIT40.test(proposal.sourceTree) || ![proposal.baseSnapshotSha256, proposal.snapshotSha256, proposal.deltaSha256].every(value => HEX64.test(value ?? ''))
+    || typeof proposal.runtimeObservedAt !== 'string' || !Number.isFinite(Date.parse(proposal.runtimeObservedAt))
+    || new Date(proposal.runtimeObservedAt).toISOString() !== proposal.runtimeObservedAt) bad();
+  const { rowKeys, delta } = proposal;
+  if (!Array.isArray(rowKeys) || rowKeys.length < 1 || rowKeys.length !== proposal.rowCount || rowKeys.some(key => typeof key !== 'string' || !key)
+    || new Set(rowKeys).size !== rowKeys.length || !Array.isArray(delta)) bad();
+  const seen = new Set();
+  for (const entry of delta) {
+    if (!sameKeySet(entry, DELTA_KEYS) || typeof entry.rowKey !== 'string' || !rowKeys.includes(entry.rowKey) || seen.has(entry.rowKey)
+      || !['added', 'changed'].includes(entry.change) || typeof entry.reason !== 'string'
+      || typeof entry.newValueJsonText !== 'string' || typeof entry.newSourceRef !== 'string'
+      || entry.newValueSha256 !== sha256(entry.newValueJsonText) || entry.newSourceRefSha256 !== sha256(entry.newSourceRef)) bad();
+    seen.add(entry.rowKey);
+    if (entry.change === 'added') {
+      if (entry.oldValueJsonText !== null || entry.oldSourceRef !== null || entry.oldValueSha256 !== null || entry.oldSourceRefSha256 !== null) bad();
+    } else if (typeof entry.oldValueJsonText !== 'string' || typeof entry.oldSourceRef !== 'string'
+      || entry.oldValueSha256 !== sha256(entry.oldValueJsonText) || entry.oldSourceRefSha256 !== sha256(entry.oldSourceRef)
+      || (entry.oldValueJsonText === entry.newValueJsonText && entry.oldSourceRef === entry.newSourceRef)) bad();
+  }
+  if (!sameList(proposal.addedKeys, delta.filter(entry => entry.change === 'added').map(entry => entry.rowKey))
+    || !sameList(proposal.changedKeys, delta.filter(entry => entry.change === 'changed').map(entry => entry.rowKey))
+    || sha256(JSON.stringify(delta)) !== proposal.deltaSha256) bad();
+  // The runtime time is the one measured into nodeRuntimeVersion's source reference (publish-register-v2.ts buildPreviewSourceRowsV2):
+  // a time edited after review would refuse only at the operator, mid-downtime; refuse it here.
+  const runtimeEntry = delta.find(entry => entry.rowKey === 'nodeRuntimeVersion');
+  if (runtimeEntry && !runtimeEntry.newSourceRef.includes(`; measured ${proposal.runtimeObservedAt}; source ${proposal.sourceRevision}/${proposal.sourceTree}; operator sha256:${proposal.operatorManifestSha256}`)) bad();
+  return {
+    runtimeObservedAt: proposal.runtimeObservedAt, baseRegisterVersion: proposal.baseRegisterVersion, baseSnapshotSha256: proposal.baseSnapshotSha256,
+    snapshotSha256: proposal.snapshotSha256, deltaSha256: proposal.deltaSha256
+  };
+}
+
+/** The receipt a native-operator `publish` printed (a native attestation whose `publication` is the new version). */
+async function readPublishedPublication(path, { layout }) {
+  const file = await readJson(path, { layout, flag: '--publication', maxBytes: MAX_PUBLIC_ARTIFACT_BYTES });
+  const value = file.value;
+  try {
+    validateNativeAttestation(value, { sourceRevision: value?.sourceRevision, sourceTree: value?.sourceTree, nativeSourceSha256: value?.nativeSourceSha256, publication: value?.publication }, Date.parse(value?.verifiedAt));
+  } catch { refuse('PUBLICATION_REFUSED'); }
+  return { path: file.path, sha256: file.sha256, sourceRevision: value.sourceRevision, sourceTree: value.sourceTree, publication: value.publication };
+}
+
 async function nativePlanCommand(options, { layout, deps }) {
   const operation = options['--operation'];
-  if (!['apply-and-plan', 'verify'].includes(operation)) refuse('ARGUMENTS_REFUSED', ['--operation']);
+  if (!['apply-and-plan', 'plan', 'publish', 'verify'].includes(operation)) refuse('ARGUMENTS_REFUSED', ['--operation']);
+  if ((operation === 'publish') !== (options['--proposal'] !== undefined)) refuse('ARGUMENTS_REFUSED', ['--proposal']);
+  // The owner's yes names the delta they read; a re-run plan (new runtime time, new hash) needs a new yes.
+  if ((operation === 'publish') !== (options['--approved-delta-sha256'] !== undefined) || (operation === 'publish' && !HEX64.test(options['--approved-delta-sha256']))) refuse('ARGUMENTS_REFUSED', ['--approved-delta-sha256']);
+  if (options['--publication'] !== undefined && operation !== 'verify') refuse('ARGUMENTS_REFUSED', ['--publication']);
   await assertOutputFree(options['--out'], { layout });
   // Lazy: native-operator.mjs loads tsx and pg, which exist only in an installed release root.
   const validateNativePlan = deps.validateNativePlan ?? (await import('../../preview-auth-dev/v1/native-operator.mjs')).validateNativePlan;
@@ -296,8 +365,38 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (source.value.role !== 'api') refuse('SOURCE_ROLE_REFUSED');
   // The native operator, prestart and pin accept only a candidate root (native-operator.mjs, prestart.mjs checkNativePlan).
   if (releasePattern(layout).exec(source.value.sourceRoot)?.[1] !== 'candidate') refuse('NATIVE_ROOT_NOT_CANDIDATE');
-  let approval = null;
-  if (operation === 'verify') {
+  const operatorDigest = operatorManifestSha256(source.value);
+  let approval = null, publicationId = from.value.publicationId;
+  let selectedBaseRegisterVersion = from.value.selectedBaseRegisterVersion, selectedBaseSnapshotSha256 = from.value.selectedBaseSnapshotSha256;
+  if (operation === 'plan') {
+    // Publish kit v2 composes from the CURRENT published version: the publication the live verify
+    // plan (and so every pinned launch plan) runs on. Derived, never typed.
+    if (from.value.operation !== 'verify') refuse('FROM_PLAN_INVALID');
+    const live = from.value.approval?.publication;
+    try { validatePublication(live); } catch { refuse('NATIVE_APPROVAL_REQUIRED'); }
+    selectedBaseRegisterVersion = live.registerVersion;
+    selectedBaseSnapshotSha256 = live.snapshotSha256;
+  } else if (operation === 'publish') {
+    // The plan that printed the proposal, for this very release; the approval is copied from the
+    // checked proposal and the publication gets a fresh id (a re-run of this plan replays it).
+    if (from.value.operation !== 'plan' || from.value.approval !== null) refuse('FROM_PLAN_INVALID');
+    if (from.value.sourceRoot !== source.value.sourceRoot || from.value.sourceRevision !== source.value.sourceRevision || from.value.sourceTree !== source.value.sourceTree
+      || from.value.sourceManifest?.sha256 !== source.sha256 || from.value.operatorManifestSha256 !== operatorDigest) refuse('PROPOSAL_MISMATCH');
+    const proposal = await readJson(options['--proposal'], { layout, flag: '--proposal', maxBytes: MAX_PUBLIC_ARTIFACT_BYTES });
+    approval = proposalApproval(proposal.value, from.value);
+    if (approval.deltaSha256 !== options['--approved-delta-sha256']) refuse('PROPOSAL_NOT_APPROVED');
+    publicationId = (deps.randomUUID ?? randomUUID)();
+  } else if (operation === 'verify' && options['--publication'] !== undefined) {
+    // After a publish: verify the publication that plan wrote (and only that one).
+    if (from.value.operation !== 'publish' || !plainObject(from.value.approval)) refuse('FROM_PLAN_INVALID');
+    const published = await readPublishedPublication(options['--publication'], { layout });
+    const { publication } = published;
+    if (published.sourceRevision !== from.value.sourceRevision || published.sourceTree !== from.value.sourceTree
+      || publication.publicationId !== from.value.publicationId || publication.baseRegisterVersion !== from.value.selectedBaseRegisterVersion
+      || publication.snapshotSha256 !== from.value.approval.snapshotSha256) refuse('PUBLICATION_MISMATCH');
+    const { runtimeObservedAt, baseRegisterVersion, baseSnapshotSha256, snapshotSha256, deltaSha256 } = from.value.approval;
+    approval = { runtimeObservedAt, baseRegisterVersion, baseSnapshotSha256, snapshotSha256, deltaSha256, publication };
+  } else if (operation === 'verify') {
     // verify uses approval.runtimeObservedAt (a string) and approval.publication (the live receipt,
     // which pin compares with the launch plans). Carried over unchanged from --from.
     approval = from.value.approval;
@@ -306,13 +405,14 @@ async function nativePlanCommand(options, { layout, deps }) {
   }
   const plan = {
     schema: from.value.schema, operation, sourceRoot: source.value.sourceRoot, sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree,
-    sourceManifest: { path: source.path, sha256: source.sha256 }, operatorManifestSha256: operatorManifestSha256(source.value),
-    selectedBaseRegisterVersion: from.value.selectedBaseRegisterVersion, selectedBaseSnapshotSha256: from.value.selectedBaseSnapshotSha256,
-    publicationId: from.value.publicationId, approval
+    sourceManifest: { path: source.path, sha256: source.sha256 }, operatorManifestSha256: operatorDigest,
+    selectedBaseRegisterVersion, selectedBaseSnapshotSha256, publicationId, approval
   };
   try { validateNativePlan(plan); } catch { refuse('NATIVE_PLAN_INVALID'); }
   await (deps.verifySourceManifest ?? verifySourceManifest)(source.value, sourceBinding(source));
-  return writeArtifact(options['--out'], plan, { layout, maxBytes: MAX_PLAN_BYTES });
+  const written = await writeArtifact(options['--out'], plan, { layout, maxBytes: MAX_PLAN_BYTES });
+  // For publish, echo what the owner approved so it can be compared with the reviewed proposal.
+  return operation === 'publish' ? { ...written, publicationId, approval } : written;
 }
 
 /** Parse, then run one subcommand. `layout`/`deps` exist for the unit tests' throwaway roots. */
