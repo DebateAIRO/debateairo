@@ -112,6 +112,7 @@ import {
   RunRepository,
   decryptLeasedContentForRun,
   insertRunRoleAssignment,
+  isDatabasePoolBusy,
   prepareLeasedContentEncryptionForRun,
   queryPrivateStream,
   withOwnerAskAdmissionLease,
@@ -1807,6 +1808,14 @@ export function askRefusalRetryAfter(code: string, now: Date, retryAt?: Date): s
   return midnight.toUTCString();
 }
 
+/**
+ * Connection budget (2026-10-10): the one envelope for a busy database, and how
+ * long a well-behaved client waits before trying again. The site's own pages
+ * treat any 503 as "try again in a moment" (apps/ui/lib/v3/requestFailure.ts).
+ */
+const SERVICE_BUSY_CODE = "SERVICE_BUSY";
+const SERVICE_BUSY_RETRY_AFTER_SECONDS = "2";
+
 export class AskRefusal extends Error {
   readonly code: string;
   /** The refusal's own reset instant, when it names one (the preview's Bucharest day). */
@@ -2484,16 +2493,22 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // fall through to the generic 500 branch, whose body is `knownError.message`
     // — for these that message IS the internal ARGON2_* code.
     const argon2Unavailable = knownError instanceof Argon2InfrastructureError;
+    // Connection budget (2026-10-10): a database pool that could not hand out a
+    // connection within its wait limit, or a full server, is busy, not broken —
+    // one constant retryable 503 that names neither the database nor the pool.
+    const databaseBusy = !malformed && !authFlow && !argon2Unavailable && !askRefusal
+      && isDatabasePoolBusy(knownError);
     const statusCode = malformed ? 400
       : authFlow ? knownError.statusCode
-        : argon2Unavailable ? 503
+        : argon2Unavailable || databaseBusy ? 503
           // R1: an ask refusal is 422, except the one that will pass tomorrow.
           : askRefusal ? askRefusalStatus(knownError.code) : 500;
     const errorCode = malformed
       ? "MALFORMED_REQUEST"
       : authFlow ? knownError.code
         : argon2Unavailable ? AUTH_RETRYABLE_UNAVAILABLE_CODE
-          : askRefusal ? knownError.code : "INTERNAL_ERROR";
+          : databaseBusy ? SERVICE_BUSY_CODE
+            : askRefusal ? knownError.code : "INTERNAL_ERROR";
     if (statusCode >= 500) {
       console.error(JSON.stringify(Object.freeze({
         event: "api.request.failed",
@@ -2505,7 +2520,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     // R1: `Retry-After` names the instant the daily envelope resets, so a client
     // library that honours the header waits exactly as long as it must.
-    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date(), knownError.retryAt) : null;
+    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date(), knownError.retryAt)
+      : databaseBusy ? SERVICE_BUSY_RETRY_AFTER_SECONDS : null;
     if (retryAfter !== null) reply.header("retry-after", retryAfter);
     // I6: the spend figures the refusal carries are the OPERATOR's, so they are
     // logged here and withheld from the body below.

@@ -19,9 +19,11 @@ describe("XREV-01 cross-maker node review", () => {
       { maker: "house-b", value: 2 },
       { maker: "house-c", value: 3 }
     ] as const;
-    expect(selectDifferentMakerReviewer("house-a", makers)).toBe(makers[1]);
-    expect(selectDifferentMakerReviewer("house-b", makers)).toBe(makers[0]);
-    expect(() => selectDifferentMakerReviewer("house-a", [makers[0]])).toThrowError(
+    // Owner ruling 2026-10-10: the first reviewer is the maker after the author
+    // in the debate's SEEDED circle, no longer the panel's first other maker.
+    expect(["house-b", "house-c"]).toContain(selectDifferentMakerReviewer("run:1", "house-a", makers).maker);
+    expect(["house-a", "house-c"]).toContain(selectDifferentMakerReviewer("run:1", "house-b", makers).maker);
+    expect(() => selectDifferentMakerReviewer("run:1", "house-a", [makers[0]])).toThrowError(
       expect.objectContaining({ code: "DIFFERENT_MAKER_REVIEWER_UNAVAILABLE" })
     );
   });
@@ -33,11 +35,11 @@ describe("XREV-01 cross-maker node review", () => {
       { maker: "house-c", value: 3 }
     ] as const;
 
-    expect(selectDifferentMakerReviewer("house-a", makers, "house-b")).toBe(makers[2]);
-    expect(selectDifferentMakerReviewer("house-a", makers, "house-c")).toBe(makers[1]);
+    expect(selectDifferentMakerReviewer("run:1", "house-a", makers, "house-b")).toBe(makers[2]);
+    expect(selectDifferentMakerReviewer("run:1", "house-a", makers, "house-c")).toBe(makers[1]);
     // Removing the third member leaves the ratified M=2 policy byte-stable:
     // the sole different-maker reviewer remains selected on every review.
-    expect(selectDifferentMakerReviewer("house-a", makers.slice(0, 2), "house-b")).toBe(makers[1]);
+    expect(selectDifferentMakerReviewer("run:1", "house-a", makers.slice(0, 2), "house-b")).toBe(makers[1]);
   });
 
   it("pins the single depth authority at 1..5 after the coverage-table guard retires", () => {
