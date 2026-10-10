@@ -161,7 +161,7 @@ describe("data-export snapshot", () => {
     for (const internal of ["run_id", "acceptance_id", "session_id", "case_id", "message_id", "case_message_id", "wrapped_key", "email_ciphertext", "evidence_ciphertext"]) expect(encoded).not.toContain(`"${internal}"`);
     expect(Object.keys(h.raw)).toEqual([...RAW_SECTIONS]);
 
-    // migrations/0111_data_export.sql:188 emits execute_at directly into JSON;
+    // migrations/0112_data_export.sql:204 emits execute_at directly into JSON;
     // the database session can serialize its offset as in C12's E-2 frame.
     expect((await h.collect()).account.erasure_requests[0]?.execute_at).toBe("2030-05-04T03:02:01.000Z");
 

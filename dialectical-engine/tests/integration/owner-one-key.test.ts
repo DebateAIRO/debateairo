@@ -1,4 +1,5 @@
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
+import { authBranchMigrationsBefore } from '../support/authBranchLineage.js';
 import { randomUUID } from 'node:crypto';
 import { expect, it } from 'vitest';
 import { createPool, migrate, type Pool } from '@debateai/db';
@@ -11,7 +12,8 @@ async function isolated(run:(database:TestDatabase,runtime:Pool)=>Promise<void>)
  const database=await startTestDatabase();let runtime:Pool|undefined;
  try {
   await migrate(database.pool);
-  await database.pool.query("CREATE ROLE task9_acceptance_runtime LOGIN PASSWORD 'step6c1-private-only' IN ROLE debateai_runtime");
+  // Signup's legal acceptance runs as debateai_billing_runtime since 0094 (legal writes API-only), as in staff-security-acceptance.
+  await database.pool.query("CREATE ROLE task9_acceptance_runtime LOGIN PASSWORD 'step6c1-private-only' IN ROLE debateai_runtime,debateai_billing_runtime");
   const url=new URL(database.connectionString);url.username='task9_acceptance_runtime';url.password='step6c1-private-only';runtime=createPool(url.toString());
   await run(database,runtime);
  } finally {await runtime?.end();await database.stop();}
@@ -90,7 +92,7 @@ it('requires both distinct matching current proofs for a fixed two-key command a
 it('upgrades all original migrations with a pending native two-key command without rewriting its evidence or truncating its proof requirement',async()=>{
  const database=await startTestDatabase();let jit:Pool|undefined,runtime:Pool|undefined;
  try {
-  const historical=(await readdir('migrations')).filter(name=>/^\d+.*\.sql$/.test(name)&&name<'0094_owner_one_verified_key.sql').sort();expect(historical).toHaveLength(101);
+  const historical=await authBranchMigrationsBefore('0094_owner_one_verified_key.sql');expect(historical).toHaveLength(101);
   for(const name of historical)await database.pool.query(await readFile('migrations/'+name,'utf8'));
   await database.pool.query(`ALTER ROLE debateai_prod_staff_recovery PASSWORD 'step6c1-upgrade-jit' VALID UNTIL '${new Date(Date.now()+240000).toISOString()}'`);
   await database.pool.query("CREATE ROLE step6c1_upgrade_runtime LOGIN PASSWORD 'step6c1-upgrade-only' IN ROLE debateai_runtime");

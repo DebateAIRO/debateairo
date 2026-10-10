@@ -1,0 +1,20 @@
+# Install as /etc/systemd/system/debateai-preview-notice@.service
+# Started by the spending gate's watchers (deploy/preview-gate/v2): one plain email to the owner
+# for a fixed gate event, through the same owner-only mail path as debateai-preview-alert@:
+#   debateai-preview-notice@gate-halted-<reason>.service  (gate-halt-watch, once per halt)
+#   debateai-preview-notice@gate-addresses-mismatch.service  (gate-addresses, once per change)
+# alert.mjs accepts only those two kinds; the email names the one command that fixes it.
+# A mail failure is logged and never fails this unit.
+[Unit]
+Description=DebateAI preview: email the owner a spending-gate notice (%i)
+CollectMode=inactive-or-failed
+
+[Service]
+Type=oneshot
+# Root runs node through `env -i` with PATH only, as the alert does.
+ExecStart=/usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/alert.mjs --notice %i
+TimeoutStartSec=60
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true

@@ -1,11 +1,15 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { foldSubscription } from "@debateai/billing-core";
+import { decimalToMicros, foldSubscription } from "@debateai/billing-core";
 import type { Pool } from "@debateai/db";
 import { startBillingHarness, testConsentDocuments, type BillingHarness } from "../support/billingHarness.js";
-import { testBillingPlans } from "../support/billingFixtures.js";
+import { StubGeo, testBillingPlans } from "../support/billingFixtures.js";
 import { testHttpIdentity } from "../support/httpSession.js";
-import { mountSubscriptionRoutes, subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
+import {
+  mountSubscriptionRoutes, seedNetopiaSubscription, subscriptionDeps, testAgreement
+} from "../support/billingSubscriptionFixtures.js";
+import { netopiaVerifyHandler, verifyJob } from "../support/netopia-verify.js";
+import { StubCardPayments, stubPaymentReport } from "../support/stub-card-payments.js";
 import { createUpgradeSettlement, quoteUpgrade, startUpgrade } from "../../apps/api/src/billing/upgrade.js";
 
 let h: BillingHarness;
@@ -36,8 +40,9 @@ async function scheduleErasure(pool: Pool, ownerRef: string): Promise<void> {
 }
 
 const quoteInput = (ownerRef: string) => ({
-  ownerRef, ip: IP, planId: "PLUS" as const, country: "RO", name: "Test Buyer", region: "Bucuresti", postalCode: null,
-  city: "Sector 1", company: null, now: h.clock.now
+  ownerRef, ip: IP, planId: "PLUS" as const, country: "RO", name: null, firstName: "Test", lastName: "Buyer",
+  phone: "+40712345678", street: "Strada Test 1", region: "Bucuresti", postalCode: "010011", city: "Sector 1",
+  company: null, now: h.clock.now
 });
 
 describe("P15 no new money while an account erasure is pending", () => {
@@ -60,8 +65,8 @@ describe("P15 no new money while an account erasure is pending", () => {
     const identity = testHttpIdentity("p15-guard-routes");
     const paid = await h.activate({ ownerRef: identity.authenticated.ownerRef });
     const deps = subscriptionDeps(h.database.pool, {
-      recordsKey: h.recordsKey, tax: h.tax, xmoney: h.xmoney, geo: h.geo, clock: h.clock.read,
-      checkout: h.checkoutWith({}), accountEmail: { read: async () => "erasing@example.test" }
+      recordsKey: h.recordsKey, tax: h.tax, payments: h.payments, geo: h.geo, clock: h.clock.read,
+      accountEmail: { read: async () => "erasing@example.test" }
     });
     const api = await mountSubscriptionRoutes(deps, identity);
     const headers = { "x-test-session": identity.rawSessionToken };
@@ -72,8 +77,13 @@ describe("P15 no new money while an account erasure is pending", () => {
     await scheduleErasure(h.database.pool, paid.ownerRef);
     for (const [url, payload] of [
       ["/v1/billing/subscription/upgrade-quote", { plan_id: "PRO" }],
-      ["/v1/billing/subscription/upgrade", { plan_id: "PRO", quote_ref: quoted.json().quote_ref as string }],
-      ["/v1/billing/subscription/card", undefined]
+      ["/v1/billing/subscription/upgrade", {
+        plan_id: "PRO", quote_ref: quoted.json().quote_ref as string, locale: "en", renewal_terms: testAgreement("en")
+      }],
+      ["/v1/billing/subscription/card", {
+        locale: "en", renewal_terms: testAgreement("en"), first_name: "Erin", last_name: "Rasure", phone: "+40712345678",
+        street: "Strada Exemplu 1", city: "Bucuresti"
+      }]
     ] as const) {
       const response = await api.inject({ method: "POST", url, headers, ...(payload === undefined ? {} : { payload }) });
       expect(response.statusCode, url).toBe(409);
@@ -88,8 +98,8 @@ describe("P15 no new money while an account erasure is pending", () => {
     const bought = await h.buy({ ownerRef });
     // The checkout was open when the erasure was scheduled, and the hook failed: nothing ended the CREATED plan.
     await scheduleErasure(h.database.pool, ownerRef);
-    const payment = h.xmoney.pay({ externalOrderId: bought.chargeId, amountDecimal: bought.totalDecimal, cardCountry: "RO" });
-    await h.settle(payment.transactionId);
+    h.payments.pay(bought.chargeId, { amountMicros: decimalToMicros(bought.totalDecimal), cardCountry: "RO" });
+    await h.settle(bought.chargeId);
     const kinds = (await h.repository.charge(bought.chargeId))!.events.map((event) => [event.kind, event.errorCode]);
     expect(kinds).toEqual(expect.arrayContaining([["SUCCEEDED", null], ["REFUND_REQUESTED", "SUBSCRIPTION_ENDED"]]));
     const events = await h.repository.subscriptionEvents(bought.subscriptionId);
@@ -99,16 +109,23 @@ describe("P15 no new money while an account erasure is pending", () => {
 
   it("refunds an upgrade paid after the erasure was scheduled, and leaves the plan as it was", async () => {
     const ownerRef = randomUUID();
-    const paid = await h.activate({ ownerRef });
-    const deps = subscriptionDeps(h.database.pool, {
-      recordsKey: h.recordsKey, tax: h.tax, xmoney: h.xmoney, geo: h.geo, clock: h.clock.read
+    const seeded = await seedNetopiaSubscription(h.database.pool, {
+      ownerRef, planId: "PLUS", activatedAt: new Date(h.clock.now.getTime() - 5 * 86_400_000), taxCountry: "RO"
     });
+    const payments = new StubCardPayments();
+    const deps = subscriptionDeps(h.database.pool, { tax: h.tax, geo: new StubGeo(), clock: h.clock.read, payments });
     const quoted = await quoteUpgrade(deps, { ownerRef, planId: "PRO", ip: IP, now: h.clock.now });
-    const started = await startUpgrade(deps, { ownerRef, planId: "PRO", quoteRef: quoted.quote_ref });
+    const started = await startUpgrade(deps, {
+      ownerRef, userId: randomUUID(), planId: "PRO", quoteRef: quoted.quote_ref, ip: IP, userAgent: "p15-guard",
+      locale: "en", agreement: testAgreement("en")!
+    });
     await scheduleErasure(h.database.pool, ownerRef);
-    await h.worker.drain(10);
+    const charge = (await h.repository.charge(started.charge_ref))!;
+    payments.scriptStatus(started.charge_ref, stubPaymentReport(started.charge_ref, "PAID", { amountMicros: charge.totalMicros }));
+    const { verify } = netopiaVerifyHandler(h.database.pool, { payments, clock: h.clock.read });
+    await verify.handle(verifyJob(started.charge_ref, h.clock.now), h.clock.now);
     const kinds = (await h.repository.charge(started.charge_ref))!.events.map((event) => [event.kind, event.errorCode]);
     expect(kinds).toEqual(expect.arrayContaining([["REFUND_REQUESTED", "SUBSCRIPTION_ENDED"]]));
-    expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId)).planId).toBe("PLUS");
+    expect(foldSubscription(await h.repository.subscriptionEvents(seeded.subscriptionId)).planId).toBe("PLUS");
   });
 });

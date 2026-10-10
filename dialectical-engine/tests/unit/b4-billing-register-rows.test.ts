@@ -129,7 +129,7 @@ describe("billingPlans v1 carries exactly the owner's plans", () => {
 describe("billingPolicy v1 keeps billing switched off", () => {
   const policy = policyOf(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value);
 
-  it("carries the spec's values, with no xMoney environment and no owner address (A22)", () => {
+  it("carries the spec's values, with no payment environment and no owner address (A22)", () => {
     expect(BILLING_POLICY_ROW_KEY).toBe("billingPolicy");
     expect(policy).toMatchObject({
       enabled: false,
@@ -142,7 +142,7 @@ describe("billingPolicy v1 keeps billing switched off", () => {
       taxCode: "saas",
       invoiceIssuerRules: { RO: "SMARTBILL", "*": "QUADERNO" }
     });
-    expect(policy).not.toHaveProperty("xmoneyEnvironment");
+    expect(policy).not.toHaveProperty("paymentEnvironment");
     expect(Object.keys(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value)).not.toContain("owner_report_email_ref");
   });
 
@@ -170,7 +170,7 @@ describe("billingPolicy v1 keeps billing switched off", () => {
   });
 
   it.each([
-    ["the xMoney environment A22 removed", (row: Record<string, unknown>) => { row.xmoney_environment = "stage"; }],
+    ["a policy naming a payment environment (A22: the environment follows the API's base URL, never the policy)", (row: Record<string, unknown>) => { row.payment_environment = "sandbox"; }],
     ["no catch-all invoice rule", (row: Record<string, unknown>) => { row.invoice_issuer_rules = { RO: "SMARTBILL" }; }],
     ["a lower-case rule country", (row: Record<string, unknown>) => { row.invoice_issuer_rules = { ro: "SMARTBILL", "*": "QUADERNO" }; }],
     // P2-M23 (spec §1.4): exactly RO→SmartBill and everything else→Quaderno. A catch-all SmartBill would issue
@@ -199,7 +199,8 @@ describe("billingPolicy v1 keeps billing switched off", () => {
     }],
     ["a withdrawal list of one country", (row: Record<string, unknown>) => { row.withdrawal_countries = ["RO"]; }],
     ["a quote that lives under a minute", (row: Record<string, unknown>) => { row.quote_ttl_seconds = 30; }],
-    // Final review Part 1b, Minor 6: a changed renewal needs at least 7 business days' notice (xMoney, M3).
+    // Final review Part 1b, Minor 6: a changed renewal needs at least 7 business days' notice (M3; A7's notice rule,
+    // kept for NETOPIA until N-23 is answered).
     ["a renewal notice under the 7 business days a changed renewal needs", (row: Record<string, unknown>) => {
       row.renewal_notice_business_days = 6;
     }],

@@ -21,6 +21,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const REF = "0123456789abcdef0123456789abcdef";
+async function settle(): Promise<void> {
+  for (let hop = 0; hop < 6; hop += 1) await act(async () => { await Promise.resolve(); });
+}
+
 async function mount(getBillingCharge: ReturnType<typeof vi.fn>): Promise<void> {
   await act(async () => {
     root.render(
@@ -80,9 +85,27 @@ describe("P19 the waiting screen (B5)", () => {
     expect(container.textContent).toBe("REFUSED");
   });
 
-  // W15 F1 (P2-M5): a checkout whose payment was refunded at xMoney before we verified it reads FAILED with
+  // F4 (ruling PR-55, finding ui-1): the owner refunds by hand, so the refund and its email can be days away. Until
+  // the refund is recorded the server answers REFUND_PENDING, and the page says the refund is on its way.
+  it("a refused payment whose refund is not recorded yet says it is on its way, then 'refunded' once it is (F4)", async () => {
+    await mount(vi.fn(async () => ({ state: "FAILED" as const, reason_code: "REFUND_PENDING" })));
+    expect(container.textContent).toBe(billingEnglish["billing.checkout.refundPending"]);
+    expect(container.textContent)
+      .toBe("We can't use this payment, so we're refunding it to your card in full. We'll email you when it's done.");
+    expect(container.textContent).not.toContain("no money was taken");
+    expect(container.textContent).not.toContain("We refunded");
+    for (const reason of ["ALREADY_SUBSCRIBED", "SUBSCRIPTION_ENDED", "UPGRADE_CLOSED"]) {
+      act(() => root.unmount());
+      root = createRoot(container);
+      await mount(vi.fn(async () => ({ state: "FAILED" as const, reason_code: reason })));
+      expect(container.textContent, reason).toBe("We refunded this payment in full. The email we sent explains why.");
+      expect(container.textContent, reason).not.toContain("no money was taken");
+    }
+  });
+
+  // W15 F1 (P2-M5): a checkout whose payment was refunded at NETOPIA before we verified it reads FAILED with
   // PROVIDER_REFUND. The money was taken and given back, so never "no money was taken", and no email follows it.
-  it("a checkout refunded at xMoney before it started says the card was refunded and the plan didn't start (P2-M5)", async () => {
+  it("a checkout refunded at NETOPIA before it started says the card was refunded and the plan didn't start (P2-M5)", async () => {
     await mount(vi.fn(async () => ({ state: "FAILED" as const, reason_code: "PROVIDER_REFUND" })));
     expect(container.textContent).toBe(billingEnglish["billing.checkout.refundedBeforeStart"]);
     expect(container.textContent).toBe("This payment was refunded to your card in full, and your plan didn't start. You can try again.");
@@ -104,7 +127,7 @@ describe("P19 the waiting screen (B5)", () => {
   it("a new card from a country we cannot serve (D6a's CARD_CHECK_REFUSED) says so, since no email follows", async () => {
     await mount(vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CARD_CHECK_REFUSED" })));
     expect(container.textContent).toBe(
-      "We can't accept cards issued in that card's country. The hold on it is released, and your plan keeps the card it had."
+      "We can't accept cards issued in that card's country. Nothing was charged, and your plan keeps the card it had."
     );
     expect(container.textContent).not.toContain("email");
   });
@@ -115,5 +138,24 @@ describe("P19 the waiting screen (B5)", () => {
       "We couldn't save your new card just now because a payment on your plan is still being confirmed. Your current card stays in use; please try again in an hour."
     );
     expect(container.textContent).not.toBe("PAID");
+  });
+
+  it("words an upgrade's confirmation from the charge's kind, and a card check that saved no card (N18, N13)", async () => {
+    const upgrade = vi.fn(async () => ({ state: "SUCCEEDED" as const, reason_code: null, kind: "UPGRADE" as const }));
+    await act(async () => {
+      root.render(<ChargeStatusPoller chargeRef={REF} catalog={billingEnglish} client={{ getBillingCharge: upgrade }}
+        successText="checkout success" upgradeSuccessText="upgrade success" failureText="failed" />);
+    });
+    await settle();
+    expect(container.textContent).toBe("upgrade success");
+    const notSaved = vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CARD_NOT_SAVED", kind: "CARD_CHECK" as const }));
+    act(() => root.unmount());
+    root = createRoot(container);
+    await act(async () => {
+      root.render(<ChargeStatusPoller chargeRef={REF} catalog={billingEnglish} client={{ getBillingCharge: notSaved }}
+        successText="saved" failureText="failed" />);
+    });
+    await settle();
+    expect(container.textContent).toBe((billingEnglish as Record<string, string>)["billing.card.notSaved"]);
   });
 });

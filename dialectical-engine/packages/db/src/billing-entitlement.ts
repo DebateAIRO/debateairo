@@ -21,7 +21,7 @@ export type EntitlementPlanId = typeof ENTITLEMENT_PLAN_IDS[number];
  * plan's `paid_through` (A8a), and that 0084 refuses on a FREE row:
  *  - RENEWAL_POSTPONED (R-22): a renewal waiting for its notice (A7);
  *  - PAST_DUE_GRACE (R-22): a charge being retried (dunning);
- *  - RENEWAL_PENDING (ruling Q-1): a renewal waiting out an xMoney or tax-service
+ *  - RENEWAL_PENDING (ruling Q-1): a renewal waiting out a NETOPIA or tax-service
  *    outage, at most 72 h past the period end (P11a owns that bound).
  */
 export const ENTITLEMENT_CAUSES = Object.freeze([

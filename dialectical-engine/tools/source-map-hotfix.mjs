@@ -12,7 +12,7 @@ const PIN = "source-map-js@1.2.2";
 const SRI = "sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==";
 const COMMANDS = Object.freeze({
   install: ["install", "--frozen-lockfile"], generate: ["run", "generate:contract"],
-  typecheck: ["run", "typecheck"], tests: ["run", "test:ci-gate"],
+  typecheck: ["run", "typecheck"], tests: ["run", "test:ci-gate"], integration: ["run", "test:ci-integration"], registration: ["run", "test:ci-integration-registration"],
   audit: ["audit", "--audit-level=moderate"],
   ui: ["--filter", "dialectical-engine-v2ui", "build"],
   floor: ["exec", "vitest", "run", "tests/architecture/dependency-floors.test.ts"]

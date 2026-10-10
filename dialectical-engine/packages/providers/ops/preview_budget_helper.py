@@ -21,6 +21,7 @@ INPUT_PRICE = Decimal('0.15')
 OUTPUT_PRICE = Decimal('0.50')
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_TIMEOUT_SECONDS = 600
+CONNECT_TIMEOUT_SECONDS = 15  # TCP connect + TLS handshake; a black-holed address fails (unsent) fast.
 
 
 # SafetyError is not defined here: the gate checks this file's custody and hash, then runs it with
@@ -29,6 +30,11 @@ MAX_TIMEOUT_SECONDS = 600
 
 class ResponseTooLarge(SafetyError):  # noqa: F821 - provided by the gate
     pass
+
+
+class RequestNotSent(SafetyError):  # noqa: F821 - provided by the gate
+    """Provably unsent: the TCP connect or the TLS handshake failed, or the deadline passed, before
+    http.client was asked to write any byte of the request. Nothing billable reached the provider."""
 
 
 def utc_now():
@@ -205,7 +211,9 @@ class HttpsTransport:
         if not isinstance(payload, bytes):
             raise SafetyError('request_bytes_required')
         deadline = time.monotonic() + self.timeout
-        connection = http.client.HTTPSConnection('api.deepinfra.com', timeout=self.timeout, context=ssl.create_default_context())
+        # The connect gets its own short timeout; remaining() then gives the socket the rest.
+        connection = http.client.HTTPSConnection('api.deepinfra.com', timeout=min(CONNECT_TIMEOUT_SECONDS, self.timeout),
+                                                 context=ssl.create_default_context())
 
         def remaining():
             seconds = deadline - time.monotonic()
@@ -214,8 +222,13 @@ class HttpsTransport:
             if connection.sock is not None:
                 connection.sock.settimeout(seconds)
         try:
-            connection.connect()
-            remaining()
+            try:
+                # Only the TCP connect and the TLS handshake: no request byte exists on the wire
+                # before connection.request() below, so a failure here is provably unsent.
+                connection.connect()
+                remaining()
+            except Exception:  # noqa: BLE001 - every failure before the request is the same fact
+                raise RequestNotSent('request_not_sent') from None
             connection.request('POST', '/v1/openai/chat/completions', body=payload,
                                headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Accept': 'application/json'})
             remaining()

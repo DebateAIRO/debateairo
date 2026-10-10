@@ -176,7 +176,7 @@ export type AdmissionPolicy = Readonly<{
   billingQuote: AdmissionScopePolicy<"owner"> | null;
   /** Paid plans P8c: checkouts, 10 an hour per owner (spec §2.7; value pending V-1). */
   billingCheckout: AdmissionScopePolicy<"owner"> | null;
-  /** Paid plans P9a: xMoney's notices, 120 a minute per source (contract §2). */
+  /** Paid plans P9a: NETOPIA's unverified payment messages, 120 a minute per source (contract §2). */
   billingNotify: AdmissionScopePolicy<"source"> | null;
   /** P13 (A25): the public cancel link, per source network. */
   billingCancelLink: AdmissionScopePolicy<"source"> | null;
@@ -274,7 +274,7 @@ export const ADMISSION_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     billing_checkout: Object.freeze({
       key: "owner" as const, limit: 10, window_ms: 60 * 60_000, capacity: 65_536
     }),
-    // Paid plans P9a: xMoney's notices, 120 a minute per source (contract §2).
+    // Paid plans P9a: NETOPIA's unverified payment messages, 120 a minute per source (contract §2).
     billing_notify: Object.freeze({
       key: "source" as const, limit: 120, window_ms: 60_000, capacity: 65_536
     }),

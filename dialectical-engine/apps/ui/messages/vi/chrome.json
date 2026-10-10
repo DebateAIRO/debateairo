@@ -65,6 +65,7 @@
   "chrome.footer.cancel": "Hủy gói",
   "chrome.footer.withdraw": "Rút lại gói",
   "chrome.footer.paymentMarks": "Các thẻ chúng tôi chấp nhận",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

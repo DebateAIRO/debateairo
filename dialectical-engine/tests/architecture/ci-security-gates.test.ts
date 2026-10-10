@@ -1,10 +1,12 @@
 // tests/architecture/ci-security-gates.test.ts
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 const gitRoot = resolve(import.meta.dirname, "../../..");
 const read = (p: string) => readFileSync(resolve(gitRoot, p), "utf8");
+const workflowFiles = () => readdirSync(resolve(gitRoot, ".github/workflows")).filter((name) => /\.ya?ml$/.test(name)).sort()
+  .map((name) => `.github/workflows/${name}`);
 const { commandArguments } = await import(pathToFileURL(resolve(gitRoot, "dialectical-engine/tools/source-map-hotfix.mjs")).href) as {
   commandArguments: (label: string) => string[];
 };
@@ -40,8 +42,68 @@ describe("CI security gates (F-03)", () => {
     for (const needle of [`node-version: ${declaredNodeFloor()}`, "gitleaks", "github/codeql-action/analyze"]) expect(wf).toContain(needle);
     expect(executableGateCommands(wf)).toEqual([
       "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run typecheck",
-      "pnpm run test:ci-gate", "pnpm audit --audit-level=moderate"
+      "pnpm run test:ci-gate", "pnpm audit --audit-level=moderate",
+      // job auth-integration (2026-10-09); the registration suite has its own workflow (see below)
+      "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-integration"
     ]);
+  });
+  // 2026-10-09 (review of PR #82): the integration suites are the only real proof of the sign-in and account-security
+  // rules, and `verify` never ran tests/integration. A separate job runs the curated list through the same gate.
+  it("runs the curated auth/security integration suites in their own job, through the known-red gate", async () => {
+    const wf = read(".github/workflows/security.yml");
+    const job = wf.slice(wf.indexOf("\n  auth-integration:\n"), wf.indexOf("\n  secrets:\n"));
+    expect(wf).toMatch(/^  pull_request: \{ branches: \[main, dev\] \}$/m);
+    expect(wf).not.toContain("registration-integration:");
+    expect(job).toContain("runs-on: ubuntu-latest");
+    expect(job).toContain(`node-version: ${declaredNodeFloor()}`);
+    expect(executableGateCommands(job)).toEqual(["pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-integration"]);
+    const scripts = JSON.parse(read("dialectical-engine/package.json")).scripts as Record<string, string>;
+    expect(scripts["test:ci-integration"]).toBe("node tools/ci-known-red.mjs @tests/ci-integration-auth.txt");
+    const { expandTargets } = await import(pathToFileURL(resolve(gitRoot, "dialectical-engine/tools/ci-known-red.mjs")).href) as {
+      expandTargets: (args: string[]) => { targets: string[]; invalid: string[] };
+    };
+    expect(scripts["test:ci-integration-registration"]).toBe("node tools/ci-known-red.mjs @tests/ci-integration-registration.txt");
+    const { targets, invalid } = expandTargets(["@tests/ci-integration-auth.txt", "@tests/ci-integration-registration.txt"]);
+    expect(invalid).toEqual([]);
+    for (const file of targets) expect(file).toMatch(/^tests\/integration\/[\w.-]+\.test\.ts$/);
+    // The suites the review named as the only real proof of each rule stay on the list.
+    for (const name of ["verification-send-budget", "session-database", "phone-profile-database", "recovery-email-database",
+      "backup-email-database", "password-reset-flow", "email-mfa-flow", "mfa-recovery-database", "consumer-recovery-journey",
+      "registration-database", "account-flow-release-upgrade", "staff-access-database", "staff-http-database",
+      "staff-security-acceptance", "staff-disable-races", "staff-webauthn-database"]) {
+      expect(targets, name).toContain(`tests/integration/${name}.test.ts`);
+    }
+  });
+  // 2026-10-09: the registration/verification-mail suite alone takes ~34 minutes, so it is NOT run on every pull request.
+  // Its own workflow runs it when a path that can change its outcome changes, nightly against dev, and by hand.
+  it("runs the long registration suite only on relevant changes, nightly against dev and by hand", () => {
+    const wf = read(".github/workflows/registration-integration.yml");
+    expect(executableGateCommands(wf)).toEqual(["pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-integration-registration"]);
+    expect(wf).toContain("runs-on: ubuntu-latest");
+    expect(wf).toContain(`node-version: ${declaredNodeFloor()}`);
+    expect(wf).toMatch(/^    timeout-minutes: 120$/m);
+    expect(wf).toMatch(/^  schedule: \[\{ cron: "30 3 \* \* \*" \}\]$/m);
+    expect(wf).toMatch(/^  workflow_dispatch:$/m);
+    expect(wf).toContain(`ref: "\${{ github.event_name == 'schedule' && 'dev' || '' }}"`);
+    expect(wf).not.toMatch(/^  push:/m);
+    const pullRequest = wf.slice(wf.indexOf("\n  pull_request:\n"), wf.indexOf("\n  schedule:"));
+    expect(pullRequest).toContain("branches: [main, dev]");
+    const paths = [...pullRequest.matchAll(/^      - "([^"]+)"$/gm)].map((match) => match[1]);
+    for (const path of ["dialectical-engine/migrations/**", "dialectical-engine/packages/db/**", "dialectical-engine/apps/api/src/registration*",
+      "dialectical-engine/apps/api/src/sessions.ts", "dialectical-engine/apps/api/src/turnstile.ts",
+      "dialectical-engine/tests/integration/registration-database.test.ts", "dialectical-engine/tests/support/**",
+      "dialectical-engine/tests/ci-integration-registration.txt", "dialectical-engine/tools/ci-known-red.mjs",
+      ".github/workflows/registration-integration.yml"]) expect(paths, path).toContain(path);
+    // Every listed path names something that exists, so a rename cannot silently stop the trigger.
+    const scripts = JSON.parse(read("dialectical-engine/package.json")).scripts as Record<string, string>;
+    expect(scripts["test:ci-integration-registration"]).toBe("node tools/ci-known-red.mjs @tests/ci-integration-registration.txt");
+    for (const path of paths) {
+      const fixed = path!.replace(/\/\*\*$/, "").replace(/\*$/, "");
+      const existing = path!.endsWith("*") && !path!.endsWith("/**")
+        ? readdirSync(resolve(gitRoot, dirname(fixed))).some((entry) => entry.startsWith(basename(fixed)))
+        : existsSync(resolve(gitRoot, fixed));
+      expect(existing, path).toBe(true);
+    }
   });
   it("cannot satisfy an executable gate with a comment or removed step", () => {
     const wf = read(".github/workflows/security.yml");
@@ -173,12 +235,19 @@ describe("CI security gates (F-03)", () => {
     const floor = declaredNodeFloor();
     expect(existsSync(resolve(gitRoot, ".nvmrc")), ".nvmrc at the git root").toBe(true);
     expect(read(".nvmrc").trim()).toBe(floor);
+    for (const workflow of workflowFiles()) {
+      const nodeVersions = read(workflow).match(/node-version: [^,}\s]+/g) ?? [];
+      for (const pin of nodeVersions) expect(pin, workflow).toBe(`node-version: ${floor}`);
+    }
     expect(read(".github/workflows/security.yml")).toContain(`node-version: ${floor}`);
     expect(JSON.parse(read("dialectical-engine/register.bootstrap.json")).values.nodeRuntimeVersion).toBe("v22.23.1");
   });
   it("pins every action to a full commit SHA with its release tag as a comment (L6-F7)", () => {
-    const uses = read(".github/workflows/security.yml").split("\n").filter((line) => /^\s*-?\s*uses:/.test(line));
-    expect(uses.length).toBeGreaterThan(0);
-    for (const line of uses) expect(line).toMatch(/uses: [\w.-]+\/[\w./-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/);
+    expect(workflowFiles()).toEqual([".github/workflows/registration-integration.yml", ".github/workflows/security.yml"]);
+    for (const workflow of workflowFiles()) {
+      const uses = read(workflow).split("\n").filter((line) => /^\s*-?\s*uses:/.test(line));
+      expect(uses.length, workflow).toBeGreaterThan(0);
+      for (const line of uses) expect(line, workflow).toMatch(/uses: [\w.-]+\/[\w./-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/);
+    }
   });
 });

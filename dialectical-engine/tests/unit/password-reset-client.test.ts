@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { createPasswordResetClient } from "../../packages/contract/src/password-reset.js";
+import { buildApi, type AskApplication } from "../../apps/api/src/index.js";
+import { RECOVERY_START_PUBLIC_RESPONSE } from "../../apps/api/src/recovery.js";
+import { passwordResetOnVirtualClock } from "../support/recoveryStartStorage.js";
+
+const ORIGIN = "https://preview.example.test";
 
 const state = { status: "password_required", expires_at: "2030-01-01T00:00:00Z", password_min_length: 12, password_max_length: 1024 };
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "content-type": "application/json" } });
@@ -47,9 +52,31 @@ describe("password-only reset typed client", () => {
       await expect(malformed.status()).rejects.toThrow("Password reset could not be confirmed.");
     }
   });
-  it("keeps start enumeration-resistant and errors secret-free", async () => {
-    const client = createPasswordResetClient(async () => json({ message: "If this account can be recovered, instructions will arrive through an eligible channel." }, 202));
-    expect(await client.start("demo@example.test")).toEqual({ message: "If this account can be recovered, instructions will arrive through an eligible channel." });
+  it("keeps start enumeration-resistant end to end: the real reset service answers known and unknown addresses alike", async () => {
+    // The client talks to the real start route and the real PasswordResetService; only storage is in memory.
+    const { service, storage } = passwordResetOnVirtualClock(["owned@example.test"]);
+    const api = buildApi({ application: {} as AskApplication, allowedOrigin: ORIGIN, passwordReset: service });
+    try {
+      const transport = (async (input, init) => {
+        const injected = await api.inject({
+          method: (init?.method ?? "GET") as "GET" | "POST", url: String(input),
+          headers: { ...Object.fromEntries(new Headers(init?.headers).entries()), origin: ORIGIN },
+          ...(init?.body === undefined ? {} : { payload: String(init.body) })
+        });
+        const headers = new Headers();
+        for (const [name, value] of Object.entries(injected.headers)) if (typeof value === "string") headers.set(name, value);
+        return new Response(injected.body, { status: injected.statusCode, headers });
+      }) as typeof fetch;
+      const client = createPasswordResetClient(transport, "/");
+      const known = await client.start("owned@example.test"), unknown = await client.start("nobody-here@example.test");
+      expect(known).toEqual(RECOVERY_START_PUBLIC_RESPONSE);
+      expect(unknown).toEqual(known);
+      expect(storage.starts.map((row) => row.candidateId === null)).toEqual([false, true]);
+    } finally {
+      await api.close();
+    }
+  });
+  it("keeps reset errors secret-free", async () => {
     const rejected = createPasswordResetClient(async () => json({ error: "PASSWORD_RESET_PROOF_INVALID", detail: "secret fixture" }, 401));
     await expect(rejected.complete("secret fixture", "123456")).rejects.toMatchObject({ status: 401, serverCode: "PASSWORD_RESET_PROOF_INVALID", message: "Password reset was not accepted." });
   });

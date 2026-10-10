@@ -11,6 +11,9 @@ const CONTRACT_PATH='dialectical-engine/packages/contract/';
 const CONTRACT_OUTPUT_PATH=CONTRACT_PATH+'generated/';
 const CONTRACT_OUTPUT_NAMES=['client.ts','field-inventory.json','openapi.json'];
 const OPERATOR_PATH='dialectical-engine/deploy/preview-auth-dev/v1/';
+/** The one operator digest formula: every launcher, the native operator and the release tool call this. */
+export const operatorFiles=manifest=>manifest.files.filter(file=>file.path.startsWith(OPERATOR_PATH));
+export const operatorManifestSha256=manifest=>sha256(JSON.stringify(operatorFiles(manifest)));
 // Only this source-derived UI output is delegated to the separate complete UiBuildManifest.
 const generatedPaths=role=>[CONTRACT_OUTPUT_PATH.slice(0,-1),...(role==='ui'?['dialectical-engine/apps/ui/.next']:[])];
 const compare=(a,b)=>Buffer.compare(Buffer.from(a),Buffer.from(b));
@@ -135,11 +138,11 @@ async function verifyExecutingOperator(manifest,execution) {
   if(entryUrl.protocol!=='file:'||entryUrl.search||entryUrl.hash||selfUrl.search||selfUrl.hash
     ||fileURLToPath(entryUrl)!==entry||entryUrl.href!==pathToFileURL(entry).href||fileURLToPath(selfUrl)!==verifier
     ||process.argv[1]!==entry||resolve(process.argv[1])!==entry||await realpath(entry)!==entry||await realpath(verifier)!==verifier)refuse('PREVIEW_EXECUTING_OPERATOR_REFUSED');
-  const declared=manifest.files.filter(file=>file.path.startsWith(OPERATOR_PATH));
+  const declared=operatorFiles(manifest);
   const actual=(await buildInventory(operatorRoot,manifest.uid,{complete:true,allowedRoot:manifest.sourceRoot})).map(file=>({...file,path:OPERATOR_PATH+file.path}));
   // Compare fields explicitly: property insertion order is not module identity.
   if(!declared.some(file=>file.path===OPERATOR_PATH+execution.entryName)
-    ||sha256(JSON.stringify(declared))!==execution.operatorManifestSha256
+    ||operatorManifestSha256(manifest)!==execution.operatorManifestSha256
     ||actual.length!==declared.length||actual.some((file,index)=>file.path!==declared[index]?.path||file.sha256!==declared[index]?.sha256||file.mode!==declared[index]?.mode))refuse('PREVIEW_EXECUTING_OPERATOR_REFUSED');
 }
 

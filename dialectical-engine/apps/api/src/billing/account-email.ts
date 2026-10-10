@@ -7,7 +7,7 @@ export interface AccountEmailReader {
 }
 
 /**
- * Spec §2.5.3 step 3: xMoney's customer gets the account email, decrypted with the person's DEK inside the API,
+ * Spec §2.5.3 step 3: NETOPIA's payer gets the account email, decrypted with the person's DEK inside the API,
  * with the AAD registration wrote it under (apps/api/src/registration.ts:1271-1273). Buffers are zeroed.
  * Only an `active` account has an address to give: `age_frozen` (0077), `pending_mfa`, `suspended` and `deleted`
  * accounts answer BILLING_ACCOUNT_EMAIL_UNAVAILABLE.

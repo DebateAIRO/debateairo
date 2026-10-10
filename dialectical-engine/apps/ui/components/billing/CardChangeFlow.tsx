@@ -1,124 +1,168 @@
 "use client";
 
-import { useState } from "react";
-import { ContractHttpError, type ContractClient } from "@debateai/contract";
+import { useEffect, useState } from "react";
+import { ContractHttpError, postcodeOptional, type ContractClient } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
-import { formatUsd } from "@/lib/billing/format";
-import type { XMoneySdkLoader } from "@/lib/billing/xmoneySdk";
+import { countryName, formatUsd } from "@/lib/billing/format";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import billingEnglish from "@/messages/en/billing.json";
+import { BillingDetailsFields, type BillingDetails } from "./BillingDetailsFields";
 import { ChargeStatusPoller } from "./ChargeStatusPoller";
-import { XMoneyCardForm } from "./XMoneyCardForm";
+import type { ConsentPair } from "./CheckoutFlow";
 
-export type CardChangeClient = Pick<ContractClient, "startCardChange" | "getBillingCharge">;
-type Checkout = Awaited<ReturnType<ContractClient["startCardChange"]>>;
+export type CardChangeClient = Pick<ContractClient, "getBillingCardDetails" | "getBillingSubscription" | "startCardChange" | "getBillingCharge">;
+type Stored = Awaited<ReturnType<ContractClient["getBillingCardDetails"]>>;
 
-const NO_HOLD = /^0+(?:\.0+)?$/;
-
-/** Leaves for sign-in the way CheckoutFlow does (no history entry back to a page that cannot change the card). */
 const leaveFor = (href: string): void => { window.location.replace(href); };
-
-/** The API's SESSION_REQUIRED: the session ended while the page was open (expired, revoked, signed out elsewhere). */
+/** Spec §2.11: NETOPIA's check for 0 is reached by a top-level navigation, as the checkout's page is. */
+const leaveForPayment = (url: string): void => { window.location.assign(url); };
 const sessionEnded = (failure: unknown): boolean => failure instanceof ContractHttpError && failure.status === 401;
 
-/**
- * AMENDMENTS-R1 A12: a new managed order with an authorisation hold that is released at once. It lives on its own
- * page, so the xMoney policy (A11) never touches /settings itself. Spec §1.3: the page names the hold in plain words,
- * with the amount the server signed (`hold_amount`), before the person presses "Save card".
- */
+/** Spec 2026-10-05 §2.11 (C-2): corrected details (country and region fixed, §2.5.3), the agreement, NETOPIA's 0 check. */
 export function CardChangeFlow({
   catalog = billingEnglish,
   locale,
-  sdkOrigin,
-  nonce,
+  renewalConsent,
   returnedChargeRef = null,
   client = contractClient,
-  loadSdk,
-  navigate = leaveFor
+  navigate = leaveFor,
+  goToPayment = leaveForPayment
 }: Readonly<{
   catalog?: MessageCatalog;
   locale: string;
-  sdkOrigin: string | null;
-  nonce: string | undefined;
-  /** P12e's backUrl `/settings/card?charge=<ref>`: back from the bank's check, the page polls that charge. */
+  /** The renewal sentence's manifest pair in this locale; null: the page offers no check (the server would refuse it). */
+  renewalConsent: ConsentPair | null;
   returnedChargeRef?: string | null;
   client?: CardChangeClient;
-  loadSdk?: XMoneySdkLoader;
   navigate?: (href: string) => void;
+  goToPayment?: (url: string) => void;
 }>) {
-  const [checkout, setCheckout] = useState<Checkout | null>(null);
-  const [chargeRef, setChargeRef] = useState<string | null>(returnedChargeRef);
+  const [stored, setStored] = useState<Stored | null>(null);
+  const [details, setDetails] = useState<BillingDetails | null>(null);
+  const [city, setCity] = useState("");
+  const [total, setTotal] = useState<string | null>(null);
+  const [cancelRequested, setCancelRequested] = useState(false);
+  const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [messageKey, setMessageKey] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (returnedChargeRef !== null) return;
+    let active = true;
+    void (async () => {
+      try {
+        const [read, subscribed] = await Promise.all([client.getBillingCardDetails(), client.getBillingSubscription()]);
+        if (!active) return;
+        setStored(read);
+        setDetails({
+          firstName: read.first_name ?? "", lastName: read.last_name ?? "", phone: read.phone ?? "",
+          street: read.street ?? "", postalCode: read.postal_code ?? ""
+        });
+        setCity(read.city ?? "");
+        setTotal(subscribed.subscription?.renewal_total ?? null);
+        setCancelRequested(subscribed.subscription?.cancel_requested ?? false);
+      } catch (failure) {
+        if (!active) return;
+        if (sessionEnded(failure)) { navigate(`/login?next=${encodeURIComponent("/settings/card")}`); return; }
+        setMessageKey(failure instanceof ContractHttpError && failure.serverCode === "NOT_SUBSCRIBED"
+          ? "billing.card.notSubscribed" : "billing.checkout.genericError");
+      }
+    })();
+    return () => { active = false; };
+  }, [client, navigate, returnedChargeRef]);
+
   async function start(): Promise<void> {
+    if (stored === null || details === null || renewalConsent === null) return;
     setBusy(true);
     setMessageKey(null);
     try {
-      setCheckout(await client.startCardChange());
+      const started = await client.startCardChange({
+        locale, renewal_terms: renewalConsent, first_name: details.firstName.trim(), last_name: details.lastName.trim(),
+        phone: details.phone.trim(), street: details.street.trim(), city: city.trim(),
+        ...(details.postalCode.trim() === "" ? {} : { postal_code: details.postalCode.trim() })
+      });
+      goToPayment(started.redirect_url);
     } catch (failure) {
-      // Spec §2.10: the page requires sign-in. A session that ended goes back to sign-in and then to this page, with
-      // no error sentence, as CheckoutFlow does.
+      setBusy(false);
       if (sessionEnded(failure)) {
         navigate(`/login?next=${encodeURIComponent("/settings/card")}`);
         return;
       }
       const code = failure instanceof ContractHttpError ? failure.serverCode : null;
       setMessageKey(code === "NOT_SUBSCRIBED" ? "billing.card.notSubscribed"
-        // P15 (D6b): while an account deletion is pending, the card change takes no new hold.
         : code === "ACCOUNT_ERASURE_PENDING" ? "billing.checkout.erasurePending"
-        // P12e (D6b, 409): a payment on the plan is still being confirmed, so no card check starts now.
         : code === "CARD_CHANGE_NOT_AVAILABLE_NOW" ? "billing.card.tryAgainShortly"
-        // P12e (D6b, 403): the updated Terms come first, as at checkout.
         : code === "LEGAL_REACCEPTANCE_REQUIRED" ? "billing.checkout.reacceptRequired"
-        // W10 (P2-M19, 429): the hourly budget the card change shares with quotes, downgrades and undos is spent.
+        // F4 (finding ui-2): the agreement this page carries was superseded while it was open; a retry resends it.
+        : code === "LEGAL_DOCUMENT_STALE" ? "billing.checkout.pageOutdated"
         : code === "ADMISSION_RATE_LIMITED" ? "billing.checkout.rateLimited"
+        : code === "BILLING_PHONE_INVALID" ? "billing.checkout.phoneInvalid"
+        : code === "BILLING_ADDRESS_REQUIRED" ? "billing.checkout.detailsRequired"
+        : code === "PAYMENT_PROVIDER_UNAVAILABLE" ? "billing.checkout.formUnavailable"
         : "billing.checkout.genericError");
-    } finally {
-      setBusy(false);
     }
   }
 
-  const holdNote = checkout === null ? "" : NO_HOLD.test(checkout.hold_amount)
-    ? t(catalog, "billing.card.noHoldNote")
-    : t(catalog, "billing.card.holdNote", { amount: formatUsd(locale, checkout.hold_amount) });
+  const postalOptional = stored !== null && postcodeOptional(stored.country);
+  const complete = details !== null && [details.firstName, details.lastName, details.phone, details.street, city]
+    .every((value) => value.trim() !== "") && (postalOptional || details.postalCode.trim() !== "");
+  const canStart = !busy && complete && agreed && renewalConsent !== null && total !== null;
 
   return (
     <section aria-labelledby="card-change-title">
       <h1 id="card-change-title" className="setTitle">{t(catalog, "billing.card.title")}</h1>
       <p className="billingNote">{t(catalog, "billing.card.intro")}</p>
-      {chargeRef !== null ? (
+      {returnedChargeRef !== null ? (
         <ChargeStatusPoller
-          chargeRef={chargeRef}
+          chargeRef={returnedChargeRef}
           catalog={catalog}
           client={client}
           successText={t(catalog, "billing.card.saved")}
           failureText={t(catalog, "billing.card.failed")}
-          // No email follows a card check (RefundDesk sends none for its release), so the wait promises none.
+          // No email follows a card check, so the wait promises none.
           timedOutText={t(catalog, "billing.subscription.stillConfirming")}
         />
-      ) : checkout !== null ? (
-        <XMoneyCardForm
-          checkout={checkout}
-          sdkOrigin={sdkOrigin}
-          nonce={nonce}
-          locale={locale}
-          catalog={catalog}
-          submitLabel={t(catalog, "billing.card.save")}
-          summary={holdNote}
-          onSubmitted={() => setChargeRef(checkout.charge_ref)}
-          {...(loadSdk === undefined ? {} : { loadSdk })}
-        />
-      ) : (
-        <div className="billingActions">
-          <button type="button" className="btn btnDark" disabled={busy} onClick={() => { void start(); }}>
-            {t(catalog, "billing.checkout.continueToCard")}
-          </button>
-        </div>
-      )}
+      ) : stored !== null && details !== null ? (
+        <>
+          <div className="billingField">
+            <label htmlFor="card-country">{t(catalog, "billing.checkout.country")}</label>
+            <input id="card-country" value={countryName(locale, stored.country)} readOnly />
+          </div>
+          {stored.region !== null ? (
+            <div className="billingField">
+              <label htmlFor="card-region">{t(catalog, stored.country === "RO" ? "billing.checkout.county" : "billing.checkout.region")}</label>
+              <input id="card-region" value={stored.region} readOnly />
+            </div>
+          ) : null}
+          <p className="billingNote">{t(catalog, "billing.card.taxPlaceNote")}</p>
+          <BillingDetailsFields catalog={catalog} idPrefix="card" values={details} postalOptional={postalOptional}
+            onChange={(field, value) => setDetails({ ...details, [field]: value })} />
+          <div className="billingField">
+            <label htmlFor="card-city">{t(catalog, "billing.checkout.city")}</label>
+            <input id="card-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required />
+          </div>
+          <p className="billingNote">{t(catalog, "billing.card.noHoldNote")}</p>
+          {total !== null ? (
+            <>
+              <label className="billingConsent">
+                <input id="card-agreement" type="checkbox" checked={agreed} onChange={(event) => setAgreed(event.target.checked)} />
+                <span>{t(catalog, "billing.consent.renewal", { total: formatUsd(locale, total) })}</span>
+              </label>
+              <div className="billingActions">
+                <button type="button" className="btn btnDark" disabled={!canStart} onClick={() => { void start(); }}>
+                  {t(catalog, "billing.card.checkCard")}
+                </button>
+              </div>
+            </>
+          ) : (
+            // No total, no agreement to give and no check to start: say why instead of a button that never enables.
+            cancelRequested
+              ? <p className="billingStatus" role="status">{t(catalog, "billing.subscription.wontRenew")}</p>
+              : <p className="billingError" role="alert">{t(catalog, "billing.checkout.genericError")}</p>
+          )}
+        </>
+      ) : null}
       {messageKey === null ? null : messageKey === "billing.checkout.reacceptRequired" ? (
-        // W10 (P2-M20): the accept screen covers the signed-in home page (L4); a plain anchor, so leaving the card
-        // page is a full page load (P2-I14).
         <p className="billingError" role="alert"><a href="/">{t(catalog, messageKey)}</a></p>
       ) : <p className="billingError" role="alert">{t(catalog, messageKey)}</p>}
       <p className="billingActions"><a href="/settings">{t(catalog, "billing.card.back")}</a></p>

@@ -9,7 +9,7 @@ export type DevelopmentAuthStackProfile = Readonly<{
   providerPorts: readonly [number, number, number, number, number, number, number];
   supportModelPort: number;
   /**
-   * Paid plans (P6b): fake xMoney, Quaderno and SmartBill, started only with DEBATEAI_BILLING_FAKES=1.
+   * Paid plans (P6b): fake NETOPIA, Quaderno and SmartBill, started only with DEBATEAI_BILLING_FAKES=1.
    * Paid plans S1a: moved past the scorecard's two new relay slots (agy and pi-glm, the last two
    * `providerPorts`), which had taken the first two of these ports on their own branch.
    */

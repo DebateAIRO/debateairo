@@ -1,0 +1,77 @@
+# tests/ci-integration-auth.txt — the sign-in / account-security integration suites CI runs on every change.
+#
+# Gate: `pnpm run test:ci-integration` (tools/ci-known-red.mjs @tests/ci-integration-auth.txt), the CI job
+# "auth-integration" in .github/workflows/security.yml. Each file starts its own embedded PostgreSQL
+# (tests/support/testDatabase.ts; ubuntu installs @embedded-postgres/linux-x64) and runs the real migrations, so
+# these are the only checks that prove, against SQL, the rules the unit suites can only fake: the server-side resend
+# limit, the 30-day absolute session cut-off, phone masking and recovery-email lifecycle in storage, reset and
+# MFA-recovery non-enumeration, the staff boundary and the upgrade path. Files run one at a time
+# (vitest.config.ts fileParallelism: false). Failures are judged against tests/ci-known-red.txt like the unit gate;
+# host-sensitive cases (timing / memory tripwires) are reported but never gate, via tests/ci-flaky.txt.
+#
+# A file is listed only when it needs nothing outside the repository (no Docker, network, provider keys or host
+# services). Each was run alone on 2026-10-09 (branch fix/2026-10-09-real-auth-tests) and passed; the gate over the
+# whole list took about five minutes on the Mac (2-35 s per file).
+#
+# One path per line, product-relative. A path that does not exist fails the gate (no silent shrinking).
+
+# Verification mail and sign-up
+tests/integration/verification-send-budget.test.ts
+# registration-database.test.ts is not here: ~34 minutes alone, it runs from its own workflow (.github/workflows/
+# registration-integration.yml, list tests/ci-integration-registration.txt) on relevant pull requests, nightly, by hand.
+tests/integration/pending-onboarding-database.test.ts
+tests/integration/identity-database.test.ts
+tests/integration/age-gate-database.test.ts
+tests/integration/legal-acceptance.test.ts
+tests/integration/sensitive-data-consent-database.test.ts
+
+# Sessions and sign-in
+tests/integration/session-database.test.ts
+tests/integration/consumer-auth-database.test.ts
+tests/integration/consumer-security-database.test.ts
+tests/integration/p2-auth-risk-database.test.ts
+tests/integration/p2-passkey-storage.test.ts
+tests/integration/social-auth-journey.test.ts
+tests/integration/social-identity-database.test.ts
+tests/integration/account-flow-release-upgrade.test.ts
+
+# Profile, recovery addresses and email change
+tests/integration/phone-profile-database.test.ts
+tests/integration/recovery-email-database.test.ts
+tests/integration/backup-email-database.test.ts
+tests/integration/email-change-database.test.ts
+tests/integration/email-change-service.test.ts
+
+# Password reset and MFA recovery (non-enumeration, proof, lifecycle)
+tests/integration/password-reset-flow.test.ts
+tests/integration/password-reset-database.test.ts
+tests/integration/email-mfa-flow.test.ts
+tests/integration/mfa-recovery-database.test.ts
+tests/integration/consumer-recovery-journey.test.ts
+tests/integration/consumer-recovery-database.test.ts
+tests/integration/p2-recovery-persistence.test.ts
+tests/integration/p2-recovery-start-database.test.ts
+
+# Authorization and the staff / Owner boundary
+tests/integration/s7-authorization-database.test.ts
+tests/integration/staff-access-database.test.ts
+tests/integration/staff-audit-alerts.test.ts
+tests/integration/staff-disable-races.test.ts
+tests/integration/staff-http-database.test.ts
+tests/integration/staff-object-privacy.test.ts
+tests/integration/staff-security-acceptance.test.ts
+tests/integration/staff-webauthn-database.test.ts
+tests/integration/owner-one-key.test.ts
+# Spawns one tsx child under a 5 s commit deadline (kill-ceremony case): the only timing-bounded case on this list.
+tests/integration/owner-bootstrap-recovery.test.ts
+tests/integration/s9-dev-token-retirement-database.test.ts
+
+# Account erasure, migration lineage and preview upgrade preservation
+tests/integration/s10-t9-account-erasure-races.test.ts
+tests/integration/auth-dev-lineage.test.ts
+tests/integration/auth-dev-migration.test.ts
+tests/integration/preview-auth-preservation.test.ts
+tests/integration/preview-auth-dev-fallback.test.ts
+
+# NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
+# starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).

@@ -82,31 +82,31 @@ describe("P7 billing job queries and the worker over the real outbox", () => {
     }
   });
 
-  it("calls xMoney's refund exactly once per job when a slow batch outlives the 300 s lease on two workers (D5 5e)", async () => {
+  it("moves each refund exactly once per job when a slow batch outlives the 300 s lease on two workers (D5 5e)", async () => {
     const other = createPool(database.connectionString);
     try {
       const repository = new BillingRepository(database.pool);
-      // XMONEY_REFUND: no other test in this file queues that kind, so the claims below see these three jobs alone.
+      // PAYMENT_REFUND: no other test in this file queues that kind, so the claims below see these three jobs alone.
       const T0 = new Date("2026-10-02T10:00:00.000Z");
       let clock = T0;
       const refs = ["first", "second", "third"].map((name) => `${name}-${randomUUID()}`);
       await repository.withTransaction(async (client) => {
         for (const [index, ref] of refs.entries()) {
           await repository.enqueue(client, {
-            kind: "XMONEY_REFUND", ref, notBefore: new Date(T0.getTime() - 3_000 + index * 1_000), payload: {}
+            kind: "PAYMENT_REFUND", ref, notBefore: new Date(T0.getTime() - 3_000 + index * 1_000), payload: {}
           });
         }
       });
-      /** The stand-in for `xmoney.refund`: one entry per call that would move money. */
+      /** The stand-in for the refund's money move (NETOPIA's call, or the owner's hand-off): one entry per move. */
       const refundCalls: string[] = [];
       const processB = new BillingOutboxWorker({
         repository: new BillingRepository(other), workerId: "w-b", clock: () => clock, audit: () => undefined, batchSize: 10
       });
-      processB.register("XMONEY_REFUND", async (job) => { refundCalls.push(job.ref); return { kind: "DONE" }; });
+      processB.register("PAYMENT_REFUND", async (job) => { refundCalls.push(job.ref); return { kind: "DONE" }; });
       const processA = new BillingOutboxWorker({
         repository, workerId: "w-a", clock: () => clock, audit: () => undefined, batchSize: 10
       });
-      processA.register("XMONEY_REFUND", async (job) => {
+      processA.register("PAYMENT_REFUND", async (job) => {
         refundCalls.push(job.ref);
         // A slow provider: the first refund takes 200 s and the second 101 s more. By then the third job, claimed at
         // T0 and not started, is past its 5-minute lease, and process B claims and runs it. The second job's lease was

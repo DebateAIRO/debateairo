@@ -199,7 +199,7 @@ describe("P12a the WITHDRAW_SUBSCRIPTION grant on real PostgreSQL", () => {
     const withdrawnEventId = randomUUID();
     const long = new Date("2014-03-01T00:00:00.000Z");
     const events: ReadonlyArray<readonly [string, string, Date, Record<string, unknown>]> = [
-      [randomUUID(), "CREATED", long, { xmoney_environment: "stage" }],
+      [randomUUID(), "CREATED", long, { payment_provider: "netopia", payment_environment: "sandbox" }],
       [withdrawnEventId, "WITHDRAWN", new Date(long.getTime() + 86_400_000),
         { refund_micros: null, refund_by_owner: true, source: "OWNER", withdrew_at: long.toISOString() }]
     ];

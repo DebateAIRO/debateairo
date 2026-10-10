@@ -37,8 +37,9 @@ const rows: readonly Row[] = [
   // types (budget) are TYPE imports, so db and the connector packages may depend
   // on billing-core without a cycle (register already depends on db).
   ["billing-core", "packages/billing-core", ["kernel"]],
-  // Paid plans (A26(a)): xMoney order signing, notice decryption and (P3b) the HTTP client.
-  ["payments-xmoney", "packages/payments-xmoney", ["kernel"]],
+  // NETOPIA (spec 2026-10-05 §2.4): the card processor's package over plain fetch and node:crypto; billing-core for the
+  // payment port's types and error vocabulary (billing-core depends on kernel alone, so no cycle).
+  ["payments-netopia", "packages/payments-netopia", ["kernel", "billing-core"]],
   // Paid plans (A26(a)): the Quaderno tax connector over plain fetch (P4).
   ["tax-quaderno", "packages/tax-quaderno", ["kernel", "billing-core"]],
   // Paid plans (A26(a)): the SmartBill invoice connector over plain fetch (P5).
@@ -59,7 +60,7 @@ const rows: readonly Row[] = [
   // SUP-01 C1 — schema, role grants, kill switch, reservation, status"); the table
   // lagged the product only because this audit was crashing on the retired `web`
   // manifest read and had never reported a verdict. Both rows are the same commit.
-  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "judgement", "providers", "support-kb", "story", "legal-manifest", "geo", "billing-core", "payments-xmoney", "tax-quaderno", "invoice-smartbill", "mail-templates", "scorecard"]],
+  ["apps/api", "apps/api", ["contract", "kernel", "crypto", "db", "register", "serve", "battery", "ledger", "settlement", "critique", "liveness", "evaluator", "judgement", "providers", "support-kb", "story", "legal-manifest", "geo", "billing-core", "payments-netopia", "tax-quaderno", "invoice-smartbill", "mail-templates", "scorecard"]],
   ["apps/runner", "apps/runner", ["kernel", "crypto", "published-arithmetic", "propagation", "register", "db", "ledger", "providers", "graph", "judgement", "evidence", "battery", "battery-decision", "critique", "valuation", "serve", "memory", "settlement", "liveness", "budget", "billing-core", "contract", "support-kb", "story", "scorecard"]],
   ["apps/replay", "apps/replay", ["published-arithmetic"]],
   ["apps/scheduler", "apps/scheduler", ["kernel", "db", "ledger", "register", "propagation", "serve", "battery", "settlement", "liveness"]],
@@ -638,7 +639,12 @@ function constraintHasReplayGuard(source: string, index: number, name: string): 
 export type NativeMigrationReplayContext = Readonly<{ plan: MigrationPlan; migrateSource: string }>;
 const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2";
 // Finite reviewed executable module: comments/strings/dead code cannot stand in for its controls.
-const NATIVE_MIGRATE_MODULE_SHA256 = "59d23c2df37dc577bd142b54a53de5d3f856c27a1e026cbb31937b07616f4891";
+// N26m/N26n (PR-54): the reviewed module after the NETOPIA branch merged dev (its billing exports and #101's
+// applyForward110) and added the forward chain (migrate() runs the superseding verifier, applyForward110, then
+// applyForwardChain; migrations/lineage/README.md).
+// data-export S01 (V-28): dev's module plus the export's repository exports and the compatibility re-seal after
+// applyForwardChain (0112 moves lineageEvidence; V-18).
+const NATIVE_MIGRATE_MODULE_SHA256 = "00b1e841d496b836f4d5ab14fce2e3069d963d85a26fa05e9829a652d58704fe";
 const NATIVE_ONCE_SOURCES = new Set([
   "0104_password_only_reset.sql", "0105_backup_email_verification.sql",
   "0106_known_password_mfa_recovery.sql", "0107_auth_dev_integration.sql"
@@ -668,7 +674,9 @@ function assertNativeReplayBinding(name: string, source: string, { plan, migrate
     "for (const name of plan.manifest.order)", "if (appliedSet.has(name) || resolvedSet.has(name)) continue;",
     "await client.query(plan.sources.get(name)!.sql);",
     "INSERT INTO public.debateai_schema_migration (name, applied_at)", "[name]",
-    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,", "await applyForward110(client,plan,lineage,", "await applyForward111(client,plan,lineage,",
+    "await client.query(plan.effectiveCapabilityVerifierSql);", "await applyForward108(client,plan,lineage,", "await applyForward110(client,plan,lineage,",
+    "await applyForwardChain(client,plan,",
+    "[compatEvidenceAfterChain,compat.logicalName]",
     'await client.query("COMMIT")', "} catch (error) {", 'await client.query("ROLLBACK")',
     "throw error;", "} finally {", "client.release();"
   ];

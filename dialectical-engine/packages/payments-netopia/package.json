@@ -1,0 +1,1 @@
+{"name":"@debateai/payments-netopia","version":"0.1.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"@debateai/billing-core":"workspace:*","@debateai/kernel":"workspace:*"}}

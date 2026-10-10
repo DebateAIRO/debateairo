@@ -88,7 +88,8 @@ test("all 35 locales carry the exact legal contract and a translated sample", ()
 test("every locale translates the footer and navigation labels", () => {
   const added = Object.keys(chromeEnglish).filter((key) => key.startsWith("chrome.legal") || key.startsWith("chrome.footer."));
   // 13 -> 20: the paid-plans footer (P21, R3-4): pricing, cancel, withdraw, the card marks' group and names, DB-IP.
-  assert.equal(added.length, 20);
+  // 20 -> 21: NETOPIA's mark beside the card marks (N25b, spec §2.18), its brand name untranslated.
+  assert.equal(added.length, 21);
   for (const locale of locales.filter((code) => code !== "en")) {
     const chrome = JSON.parse(source(`messages/${locale}/chrome.json`));
     for (const key of added) {

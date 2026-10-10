@@ -1,32 +1,39 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Pool } from "pg";
-import {
-  AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository, type CustomerXMoneyEnvironment
-} from "@debateai/db";
-import { computeWindows, foldSubscription } from "@debateai/billing-core";
+import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
+import { computeWindows, foldSubscription, microsToDecimal, type SecretToken } from "@debateai/billing-core";
 import { hashToken } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
-import type { XMoneyClient } from "@debateai/payments-xmoney";
 import { planById, type PlanId } from "@debateai/register";
 import type { BillingAudit, BillingAuditEvent, BillingAuditField } from "../../apps/api/src/billing/audit.js";
 import type { BillingAdmissionScope } from "../../apps/api/src/billing/index.js";
-import { CheckoutService } from "../../apps/api/src/billing/checkout.js";
-import { sealBillingProfile, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
+import type { ConsentKind } from "../../apps/api/src/billing/checkout.js";
+import { englishOrderText } from "../../apps/api/src/billing/order-text.js";
+import { runBillingRefundDoneCli, type RefundDoneArguments } from "../../apps/api/src/billing/refund-done-cli.js";
+import { sealBillingProfile, sealCardToken, sealQuoteLocation } from "../../apps/api/src/billing/records.js";
 import { RefundDesk } from "../../apps/api/src/billing/refunds.js";
 import { chargeEvent, subscriptionEvent } from "../../apps/api/src/billing/rows.js";
 import { installSubscriptionRoutes } from "../../apps/api/src/billing/subscription-routes.js";
 import type { SubscriptionRouteDeps } from "../../apps/api/src/billing/subscription-deps.js";
 import { AdjustableTaxEngine, StubGeo, testBillingPlans, testBillingPolicy, testCountryPolicy } from "./billingFixtures.js";
 import type { TestHttpIdentity } from "./httpSession.js";
+import { StubCardPayments } from "./stub-card-payments.js";
 
 /** A generated records key: tests never hold a real one. */
 export const TEST_RECORDS_KEY = Buffer.alloc(32, 7);
 /** Stands for PUBLIC_APP_URL (R-7) in every billing link a test reads. */
 export const TEST_PUBLIC_APP_URL = "https://dezbatere.test";
-/** A generated xMoney private key (A23: bytes); tests never hold a real one. */
-export const TEST_XMONEY_PRIVATE_KEY = Buffer.alloc(32, 9);
+
+const TEST_AGREEMENT_SHA256 = createHash("sha256").update("renewal agreement (test)", "utf8").digest("hex");
+/** 0080's `acceptance_document_version_shape`: a consent sentence's version is `sha256-` + its hash's first 12 hex. */
+const TEST_AGREEMENT = Object.freeze({ version: `sha256-${TEST_AGREEMENT_SHA256.slice(0, 12)}`, sha256: TEST_AGREEMENT_SHA256 });
+
+/** N12/N13: the card-saving agreement a test page shows in `locale` (spec §2.18); null where none is published. */
+export function testAgreement(locale: string): Readonly<{ version: string; sha256: string }> | null {
+  return locale === "en" ? TEST_AGREEMENT : null;
+}
 
 export type RecordingAudit = BillingAudit & {
   readonly events: Array<Readonly<{ event: BillingAuditEvent; fields: Readonly<Record<string, BillingAuditField>> }>>;
@@ -39,32 +46,48 @@ export function recordingAudit(): RecordingAudit {
   }, { events });
 }
 
-export type SeededSubscription = Readonly<{
-  ownerRef: string; subscriptionId: string; customerId: string;
-  initialQuoteId: string; initialChargeId: string; initialTransactionId: string;
-  xmoneyOrderId: string; xmoneyCustomerId: string; cardRef: string;
-  periodStart: Date; periodEnd: Date; totalMicros: number;
-  /** The xMoney system the subscription was created in (D5 5h); "stage" unless a test asks for "live". */
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
-}>;
-
-/** xMoney ids and card refs are digits only (0085/0086 CHECKs). */
+/** Payment numbers are digits only (0086's CHECK); a fresh one on every seed. */
 const digits = (base: number, span: number): string => String(base + Math.floor(Math.random() * span));
 
+export type SeededNetopiaSubscription = Readonly<{
+  ownerRef: string; subscriptionId: string; customerId: string;
+  initialQuoteId: string; initialChargeId: string;
+  /** NETOPIA's ntpID of the first payment. */
+  providerPaymentId: string;
+  /** The saved card ACTIVATED adopted: a sealed made-up token, its source the INITIAL charge, expiring in December three years on. */
+  cardTokenId: string;
+  periodStart: Date; periodEnd: Date; totalMicros: number;
+  /** NETOPIA's sandbox unless a test asks for "live" (a plan of the other environment, spec §2.5.4). */
+  paymentEnvironment: "sandbox" | "live";
+}>;
+
+/** A SecretToken over a made-up value (tests never hold a real token): it prints `[token]` everywhere. */
+export function testCardToken(plaintext: string): SecretToken {
+  const token = {
+    reveal: (): string => plaintext,
+    fingerprint: createHash("sha256").update(plaintext, "utf8").digest("hex").slice(0, 16),
+    toString: (): string => "[token]",
+    toJSON: (): string => "[token]",
+    [Symbol.for("nodejs.util.inspect.custom")]: (): string => "[token]"
+  };
+  return token;
+}
+
 /**
- * One ACTIVE subscription as checkout (P8c) and VERIFY_PAYMENT (P9b) leave it: customer with its xMoney link, sealed
- * profile, SUBSCRIBE quote with its sealed location, INITIAL charge (REQUESTED, SUCCEEDED) that spent the quote,
- * CREATED + ACTIVATED (with the subscriber's own `recurring_net_micros`, Terms §12), SUBSCRIBED entitlement paid
- * through the period end. `netMicros` is the price the person bought at (default: the register's price today), so a
- * test can show the register's later price never reaches an existing subscriber.
+ * One ACTIVE NETOPIA subscription as the flows leave it (skeleton §2.5): customer, sealed profile with the payer's fields, SUBSCRIBE quote with its sealed location (ip
+ * 192.0.2.10), INITIAL charge in NETOPIA's sandbox, or in the environment a test names (REQUESTED, SUCCEEDED with an
+ * ntpID), that spent the quote, the card that payment saved, CREATED naming `payment_provider`/`payment_environment`,
+ * ACTIVATED adopting the card, SUBSCRIBED entitlement paid through the period end.
  */
-export async function seedActiveSubscription(pool: Pool, input: Readonly<{
+export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
   ownerRef: string; planId: Exclude<PlanId, "FREE">; activatedAt: Date; taxCountry: string;
-  taxRateBasisPoints?: number; email?: string; xmoneyEnvironment?: CustomerXMoneyEnvironment; netMicros?: number;
-}>): Promise<SeededSubscription> {
+  taxRateBasisPoints?: number; email?: string; netMicros?: number;
+  /** N24b: the plan's NETOPIA environment; "sandbox" unless a test seeds a plan of the other one. */
+  paymentEnvironment?: "sandbox" | "live";
+}>): Promise<SeededNetopiaSubscription> {
   const billing = new BillingRepository(pool);
   const entitlements = new EntitlementRepository(pool);
-  const environment = input.xmoneyEnvironment ?? "stage";
+  const environment = input.paymentEnvironment ?? "sandbox";
   const rate = input.taxRateBasisPoints ?? 2_100;
   const netMicros = input.netMicros ?? planById(testBillingPlans, input.planId).netPriceMicros;
   const taxMicros = Math.floor(netMicros * rate / 10_000 / 10_000) * 10_000;
@@ -72,30 +95,25 @@ export async function seedActiveSubscription(pool: Pool, input: Readonly<{
   const subscriptionId = randomUUID();
   const initialQuoteId = randomUUID();
   const initialChargeId = randomUUID().replaceAll("-", "");
-  const initialTransactionId = digits(100_000_000, 800_000_000);
-  const xmoneyOrderId = digits(900_000_000, 90_000_000);
-  const xmoneyCustomerId = digits(50_000_000, 40_000_000);
-  const cardRef = digits(4_000_000, 900_000);
+  const providerPaymentId = digits(1_000_000, 8_000_000);
+  const cardTokenId = randomUUID();
   const periodStart = input.activatedAt;
   const periodEnd = computeWindows(periodStart, periodStart).month.end;
   const checkoutAt = new Date(periodStart.getTime() - 60_000);
+  const payer = { firstName: "Test", lastName: "Subscriber", phone: "+40712345678" } as const;
   const location = sealQuoteLocation(TEST_RECORDS_KEY, initialQuoteId, {
-    name: null, country: input.taxCountry, region: null, postalCode: null, city: null, street: null,
-    ip: "192.0.2.10", ipCountry: input.taxCountry, company: null
+    name: "Test Subscriber", ...payer, country: input.taxCountry, region: null, postalCode: "010101", city: "Bucuresti",
+    street: "Strada Exemplu 1", ip: "192.0.2.10", ipCountry: input.taxCountry, company: null
   });
   const customerId = await billing.withTransaction(async (client) => {
-    // R-14: the xMoney customer is linked in one environment; the tests use stage, as P6a's fakes do.
-    const customer = await billing.ensureCustomer(client, {
-      ownerRef: input.ownerRef, locale: "en", now: checkoutAt, environment
-    });
-    await billing.setXMoneyCustomerId(client, customer.customerId, xmoneyCustomerId, environment);
+    const customer = await billing.ensureCustomer(client, { ownerRef: input.ownerRef, locale: "en", now: checkoutAt });
     const profile = sealBillingProfile(TEST_RECORDS_KEY, customer.customerId, {
-      email: input.email ?? `${input.ownerRef}@example.test`, locale: "en", name: null, country: input.taxCountry,
-      region: null, postalCode: null, city: null, street: null, company: null
+      email: input.email ?? `${input.ownerRef}@example.test`, locale: "en", name: "Test Subscriber", ...payer,
+      paymentIp: "192.0.2.10", country: input.taxCountry, region: null, postalCode: "010101", city: "Bucuresti",
+      street: "Strada Exemplu 1", company: null
     });
     await billing.appendProfile(client, {
-      customerId: customer.customerId, at: checkoutAt, locale: "en",
-      profileCiphertext: profile.ciphertext, keyId: profile.keyId
+      customerId: customer.customerId, at: checkoutAt, locale: "en", profileCiphertext: profile.ciphertext, keyId: profile.keyId
     });
     await billing.insertQuote(client, {
       quoteId: initialQuoteId, ownerRef: input.ownerRef, planId: input.planId, kind: "SUBSCRIBE",
@@ -107,27 +125,33 @@ export async function seedActiveSubscription(pool: Pool, input: Readonly<{
     await billing.insertCharge(client, {
       chargeId: initialChargeId, ownerRef: input.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1,
       periodStart, periodEnd, quoteId: initialQuoteId, netMicros, taxMicros, totalMicros, currency: "USD",
-      createdAt: checkoutAt, xmoneyEnvironment: environment
+      createdAt: checkoutAt, paymentProvider: "netopia", paymentEnvironment: environment
     });
     await billing.useQuote(client, { quoteId: initialQuoteId, usedAt: checkoutAt, chargeId: initialChargeId });
     await billing.appendChargeEvent(client, chargeEvent(initialChargeId, "REQUESTED", checkoutAt, {
-      xmoneyTransactionId: null, amountMicros: totalMicros, errorCode: null
+      providerPaymentId: null, amountMicros: totalMicros, errorCode: null
     }));
     await billing.appendChargeEvent(client, chargeEvent(initialChargeId, "SUCCEEDED", periodStart, {
-      xmoneyTransactionId: initialTransactionId, amountMicros: totalMicros, errorCode: null
+      providerPaymentId, amountMicros: totalMicros, errorCode: null, providerCreatedAt: periodStart
     }));
-    const base = { subscriptionId, ownerRef: input.ownerRef, planId: input.planId, xmoneyCustomerId } as const;
+    const sealedCard = sealCardToken(TEST_RECORDS_KEY, cardTokenId, testCardToken(["test", "card", cardTokenId.slice(0, 8)].join("-")));
+    await billing.insertCardToken(client, {
+      tokenId: cardTokenId, customerId: customer.customerId, paymentProvider: "netopia", paymentEnvironment: environment,
+      sourceChargeId: initialChargeId, sourceToolOrder: null, sourceNoticeId: null, sourcePaidAt: periodStart,
+      tokenCiphertext: sealedCard.ciphertext, keyId: sealedCard.keyId, expMonth: 12,
+      expYear: periodStart.getUTCFullYear() + 3, last4: "1111", cardCountry: input.taxCountry, createdAt: periodStart
+    });
+    const base = { subscriptionId, ownerRef: input.ownerRef, planId: input.planId } as const;
     await billing.appendSubscriptionEvent(client, {
-      ...base, eventId: randomUUID(), kind: "CREATED", at: checkoutAt,
-      periodAnchorAt: null, xmoneyOrderId: null, cardRef: null,
-      // 0085 `subscription_event_created_names_environment`: every CREATED names its xMoney system (D5 5h).
-      data: { country_confirmed: false, ip_country: input.taxCountry, quote_id: initialQuoteId, xmoney_environment: environment }
+      ...base, eventId: randomUUID(), kind: "CREATED", at: checkoutAt, periodAnchorAt: null, cardTokenId: null,
+      // 0111 `subscription_event_created_names_payment_system`: a NETOPIA CREATED names both keys (spec §2.5.1).
+      data: {
+        country_confirmed: false, ip_country: input.taxCountry, quote_id: initialQuoteId,
+        payment_provider: "netopia", payment_environment: environment
+      }
     });
     await billing.appendSubscriptionEvent(client, {
-      ...base, eventId: randomUUID(), kind: "ACTIVATED", at: periodStart, periodAnchorAt: periodStart,
-      xmoneyOrderId, cardRef,
-      // As P9b writes it: the SUBSCRIBE quote's net is the price this subscriber keeps (Terms §12, P11a's
-      // `recurringNetOf`); a history without it is never renewed (BILLING_RECURRING_PRICE_MISSING).
+      ...base, eventId: randomUUID(), kind: "ACTIVATED", at: periodStart, periodAnchorAt: periodStart, cardTokenId,
       data: { charge_id: initialChargeId, announced_total_micros: totalMicros, recurring_net_micros: netMicros, reactivated: false }
     });
     await entitlements.append(client, {
@@ -137,20 +161,20 @@ export async function seedActiveSubscription(pool: Pool, input: Readonly<{
     return customer.customerId;
   });
   return Object.freeze({
-    ownerRef: input.ownerRef, subscriptionId, customerId, initialQuoteId, initialChargeId, initialTransactionId,
-    xmoneyOrderId, xmoneyCustomerId, cardRef, periodStart, periodEnd, totalMicros, xmoneyEnvironment: environment
+    ownerRef: input.ownerRef, subscriptionId, customerId, initialQuoteId, initialChargeId, providerPaymentId, cardTokenId,
+    periodStart, periodEnd, totalMicros, paymentEnvironment: environment
   });
 }
 
 /**
- * What VERIFY_PAYMENT (P9c, A9) leaves after the first payment of `seeded` is charged back: CHARGEBACK on the charge,
- * SUSPENDED, and a FREE entitlement effective `at` (paid features paused while the dispute is open).
+ * What VERIFY_PAYMENT (P9c, A9; N15 on NETOPIA) leaves after the first payment of `seeded` is charged back: CHARGEBACK
+ * on the charge, SUSPENDED, and a FREE entitlement effective `at` (paid features paused while the dispute is open).
  */
-export async function suspendForChargeback(pool: Pool, seeded: SeededSubscription, at: Date = new Date()): Promise<void> {
+export async function suspendForChargeback(pool: Pool, seeded: SeededNetopiaSubscription, at: Date = new Date()): Promise<void> {
   const billing = new BillingRepository(pool);
   await billing.withTransaction(async (client) => {
     await billing.appendChargeEvent(client, chargeEvent(seeded.initialChargeId, "CHARGEBACK", at, {
-      xmoneyTransactionId: seeded.initialTransactionId, amountMicros: seeded.totalMicros, errorCode: null
+      providerPaymentId: seeded.providerPaymentId, amountMicros: seeded.totalMicros, errorCode: null
     }));
     const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId, client));
     await billing.appendSubscriptionEvent(client, subscriptionEvent(state, "SUSPENDED", at, { charge_id: seeded.initialChargeId }));
@@ -191,9 +215,13 @@ export async function seedWithdrawalGrant(pool: Pool, identity: TestHttpIdentity
   `, [randomUUID(), hashToken("step-up-grant", grantToken), sessionId, userId]);
 }
 
-/** A paid UPGRADE on a seeded subscription, as P12c + the UPGRADE settlement leave it (quote, charge, UPGRADED, entitlement). */
-export async function seedPaidUpgrade(pool: Pool, seeded: SeededSubscription, input: Readonly<{
-  at: Date; netMicros: number; taxMicros: number; transactionId: string; monthCreditOverrideMicros: number;
+/**
+ * A paid UPGRADE on a seeded NETOPIA subscription, as N12's hosted upgrade and the UPGRADE settlement leave it (quote,
+ * charge in the plan's environment with REQUESTED, SUBMITTED and SUCCEEDED naming `providerPaymentId`, UPGRADED,
+ * entitlement).
+ */
+export async function seedPaidUpgrade(pool: Pool, seeded: SeededNetopiaSubscription, input: Readonly<{
+  at: Date; netMicros: number; taxMicros: number; providerPaymentId: string; monthCreditOverrideMicros: number;
   /** The plan upgraded to (PRO by default); its full price, with Romania's 21 %, is the next renewal's. */
   planId?: "PRO" | "MAX";
 }>): Promise<Readonly<{ chargeId: string; quoteId: string }>> {
@@ -221,12 +249,13 @@ export async function seedPaidUpgrade(pool: Pool, seeded: SeededSubscription, in
       chargeId, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "UPGRADE", attempt: 1,
       periodStart: quotedAt, periodEnd: seeded.periodEnd, quoteId, netMicros: input.netMicros,
       taxMicros: input.taxMicros, totalMicros, currency: "USD", createdAt: new Date(input.at.getTime() - 30_000),
-      xmoneyEnvironment: seeded.xmoneyEnvironment
+      paymentProvider: "netopia", paymentEnvironment: seeded.paymentEnvironment
     });
     await billing.useQuote(client, { quoteId, usedAt: new Date(input.at.getTime() - 30_000), chargeId });
-    for (const [kind, transactionId] of [["REQUESTED", null], ["SUBMITTED", input.transactionId], ["SUCCEEDED", input.transactionId]] as const) {
+    for (const [kind, providerPaymentId] of [["REQUESTED", null], ["SUBMITTED", input.providerPaymentId], ["SUCCEEDED", input.providerPaymentId]] as const) {
       await billing.appendChargeEvent(client, chargeEvent(chargeId, kind, input.at, {
-        xmoneyTransactionId: transactionId, amountMicros: totalMicros, errorCode: null
+        providerPaymentId, amountMicros: totalMicros, errorCode: null,
+        ...(kind === "SUCCEEDED" ? { providerCreatedAt: input.at } : {})
       }));
     }
     const state = foldSubscription(await billing.subscriptionEvents(seeded.subscriptionId));
@@ -241,43 +270,10 @@ export async function seedPaidUpgrade(pool: Pool, seeded: SeededSubscription, in
   return Object.freeze({ chargeId, quoteId });
 }
 
-/** Every xMoney method a consumer of these deps picks, unconfigured: a test that needs one passes its own fake. */
+/** A NETOPIA read none of these deps should make: a test that needs one passes its own fake. */
 const unconfigured = async (): Promise<never> => {
-  throw new TypedDomainError("XMONEY_UNAVAILABLE", "no fake configured");
+  throw new TypedDomainError("PAYMENT_PROVIDER_UNAVAILABLE", "no fake configured");
 };
-const UNCONFIGURED_XMONEY: Pick<XMoneyClient, "rebill" | "refund" | "getTransaction" | "listTransactions"> = Object.freeze({
-  rebill: unconfigured, refund: unconfigured, getTransaction: unconfigured, listTransactions: unconfigured
-});
-/** The stand-in for the methods P8c's `CheckoutDeps.xmoney` picks (`listTransactions`, `getOrder`: D7 #5's look). */
-const UNCONFIGURED_XMONEY_CUSTOMERS: Pick<XMoneyClient, "createCustomer" | "listTransactions" | "getOrder"> = Object.freeze({
-  createCustomer: unconfigured, listTransactions: unconfigured, getOrder: unconfigured
-});
-
-/**
- * P8c's real CheckoutService over a real database, keyed with generated values. The ONE place the billing tests
- * name CheckoutDeps' members; the card change uses only its `signEmbeddedOrder` (R-17).
- */
-export function cardCheckoutFor(pool: Pool): CheckoutService {
-  return new CheckoutService({
-    repository: new BillingRepository(pool),
-    jobs: new BillingJobQueries(pool),
-    acceptances: new AcceptanceRepository(pool),
-    xmoney: UNCONFIGURED_XMONEY_CUSTOMERS,
-    accountEmail: { read: async () => "p12@example.test" },
-    geo: new StubGeo(),
-    countryPolicy: testCountryPolicy,
-    policy: testBillingPolicy,
-    consentDocuments: () => null,
-    recordsKey: TEST_RECORDS_KEY,
-    xmoneyPrivateKey: TEST_XMONEY_PRIVATE_KEY,
-    xmoneyPublicKey: "pk_test_p12",
-    siteId: "site-p12",
-    publicAppUrl: TEST_PUBLIC_APP_URL,
-    xmoneyEnvironment: "stage",
-    audit: recordingAudit()
-  });
-}
-
 /** The routes' dependencies over a real database, with fakes for every vendor. */
 export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRouteDeps> = {}): SubscriptionRouteDeps {
   const billing = overrides.billing ?? new BillingRepository(pool);
@@ -296,22 +292,65 @@ export function subscriptionDeps(pool: Pool, overrides: Partial<SubscriptionRout
     legal: { requiresReacceptance: async () => false },
     audit,
     clock: () => new Date(),
-    xmoney: UNCONFIGURED_XMONEY,
-    // The connectors' xMoney system in these tests, as P6a's fakes and `seedActiveSubscription`'s default.
-    xmoneyEnvironment: "stage",
+    payments: new StubCardPayments(),
+    paymentEnvironment: "sandbox",
+    acceptances: new AcceptanceRepository(pool),
+    consentDocuments: (kind: ConsentKind, locale: string) => kind === "CONSENT_RENEWAL" ? testAgreement(locale) : null,
+    orderText: englishOrderText,
     countryPolicy: testCountryPolicy,
     geo: new StubGeo(),
     kick: () => undefined,
     ownerSpend: { readOwnerSpentMicros: async () => 0 },
-    checkout: cardCheckoutFor(pool),
     accountEmail: { read: async () => "p12@example.test" },
     refunds: new RefundDesk({
-      repository: billing, jobs, xmoney: UNCONFIGURED_XMONEY, policy: testBillingPolicy, audit, clock: () => new Date(),
-      xmoneyEnvironment: "stage"
+      repository: billing, jobs, policy: testBillingPolicy, audit, clock: () => new Date(),
+      netopia: { payments: { status: unconfigured }, paymentEnvironment: "sandbox", jobs }
     }),
     cancelLinks: { request: async () => "SILENT" as const, cancelByToken: async () => "INVALID" as const },
     ...overrides
   });
+}
+
+/**
+ * N24b: the API's RefundDesk in NETOPIA's owner mode (spec §2.12.2: no refund call is configured), over the real tables
+ * (its lease, the job stage and the owner lock on the same pool). A PAYMENT_REFUND job it handles moves no money: it
+ * ends DONE at the stage OWNER_REFUND_DUE with O2_REFUND_DUE queued to the owner. It never reads NETOPIA.
+ */
+export function netopiaRefundDesk(pool: Pool, input: Readonly<{
+  audit?: BillingAudit; clock?: () => Date; paymentEnvironment?: "sandbox" | "live";
+}> = {}): RefundDesk {
+  const repository = new BillingRepository(pool);
+  const jobs = new BillingJobQueries(pool);
+  const unread = async (): Promise<never> => {
+    throw new TypedDomainError("PAYMENT_PROVIDER_UNAVAILABLE", "the owner mode never reads NETOPIA in these tests");
+  };
+  return new RefundDesk({
+    repository, jobs, policy: testBillingPolicy, audit: input.audit ?? recordingAudit(),
+    clock: input.clock ?? (() => new Date()),
+    netopia: { payments: { status: unread }, paymentEnvironment: input.paymentEnvironment ?? "sandbox", jobs }
+  });
+}
+
+/**
+ * N24b: the owner's `pnpm billing:refund-done --charge <charge> --amount <amount> --confirm` (spec §2.12.2 item 4), run
+ * through the command's own parser and printer over `desk`, as its entry block wires it (`refund-done-cli.ts`): what
+ * the owner records after refunding that amount in NETOPIA's admin. Its output; a refusal throws its code.
+ */
+export async function ownerRefundDone(desk: RefundDesk, chargeId: string, amountMicros: number, at: Date = new Date()): Promise<string> {
+  const output: string[] = [];
+  const sink = { stdout: (text: string) => { output.push(text); }, stderr: (text: string) => { output.push(text); } };
+  const code = await runBillingRefundDoneCli(
+    ["--charge", chargeId, "--amount", microsToDecimal(amountMicros), "--confirm"], sink, async () => {
+      const plan = (input: RefundDoneArguments) => desk.planOwnerRefund(input.chargeRef, input.amountMicros, {
+        despiteChargeback: input.despiteChargeback
+      });
+      return Object.freeze({
+        plan, record: async (input: RefundDoneArguments) => desk.recordOwnerRefund(await plan(input), at), close: async () => undefined
+      });
+    }
+  );
+  if (code !== 0) throw new Error(`OWNER_REFUND_DONE_${String(code)}:${output.join("").trim()}`);
+  return output.join("");
 }
 
 /**

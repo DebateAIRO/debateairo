@@ -8,7 +8,7 @@ import type { Pool, PoolClient } from "pg";
  * key. `acceptanceId` is chosen by the caller because the evidence's AAD binds it (rowId).
  */
 export type AcceptanceKind = "TERMS" | "PRIVACY_SHOWN" | "RENEWAL_TERMS" | "IMMEDIATE_START" | "ADULT";
-export type AcceptanceSurface = "SIGN_UP" | "CHECKOUT" | "REACCEPT";
+export type AcceptanceSurface = "SIGN_UP" | "CHECKOUT" | "REACCEPT" | "UPGRADE" | "CARD_CHANGE";
 
 export type AcceptanceInput = Readonly<{
   acceptanceId: string;

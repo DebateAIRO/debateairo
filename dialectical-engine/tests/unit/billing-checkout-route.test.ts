@@ -16,7 +16,7 @@ const OWNER = testHttpIdentity("billing-checkout-owner");
 const CHARGE = "0123456789abcdef0123456789abcdef";
 const PAIR = { version: "sha256-aaaaaaaaaaaa", sha256: "a".repeat(64) };
 const BODY = { quote_ref: "5f0c2a8e-8a61-4d1f-9a55-0d6f3a1b2c4d", locale: "en", consents: { renewal_terms: PAIR, immediate_start: PAIR } };
-const RESULT: CheckoutResult = { chargeId: CHARGE, publicKey: "pk_test", orderPayload: "eyJ9", orderChecksum: "c2ln", sdkEnvironment: "stage", reused: false };
+const RESULT: CheckoutResult = { chargeId: CHARGE, redirectUrl: "https://secure-sandbox.netopia-payments.com/ui/card?p=abc", environment: "sandbox", reused: false };
 const REFUSED = Object.freeze({ allowed: false, reason: "LIMIT", retryAfterMs: 1_000, windowMs: 3_600_000 });
 
 /** The age gate's answer for a session (`SessionApplication.readAgeConfirmation`, apps/api/src/sessions.ts:77). */
@@ -53,10 +53,10 @@ const postCheckout = (api: ReturnType<typeof harness>, payload: unknown = BODY) 
 });
 
 const event = (kind: string, errorCode: string | null = null) =>
-  ({ eventId: "e", chargeId: CHARGE, kind, at: NOW, xmoneyTransactionId: "1", amountMicros: 24_200_000, errorCode }) as unknown as ChargeEventRow;
+  ({ eventId: "e", chargeId: CHARGE, kind, at: NOW, providerPaymentId: "1", amountMicros: 24_200_000, errorCode }) as unknown as ChargeEventRow;
 
 describe("P8c POST /v1/billing/checkout", () => {
-  it("starts the embedded payment and answers only what the browser needs", async () => {
+  it("starts NETOPIA's page and answers only what the browser needs", async () => {
     const checkout = { start: vi.fn(async () => RESULT) };
     const api = harness(checkout);
     const response = await api.inject({
@@ -64,7 +64,7 @@ describe("P8c POST /v1/billing/checkout", () => {
       headers: { ...testSessionHeaders(OWNER, true), "content-type": "application/json" }, payload: JSON.stringify({ ...BODY, country_confirmed: true })
     });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ public_key: "pk_test", order_payload: "eyJ9", order_checksum: "c2ln", charge_ref: CHARGE, sdk_environment: "stage" });
+    expect(response.json()).toEqual({ redirect_url: RESULT.redirectUrl, charge_ref: CHARGE, environment: "sandbox" });
     expect(checkout.start).toHaveBeenCalledWith(expect.objectContaining({
       ownerRef: OWNER.authenticated.ownerRef, userId: OWNER.authenticated.userId, quoteRef: BODY.quote_ref, locale: "en",
       consents: { renewal: PAIR, immediateStart: PAIR }, countryConfirmed: true, now: NOW
@@ -100,10 +100,15 @@ describe("P8c POST /v1/billing/checkout", () => {
     expect(await pending.startBillingCheckout(request)).toEqual({ state: "PENDING", charge_ref: CHARGE });
     const expired = createContractClient("https://api.debateai.test", answering(409, { error: "QUOTE_EXPIRED", message: "QUOTE_EXPIRED" }));
     await expect(expired.startBillingCheckout(request)).rejects.toMatchObject({ status: 409, serverCode: "QUOTE_EXPIRED" });
-    const signed = createContractClient("https://api.debateai.test", answering(200, {
-      public_key: "pk_test", order_payload: "eyJ9", order_checksum: "c2ln", charge_ref: CHARGE, sdk_environment: "stage"
+    const started = createContractClient("https://api.debateai.test", answering(200, {
+      redirect_url: RESULT.redirectUrl, charge_ref: CHARGE, environment: "sandbox"
     }));
-    expect(await signed.startBillingCheckout(request)).toMatchObject({ charge_ref: CHARGE, sdk_environment: "stage" });
+    expect(await started.startBillingCheckout(request)).toEqual({ redirect_url: RESULT.redirectUrl, charge_ref: CHARGE, environment: "sandbox" });
+    // A page URL that is not http(s) is never handed to the browser (spec §2.2 rule 10).
+    const crafted = createContractClient("https://api.debateai.test", answering(200, {
+      redirect_url: "javascript:alert(1)", charge_ref: CHARGE, environment: "sandbox"
+    }));
+    await expect(crafted.startBillingCheckout(request)).rejects.toBeDefined();
   });
 
   it("charges its own owner-keyed checkout budget (spec §2.7), not the quote's", async () => {
@@ -163,10 +168,10 @@ describe("P8c POST /v1/billing/checkout", () => {
 describe("P8c GET /v1/billing/charges/{chargeRef}", () => {
   it("reads the state of the caller's own charge, and 404s anything else", async () => {
     const read = vi.fn(async (ref: string, ownerRef: string) => ref === CHARGE && ownerRef === OWNER.authenticated.ownerRef
-      ? { state: "SUCCEEDED" as const, reasonCode: null } : null);
+      ? { state: "SUCCEEDED" as const, reasonCode: null, kind: "INITIAL" as const } : null);
     const api = harness({ start: vi.fn() }, { read });
     const own = await api.inject({ method: "GET", url: `/v1/billing/charges/${CHARGE}`, headers: testSessionHeaders(OWNER) });
-    expect([own.statusCode, own.json()]).toEqual([200, { state: "SUCCEEDED", reason_code: null }]);
+    expect([own.statusCode, own.json()]).toEqual([200, { state: "SUCCEEDED", reason_code: null, kind: "INITIAL" }]);
     const other = await api.inject({ method: "GET", url: `/v1/billing/charges/${"f".repeat(32)}`, headers: testSessionHeaders(OWNER) });
     expect(other.statusCode).toBe(404);
     const anonymous = await api.inject({ method: "GET", url: `/v1/billing/charges/${CHARGE}` });
@@ -194,7 +199,7 @@ describe("P8c GET /v1/billing/charges/{chargeRef}", () => {
     // P12e's refused new card: the hold is released and the card change reads FAILED.
     expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED"), event("REFUND_REQUESTED", "CARD_CHECK_REFUSED")]))
       .toEqual({ state: "FAILED", reasonCode: "CARD_CHECK_REFUSED" });
-    // P2-M5: a checkout whose plan never started, its payment refunded or voided at xMoney first, bought nothing.
+    // P2-M5: a checkout whose plan never started, its payment refunded or voided at NETOPIA first, bought nothing.
     for (const reason of ["PROVIDER_REFUND", "PROVIDER_VOID"]) {
       expect(chargeStatusOf([event("REQUESTED"), event("SUCCEEDED"), event("REFUND_REQUESTED", reason)], false), reason)
         .toEqual({ state: "FAILED", reasonCode: reason });
@@ -210,22 +215,26 @@ describe("P8c GET /v1/billing/charges/{chargeRef}", () => {
     const stranger = testHttpIdentity("billing-checkout-stranger");
     const rows = new Map([[CHARGE, {
       chargeId: CHARGE, ownerRef: stranger.authenticated.ownerRef, kind: "INITIAL", subscriptionId: "s",
-      events: [event("REQUESTED"), event("SUCCEEDED")]
+      paymentProvider: "netopia", events: [event("REQUESTED"), event("SUCCEEDED")]
     }]]);
     const repository = {
       charge: async (ref: string) => (rows.get(ref) ?? null) as never,
-      subscriptionEvents: async () => [{ kind: "CREATED" }, { kind: "ACTIVATED" }] as never
-    };
+      subscriptionEvents: async () => [{ kind: "CREATED" }, { kind: "ACTIVATED" }] as never,
+      withTransaction: async () => { throw new Error("NOT_REACHED"); },
+      enqueue: async () => { throw new Error("NOT_REACHED"); },
+      lastStatusRead: async () => null
+    } as unknown as ConstructorParameters<typeof ChargeStatusReader>[0]["repository"];
     const billing: BillingRouteOptions = {
       plans: testBillingPlans, clock: () => NOW, legal: { requiresReacceptance: async () => false },
-      checkout: { start: vi.fn() }, charges: new ChargeStatusReader(repository),
+      checkout: { start: vi.fn() },
+      charges: new ChargeStatusReader({ repository, jobs: { bringForward: async () => false }, clock: () => NOW }),
       quotes: { create: async () => { throw new Error("NOT_REACHED"); } }
     };
     const api = buildApi({
       application: unusedAskApplication(), sessions: testSessionApplication([OWNER, stranger]), allowedOrigin: TEST_APP_ORIGIN, billing
     });
     const theirs = await api.inject({ method: "GET", url: `/v1/billing/charges/${CHARGE}`, headers: testSessionHeaders(stranger) });
-    expect([theirs.statusCode, theirs.json()]).toEqual([200, { state: "SUCCEEDED", reason_code: null }]);
+    expect([theirs.statusCode, theirs.json()]).toEqual([200, { state: "SUCCEEDED", reason_code: null, kind: "INITIAL" }]);
     // The same reference, asked by another signed-in person: the answer for a charge that does not exist.
     const mine = await api.inject({ method: "GET", url: `/v1/billing/charges/${CHARGE}`, headers: testSessionHeaders(OWNER) });
     expect(mine.statusCode).toBe(404);

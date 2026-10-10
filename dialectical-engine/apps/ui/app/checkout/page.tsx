@@ -1,17 +1,17 @@
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { currentDocument } from "@debateai/legal-manifest";
 import { CheckoutFlow, type CheckoutConsents } from "@/components/billing/CheckoutFlow";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ageConfirmationHref } from "@/lib/ageConfirmation";
 import { billingPageFooter } from "@/lib/billing/footerBilling";
+import { availablePaymentMarks } from "@/lib/billing/paymentMarks";
 import { isPaidPlanId } from "@/lib/billing/plans";
 import { ageConfirmationOwed, billingIsOn, sessionConfirmed } from "@/lib/billing/serverBilling";
 import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
 import { readSessionCookie } from "@/lib/serverApi";
-import { NONCE_REQUEST_HEADER } from "../../content-security-policy.mjs";
 
 /**
  * The consent sentences' manifest pairs for the locale the page shows them in (spec §2.5.3, L2). Never another
@@ -58,9 +58,6 @@ export default async function CheckoutPage({
       </main>
     );
   }
-  const headerStore = await headers();
-  const nonce = headerStore.get(NONCE_REQUEST_HEADER) ?? undefined;
-  const sdkOrigin = process.env.XMONEY_SDK_ORIGIN?.trim() || null;
   return (
     <main className="screen scroll billingPage">
       <div className="billingInner narrow">
@@ -69,8 +66,7 @@ export default async function CheckoutPage({
           locale={locale}
           catalog={billingCatalog}
           consents={consentPairs(locale)}
-          sdkOrigin={sdkOrigin}
-          nonce={nonce}
+          paymentMarks={availablePaymentMarks()}
         />
       </div>
       <SiteFooter variant="full" billing={billingPageFooter()} />

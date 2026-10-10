@@ -65,6 +65,7 @@
   "chrome.footer.cancel": "Opsig en plan",
   "chrome.footer.withdraw": "Fortryd en plan",
   "chrome.footer.paymentMarks": "Kort, vi tager imod",
+  "chrome.footer.netopia": "NETOPIA Payments",
   "chrome.footer.visa": "Visa",
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP"

@@ -1,6 +1,6 @@
 import { applyForward108, base108Lineage } from "./migration-forward108.js";
 import { applyForward110 } from "./migration-forward110.js";
-import { applyForward111 } from "./migration-forward111.js";
+import { applyForwardChain, effectiveForwardVerifierSql } from "./migration-forward-chain.js";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { assertAuth106Catalog, compatibilityPreconditionDigest, identifyLineage, lineageEvidence, loadMigrationPlan, sha256, transactionBodyPostconditionEvidence, transactionBodyPreconditionDigest } from "./migration-lineage.js";
@@ -77,28 +77,44 @@ export {
 export {
   BillingRepository,
   type BillingReadExecutor,
+  type CardTokenInput,
+  type CardTokenRevocationReason,
+  type CardTokenRow,
   type ChargeEventInput,
   type ChargeEventKind,
   type ChargeEventRow,
   type ChargeKind,
   type ChargeRow,
-  type CustomerXMoneyEnvironment,
+  RETIRED_OUTBOX_KINDS,
   type DueRenewalCursor,
   type DueRenewalsOptions,
+  type HostedPaymentInput,
+  type HostedPaymentRow,
   type InvoiceIntentRow,
   type InvoiceIssuerName,
   type InvoiceKind,
   type InvoiceRow,
   type LocationEvidenceRow,
   type LocationVerdict,
-  type NoticeRow,
+  type NoticeOutcome,
+  type NoticeQuarantineCursor,
+  type NoticeQuarantineInput,
+  type NoticeQuarantinePage,
+  type NoticeQuarantineReason,
+  type NoticeQuarantineRow,
+  type OpenOwnerRefundRow,
   type OutboxClaimFence,
   type OutboxJob,
   type OutboxKind,
   type OutboxPayload,
+  type PaymentEnvironmentName,
+  type PaymentNoticeInput,
+  type PaymentNoticeRow,
+  type PaymentProviderName,
   type QuoteKind,
   type QuoteRow,
-  type TaxSummaryRow
+  type TaxSummaryRow,
+  type ToolOrderRow
 } from "./billing.js";
 
 // Budget spec §2.9 (R-2): the one writer of core.run_cost_substitution (0083).
@@ -1082,10 +1098,20 @@ export async function migrate(pool: Pool): Promise<void> {
       const final = await lineageEvidence(client);
       await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[final,compat.logicalName]);
     }
-    await client.query(plan.effectiveCapabilityVerifierSql);
+    // PR-54: once a forward step after 0108 is applied, its verifier supersedes the sealed one (lineage/README.md).
+    const forwardVerifierSql = effectiveForwardVerifierSql(plan, appliedSet);
+    if (forwardVerifierSql === undefined) await client.query(plan.effectiveCapabilityVerifierSql);
+    else await client.query(forwardVerifierSql);
     await applyForward108(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
     await applyForward110(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
-    await applyForward111(client,plan,lineage,new Set([...appliedSet,...resolvedSet]));
+    const compatEvidenceBeforeChain = await lineageEvidence(client);
+    await applyForwardChain(client,plan,new Set([...appliedSet,...resolvedSet]));
+    // data-export 0112 (V-28): a chain step that moves lineageEvidence (step_up_grant_action_check, valid_consumer_authorization_internal)
+    // re-seals the compatibility row it moved; the check above guards every later run (V-18).
+    const compatEvidenceAfterChain = await lineageEvidence(client);
+    if (compatEvidenceAfterChain !== compatEvidenceBeforeChain) {
+      await client.query("UPDATE public.debateai_schema_migration_resolution SET postcondition_evidence_digest=$1 WHERE logical_name=$2",[compatEvidenceAfterChain,compat.logicalName]);
+    }
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -2357,7 +2383,7 @@ export {
   type SignUpAcceptanceRow
 } from "./legal-acceptance.js";
 export * from "./obs-schema.js";
-export { BillingJobQueries } from "./billing-jobs.js";
+export { BillingJobQueries, type DueStatusRead, type StatusReadCursor, type StatusReadSchedule } from "./billing-jobs.js";
 export {
   accountRecoveryChannelRefsAad,
   PostgresRecoveryStartRepository

@@ -1,8 +1,9 @@
 import { TypedDomainError } from "@debateai/kernel";
 import { microsToDecimal, withdrawalDeadline, type SubscriptionState, type WithdrawalDeadline } from "@debateai/billing-core";
 import type { BillingInvoicesResponse, BillingSubscriptionResponse } from "@debateai/contract";
-import type { BillingRepository, CustomerXMoneyEnvironment } from "@debateai/db";
+import type { BillingRepository } from "@debateai/db";
 import type { BillingPolicy, PlanId } from "@debateai/register";
+import { isThisPaymentSystem } from "./outbox.js";
 import { renewalLeadMs } from "./renewal-rules.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 
@@ -29,18 +30,26 @@ export async function initialTaxCountry(
 
 type WindowInput = Readonly<{
   state: SubscriptionState; taxCountry: string | null; policy: BillingPolicy; now: Date;
-  /** P2-I4 (D5 5h): the connectors' xMoney system; a plan created in the other one is never offered a withdrawal. */
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
+  /**
+   * P2-I4 (D5 5h), N8's connectors.paymentEnvironment: the NETOPIA environment this API talks to; a plan of another
+   * payment system is never offered a withdrawal, an upgrade or a card change (spec §2.5.4).
+   */
+  paymentEnvironment: "sandbox" | "live";
 }>;
+
+/** Spec §2.5.4: the plan belongs to the payment system this API serves (provider and environment together). */
+function served(input: WindowInput): boolean {
+  return isThisPaymentSystem(input.state, input.paymentEnvironment);
+}
 
 /**
  * The withdrawal deadline while the right is still open (ACTIVE, a withdrawal country, before it closes, and the plan
- * paid in this API's xMoney system: its refund could not be sent to the other one); else null.
+ * paid in a payment system this API serves (spec §2.5.4): its refund could not be sent to another one); else null.
  */
 function openWithdrawal(input: WindowInput): WithdrawalDeadline | null {
   const { state, taxCountry, policy, now } = input;
   if (state.status !== "ACTIVE" || state.activatedAt === null || taxCountry === null) return null;
-  if (state.xmoneyEnvironment !== input.xmoneyEnvironment) return null;
+  if (!served(input)) return null;
   if (!policy.withdrawalCountries.includes(taxCountry)) return null;
   const deadline = withdrawalDeadline({ activatedAt: state.activatedAt, taxCountry, withdrawalDays: policy.withdrawalDays });
   return now.getTime() < deadline.closesAt.getTime() ? deadline : null;
@@ -64,34 +73,37 @@ const iso = (value: Date | null): string | null => value === null ? null : value
 
 /**
  * An upgrade is offered only while it can be charged at a prorated price: ACTIVE, below Max, no postponed renewal
- * running, outside the renewal's lead (P12c refuses it there with UPGRADE_NOT_AVAILABLE_NOW), and the plan paid in
- * this API's xMoney system (P2-W3 (a): P12c refuses the other one's NOT_SUBSCRIBED).
+ * running, outside the renewal's lead (P12c refuses it there with UPGRADE_NOT_AVAILABLE_NOW), and a NETOPIA plan of
+ * the environment this API serves (spec §2.5.4, §2.10; P2-W3 (a): the upgrade refuses any other plan NOT_SUBSCRIBED).
+ * The upgrade route serves NETOPIA plans only (`servedByNetopia`'s rule), so another system's plan is never offered it.
  */
 function upgradeOffered(input: WindowInput): boolean {
   const { state, now } = input;
   return state.status === "ACTIVE" && state.planId !== "MAX" && state.renewalPostponedUntil === null
-    && state.xmoneyEnvironment === input.xmoneyEnvironment
+    && served(input)
     && state.currentPeriodEnd !== null && now.getTime() < state.currentPeriodEnd.getTime() - renewalLeadMs();
 }
 
 /**
- * A card change is offered while ACTIVE or PAST_DUE, for a plan of this API's xMoney system only (P2-W3 (a): P12e
- * refuses the other one's NOT_SUBSCRIBED; its order lives in a system this API does not talk to).
+ * A card change is offered while ACTIVE or PAST_DUE, for a plan of a payment system this API serves (spec §2.5.4).
+ * N13's route takes NETOPIA plans only (P2-W3 (a), C-15: offer an action only where its route accepts it), as the
+ * upgrade does (N12's ruling).
  */
 function cardChangeOffered(input: WindowInput): boolean {
   const { state } = input;
-  return (state.status === "ACTIVE" || state.status === "PAST_DUE") && state.xmoneyEnvironment === input.xmoneyEnvironment;
+  return (state.status === "ACTIVE" || state.status === "PAST_DUE") && served(input);
 }
 
 /**
  * C-15: an undo of a pending cancel is offered only where the revoke route (`revokeCancelForOwner`) accepts it: ACTIVE,
- * the plan paid in this API's xMoney system (D5 5h: the other one's cancel stands, NOT_SUBSCRIBED), a cancel pending,
- * and before the period end. A SUSPENDED plan's undo is refused while paused (P2-W10); a PAST_DUE plan's cancel ends it
- * at once, so it never carries one.
+ * the plan paid in a payment system this API serves (spec §2.5.4; D5 5h: another one's cancel stands, NOT_SUBSCRIBED),
+ * a cancel pending, and before the period end. A SUSPENDED plan's undo is refused while paused (P2-W10); a PAST_DUE
+ * plan's cancel ends it at once, so it never carries one.
  */
 function revokeCancelOffered(input: WindowInput): boolean {
   const { state, now } = input;
-  return state.status === "ACTIVE" && state.cancelRequested && state.xmoneyEnvironment === input.xmoneyEnvironment
+  return state.status === "ACTIVE" && state.cancelRequested
+    && served(input)
     && (state.currentPeriodEnd === null || now.getTime() < state.currentPeriodEnd.getTime());
 }
 
@@ -100,6 +112,9 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
   const renewsOn = state.status === "ACTIVE" && !state.cancelRequested
     ? state.renewalPostponedUntil ?? state.currentPeriodEnd
     : null;
+  // The card page names the total its agreement charges again (spec §2.18): a renewing ACTIVE plan's, and a PAST_DUE
+  // plan's whose renewal is still retried (a PAST_DUE cancel ends it at once). The fold holds one after ACTIVATED.
+  const chargedAgain = renewsOn !== null || (state.status === "PAST_DUE" && !state.cancelRequested);
   const withdrawal = openWithdrawal(input);
   return Object.freeze({
     plan_id: paidPlanOf(state.planId),
@@ -107,7 +122,7 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
     cancel_requested: state.cancelRequested,
     current_period_end: iso(state.currentPeriodEnd),
     renews_on: iso(renewsOn),
-    renewal_total: renewsOn === null || state.announcedTotalMicros === null
+    renewal_total: !chargedAgain || state.announcedTotalMicros === null
       ? null : microsToDecimal(state.announcedTotalMicros),
     scheduled_downgrade_plan_id: state.scheduledDowngradePlanId === null ? null : paidPlanOf(state.scheduledDowngradePlanId),
     withdrawal_open_until: iso(withdrawal?.closesAt ?? null),
@@ -119,13 +134,13 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
 }
 
 export async function readSubscriptionView(
-  deps: Pick<SubscriptionRouteDeps, "billing" | "policy" | "xmoneyEnvironment">, ownerRef: string, now: Date
+  deps: Pick<SubscriptionRouteDeps, "billing" | "policy" | "paymentEnvironment">, ownerRef: string, now: Date
 ): Promise<SubscriptionView | null> {
   const state = await deps.billing.subscriptionForOwner(ownerRef);
   if (state === null) return null;
   return subscriptionView({
     state, taxCountry: await initialTaxCountry(deps.billing, state), policy: deps.policy, now,
-    xmoneyEnvironment: deps.xmoneyEnvironment
+    paymentEnvironment: deps.paymentEnvironment
   });
 }
 

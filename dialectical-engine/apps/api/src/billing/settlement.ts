@@ -1,17 +1,25 @@
 import type { PoolClient } from "pg";
-import { invoiceIssuerFor, type SubscriptionEvent, type SubscriptionState } from "@debateai/billing-core";
+import { invoiceIssuerFor, type PaymentProvider, type SubscriptionEvent, type SubscriptionState } from "@debateai/billing-core";
 import type { BillingRepository, ChargeRow, QuoteRow } from "@debateai/db";
-import type { XMoneyTransaction } from "@debateai/payments-xmoney";
 import type { BillingPolicy } from "@debateai/register";
 import type { RequestedRefundReason } from "./codes.js";
+
+/** N10 (spec §2.8): the NETOPIA payment a settlement decides; `cardTokenId` is the card its event adopts (§2.15.2). */
+export type SettledPayment = Readonly<{
+  provider: PaymentProvider;
+  providerPaymentId: string;
+  occurredAt: Date | null;
+  cardCountry: string | null;
+  cardTokenId: string | null;
+}>;
 
 /** What a charge kind's settlement sees, inside the one VERIFY_PAYMENT transaction, under the owner lock. */
 export type SettlementContext = Readonly<{
   client: PoolClient;
   now: Date;
   charge: ChargeRow;
-  /** Null only for a rebill refused synchronously (P11a), which has no transaction to read. */
-  transaction: XMoneyTransaction | null;
+  /** N10: the NETOPIA payment being decided; null for a failure, and for a refusal written with no payment. */
+  payment: SettledPayment | null;
   subscription: SubscriptionState;
   events: ReadonlyArray<SubscriptionEvent>;
   /** Null only for a CARD_CHECK charge, which has no quote. */
@@ -19,9 +27,9 @@ export type SettlementContext = Readonly<{
   ownerRef: string;
   customerId: string;
   /**
-   * The card's issuing country as xMoney reports it (`GET /card/{id}`), read for a successful payment; P12e's
-   * CARD_CHECK settlement refuses a new card from an always-blocked country with it. Null when xMoney names no
-   * country, and on a failure, a void or a chargeback (nothing there reads it).
+   * The card's issuing country as NETOPIA's status reports it, read for a successful payment; P12e's CARD_CHECK
+   * settlement refuses a new card from an always-blocked country with it. Null when NETOPIA names no country, and on
+   * a failure, a void or a chargeback (nothing there reads it).
    */
   cardCountry: string | null;
   /** What the settlement's own `prepare` read before this transaction opened (absent: it has no `prepare`). */
@@ -49,7 +57,12 @@ export interface ChargeSettlement {
    */
   prepare?(charge: ChargeRow): Promise<SettlementPrepared>;
   succeeded(context: SettlementContext): Promise<SettlementResult>;
-  failed(context: SettlementContext & Readonly<{ errorCode: string }>): Promise<void>;
+  /**
+   * `bankDeclined` (N10/N11): NETOPIA's own "the bank refused" (spec §2.4.5), passed by the renewal's synchronous refusal and
+   * by VERIFY_PAYMENT's NETOPIA path. Absent: a charge whose caller did not say is never read as the bank's refusal
+   * (`settlement-renewal.ts`).
+   */
+  failed(context: SettlementContext & Readonly<{ errorCode: string; bankDeclined?: boolean }>): Promise<void>;
   /** A card check's authorization is voided on purpose (A12); P12e supplies this for CARD_CHECK. */
   voided?(context: SettlementContext): Promise<void>;
 }

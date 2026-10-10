@@ -3,6 +3,9 @@ import { createContractClient } from "@debateai/contract";
 import { describe, expect, it } from "vitest";
 import { buildApi, SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, type AskApplication } from "../../apps/api/src/index.js";
 import type { SessionApplication, AuthenticatedSession } from "../../apps/api/src/sessions.js";
+import { AccountProfileService, phoneProfileAad } from "../../apps/api/src/account-profile.js";
+import { encrypt, hashToken, type CryptoEnvelope, type ReadableUserDekStore } from "@debateai/crypto";
+import type { ProfileSession } from "@debateai/db";
 const origin = "https://app.example.test", token = "s".repeat(43), csrf = "c".repeat(43), grant = "g".repeat(43);
 const session = {
   userId: "44444444-4444-4444-8444-444444444444", ownerRef: "22222222-2222-4222-8222-222222222222", tokenHash: `sha256:${"aa".repeat(32)}`, csrfTokenHash: `sha256:${"bb".repeat(32)}`, authKind: "cookie", session: {
@@ -12,8 +15,39 @@ const session = {
 const headers = {
   origin, cookie: `${SESSION_COOKIE_NAME}=${token}; ${CSRF_COOKIE_NAME}=${csrf}`, "x-csrf-token": csrf
 };
-function harness() {
+/**
+ * Storage for the REAL AccountProfileService: the phone lives only as a ciphertext under the user's DEK
+ * (same AAD the database row carries), and the step-up grant is checked by its hash the way the
+ * repository's SQL does. Masking, decryption and grant hashing all run in the product code.
+ */
+const PHONE = "+40722123456", UPDATED_AT = new Date("2026-10-04T11:00:00.000Z");
+function profileStorage() {
+  const dek = Buffer.alloc(32, 7);
+  let ciphertext = encrypt(dek, Buffer.from(PHONE), phoneProfileAad(session.userId));
   const calls: unknown[] = [];
+  const repository = {
+    async read(s: ProfileSession) {
+      calls.push(s);
+      return s.userId === session.userId ? { ciphertext, updatedAt: UPDATED_AT } : null;
+    },
+    async use(s: ProfileSession, input: Readonly<{ action: string; grantTokenHash: string; ciphertext?: CryptoEnvelope }>) {
+      calls.push({ s, action: input.action, grantTokenHash: input.grantTokenHash });
+      if (s.userId !== session.userId || input.grantTokenHash !== hashToken("step-up-grant", grant)) return null;
+      if (input.action === "CHANGE_PHONE_PROFILE" && input.ciphertext !== undefined) ciphertext = input.ciphertext;
+      return { ciphertext, updatedAt: UPDATED_AT };
+    },
+    async hasPhone() { return true; }
+  };
+  const users: ReadableUserDekStore = {
+    async load(id) { if (id !== session.userId) throw new Error("NO_DEK"); return Buffer.from(dek); },
+    async exists(id) { return id === session.userId; },
+    async store() { throw new Error("UNEXPECTED_DEK_WRITE"); },
+    async destroy() { throw new Error("UNEXPECTED_DEK_DESTROY"); }
+  };
+  return { repository, users, calls };
+}
+function harness() {
+  const storage = profileStorage(), calls = storage.calls;
   const api = buildApi({
     application: {} as AskApplication, allowedOrigin: origin, sessions: {
       authenticate: async (t) => t === token ? session : null, verifyCsrf: (_s, t) => t === csrf, beginLogin: async () => ({
@@ -23,28 +57,7 @@ function harness() {
       }), logout: async () => true, listSessions: async () => [], revokeSession: async () => true, revokeAllSessions: async () => 1, stepUp: async () => ({
         sessionToken: token, csrfToken: csrf
       })
-    } satisfies SessionApplication, accountProfile: {
-      phoneProfile: async (s) => {
-        calls.push(s);
-        return {
-          phone_present: true, phone_masked: "••••••••3456", phone_verified: false, updated_at: null
-        };
-      }, revealPhoneProfile: async (s, g) => {
-        calls.push({
-          s, g
-        });
-        return {
-          phone: "+40722123456", phone_verified: false
-        };
-      }, updatePhoneProfile: async (s, i) => {
-        calls.push({
-          s, i
-        });
-        return {
-          phone_present: true, phone_masked: "••••••••3456", phone_verified: false, updated_at: null
-        };
-      }
-    }, recoveryEmail: {
+    } satisfies SessionApplication, accountProfile: new AccountProfileService({ repository: storage.repository, users: storage.users }), recoveryEmail: {
       recoveryEmail: async () => ({
         state: "absent", email: null, pending: null
       }), requestRecoveryEmail: async () => ({
@@ -66,14 +79,38 @@ describe("purpose-bound account profile routes", () => {
         url: "/v1/account/profile", headers
       });
       expect(r.statusCode).toBe(200);
+      // Masked by AccountProfileService from the decrypted ciphertext: eight bullets, then the last four.
       expect(r.json()).toEqual({
-        phone_present: true, phone_masked: "••••••••3456", phone_verified: false, updated_at: null
+        phone_present: true, phone_masked: "••••••••3456", phone_verified: false, updated_at: UPDATED_AT.toISOString()
       });
       expect(r.headers["cache-control"]).toBe("no-store");
-      expect(r.body).not.toContain("+40722123456");
+      for (const leaked of [PHONE, "0722123", "722123"]) expect(r.body).not.toContain(leaked);
       expect(calls[0]).toEqual({
         userId: session.userId, sessionId: session.session.session_id, tokenHash: session.tokenHash
       });
+    }
+    finally {
+      await api.close();
+    }
+  });
+  it("re-masks a changed phone from what was stored, not from what the client sent back", async () => {
+    const { api } = harness();
+    try {
+      const changed = await api.inject({
+        method: "POST", url: "/v1/account/profile", headers, payload: { phone: "+40733999888", step_up_grant: grant }
+      });
+      expect(changed.statusCode).toBe(200);
+      expect(changed.json()).toMatchObject({ phone_present: true, phone_masked: "••••••••9888" });
+      expect(changed.body).not.toContain("733999");
+      const read = await api.inject({ url: "/v1/account/profile", headers });
+      expect(read.json()).toMatchObject({ phone_present: true, phone_masked: "••••••••9888" });
+      expect(read.body).not.toContain("+40733999888");
+      // A grant that does not hash to the stored one changes nothing and reveals nothing.
+      const refused = await api.inject({
+        method: "POST", url: "/v1/account/profile/reveal", headers, payload: { step_up_grant: "x".repeat(43) }
+      });
+      expect(refused.statusCode).toBeGreaterThanOrEqual(400);
+      expect(refused.body).not.toContain("733999");
     }
     finally {
       await api.close();
@@ -114,7 +151,7 @@ describe("purpose-bound account profile routes", () => {
       expect(calls[0]).toMatchObject({
         s: {
           tokenHash: session.tokenHash
-        }, g: grant
+        }, action: "READ_PHONE_PROFILE", grantTokenHash: hashToken("step-up-grant", grant)
       });
     }
     finally {

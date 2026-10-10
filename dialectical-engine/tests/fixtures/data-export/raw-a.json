@@ -252,7 +252,8 @@
         "total_micros": 1190000,
         "currency": "EUR",
         "created_at": "2026-10-01T00:00:00.000Z",
-        "xmoney_environment": "test"
+        "payment_provider": "netopia",
+        "payment_environment": "sandbox"
       }
     ],
     "internal_grants": [
@@ -280,12 +281,13 @@
         "charge_id": "charge-1",
         "kind": "CAPTURED",
         "at": "2026-10-01T00:00:00.000Z",
-        "xmoney_environment": "test",
-        "xmoney_transaction_id": "xt-1",
+        "payment_provider": "netopia",
+        "payment_environment": "sandbox",
+        "provider_payment_id": "xt-1",
         "refunds_transaction_id": null,
         "amount_micros": 1190000,
         "error_code": null,
-        "xmoney_created_at": "2026-10-01T00:00:00.000Z"
+        "provider_created_at": "2026-10-01T00:00:00.000Z"
       }
     ],
     "quote_uses": [

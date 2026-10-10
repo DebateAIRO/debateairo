@@ -18,7 +18,7 @@
  * so nothing is issued for a refund that never happened.
  *
  * `--amount` (P4-K, P2-W12; the owner's ruling of 3 October 2026, option (b)) records the credit note the owner
- * issued by hand for a refund made in the xMoney dashboard that xMoney reported on the payment itself (P9c's
+ * issued by hand for a refund made in NETOPIA's admin that NETOPIA reported as the payment's own status (P9c's
  * PROVIDER_REFUND REFUNDED with no refund transaction, the owner summary's DASHBOARD_REFUND line, which has no job):
  * at the owner's amount, at most what the payment held (that REFUNDED row's amount, P9c's upper bound), from the
  * issuer of the charge's own invoice. The line then clears by `invoiceUnknownItems`' own NOT EXISTS, and
@@ -32,18 +32,20 @@
  */
 import { pathToFileURL } from "node:url";
 import {
-  BillingJobQueries, BillingRepository, type ChargeEventRow, type ChargeRow, type CustomerXMoneyEnvironment, type InvoiceRow,
+  BillingJobQueries, BillingRepository, type ChargeEventRow, type ChargeRow, type InvoiceRow,
   type OutboxJob
 } from "@debateai/db";
 import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
-import { xmoneyEnvironmentOf } from "@debateai/payments-xmoney";
+import { netopiaEnvironmentOf } from "@debateai/payments-netopia";
 import { loadBillingInvoiceEnvironment } from "@debateai/register";
 import { documentOfJob, issuerOfJob, isDocumentJobKind, unbackedDocumentCode, type DocumentJobKind } from "./dead-jobs.js";
 import { refundJobOf, saleRefundOf, type RecordedCharge } from "./invoice-common.js";
 import { recordQuadernoDocument } from "./invoice-quaderno.js";
 import { INVOICE_CONFIRMED_NOT_ISSUED, parseSmartBillReference, recordSmartBillDocument } from "./invoice-smartbill.js";
 import { openBillingOperatorPool } from "./operator-connection.js";
+import { isThisPaymentSystem } from "./outbox.js";
+import { hostCommand } from "./refunds.js";
 
 export type InvoiceArguments =
   /** `amountMicros` (P4-K): only with `--kind CREDIT_NOTE`, for a DASHBOARD_REFUND line; absent otherwise. */
@@ -66,8 +68,8 @@ export type InvoiceCommandDeps = Readonly<{
     | "charge" | "quote" | "customerByOwner" | "invoicesForOwner" | "withTransaction" | "insertInvoiceIntent"
     | "insertInvoice" | "appendInvoiceStatus" | "enqueue" | "requeue">;
   jobs: Pick<BillingJobQueries, "documentJobsOfCharge" | "documentByExternalRef">;
-  /** P2-I4 (D5 5h): the xMoney system the API's invoicers follow; a charge of the other system owes no document here. */
-  xmoneyEnvironment: CustomerXMoneyEnvironment;
+  /** P2-I4 (D5 5h): the NETOPIA environment the API's invoicers follow; a charge of another system owes no document here. */
+  paymentEnvironment: "sandbox" | "live";
   /** R-7: PUBLIC_APP_URL's origin, for a recorded Quaderno receipt's settings link. */
   publicAppUrl: string;
 }>;
@@ -123,11 +125,11 @@ export function parseInvoiceArguments(args: readonly string[]): InvoiceArguments
 export async function runInvoiceCommand(deps: InvoiceCommandDeps, input: InvoiceArguments, now: Date): Promise<InvoiceResult> {
   const charge = await deps.repository.charge(input.chargeId);
   if (charge === null) return refuse("BILLING_INVOICE_CHARGE_UNKNOWN", "no charge has this reference");
-  if (charge.xmoneyEnvironment !== deps.xmoneyEnvironment) {
-    return refuse("BILLING_INVOICE_OTHER_XMONEY_SYSTEM", "the charge was paid in the other Netopia system");
+  if (!isThisPaymentSystem(charge, deps.paymentEnvironment)) {
+    return refuse("BILLING_INVOICE_OTHER_PAYMENT_SYSTEM", "the charge was paid in another payment system");
   }
   const paid = charge.events.find((event) => event.kind === "SUCCEEDED");
-  if (paid === undefined || paid.xmoneyTransactionId === null) {
+  if (paid === undefined || paid.providerPaymentId === null) {
     return refuse("BILLING_INVOICE_CHARGE_NOT_PAID", "the charge records no payment");
   }
   const issued = (await deps.repository.invoicesForOwner(charge.ownerRef)).filter((invoice) => invoice.chargeId === charge.chargeId);
@@ -175,7 +177,7 @@ export async function runInvoiceCommand(deps: InvoiceCommandDeps, input: Invoice
  * the one definition the credit-note jobs read.
  */
 function dashboardRefundOf(charge: PaidChargeRow, paid: ChargeEventRow): Readonly<{ upToMicros: number }> | null {
-  const sale = paid.xmoneyTransactionId === null ? null : saleRefundOf(charge, paid, paid.xmoneyTransactionId);
+  const sale = paid.providerPaymentId === null ? null : saleRefundOf(charge, paid, paid.providerPaymentId);
   return sale?.kind === "AMOUNT_UNKNOWN" ? sale : null;
 }
 
@@ -189,7 +191,7 @@ async function recordDashboardCreditNote(deps: InvoiceCommandDeps, input: Readon
 }>): Promise<InvoiceResult> {
   const dashboard = dashboardRefundOf(input.charge, input.paid);
   if (dashboard === null) {
-    return refuse("BILLING_INVOICE_NO_DASHBOARD_REFUND", "--amount is only for a refund made in the Netopia dashboard");
+    return refuse("BILLING_INVOICE_NO_DASHBOARD_REFUND", "--amount is only for a refund made in NETOPIA's admin");
   }
   if (input.original === undefined) return refuse("BILLING_INVOICE_ORIGINAL_MISSING", "settle the charge's invoice first");
   if (input.amountMicros > dashboard.upToMicros) {
@@ -281,7 +283,7 @@ function creditedMicros(charge: PaidChargeRow, paid: ChargeEventRow, dead: Liste
     return refuse("BILLING_INVOICE_NOTHING_TO_ISSUE", "no refund of the sale backs this credit note");
   }
   if (sale.kind === "AMOUNT_UNKNOWN") {
-    return refuse("BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN", "a dashboard refund whose amount only the dashboard shows");
+    return refuse("BILLING_INVOICE_REFUND_AMOUNT_UNKNOWN", "an admin refund whose amount only NETOPIA's admin shows");
   }
   return sale.amountMicros;
 }
@@ -291,18 +293,30 @@ export function renderInvoiceResult(input: InvoiceArguments, result: InvoiceResu
     case "RECORDED": {
       const what = `${result.issuer === "SMARTBILL" ? "SmartBill" : "Quaderno"} ${result.document === "INVOICE" ? "invoice" : "credit note"}`;
       const reference = input.mode === "RECORD" ? input.reference : "";
+      // README §14.8's host form, each command on its own line after the sentences (F8's rule, ruling PR-56).
+      const commands = [
+        ...(result.issuer === "SMARTBILL"
+          ? [hostCommand(`billing:efactura-status --invoice ${reference || "<series>-<number>"} --status <ACCEPTED or REJECTED>`)]
+          : []),
+        ...(result.creditNoteWaiting
+          ? [hostCommand(`billing:invoice --charge ${input.chargeId} --kind CREDIT_NOTE --requeue`
+            + (result.issuer === "SMARTBILL" ? " --confirm-not-issued" : ""))]
+          : [])
+      ];
       return `Recorded: ${what} ${reference} for charge ${input.chargeId}.`
         + (result.document === "INVOICE" ? " The receipt (M2) is queued for the customer." : "")
         + (result.issuer === "SMARTBILL"
-          ? " It joins the e-Factura list until you record ANAF's answer with pnpm billing:efactura-status." : "")
+          ? " It joins the e-Factura list until you record ANAF's answer with the billing:efactura-status command below." : "")
         + " It leaves the owner summary's list."
         + (input.mode === "RECORD" && input.amountMicros !== undefined
           ? ` The quarter's tax summary now subtracts this refund at ${microsToDecimal(input.amountMicros)} USD.` : "")
         + (result.creditNoteWaiting
-          ? ` A credit note of this charge was waiting for this invoice: re-queue it with pnpm billing:invoice --charge`
-            + ` ${input.chargeId} --kind CREDIT_NOTE --requeue${result.issuer === "SMARTBILL" ? " --confirm-not-issued (once you have checked SmartBill)" : ""}.`
+          ? " A credit note of this charge was waiting for this invoice: re-queue it with the billing:invoice command below"
+            + `${result.issuer === "SMARTBILL" ? " (once you have checked SmartBill)" : ""}.`
           : "")
-        + "\n";
+        + (commands.length === 0 ? ""
+          : ` Run ${commands.length === 1 ? "the command" : "the commands"} as root on the server.`)
+        + "\n" + commands.map((command) => `  ${command}\n`).join("");
     }
     case "REQUEUED":
       return `Re-queued: the ${result.jobKind} job of charge ${input.chargeId} runs again within a minute, in the API's`
@@ -344,18 +358,19 @@ export async function runBillingInvoiceCli(
 
 /**
  * The command as the host runs it: P14b's operator pool on the API's database URL (the API's own principal in
- * production), read-write, one connection, the xMoney system named by the API's XMONEY_API_BASE_URL. The integration
+ * production), read-write, one connection, the payment system named by the API's NETOPIA_API_BASE_URL. The integration
  * test opens it the same way, so the shipped setup is the one tested.
  */
 export async function openInvoiceCommand(environment: Readonly<{
-  DATABASE_URL: string; XMONEY_API_BASE_URL: string; PUBLIC_APP_URL: string; NODE_ENV?: string | undefined;
+  DATABASE_URL: string; NETOPIA_API_BASE_URL: string; PUBLIC_APP_URL: string; NODE_ENV?: string | undefined;
 }>): ReturnType<OpenInvoiceCommand> {
+  const paymentEnvironment = netopiaEnvironmentOf(environment.NETOPIA_API_BASE_URL.replace(/\/+$/u, ""));
+  if (paymentEnvironment === null) throw new TypeError("BILLING_CONFIGURATION_INVALID:NETOPIA_API_BASE_URL");
   const pool = await openBillingOperatorPool(environment.DATABASE_URL, {
     production: environment.NODE_ENV === "production", readOnly: false, max: 1
   });
   const deps: InvoiceCommandDeps = Object.freeze({
-    repository: new BillingRepository(pool), jobs: new BillingJobQueries(pool),
-    xmoneyEnvironment: xmoneyEnvironmentOf(environment.XMONEY_API_BASE_URL),
+    repository: new BillingRepository(pool), jobs: new BillingJobQueries(pool), paymentEnvironment,
     publicAppUrl: new URL(environment.PUBLIC_APP_URL).origin
   });
   return Object.freeze({

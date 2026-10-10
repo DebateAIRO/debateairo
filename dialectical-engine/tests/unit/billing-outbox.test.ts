@@ -109,14 +109,14 @@ describe("P7 billing outbox worker", () => {
     for (const [attempts, dead] of [[1, false], [6, true]] as const) {
       const audit = vi.fn();
       const { repository, worker } = workerOn([job("EMAIL", attempts)], audit);
-      worker.register("EMAIL", async () => { throw new TypedDomainError("XMONEY_UNAVAILABLE", "down"); });
+      worker.register("EMAIL", async () => { throw new TypedDomainError("PAYMENT_PROVIDER_UNAVAILABLE", "down"); });
       const [outcome] = await worker.runOnce();
       expect(outcome?.outcome).toBe(dead ? "DEAD" : "RETRY");
       expect(repository.fail).toHaveBeenCalledWith(
-        "job-EMAIL-ref-1", "XMONEY_UNAVAILABLE", dead ? null : new Date(NOW.getTime() + MINUTE), NOW, fence(attempts)
+        "job-EMAIL-ref-1", "PAYMENT_PROVIDER_UNAVAILABLE", dead ? null : new Date(NOW.getTime() + MINUTE), NOW, fence(attempts)
       );
       expect(audit).toHaveBeenCalledTimes(dead ? 1 : 0);
-      if (dead) expect(audit).toHaveBeenCalledWith("billing.outbox.dead", { kind: "EMAIL", code: "XMONEY_UNAVAILABLE", attempts: 6 });
+      if (dead) expect(audit).toHaveBeenCalledWith("billing.outbox.dead", { kind: "EMAIL", code: "PAYMENT_PROVIDER_UNAVAILABLE", attempts: 6 });
     }
   });
 
@@ -146,7 +146,7 @@ describe("P7 billing outbox worker", () => {
   });
 
   it("drains until a round claims nothing, so a job queued by a handler runs in the same drain", async () => {
-    const claimed = [job("VERIFY_PAYMENT", 1, "tx-1"), job("XMONEY_REFUND", 1, "c:tx-1")];
+    const claimed = [job("VERIFY_PAYMENT", 1, "tx-1"), job("PAYMENT_REFUND", 1, "c")];
     const repository = fakeRepository([]);
     repository.claim
       .mockResolvedValueOnce([claimed[0]!])
@@ -154,7 +154,7 @@ describe("P7 billing outbox worker", () => {
       .mockResolvedValue([]);
     const worker = new BillingOutboxWorker({ repository, workerId: "w-1", clock: () => NOW, audit: vi.fn(), batchSize: 20 });
     worker.register("VERIFY_PAYMENT", async () => ({ kind: "DONE" }));
-    worker.register("XMONEY_REFUND", async () => ({ kind: "DONE" }));
+    worker.register("PAYMENT_REFUND", async () => ({ kind: "DONE" }));
     expect(await worker.drain(10)).toBe(2);
     expect(repository.claim).toHaveBeenCalledTimes(3);
   });

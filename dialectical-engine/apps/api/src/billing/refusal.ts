@@ -14,6 +14,8 @@ export type BillingRefusalCode =
   | "COUNTRY_BLOCKED"
   | "COUNTRY_CONFIRMATION_REQUIRED"
   | "BILLING_ADDRESS_REQUIRED"
+  /** N13/N18 (spec §2.6.1): the phone is not E.164 (`+` and 8–15 digits) (422). */
+  | "BILLING_PHONE_INVALID"
   | "TAX_ID_INVALID"
   | "TAX_SERVICE_UNAVAILABLE"
   | "ALREADY_SUBSCRIBED"
@@ -38,6 +40,8 @@ export type BillingRefusalCode =
   | "UPGRADE_NOT_HIGHER"
   /** P12c: an earlier upgrade has no outcome yet, or another process holds the subscription's lease (409). */
   | "UPGRADE_IN_PROGRESS"
+  /** N12 (spec §2.10): an upgrade is paid or on its way at NETOPIA (or unreadable); `chargeRef` names it (409). */
+  | "UPGRADE_PENDING"
   /** P12c: the renewal of this period is due, postponed or already charging; upgrade in the new period (409). */
   | "UPGRADE_NOT_AVAILABLE_NOW"
   /**
@@ -47,7 +51,7 @@ export type BillingRefusalCode =
   | "WITHDRAWAL_WINDOW_CLOSED"
   /** P12d: no live WITHDRAW_SUBSCRIPTION step-up grant for this session (403); nothing was written. */
   | "STEP_UP_REQUIRED"
-  /** P12e (A2): a renewal's rebill may have reached xMoney; the card can change once its outcome is recorded. */
+  /** P12e (A2): a renewal's charge may have reached NETOPIA; the card can change once its outcome is recorded. */
   | "CARD_CHANGE_NOT_AVAILABLE_NOW"
   /** P13 (A25): the emailed cancel link's token is unknown, already spent or past its 24 hours (404). */
   | "CANCEL_LINK_INVALID"
@@ -64,7 +68,7 @@ export type BillingRefusalCode =
 export type BillingRefusalStatus = 403 | 404 | 409 | 422 | 503;
 
 export class BillingRefusal extends Error {
-  /** `chargeRef`: our own charge id (32 hex), sent back only with CHECKOUT_PENDING. */
+  /** `chargeRef`: our own charge id (32 hex), sent back only with CHECKOUT_PENDING and UPGRADE_PENDING. */
   constructor(readonly status: BillingRefusalStatus, readonly code: BillingRefusalCode, readonly chargeRef: string | null = null) {
     super(code);
     this.name = "BillingRefusal";

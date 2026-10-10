@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // tools/ci-known-red.mjs — B31 recorded known-red CI gate.
 //
-// Runs `pnpm exec vitest run <dirs…> --reporter=json` and compares the failing full test
+// Runs `pnpm exec vitest run <dirs…> --reporter=json` (an `@<file>` argument expands to the test files
+// that file lists, see expandTargets) and compares the failing full test
 // names against tests/ci-known-red.txt:
 //   - a failure that is NOT on the list        -> printed, exit 1 (a NEW failure)
 //   - a failure that IS on the list            -> counted as "known red"
@@ -27,6 +28,8 @@ import { fileURLToPath } from "node:url";
 
 const PRODUCT_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const ALLOWLIST_PATH = resolve(PRODUCT_ROOT, "tests/ci-known-red.txt");
+/** Host-sensitive tests (timing / resident-memory tripwires) whose outcome is printed but never decides the gate. */
+const FLAKY_PATH = resolve(PRODUCT_ROOT, "tests/ci-flaky.txt");
 const NAME_SEPARATOR = " > ";
 const TEST_FILE_PATTERN = /^tests\/[\w.-]+\/[\w.-]+\.test\.tsx?$/;
 /** V-4: how many extra executions confirm a listed test that passed. Two, so a confirmed entry
@@ -97,14 +100,39 @@ export function failedNamesFromReport(report, rootDir) {
  * The gate's decision. `ran` is the set of test names vitest actually reported; when it is
  * omitted every allowlisted entry is assumed to have run (the two-argument contract).
  */
-export function decide({ failed, allowlist, ran }) {
+export function decide({ failed, allowlist, ran, flaky = [] }) {
   const allowed = new Set(allowlist);
+  const tolerated = new Set(flaky);
   const failedSet = new Set(failed);
   const ranSet = ran === undefined || ran === null ? null : new Set(ran);
-  const newFailures = failed.filter((name) => !allowed.has(name));
+  const newFailures = failed.filter((name) => !allowed.has(name) && !tolerated.has(name));
   const knownFailures = failed.filter((name) => allowed.has(name));
+  // A flaky entry is a host-sensitive test (tests/ci-flaky.txt): its failure is reported, never new, and its pass
+  // is never "stale" — it is expected to pass on a quiet host, so the shrink-only rule (V-4) does not apply to it.
+  const flakyFailures = failed.filter((name) => tolerated.has(name) && !allowed.has(name));
   const stale = allowlist.filter((name) => !failedSet.has(name) && (ranSet === null || ranSet.has(name)));
-  return { newFailures, knownFailures, stale, exitCode: newFailures.length > 0 ? 1 : 0 };
+  return { newFailures, knownFailures, flakyFailures, stale, exitCode: newFailures.length > 0 ? 1 : 0 };
+}
+
+/**
+ * Expand `@<list file>` arguments into the test files that file names (one product-relative path per line, `#`
+ * comments and blank lines ignored). A curated suite such as the auth integration list
+ * (tests/ci-integration-auth.txt) is then gated by name, file by file. A listed path that does not look like a test
+ * file or does not exist is returned in `invalid`, so a typo can never shrink the suite in silence.
+ */
+export function expandTargets(args, readText = (path) => readFileSync(resolve(PRODUCT_ROOT, path), "utf8"), exists = (path) => existsSync(resolve(PRODUCT_ROOT, path))) {
+  const targets = [];
+  const invalid = [];
+  for (const arg of args) {
+    if (!arg.startsWith("@")) { targets.push(arg); continue; }
+    for (const raw of readText(arg.slice(1)).split("\n")) {
+      const line = raw.trim();
+      if (line === "" || line.startsWith("#")) continue;
+      if (!TEST_FILE_PATTERN.test(line) || !exists(line)) invalid.push(line);
+      else targets.push(line);
+    }
+  }
+  return { targets: [...new Set(targets)], invalid };
 }
 
 /**
@@ -165,7 +193,13 @@ function sweep(targets, reportPath) {
   }
 }
 
-function main(dirs) {
+function main(args) {
+  const { targets: dirs, invalid: invalidTargets } = expandTargets(args);
+  if (invalidTargets.length > 0) {
+    console.error("listed test files that do not exist or are not test files:");
+    for (const line of invalidTargets) console.error(`  ${line}`);
+    return 2;
+  }
   if (dirs.length === 0) {
     console.error("usage: node tools/ci-known-red.mjs <test dir> [<test dir>…]");
     return 2;
@@ -180,6 +214,14 @@ function main(dirs) {
     for (const line of invalid) console.error(`  ${line}`);
     return 2;
   }
+  const flakyList = existsSync(FLAKY_PATH) ? parseAllowlist(readFileSync(FLAKY_PATH, "utf8")) : { entries: [], invalid: [] };
+  const overlap = flakyList.entries.filter((name) => allowlist.includes(name));
+  if (flakyList.invalid.length > 0 || overlap.length > 0) {
+    console.error("tests/ci-flaky.txt: unparseable entries, or entries also on tests/ci-known-red.txt:");
+    for (const line of [...flakyList.invalid, ...overlap]) console.error(`  ${line}`);
+    return 2;
+  }
+  const flaky = flakyList.entries;
 
   const scratch = mkdtempSync(join(tmpdir(), "ci-known-red-"));
   const reportPath = join(scratch, "vitest.json");
@@ -192,7 +234,18 @@ function main(dirs) {
     const report = first.report;
 
     const { failed, ran, messages } = failedNamesFromReport(report, PRODUCT_ROOT);
-    const decision = decide({ failed, allowlist, ran });
+    const decision = decide({ failed, allowlist, ran, flaky });
+    // How much actually ran, so a log can never show a green gate over a sweep that collected nothing.
+    console.log(`CI_GATE_SCOPE files=${Array.isArray(report?.testResults) ? report.testResults.length : 0} tests=${ran.length}`);
+    const ranFlaky = flaky.filter((name) => ran.includes(name));
+    if (ranFlaky.length > 0) {
+      console.log(`host-sensitive tests (tests/ci-flaky.txt), reported and never gating — ${decision.flakyFailures.length} of ${ranFlaky.length} failed:`);
+      for (const name of ranFlaky) {
+        const failedHere = decision.flakyFailures.includes(name);
+        console.log(`  ${failedHere ? "FAILED" : "passed"}: ${name}`);
+        if (failedHere) console.log((messages[name] ?? "").split("\n").slice(0, 2).join("\n").replace(/^/gm, "      "));
+      }
+    }
 
     if (report?.success === false && failed.length === 0) {
       console.error("vitest reported failure but named no failing test; refusing to report a green gate");

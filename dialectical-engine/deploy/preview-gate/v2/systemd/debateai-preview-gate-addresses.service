@@ -1,0 +1,41 @@
+# Install as /etc/systemd/system/debateai-preview-gate-addresses.service (root:root 0644).
+# Started hourly by debateai-preview-gate-addresses.timer (part of the standard install; the
+# lifecycle target Wants= the timer). It runs the gate's own start check while the gate runs. A
+# mismatch not announced before fails this unit (exit 3) and its OnFailure= notice emails the
+# owner the one command that updates the list: at most one email per change. It reads only DNS
+# (through the local resolver stub) and the drop-in; no key, no gate state. Unprivileged.
+[Unit]
+Description=DebateAI preview: check the spending gate's DeepInfra allow-list against DNS
+OnFailure=debateai-preview-notice@gate-addresses-mismatch.service
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/team-budget-v2/deepinfra_addresses.py watch --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf --state /var/lib/debateai-preview-gate-addresses/announced
+# Only this unit's own state: the fingerprint of the last announced mismatch.
+StateDirectory=debateai-preview-gate-addresses
+StateDirectoryMode=0700
+TimeoutStartSec=60
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+InaccessiblePaths=-/etc/debateai-v3-preview -/var/lib/debateai-v3-preview -/var/lib/postgresql -/etc/postfix
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=127.0.0.53/32

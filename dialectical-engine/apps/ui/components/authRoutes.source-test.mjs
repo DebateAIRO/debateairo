@@ -54,7 +54,8 @@ test("every public and protected entry point reaches the dedicated auth routes",
   // catalogue; the route (settings behind the AuthGate) is unchanged.
   // L4: the settings page is never covered by the accept screen.
   // B10c: the page also serves the billing catalogue, for the usage bars.
-  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\} \/>/);
+  // N19 (spec 2026-10-05 §2.18): and the card-saving sentence's manifest pair, for the upgrade's agreement.
+  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\}\s+renewalConsent=\{currentDocument\("CONSENT_RENEWAL", locale\)\} \/>/);
   assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\} legalGate=\{false\}>/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);
@@ -64,7 +65,7 @@ test("every public and protected entry point reaches the dedicated auth routes",
   assert.match(signUp, /href=\{loginHref\}/);
   // W11 fix 1: /login redirects a signed-in visitor to its ?next, which can be a card page
   // (/checkout?plan=…). A client-side <Link> would carry that redirect out inside the /sign-up
-  // document, under the strict policy that blocks xMoney's frame. A plain <a> makes /login a
+  // document, under the site's strict policy. A plain <a> makes /login a
   // full page load, so the card page arrives as a new document with its own policy.
   assert.match(signUp, /<a href=\{loginHref\}>/);
   assert.doesNotMatch(signUp, /<Link\b/);

@@ -11,7 +11,7 @@ import { readSessionCookie } from "@/lib/serverApi";
 
 const CHARGE_REF = /^[0-9a-f]{32}$/;
 
-/** xMoney's backUrl (spec §2.10). It shows the charge state our server reports, never a browser verdict. */
+/** NETOPIA's return address (spec §2.6.5). It shows the charge state our server reports, never a browser verdict. */
 export default async function CheckoutReturnPage({
   searchParams = Promise.resolve({})
 }: {
@@ -41,6 +41,7 @@ export default async function CheckoutReturnPage({
               chargeRef={chargeRef}
               catalog={billingCatalog}
               successText={t(billingCatalog, "billing.checkout.returnSucceeded")}
+              upgradeSuccessText={t(billingCatalog, "billing.checkout.upgradeSucceeded")}
               failureText={t(billingCatalog, "billing.checkout.failed")}
             />
           )}

@@ -4,7 +4,3 @@ export const API_CONTENT_SECURITY_POLICY: string;
 export function buildContentSecurityPolicy(scriptSources: string): string;
 export function createNonce(): string;
 export function nonceContentSecurityPolicy(nonce: string, development: boolean): string;
-export type CardFormOrigins = Readonly<{ sdk: string; api: string | null }>;
-export function isCardFormPath(pathname: string): boolean;
-export function cardFormOrigins(sdkOrigin: string | undefined | null): CardFormOrigins | null;
-export function cardFormContentSecurityPolicy(nonce: string, development: boolean, origins: CardFormOrigins): string;

@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
-import { parseInvoiceArguments, runBillingInvoiceCli } from "../../apps/api/src/billing/invoice-cli.js";
+import { parseInvoiceArguments, renderInvoiceResult, runBillingInvoiceCli } from "../../apps/api/src/billing/invoice-cli.js";
+import {
+  asRunbookLine, BARE_BILLING_COMMAND, ON_HOST, printedHostCommands, runbookBillingCommands
+} from "../support/runbookHostCommands.js";
 
 const CHARGE = "0123456789abcdef0123456789abcdef";
 const sink = () => {
@@ -90,5 +93,39 @@ describe("W12 pnpm billing:invoice's grammar (P2-I17)", () => {
         close: async () => undefined
       }))).toBe(0);
     expect(plain.lines.out).not.toContain("USD");
+  });
+});
+
+// F8's rule (ruling PR-56): the commands a recorded document names next are README §14.8's host form, each on its own
+// line after the sentences; a bare `pnpm billing:…` fails in a root shell (no settings).
+describe("the commands the invoice command prints next", () => {
+  it("names billing:efactura-status and the waiting credit note's re-queue as the runbook runs them, each on its own line", () => {
+    const runbook = runbookBillingCommands();
+    const record = parseInvoiceArguments(["--charge", CHARGE, "--kind", "INVOICE", "--record", "DBAI-0900"]);
+    const smartbill = renderInvoiceResult(record, { kind: "RECORDED", document: "INVOICE", issuer: "SMARTBILL", creditNoteWaiting: true });
+    expect(smartbill).not.toMatch(BARE_BILLING_COMMAND);
+    expect(smartbill).toContain(" It joins the e-Factura list until you record ANAF's answer with the billing:efactura-status"
+      + " command below. It leaves the owner summary's list.");
+    expect(smartbill).toContain(" A credit note of this charge was waiting for this invoice: re-queue it with the"
+      + " billing:invoice command below (once you have checked SmartBill). Run the commands as root on the server.\n");
+    const efactura = `${ON_HOST} billing:efactura-status --invoice DBAI-0900 --status <ACCEPTED or REJECTED>`;
+    const requeue = `${ON_HOST} billing:invoice --charge ${CHARGE} --kind CREDIT_NOTE --requeue`;
+    expect(printedHostCommands(smartbill)).toEqual([efactura, `${requeue} --confirm-not-issued`]);
+    expect(smartbill.endsWith(`.\n  ${efactura}\n  ${requeue} --confirm-not-issued\n`)).toBe(true);
+    expect(runbook).toContain(asRunbookLine(efactura, [
+      ["--invoice DBAI-0900", '--invoice "$INVOICE"'], ["--status <ACCEPTED or REJECTED>", '--status "$STATUS"']
+    ]));
+    const requeueValues = [[`--charge ${CHARGE}`, '--charge "$CHARGE_REF"'], ["--kind CREDIT_NOTE", '--kind "$KIND"']] as const;
+    expect(runbook).toContain(asRunbookLine(`${requeue} --confirm-not-issued`, requeueValues));
+    const quaderno = renderInvoiceResult(record, { kind: "RECORDED", document: "INVOICE", issuer: "QUADERNO", creditNoteWaiting: true });
+    expect(quaderno).not.toMatch(BARE_BILLING_COMMAND);
+    expect(quaderno).toContain("re-queue it with the billing:invoice command below. Run the command as root on the server.\n");
+    expect(printedHostCommands(quaderno)).toEqual([requeue]);
+    expect(runbook).toContain(asRunbookLine(requeue, requeueValues));
+    // Nothing to run next: no command, and no root step.
+    const done = renderInvoiceResult(record, { kind: "RECORDED", document: "INVOICE", issuer: "QUADERNO", creditNoteWaiting: false });
+    expect(printedHostCommands(done)).toEqual([]);
+    expect(done).toBe(`Recorded: Quaderno invoice DBAI-0900 for charge ${CHARGE}. The receipt (M2) is queued for the customer.`
+      + " It leaves the owner summary's list.\n");
   });
 });

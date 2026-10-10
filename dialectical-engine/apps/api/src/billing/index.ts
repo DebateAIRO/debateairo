@@ -10,7 +10,7 @@ import type { LegalAcceptanceApplication } from "../legal.js";
 import type { AuthenticatedSession } from "../sessions.js";
 import type { ChargeStatusPort } from "./charge-status.js";
 import type { CheckoutServicePort } from "./checkout.js";
-import type { NoticeIntakePort } from "./notice-intake.js";
+import type { NetopiaNoticeIntakePort } from "./netopia-intake.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
 import { answerRefusal, BillingRefusal, billingNotFound } from "./refusal.js";
 import { installSubscriptionRoutes, SUBSCRIPTION_ROUTE_PATHS } from "./subscription-routes.js";
@@ -33,7 +33,7 @@ export const BILLING_ROUTE_PATHS = Object.freeze([
   "POST /v1/billing/quote",
   "POST /v1/billing/checkout",
   "GET /v1/billing/charges/{chargeRef}",
-  "POST /v1/billing/xmoney/notify",
+  "POST /v1/billing/netopia/notify",
   ...SUBSCRIPTION_ROUTE_PATHS
 ] as const);
 export type BillingRoutePath = typeof BILLING_ROUTE_PATHS[number];
@@ -91,8 +91,8 @@ export type BillingRouteDeps = Readonly<{
   /** P8c. */
   checkout?: CheckoutServicePort;
   charges?: ChargeStatusPort;
-  /** P9a. */
-  notices?: NoticeIntakePort;
+  /** N9 (spec 2026-10-05 §2.7): NETOPIA's message. Present with billing on, and in the provider-only mode. */
+  netopiaNotices?: NetopiaNoticeIntakePort;
   /**
    * P8c (R3-2): the age gate's reader. Only `buildApi` supplies it, from `options.sessions`; absent, the checkout
    * refuses 503 AGE_CHECK_UNAVAILABLE (this guard fails closed).
@@ -138,40 +138,19 @@ const PLANS_CACHE_CONTROL = "public, max-age=60";
 /** Quote, checkout and card bodies are small; each declares the 16 KiB credential-route ceiling. */
 const BILLING_BODY_LIMIT_BYTES = 16_384;
 
-const NOTIFY_PATH = "/v1/billing/xmoney/notify";
 const NOTIFY_BODY_LIMIT_BYTES = 65_536;
+/** N9 (spec 2026-10-05 §2.7.1): the route NETOPIA posts its message to (the public address adds `/api`). */
+export const NETOPIA_NOTIFY_PATH = "/v1/billing/netopia/notify";
+/**
+ * NETOPIA's message must reach its verifier as the exact bytes received, whatever content type it was sent with: the
+ * route's preParsing hook relabels the request with this private type, the one parser registered for it keeps a
+ * Buffer, and every other route refuses the type with the house 415. Fastify's JSON parsing stays for all others.
+ */
+const NETOPIA_NOTICE_MEDIA_TYPE = "application/vnd.debateai.netopia-notice";
 
 /** A transport fault the house error handler already maps to its constant envelope (index.ts TRANSPORT_FAULT_ENVELOPES). */
 function transportFault(code: "FST_ERR_CTP_INVALID_MEDIA_TYPE" | "FST_ERR_CTP_BODY_TOO_LARGE", statusCode: 413 | 415): Error {
   return Object.assign(new Error(code), { code, statusCode });
-}
-
-function readBoundedBody(payload: NodeJS.ReadableStream, limit: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    let settled = false;
-    payload.on("data", (chunk: Buffer | string) => {
-      if (settled) return;
-      const bytes = typeof chunk === "string" ? Buffer.from(chunk, "utf8") : chunk;
-      size += bytes.length;
-      if (size > limit) {
-        settled = true;
-        reject(transportFault("FST_ERR_CTP_BODY_TOO_LARGE", 413));
-        return;
-      }
-      chunks.push(bytes);
-    });
-    payload.on("end", () => { if (!settled) { settled = true; resolve(Buffer.concat(chunks).toString("utf8")); } });
-    payload.on("error", (error: Error) => { if (!settled) { settled = true; reject(error); } });
-  });
-}
-
-/** A form body decodes "+" as a space and base64 has no spaces, so a space here was a "+". */
-export function opensslResultOf(body: unknown): string {
-  if (typeof body !== "object" || body === null) return "";
-  const value = (body as Readonly<Record<string, unknown>>).opensslResult;
-  return typeof value === "string" ? value.replaceAll(" ", "+") : "";
 }
 
 function quoteResponse(result: QuoteResult): Readonly<Record<string, unknown>> {
@@ -209,18 +188,19 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     }));
   });
 
-  // Root-level, because Fastify parsers are per encapsulation context and a plugin would register the route
-  // asynchronously; gated on the one route that accepts form bodies, so every other route keeps its 415.
-  api.addContentTypeParser("application/x-www-form-urlencoded", (request, payload, done) => {
-    if (request.routeOptions.url !== NOTIFY_PATH) {
-      done(transportFault("FST_ERR_CTP_INVALID_MEDIA_TYPE", 415), undefined);
-      return;
+  // N9: root-level, because Fastify parsers are per encapsulation context and a plugin would register the route
+  // asynchronously; for NETOPIA's notify route only (the route relabels its own requests), so every other route keeps
+  // its 415.
+  api.addContentTypeParser(
+    NETOPIA_NOTICE_MEDIA_TYPE, { parseAs: "buffer", bodyLimit: NOTIFY_BODY_LIMIT_BYTES },
+    (request, body, done) => {
+      if (request.routeOptions.url !== NETOPIA_NOTIFY_PATH) {
+        done(transportFault("FST_ERR_CTP_INVALID_MEDIA_TYPE", 415), undefined);
+        return;
+      }
+      done(null, body);
     }
-    readBoundedBody(payload, NOTIFY_BODY_LIMIT_BYTES).then(
-      (text) => done(null, Object.fromEntries(new URLSearchParams(text))),
-      (error: Error) => done(error, undefined)
-    );
-  });
+  );
 
   // The plans come from the register version read at boot, so one body serves every caller until restart.
   let plansBody: Readonly<Record<string, unknown>> | null = null;
@@ -266,8 +246,9 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       }
       const result = await quotes.create({
         ownerRef: authenticated.ownerRef, ip: source(request).ip, planId: body.plan_id, country: body.country ?? null,
-        name: body.name ?? null, region: body.region ?? null, postalCode: body.postal_code ?? null,
-        city: body.city ?? null,
+        name: body.name ?? null, firstName: body.first_name ?? null, lastName: body.last_name ?? null,
+        phone: body.phone ?? null, street: body.street ?? null, region: body.region ?? null,
+        postalCode: body.postal_code ?? null, city: body.city ?? null,
         company: body.company === undefined ? null
           : { name: body.company.name, vatId: body.company.vat_id, address: body.company.address },
         now: clock()
@@ -299,8 +280,7 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
         countryConfirmed: body.country_confirmed === true, now: clock()
       });
       return reply.send(BillingCheckoutResponseSchema.parse({
-        public_key: result.publicKey, order_payload: result.orderPayload, order_checksum: result.orderChecksum,
-        charge_ref: result.chargeId, sdk_environment: result.sdkEnvironment
+        redirect_url: result.redirectUrl, charge_ref: result.chargeId, environment: result.environment
       }));
     });
   });
@@ -312,21 +292,41 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
       const status = await charges.read(request.params.chargeRef, authenticated.ownerRef);
       if (status === null) return billingNotFound(reply);
-      return reply.send(BillingChargeStatusResponseSchema.parse({ state: status.state, reason_code: status.reasonCode }));
+      return reply.send(BillingChargeStatusResponseSchema.parse({ state: status.state, reason_code: status.reasonCode, kind: status.kind }));
     }
   );
 
-  // P9a (Q-2): 200 "OK" once stored and for anything that does not decrypt; 429 over the source's budget; a failed
-  // store write reaches the house error handler as 500, so xMoney sends the notice again. Installed last, in
-  // BILLING_ROUTE_PATHS order; its form parser is registered above, before the plans route.
-  api.post(NOTIFY_PATH, { ...deps.policy("POST /v1/billing/xmoney/notify"), bodyLimit: NOTIFY_BODY_LIMIT_BYTES }, async (request, reply) => {
-    const { notices } = deps;
-    if (notices === undefined) return billingNotFound(reply);
-    if (!admit.gate(reply, "billingNotify", "POST /v1/billing/xmoney/notify", clientIpNetworkScope(source(request).ip))) {
-      return reply;
+  // N9 (spec 2026-10-05 §2.7.1-2.7.2): verification before admission. A verified message is never refused for volume;
+  // only one that fails verification is charged to the source's billingNotify budget (429 over it). Every answer is
+  // JSON; the intake decides it. Installed in BILLING_ROUTE_PATHS order.
+  api.post(NETOPIA_NOTIFY_PATH, {
+    ...deps.policy("POST /v1/billing/netopia/notify"),
+    bodyLimit: NOTIFY_BODY_LIMIT_BYTES,
+    preParsing: async (request, _reply, payload) => {
+      request.headers = { ...request.headers, "content-type": NETOPIA_NOTICE_MEDIA_TYPE };
+      return payload;
     }
-    await notices.receive(opensslResultOf(request.body));
-    return reply.status(200).header("content-type", "text/plain; charset=utf-8").send("OK");
+  }, async (request, reply) => {
+    const intake = deps.netopiaNotices;
+    if (intake === undefined) return billingNotFound(reply);
+    const sourceKey = clientIpNetworkScope(source(request).ip);
+    // Node lowercases header names, so NETOPIA's `Verification-token` is read whatever its letter case.
+    const header = request.headers["verification-token"];
+    let refused = false;
+    const answer = await intake.receive({
+      rawBody: Buffer.isBuffer(request.body) ? request.body : Buffer.alloc(0),
+      header: typeof header === "string" ? header : undefined,
+      sourceKey,
+      now: clock(),
+      admit: () => {
+        const admitted = admit.gate(reply, "billingNotify", "POST /v1/billing/netopia/notify", sourceKey);
+        if (!admitted) refused = true;
+        return admitted;
+      }
+    });
+    // The gate has already answered 429 with its retry-after; never send twice, whatever the onSend hooks' timing.
+    if (refused || reply.sent) return reply;
+    return reply.status(answer.status).header("content-type", "application/json").send(answer.body);
   });
 
   // P12b onward: the subscriber's own routes, in BILLING_ROUTE_PATHS order after the notice route.

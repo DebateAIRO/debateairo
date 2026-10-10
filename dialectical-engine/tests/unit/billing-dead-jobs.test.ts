@@ -10,6 +10,9 @@ import {
 } from "../../apps/api/src/billing/dead-jobs.js";
 import { BillingOutboxWorker } from "../../apps/api/src/billing/outbox.js";
 import { createEmailJobHandler, emailJob, type BillingMail } from "../../apps/api/src/billing/email-job.js";
+import {
+  asRunbookLine, BARE_BILLING_COMMAND, ON_HOST, printedHostCommands, runbookBillingCommands
+} from "../support/runbookHostCommands.js";
 
 const NOW = new Date("2026-10-01T10:00:00.000Z");
 const CHARGE = "0123456789abcdef0123456789abcdef";
@@ -91,12 +94,13 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
         "param.reasonCode": "INVOICE_UNKNOWN"
       }
     });
-    expect(String(enqueued[0]!.payload["param.nextSteps"]))
-      .toContain(`pnpm billing:invoice --charge ${CHARGE} --kind INVOICE --record <series>-<number>`);
-    expect(String(enqueued[0]!.payload["param.nextSteps"]))
-      .toContain(`pnpm billing:invoice --charge ${CHARGE} --kind INVOICE --requeue --confirm-not-issued`);
-    expect(String(enqueued[1]!.payload["param.nextSteps"]))
-      .toContain(`pnpm billing:invoice --charge ${CHARGE} --kind CREDIT_NOTE --requeue`);
+    // Each command on its own line, as README §14.8 runs it on the host.
+    expect(printedHostCommands(String(enqueued[0]!.payload["param.nextSteps"]))).toEqual([
+      `${ON_HOST} billing:invoice --charge ${CHARGE} --kind INVOICE --record <series>-<number>`,
+      `${ON_HOST} billing:invoice --charge ${CHARGE} --kind INVOICE --requeue --confirm-not-issued`
+    ]);
+    expect(printedHostCommands(String(enqueued[1]!.payload["param.nextSteps"])))
+      .toEqual([`${ON_HOST} billing:invoice --charge ${CHARGE} --kind CREDIT_NOTE --requeue`]);
   });
 
   it("emails the owner O3 for every dead email but its own, and for nothing else", async () => {
@@ -104,7 +108,7 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
     await alert(job("EMAIL", `M1:${CHARGE}`, { template: "M1", recipient: "CUSTOMER" }), "BILLING_PROFILE_UNREADABLE", NOW);
     await alert(job("EMAIL", `M3:sub:2026-11-01T00:00:00.000Z:23800000`, { template: "M3", recipient: "CUSTOMER" }), "OUTBOX_HANDLER_FAILED", NOW);
     await alert(job("EMAIL", `O3:${JOB_ID}`, { template: "O3", recipient: "OWNER" }), "OUTBOX_HANDLER_FAILED", NOW);
-    await alert(job("XMONEY_REFUND", `${CHARGE}:9912345`), "XMONEY_REFUSED", NOW);
+    await alert(job("PAYMENT_REFUND", CHARGE), "PAYMENT_CONFIGURATION_REFUSED", NOW);
     await alert(job("VERIFY_PAYMENT", "9912345"), "CHARGE_NOT_FOUND", NOW);
     expect(enqueued.map((entry) => [entry.payload["param.jobKind"], entry.payload["param.reference"]])).toEqual([
       ["EMAIL M1", `M1:${CHARGE}`],
@@ -116,7 +120,7 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
   it("presents a job our records do not back as nothing to issue or re-queue (the W4 forward), never as a document to record", () => {
     const missing = documentJobAction({ chargeId: CHARGE, jobKind: "SMARTBILL_STORNO", code: "CREDIT_NOTE_REFUND_MISSING" });
     expect(missing).toContain("no refund is recorded for this sale: nothing to issue or re-queue; tell whoever runs the server");
-    for (const code of ["CREDIT_NOTE_REFUND_MISSING", "CREDIT_NOTE_PAYLOAD_INVALID", "INVOICE_CHARGE_NOT_PAID", "OTHER_XMONEY_SYSTEM"]) {
+    for (const code of ["CREDIT_NOTE_REFUND_MISSING", "CREDIT_NOTE_PAYLOAD_INVALID", "INVOICE_CHARGE_NOT_PAID", "OTHER_PAYMENT_SYSTEM"]) {
       expect(unbackedDocumentCode(code), code).toBe(true);
       const text = documentJobAction({ chargeId: CHARGE, jobKind: "QUADERNO_RECORD_REFUND", code });
       expect(text, code).not.toContain("--record");
@@ -136,27 +140,70 @@ describe("W12 (P2-I16) a job that dies reaches the owner at once", () => {
     expect(say("SMARTBILL_INVOICE", "INVOICE_SERVICE_REFUSED")).toContain("SmartBill never issued it");
     expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).toContain(`--kind CREDIT_NOTE --record <series>-<number>`);
     expect(say("QUADERNO_RECORD_SALE", "INVOICE_UNKNOWN")).toContain("--record <Quaderno id>");
-    expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("only the dashboard shows");
+    expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("only the admin shows");
     // P4-K (P2-W12, the owner's ruling of 3 October 2026, option (b)): the owner issues the credit note by hand and
     // records it with its amount; the line clears and the quarter's figure subtracts it. One credit note per charge.
     expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("issue its credit note by hand in SmartBill (a Romanian"
-      + " sale) or Quaderno, then record it with its amount: pnpm billing:invoice --charge"
-      + ` ${CHARGE} --kind CREDIT_NOTE --record <series>-<number> (SmartBill) or <Quaderno id> --amount <the amount refunded,`
-      + " for example 12.10>");
+      + " sale) or Quaderno, then record it with its amount with the command below, with the SmartBill <series>-<number>"
+      + " or the Quaderno id in place of <document> and the amount refunded (for example 12.10) in place of <amount>");
+    expect(printedHostCommands(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")))
+      .toEqual([`${ON_HOST} billing:invoice --charge ${CHARGE} --kind CREDIT_NOTE --record <document> --amount <amount>`]);
     expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("at most what the payment held");
     expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).toContain("the line then leaves this list and the quarter's tax"
       + " summary subtracts that amount");
     expect(say("DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL")).not.toContain("cannot record");
-    // Part 4 final review C-5 (the controller's ruling): a payment xMoney refunded before we ever saw it paid owes no
+    // Part 4 final review C-5 (the controller's ruling): a payment NETOPIA refunded before we ever saw it paid owes no
     // invoice and no credit note (A29 (q)), so its line asks for no document and names no command.
     expect(say("REFUNDED_BEFORE_START", "NO_DOCUMENT_OWED")).toBe("Refunded before it started: no invoice or credit note"
       + " is owed. Take this sale and its refund out of the quarter's figures by hand.");
     expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).not.toContain("--amount");
     expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).toContain("(a partial refund, or a second refund of one charge)");
-    expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).not.toContain("dashboard");
+    expect(say("SMARTBILL_STORNO", "CREDIT_NOTE_MANUAL")).not.toContain("admin");
     // A SmartBill job is re-queued only after the owner checked SmartBill: it has no lookup (X1 row 8).
     expect(say("SMARTBILL_INVOICE", "OUTBOX_HANDLER_FAILED")).toContain("--requeue --confirm-not-issued");
     expect(say("SMARTBILL_INVOICE", "OUTBOX_HANDLER_FAILED")).toContain("checked in SmartBill that nothing was issued");
+  });
+
+  // F8's rule (ruling PR-56) for every invoice command these steps name: README §14.8's host form, each on its own
+  // line after the steps, which say to run them as root on the server; a bare `pnpm billing:invoice` has no settings.
+  it("prints every invoice command as the runbook runs it on the host, each on its own line after the steps", () => {
+    const runbook = runbookBillingCommands();
+    const kinds = ["SMARTBILL_INVOICE", "SMARTBILL_STORNO", "QUADERNO_RECORD_SALE", "QUADERNO_RECORD_REFUND"];
+    const codes = ["INVOICE_UNKNOWN", "INVOICE_SERVICE_REFUSED", "INVOICE_SERVICE_UNAVAILABLE", "TAX_SERVICE_REFUSED",
+      "TAX_SERVICE_UNAVAILABLE", "INVOICE_ORIGINAL_MISSING", "CREDIT_NOTE_MANUAL", "OUTBOX_HANDLER_FAILED"];
+    const cases = [...kinds.flatMap((jobKind) => codes.map((code) => [jobKind, code] as const)),
+      ["DASHBOARD_REFUND", "CREDIT_NOTE_MANUAL"] as const];
+    for (const [jobKind, code] of cases) {
+      const text = documentJobAction({ chargeId: CHARGE, jobKind, code });
+      const label = `${jobKind} ${code}`;
+      expect(text, label).not.toMatch(BARE_BILLING_COMMAND);
+      const [steps, ...rest] = text.split("\n");
+      const commands = printedHostCommands(text);
+      expect(commands.length, label).toBeGreaterThan(0);
+      expect(rest, label).toEqual(commands.map((command) => `  ${command}`));
+      expect(steps, label).toMatch(/; run the commands? as root on the server:$/u);
+      for (const command of commands) {
+        const line = asRunbookLine(command, [
+          [`--charge ${CHARGE}`, '--charge "$CHARGE_REF"'], ["--record <series>-<number>", '--record "$DOCUMENT"'],
+          ["--record <Quaderno id>", '--record "$DOCUMENT"'], ["--record <document>", '--record "$DOCUMENT"'],
+          ["--amount <amount>", '--amount "$AMOUNT"']
+        ]);
+        // README §14.8 names the kind as read in, except for the admin refund's credit note (always CREDIT_NOTE).
+        expect(runbook, `${label}: ${command}`).toContain(jobKind === "DASHBOARD_REFUND"
+          ? line : line.replace(/--kind (?:INVOICE|CREDIT_NOTE)/u, '--kind "$KIND"'));
+      }
+    }
+  });
+
+  it("names the owner summary's command as the runbook runs it when an email to the owner is lost", () => {
+    const owner = deadEmailAction("O1", "OWNER");
+    expect(owner).not.toMatch(BARE_BILLING_COMMAND);
+    expect(owner).toContain("check the owner address (the file OWNER_REPORT_EMAIL_PATH names in the API's settings) and the"
+      + " mail relay; the tax summary, printed by the command below with the quarter in place of <quarter> (for example"
+      + " 2026-Q4), shows the same lists; run the command as root on the server:\n");
+    expect(printedHostCommands(owner)).toEqual([`${ON_HOST} billing:tax-summary --quarter <quarter>`]);
+    expect(owner.split("\n").at(-1)).toBe(`  ${ON_HOST} billing:tax-summary --quarter <quarter>`);
+    expect(runbookBillingCommands()).toContain(asRunbookLine(printedHostCommands(owner)[0]!, [["<quarter>", "2026-Q4"]]));
   });
 
   it("says what a lost email means for each kind of email", () => {

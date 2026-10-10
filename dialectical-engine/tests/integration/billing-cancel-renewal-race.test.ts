@@ -47,8 +47,8 @@ describe("P12b a cancel after the renewal started ends the plan, and the renewal
     const paid = await h.activate({ ownerRef: identity.authenticated.ownerRef });
     const end = await h.periodEndOf(paid.subscriptionId);
     h.clock.now = new Date(end.getTime() + MINUTE);
-    // The rebill went through at xMoney, but its answer was lost: SUBMIT_UNKNOWN, and RENEWAL_PENDING keeps the plan.
-    h.xmoney.failNextRebill(paid.transaction.orderId, "XMONEY_OUTCOME_UNKNOWN", true);
+    // NETOPIA made the charge, but its answer was lost: SUBMIT_UNKNOWN, and RENEWAL_PENDING keeps the plan.
+    h.payments.failNextCharge(paid.subscriptionId, "PAID_ANSWER_LOST");
     await h.renewal.runOnce();
     const [charge] = await renewalCharges(paid.subscriptionId);
     expect(charge).toMatchObject({ attempt: 1, periodStart: end });
@@ -60,10 +60,11 @@ describe("P12b a cancel after the renewal started ends the plan, and the renewal
     expect((await m7Of(paid.subscriptionId))[0]?.payload).toMatchObject({
       "param.accessEndDate": cancelledAt.toISOString().slice(0, 10), "param.canUndo": "false"
     });
-    // P11a's recovery finds the lost payment on the order (A2) and hands it to VERIFY_PAYMENT: no second rebill.
+    // P11a's recovery reads NETOPIA's status of the same order (spec §2.9.3) and hands the payment to VERIFY_PAYMENT:
+    // no second charge.
     h.clock.advance(2 * MINUTE);
     await h.renewal.runOnce();
-    expect(h.xmoney.rebillsFor(paid.transaction.orderId)).toBe(1);
+    expect(h.payments.chargesFor(paid.subscriptionId)).toBe(1);
     await h.worker.drain(10);
     const recorded = (await h.repository.charge(charge!.chargeId))!.events;
     expect(recorded.map((event) => event.kind)).toContain("SUBMITTED");
@@ -76,7 +77,7 @@ describe("P12b a cancel after the renewal started ends the plan, and the renewal
     expect(await h.entitlements.current(paid.ownerRef, h.clock.now)).toMatchObject({ planId: "FREE", cause: "ENDED_CANCEL" });
   });
 
-  it("ends the plan and refunds the renewal when the cancel comes inside the renewal's lead, after the rebill", async () => {
+  it("ends the plan and refunds the renewal when the cancel comes inside the renewal's lead, after the charge", async () => {
     const identity = testHttpIdentity("p12b-race-lead");
     const paid = await h.activate({ ownerRef: identity.authenticated.ownerRef });
     const end = await h.periodEndOf(paid.subscriptionId);
@@ -102,7 +103,7 @@ describe("P12b a cancel after the renewal started ends the plan, and the renewal
       planId: "FREE", cause: "ENDED_CANCEL", periodAnchorAt: cancelledAt
     });
     expect(await revoke(identity)).toBe(409);
-    // complete-ok arrives: the plan is no longer live, so the money goes back and nothing renews.
+    // NETOPIA's PAID status is read: the plan is no longer live, so the money goes back and nothing renews.
     await h.worker.drain(10);
     const kinds = (await h.repository.charge(charge!.chargeId))!.events.map((event) => [event.kind, event.errorCode]);
     expect(kinds).toEqual(expect.arrayContaining([["REFUND_REQUESTED", "SUBSCRIPTION_ENDED"]]));
@@ -128,7 +129,7 @@ describe("P12b a cancel after the renewal started ends the plan, and the renewal
     h.clock.now = new Date(end.getTime() + MINUTE);
     await h.renewal.runOnce();
     expect(await renewalCharges(paid.subscriptionId)).toEqual([]);
-    expect(h.xmoney.rebillsFor(paid.transaction.orderId)).toBe(0);
+    expect(h.payments.chargesFor(paid.subscriptionId)).toBe(0);
     // P11b's period-end sweep ends it, as before this rule.
     await h.maintenance.runOnce();
     expect(foldSubscription(await h.repository.subscriptionEvents(paid.subscriptionId))).toMatchObject({

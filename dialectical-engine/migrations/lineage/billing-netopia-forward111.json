@@ -1,0 +1,17 @@
+{
+  "version": "billing-netopia-forward111-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0110_account_erasure_public_debates.sql",
+    "manifestSha256": "aab6bee30ee55b07116c21a25701af9af33f715caf5103a0b5c82f1fd77999d2",
+    "verifierSha256": "efeddf3d398eef8f6b47e1b1c5820f9ee5f551a7404e65135b5a4e0c70157944"
+  },
+  "migration": {
+    "name": "0111_billing_netopia.sql",
+    "sha256": "d29d608c87c1718088d47cd8ae5b1d67a68685cea39535ea99a3058144ef0eef"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-111.sql",
+    "sha256": "aba0e0b3f47f3b351ac1b683804bce6ef4ad9f8b7e19c2191996408d7964f52a"
+  }
+}

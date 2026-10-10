@@ -8,6 +8,8 @@ import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type:
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const NOW = new Date("2026-10-03T12:00:00.000Z");
+const CONSENT = Object.freeze({ version: "consent-renewal-1", sha256: "a".repeat(64) });
+let goToPayment: ReturnType<typeof vi.fn>;
 
 /** P12b's BillingSubscriptionResponse.subscription, field for field (the schema is strict). */
 function subscription(overrides: Record<string, unknown> = {}) {
@@ -44,6 +46,7 @@ beforeEach(() => {
   container = document.createElement("div");
   document.body.append(container);
   root = createRoot(container);
+  goToPayment = vi.fn();
   client = {
     getBillingSubscription: vi.fn(async () => ({ subscription: subscription() })),
     getBillingInvoices: vi.fn(async () => INVOICES),
@@ -63,7 +66,8 @@ async function settle(): Promise<void> {
 }
 async function render(): Promise<void> {
   await act(async () => {
-    root.render(<SubscriptionControls catalog={billingEnglish} locale="en" client={client as unknown as SubscriptionClient} now={() => NOW} />);
+    root.render(<SubscriptionControls catalog={billingEnglish} locale="en" client={client as unknown as SubscriptionClient} now={() => NOW}
+      renewalConsent={CONSENT} goToPayment={goToPayment} />);
   });
   await settle();
 }
@@ -72,6 +76,14 @@ const button = (label: string): HTMLButtonElement | undefined =>
   [...container.querySelectorAll("button")].find((candidate) => candidate.textContent === label);
 async function click(label: string): Promise<void> {
   await act(async () => { button(label)!.click(); });
+  await settle();
+}
+const upgradeButton = (): HTMLButtonElement | undefined =>
+  [...container.querySelectorAll("button")].find((candidate) => candidate.textContent?.startsWith("Upgrade and pay ") === true);
+/** Spec §2.18: the card-saving agreement is ticked before the upgrade leaves for NETOPIA's page. */
+async function upgradeAndPay(): Promise<void> {
+  await act(async () => { container.querySelector<HTMLInputElement>("#upgrade-agreement")!.click(); });
+  await act(async () => { upgradeButton()!.click(); });
   await settle();
 }
 async function fill(selector: string, value: string): Promise<void> {
@@ -86,7 +98,8 @@ describe("P20 SubscriptionControls (S1)", () => {
   it("renders nothing while it asks, and nothing at all when billing is off, after ONE request", async () => {
     client.getBillingSubscription.mockReturnValue(new Promise(() => undefined));
     await act(async () => {
-      root.render(<SubscriptionControls catalog={billingEnglish} locale="en" client={client as unknown as SubscriptionClient} now={() => NOW} />);
+      root.render(<SubscriptionControls catalog={billingEnglish} locale="en" client={client as unknown as SubscriptionClient} now={() => NOW}
+      renewalConsent={CONSENT} goToPayment={goToPayment} />);
     });
     // Local mode and billing-off Settings must look exactly as today: no card, not even a "Checking…" line.
     expect(container.innerHTML).toBe("");
@@ -201,31 +214,57 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).not.toContain("November 16, 2026");
   });
 
-  it("upgrades with a quote for the rest of the month, then waits for the server's charge state", async () => {
+  it("upgrades with a quote for the rest of the month, the agreement with the new monthly total, then NETOPIA's page", async () => {
     const quoteRef = "22222222-2222-4222-8222-222222222222";
     client.quoteSubscriptionUpgrade.mockResolvedValue({
       quote_ref: quoteRef, plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", tax_name: "TVA",
       tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
       renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
     });
-    client.upgradeSubscription.mockResolvedValue({
-      charge_ref: "0123456789abcdef0123456789abcdef", state: "PENDING", reason_code: null
-    });
-    client.getBillingCharge.mockResolvedValue({ state: "SUCCEEDED", reason_code: null });
+    const page = "https://secure-sandbox.netopia-payments.com/ui/card?p=0123456789ab";
+    client.upgradeSubscription.mockResolvedValue({ redirect_url: page, charge_ref: "0123456789abcdef0123456789abcdef" });
     await render();
     await click("Change plan");
-    expect(button("Upgrade to Pro")).toBeDefined();
-    expect(button("Upgrade to Max")).toBeDefined();
     await click("Upgrade to Pro");
-    expect(client.quoteSubscriptionUpgrade).toHaveBeenCalledWith("PRO");
-    // A7: $60.50 becomes the announced price the next renewal charges without a notice, so it is shown first.
     expect(text()).toContain(
       "Pay $36.30 now for the rest of this month. From October 29, 2026, Pro costs $60.50 a month, tax included, until you cancel."
     );
-    await click("Upgrade and pay");
-    expect(client.upgradeSubscription).toHaveBeenCalledWith("PRO", quoteRef);
-    expect(text()).toContain("You're on Pro now.");
-    expect(client.getBillingSubscription.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(text()).toContain((billingEnglish as Record<string, string>)["billing.consent.renewal"]!.replace("{total}", "$60.50"));
+    expect(upgradeButton()!.textContent).toBe("Upgrade and pay $36.30");
+    expect(upgradeButton()!.disabled).toBe(true);
+    await upgradeAndPay();
+    expect(client.upgradeSubscription).toHaveBeenCalledWith("PRO", quoteRef, { locale: "en", renewal_terms: CONSENT });
+    expect(goToPayment.mock.calls).toEqual([[page]]);
+  });
+
+  it("drops an upgrade quote whose start failed, so choosing the upgrade again pays a fresh price (N19b)", async () => {
+    const used = "55555555-5555-4555-8555-555555555555";
+    const fresh = "66666666-6666-4666-8666-666666666666";
+    const upgradeQuote = (quoteRef: string) => ({
+      quote_ref: quoteRef, plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", tax_name: "TVA",
+      tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
+      renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
+    });
+    const page = "https://secure-sandbox.netopia-payments.com/ui/card?p=0123456789ab";
+    client.quoteSubscriptionUpgrade.mockResolvedValueOnce(upgradeQuote(used)).mockResolvedValueOnce(upgradeQuote(fresh));
+    client.upgradeSubscription
+      .mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 503, "x", "PAYMENT_PROVIDER_UNAVAILABLE"))
+      .mockResolvedValueOnce({ redirect_url: page, charge_ref: "0123456789abcdef0123456789abcdef" });
+    await render();
+    await click("Change plan");
+    await click("Upgrade to Pro");
+    await upgradeAndPay();
+    expect(client.upgradeSubscription).toHaveBeenLastCalledWith("PRO", used, { locale: "en", renewal_terms: CONSENT });
+    expect(text()).toContain((billingEnglish as Record<string, string>)["billing.checkout.formUnavailable"]!);
+    // The server's FAILED charge holds the quote's one use: no pay button for it any more.
+    expect(upgradeButton()).toBeUndefined();
+    await click("Upgrade to Pro");
+    expect(client.quoteSubscriptionUpgrade).toHaveBeenCalledTimes(2);
+    expect(container.querySelector<HTMLInputElement>("#upgrade-agreement")!.checked).toBe(false);
+    await upgradeAndPay();
+    expect(client.upgradeSubscription).toHaveBeenCalledTimes(2);
+    expect(client.upgradeSubscription).toHaveBeenLastCalledWith("PRO", fresh, { locale: "en", renewal_terms: CONSENT });
+    expect(goToPayment.mock.calls).toEqual([[page]]);
   });
 
   it("offers no upgrade when the server says none is possible, and still offers the downgrades", async () => {
@@ -409,6 +448,8 @@ describe("P20 SubscriptionControls (S1)", () => {
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "UPGRADE_NOT_AVAILABLE_NOW"), "Your plan is about to renew, so an upgrade can't start right now. You can upgrade as soon as the renewal has gone through.", false],
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"), "Your account is scheduled for deletion. Cancel the deletion in Settings to subscribe or change your plan.", false],
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "UPGRADE_IN_PROGRESS"), "Your last upgrade payment is still being confirmed. Please wait a few minutes and try again.", true],
+      // F4 (finding ui-2): the agreement the page carries was superseded while it was open; only a reload fixes it.
+      [new ContractHttpError("SERVER_FAILURE", 409, "x", "LEGAL_DOCUMENT_STALE"), "This page is out of date. Please reload it.", false],
       [new ContractHttpError("NETWORK_FAILURE", 0, "x"), "We're still confirming this with the payment provider.", true],
       [new ContractHttpError("SERVER_FAILURE", 503, "x"), "We're still confirming this with the payment provider.", true]
     ] as const) {
@@ -420,7 +461,7 @@ describe("P20 SubscriptionControls (S1)", () => {
       const readsBefore = client.getBillingSubscription.mock.calls.length;
       await click("Change plan");
       await click("Upgrade to Pro");
-      await click("Upgrade and pay");
+      await upgradeAndPay();
       expect(text(), label).toContain(sentence);
       expect(client.getBillingSubscription.mock.calls.length > readsBefore, label).toBe(reloads);
       // Only the refusal made before any charge says "Nothing changed"; money may be moving in every other case.
@@ -440,7 +481,7 @@ describe("P20 SubscriptionControls (S1)", () => {
       await click("Change plan");
       await click("Upgrade to Pro");
       expect(text(), failure.serverCode!).toContain(sentence);
-      expect(button("Upgrade and pay"), failure.serverCode!).toBeUndefined();
+      expect(upgradeButton(), failure.serverCode!).toBeUndefined();
       expect(client.upgradeSubscription).not.toHaveBeenCalled();
     }
     act(() => root.unmount());
@@ -486,7 +527,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Upgrade to Pro");
     expect(text()).toContain(reaccept);
     expectReacceptLink();
-    expect(button("Upgrade and pay")).toBeUndefined();
+    expect(upgradeButton()).toBeUndefined();
     // The upgrade itself.
     act(() => root.unmount());
     root = createRoot(container);
@@ -499,7 +540,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     await render();
     await click("Change plan");
     await click("Upgrade to Pro");
-    await click("Upgrade and pay");
+    await upgradeAndPay();
     expect(text()).toContain(reaccept);
     expectReacceptLink();
     expect(text()).not.toContain("still confirming");

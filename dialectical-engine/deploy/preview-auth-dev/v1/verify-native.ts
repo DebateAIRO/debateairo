@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import pg,{type Pool} from 'pg';
 import { migrate } from '@debateai/db';
-import { loadMigrationPlan } from '../../../packages/db/src/migration-lineage.js';
+import { loadMigrationPlan,type MigrationPlan } from '../../../packages/db/src/migration-lineage.js';
 import { PostgresPasswordResetRepository } from '../../../packages/db/src/password-reset.js';
 import { PostgresBackupEmailRepository,PostgresMfaRecoveryRepository } from '../../../packages/db/src/email-mfa-recovery.js';
 import type { AuditContextHasher } from '@debateai/crypto';
@@ -9,12 +9,44 @@ import { type RegisterPublicationReceipt } from '@debateai/register';
 import { readSealedSnapshot } from './publish-register.js';
 const hash=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const fail=():never=>{throw new TypeError('PREVIEW_NATIVE_VERIFICATION_REFUSED');};
+/** Verify (and publish) found a numbered migration of this source that the database has not applied. Only apply-and-plan applies one. */
+export class NativeVerifyPendingForwardStepError extends Error {
+ readonly code='PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP';
+ readonly pending:readonly string[];
+ constructor(pending:readonly string[]){
+  super(`PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: ${pending.join(', ')}. Verify never applies a migration; run the native operator with operation apply-and-plan first.`);
+  this.name='NativeVerifyPendingForwardStepError';this.pending=Object.freeze([...pending]);
+ }
+}
+/**
+ * Every numbered migration the source holds whose name the database records nowhere, in the plan's apply order. The
+ * source's list is exactly the one loadMigrationPlan checks for SOURCE_INVENTORY: the recipe's sources (manifest.order),
+ * 0108 (plan.forward108), dev's 0110 (plan.forward110), then plan.forwardChain however long (0111 first). `applied`
+ * holds the ledger's names and the resolutions' logical names (PR-59).
+ */
+export function pendingForwardSteps(plan:Pick<MigrationPlan,'manifest'|'forward108'|'forward110'|'forwardChain'>,applied:ReadonlySet<string>):readonly string[]{
+ return [...plan.manifest.order,plan.forward108.name,plan.forward110.name,...plan.forwardChain.map(step=>step.name)].filter(name=>!applied.has(name));
+}
+/**
+ * Read-only: SELECTs of the ledger names and of the resolutions' logical names (none when the resolution table does
+ * not exist). Refuses before anything could apply a pending step.
+ */
+export async function refusePendingForwardSteps(pool:Pool,plan?:MigrationPlan):Promise<void>{
+ const source=plan??await loadMigrationPlan();
+ const applied=new Set((await pool.query<{name:string}>('SELECT name FROM public.debateai_schema_migration')).rows.map(row=>row.name));
+ const resolutionTable=(await pool.query<{present:boolean}>("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0]?.present===true;
+ if(resolutionTable)for(const row of (await pool.query<{logical_name:string}>('SELECT logical_name FROM public.debateai_schema_migration_resolution')).rows)applied.add(row.logical_name);
+ const pending=pendingForwardSteps(source,applied);
+ if(pending.length>0)throw new NativeVerifyPendingForwardStepError(pending);
+}
 export async function verifyNativeState(pool:Pool,binding:Readonly<{sourceRevision:string;sourceTree:string;nativeSourceSha256:string;publication:RegisterPublicationReceipt}>) {
- // Verification is replay-only. Applying pending SQL is a separately explicit native operator operation.
+ // Verification is replay-only: a pending step (any numbered migration of the source) is refused before migrate runs. Applying pending SQL is the
+ // separately explicit native operator operation apply-and-plan, with the owner's yes.
  const installed=(await pool.query("SELECT name FROM public.debateai_schema_migration WHERE name='0108_preview_recovery_verified_bindings.sql'")).rows;
  if(installed.length!==1)fail();
- await migrate(pool); // Authoritative current source: complete table/column/membership/owner/provenance checks.
  const plan=await loadMigrationPlan();
+ await refusePendingForwardSteps(pool,plan);
+ await migrate(pool); // Authoritative current source: complete table/column/membership/owner/provenance checks.
  const client=await pool.connect();let transaction=false,released=false;
  const release=()=>{if(!released){released=true;client.release();}};
  try{

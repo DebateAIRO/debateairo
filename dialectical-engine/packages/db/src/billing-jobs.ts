@@ -1,5 +1,22 @@
 import type { Pool, PoolClient } from "pg";
-import type { CustomerXMoneyEnvironment, OutboxJob, OutboxKind, OutboxPayload } from "./billing.js";
+import type {
+  ChargeKind, OutboxJob, OutboxKind, OutboxPayload, PaymentEnvironmentName, PaymentProviderName
+} from "./billing.js";
+
+/** Spec 2026-10-05 §2.14: which read schedule a NETOPIA charge is on. */
+export type StatusReadSchedule = "OPEN" | "CLOSED" | "PAID" | "REFUND";
+/** Where the frequent pass stopped: the last row it read (the list runs newest due first). */
+export type StatusReadCursor = Readonly<{ dueAt: Date; chargeId: string }>;
+/** One NETOPIA charge whose next status read is due, with what the reconciler needs to read and decide it. */
+export type DueStatusRead = Readonly<{
+  chargeId: string; ownerRef: string; subscriptionId: string; kind: ChargeKind; quoteId: string | null; createdAt: Date;
+  totalMicros: number; schedule: StatusReadSchedule; dueAt: Date;
+  /** The best ntpID we hold (N-16): the charge's newest SUBMITTED one, else the hosted page's. */
+  providerPaymentId: string | null;
+}>;
+
+/** How far back a charge can still be due: a payment made up to 30 days after its charge, read until 120 days later. */
+const STATUS_READ_HORIZON_MS = 151 * 86_400_000;
 
 const SUBSCRIPTION_LEASE_NAMESPACE = "debateai.billing.subscription:";
 
@@ -204,65 +221,24 @@ export class BillingJobQueries {
   }
 
   /**
-   * A1(1): the charge that recorded this xMoney transaction in an event of `kind` (any kind when null), in ONE xMoney
-   * system (D5 5h): stage and live number their transactions separately, so a live id never matches a stage row.
-   * The event's `xmoney_environment` is its charge's (P1a's foreign key on `(charge_id, xmoney_environment)`).
+   * N11 (spec §2.9.3): the charges of these kinds, in ONE payment system (provider and environment), made since
+   * `createdFrom`, that hold no SUBMITTED, SUCCEEDED or FAILED yet: a call marker, a not-sent request or an unknown
+   * outcome. The number of unknowns is no limit: probing and resending the same orderID is safe (NETOPIA's error 56).
+   * One keyset page on (created_at, charge_id), oldest first.
    */
-  async chargeIdForTransaction(
-    transactionId: string, kind: string | null, environment: CustomerXMoneyEnvironment
-  ): Promise<string | null> {
-    const result = await this.pool.query<{ charge_id: string }>(
-      `SELECT charge_id FROM billing.charge_event
-        WHERE xmoney_transaction_id=$1 AND ($2::text IS NULL OR kind=$2) AND xmoney_environment=$3
-        ORDER BY at LIMIT 1`,
-      [transactionId, kind, environment]
-    );
-    return result.rows[0]?.charge_id ?? null;
-  }
-
-  /**
-   * A2: charges of these kinds, in this xMoney system (D5 5h), that were requested but carry no transaction and no
-   * outcome yet: one keyset page after `after`, oldest first (D6b: paged like P14a's `adoptionCandidates`, so old
-   * charges never starve fresh ones). A charge holding two or more SUBMIT_UNKNOWN events has spent A2's one extra
-   * submission and is only adopted (P14a's daily pass does that too): it is left out until its close can be due,
-   * when P11a lists it once more and closes it — a renewal's own charge (attempt 1) once the earliest instant its
-   * window can end is at or before `renewalCloseBefore` (now − Q-1's 72 hours): P2-M11, its due instant, which is the
-   * period start or the end of a notice postponement past it, never the instant the charge was made (a charge made
-   * late, after a tax outage, is closed when its hold lapses); P11a's `renewalPendingUntil` decides the exact instant.
-   * A dunning retry is listed once its latest SUBMIT_UNKNOWN is at or before `closeBefore`.
-   */
-  async openCharges(input: Readonly<{
-    environment: CustomerXMoneyEnvironment;
-    kinds: ReadonlyArray<string>;
-    after: Readonly<{ createdAt: Date; chargeId: string }> | null;
-    closeBefore: Date;
-    renewalCloseBefore: Date;
-    limit: number;
+  async openPaymentCharges(input: Readonly<{
+    provider: PaymentProviderName; environment: PaymentEnvironmentName; kinds: ReadonlyArray<ChargeKind>;
+    createdFrom: Date; after: Readonly<{ createdAt: Date; chargeId: string }> | null; limit: number;
   }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; createdAt: Date }>>> {
     const result = await this.pool.query<{ charge_id: string; subscription_id: string; created_at: Date }>(
       `SELECT c.charge_id, c.subscription_id, c.created_at FROM billing.charge c
-        WHERE c.xmoney_environment = $1 AND c.kind = ANY($2::text[])
-          AND ($3::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($3::timestamptz, $4::text))
+        WHERE c.payment_provider = $1 AND c.payment_environment = $2 AND c.kind = ANY($3::text[]) AND c.created_at >= $4
+          AND ($5::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($5::timestamptz, $6::text))
           AND NOT EXISTS (SELECT 1 FROM billing.charge_event e
                            WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUCCEEDED', 'FAILED'))
-          AND (
-            (SELECT count(*) FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') < 2
-            OR (c.attempt = 1 AND GREATEST(c.period_start, COALESCE((
-                  SELECT max(postponed.until) FROM (
-                    SELECT CASE WHEN p.data ->> 'until' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$'
-                                THEN (p.data ->> 'until')::timestamptz END AS until
-                      FROM billing.subscription_event p
-                     WHERE p.subscription_id = c.subscription_id AND p.kind = 'RENEWAL_POSTPONED'
-                  ) AS postponed WHERE postponed.until > c.period_start
-                ), c.period_start)) <= $6)
-            OR (c.attempt > 1
-                AND (SELECT max(u.at) FROM billing.charge_event u WHERE u.charge_id = c.charge_id AND u.kind = 'SUBMIT_UNKNOWN') <= $5)
-          )
         ORDER BY c.created_at, c.charge_id LIMIT $7`,
-      [
-        input.environment, [...input.kinds], input.after?.createdAt ?? null, input.after?.chargeId ?? null,
-        input.closeBefore, input.renewalCloseBefore, input.limit
-      ]
+      [input.provider, input.environment, [...input.kinds], input.createdFrom, input.after?.createdAt ?? null,
+        input.after?.chargeId ?? null, input.limit]
     );
     return result.rows.map((row) => Object.freeze({
       chargeId: row.charge_id, subscriptionId: row.subscription_id, createdAt: row.created_at
@@ -270,37 +246,147 @@ export class BillingJobQueries {
   }
 
   /**
-   * Q-1 ("a rebill outcome still unknown"): the renewals of this xMoney system whose rebill answered (SUBMITTED, at
-   * or before `submittedBefore`) and whose VERIFY_PAYMENT has not settled them (no SUCCEEDED, no FAILED), for a period
-   * that started in `(periodStartFrom, periodStartTo]`. Only a renewal's own charge (attempt 1): a dunning retry
-   * already runs on its grace. One keyset page on `(created_at, charge_id)`, like `openCharges`.
+   * N11 (spec §2.9.4): the RENEWAL charges of one payment system, any attempt, made since `createdFrom`, SUBMITTED at or
+   * before `submittedBefore`, with no SUCCEEDED and no FAILED: renewals NETOPIA answered and still holds pending. One
+   * keyset page on (created_at, charge_id), oldest first.
    */
-  async unverifiedRenewals(input: Readonly<{
-    environment: CustomerXMoneyEnvironment;
-    periodStartFrom: Date;
-    periodStartTo: Date;
-    submittedBefore: Date;
-    after: Readonly<{ createdAt: Date; chargeId: string }> | null;
-    limit: number;
-  }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; periodStart: Date; createdAt: Date }>>> {
-    const result = await this.pool.query<{ charge_id: string; subscription_id: string; period_start: Date; created_at: Date }>(
-      `SELECT c.charge_id, c.subscription_id, c.period_start, c.created_at FROM billing.charge c
-        WHERE c.xmoney_environment = $1 AND c.kind = 'RENEWAL' AND c.attempt = 1
-          AND c.period_start > $2 AND c.period_start <= $3
+  async submittedPaymentRenewals(input: Readonly<{
+    provider: PaymentProviderName; environment: PaymentEnvironmentName; createdFrom: Date; submittedBefore: Date;
+    after: Readonly<{ createdAt: Date; chargeId: string }> | null; limit: number;
+  }>): Promise<Array<Readonly<{ chargeId: string; subscriptionId: string; periodStart: Date; attempt: number; createdAt: Date }>>> {
+    const result = await this.pool.query<{
+      charge_id: string; subscription_id: string; period_start: Date; attempt: number; created_at: Date;
+    }>(
+      `SELECT c.charge_id, c.subscription_id, c.period_start, c.attempt, c.created_at FROM billing.charge c
+        WHERE c.payment_provider = $1 AND c.payment_environment = $2 AND c.kind = 'RENEWAL' AND c.created_at >= $3
           AND ($5::timestamptz IS NULL OR (c.created_at, c.charge_id) > ($5::timestamptz, $6::text))
           AND EXISTS (SELECT 1 FROM billing.charge_event s
                        WHERE s.charge_id = c.charge_id AND s.kind = 'SUBMITTED' AND s.at <= $4)
           AND NOT EXISTS (SELECT 1 FROM billing.charge_event e
                            WHERE e.charge_id = c.charge_id AND e.kind IN ('SUCCEEDED', 'FAILED'))
         ORDER BY c.created_at, c.charge_id LIMIT $7`,
-      [
-        input.environment, input.periodStartFrom, input.periodStartTo, input.submittedBefore,
-        input.after?.createdAt ?? null, input.after?.chargeId ?? null, input.limit
-      ]
+      [input.provider, input.environment, input.createdFrom, input.submittedBefore, input.after?.createdAt ?? null,
+        input.after?.chargeId ?? null, input.limit]
     );
     return result.rows.map((row) => Object.freeze({
-      chargeId: row.charge_id, subscriptionId: row.subscription_id, periodStart: row.period_start, createdAt: row.created_at
+      chargeId: row.charge_id, subscriptionId: row.subscription_id, periodStart: row.period_start,
+      attempt: row.attempt, createdAt: row.created_at
     }));
+  }
+
+  /**
+   * Spec §2.14 (SR-21): the NETOPIA charges of one environment whose next status read is due at `now`, newest due first,
+   * after `cursor` (exclusive), at most `limit`. Each charge's schedule and next read come from our rows and its newest
+   * `billing.status_read` row (every read writes one):
+   * - REFUND: requested refund amounts above the refunded ones (§2.12.2's owner refunds): now, then daily; a payment
+   *   whose owner refund is HELD (N15b, ruling PR-41: a CHARGEBACK of that `provider_payment_id` and no
+   *   CHARGEBACK_RESOLVED of it, the rule of `openOwnerRefunds` and of refunds.ts' `heldByChargeback`) counts neither
+   *   its requests nor its refunds here, so it keeps only the PAID schedule;
+   * - PAID: SUCCEEDED (never a 0 card check): the latest of 1, 7, 30, 60, 90, 120 days after the payment not read since;
+   * - OPEN: a hosted page started (SUBMITTED or SUBMIT_UNKNOWN) or a SUBMITTED renewal, not final: 10 min, 30 min, 1 h,
+   *   3 h after the submit, then daily after the last read, up to 30 days; never a renewal N11's probes own. A hosted
+   *   INITIAL or UPGRADE whose only FAILED rows are PAYMENT_DECLINED and whose plan has not ENDED is not final either
+   *   (F5, spec §2.6.3 and §2.8: the person may retry on the same page, and that payment's message may be lost);
+   * - CLOSED: a hosted INITIAL or UPGRADE with no SUCCEEDED that failed for good (a FAILED other than PAYMENT_DECLINED)
+   *   or whose plan ENDED: daily for 30 days. A hosted 0 card check that failed is never read: its card is saved only
+   *   from NETOPIA's message, so a read could not adopt it (spec §2.11).
+   * `next` is the last row of a full page, else null (the cursor wraps, so no due charge is starved). Every step is
+   * written in hours: a `timestamptz + interval 'N days'` follows the session's time zone across a daylight-saving
+   * change, and a read must not move by an hour with it.
+   */
+  async dueStatusReads(
+    executor: Pick<Pool, "query"> | PoolClient, now: Date, cursor: StatusReadCursor | null, limit: number,
+    environment: PaymentEnvironmentName
+  ): Promise<Readonly<{ rows: ReadonlyArray<DueStatusRead>; next: StatusReadCursor | null }>> {
+    const result = await executor.query<{
+      charge_id: string; owner_ref: string; subscription_id: string; kind: ChargeKind; quote_id: string | null;
+      created_at: Date; total_micros: string; schedule: StatusReadSchedule; due_at: Date; provider_payment_id: string | null;
+    }>(`
+      WITH facts AS (
+        SELECT c.charge_id, c.owner_ref::text AS owner_ref, c.subscription_id::text AS subscription_id, c.kind,
+          c.quote_id::text AS quote_id, c.created_at, c.total_micros,
+          h.provider_payment_id AS hosted_payment_id,
+          (SELECT e.provider_payment_id FROM billing.charge_event e
+            WHERE e.charge_id = c.charge_id AND e.kind = 'SUBMITTED' AND e.provider_payment_id IS NOT NULL
+            ORDER BY e.at DESC LIMIT 1) AS submitted_payment_id,
+          COALESCE((SELECT min(e.at) FROM billing.charge_event e
+            WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUBMIT_UNKNOWN')), h.started_at, c.created_at) AS anchor_at,
+          (SELECT min(e.at) FROM billing.charge_event e WHERE e.charge_id = c.charge_id AND e.kind = 'SUCCEEDED') AS paid_at,
+          EXISTS (SELECT 1 FROM billing.charge_event e WHERE e.charge_id = c.charge_id AND e.kind = 'SUBMITTED') AS submitted,
+          EXISTS (SELECT 1 FROM billing.charge_event e
+            WHERE e.charge_id = c.charge_id AND e.kind IN ('SUBMITTED', 'SUBMIT_UNKNOWN')) AS sent,
+          EXISTS (SELECT 1 FROM billing.charge_event e WHERE e.charge_id = c.charge_id AND e.kind = 'FAILED') AS failed,
+          EXISTS (SELECT 1 FROM billing.charge_event e WHERE e.charge_id = c.charge_id AND e.kind = 'FAILED'
+            AND e.error_code IS DISTINCT FROM 'PAYMENT_DECLINED') AS final_failed,
+          EXISTS (SELECT 1 FROM billing.subscription_event s
+            WHERE s.subscription_id = c.subscription_id AND s.kind = 'ENDED') AS ended,
+          COALESCE((SELECT sum(e.amount_micros) FROM billing.charge_event e
+            WHERE e.charge_id = c.charge_id AND e.kind = 'REFUND_REQUESTED'
+              AND NOT EXISTS (SELECT 1 FROM billing.charge_event cb
+                WHERE cb.charge_id = c.charge_id AND cb.kind = 'CHARGEBACK' AND cb.provider_payment_id = e.provider_payment_id
+                  AND NOT EXISTS (SELECT 1 FROM billing.charge_event won
+                    WHERE won.charge_id = c.charge_id AND won.kind = 'CHARGEBACK_RESOLVED'
+                      AND won.provider_payment_id = e.provider_payment_id))), 0)
+            > COALESCE((SELECT sum(e.amount_micros) FROM billing.charge_event e
+            WHERE e.charge_id = c.charge_id AND e.kind = 'REFUNDED'
+              AND NOT EXISTS (SELECT 1 FROM billing.charge_event cb
+                WHERE cb.charge_id = c.charge_id AND cb.kind = 'CHARGEBACK'
+                  AND cb.provider_payment_id = COALESCE(e.refunds_transaction_id, e.provider_payment_id)
+                  AND NOT EXISTS (SELECT 1 FROM billing.charge_event won
+                    WHERE won.charge_id = c.charge_id AND won.kind = 'CHARGEBACK_RESOLVED'
+                      AND won.provider_payment_id = COALESCE(e.refunds_transaction_id, e.provider_payment_id)))), 0) AS refund_open,
+          (SELECT max(r.at) FROM billing.status_read r WHERE r.charge_id = c.charge_id) AS last_read_at
+        FROM billing.charge c
+        LEFT JOIN billing.hosted_payment h ON h.charge_id = c.charge_id
+        WHERE c.payment_provider = 'netopia' AND c.payment_environment = $1 AND c.created_at >= $2 AND c.created_at <= $3
+      ),
+      classed AS (
+        SELECT f.*, CASE
+          WHEN f.refund_open THEN 'REFUND'
+          WHEN f.paid_at IS NOT NULL THEN CASE WHEN f.kind = 'CARD_CHECK' AND f.total_micros = 0 THEN NULL ELSE 'PAID' END
+          WHEN f.kind = 'RENEWAL' THEN CASE WHEN f.submitted AND NOT f.failed THEN 'OPEN' END
+          WHEN f.hosted_payment_id IS NULL AND NOT f.sent THEN NULL
+          WHEN f.hosted_payment_id IS NOT NULL AND f.kind IN ('INITIAL', 'UPGRADE') AND NOT f.final_failed AND NOT f.ended
+            THEN 'OPEN'
+          WHEN f.failed OR f.ended THEN CASE WHEN f.hosted_payment_id IS NOT NULL AND f.kind <> 'CARD_CHECK' THEN 'CLOSED' END
+          ELSE 'OPEN' END AS schedule
+        FROM facts f
+      ),
+      due AS (
+        SELECT k.*, CASE k.schedule
+          WHEN 'REFUND' THEN COALESCE(k.last_read_at + interval '24 hours', $3::timestamptz)
+          WHEN 'PAID' THEN (SELECT max(k.paid_at + m.step)
+            FROM unnest(ARRAY[interval '24 hours', interval '168 hours', interval '720 hours', interval '1440 hours',
+              interval '2160 hours', interval '2880 hours']) AS m(step)
+            WHERE k.paid_at + m.step <= $3::timestamptz AND (k.last_read_at IS NULL OR k.last_read_at < k.paid_at + m.step))
+          WHEN 'CLOSED' THEN (SELECT n.at FROM (SELECT COALESCE(k.last_read_at, k.anchor_at) + interval '24 hours' AS at) AS n
+            WHERE n.at <= k.anchor_at + interval '720 hours')
+          WHEN 'OPEN' THEN (SELECT n.at FROM (SELECT COALESCE(
+              (SELECT min(p.at) FROM (VALUES (k.anchor_at + interval '10 minutes'), (k.anchor_at + interval '30 minutes'),
+                (k.anchor_at + interval '1 hour'), (k.anchor_at + interval '3 hours')) AS p(at)
+                WHERE k.last_read_at IS NULL OR p.at > k.last_read_at),
+              k.last_read_at + interval '24 hours') AS at) AS n
+            WHERE n.at <= k.anchor_at + interval '720 hours')
+        END AS due_at
+        FROM classed k WHERE k.schedule IS NOT NULL
+      )
+      SELECT charge_id, owner_ref, subscription_id, kind, quote_id, created_at, total_micros::text AS total_micros, schedule,
+        due_at, COALESCE(submitted_payment_id, hosted_payment_id) AS provider_payment_id
+      FROM due
+      WHERE due_at IS NOT NULL AND due_at <= $3::timestamptz
+        AND ($4::timestamptz IS NULL OR (due_at, charge_id) < ($4::timestamptz, $5::text))
+      ORDER BY due_at DESC, charge_id DESC
+      LIMIT $6
+    `, [environment, new Date(now.getTime() - STATUS_READ_HORIZON_MS), now, cursor?.dueAt ?? null, cursor?.chargeId ?? null, limit]);
+    const rows = result.rows.map((row) => Object.freeze({
+      chargeId: row.charge_id, ownerRef: row.owner_ref, subscriptionId: row.subscription_id, kind: row.kind,
+      quoteId: row.quote_id, createdAt: row.created_at, totalMicros: Number(row.total_micros), schedule: row.schedule,
+      dueAt: row.due_at, providerPaymentId: row.provider_payment_id
+    }));
+    const last = rows.at(-1);
+    return Object.freeze({
+      rows, next: rows.length < limit || last === undefined ? null : Object.freeze({ dueAt: last.dueAt, chargeId: last.chargeId })
+    });
   }
 
   /** Subscriptions whose latest event is not terminal, in id order, one page after `after`. */
@@ -321,42 +407,15 @@ export class BillingJobQueries {
   }
 
   /**
-   * D7 #5: whether our own rows say a payment for this INITIAL charge may be on its way: a stored notice naming it
-   * (as `externalOrderId`) that is not `complete-failed` and whose transaction the charge has not recorded as FAILED
-   * or as CHARGEBACK (P2-N1: a first payment charged back before it was verified), or an open VERIFY_PAYMENT job
-   * for it (a notice's job names it as `external_order_id`, a rebill's as `charge_id`). A not-final attempt
-   * (`start`, `in-progress`, `3d-pending`) counts only while it is fresh: a notice with such a status only when
-   * received at or after `notFinalSince`, and a job the check last retried as PAYMENT_NOT_FINAL only when its notice
-   * (else the job itself) is that recent. A job not run yet, and any other status, always count. A
-   * notice VERIFY_PAYMENT ended MISMATCH (P2-I1: its order reference is not xMoney's, or its payer is not the
-   * checkout's customer) names nothing on its way: a notice is not authenticated, so it never holds a checkout.
-   * Read in the checkout's transaction, under the owner lock.
+   * Spec 2026-10-05 §2.7.3 step 4 (SR-10): a fresh message or status read brings the live job of (kind, ref) forward
+   * to `now` through A19's UPDATE grant on `not_before`, so a VERIFY_PAYMENT waiting on its not-final schedule runs at
+   * once. Never moves a job later. False when no live job exists (the caller then enqueues one).
    */
-  async checkoutPaymentSignals(
-    client: PoolClient, chargeId: string, environment: CustomerXMoneyEnvironment, notFinalSince: Date
-  ): Promise<boolean> {
-    const result = await client.query<{ pending: boolean }>(`
-      SELECT EXISTS (
-        SELECT 1 FROM billing.xmoney_notice AS notice
-        WHERE notice.external_order_id = $1 AND notice.xmoney_environment = $2 AND notice.status <> 'complete-failed'
-          AND (notice.status NOT IN ('start', 'in-progress', '3d-pending') OR notice.received_at >= $3)
-          AND NOT EXISTS (
-            SELECT 1 FROM billing.charge_event AS failed
-            WHERE failed.charge_id = $1 AND failed.kind IN ('FAILED', 'CHARGEBACK')
-              AND failed.xmoney_transaction_id = notice.transaction_id
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM billing.xmoney_notice_outcome AS outcome
-            WHERE outcome.notice_id = notice.notice_id AND outcome.outcome = 'MISMATCH'
-          )
-      ) OR EXISTS (
-        SELECT 1 FROM billing.outbox AS job
-        LEFT JOIN billing.xmoney_notice AS origin ON origin.notice_id::text = job.payload->>'notice_id'
-        WHERE job.kind = 'VERIFY_PAYMENT' AND job.done_at IS NULL AND job.dead_at IS NULL
-          AND (job.payload->>'external_order_id' = $1 OR job.payload->>'charge_id' = $1)
-          AND (job.last_error_code IS DISTINCT FROM 'PAYMENT_NOT_FINAL' OR COALESCE(origin.received_at, job.created_at) >= $3)
-      ) AS pending
-    `, [chargeId, environment, notFinalSince]);
-    return result.rows[0]?.pending === true;
+  async bringForward(client: PoolClient, kind: OutboxKind, ref: string, now: Date): Promise<boolean> {
+    const result = await client.query(`
+      UPDATE billing.outbox SET not_before = LEAST(not_before, $3::timestamptz)
+      WHERE kind = $1 AND ref = $2 AND done_at IS NULL AND dead_at IS NULL
+    `, [kind, ref, now]);
+    return (result.rowCount ?? 0) > 0;
   }
 }

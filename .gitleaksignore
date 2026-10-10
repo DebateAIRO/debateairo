@@ -68,3 +68,13 @@ aa15f4e9e63d2fab63b6c8d103802b42051b41d3:dialectical-engine/tests/unit/billing-c
 # test builds to prove a secret cut at the examined-length limit is never shown. A made-up value, not a key.
 # Owner's ruling on PR #97. The test now builds the value from pieces, so later edits do not raise the same match.
 6b4484dbab1d74e7e613513bb44a44b4ae060cc2:dialectical-engine/tests/unit/preview-lifecycle-alert.test.ts:generic-api-key:246
+# 2026-10-09 — NETOPIA switch (PR #103): generic-api-key matched the SHA-256 digest of dev's sealed lineage file
+# migrations/lineage/auth-dev-20261006.json, pinned so the forward chain proves the sealed bytes unchanged. A public
+# file digest, not a key. Owner's ruling on PR #103.
+3ab8e86ea8288eb8a3a7b0d497fb71e0aa800bfe:dialectical-engine/tests/architecture/migration-forward-chain.test.ts:generic-api-key:22
+# 2026-10-09 — NETOPIA switch (PR #103): generic-api-key matched a made-up card-token id (a UUID) in the shared billing
+# fixtures. A made-up test value, not a token. Owner's ruling on PR #103.
+1744d17efd136bfdcfac1443412ba7f09f77e58a:dialectical-engine/tests/support/billingFixtures.ts:generic-api-key:99
+# 2026-10-09 — NETOPIA switch (PR #103): generic-api-key matched the same made-up card-token id (a UUID) in the retry
+# timing test. A made-up test value, not a token. Owner's ruling on PR #103.
+1bb5935b7871c24c0ba7e2244f0a00760d8edb83:dialectical-engine/tests/unit/billing-retry-timing.test.ts:generic-api-key:87

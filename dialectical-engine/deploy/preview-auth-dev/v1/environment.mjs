@@ -2,6 +2,8 @@ import { refuse, withPrivateBytes } from './custody.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY, PREVIEW_SOCKET } from './turnstile-custody.mjs';
 const STAFF=['STAFF_ACCESS_POLICY_VERSION','STAFF_WEBAUTHN_ORIGIN','STAFF_WEBAUTHN_RP_ID','STAFF_INDEPENDENT_ALERT_CONFIG_PATH','STAFF_ALERT_OPERATOR_MODULE_PATH','STAFF_ALERT_OPERATOR_MODULE_SHA256',
  'INTERNAL_ALLOWANCE_POLICY_VERSION','INTERNAL_ALLOWANCE_CURRENCY','INTERNAL_ALLOWANCE_MAXIMUM_GRANT_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_DAY_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_WEEK_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_LIFETIME_MS','INTERNAL_ALLOWANCE_FINISH_ALLOWANCE_BP','INTERNAL_ALLOWANCE_POLICY_SOURCE_REF'];
+/** The only public model list the preview UI may be built and run with. */
+export const PREVIEW_FREE_MODEL_IDS_JSON='["zai-org/GLM-5.3-Flash"]';
 const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY'];
 export function parseEnvironmentText(text) {
  try{
@@ -22,7 +24,7 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
   if(service==='ui'){
    if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.PORT!==approved.uiPort||configured.DIALECTICAL_UI_HOST!=='127.0.0.1'
     ||configured.DIALECTICAL_API_BASE!==`http://127.0.0.1:${approved.apiPort}`
-    ||configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON!=='["zai-org/GLM-5.3-Flash"]'
+    ||configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON!==PREVIEW_FREE_MODEL_IDS_JSON
     ||(configured.TURNSTILE_SITE_KEY!==undefined&&configured.TURNSTILE_SITE_KEY!==PREVIEW_SITE_KEY))refuse();
    return {environment:Object.freeze(environment),selectedRegisterVersion:null,deploymentMode:'local'};
   }

@@ -61,7 +61,7 @@ function localMidnight(civilUtcMidnight: number, zone: string): Date {
  * for weekends only): a last day that falls on a Saturday or a Sunday moves to the next Monday, as Regulation (EEC,
  * Euratom) No 1182/71 art. 3(4) ends such a period (Directive 2011/83/EU recital 41 applies it). Public holidays do
  * not move it yet: they need a per-country table and counsel, a recorded go-live blocker. Business days are used
- * otherwise only for xMoney's notice rules (A7). This function is the one place the counting lives, so a later
+ * otherwise only for A7's notice rule (kept for NETOPIA until N-23 is answered). This function is the one place the counting lives, so a later
  * ruling changes it here alone.
  */
 export function withdrawalDeadline(input: Readonly<{
