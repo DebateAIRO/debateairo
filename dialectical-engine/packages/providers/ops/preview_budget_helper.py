@@ -272,6 +272,9 @@ class DeepInfraProfile:
       per_call_cap_usd (Decimal)         no row may reserve more than this for one full-size request
       max_request_bytes (int)            the largest request body accepted (and priced)
       redaction_patterns (tuple of str)  regexes for the vendor's key shapes, blanked in replies
+      key_pattern (str, optional)        the shape this vendor's key must have (re.fullmatch); the
+                                         gate refuses any other key before a reservation, so a
+                                         key of another provider in this gate's folder is never sent
       rows {model: ModelRow}             the reviewed models
       path_for(row) -> str               the POST path (checked: no '?', starts with '/')
       auth_headers(key) -> dict          the header(s) carrying the key
@@ -292,6 +295,8 @@ class DeepInfraProfile:
     per_call_cap_usd = Decimal('0.25')
     max_request_bytes = 256 * 1024
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
+    # No fixed shape either, but never another provider's key (Anthropic sk-ant-, Google AIza).
+    key_pattern = r'(?!sk-ant-|AIza)[!-~]{16,512}'
     rows = {row.model: row for row in (
         ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 163840, 'high', True),
         ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 131072, 'high', False),
@@ -381,6 +386,25 @@ PriceStep = namedtuple('PriceStep', 'name prompt_tokens_up_to input_usd_per_m ca
 ANTHROPIC_USAGE_KEYS = frozenset({'input_tokens', 'output_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens',
                                   'cache_creation', 'server_tool_use', 'service_tier', 'inference_geo'})
 ANTHROPIC_CACHE_SPLIT_KEYS = frozenset({'ephemeral_5m_input_tokens', 'ephemeral_1h_input_tokens'})
+# The only content blocks a reply the gate settles may carry: text, and thinking it never shows.
+ANTHROPIC_CONTENT_BLOCKS = frozenset({'text', 'thinking', 'redacted_thinking'})
+# Top-level reply members that mean work the token usage may not cover (a code container, context
+# editing): the usage is then invalid. Any other top-level key naming usage or tokens is too.
+ANTHROPIC_UNPRICED_REPLY_KEYS = frozenset({'container', 'context_management'})
+
+
+def names_any_key_suffixed(value, suffix):
+    """Whether any object at any depth of a parsed JSON value has a key ending with suffix."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            if any(isinstance(key, str) and key.endswith(suffix) for key in item):
+                return True
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
+    return False
 
 
 class AnthropicProfile:
@@ -394,6 +418,9 @@ class AnthropicProfile:
     kind of input token at its own price. Anthropic reports no cost, so the guard charge is that
     list-price charge. Any usage field this profile does not know, any server-tool use, another
     service tier or region, or a tool block makes the usage invalid: uncertain, and the gate halts.
+    A cache write reported without its 5-minute/1-hour split is charged at the 1-hour
+    price (the dearer one). A reply with a container, context editing, usage or token counts
+    outside `usage`, or a content block other than text or thinking is invalid too.
     """
     name = 'anthropic'
     host = 'api.anthropic.com'
@@ -402,6 +429,7 @@ class AnthropicProfile:
     per_call_cap_usd = Decimal('0.25')
     max_request_bytes = 256 * 1024
     redaction_patterns = (r'sk-ant-[A-Za-z0-9_-]+',)
+    key_pattern = r'sk-ant-[A-Za-z0-9_-]+'
     rows = {row.model: row for row in (
         ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.625'), Decimal('2.50'), 32768, 'high', False),)}
     settlement_steps = (
@@ -429,8 +457,11 @@ class AnthropicProfile:
 
     def body_valid(self, body, row):
         """Exactly model, max_tokens and messages, an optional system string, and output_config
-        {"effort": "high"} iff the row says so (then required). Messages are text only, first
-        role user; nothing else anywhere (contract-BC-wire, Anthropic)."""
+        {"effort": "high"} iff the row says so (then required). Nothing else anywhere
+        (contract-BC-wire, Anthropic). It mirrors what the app's adapter (anthropic-messages.ts) can
+        send, no more: non-empty text content, roles alternating user/assistant starting AND ending
+        with a user turn (the adapter joins same-role turns and refuses a final assistant turn), and
+        a non-empty system text when present (the adapter joins non-empty system messages)."""
         if not isinstance(body, dict) or body.get('model') != row.model:
             return False
         required = {'model', 'max_tokens', 'messages'} | ({'output_config'} if row.effort else set())
@@ -442,14 +473,14 @@ class AnthropicProfile:
             if not (isinstance(config, dict) and set(config) == {'effort'} and isinstance(config['effort'], str)
                     and config['effort'] == row.effort):
                 return False
-        if 'system' in body and not isinstance(body['system'], str):
+        if 'system' in body and not (isinstance(body['system'], str) and body['system']):
             return False
         messages = body['messages']
         return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
-                and isinstance(messages, list) and bool(messages)
-                and all(isinstance(m, dict) and set(m) == {'role', 'content'} and m['role'] in ('user', 'assistant')
-                        and isinstance(m['content'], str) for m in messages)
-                and messages[0]['role'] == 'user')
+                and isinstance(messages, list) and len(messages) % 2 == 1
+                and all(isinstance(m, dict) and set(m) == {'role', 'content'}
+                        and m['role'] == ('user' if index % 2 == 0 else 'assistant')
+                        and isinstance(m['content'], str) and m['content'] for index, m in enumerate(messages)))
 
     def request_bytes(self, body):
         return canonical(body)
@@ -459,13 +490,17 @@ class AnthropicProfile:
         whose usage this profile fully understands, else None (uncertain)."""
         if not isinstance(response, dict) or response.get('type') != 'message':
             return None
+        # A container, context editing, or usage/token counts outside `usage` may bill beyond it.
+        if any(key in ANTHROPIC_UNPRICED_REPLY_KEYS or key != 'usage' and ('usage' in key or 'tokens' in key)
+               for key in response):
+            return None
         content = response.get('content')
         if not isinstance(content, list) or not all(isinstance(block, dict) for block in content):
             return None
-        for block in content:  # Any tool activity (client or server side) may bill beyond the tokens.
-            kind = block.get('type')
-            if not isinstance(kind, str) or 'tool_use' in kind or 'tool_result' in kind:
-                return None
+        # Only text and thinking: any tool activity (client or server side), a container upload or
+        # any block this profile does not know may bill beyond the tokens.
+        if not all(block.get('type') in ANTHROPIC_CONTENT_BLOCKS for block in content):
+            return None
         usage = response.get('usage')
         if not isinstance(usage, dict) or not set(usage) <= ANTHROPIC_USAGE_KEYS:
             return None
@@ -481,7 +516,9 @@ class AnthropicProfile:
             return None
         if usage.get('service_tier') not in (None, 'standard') or usage.get('inference_geo') not in (None, 'global'):
             return None
-        hour = 0
+        # A cache write reported without its 5-minute/1-hour split is charged at the dearer 1-hour
+        # price (the gate never asks for caching; a write it cannot place is priced on the safe side).
+        hour = creation
         split = usage.get('cache_creation')
         if split is not None:
             if not (isinstance(split, dict) and set(split) == ANTHROPIC_CACHE_SPLIT_KEYS
@@ -527,7 +564,7 @@ class AnthropicProfile:
         """True only for Anthropic's own "slow down" answers (owner ruling 5, 2026-10-10): HTTP 429
         or 529, a body of exactly type "error", error (and an optional request_id string), an
         error type of rate_limit_error or overloaded_error, and no usage, content or model key, no
-        other billed key (BILLED_KEYS) and no tokens_* key at any depth. The core passes the RAW
+        other billed key (BILLED_KEYS) and no tokens_* or *_tokens key at any depth. The core passes the RAW
         reply (before redaction drops any subtree). Anything else is accounted (and halts) as before."""
         if status not in (429, 529) or not isinstance(response, dict):
             return False
@@ -538,7 +575,8 @@ class AnthropicProfile:
                 and error.get('type') in ('rate_limit_error', 'overloaded_error')
                 and isinstance(response.get('request_id', ''), str)
                 and not names_any_key(response, BILLED_KEYS + ('content', 'model'))
-                and not names_any_key_prefixed(response, 'tokens_'))
+                and not names_any_key_prefixed(response, 'tokens_')
+                and not names_any_key_suffixed(response, '_tokens'))
 
     def probe_body(self, row):
         body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),

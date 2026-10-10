@@ -43,10 +43,11 @@ FOLDERS = {
     'anthropic': '/var/lib/debateai-v3-preview/provider-anthropic-authority-v1',
     'google': '/var/lib/debateai-v3-preview/provider-google-authority-v1',
 }
-# The key shapes. DeepInfra's keys have no fixed shape: the gate's own read_key rule (16 to 512
-# printable ASCII characters, no spaces).
+# The key shapes, the same as the gate profiles' key_pattern. DeepInfra's keys have no fixed shape:
+# the gate's own read_key rule (16 to 512 printable ASCII characters, no spaces), but never another
+# provider's key (Anthropic sk-ant-, Google AIza) pasted at the wrong prompt.
 SHAPES = {
-    'deepinfra': re.compile(r'[!-~]{16,512}'),
+    'deepinfra': re.compile(r'(?!sk-ant-|AIza)[!-~]{16,512}'),
     'anthropic': re.compile(r'(?=.{16,512}\Z)sk-ant-[A-Za-z0-9_-]+', re.ASCII),
     'google': re.compile(r'AIza[0-9A-Za-z_-]{35}', re.ASCII),
 }

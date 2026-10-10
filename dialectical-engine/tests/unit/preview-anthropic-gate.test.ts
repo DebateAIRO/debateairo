@@ -20,6 +20,7 @@ import {
   type PreviewBudgetExecution, type PreviewBudgetPort, type PreviewGateRemaining, type PreviewProviderTestConfig,
   type ProviderCallRequest, type ProviderDiscoveryTarget
 } from "@debateai/providers";
+import { anthropicMessagesRequestBody } from "../../packages/providers/src/anthropic-messages.js";
 import {
   assertPreviewBudgetAdmits, estimatePreviewGateNeeds, previewGateKeyOf, previewRemainingPorts,
   type PreviewBudgetGateSettings
@@ -379,5 +380,46 @@ describe("Haiku's gateway, through the guarded fetch, sends the wire contract's 
     const observed = await observeProviderTarget({ target, timeoutMs: 5_000, clock: () => new Date(), fetchImplementation: fetcher, ...previewProbeControls(target) });
     expect(observed.state).toBe("HEALTHY");
     expect(JSON.parse(executions.anthropic![0]!.requestBody)).toMatchObject({ model: HAIKU, max_tokens: 8192, output_config: { effort: "high" } });
+  });
+});
+
+// The packets the adapter fixture covers (also rebuilt by tests/unit/preview-anthropic-gate.test.ts).
+const ADAPTER_CASES = [
+  { name: "system and one user turn", maxTokens: 8192, messages: [
+    { role: "system", content: "You are the synthetic judge." }, { role: "user", content: "Is the synthetic claim supported?" }] },
+  { name: "two system messages joined, a full exchange", maxTokens: 32768, messages: [
+    { role: "system", content: "Frame A." }, { role: "user", content: "First." }, { role: "system", content: "Frame B." },
+    { role: "assistant", content: "Answer." }, { role: "user", content: "Second." }] },
+  { name: "consecutive user turns joined, no system", maxTokens: 1, messages: [
+    { role: "user", content: "Part one." }, { role: "user", content: "Part two." }] },
+  { name: "non-ASCII text and escapes", maxTokens: 1024, messages: [
+    { role: "system", content: "Răspunde în română. \"Citat\" \\ backslash\nnew line\ttab" },
+    { role: "user", content: "Întrebare: 日本語? emoji 🙂 and   separator" }] },
+  { name: "repair: user, assistant, user, assistant joined, user", maxTokens: 8192, messages: [
+    { role: "user", content: "Q" }, { role: "assistant", content: "A1" }, { role: "assistant", content: "A2" },
+    { role: "user", content: "Fix it." }] }
+] as const;
+const adapterBodies = JSON.parse(readFileSync(new URL("./fixtures/anthropic-adapter-bodies.json", import.meta.url), "utf8")) as {
+  schema: string; sent: Array<{ name: string; body: string }>; refused: Array<{ name: string; body: string }> };
+
+describe("the gate's shape mirrors the adapter's (the Python gate reads the same file)", () => {
+  it("the fixture's sent bodies are the adapter's own output, byte for byte", () => {
+    expect(adapterBodies.schema).toBe("anthropic-adapter-bodies-v1");
+    expect(adapterBodies.sent.map(entry => entry.name)).toEqual(ADAPTER_CASES.map(entry => entry.name));
+    ADAPTER_CASES.forEach((entry, index) => {
+      expect(anthropicMessagesRequestBody({ model: HAIKU, maxTokens: entry.maxTokens, thinkingLevel: "high",
+        messages: entry.messages as unknown as Parameters<typeof anthropicMessagesRequestBody>[0]["messages"] })).toBe(adapterBodies.sent[index]!.body);
+    });
+  });
+  it("the guarded fetch takes every body the adapter sends and refuses every body it never sends", async () => {
+    const { executions, port } = recordingPorts();
+    const fetcher = createPreviewGuardedFetch({ anthropic: port("anthropic", () => haikuReply()) });
+    for (const entry of adapterBodies.sent) await fetcher(PREVIEW_ANTHROPIC_MESSAGES_URL, { method: "POST", body: entry.body });
+    expect(executions.anthropic!.map(execution => execution.requestBody)).toEqual(adapterBodies.sent.map(entry => entry.body));
+    for (const entry of adapterBodies.refused) {
+      await expect(fetcher(PREVIEW_ANTHROPIC_MESSAGES_URL, { method: "POST", body: entry.body }), entry.name)
+        .rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+    }
+    expect(executions.anthropic).toHaveLength(adapterBodies.sent.length);
   });
 });

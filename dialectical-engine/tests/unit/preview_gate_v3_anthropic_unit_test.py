@@ -111,9 +111,9 @@ class GateUnitTests(unittest.TestCase):
         self.assertEqual(without(UNIT, changed), without(DEEPINFRA_UNIT, changed))
         hidden = set(' '.join(values(UNIT, 'InaccessiblePaths')).split())
         deepinfra_hidden = set(' '.join(values(DEEPINFRA_UNIT, 'InaccessiblePaths')).split())
-        self.assertLessEqual(deepinfra_hidden, hidden)
-        self.assertEqual(hidden - deepinfra_hidden, {'-' + DEEPINFRA_PRIVATE, '-/etc/debateai-v3-preview/provider-deepinfra-go-v3.json',
-                                                     '-' + GOOGLE_PRIVATE, '-/etc/debateai-v3-preview/provider-google-go-v1.json'})
+        # Each gate hides the other's state and GO (and both hide Google's); nothing else differs.
+        self.assertEqual(hidden - deepinfra_hidden, {'-' + DEEPINFRA_PRIVATE, '-/etc/debateai-v3-preview/provider-deepinfra-go-v3.json'})
+        self.assertEqual(deepinfra_hidden - hidden, {'-' + PRIVATE, '-' + GO})
         self.assertNotIn('-' + PRIVATE, hidden)
 
     def test_watchers_follow_the_anthropic_gate_with_their_own_state(self):
@@ -132,17 +132,60 @@ class GateUnitTests(unittest.TestCase):
         self.assertEqual(check[:4], ['/usr/bin/python3', '-I', OPERATOR + 'anthropic_addresses.py', 'watch'])
         self.assertEqual(values(CHECK_UNIT, 'StateDirectory'), ['debateai-preview-anthropic-addresses'])
         self.assertTrue(check[5].startswith('/var/lib/debateai-preview-anthropic-addresses/'))
-        # DeepInfra's address notice names DeepInfra's update command; this check has no list to
-        # update, so a mismatch fails the unit and the plain alert emails its journal lines.
-        self.assertEqual(values(CHECK_UNIT, 'OnFailure'), ['debateai-preview-alert@%n.service'])
+        # Its own notice (anthropic-addresses): the email names this unit and the Anthropic check,
+        # never DeepInfra's update command.
+        self.assertEqual(values(CHECK_UNIT, 'OnFailure'), ['debateai-preview-notice@anthropic-addresses-mismatch.service'])
+        self.assertEqual(options['--notice'], 'anthropic-halted')
         same = {'Description', 'ExecStart', 'StateDirectory', 'OnFailure'}
         self.assertEqual(without(CHECK_UNIT, same), without(DEEPINFRA_CHECK, same))
         for timer, v2 in ((HALT_TIMER, V2 / 'systemd/debateai-preview-gate-halt-watch.timer'),
                           (CHECK_TIMER, V2 / 'systemd/debateai-preview-gate-addresses.timer')):
             with self.subTest(timer=timer.name):
                 self.assertEqual(without(timer, {'Description'}), without(v2, {'Description'}))
-        # The watcher script is v2's, unchanged; the operator copies it into the Anthropic folder.
+        # The watcher script is v2's (with its notice kinds); the operator copies it into the Anthropic folder.
         self.assertTrue((V2 / 'gate_watch.py').is_file())
+
+    def test_the_halt_watcher_queues_the_anthropic_notice_unit(self):
+        gate_watch = load(V2 / 'gate_watch.py', 'gate_watch_anthropic')
+        calls = []
+
+        def run(argv, **_kwargs):
+            calls.append(argv)
+            return type('Completed', (), {'returncode': 0})()
+        self.assertIn('anthropic-halted', gate_watch.NOTICE_KINDS)
+        self.assertEqual(gate_watch.queue_notice('uncertain_charge', run, 'anthropic-halted'),
+                         'debateai-preview-notice@anthropic-halted-uncertain_charge.service')
+        self.assertEqual(calls[-1], [gate_watch.SYSTEMCTL, 'start', '--no-block', 'debateai-preview-notice@anthropic-halted-uncertain_charge.service'])
+        with self.assertRaises(gate_watch.WatchError):
+            gate_watch.queue_notice('uncertain_charge', run, 'anthropic-addresses')
+
+    def test_every_unit_hides_every_gate_state_it_does_not_need(self):
+        """Each gate unit hides every OTHER gate's private folder (its key, ledgers) and GO; each halt
+        watcher hides the other gates' folders and GOs and its own key file; a unit that reads no gate
+        state (the address checks) hides the whole preview state and configuration."""
+        gates = {
+            'deepinfra': (DEEPINFRA_PRIVATE, '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json'),
+            'anthropic': (PRIVATE, GO),
+            'google': (GOOGLE_PRIVATE, '/etc/debateai-v3-preview/provider-google-go-v1.json'),
+            'team-v2': ('/var/lib/debateai-v3-preview/provider-team-authority-v2', '/etc/debateai-v3-preview/provider-team-go-v2.json'),
+        }
+        units = sorted(SYSTEMD.glob('*.service'))
+        self.assertGreaterEqual(len(units), 6)
+        for unit in units:
+            with self.subTest(unit=unit.name):
+                hidden = set(' '.join(values(unit, 'InaccessiblePaths')).split())
+                start = ' '.join(values(unit, 'ExecStart')).split()
+                own = start[start.index('--private') + 1] if '--private' in start else None
+                if own is None:
+                    self.assertLessEqual({'-/var/lib/debateai-v3-preview', '-/etc/debateai-v3-preview'}, hidden)
+                    continue
+                self.assertIn(own, [state for state, _go in gates.values()])
+                for state, go in gates.values():
+                    if state != own:
+                        self.assertLessEqual({'-' + state, '-' + go}, hidden)
+                self.assertNotIn('-' + own, hidden)
+                if 'gate_watch.py' in ' '.join(start):
+                    self.assertIn('-' + own + '/api-key.txt', hidden)
 
     def test_the_target_dropin_wants_exactly_the_three_new_units(self):
         wanted = ' '.join(values(TARGET_DROPIN, 'Wants')).split()

@@ -256,9 +256,10 @@ function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
 }
 /**
  * PR B, the wire contract's Anthropic body, exactly as the Anthropic gate checks it: `model`,
- * `max_tokens` (1..the row's bound), `messages` (non-empty, each exactly {role user|assistant,
- * content text}, the first a user turn), an optional `system` text, and `output_config`
- * {"effort": "high"} exactly when the row has an effort switch. Nothing else, anywhere.
+ * `max_tokens` (1..the row's bound), `messages` (each exactly {role, content: non-empty text},
+ * roles alternating user/assistant, first and last a user turn, as the adapter builds them), an
+ * optional non-empty `system` text, and `output_config` {"effort": "high"} exactly when the row
+ * has an effort switch. Nothing else, anywhere.
  */
 function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
   if (reviewed.provider !== "anthropic") return false;
@@ -268,13 +269,13 @@ function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewM
   const effort = body.output_config;
   return Object.keys(body).length === required.length + optional
     && required.every(key => Object.hasOwn(body, key))
-    && (optional === 0 || typeof body.system === "string")
+    && (optional === 0 || (typeof body.system === "string" && body.system.length > 0))
     && (reviewed.effort === null || (isPlainObject(effort) && Object.keys(effort).length === 1 && effort.effort === reviewed.effort))
     && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
-    && Array.isArray(messages) && messages.length >= 1
-    && messages.every(message => isPlainObject(message) && Object.keys(message).length === 2
-      && (message.role === "user" || message.role === "assistant") && typeof message.content === "string")
-    && (messages[0] as Record<string, unknown>).role === "user";
+    && Array.isArray(messages) && messages.length % 2 === 1
+    && messages.every((message, index) => isPlainObject(message) && Object.keys(message).length === 2
+      && message.role === (index % 2 === 0 ? "user" : "assistant")
+      && typeof message.content === "string" && message.content.length > 0);
 }
 /** No key ever leaves the app for a gate: a key header on the guarded fetch is refused. */
 function carriesKeyHeader(headers: RequestInit["headers"]): boolean {

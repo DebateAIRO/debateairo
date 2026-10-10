@@ -2,11 +2,11 @@
 # Started hourly by debateai-preview-anthropic-addresses.timer. It runs the Anthropic gate's own
 # start check while the gate runs: every IPv4 address of api.anthropic.com must be inside
 # 160.79.104.0/23. A mismatch not announced before fails this unit (exit 3) and its OnFailure=
-# alert emails the owner, with this unit's journal lines: at most one email per change. It reads
+# notice (anthropic-addresses) emails the owner, with this unit's journal lines: at most one email per change. It reads
 # only DNS (through the local resolver stub); no key, no gate state. Unprivileged.
 [Unit]
 Description=DebateAI preview: check that api.anthropic.com is still inside the Anthropic gate's allowed range
-OnFailure=debateai-preview-alert@%n.service
+OnFailure=debateai-preview-notice@anthropic-addresses-mismatch.service
 
 [Service]
 Type=oneshot

@@ -40,6 +40,13 @@ cache reads.
   own price, at the step the question length falls in. Exactly 100,000 tokens is still the lower
   step; 100,001 is the upper one. Anthropic does not report a cost, so this list-price charge is
   what the pot records.
+- The app never asks for caching, so cache writes should never appear. If Anthropic reports a
+  cache write without saying whether it was the 5-minute or the 1-hour kind, the gate charges all
+  of it at the dearer 1-hour price.
+- **Answers the gate cannot price stop the gate.** Any usage field it does not know, any web
+  search or other server tool, a region other than "global", a service tier other than
+  "standard", a code container, context editing, token counts outside the usage block, or any
+  answer part other than text or thinking: the call is held in full and the gate halts.
 - A price change is a reviewed code change (the gate, the app and their shared test file
   `tests/unit/fixtures/preview-model-rows-anthropic.json`), never an edit of the GO.
 
@@ -84,10 +91,15 @@ cache reads.
   hash of its own copy, so it keeps running unchanged. Updating the DeepInfra folder to this
   release later needs a new DeepInfra GO and `activate` (DeepInfra README, "Change the daily
   budget or another limit").
-- **The halt email names the DeepInfra command (known gap).** The halt watcher uses the same
-  email as the DeepInfra gate's. Its reason code is right, but the one command in it re-opens the
-  DeepInfra gate. Until the email learns about this gate, check `status` of both gates and use the
-  `activate` command in this README ("Re-open after a halt").
+- **Its own emails.** The halt watcher sends the Anthropic halt email (`anthropic-halted`): its
+  one command re-opens THIS gate. The hourly address check sends its own email
+  (`anthropic-addresses`). Each gate's watchers queue their own email, so two gates' halts never
+  arrive as one email.
+- **Each gate sees only its own key.** Every gate's unit hides the other gates' private folders
+  (keys, records) and GO files, and each watcher hides every key it does not need.
+- **The gate refuses a key of the wrong shape.** The Anthropic gate only sends a key that starts
+  with `sk-ant-`; the DeepInfra gate refuses a key that starts with `sk-ant-` or `AIza`. So a key
+  put into the wrong folder is never sent to the wrong company. The key command checks the same.
 
 ## Names
 
@@ -289,6 +301,8 @@ build flag, the register); in short:
   it is; this gate's GO carries that same value.
 - Add `claude-haiku-5-5` to the model rosters (free and/or premium). Each roster must keep at
   least two makers.
+- Showing Haiku on the website's new-debate form is a later, reviewed change: this release keeps
+  the website's model lists without Haiku (its build flag values are reviewed in the code).
 - Publish a new sealed register version that names the model. A sealed version is never edited:
   a new version supersedes it.
 - Restart the API and the runner.
@@ -320,8 +334,7 @@ The gate refuses any model the GO does not switch on, whatever the app asks for.
 ```
 
 **The halt watcher.** Every minute it asks this gate for `status` (read-only). Once per halt it
-queues one email to the owner with the reason code. See "The halt email names the DeepInfra
-command" above: use the command in this README.
+queues one email to the owner with the reason code and this gate's own re-open command.
 
 **Emergency off.** Level 1 is instant (no new paid call starts; re-open with `activate`). Level 2
 stops the service (up to about 11 minutes, while calls in flight finish).
@@ -363,4 +376,4 @@ journalctl -u debateai-preview-anthropic-addresses -n 5 -o cat
 - The probe: the exact model name in the answer, the usage fields Anthropic really sends (any
   field the gate does not know halts), and the charge.
 - The API (uid 994) can ask `/remaining` on the new socket; any other account is closed at once.
-- The halt email arrives once per halt (with the DeepInfra command, the known gap above).
+- The halt email arrives once per halt, with this gate's own re-open command.

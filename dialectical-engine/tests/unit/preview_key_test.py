@@ -175,7 +175,9 @@ class RefusalTests(KeyCommandTest):
                                b'sk-ant-0123456789abcdef\n', KEYS['google'], KEYS['deepinfra'], b'', b'sk-ant-01234/56789ab'],
                  'google': [b'AIza' + b'x' * 34, b'AIza' + b'x' * 36, b'AIzb' + b'x' * 35, b'AIza' + b'x' * 34 + b'.',
                             KEYS['anthropic']],
-                 'deepinfra': [b'x' * 15, b'x' * 513, b'has a space in it here', b'tab\tinside-0123456789', b'\x7f' * 20, b'']}
+                 # Another provider's key pasted at the DeepInfra prompt is refused too.
+                 'deepinfra': [b'x' * 15, b'x' * 513, b'has a space in it here', b'tab\tinside-0123456789', b'\x7f' * 20, b'',
+                               KEYS['anthropic'], KEYS['google'], b'sk-ant-anything-0123456789', b'AIza-anything-0123456789']}
         self.assertEqual(len(long), 513)
         for provider, keys in cases.items():
             for key in keys:
@@ -188,6 +190,7 @@ class RefusalTests(KeyCommandTest):
                     self.assertEqual(self.listing(provider), [])
         self.assertTrue(preview_key.shape_ok('anthropic', b'sk-ant-' + b'a' * 505))  # 512 characters in all.
         self.assertTrue(preview_key.shape_ok('deepinfra', b'!' * 16))
+        self.assertTrue(preview_key.shape_ok('deepinfra', b'sk-other-0123456789'))  # Only the known prefixes are refused.
 
     def test_a_folder_that_is_not_roots_700_folder_is_refused(self):
         loose = self.root / 'loose'

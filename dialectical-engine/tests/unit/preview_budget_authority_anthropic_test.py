@@ -8,6 +8,7 @@ import contextlib
 import hashlib
 import io
 import json
+import re
 import sys
 import unittest
 from decimal import Decimal
@@ -62,6 +63,12 @@ def envelope(value, operation_id='op-1'):
             'requestSha256': hashlib.sha256(raw.encode()).hexdigest(), 'reservedUsd': str(reservation_of(raw))}
 
 
+def envelope_text(raw, operation_id='op-1'):
+    """An envelope for exact request bytes (the app's own text), reserved as the app reserves them."""
+    return {'scope_id': SCOPE, 'operationId': operation_id, 'requestBody': raw,
+            'requestSha256': hashlib.sha256(raw.encode()).hexdigest(), 'reservedUsd': str(reservation_of(raw))}
+
+
 def sized(size):
     value = request(messages=[{'role': 'user', 'content': ''}])
     value['messages'][0]['content'] = 'x' * (size - len(json.dumps(value).encode()))
@@ -75,6 +82,9 @@ def message(input_tokens=1000, output_tokens=500, model=HAIKU, text='OK', conten
             'content': [{'type': 'text', 'text': text}] if content is None else content,
             'stop_reason': 'end_turn', 'stop_sequence': None,
             'usage': {'input_tokens': input_tokens, 'output_tokens': output_tokens, **usage}}
+
+
+FIVE_MINUTES_30000 = {'ephemeral_5m_input_tokens': 30000, 'ephemeral_1h_input_tokens': 0}
 
 
 def cost(step, input_tokens=0, write_5m=0, write_1h=0, read=0, output=0):
@@ -240,10 +250,12 @@ class SettlementTests(AnthropicTest):
         cases = (('small', message(1000, 500), 'up_to_100k', Decimal('0.00035')),
                  ('boundary_100000', message(100000, 1000), 'up_to_100k', Decimal('0.0105')),
                  ('just_over_100001', message(100001, 1000), 'over_100k', Decimal('0.0525005')),
-                 # Cache reads and writes count toward the prompt total that picks the step.
-                 ('mixed_100000', message(60000, 10, cache_creation_input_tokens=30000, cache_read_input_tokens=10000),
+                 # Cache reads and writes count toward the prompt total that picks the step (a 5-minute write here).
+                 ('mixed_100000', message(60000, 10, cache_creation_input_tokens=30000, cache_read_input_tokens=10000,
+                                  cache_creation=FIVE_MINUTES_30000),
                   'up_to_100k', Decimal('0.009855')),
-                 ('mixed_100001', message(60000, 10, cache_creation_input_tokens=30000, cache_read_input_tokens=10001),
+                 ('mixed_100001', message(60000, 10, cache_creation_input_tokens=30000, cache_read_input_tokens=10001,
+                                  cache_creation=FIVE_MINUTES_30000),
                   'over_100k', Decimal('0.04927505')))
         independent = {'small': cost(LOWER, 1000, output=500), 'boundary_100000': cost(LOWER, 100000, output=1000),
                        'just_over_100001': cost(UPPER, 100001, output=1000),
@@ -285,7 +297,9 @@ class SettlementTests(AnthropicTest):
         # 90000 x 0.50 + 4000 x 0.625 + 2000 x 1.00 + 5000 x 0.05 + 2000 x 2.50 = 54750 -> $0.05475
         self.assertEqual(cost(UPPER, 90000, 4000, 2000, 5000, 2000), Decimal('0.05475'))
         no_split = message(2000, 100, cache_creation_input_tokens=3000, cache_read_input_tokens=4000)
-        self.assertEqual(cost(LOWER, 2000, 3000, 0, 4000, 100), Decimal('0.000665'))
+        # Without its split, the whole write is charged at the dearer 1-hour price:
+        # 2000 x 0.10 + 3000 x 0.20 + 4000 x 0.01 + 100 x 0.50 = 890 -> $0.00089
+        self.assertEqual(cost(LOWER, 2000, 0, 3000, 4000, 100), Decimal('0.00089'))
         documented = message(2000, 100, cache_creation_input_tokens=0, cache_read_input_tokens=0,
                              cache_creation={'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 0},
                              server_tool_use={'web_search_requests': 0, 'web_fetch_requests': 0},
@@ -294,7 +308,7 @@ class SettlementTests(AnthropicTest):
                         server_tool_use=None, service_tier=None, inference_geo=None)
         for name, reply, expected, step, hour in (('lower', lower, Decimal('0.000815'), 'up_to_100k', 2000),
                                                   ('upper', upper, Decimal('0.05475'), 'over_100k', 2000),
-                                                  ('no_split', no_split, Decimal('0.000665'), 'up_to_100k', 0),
+                                                  ('no_split', no_split, Decimal('0.00089'), 'up_to_100k', 3000),
                                                   ('documented_zeros', documented, cost(LOWER, 2000, output=100), 'up_to_100k', 0),
                                                   ('nulls', nulls, cost(LOWER, 2000, output=100), 'up_to_100k', 0)):
             with self.subTest(name):
@@ -363,6 +377,13 @@ class SettlementTests(AnthropicTest):
             'block_not_an_object': {**good, 'content': ['OK']},
             'content_not_a_list': {**good, 'content': 'OK'},
             'type_not_message': {**good, 'type': 'error'},
+            'container_upload_block': {**good, 'content': [{'type': 'text', 'text': 'OK'}, {'type': 'container_upload', 'file_id': 'f'}]},
+            'unknown_block': {**good, 'content': [{'type': 'image', 'source': {}}]},
+            'block_without_type': {**good, 'content': [{'text': 'OK'}]},
+            'container': {**good, 'container': {'id': 'c', 'expires_at': 'x'}},
+            'context_management': {**good, 'context_management': {'applied_edits': []}},
+            'usage_outside_usage': {**good, 'server_usage': {'x': 1}},
+            'tokens_outside_usage': {**good, 'cache_tokens': 5},
             'usage_a_list': {**good, 'usage': [1000, 500]},
         })
         for name, reply in replies.items():
@@ -450,6 +471,7 @@ class UnbilledAndUnsentTests(AnthropicTest):
             '429_request_id_number': (429, {**self.RATE, 'request_id': 7}),
             '429_not_json': (429, {'_invalid_json': True}),
             '429_tokens_prefixed': (429, {'type': 'error', 'error': {'type': 'rate_limit_error', 'tokens_billed': 3}}),
+            '429_tokens_suffixed': (429, {'type': 'error', 'error': {'type': 'rate_limit_error', 'output_tokens': 3}}),
             '529_cost': (529, {'type': 'error', 'error': {'type': 'overloaded_error', 'cost': '0.001'}}),
             # Judged on the RAW reply: redaction would drop this 'headers' subtree and hide the usage.
             '429_usage_under_redacted_key': (429, {'type': 'error', 'error': {'type': 'rate_limit_error',
@@ -557,7 +579,7 @@ class KeyCustodyTests(AnthropicTest):
 class RequestShapeTests(AnthropicTest):
     def test_the_wire_contract_shape_is_accepted(self):
         go = bridge.read_go(self.gate().go_path)
-        for value in (request(), without('system'), request(max_tokens=1), request(max_tokens=32768), request(system=''),
+        for value in (request(), without('system'), request(max_tokens=1), request(max_tokens=32768),
                       request(messages=[{'role': 'user', 'content': 'a'}, {'role': 'assistant', 'content': 'b'},
                                         {'role': 'user', 'content': 'c'}])):
             with self.subTest(value=value):
@@ -588,6 +610,13 @@ class RequestShapeTests(AnthropicTest):
             request(output_config={'effort': 'high', 'budget_tokens': 1}), request(output_config={}),
             request(output_config='high'), request(output_config=None),
             request(system=[{'type': 'text', 'text': 'x'}]), request(system=7), request(system=None),
+            # What the adapter can never send (anthropic-messages.ts): an empty system or content,
+            # two turns of one role in a row, a final assistant turn.
+            request(system=''), request(messages=[{'role': 'user', 'content': ''}]),
+            request(messages=[{'role': 'user', 'content': 'a'}, {'role': 'user', 'content': 'b'}]),
+            request(messages=[{'role': 'user', 'content': 'a'}, {'role': 'assistant', 'content': 'b'}]),
+            request(messages=[{'role': 'user', 'content': 'a'}, {'role': 'assistant', 'content': 'b'},
+                              {'role': 'assistant', 'content': 'c'}, {'role': 'user', 'content': 'd'}]),
             request(system=[{'type': 'text', 'text': 'x', 'cache_control': {'type': 'ephemeral'}}])]
         for value in refused:
             with self.subTest(refused=value), self.refused('REQUEST_PARAMETERS_INVALID'):
@@ -598,6 +627,23 @@ class RequestShapeTests(AnthropicTest):
         for value in (without('model'), request(model=None), request(model=7)):
             with self.subTest(model=value.get('model')), self.refused('REQUEST_PARAMETERS_INVALID'):
                 bridge.validate_request(envelope(value), go)
+
+    def test_every_body_the_app_adapter_sends_passes_and_what_it_refuses_fails(self):
+        # tests/unit/fixtures/anthropic-adapter-bodies.json: `sent` holds the adapter's own output
+        # byte for byte (its TS test rebuilds each one); `refused` holds bodies the adapter never sends.
+        fixture = json.loads((Path(__file__).resolve().parent / 'fixtures/anthropic-adapter-bodies.json').read_text())
+        self.assertGreaterEqual(len(fixture['sent']), 4)
+        go = bridge.read_go(self.gate().go_path)
+        for case in fixture['sent']:
+            with self.subTest(sent=case['name']):
+                body = json.loads(case['body'])
+                self.assertTrue(ANTHROPIC.body_valid(body, ANTHROPIC.rows[HAIKU]))
+                outgoing, reserved, _, _ = bridge.validate_request(envelope_text(case['body']), go)
+                self.assertEqual(json.loads(outgoing), body)
+                self.assertLessEqual(len(outgoing), len(case['body'].encode()))
+        for case in fixture['refused']:
+            with self.subTest(refused=case['name']):
+                self.assertFalse(ANTHROPIC.body_valid(json.loads(case['body']), ANTHROPIC.rows[HAIKU]))
 
     def test_a_row_without_effort_must_not_carry_output_config(self):
         row = ANTHROPIC.rows[HAIKU]._replace(effort=None)
@@ -613,6 +659,22 @@ class RequestShapeTests(AnthropicTest):
                       key_loader=lambda _private: calls.append('key'))
         self.assertEqual(calls, [])
         self.assertIsNone(gate.day(DAY))
+
+    def test_a_key_of_another_shape_is_never_sent_and_reserves_nothing(self):
+        # A DeepInfra or Google key put in the Anthropic folder: refused before any reservation or call.
+        for wrong in ('synthetic-key-0123456789', 'AIza' + 'x' * 35, 'sk-ant-has space'):
+            with self.subTest(key=wrong[:8]):
+                gate = self.ready()
+                calls = []
+                with self.refused('KEY_SHAPE_INVALID'):
+                    self.call(gate, dispatch=lambda *args: calls.append(args), key_loader=lambda _private, k=wrong: k)
+                self.assertEqual(calls, [])
+                self.assertIsNone(gate.day(DAY))
+        deepinfra = bridge.helper.PROFILES['deepinfra']
+        self.assertTrue(re.fullmatch(ANTHROPIC.key_pattern, KEY))
+        self.assertFalse(re.fullmatch(deepinfra.key_pattern, KEY))  # An Anthropic key in the DeepInfra gate is refused.
+        self.assertFalse(re.fullmatch(deepinfra.key_pattern, 'AIza' + 'x' * 35))
+        self.assertTrue(re.fullmatch(deepinfra.key_pattern, 'synthetic-key-0123456789'))
 
 
 class RemainingAndProbeTests(AnthropicTest):

@@ -1,0 +1,52 @@
+{
+  "schema": "anthropic-adapter-bodies-v1",
+  "about": "Request bodies of the app's Anthropic adapter (packages/providers/src/anthropic-messages.ts). `sent` is the adapter's own output, byte for byte, for the packets in tests/unit/preview-anthropic-gate.test.ts (that test rebuilds every one); `refused` are bodies the adapter never sends. The gate's AnthropicProfile.body_valid and the app's guarded fetch must accept every `sent` body and refuse every `refused` one.",
+  "sent": [
+    {
+      "name": "system and one user turn",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Is the synthetic claim supported?\"}],\"system\":\"You are the synthetic judge.\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "two system messages joined, a full exchange",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":32768,\"messages\":[{\"role\":\"user\",\"content\":\"First.\"},{\"role\":\"assistant\",\"content\":\"Answer.\"},{\"role\":\"user\",\"content\":\"Second.\"}],\"system\":\"Frame A.\\n\\nFrame B.\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "consecutive user turns joined, no system",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"Part one.\\n\\nPart two.\"}],\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "non-ASCII text and escapes",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":1024,\"messages\":[{\"role\":\"user\",\"content\":\"Întrebare: 日本語? emoji 🙂 and   separator\"}],\"system\":\"Răspunde în română. \\\"Citat\\\" \\\\ backslash\\nnew line\\ttab\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "repair: user, assistant, user, assistant joined, user",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8192,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"},{\"role\":\"assistant\",\"content\":\"A1\\n\\nA2\"},{\"role\":\"user\",\"content\":\"Fix it.\"}],\"output_config\":{\"effort\":\"high\"}}"
+    }
+  ],
+  "refused": [
+    {
+      "name": "a final assistant turn (the adapter refuses it as a prefill)",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"},{\"role\":\"assistant\",\"content\":\"A\"}],\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "a first assistant turn",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"assistant\",\"content\":\"A\"},{\"role\":\"user\",\"content\":\"Q\"}],\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "an empty message",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"\"}],\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "two user turns in a row (the adapter joins them)",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"a\"},{\"role\":\"user\",\"content\":\"b\"}],\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "an empty system text (the adapter leaves system out)",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}],\"system\":\"\",\"output_config\":{\"effort\":\"high\"}}"
+    },
+    {
+      "name": "no effort at the default level (the preview always sends high)",
+      "body": "{\"model\":\"claude-haiku-5-5\",\"max_tokens\":8,\"messages\":[{\"role\":\"user\",\"content\":\"Q\"}]}"
+    }
+  ]
+}
