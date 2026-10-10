@@ -13,7 +13,7 @@ const state = (overrides: Partial<SubscriptionState> = {}): SubscriptionState =>
   periodAnchorAt: START, currentPeriodStart: START, currentPeriodEnd: END,
   cancelRequested: false, scheduledDowngradePlanId: null, activatedAt: START, endedCause: null, pastDueSince: null, retryIndex: 0,
   renewalPostponedUntil: null, announcedTotalMicros: 24_200_000, lastNoticeAt: null, paymentProvider: "netopia",
-  paymentEnvironment: "sandbox", cardTokenId: null,
+  paymentEnvironment: "sandbox", cardTokenId: null, currency: "USD",
   ...overrides
 });
 
@@ -22,7 +22,7 @@ const quote: QuoteRow = Object.freeze({
   netMicros: 15_000_000, taxMicros: 3_150_000, totalMicros: 18_150_000, taxCountry: "RO", taxRegion: null,
   taxRateBasisPoints: 2_100, taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null,
   createdAt: MIDDLE, expiresAt: new Date(MIDDLE.getTime() + 1_800_000),
-  locationCiphertext: Buffer.alloc(0), keyId: "k", recurringTotalMicros: 60_500_000
+  locationCiphertext: Buffer.alloc(0), keyId: "k", recurringTotalMicros: 60_500_000, currency: "USD"
 });
 
 /** P12c's key: the charge runs from its quote's creation to the end of the period it was quoted in. */

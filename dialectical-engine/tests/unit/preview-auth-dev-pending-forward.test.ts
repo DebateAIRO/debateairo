@@ -10,6 +10,8 @@ import { NativeVerifyPendingForwardStepError, pendingForwardSteps, refusePending
 // list loadMigrationPlan checks for SOURCE_INVENTORY: the recipe's sources, 0108, 0110 and the chain) must be recorded
 // in the ledger or as a resolution's logical name, or it is pending.
 const NETOPIA_STEP = '0111_billing_netopia.sql';
+// Part C's step, chained after 0111 (spec 2026-10-05 §2.16.6).
+const PART_C_STEP = '0113_billing_price_currencies.sql';
 const DEV_STEP = '0110_account_erasure_public_debates.sql';
 const LEDGER = 'SELECT name FROM public.debateai_schema_migration';
 const RESOLUTION_TABLE = "SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present";
@@ -49,12 +51,12 @@ describe('pendingForwardSteps', () => {
  it('reads this source\'s plan: 0110 and 0111 are pending, in that order, on a database complete through 0108', async () => {
   const plan = await loadMigrationPlan();
   expect(plan.forward110.name).toBe(DEV_STEP);
-  expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA_STEP]);
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name]))).toEqual([DEV_STEP, NETOPIA_STEP]);
+  expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA_STEP, PART_C_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name]))).toEqual([DEV_STEP, NETOPIA_STEP, PART_C_STEP]);
  });
  it('reads this source\'s plan: only 0111 is pending on a database complete through dev\'s 0110', async () => {
   const plan = await loadMigrationPlan();
-  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP]))).toEqual([NETOPIA_STEP]);
+  expect(pendingForwardSteps(plan, new Set([...plan.manifest.order, plan.forward108.name, DEV_STEP]))).toEqual([NETOPIA_STEP, PART_C_STEP]);
  });
  it('reads this source\'s plan: a recipe source the database lacks is pending, in apply order before 0108', async () => {
   const plan = await loadMigrationPlan();
@@ -78,7 +80,7 @@ describe('refusePendingForwardSteps', () => {
   const error = refusal as NativeVerifyPendingForwardStepError;
   expect(error.code).toBe('PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP');
   expect(error.name).toBe('NativeVerifyPendingForwardStepError');
-  expect(error.pending).toEqual([NETOPIA_STEP]);
+  expect(error.pending).toEqual([NETOPIA_STEP, PART_C_STEP]);
   expect(Object.isFrozen(error.pending)).toBe(true);
   expect(error.message).toBe(`PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: ${error.pending.join(', ')}. Verify never applies a migration; run the native operator with operation apply-and-plan first.`);
   expect(queries).toEqual([LEDGER, RESOLUTION_TABLE, RESOLUTIONS]);
@@ -86,7 +88,7 @@ describe('refusePendingForwardSteps', () => {
  it('refuses, naming 0110 and 0111 in that order, on a database complete through 0108 (a plan carrying forward110 not applied)', async () => {
   const plan = await loadMigrationPlan();
   const { pool } = fakePool([...plan.manifest.order, plan.forward108.name]);
-  await expect(refusePendingForwardSteps(pool, plan)).rejects.toMatchObject({ code: 'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP', pending: [DEV_STEP, NETOPIA_STEP] });
+  await expect(refusePendingForwardSteps(pool, plan)).rejects.toMatchObject({ code: 'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP', pending: [DEV_STEP, NETOPIA_STEP, PART_C_STEP] });
  });
  it('refuses, naming 0110, when only 0110 is missing', async () => {
   const plan = await loadMigrationPlan();

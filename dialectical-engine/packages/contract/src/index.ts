@@ -342,12 +342,20 @@ const InternalBillingUsageResponseSchema = z.object({
 export const BillingUsageResponseSchema = z.union([CustomerBillingUsageResponseSchema,InternalBillingUsageResponseSchema]);
 export type BillingUsageResponse = z.infer<typeof BillingUsageResponseSchema>;
 
+/**
+ * Spec 2026-10-05 §2.16 (Part C): the price currencies. Every plan has a price in each; the buyer's tax country picks
+ * one (the register's `currency_by_country`), and each subscription keeps it for good. The AI credit is never priced
+ * here: it stays in US dollars.
+ */
+export const BillingCurrencySchema = z.enum(["USD", "EUR", "RON"]);
+export type BillingCurrency = z.infer<typeof BillingCurrencySchema>;
+
 /** Paid-plans spec §2.5.3: money crosses the wire as a decimal string with exactly two places, "20.00". */
 export const BillingDecimalMoneySchema = z.string().regex(/^(?:0|[1-9]\d{0,8})\.\d{2}$/);
 
 /** GET /v1/billing/plans (public). Credit is never shown in dollars: "4" reads "4× the Plus allowance". */
 export const BillingPlansResponseSchema = z.object({
-  currency: z.literal("USD"),
+  currency: BillingCurrencySchema,
   plans: z.array(z.object({
     plan_id: PlanIdSchema,
     net_price: BillingDecimalMoneySchema,

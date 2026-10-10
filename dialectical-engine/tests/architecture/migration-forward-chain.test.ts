@@ -50,7 +50,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains 0111 to the recipe, to 0110's manifest and to the verifier in force after 0110 (the sealed one)", async () => {
     const plan = await loadMigrationPlan();
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
-    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql"]);
+    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql", "0113_billing_price_currencies.sql"]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
     // as its base verifier: after 0110, the sealed verifier is the one in force.
@@ -85,6 +85,31 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     for (const old of ["lineage/billing-netopia-forward109.json", "lineage/verify-effective-capabilities-109.sql"]) {
       await expect(bytesOf(old)).rejects.toMatchObject({ code: "ENOENT" });
     }
+  });
+
+  it("chains Part C's 0113 to the recipe, to 0111's manifest and to 0111's verifier, which it keeps in force", async () => {
+    const plan = await loadMigrationPlan();
+    const [netopia, step] = plan.forwardChain;
+    const manifest = JSON.parse((await bytesOf("lineage/billing-price-currencies-forward0113.json")).toString("utf8"));
+    expect(manifest).toEqual({
+      version: "billing-price-currencies-forward0113-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: {
+        name: "0111_billing_netopia.sql",
+        manifestSha256: netopia!.manifestSha256,
+        verifierSha256: netopia!.verifierSha256
+      },
+      migration: { name: "0113_billing_price_currencies.sql", sha256: sha256(await bytesOf("0113_billing_price_currencies.sql")) },
+      verifier: {
+        path: "lineage/verify-effective-capabilities-111.sql",
+        sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-111.sql"))
+      }
+    });
+    expect(step!.manifestSha256).toBe(sha256(await bytesOf("lineage/billing-price-currencies-forward0113.json")));
+    expect(step!.previousName).toBe(netopia!.name);
+    expect(step!.previousManifestSha256).toBe(netopia!.manifestSha256);
+    expect(step!.previousVerifierSha256).toBe(netopia!.verifierSha256);
+    expect(step!.verifierSql).toBe((await bytesOf("lineage/verify-effective-capabilities-111.sql")).toString("utf8"));
   });
 
   it("supersedes the sealed verifier with NETOPIA's nine tables and two purges, and nothing else", async () => {

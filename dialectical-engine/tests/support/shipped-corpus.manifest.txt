@@ -839,6 +839,7 @@ packages/db/src/internal-allowance.ts
 packages/db/src/legacy-claim.ts
 packages/db/src/legal-acceptance.ts
 packages/db/src/migration-forward-chain.ts
+packages/db/src/migration-forward0113.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts

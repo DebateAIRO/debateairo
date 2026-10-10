@@ -25,6 +25,11 @@ first. A step is added with new files only. Worked example: 0111; the next step,
 6. On the preview the step is applied only by the native operator's `apply-and-plan` (with the owner's yes); its `verify`,
    `publish` and every start refuse while the step, or dev's 0110, is pending (`deploy/preview-auth-dev/v1/README.md`).
 
+Part C's step (`0113_billing_price_currencies.sql`, `billing-price-currencies-forward0113.json`,
+`migration-forward0113.ts`) is built after 0111 and names 0111's verifier as its own (it adds no billing relation and no
+function). It takes the next free number when it merges: chained after the auth DB batch's 0112 if that merged first,
+else renumbered 0112.
+
 `migrate()` then runs the base recipe, 0108, the sealed verifier and 0110 as before, then each pending step in order:
 its SQL, its verifier, its ledger row and its receipt in `public.debateai_schema_migration_step`. A database at 0108
 without 0110 gets 0110, then the chain. On a later run the verifier of the last applied step replaces the sealed one,

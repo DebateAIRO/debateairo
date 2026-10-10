@@ -74,7 +74,7 @@ async function quoteAndCharge(
       netMicros: 20_000_000, taxMicros: 4_200_000, totalMicros: 24_200_000, taxCountry: "RO", taxRegion: null,
       taxRateBasisPoints: 2100, taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null, createdAt: now,
       expiresAt: new Date(now.getTime() + 1_800_000), locationCiphertext: location.ciphertext, keyId: location.keyId,
-      recurringTotalMicros: null
+      recurringTotalMicros: null, currency: "USD"
     });
     await billing.insertCharge(c, charge);
   });
@@ -191,7 +191,7 @@ describe("P1b — quotes, subscriptions and charges", () => {
         quoteId, ownerRef, planId: "PLUS", kind: "SUBSCRIBE", netMicros: 20_000_000, taxMicros: 4_200_000,
         totalMicros: 24_200_000, taxCountry: "RO", taxRegion: null, taxRateBasisPoints: 2100, taxStatus: "TAXABLE",
         taxName: "VAT", quadernoRef: null, createdAt: now, expiresAt: new Date(now.getTime() + 1_800_000),
-        locationCiphertext: location.ciphertext, keyId: location.keyId, recurringTotalMicros: null
+        locationCiphertext: location.ciphertext, keyId: location.keyId, recurringTotalMicros: null, currency: "USD"
       });
       await billing.insertCharge(c, {
         chargeId, ownerRef, subscriptionId, kind: "INITIAL", attempt: 1, periodStart: anchor,

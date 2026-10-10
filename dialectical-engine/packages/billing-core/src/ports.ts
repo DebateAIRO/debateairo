@@ -3,6 +3,8 @@
 // (the credit line in the customer's language), and the three
 // OPTIONAL InvoiceIssuer members lookup (A17b), creditPartial (A17c) and pdf (A26b). R-24: an issuer
 // offers each only when its API confirms it (X1); P10b defines what happens when one is absent.
+import type { PriceCurrency } from "./payments.js";
+
 export type TaxLocation = Readonly<{
   country: string; region: string | null; postalCode: string | null; city: string | null; street: string | null; ip: string | null;
 }>;
@@ -41,7 +43,7 @@ export type InvoiceErrorCode = "INVOICE_SERVICE_UNAVAILABLE" | "INVOICE_SERVICE_
 
 export interface TaxEngine {
   quote(i: Readonly<{
-    netMicros: number; currency: "USD"; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
+    netMicros: number; currency: PriceCurrency; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
   }>): Promise<TaxQuote>;
   validateTaxId(country: string, taxId: string): Promise<TaxIdCheck>;
   recordSale(i: SaleRecord): Promise<{ documentId: string; number: string; url: string | null }>;

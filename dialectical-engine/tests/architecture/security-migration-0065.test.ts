@@ -618,6 +618,6 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
     expect(ordered.at(-1)).toBe("0107_auth_dev_integration.sql");
     expect(plan.forward108.name).toBe("0108_preview_recovery_verified_bindings.sql");
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
-    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql"]);
+    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql", "0113_billing_price_currencies.sql"]);
   });
 });

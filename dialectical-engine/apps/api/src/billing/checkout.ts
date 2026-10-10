@@ -244,7 +244,9 @@ export class CheckoutService implements CheckoutServicePort {
         data: {
           country_confirmed: place.kind === "CONFIRM_COUNTRY", ip_country: place.ipCountry, quote_id: quote.quoteId,
           // Spec §2.5.5: the payment system this subscription's charges and saved card belong to.
-          payment_provider: "netopia", payment_environment: environment
+          payment_provider: "netopia", payment_environment: environment,
+          // Spec 2026-10-05 §2.16.3: the subscription's currency, for good.
+          currency: quote.currency
         }
       });
       // Provisional: the paid period starts at activation (P9b anchors it there).

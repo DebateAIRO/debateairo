@@ -2307,7 +2307,16 @@ with the spec's values and billing **off**: copy those two into `/etc/debateai/r
 also carries `taxAuthorities`, equal to the code-owned text; copy that member only to correct the text (the register
 README's `taxAuthorities` row says what carrying it costs). `countryPolicy` is not in that example: it lives in
 `deploy/vps/register/country-policy.example.json`, and goes into the hosted file only once every condition of §5
-"Country data" holds (go-live lines 27–30). Then, inside a migrator window (§4 steps 2 and 5), check and publish:
+"Country data" holds (go-live lines 27–30).
+
+**Your price list (Part C).** Every plan has a price in USD, EUR and RON, and `currency_by_country` says which one each
+buyer pays, by the country of the billing address: RON for Romania, EUR for the other 26 EU countries and Norway,
+Iceland, Liechtenstein, Switzerland and the United Kingdom, USD for everyone else. Set your prices in `net_prices`
+(micro-units: 100 lei is `100000000`; whole bani or cents only), keep `credit_currency` at `USD`, dry-run, publish, pin,
+restart. A subscription keeps its currency and its price for good; a new price list or a changed country reaches only
+new subscriptions. `pnpm billing:check` shows a cross while the published plans are the engine's own row.
+
+Then, inside a migrator window (§4 steps 2 and 5), check and publish:
 
 ```sh
 pnpm register:publish-hosted --dry-run --file /etc/debateai/register/hosted-register.json
@@ -2324,6 +2333,11 @@ below is the same: edit the file, dry-run, publish, pin, restart. A published ve
 `recurring_net_micros`) and renews at that price plus the current tax. So a `billingPlans` version with a new price
 reaches only new subscriptions; existing subscribers keep their price until a price-change command with the 30 days'
 notice of Terms §12 exists (it is not built yet).
+
+**Upgrading to Part C.** The engine refuses to start on a register version whose `billingPlans` has one price per plan
+(`BILLING_PLANS_INVALID`). Before restarting on Part C's code: rewrite the file's `billingPlans` in the new shape (or
+remove it to seal the engine's own row), dry-run, publish, pin the printed `REGISTER_VERSION=` in both `api.env` and
+`runner.env`, then restart both.
 
 ### 14.5 NETOPIA's message
 

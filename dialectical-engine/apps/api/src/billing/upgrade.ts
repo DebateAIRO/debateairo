@@ -5,7 +5,7 @@ import { microsToDecimal, upgradeMonthCreditOverrideMicros, upgradeProrationMicr
 import type { BillingUpgradeQuoteResponse, BillingUpgradeResponse } from "@debateai/contract";
 import type { BillingRepository, ChargeRow, EntitlementRepository, QuoteRow } from "@debateai/db";
 import { netopiaLanguageOf } from "@debateai/payments-netopia";
-import { planById, type BillingPlans, type PlanId } from "@debateai/register";
+import { planById, planNetPrice, type BillingPlans, type PlanId } from "@debateai/register";
 import { reuseWindowMs, type ConsentPair } from "./checkout.js";
 import {
   assertCurrentAgreement, bestPaymentId, closeUnpaidHostedCharge, hostedStartDeps, paidOrAlmost, readPaymentStatus,
@@ -99,23 +99,25 @@ export async function quoteUpgrade(deps: SubscriptionRouteDeps, input: Readonly<
   if (await deps.billing.ownerErasurePending(input.ownerRef)) refuse(409, "ACCOUNT_ERASURE_PENDING");
   const current = planById(deps.plans, state.planId);
   const target = planById(deps.plans, input.planId);
-  if (target.netPriceMicros <= current.netPriceMicros) refuse(422, "UPGRADE_NOT_HIGHER");
+  // Spec 2026-10-05 §2.16.3: every price of this subscription is in its own currency, for good.
+  const targetNetMicros = planNetPrice(target, state.currency);
+  if (targetNetMicros <= planNetPrice(current, state.currency)) refuse(422, "UPGRADE_NOT_HIGHER");
   if (renewalUnderWay(state, await deps.billing.chargesForSubscription(state.subscriptionId), input.now)) {
     refuse(409, "UPGRADE_NOT_AVAILABLE_NOW");
   }
   const oldNetMicros = ownNetMicros(await deps.billing.subscriptionEvents(state.subscriptionId));
   // A plan bought dearer than the higher plan costs today has nothing to prorate upwards.
-  if (target.netPriceMicros <= oldNetMicros) refuse(422, "UPGRADE_NOT_HIGHER");
+  if (targetNetMicros <= oldNetMicros) refuse(422, "UPGRADE_NOT_HIGHER");
   const context = await storedTaxContext({ billing: deps.billing, recordsKey: deps.recordsKey }, state);
   const ipCountry = await gateCardAction(deps, input.ownerRef, input.ip, context);
   const netMicros = upgradeProrationMicros({
-    oldNetMicros, newNetMicros: target.netPriceMicros,
+    oldNetMicros, newNetMicros: targetNetMicros,
     periodStart: state.currentPeriodStart, periodEnd: state.currentPeriodEnd, now: input.now
   });
   // Rounded to whole cents, a difference too small for the time left prices at zero: the same answer as the lead.
   if (netMicros <= 0) refuse(409, "UPGRADE_NOT_AVAILABLE_NOW");
   const prorated = await quoteTax(deps.tax, deps.policy, context, netMicros, input.now);
-  const recurring = await quoteTax(deps.tax, deps.policy, context, target.netPriceMicros, input.now);
+  const recurring = await quoteTax(deps.tax, deps.policy, context, targetNetMicros, input.now);
   const quoteId = randomUUID();
   const sealed = sealQuoteLocation(deps.recordsKey, quoteId, { ...context.quoteLocation, ip: input.ip, ipCountry });
   const expiresAt = new Date(input.now.getTime() + deps.policy.quoteTtlSeconds * 1_000);
@@ -125,7 +127,7 @@ export async function quoteUpgrade(deps: SubscriptionRouteDeps, input: Readonly<
     taxCountry: prorated.taxCountry, taxRegion: prorated.taxRegion, taxRateBasisPoints: prorated.taxRateBasisPoints,
     taxStatus: prorated.status, taxName: prorated.taxName, quadernoRef: prorated.reference,
     createdAt: input.now, expiresAt, locationCiphertext: sealed.ciphertext, keyId: sealed.keyId,
-    recurringTotalMicros: recurring.totalMicros
+    recurringTotalMicros: recurring.totalMicros, currency: state.currency
   });
   await deps.billing.withTransaction((client) => deps.billing.insertQuote(client, row));
   return Object.freeze({
@@ -304,7 +306,8 @@ async function prepareUpgrade(
   if (locked.events.some((event) => event.kind === "UPGRADED" && event.at.getTime() >= quote.createdAt.getTime())) {
     refuse(409, "QUOTE_EXPIRED");
   }
-  if (planById(deps.plans, input.planId).netPriceMicros <= planById(deps.plans, state.planId).netPriceMicros) {
+  if (planNetPrice(planById(deps.plans, input.planId), state.currency)
+    <= planNetPrice(planById(deps.plans, state.planId), state.currency)) {
     refuse(422, "UPGRADE_NOT_HIGHER");
   }
   if (renewalUnderWay(state, charges, now)) refuse(409, "UPGRADE_NOT_AVAILABLE_NOW");
@@ -398,7 +401,7 @@ export function upgradeSucceededWrites(input: Readonly<{
       ...(input.cardTokenId === undefined ? {} : { cardTokenId: input.cardTokenId }),
       data: Object.freeze({
         announced_total_micros: quote.recurringTotalMicros, quote_ref: quote.quoteId,
-        recurring_net_micros: newPlan.netPriceMicros
+        recurring_net_micros: planNetPrice(newPlan, state.currency)
       })
     }),
     entitlement: Object.freeze({
@@ -460,7 +463,8 @@ export function createUpgradeSettlement(deps: Readonly<{
         return goesBack;
       }
       if (subscription.status !== "ACTIVE" || subscription.currentPeriodStart === null
-        || planById(deps.plans, quote.planId).netPriceMicros <= planById(deps.plans, subscription.planId).netPriceMicros
+        || planNetPrice(planById(deps.plans, quote.planId), subscription.currency)
+          <= planNetPrice(planById(deps.plans, subscription.planId), subscription.currency)
         || !chargeInCurrentPeriod(charge, subscription)) {
         return goesBack;
       }

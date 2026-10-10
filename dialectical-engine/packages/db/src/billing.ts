@@ -4,6 +4,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   foldSubscription,
   type PlanId,
+  type PriceCurrency,
   type SubscriptionEvent,
   type SubscriptionEventKind,
   type SubscriptionState,
@@ -52,11 +53,13 @@ export type QuoteRow = Readonly<{
   quadernoRef: string | null; createdAt: Date; expiresAt: Date; locationCiphertext: Buffer; keyId: string;
   /** A7 / R-31: an UPGRADE quote's new full-month total (the announced total UPGRADED records); else null. */
   recurringTotalMicros: number | null;
+  /** Spec 2026-10-05 §2.16.3 (Part C's migration): the currency this quote prices in; a subscription's later quotes keep its own. */
+  currency: PriceCurrency;
 }>;
 export type ChargeRow = Readonly<{
   chargeId: string; ownerRef: string; subscriptionId: string; kind: ChargeKind; attempt: number;
   periodStart: Date; periodEnd: Date; quoteId: string | null;
-  netMicros: number; taxMicros: number; totalMicros: number; currency: "USD"; createdAt: Date;
+  netMicros: number; taxMicros: number; totalMicros: number; currency: PriceCurrency; createdAt: Date;
   /** Spec 2026-10-05 §2.5.1: the provider and the environment this charge is paid in; its events inherit both. */
   paymentProvider: PaymentProviderName;
   paymentEnvironment: PaymentEnvironmentName;
@@ -222,7 +225,7 @@ type SubscriptionEventRaw = {
 type ChargeRaw = {
   charge_id: string; owner_ref: string; subscription_id: string; kind: ChargeKind; attempt: number;
   period_start: Date; period_end: Date; quote_id: string | null; net_micros: string; tax_micros: string;
-  total_micros: string; currency: "USD"; created_at: Date; payment_provider: PaymentProviderName;
+  total_micros: string; currency: PriceCurrency; created_at: Date; payment_provider: PaymentProviderName;
   payment_environment: PaymentEnvironmentName;
 };
 type ChargeEventRaw = {
@@ -234,7 +237,7 @@ type QuoteRaw = {
   quote_id: string; owner_ref: string; plan_id: PlanId; kind: QuoteKind; net_micros: string; tax_micros: string;
   total_micros: string; tax_country: string; tax_region: string | null; tax_rate_bp: string; tax_status: TaxStatus;
   tax_name: string; quaderno_ref: string | null; created_at: Date; expires_at: Date; location_ciphertext: Buffer;
-  key_id: string; recurring_total_micros: string | null;
+  key_id: string; recurring_total_micros: string | null; currency: PriceCurrency;
 };
 type OutboxRaw = {
   job_id: string; kind: OutboxKind; ref: string; payload: Record<string, string | number | boolean | null>;
@@ -545,18 +548,18 @@ export class BillingRepository {
     await c.query(`
       INSERT INTO billing.quote (quote_id, owner_ref, plan_id, kind, net_micros, tax_micros, total_micros,
         tax_country, tax_region, tax_rate_bp, tax_status, tax_name, quaderno_ref, created_at, expires_at,
-        location_ciphertext, key_id, recurring_total_micros)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+        location_ciphertext, key_id, recurring_total_micros, currency)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
     `, [q.quoteId, q.ownerRef, q.planId, q.kind, q.netMicros, q.taxMicros, q.totalMicros, q.taxCountry,
       q.taxRegion, q.taxRateBasisPoints, q.taxStatus, q.taxName, q.quadernoRef, q.createdAt, q.expiresAt,
-      q.locationCiphertext, q.keyId, q.recurringTotalMicros ?? null]);
+      q.locationCiphertext, q.keyId, q.recurringTotalMicros ?? null, q.currency]);
   }
 
   async quote(quoteId: string, ownerRef: string, executor: BillingReadExecutor = this.pool): Promise<QuoteRow | null> {
     const row = (await executor.query<QuoteRaw>(`
       SELECT quote_id, owner_ref, plan_id, kind, net_micros, tax_micros, total_micros, tax_country, tax_region,
         tax_rate_bp, tax_status, tax_name, quaderno_ref, created_at, expires_at, location_ciphertext, key_id,
-        recurring_total_micros
+        recurring_total_micros, currency
       FROM billing.quote WHERE quote_id = $1 AND owner_ref = $2
     `, [quoteId, ownerRef])).rows[0];
     if (row === undefined) return null;
@@ -566,7 +569,8 @@ export class BillingRepository {
       taxCountry: row.tax_country, taxRegion: row.tax_region, taxRateBasisPoints: Number(row.tax_rate_bp),
       taxStatus: row.tax_status, taxName: row.tax_name, quadernoRef: row.quaderno_ref, createdAt: row.created_at,
       expiresAt: row.expires_at, locationCiphertext: row.location_ciphertext, keyId: row.key_id,
-      recurringTotalMicros: row.recurring_total_micros === null ? null : micros(row.recurring_total_micros)
+      recurringTotalMicros: row.recurring_total_micros === null ? null : micros(row.recurring_total_micros),
+      currency: row.currency
     });
   }
 

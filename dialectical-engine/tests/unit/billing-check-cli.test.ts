@@ -65,7 +65,10 @@ const UNVERIFIED = () => {
   const answer = netopiaNoticeAnswer("NOTICE_HEADER_MISSING");
   return new Response(answer.body, { status: answer.status, headers: { "content-type": "application/json" } });
 };
-const OFF: RegisterFacts = Object.freeze({ registerVersion: 7, billingEnabled: false, planCurrency: "USD", countryPolicy: true });
+const OFF: RegisterFacts = Object.freeze({
+  registerVersion: 7, billingEnabled: false, countryPolicy: true,
+  plans: { ownPriceList: true, countriesIn: { USD: 0, EUR: 31, RON: 1 }, defaultCurrency: "USD" as const }
+});
 
 function depsFor(environment: Record<string, string>, script: Partial<{
   status: () => Response; notify: () => Response | Promise<Response>; register: () => Promise<RegisterFacts>; company: SellerCompany;
@@ -113,7 +116,7 @@ describe("N21 pnpm billing:check", () => {
       "✓ NETOPIA accepted the API key (it answered that our made-up order does not exist; nothing was charged).",
       "✓ https://dezbatere.test/api/v1/billing/netopia/notify gives the notify route's own answer to an unsigned message (HTTP 503, \"retry\"), with no redirect, so NETOPIA's messages can reach it.",
       "✓ Billing is off in register version 7: with NETOPIA's four settings complete, the API serves only NETOPIA's message (the provider-only mode).",
-      "✓ The plans of register version 7 are priced in USD.",
+      "✓ The plans of register version 7 carry your prices in USD, EUR and RON: 1 country pays in RON, 31 countries pay in EUR; every other country pays in USD.",
       "✓ Register version 7 carries countryPolicy.",
       "✓ The company's facts (CUI, name, registered office, general address) are filled in."
     ]) expect(text, sentence).toContain(`${sentence}\n`);
@@ -126,6 +129,15 @@ describe("N21 pnpm billing:check", () => {
     expect(`/api${NETOPIA_NOTIFY_PATH}`).toBe("/api/v1/billing/netopia/notify");
   });
 
+  it("crosses the plans while they are the engine's own row, whose EUR and RON prices are placeholders (Part C)", async () => {
+    const lines = await runBillingCheck(depsFor(await stage(), {
+      register: async () => ({ ...OFF, plans: { ...OFF.plans!, ownPriceList: false } })
+    }));
+    expect(texts(lines, false)).toEqual([
+      "The plans of register version 7 are the engine's own row, whose EUR and RON prices are placeholders: publish your price list (README §14.4)."
+    ]);
+  });
+
   it("names what is wrong, item by item, and never a value", async () => {
     const environment = await stage();
     const { QUADERNO_API_KEY_PATH: _missing, ...incomplete } = environment;
@@ -133,7 +145,7 @@ describe("N21 pnpm billing:check", () => {
     await chmod(environment.NETOPIA_IPN_KEYS_PATH!, 0o666);
     const lines = await runBillingCheck(depsFor({ ...incomplete, NETOPIA_API_BASE_URL: "https://secure.netopia-payments.com/api" }, {
       notify: () => new Response(null, { status: 301, headers: { location: "https://www.dezbatere.test/" } }),
-      register: async () => ({ registerVersion: 8, billingEnabled: true, planCurrency: null, countryPolicy: false }),
+      register: async () => ({ registerVersion: 8, billingEnabled: true, plans: null, countryPolicy: false }),
       company: SELLER_COMPANY
     }));
     const crosses = texts(lines, false);

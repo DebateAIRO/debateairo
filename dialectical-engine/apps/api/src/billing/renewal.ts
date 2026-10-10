@@ -560,14 +560,16 @@ export class RenewalService {
   ): Readonly<{ quote: QuoteRow; charge: ChargeRow }> {
     const quoteId = randomUUID();
     const sealed = sealQuoteLocation(this.deps.recordsKey, quoteId, priced.location);
-    const quote = Object.freeze({
+    const quote: QuoteRow = Object.freeze({
       quoteId, ownerRef: state.ownerRef, planId: priced.planId, kind: "RENEWAL",
       netMicros: priced.tax.netMicros, taxMicros: priced.tax.taxMicros, totalMicros: priced.tax.totalMicros,
       taxCountry: priced.tax.taxCountry, taxRegion: priced.tax.taxRegion, taxRateBasisPoints: priced.tax.taxRateBasisPoints,
       taxStatus: priced.tax.status, taxName: priced.tax.taxName, quadernoRef: priced.tax.reference,
       expiresAt: new Date(now.getTime() + this.deps.policy.quoteTtlSeconds * 1_000), createdAt: now,
-      locationCiphertext: sealed.ciphertext, keyId: sealed.keyId, recurringTotalMicros: null
-    }) as QuoteRow;
+      locationCiphertext: sealed.ciphertext, keyId: sealed.keyId, recurringTotalMicros: null,
+      // Spec 2026-10-05 §2.16.3: a renewal (and each retry) is priced in the subscription's own currency.
+      currency: state.currency
+    });
     const charge = Object.freeze({
       chargeId: newChargeId(), ownerRef: state.ownerRef, subscriptionId: state.subscriptionId, kind: "RENEWAL", attempt, periodStart,
       periodEnd: computeWindows(state.periodAnchorAt!, periodStart).month.end, quoteId,

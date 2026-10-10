@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import type { MigrationPlan } from './migration-lineage.js';
 import { loadForward111 } from './migration-forward111.js';
+import { loadForward0113 } from './migration-forward0113.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -21,8 +22,11 @@ export type ForwardStepPlan=Readonly<{
 }>;
 type StepLoader=(anchor:ForwardStepAnchor)=>Promise<ForwardStepPlan>;
 
-/** The chain, in order: 0111 (NETOPIA). Step 0112 adds its loader here (README); nothing else in this file changes. */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111]);
+/**
+ * The chain, in order: 0111 (NETOPIA), 0113 (Part C's prices; renumbered and re-chained at merge time if dev moved, spec
+ * 2026-10-05 §2.16.6). A step adds its loader here (README); nothing else in this file changes.
+ */
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111, loadForward0113]);
 
 const STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;
 const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD_CHAIN_${detail}`);};

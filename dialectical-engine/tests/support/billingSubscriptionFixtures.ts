@@ -3,10 +3,10 @@ import { setTimeout as delay } from "node:timers/promises";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
-import { computeWindows, foldSubscription, microsToDecimal, type SecretToken } from "@debateai/billing-core";
+import { computeWindows, foldSubscription, microsToDecimal, type PriceCurrency, type SecretToken } from "@debateai/billing-core";
 import { hashToken } from "@debateai/crypto";
 import { TypedDomainError } from "@debateai/kernel";
-import { planById, type PlanId } from "@debateai/register";
+import { planById, planNetPrice, type PlanId } from "@debateai/register";
 import type { BillingAudit, BillingAuditEvent, BillingAuditField } from "../../apps/api/src/billing/audit.js";
 import type { BillingAdmissionScope } from "../../apps/api/src/billing/index.js";
 import type { ConsentKind } from "../../apps/api/src/billing/checkout.js";
@@ -59,6 +59,8 @@ export type SeededNetopiaSubscription = Readonly<{
   periodStart: Date; periodEnd: Date; totalMicros: number;
   /** NETOPIA's sandbox unless a test asks for "live" (a plan of the other environment, spec §2.5.4). */
   paymentEnvironment: "sandbox" | "live";
+  /** Spec 2026-10-05 §2.16.3: the subscription's currency (CREATED's), "USD" unless a test names another. */
+  currency: PriceCurrency;
 }>;
 
 /** A SecretToken over a made-up value (tests never hold a real token): it prints `[token]` everywhere. */
@@ -84,12 +86,18 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
   taxRateBasisPoints?: number; email?: string; netMicros?: number;
   /** N24b: the plan's NETOPIA environment; "sandbox" unless a test seeds a plan of the other one. */
   paymentEnvironment?: "sandbox" | "live";
+  /**
+   * Part C (spec 2026-10-05 §2.16.3): the subscription's currency, "USD" unless a test names another. The fixture stands
+   * for a checkout already made, so its quote, its INITIAL charge and its CREATED all carry it.
+   */
+  currency?: PriceCurrency;
 }>): Promise<SeededNetopiaSubscription> {
   const billing = new BillingRepository(pool);
   const entitlements = new EntitlementRepository(pool);
   const environment = input.paymentEnvironment ?? "sandbox";
   const rate = input.taxRateBasisPoints ?? 2_100;
-  const netMicros = input.netMicros ?? planById(testBillingPlans, input.planId).netPriceMicros;
+  const currency = input.currency ?? "USD";
+  const netMicros = input.netMicros ?? planNetPrice(planById(testBillingPlans, input.planId), currency);
   const taxMicros = Math.floor(netMicros * rate / 10_000 / 10_000) * 10_000;
   const totalMicros = netMicros + taxMicros;
   const subscriptionId = randomUUID();
@@ -120,11 +128,11 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
       netMicros, taxMicros, totalMicros, taxCountry: input.taxCountry, taxRegion: null,
       taxRateBasisPoints: rate, taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null,
       createdAt: new Date(periodStart.getTime() - 120_000), expiresAt: new Date(periodStart.getTime() + 1_800_000),
-      locationCiphertext: location.ciphertext, keyId: location.keyId, recurringTotalMicros: null
+      locationCiphertext: location.ciphertext, keyId: location.keyId, recurringTotalMicros: null, currency
     });
     await billing.insertCharge(client, {
       chargeId: initialChargeId, ownerRef: input.ownerRef, subscriptionId, kind: "INITIAL", attempt: 1,
-      periodStart, periodEnd, quoteId: initialQuoteId, netMicros, taxMicros, totalMicros, currency: "USD",
+      periodStart, periodEnd, quoteId: initialQuoteId, netMicros, taxMicros, totalMicros, currency,
       createdAt: checkoutAt, paymentProvider: "netopia", paymentEnvironment: environment
     });
     await billing.useQuote(client, { quoteId: initialQuoteId, usedAt: checkoutAt, chargeId: initialChargeId });
@@ -147,7 +155,7 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
       // 0111 `subscription_event_created_names_payment_system`: a NETOPIA CREATED names both keys (spec §2.5.1).
       data: {
         country_confirmed: false, ip_country: input.taxCountry, quote_id: initialQuoteId,
-        payment_provider: "netopia", payment_environment: environment
+        payment_provider: "netopia", payment_environment: environment, currency
       }
     });
     await billing.appendSubscriptionEvent(client, {
@@ -162,7 +170,7 @@ export async function seedNetopiaSubscription(pool: Pool, input: Readonly<{
   });
   return Object.freeze({
     ownerRef: input.ownerRef, subscriptionId, customerId, initialQuoteId, initialChargeId, providerPaymentId, cardTokenId,
-    periodStart, periodEnd, totalMicros, paymentEnvironment: environment
+    periodStart, periodEnd, totalMicros, paymentEnvironment: environment, currency
   });
 }
 
@@ -226,7 +234,7 @@ export async function seedPaidUpgrade(pool: Pool, seeded: SeededNetopiaSubscript
   planId?: "PRO" | "MAX";
 }>): Promise<Readonly<{ chargeId: string; quoteId: string }>> {
   const planId = input.planId ?? "PRO";
-  const recurringNetMicros = planById(testBillingPlans, planId).netPriceMicros;
+  const recurringNetMicros = planNetPrice(planById(testBillingPlans, planId), seeded.currency);
   const recurringTotalMicros = recurringNetMicros + Math.floor(recurringNetMicros * 2_100 / 10_000 / 10_000) * 10_000;
   const billing = new BillingRepository(pool);
   const quoteId = randomUUID();
@@ -242,13 +250,13 @@ export async function seedPaidUpgrade(pool: Pool, seeded: SeededNetopiaSubscript
       taxMicros: input.taxMicros, totalMicros, taxCountry: "RO", taxRegion: null, taxRateBasisPoints: 2_100,
       taxStatus: "TAXABLE", taxName: "VAT", quadernoRef: null, createdAt: quotedAt,
       expiresAt: new Date(quotedAt.getTime() + 1_800_000), locationCiphertext: location.ciphertext, keyId: location.keyId,
-      recurringTotalMicros
+      recurringTotalMicros, currency: seeded.currency
     });
     // As upgrade.ts writes it: the UPGRADE charge covers its quote's creation to the period end (W6's coverage).
     await billing.insertCharge(client, {
       chargeId, ownerRef: seeded.ownerRef, subscriptionId: seeded.subscriptionId, kind: "UPGRADE", attempt: 1,
       periodStart: quotedAt, periodEnd: seeded.periodEnd, quoteId, netMicros: input.netMicros,
-      taxMicros: input.taxMicros, totalMicros, currency: "USD", createdAt: new Date(input.at.getTime() - 30_000),
+      taxMicros: input.taxMicros, totalMicros, currency: seeded.currency, createdAt: new Date(input.at.getTime() - 30_000),
       paymentProvider: "netopia", paymentEnvironment: seeded.paymentEnvironment
     });
     await billing.useQuote(client, { quoteId, usedAt: new Date(input.at.getTime() - 30_000), chargeId });

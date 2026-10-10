@@ -159,7 +159,7 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
   const db=await startTestDatabase();
   try{
    const plan=await loadMigrationPlan(),pending=[plan.forward110.name,...plan.forwardChain.map(step=>step.name)];
-   expect(pending).toEqual(['0110_account_erasure_public_debates.sql','0111_billing_netopia.sql']);
+   expect(pending).toEqual(['0110_account_erasure_public_debates.sql','0111_billing_netopia.sql','0113_billing_price_currencies.sql']);
    const ledger=async(client:{query:pg.Pool['query']}=db.pool)=>(await client.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
    const resolutionTable=async()=>(await db.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0].present as boolean;
    await seed(db.pool);
@@ -186,7 +186,7 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
     await client.query('BEGIN');
     await client.query('DELETE FROM public.debateai_schema_migration WHERE name=ANY($1::text[])',[pending]);
     const lacking=await ledger(client);
-    expect(lacking).toHaveLength(complete.length-2);
+    expect(lacking).toHaveLength(complete.length-pending.length);
     await expect(refusePendingForwardSteps(client as unknown as pg.Pool,plan)).rejects.toMatchObject({code:'PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP',pending});
     expect(await ledger(client)).toEqual(lacking);
    }finally{await client.query('ROLLBACK');client.release();}

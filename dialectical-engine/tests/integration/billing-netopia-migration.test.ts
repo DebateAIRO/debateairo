@@ -15,6 +15,8 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  */
 const MIGRATIONS = new URL("../../migrations/", import.meta.url);
 const NETOPIA_MIGRATION = "0111_billing_netopia.sql";
+/** Part C's step, chained after 0111 (spec 2026-10-05 §2.16.6): migrate() applies it after 0111's. */
+const PART_C_MIGRATION = "0113_billing_price_currencies.sql";
 const DEV_110 = "0110_account_erasure_public_debates.sql";
 const SUPERSEDING_VERIFIER = "lineage/verify-effective-capabilities-111.sql";
 const SEALED_VERIFIER = "lineage/verify-effective-capabilities.sql";
@@ -484,11 +486,11 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
     expect(before.forward110).toHaveLength(1);
     expect(before.steps).toBeNull();
     const after = await migrationLedgers() as { ledger: Array<{ name: string }>; forward108: unknown[]; forward110: unknown[]; steps: Array<Record<string, unknown>> };
-    expect(after.ledger.map((row) => row.name)).toEqual([...before.ledger.map((row) => row.name), NETOPIA_MIGRATION].sort());
-    expect(after.ledger.filter((row) => row.name !== NETOPIA_MIGRATION)).toEqual(before.ledger);
+    expect(after.ledger.map((row) => row.name)).toEqual([...before.ledger.map((row) => row.name), NETOPIA_MIGRATION, PART_C_MIGRATION].sort());
+    expect(after.ledger.filter((row) => row.name !== NETOPIA_MIGRATION && row.name !== PART_C_MIGRATION)).toEqual(before.ledger);
     expect(after.forward108).toEqual(before.forward108);
     expect(after.forward110).toEqual(before.forward110);
-    expect(after.steps).toHaveLength(1);
+    expect(after.steps.map((row) => row.source_name)).toEqual([NETOPIA_MIGRATION, PART_C_MIGRATION]);
     expect(after.steps[0]).toMatchObject({
       source_name: NETOPIA_MIGRATION, base_recipe_sha256: plan.recipeSha256,
       previous_manifest_sha256: plan.forward110.manifestSha256, forward_manifest_sha256: step!.manifestSha256,
@@ -545,26 +547,33 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
     } finally {
       await query("REVOKE SELECT ON billing.card_token FROM debateai_authorization_runtime");
     }
-    const [receipt] = await receiptOf();
+    // Part C: 0113 is chained after 0111, so the table holds both receipts; each drift below touches 0111's row only.
+    const receipts = await receiptOf();
+    const [receipt, partC] = receipts;
+    expect(partC?.source_name).toBe(PART_C_MIGRATION);
     for (const field of ["source_sha256", "forward_manifest_sha256", "previous_manifest_sha256", "precondition_evidence_digest"]) {
-      await query(`UPDATE public.debateai_schema_migration_step SET ${field} = repeat('0', 64)`);
+      await query(`UPDATE public.debateai_schema_migration_step SET ${field} = repeat('0', 64) WHERE source_name = $1`, [NETOPIA_MIGRATION]);
       try {
         await expect(migrate(database.pool), field).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_RECEIPT_BINDING_DRIFT ${NETOPIA_MIGRATION}`);
       } finally {
-        await query(`UPDATE public.debateai_schema_migration_step SET ${field} = $1`, [receipt[field]]);
+        await query(`UPDATE public.debateai_schema_migration_step SET ${field} = $1 WHERE source_name = $2`, [receipt[field], NETOPIA_MIGRATION]);
       }
     }
-    await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = repeat('0', 64)");
+    // The postcondition is compared while a step is the last applied one: since Part C, that is 0113's receipt.
+    await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = repeat('0', 64) WHERE source_name = $1", [PART_C_MIGRATION]);
     try {
-      await expect(migrate(database.pool)).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${NETOPIA_MIGRATION}`);
+      await expect(migrate(database.pool)).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${PART_C_MIGRATION}`);
     } finally {
-      await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = $1", [receipt.postcondition_evidence_digest]);
+      await query("UPDATE public.debateai_schema_migration_step SET postcondition_evidence_digest = $1 WHERE source_name = $2",
+        [partC!.postcondition_evidence_digest, PART_C_MIGRATION]);
     }
     await query("DELETE FROM public.debateai_schema_migration_step");
     try {
       await expect(migrate(database.pool)).rejects.toThrow("MIGRATION_FORWARD_CHAIN_RECEIPT_BINDING_DRIFT");
     } finally {
-      await query("INSERT INTO public.debateai_schema_migration_step VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", Object.values(receipt));
+      for (const row of receipts) {
+        await query("INSERT INTO public.debateai_schema_migration_step VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", Object.values(row));
+      }
     }
     // 0111 recorded without 0110 is refused: the chain stands on 0110.
     const ledger110 = (await query("DELETE FROM public.debateai_schema_migration WHERE name = $1 RETURNING name, applied_at", [DEV_110])).rows[0];
@@ -587,7 +596,7 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       await query("REVOKE SELECT ON public.debateai_schema_migration_step FROM debateai_authorization_runtime");
     }
     await migrate(database.pool);
-    expect(await receiptOf()).toEqual([receipt]);
+    expect(await receiptOf()).toEqual(receipts);
   });
 
   it("migrates a fresh database through 0108, 0110 and 0111, and a second migrate() is a no-op", async () => {
@@ -598,9 +607,9 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       const names = (await fresh.pool.query("SELECT name FROM public.debateai_schema_migration ORDER BY name")).rows.map((row) => row.name);
       const resolved = (await fresh.pool.query("SELECT logical_name FROM public.debateai_schema_migration_resolution ORDER BY logical_name")).rows
         .map((row) => row.logical_name);
-      expect([...names, ...resolved].sort()).toEqual([...plan.manifest.order, plan.forward108.name, DEV_110, NETOPIA_MIGRATION].sort());
+      expect([...names, ...resolved].sort()).toEqual([...plan.manifest.order, plan.forward108.name, DEV_110, NETOPIA_MIGRATION, PART_C_MIGRATION].sort());
       const receipts = await receiptOf(fresh.pool);
-      expect(receipts.map((row) => row.source_name)).toEqual([NETOPIA_MIGRATION]);
+      expect(receipts.map((row) => row.source_name)).toEqual([NETOPIA_MIGRATION, PART_C_MIGRATION]);
       const before = (await fresh.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
       await migrate(fresh.pool);
       expect((await fresh.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(before);
@@ -617,12 +626,12 @@ describe("F10 — 0111 is the forward step after dev's 0110, with its receipt an
       const plan = await loadMigrationPlan();
       await migrate(older.pool);
       const counts = (await older.pool.query("SELECT name, count(*)::int n FROM public.debateai_schema_migration WHERE name = ANY($1) GROUP BY name ORDER BY name",
-        [[DEV_110, NETOPIA_MIGRATION]])).rows;
-      expect(counts).toEqual([{ name: DEV_110, n: 1 }, { name: NETOPIA_MIGRATION, n: 1 }]);
+        [[DEV_110, NETOPIA_MIGRATION, PART_C_MIGRATION]])).rows;
+      expect(counts).toEqual([{ name: DEV_110, n: 1 }, { name: NETOPIA_MIGRATION, n: 1 }, { name: PART_C_MIGRATION, n: 1 }]);
       const receipt110 = (await older.pool.query("SELECT source_name, chain_manifest_sha256 FROM public.debateai_schema_migration_forward110")).rows;
       expect(receipt110).toEqual([{ source_name: DEV_110, chain_manifest_sha256: plan.forward108.manifestSha256 }]);
       const receipts = await receiptOf(older.pool);
-      expect(receipts).toHaveLength(1);
+      expect(receipts.map((row) => row.source_name)).toEqual([NETOPIA_MIGRATION, PART_C_MIGRATION]);
       expect(receipts[0]).toMatchObject({ source_name: NETOPIA_MIGRATION, previous_manifest_sha256: plan.forward110.manifestSha256 });
       const before = (await older.pool.query("SELECT name, applied_at FROM public.debateai_schema_migration ORDER BY name")).rows;
       await migrate(older.pool);

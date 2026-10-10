@@ -3,6 +3,7 @@ import { TypedDomainError } from "@debateai/kernel";
 import {
   decimalToMicros,
   microsToDecimal,
+  type PriceCurrency,
   type RefundRecord,
   type SaleRecord,
   type TaxEngine,
@@ -131,7 +132,7 @@ export class QuadernoTaxEngine implements TaxEngine {
   }
 
   async quote(i: Readonly<{
-    netMicros: number; currency: "USD"; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
+    netMicros: number; currency: PriceCurrency; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
   }>): Promise<TaxQuote> {
     const query = new URLSearchParams({
       to_country: i.location.country, amount: microsToDecimal(i.netMicros), currency: i.currency,
@@ -150,6 +151,8 @@ export class QuadernoTaxEngine implements TaxEngine {
     const totalMicros = quadernoAmountMicros(reply.total_amount);
     if (netMicros !== i.netMicros) refused("SUBTOTAL_MISMATCH");
     if (taxMicros < 0 || totalMicros !== netMicros + taxMicros) refused("TOTAL_MISMATCH");
+    // Spec 2026-10-05 §2.16.4: the tax is priced in the currency we asked for, or the quote is not ours to charge.
+    if (reply.currency !== undefined && reply.currency !== null && reply.currency !== i.currency) refused("CURRENCY_MISMATCH");
     const country = text(reply.country);
     if (country === null || !/^[A-Za-z]{2}$/u.test(country)) refused("COUNTRY_INVALID");
     return Object.freeze({

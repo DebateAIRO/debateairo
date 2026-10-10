@@ -4,7 +4,7 @@ import {
   BillingPlansResponseSchema, BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingUsageResponseSchema
 } from "@debateai/contract";
 import { allowanceVsPlus, microsToDecimal } from "@debateai/billing-core";
-import type { BillingPlans, PlanId } from "@debateai/register";
+import { planNetPrice, priceCurrencyFor, type BillingPlans, type PlanId } from "@debateai/register";
 import { clientIpNetworkScope } from "../client-ip.js";
 import type { LegalAcceptanceApplication } from "../legal.js";
 import type { AuthenticatedSession } from "../sessions.js";
@@ -219,11 +219,13 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     if (plans === undefined) return billingNotFound(reply);
     // A source-keyed scope counts the caller's network (DL5-F3: an IPv6 address is its /64), as G3a's does.
     if (!admit.gate(reply, "publicReads", "GET /v1/billing/plans", clientIpNetworkScope(source(request).ip))) return reply;
+    // Part C (C1): the rule's default currency until C3 answers each visitor in their own.
+    const currency = priceCurrencyFor(plans, null);
     plansBody ??= BillingPlansResponseSchema.parse({
-      currency: plans.currency,
+      currency,
       plans: plans.plans.map((plan) => ({
         plan_id: plan.planId,
-        net_price: microsToDecimal(plan.netPriceMicros),
+        net_price: microsToDecimal(planNetPrice(plan, currency)),
         allowance_vs_plus: allowanceVsPlus(plans, plan.planId)
       }))
     });

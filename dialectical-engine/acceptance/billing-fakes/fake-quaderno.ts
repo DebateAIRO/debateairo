@@ -67,7 +67,8 @@ export async function startFakeQuaderno(options: Readonly<{ apiKey?: string; por
           tax_amount: cents(tax),
           total_amount: cents(net + tax),
           status: JSON.stringify(decision.status.toLowerCase()),
-          currency: '"USD"',
+          // Quaderno answers in the currency it was asked for (spec 2026-10-05 §2.16.4).
+          currency: JSON.stringify(url.searchParams.get("currency") ?? "USD"),
           tax_code: JSON.stringify(url.searchParams.get("tax_code") ?? "saas")
         };
         const applied = override === null ? fields : { ...fields, ...override };
