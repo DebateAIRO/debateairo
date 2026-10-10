@@ -171,8 +171,30 @@ def integer(value):
     return type(value) is int and value >= 0
 
 
+def billed_output_tokens(prompt, completion, total, reasoning):
+    """Output tokens to charge, on the careful side, or None when the counts contradict each other.
+
+    Reasoning (thinking) tokens are charged as output. They count inside completion_tokens only
+    when the reply proves it: total_tokens equal to prompt + completion, with reasoning no larger
+    than completion. Otherwise (reasoning larger than completion, total equal to prompt +
+    completion + reasoning, or no total at all) they are charged on top: completion + reasoning.
+    Any other total does not add up, and the usage is not valid.
+    """
+    if reasoning is None or reasoning == 0:
+        return completion if total is None or total == prompt + completion else None
+    if total is None:
+        return completion + reasoning  # Inclusion cannot be shown: charge both.
+    if total == prompt + completion:
+        return completion if reasoning <= completion else completion + reasoning
+    if total == prompt + completion + reasoning:
+        return completion + reasoning  # The total says reasoning was counted outside completion.
+    return None
+
+
 def account_response(response, input_price, output_price):
-    """OpenAI-shape usage priced at one row's list prices (USD per million tokens)."""
+    """OpenAI-shape usage priced at one row's list prices (USD per million tokens). Reasoning
+    tokens (in completion_tokens_details or at the top level of usage) are charged as
+    billed_output_tokens says."""
     usage = response.get('usage')
     usage = usage if isinstance(usage, dict) else {}
     prompt, completion, total = usage.get('prompt_tokens'), usage.get('completion_tokens'), usage.get('total_tokens')
@@ -180,18 +202,23 @@ def account_response(response, input_price, output_price):
     completion_details = usage.get('completion_tokens_details') or {}
     details_valid = isinstance(prompt_details, dict) and isinstance(completion_details, dict)
     cached = prompt_details.get('cached_tokens', usage.get('cached_tokens')) if isinstance(prompt_details, dict) else None
-    reasoning = completion_details.get('reasoning_tokens') if isinstance(completion_details, dict) else None
+    # Reasoning may be reported in the details, at the top level, or both: the larger one counts.
+    reported = [value for value in (completion_details.get('reasoning_tokens') if isinstance(completion_details, dict) else None,
+                                    usage.get('reasoning_tokens')) if value is not None]
+    reasoning = max(reported) if reported and all(integer(value) for value in reported) else None
     valid = integer(prompt) and integer(completion) and details_valid
-    valid = valid and (total is None or integer(total) and total == prompt + completion)
+    valid = valid and all(integer(value) for value in reported)
+    valid = valid and (total is None or integer(total))
     valid = valid and (cached is None or integer(cached) and cached <= prompt)
-    valid = valid and (reasoning is None or integer(reasoning) and reasoning <= completion)
-    configured = ((Decimal(prompt) * input_price + Decimal(completion) * output_price) / Decimal(1000000)) if valid else None
+    output = billed_output_tokens(prompt, completion, total, reasoning) if valid else None
+    valid = valid and output is not None
+    configured = ((Decimal(prompt) * input_price + Decimal(output) * output_price) / Decimal(1000000)) if valid else None
     provider = decimal_amount(usage.get('estimated_cost', response.get('estimated_cost')))
     reliable = [value for value in (configured, provider) if value is not None]
     return {'input_usd_per_m': str(input_price), 'output_usd_per_m': str(output_price),  # The settlement prices.
             'prompt_tokens': prompt if integer(prompt) else None, 'completion_tokens': completion if integer(completion) else None,
             'total_tokens': total if integer(total) else None, 'cached_tokens': cached if integer(cached) else None,
-            'reasoning_tokens': reasoning if integer(reasoning) else None, 'usage_valid': valid,
+            'reasoning_tokens': reasoning, 'billed_output_tokens': output if valid else None, 'usage_valid': valid,
             'configured_price_cost_usd': str(configured) if configured is not None else None,
             'provider_estimated_cost_usd': str(provider) if provider is not None else None,
             'guard_charge_usd': str(max(reliable)) if reliable else None,
@@ -282,7 +309,8 @@ class DeepInfraProfile:
       ceiling_prices(row) -> (in, out)   the highest prices the row can ever reserve at (worst cases)
       account(response, row, moment) -> dict  usage and guard charge (see account_response's keys)
       reply_model(response) -> str|None  where the reply names the model that answered
-      unbilled_refusal(status, response) -> bool  a refusal that provably billed nothing
+      unbilled_refusal(status, response) -> bool  a refusal that provably billed nothing (the gate
+                                         keeps a $0 'released_unbilled' entry, capped per day)
       probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024)
       reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
     """
@@ -295,7 +323,10 @@ class DeepInfraProfile:
     rows = {row.model: row for row in (
         ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 163840, 'high', True),
         ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 131072, 'high', False),
-        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 131072, None, False))}
+        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 131072, None, False),
+        # Owner swap 2026-10-10 (Qwen in place of Gemini): flat list price over the whole 1M window,
+        # no promotion, no tiers; reasoning_effort is not listed, so none is sent.
+        ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 131072, None, False))}
 
     def path_for(self, row):
         return self.path
@@ -348,8 +379,10 @@ class DeepInfraProfile:
     def unbilled_refusal(self, status, response):
         """True only for a refusal that provably billed nothing (owner ruling 5, 2026-10-10): HTTP
         429, a JSON object with an error field, and no usage, choices, cost, estimated_cost,
-        inference_status (DeepInfra's native cost block) or tokens_* key at any depth. The gate then releases the hold as for a call never sent (it counts toward the
-        unsent streak). Anything else is accounted (and halts) as before."""
+        inference_status (DeepInfra's native cost block) or tokens_* key at any depth. The gate then
+        releases the hold, keeps the entry at $0 as 'released_unbilled' (so it stays on the record),
+        counts it toward the unsent streak and toward the daily ceiling UNBILLED_RELEASES_PER_DAY.
+        Anything else is accounted (and halts) as before."""
         return (status == 429 and isinstance(response, dict) and bool(response.get('error'))
                 and not names_any_key(response, BILLED_KEYS)
                 and not names_any_key_prefixed(response, 'tokens_'))

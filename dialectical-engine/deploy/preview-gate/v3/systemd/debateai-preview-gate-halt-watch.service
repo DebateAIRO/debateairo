@@ -44,6 +44,8 @@ RemoveIPC=yes
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3/api-key.txt
 InaccessiblePaths=-/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/etc/debateai-v3-preview/api.env -/root -/var/lib/postgresql -/etc/postfix
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json
+# The other provider gates' folders (with their keys) and GOs: this watcher reads only its own gate.
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-anthropic-authority-v1 -/etc/debateai-v3-preview/provider-anthropic-go-v1.json -/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json
 InaccessiblePaths=-/etc/debateai-v3-preview/auth-dev-v1 -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/api -/etc/debateai-v3-preview/lifecycle
 RestrictAddressFamilies=AF_UNIX
 IPAddressDeny=any

@@ -21,7 +21,8 @@ from unittest.mock import patch
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from preview_budget_authority_fixture import (  # noqa: E402
-    DEEPSEEK, HELPER_SOURCE, file_sha, HOST, KEY, MIMO, MODEL, PEER, ROWS, SCOPE, SOURCE, Gate, body, envelope, go_document,
+    DEEPSEEK, HELPER_SOURCE, file_sha, HOST, KEY, MIMO, MODEL, PEER, QWEN, RESERVED, ROWS, SCOPE, SOURCE, Gate, body, envelope,
+    go_document,
     load_bridge, provider_response, reservation_of)
 
 bridge = load_bridge()
@@ -29,7 +30,7 @@ SafetyError = bridge.helper.SafetyError
 DEEPINFRA = bridge.helper.PROFILES['deepinfra']
 _HTTPS = bridge.helper.HttpsTransport
 PARITY = Path(__file__).resolve().parent / 'fixtures/preview-model-rows.json'
-ALL = [MODEL, DEEPSEEK, MIMO]
+ALL = [MODEL, DEEPSEEK, MIMO, QWEN]
 
 
 def no_network(*_args, **_kwargs):
@@ -106,7 +107,8 @@ class ReviewedTableTests(GateTest):
     def test_every_reviewed_row_fits_the_per_call_cap_for_a_full_size_request(self):
         self.assertEqual((DEEPINFRA.per_call_cap_usd, DEEPINFRA.max_request_bytes), (Decimal('0.25'), 256 * 1024))
         self.assertLessEqual(DEEPINFRA.per_call_cap_usd, bridge.MAX_PROFILE_CALL_CAP_USD)
-        expected = {MODEL: Decimal('0.1215488'), DEEPSEEK: Decimal('0.1314816'), MIMO: Decimal('0.2276352')}
+        expected = {MODEL: Decimal('0.1215488'), DEEPSEEK: Decimal('0.1314816'), MIMO: Decimal('0.2276352'),
+                    QWEN: Decimal('0.0799232')}
         for name, profile in bridge.helper.PROFILES.items():
             for model, row in profile.rows.items():
                 with self.subTest(provider=name, model=model):
@@ -259,7 +261,7 @@ class ModelCallTests(GateTest):
         gate = self.gate(enabled_models=ALL).ready()
         usage = {'prompt_tokens': 100000, 'completion_tokens': 20000}
         # 100k in + 20k out at each row's list prices.
-        expected = {MODEL: Decimal('0.025'), DEEPSEEK: Decimal('0.032'), MIMO: Decimal('0.0604')}
+        expected = {MODEL: Decimal('0.025'), DEEPSEEK: Decimal('0.032'), MIMO: Decimal('0.0604'), QWEN: Decimal('0.01894')}
         for model in ALL:
             with self.subTest(model=model):
                 seen = {}
@@ -540,7 +542,8 @@ class ProbeTests(GateTest):
     def probe(self, gate, model, dispatch=None, **kwargs):
         options = {'dispatch': dispatch or (lambda sent, _key: (200, provider_response('0.0004', json.loads(sent)['model'],
                                                                                          content='OK'))),
-                   'key_loader': lambda _private: KEY, 'host': HOST, 'platform': 'linux', 'uid': 0, 'now': gate.clock}
+                   'key_loader': lambda _private: KEY, 'host': HOST, 'platform': 'linux', 'uid': 0, 'now': gate.clock,
+                   'fence': lambda _provider: None}  # The fence itself: ProbeFenceTests.
         options.update(kwargs)
         return bridge.probe(gate.private, gate.go_path, model, **options)
 
@@ -552,8 +555,9 @@ class ProbeTests(GateTest):
 
                 def dispatch(request, key, model=model):
                     sent.append((json.loads(request), key))
+                    # total_tokens = prompt + completion proves the 20 reasoning tokens are inside the 30.
                     return 200, {'model': model, 'choices': [{'message': {'content': 'OK'}}],
-                                 'usage': {'prompt_tokens': 12, 'completion_tokens': 30,
+                                 'usage': {'prompt_tokens': 12, 'completion_tokens': 30, 'total_tokens': 42,
                                            'completion_tokens_details': {'reasoning_tokens': 20}}}
                 summary = self.probe(gate, model, dispatch)
                 expected_body = {'model': model, 'max_tokens': 1024,
@@ -656,7 +660,9 @@ class UnbilledRefusalTests(GateTest):
             status = gate.status()
             self.assertEqual((status['state'], status['unsent_streak'], status['today_posts'], status['today_spend_usd'],
                               status['in_flight']), ('active', number, 0, '0', 0))
-        self.assertEqual(gate.day('2026-10-08')['entries'], {})
+        # Kept on the record at $0 (round 2 review): never counted as spend or as a paid post.
+        self.assertEqual({entry['state'] for entry in gate.day('2026-10-08')['entries'].values()}, {'released_unbilled'})
+        self.assertEqual(gate.status()['today_unbilled_releases'], 4)
         self.assertIn('"reason": "unbilled_refusal"', self.out.getvalue())
         with self.refused('PROVIDER_REFUSED_UNBILLED'):
             gate.call('op-5', dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
@@ -982,6 +988,429 @@ class ProfileTests(GateTest):
 
     def test_reserved_provider_names_have_no_profile_yet(self):
         self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra'})
+
+
+
+class QwenRowTests(GateTest):
+    """Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra, appended after MiMo."""
+
+    def test_the_qwen_row_is_appended_after_mimo_with_its_contract_values(self):
+        self.assertEqual(list(DEEPINFRA.rows), [MODEL, DEEPSEEK, MIMO, QWEN])
+        row = DEEPINFRA.rows[QWEN]
+        self.assertEqual((row.maker, row.input_usd_per_m, row.output_usd_per_m, row.output_bound, row.effort, row.json_object),
+                         ('Alibaba', Decimal('0.113'), Decimal('0.382'), 131072, None, False))
+        # ((262144 + 2048) x 0.113 + 131072 x 0.382) / 1e6, under the $0.25 cap.
+        self.assertEqual(bridge.worst_case_reservation(DEEPINFRA, row), Decimal('0.0799232'))
+        self.assertTrue(bridge.row_reviewed(DEEPINFRA, QWEN, row))
+
+    def test_qwen_takes_no_effort_and_no_json_mode(self):
+        gate = self.gate(enabled_models=ALL).ready()
+        self.assertEqual(gate.call('ok', value=body(model=QWEN))['status'], 200)
+        for name, value in (('effort', {**body(model=QWEN), 'reasoning_effort': 'high'}),
+                            ('json', {**body(model=QWEN), 'response_format': {'type': 'json_object'}})):
+            with self.subTest(name), self.refused('REQUEST_PARAMETERS_INVALID'):
+                gate.call(name, value=value)
+
+
+class UnbilledLedgerTests(GateTest):
+    """Round 2 review: every unbilled release stays on the record at $0, and is capped per day."""
+    RATE_LIMITED = UnbilledRefusalTests.RATE_LIMITED
+
+    def refuse(self, gate, operation_id):
+        with self.refused('PROVIDER_REFUSED_UNBILLED'):
+            gate.call(operation_id, dispatch=lambda _s, _k: (429, dict(self.RATE_LIMITED)))
+
+    def test_the_entry_is_kept_with_held_zero_status_reason_and_time(self):
+        gate = self.gate().ready()
+        self.refuse(gate, 'op-1')
+        entry = entry_of(gate, 'op-1')
+        self.assertEqual({k: entry[k] for k in ('state', 'held_usd', 'http_status', 'reason', 'released_at', 'model')},
+                         {'state': 'released_unbilled', 'held_usd': '0', 'http_status': 429, 'reason': 'unbilled_refusal',
+                          'released_at': '2026-10-08T09:00:00+00:00', 'model': MODEL})
+        self.assertEqual(Decimal(entry['reserved_usd']), RESERVED)  # What was set aside stays recorded.
+        status = gate.status()
+        self.assertEqual((status['today_spend_usd'], status['today_posts'], status['today_unbilled_releases'],
+                          status['today_by_model'], status['in_flight']), ('0', 0, 1, {}, 0))
+        with bridge.TeamStore(gate.private, shared=True) as store:
+            self.assertEqual(bridge.day_spend(store.ledger('2026-10-08')), Decimal(0))
+
+    def test_unbilled_releases_never_count_as_paid_posts(self):
+        gate = self.gate(max_paid_posts_per_day=1).ready()
+        self.refuse(gate, 'op-1')
+        self.refuse(gate, 'op-2')
+        report = bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, slots=gate.slots, now=gate.clock)
+        self.assertEqual(report['remaining_calls'], 1)
+        self.assertEqual(gate.call('op-3')['status'], 200)
+        with self.refused('DAILY_CALL_LIMIT_REACHED'):
+            gate.call('op-4')
+
+    def test_the_twentieth_release_of_a_day_halts_and_settled_replies_do_not_reset_the_count(self):
+        self.assertEqual(bridge.UNBILLED_RELEASES_PER_DAY, 20)
+        gate = self.gate().ready()
+        for number in range(1, 20):
+            self.refuse(gate, 'u-%d' % number)
+            if number % 4 == 0:
+                gate.call('ok-%d' % number)  # Resets the streak, never the daily count.
+                self.assertEqual(gate.status()['unsent_streak'], 0)
+            self.assertEqual((gate.status()['state'], gate.status()['today_unbilled_releases']), ('active', number))
+        self.refuse(gate, 'u-20')
+        status = gate.status()
+        self.assertEqual((status['state'], status['reason'], status['today_unbilled_releases'], status['in_flight']),
+                         ('halted', 'unbilled_release_ceiling', 20, 0))
+        self.assertEqual(status['halts'][-1]['entry_id'], 'preview-test:' + SCOPE + ':u-20')
+        self.assertEqual(entry_of(gate, 'u-20')['state'], 'released_unbilled')
+        with self.refused('AUTHORITY_STOPPED'):
+            gate.call('after')
+        # Re-opening the same day does not reset it either: the next release halts at once.
+        gate.activate()
+        self.refuse(gate, 'u-21')
+        self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'unbilled_release_ceiling'))
+
+    def test_the_next_bucharest_day_starts_at_zero(self):
+        gate = self.gate().ready()
+        for number in range(3):
+            self.refuse(gate, 'u-%d' % number)
+        gate.clock.set('2026-10-08T21:30:00+00:00')  # 00:30 in Bucharest on 9 October.
+        self.assertEqual((gate.status()['today'], gate.status()['today_unbilled_releases']), ('2026-10-09', 0))
+        self.refuse(gate, 'next-day')
+        self.assertEqual(gate.status()['today_unbilled_releases'], 1)
+        self.assertEqual(len(gate.day('2026-10-08')['entries']), 3)
+
+    def test_recovery_and_day_spend_ignore_the_zero_holds(self):
+        gate = self.gate().ready()
+        self.refuse(gate, 'op-1')
+        gate.call('op-2', charge='0.02')
+        self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 0, 'unrecorded_uncertain': 0})
+        self.assertEqual((gate.status()['state'], gate.status()['today_spend_usd']), ('active', '0.02'))
+        broken = gate.day('2026-10-08')
+        broken['entries']['preview-test:' + SCOPE + ':op-1']['held_usd'] = '0.01'
+        with self.assertRaisesRegex(SafetyError, '^LEDGER_ENTRY_INVALID$'):
+            bridge.day_spend(broken)
+
+    def test_death_during_the_release_fails_closed_or_drops_a_complete_record(self):
+        class Crash(BaseException):
+            pass
+        for writes_before_death, expected, state in ((0, ('halted', 'interrupted_call_uncertain'), 'uncertain'),
+                                                     (1, ('halted', 'interrupted_call_uncertain'), 'uncertain'),
+                                                     (2, ('active', None), 'released_unbilled')):
+            with self.subTest(writes_before_death=writes_before_death):
+                gate = self.gate().ready()
+                real, written = bridge.helper.write_bytes, []
+
+                def dying(dir_fd, name, data):
+                    if len(written) >= writes_before_death:
+                        raise Crash()
+                    written.append(name)
+                    return real(dir_fd, name, data)
+                death = patch.object(bridge.helper, 'write_bytes', dying)
+
+                def dispatch(_body, _key):
+                    death.start()
+                    return 429, dict(self.RATE_LIMITED)
+                try:
+                    with self.assertRaises(BaseException):
+                        gate.call('op-1', dispatch=dispatch)
+                finally:
+                    death.stop()
+                bridge.recover_interrupted(gate.private, now=gate.clock)
+                status = gate.status()
+                self.assertEqual(((status['state'], status['reason']), status['in_flight']), (expected, 0))
+                self.assertEqual(entry_of(gate, 'op-1')['state'], state)
+
+    def test_the_mechanism_is_the_profile_hook_for_any_provider(self):
+        # PR B routes its own proved-unbilled replies through profile.unbilled_refusal: same entry, same ceiling.
+        with patch.object(DEEPINFRA, 'unbilled_refusal', lambda status, _response: status == 503):
+            gate = self.gate().ready()
+            with self.refused('PROVIDER_REFUSED_UNBILLED'):
+                gate.call('op-1', dispatch=lambda _s, _k: (503, {'error': 'busy'}))
+        entry = entry_of(gate, 'op-1')
+        self.assertEqual((entry['state'], entry['held_usd'], entry['http_status']), ('released_unbilled', '0', 503))
+
+
+class ReasoningTokenTests(GateTest):
+    """Round 2 review: reasoning tokens reported outside completion_tokens are charged as output."""
+
+    def account(self, usage):
+        return bridge.helper.account_response({'usage': usage}, Decimal('1'), Decimal('2'))
+
+    def test_reasoning_is_charged_on_top_unless_the_total_proves_it_inside(self):
+        base = {'prompt_tokens': 100, 'completion_tokens': 50}
+        cases = {
+            'no_reasoning': ({}, 50),
+            'total_proves_inside': ({'total_tokens': 150, 'completion_tokens_details': {'reasoning_tokens': 30}}, 50),
+            'no_total_details': ({'completion_tokens_details': {'reasoning_tokens': 30}}, 80),
+            'no_total_top_level': ({'reasoning_tokens': 30}, 80),
+            'larger_than_completion': ({'total_tokens': 150, 'completion_tokens_details': {'reasoning_tokens': 70}}, 120),
+            'larger_no_total': ({'reasoning_tokens': 70}, 120),
+            'total_counts_it_outside': ({'total_tokens': 180, 'reasoning_tokens': 30}, 80),
+            'both_places_larger_wins': ({'reasoning_tokens': 40, 'completion_tokens_details': {'reasoning_tokens': 30}}, 90),
+            'zero_reasoning_no_total': ({'reasoning_tokens': 0}, 50),
+        }
+        for name, (extra, output) in cases.items():
+            with self.subTest(name):
+                accounting = self.account({**base, **extra})
+                self.assertIs(accounting['usage_valid'], True)
+                self.assertEqual(accounting['billed_output_tokens'], output)
+                self.assertEqual(Decimal(accounting['guard_charge_usd']), (100 + Decimal(output) * 2) / Decimal(1000000))
+
+    def test_counts_that_do_not_add_up_stay_invalid(self):
+        for name, usage in (('total_off', {'prompt_tokens': 100, 'completion_tokens': 50, 'total_tokens': 151}),
+                            ('total_off_with_reasoning', {'prompt_tokens': 100, 'completion_tokens': 50, 'total_tokens': 170,
+                                                          'reasoning_tokens': 30}),
+                            ('reasoning_text', {'prompt_tokens': 100, 'completion_tokens': 50, 'reasoning_tokens': '30'}),
+                            ('reasoning_negative', {'prompt_tokens': 100, 'completion_tokens': 50,
+                                                    'completion_tokens_details': {'reasoning_tokens': -1}})):
+            with self.subTest(name):
+                accounting = self.account(usage)
+                self.assertEqual((accounting['usage_valid'], accounting['guard_charge_usd']), (False, None))
+
+    def test_a_call_without_total_is_settled_with_its_reasoning(self):
+        gate = self.gate().ready()
+        gate.call('op-1', dispatch=lambda _s, _k: (200, {'model': MODEL, 'usage': {
+            'prompt_tokens': 1000, 'completion_tokens': 100, 'completion_tokens_details': {'reasoning_tokens': 400}}}))
+        # 1000 x 0.15 + (100 + 400) x 0.50, per million.
+        self.assertEqual(Decimal(entry_of(gate, 'op-1')['held_usd']), Decimal('0.0004'))
+
+
+class TeamTotalTests(GateTest):
+    """Round 2 review: one GO is at most the owner's $5.00 team total, and activate adds the other
+    gates' GOs (a fixed, reviewed list; tests reach it only through activate's seam)."""
+
+    def other_go(self, gate, provider, budget='1.50', **fields):
+        path = gate.root / ('team-go-' + provider + '.json')
+        path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': provider,
+                                    'daily_budget_usd': budget, **fields}))
+        os.chmod(path, 0o600)
+        return path
+
+    def test_one_go_is_capped_at_the_team_total(self):
+        self.assertEqual(bridge.TEAM_TOTAL_BUDGET_USD, Decimal('5.00'))
+        gate = self.gate()
+        self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', daily_budget_usd='5.00'))['daily_budget_usd'], '5.00')
+        for budget in ('5.01', '6.00', '50.00'):
+            with self.subTest(budget=budget), self.refused('ROOT_GO_INVALID'):
+                bridge.read_go(gate.write_go(name='bad.json', daily_budget_usd=budget))
+
+    def test_missing_other_gos_count_zero_and_the_sum_may_reach_the_total(self):
+        gate = self.gate(daily_budget_usd='3.50').ready()  # No other GO exists.
+        self.assertEqual(gate.status()['state'], 'active')
+        self.other_go(gate, 'anthropic', '1.50')
+        bridge.stop_authority(gate.private, now=gate.clock)
+        self.assertEqual(gate.activate()['state'], 'active')  # 3.50 + 1.50 = 5.00 exactly.
+        self.assertEqual(bridge.team_total(gate.go, {'deepinfra': str(gate.go_path),
+                                                     'anthropic': str(gate.root / 'team-go-anthropic.json')},
+                                           os.getuid()), Decimal('5.00'))
+
+    def test_a_sum_over_the_team_total_refuses(self):
+        for others in ({'anthropic': '1.51'}, {'anthropic': '1.00', 'google': '0.51'}, {'google': '5.00'}):
+            with self.subTest(others=others):
+                gate = self.gate(daily_budget_usd='3.50')
+                gate.init()
+                for provider, budget in others.items():
+                    self.other_go(gate, provider, budget)
+                with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):
+                    gate.activate()
+                self.assertEqual(gate.control()['state'], 'initialized')
+
+    def test_this_providers_own_listed_go_is_not_counted_twice(self):
+        gate = self.gate(daily_budget_usd='4.00')
+        gate.init()
+        self.other_go(gate, 'deepinfra', '3.00')  # The old GO of this same gate: replaced, not added.
+        self.assertEqual(gate.activate()['state'], 'active')
+
+    def test_an_unreadable_or_invalid_other_go_refuses(self):
+        def spoil(name):
+            def apply(gate):
+                path = self.other_go(gate, 'anthropic')
+                if name == 'not_json':
+                    path.write_text('{')
+                elif name == 'not_object':
+                    path.write_text('[]')
+                elif name == 'wrong_provider':
+                    path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'google',
+                                                'daily_budget_usd': '1.00'}))
+                elif name == 'wrong_schema':
+                    path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v2', 'provider': 'anthropic',
+                                                'daily_budget_usd': '1.00'}))
+                elif name == 'budget_number':
+                    path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'anthropic',
+                                                'daily_budget_usd': 1.0}))
+                elif name == 'budget_over_cap':
+                    path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'anthropic',
+                                                'daily_budget_usd': '50.00'}))
+                elif name == 'too_large':
+                    path.write_text(' ' * (bridge.TEAM_GO_BYTES + 1))
+                elif name == 'group_writable':
+                    os.chmod(path, 0o620)
+                elif name == 'symlink':
+                    target = gate.root / 'real-anthropic.json'
+                    path.rename(target)
+                    path.symlink_to(target)
+                elif name == 'folder':
+                    path.unlink()
+                    path.mkdir()
+                elif name == 'unreadable':
+                    os.chmod(path, 0o000)
+            return apply
+        names = ['not_json', 'not_object', 'wrong_provider', 'wrong_schema', 'budget_number', 'budget_over_cap',
+                 'too_large', 'group_writable', 'symlink', 'folder']
+        if os.getuid() != 0:
+            names.append('unreadable')  # Root reads a mode-0000 file.
+        for name in names:
+            with self.subTest(name):
+                gate = self.gate(daily_budget_usd='1.00')
+                gate.init()
+                spoil(name)(gate)
+                with self.refused('TEAM_TOTAL_UNVERIFIABLE'):
+                    gate.activate()
+                self.assertEqual(gate.control()['state'], 'initialized')
+        gate = self.gate(daily_budget_usd='1.00')
+        gate.init()
+        self.other_go(gate, 'anthropic')
+        with self.refused('TEAM_TOTAL_UNVERIFIABLE'):  # Owned by the developer, not by root.
+            gate.activate(owner_uid=os.getuid() + 1)
+
+    def test_the_list_is_the_reviewed_gate_table_and_only_a_test_seam_overrides_it(self):
+        self.assertEqual({name: go for name, (_private, go) in bridge.GATE_PATHS.items()}, {
+            'deepinfra': '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json',
+            'anthropic': '/etc/debateai-v3-preview/provider-anthropic-go-v1.json',
+            'google': '/etc/debateai-v3-preview/provider-google-go-v1.json'})
+        text = SOURCE.read_text()
+        self.assertIn('result = activate(args.private, args.go)\n', text)  # main() passes no seam.
+        self.assertNotIn('os.environ', text)
+
+
+class ProbeFenceTests(GateTest):
+    """Round 2 review: a probe refuses unless it runs inside the fenced transient unit."""
+
+    def fence(self, gate, provider='deepinfra', cgroup=None, status=None):
+        proc = gate.root / 'proc'
+        (proc / 'self').mkdir(parents=True, exist_ok=True)
+        unit = bridge.probe_unit_name(provider)
+        (proc / 'self/cgroup').write_text('0::/system.slice/%s\n' % unit if cgroup is None else cgroup)
+        (proc / 'self/status').write_text('Name:\tpython3\nNoNewPrivs:\t1\nCapEff:\t0000000000000000\n'
+                                          'CapBnd:\t0000000000000000\n' if status is None else status)
+        paths = {name: (str(gate.root / name / 'private'), str(gate.root / name / 'go.json'))
+                 for name in ('deepinfra', 'anthropic', 'google')}
+        return proc, paths, (str(gate.root / 'retired-v2'),)
+
+    def check(self, gate, provider='deepinfra', datagram=lambda: False, **kwargs):
+        proc, paths, retired = self.fence(gate, provider, **kwargs)
+        return bridge.check_probe_fence(provider, proc_root=proc, gate_paths=paths, retired_paths=retired, datagram=datagram)
+
+    def missing(self, call):
+        with self.assertRaises(bridge.FenceRequired) as caught:
+            call()
+        self.assertEqual(str(caught.exception), 'PROBE_FENCE_REQUIRED')
+        return caught.exception.missing
+
+    def test_inside_the_fence_it_passes(self):
+        gate = self.gate()
+        self.assertIsNone(self.check(gate))
+        self.assertIsNone(self.check(gate, cgroup='1:name=systemd:/system.slice/debateai-preview-probe-deepinfra.service\n'))
+
+    def test_each_missing_part_of_the_fence_is_named(self):
+        gate = self.gate()
+        no_caps = 'NoNewPrivs:\t1\nCapEff:\t0000000000000000\nCapBnd:\t0000000000000000\n'
+        cases = {
+            'bare_login_shell': ({'cgroup': '0::/user.slice/user-0.slice/session-4.scope\n'}, ['unit']),
+            'another_unit': ({'cgroup': '0::/system.slice/run-u42.service\n'}, ['unit']),
+            'another_providers_unit': ({'cgroup': '0::/system.slice/debateai-preview-probe-anthropic.service\n'}, ['unit']),
+            'no_cgroup_file': ({'cgroup': ''}, ['unit']),
+            'new_privileges': ({'status': no_caps.replace('NoNewPrivs:\t1', 'NoNewPrivs:\t0')}, ['privileges']),
+            'capabilities': ({'status': no_caps.replace('CapEff:\t0000000000000000', 'CapEff:\t000001ffffffffff')},
+                             ['privileges']),
+            'bounding_set': ({'status': no_caps.replace('CapBnd:\t0000000000000000', 'CapBnd:\t000001ffffffffff')},
+                             ['privileges']),
+            'no_status': ({'status': ''}, ['privileges']),
+            'network': ({'datagram': lambda: True}, ['network']),
+        }
+        for name, (kwargs, expected) in cases.items():
+            with self.subTest(name):
+                self.assertEqual(self.missing(lambda: self.check(gate, **kwargs)), expected)
+
+    def test_every_other_gates_folder_and_go_must_be_hidden_but_its_own_may_be_seen(self):
+        cases = [('anthropic', 'private'), ('google', 'go.json'), ('retired', None)]
+        for owner, part in cases:
+            with self.subTest(owner=owner):
+                gate = self.gate()
+                proc, paths, retired = self.fence(gate)
+                if owner == 'retired':
+                    Path(retired[0]).mkdir()
+                else:
+                    target = Path(paths[owner][0] if part == 'private' else paths[owner][1])
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.mkdir() if part == 'private' else target.write_text('{}')
+                self.assertEqual(self.missing(lambda: bridge.check_probe_fence(
+                    'deepinfra', proc_root=proc, gate_paths=paths, retired_paths=retired, datagram=lambda: False)),
+                    ['other_gates'])
+        gate = self.gate()
+        proc, paths, retired = self.fence(gate, 'anthropic')
+        Path(paths['anthropic'][0]).mkdir(parents=True)  # Its own folder: visible, as it must be.
+        Path(paths['anthropic'][1]).write_text('{}')
+        self.assertIsNone(bridge.check_probe_fence('anthropic', proc_root=proc, gate_paths=paths, retired_paths=retired,
+                                                   datagram=lambda: False))
+        Path(paths['deepinfra'][1]).parent.mkdir(parents=True)
+        Path(paths['deepinfra'][1]).write_text('{}')  # The same fence, generic: DeepInfra is "other" here.
+        self.assertEqual(self.missing(lambda: bridge.check_probe_fence(
+            'anthropic', proc_root=proc, gate_paths=paths, retired_paths=retired, datagram=lambda: False)), ['other_gates'])
+
+    def test_a_path_is_hidden_only_when_absent_or_an_unopenable_mode_0000_node(self):
+        gate = self.gate()
+        folder, plain, link = gate.root / 'shown', gate.root / 'plain.json', gate.root / 'link'
+        folder.mkdir()
+        plain.write_text('{}')
+        link.symlink_to(plain)
+        self.assertTrue(bridge.path_hidden(str(gate.root / 'absent')))
+        for visible in (folder, plain, link):
+            with self.subTest(path=visible.name):
+                self.assertFalse(bridge.path_hidden(str(visible)))
+        if os.getuid() != 0:  # What InaccessiblePaths= mounts: mode 0000, and no capability to open it.
+            hidden = gate.root / 'inaccessible'
+            hidden.mkdir()
+            os.chmod(hidden, 0o000)
+            self.addCleanup(os.chmod, hidden, 0o700)
+            self.assertTrue(bridge.path_hidden(str(hidden)))
+
+    def test_the_network_check_sends_one_empty_datagram_to_a_documentation_address_only(self):
+        sent = []
+
+        class Socket:
+            def __init__(self, family, kind, outcome):
+                sent.append((family, kind))
+                self.outcome = outcome
+
+            def sendto(self, data, address):
+                sent.append((data, address))
+                if self.outcome is not None:
+                    raise self.outcome
+
+            def close(self):
+                pass
+        for outcome, leaves in ((None, True), (PermissionError(1, 'blocked'), False), (OSError(101, 'unreachable'), False)):
+            with self.subTest(outcome=outcome):
+                sent.clear()
+                with patch.object(bridge.socket, 'socket', lambda family, kind, o=outcome: Socket(family, kind, o)):
+                    self.assertIs(bridge.datagram_leaves(), leaves)
+                self.assertEqual(sent, [(socket.AF_INET, socket.SOCK_DGRAM), (b'', ('192.0.2.1', 9))])
+
+    def test_a_bare_probe_refuses_before_the_key_or_any_reservation(self):
+        gate = self.gate().ready()
+        with patch.object(bridge, 'datagram_leaves', lambda: True), self.refused('PROBE_FENCE_REQUIRED'):
+            bridge.probe(gate.private, gate.go_path, DEEPSEEK, dispatch=no_network, key_loader=no_network, host=HOST,
+                         platform='linux', uid=0, now=gate.clock)
+        self.assertIsNone(gate.day('2026-10-08'))
+        self.assertEqual(gate.control()['in_flight'], {})
+        # The one refusal line names which parts of the fence are missing (fixed names only).
+        out = io.StringIO()
+
+        def fenced_out(*_args, **_kwargs):
+            raise bridge.FenceRequired(['unit', 'network'])
+        with patch.object(bridge, 'probe', fenced_out), contextlib.redirect_stdout(out):
+            code = bridge.main(['probe', '--private', str(gate.private), '--go', str(gate.go_path), '--model', DEEPSEEK])
+        self.assertEqual((code, json.loads(out.getvalue())),
+                         (2, {'status': 'refused', 'error_class': 'FenceRequired', 'error': 'PROBE_FENCE_REQUIRED',
+                              'missing': ['unit', 'network']}))
 
 
 if __name__ == '__main__':
