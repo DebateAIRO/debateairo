@@ -277,14 +277,34 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * Serving company for the selected private-preview GLM endpoint; terms reviewed 5 October 2026.
- * Listed only by the preview's GLM build (`providerRegister`).
+ * The models the private preview offers, by the id its build flag names them with. DeepInfra
+ * serves the first three (each made by another company, named in brackets); Anthropic and Google
+ * serve their own. Facts checked against the vendors' published terms: see
+ * `docs/legal/2026-10-10-preview-provider-facts.md`.
+ */
+const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: string]> = Object.freeze([
+  ["zai-org/GLM-5.3-Flash", "GLM-5.3-Flash (Z.AI)"],
+  ["deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek-V4.1-Flash (DeepSeek)"],
+  ["XiaomiMiMo/MiMo-V2.6-Pro", "MiMo-V2.6-Pro (Xiaomi)"]
+] as const);
+const PREVIEW_ANTHROPIC_MODEL = "claude-haiku-5-5";
+const PREVIEW_GOOGLE_MODEL = "gemini-3.8-flash";
+const PREVIEW_MODEL_IDS: ReadonlySet<string> = new Set([
+  ...PREVIEW_DEEPINFRA_MODELS.map(([id]) => id),
+  PREVIEW_ANTHROPIC_MODEL,
+  PREVIEW_GOOGLE_MODEL
+]);
+
+/**
+ * Serving company for the private preview's open-weight models; terms reviewed 5 October 2026 and
+ * rechecked 10 October 2026. Listed only by a preview build (`providerRegister`), which names in
+ * `models` exactly the DeepInfra models that build offers.
  */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
   key: "deepinfra",
   provider: "DeepInfra",
-  models: "GLM-5.3-Flash (Z.AI)",
+  models: PREVIEW_DEEPINFRA_MODELS.map(([, label]) => label).join(", "),
   entity: "Deep Infra Inc.",
   purposesConfirmed: true,
   // Published terms exclude model training. Endpoint-specific retention and transfer facts
@@ -296,17 +316,113 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * The whole Register, in the order `/providers` shows it. DeepInfra serves GLM only on the private
- * preview, so only the preview's GLM build lists it: the build that sets the public flag the
- * new-debate form reads (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, `previewPlanRoster`). Every other
- * build, the real site included, sets none. The flag's value is checked where it picks the roster,
- * which refuses a malformed one loudly; here any value counts, so the page discloses rather than
- * hides, and this module (the root layout imports it) never throws.
+ * Anthropic's API as the private preview uses it (Claude Haiku 5.5), checked 10 October 2026: a
+ * customer in the EEA contracts with Anthropic Ireland, Limited (Commercial Terms); API inputs and
+ * outputs are deleted within 30 days unless flagged for misuse or the law requires more (privacy
+ * center); zero data retention needs Anthropic's approval, which the preview does not have; no
+ * training on customer content (Commercial Terms B); transfers under standard contractual clauses
+ * (Data Processing Addendum). On a preview build that offers it, it replaces the hosted-site
+ * placeholder row for Claude, so the page never shows Anthropic twice.
+ */
+export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  ...UNCHECKED_CLOUD,
+  key: "claude",
+  provider: "Anthropic",
+  models: "Claude Haiku 5.5",
+  entity: "Anthropic Ireland, Limited",
+  homeCountryKey: "legal.providers.ireland",
+  locationKey: "legal.providers.locationAnthropic",
+  retentionKey: "legal.providers.retentionAnthropic",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.sccBasis",
+  contact: "privacy@anthropic.com",
+  checkedOn: "2026-10-10"
+});
+
+/**
+ * Google's Gemini API, paid tier only, as the private preview uses it (Gemini 3.8 Flash), checked
+ * 10 October 2026: for a billing address in Romania the contracting entity is Google Cloud EMEA
+ * Limited (Google Contracting Entity page, "Gemini API Paid Services"); paid prompts and responses
+ * are not used to improve Google's products and are logged 55 days for abuse monitoring, in any
+ * country where Google or its agents have facilities (Gemini API terms and usage policies); zero
+ * data retention is guaranteed only on Vertex AI, not on this API. Google's EU–US Data Privacy
+ * Framework listing could not be read, so the transfer basis stays bracketed. On a preview build
+ * that offers it, it replaces the hosted-site placeholder row for Gemini.
+ */
+export const GOOGLE_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  ...UNCHECKED_CLOUD,
+  key: "gemini",
+  provider: "Google",
+  models: "Gemini 3.8 Flash",
+  entity: "Google Cloud EMEA Limited",
+  homeCountryKey: "legal.providers.ireland",
+  locationKey: "legal.providers.locationGoogle",
+  retentionKey: "legal.providers.retentionGoogle",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.usBasis",
+  contact: "legal-notices@google.com",
+  checkedOn: "2026-10-10"
+});
+
+/**
+ * The model ids a preview build offers, read from its public flag in either form: the first
+ * preview's list (`["zai-org/GLM-5.3-Flash"]`) or the per-plan object (`{"free":[…],"premium":[…]}`),
+ * whose lists are merged. `null` means "list every preview provider": the flag is malformed, empty,
+ * or names a model this Register cannot place. The new-debate form refuses a bad flag loudly; a
+ * legal page discloses rather than hides, and never throws (the root layout imports this module).
+ */
+function previewModelIds(flag: string): ReadonlySet<string> | null {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(flag);
+  } catch {
+    return null;
+  }
+  const lists: unknown[] = [];
+  if (Array.isArray(decoded)) {
+    lists.push(decoded);
+  } else if (typeof decoded === "object" && decoded !== null) {
+    const { free, premium } = decoded as { free?: unknown; premium?: unknown };
+    if (free === undefined && premium === undefined) return null;
+    for (const list of [free, premium]) if (list !== undefined) lists.push(list);
+  } else {
+    return null;
+  }
+  const ids = new Set<string>();
+  for (const list of lists) {
+    if (!Array.isArray(list)) return null;
+    for (const id of list) {
+      if (typeof id !== "string" || !PREVIEW_MODEL_IDS.has(id)) return null;
+      ids.add(id);
+    }
+  }
+  return ids.size === 0 ? null : ids;
+}
+
+/**
+ * The whole Register, in the order `/providers` shows it. Only the private preview's build sets
+ * the public flag the new-debate form reads (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON,
+ * `previewPlanRoster`); every other build, the real site included, sets none and gets the
+ * hosted-site rows unchanged. A preview build lists DeepInfra (just before the support chat's
+ * model) when it offers a DeepInfra model, naming only those models, and swaps the Claude and
+ * Gemini placeholder rows for the checked preview rows when it offers Claude Haiku 5.5 or Gemini
+ * 3.8 Flash. Never throws.
  */
 export function providerRegister(previewFreeModelIdsJson: string | undefined): readonly ProviderRegisterEntry[] {
+  if (previewFreeModelIdsJson === undefined) return Object.freeze([...MODEL_PROVIDERS, SUPPORT_PROVIDER]);
+  const ids = previewModelIds(previewFreeModelIdsJson);
+  const offers = (id: string): boolean => ids === null || ids.has(id);
+  const deepInfraModels = PREVIEW_DEEPINFRA_MODELS.filter(([id]) => offers(id)).map(([, label]) => label);
+  const rows = MODEL_PROVIDERS.map((row) => {
+    if (row.key === "claude" && offers(PREVIEW_ANTHROPIC_MODEL)) return ANTHROPIC_PREVIEW_PROVIDER;
+    if (row.key === "gemini" && offers(PREVIEW_GOOGLE_MODEL)) return GOOGLE_PREVIEW_PROVIDER;
+    return row;
+  });
   return Object.freeze([
-    ...MODEL_PROVIDERS,
-    ...(previewFreeModelIdsJson === undefined ? [] : [DEEPINFRA_PROVIDER]),
+    ...rows,
+    ...(deepInfraModels.length === 0 ? [] : [Object.freeze({ ...DEEPINFRA_PROVIDER, models: deepInfraModels.join(", ") })]),
     SUPPORT_PROVIDER
   ]);
 }
