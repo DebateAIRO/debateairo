@@ -34,6 +34,7 @@ SOCKET = '/run/debateai-v3-preview/deepinfra-budget-v3.sock'
 V2_PRIVATE = '/var/lib/debateai-v3-preview/provider-team-authority-v2'
 DROPIN = '/etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf'
 GLM, DEEPSEEK, MIMO = 'zai-org/GLM-5.3-Flash', 'deepseek-ai/DeepSeek-V4.1-Flash', 'XiaomiMiMo/MiMo-V2.6-Pro'
+QWEN = 'Qwen/Qwen3.8-Flash'
 
 
 def load(path, name):
@@ -111,6 +112,14 @@ class ModelCheckTests(unittest.TestCase):
         self.assertEqual((code, line), (0, {'status': 'ok', 'host': 'api.deepinfra.com', 'models': [GLM, DEEPSEEK, MIMO]}))
         self.assertEqual(opener.urls, [('https://api.deepinfra.com/models/' + m, 20) for m in (GLM, DEEPSEEK, MIMO)])
 
+    def test_the_qwen_id_is_one_path_under_models(self):
+        opener = FakeOpener({QWEN: (200, b'{"model_name": "Qwen/Qwen3.8-Flash"}')})
+        code, line = self.run_main(self.go(enabled_models=[GLM, QWEN]), FakeOpener({GLM: (200, b'{}'), QWEN: (200, b'{}')}))
+        self.assertEqual((code, line), (0, {'status': 'ok', 'host': 'api.deepinfra.com', 'models': [GLM, QWEN]}))
+        code, line = self.run_main(self.go(enabled_models=[QWEN]), opener)
+        self.assertEqual(opener.urls, [('https://api.deepinfra.com/models/Qwen/Qwen3.8-Flash', 20)])
+        self.assertTrue(models.MODEL_ID.fullmatch(QWEN))
+
     def test_a_model_deepinfra_no_longer_lists_refuses_and_is_named(self):
         for answer in ((404, b'{}'), urllib.error.HTTPError('u', 404, 'Not Found', {}, None), (200, b'not json'),
                        (200, b'[]'), (204, b''), (200, b'{' + b' ' * (2 * 1024 * 1024) + b'}')):
@@ -186,7 +195,12 @@ class UnitFileTests(unittest.TestCase):
         self.assertEqual([pair for pair in directives(UNIT) if pair[0] not in changed],
                          [pair for pair in directives(V2_UNIT) if pair[0] not in changed])
         hidden, v2_hidden = ' '.join(values(UNIT, 'InaccessiblePaths')).split(), ' '.join(values(V2_UNIT, 'InaccessiblePaths')).split()
-        self.assertEqual(set(hidden) - set(v2_hidden), {'-' + V2_PRIVATE, '-/etc/debateai-v3-preview/provider-team-go-v2.json'})
+        # v2's state, and (PR B) the other provider gates' state and GOs.
+        self.assertEqual(set(hidden) - set(v2_hidden), {'-' + V2_PRIVATE, '-/etc/debateai-v3-preview/provider-team-go-v2.json',
+                                                        '-/var/lib/debateai-v3-preview/provider-anthropic-authority-v1',
+                                                        '-/etc/debateai-v3-preview/provider-anthropic-go-v1.json',
+                                                        '-/var/lib/debateai-v3-preview/provider-google-authority-v1',
+                                                        '-/etc/debateai-v3-preview/provider-google-go-v1.json'})
         self.assertLessEqual(set(v2_hidden), set(hidden))
         self.assertEqual((values(UNIT, 'IPAddressDeny'), values(UNIT, 'IPAddressAllow')), (['any'], ['127.0.0.53/32']))
 
@@ -214,9 +228,32 @@ class UnitFileTests(unittest.TestCase):
 
     def test_readme_names_the_same_paths_and_the_proposed_go(self):
         readme = (V3 / 'README.md').read_text()
-        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"3.00"', '1200',
-                     'max_concurrent_calls', GLM, DEEPSEEK, MIMO, ' probe '):
+        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"3.50"', '1200',
+                     'max_concurrent_calls', GLM, DEEPSEEK, MIMO, QWEN, ' probe ', 'preview:qwen-3-8-flash',
+                     'TEAM_TOTAL_BUDGET_EXCEEDED', 'unbilled_release_ceiling', 'PROBE_FENCE_REQUIRED'):
             self.assertIn(name, readme)
+
+    def test_the_readme_probe_runs_inside_the_fence_the_probe_checks(self):
+        gate = load(GATE, 'gate_for_v3_probe_fence_test')  # Import only: no helper runs, no phase starts.
+        lines = [line for line in (V3 / 'README.md').read_text().splitlines()
+                 if line.startswith('systemd-run') and ' probe ' in line]
+        self.assertEqual(len(lines), 1)
+        line = lines[0]
+        self.assertIn('--unit=' + gate.probe_unit_name('deepinfra').removesuffix('.service') + ' ', line)
+        for setting in ('IPAddressDeny=any', 'NoNewPrivileges=yes', 'CapabilityBoundingSet= ', 'ProtectSystem=strict',
+                        'ReadWritePaths=$P '):
+            self.assertIn(setting, line)
+        hidden = re.search(r"-p 'InaccessiblePaths=([^']*)'", line).group(1).split()
+        others = [path for name, pair in gate.GATE_PATHS.items() if name != 'deepinfra' for path in pair]
+        for path in [*others, *gate.RETIRED_GATE_PATHS]:
+            self.assertIn('-' + path, hidden)
+        for path in gate.GATE_PATHS['deepinfra']:
+            self.assertNotIn('-' + path, hidden)  # Its own folder and GO stay readable.
+        # The gate table names the same paths as the units.
+        self.assertEqual(gate.GATE_PATHS['deepinfra'], (PRIVATE, GO))
+        unit_hidden = ' '.join(values(UNIT, 'InaccessiblePaths')).split()
+        for path in [*others, *gate.RETIRED_GATE_PATHS]:
+            self.assertIn('-' + path, unit_hidden)
 
     def test_no_secret_or_machine_specific_path_in_the_folder(self):
         for path in sorted(V3.rglob('*')):

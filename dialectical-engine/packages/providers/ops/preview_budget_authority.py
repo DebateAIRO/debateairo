@@ -60,10 +60,24 @@ fails; the gate does not halt. UNSENT_HALT_STREAK such failures in a row (kept i
 file, so a restart does not reset them) halt with provider_unreachable. Any settled reply or an
 activation resets the streak. Anything after the connect stays uncertain and halts as before,
 with one exception (owner ruling 5, 2026-10-10): a reply the profile's unbilled_refusal proves
-unbilled (DeepInfra: a 429 with an error and no usage, choices or estimated_cost anywhere) is
-handled exactly like a provably unsent call. The caller sees PROVIDER_NOT_REACHED or
+unbilled (DeepInfra: a 429 with an error and no usage, choices or estimated_cost anywhere) has its
+hold released and counts toward the streak like a provably unsent call, but it stays on the
+record: its entry is kept as 'released_unbilled' with held_usd "0" and its HTTP status, reason and
+time. Those entries never count toward the pot or max_paid_posts_per_day, and the
+UNBILLED_RELEASES_PER_DAY-th of one Bucharest day halts (unbilled_release_ceiling); a settled
+reply does not reset that daily count. So a vendor that billed such replies after all could not
+drain the pot unseen or without limit. (A provably unsent call leaves no entry: no byte reached
+the vendor, so there is nothing it could bill.) The caller sees PROVIDER_NOT_REACHED or
 PROVIDER_REFUSED_UNBILLED for these two (nothing billed, hold released); every other refusal
 outside the three pot codes is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
+
+Team total (owner, 2026-10-10): one GO's daily_budget_usd is at most TEAM_TOTAL_BUDGET_USD, and
+activate (root, in a shell, so outside every unit's sandbox) also adds the daily_budget_usd of the
+other provider gates' GO files (GATE_PATHS) and refuses when the sum is over it.
+
+Probe fence: a probe refuses (PROBE_FENCE_REQUIRED) unless it runs inside the fenced transient
+unit the README gives (check_probe_fence), so a bare run never reads the key without the network
+allow-list or while another gate's folder or GO is visible.
 
 Day boundary (by design): a call is charged to the Bucharest day on which it was reserved, even
 when it settles after midnight. So the real upstream charges made within one calendar day can
@@ -147,7 +161,31 @@ CALL_ENTRY_PREFIX = 'preview-test:'
 PROBE_ENTRY_PREFIX = 'preview-probe:'
 PROBE_LOCK_NAME = 'team-probe.lock'  # Held by a running probe; serve start and reservations check it.
 PROBE_EXCERPT_CHARS = 80
-ENTRY_STATES = ('pending', 'settled', 'uncertain')
+# released_unbilled: a refusal the profile proved unbilled; its hold is released (held_usd "0") but
+# the entry stays on the day's record, and counts toward UNBILLED_RELEASES_PER_DAY.
+ENTRY_STATES = ('pending', 'settled', 'uncertain', 'released_unbilled')
+UNBILLED_RELEASES_PER_DAY = 20  # Per gate and Bucharest day; never reset by a settled reply.
+TEAM_TOTAL_BUDGET_USD = Decimal('5.00')  # The owner's daily team total over every provider gate's pot.
+TEAM_GO_BYTES = 64 * 1024
+# Every provider gate on the preview host, by GO provider: (private folder, GO file). Reviewed:
+# activate sums the other gates' GOs from here, and the probe fence checks every other gate's
+# folder and GO is hidden. The units hide each gate's paths from the others.
+GATE_PATHS = {
+    'deepinfra': ('/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3',
+                  '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json'),
+    'anthropic': ('/var/lib/debateai-v3-preview/provider-anthropic-authority-v1',
+                  '/etc/debateai-v3-preview/provider-anthropic-go-v1.json'),
+    'google': ('/var/lib/debateai-v3-preview/provider-google-authority-v1',
+               '/etc/debateai-v3-preview/provider-google-go-v1.json'),
+}
+# The retired gates' state (v1, v2) and v2's GO: hidden from every probe too.
+RETIRED_GATE_PATHS = ('/var/lib/debateai-v3-preview/provider-test-authority',
+                      '/var/lib/debateai-v3-preview/provider-team-authority-v2',
+                      '/etc/debateai-v3-preview/provider-team-go-v2.json')
+PROBE_UNIT_PREFIX = 'debateai-preview-probe-'  # + provider + '.service': the probe's transient unit.
+# TEST-NET-1 (RFC 5737): reserved for documentation, never routed. Inside the fence an empty
+# datagram to it is refused at once; outside it leaves the process, which proves there is no fence.
+FENCE_TEST_ADDRESS = ('192.0.2.1', 9)
 
 
 def sha_bytes(raw):
@@ -337,7 +375,7 @@ def valid_go(go):
         and isinstance(go['target_host'], str) and re.fullmatch(r'[A-Za-z0-9.-]{1,128}', go['target_host'])
         and isinstance(uids, list) and uids and all(type(uid) is int and uid >= 0 for uid in uids)
         and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
-        and Decimal('0.01') <= Decimal(budget) <= Decimal('50.00')
+        and Decimal('0.01') <= Decimal(budget) <= TEAM_TOTAL_BUDGET_USD
         and _int_in(go['max_paid_posts_per_day'], 1, 5000) and _int_in(go['max_concurrent_calls'], 1, 8)
         and _int_in(go['open_days'], 1, 31)
         and isinstance(predecessor, str) and re.fullmatch(r'[0-9a-f]{64}', predecessor))
@@ -370,17 +408,31 @@ def day_ledger_name(day):
 
 
 def day_spend(ledger):
-    """Held amounts of every entry reserved on this day: pending, settled and uncertain."""
+    """Held amounts of every entry reserved on this day: pending, settled and uncertain. A
+    released_unbilled entry holds exactly 0 (its reservation stays recorded beside it)."""
     total = Decimal(0)
     for entry in ledger['entries'].values():
         held = helper.decimal_amount(entry.get('held_usd')) if isinstance(entry, dict) else None
         reserved = helper.decimal_amount(entry.get('reserved_usd')) if isinstance(entry, dict) else None
         if held is None or reserved is None or entry.get('state') not in ENTRY_STATES:
             raise SafetyError('LEDGER_ENTRY_INVALID')
-        if entry['state'] != 'settled' and held < reserved:
+        if entry['state'] == 'released_unbilled':
+            if held != 0:
+                raise SafetyError('LEDGER_ENTRY_INVALID')
+        elif entry['state'] != 'settled' and held < reserved:
             raise SafetyError('LEDGER_ENTRY_UNDER_RESERVED')
         total += held
     return total
+
+
+def unbilled_releases(ledger):
+    """Today's refusals released as unbilled (kept on the record at $0)."""
+    return sum(1 for entry in ledger['entries'].values() if entry['state'] == 'released_unbilled')
+
+
+def paid_posts(ledger):
+    """Today's calls that count toward max_paid_posts_per_day: every entry but the unbilled releases."""
+    return len(ledger['entries']) - unbilled_releases(ledger)
 
 
 def validate_control(control):
@@ -473,9 +525,12 @@ def _halt(control, reason, moment, entry_id=None):
 
 
 def spend_by_model(ledger):
-    """Today's held amount and call count per model (every entry records its model)."""
+    """Today's held amount and call count per model (every entry records its model). Unbilled
+    releases are counted apart (day_summary's today_unbilled_releases)."""
     totals = {}
     for entry in ledger['entries'].values():
+        if entry['state'] == 'released_unbilled':
+            continue
         model = entry.get('model') if isinstance(entry.get('model'), str) else 'unknown'
         spend, posts = totals.get(model, (Decimal(0), 0))
         totals[model] = (spend + helper.decimal_amount(entry['held_usd']), posts + 1)
@@ -495,7 +550,8 @@ def day_summary(control, ledger, moment):
             'window_open': window_open(control, moment),
             'today': ledger['day'], 'daily_budget_usd': control['limits']['daily_budget_usd'],
             'today_spend_usd': format(spend, 'f'), 'remaining_today_usd': format(max(Decimal(0), budget - spend), 'f'),
-            'today_posts': len(ledger['entries']), 'max_paid_posts_per_day': control['limits']['max_paid_posts_per_day'],
+            'today_posts': paid_posts(ledger), 'max_paid_posts_per_day': control['limits']['max_paid_posts_per_day'],
+            'today_unbilled_releases': unbilled_releases(ledger), 'unbilled_releases_per_day': UNBILLED_RELEASES_PER_DAY,
             'in_flight': len(control['in_flight']),
             'today_uncertain': sum(1 for entry in ledger['entries'].values() if entry['state'] == 'uncertain'),
             'today_by_model': spend_by_model(ledger),
@@ -519,7 +575,53 @@ def init_state(private, go_path, now=None):
             'provider': go['provider'], 'enabled_models': go['enabled_models'], 'go_sha256': go_sha, 'predecessor_ledger_sha256': control['predecessor_ledger_sha256']}
 
 
-def activate(private, go_path, host=None, platform=None, now=None):
+def other_gate_budget(path, provider, owner_uid=0):
+    """The daily_budget_usd of another provider gate's GO file, for the team total.
+
+    A missing file counts 0 (that gate is not installed). A file that exists must be a regular
+    file (not a symlink: O_NOFOLLOW) owned by owner_uid (root) that group and others cannot
+    write, holding a GO object with this schema, the expected provider and a valid
+    daily_budget_usd; anything else refuses TEAM_TOTAL_UNVERIFIABLE. Only these three fields are
+    judged: that gate's own activate checks the rest against its own code."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)  # NONBLOCK: a FIFO cannot hang it.
+    except FileNotFoundError:
+        return Decimal(0)
+    except OSError:
+        raise SafetyError('TEAM_TOTAL_UNVERIFIABLE') from None
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != owner_uid or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            raise SafetyError('TEAM_TOTAL_UNVERIFIABLE')
+        with os.fdopen(os.dup(fd), 'rb') as stream:
+            raw = stream.read(TEAM_GO_BYTES + 1)
+        go = json.loads(raw) if len(raw) <= TEAM_GO_BYTES else None
+    except SafetyError:
+        raise
+    except (OSError, ValueError, TypeError, RecursionError):
+        raise SafetyError('TEAM_TOTAL_UNVERIFIABLE') from None
+    finally:
+        os.close(fd)
+    budget = go.get('daily_budget_usd') if isinstance(go, dict) else None
+    if not (isinstance(go, dict) and go.get('schema') == GO_SCHEMA and go.get('provider') == provider
+            and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
+            and Decimal('0.01') <= Decimal(budget) <= TEAM_TOTAL_BUDGET_USD):
+        raise SafetyError('TEAM_TOTAL_UNVERIFIABLE')
+    return Decimal(budget)
+
+
+def team_total(go, gate_go_paths=None, owner_uid=0):
+    """This GO's daily_budget_usd plus every other provider gate's (GATE_PATHS). gate_go_paths
+    ({provider: GO path}) and owner_uid are the offline tests' seam; main() never passes them."""
+    paths = {name: go_file for name, (_private, go_file) in GATE_PATHS.items()} if gate_go_paths is None else gate_go_paths
+    total = Decimal(go['daily_budget_usd'])
+    for provider, path in sorted(paths.items()):
+        if provider != go['provider']:  # This provider's pot is the GO being activated.
+            total += other_gate_budget(path, provider, owner_uid)
+    return total
+
+
+def activate(private, go_path, host=None, platform=None, now=None, gate_go_paths=None, owner_uid=0):
     now = now or helper.utc_now
     go, go_sha = load_go(go_path)
     host, platform = host or socket.gethostname(), platform or sys.platform
@@ -529,6 +631,9 @@ def activate(private, go_path, host=None, platform=None, now=None):
     profile = profile_of(go['provider'])
     if go['max_concurrent_calls'] * largest_reservation(profile, go['enabled_models']) > Decimal(go['daily_budget_usd']):
         raise SafetyError('CONCURRENCY_EXCEEDS_BUDGET')
+    # Root runs activate in a shell, outside the units that hide the gates' GOs from each other.
+    if team_total(go, gate_go_paths, owner_uid) > TEAM_TOTAL_BUDGET_USD:
+        raise SafetyError('TEAM_TOTAL_BUDGET_EXCEEDED')
     with TeamStore(private) as store:
         control = store.control()
         if control['state'] not in ('initialized', 'halted') or control['scope_id'] != go['scope_id'] \
@@ -663,7 +768,7 @@ def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now,
         entry_id = entry_id_of(go, input, probe)
         if entry_id in ledger['entries'] or entry_id in control['in_flight']:
             raise SafetyError('DUPLICATE_OPERATION')
-        if len(ledger['entries']) >= go['max_paid_posts_per_day']:
+        if paid_posts(ledger) >= go['max_paid_posts_per_day']:
             raise SafetyError('DAILY_CALL_LIMIT_REACHED')
         if day_spend(ledger) + reserved > Decimal(go['daily_budget_usd']):
             raise SafetyError('TEAM_DAILY_BUDGET_REACHED')
@@ -729,7 +834,12 @@ class CallNotSent(SafetyError):
 
 
 class UnbilledRefusal(Exception):
-    """The provider answered with a refusal its profile proves unbilled: handled as not sent."""
+    """The provider answered with a refusal its profile proves unbilled (profile.unbilled_refusal):
+    released by release_unbilled, which keeps the entry at $0."""
+
+    def __init__(self, status):
+        super().__init__('unbilled_refusal')
+        self.status = status if type(status) is int else None
 
 
 def release_unsent(private, entry_id, day, now):
@@ -758,6 +868,44 @@ def release_unsent(private, entry_id, day, now):
         control['in_flight'].pop(entry_id, None)
         store.save_control(control)
         return {'authority': control['state'], 'unsent_streak': streak}
+
+
+def release_unbilled(private, entry_id, day, http_status, now):
+    """Lock, release the hold of a refusal the profile proved unbilled, unlock.
+
+    Unlike a provably unsent call, the entry stays on its reservation day's ledger: state
+    'released_unbilled', held_usd "0", with the HTTP status, the reason and the time. It counts
+    toward the unsent streak (UNSENT_HALT_STREAK in a row halt with provider_unreachable) and
+    toward the day's ceiling: the UNBILLED_RELEASES_PER_DAY-th such entry on one Bucharest day
+    halts with unbilled_release_ceiling. That count is read from the ledger, so a settled reply,
+    a restart or an activation never resets it; only the next day starts again at 0.
+
+    Write order as for a settlement: the control file (streak, any halt) first, then the ledger,
+    then in flight is cleared. Dying after the first write leaves a pending entry in flight (serve
+    start halts on it: fail closed); after the second, a released_unbilled entry still in flight,
+    which serve start drops (its record is complete and nothing was billed).
+    """
+    with TeamStore(private) as store:
+        control = store.control()
+        moment = current(now)
+        ledger = store.ledger(day)
+        entry = ledger['entries'].get(entry_id)
+        if entry is None or entry['state'] != 'pending' or control['in_flight'].get(entry_id) != day:
+            raise SafetyError('SETTLEMENT_STATE_INVALID')
+        released = unbilled_releases(ledger) + 1
+        streak = control.get('unsent_streak', 0) + 1
+        control['unsent_streak'] = streak
+        if released >= UNBILLED_RELEASES_PER_DAY:
+            _halt(control, 'unbilled_release_ceiling', moment, entry_id)
+        if streak >= UNSENT_HALT_STREAK:
+            _halt(control, 'provider_unreachable', moment, entry_id)
+        store.save_control(control)
+        entry.update(state='released_unbilled', held_usd='0', reason='unbilled_refusal',
+                     http_status=http_status if type(http_status) is int else None, released_at=iso(moment))
+        store.save_ledger(ledger)
+        control['in_flight'].pop(entry_id, None)
+        store.save_control(control)
+        return {'authority': control['state'], 'unsent_streak': streak, 'unbilled_releases_today': released}
 
 
 def settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots):
@@ -843,10 +991,12 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
             unbilled = profile.unbilled_refusal(status, raw_response)
             response = helper.redact(raw_response, key, profile.redaction_patterns)
             if unbilled:
-                raise UnbilledRefusal()
+                raise UnbilledRefusal(status)
         except (helper.RequestNotSent, UnbilledRefusal) as unsent:
             try:
-                outcome = release_unsent(private, entry_id, day, now)
+                # Unsent: no entry kept. Unbilled: kept at $0 on the record, and capped per day.
+                outcome = (release_unbilled(private, entry_id, day, unsent.status, now)
+                           if isinstance(unsent, UnbilledRefusal) else release_unsent(private, entry_id, day, now))
             except BaseException:
                 # The hold could not be released: treat it exactly like an uncertain call.
                 outcome = settle_or_halt(private, entry_id, day, {
@@ -968,7 +1118,7 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
             # can carry more, so what is left is rounded DOWN and the largest hold UP: never in the
             # app's favour.
             'remaining_usd': nano_text(max(Decimal(0), budget - spend), ROUND_FLOOR),
-            'remaining_calls': max(0, limits['max_paid_posts_per_day'] - len(ledger['entries'])),
+            'remaining_calls': max(0, limits['max_paid_posts_per_day'] - paid_posts(ledger)),
             'max_concurrent_calls': limits['max_concurrent_calls'],
             'largest_reservation_usd': nano_text(largest_reservation(profile, control['enabled_models']), ROUND_CEILING),
             'enabled_models': list(control['enabled_models'])}
@@ -1024,7 +1174,10 @@ def probe_summary(observed, profile):
     response, row, accounting = observed['response'], observed['row'], observed['changes'].get('accounting') or {}
     text = profile.reply_text(response)
     excerpt = re.sub(r'\s+', ' ', text)[:PROBE_EXCERPT_CHARS] if isinstance(text, str) else None
-    max_tokens, completion = min(1024, row.output_bound), accounting.get('completion_tokens')
+    # What was billed as output (completion, plus reasoning counted outside it), else completion.
+    max_tokens = min(1024, row.output_bound)
+    billed = accounting.get('billed_output_tokens')
+    completion = billed if billed is not None else accounting.get('completion_tokens')
     return {'status': 'probed', 'provider': profile.name, 'model': row.model, 'maker': row.maker,
             'sent': {'max_tokens': max_tokens, 'effort': row.effort or 'none'},
             # A model that bills past max_tokens would overrun its reservation in real use: do not enable it.
@@ -1033,15 +1186,113 @@ def probe_summary(observed, profile):
             'model_echoed_exactly': observed['changes'].get('reply_model') == row.model,
             'reply_model': observed['changes'].get('reply_model'),
             'usage': {name: accounting.get(name) for name in ('prompt_tokens', 'completion_tokens', 'total_tokens',
-                                                             'reasoning_tokens', 'cached_tokens', 'usage_valid')},
+                                                             'reasoning_tokens', 'billed_output_tokens', 'cached_tokens',
+                                                             'usage_valid')},
             'guard_charge_usd': accounting.get('guard_charge_usd'),
             'provider_estimated_cost_usd': accounting.get('provider_estimated_cost_usd'),
             'entry_state': observed['changes'].get('state'), 'halt_reason': observed['halt_reason'],
             'authority': observed.get('authority'), 'reply_excerpt': excerpt}
 
 
-def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None, platform=None, uid=None, now=None):
-    """Root only: one tiny paid call ("Reply exactly: OK") to a reviewed model of the GO's provider,
+class FenceRequired(SafetyError):
+    """PROBE_FENCE_REQUIRED, with the names of the fence checks that failed (`missing`)."""
+
+    def __init__(self, missing):
+        super().__init__('PROBE_FENCE_REQUIRED')
+        self.missing = list(missing)
+
+
+def probe_unit_name(provider):
+    return PROBE_UNIT_PREFIX + provider + '.service'
+
+
+def path_hidden(path):
+    """Whether this process can see nothing of path: it is absent, or it is the mode-0000 node
+    that systemd's InaccessiblePaths= mounts over it and it cannot be opened. A real folder or
+    file, or a symlink, is visible."""
+    try:
+        info = os.stat(path, follow_symlinks=False)
+    except (FileNotFoundError, PermissionError):
+        return True  # Absent, or a folder above it cannot be searched.
+    except OSError:
+        return False  # Cannot even tell: not proved hidden.
+    if stat.S_ISLNK(info.st_mode) or stat.S_IMODE(info.st_mode) != 0:
+        return False
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        return True
+    os.close(fd)
+    return False  # Mode 0000 but still opened (a capability such as CAP_DAC_OVERRIDE is left).
+
+
+def datagram_leaves():
+    """Whether an empty UDP datagram to FENCE_TEST_ADDRESS (a documentation address that is never
+    routed) leaves this process. Under IPAddressDeny=any it is refused at once (EPERM); any error
+    means it did not leave."""
+    sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sender.sendto(b'', FENCE_TEST_ADDRESS)
+    except OSError:
+        return False
+    finally:
+        sender.close()
+    return True
+
+
+def check_probe_fence(provider, *, proc_root='/proc', gate_paths=None, retired_paths=None, datagram=None):
+    """Refuses (PROBE_FENCE_REQUIRED, naming what is missing) unless this process runs inside the
+    probe fence the README gives for this provider. Generic: every provider's probe runs it.
+
+    unit         /proc/self/cgroup names the transient unit debateai-preview-probe-<provider>.service
+                 (systemd-run --unit=debateai-preview-probe-<provider>)
+    privileges   /proc/self/status shows NoNewPrivs 1 and no effective or bounding capability
+                 (NoNewPrivileges=yes, CapabilityBoundingSet= empty)
+    other_gates  every other provider gate's private folder and GO (GATE_PATHS) and the retired
+                 gates' state (RETIRED_GATE_PATHS) are hidden (InaccessiblePaths=)
+    network      a datagram to an address outside the allow-list does not leave (IPAddressDeny=any)
+
+    proc_root, gate_paths, retired_paths and datagram are the offline tests' seam; probe() and
+    main() never pass them.
+    """
+    gate_paths = GATE_PATHS if gate_paths is None else gate_paths
+    retired_paths = RETIRED_GATE_PATHS if retired_paths is None else retired_paths
+    datagram = datagram_leaves if datagram is None else datagram
+    missing = []
+    try:
+        cgroup = Path(proc_root, 'self', 'cgroup').read_text()
+    except (OSError, UnicodeError):
+        cgroup = ''
+    units = set()
+    for line in cgroup.splitlines():
+        parts = line.split(':', 2)
+        if len(parts) == 3 and parts[1] in ('', 'name=systemd'):
+            units.add(parts[2].rstrip('/').rsplit('/', 1)[-1])
+    if not isinstance(provider, str) or probe_unit_name(provider) not in units:
+        missing.append('unit')
+    try:
+        fields = dict(line.split(':', 1) for line in Path(proc_root, 'self', 'status').read_text().splitlines()
+                      if ':' in line)
+        fields = {name.strip(): value.strip() for name, value in fields.items()}
+        privileges = (fields.get('NoNewPrivs') == '1' and int(fields.get('CapEff', 'x'), 16) == 0
+                      and int(fields.get('CapBnd', 'x'), 16) == 0)
+    except (OSError, UnicodeError, ValueError):
+        privileges = False
+    if not privileges:
+        missing.append('privileges')
+    others = [path for name, pair in sorted(gate_paths.items()) if name != provider for path in pair]
+    if not all(path_hidden(path) for path in [*others, *retired_paths]):
+        missing.append('other_gates')
+    if datagram():
+        missing.append('network')
+    if missing:
+        raise FenceRequired(missing)
+
+
+def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None, platform=None, uid=None, now=None,
+          fence=None):
+    """Root only, inside the probe fence (check_probe_fence; fence is the offline tests' seam): one
+    tiny paid call ("Reply exactly: OK") to a reviewed model of the GO's provider,
     even one the GO does not enable yet, through the normal reserve/settle/halt path. It counts in
     today's pot and call count, and a non-200 reply or another model in the reply halts the gate
     like any call. Prints status, whether the reply named the exact model, usage and the charge."""
@@ -1050,6 +1301,8 @@ def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None,
     uid = os.getuid() if uid is None else uid
     if platform != 'linux' or uid != 0 or host != go['target_host']:
         raise SafetyError('ROOT_PROBE_REFUSED')
+    # Before the key is read or anything is reserved.
+    (fence or (lambda provider: check_probe_fence(provider)))(go['provider'])
     profile = profile_of(go['provider'])
     row = profile.rows.get(model) if isinstance(model, str) else None
     if row is None:
@@ -1095,9 +1348,11 @@ def recover_interrupted(private, now=None):
 
     Every id still in flight was interrupted. If its entry reached the ledger, its charge, its
     halt or its reply may be lost whatever state the entry shows, so the gate halts; a pending
-    entry becomes uncertain. An id without an entry was never dispatched and is dropped. An
-    uncertain entry that no recorded halt names (on today's or an in-flight day's ledger) also
-    halts. The halt is written first, so dying here repeats the recovery.
+    entry becomes uncertain. An id without an entry was never dispatched and is dropped, as is an
+    id whose entry is already released_unbilled (release_unbilled wrote its streak, any halt and
+    its $0 record before dying; nothing was billed). An uncertain entry that no recorded halt names
+    (on today's or an in-flight day's ledger) also halts. The halt is written first, so dying here
+    repeats the recovery.
     """
     now = now or helper.utc_now
     with TeamStore(private) as store:
@@ -1107,7 +1362,8 @@ def recover_interrupted(private, now=None):
         moment, in_flight = current(now), control['in_flight']
         ledgers = {day: store.ledger(day) for day in sorted(set(in_flight.values()) | {bucharest_day(moment)})}
         named = {event.get('entry_id') for event in control.get('halts', [])}
-        interrupted = [(entry_id, day) for entry_id, day in sorted(in_flight.items()) if entry_id in ledgers[day]['entries']]
+        interrupted = [(entry_id, day) for entry_id, day in sorted(in_flight.items()) if entry_id in ledgers[day]['entries']
+                       and ledgers[day]['entries'][entry_id]['state'] != 'released_unbilled']
         unrecorded = [entry_id for ledger in ledgers.values() for entry_id, entry in sorted(ledger['entries'].items())
                       if entry['state'] == 'uncertain' and entry_id not in named and entry_id not in in_flight]
         if not in_flight and not unrecorded:
@@ -1468,6 +1724,8 @@ def main(argv=None):
         refusal = {'status': 'refused', 'error_class': type(error).__name__}
         if isinstance(error, SafetyError):
             refusal['error'] = str(error)  # Fixed public codes only; never exception text from elsewhere.
+        if isinstance(error, FenceRequired):
+            refusal['missing'] = error.missing  # Fixed check names: which part of the fence is absent.
         emit(refusal)
         return 2
 
