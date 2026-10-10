@@ -436,7 +436,7 @@ export function previewExpectedCalls(input: Readonly<{
 
 /** The basis's one-call-per-site split: the panel's calls and the answer writer's and checker's; null without a split. */
 function debateSitesByRole(basis: Readonly<Record<string, unknown>>):
-  Readonly<{ panel: number; answerWriter: number; answerChecker: number; total: number }> | null {
+  Readonly<{ panel: number; reviewer: number; answerWriter: number; answerChecker: number; total: number }> | null {
   let byRole: ReturnType<typeof expectedCallsByRoleFromBasis>;
   try {
     byRole = expectedCallsByRoleFromBasis(basis);
@@ -445,8 +445,27 @@ function debateSitesByRole(basis: Readonly<Record<string, unknown>>):
   }
   const total = Object.values(byRole).reduce((sum, calls) => sum + calls, 0);
   if (total < 1) return null;
-  return Object.freeze({ panel: total - byRole.ANSWER_WRITER - byRole.ANSWER_CHECKER,
+  return Object.freeze({ panel: total - byRole.ANSWER_WRITER - byRole.ANSWER_CHECKER, reviewer: byRole.REVIEWER,
     answerWriter: byRole.ANSWER_WRITER, answerChecker: byRole.ANSWER_CHECKER, total });
+}
+
+/**
+ * Per gate, the panel member whose realistic debate call costs the most (a model off the reviewed rows
+ * is its own gate), in panel order, with how many panel members that gate serves.
+ */
+function dearestPanelMemberPerGate(panelModels: readonly string[]): readonly Readonly<{ model: string; gateMembers: number }>[] {
+  const realisticCall = (model: string): bigint => {
+    const row = previewModelRow(model);
+    return row === undefined ? 0n : previewCallNanoUsd(row, PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, PREVIEW_GLM_GENERATION_TOKEN_FLOOR);
+  };
+  const dearest = new Map<string, { model: string; gateMembers: number }>();
+  for (const model of panelModels) {
+    const gate = previewGateKeyOf(model) ?? `model:${model}`;
+    const current = dearest.get(gate);
+    if (current === undefined) dearest.set(gate, { model, gateMembers: 1 });
+    else dearest.set(gate, { model: realisticCall(model) > realisticCall(current.model) ? model : current.model, gateMembers: current.gateMembers + 1 });
+  }
+  return Object.freeze([...dearest.values()].map((entry) => Object.freeze(entry)));
 }
 
 /** One part of a debate's calls: `numerator / denominator` calls of one kind by one model. */
@@ -503,7 +522,19 @@ export function previewCallShares(input: Readonly<{
     if (sites === null) {
       for (const model of panelModels) addDebate(model, debate);
     } else {
-      for (const model of panelModels) addDebate(model, BigInt(sites.panel) * debate);
+      // Every panel step but the reviews is shared evenly: each member states one position, authors its own
+      // root's tree and its cross-exchanges, and judges every node another maker authored (apps/runner/src/
+      // index.ts:5291-5326: the judge seats called per node are all the others, panelCallCap = members - 1).
+      for (const model of panelModels) addDebate(model, BigInt(sites.panel - sites.reviewer) * debate);
+      // A node's ONE review goes to a different maker chosen in a fixed order, alternating only against
+      // that author's latest reviewer (selectDifferentMakerReviewer, apps/runner/src/index.ts:834), so one
+      // member can take far more than an even share. So each gate is charged, at its dearest panel member,
+      // every review its members could take: all of them when it has two or more panel members, else the
+      // reviews of the other members' nodes (a member never reviews its own maker's nodes, an even
+      // 1/members of them). The careful side: with two gates a review is counted on both.
+      for (const { model, gateMembers } of dearestPanelMemberPerGate(panelModels)) {
+        addDebate(model, BigInt(sites.reviewer) * debate * (gateMembers >= 2 ? members : members - 1n));
+      }
       addDebate(input.roleModels.answerWriter, BigInt(sites.answerWriter) * debate * members);
       addDebate(input.roleModels.answerChecker, BigInt(sites.answerChecker) * debate * members);
     }
