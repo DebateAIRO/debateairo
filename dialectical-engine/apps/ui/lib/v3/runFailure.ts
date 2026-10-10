@@ -24,7 +24,8 @@ export const RUN_FAILURE_KINDS = Object.freeze([
   /**
    * The API created the run, then could not finish setting it up
    * (`RUN_SETUP_FAILED:<step>`, any step but PLAN_CHANGED), or the runner,
-   * claiming it, refused its pinned role assignment (RUN_ROLE_ASSIGNMENT_INVALID).
+   * claiming it, refused its pinned role assignment (RUN_ROLE_ASSIGNMENT_INVALID)
+   * or its pinned role rotation (RUN_ROLE_ROTATION_INVALID).
    */
   "NOT_STARTED",
   /**
@@ -74,6 +75,13 @@ export const RUN_FAILURE_CODES: Readonly<Record<string, RunFailureKind>> = Objec
    * at claim fails later, with one of the two codes above.)
    */
   RUN_ROLE_ASSIGNMENT_INVALID: "NOT_STARTED",
+  /**
+   * Role rotation (spec 2026-10-11, error table: "like RUN_ROLE_ASSIGNMENT_INVALID"):
+   * the rotation pinned at the ask is unreadable, sits beside a scorecard
+   * assignment, or names a model outside the debate's panel. The runner refuses
+   * it at claim, before any model is asked, so the debate never began.
+   */
+  RUN_ROLE_ROTATION_INVALID: "NOT_STARTED",
   RUN_CEILING_BELOW_FIRST_CALL: "RUN_LIMIT_REACHED"
 });
 

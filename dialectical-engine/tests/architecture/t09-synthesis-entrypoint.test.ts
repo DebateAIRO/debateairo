@@ -114,4 +114,47 @@ describe("T9 production entry point wiring", () => {
     expect(roles).toContain('"SYNTHESIZER"');
     expect(roles).toContain('"EVALUATOR"');
   });
+
+  /**
+   * Role rotation (spec 2026-10-11 Part 6): the runner-level rows live in
+   * tests/integration/database.test.ts, which CI does not run, so the wiring is
+   * also pinned here by name. A rotated run's per-claim policy carries the pin's
+   * two answer refs, and every per-run use reads that one value; the pre-claim
+   * J24 (2) check keeps the sealed refs. A pin that does not read, sits beside a
+   * scorecard assignment or leaves the panel is a terminal refusal; a database
+   * error is not.
+   */
+  it("swaps the sealed answer refs for a rotated run's pinned ones, per claim only (role rotation)", async () => {
+    const source = await readFile(
+      new URL("../../apps/runner/src/index.ts", import.meta.url),
+      "utf8"
+    );
+    const claim = source.indexOf("const claimed = workItemId === undefined");
+    const read = source.indexOf("rotationPin = await readRunRoleRotation(this.pool, run.runId);");
+    const assignment = source.indexOf("const pinnedRoleAssignment = await readRunRoleAssignment(this.pool, run.runId);");
+    const firstProbe = source.indexOf("const probe = await this.settings.claimTimeProbe(member);");
+    expect(claim).toBeGreaterThan(-1);
+    expect(read).toBeGreaterThan(assignment);
+    expect(assignment).toBeGreaterThan(claim);
+    // Read before any member is probed: a refused pin costs no probe and no call.
+    expect(firstProbe).toBeGreaterThan(read);
+    const guard = source.slice(read, firstProbe);
+    expect(guard).toContain('if (rotationPin !== null && roleAssignment !== null) throw new TypeError("BOTH_PINS");');
+    expect(guard).toContain("if (!pinned.every((role) => panelRefs.has(role.providerRef))) throw new TypeError(\"PIN_OFF_PANEL\");");
+    expect(guard).toContain("if (!(error instanceof TypeError)) throw error;");
+    expect(guard).toContain('reason: "RUN_ROLE_ROTATION_INVALID"');
+    expect(guard).toContain('throw new TypedDomainError("RUN_ROLE_ROTATION_INVALID",');
+    // The per-claim policy: the boot policy with the two answer refs replaced, nothing else.
+    expect(source).toContain(
+      "const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null"
+    );
+    expect(source).toContain("synthesizerRoleRef: rotationPin.answerWriter.providerRef,");
+    expect(source).toContain("evaluatorRoleRef: rotationPin.answerChecker.providerRef");
+    // The serve chain reads the per-claim policy, never the boot one.
+    expect(source).toContain("const synthesisRoles = synthesisRolePolicy;");
+    expect(source).not.toContain("const synthesisRoles = this.settings.synthesisRolePolicy;");
+    // The pre-claim J24 (2) check still names the sealed refs.
+    expect(source).toContain("? this.settings.synthesisRolePolicy.synthesizerRoleRef");
+    expect(source).toContain(": this.settings.synthesisRolePolicy.evaluatorRoleRef;");
+  });
 });

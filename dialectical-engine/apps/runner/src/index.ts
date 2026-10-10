@@ -9,11 +9,13 @@ import {
   assertNoOpenWriteTransaction,
   insertCallPrompt,
   readRunRoleAssignment,
+  readRunRoleRotation,
   withRunContentLease,
   withWriteTransaction,
   type CompletionActivationResolution,
   type DiscoveredPanelMember,
   type RunCostSubstitutionReason,
+  type RunRoleRotationRecord,
   type ServeDisclosureRecord
 } from "@debateai/db";
 import {
@@ -4526,6 +4528,30 @@ export class WalkingSkeletonRunner {
       }
       roleAssignment = parsedAssignment.data;
     }
+    /**
+     * Role rotation (spec 2026-10-11 Part 6): the four roles admission picked, pinned beside the run.
+     * A rotated run swaps the two sealed answer-role refs for the pinned ones for THIS run only (the
+     * per-run `synthesisRolePolicy` below) and hands its story the pinned pair; the legacy seat book and
+     * every other path stay as they are. Admission picks only among the debate's own frozen panel, and a
+     * run never carries both pins (admission pins a rotation only where no scorecard assignment is
+     * pinned), so a pin that breaks either rule, or that does not read, is a TERMINAL refusal before any
+     * probe or call, like RUN_ROLE_ASSIGNMENT_INVALID. A database failure is not a TypeError and keeps
+     * today's (non-terminal) path.
+     */
+    let rotationPin: RunRoleRotationRecord | null;
+    try {
+      rotationPin = await readRunRoleRotation(this.pool, run.runId);
+      if (rotationPin !== null && roleAssignment !== null) throw new TypeError("BOTH_PINS");
+      if (rotationPin !== null) {
+        const panelRefs = new Set(run.discoveredPanel.map((member) => member.provider_ref));
+        const pinned = [rotationPin.answerWriter, rotationPin.answerChecker, rotationPin.storyteller, rotationPin.storyChecker];
+        if (!pinned.every((role) => panelRefs.has(role.providerRef))) throw new TypeError("PIN_OFF_PANEL");
+      }
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
+      await this.#work.recordTerminalFailure({ runId: run.runId, workItemId: claimed.workItemId, reason: "RUN_ROLE_ROTATION_INVALID" });
+      throw new TypedDomainError("RUN_ROLE_ROTATION_INVALID", "The run's pinned role rotation cannot seat a debate");
+    }
     const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, maker] as const));
     const absentAtClaim: Array<{ readonly member: DiscoveredPanelMember; readonly failureCode: string }> = [];
     const configuredMakers: Array<{
@@ -4741,7 +4767,16 @@ export class WalkingSkeletonRunner {
         "Every provider pinned at ask time was absent when the runner claimed the work item"
       );
     }
-    const synthesisRolePolicy = this.settings.synthesisRolePolicy;
+    // Role rotation: a rotated run's per-claim policy is the boot policy with the two answer-role refs
+    // replaced by the pin's (bounds and loop bound unchanged). Every per-run use below reads this one
+    // value; the pre-claim J24 (2) check above keeps the sealed refs, the fallback a one-maker debate needs.
+    const synthesisRolePolicy = this.settings.synthesisRolePolicy === undefined || rotationPin === null
+      ? this.settings.synthesisRolePolicy
+      : Object.freeze({
+        ...this.settings.synthesisRolePolicy,
+        synthesizerRoleRef: rotationPin.answerWriter.providerRef,
+        evaluatorRoleRef: rotationPin.answerChecker.providerRef
+      });
     if (synthesisRolePolicy === undefined) {
       // Unreachable: the pre-claim gate refuses first. Typed rather than
       // optional-chained so a future caller cannot reach synthesis without it.
@@ -7084,7 +7119,8 @@ export class WalkingSkeletonRunner {
       }))
     ]);
     // ---- T9: the synthesis serve chain's inputs -------------------------
-    const synthesisRoles = this.settings.synthesisRolePolicy;
+    // Role rotation: the per-claim policy (the pin's two answer refs on a rotated run, else the sealed one).
+    const synthesisRoles = synthesisRolePolicy;
     if (synthesisRoles === undefined) {
       // Unreachable from executeWorkItem: the claim-time gate refuses first.
       // Kept as the typed defence for any future caller that reaches serve by
@@ -8064,6 +8100,11 @@ export class WalkingSkeletonRunner {
       const storyWriter = this.settings.story;
       const floorRecorded = floor !== null && disclosureRecorded;
       if (storyWriter !== undefined && (answerCarriesLabel || floorRecorded)) {
+        /** Role rotation: a pinned story member among this run's claim-eligible members, or null. */
+        const storyRotationRoleMaker = (providerRef: string) => {
+          const maker = synthesisMakers.find((candidate) => candidate.providerRef === providerRef);
+          return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };
+        };
         try {
           afterSettle.story = {
             kind: "SNAPSHOT",
@@ -8132,7 +8173,16 @@ export class WalkingSkeletonRunner {
                     checker: storySeatRoleMaker(seatBook.answerChecker,
                       answeredRound === undefined ? undefined : checkerPlannedByRound.get(answeredRound.round))
                   }
-                : undefined,
+                // Role rotation (spec 2026-10-11 Part 6): a rotated run (never an assigned one; the claim
+                // refuses both pins) hands the story its pinned pair, looked up among this run's
+                // claim-eligible members. A pinned member not claim-eligible reads null, and the story then
+                // uses the register's ref, as it does for a FALLBACK seat (packages/story writer.ts).
+                : rotationPin === null
+                  ? undefined
+                  : {
+                      storyteller: storyRotationRoleMaker(rotationPin.storyteller.providerRef),
+                      checker: storyRotationRoleMaker(rotationPin.storyChecker.providerRef)
+                    },
               // Each story step re-takes the SAME disclosure lease the debate held
               // (this run and its memory-linked prior run), briefly, on this
               // runner's pool: every store and gateway inside it borrows it, and
@@ -8644,6 +8694,7 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_OWNER_REF_INVALID",
   "RUN_PRINCIPAL_SESSION_MISMATCH",
   "RUN_ROLE_ASSIGNMENT_INVALID",
+  "RUN_ROLE_ROTATION_INVALID",
   "SCALAR_DECISION_CANNOT_SPAWN",
   "SCORECARD_INTERVAL_INVALID",
   "SCORECARD_TASK_CLASS_AMBIGUOUS",

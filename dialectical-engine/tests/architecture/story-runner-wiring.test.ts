@@ -80,6 +80,23 @@ describe("verdict story — wired into the shipped runner, after settle, never i
     expect(writer).toContain("const checker = input.roleMakers?.checker ?? resolve(policy.storyCheckerRoleRef);");
   });
 
+  /**
+   * Role rotation (spec 2026-10-11 Part 6): a rotated run (never an assigned one;
+   * the claim refuses both pins) hands its story the pinned storyteller and story
+   * checker, looked up among the run's claim-eligible members; a member that is
+   * not claim-eligible reads null, so the story keeps the register's ref.
+   */
+  it("hands a rotated run's story its pinned pair, among the run's claim-eligible members (role rotation)", async () => {
+    const runner = await read("apps/runner/src/index.ts");
+    const snapshot = runner.slice(runner.indexOf("input: buildStoryRunSnapshot({"),
+      runner.indexOf('return { kind: "COMPLETED", answerId: persisted.answerId };'));
+    expect(snapshot).toMatch(/: rotationPin === null\s+\? undefined\s+: \{\s+storyteller: storyRotationRoleMaker\(rotationPin\.storyteller\.providerRef\),\s+checker: storyRotationRoleMaker\(rotationPin\.storyChecker\.providerRef\)\s+\}/u);
+    const helper = runner.slice(runner.indexOf("const storyRotationRoleMaker = (providerRef: string) => {"),
+      runner.indexOf("input: buildStoryRunSnapshot({"));
+    expect(helper).toContain("const maker = synthesisMakers.find((candidate) => candidate.providerRef === providerRef);");
+    expect(helper).toContain("return maker === undefined ? null : { provider: maker.provider, providerRef: maker.providerRef };");
+  });
+
   it("keeps the runner's framed-prompt builders at one: the story builds its prompts in packages/story", async () => {
     const runner = await read("apps/runner/src/index.ts");
     // Paid plans S1a: dev's two synthesis framings became the scorecard's ONE
