@@ -453,6 +453,11 @@ function assertGeminiGatewayOptions(options: OpenAICompatibleGatewayOptions): vo
     throw new TypeError("PROVIDER_GEMINI_THINKING_INVALID");
   }
   if (options.authorizationHeader !== undefined) assertGeminiCredentialForm(options.authorizationHeader);
+  // The target's own answer bound (a reviewed preview row's), as the OpenAI gateway reads it.
+  if (options.maxOutputTokens !== undefined
+    && (!Number.isSafeInteger(options.maxOutputTokens) || options.maxOutputTokens < 1)) {
+    throw new TypeError("PROVIDER_GATEWAY_MAX_OUTPUT_TOKENS_INVALID");
+  }
 }
 
 export class GeminiGenerateProviderGateway implements ProviderGateway {
@@ -504,10 +509,13 @@ export class GeminiGenerateProviderGateway implements ProviderGateway {
       contextWindowTokens === undefined
         || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
 
+    // The model's output limit, and the target's own bound when it has one (a reviewed preview
+    // row: 16,384 for gemini-3.8-flash, the size the preview gate reserves for): no attempt, the
+    // length retry included, ever asks for more.
+    const outputCap = Math.min(GEMINI_MAX_OUTPUT_TOKENS, this.#options.maxOutputTokens ?? GEMINI_MAX_OUTPUT_TOKENS);
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
-      // Capped at the model's output limit: a retry never asks for more.
       const attemptTokenCeiling = Math.min(
-        lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures), GEMINI_MAX_OUTPUT_TOKENS
+        lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures), outputCap
       );
       if (attempt > 1 && !fitsContextWindow(attemptPacket, attemptTokenCeiling)) break;
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
@@ -713,7 +721,7 @@ export class GeminiGenerateProviderGateway implements ProviderGateway {
             attemptPacket = request.packet;
             // At the output limit already: the retry would be the same request
             // under the same bound, so it is not sent.
-            if (Math.min(lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures), GEMINI_MAX_OUTPUT_TOKENS)
+            if (Math.min(lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures), outputCap)
               <= attemptTokenCeiling) break;
           } else if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
             const repair = request.buildRepairPacket({

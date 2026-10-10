@@ -93,7 +93,9 @@ export function developmentCliProviderRoster(
 
 export type DevelopmentConfiguredProvider = Readonly<{
   providerRef: string;
-  adapterKind: "openai-compatible-http";
+  // The dev panel itself only writes "openai-compatible-http"; the preview register kit
+  // (publish-register-v2.ts) may also name the native Gemini adapter (multi-model preview, PR C).
+  adapterKind: "openai-compatible-http" | "google-gemini-http";
   maker: string;
 }>;
 

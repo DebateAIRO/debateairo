@@ -524,7 +524,8 @@ describe("PR C — the Gemini base URL rule and the adapter kind", () => {
     for (const baseUrl of [GOOGLE_GEMINI_BASE_URL, `${GOOGLE_GEMINI_BASE_URL}/`]) {
       const [target] = parse({ ...GEMINI_ROW, base_url: baseUrl }, GOOGLE_GEMINI_HTTP_ADAPTER_KIND);
       expect(target).toMatchObject({ baseUrl: GOOGLE_GEMINI_BASE_URL, adapterKind: GOOGLE_GEMINI_HTTP_ADAPTER_KIND });
-      expect(providerTargetGatewayControls(target!)).toEqual({ adapterKind: GOOGLE_GEMINI_HTTP_ADAPTER_KIND });
+      // The gate PR: gemini-3.8-flash is a reviewed preview row, so its output bound (16,384) caps maxOutputTokens.
+      expect(providerTargetGatewayControls(target!)).toEqual({ adapterKind: GOOGLE_GEMINI_HTTP_ADAPTER_KIND, maxOutputTokens: 16_384 });
     }
     expect(parse(GEMINI_ROW)[0]!.adapterKind).toBe(GOOGLE_GEMINI_HTTP_ADAPTER_KIND);
   });

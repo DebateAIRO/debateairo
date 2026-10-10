@@ -28,8 +28,12 @@ const REVIEWED_PROVIDER_SET = { kind: 'CONFIGURED_PROVIDER_SET', requiredDistinc
   { providerRef: 'preview:fixture-a', adapterKind: 'openai-compatible-http', maker: 'Z.AI' },
   { providerRef: 'preview:fixture-b', adapterKind: 'openai-compatible-http', maker: 'Z.AI' },
   { providerRef: 'preview:deepseek-v4-1-flash', adapterKind: 'openai-compatible-http', maker: 'DeepSeek' },
-  { providerRef: 'preview:mimo-v2-6-pro', adapterKind: 'openai-compatible-http', maker: 'Xiaomi' }
+  { providerRef: 'preview:mimo-v2-6-pro', adapterKind: 'openai-compatible-http', maker: 'Xiaomi' },
+  // PR C: Google's reviewed ref, on the native Gemini adapter.
+  { providerRef: 'preview:gemini-3-8-flash', adapterKind: 'google-gemini-http', maker: 'Google' }
 ] };
+/** The set A's kit published before PR C (DeepInfra's four refs): still a lawful base. */
+const DEEPINFRA_PROVIDER_SET = { ...REVIEWED_PROVIDER_SET, providers: REVIEWED_PROVIDER_SET.providers.slice(0, 4) };
 
 /** The two real preview shapes (both two-GLM, built by v1): the 65-row base v1 was written for (live v8) and the 68-row result (live v9). */
 async function fixture() {
@@ -61,7 +65,8 @@ describe('publish kit v2: source closure', () => {
     expect(value('providerFamilyMap').families).toEqual([
       { familyRef: 'Z.AI', providerRefs: ['preview:fixture-a', 'preview:fixture-b'] },
       { familyRef: 'DeepSeek', providerRefs: ['preview:deepseek-v4-1-flash'] },
-      { familyRef: 'Xiaomi', providerRefs: ['preview:mimo-v2-6-pro'] }
+      { familyRef: 'Xiaomi', providerRefs: ['preview:mimo-v2-6-pro'] },
+      { familyRef: 'Google', providerRefs: ['preview:gemini-3-8-flash'] }
     ]);
     for (const key of PREVIEW_BASE_OWNED_KEYS) expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(key);
   });
@@ -131,6 +136,9 @@ describe('publish kit v2: composing from the current version', () => {
     const first = compose(f.source, f.v9);
     expect(JSON.parse(first.rows.find(row => row.rowKey === 'configuredProviderSet')!.valueJsonText)).toEqual(REVIEWED_PROVIDER_SET);
     expect(() => compose(f.source, [...first.rows] as Row[], '10')).not.toThrow();
+    // PR C: a version published with DeepInfra's four refs only (before the Google row) is a lawful base too.
+    const deepinfraOnly = patchValue([...first.rows] as Row[], 'configuredProviderSet', (v: any) => { v.providers = DEEPINFRA_PROVIDER_SET.providers.map(p => ({ ...p })); });
+    expect(() => compose(f.source, deepinfraOnly, '10')).not.toThrow();
   });
 
   it('an unchanged source on its own result has an empty delta and the same snapshot', async () => {
