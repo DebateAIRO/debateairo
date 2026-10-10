@@ -6,8 +6,9 @@ import { loadBootstrapRegister, canonicalRegisterJson, parseCanonicalRegisterJso
 import { STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
 import { buildPreviewSourceRows, composePreviewSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import {
-  buildPreviewSourceRowsV2, composePreviewSnapshotV2, assertBaseIsCurrent, publishPreviewRegisterV2, previewDeltaSha256V2,
-  PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError
+  buildPreviewSourceRowsV2, composePreviewSnapshotV2, assertBaseIsCurrent, publishPreviewRegisterV2, previewDeltaSha256V2, previewCheckerRoleRef,
+  PREVIEW_SOURCE_ROW_KEYS_V2, PREVIEW_BASE_OWNED_KEYS, BASE_NOT_CURRENT, PreviewRegisterBaseNotCurrentError,
+  PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_EVALUATOR_ROLE_REF, PREVIEW_DEEPSEEK_CHECKER_ROLE_REF
 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
 
 type Row = { rowKey: string; valueJsonText: string; sourceRef: string };
@@ -19,11 +20,15 @@ const owned = () => [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY
 const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(b.rowKey, 'en'));
 
 /**
- * Multi-model (2026-10-10): the only rows the reviewed DeepInfra rows change against the sealed two-GLM
- * shape: the provider set (four refs, three makers), the family map that follows it, and the checker
- * (and the story checker that follows it) moved to the DeepSeek ref. The writer stays fixture-a (GLM).
+ * Multi-model (2026-10-10): by default the only rows the reviewed DeepInfra rows change against the sealed
+ * two-GLM shape are the provider set (four refs, three makers) and the family map that follows it. The
+ * writer stays fixture-a and the checker fixture-b (both GLM), as in the sealed version, so the version
+ * can be published while the gate has only GLM switched on.
  */
-const MULTI_MODEL_KEYS = ['configuredProviderSet', 'evaluatorRoleRef', 'providerFamilyMap', 'storyCheckerRoleRef'];
+const MULTI_MODEL_KEYS = ['configuredProviderSet', 'providerFamilyMap'];
+/** With the explicit DeepSeek checker choice, the checker and the story checker that follows it move too. */
+const DEEPSEEK_CHECKER_KEYS = ['configuredProviderSet', 'evaluatorRoleRef', 'providerFamilyMap', 'storyCheckerRoleRef'];
+const DEEPSEEK = { checker: 'deepseek', deepseekEnabledOnGate: true } as const;
 const REVIEWED_PROVIDER_SET = { kind: 'CONFIGURED_PROVIDER_SET', requiredDistinctMakers: 1, providers: [
   { providerRef: 'preview:fixture-a', adapterKind: 'openai-compatible-http', maker: 'Z.AI' },
   { providerRef: 'preview:fixture-b', adapterKind: 'openai-compatible-http', maker: 'Z.AI' },
@@ -48,7 +53,7 @@ async function fixture() {
 const compose = (source: Row[], base: Row[], version = '9') => composePreviewSnapshotV2({ sourceRows: source as any, baseRows: base as any, baseRegisterVersion: version, baseSnapshotSha256: computeRegisterSnapshotSha256(base as any) });
 
 describe('publish kit v2: source closure', () => {
-  it('builds exactly the reviewed key list: v1\'s rows except the four multi-model rows', async () => {
+  it('builds exactly the reviewed key list: v1\'s rows except the two multi-model rows', async () => {
     const bootstrap = await loadBootstrapRegister();
     const rows = await buildPreviewSourceRowsV2(bootstrap, runtime);
     expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2].sort());
@@ -60,8 +65,9 @@ describe('publish kit v2: source closure', () => {
     expect(value('configuredProviderSet')).toEqual(REVIEWED_PROVIDER_SET);
     expect(value('synthesizerRoleRef').providerRef).toBe('preview:fixture-a');
     expect(value('storytellerRoleRef').providerRef).toBe('preview:fixture-a');
-    expect(value('evaluatorRoleRef').providerRef).toBe('preview:deepseek-v4-1-flash');
-    expect(value('storyCheckerRoleRef').providerRef).toBe('preview:deepseek-v4-1-flash');
+    expect(value('evaluatorRoleRef').providerRef).toBe('preview:fixture-b');
+    expect(value('storyCheckerRoleRef').providerRef).toBe('preview:fixture-b');
+    expect([PREVIEW_SYNTHESIZER_ROLE_REF, PREVIEW_EVALUATOR_ROLE_REF, PREVIEW_DEEPSEEK_CHECKER_ROLE_REF]).toEqual(['preview:fixture-a', 'preview:fixture-b', 'preview:deepseek-v4-1-flash']);
     expect(value('providerFamilyMap').families).toEqual([
       { familyRef: 'Z.AI', providerRefs: ['preview:fixture-a', 'preview:fixture-b'] },
       { familyRef: 'DeepSeek', providerRefs: ['preview:deepseek-v4-1-flash'] },
@@ -76,14 +82,14 @@ describe('publish kit v2: source closure', () => {
 });
 
 describe('publish kit v2: composing from the current version', () => {
-  it('from the 65-row base it produces v1\'s snapshot except the four multi-model rows, reporting the three keys as added', async () => {
+  it('from the 65-row base it produces v1\'s snapshot except the two multi-model rows, reporting the three keys as added', async () => {
     const f = await fixture();
     const v1 = composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v8 as any, baseRegisterVersion: '8', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v8 as any) });
     const v2 = compose(f.source, f.v8, '8');
     expect(v2.rows.map(row => row.rowKey)).toEqual(v1.rows.map(row => row.rowKey));
     for (const row of v2.rows) if (!MULTI_MODEL_KEYS.includes(row.rowKey)) expect(row).toEqual(v1.rows.find(old => old.rowKey === row.rowKey));
     expect(v2.addedKeys).toEqual(V1_ADDITIONS);
-    expect(v2.changedKeys).toEqual(['configuredProviderSet', 'evaluatorRoleRef', 'nodeRuntimeVersion', 'providerFamilyMap', 'storyCheckerRoleRef']);
+    expect(v2.changedKeys).toEqual(['configuredProviderSet', 'nodeRuntimeVersion', 'providerFamilyMap']);
     for (const key of V1_ADDITIONS) {
       const entry = v2.delta.find(row => row.rowKey === key)!;
       expect(entry).toMatchObject({ change: 'added', reason: 'added-source-key', oldValueJsonText: null, oldSourceRef: null, oldValueSha256: null, oldSourceRefSha256: null });
@@ -93,7 +99,7 @@ describe('publish kit v2: composing from the current version', () => {
     expect(v2.delta.find(row => row.rowKey === 'nodeRuntimeVersion')).toMatchObject({ change: 'changed', reason: 'observed-node-runtime', oldValueJsonText: '"v22.23.1"', newValueJsonText: '"v26.8.2"' });
   });
 
-  it('changes a value on top of the 68-row two-GLM version that v1 refuses, and the delta shows only that change plus the four multi-model rows', async () => {
+  it('changes a value on top of the 68-row two-GLM version that v1 refuses, and the delta shows only that change plus the two multi-model rows (the role rows stay unchanged)', async () => {
     const f = await fixture();
     expect(() => composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v9 as any, baseRegisterVersion: '9', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v9 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
     const before = structuredClone(f.v9);
@@ -118,6 +124,7 @@ describe('publish kit v2: composing from the current version', () => {
     expect(plan.baseRegisterVersion).toBe('9');
     // Every other row, the base-owned ones included, is the base row byte for byte.
     for (const row of plan.rows) if (row.rowKey !== 'composerContractHash' && !MULTI_MODEL_KEYS.includes(row.rowKey)) expect(row).toEqual(f.v9.find(base => base.rowKey === row.rowKey));
+    for (const key of ['synthesizerRoleRef', 'evaluatorRoleRef', 'storytellerRoleRef', 'storyCheckerRoleRef']) expect(plan.delta.map(entry => entry.rowKey)).not.toContain(key);
     expect(f.v9).toEqual(before);
   });
 
@@ -191,6 +198,58 @@ describe('publish kit v2: composing from the current version', () => {
   it('refuses a base whose snapshot hash is not the one selected', async () => {
     const f = await fixture();
     expect(() => composePreviewSnapshotV2({ sourceRows: f.source as any, baseRows: f.v9 as any, baseRegisterVersion: '9', baseSnapshotSha256: '0'.repeat(64) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+  });
+});
+
+describe('publish kit v2: the checker choice (GLM by default, DeepSeek only on the operator\'s word)', () => {
+  const build = async (choice?: unknown) => [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime, choice as any)] as Row[];
+  const ref = (rows: Row[], key: string) => JSON.parse(rows.find(row => row.rowKey === key)!.valueJsonText).providerRef;
+
+  it('an explicit {checker:\'glm\'} is the default, byte for byte', async () => {
+    expect(await build({ checker: 'glm' })).toEqual(await build());
+    expect(previewCheckerRoleRef()).toBe(PREVIEW_EVALUATOR_ROLE_REF);
+  });
+
+  it('with checker deepseek and the acknowledgement, the delta against the sealed two-GLM v9 also moves the checker and the story checker', async () => {
+    const f = await fixture();
+    const source = await build(DEEPSEEK);
+    const differing = source.filter(row => JSON.stringify(row) !== JSON.stringify(f.v1Source.find(old => old.rowKey === row.rowKey))).map(row => row.rowKey);
+    expect(differing).toEqual(DEEPSEEK_CHECKER_KEYS);
+    expect(ref(source, 'evaluatorRoleRef')).toBe('preview:deepseek-v4-1-flash');
+    expect(ref(source, 'storyCheckerRoleRef')).toBe('preview:deepseek-v4-1-flash');
+    expect(ref(source, 'synthesizerRoleRef')).toBe('preview:fixture-a');
+    expect(ref(source, 'storytellerRoleRef')).toBe('preview:fixture-a');
+    const plan = compose(source, f.v9);
+    expect(plan.changedKeys).toEqual(['composerContractHash', ...DEEPSEEK_CHECKER_KEYS]);
+    expect(plan.addedKeys).toEqual([]);
+    expect(JSON.parse(plan.delta.find(entry => entry.rowKey === 'evaluatorRoleRef')!.oldValueJsonText!).providerRef).toBe('preview:fixture-b');
+    expect(JSON.parse(plan.delta.find(entry => entry.rowKey === 'evaluatorRoleRef')!.newValueJsonText).providerRef).toBe('preview:deepseek-v4-1-flash');
+  });
+
+  it('switching on in two versions: the default four-ref version first, then the DeepSeek checker (only the two role rows), and back', async () => {
+    const f = await fixture();
+    const first = compose(f.source, f.v9);
+    const second = compose(await build(DEEPSEEK), [...first.rows] as Row[], '10');
+    expect(second.changedKeys).toEqual(['evaluatorRoleRef', 'storyCheckerRoleRef']);
+    const back = compose(f.source, [...second.rows] as Row[], '11');
+    expect(back.changedKeys).toEqual(['evaluatorRoleRef', 'storyCheckerRoleRef']);
+    expect(back.snapshotSha256).toBe(first.snapshotSha256);
+  });
+
+  it.each([
+    ['deepseek without the acknowledgement', { checker: 'deepseek' }, 'checker-deepseek-not-enabled-on-gate'],
+    ['deepseek with the acknowledgement false', { checker: 'deepseek', deepseekEnabledOnGate: false }, 'checker-deepseek-not-enabled-on-gate'],
+    ['deepseek with the acknowledgement as text', { checker: 'deepseek', deepseekEnabledOnGate: 'true' }, 'checker-deepseek-not-enabled-on-gate'],
+    ['an unknown checker', { checker: 'mimo' }, 'checker-choice'],
+    ['an unknown checker with the acknowledgement', { checker: 'mimo', deepseekEnabledOnGate: true }, 'checker-choice'],
+    ['glm with a stray acknowledgement', { checker: 'glm', deepseekEnabledOnGate: true }, 'checker-choice'],
+    ['deepseek with an extra field', { ...DEEPSEEK, maker: 'DeepSeek' }, 'checker-choice'],
+    ['a bare string', 'deepseek', 'checker-choice'],
+    ['null', null, 'checker-choice'],
+    ['an array', [DEEPSEEK], 'checker-choice']
+  ])('refuses %s, by its own rule, before building any row', async (_name, choice, rule) => {
+    await expect(build(choice)).rejects.toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
+    expect(() => previewCheckerRoleRef(choice)).toThrow(`PREVIEW_REGISTER_SNAPSHOT_REFUSED: ${rule}`);
   });
 });
 

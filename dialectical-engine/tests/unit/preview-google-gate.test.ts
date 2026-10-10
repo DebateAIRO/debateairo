@@ -17,7 +17,7 @@ import {
   geminiGenerateContentUrl, geminiPreviewRequestBody, observeProviderTarget, parsePreviewProviderTestConfig,
   parseProviderDiscoveryTargets, previewGoogleBucharestDay, previewGoogleCarefulPrices, previewGoogleLookaheadPrices,
   previewGoogleNativeBodyValid, previewGoogleReservationNanoUsd, previewModelRow, previewModelRowForRef,
-  previewNanoUsdText, previewProbeControls, previewTargetJsonRow, providerTargetGatewayControls, withPreviewProviderCallPolicy,
+  previewNanoUsdText, previewProbeControls, previewTargetJsonRow, previewTargetGatewayControls, providerTargetGatewayControls, withPreviewProviderCallPolicy,
   type PreviewBudgetExecution, type PreviewBudgetPort, type ProviderCallRequest, type ProviderDiscoveryTarget
 } from "@debateai/providers";
 import { evaluateAskAdmission, type RunCreationSettings } from "@debateai/api";
@@ -25,7 +25,7 @@ import type { AskRequest } from "@debateai/contract";
 import { gateHostedRoster } from "../../apps/runner/src/hosted-provider-set.js";
 import {
   assertPreviewBudgetAdmits, estimatePreviewGateNeeds, previewGateKeyOf, previewRemainingPorts,
-  PreviewDailyLimitRefusal, type PreviewBudgetGateSettings
+  PreviewDailyLimitRefusal, PreviewGateUnavailableRefusal, type PreviewBudgetGateSettings
 } from "../../apps/api/src/preview-budget-estimate.js";
 import { PREVIEW_MODEL_MAKERS, parsePreviewRosterFlag } from "../../apps/ui/lib/previewPlanRoster.js";
 import { previewAskProxyCeiling } from "../../apps/ui/lib/previewAskProxyCeiling.js";
@@ -355,7 +355,10 @@ describe("declared targets: the reviewed sets", () => {
   it("the Google target's gateway controls: high, its window, the native wire and the 16,384 answer bound", () => {
     const target = targets(GOOGLE_REFS).at(-1)!;
     expect(providerTargetGatewayControls(target)).toEqual({ thinking: { parameter: "reasoning_effort", levels: ["high"] },
-      contextWindowTokens: 1_048_576, adapterKind: "google-gemini-http", maxOutputTokens: 16_384 });
+      contextWindowTokens: 1_048_576, adapterKind: "google-gemini-http" });
+    // On the preview only, the answer bound comes from the reviewed row (A's previewTargetGatewayControls).
+    expect(previewTargetGatewayControls(parse(WITH_GOOGLE), target)).toEqual({ maxOutputTokens: 16_384 });
+    expect(previewTargetGatewayControls(undefined, target)).toEqual({});
     expect(previewProbeControls(target)).toEqual({ thinkingLevel: "high", tokenCeiling: 8192 });
   });
 });
@@ -385,6 +388,12 @@ const openGate = (enabledModels: string[], remainingNanoUsd = 30_000_000_000n) =
   state: "active" as const, windowOpen: true, remainingNanoUsd, remainingCalls: 1200, maxConcurrentCalls: 1,
   largestReservationNanoUsd: 519_264_000n, enabledModels });
 
+const REF_OF: Readonly<Record<string, string>> = Object.freeze({ [GLM]: "preview:fixture-a", [DEEPSEEK]: "preview:deepseek-v4-1-flash",
+  [MIMO]: "preview:mimo-v2-6-pro", [GEMINI]: PREVIEW_GOOGLE_PROVIDER_REF });
+const panelOf = (models: string[]) => models.map(model_id => ({ provider_ref: REF_OF[model_id]!, model_id }));
+const ROLES = (roleModelIds: string[]) => ({ roleModelIds, roleProviderRefs: roleModelIds.map(model => REF_OF[model]!),
+  storyCalls: 0, maxCooldownHoldsPerRun: 0 });
+
 describe("the start-of-debate estimate asks the Google gate", () => {
   it("maps each row to its own gate, and builds the Google /remaining port only when its socket is set", () => {
     expect([GLM, DEEPSEEK, MIMO, GEMINI].map(previewGateKeyOf)).toEqual(["deepinfra", "deepinfra", "deepinfra", "google"]);
@@ -392,43 +401,46 @@ describe("the start-of-debate estimate asks the Google gate", () => {
     expect(Object.keys(previewRemainingPorts(parse({ ...BASE, free_model_ids: [GLM] })!))).toEqual(["deepinfra"]);
   });
   it("prices every Google call at the row's ceiling", () => {
-    const needs = estimatePreviewGateNeeds({ basis: basis(2), panelModelIds: [GLM, GEMINI], roleModelIds: [GLM], storyCalls: 0 });
+    const needs = estimatePreviewGateNeeds({ basis: basis(2), panel: panelOf([GLM, GEMINI]), ...ROLES([GLM]) });
     const google = needs.find(need => need.gate === "google")!;
-    // 30 calls x (4,000 x 1,500 + 1,200 x 7,500) x 115 / 100.
-    expect(google).toMatchObject({ modelIds: [GEMINI], dearestModelId: GEMINI, expectedCalls: 30, callsNanoUsd: 517_500_000n });
+    expect(google).toMatchObject({ modelIds: [GEMINI], dearestModelId: GEMINI });
+    // Every call at (4,000 x 1,500 + 1,200 x 7,500) nano-USD, x 115 / 100, rounded up.
+    const raw = BigInt(google.expectedCalls) * (4_000n * 1_500n + 1_200n * 7_500n) * 115n;
+    expect(google.callsNanoUsd).toBe((raw + 99n) / 100n);
+    expect(google.expectedCalls).toBeGreaterThan(0);
   });
   const counted = () => {
     const calls = { deepinfra: 0, google: 0 };
     const gate = (roleModelIds: string[], withGoogle = true): PreviewBudgetGateSettings => Object.freeze({
       remaining: { deepinfra: async () => { calls.deepinfra += 1; return openGate([GLM, DEEPSEEK]); },
         ...(withGoogle ? { google: async () => { calls.google += 1; return openGate([GEMINI]); } } : {}) },
-      roleModelIds, storyCalls: 0 });
+      ...ROLES(roleModelIds), readUnfinishedRuns: async () => [] });
     return { calls, gate };
   };
   it("reads the Google gate for a Gemini panel member", async () => {
     const { calls, gate } = counted();
-    await assertPreviewBudgetAdmits(gate([GLM, DEEPSEEK]), { basis: basis(3), panelModelIds: [GLM, DEEPSEEK, GEMINI] });
+    await assertPreviewBudgetAdmits(gate([GLM, DEEPSEEK]), { basis: basis(3), panel: panelOf([GLM, DEEPSEEK, GEMINI]) });
     expect(calls).toEqual({ deepinfra: 1, google: 1 });
   });
   it("reads the Google gate for a Gemini role ref", async () => {
     const { calls, gate } = counted();
-    await assertPreviewBudgetAdmits(gate([GLM, GEMINI]), { basis: basis(2), panelModelIds: [GLM, DEEPSEEK] });
+    await assertPreviewBudgetAdmits(gate([GLM, GEMINI]), { basis: basis(2), panel: panelOf([GLM, DEEPSEEK]) });
     expect(calls).toEqual({ deepinfra: 1, google: 1 });
   });
   it("never reads the Google gate for a DeepInfra-only debate", async () => {
     const { calls, gate } = counted();
-    await assertPreviewBudgetAdmits(gate([GLM, DEEPSEEK]), { basis: basis(2), panelModelIds: [GLM, DEEPSEEK] });
+    await assertPreviewBudgetAdmits(gate([GLM, DEEPSEEK]), { basis: basis(2), panel: panelOf([GLM, DEEPSEEK]) });
     expect(calls).toEqual({ deepinfra: 1, google: 0 });
   });
-  it("refuses a Gemini debate without a Google port, and when the Google gate is short", async () => {
+  it("refuses a Gemini debate without a Google port (not available) and when the Google gate is short (daily)", async () => {
     const { gate } = counted();
-    await expect(assertPreviewBudgetAdmits(gate([GLM, DEEPSEEK], false), { basis: basis(3), panelModelIds: [GLM, DEEPSEEK, GEMINI] }))
-      .rejects.toBeInstanceOf(PreviewDailyLimitRefusal);
-    await expect(assertPreviewBudgetAdmits(gate([GLM, GEMINI], false), { basis: basis(2), panelModelIds: [GLM, DEEPSEEK] }))
-      .rejects.toMatchObject({ code: "DAILY_COST_ENVELOPE_REACHED", message: expect.stringContaining("no remaining port for gate google") });
+    await expect(assertPreviewBudgetAdmits(gate([GLM, DEEPSEEK], false), { basis: basis(3), panel: panelOf([GLM, DEEPSEEK, GEMINI]) }))
+      .rejects.toBeInstanceOf(PreviewGateUnavailableRefusal);
+    await expect(assertPreviewBudgetAdmits(gate([GLM, GEMINI], false), { basis: basis(2), panel: panelOf([GLM, DEEPSEEK]) }))
+      .rejects.toMatchObject({ code: "ASK_MODEL_CANDIDATE_UNAVAILABLE" });
     const short: PreviewBudgetGateSettings = Object.freeze({ remaining: { deepinfra: async () => openGate([GLM, DEEPSEEK]),
-      google: async () => openGate([GEMINI], 1_000_000_000n) }, roleModelIds: [GLM, DEEPSEEK], storyCalls: 0 });
-    await expect(assertPreviewBudgetAdmits(short, { basis: basis(3), panelModelIds: [GLM, DEEPSEEK, GEMINI] })).rejects.toBeInstanceOf(PreviewDailyLimitRefusal);
+      google: async () => openGate([GEMINI], 1_000_000_000n) }, ...ROLES([GLM, DEEPSEEK]), readUnfinishedRuns: async () => [] });
+    await expect(assertPreviewBudgetAdmits(short, { basis: basis(3), panel: panelOf([GLM, DEEPSEEK, GEMINI]) })).rejects.toBeInstanceOf(PreviewDailyLimitRefusal);
   });
 });
 
@@ -451,7 +463,7 @@ describe("a three-maker panel with Gemini through the real admission path", () =
       previewProviderTestConfig: config,
       previewBudgetGate: { remaining: {
         deepinfra: async () => { asked.deepinfra += 1; return openGate([GLM, DEEPSEEK]); },
-        google: async () => { asked.google += 1; return openGate([GEMINI]); } }, roleModelIds: [GLM, DEEPSEEK], storyCalls: 0 },
+        google: async () => { asked.google += 1; return openGate([GEMINI]); } }, ...ROLES([GLM, DEEPSEEK]), readUnfinishedRuns: async () => [] },
       resolveDiscoveredPanel: async () => [member("preview:fixture-a", "Z.AI", GLM), member("preview:fixture-b", "Z.AI", GLM),
         member("preview:deepseek-v4-1-flash", "DeepSeek", DEEPSEEK), member(PREVIEW_GOOGLE_PROVIDER_REF, "Google", GEMINI)]
     }), ASK);
@@ -474,7 +486,7 @@ function googleGateway(googleReply: () => string) {
   const recorded = recordingPorts(googleReply);
   const fetchImplementation = createPreviewGuardedFetch(recorded.ports, { clock: () => NOW });
   const native = new GeminiGenerateProviderGateway({ endpoint: target.baseUrl, model: target.model, maker: target.maker,
-    ...providerTargetGatewayControls(target), fetchImplementation,
+    ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(parse(WITH_GOOGLE), target), fetchImplementation,
     persistRawArtifact: async artifact => artifact.artifactId, appendLedgerEntry: async entry => entry.attemptId,
     assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined });
   return { ...recorded, target, native };

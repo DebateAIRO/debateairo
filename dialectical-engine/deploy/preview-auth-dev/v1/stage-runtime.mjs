@@ -7,9 +7,9 @@ import { pathToFileURL } from 'node:url';
 import { createServer } from 'node:http';
 import pg from 'pg';
 import { sha256,refuse,withPrivateBytes } from './custody.mjs';
-import { REQUIRED_AUTH_ROUTES } from './ui-build.mjs';
+import { REQUIRED_AUTH_ROUTES,builtModelRosterFlag } from './ui-build.mjs';
 import { PREVIEW_ORIGIN,PREVIEW_SITE_KEY } from './turnstile-custody.mjs';
-import { PREVIEW_FREE_MODEL_IDS_JSON } from './environment.mjs';
+import { uiRosterMatchesApiConfig } from './environment.mjs';
 import { STAGE_REQUIRED_PROOFS } from './stage-plan.mjs';
 function ownedChild(command,args,options){
  const child=spawn(command,args,{...options,shell:false,detached:true,stdio:['ignore','pipe','pipe']});let output='';
@@ -20,6 +20,10 @@ function ownedChild(command,args,options){
 async function eventually(probe,child){const limit=Date.now()+60000;while(Date.now()<limit){if(child.child.exitCode!==null||child.child.signalCode!==null)refuse('PREVIEW_STAGE_PROCESS_EXITED');try{const value=await probe();if(value)return value;}catch{}await new Promise(resolve=>setTimeout(resolve,50));}refuse('PREVIEW_STAGE_LISTEN_TIMEOUT');}
 export async function exerciseStageRuntime({apiRoot,uiRoot,stateRoot,environment,publication,uiPort,fullFixture,artifact}) {
  if(environment.NODE_ENV!=='production'||environment.DEBATEAI_DEPLOYMENT_MODE!=='local'||environment.REGISTER_VERSION!==publication.registerVersion||environment.PUBLIC_APP_URL!==PREVIEW_ORIGIN)refuse('PREVIEW_STAGE_ENVIRONMENT_REFUSED');
+ // The one place that holds both sides: the website's model list (as built) must offer exactly what the
+ // API's preview configuration allows (environment.mjs uiRosterMatchesApiConfig), before anything starts.
+ const modelRoster=await builtModelRosterFlag(join(uiRoot,'apps/ui/.next'));
+ if(!uiRosterMatchesApiConfig(modelRoster,environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON))refuse('PREVIEW_STAGE_MODEL_ROSTER_REFUSED');
  // This helper accepts synthetic .test custody only from the controller-owned stage fixture. It never opens installed environments.
  await mkdir(stateRoot,{recursive:true,mode:0o700});const entry=join(stateRoot,'stage-api-entry.mjs');
  const captureRoot=join(stateRoot,'mail');await mkdir(captureRoot,{mode:0o700});
@@ -36,7 +40,7 @@ export async function exerciseStageRuntime({apiRoot,uiRoot,stateRoot,environment
   if(event.pid!==api.child.pid||event.platform!==process.platform||event.registerVersion!==publication.registerVersion||event.mainSha256!==mainSha256)refuse('PREVIEW_STAGE_EVENT_REFUSED');
   const apiBase=`http://127.0.0.1:${environment.API_PORT}`;
   const apiProofs={};for(const path of ['/v1/deployment','/v1/auth/password-reset/status','/v1/auth/mfa-recovery/status']){const result=await fetch(apiBase+path,{signal:AbortSignal.timeout(5000)});if(result.status!==401)refuse('PREVIEW_STAGE_API_RESPONSE_REFUSED');apiProofs[path]={status:result.status};await result.body?.cancel();}
-  const uiEnv={NODE_ENV:'production',PORT:String(uiPort),DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:apiBase,PUBLIC_APP_URL:PREVIEW_ORIGIN,NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:PREVIEW_FREE_MODEL_IDS_JSON,TURNSTILE_SITE_KEY:PREVIEW_SITE_KEY,PATH:'/usr/local/bin:/usr/bin:/bin'};
+  const uiEnv={NODE_ENV:'production',PORT:String(uiPort),DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:apiBase,PUBLIC_APP_URL:PREVIEW_ORIGIN,NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:modelRoster,TURNSTILE_SITE_KEY:PREVIEW_SITE_KEY,PATH:'/usr/local/bin:/usr/bin:/bin'};
   ui=ownedChild(process.execPath,[join(uiRoot,'apps/ui/server.mjs')],{cwd:join(uiRoot,'apps/ui'),env:uiEnv});
   const uiBase=`http://127.0.0.1:${uiPort}`;
   await eventually(async()=>{const r=await fetch(uiBase+'/login',{signal:AbortSignal.timeout(1000)});await r.body?.cancel();return r.status===200;},ui);
@@ -265,7 +269,7 @@ async function fullStageCases({apiRoot,uiRoot,apiBase,uiBase,captureRoot,environ
   proofs[{'passkey':'passkey-general-recovery',totp:'direct-totp-general-recovery',provider:'nullable-provider-general-recovery'}[kind]]=passed({method,proofs:2,evidence:true,oldMethodDenied:true,ordinaryOnlyAfterCompletion:true});
  }
  proofs['scoped-cookie-and-origin']=passed({observationsSha256:sha256(JSON.stringify(observations)),wrongOrigin:403,missingWrongCsrf:403,capabilitySession:401,resetFactorAndCodePreserved:true});
- const {previewAskProxyCeiling}=await tsImport(join(uiRoot,'apps/ui/lib/previewAskProxyCeiling.ts'),import.meta.url),models=PREVIEW_FREE_MODEL_IDS_JSON,input={method:'POST',path:['v1','asks'],origin:PREVIEW_ORIGIN};
+ const {previewAskProxyCeiling}=await tsImport(join(uiRoot,'apps/ui/lib/previewAskProxyCeiling.ts'),import.meta.url),models=await builtModelRosterFlag(join(uiRoot,'apps/ui/.next')),input={method:'POST',path:['v1','asks'],origin:PREVIEW_ORIGIN};
  check(previewAskProxyCeiling(input,models)===1260000,'PROXY_CEILING');for(const patch of [{method:'GET'},{path:['v1','asks','other']},{origin:'https://other.test'},{path:['v1','answers']}])check(previewAskProxyCeiling({...input,...patch},models)===undefined,'PROXY_SCOPE');
  const proxySource=await readFile(join(uiRoot,'apps/ui/app/api/[...path]/route.ts'),'utf8');check(proxySource.includes('PUBLISH_UPSTREAM_TIMEOUT_MS = 85_000')&&proxySource.includes('UPSTREAM_TIMEOUT_MS = 30_000')&&proxySource.includes('previewAskProxyCeiling({method:request.method,path,origin:request.headers.get("origin")}'),'PROXY_SOURCE');
  proofs['proxy-exact-path-deadline']=passed({sourceSha256:sha256(proxySource),helperSha256:sha256(await readFile(join(uiRoot,'apps/ui/lib/previewAskProxyCeiling.ts'))),ceiling:1260000,ordinary:30000,publish:85000,kind:'source-bound-pure-helper-and-actual-ui-route',measuredLongDeadline:false});

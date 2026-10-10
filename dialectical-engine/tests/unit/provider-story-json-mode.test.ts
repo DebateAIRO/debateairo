@@ -42,10 +42,11 @@ const high = { ...request, thinkingLevel: "high" };
 describe("story JSON mode is an effective, target-specific wire control", () => {
   it("infers support only for the exact verified endpoint and model", () => {
     const target = { providerRef: "synthetic", maker: "Z.AI", baseUrl: ENDPOINT, model: MODEL };
-    expect(providerTargetGatewayControls(target)).toEqual({ supportsJsonObjectResponse: true, maxOutputTokens: 163_840 });
-    // Contract A §1: JSON mode is row-driven; the two other reviewed rows refuse it and keep their own bound.
+    expect(providerTargetGatewayControls(target)).toEqual({ supportsJsonObjectResponse: true });
+    // Contract A §1: JSON mode is row-driven; the two other reviewed rows refuse it. The row's output
+    // cap is the preview's alone (previewTargetGatewayControls), never added to an ordinary target.
     for (const model of ["deepseek-ai/DeepSeek-V4.1-Flash", "XiaomiMiMo/MiMo-V2.6-Pro"]) {
-      expect(providerTargetGatewayControls({ ...target, model })).toEqual({ maxOutputTokens: 131_072 });
+      expect(providerTargetGatewayControls({ ...target, model })).toEqual({});
     }
     for (const other of [
       { ...target, baseUrl: "https://other.example/v1/openai" },

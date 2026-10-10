@@ -290,8 +290,6 @@ export type ProviderTargetGatewayControls = Readonly<{
   supportsJsonObjectResponse?: boolean;
   /** PR C: the target's native wire, for `createProviderGatewayForAdapter`; absent = OpenAI-compatible. */
   adapterKind?: string;
-  /** Contract A §2: a reviewed preview row's output bound; max_tokens is never sent above it. */
-  maxOutputTokens?: number;
 }>;
 
 /** The reviewed preview row behind an endpoint and model, if any (contract A §1; PR C adds Google's). */
@@ -309,8 +307,7 @@ export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): 
     }),
     ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens }),
     ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{}),
-    ...(target.adapterKind === undefined ? {} : { adapterKind: target.adapterKind }),
-    ...(reviewedPreviewRow(target.baseUrl,target.model)===undefined?{}:{maxOutputTokens:reviewedPreviewRow(target.baseUrl,target.model)!.outputBound})
+    ...(target.adapterKind === undefined ? {} : { adapterKind: target.adapterKind })
   });
 }
 
