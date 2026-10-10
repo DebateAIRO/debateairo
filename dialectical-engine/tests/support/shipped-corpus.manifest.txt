@@ -951,6 +951,7 @@ packages/providers/src/prompt-tripwire.ts
 packages/providers/src/provider-probe.ts
 packages/published-arithmetic/src/index.ts
 packages/register/src/algorithm-policy.ts
+packages/register/src/answer-role-rotation-policy.ts
 packages/register/src/auth-policy.ts
 packages/register/src/billing-plans.ts
 packages/register/src/billing-policy.ts
