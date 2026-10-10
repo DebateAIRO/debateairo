@@ -8,17 +8,21 @@
  * team money and calls. If the debate does not fit, or the gate is closed, halted, will not serve
  * one of the debate's models, or cannot be asked, the debate is not started at all.
  *
- * Today there is ONE gate (the config's `budget_socket`), serving every reviewed DeepInfra row.
- * Each row maps to its gate by `previewGateKeyOf`; a later per-provider socket map adds keys there
- * and one port per key in `PreviewBudgetGateSettings.remaining`, without changing the estimate.
+ * One gate per provider (PR B): the DeepInfra gate on the config's `budget_socket`, the Anthropic
+ * gate on `anthropic_budget_socket`. Each row maps to its gate by `previewGateKeyOf` (the row's
+ * provider), and every gate a debate's panel or role models use is asked; a gate the config does
+ * not name has no port, so a debate needing it is refused before it starts.
  */
 import { TypedDomainError } from "@debateai/kernel";
 import {
+  PREVIEW_PROVIDER_NAMES,
   createPreviewRemainingRpcPort,
   previewModelRow,
   previewModelRowForRef,
+  previewProviderSocket,
   type PreviewGateRemaining,
   type PreviewModelRow,
+  type PreviewProviderName,
   type PreviewProviderTestConfig
 } from "@debateai/providers";
 import { readStoryPolicyFromRegister, readSynthesisRoleControls } from "@debateai/register";
@@ -63,8 +67,8 @@ export class PreviewDailyLimitRefusal extends TypedDomainError {
   }
 }
 
-/** The gates the preview has; today only the DeepInfra gate on `budget_socket`. */
-export type PreviewGateKey = "deepinfra";
+/** The gates the preview has: one per reviewed provider. */
+export type PreviewGateKey = PreviewProviderName;
 
 /** Average call the estimate assumes (input and output tokens). */
 export const PREVIEW_ESTIMATE_INPUT_TOKENS_PER_CALL = 4_000n;
@@ -75,8 +79,8 @@ export const PREVIEW_ESTIMATE_MARGIN_DENOMINATOR = 100n;
 
 /** What admission needs to ask the gate(s); built once at boot from the preview config and the register. */
 export type PreviewBudgetGateSettings = Readonly<{
-  /** One read-only remaining port per gate. */
-  remaining: Readonly<Record<PreviewGateKey, (signal?: AbortSignal) => Promise<PreviewGateRemaining>>>;
+  /** One read-only remaining port per gate the config names (a gate without a socket has none). */
+  remaining: Readonly<Partial<Record<PreviewGateKey, (signal?: AbortSignal) => Promise<PreviewGateRemaining>>>>;
   /** The register's role models (answer writer and checker, storyteller and story checker), as model ids. */
   roleModelIds: readonly string[];
   /** Calls the verdict story may make after the answer (both story roles, every round). */
@@ -85,7 +89,7 @@ export type PreviewBudgetGateSettings = Readonly<{
 
 /** The gate a reviewed model's calls go through, or undefined for a model the preview never calls. */
 export function previewGateKeyOf(model: string): PreviewGateKey | undefined {
-  return previewModelRow(model) === undefined ? undefined : "deepinfra";
+  return previewModelRow(model)?.provider;
 }
 
 /** One average call at a row's list price, in nano-USD. */
@@ -196,7 +200,7 @@ export async function assertPreviewBudgetAdmits(
   }
   for (const need of needs) {
     const port = gate!.remaining[need.gate];
-    if (port === undefined) refuse(`no remaining port for gate ${need.gate}`);
+    if (port === undefined) return refuse(`no remaining port for gate ${need.gate}`);
     let remaining: PreviewGateRemaining;
     try {
       remaining = await port();
@@ -206,6 +210,20 @@ export async function assertPreviewBudgetAdmits(
     const reason = previewGateRefusalReason(need, remaining);
     if (reason !== null) refuse(reason);
   }
+}
+
+/** One read-only /remaining port per gate the config names: DeepInfra's always, Anthropic's when set. */
+export function previewRemainingPorts(
+  config: PreviewProviderTestConfig
+): PreviewBudgetGateSettings["remaining"] {
+  const remaining: Partial<Record<PreviewGateKey, (signal?: AbortSignal) => Promise<PreviewGateRemaining>>> = {};
+  for (const provider of PREVIEW_PROVIDER_NAMES) {
+    const socket = previewProviderSocket(config, provider);
+    if (socket === undefined) continue;
+    const port = createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: config.scope_id });
+    remaining[provider] = (signal?: AbortSignal) => port.remaining(signal);
+  }
+  return Object.freeze(remaining);
 }
 
 /**
@@ -222,9 +240,8 @@ export async function readPreviewBudgetGateSettings(
   const story = await readStoryPolicyFromRegister(pool, registerVersion).catch(() => null);
   const refs = [roles.synthesizerRoleRef, roles.evaluatorRoleRef,
     ...(story === null ? [] : [story.storytellerRoleRef, story.storyCheckerRoleRef])];
-  const port = createPreviewRemainingRpcPort(config);
   return Object.freeze({
-    remaining: Object.freeze({ deepinfra: (signal?: AbortSignal) => port.remaining(signal) }),
+    remaining: previewRemainingPorts(config),
     roleModelIds: Object.freeze(refs.map((ref) => previewModelRowForRef(ref)?.model ?? `unreviewed-ref:${ref}`)),
     storyCalls: story === null ? 0 : 2 * story.loopMaxRounds
   });

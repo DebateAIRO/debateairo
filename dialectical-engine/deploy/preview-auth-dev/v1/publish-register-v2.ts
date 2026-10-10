@@ -18,6 +18,9 @@
 // second maker serves with marks, never blocks). The answer writer stays fixture-a (GLM); the checker
 // moves to the DeepSeek ref, a different maker, so the answer is checked by another maker. The base may
 // be the sealed two-GLM pair (or its historical shapes) or a version this kit already published.
+// PR B (2026-10-10): the source set also carries Anthropic's reviewed ref (preview:claude-haiku-5-5,
+// maker Anthropic, adapter kind anthropic-messages-http). A base may be any reviewed set: DeepInfra's
+// refs plus any other reviewed providers' refs, in register order.
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';
@@ -31,7 +34,7 @@ import {
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
 import { parseProviderDiscoveryTargets } from '@debateai/providers';
 import { PREVIEW_GLM_PROVIDER_REFS, assertPreviewProviderTargets } from '../../../packages/providers/src/preview-test.js';
-import { PREVIEW_MODEL_ROWS, PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef, previewTargetJsonRow } from '../../../packages/providers/src/preview-models.js';
+import { PREVIEW_MODEL_ROWS, PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef, previewRefsAreReviewedSet, previewTargetJsonRow } from '../../../packages/providers/src/preview-models.js';
 import { staffAccessPolicyFromValue } from '../../../packages/register/src/staff-access-policy.js';
 import { internalAllowancePolicyFromValue } from '../../../packages/register/src/internal-allowance-policy.js';
 import { publishPreviewRegister, type RuntimeObservation, type PreviewSnapshot } from './publish-register.js';
@@ -78,7 +81,8 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
   if(runtime.nodeVersion!=='v26.8.2'||runtime.pnpmVersion!=='11.20.0'||!/^([0-9a-f]{40})$/.test(runtime.sourceRevision)
     ||!/^([0-9a-f]{40})$/.test(runtime.sourceTree)||!/^([0-9a-f]{64})$/.test(runtime.operatorSha256)
     ||!Number.isFinite(Date.parse(runtime.observedAt))||bootstrap.values.pnpmVersion!==runtime.pnpmVersion||bootstrap.values.postgresMajorVersion!=='18')fail();
-  const configuredProviders=PREVIEW_REVIEWED_PROVIDER_REFS.map(providerRef=>({providerRef,adapterKind:'openai-compatible-http' as const,maker:previewModelRowForRef(providerRef)!.maker}));
+  // PR B: each ref carries its row's adapter kind (Claude Haiku: the native Anthropic Messages adapter).
+  const configuredProviders=PREVIEW_REVIEWED_PROVIDER_REFS.map(providerRef=>({providerRef,adapterKind:previewModelRowForRef(providerRef)!.adapterKind,maker:previewModelRowForRef(providerRef)!.maker}));
   const targetsJson=JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow));
   const targets=parseProviderDiscoveryTargets(targetsJson,configuredProviders);
   // Validation only; composition never contacts an authority or declares health.
@@ -121,10 +125,12 @@ function assertProviderRows(rows:ReadonlyMap<string,RegisterPublicationRow>, sid
   if(!credentialFree(providers)||!Array.isArray(providers?.providers))fail();
   if(side==='source'){
     if(!sameRefs(providers.providers,PREVIEW_REVIEWED_PROVIDER_REFS)||providers.requiredDistinctMakers!==1
-      ||providers.providers.some((p:any)=>Object.keys(p).sort().join(',')!=='adapterKind,maker,providerRef'||p.adapterKind!=='openai-compatible-http'||p.maker!==previewModelRowForRef(p.providerRef)?.maker))fail();
+      ||providers.providers.some((p:any)=>Object.keys(p).sort().join(',')!=='adapterKind,maker,providerRef'||p.adapterKind!==previewModelRowForRef(p.providerRef)?.adapterKind||p.maker!==previewModelRowForRef(p.providerRef)?.maker))fail();
     return;
   }
-  if(!sameRefs(providers.providers,PREVIEW_GLM_PROVIDER_REFS)&&!sameRefs(providers.providers,PREVIEW_REVIEWED_PROVIDER_REFS))fail();
+  // The base may be the sealed two-GLM pair or any reviewed set (DeepInfra's refs plus any other
+  // reviewed providers', in order): a version published before a provider's gate existed qualifies.
+  if(!sameRefs(providers.providers,PREVIEW_GLM_PROVIDER_REFS)&&!previewRefsAreReviewedSet(providers.providers.map((p:any)=>p?.providerRef)))fail();
   const vetted=providers.setVersion===2;
   if(providers.kind!=='CONFIGURED_PROVIDER_SET'||Object.keys(providers).sort().join(',')!==(vetted?'kind,providers,requiredDistinctMakers,setVersion':'kind,providers,requiredDistinctMakers')
     ||providers.providers.some((p:any)=>Object.keys(p).sort().join(',')!==(vetted?'adapterKind,maker,providerRef,vetting':'adapterKind,maker,providerRef')

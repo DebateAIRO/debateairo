@@ -5,9 +5,9 @@ import { TypedDomainError } from "@debateai/kernel";
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import {
-  PREVIEW_CONTEXT_WINDOW_TOKENS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
-  PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRow, previewModelRowForRef, previewNanoUsdText, previewReservationNanoUsd,
-  previewRostersHonourMakerRule, type PreviewModelRow
+  PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
+  previewModelRow, previewModelRowForRef, previewNanoUsdText, previewRefsAreReviewedSet, previewReservationNanoUsd,
+  previewRostersHonourMakerRule, type PreviewModelRow, type PreviewProviderName
 } from "./preview-models.js";
 
 export const PREVIEW_GLM_MODEL = "zai-org/GLM-5.3-Flash" as const;
@@ -35,6 +35,10 @@ export const PREVIEW_GLM_TARGET = Object.freeze({
  * - six keys with `free_model_ids` and `premium_model_ids`, each a non-empty list of unique reviewed
  *   model ids; when the two lists together name two or more makers, EACH names two or more.
  * Parsed, both forms carry both lists.
+ *
+ * PR B: the six-key form may also carry `anthropic_budget_socket`, the Anthropic gate's socket (same
+ * folder and pattern, never the DeepInfra socket). A roster naming an Anthropic model requires it.
+ * `budget_socket` stays the DeepInfra gate's. Every gate is asked with the one `scope_id`.
  */
 export interface PreviewProviderTestConfig {
   readonly deployment: "v3-preview";
@@ -43,12 +47,22 @@ export interface PreviewProviderTestConfig {
   readonly requested_thinking_level: "high";
   readonly budget_socket: string;
   readonly scope_id: string;
+  readonly anthropic_budget_socket?: string;
+}
+/** Each non-DeepInfra provider's optional socket key (a later provider adds its own key here). */
+export const PREVIEW_PROVIDER_SOCKET_KEYS: Readonly<Record<Exclude<PreviewProviderName, "deepinfra">, "anthropic_budget_socket">> =
+  Object.freeze({ anthropic: "anthropic_budget_socket" });
+const PREVIEW_SOCKET_PATTERN = /^\/run\/debateai-v3-preview\/[a-z0-9-]+\.sock$/u;
+/** The gate socket a provider's calls go through under this config, or undefined when it has none. */
+export function previewProviderSocket(config: PreviewProviderTestConfig, provider: PreviewProviderName): string | undefined {
+  return provider === "deepinfra" ? config.budget_socket : config[PREVIEW_PROVIDER_SOCKET_KEYS[provider]];
 }
 /** What the target check needs; the legacy five-key literal (v1 publish kit) still fits it. */
 export type PreviewTargetRosters = Readonly<Partial<PreviewProviderTestConfig> & { free_model_ids: readonly string[] }>;
 function refused(): never { throw new TypeError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID"); }
 const LEGACY_CONFIG_KEYS = ["budget_socket", "deployment", "free_model_ids", "requested_thinking_level", "scope_id"];
 const CONFIG_KEYS = [...LEGACY_CONFIG_KEYS, "premium_model_ids"].sort();
+const OPTIONAL_SOCKET_KEYS: readonly string[] = Object.values(PREVIEW_PROVIDER_SOCKET_KEYS);
 function reviewedRoster(value: unknown): readonly string[] {
   if (!Array.isArray(value) || value.length < 1 || value.length > PREVIEW_MODEL_ROWS.length
     || value.some(id => previewModelRow(id) === undefined) || new Set(value).size !== value.length) return refused();
@@ -61,15 +75,25 @@ export function parsePreviewProviderTestConfig(source: string | undefined): Prev
   const row = value as Record<string, unknown>;
   const keys = Object.keys(row).sort().join(",");
   const legacy = keys === LEGACY_CONFIG_KEYS.join(",");
-  if ((!legacy && keys !== CONFIG_KEYS.join(",")) || row.deployment !== "v3-preview" || row.requested_thinking_level !== "high"
-    || typeof row.budget_socket !== "string" || !/^\/run\/debateai-v3-preview\/[a-z0-9-]+\.sock$/u.test(row.budget_socket)
+  const socketKeys = Object.keys(row).filter(key => OPTIONAL_SOCKET_KEYS.includes(key));
+  const baseKeys = Object.keys(row).filter(key => !OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(",");
+  if ((!legacy && baseKeys !== CONFIG_KEYS.join(",")) || row.deployment !== "v3-preview" || row.requested_thinking_level !== "high"
+    || typeof row.budget_socket !== "string" || !PREVIEW_SOCKET_PATTERN.test(row.budget_socket)
     || typeof row.scope_id !== "string" || !/^[a-z0-9][a-z0-9-]{0,95}$/u.test(row.scope_id)) return refused();
+  // Each provider's own socket: the same folder and pattern, and never another gate's socket.
+  const sockets = [row.budget_socket, ...socketKeys.map(key => row[key])];
+  if (socketKeys.some(key => typeof row[key] !== "string" || !PREVIEW_SOCKET_PATTERN.test(row[key] as string))
+    || new Set(sockets).size !== sockets.length) return refused();
   if (legacy && (!Array.isArray(row.free_model_ids) || row.free_model_ids.length !== 1 || row.free_model_ids[0] !== PREVIEW_GLM_MODEL)) return refused();
   const free = reviewedRoster(row.free_model_ids);
   const premium = legacy ? free : reviewedRoster(row.premium_model_ids);
   if (!previewRostersHonourMakerRule(free, premium)) return refused();
-  return Object.freeze({ deployment: "v3-preview", free_model_ids: free, premium_model_ids: premium,
-    requested_thinking_level: "high", budget_socket: row.budget_socket, scope_id: row.scope_id });
+  const config: PreviewProviderTestConfig = Object.freeze({ deployment: "v3-preview", free_model_ids: free, premium_model_ids: premium,
+    requested_thinking_level: "high", budget_socket: row.budget_socket, scope_id: row.scope_id,
+    ...Object.fromEntries(socketKeys.sort().map(key => [key, row[key] as string])) });
+  // A roster model whose provider has no gate socket here could never be called: refuse to boot.
+  if ([...free, ...premium].some(id => previewProviderSocket(config, previewModelRow(id)!.provider) === undefined)) return refused();
+  return config;
 }
 export function validatePreviewProviderTestConfig(value: unknown): PreviewProviderTestConfig | undefined {
  if(value===undefined)return undefined;
@@ -139,18 +163,19 @@ export function previewPlanTierRosters<T extends Readonly<{ free: readonly strin
  */
 export function assertPreviewProviderTargets(config: PreviewTargetRosters | undefined, targets: readonly ProviderDiscoveryTarget[]): void {
   if (config === undefined) return;
-  const refs = targets.map(target => target.providerRef).join("\0");
-  if (refs !== PREVIEW_GLM_PROVIDER_REFS.join("\0") && refs !== PREVIEW_REVIEWED_PROVIDER_REFS.join("\0")) refused();
+  const refs = targets.map(target => target.providerRef);
+  if (refs.join("\0") !== PREVIEW_GLM_PROVIDER_REFS.join("\0") && !previewRefsAreReviewedSet(refs)) refused();
   for (const target of targets) {
     const reviewed = previewModelRowForRef(target.providerRef);
     if (reviewed === undefined || target.model !== reviewed.model || target.maker !== reviewed.maker
-      || target.baseUrl !== PREVIEW_DEEPINFRA_BASE_URL
+      || target.baseUrl !== reviewed.baseUrl
+      || (target.adapterKind ?? "openai-compatible-http") !== reviewed.adapterKind
       || (reviewed.effort === null
         ? target.thinkingParameter !== undefined || target.thinkingLevels !== undefined
         : target.thinkingParameter !== "reasoning_effort" || target.thinkingLevels?.length !== 1 || target.thinkingLevels[0] !== reviewed.effort)
       || target.inputPriceMicrosPerMillionTokens !== reviewed.inputPriceMicrosPerMillion
       || target.outputPriceMicrosPerMillionTokens !== reviewed.outputPriceMicrosPerMillion
-      || target.contextWindowTokens !== PREVIEW_CONTEXT_WINDOW_TOKENS
+      || target.contextWindowTokens !== reviewed.contextWindowTokens
       || target.authorizationHeader !== undefined || target.authorizationFile !== undefined) refused();
   }
   const served = new Set(targets.map(target => target.model));
@@ -210,34 +235,85 @@ export interface PreviewBudgetExecution {
 export interface PreviewBudgetPort {
   execute(input: PreviewBudgetExecution, signal?: AbortSignal): Promise<Readonly<{ status: number; body: string }>>;
 }
+/** Each provider's gate port; a single port (the pre-PR-B form) is the DeepInfra gate's. */
+export type PreviewBudgetPorts = Readonly<Partial<Record<PreviewProviderName, PreviewBudgetPort>>>;
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+/** Contract A §2: the DeepInfra (OpenAI) body the DeepInfra gate accepts for a row of its own. */
+function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
+  if (reviewed.provider !== "deepinfra") return false;
+  const hasResponseFormat = Object.hasOwn(body, "response_format");
+  const responseFormat = body.response_format;
+  if (hasResponseFormat && (!reviewed.jsonObject || !isPlainObject(responseFormat)
+    || Object.keys(responseFormat).length !== 1 || !Object.hasOwn(responseFormat, "type") || responseFormat.type !== "json_object")) return false;
+  const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["reasoning_effort"])];
+  return Object.keys(body).length === required.length + (hasResponseFormat ? 1 : 0)
+    && required.every(key => Object.hasOwn(body, key))
+    && (reviewed.effort === null || body.reasoning_effort === reviewed.effort)
+    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
+    && Array.isArray(body.messages);
+}
 /**
- * Contract A §2/§3: the one fetch the preview's provider calls and probes go through. It sends only
- * a body the gate accepts for that body's reviewed row (exact keys, the row's effort and JSON
- * switches, 1 <= max_tokens <= the row's bound, at most 256 KiB) and reserves at that row's price.
+ * PR B, the wire contract's Anthropic body, exactly as the Anthropic gate checks it: `model`,
+ * `max_tokens` (1..the row's bound), `messages` (non-empty, each exactly {role user|assistant,
+ * content text}, the first a user turn), an optional `system` text, and `output_config`
+ * {"effort": "high"} exactly when the row has an effort switch. Nothing else, anywhere.
  */
-export function createPreviewGuardedFetch(port: PreviewBudgetPort): typeof fetch {
+function anthropicBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow): boolean {
+  if (reviewed.provider !== "anthropic") return false;
+  const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["output_config"])];
+  const optional = Object.hasOwn(body, "system") ? 1 : 0;
+  const messages = body.messages;
+  const effort = body.output_config;
+  return Object.keys(body).length === required.length + optional
+    && required.every(key => Object.hasOwn(body, key))
+    && (optional === 0 || typeof body.system === "string")
+    && (reviewed.effort === null || (isPlainObject(effort) && Object.keys(effort).length === 1 && effort.effort === reviewed.effort))
+    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= reviewed.outputBound
+    && Array.isArray(messages) && messages.length >= 1
+    && messages.every(message => isPlainObject(message) && Object.keys(message).length === 2
+      && (message.role === "user" || message.role === "assistant") && typeof message.content === "string")
+    && (messages[0] as Record<string, unknown>).role === "user";
+}
+/** No key ever leaves the app for a gate: a key header on the guarded fetch is refused. */
+function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
+  if (headers === undefined) return false;
+  const names = [...new Headers(headers).keys()].map(name => name.toLowerCase());
+  return names.some(name => name === "authorization" || name === "x-api-key" || name === "x-goog-api-key");
+}
+/**
+ * Contract A §2/§3, PR B: the one fetch the preview's provider calls and probes go through. It
+ * routes by the EXACT call URL to that provider's gate (DeepInfra chat completions to the DeepInfra
+ * gate, Anthropic Messages to the Anthropic gate), so a call can only ever reach its own provider's
+ * socket. It sends only a body that gate accepts for that body's reviewed row of THAT provider
+ * (exact keys, the row's effort and JSON switches, 1 <= max_tokens <= the row's bound, at most
+ * 256 KiB), never a key header, and reserves at that row's price.
+ */
+export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudgetPorts): typeof fetch {
+  const byProvider: PreviewBudgetPorts = typeof (ports as PreviewBudgetPort).execute === "function"
+    ? Object.freeze({ deepinfra: ports as PreviewBudgetPort }) : ports as PreviewBudgetPorts;
   return async (input, init) => {
     if (init?.signal?.aborted) throw new DOMException("Private preview call canceled", "TimeoutError");
-    if (String(input) !== `${PREVIEW_DEEPINFRA_BASE_URL}/chat/completions` || init?.method !== "POST" || typeof init.body !== "string"
-      || Buffer.byteLength(init.body, "utf8") > PREVIEW_REQUEST_BODY_MAX_BYTES) refused();
-    let decoded: unknown; try { decoded = JSON.parse(init.body); } catch { return refused(); }
-    if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) refused();
-    const body = decoded as Record<string, unknown>;
-    const reviewed: PreviewModelRow = previewModelRow(body.model) ?? refused();
-    const hasResponseFormat = Object.hasOwn(body, "response_format");
-    const responseFormat = body.response_format as Record<string, unknown> | null;
-    if (hasResponseFormat && (!reviewed.jsonObject || typeof responseFormat !== "object" || responseFormat === null || Array.isArray(responseFormat)
-      || Object.keys(responseFormat).length !== 1 || !Object.hasOwn(responseFormat, "type") || responseFormat.type !== "json_object")) refused();
-    const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["reasoning_effort"])];
-    if (Object.keys(body).length !== required.length + (hasResponseFormat ? 1 : 0)
-      || !required.every(key => Object.hasOwn(body, key))
-      || (reviewed.effort !== null && body.reasoning_effort !== reviewed.effort)
-      || !Number.isSafeInteger(body.max_tokens) || Number(body.max_tokens) < 1 || Number(body.max_tokens) > reviewed.outputBound
-      || !Array.isArray(body.messages)) refused();
+    const url = String(input);
+    const provider: PreviewProviderName | undefined = url === `${PREVIEW_DEEPINFRA_BASE_URL}/chat/completions` ? "deepinfra"
+      : url === PREVIEW_ANTHROPIC_MESSAGES_URL ? "anthropic" : undefined;
+    if (provider === undefined || init?.method !== "POST" || typeof init.body !== "string"
+      || Buffer.byteLength(init.body, "utf8") > PREVIEW_REQUEST_BODY_MAX_BYTES || carriesKeyHeader(init.headers)) refused();
+    let decoded: unknown; try { decoded = JSON.parse(init!.body as string); } catch { return refused(); }
+    if (!isPlainObject(decoded)) return refused();
+    const reviewed: PreviewModelRow = previewModelRow(decoded.model) ?? refused();
+    if (!(provider === "deepinfra" ? deepInfraBodyAccepted(decoded, reviewed) : anthropicBodyAccepted(decoded, reviewed))) refused();
+    const port = byProvider[provider];
+    if (port === undefined) {
+      // A configured provider without its gate: nothing is reserved or sent.
+      throw new TypedDomainError("PROVIDER_CALL_FAILED", "Private preview gate for this provider is not configured");
+    }
+    const body = init!.body as string;
     // UTF-8 bytes + template allowance; the row's full output bound, including hidden reasoning.
-    const reserved = previewReservationNanoUsd(reviewed, Buffer.byteLength(init.body, "utf8"));
-    const result = await port.execute({ operationId: randomUUID(), requestBody: init.body,
-      requestSha256: createHash("sha256").update(init.body).digest("hex"), reservedUsd: previewNanoUsdText(reserved) }, init.signal ?? undefined);
+    const reserved = previewReservationNanoUsd(reviewed, Buffer.byteLength(body, "utf8"));
+    const result = await port.execute({ operationId: randomUUID(), requestBody: body,
+      requestSha256: createHash("sha256").update(body).digest("hex"), reservedUsd: previewNanoUsdText(reserved) }, init!.signal ?? undefined);
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
   };
 }
@@ -272,11 +348,11 @@ function previewAuthorityRefusal(status: number | undefined, row: unknown): Type
   return new TypedDomainError("RUN_COST_ENVELOPE_MONEY_REACHED", "Private preview authority stopped or refused the request");
 }
 /** Local IPC only: application principals never receive the provider credential or ledger write access. */
-export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig): PreviewBudgetPort {
+export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig, socketPath: string = config.budget_socket): PreviewBudgetPort {
   return Object.freeze({ execute(input: PreviewBudgetExecution, signal?: AbortSignal) {
     return new Promise<Readonly<{ status: number; body: string }>>((resolve, reject) => {
       const data = JSON.stringify({ scope_id: config.scope_id, ...input });
-      const request = httpRequest({ socketPath: config.budget_socket, path: "/complete", method: "POST",
+      const request = httpRequest({ socketPath, path: "/complete", method: "POST",
         headers: { "content-type": "application/json", "content-length": Buffer.byteLength(data) } }, response => {
         const chunks: Buffer[] = []; let bytes = 0;
         // A destroy without an error emits only 'close': settle first, so the call can never hang.
@@ -307,4 +383,16 @@ export function createPreviewBudgetRpcPort(config: PreviewProviderTestConfig): P
       request.end(data);
     });
   } });
+}
+/**
+ * PR B: one RPC port per gate this config names (DeepInfra on `budget_socket`, Anthropic on
+ * `anthropic_budget_socket` when set). The guarded fetch routes each call to its own provider's port.
+ */
+export function createPreviewBudgetRpcPorts(config: PreviewProviderTestConfig): PreviewBudgetPorts {
+  const ports: Partial<Record<PreviewProviderName, PreviewBudgetPort>> = {};
+  for (const provider of ["deepinfra", ...Object.keys(PREVIEW_PROVIDER_SOCKET_KEYS)] as PreviewProviderName[]) {
+    const socket = previewProviderSocket(config, provider);
+    if (socket !== undefined) ports[provider] = createPreviewBudgetRpcPort(config, socket);
+  }
+  return Object.freeze(ports);
 }

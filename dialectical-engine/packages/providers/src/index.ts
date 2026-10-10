@@ -16,7 +16,7 @@ import {
   isAnthropicThinkingControl,
   readAnthropicMessagesReply
 } from "./anthropic-messages.js";
-import { PREVIEW_DEEPINFRA_BASE_URL, previewModelRow } from "./preview-models.js";
+import { previewModelRowForEndpoint } from "./preview-models.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -309,13 +309,13 @@ export type ProviderTargetGatewayControls = Readonly<{
   maxOutputTokens?: number;
 }>;
 
-/** The reviewed DeepInfra row behind an endpoint and model, if any (contract A §1). */
-function reviewedDeepInfraRow(endpoint:string,model:string) {
-  return endpoint === PREVIEW_DEEPINFRA_BASE_URL ? previewModelRow(model) : undefined;
+/** The reviewed preview row behind an endpoint and model, if any (contract A §1; PR B adds Anthropic's). */
+function reviewedPreviewRow(endpoint:string,model:string) {
+  return previewModelRowForEndpoint(endpoint,model);
 }
-/** Row-driven: only a reviewed DeepInfra row whose json_object is true may send response_format. */
+/** Row-driven: only a reviewed row whose json_object is true (a DeepInfra row) may send response_format. */
 function isJsonObjectResponseTarget(endpoint:string,model:string):boolean {
-  return reviewedDeepInfraRow(endpoint,model)?.jsonObject === true;
+  return reviewedPreviewRow(endpoint,model)?.jsonObject === true;
 }
 export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): ProviderTargetGatewayControls {
   return Object.freeze({
@@ -325,7 +325,7 @@ export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): 
     ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens }),
     ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{}),
     ...(target.adapterKind === undefined ? {} : { adapterKind: target.adapterKind }),
-    ...(reviewedDeepInfraRow(target.baseUrl,target.model)===undefined?{}:{maxOutputTokens:reviewedDeepInfraRow(target.baseUrl,target.model)!.outputBound})
+    ...(reviewedPreviewRow(target.baseUrl,target.model)===undefined?{}:{maxOutputTokens:reviewedPreviewRow(target.baseUrl,target.model)!.outputBound})
   });
 }
 

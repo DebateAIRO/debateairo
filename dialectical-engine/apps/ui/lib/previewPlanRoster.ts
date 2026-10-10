@@ -1,12 +1,14 @@
 /**
- * The reviewed DeepInfra preview model ids and the maker of each. This mirrors
- * packages/providers/src/preview-models.ts (contract A §1); the UI keeps its own copy so the
- * browser bundle does not import the provider package. Change both together.
+ * The reviewed preview model ids (every provider) and the maker of each. This mirrors
+ * packages/providers/src/preview-models.ts (contract A §1; PR B adds Anthropic's Claude Haiku);
+ * the UI keeps its own copy so the browser bundle does not import the provider package. Change
+ * both together: tests/unit/preview-anthropic-gate.test.ts checks they agree.
  */
-const PREVIEW_MODEL_MAKERS: Readonly<Record<string, string>> = Object.freeze({
+export const PREVIEW_MODEL_MAKERS: Readonly<Record<string, string>> = Object.freeze({
   "zai-org/GLM-5.3-Flash": "Z.AI",
   "deepseek-ai/DeepSeek-V4.1-Flash": "DeepSeek",
-  "XiaomiMiMo/MiMo-V2.6-Pro": "Xiaomi"
+  "XiaomiMiMo/MiMo-V2.6-Pro": "Xiaomi",
+  "claude-haiku-5-5": "Anthropic"
 });
 const LEGACY_PREVIEW_MODEL = "zai-org/GLM-5.3-Flash";
 
