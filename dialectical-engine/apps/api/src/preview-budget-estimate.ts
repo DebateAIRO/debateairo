@@ -26,24 +26,30 @@
  * the line, its waker and its start check exist only with the hosted room, `askRoomComposition` in
  * apps/api/src/main.ts, which the preview, in local mode, never builds.)
  *
- * Today there is ONE gate (the config's `budget_socket`), serving every reviewed DeepInfra row.
- * Each row maps to its gate by `previewGateKeyOf`; a later per-provider socket map adds keys there
- * and one port per key in `PreviewBudgetGateSettings.remaining`, without changing the estimate.
+ * One gate per provider (PR B): the DeepInfra gate on the config's `budget_socket`, the Anthropic
+ * gate on `anthropic_budget_socket`. Each row maps to its gate by `previewGateKeyOf` (the row's
+ * provider); every gate a debate's panel or role models use is asked, each charged only its own
+ * models' calls and its own in-flight hold, and unfinished debates are held on each gate they use. A
+ * gate the config does not name has no port, so a debate needing it is refused (as unavailable)
+ * before it starts.
  */
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import {
   createPreviewRemainingRpcPort,
   lengthRetryTokenCeiling,
+  PREVIEW_MODEL_ROWS_BY_PROVIDER,
+  PREVIEW_PROVIDER_NAMES,
   PREVIEW_GLM_GENERATION_TOKEN_FLOOR,
-  PREVIEW_MODEL_ROWS,
   PREVIEW_REQUEST_BODY_MAX_BYTES,
   PREVIEW_REVIEWED_PROVIDER_REFS,
   previewCallBound,
   previewChargedInputTokens,
   previewModelRow,
   previewModelRowForRef,
+  previewProviderSocket,
   type PreviewGateRemaining,
   type PreviewModelRow,
+  type PreviewProviderName,
   type PreviewProviderTestConfig
 } from "@debateai/providers";
 import { readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs, readSynthesisRoleControls } from "@debateai/register";
@@ -110,8 +116,8 @@ export class PreviewGateUnavailableRefusal extends TypedDomainError {
   }
 }
 
-/** The gates the preview has; today only the DeepInfra gate on `budget_socket`. */
-export type PreviewGateKey = "deepinfra";
+/** The gates the preview has: one per reviewed provider. */
+export type PreviewGateKey = PreviewProviderName;
 
 /** The estimate's margin on calls and money: x 1.15 (the owner's rule, 2026-09-28). */
 export const PREVIEW_ESTIMATE_MARGIN_NUMERATOR = 115n;
@@ -240,8 +246,8 @@ export type PreviewMeasuredCallUsage = readonly Readonly<{
 
 /** What admission needs to ask the gate(s); built once at boot from the preview config and the register. */
 export type PreviewBudgetGateSettings = Readonly<{
-  /** One read-only remaining port per gate. */
-  remaining: Readonly<Record<PreviewGateKey, (signal?: AbortSignal) => Promise<PreviewGateRemaining>>>;
+  /** One read-only remaining port per gate the config names (a gate without a socket has none). */
+  remaining: Readonly<Partial<Record<PreviewGateKey, (signal?: AbortSignal) => Promise<PreviewGateRemaining>>>>;
   /** The register's roles (answer writer and checker, storyteller and story checker), as model ids. */
   roleModels: PreviewRoleModels;
   /** The same roles as provider refs; the runner health-checks those not on the panel at every pickup. */
@@ -268,7 +274,7 @@ export type PreviewBudgetGateSettings = Readonly<{
 
 /** The gate a reviewed model's calls go through, or undefined for a model the preview never calls. */
 export function previewGateKeyOf(model: string): PreviewGateKey | undefined {
-  return previewModelRow(model) === undefined ? undefined : "deepinfra";
+  return previewModelRow(model)?.provider;
 }
 
 /** One call at a row's list price: its input at the input price, its output clamped to the row's own bound. */
@@ -632,13 +638,13 @@ export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readon
  * Pure: what an UNFINISHED earlier debate is still held for, per gate. Still debating: its whole
  * estimate again, ask-time probes aside (over-counting what it already spent, which the gate's
  * remaining figure also reflects; that is the careful side). Only writing its story: the story's
- * calls. A model off the reviewed rows (an older run) is priced at the row whose average debate call
- * is dearest, on the DeepInfra gate, the only gate today.
+ * calls. A model off the reviewed rows (an older run, from before any other provider's gate
+ * existed) is priced at the DeepInfra row whose average debate call is dearest, on the DeepInfra gate.
  */
 export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: PreviewEstimateSettings,
   pricer: PreviewCallPricer = previewEstimatePricer({ measured: [], callOutputTokens: settings.callOutputTokens }),
   debateCallCount: PreviewDebateCallCount = previewDebateCallCount()): readonly PreviewGateNeed[] {
-  const dearestRow = PREVIEW_MODEL_ROWS.reduce((best, row) => pricer(row, "DEBATE") > pricer(best, "DEBATE") ? row : best);
+  const dearestRow = PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.reduce((best, row) => pricer(row, "DEBATE") > pricer(best, "DEBATE") ? row : best);
   const rowOf = (model: string): PreviewModelRow => previewModelRow(model) ?? dearestRow;
   const byGate = new Map<PreviewGateKey, string[]>();
   for (const model of new Set([...run.panel.map((member) => member.model_id), ...roleModelList(settings.roleModels)])) {
@@ -850,7 +856,7 @@ export async function assertPreviewBudgetAdmits(
   }
   for (const need of needs) {
     const port = gate!.remaining[need.gate];
-    if (port === undefined) unavailable(`no remaining port for gate ${need.gate}`);
+    if (port === undefined) return unavailable(`no remaining port for gate ${need.gate}`);
     let remaining: PreviewGateRemaining;
     try {
       remaining = await port();
@@ -980,6 +986,20 @@ export function previewCallOutputTokens(config: PreviewProviderTestConfig, ceili
   });
 }
 
+/** One read-only /remaining port per gate the config names: DeepInfra's always, Anthropic's when set. */
+export function previewRemainingPorts(
+  config: PreviewProviderTestConfig
+): PreviewBudgetGateSettings["remaining"] {
+  const remaining: Partial<Record<PreviewGateKey, (signal?: AbortSignal) => Promise<PreviewGateRemaining>>> = {};
+  for (const provider of PREVIEW_PROVIDER_NAMES) {
+    const socket = previewProviderSocket(config, provider);
+    if (socket === undefined) continue;
+    const port = createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: config.scope_id });
+    remaining[provider] = (signal?: AbortSignal) => port.remaining(signal);
+  }
+  return Object.freeze(remaining);
+}
+
 /**
  * Boot: the admission settings for the preview, from its config and the register version in force.
  * The role refs are the register's sealed provider refs; one the preview does not review is kept as
@@ -1002,11 +1022,10 @@ export async function readPreviewBudgetGateSettings(
   const organCeilings = await readOrganTokenCeilings(pool, registerVersion);
   const refs = [roles.synthesizerRoleRef, roles.evaluatorRoleRef,
     ...(story === null ? [] : [story.storytellerRoleRef, story.storyCheckerRoleRef])];
-  const port = createPreviewRemainingRpcPort(config);
   const storyRounds = story === null ? 0 : story.loopMaxRounds;
   const modelOfRef = (ref: string): string => previewModelRowForRef(ref)?.model ?? `unreviewed-ref:${ref}`;
   return Object.freeze({
-    remaining: Object.freeze({ deepinfra: (signal?: AbortSignal) => port.remaining(signal) }),
+    remaining: previewRemainingPorts(config),
     roleModels: Object.freeze({
       answerWriter: modelOfRef(roles.synthesizerRoleRef), answerChecker: modelOfRef(roles.evaluatorRoleRef),
       storyteller: story === null ? null : modelOfRef(story.storytellerRoleRef),

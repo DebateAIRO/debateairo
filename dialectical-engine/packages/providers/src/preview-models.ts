@@ -9,14 +9,43 @@
  * tests/unit/fixtures/preview-model-rows.json so the two copies cannot drift. Changing a row is a
  * reviewed code change on both sides, never a configuration edit.
  *
+ * Multi-model preview, PR B: the rows are kept per provider (`PREVIEW_MODEL_ROWS_BY_PROVIDER`), one
+ * root gate per provider; each provider's rows have their own parity file
+ * (tests/unit/fixtures/preview-model-rows.json for DeepInfra, preview-model-rows-anthropic.json for
+ * Anthropic). A later provider is one more key there and one more parity file.
+ *
  * No imports on purpose: index.ts, preview-test.ts and provider-probe.ts all read these rows.
  */
+/** The providers the preview has a reviewed root gate for. */
+export type PreviewProviderName = "deepinfra" | "anthropic";
+
 export type PreviewModelRow = Readonly<{
+  /** The provider (and so the root gate) this row's calls go through. */
+  provider: PreviewProviderName;
+  /** The target's base URL (`base_url`), exactly. */
+  baseUrl: string;
+  /** The register's adapter kind for this row's provider ref. */
+  adapterKind: "openai-compatible-http" | "anthropic-messages-http";
+  /** The context window the target declares (`context_window_tokens`). */
+  contextWindowTokens: number;
   model: string;
   maker: string;
-  /** Vendor list price in USD per million tokens, as the decimal string the gate reads. */
+  /**
+   * Vendor list price in USD per million tokens, as the decimal string the gate reads: the price
+   * the estimate uses and every call reserves at (unless `upperStep` applies). For a vendor with
+   * price steps (Anthropic) it is the lower step's; the gate settles at the real step and halts on
+   * any overrun.
+   */
   inputUsdPerM: string;
   outputUsdPerM: string;
+  /**
+   * A vendor's upper price step, if it has one (Anthropic: a prompt above 100,000 tokens). A call
+   * whose charged input tokens (body bytes + 2048) are above `aboveChargedInputTokens` reserves at
+   * these prices; at or below, its prompt cannot reach the upper step and it reserves at the row's
+   * own (owner ruling 2026-10-10, evening). The gate applies the same rule (reservation_prices).
+   */
+  upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string;
+    inputNanoUsdPerToken: bigint; outputNanoUsdPerToken: bigint }>;
   /** The same prices as whole nano-USD per token (USD per million x 1000), for BigInt arithmetic. */
   inputNanoUsdPerToken: bigint;
   outputNanoUsdPerToken: bigint;
@@ -25,18 +54,24 @@ export type PreviewModelRow = Readonly<{
   outputPriceMicrosPerMillion: number;
   /** Largest max_tokens ever sent, and the output side of every reservation. */
   outputBound: number;
-  /** "high": the body carries exactly reasoning_effort "high"; null: the body never carries it. */
+  /**
+   * "high": the body carries exactly the provider's effort member with "high" (DeepInfra
+   * `reasoning_effort`, Anthropic `output_config.effort`); null: the body never carries it.
+   */
   effort: "high" | null;
   /** Whether response_format {"type":"json_object"} may be sent. */
   jsonObject: boolean;
-  /** The most tokens one call may take in, prompt and answer together (vendor documentation). */
-  contextWindowTokens: number;
 }>;
 
-/** The preview connection's one base URL and window, shared by every row. */
+/** The DeepInfra connection's base URL and window, shared by every DeepInfra row. */
 export const PREVIEW_DEEPINFRA_BASE_URL = "https://api.deepinfra.com/v1/openai" as const;
-/** The window of every row that does not state its own (GLM, DeepSeek, MiMo). */
-const PREVIEW_CONTEXT_WINDOW_TOKENS = 1_048_576;
+/** The window of every DeepInfra row that does not state its own (GLM, DeepSeek, MiMo). */
+export const PREVIEW_CONTEXT_WINDOW_TOKENS = 1_048_576 as const;
+/** The Anthropic Messages connection's base URL (the adapter's one lawful base) and its exact call URL. */
+export const PREVIEW_ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1" as const;
+export const PREVIEW_ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages" as const;
+/** Claude Haiku 5.5's window (1M tokens). */
+export const PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
 /**
  * Request bodies above this are refused before any reservation (contract A §2). Owner ruling
  * 2026-10-10 (evening): a HARD cap of 256 KiB for every row, because a story request at the "high"
@@ -52,10 +87,18 @@ const PREVIEW_ANSWER_CAP_TOKENS = 32_768;
 /** Template allowance added to the body's bytes on the input side of a reservation (contract A §3). */
 const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 
-function row(input: Readonly<{
+type RowInput = Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
   outputBound: number; effort: "high" | null; jsonObject: boolean; contextWindowTokens?: number;
-}>): PreviewModelRow {
+  upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string }>;
+}>;
+const PROVIDER_CONNECTIONS = Object.freeze({
+  deepinfra: Object.freeze({ provider: "deepinfra", baseUrl: PREVIEW_DEEPINFRA_BASE_URL,
+    adapterKind: "openai-compatible-http", contextWindowTokens: PREVIEW_CONTEXT_WINDOW_TOKENS }),
+  anthropic: Object.freeze({ provider: "anthropic", baseUrl: PREVIEW_ANTHROPIC_BASE_URL,
+    adapterKind: "anthropic-messages-http", contextWindowTokens: PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS })
+} as const);
+function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
   // USD per million with two or three decimals ("0.15", "0.113") is a whole nano-USD per token.
   const nano = (usdPerM: string): bigint => {
     const match = /^(\d+)\.(\d{2,3})$/u.exec(usdPerM);
@@ -64,9 +107,13 @@ function row(input: Readonly<{
   };
   const inputNanoUsdPerToken = nano(input.inputUsdPerM);
   const outputNanoUsdPerToken = nano(input.outputUsdPerM);
+  const { upperStep, ...plain } = input;
   return Object.freeze({
-    ...input,
-    contextWindowTokens: input.contextWindowTokens ?? PREVIEW_CONTEXT_WINDOW_TOKENS,
+    ...PROVIDER_CONNECTIONS[provider],
+    ...plain,
+    ...(upperStep === undefined ? {} : { upperStep: Object.freeze({ ...upperStep,
+      inputNanoUsdPerToken: nano(upperStep.inputUsdPerM), outputNanoUsdPerToken: nano(upperStep.outputUsdPerM) }) }),
+    contextWindowTokens: input.contextWindowTokens ?? PROVIDER_CONNECTIONS[provider].contextWindowTokens,
     inputNanoUsdPerToken,
     outputNanoUsdPerToken,
     inputPriceMicrosPerMillion: Number(inputNanoUsdPerToken) * 1000,
@@ -74,17 +121,40 @@ function row(input: Readonly<{
   });
 }
 
-export const PREVIEW_MODEL_ROWS: readonly PreviewModelRow[] = Object.freeze([
-  row({ model: "zai-org/GLM-5.3-Flash", maker: "Z.AI", inputUsdPerM: "0.15", outputUsdPerM: "0.50",
-    outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: true }),
-  row({ model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek", inputUsdPerM: "0.20", outputUsdPerM: "0.60",
-    outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false }),
-  row({ model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
-    outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false }),
-  // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
-  row({ model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
-    outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 })
-]);
+/**
+ * The reviewed rows, per provider (each provider's gate holds the same rows in Python). A provider
+ * is an addition here: its own key, its own parity file, its own gate and socket.
+ */
+export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName, readonly PreviewModelRow[]>> = Object.freeze({
+  deepinfra: Object.freeze([
+    row("deepinfra", { model: "zai-org/GLM-5.3-Flash", maker: "Z.AI", inputUsdPerM: "0.15", outputUsdPerM: "0.50",
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: true }),
+    row("deepinfra", { model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek", inputUsdPerM: "0.20", outputUsdPerM: "0.60",
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false }),
+    row("deepinfra", { model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false }),
+    // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
+    row("deepinfra", { model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 })
+  ]),
+  // PR B, owner ruling 2026-10-10 (evening). Estimate and reserve at the lower step ($0.10 / $0.50);
+  // a call whose bytes + 2048 are above 100,000 reserves at the upper step ($0.50 / $2.50), so a
+  // 256 KiB call holds at most (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016. A request cannot
+  // ask for caching; the gate settles at the real step and halts on an overrun (charge_overrun).
+  anthropic: Object.freeze([
+    row("anthropic", { model: "claude-haiku-5-5", maker: "Anthropic", inputUsdPerM: "0.10", outputUsdPerM: "0.50",
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false,
+      upperStep: { aboveChargedInputTokens: 100_000, inputUsdPerM: "0.50", outputUsdPerM: "2.50" } })
+  ])
+});
+/** Every reviewed row, providers in the order above. */
+export const PREVIEW_MODEL_ROWS: readonly PreviewModelRow[] = Object.freeze(
+  (Object.keys(PREVIEW_MODEL_ROWS_BY_PROVIDER) as PreviewProviderName[]).flatMap((provider) => PREVIEW_MODEL_ROWS_BY_PROVIDER[provider])
+);
+/** The preview's providers, in register order. */
+export const PREVIEW_PROVIDER_NAMES: readonly PreviewProviderName[] = Object.freeze(
+  Object.keys(PREVIEW_MODEL_ROWS_BY_PROVIDER) as PreviewProviderName[]
+);
 
 /** The reviewed row for an exact model id, or undefined. */
 export function previewModelRow(model: unknown): PreviewModelRow | undefined {
@@ -104,10 +174,24 @@ export const PREVIEW_PROVIDER_REF_MODELS: Readonly<Record<string, string>> = Obj
   "preview:fixture-b": "zai-org/GLM-5.3-Flash",
   "preview:deepseek-v4-1-flash": "deepseek-ai/DeepSeek-V4.1-Flash",
   "preview:mimo-v2-6-pro": "XiaomiMiMo/MiMo-V2.6-Pro",
-  "preview:qwen-3-8-flash": "Qwen/Qwen3.8-Flash"
+  "preview:qwen-3-8-flash": "Qwen/Qwen3.8-Flash",
+  "preview:claude-haiku-5-5": "claude-haiku-5-5"
 });
 /** The reviewed provider set, in register order. */
 export const PREVIEW_REVIEWED_PROVIDER_REFS = Object.freeze(Object.keys(PREVIEW_PROVIDER_REF_MODELS));
+/**
+ * The reviewed ref sets a preview register may name, besides the sealed two-GLM pair: the DeepInfra
+ * refs, plus the refs of any other reviewed providers, always in register order. So a register
+ * published before a provider's gate existed keeps booting after that provider's rows are added.
+ */
+export function previewRefsAreReviewedSet(refs: readonly string[]): boolean {
+  const providerOf = (ref: string) => previewModelRowForRef(ref)?.provider;
+  if (refs.some((ref) => providerOf(ref) === undefined) || new Set(refs).size !== refs.length) return false;
+  const providers = new Set(refs.map((ref) => providerOf(ref)!));
+  if (!providers.has("deepinfra")) return false;
+  const expected = PREVIEW_REVIEWED_PROVIDER_REFS.filter((ref) => providers.has(providerOf(ref)!));
+  return expected.length === refs.length && expected.every((ref, index) => ref === refs[index]);
+}
 
 /** The row a provider ref is reviewed for, or undefined. */
 export function previewModelRowForRef(providerRef: unknown): PreviewModelRow | undefined {
@@ -120,7 +204,7 @@ export function previewTargetJsonRow(providerRef: string): Readonly<Record<strin
   const reviewed = previewModelRowForRef(providerRef);
   if (reviewed === undefined) throw new TypeError("PREVIEW_PROVIDER_REF_UNREVIEWED");
   return Object.freeze({
-    provider_ref: providerRef, base_url: PREVIEW_DEEPINFRA_BASE_URL, model: reviewed.model,
+    provider_ref: providerRef, base_url: reviewed.baseUrl, model: reviewed.model,
     input_price_micros_per_million: reviewed.inputPriceMicrosPerMillion,
     output_price_micros_per_million: reviewed.outputPriceMicrosPerMillion,
     ...(reviewed.effort === null ? {} : { thinking_parameter: "reasoning_effort", thinking_levels: Object.freeze([reviewed.effort]) }),
@@ -141,10 +225,21 @@ export function previewChargedInputTokens(bodyBytes: number): bigint {
   return BigInt(bodyBytes + PREVIEW_RESERVATION_TEMPLATE_BYTES);
 }
 
-/** Contract A §3: ((body bytes + 2048) x input + output_bound x output), in nano-USD. */
+/**
+ * Contract A §3: ((body bytes + 2048) x input + output_bound x output), in nano-USD, at the row's
+ * prices, or at its upper step's when the charged input tokens are above that step's threshold.
+ */
 export function previewReservationNanoUsd(reviewed: PreviewModelRow, bodyBytes: number): bigint {
-  return previewChargedInputTokens(bodyBytes) * reviewed.inputNanoUsdPerToken
-    + BigInt(reviewed.outputBound) * reviewed.outputNanoUsdPerToken;
+  const tokens = previewChargedInputTokens(bodyBytes);
+  const step = reviewed.upperStep !== undefined && tokens > BigInt(reviewed.upperStep.aboveChargedInputTokens)
+    ? reviewed.upperStep : reviewed;
+  return tokens * step.inputNanoUsdPerToken + BigInt(reviewed.outputBound) * step.outputNanoUsdPerToken;
+}
+
+/** The reviewed row for a target's own base URL and model name, if any (any provider). */
+export function previewModelRowForEndpoint(baseUrl: string, model: string): PreviewModelRow | undefined {
+  const reviewed = previewModelRow(model);
+  return reviewed !== undefined && reviewed.baseUrl === baseUrl ? reviewed : undefined;
 }
 
 /** The two-maker rule (contract A §6/§7): with two or more makers in the union, each roster names two or more. */

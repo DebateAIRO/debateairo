@@ -6,13 +6,17 @@ const STAFF=['STAFF_ACCESS_POLICY_VERSION','STAFF_WEBAUTHN_ORIGIN','STAFF_WEBAUT
  * The only public model lists the preview UI may be built and run with, one per stage of the switch-on
  * order (deploy/preview-gate/v3/README.md, "Switching on the new models, in order"):
  * - `glm-only`: the legacy array, GLM for Free and Premium (until the gate and the API offer more);
- * - `multi-model`: Free gets two makers (Z.AI, DeepSeek), Premium four (plus Xiaomi and Alibaba).
+ * - `multi-model`: Free gets two makers (Z.AI, DeepSeek), Premium four (plus Xiaomi and Alibaba);
+ * - `all-models`: Free and Premium both get all five AIs (Z.AI, DeepSeek, Xiaomi, Alibaba via the DeepInfra
+ *   gate; Anthropic's Haiku via the Anthropic gate), the owner's first-debate value; the API config must
+ *   then also name `anthropic_budget_socket`.
  * The value is baked into the website when it is built (release-artifacts.mjs `ui-build --models`),
  * ui-build.mjs records it next to the build, and narrowEnvironment demands that ui.env says the same.
  */
 export const PREVIEW_MODEL_ROSTER_FLAGS=Object.freeze({
  'glm-only':'["zai-org/GLM-5.3-Flash"]',
- 'multi-model':'{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"]}'
+ 'multi-model':'{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash"]}',
+ 'all-models':'{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro","Qwen/Qwen3.8-Flash","claude-haiku-5-5"]}'
 });
 /** The default build value (the stage before the API offers more than GLM): the legacy array. */
 export const PREVIEW_FREE_MODEL_IDS_JSON=PREVIEW_MODEL_ROSTER_FLAGS['glm-only'];
@@ -20,6 +24,8 @@ const REVIEWED_ROSTER_FLAGS=Object.values(PREVIEW_MODEL_ROSTER_FLAGS);
 export const isReviewedModelRosterFlag=value=>typeof value==='string'&&REVIEWED_ROSTER_FLAGS.includes(value);
 const LEGACY_CONFIG_KEYS='budget_socket,deployment,free_model_ids,requested_thinking_level,scope_id';
 const ROSTER_CONFIG_KEYS='budget_socket,deployment,free_model_ids,premium_model_ids,requested_thinking_level,scope_id';
+// PR B: the roster form may also name the Anthropic gate's socket (the API's parser checks its value).
+const OPTIONAL_SOCKET_KEYS=Object.freeze(['anthropic_budget_socket']);
 /**
  * Whether the UI's public model list (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) offers exactly what the
  * API's preview configuration (PREVIEW_PROVIDER_TEST_CONFIG_JSON) allows: the legacy array only with the
@@ -34,7 +40,8 @@ export function uiRosterMatchesApiConfig(uiFlag,apiConfigJson) {
   if(!api||typeof api!=='object'||Array.isArray(api))return false;
   const keys=Object.keys(api).sort().join(','),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   if(Array.isArray(ui))return keys===LEGACY_CONFIG_KEYS&&same(api.free_model_ids,ui);
-  return keys===ROSTER_CONFIG_KEYS&&same(api.free_model_ids,ui.free)&&same(api.premium_model_ids,ui.premium);
+  const rosterKeys=Object.keys(api).filter(key=>!OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(',');
+  return rosterKeys===ROSTER_CONFIG_KEYS&&same(api.free_model_ids,ui.free)&&same(api.premium_model_ids,ui.premium);
  }catch{return false;}
 }
 const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY'];

@@ -1,4 +1,4 @@
-import { OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, previewTargetJsonRow, previewModelRowForRef } from "@debateai/providers";
+import { previewTargetJsonRow, previewModelRowForRef } from "@debateai/providers";
 import { createHash } from "node:crypto";
 import {
   CONFIGURED_PROVIDER_SET_DEPLOYMENT_SOURCE_REF,
@@ -95,8 +95,8 @@ export function gateHostedRoster(text: string): HostedRoster {
     if(!required.every(key=>Object.hasOwn(provider,key))||Object.keys(provider).some(key=>!([...ROSTER_KEYS,...OPTIONAL_TARGET_KEYS,"preview_budget_authority"] as readonly string[]).includes(key)))refuse();
     if(Object.hasOwn(provider,"preview_budget_authority")&&!rootBroker)refuse();
     // Preview multi-model (contract A §1): a root-broker provider is exactly one reviewed row (its
-    // ref's model, maker, DeepInfra URL, prices, window and effort switch), with no credential file.
-    if(rootBroker&&(provider.adapter_kind!==OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND||previewModelRowForRef(provider.provider_ref)===undefined
+    // ref's model, maker, adapter kind, URL, prices, window and effort switch), with no credential file.
+    if(rootBroker&&(previewModelRowForRef(provider.provider_ref)===undefined||provider.adapter_kind!==previewModelRowForRef(provider.provider_ref)!.adapterKind
       ||provider.maker!==previewModelRowForRef(provider.provider_ref)!.maker||Object.hasOwn(provider,"runner_authorization_file")||Object.hasOwn(provider,"api_authorization_file")
       ||!rootBrokerTargetMatches(provider)))refuse();
     if (!BUILT_IN_PROVIDER_ADAPTERS.some(adapter => adapter.adapterKind === provider.adapter_kind)) refuse();

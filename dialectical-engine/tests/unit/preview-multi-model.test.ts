@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  OpenAICompatibleProviderGateway, PREVIEW_MODEL_ROWS, PREVIEW_REVIEWED_PROVIDER_REFS, assertPreviewProviderTargets,
+  OpenAICompatibleProviderGateway, PREVIEW_MODEL_ROWS_BY_PROVIDER, PREVIEW_REVIEWED_PROVIDER_REFS, assertPreviewProviderTargets,
   createPreviewGuardedFetch, observeProviderTarget, parsePreviewProviderTestConfig, parseProviderDiscoveryTargets,
   previewModelRow, previewNanoUsdText, previewPlanTierRosters, previewProbeControls, previewReservationNanoUsd,
   previewTargetJsonRow, providerTargetGatewayControls, withPreviewProviderCallPolicy, previewTargetGatewayControls,
@@ -42,10 +42,15 @@ const fixtureFile = JSON.parse(readFileSync(new URL("./fixtures/preview-model-ro
   schema: string; provider: string; reservation: { overhead_bytes: number; worst_case_request_bytes: number; per_call_cap_usd: string };
   rows: FixtureRow[] };
 const fixtureRows = fixtureFile.rows;
+/** PR B: this file's parity checks are DeepInfra's rows; Anthropic's have their own file and test. */
+const PREVIEW_MODEL_ROWS = PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra;
+/** The register's configured provider for a reviewed ref (its row's maker and adapter kind). */
+const configured = (providerRef: string) => { const row = previewModelRow(previewTargetJsonRow(providerRef).model)!;
+  return { providerRef, maker: row.maker, adapterKind: row.adapterKind }; };
 
 function targets(refs: readonly string[]): readonly ProviderDiscoveryTarget[] {
   return parseProviderDiscoveryTargets(JSON.stringify(refs.map(previewTargetJsonRow)),
-    refs.map(providerRef => ({ providerRef, maker: previewModelRow(previewTargetJsonRow(providerRef).model)!.maker })));
+    refs.map(configured));
 }
 function recordingFetch() {
   const executions: PreviewBudgetExecution[] = [];
@@ -120,7 +125,7 @@ describe("configuration accepts both forms (contract A §6)", () => {
     ["an empty roster", { ...MULTI, premium_model_ids: [] }],
     ["a missing premium list with a non-GLM free list", { ...BASE, free_model_ids: [GLM, DEEPSEEK] }],
     ["a legacy form with another model", { ...BASE, free_model_ids: [DEEPSEEK] }],
-    ["an extra key", { ...MULTI, anthropic_budget_socket: "/run/debateai-v3-preview/a.sock" }],
+    ["an extra key", { ...MULTI, other_budget_socket: "/run/debateai-v3-preview/a.sock" }],
     ["a non-array roster", { ...MULTI, premium_model_ids: GLM }],
     ["a one-maker Premium roster of Qwen alone", { ...MULTI, premium_model_ids: [QWEN] }],
     ["Qwen twice", { ...MULTI, premium_model_ids: [GLM, QWEN, QWEN] }]
@@ -148,8 +153,7 @@ describe("each declared target is checked against its reviewed row", () => {
     const rows = PREVIEW_REVIEWED_PROVIDER_REFS.map(ref => ({ ...previewTargetJsonRow(ref) } as Record<string, unknown>));
     Object.assign(rows[index]!, change);
     for (const [key, value] of Object.entries(change)) if (value === undefined) delete rows[index]![key];
-    return parseProviderDiscoveryTargets(JSON.stringify(rows), PREVIEW_REVIEWED_PROVIDER_REFS.map(providerRef =>
-      ({ providerRef, maker: previewModelRow(previewTargetJsonRow(providerRef).model)!.maker })));
+    return parseProviderDiscoveryTargets(JSON.stringify(rows), PREVIEW_REVIEWED_PROVIDER_REFS.map(configured));
   };
   it.each([
     ["DeepSeek at GLM's price", 2, { input_price_micros_per_million: 150_000 }],
@@ -167,7 +171,7 @@ describe("each declared target is checked against its reviewed row", () => {
   });
   it("refuses a reviewed ref declared under another maker", () => {
     const declared = parseProviderDiscoveryTargets(JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow)),
-      PREVIEW_REVIEWED_PROVIDER_REFS.map(providerRef => ({ providerRef, maker: "Z.AI" })));
+      PREVIEW_REVIEWED_PROVIDER_REFS.map(providerRef => ({ ...configured(providerRef), maker: "Z.AI" })));
     expect(() => assertPreviewProviderTargets(parse(MULTI), declared)).toThrow();
   });
 });
@@ -300,7 +304,7 @@ describe("discovery probes use each row's own controls", () => {
 
 describe("the hosted root-broker rule accepts any reviewed row, exactly", () => {
   const broker = (ref: string, change: Record<string, unknown> = {}) => JSON.stringify({ providers: [{
-    ...previewTargetJsonRow(ref), adapter_kind: "openai-compatible-http", maker: previewModelRow(previewTargetJsonRow(ref).model)!.maker,
+    ...previewTargetJsonRow(ref), adapter_kind: previewModelRow(previewTargetJsonRow(ref).model)!.adapterKind, maker: previewModelRow(previewTargetJsonRow(ref).model)!.maker,
     vetting: {}, preview_budget_authority: true, ...change }] });
   it.each(PREVIEW_REVIEWED_PROVIDER_REFS)("accepts %s", ref => { expect(() => gateHostedRoster(broker(ref))).not.toThrow(); });
   it.each([
@@ -331,7 +335,8 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768
   it("its reviewed row, ref and target row", () => {
     expect(previewModelRow(QWEN)).toMatchObject({ maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
       inputNanoUsdPerToken: 113n, outputNanoUsdPerToken: 382n, outputBound: 32_768, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 });
-    expect(PREVIEW_REVIEWED_PROVIDER_REFS).toEqual(["preview:fixture-a", "preview:fixture-b", "preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash"]);
+    expect(PREVIEW_REVIEWED_PROVIDER_REFS).toEqual(["preview:fixture-a", "preview:fixture-b", "preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash",
+      "preview:claude-haiku-5-5"]); // PR B: Anthropic's ref after DeepInfra's.
     expect(previewTargetJsonRow("preview:qwen-3-8-flash")).toEqual({ provider_ref: "preview:qwen-3-8-flash",
       base_url: "https://api.deepinfra.com/v1/openai", model: QWEN, input_price_micros_per_million: 113_000,
       output_price_micros_per_million: 382_000, context_window_tokens: 1_000_000 });

@@ -719,7 +719,7 @@ def validate_request(input, go, probe=False, moment=None):
         raise SafetyError('REQUEST_INVALID') from None
     if not isinstance(outgoing, bytes) or len(outgoing) > len(raw):
         raise SafetyError('REQUEST_INVALID')
-    prices, ceiling = profile.reservation_prices(row, moment or helper.utc_now()), profile.ceiling_prices(row)
+    prices, ceiling = profile.reservation_prices(row, moment or helper.utc_now(), len(raw)), profile.ceiling_prices(row)
     if not prices_ok(prices) or prices[0] > ceiling[0] or prices[1] > ceiling[1] \
             or not helper.path_valid(profile.path_for(row)):
         raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed profile; checked anyway.
@@ -978,6 +978,10 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         if cancelled is not None and cancelled():
             raise SafetyError('CALLER_CANCELED_BEFORE_DISPATCH')
         key = (key_loader or helper.read_key)(private)
+        # A key of another shape (another provider's key put in this gate's folder) is never sent.
+        key_pattern = getattr(profile, 'key_pattern', None)
+        if key_pattern is not None and not (isinstance(key, str) and re.fullmatch(key_pattern, key)):
+            raise SafetyError('KEY_SHAPE_INVALID')
         if slots.tripped:
             raise SafetyError('AUTHORITY_STOPPED')
         entry_id, day = reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now, probe, prices)
@@ -1315,7 +1319,7 @@ def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None,
     if row is None:
         raise SafetyError('MODEL_NOT_REVIEWED')
     raw = json.dumps(profile.probe_body(row), ensure_ascii=False, separators=(',', ':'))
-    prices = profile.reservation_prices(row, current(now or helper.utc_now))
+    prices = profile.reservation_prices(row, current(now or helper.utc_now), len(raw.encode()))
     request = {'scope_id': go['scope_id'], 'operationId': 'probe-%x' % time.time_ns(), 'requestBody': raw,
                'requestSha256': hashlib.sha256(raw.encode()).hexdigest(),
                'reservedUsd': str(reservation_for(len(raw.encode()), row, prices))}

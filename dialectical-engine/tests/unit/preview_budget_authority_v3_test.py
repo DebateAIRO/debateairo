@@ -794,7 +794,7 @@ class DatedVendorProfile(FakeVendorProfile):
     def path_for(self, row):
         return '/v1/models/' + row.model + ':generate'
 
-    def reservation_prices(self, row, moment):
+    def reservation_prices(self, row, moment, request_bytes=None):
         return (Decimal('0.20'), Decimal('0.40')) if moment >= self.RISE else (row.input_usd_per_m, row.output_usd_per_m)
 
     def ceiling_prices(self, row):
@@ -866,7 +866,7 @@ class ProfileApiTests(GateTest):
     def test_reservation_prices_above_the_ceiling_are_refused(self):
         gate = self.dated_gate()
         profile = bridge.helper.PROFILES['datedvendor']
-        with patch.object(profile, 'reservation_prices', lambda _row, _moment: (Decimal('0.30'), Decimal('0.40'))), \
+        with patch.object(profile, 'reservation_prices', lambda _row, _moment, _bytes=None: (Decimal('0.30'), Decimal('0.40'))), \
                 self.refused('REQUEST_INVALID'):
             bridge.validate_request(self.dated_request('op-1', (Decimal('0.30'), Decimal('0.40'))), gate.go)
 
@@ -1038,7 +1038,9 @@ class ProfileTests(GateTest):
                 gate.call('op-2', value=body())  # A DeepInfra row is not this profile's row.
 
     def test_reserved_provider_names_have_no_profile_yet(self):
-        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra'})
+        # Anthropic's profile arrived with PR B (its own tests: preview_budget_authority_anthropic_test.py).
+        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'anthropic'})
+        self.assertNotIn('google', bridge.helper.PROFILES)
 
 
 

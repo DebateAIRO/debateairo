@@ -1,4 +1,4 @@
-import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, previewProbeControls, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
 import { readModelScorecard, readEngineVersion } from "@debateai/register";
 import { readPreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { PasswordResetService } from "./password-reset.js";
@@ -490,7 +490,7 @@ if (previewConfig !== undefined) {
     }
   });
 }
-const previewFetch = previewConfig === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPort(previewConfig));
+const previewFetch = previewConfig === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewConfig));
 // Contract A §5: the preview's start-of-debate estimate asks the gate what is left today (read-only).
 const previewBudgetGate = previewConfig === undefined ? undefined : await boot.run("preview-budget-gate", async () => {
   // Every declared target is health-checked at ask time, paid through the gate even when the ask is refused.
