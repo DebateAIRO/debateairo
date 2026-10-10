@@ -15,9 +15,13 @@
 // Multi-model (2026-10-10): the source provider set is the reviewed DeepInfra rows (preview-models.ts):
 // preview:fixture-a and preview:fixture-b stay GLM (Z.AI) so runs pinned to the sealed two-GLM version
 // keep resolving, plus one ref per new model with its own maker. requiredDistinctMakers stays 1 (a missing
-// second maker serves with marks, never blocks). The answer writer stays fixture-a (GLM); the checker
-// moves to the DeepSeek ref, a different maker, so the answer is checked by another maker. The base may
-// be the sealed two-GLM pair (or its historical shapes) or a version this kit already published.
+// second maker serves with marks, never blocks). The answer writer stays fixture-a (GLM). By default the
+// checker stays fixture-b (GLM), as in the sealed two-GLM version: a version with four refs can then be
+// published while the gate has only GLM switched on. Moving the checker (and the story checker that
+// follows it, story-policy.ts) to the DeepSeek ref is a separate, explicit choice, `checker: 'deepseek'`,
+// which refuses unless the operator also states `deepseekEnabledOnGate: true` (the gate's GO switches
+// DeepSeek on; the app refuses an ask whose role model the gate has not switched on). The base may be the
+// sealed two-GLM pair (or its historical shapes) or a version this kit already published.
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';
@@ -66,15 +70,36 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
   'verdictHighCut','verdictLowCut','verdictMarginGamma','verificationPolicy','vllmImageDigest','wayOfKnowingCeiling'
 ] as const);
 
-/** The answer writer stays GLM (fixture-a); the checker is DeepSeek, a different maker. Story roles follow (story-policy.ts). */
+/** The answer writer: GLM (fixture-a), always. Story roles follow the writer and checker (story-policy.ts). */
 export const PREVIEW_SYNTHESIZER_ROLE_REF = 'preview:fixture-a' as const;
-export const PREVIEW_EVALUATOR_ROLE_REF = 'preview:deepseek-v4-1-flash' as const;
+/** The default checker: GLM's second ref (fixture-b), the value the sealed two-GLM version holds. */
+export const PREVIEW_EVALUATOR_ROLE_REF = 'preview:fixture-b' as const;
+/** The checker after the explicit `checker: 'deepseek'` choice: DeepSeek, a different maker from the writer. */
+export const PREVIEW_DEEPSEEK_CHECKER_ROLE_REF = 'preview:deepseek-v4-1-flash' as const;
+/**
+ * Which model checks the answer. Omitted means `{checker:'glm'}`. `{checker:'deepseek'}` must also say
+ * `deepseekEnabledOnGate: true` (exactly): the operator's statement that the gate's GO switches DeepSeek on.
+ */
+export type PreviewCheckerChoice = Readonly<{checker:'glm'}> | Readonly<{checker:'deepseek';deepseekEnabledOnGate:true}>;
+/** The checker's provider ref for a choice; anything but the two reviewed shapes refuses by its own rule. */
+export function previewCheckerRoleRef(choice:unknown={checker:'glm'}):string {
+  if(choice===null||typeof choice!=='object'||Object.getPrototypeOf(choice)!==Object.prototype)fail('checker-choice');
+  const value=choice as Record<string,unknown>,keys=Object.keys(value).sort().join(',');
+  if(value.checker==='glm'&&keys==='checker')return PREVIEW_EVALUATOR_ROLE_REF;
+  if(value.checker!=='deepseek'||!['checker','checker,deepseekEnabledOnGate'].includes(keys))fail('checker-choice');
+  if(value.deepseekEnabledOnGate!==true)fail('checker-deepseek-not-enabled-on-gate');
+  return PREVIEW_DEEPSEEK_CHECKER_ROLE_REF;
+}
 
 const sameKeys = (actual:readonly string[], expected:readonly string[]) =>
   actual.length===expected.length && [...actual].sort().join('\0')===[...expected].sort().join('\0');
 
-/** v1's source build (same runtime gate, same provider panel), closed by the reviewed key list instead of a count. */
-export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation):Promise<readonly RegisterPublicationRow[]> {
+/**
+ * v1's source build (same runtime gate, same provider panel), closed by the reviewed key list instead of a count.
+ * `checker` is the reviewed checker choice (default GLM); it is checked before anything else is built.
+ */
+export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}):Promise<readonly RegisterPublicationRow[]> {
+  const evaluatorRoleRef=previewCheckerRoleRef(checker);
   if(runtime.nodeVersion!=='v26.8.2'||runtime.pnpmVersion!=='11.20.0'||!/^([0-9a-f]{40})$/.test(runtime.sourceRevision)
     ||!/^([0-9a-f]{40})$/.test(runtime.sourceTree)||!/^([0-9a-f]{64})$/.test(runtime.operatorSha256)
     ||!Number.isFinite(Date.parse(runtime.observedAt))||bootstrap.values.pnpmVersion!==runtime.pnpmVersion||bootstrap.values.postgresMajorVersion!=='18')fail();
@@ -87,7 +112,7 @@ export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runt
   const panel={configuredProviders,requiredDistinctMakers:1,healthyProviderRefs:[],targets,targetsJson};
   const projected:BootstrapRegister={...bootstrap,values:{...bootstrap.values,nodeRuntimeVersion:runtime.nodeVersion},resolution:{...bootstrap.resolution,
     nodeRuntimeVersion:`preview-auth-dev-v1 actual Node ${runtime.nodeVersion}; measured ${runtime.observedAt}; source ${runtime.sourceRevision}/${runtime.sourceTree}; operator sha256:${runtime.operatorSha256}`}};
-  const rows=[...await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef:PREVIEW_EVALUATOR_ROLE_REF},'local'),
+  const rows=[...await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef},'local'),
     ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
   if(!sameKeys(rows.map(row=>row.rowKey),PREVIEW_SOURCE_ROW_KEYS_V2))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze(row)));
