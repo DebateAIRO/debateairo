@@ -383,7 +383,8 @@ describe("SUP-02 cases", () => {
         unwrapDataKey: async () => { unwrapCalls += 1;throw new Error("must not unwrap"); },
         openContent: () => { throw new Error("must not open"); },
         sealContent: () => { throw new Error("must not seal"); }
-      }
+      },
+      clock: () => shreddedAt
     });
 
     await expect(access.readByToken(tokenSha256,{ limit: 20 })).resolves.toEqual({
