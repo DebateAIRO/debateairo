@@ -22,11 +22,12 @@ DEEPSEEK = 'deepseek-ai/DeepSeek-V4.1-Flash'
 MIMO = 'XiaomiMiMo/MiMo-V2.6-Pro'
 QWEN = 'Qwen/Qwen3.8-Flash'
 # The reviewed rows, written out independently of the gate (contract A section 1):
-# model -> (maker, input $/M, output $/M, output bound, effort, json_object).
-ROWS = {MODEL: ('Z.AI', '0.15', '0.50', 163840, 'high', True),
-        DEEPSEEK: ('DeepSeek', '0.20', '0.60', 131072, 'high', False),
-        MIMO: ('Xiaomi', '0.43', '0.87', 131072, None, False),
-        QWEN: ('Alibaba', '0.113', '0.382', 131072, None, False)}
+# model -> (maker, input $/M, output $/M, output bound, effort, json_object). Output bound 32768 for
+# every row (owner ruling 2026-10-10).
+ROWS = {MODEL: ('Z.AI', '0.15', '0.50', 32768, 'high', True),
+        DEEPSEEK: ('DeepSeek', '0.20', '0.60', 32768, 'high', False),
+        MIMO: ('Xiaomi', '0.43', '0.87', 32768, None, False),
+        QWEN: ('Alibaba', '0.113', '0.382', 32768, None, False)}
 HOST = 'synthetic-host'
 SCOPE = 'preview-team-synthetic'
 # A made-up test value, not a key. Built from pieces so a secret scanner does not read it as one

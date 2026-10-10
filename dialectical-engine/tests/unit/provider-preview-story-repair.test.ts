@@ -192,7 +192,7 @@ describe("preview storyteller v2 safe repair allowance", () => {
     expect(new Set(executions.map(execution => execution.operationId)).size).toBe(2);
     for (const execution of executions) {
       expect(execution.requestSha256).toMatch(/^[0-9a-f]{64}$/u);
-      expect(Number(execution.reservedUsd)).toBeGreaterThan(0.08192);
+      expect(Number(execution.reservedUsd)).toBeGreaterThan(0.016384);
     }
     expect(artifacts.map(artifact => artifact.parseStatus)).toEqual(["SCHEMA_FAILED", "PARSED"]);
     expect(ledger.map(entry => entry.outcome)).toEqual(["FAILED", "OK"]);

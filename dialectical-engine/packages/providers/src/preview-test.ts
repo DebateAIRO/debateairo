@@ -22,7 +22,7 @@ export const PREVIEW_GLM_BASE_URL = PREVIEW_DEEPINFRA_BASE_URL;
 export const PREVIEW_GLM_DEADLINE_MS = 600_000 as const;
 export const PREVIEW_GLM_GENERATION_TOKEN_FLOOR = 8192 as const;
 /** GLM's row bound; every row's own bound is PreviewModelRow.outputBound. */
-export const PREVIEW_GLM_OUTPUT_RESERVATION = 163_840 as const;
+export const PREVIEW_GLM_OUTPUT_RESERVATION = 32_768 as const;
 export const PREVIEW_GLM_TARGET = Object.freeze({
   provider_ref: PREVIEW_GLM_PROVIDER_REF, base_url: PREVIEW_GLM_BASE_URL, model: PREVIEW_GLM_MODEL,
   input_price_micros_per_million: 150_000, output_price_micros_per_million: 500_000,
@@ -269,7 +269,7 @@ export interface PreviewBudgetPort {
 /**
  * Contract A §2/§3: the one fetch the preview's provider calls and probes go through. It sends only
  * a body the gate accepts for that body's reviewed row (exact keys, the row's effort and JSON
- * switches, 1 <= max_tokens <= the row's bound, at most 256 KiB) and reserves at that row's price.
+ * switches, 1 <= max_tokens <= the row's bound, at most 128 KiB) and reserves at that row's price.
  */
 export function createPreviewGuardedFetch(port: PreviewBudgetPort): typeof fetch {
   return async (input, init) => {

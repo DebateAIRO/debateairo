@@ -37,8 +37,17 @@ export type PreviewModelRow = Readonly<{
 export const PREVIEW_DEEPINFRA_BASE_URL = "https://api.deepinfra.com/v1/openai" as const;
 /** The window of every row that does not state its own (GLM, DeepSeek, MiMo). */
 const PREVIEW_CONTEXT_WINDOW_TOKENS = 1_048_576;
-/** Request bodies above this are refused before any reservation (contract A §2). */
-export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
+/**
+ * Request bodies above this are refused before any reservation (contract A §2). Owner ruling
+ * 2026-10-10: a HARD cap of 128 KiB for every row (the largest real request seen was about 51 KB).
+ */
+export const PREVIEW_REQUEST_BODY_MAX_BYTES = 128 * 1024;
+/**
+ * Owner ruling 2026-10-10: every reviewed row's answer cap (its max_tokens ceiling and the output side
+ * of every reservation). No call the app makes asks for more than 24,000 today (debate calls and health
+ * checks 8,192, the storyteller 12,000 then 24,000 on its retry).
+ */
+export const PREVIEW_ANSWER_CAP_TOKENS = 32_768;
 /** Template allowance added to the body's bytes on the input side of a reservation (contract A §3). */
 const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 
@@ -66,14 +75,14 @@ function row(input: Readonly<{
 
 export const PREVIEW_MODEL_ROWS: readonly PreviewModelRow[] = Object.freeze([
   row({ model: "zai-org/GLM-5.3-Flash", maker: "Z.AI", inputUsdPerM: "0.15", outputUsdPerM: "0.50",
-    outputBound: 163_840, effort: "high", jsonObject: true }),
+    outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: true }),
   row({ model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek", inputUsdPerM: "0.20", outputUsdPerM: "0.60",
-    outputBound: 131_072, effort: "high", jsonObject: false }),
+    outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false }),
   row({ model: "XiaomiMiMo/MiMo-V2.6-Pro", maker: "Xiaomi", inputUsdPerM: "0.43", outputUsdPerM: "0.87",
-    outputBound: 131_072, effort: null, jsonObject: false }),
+    outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false }),
   // Owner swap 2026-10-10: Qwen3.8-Flash on DeepInfra (flat rate across its 1,000,000-token window).
   row({ model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
-    outputBound: 131_072, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 })
+    outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 })
 ]);
 
 /** The reviewed row for an exact model id, or undefined. */

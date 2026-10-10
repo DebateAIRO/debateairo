@@ -318,15 +318,21 @@ class DeepInfraProfile:
     host = 'api.deepinfra.com'
     path = '/v1/openai/chat/completions'
     per_call_cap_usd = Decimal('0.25')
-    max_request_bytes = 256 * 1024
+    # Per-call caps (owner ruling 2026-10-10), the same for every row: a hard 128 KiB request body
+    # cap here, and output_bound 32768 (the max_tokens ceiling and the reservation's output term)
+    # in each row below. Measured then: no call the app makes asks for more than 24,000 tokens
+    # (debate 8,192, health checks 8,192, storyteller 12,000 then 24,000 on retry), and the largest
+    # real request seen was about 51 KB. Full-size worst cases: GLM $0.036352, DeepSeek $0.0462848,
+    # MiMo $0.08574976, Qwen $0.027559936 (tests/unit/fixtures/preview-model-rows.json).
+    max_request_bytes = 128 * 1024
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
     rows = {row.model: row for row in (
-        ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 163840, 'high', True),
-        ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 131072, 'high', False),
-        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 131072, None, False),
+        ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 32768, 'high', True),
+        ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 32768, 'high', False),
+        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 32768, None, False),
         # Owner swap 2026-10-10 (Qwen in place of Gemini): flat list price over the whole 1M window,
         # no promotion, no tiers; reasoning_effort is not listed, so none is sent.
-        ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 131072, None, False))}
+        ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 32768, None, False))}
 
     def path_for(self, row):
         return self.path
