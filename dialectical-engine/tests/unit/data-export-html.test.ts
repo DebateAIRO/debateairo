@@ -18,7 +18,7 @@ describe("data export readable page", () => {
     expect(html).toContain("Ada");
     expect(html).toContain("ada@example.test");
     expect(html).toContain("Member since");
-    expect(html).toContain("January 2, 2024");
+    expect(html).toContain("Jan 2, 2024");
   });
   it("H-3 orders debate questions newest first", () => {
     const html = page();
@@ -31,7 +31,7 @@ describe("data export readable page", () => {
     expect(html).toMatch(/MARK-Q1[\s\S]*?Published/);
     for (const n of [1, 2]) {
       expect(html).toContain(`MARK-Q${n}`);
-      expect(html).toContain(n === 1 ? "October 8, 2026" : "October 9, 2026");
+      expect(html).toContain(n === 1 ? "Oct 8, 2026" : "Oct 9, 2026");
       expect(html).toContain(n === 1 ? "Published" : "Private");
       expect(html).toContain(n === 1 ? "Supported" : "Contested");
       for (const path of ["headline", "summary", "confidence", "paths.line", "change.text", "why.reasons.text", "long.sections.title", "long.sections.paragraphs.text", "reviewer_note.text"]) {
@@ -66,5 +66,25 @@ describe("data export readable page", () => {
     for (const token of ["#F9F6F1", "#FDFBF6", "#29261F", "#14110E", "#181410", "#F2EAD9", "#D9C8A9", "#705A33"]) {
       expect(archiveHtml).toContain(token);
     }
+  });
+  it("H-9 uses the drawn short dates for the German account and debates", () => {
+    const html = renderYourDataHtml({ ...snapshotA, locale: "de" }, loadArchiveCatalog("de"));
+    expect(html).toContain("02.01.2024");
+    expect(html).toContain("08.10.2026");
+    expect(html).toContain("09.10.2026");
+  });
+  it("H-10 keeps the S5 heading, label, and unreadable metadata declarations", () => {
+    const style = page().match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "";
+    const declarations = (selector: string) => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const block = style.match(new RegExp(`(?:^|[}\\n])${escaped}\\{([^}]*)\\}`))?.[1] ?? "";
+      return Object.fromEntries(block.split(";").filter(Boolean).map((item) => item.split(":")));
+    };
+    expect(declarations("h1")).toMatchObject({ "font-size": "30px", "font-weight": "500", "letter-spacing": "-.02em" });
+    expect(declarations("h2")).toMatchObject({ "font-size": "20px", "font-weight": "600" });
+    expect(declarations("h3")).toMatchObject({ "font-size": "22px", "font-weight": "500", "line-height": "1.3" });
+    expect(declarations(".label")).toMatchObject({ color: "var(--muted)", margin: "18px 0 6px" });
+    expect(declarations(".label:first-child")["margin-top"]).toBe("0");
+    expect(declarations("article>.meta:first-child")["margin-top"]).toBe("0");
   });
 });

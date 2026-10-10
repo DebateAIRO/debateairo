@@ -104,4 +104,13 @@ describe("data export archive", () => {
     expect(readme).toContain("Your date of birth is never stored.");
     expect(readme).toContain("Cookie choices are stored only in your browser, never on our servers.");
   });
+  it("A-10 keeps the fixture account state inside the producer's database value domain", () => {
+    const data = JSON.parse(archive().find((entry) => entry.name === "account.json")!.bytes.toString("utf8"));
+    expect(data.account.state).toMatch(/^(pending_verification|active|suspended|deleted)$/);
+  });
+
+  it("A-11 gives the fixture account the required adult affirmation timestamp", () => {
+    const data = JSON.parse(archive().find((entry) => entry.name === "account.json")!.bytes.toString("utf8"));
+    expect(data.account.adult_affirmed_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
 });

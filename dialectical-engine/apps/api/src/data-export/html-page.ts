@@ -11,7 +11,7 @@ const escapeHtml = (value: unknown): string => String(value ?? "").replace(/[&<>
 
 function dateText(value: unknown, locale: string): string {
   const date = new Date(words(value));
-  return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(locale, { dateStyle: "long", timeZone: "UTC" }).format(date) : "";
+  return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" }).format(date) : "";
 }
 
 function storyTexts(value: unknown): string[] {
@@ -73,14 +73,14 @@ export function renderYourDataHtml(snapshot: ExportSnapshot, catalog: ArchiveCat
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 main{max-width:720px;margin:0 auto;padding:48px 24px}
 header{padding-bottom:20px;border-bottom:1px solid var(--line-strong)}
-h1,h2,h3{font-family:Georgia,serif;line-height:1.25}h1{margin:0}header p{margin:10px 0 0;font-size:13px;color:var(--text-2)}
-section.account-section{margin-top:28px}section.debates-section{margin-top:32px}h2{margin:0 0 12px}
+h1,h2,h3{font-family:Georgia,serif}h1{margin:0;font-size:30px;font-weight:500;line-height:1.25;letter-spacing:-.02em}header p{margin:10px 0 0;font-size:13px;color:var(--text-2)}
+section.account-section{margin-top:28px}section.debates-section{margin-top:32px}h2{margin:0 0 12px;font-size:20px;font-weight:600;line-height:1.25}
 .account-card,article{background:var(--surface);border:1px solid var(--line);border-radius:14px}
 .account-card{padding:14px 18px}.pseudonym{margin:0 0 8px;font-size:15px;font-weight:700}
 dl{margin:0;display:grid;grid-template-columns:140px 1fr;row-gap:6px;font-size:14px}dt{color:var(--muted)}dd{margin:0}
 article{padding:18px 22px}article+article{margin-top:16px}
-.label{margin:0 0 4px;font-size:12px;font-weight:700}.section-label{margin:18px 0 4px}.verdict-label{margin:16px 0 4px}
-h3{margin:0}.meta{margin:8px 0 0;font-size:13px;color:var(--text-2)}
+.label{margin:18px 0 6px;font-size:12px;font-weight:700;color:var(--muted)}.label:first-child{margin-top:0}
+h3{margin:0;font-size:22px;font-weight:500;line-height:1.3}.meta{margin:8px 0 0;font-size:13px;color:var(--text-2)}article>.meta:first-child{margin-top:0}
 .pill{display:inline-block;padding:2px 10px;border:1px solid var(--gold-border);border-radius:999px;color:var(--gold-text);font-size:12px;font-weight:700;line-height:1.5}
 .pill.supported{border-color:var(--agree-text);color:var(--agree-text)}.pill.unsupported{border-color:var(--dispute-border);color:var(--dispute)}
 .answer{margin:10px 0 0;font-size:15px;line-height:1.6}.story-text{margin:0;font-size:15px;line-height:1.6}
