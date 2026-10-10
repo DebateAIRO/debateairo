@@ -92,27 +92,42 @@ export class DataExportApplication {
     const { repository, store, workerId } = this.deps;
     try {
       for (const { exportId } of await repository.sweep()) {
-        await store.destroyKey(exportId);
-        await store.deleteArchive(exportId);
-        await repository.markKeyDestroyed(exportId);
+        try {
+          await store.destroyKey(exportId);
+          await store.deleteArchive(exportId);
+          await repository.markKeyDestroyed(exportId);
+        } catch {
+          this.deps.log?.(`[DATA_EXPORT_SWEEP_FAILED] ROW ${exportId}`);
+        }
       }
+    } catch {
+      this.deps.log?.("[DATA_EXPORT_SWEEP_FAILED] ROW_BATCH");
+    }
+    try {
       const storedIds = await store.listIds();
       const liveIds = new Set(await repository.liveIds(storedIds));
       for (const id of storedIds) {
         if (liveIds.has(id)) continue;
-        await store.destroyKey(id);
-        await store.deleteArchive(id);
+        try {
+          await store.destroyKey(id);
+          await store.deleteArchive(id);
+        } catch {
+          this.deps.log?.(`[DATA_EXPORT_SWEEP_FAILED] ORPHAN ${id}`);
+        }
       }
     } catch {
-      this.deps.log?.("[DATA_EXPORT_SWEEP_FAILED] SWEEP");
-      return;
+      this.deps.log?.("[DATA_EXPORT_SWEEP_FAILED] ORPHAN_BATCH");
     }
 
     const claim = await repository.claim(workerId, DATA_EXPORT_LEASE_SECONDS);
     if (claim === null) return;
     if (claim.attempt > DATA_EXPORT_MAX_ATTEMPTS) {
-      await store.destroyKey(claim.exportId);
-      await store.deleteArchive(claim.exportId);
+      try {
+        await store.destroyKey(claim.exportId);
+        await store.deleteArchive(claim.exportId);
+      } catch {
+        this.deps.log?.(`[DATA_EXPORT_SWEEP_FAILED] ATTEMPTS ${claim.exportId}`);
+      }
       await repository.fail(claim.exportId, workerId, "ATTEMPTS");
       return;
     }
@@ -129,8 +144,12 @@ export class DataExportApplication {
     const timer = setInterval(renew, DATA_EXPORT_RENEW_MS);
     timer.unref?.();
     const discard = async () => {
-      await store.destroyKey(claim.exportId);
-      await store.deleteArchive(claim.exportId);
+      try {
+        await store.destroyKey(claim.exportId);
+        await store.deleteArchive(claim.exportId);
+      } catch {
+        this.deps.log?.(`[DATA_EXPORT_SWEEP_FAILED] DISCARD ${claim.exportId}`);
+      }
     };
     let phase: "BUILD" | "MAIL" = "BUILD";
     try {

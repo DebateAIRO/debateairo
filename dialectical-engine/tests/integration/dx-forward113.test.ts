@@ -69,6 +69,58 @@ describe("data export forward113", () => {
     expect(check).toContain("EXPORT_DATA");
   }, 180_000);
 
+  it("F10 accepts schema-neutral reindex on export indexes", async () => {
+    for (const statement of [
+      "REINDEX TABLE identity.data_export",
+      "REINDEX INDEX CONCURRENTLY identity.data_export_pkey",
+      "REINDEX TABLE CONCURRENTLY identity.data_export"
+    ]) {
+      await db.pool.query(statement);
+      await expect(migrate(db.pool), statement).resolves.toBeUndefined();
+    }
+  }, 180_000);
+
+  it("F10 refuses export catalog drift and accepts the restored catalog", async () => {
+    const constraint = async (name: string) => (await db.pool.query<{ def: string }>(
+      "SELECT pg_get_constraintdef(oid) def FROM pg_constraint WHERE conrelid='identity.data_export'::regclass AND conname=$1", [name]
+    )).rows[0]!.def;
+    const arms: Array<[string, () => Promise<[string, string]>]> = [
+      ["column ACL", async () => ["GRANT SELECT(link_token_hash) ON identity.data_export TO debateai_runtime", "REVOKE SELECT(link_token_hash) ON identity.data_export FROM debateai_runtime"]],
+      ["one PREPARING index", async () => ["DROP INDEX identity.data_export_one_preparing", (await db.pool.query<{ def: string }>("SELECT pg_get_indexdef('identity.data_export_one_preparing'::regclass) def")).rows[0]!.def]],
+      ["token UNIQUE", async () => ["ALTER TABLE identity.data_export DROP CONSTRAINT data_export_link_token_hash_key", `ALTER TABLE identity.data_export ADD CONSTRAINT data_export_link_token_hash_key ${await constraint("data_export_link_token_hash_key")}`]],
+      ["token CHECK", async () => ["ALTER TABLE identity.data_export DROP CONSTRAINT data_export_token_check", `ALTER TABLE identity.data_export ADD CONSTRAINT data_export_token_check ${await constraint("data_export_token_check")}`]],
+      ["SENT CHECK", async () => ["ALTER TABLE identity.data_export DROP CONSTRAINT data_export_sent_check", `ALTER TABLE identity.data_export ADD CONSTRAINT data_export_sent_check ${await constraint("data_export_sent_check")}`]],
+      ["user FK", async () => ["ALTER TABLE identity.data_export DROP CONSTRAINT data_export_user_id_fkey", `ALTER TABLE identity.data_export ADD CONSTRAINT data_export_user_id_fkey ${await constraint("data_export_user_id_fkey")}`]],
+      ["user trigger", async () => ["ALTER TABLE identity.data_export DISABLE TRIGGER USER", "ALTER TABLE identity.data_export ENABLE TRIGGER USER"]]
+    ];
+    for (const [name, make] of arms) {
+      const [mutate, restore] = await make();
+      await db.pool.query(mutate);
+      try { await expect(migrate(db.pool), name).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${EXPORT}`); }
+      finally { await db.pool.query(restore); }
+      await migrate(db.pool);
+    }
+  }, 300_000);
+
+  it("F11 refuses export role membership, rules, publication, persistence and forced RLS drift", async () => {
+    const arms: Array<[string, string, string]> = [
+      ["worker to authorization", "GRANT debateai_data_export_worker TO debateai_authorization_runtime", "REVOKE debateai_data_export_worker FROM debateai_authorization_runtime"],
+      ["worker to runtime", "GRANT debateai_data_export_worker TO debateai_runtime", "REVOKE debateai_data_export_worker FROM debateai_runtime"],
+      ["authorization to worker", "GRANT debateai_authorization_runtime TO debateai_data_export_worker", "REVOKE debateai_authorization_runtime FROM debateai_data_export_worker"],
+      ["transitive bridge to worker", "CREATE ROLE dx_forward113_bridge NOLOGIN; GRANT debateai_data_export_worker TO dx_forward113_bridge; GRANT dx_forward113_bridge TO debateai_authorization_runtime", "REVOKE dx_forward113_bridge FROM debateai_authorization_runtime; REVOKE debateai_data_export_worker FROM dx_forward113_bridge; DROP ROLE dx_forward113_bridge"],
+      ["rewrite rule", "CREATE RULE dx_forward113_probe AS ON UPDATE TO identity.data_export DO INSTEAD NOTHING", "DROP RULE dx_forward113_probe ON identity.data_export"],
+      ["publication", "CREATE PUBLICATION dx_forward113_probe FOR TABLE identity.data_export", "DROP PUBLICATION dx_forward113_probe"],
+      ["unlogged", "ALTER TABLE identity.data_export SET UNLOGGED", "ALTER TABLE identity.data_export SET LOGGED"],
+      ["forced RLS", "ALTER TABLE identity.data_export FORCE ROW LEVEL SECURITY", "ALTER TABLE identity.data_export NO FORCE ROW LEVEL SECURITY"]
+    ];
+    for (const [name, mutate, restore] of arms) {
+      await db.pool.query(mutate);
+      try { await expect(migrate(db.pool), name).rejects.toThrow(`MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT ${EXPORT}`); }
+      finally { await db.pool.query(restore); }
+      await migrate(db.pool);
+    }
+  }, 300_000);
+
   it("G5 binds receipt presence, previous manifest and postcondition digest", async () => {
     const original = (await db.pool.query("SELECT * FROM public.debateai_schema_migration_step WHERE source_name=$1", [EXPORT])).rows[0];
     await db.pool.query("DELETE FROM public.debateai_schema_migration_step WHERE source_name=$1", [EXPORT]);
