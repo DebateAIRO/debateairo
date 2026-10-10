@@ -153,7 +153,12 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(section.startsWith("## Part C's prices (0113)")).toBe(true);
     for (const needle of ["0112", "auth-db-batch-forward.json", "billing-price-currencies-forward0113.json",
       "verify-effective-capabilities-111.sql", "packages/db/src/migration-forward0113.ts", "MIGRATION_FORWARD0113_",
-      "replayVerifierSql", "`STEPS`"]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
+      "replayVerifierSql", "`STEPS`",
+      // C5a fix round 1: unlike the batch's, 0113's number is in its guard, its loader's names and its refusal prefix.
+      "`$billing_0113_requires$`", "`BILLING_0113_REQUIRES_0111`", "`loadForward0113`", "`VERSION` and `MANIFEST_PATH`",
+      "rename every file and constant that carries the number"
+    ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
+    expect(section.slice(0, section.indexOf("\n## ", 1))).not.toContain("Its number lives only in");
     expect(readme).not.toContain("else renumbered 0112");
   });
 

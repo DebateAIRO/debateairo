@@ -63,7 +63,12 @@ after 0112 when it merged with dev at 7db4a7b72, keeping its number, the next fr
 - No supplemental verifier and no `replayVerifierSql`: its checks are its postcondition digest (the quote's column and
   the three CHECKs), which every later `migrate()` compares.
 - Loader: `packages/db/src/migration-forward0113.ts` (exact keys, digests checked, `MIGRATION_FORWARD0113_*` refusals),
-  appended last to `STEPS`. Its number lives only in the SQL file name, the manifest and the loader's `NAME`/`PREVIOUS`.
+  appended last to `STEPS`. Unlike the batch's, its number is in many places: the SQL's file name, header comment,
+  `$billing_0113_requires$` guard label and `BILLING_0113_REQUIRES_0111` refusal; the manifest's file name and
+  `version`; the loader's file name, its `loadForward0113` (imported by `migration-forward-chain.ts`), its `NAME`,
+  `VERSION` and `MANIFEST_PATH`, and the `MIGRATION_FORWARD0113_` prefix; and the tests that pin the chain. A renumber
+  follows C1's recipe: rename every file and constant that carries the number, recompute the manifest's migration
+  digest, and re-pin the chain lists.
 
 ## Replay: every applied step keeps its own checks
 
