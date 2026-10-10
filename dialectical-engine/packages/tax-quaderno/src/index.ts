@@ -151,8 +151,9 @@ export class QuadernoTaxEngine implements TaxEngine {
     const totalMicros = quadernoAmountMicros(reply.total_amount);
     if (netMicros !== i.netMicros) refused("SUBTOTAL_MISMATCH");
     if (taxMicros < 0 || totalMicros !== netMicros + taxMicros) refused("TOTAL_MISMATCH");
-    // Spec 2026-10-05 §2.16.4: the tax is priced in the currency we asked for, or the quote is not ours to charge.
-    if (reply.currency !== undefined && reply.currency !== null && reply.currency !== i.currency) refused("CURRENCY_MISMATCH");
+    // Spec 2026-10-05 §2.16.4: the answer names the currency we asked for, or the quote is not ours to charge. An answer
+    // that names none (absent or null) proves nothing, so it is refused too (CF1: money-2, tax-3).
+    if (reply.currency !== i.currency) refused("CURRENCY_MISMATCH");
     const country = text(reply.country);
     if (country === null || !/^[A-Za-z]{2}$/u.test(country)) refused("COUNTRY_INVALID");
     return Object.freeze({

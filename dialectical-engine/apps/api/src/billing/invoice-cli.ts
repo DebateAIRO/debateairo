@@ -20,7 +20,8 @@
  * `--amount` (P4-K, P2-W12; the owner's ruling of 3 October 2026, option (b)) records the credit note the owner
  * issued by hand for a refund made in NETOPIA's admin that NETOPIA reported as the payment's own status (P9c's
  * PROVIDER_REFUND REFUNDED with no refund transaction, the owner summary's DASHBOARD_REFUND line, which has no job):
- * at the owner's amount, at most what the payment held (that REFUNDED row's amount, P9c's upper bound), from the
+ * at the owner's amount, typed in the charge's own currency (spec 2026-10-05 §2.16.5; never converted), at most what
+ * the payment held (that REFUNDED row's amount, P9c's upper bound), from the
  * issuer of the charge's own invoice. The line then clears by `invoiceUnknownItems`' own NOT EXISTS, and
  * `quarterSummaryRows` subtracts the refund at the credit note's amount. One credit note per charge stays (0086's
  * `invoice_one_per_intent`): a charge that has one already is refused, and that refund goes to the accountant.

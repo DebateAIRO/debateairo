@@ -54,6 +54,16 @@ describe("Quaderno is asked in the subscription's currency", () => {
     }));
   });
 
+  // CF1 (money-2, tax-3, tests-3): the answer must NAME the currency asked; one that names none proves nothing.
+  it.each([["null", "null"], ["absent", null]] as const)(
+    "refuses an answer whose currency is %s (QUADERNO_CURRENCY_MISMATCH)", async (_label, value) => {
+      fake.overrideNextCalculation({ currency: value });
+      await expect(ask("RON")).rejects.toThrowError(expect.objectContaining({
+        code: "TAX_SERVICE_REFUSED", message: "QUADERNO_CURRENCY_MISMATCH"
+      }));
+    }
+  );
+
   it("the in-memory fake records the currency of every quote asked", async () => {
     const tax = new FakeTaxEngine();
     await tax.quote({ netMicros: 100_000_000, currency: "RON", location: { ...LOCATION, country: "RO" }, taxId: null, taxCode: "saas", date: DATE });

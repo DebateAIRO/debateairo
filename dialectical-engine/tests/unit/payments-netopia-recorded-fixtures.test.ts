@@ -70,6 +70,15 @@ describe.runIf(fixtures.length > 0)("N22 — recorded NETOPIA fixtures (OWNER-RU
     expect(parsed.cardCountry, "neither instrument.country nor ISSUER_COUNTRY parsed: the blocked-country refusal would never fire").not.toBeNull();
   });
 
+  it("pin the currency (CF1, ops-4): the first paid message and the status answer name the currency the start asked", () => {
+    // VERIFY_PAYMENT refuses a report whose currency is not the charge's (absent included), so NETOPIA must echo it.
+    const asked = String(valueAtPath(json("start-request"), "order.currency"));
+    expect(asked).toMatch(/^[A-Z]{3}$/u);
+    expect(parseNetopiaNotice(Buffer.from(fixture("notice-start").bodyText, "utf8"), recordedNow("notice-start")).currency).toBe(asked);
+    const status = readPaymentAnswer(json("status-answer"), { orderId: orderIdOf("status-answer"), now: recordedNow("status-answer"), purpose: "STATUS" });
+    expect(status.kind === "REPORT" ? status.report.currency : status.kind).toBe(asked);
+  });
+
   it("pin operationDate's format: a zoned time near the recording day, in messages and status answers", () => {
     expect(parseNetopiaNotice(Buffer.from(fixture("notice-start").bodyText, "utf8"), recordedNow("notice-start")).occurredAt).not.toBeNull();
     expect(parseOccurredAt(String(valueAtPath(json("status-answer"), "payment.operationDate")), recordedNow("status-answer"))).not.toBeNull();

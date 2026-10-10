@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import { CardChangeFlow, type CardChangeClient } from "../../apps/ui/components/billing/CardChangeFlow.js";
+import { formatMoney } from "../../apps/ui/lib/billing/format.js";
 import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
 
 const EN = billingEnglish as Readonly<Record<string, string>>;
@@ -89,6 +90,23 @@ describe("P20 the card change page (A11, A12)", () => {
       street: "Strada Memorandumului 1", city: "Cluj-Napoca", postal_code: "400001"
     });
     expect(goToPayment.mock.calls).toEqual([[PAGE]]);
+  });
+
+  it("CF1 (ui-1, tests-2): a RON subscription's agreement names its monthly total in RON, never in dollars", async () => {
+    const client = {
+      getBillingCardDetails: vi.fn(async () => DETAILS),
+      getBillingSubscription: vi.fn(async () => ({ subscription: { renewal_total: "121.00", currency: "RON" } })),
+      startCardChange: vi.fn(), getBillingCharge: vi.fn()
+    };
+    await act(async () => {
+      root.render(<CardChangeFlow catalog={billingEnglish} locale="en" renewalConsent={CONSENT}
+        client={client as unknown as CardChangeClient} />);
+    });
+    await settle();
+    const total = formatMoney("en", "121.00", "RON");
+    expect(total).toMatch(/RON/u);
+    expect(container.textContent).toContain(EN["billing.consent.renewal"]!.replace("{total}", total));
+    expect(container.textContent).not.toContain("$");
   });
 
   it("names why no check is offered when the read has no total, never a button that cannot enable", async () => {

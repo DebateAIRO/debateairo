@@ -1019,10 +1019,10 @@ describe("P22 the Billing runbook", () => {
       "### 14.9 The sandbox run, end to end (OWNER-RUN)", "9900 0048 1022 5098", "9900 0091 8421 4768",
       "BILLING_STAGE_CLOCK_OFFSET_DAYS=31", "BILLING_STAGE_CLOCK_LIVE_REFUSED",
       "pnpm exec vitest run tests/integration/billing-whole-flow.test.ts",
-      "BILLING_STAGE_LIVE_INVOICER_REFUSED", "`https://smartbill.invalid`", "made as a buyer outside Romania",
+      "BILLING_STAGE_LIVE_INVOICER_REFUSED", "`https://smartbill.invalid`", "made as a buyer in the United States (US)",
       "Fill in the company's CUI first (§14.7)", "BILLING_COMPANY_FACTS_UNVERIFIED:cui",
       "The stage clock only ever goes up", "A host must never go live holding rows written on a moved clock",
-      "BILLING_LIVE_SANDBOX_INVOICER_REFUSED", "on a second test account (Germany again", "ALREADY_SUBSCRIBED",
+      "BILLING_LIVE_SANDBOX_INVOICER_REFUSED", "on a second test account (the United States again", "ALREADY_SUBSCRIBED",
       "beside anything but Quaderno's sandbox and a `.invalid` SmartBill address",
       "its usage bars and a withdrawal's credit-used share", "the fake stack in step 6 proves the bars and the share",
       "so do not run them on this host while the line is set",
@@ -1156,5 +1156,111 @@ describe("P22 the Billing runbook", () => {
       expect(subject, `owner.${code}.subject`).toBeTypeOf("string");
       expect(quote, code).toBe(subject!.replace(/\{[A-Za-z]+\}/gu, "…"));
     }
+  });
+});
+
+describe("CF1 (Part C's final review): the runbook speaks the charge's currency and the Part C upgrade", () => {
+  const flat = billing.replace(/\s+/gu, " ");
+  const slice = (from: string, to: string): string => {
+    const at = flat.indexOf(from);
+    expect(at, from).toBeGreaterThan(0);
+    const end = flat.indexOf(to, at);
+    expect(end, to).toBeGreaterThan(at);
+    return flat.slice(at, end);
+  };
+
+  it("money-1, tax-1, ops-5: a dashboard refund's credit-note amount is typed in the charge's own currency", () => {
+    const invoice = slice("For an invoice or a credit note, settle the line with `pnpm billing:invoice`", "- `BILLING_INVOICE_CHARGE_UNKNOWN`");
+    for (const needle of [
+      // The --amount bullet, the pasted command's prompt comment, and the usage code's explanation.
+      "and the amount you refunded, in the charge's own currency as the tax summary's \"up to\" line names it",
+      "(for example `50.00` for 50.00 RON)",
+      "then type the amount you refunded in NETOPIA's admin, in the charge's own currency as the summary's \"up to\" line names it",
+      "an `--amount` that is not units and cents (or bani) above zero"
+    ]) {
+      expect(invoice, needle).toContain(needle);
+    }
+    // No "dollars and cents" is left beside billing:invoice, nor anywhere else in §14.
+    expect(invoice).not.toContain("dollars and cents");
+    expect(invoice).not.toMatch(/in dollars/iu);
+    expect(flat).not.toContain("dollars and cents");
+    // The claim stays true of the command: the amount is read in the charge's currency, which its result line names.
+    const cli = read("apps/api/src/billing/invoice-cli.ts");
+    expect(cli).toContain("in the charge's own currency");
+    expect(cli).toContain("subtracts this refund at ${microsToDecimal(input.amountMicros)} ${result.currency}");
+  });
+
+  it("ops-6, data-1, data-2: upgrading to Part C migrates 0113 first, in §5's order, and says how to roll back", () => {
+    const upgrade = slice("#### Upgrading to Part C (migration 0113)", "### 14.5");
+    const steps = [
+      "1. **Put the new checkout in place**",
+      "2. **Open the migrator window** (§4 step 2).",
+      "3. **Migrate**: `pnpm db:migrate`. It applies `migrations/0113_billing_price_currencies.sql`",
+      "4. **Run `hardening.sql`** (§4 step 3).",
+      "5. **Close the window** (§4 step 5).",
+      "6. **Publish the v2 `billingPlans`**",
+      "7. **Pin it**: copy the printed `REGISTER_VERSION=` line into both `api.env` and `runner.env`.",
+      "8. **Restart both**: `systemctl restart debateai-api debateai-runner`."
+    ];
+    let previous = -1;
+    for (const step of steps) {
+      const at = upgrade.indexOf(step);
+      expect(at, step).toBeGreaterThan(previous);
+      previous = at;
+    }
+    for (const needle of ["0113", "pnpm db:migrate", "0110, 0111 and 0112", "BILLING_PLANS_INVALID",
+      "**Rolling back** past Part C: before restarting the older code, pin the register version it ran on",
+      "the forward migration stays applied", "older code refuses a v2 version"]) {
+      expect(upgrade, needle).toContain(needle);
+    }
+    // The section names the real migration and the real refusal.
+    expect(readdirSync(resolve("migrations"))).toContain("0113_billing_price_currencies.sql");
+    expect(read("packages/register/src/billing-plans.ts")).toContain("BILLING_PLANS_INVALID");
+  });
+
+  it("ops-2, ops-3, ops-4: the sandbox run allows the plans cross, buys as a USD buyer, and reads each currency back", () => {
+    const sandbox = slice("### 14.9 The sandbox run, end to end (OWNER-RUN)", "**The small live test, with billing off.**");
+    for (const needle of [
+      // ops-2: the one cross allowed on the sandbox server.
+      "The plans line's cross (\"…placeholders…\") is expected on this server unless you publish a price list here too",
+      "on the live host it must be a tick (go-live row 73)",
+      // ops-3 (ruling PR-65): steps 1–5 as a USD buyer; EUR and RON once NETOPIA's sandbox accepts them.
+      "**Every purchase in steps 1–5 is made as a buyer in the United States (US)**",
+      "whose `pay` is on in `deploy/vps/register/country-policy.example.json`",
+      "pays in USD", "add `\"US\"` to `withdrawal_countries`",
+      "**Once NETOPIA's sandbox accepts EUR and RON**",
+      "If NETOPIA's sandbox refuses them before the settlement form is signed, wait for the form",
+      "buy Plus once as a German buyer",
+      // ops-4: the status line names the currency, and the owner checks it.
+      "`NETOPIA_SANDBOX_STATUS=PAID:3:1.00 USD`", "check that the line names the currency the payment was started in",
+      "`NO_CURRENCY`"
+    ]) {
+      expect(sandbox, needle).toContain(needle);
+    }
+    expect(sandbox).not.toContain("every line must show a tick.");
+    expect(sandbox).not.toContain("Choose a country whose `pay` is on, for example Germany (DE)");
+    // The claims stay true of the example files and the tool.
+    const switches = (JSON.parse(read("deploy/vps/register/country-policy.example.json")) as {
+      countryPolicy: { countries: Record<string, { pay: boolean }> };
+    }).countryPolicy.countries;
+    expect(switches.US?.pay).toBe(true);
+    const byCountry = BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value.currency_by_country;
+    expect(byCountry.countries.US ?? byCountry.default).toBe("USD");
+    expect(byCountry.countries.DE).toBe("EUR");
+    expect(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value.withdrawal_countries).not.toContain("US");
+    expect(read("tools/billing/netopia-sandbox.ts")).toContain('${read.currency ?? "NO_CURRENCY"}');
+  });
+
+  it("ops-3, ops-4: go-live row 74 follows the same condition and reads each currency back from the status line", () => {
+    const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
+    const row = checklist.split("\n").find((line) => line.startsWith("| 74 |")) ?? "";
+    for (const needle of [
+      "once NETOPIA's sandbox accepts EUR and RON", "if it refuses them before the settlement form is signed, the owner waits for the form",
+      "the EUR calculation and sale are the German purchase of §14.9 step 7",
+      "`status --order` line names the currency the payment was started in"
+    ]) {
+      expect(row, needle).toContain(needle);
+    }
+    expect(row).not.toContain("the German purchase of §14.9 steps 1–5");
   });
 });

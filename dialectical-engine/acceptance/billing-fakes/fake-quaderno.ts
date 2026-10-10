@@ -14,7 +14,8 @@ export type FakeQuaderno = Readonly<{
   failNext(status: number, times?: number): void;
   failNextPost(status: number): void;
   stallNext(times?: number): void;
-  overrideNextCalculation(fields: Readonly<Record<string, string>>): void;
+  /** Each value is the member's raw JSON text; `null` leaves the member out of the answer. */
+  overrideNextCalculation(fields: Readonly<Record<string, string | null>>): void;
   /** From now on GET /invoices and /credits ignore processor_id, as a Quaderno that dropped the filter would. */
   returnUnfilteredLists(): void;
   postCount(processorId: string): number;
@@ -33,7 +34,7 @@ export async function startFakeQuaderno(options: Readonly<{ apiKey?: string; por
   let failures: number[] = [];
   let postFailure: number | null = null;
   let stalls = 0;
-  let override: Readonly<Record<string, string>> | null = null;
+  let override: Readonly<Record<string, string | null>> | null = null;
   let unfiltered = false;
   let nextId = 0;
 
@@ -71,9 +72,10 @@ export async function startFakeQuaderno(options: Readonly<{ apiKey?: string; por
           currency: JSON.stringify(url.searchParams.get("currency") ?? "USD"),
           tax_code: JSON.stringify(url.searchParams.get("tax_code") ?? "saas")
         };
-        const applied = override === null ? fields : { ...fields, ...override };
+        const applied: Record<string, string | null> = override === null ? fields : { ...fields, ...override };
         override = null;
-        send(response, 200, `{${Object.entries(applied).map(([key, value]) => `"${key}":${value}`).join(",")}}`);
+        const members = Object.entries(applied).filter((entry): entry is [string, string] => entry[1] !== null);
+        send(response, 200, `{${members.map(([key, value]) => `"${key}":${value}`).join(",")}}`);
         return;
       }
       if (request.method === "GET" && url.pathname === "/api/tax_ids/validate") {
@@ -123,7 +125,7 @@ export async function startFakeQuaderno(options: Readonly<{ apiKey?: string; por
     failNext(status: number, times = 1) { failures = [...failures, ...Array.from({ length: times }, () => status)]; },
     failNextPost(status: number) { postFailure = status; },
     stallNext(times = 1) { stalls += times; },
-    overrideNextCalculation(fields: Readonly<Record<string, string>>) { override = fields; },
+    overrideNextCalculation(fields: Readonly<Record<string, string | null>>) { override = fields; },
     returnUnfilteredLists() { unfiltered = true; },
     postCount(processorId: string) { return posts.get(processorId) ?? 0; },
     async stop() {

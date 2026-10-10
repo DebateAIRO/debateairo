@@ -23,7 +23,7 @@ describe("W12 pnpm billing:invoice's grammar (P2-I17)", () => {
       .toMatchObject({ mode: "RECORD", reference: "1234567" });
   });
 
-  it("takes --amount <dollars.cents> only with --kind CREDIT_NOTE --record, for a dashboard refund's credit note (P4-K, P2-W12)", () => {
+  it("takes --amount <units.cents> (in the charge's currency) only with --kind CREDIT_NOTE --record, for a dashboard refund's credit note (P4-K, P2-W12)", () => {
     expect(parseInvoiceArguments(["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--record", "DBAI-0042", "--amount", "12.10"]))
       .toEqual({ chargeId: CHARGE, kind: "CREDIT_NOTE", mode: "RECORD", reference: "DBAI-0042", amountMicros: 12_100_000 });
     expect(parseInvoiceArguments(["--amount", "0.01", "--record", "qd_7f3a91", "--kind", "CREDIT_NOTE", "--charge", CHARGE]))

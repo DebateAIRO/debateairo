@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BUCHAREST_SECTORS, ContractHttpError, ROMANIA_COUNTIES } from "@debateai/contract";
 import { CheckoutFlow, type CheckoutClient } from "../../apps/ui/components/billing/CheckoutFlow.js";
+import { formatMoney } from "../../apps/ui/lib/billing/format.js";
 import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -16,11 +17,11 @@ const CONSENTS = Object.freeze({
 });
 const PAGE = "https://secure-sandbox.netopia-payments.com/ui/card?p=0123456789ab";
 const STARTED = Object.freeze({ redirect_url: PAGE, charge_ref: "0123456789abcdef0123456789abcdef", environment: "sandbox" as const });
-/** N18's BillingQuoteResponse, field for field (a connection in Germany, priced for Germany). */
+/** N18's BillingQuoteResponse, field for field (a connection in Germany, priced for Germany: in EUR, spec §2.16.1). */
 function quote(overrides: Record<string, unknown> = {}) {
   return {
     quote_ref: "11111111-1111-4111-8111-111111111111", plan_id: "PLUS", net: "20.00", tax: "3.80", total: "23.80",
-    currency: "USD", tax_name: "MwSt.", tax_rate_bp: 1900, tax_country: "DE", tax_region: null, tax_status: "TAXABLE",
+    currency: "EUR", tax_name: "MwSt.", tax_rate_bp: 1900, tax_country: "DE", tax_region: null, tax_status: "TAXABLE",
     country: "DE", ip_country: "DE", country_confirm_needed: false, address_required: false,
     renews_on: "2026-10-29T10:00:00.000Z", withdrawal_days: 14, expires_at: "2026-09-29T10:30:00.000Z", ...overrides
   };
@@ -113,9 +114,13 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
       plan_id: "PLUS", country: "DE", first_name: "Anna", last_name: "Schmidt", phone: "+49 151 1234 5678",
       street: "Invalidenstrasse 1", city: "Berlin", postal_code: "10115"
     });
-    expect(text()).toContain("Plus — $20.00 + $3.80 MwSt. (19%, Germany) = $23.80 per month.");
+    // CF1 (ui-1, tests-2): a German quote is in EUR, so every amount the buyer agrees to is in EUR (spec §2.16.5).
+    const eur = (decimal: string): string => formatMoney("en", decimal, "EUR");
+    expect(eur("23.80")).toBe("€23.80");
+    expect(text()).toContain(`Plus — ${eur("20.00")} + ${eur("3.80")} MwSt. (19%, Germany) = ${eur("23.80")} per month.`);
     // Spec §2.18: the card-saving agreement names the monthly total (live once N20 adds {total} to the sentence).
-    expect(text()).toContain(EN["billing.consent.renewal"]!.replace("{total}", "$23.80"));
+    expect(text()).toContain(EN["billing.consent.renewal"]!.replace("{total}", eur("23.80")));
+    expect(text()).not.toContain("$");
     expect(text()).toContain(EN["billing.checkout.cardNote"]);
     const next = button("billing.checkout.continueToCard")!;
     await click(checkbox(0));
@@ -155,6 +160,27 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     // Moving the county away from Bucharest clears the sector, so "Sector 3" never names a city elsewhere.
     await choose(select("checkout-region"), "Ilfov");
     expect(input("checkout-city").value).toBe("");
+  });
+
+  it("CF1 (ui-1, tests-2): a Romanian quote shows its total, its tax and the agreement in RON, never in dollars", async () => {
+    const romanian = { country: "RO", ip_country: "RO", tax_country: "RO", tax_name: "TVA", tax_rate_bp: 2100 };
+    client.createBillingQuote.mockResolvedValueOnce(quote({ ...romanian, address_required: true }))
+      .mockResolvedValueOnce(quote({ ...romanian, net: "100.00", tax: "21.00", total: "121.00", currency: "RON" }));
+    await render();
+    await fill(input("checkout-firstName"), "Ana");
+    await fill(input("checkout-lastName"), "Pop");
+    await fill(input("checkout-phone"), "+40 712 345 678");
+    await fill(input("checkout-street"), "Strada Lipscani 1");
+    await fill(input("checkout-postalCode"), "030031");
+    await choose(select("checkout-region"), "Bucuresti");
+    await choose(select("checkout-city"), "Sector 3");
+    await click(button("billing.checkout.showPrice")!);
+    const ron = (decimal: string): string => formatMoney("en", decimal, "RON");
+    expect(ron("121.00")).toMatch(/RON/u);
+    // The total line, its tax label and the card-saving agreement each name RON.
+    expect(text()).toContain(`Plus — ${ron("100.00")} + ${ron("21.00")} TVA (21%, Romania) = ${ron("121.00")} per month.`);
+    expect(text()).toContain(EN["billing.consent.renewal"]!.replace("{total}", ron("121.00")));
+    expect(text()).not.toContain("$");
   });
 
   it("asks the US and Canada for the state, and lets Ireland go without a postal code", async () => {

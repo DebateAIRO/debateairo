@@ -260,6 +260,23 @@ async function start(command: Extract<ToolCommand, { command: "start" | "zero" }
   }
 }
 
+/** NETOPIA's exact decimal for micros: at least the cents, and any further digit it sent (never rounded). */
+function exactDecimal(micros: number): string {
+  const whole = Math.trunc(Math.abs(micros) / 1_000_000);
+  const fraction = String(Math.abs(micros) % 1_000_000).padStart(6, "0").replace(/0{1,4}$/u, "");
+  return `${micros < 0 ? "-" : ""}${whole}.${fraction.padEnd(2, "0")}`;
+}
+
+/**
+ * CF1 (ops-4, go-live row 74): the status line the owner reads back: the state, NETOPIA's status, and the amount and the
+ * currency NETOPIA's answer gives (for example `PAID:3:121.00 RON`), or NO_AMOUNT / NO_CURRENCY when it gives none. The
+ * owner checks that it names the currency the payment was started in: VERIFY_PAYMENT refuses any other.
+ */
+export function sandboxStatusLine(read: PaymentReport): string {
+  const amount = read.amountMicros === null ? "NO_AMOUNT" : exactDecimal(read.amountMicros);
+  return `${read.state}:${read.providerStatus}:${amount} ${read.currency ?? "NO_CURRENCY"}`;
+}
+
 async function status(command: Extract<ToolCommand, { command: "status" }>, session: SandboxSession, output: SandboxOutput, at: Date): Promise<number> {
   const orderId = command.orderId ?? newToolOrderId();
   const state = command.orderId === null ? null : readState(command.captureDir, command.orderId);
@@ -270,7 +287,7 @@ async function status(command: Extract<ToolCommand, { command: "status" }>, sess
   let line: string;
   try {
     read = await session.payments(DEFAULT_REQUEST_FACTS).status({ orderId, providerPaymentId: ntpId });
-    line = read === "NO_SUCH_ORDER" ? "NO_SUCH_ORDER" : `${read.state}:${read.providerStatus}`;
+    line = read === "NO_SUCH_ORDER" ? "NO_SUCH_ORDER" : sandboxStatusLine(read);
   } catch (error) {
     line = codeOf(error);
   }

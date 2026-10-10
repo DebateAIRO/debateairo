@@ -7,12 +7,12 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import type { PaymentEnvironment } from "@debateai/billing-core";
+import type { PaymentEnvironment, PaymentReport } from "@debateai/billing-core";
 import { createSecretToken } from "@debateai/payments-netopia";
 import { createNetopiaPaymentsForRecording } from "../../packages/payments-netopia/src/client.js";
 import {
   NETOPIA_CAPTURE_FORMAT, captureFetch, newToolOrderId, parseSandboxArguments, redactTokens, runNetopiaSandbox,
-  type CapturedExchange, type SandboxSession
+  sandboxStatusLine, type CapturedExchange, type SandboxSession
 } from "../../tools/billing/netopia-sandbox.js";
 import { startFakeNetopia, type FakeNetopia } from "../support/fake-netopia.js";
 
@@ -174,17 +174,41 @@ describe("N22 — start, status and zero on the sandbox", () => {
     expect(h.fake.orders.get(orderId)?.currency).toBe("RON");
   });
 
+  it("CF1 (ops-4): a RON payment's status line names RON, so the owner can check the currency asked", async () => {
+    const h = await harness();
+    await h.run("start", "--capture-dir", h.dir, "--currency", "RON", "--amount", "1.21");
+    const orderId = printed(h.out, "NETOPIA_SANDBOX_ORDER")!;
+    h.fake.pay(orderId, "APPROVE");
+    h.out.length = 0;
+    expect(await h.run("status", "--capture-dir", h.dir, "--order", orderId)).toBe(0);
+    expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("PAID:3:1.21 RON");
+  });
+
+  it("CF1 (ops-4): the status line says NO_CURRENCY (and NO_AMOUNT) when NETOPIA's answer names none", () => {
+    const report = (overrides: Partial<PaymentReport>): PaymentReport => ({
+      orderId: newToolOrderId(), providerPaymentId: "ntp-1", state: "PAID", providerStatus: "3", amountMicros: 121_000_000,
+      currency: "RON", cardCountry: null, savedCard: null, declineCode: null, declineSide: null, bankDeclined: false,
+      occurredAt: null, clientId: null, ...overrides
+    });
+    expect(sandboxStatusLine(report({}))).toBe("PAID:3:121.00 RON");
+    expect(sandboxStatusLine(report({ currency: null }))).toBe("PAID:3:121.00 NO_CURRENCY");
+    expect(sandboxStatusLine(report({ amountMicros: null, currency: null }))).toBe("PAID:3:NO_AMOUNT NO_CURRENCY");
+    // NETOPIA's decimals are kept exactly, even past the cent (never rounded into a figure it did not send).
+    expect(sandboxStatusLine(report({ amountMicros: 1_005_000, currency: "EUR" }))).toBe("PAID:3:1.005 EUR");
+  });
+
   it("reads a status with the stored ntpID, without one, and for an order NETOPIA does not know", async () => {
     const h = await harness();
     await h.run("start", "--capture-dir", h.dir);
     const orderId = printed(h.out, "NETOPIA_SANDBOX_ORDER")!;
     h.fake.pay(orderId, "APPROVE");
     h.out.length = 0;
+    // CF1 (ops-4): the line names the amount and the currency NETOPIA's answer gives, for go-live row 74.
     expect(await h.run("status", "--capture-dir", h.dir, "--order", orderId)).toBe(0);
-    expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("PAID:3");
+    expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("PAID:3:1.00 USD");
     h.out.length = 0;
     expect(await h.run("status", "--capture-dir", h.dir, "--order", orderId, "--no-ntp-id")).toBe(0);
-    expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("PAID:3");
+    expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("PAID:3:1.00 USD");
     h.out.length = 0;
     expect(await h.run("status", "--capture-dir", h.dir, "--unknown-order")).toBe(0);
     expect(printed(h.out, "NETOPIA_SANDBOX_STATUS")).toBe("NO_SUCH_ORDER");
