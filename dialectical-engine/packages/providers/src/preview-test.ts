@@ -257,8 +257,9 @@ export function withPreviewProviderCallPolicy(gateway: ProviderGateway, config: 
         : "The private preview connection is configured for high only");
     }
     const bound = previewCallBound(request.bound, config);
-    const { thinkingLevel: _requested, ...rest } = request;
-    return gateway.call({ ...rest, ...(reviewed.effort === null ? {} : { thinkingLevel: config.requested_thinking_level }),
+    // One explicit level replaces whatever the request carried: the configured level on an effort
+    // row; DEFAULT_ONLY on a row without one, which the gateway treats exactly as "no level".
+    return gateway.call({ ...request, thinkingLevel: reviewed.effort === null ? THINKING_LEVEL_DEFAULT_ONLY : config.requested_thinking_level,
       bound: previewStoryRepairAllowed(request) ? Object.freeze({ ...bound, maxAttempts: 2 }) : bound });
   } });
 }

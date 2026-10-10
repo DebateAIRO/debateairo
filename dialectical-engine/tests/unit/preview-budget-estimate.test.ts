@@ -30,7 +30,6 @@ import {
   previewGateEstimateNanoUsd,
   previewExpectedCalls,
   PreviewGateUnavailableRefusal,
-  PREVIEW_UNAVAILABLE_RETRY_MS,
   PREVIEW_UNFINISHED_RUNS_SQL,
   type PreviewUnfinishedRun,
   nextBucharestMidnight,
@@ -222,7 +221,7 @@ describe("evaluateAskAdmission on the preview asks the gate before any run exist
 
   it("the not-available refusal asks for a retry in about a minute", () => {
     const now = new Date("2026-10-10T10:00:00.000Z");
-    const refusal = new AskRefusal(new PreviewGateUnavailableRefusal(new Date(now.getTime() + PREVIEW_UNAVAILABLE_RETRY_MS)));
+    const refusal = new AskRefusal(new PreviewGateUnavailableRefusal(new Date(now.getTime() + 60_000)));
     expect(askRefusalRetryAfter(refusal.code, now, refusal.retryAt)).toBe("Sat, 10 Oct 2026 10:01:00 GMT");
     expect(refusal.message).not.toMatch(/gate|nano|USD|halted/u);
   });

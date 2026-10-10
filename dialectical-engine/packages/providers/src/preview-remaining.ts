@@ -9,7 +9,6 @@
  */
 import { request as httpRequest } from "node:http";
 import { TypedDomainError } from "@debateai/kernel";
-import type { PreviewProviderTestConfig } from "./preview-test.js";
 
 /** The gate's answer, with both money figures as exact nano-USD (1e-9 USD). */
 export type PreviewGateRemaining = Readonly<{
@@ -80,7 +79,7 @@ export function parsePreviewGateRemaining(value: unknown): PreviewGateRemaining 
 
 /** Local IPC only, on the same socket and allow-list as `/complete`. Read-only. */
 export function createPreviewRemainingRpcPort(
-  config: Pick<PreviewProviderTestConfig, "budget_socket" | "scope_id">,
+  config: Readonly<{ budget_socket: string; scope_id: string }>,
   timeoutMs: number = PREVIEW_REMAINING_TIMEOUT_MS
 ): PreviewRemainingPort {
   const socketPath = config.budget_socket;
