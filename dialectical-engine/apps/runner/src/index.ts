@@ -9252,6 +9252,14 @@ export function captureFailureEnvelope(input: {
  */
 export const RUNNER_QUEUE_WAIT_LIMIT = "30m" as const;
 
+/**
+ * How long one debate may run before Hatchet gives it up. One task is one whole
+ * debate; a task declared without a limit is registered by the SDK with '60s'.
+ * Owner ruling 2026-10-10: 60 minutes in every deployment, the preview's value
+ * since 2026-10-06.
+ */
+export const RUNNER_EXECUTION_LIMIT = "3600s" as const;
+
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
   readonly runner: WalkingSkeletonRunner;
@@ -9268,7 +9276,7 @@ export function declareHatchetWalkingSkeletonTask(input: {
     name: input.workflowName,
     retries: input.engineRetries,
     scheduleTimeout: RUNNER_QUEUE_WAIT_LIMIT,
-    ...(input.previewExecutionTimeout===undefined?{}:{executionTimeout:input.previewExecutionTimeout}),
+    executionTimeout: input.previewExecutionTimeout ?? RUNNER_EXECUTION_LIMIT,
     // S06 capture binding. It was written in e8d99d33 and destroyed by the
     // conflict resolution in merge 1c9578a2, which took the mainline side of
     // this file whole; the test that specifies it survived the same merge.

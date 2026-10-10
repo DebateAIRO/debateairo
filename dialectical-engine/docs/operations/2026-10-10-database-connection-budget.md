@@ -203,10 +203,10 @@ connections.
 Ranked by how likely they are to hurt at launch. Each is now bounded by the wait limit (an error after seconds instead of
 a freeze), but each still deserves its own fix:
 
-1. **Outside the preview, every debate would be cancelled after 60 seconds.** `declareHatchetWalkingSkeletonTask`
-   (`apps/runner/src/index.ts`) sets `executionTimeout` only for the preview (3600 s). Without it, the SDK registers the
-   task with `'60s'` (`@hatchet-dev/typescript-sdk` 1.28.1, `v1/client/worker/worker-internal.js`,
-   `resolveExecutionTimeout`). Fix before launch: one execution limit for every deployment, chosen by the owner.
+1. **Fixed in #130 (2026-10-10).** Outside the preview, every debate would have been cancelled after 60 seconds:
+   `declareHatchetWalkingSkeletonTask` (`apps/runner/src/index.ts`) set `executionTimeout` only for the preview, and the
+   SDK registers a task without one with `'60s'` (`@hatchet-dev/typescript-sdk` 1.28.1, `resolveExecutionTimeout`).
+   Every deployment now gets 60 minutes (`RUNNER_EXECUTION_LIMIT`), beside this change's 30-minute queue wait.
 2. **Public debate pages:** each reader takes a blocking, exclusive lock per publication on one connection, then reads on
    a second (`apps/api/src/publications.ts` `readPublicDebate`, `packages/db/src/publication-lease.ts`). Many readers of
    one popular debate queue on the lock, each holding a connection. Fix: a shared lock for readers, and reads on the
