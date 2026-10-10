@@ -246,6 +246,8 @@ export type BillingHarness = Readonly<{
     countryConfirmed?: boolean; company?: Readonly<{ name: string; vatId: string; address: string }>;
     /** The postal code and the free-text state or county the buyer typed (defaults below). */
     postalCode?: string; region?: string;
+    /** The `billingPlans` version the quote is made under (`quotesWith`); default the harness's `quotes`. */
+    plans?: BillingPlans;
   }>): Promise<Purchase>;
   refunds: RefundDesk;
   verify: VerifyPaymentHandler;
@@ -384,7 +386,7 @@ export async function startBillingHarness(start = new Date("2026-10-01T10:00:00.
       const country = input.country ?? "RO";
       const postalCode = input.postalCode
         ?? ({ US: "10001", CA: "K1A 0B1", RO: "010011", DE: "10115" } as Readonly<Record<string, string>>)[country] ?? "00000";
-      const quoted = await quotes.create({
+      const quoted = await (input.plans === undefined ? quotes : quotesWith(input.plans)).create({
         ownerRef, ip: "198.51.100.7", planId: input.planId ?? "PLUS", country, name: null, firstName: "Test",
         lastName: "Buyer", phone: "+40712345678", street: "Strada Test 1", region: input.region ?? "Bucuresti",
         postalCode, city: "Sector 1", company: input.company ?? null, now: clock.now
