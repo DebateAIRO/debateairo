@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Pool } from "pg";
+import { ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND } from "@debateai/providers";
 import { allocateSequence, withRunContentLease, withWriteTransaction } from "@debateai/db";
 import {
   LEDGER_ACTION_SCOPE,
@@ -236,7 +237,16 @@ export interface MakerAvailability {
 export interface DeploymentMakerCapability {
   readonly deploymentMakerCapability: boolean;
   readonly configuredMakers: readonly string[];
-  readonly configuredProviders: readonly { readonly providerRef: string; readonly maker: string }[];
+  /**
+   * `adapterKind` is carried ONLY for a native wire (multi-model preview, PR B:
+   * `anthropic-messages-http`), so the target parser can pick that wire from the
+   * sealed row. Every OpenAI-compatible entry keeps its exact two-member shape.
+   */
+  readonly configuredProviders: readonly {
+    readonly providerRef: string;
+    readonly maker: string;
+    readonly adapterKind?: typeof ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
+  }[];
   readonly registerRef: string;
 }
 
@@ -285,8 +295,12 @@ export async function readDeploymentMakerCapability(
   return Object.freeze({
     deploymentMakerCapability: configuredMakers.length >= (requiredDistinctMakers as number),
     configuredMakers: Object.freeze(configuredMakers),
-    configuredProviders: Object.freeze(typedProviders.map(({ providerRef, maker }) =>
-      Object.freeze({ providerRef, maker })
+    configuredProviders: Object.freeze(typedProviders.map(({ providerRef, maker, adapterKind }) =>
+      Object.freeze({
+        providerRef,
+        maker,
+        ...(adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND ? { adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND } : {})
+      })
     )),
     registerRef: `${CONFIGURED_PROVIDER_SET_ROW_KEY}@${registerVersion}:${row.source_ref}`
   });

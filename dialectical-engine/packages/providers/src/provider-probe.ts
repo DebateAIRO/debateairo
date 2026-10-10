@@ -2,6 +2,13 @@ import { randomUUID } from "node:crypto";
 import { THINKING_LEVEL_TOKEN } from "./index.js";
 import { PREVIEW_GLM_OUTPUT_RESERVATION } from "./preview-test.js";
 import type { ProviderDiscoveryTarget } from "./index.js";
+import {
+  ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  anthropicMessagesProbeAnswer,
+  anthropicMessagesProbeRequest
+} from "./anthropic-messages.js";
+
+const PROBE_PROMPT = "DR-181 discovery health probe. Reply exactly: OK";
 
 /**
  * DR-181/DR-182 — the ONE provider health probe.
@@ -73,6 +80,40 @@ export async function observeProviderTarget(input: Readonly<{
   try {
     if(input.tokenCeiling!==undefined&&(!Number.isSafeInteger(input.tokenCeiling)||input.tokenCeiling<1||input.tokenCeiling>PREVIEW_GLM_OUTPUT_RESERVATION))throw new TypeError("PROVIDER_PROBE_TOKEN_CEILING_INVALID");
     if(input.thinkingLevel!==undefined&&(!THINKING_LEVEL_TOKEN.test(input.thinkingLevel)||input.target.thinkingParameter===undefined||!input.target.thinkingLevels?.includes(input.thinkingLevel)))throw new TypeError("PROVIDER_PROBE_THINKING_INVALID");
+    // Multi-model preview, PR B: a native target is probed on its own wire —
+    // the same question, the same "OK" and model-echo test, its own body.
+    if (input.target.adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) {
+      const request = anthropicMessagesProbeRequest({
+        model: input.target.model,
+        maxTokens: input.tokenCeiling,
+        thinkingLevel: input.thinkingLevel,
+        credential: input.target.authorizationHeader,
+        prompt: PROBE_PROMPT
+      });
+      const response = await input.fetchImplementation(`${input.target.baseUrl}${request.path}`, {
+        method: "POST",
+        headers: request.headers,
+        signal: AbortSignal.timeout(input.timeoutMs),
+        body: request.body
+      });
+      const raw = await response.text();
+      if (!response.ok || Buffer.byteLength(raw, "utf8") > MAX_PROBE_RESPONSE_BYTES) {
+        throw new TypeError("PROVIDER_PROBE_UNAVAILABLE");
+      }
+      const answer = anthropicMessagesProbeAnswer(JSON.parse(raw));
+      if (answer === null || answer.model !== input.target.model || answer.text !== "OK") {
+        throw new TypeError("PROVIDER_PROBE_RESPONSE_INVALID");
+      }
+      return Object.freeze({
+        probeEvidenceRef,
+        providerRef: input.target.providerRef,
+        maker: input.target.maker,
+        state: "HEALTHY" as const,
+        modelId: input.target.model,
+        failureCode: null,
+        probedAt
+      });
+    }
     const headers: Record<string, string> = { "content-type": "application/json" };
     if (input.target.authorizationHeader !== undefined) {
       headers.authorization = input.target.authorizationHeader;
@@ -89,7 +130,7 @@ export async function observeProviderTarget(input: Readonly<{
           ...(input.thinkingLevel===undefined?{}:{[input.target.thinkingParameter!]:input.thinkingLevel}),
           messages: [{
             role: "user",
-            content: "DR-181 discovery health probe. Reply exactly: OK"
+            content: PROBE_PROMPT
           }]
         })
       }

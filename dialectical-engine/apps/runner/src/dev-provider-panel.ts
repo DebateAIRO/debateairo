@@ -93,7 +93,10 @@ export function developmentCliProviderRoster(
 
 export type DevelopmentConfiguredProvider = Readonly<{
   providerRef: string;
-  adapterKind: "openai-compatible-http";
+  // The dev panel itself only writes "openai-compatible-http"; the hosted
+  // register file (hosted-register-publish.ts) may also name the native
+  // Anthropic Messages adapter (multi-model preview, PR B).
+  adapterKind: "openai-compatible-http" | "anthropic-messages-http";
   maker: string;
 }>;
 
