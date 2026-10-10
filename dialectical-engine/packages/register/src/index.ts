@@ -1138,6 +1138,15 @@ export {
   type PublicationCheckPolicy,
   type PublicationCheckPolicyValue
 } from "./publication-check-policy.js";
+// Open sign-up mail PR 3 (owner decision G2, 2026-10-09): the daily account-mail budget, code-owned, hosted override.
+export {
+  OUTBOUND_MAIL_POLICY_DEPLOYMENT_REGISTER_ROW,
+  OUTBOUND_MAIL_POLICY_ROW_KEY,
+  outboundMailPolicyFromValue,
+  readOutboundMailPolicy,
+  type OutboundMailPolicy,
+  type OutboundMailPolicyValue
+} from "./outbound-mail-policy.js";
 // Verdict story (spec 2026-09-26 §9): the OPTIONAL story rows and their readers.
 export {
   STORY_COST_RULING_REF,

@@ -458,22 +458,27 @@ describe("REGISTER-SUPPORT-PUBLICATION schema source contract", () => {
     // (the pre-publish check's deadline; packages/register/src/publication-check-policy.ts). A DEPLOYMENT row, so
     // `historicalRows` stays 14 and the legacy hash is untouched. MEASURED: the port emits 62 with no duplicate keys,
     // and 61 with the key removed.
+    //
+    // OPEN SIGN-UP MAIL (owner decision G2, 2026-10-09): +1. The deployment now also seals `outboundMailPolicy` (the
+    // daily account-mail budget; packages/register/src/outbound-mail-policy.ts). A DEPLOYMENT row, so
+    // `historicalRows` stays 14 and the legacy hash is untouched: 64 with no duplicate keys, 63 with the key removed.
     const storyKeys: readonly string[] = STORY_ROW_KEYS;
-    expect(developmentRows).toHaveLength(63);
-    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(57);
-    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(62);
-    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(62);
-    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(62);
-    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(61);
-    expect(developmentRows.filter((row) => row.rowKey !== "taxAuthorities")).toHaveLength(62);
-    expect(developmentRows.filter((row) => row.rowKey !== "publicationCheckPolicy")).toHaveLength(62);
+    expect(developmentRows).toHaveLength(64);
+    expect(developmentRows.filter((row) => !storyKeys.includes(row.rowKey))).toHaveLength(58);
+    expect(developmentRows.filter((row) => row.rowKey !== "admissionPolicy")).toHaveLength(63);
+    expect(developmentRows.filter((row) => row.rowKey !== "costEnvelopePolicy")).toHaveLength(63);
+    expect(developmentRows.filter((row) => row.rowKey !== "countryPolicy")).toHaveLength(63);
+    expect(developmentRows.filter((row) => !["billingPlans", "billingPolicy"].includes(row.rowKey))).toHaveLength(62);
+    expect(developmentRows.filter((row) => row.rowKey !== "taxAuthorities")).toHaveLength(63);
+    expect(developmentRows.filter((row) => row.rowKey !== "publicationCheckPolicy")).toHaveLength(63);
+    expect(developmentRows.filter((row) => row.rowKey !== "outboundMailPolicy")).toHaveLength(63);
     // A19 x MODEL SCORECARD: it adds no row to these counts, deliberately (paid plans S1a: +0). `modelScorecard` is NOT a
     // code-owned deployment row: local mode reads the bundled public file
     // (scorecards/current.json), and the hosted scorecard is an ADDITIVE operator
     // row published with `--scorecard`. A code-owned default would seal the
     // one-version-behind public scorecard wherever an operator forgot the flag.
     expect(developmentRows.map((row) => row.rowKey)).not.toContain(MODEL_SCORECARD_ROW_KEY);
-    expect(developmentRows.filter(row=>row.rowKey!=="consumerRecoveryPolicy")).toHaveLength(62);
+    expect(developmentRows.filter(row=>row.rowKey!=="consumerRecoveryPolicy")).toHaveLength(63);
     expect(developmentRows.filter(row=>row.rowKey==="consumerRecoveryPolicy")).toHaveLength(1);
     expect(await readLegacyDevelopmentV4Rows()).toHaveLength(32);
     expect(computeRegisterSnapshotSha256(historicalRows)).toBe(LEGACY_REGISTER_V1_SNAPSHOT_SHA256);

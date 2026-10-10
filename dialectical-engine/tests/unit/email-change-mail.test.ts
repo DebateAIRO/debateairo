@@ -9,6 +9,7 @@ import {
   MailDeliveryError,
   SendmailEmailChangeMailSender
 } from "../../apps/api/src/mail-channel.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 
 // Turn 14 — the three change-email messages through the real `sendmail -t`
 // path, captured by the dev sink (deploy/dev-auth/sendmail-capture.mjs).
@@ -25,7 +26,7 @@ async function captured(): Promise<readonly string[]> {
 }
 
 function sender(): SendmailEmailChangeMailSender {
-  return new SendmailEmailChangeMailSender({
+  return new SendmailEmailChangeMailSender({ gate: testOutboundMailGate(),
     executable: capture, from: "noreply@debate.test", publicAppUrl: "https://debate.test", timeoutMs: 10_000
   });
 }

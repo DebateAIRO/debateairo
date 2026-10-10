@@ -8,6 +8,7 @@ import {
   MailDeliveryError,
   SendmailSecurityNotificationSender
 } from "../../apps/api/src/mail-channel.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 
 describe("S10 own-sendmail security notification adapter", () => {
   it("writes only fixed event copy with the stable opaque message id", async () => {
@@ -20,7 +21,7 @@ describe("S10 own-sendmail security notification adapter", () => {
     });
     chmodSync(executable, 0o700);
     try {
-      const sender = new SendmailSecurityNotificationSender({
+      const sender = new SendmailSecurityNotificationSender({ gate: testOutboundMailGate(),
         executable,
         from: "noreply@debateai.test",
         timeoutMs: 1_000
@@ -72,7 +73,7 @@ describe("S10 own-sendmail security notification adapter", () => {
     );
     chmodSync(executable, 0o700);
     try {
-      const sender = new SendmailSecurityNotificationSender({
+      const sender = new SendmailSecurityNotificationSender({ gate: testOutboundMailGate(),
         executable,
         from: "noreply@debateai.test",
         // This test pins argv, not timing; a 1s budget flakes on a loaded host.
@@ -100,7 +101,7 @@ describe("S10 own-sendmail security notification adapter", () => {
   });
 
   it("refuses a recipient that could fan the message out under -t", async () => {
-    const sender = new SendmailSecurityNotificationSender({
+    const sender = new SendmailSecurityNotificationSender({ gate: testOutboundMailGate(),
       executable: "/definitely/not/a/sendmail-binary",
       from: "noreply@debateai.test",
       timeoutMs: 1_000

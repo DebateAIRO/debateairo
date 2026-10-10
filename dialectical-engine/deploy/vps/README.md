@@ -868,6 +868,25 @@ not know, so it cannot read the answer until you roll forward again. Nothing is 
 never changed and never purged (an encrypted debate's prompts are stored encrypted). The database and every nightly
 backup grow by roughly the size of every prompt sent; plan disk and backup space by it (§9).
 
+### Upgrading to the outbound mail gate release
+
+This release puts a gate in front of every account mail (sign-up verification, address confirmations, password
+reset, recovery and security notices): the one shared address rule, a suppression check, and a daily budget read
+from the new code-owned register row `outboundMailPolicy` (owner decision G2, 2026-10-09). The API reads it at
+start-up and refuses a register version without it (`OUTBOUND_MAIL_POLICY_UNRESOLVED`). No migration yet: the day's
+count is kept in the API process (preview-only, see `docs/superpowers/specs/2026-10-09-outbound-mail-gate.md`), so
+**do not open the live site on this release**; the counter table arrives in a later release.
+
+- **Publish a new hosted register version before the API restarts on this code**, exactly as for the
+  publication-check deadline release below: `pnpm register:publish-hosted` from the new checkout, pin the version
+  in both `EnvironmentFile`s, restart both units, and only then any `pnpm hosted:publish-provider-set`.
+- **The live site's budget** is 10000 a day: add the optional `outboundMailPolicy` member to the hosted file
+  (`deploy/vps/register/README.md`) and publish again. Left out, the code-owned 2000 a day is sealed.
+- **At the cap** sign-up and resend answer `MAIL_DAILY_LIMIT` and the API logs one
+  `[OUTBOUND_MAIL_ALERT] code=OUTBOUND_MAIL_STANDARD_CAP_REACHED` line a day; reaching half the cap logs
+  `OUTBOUND_MAIL_DAILY_THRESHOLD`. No line carries an address.
+- **Rolling back** needs no register change: an older API does not read the row.
+
 ### Upgrading to the publication-check deadline release
 
 This release moves the deadline of the safety check that runs before a debate is published (60 seconds) out of
@@ -1794,6 +1813,7 @@ version must carry, besides the algorithm's own rows:
 |---|---|
 | `costEnvelopePolicy` | both services refuse: `COST_ENVELOPE_POLICY_UNRESOLVED` |
 | `publicationCheckPolicy` | the API refuses: `PUBLICATION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the publication-check deadline release on carries it (the code-owned 60000 ms, or the file's member); a version sealed before that release does not |
+| `outboundMailPolicy` | the API refuses: `OUTBOUND_MAIL_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the outbound mail gate release on carries it (the code-owned 2000 a day, or the file's member); a version sealed before that release does not |
 | `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
 | `admissionPolicy`, with the three support budgets | the API refuses: `SUPPORT_ADMISSION_SCOPES_NOT_SEALED`; and, with the band, `ask_room_reads` (from the file's `askRoomReads`), else the API refuses with `ASK_ROOM_ADMISSION_UNSEALED` |
 | `configuredProviderSet`, every vendor vetted | the publication refuses `PROVIDER_VENDOR_NOT_VETTED`; a target not in it refuses `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` |
@@ -1855,6 +1875,7 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` | billing is switched on without the three budget members in `costEnvelopePolicy`, or without plans |
 | `ASK_ROOM_ADMISSION_UNSEALED` | the file seals the band (the budget rule's three members in `costEnvelopePolicy`) without `askRoomReads`, the room read's budget. Refused by the plan (a dry run included), by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ASK_ROOM_ADMISSION_UNSEALED`, and when the API starts. Add `askRoomReads` to the same file (go-live line 13, "Publishing them" under the cost envelopes above) |
 | `PUBLICATION_CHECK_POLICY_INVALID` | the file's optional `publicationCheckPolicy` is not `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 60000, or the member is `null` |
+| `OUTBOUND_MAIL_POLICY_INVALID` | the file's optional `outboundMailPolicy` is not `{"kind": "OUTBOUND_MAIL_POLICY", "daily_cap": N, "reserved_for_security_pct": R, "alert_at_pct": A}` with N from 1 to 1000000, R from 0 to 90 and A from 1 to 100, all whole numbers, or the member is `null` |
 | `HOSTED_REGISTER_EXAMPLE_VENDOR_REFUSED:` / `HOSTED_REGISTER_EXAMPLE_SOURCE_REF_REFUSED` | a vendor, maker, vetting date or source ref still comes from the kit's example |
 | `HOSTED_REGISTER_PUBLISHER_REQUIRED` | the connection is not the migrator |
 | `FX-REG-SEALED_VERSION_MISMATCH` | the database holds a different sealed historical bootstrap: stop and investigate |
@@ -1863,10 +1884,10 @@ Before restarting anything on a new version, check that the newest version carri
 rows a hosted start-up refuses without:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy') ORDER BY row_key"
+sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy', 'outboundMailPolicy') ORDER BY row_key"
 ```
 
-Four rows is the pass. Then set `REGISTER_VERSION` to that version in both `EnvironmentFile`s
+Five rows is the pass. Then set `REGISTER_VERSION` to that version in both `EnvironmentFile`s
 and restart both units.
 
 ---

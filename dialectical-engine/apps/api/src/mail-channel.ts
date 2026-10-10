@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { MailTemplateError, mailAttachmentFactsOf, renderMail as renderTemplatedMail, type MailTemplateId } from "@debateai/mail-templates";
 import { buildTemplatedMessage, type MailAttachment } from "./mail-mime.js";
 import { isMailAddress } from "@debateai/kernel";
+import { OutboundMailRefusal, type MailPurpose, type OutboundMailAuthorizer } from "./outbound-mail-gate.js";
 
 // With `sendmail -t` the MTA reads every recipient out of the header block on
 // stdin, so no address reaches argv, which any local user can read with `ps`
@@ -67,6 +68,25 @@ export class MailDeliveryError extends Error {
   }
 }
 
+/**
+ * Open sign-up mail PR 3: the outbound mail gate's question, asked by every account-mail sender immediately before
+ * it starts the mail program (apps/api/src/outbound-mail-gate.ts). A refusal leaves as the sender's ordinary
+ * MailDeliveryError with the gate's content-free code; nothing is spawned.
+ */
+export async function authorizeOutboundMail(gate: OutboundMailAuthorizer, recipient: string, purpose: MailPurpose): Promise<void> {
+  try {
+    await gate.authorize({ recipient, purpose });
+  } catch (error) {
+    if (error instanceof OutboundMailRefusal) throw new MailDeliveryError(error.code);
+    throw new MailDeliveryError("OUTBOUND_MAIL_GATE_UNAVAILABLE");
+  }
+}
+
+/** Every Sendmail* sender must be built with the gate: no default, so a composition cannot forget it. */
+export function isOutboundMailAuthorizer(value: unknown): value is OutboundMailAuthorizer {
+  return typeof value === "object" && value !== null && typeof (value as { authorize?: unknown }).authorize === "function";
+}
+
 export class MemoryMailSender implements MailSender {
   readonly messages: VerificationMail[] = [];
 
@@ -81,8 +101,10 @@ export class SendmailMailSender implements MailSender {
     readonly from: string;
     readonly publicAppUrl: string;
     readonly timeoutMs: number;
+    readonly gate: OutboundMailAuthorizer;
   }) {
     if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)
+      || !isOutboundMailAuthorizer(options.gate)
       || options.executable.trim() === ""
       || !isPublicAppUrl(options.publicAppUrl)
       || !Number.isInteger(options.timeoutMs)
@@ -102,7 +124,7 @@ export class SendmailMailSender implements MailSender {
     const verificationUrl = new URL("/verify-email", this.options.publicAppUrl);
     verificationUrl.hash = `token=${mail.token}`;
     const message = renderMail({ template: "verification-v1", recipient: mail.recipient, url: verificationUrl, expiresAt: mail.expiresAt, ...(mail.display === undefined ? {} : { display: mail.display }) }, this.options.from);
-    await sendRenderedMail(message, this.options);
+    await sendRenderedMail(message, this.options, { recipient: mail.recipient, purpose: "verification" });
   }
 }
 
@@ -111,8 +133,10 @@ export class SendmailSecurityNotificationSender implements SecurityNotificationS
     readonly executable:string;
     readonly from:string;
     readonly timeoutMs:number;
+    readonly gate:OutboundMailAuthorizer;
   }) {
     if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)
+      || !isOutboundMailAuthorizer(options.gate)
       || options.executable.trim()===""
       || !Number.isInteger(options.timeoutMs) || options.timeoutMs<=0) {
       throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
@@ -131,7 +155,7 @@ export class SendmailSecurityNotificationSender implements SecurityNotificationS
     const template = templates[mail.eventKind];
     if (template === undefined) throw new MailDeliveryError("MAIL_INPUT_INVALID");
     const message = renderMail({ template, recipient: mail.recipient, expiresAt: mail.executeAt, messageId: mail.messageId }, this.options.from);
-    await sendRenderedMail(message, this.options);
+    await sendRenderedMail(message, this.options, { recipient: mail.recipient, purpose: "account-erasure-notice" });
   }
 }
 
@@ -170,12 +194,18 @@ type SendmailTransportOptions = Readonly<{
   executable: string;
   from: string;
   timeoutMs: number;
+  gate: OutboundMailAuthorizer;
   /** Recovery retains its original fixed exit diagnostic; email change keeps detailed codes. */
   exitFailureCode?: "SENDMAIL_EXIT_FAILED";
 }>;
 
-/** Process lifecycle only: each sender validates and renders its own mail. */
-async function sendRenderedMail(message: string, options: SendmailTransportOptions): Promise<void> {
+/** Process lifecycle only: each sender validates and renders its own mail; the gate is asked here, last, before the spawn. */
+async function sendRenderedMail(
+  message: string,
+  options: SendmailTransportOptions,
+  admission: Readonly<{ recipient: string; purpose: MailPurpose }>
+): Promise<void> {
+  await authorizeOutboundMail(options.gate, admission.recipient, admission.purpose);
   let child: ReturnType<typeof spawn>;
   try {
     child = spawn(options.executable, ["-i", "-t", "-f", options.from], {
@@ -221,8 +251,10 @@ export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
     readonly from: string;
     readonly publicAppUrl: string;
     readonly timeoutMs: number;
+    readonly gate: OutboundMailAuthorizer;
   }) {
     if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)
+      || !isOutboundMailAuthorizer(options.gate)
       || options.executable.trim() === ""
       || !isPublicAppUrl(options.publicAppUrl)
       || !Number.isInteger(options.timeoutMs)
@@ -241,7 +273,10 @@ export class SendmailEmailChangeMailSender implements EmailChangeMailSender {
       : mail.kind === "notice"
         ? { template: "email-change-notice-v1", recipient: mail.recipient, newEmail: mail.newEmail, expiresAt: mail.expiresAt, url: new URL(emailChangeLink(this.options.publicAppUrl, "cancel", mail.cancelToken)) }
         : { template: "email-change-unavailable-v1", recipient: mail.recipient };
-    await sendRenderedMail(renderMail(input, this.options.from), this.options);
+    // The notice goes to the CURRENT address about a change to the account: security mail, inside the reserve.
+    const purpose: MailPurpose = mail.kind === "confirmation" ? "email-change-confirmation"
+      : mail.kind === "notice" ? "email-change-notice" : "email-change-unavailable";
+    await sendRenderedMail(renderMail(input, this.options.from), this.options, { recipient: mail.recipient, purpose });
   }
 }
 
@@ -276,8 +311,9 @@ export class SendmailRecoveryEmailMailSender implements RecoveryEmailMailSender 
     readonly from: string;
     readonly publicAppUrl: string;
     readonly timeoutMs: number;
+    readonly gate: OutboundMailAuthorizer;
   }) {
-    if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from) || !options.executable.trim() || !isPublicAppUrl(options.publicAppUrl) || !Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0)
+    if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from) || !isOutboundMailAuthorizer(options.gate) || !options.executable.trim() || !isPublicAppUrl(options.publicAppUrl) || !Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0)
       throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
   }
   async sendRecoveryEmail(mail: RecoveryEmailMail): Promise<void> {
@@ -286,7 +322,7 @@ export class SendmailRecoveryEmailMailSender implements RecoveryEmailMailSender 
     const message = renderMail({ template: "recovery-v1", recipient: mail.recipient, url: new URL(recoveryEmailLink(this.options.publicAppUrl, mail.token)), expiresAt: mail.expiresAt }, this.options.from);
     await sendRenderedMail(message, {
       ...this.options, exitFailureCode: "SENDMAIL_EXIT_FAILED"
-    });
+    }, { recipient: mail.recipient, purpose: "recovery-email-confirmation" });
   }
 }
 
@@ -296,18 +332,18 @@ export interface ConsumerSecurityNoticeSender {
 }
 /** Task9 purposes require their reviewed wrapper/template revision at deployment. */
 export class SendmailConsumerAccountSender implements ConsumerSecurityNoticeSender {
-  constructor(private readonly options:Readonly<{executable:string;from:string;timeoutMs:number;publicAppUrl:string}>){
-    if(!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)||!options.executable.trim()||!Number.isInteger(options.timeoutMs)||options.timeoutMs<1||!isPublicAppUrl(options.publicAppUrl))throw new TypeError('OWN_MAIL_CONFIGURATION_INVALID');
+  constructor(private readonly options:Readonly<{executable:string;from:string;timeoutMs:number;publicAppUrl:string;gate:OutboundMailAuthorizer}>){
+    if(!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)||!isOutboundMailAuthorizer(options.gate)||!options.executable.trim()||!Number.isInteger(options.timeoutMs)||options.timeoutMs<1||!isPublicAppUrl(options.publicAppUrl))throw new TypeError('OWN_MAIL_CONFIGURATION_INVALID');
   }
   async sendRecovery(mail:Readonly<{recipient:string;token:string;expiresAt:Date}>):Promise<void>{
     if(!isSingleDeliverableRecipient(mail.recipient)||!/^[A-Za-z0-9_-]{43}$/.test(mail.token))throw new MailDeliveryError('MAIL_INPUT_INVALID');
     const url=new URL('/recover',this.options.publicAppUrl);url.hash='token='+mail.token;
-    await sendRenderedMail(renderMail({template:'consumer-recovery-v1',recipient:mail.recipient,url,expiresAt:mail.expiresAt},this.options.from),this.options);
+    await sendRenderedMail(renderMail({template:'consumer-recovery-v1',recipient:mail.recipient,url,expiresAt:mail.expiresAt},this.options.from),this.options,{recipient:mail.recipient,purpose:'consumer-recovery'});
   }
   async sendConsumerSecurityNotice(mail:Readonly<{recipient:string;messageId:string;eventKind:ConsumerSecurityNoticeKind;happenedAt:Date}>):Promise<void>{
     const templates={METHOD_CHANGED:'security-method-changed-v1',CODES_REGENERATED:'security-codes-regenerated-v1',RECOVERY_PROVED:'security-recovery-proved-v1',RECOVERY_COMPLETED:'security-recovery-completed-v1',RECOVERY_CODE_USED:'security-recovery-code-used-v1'} as const;
     const template=templates[mail.eventKind];if(!template)throw new MailDeliveryError('MAIL_INPUT_INVALID');
-    await sendRenderedMail(renderMail({template,recipient:mail.recipient,messageId:mail.messageId,expiresAt:mail.happenedAt},this.options.from),this.options);
+    await sendRenderedMail(renderMail({template,recipient:mail.recipient,messageId:mail.messageId,expiresAt:mail.happenedAt},this.options.from),this.options,{recipient:mail.recipient,purpose:'consumer-security-notice'});
   }
 }
 
@@ -362,8 +398,10 @@ export class TemplatedMailSender implements TemplatedMailChannel {
     readonly executable: string;
     readonly from: string;
     readonly timeoutMs: number;
+    readonly gate: OutboundMailAuthorizer;
   }) {
     if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)
+      || !isOutboundMailAuthorizer(options.gate)
       || options.executable.trim() === ""
       || !Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0) {
       throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
@@ -372,6 +410,7 @@ export class TemplatedMailSender implements TemplatedMailChannel {
 
   async sendTemplated(mail: TemplatedMail): Promise<void> {
     const message = composeTemplatedMessage(this.options.from, mail, randomUUID().replaceAll("-", ""));
+    await authorizeOutboundMail(this.options.gate, mail.to, "templated");
     // The same spawn as the two senders above, argv literal for argv literal: the recipient rides in the header
     // block (-t), never on argv (L7-F7; pinned by tests/architecture/dev-mail-capture.test.ts).
     await new Promise<void>((resolve, reject) => {

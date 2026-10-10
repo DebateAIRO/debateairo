@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EmailPendingScreen } from "../../apps/ui/components/auth/EmailPendingScreen.js";
 import english from "../../apps/ui/messages/en/auth.json";
 import type { TurnstileRenderOptions } from "../../apps/ui/lib/turnstile.js";
-import { RESEND_VERIFICATION_PUBLIC_MESSAGE } from "@debateai/contract";
+import { ContractHttpError, RESEND_VERIFICATION_PUBLIC_MESSAGE } from "@debateai/contract";
 let host: HTMLDivElement; let root: Root; let options: TurnstileRenderOptions; let resets: number;
 const requests: unknown[] = [];
 let response: () => Promise<{ message: typeof RESEND_VERIFICATION_PUBLIC_MESSAGE; retry_after_seconds: 60 }>;
@@ -52,6 +52,16 @@ describe("email waiting screen", () => {
     expect(host.querySelector('[role="alert"]')?.textContent).toBe("We could not request another email. Try again shortly.");
     expect(host.textContent).not.toContain("diagnostic");
     await act(async () => options.callback("new-proof")); expect(button().disabled).toBe(false);
+  });
+  it.each([
+    ["MAIL_DAILY_LIMIT", 503, "We can't send email right now. Please try again later."],
+    ["EMAIL_INVALID", 422, "We can't send email to this address. Check it, or use a different one."]
+  ] as const)("says the plain sentence for the server's %s, never its code", async (serverCode, status, sentence) => {
+    await render(); await act(async () => options.callback("proof")); await act(async () => vi.advanceTimersByTimeAsync(60_000));
+    response = async () => { throw new ContractHttpError("HTTP_ERROR" as never, status, serverCode, serverCode); };
+    await act(async () => button().click());
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(sentence);
+    expect(host.textContent).not.toContain(serverCode);
   });
   it("fails closed without configuration and offers address correction", async () => {
     await render({ siteKey: "", nonce: "" }); await act(async () => vi.advanceTimersByTimeAsync(60_000)); expect(button().disabled).toBe(true);

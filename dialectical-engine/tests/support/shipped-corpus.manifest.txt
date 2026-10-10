@@ -108,6 +108,7 @@ apps/api/src/mail-mime.ts
 apps/api/src/main.ts
 apps/api/src/mfa.ts
 apps/api/src/onboarding-evidence.ts
+apps/api/src/outbound-mail-gate.ts
 apps/api/src/password-reset-mail.ts
 apps/api/src/password-reset-routes.ts
 apps/api/src/password-reset.ts
@@ -960,6 +961,7 @@ packages/register/src/index.ts
 packages/register/src/internal-allowance-policy.ts
 packages/register/src/mfa-policy.ts
 packages/register/src/model-scorecard-policy.ts
+packages/register/src/outbound-mail-policy.ts
 packages/register/src/password-reset-policy.ts
 packages/register/src/product-role-policy.ts
 packages/register/src/publication-check-policy.ts

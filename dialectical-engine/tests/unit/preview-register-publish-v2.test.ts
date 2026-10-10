@@ -17,14 +17,18 @@ const V1_ADDITIONS = ['consumerRecoveryPolicy', 'publicationCheckPolicy', 'taxAu
 const canonical = (value: unknown) => parseCanonicalRegisterJson(Buffer.from(JSON.stringify(value))) as string;
 const owned = () => [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
 const sorted = (rows: Row[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(b.rowKey, 'en'));
+/** The key that arrived after v1 published (open sign-up mail PR 3): the preview's history never held it. */
+const LATER_KEY = 'outboundMailPolicy';
 
 /** The two real preview shapes: the 65-row base v1 was written for (live v8) and the 68-row result (live v9). */
 async function fixture() {
   const source: Row[] = [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), runtime)] as Row[];
-  const v8 = sorted([...source.filter(row => !V1_ADDITIONS.includes(row.rowKey)).map(row => row.rowKey === 'nodeRuntimeVersion' ? { ...row, valueJsonText: '"v22.23.1"', sourceRef: 'historical node measurement' } : row), ...owned()]);
+  // The source as it was when v1 composed live v9 (66 rows): today's without the later key.
+  const v1Source = source.filter(row => row.rowKey !== LATER_KEY);
+  const v8 = sorted([...v1Source.filter(row => !V1_ADDITIONS.includes(row.rowKey)).map(row => row.rowKey === 'nodeRuntimeVersion' ? { ...row, valueJsonText: '"v22.23.1"', sourceRef: 'historical node measurement' } : row), ...owned()]);
   // v9-like: what v1 published on top of v8, with the answer-writer fingerprint still at its v1 value.
-  const v9 = sorted([...source.map(row => row.rowKey === 'composerContractHash' ? { ...row, valueJsonText: canonical('d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866') } : row), ...owned()]);
-  return { source, v8, v9 };
+  const v9 = sorted([...v1Source.map(row => row.rowKey === 'composerContractHash' ? { ...row, valueJsonText: canonical('d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866') } : row), ...owned()]);
+  return { source, v1Source, v8, v9 };
 }
 const compose = (source: Row[], base: Row[], version = '9') => composePreviewSnapshotV2({ sourceRows: source as any, baseRows: base as any, baseRegisterVersion: version, baseSnapshotSha256: computeRegisterSnapshotSha256(base as any) });
 
@@ -33,8 +37,10 @@ describe('publish kit v2: source closure', () => {
     const bootstrap = await loadBootstrapRegister();
     const rows = await buildPreviewSourceRowsV2(bootstrap, runtime);
     expect(rows.map(row => row.rowKey).sort()).toEqual([...PREVIEW_SOURCE_ROW_KEYS_V2].sort());
-    expect(rows).toHaveLength(66);
-    expect(rows).toEqual(await buildPreviewSourceRows(bootstrap, runtime));
+    expect(rows).toHaveLength(67);
+    // v1 can never add a key: today's source (with outboundMailPolicy) is one it refuses; v2 builds the same rows plus that key.
+    await expect(buildPreviewSourceRows(bootstrap, runtime)).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+    expect(rows.find(row => row.rowKey === LATER_KEY)).toBeDefined();
     for (const key of PREVIEW_BASE_OWNED_KEYS) expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(key);
   });
   it('keeps v1\'s runtime gate', async () => {
@@ -43,14 +49,14 @@ describe('publish kit v2: source closure', () => {
 });
 
 describe('publish kit v2: composing from the current version', () => {
-  it('from the 65-row base it produces exactly v1\'s snapshot, reporting the three keys as added', async () => {
+  it('from the 65-row base it produces v1\'s snapshot plus the later key, reporting the added keys', async () => {
     const f = await fixture();
-    const v1 = composePreviewSnapshot({ sourceRows: f.source as any, baseRows: f.v8 as any, baseRegisterVersion: '8', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v8 as any) });
+    const v1 = composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v8 as any, baseRegisterVersion: '8', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v8 as any) });
     const v2 = compose(f.source, f.v8, '8');
-    expect(v2.snapshotSha256).toBe(v1.snapshotSha256);
-    expect(v2.rows).toEqual(v1.rows);
-    expect(v2.addedKeys).toEqual(V1_ADDITIONS);
-    for (const key of V1_ADDITIONS) {
+    expect(v2.rows.filter(row => row.rowKey !== LATER_KEY)).toEqual(v1.rows);
+    expect(v2.rows.find(row => row.rowKey === LATER_KEY)).toEqual(f.source.find(row => row.rowKey === LATER_KEY));
+    expect([...v2.addedKeys].sort()).toEqual([...V1_ADDITIONS, LATER_KEY].sort());
+    for (const key of [...V1_ADDITIONS, LATER_KEY]) {
       const entry = v2.delta.find(row => row.rowKey === key)!;
       expect(entry).toMatchObject({ change: 'added', reason: 'added-source-key', oldValueJsonText: null, oldSourceRef: null, oldValueSha256: null, oldSourceRefSha256: null });
       expect(entry.newValueJsonText).toBe(f.source.find(row => row.rowKey === key)!.valueJsonText);
@@ -61,13 +67,15 @@ describe('publish kit v2: composing from the current version', () => {
 
   it('changes a value on top of the 68-row version that v1 refuses, and the delta shows only that change', async () => {
     const f = await fixture();
-    expect(() => composePreviewSnapshot({ sourceRows: f.source as any, baseRows: f.v9 as any, baseRegisterVersion: '9', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v9 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
+    expect(() => composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v9 as any, baseRegisterVersion: '9', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v9 as any) })).toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
     const before = structuredClone(f.v9);
     const plan = compose(f.source, f.v9);
-    expect(plan.rows).toHaveLength(68);
-    expect(plan.addedKeys).toEqual([]);
+    // On live v9: the later key arrives as added, and the one changed value is the only change.
+    expect(plan.rows).toHaveLength(69);
+    expect(plan.addedKeys).toEqual([LATER_KEY]);
     expect(plan.changedKeys).toEqual(['composerContractHash']);
-    expect(plan.delta).toEqual([{
+    expect(plan.delta.find(row => row.rowKey === LATER_KEY)).toMatchObject({ change: 'added', oldValueJsonText: null, newValueJsonText: f.source.find(row => row.rowKey === LATER_KEY)!.valueJsonText });
+    expect(plan.delta.filter(row => row.rowKey !== LATER_KEY)).toEqual([{
       rowKey: 'composerContractHash', change: 'changed', reason: 'reviewed-current-source-facet',
       oldValueJsonText: '"d96e7cc959e51339eef149991c58aafd5605542b3bf13b70a9cd722f67e0c866"', newValueJsonText: f.source.find(row => row.rowKey === 'composerContractHash')!.valueJsonText,
       oldSourceRef: f.v9.find(row => row.rowKey === 'composerContractHash')!.sourceRef, newSourceRef: f.source.find(row => row.rowKey === 'composerContractHash')!.sourceRef,
@@ -78,16 +86,16 @@ describe('publish kit v2: composing from the current version', () => {
     expect(plan.deltaSha256).toBe(previewDeltaSha256V2(plan.delta));
     expect(plan.baseRegisterVersion).toBe('9');
     // Every other row, the base-owned ones included, is the base row byte for byte.
-    for (const row of plan.rows) if (row.rowKey !== 'composerContractHash') expect(row).toEqual(f.v9.find(base => base.rowKey === row.rowKey));
+    for (const row of plan.rows) if (row.rowKey !== 'composerContractHash' && row.rowKey !== LATER_KEY) expect(row).toEqual(f.v9.find(base => base.rowKey === row.rowKey));
     expect(f.v9).toEqual(before);
   });
 
-  it('adds a key the current version lacks (how outboundMailPolicy will arrive) while changing another value', async () => {
+  it('adds keys the current version lacks (how outboundMailPolicy arrives) while changing another value', async () => {
     const f = await fixture();
     const base = f.v9.filter(row => row.rowKey !== 'taxAuthorities');
     const plan = compose(f.source, base);
-    expect(plan.rows).toHaveLength(68);
-    expect(plan.addedKeys).toEqual(['taxAuthorities']);
+    expect(plan.rows).toHaveLength(69);
+    expect([...plan.addedKeys].sort()).toEqual([LATER_KEY, 'taxAuthorities'].sort());
     expect(plan.changedKeys).toEqual(['composerContractHash']);
     expect(plan.rows.find(row => row.rowKey === 'taxAuthorities')).toEqual(f.source.find(row => row.rowKey === 'taxAuthorities'));
   });
@@ -108,7 +116,8 @@ describe('publish kit v2: composing from the current version', () => {
     ['a base row the source no longer builds (silent drop)', (f: any) => ({ base: [...f.v9, { rowKey: 'retiredRow', valueJsonText: 'false', sourceRef: 'fixture' }] }), 'base-row-dropped'],
     ['a base lacking a base-owned policy', (f: any) => ({ base: f.v9.filter((row: Row) => row.rowKey !== 'staffAccessPolicy') }), 'base-owned-row-missing'],
     ['a source carrying a base-owned policy', (f: any) => ({ source: [...f.source, owned()[0]] }), 'base-owned-row-in-source'],
-    ['a source key outside the reviewed list', (f: any) => ({ source: [...f.source, { rowKey: 'outboundMailPolicy', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'source-key-list'],
+    ['a source key outside the reviewed list', (f: any) => ({ source: [...f.source, { rowKey: 'unreviewedPolicy', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'source-key-list'],
+    ['a source without the newest reviewed key', (f: any) => ({ source: f.v1Source }), 'source-key-list'],
     ['a source missing a reviewed key', (f: any) => ({ source: f.source.filter((row: Row) => row.rowKey !== 'countryPolicy') }), 'source-key-list'],
     ['a support row in the source', (f: any) => ({ source: [...f.source, { rowKey: 'supportActivation', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'support-or-scorecard-row'],
     ['a scorecard row in the base', (f: any) => ({ base: [...f.v9, { rowKey: 'modelScorecard', valueJsonText: '{}', sourceRef: 'fixture' }] }), 'support-or-scorecard-row'],
@@ -180,7 +189,7 @@ describe('publish kit v2: the base must be the current version', () => {
       await expect(publishPreviewRegisterV2(current.pool, { publicationId: id, sourceRef: 'fixture', snapshot, approval: { ...approval, [key]: key === 'baseRegisterVersion' ? '8' : '0'.repeat(64) } })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
       expect(current.statements.some(sql => /publish_register_version/.test(sql))).toBe(false);
     }
-    const v1Snapshot = composePreviewSnapshot({ sourceRows: f.source as any, baseRows: f.v8 as any, baseRegisterVersion: '8', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v8 as any) });
+    const v1Snapshot = composePreviewSnapshot({ sourceRows: f.v1Source as any, baseRows: f.v8 as any, baseRegisterVersion: '8', baseSnapshotSha256: computeRegisterSnapshotSha256(f.v8 as any) });
     await expect(publishPreviewRegisterV2(fakePool([]).pool, { publicationId: id, sourceRef: 'fixture', snapshot: v1Snapshot as any, approval })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
   });
 });

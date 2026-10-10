@@ -4,11 +4,12 @@ import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { SendmailMailSender, SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, isSingleDeliverableRecipient } from "../../apps/api/src/mail-channel.js";
 import { mailAlternatives } from "../support/accountMail.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 it("produces exactly two base64 alternatives without bearer headers or tracking", async () => {
   const dir = await mkdtemp(join(tmpdir(), "task6-mime-")), capture = join(dir, "mail"), executable = join(dir, "sink");
   await writeFile(executable, `#!${process.execPath}\nimport fs from 'node:fs'; let chunks=[]; for await(const c of process.stdin)chunks.push(c); fs.writeFileSync(${JSON.stringify(capture)}, Buffer.concat(chunks),{mode:0o600});`, { mode: 0o700 });
   try {
-    const sender = new SendmailMailSender({ executable, from: "noreply@dezbatere.ro", publicAppUrl: "https://v3-preview.dezbatere.ro", timeoutMs: 5000 });
+    const sender = new SendmailMailSender({ gate: testOutboundMailGate(), executable, from: "noreply@dezbatere.ro", publicAppUrl: "https://v3-preview.dezbatere.ro", timeoutMs: 5000 });
     const token = "Z".repeat(43);
     await sender.sendVerification({ attemptId: "opaque", recipient: "person@example.test", token, expiresAt: new Date("2026-10-05T07:41:00Z"), display: { locale: "ro", timeZone: "Europe/Bucharest" } });
     const message = await readFile(capture, "utf8"), parts = mailAlternatives(message);
@@ -28,18 +29,18 @@ describe("producer refuses malformed inputs before spawn", () => {
     expect(isSingleDeliverableRecipient(recipient)).toBe(false);
   });
   it.each([new Date(NaN), "invalid" as unknown as Date])("rejects invalid expiry %s", async expiresAt => {
-    const sender = new SendmailMailSender({ executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 1000 });
+    const sender = new SendmailMailSender({ gate: testOutboundMailGate(), executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 1000 });
     await expect(sender.sendVerification({ attemptId: "opaque", recipient: "person@example.test", token: "Z".repeat(43), expiresAt })).rejects.toMatchObject({ operatorCode: "MAIL_INPUT_INVALID" });
   });
 });
 
 it("recovery invalid dates retain the opaque pre-spawn input failure", async () => {
-  const sender = new SendmailRecoveryEmailMailSender({ executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 1000 });
+  const sender = new SendmailRecoveryEmailMailSender({ gate: testOutboundMailGate(), executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 1000 });
   for (const expiresAt of [new Date(NaN), "invalid" as unknown as Date]) await expect(sender.sendRecoveryEmail({ kind: "confirmation", recipient: "person@example.test", token: "Z".repeat(43), expiresAt })).rejects.toMatchObject({ operatorCode: "MAIL_INPUT_INVALID" });
 });
 
 describe("configured credential origins", () => {
   it.each(["https://", "https://user:password@dezbatere.ro", "https://dezbatere.ro?token=override", "https://dezbatere.ro#token=override", "https://dezbatere.ro\r\n"])("rejects unsafe configuration %s", publicAppUrl => {
-    for (const Sender of [SendmailMailSender, SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender]) expect(() => new Sender({ executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl, timeoutMs: 1000 })).toThrow("OWN_MAIL_CONFIGURATION_INVALID");
+    for (const Sender of [SendmailMailSender, SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender]) expect(() => new Sender({ executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl, timeoutMs: 1000, gate: testOutboundMailGate() })).toThrow("OWN_MAIL_CONFIGURATION_INVALID");
   });
 });

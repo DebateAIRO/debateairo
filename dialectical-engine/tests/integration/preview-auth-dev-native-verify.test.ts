@@ -11,11 +11,18 @@ vi.mock('../../packages/db/src/migration-forward-chain.js',async original=>{
 import { migrate } from '@debateai/db';
 import { loadBootstrapRegister,createPostgresRegisterPublicationPort,canonicalRegisterJson,computeRegisterSnapshotSha256,parseRegisterVersionText } from '@debateai/register';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../packages/register/src/staff-access-policy.js';
-import { buildPreviewSourceRows,composePreviewSnapshot,publishPreviewRegister,readSealedSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
+import { composePreviewSnapshot,publishPreviewRegister,readSealedSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import { verifyNativeState } from '../../deploy/preview-auth-dev/v1/verify-native.js';
 import { loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
 import { startTestDatabase } from '../support/testDatabase.js';
 import { seedInstalledAuth106 } from '../support/auth106.js';
+import { buildPreviewSourceRowsV2 } from '../../deploy/preview-auth-dev/v1/publish-register-v2.js';
+/**
+ * Kit v1 can never add a register key (its source is closed at 66 rows), so since outboundMailPolicy (open sign-up
+ * mail PR 3) its own builder refuses today's source. These tests replay the preview's v1 history, so they use the
+ * source as it was then: today's reviewed v2 source without the key that arrived later.
+ */
+const v1ShapedSource=async(...args:Parameters<typeof buildPreviewSourceRowsV2>)=>(await buildPreviewSourceRowsV2(...args)).filter(row=>row.rowKey!=='outboundMailPolicy');
 const observation={nodeVersion:process.version,pnpmVersion:'11.20.0',sourceRevision:'a'.repeat(40),sourceTree:'b'.repeat(40),operatorSha256:'c'.repeat(64),observedAt:'2026-10-09T12:00:00.000Z'};
 async function observed(pool:pg.Pool){
  const ledger=(await pool.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
@@ -56,7 +63,7 @@ describe('native verify never applies a pending forward step',()=>{
    expect(applied.roles.find(row=>row.rolname==='debateai_staff_readiness_writer')).toEqual({rolname:'debateai_staff_readiness_writer',rolcanlogin:true,rolconnlimit:2});
    expect(applied.receipts).toBe(true);
    // Then publish and verify, as the operator does after apply-and-plan: verify replays and passes.
-   const source=await buildPreviewSourceRows(await loadBootstrapRegister(),observation);
+   const source=await v1ShapedSource(await loadBootstrapRegister(),observation);
    const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
    await createPostgresRegisterPublicationPort(pool).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
    const sealed=await readSealedSnapshot(pool,'4');

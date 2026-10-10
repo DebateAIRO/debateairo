@@ -76,7 +76,7 @@ describe("S4 mailed-token enrolment UI", () => {
     const messageFile = join(root, "message.txt");
     await writeFile(executable, `#!/bin/sh\ncat > "${messageFile}"\n`, "utf8");
     await chmod(executable, 0o700);
-    const mail = new SendmailMailSender({
+    const mail = new SendmailMailSender({ gate: testOutboundMailGate(),
       executable,
       from: "noreply@debateai.test",
       publicAppUrl: "https://debate.test",
@@ -152,6 +152,7 @@ describe("S4 mailed-token enrolment UI", () => {
   });
 });
 import {takeFragmentToken} from '../../apps/ui/lib/mfaEnrollment.js';
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 it.each([
  '/verify-email#token='+ 'a'.repeat(43)+'&token='+ 'b'.repeat(43),
  '/verify-email?token='+ 'a'.repeat(43)+'#token='+ 'b'.repeat(43),

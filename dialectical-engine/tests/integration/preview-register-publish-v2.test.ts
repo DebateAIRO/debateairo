@@ -19,20 +19,20 @@ describe('publish kit v2 on PostgreSQL 18 (source evidence, not the Linux operat
       const source = [...await buildPreviewSourceRowsV2(await loadBootstrapRegister(), observation)];
       const owned = [STAFF_ACCESS_POLICY_REGISTER_ROW, INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row => ({ rowKey: row.rowKey, valueJsonText: canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }));
       // A 65-row historical base (synthetic fixture setup only; the operator never imports history).
-      const base = [...source.filter(row => !['consumerRecoveryPolicy', 'publicationCheckPolicy', 'taxAuthorities'].includes(row.rowKey)), ...owned];
+      const base = [...source.filter(row => !['consumerRecoveryPolicy', 'outboundMailPolicy', 'publicationCheckPolicy', 'taxAuthorities'].includes(row.rowKey)), ...owned];
       await createPostgresRegisterPublicationPort(pool).importHistorical({ registerVersion: parseRegisterVersionText('4'), rows: base });
       const v4 = await readSealedSnapshot(pool, '4');
 
-      // 1. Three keys added.
+      // 1. Four keys added: v1's three and outboundMailPolicy (open sign-up mail PR 3).
       const first = composePreviewSnapshotV2({ sourceRows: source, baseRows: v4.rows, baseRegisterVersion: '4', baseSnapshotSha256: v4.snapshotSha256 });
-      expect(first.addedKeys).toEqual(['consumerRecoveryPolicy', 'publicationCheckPolicy', 'taxAuthorities']);
+      expect([...first.addedKeys].sort()).toEqual(['consumerRecoveryPolicy', 'outboundMailPolicy', 'publicationCheckPolicy', 'taxAuthorities']);
       const firstInput = { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: first, approval: approvalOf(first) };
       const v5 = await publishPreviewRegisterV2(pool, firstInput);
-      expect(v5).toMatchObject({ registerVersion: '5', baseRegisterVersion: '4', rowCount: 68, snapshotSha256: first.snapshotSha256 });
+      expect(v5).toMatchObject({ registerVersion: '5', baseRegisterVersion: '4', rowCount: 69, snapshotSha256: first.snapshotSha256 });
       // A crashed run re-run with the same plan replays its own receipt.
       expect(await publishPreviewRegisterV2(pool, firstInput)).toEqual(v5);
 
-      // 2. One value changed on top of the 68-row result (v1's composer refuses this base).
+      // 2. One value changed on top of the 69-row result (v1's composer refuses this base).
       const changed = source.map(row => row.rowKey === 'composerContractHash' ? { ...row, valueJsonText: '"' + 'e'.repeat(64) + '"' } : row) as typeof source;
       const current = await readSealedSnapshot(pool, '5');
       const second = composePreviewSnapshotV2({ sourceRows: changed, baseRows: current.rows, baseRegisterVersion: '5', baseSnapshotSha256: current.snapshotSha256 });
@@ -41,7 +41,7 @@ describe('publish kit v2 on PostgreSQL 18 (source evidence, not the Linux operat
       // An approval for a different delta writes nothing.
       await expect(publishPreviewRegisterV2(pool, { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: second, approval: { ...approvalOf(second), deltaSha256: first.deltaSha256 } })).rejects.toThrow('PREVIEW_REGISTER_SNAPSHOT_REFUSED');
       const v6 = await publishPreviewRegisterV2(pool, { publicationId: randomUUID(), sourceRef: 'publish kit v2 fixture', snapshot: second, approval: approvalOf(second) });
-      expect(v6).toMatchObject({ registerVersion: '6', baseRegisterVersion: '5', rowCount: 68 });
+      expect(v6).toMatchObject({ registerVersion: '6', baseRegisterVersion: '5', rowCount: 69 });
       const v6Rows = (await readSealedSnapshot(pool, '6')).rows;
       expect(v6Rows.find(row => row.rowKey === 'composerContractHash')!.valueJsonText).toBe('"' + 'e'.repeat(64) + '"');
       for (const row of v6Rows) if (row.rowKey !== 'composerContractHash') expect(row).toEqual(current.rows.find(old => old.rowKey === row.rowKey));
