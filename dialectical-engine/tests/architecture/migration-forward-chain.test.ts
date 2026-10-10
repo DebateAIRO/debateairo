@@ -52,8 +52,12 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(plan.forward110.name).toBe("0110_account_erasure_public_debates.sql");
     // The auth DB batch (0112) follows 0111, Part C's 0113 follows it, and role rotation's 0114 follows 0113
     // (migrations/lineage/README.md).
-    expect(plan.forwardChain.map((step) => step.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql", "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql"]);
+    expect(plan.forwardChain.map((step) => step.name)).toEqual([
+      "0111_billing_netopia.sql",
+      "0112_auth_db_batch.sql",
+      "0113_billing_price_currencies.sql",
+      "0114_role_rotation.sql"
+    ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
     // as its base verifier: after 0110, the sealed verifier is the one in force.
@@ -93,8 +97,12 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains Part C's 0113 after dev's 0112: the recipe, 0112's manifest and the effective verifier 0112 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
     const [netopia, batch, step] = plan.forwardChain;
-    expect(plan.forwardChain.map((entry) => entry.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql", "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql"]);
+    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([
+      "0111_billing_netopia.sql",
+      "0112_auth_db_batch.sql",
+      "0113_billing_price_currencies.sql",
+      "0114_role_rotation.sql"
+    ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
     expect(batchManifest.verifier.path).toBe("lineage/verify-effective-capabilities-111.sql");
@@ -128,8 +136,12 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains role rotation's 0114 after 0113: the recipe, 0113's manifest and the effective verifier 0113 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
     const [netopia, , partC, step] = plan.forwardChain;
-    expect(plan.forwardChain.map((entry) => entry.name)).toEqual(["0111_billing_netopia.sql", "0112_auth_db_batch.sql", "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql"]);
+    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([
+      "0111_billing_netopia.sql",
+      "0112_auth_db_batch.sql",
+      "0113_billing_price_currencies.sql",
+      "0114_role_rotation.sql"
+    ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
     expect(manifest).toEqual({
