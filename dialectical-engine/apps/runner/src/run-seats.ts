@@ -617,10 +617,10 @@ export function rotatedSeatSelection(eligible: readonly boolean[], cap: number, 
 /**
  * Final review I2 (REVIEWER) — the role's seats in the order one node tries
  * them: starting at `offset` (modulo their count) and wrapping round. The
- * review rotation (`selectDifferentMakerReviewer`) takes the first seat whose
- * maker differs from the latest reviewer's, so an unrotated list could leave a
- * listed seat idle for a whole run (two reviewer seats of one maker, or a third
- * seat behind two that alternate); a site-pure start lets every seat serve.
+ * review rotation (`selectDifferentMakerReviewer`) picks the MAKER in turn round
+ * the debate's seeded circle and then takes the first listed seat of that maker,
+ * so an unrotated list could leave a listed seat idle for a whole run (two
+ * reviewer seats of one maker); a site-pure start lets every seat serve.
  */
 export function rotateSeats<T>(seats: readonly T[], offset: number): readonly T[] {
   if (seats.length === 0) return Object.freeze([]);
