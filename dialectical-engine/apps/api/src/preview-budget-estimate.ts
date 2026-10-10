@@ -48,10 +48,14 @@ function bucharestParts(instant: Date): Readonly<Record<"year" | "month" | "day"
     .filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
   return parts as Record<"year" | "month" | "day" | "hour" | "minute" | "second", number>;
 }
+const BUCHAREST_WINTER_OFFSET_HOURS = 2;
+const BUCHAREST_SUMMER_OFFSET_HOURS = 3;
+const BUCHAREST_UTC_OFFSET_HOURS: readonly number[] = Object.freeze([BUCHAREST_WINTER_OFFSET_HOURS, BUCHAREST_SUMMER_OFFSET_HOURS]);
 export function nextBucharestMidnight(now: Date): Date {
   if (!Number.isFinite(now.getTime())) throw new TypeError("PREVIEW_CLOCK_INVALID");
   const today = bucharestParts(now);
-  for (const offsetHours of [2, 3]) {
+  // Bucharest is UTC+2 in winter and UTC+3 in summer: tomorrow's local midnight is one of the two.
+  for (const offsetHours of BUCHAREST_UTC_OFFSET_HOURS) {
     const candidate = new Date(Date.UTC(today.year, today.month - 1, today.day + 1) - offsetHours * 3_600_000);
     const local = bucharestParts(candidate);
     if (local.hour === 0 && local.minute === 0 && local.second === 0 && candidate.getTime() > now.getTime()) return candidate;
