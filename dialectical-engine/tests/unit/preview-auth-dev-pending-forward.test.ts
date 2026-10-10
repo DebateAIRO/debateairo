@@ -76,7 +76,7 @@ describe('pendingForwardSteps', () => {
 });
 
 describe('refusePendingForwardSteps', () => {
- it('refuses, naming 0111 and 0112, when the database lacks them, with read-only SELECTs only', async () => {
+ it('refuses, naming 0111, 0112 and 0113, when the database lacks them, with read-only SELECTs only', async () => {
   const plan = await loadMigrationPlan();
   const { pool, queries } = fakePool([...plan.manifest.order, plan.forward108.name, plan.forward110.name]);
   const refusal = await refusePendingForwardSteps(pool, plan).then(() => undefined, (error: unknown) => error);
