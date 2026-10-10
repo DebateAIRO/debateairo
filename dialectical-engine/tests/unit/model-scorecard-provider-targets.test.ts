@@ -92,7 +92,7 @@ describe("model scorecard — a provider target declares its thinking levels and
       main.indexOf("const runRepository = new RunRepository(pool);")
     );
     expect(factory).toContain("...providerTargetGatewayControls(target),");
-    expect(factory).toContain("return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig);");
+    expect(factory).toContain("return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target);");
   });
 });
 

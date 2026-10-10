@@ -1,0 +1,41 @@
+# Install as /etc/systemd/system/debateai-preview-anthropic-addresses.service (root:root 0644).
+# Started hourly by debateai-preview-anthropic-addresses.timer. It runs the Anthropic gate's own
+# start check while the gate runs: every IPv4 address of api.anthropic.com must be inside
+# 160.79.104.0/23. A mismatch not announced before fails this unit (exit 3) and its OnFailure=
+# notice (anthropic-addresses) emails the owner, with this unit's journal lines: at most one email per change. It reads
+# only DNS (through the local resolver stub); no key, no gate state. Unprivileged.
+[Unit]
+Description=DebateAI preview: check that api.anthropic.com is still inside the Anthropic gate's allowed range
+OnFailure=debateai-preview-notice@anthropic-addresses-mismatch.service
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/anthropic_addresses.py watch --state /var/lib/debateai-preview-anthropic-addresses/announced
+# Only this unit's own state: the fingerprint of the last announced mismatch.
+StateDirectory=debateai-preview-anthropic-addresses
+StateDirectoryMode=0700
+TimeoutStartSec=60
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+InaccessiblePaths=-/etc/debateai-v3-preview -/var/lib/debateai-v3-preview -/var/lib/postgresql -/etc/postfix
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=127.0.0.53/32

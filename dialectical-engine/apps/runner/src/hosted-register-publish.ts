@@ -73,6 +73,8 @@ import {
   type Scorecard
 } from "@debateai/scorecard";
 import {
+  ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND,
   assertDeploymentProviderTargets,
   assertPricedProviderTargets,
   parseProviderDiscoveryTargets,
@@ -339,9 +341,11 @@ const configuredProviderSetSchema = z.object({
   requiredDistinctMakers: z.number().int(),
   providers: z.array(z.object({
     providerRef: boundedText,
-    // A hosted deployment reaches paid vendor APIs through the one OpenAI-
-    // compatible adapter (V-9(3)); it has no self-hosted inference server (V-20).
-    adapterKind: z.literal("openai-compatible-http"),
+    // A hosted deployment reaches paid vendor APIs through the OpenAI-
+    // compatible adapter (V-9(3)) or, since the multi-model preview's PR B, the
+    // native Anthropic Messages adapter; it has no self-hosted inference server
+    // (V-20), so the vLLM kind stays refused.
+    adapterKind: z.enum([OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND]),
     maker: boundedText,
     vetting: vettingSchema.optional()
   }).strict()).min(1).max(32)
