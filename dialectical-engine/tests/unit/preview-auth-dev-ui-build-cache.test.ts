@@ -2,7 +2,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, existsSync, rmSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { dropBuildCache } from '../../deploy/preview-auth-dev/v1/ui-build.mjs';
+// String-built path, as the other deploy tests do: the .mjs module has no type declarations.
+const { dropBuildCache } = await import('../../deploy/' + 'preview-auth-dev/v1/ui-build.mjs');
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
