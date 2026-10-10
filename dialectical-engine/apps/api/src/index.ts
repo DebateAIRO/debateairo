@@ -103,7 +103,7 @@ import {
   AskRoomResponseSchema
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
-import { assertPreviewBudgetAdmits, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
+import { assertPreviewBudgetAdmits, PreviewGateUnavailableRefusal, type PreviewAdmissionLock, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
 import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
@@ -112,6 +112,7 @@ import {
   RunRepository,
   decryptLeasedContentForRun,
   insertRunRoleAssignment,
+  insertRunRoleRotation,
   prepareLeasedContentEncryptionForRun,
   queryPrivateStream,
   withOwnerAskAdmissionLease,
@@ -159,7 +160,15 @@ import {
   type PersonRoomInput,
   type PersonRoomPick
 } from "./person-room-picker.js";
-import { RoleAssignmentSchema, type RoleAssignment, type Scorecard } from "@debateai/scorecard";
+import {
+  RoleAssignmentSchema,
+  pickRotatedRoles,
+  roleRotationSeed,
+  type RoleAssignment,
+  type RoleRotationCounts,
+  type RotatedRoles,
+  type Scorecard
+} from "@debateai/scorecard";
 import {
   ASK_MODEL_ASSIGNMENT_INVALID,
   ASK_MODEL_REFUSALS,
@@ -3909,6 +3918,12 @@ export interface RunCreationSettings {
    * assignment is pinned.
    */
   readonly modelPicker?: AskModelPickerSettings;
+  /**
+   * Role rotation (spec 2026-10-11): present only when the register's answerRoleRotationPolicy row is ON.
+   * Asked only for a debate with two or more makers and no scorecard assignment (a VALID scorecard
+   * admits through `admitWithScorecard`, which never reads it). Absent: today's fixed roles, byte for byte.
+   */
+  readonly roleRotation?: Readonly<{ readCounts: () => Promise<RoleRotationCounts> }>;
 }
 
 /** One planned admission: the run's basis, panel and (with a VALID scorecard) its assignment. */
@@ -3919,6 +3934,8 @@ export type PlannedAskAdmission = {
   readonly criticUnavailableCap: ReturnType<typeof applyCriticUnavailableCap>;
   /** A20: present only when a VALID scorecard drove admission. */
   readonly modelAssignment?: AdmittedModelAssignment;
+  /** Role rotation (spec 2026-10-11): the four roles picked for this debate, pinned by submit before the work is queued. */
+  readonly roleRotation?: RotatedRoles;
   /** S2: the figure the run's hold opens with when the picker planned it (hosted); B6 uses its estimator otherwise. */
   readonly pickedHoldMicros?: number;
   /** S2 / A5: nothing fitted the person's room at any strength; the debate starts on the cheapest choice the site allows (logged when it does). */
@@ -4184,6 +4201,9 @@ async function admitWithScorecard(input: Readonly<{
   return Object.freeze({ ...planned, ifStartsNow: await admitPicked(pickAt(nowAt)) });
 }
 
+/** Role rotation: how long a refused ask whose counts could not be read is asked to wait (spec: one minute). */
+const ROLE_ROTATION_UNAVAILABLE_RETRY_MS = 60_000;
+
 export async function evaluateAskAdmission(
   settings: RunCreationSettings,
   ask: AskRequest,
@@ -4257,6 +4277,25 @@ export async function evaluateAskAdmission(
   } catch (error) {
     markAskRefusal(error);
   }
+  // Role rotation (spec 2026-10-11 Part 4): picked here, before the estimate, from this debate's own
+  // panel. Only on this path (no scorecard assignment), only with the row ON and two or more makers.
+  // The seed and the question stay in memory: never logged, stored or sent.
+  let roleRotation: RotatedRoles | null = null;
+  if (settings.roleRotation !== undefined && new Set(filteredPanel.map((entry) => entry.maker)).size >= 2) {
+    let counts: RoleRotationCounts;
+    try {
+      counts = await settings.roleRotation.readCounts();
+    } catch (error) {
+      // Never admitted with unpinned roles: the existing "cannot be reached right now" refusal,
+      // with its one-minute retry. The operator's line names no question (ids and codes only).
+      console.error(JSON.stringify(Object.freeze({
+        event: "api.ask.role_rotation_counts_unavailable",
+        diagnostic: apiOperationalErrorDiagnostic(error)
+      })));
+      return markAskRefusal(new PreviewGateUnavailableRefusal(new Date(Date.now() + ROLE_ROTATION_UNAVAILABLE_RETRY_MS)));
+    }
+    roleRotation = pickRotatedRoles({ panel: filteredPanel, counts, seed: roleRotationSeed(ask) });
+  }
   let envelopeBasis: Readonly<Record<string, unknown>>;
   try {
     envelopeBasis = await settings.resolveEnvelopeBasis({
@@ -4278,7 +4317,8 @@ export async function evaluateAskAdmission(
       await assertPreviewBudgetAdmits(settings.previewBudgetGate, {
         basis: envelopeBasis,
         panel: filteredPanel,
-        storyTier: ask.composition_budget_tier
+        storyTier: ask.composition_budget_tier,
+        rotated: roleRotation !== null
       }, undefined, previewAdmissionLock);
     } catch (error) {
       markAskRefusal(error);
@@ -4288,7 +4328,8 @@ export async function evaluateAskAdmission(
     risk,
     envelopeBasis,
     discoveredPanel: filteredPanel,
-    criticUnavailableCap: applyCriticUnavailableCap(makerAvailability)
+    criticUnavailableCap: applyCriticUnavailableCap(makerAvailability),
+    ...(roleRotation === null ? {} : { roleRotation })
   };
 }
 
@@ -4316,11 +4357,13 @@ function runArgumentLanguage(language: Readonly<{ tag: string; name: string }> |
  * the owner's record of the interim roster swap, written before the run's first
  * job on either path; no run spends on the swapped roster without it. And the
  * pinned model assignment (A20, paid plans S1a): `MODEL_ASSIGNMENT`, on either
- * path after `COST_RECORD` and before the memory question.
+ * path after `COST_RECORD` and before the memory question. And the role rotation pin
+ * (spec 2026-10-11 Part 4): `ROLE_ROTATION`, on either path next to `MODEL_ASSIGNMENT`
+ * (a debate has one or the other, never both) and before the memory question.
  */
 type RunSetupStep =
   | "ADMISSION_RELEASE" | "MEMORY_QUESTION" | "WORK_QUEUE" | "DISPATCH" | "WAITING_LINE" | "ROOM_HOLD" | "PLAN_CHANGED"
-  | "COST_RECORD" | "MODEL_ASSIGNMENT";
+  | "COST_RECORD" | "MODEL_ASSIGNMENT" | "ROLE_ROTATION";
 
 /**
  * What `evaluateAskAdmission` admits an ask with. B8 keeps two inside
@@ -4502,7 +4545,7 @@ export class PostgresAskApplication implements AskApplication {
     const previewAdmissionLock = validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig) === undefined
       ? undefined : this.settings.previewBudgetGate?.openAdmissionLock?.();
     try {
-    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment } = await evaluateAskAdmission(this.settings, ask, null, previewAdmissionLock);
+    const { risk, envelopeBasis, discoveredPanel, criticUnavailableCap, modelAssignment, roleRotation } = await evaluateAskAdmission(this.settings, ask, null, previewAdmissionLock);
     const argumentLanguage = detectArgumentLanguage(ask.question_line);
     let runId:string;
     // Set the moment startRun commits: the lease's release can still throw
@@ -4587,6 +4630,14 @@ export class PostgresAskApplication implements AskApplication {
           strength: modelAssignment.appliedStrength,
           steppedDown: modelAssignment.steppedDown
         });
+        setupStep = "MEMORY_QUESTION";
+      }
+      // Role rotation (spec 2026-10-11): the four roles are pinned beside the run (core.run_role_rotation,
+      // append-only) BEFORE its work is queued, so no runner can claim a rotated debate without them. A failed
+      // pin records the run FAILED (RUN_SETUP_FAILED:ROLE_ROTATION). No rotation: nothing is pinned.
+      if (roleRotation !== undefined) {
+        setupStep = "ROLE_ROTATION";
+        await insertRunRoleRotation(this.pool, { runId, ...roleRotation });
         setupStep = "MEMORY_QUESTION";
       }
       await this.#serve.recordMemoryQuestion({
@@ -4828,6 +4879,13 @@ export class PostgresAskApplication implements AskApplication {
               steppedDown: evaluated.modelAssignment.steppedDown
             });
             pinned.assignment = evaluated.modelAssignment;
+          }
+          // Role rotation (spec 2026-10-11 Part 4): the same setup step for START and WAIT alike, before the
+          // hold, the place in line and the first job. The pick is `evaluated`'s, the admission the run was
+          // created from; a WAIT keeps it, and the waker starts the run on it without picking again.
+          if (evaluated.roleRotation !== undefined) {
+            setupStep = "ROLE_ROTATION";
+            await insertRunRoleRotation(this.pool, { runId, ...evaluated.roleRotation });
           }
           pinned.personRoomTight = admission.kind === "START" && evaluated.personRoomTight === true;
           setupStep = "MEMORY_QUESTION";
