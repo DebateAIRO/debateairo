@@ -1,0 +1,5 @@
+[
+  {"model": "zai-org/GLM-5.3-Flash", "maker": "Z.AI", "input_usd_per_m": "0.15", "output_usd_per_m": "0.50", "output_bound": 163840, "effort": "high", "json_object": true, "worst_case_reservation_usd": "0.121548800"},
+  {"model": "deepseek-ai/DeepSeek-V4.1-Flash", "maker": "DeepSeek", "input_usd_per_m": "0.20", "output_usd_per_m": "0.60", "output_bound": 131072, "effort": "high", "json_object": false, "worst_case_reservation_usd": "0.131481600"},
+  {"model": "XiaomiMiMo/MiMo-V2.6-Pro", "maker": "Xiaomi", "input_usd_per_m": "0.43", "output_usd_per_m": "0.87", "output_bound": 131072, "effort": null, "json_object": false, "worst_case_reservation_usd": "0.227635200"}
+]

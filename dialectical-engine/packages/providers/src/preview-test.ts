@@ -4,38 +4,72 @@ import { request as httpRequest } from "node:http";
 import { TypedDomainError } from "@debateai/kernel";
 import type { CallBound, ProviderCallRequest, ProviderDiscoveryTarget, ProviderGateway } from "./index.js";
 import { assertFramedPrompt } from "./prompt-frame.js";
+import {
+  PREVIEW_CONTEXT_WINDOW_TOKENS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS, PREVIEW_REQUEST_BODY_MAX_BYTES,
+  PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRow, previewModelRowForRef, previewNanoUsdText, previewReservationNanoUsd,
+  previewRostersHonourMakerRule, type PreviewModelRow
+} from "./preview-models.js";
 
 export const PREVIEW_GLM_MODEL = "zai-org/GLM-5.3-Flash" as const;
 export const PREVIEW_GLM_PROVIDER_REF = "preview:fixture-a" as const;
-/** Existing logical synthesis/checker refs; both connect to one real model and maker. */
+/**
+ * The sealed two-GLM register's refs (synthesis writer + checker on one maker). Kept for the v1
+ * publish kit (byte for byte) and for runs pinned to that register; the multi-model set is
+ * PREVIEW_REVIEWED_PROVIDER_REFS (preview-models.ts).
+ */
 export const PREVIEW_GLM_PROVIDER_REFS = Object.freeze([PREVIEW_GLM_PROVIDER_REF, "preview:fixture-b"] as const);
-export const PREVIEW_GLM_BASE_URL = "https://api.deepinfra.com/v1/openai" as const;
+export const PREVIEW_GLM_BASE_URL = PREVIEW_DEEPINFRA_BASE_URL;
 export const PREVIEW_GLM_DEADLINE_MS = 600_000 as const;
 export const PREVIEW_GLM_GENERATION_TOKEN_FLOOR = 8192 as const;
+/** GLM's row bound; every row's own bound is PreviewModelRow.outputBound. */
 export const PREVIEW_GLM_OUTPUT_RESERVATION = 163_840 as const;
 export const PREVIEW_GLM_TARGET = Object.freeze({
   provider_ref: PREVIEW_GLM_PROVIDER_REF, base_url: PREVIEW_GLM_BASE_URL, model: PREVIEW_GLM_MODEL,
   input_price_micros_per_million: 150_000, output_price_micros_per_million: 500_000,
   thinking_parameter: "reasoning_effort", thinking_levels: Object.freeze(["high"]), context_window_tokens: 1_048_576
 });
+/**
+ * Contract A §6. Two accepted forms:
+ * - the legacy five keys with `free_model_ids: ["zai-org/GLM-5.3-Flash"]`, meaning free = premium = [GLM]
+ *   (so the server's current configuration keeps booting until the owner edits it);
+ * - six keys with `free_model_ids` and `premium_model_ids`, each a non-empty list of unique reviewed
+ *   model ids; when the two lists together name two or more makers, EACH names two or more.
+ * Parsed, both forms carry both lists.
+ */
 export interface PreviewProviderTestConfig {
   readonly deployment: "v3-preview";
-  readonly free_model_ids: readonly [typeof PREVIEW_GLM_MODEL];
+  readonly free_model_ids: readonly string[];
+  readonly premium_model_ids: readonly string[];
   readonly requested_thinking_level: "high";
   readonly budget_socket: string;
   readonly scope_id: string;
 }
+/** What the target check needs; the legacy five-key literal (v1 publish kit) still fits it. */
+export type PreviewTargetRosters = Readonly<{ free_model_ids: readonly string[]; premium_model_ids?: readonly string[] }>;
 function refused(): never { throw new TypeError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID"); }
+const LEGACY_CONFIG_KEYS = ["budget_socket", "deployment", "free_model_ids", "requested_thinking_level", "scope_id"];
+const CONFIG_KEYS = [...LEGACY_CONFIG_KEYS, "premium_model_ids"].sort();
+function reviewedRoster(value: unknown): readonly string[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > PREVIEW_MODEL_ROWS.length
+    || value.some(id => previewModelRow(id) === undefined) || new Set(value).size !== value.length) return refused();
+  return Object.freeze([...value as string[]]);
+}
 export function parsePreviewProviderTestConfig(source: string | undefined): PreviewProviderTestConfig | undefined {
   if (source === undefined) return undefined;
   let value: unknown; try { value = JSON.parse(source); } catch { return refused(); }
   if (typeof value !== "object" || value === null || Array.isArray(value)) return refused();
   const row = value as Record<string, unknown>;
-  if (Object.keys(row).length !== 5 || row.deployment !== "v3-preview" || row.requested_thinking_level !== "high"
-    || !Array.isArray(row.free_model_ids) || row.free_model_ids.length !== 1 || row.free_model_ids[0] !== PREVIEW_GLM_MODEL
+  const keys = Object.keys(row).sort().join(",");
+  const legacy = keys === LEGACY_CONFIG_KEYS.join(",");
+  if ((!legacy && keys !== CONFIG_KEYS.join(",")) || row.deployment !== "v3-preview" || row.requested_thinking_level !== "high"
     || typeof row.budget_socket !== "string" || !/^\/run\/debateai-v3-preview\/[a-z0-9-]+\.sock$/u.test(row.budget_socket)
     || typeof row.scope_id !== "string" || !/^[a-z0-9][a-z0-9-]{0,95}$/u.test(row.scope_id)) return refused();
-  return Object.freeze({ ...row, free_model_ids: Object.freeze([PREVIEW_GLM_MODEL]) }) as unknown as PreviewProviderTestConfig;
+  if (legacy && (!Array.isArray(row.free_model_ids) || row.free_model_ids.length !== 1 || row.free_model_ids[0] !== PREVIEW_GLM_MODEL)) return refused();
+  const free = reviewedRoster(row.free_model_ids);
+  const premium = legacy ? free : reviewedRoster(row.premium_model_ids);
+  if (!previewRostersHonourMakerRule(free, premium)) return refused();
+  return Object.freeze({ deployment: "v3-preview", free_model_ids: free, premium_model_ids: premium,
+    requested_thinking_level: "high", budget_socket: row.budget_socket, scope_id: row.scope_id });
 }
 export function validatePreviewProviderTestConfig(value: unknown): PreviewProviderTestConfig | undefined {
  if(value===undefined)return undefined;
@@ -94,17 +128,42 @@ export const PREVIEW_TEAM_RUNS_SQL = `SELECT run.run_id::text AS run_id
 export function previewPlanTierRosters<T extends Readonly<{ free: readonly string[]; premium: readonly string[] }>>(
   config: PreviewProviderTestConfig | undefined, defaults: T
 ): Readonly<{ free: readonly string[]; premium: readonly string[] }> {
-  // Step 1 (owner, 2026-10-08): Premium runs on the same single GLM on the private preview.
-  // One id, never [GLM, GLM]: admission maps each roster id to a panel member.
-  return config === undefined ? defaults : Object.freeze({ free: config.free_model_ids, premium: config.free_model_ids });
+  // Contract A §6: the preview's rosters are the configuration's (legacy form: [GLM] for both).
+  // Unique ids, never [GLM, GLM]: admission maps each roster id to one panel member.
+  return config === undefined ? defaults : Object.freeze({ free: config.free_model_ids, premium: config.premium_model_ids });
 }
-export function assertPreviewProviderTargets(config: PreviewProviderTestConfig | undefined, targets: readonly ProviderDiscoveryTarget[]): void {
+/**
+ * The two provider sets a preview may run on, in register order: the sealed two-GLM pair, and the
+ * reviewed multi-model set. Each declared target must equal its ref's reviewed row field for field
+ * and carry no credential; every model the rosters name must have a declared target.
+ */
+export function assertPreviewProviderTargets(config: PreviewTargetRosters | undefined, targets: readonly ProviderDiscoveryTarget[]): void {
   if (config === undefined) return;
-  if (targets.length !== 2 || targets.some((target, index) => target.providerRef !== PREVIEW_GLM_PROVIDER_REFS[index] || target.model !== PREVIEW_GLM_MODEL
-    || target.maker !== "Z.AI" || target.baseUrl !== PREVIEW_GLM_BASE_URL || target.thinkingParameter !== "reasoning_effort"
-    || target.thinkingLevels?.length !== 1 || target.thinkingLevels[0] !== "high"
-    || target.inputPriceMicrosPerMillionTokens !== 150_000 || target.outputPriceMicrosPerMillionTokens !== 500_000
-    || target.contextWindowTokens !== 1_048_576 || target.authorizationHeader !== undefined || target.authorizationFile !== undefined)) refused();
+  const refs = targets.map(target => target.providerRef).join("\0");
+  if (refs !== PREVIEW_GLM_PROVIDER_REFS.join("\0") && refs !== PREVIEW_REVIEWED_PROVIDER_REFS.join("\0")) refused();
+  for (const target of targets) {
+    const reviewed = previewModelRowForRef(target.providerRef);
+    if (reviewed === undefined || target.model !== reviewed.model || target.maker !== reviewed.maker
+      || target.baseUrl !== PREVIEW_DEEPINFRA_BASE_URL
+      || (reviewed.effort === null
+        ? target.thinkingParameter !== undefined || target.thinkingLevels !== undefined
+        : target.thinkingParameter !== "reasoning_effort" || target.thinkingLevels?.length !== 1 || target.thinkingLevels[0] !== reviewed.effort)
+      || target.inputPriceMicrosPerMillionTokens !== reviewed.inputPriceMicrosPerMillion
+      || target.outputPriceMicrosPerMillionTokens !== reviewed.outputPriceMicrosPerMillion
+      || target.contextWindowTokens !== PREVIEW_CONTEXT_WINDOW_TOKENS
+      || target.authorizationHeader !== undefined || target.authorizationFile !== undefined) refused();
+  }
+  const served = new Set(targets.map(target => target.model));
+  if ([...config.free_model_ids, ...(config.premium_model_ids ?? [])].some(model => !served.has(model))) refused();
+}
+/**
+ * The probe's controls for one reviewed target: "high" only where the row has an effort switch,
+ * and the generation floor, never above the row's bound. Throws for a target off the reviewed rows.
+ */
+export function previewProbeControls(target: Readonly<{ model: string }>): Readonly<{ thinkingLevel?: "high"; tokenCeiling: number }> {
+  const reviewed = previewModelRow(target.model) ?? refused();
+  return Object.freeze({ ...(reviewed.effort === null ? {} : { thinkingLevel: reviewed.effort }),
+    tokenCeiling: Math.min(PREVIEW_GLM_GENERATION_TOKEN_FLOOR, reviewed.outputBound) });
 }
 export function previewCallBound(bound: CallBound, config: PreviewProviderTestConfig | undefined): CallBound {
   return config === undefined ? bound : Object.freeze({ maxAttempts: 1, tokenCeiling: Math.max(bound.tokenCeiling, PREVIEW_GLM_GENERATION_TOKEN_FLOOR), deadlineMs: PREVIEW_GLM_DEADLINE_MS });
@@ -122,13 +181,22 @@ function previewStoryRepairAllowed(request: ProviderCallRequest): boolean {
   try { return assertFramedPrompt(request.packet).contractId === "story.storyteller.v2"; }
   catch { return false; }
 }
-export function withPreviewProviderCallPolicy(gateway: ProviderGateway, config: PreviewProviderTestConfig): ProviderGateway {
+/**
+ * The preview's per-call policy for ONE target. A row with an effort switch runs every call at the
+ * configured level ("high"); a row without one (MiMo) never sends a level, and a request that asks
+ * for one is refused before anything is sent.
+ */
+export function withPreviewProviderCallPolicy(gateway: ProviderGateway, config: PreviewProviderTestConfig, target: Readonly<{ model: string }>): ProviderGateway {
+  const reviewed = previewModelRow(target.model) ?? refused();
   return Object.freeze({ call(request: ProviderCallRequest) {
-    if (request.thinkingLevel !== undefined && request.thinkingLevel !== config.requested_thinking_level) {
-      throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", "The private preview connection is configured for high only");
+    if (request.thinkingLevel !== undefined && (reviewed.effort === null || request.thinkingLevel !== config.requested_thinking_level)) {
+      throw new TypedDomainError("PROVIDER_THINKING_LEVEL_UNSUPPORTED", reviewed.effort === null
+        ? "The private preview connection for this model has no thinking level"
+        : "The private preview connection is configured for high only");
     }
     const bound = previewCallBound(request.bound, config);
-    return gateway.call({ ...request, thinkingLevel: config.requested_thinking_level,
+    const { thinkingLevel: _requested, ...rest } = request;
+    return gateway.call({ ...rest, ...(reviewed.effort === null ? {} : { thinkingLevel: config.requested_thinking_level }),
       bound: previewStoryRepairAllowed(request) ? Object.freeze({ ...bound, maxAttempts: 2 }) : bound });
   } });
 }
@@ -142,31 +210,34 @@ export interface PreviewBudgetExecution {
 export interface PreviewBudgetPort {
   execute(input: PreviewBudgetExecution, signal?: AbortSignal): Promise<Readonly<{ status: number; body: string }>>;
 }
-function nanoUsd(value: bigint): string {
-  const source = value.toString().padStart(10, "0");
-  return `${source.slice(0, -9)}.${source.slice(-9)}`;
-}
+/**
+ * Contract A §2/§3: the one fetch the preview's provider calls and probes go through. It sends only
+ * a body the gate accepts for that body's reviewed row (exact keys, the row's effort and JSON
+ * switches, 1 <= max_tokens <= the row's bound, at most 256 KiB) and reserves at that row's price.
+ */
 export function createPreviewGuardedFetch(port: PreviewBudgetPort): typeof fetch {
   return async (input, init) => {
     if (init?.signal?.aborted) throw new DOMException("Private preview call canceled", "TimeoutError");
-    if (String(input) !== `${PREVIEW_GLM_BASE_URL}/chat/completions` || init?.method !== "POST" || typeof init.body !== "string"
-      || Buffer.byteLength(init.body, "utf8") > 256 * 1024) refused();
+    if (String(input) !== `${PREVIEW_DEEPINFRA_BASE_URL}/chat/completions` || init?.method !== "POST" || typeof init.body !== "string"
+      || Buffer.byteLength(init.body, "utf8") > PREVIEW_REQUEST_BODY_MAX_BYTES) refused();
     let decoded: unknown; try { decoded = JSON.parse(init.body); } catch { return refused(); }
+    if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) refused();
     const body = decoded as Record<string, unknown>;
-    if (typeof body !== "object" || body === null) refused();
+    const reviewed: PreviewModelRow = previewModelRow(body.model) ?? refused();
     const hasResponseFormat = Object.hasOwn(body, "response_format");
     const responseFormat = body.response_format as Record<string, unknown> | null;
-    if (hasResponseFormat && (typeof responseFormat !== "object" || responseFormat === null || Array.isArray(responseFormat)
+    if (hasResponseFormat && (!reviewed.jsonObject || typeof responseFormat !== "object" || responseFormat === null || Array.isArray(responseFormat)
       || Object.keys(responseFormat).length !== 1 || !Object.hasOwn(responseFormat, "type") || responseFormat.type !== "json_object")) refused();
-    if (Object.keys(body).length !== (hasResponseFormat ? 5 : 4)
-      || !["model", "reasoning_effort", "max_tokens", "messages"].every(key => Object.hasOwn(body, key)) || body.model !== PREVIEW_GLM_MODEL || body.reasoning_effort !== "high"
-      || !Number.isSafeInteger(body.max_tokens) || Number(body.max_tokens) < 1 || Number(body.max_tokens) > PREVIEW_GLM_OUTPUT_RESERVATION
-      || body.stream === true || !Array.isArray(body.messages)) refused();
-    // UTF-8 bytes + template allowance; full model output, including hidden reasoning.
-    // 150 and 500 nano-USD/token are the same $0.15/$0.50 per-million prices as the native target.
-    const reserved = BigInt(Buffer.byteLength(init.body, "utf8") + 2048) * 150n + BigInt(PREVIEW_GLM_OUTPUT_RESERVATION) * 500n;
+    const required = ["model", "max_tokens", "messages", ...(reviewed.effort === null ? [] : ["reasoning_effort"])];
+    if (Object.keys(body).length !== required.length + (hasResponseFormat ? 1 : 0)
+      || !required.every(key => Object.hasOwn(body, key))
+      || (reviewed.effort !== null && body.reasoning_effort !== reviewed.effort)
+      || !Number.isSafeInteger(body.max_tokens) || Number(body.max_tokens) < 1 || Number(body.max_tokens) > reviewed.outputBound
+      || !Array.isArray(body.messages)) refused();
+    // UTF-8 bytes + template allowance; the row's full output bound, including hidden reasoning.
+    const reserved = previewReservationNanoUsd(reviewed, Buffer.byteLength(init.body, "utf8"));
     const result = await port.execute({ operationId: randomUUID(), requestBody: init.body,
-      requestSha256: createHash("sha256").update(init.body).digest("hex"), reservedUsd: nanoUsd(reserved) }, init.signal ?? undefined);
+      requestSha256: createHash("sha256").update(init.body).digest("hex"), reservedUsd: previewNanoUsdText(reserved) }, init.signal ?? undefined);
     return new Response(result.body, { status: result.status, headers: { "content-type": "application/json" } });
   };
 }

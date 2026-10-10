@@ -132,7 +132,7 @@ describe("the preview spending gate's 409 refusal body", () => {
         fetchImplementation: createPreviewGuardedFetch(port),
         persistRawArtifact: async (artifact) => artifact.artifactId, appendLedgerEntry: async (entry) => entry.attemptId,
         assertNoOpenWriteTransaction: () => undefined, sleepImplementation: async () => undefined
-      }), preview);
+      }), preview, target);
       return gateway.call({
         runId: "run:synthetic", subjectItemId: "node:test", callSiteKey: "fixture:judge", role: "JUDGE", lane: "served",
         bound: { maxAttempts: 3, tokenCeiling: 2048, deadlineMs: 5000 }, contractHash: "contract:test", providerRef: REF,

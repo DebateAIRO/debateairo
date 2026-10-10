@@ -1,4 +1,4 @@
-import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, PREVIEW_GLM_GENERATION_TOKEN_FLOOR, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
+import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, previewProbeControls, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
 import { readModelScorecard, readEngineVersion } from "@debateai/register";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
@@ -498,7 +498,7 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   probes,
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
   probeTimeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-  ...(previewConfig === undefined ? {} : { thinkingLevel: "high", probeTokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR, fetchImplementation: previewFetch! })
+  ...(previewConfig === undefined ? {} : { probeControlsFor: previewProbeControls, fetchImplementation: previewFetch! })
 });
 /**
  * Budget spec 2026-09-28 §2.4–§2.7 and the paid-plans spec §2.4 (B6b): THE ROOM.
