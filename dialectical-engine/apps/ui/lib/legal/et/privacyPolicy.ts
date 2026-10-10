@@ -260,7 +260,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Lisa B — Piirkondlikud privaatsustingimused",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Iga kirje kehtib ainult juhul, kui selle piirkond on loetletud Tingimuste jaotises 2, ning kirjeldab ainult erinevusi selle poliitika põhiosast." }
+      { kind: "p", text: "Iga kirje kehtib inimestele, kes elavad selle piirkonnas, ning kirjeldab ainult erinevusi selle poliitika põhiosast." }
     ]
   },
   {
@@ -273,95 +273,63 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "B.2",
-    title: "Ühendkuningriik (ainult kui loetletud)",
+    title: "Ameerika Ühendriigid",
     accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Meie Ühendkuningriigi esindaja Ühendkuningriigi GDPR-i artikli 27 alusel on [name, address, email]; võite temaga ühendust võtta kõigis selle poliitikaga seotud küsimustes. Järelevalveasutus on Information Commissioner's Office, ico.org.uk. Meile kaebuse esitamiseks kirjutage aadressil privacy@dezbatere.ro; kinnitame teie kaebuse kättesaamist 30 päeva jooksul. Teie andmete edastamine Ühendkuningriigist Ameerika Ühendriikides asuvatele tehisintellekti pakkujatele põhineb ELi-USA andmekaitseraamistiku Ühendkuningriigi laiendusel, kui pakkuja on sertifitseeritud, ja muul juhul Ühendkuningriigi rahvusvahelise andmeedastuse lisal ELi lepingutüüptingimuste juurde ning seda toetab edastamise riskihinnang; registris on iga pakkuja puhul nimetatud kasutatav vahend. Teatame isikuandmetega seotud rikkumisest ICO-le 72 tunni jooksul, kui seadus seda nõuab, ja teavitame teid põhjendamatu viivituseta, kui see seab teid suure ohu alla. Kui kunagi paigaldame analüütikaküpsiseid, kohaldatakse neile Ühendkuningriigis nõusoleku asemel loobumisvõimalust; praegu me neid ei paigalda. Kui olete alla 18-aastane ja pääsete meie vanusereeglist hoolimata teenusele juurde, kohaldatakse teie andmete töötlemisele ICO lastekoodeksi standardeid." }
-    ]
-  },
-  {
-    no: "B.3",
-    title: "Ameerika Ühendriigid (ainult kui loetletud)",
-    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Teade kogumisel. Jaotise 2 tabelis on loetletud kogutavate isikuandmete liigid ja nende allikad. Töötlemise eesmärgid ja õiguslikud alused on jaotises 4 ning säilitamisajad jaotises 7. Kogume järgmisi tundlike isikuandmete kategooriaid ainult juhul, kui lisate need oma küsimustesse iseenda kohta: tervis, usulised või filosoofilised veendumused, seksuaalelu või seksuaalne sättumus, poliitilised vaated, ametiühingusse kuulumine ning rassiline või etniline päritolu. Kasutame neid ainult teie väitluste läbiviimiseks ja ainult pärast jaotises 3 kirjeldatud eraldi nõusolekut. Me ei müü ega jaga isikuandmeid ega ole seda teinud eelneva kaheteistkümne kuu jooksul. Me ei kasuta isikuandmeid sihitud reklaamiks ega kasuta tundlikke isikuandmeid muul eesmärgil kui teie taotletud teenuse osutamiseks. Loobumiseelistuse signaalid: Praegu ei ole millestki loobuda, sest me ei müü ega jaga isikuandmeid. Kui hakkame neid tulevikus müüma või jagama, arvestame Global Privacy Controli signaali loobumisena. Teie õigused: saada teavet, kustutada, parandada, loobuda, piirata tundlike isikuandmete kasutamist ning mitte kogeda nende õiguste kasutamise tõttu diskrimineerimist; esitage taotlus aadressil privacy@dezbatere.ro. Rahalised stiimulid: me ei paku neid; meie eesmärgid ja kaitsemeetmed on tasuta ja tasulises paketis samad. Säilitamist käsitletakse jaotises 7. Rikkumised: teavitame elanikke ja osariigi asutusi iga osariigi rikkumisteavitusseaduse nõuete kohaselt. Seda teadet ajakohastatakse vähemalt iga kaheteistkümne kuu järel; viimati ajakohastatud [date]." },
       { kind: "p", text: "Connecticut: töötleme tundlikke andmeid ainult teie aktiivselt antud nõusolekul, mille annate enne esimest väitlust eraldi ekraanil (jaotis 3); me ei kasuta teie isikuandmeid tehisintellekti mudelite treenimiseks. Washington: meie eraldiseisev tarbija terviseandmete privaatsusteade aadressil [URL] kehtib kogu tervisega seotud teabe, sealhulgas järelduste kohta. Texas ja Nebraska: me ei müü tundlikke isikuandmeid. Colorado, Connecticut, Virginia ja teised ulatuslike privaatsusseadustega osariigid: eespool nimetatud õigused kehtivad teile, kui seadus kehtib meie suhtes. Kui lükkame taotluse tagasi, võite selle vaidlustada, vastates meie vastusele aadressil privacy@dezbatere.ro; kui lükkame vaidlustuse tagasi, võite pöörduda oma osariigi peaprokuröri (Attorney General) poole." }
     ]
   },
   {
-    no: "B.4",
-    title: "Kanada ja Quebec (ainult kui loetletud)",
-    accent: "--gold",
+    no: "B.3",
+    title: "Kanada ja Quebec",
+    accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on [name], privacy@dezbatere.ro. Vastame taotlustele 30 päeva jooksul. Vastutame jätkuvalt isikuandmete eest, mille edastame tehisintellekti pakkujatele väljaspool Kanadat, ja kasutame võrreldava kaitse nõudmiseks lepinguid; nende pakkujate suhtes võivad kehtida nende tegevusriikide seadused, sealhulgas ametiasutuste seaduslik juurdepääs. Turundusmeile saadetakse CASL-i alusel ainult teie selgesõnalisel nõusolekul. Teatame turvameetmete rikkumisest, mis tekitab teile olulise kahju tegeliku ohu, Kanada privaatsusvolinikule (Office of the Privacy Commissioner of Canada) ja teile ning säilitame iga rikkumise kohta kirjet 24 kuud. Quebec: enne isikuandmete edastamist väljapoole Quebeci viime läbi andmekaitsealase mõjuhinnangu; teatame konfidentsiaalsusintsidendist, mis tekitab tõsise kahju ohu, asutusele Commission d'accès à l'information ja teile ning peame intsidentide registrit; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite paluda meil teie isikuandmed otsingumootorite indeksist eemaldada või nende levitamine lõpetada; võite taotleda oma andmeid struktureeritud ja üldkasutatavas vormingus; jaotis 8 kirjeldab meie automatiseeritud töötlust." }
     ]
   },
   {
-    no: "B.5",
-    title: "Austraalia ja Uus-Meremaa (ainult kui loetletud)",
-    accent: "--reasoning",
+    no: "B.4",
+    title: "Austraalia ja Uus-Meremaa",
+    accent: "--gold",
     blocks: [
       { kind: "p", text: "Austraalia. Teie isikuandmete välismaised vastuvõtjad on registris loetletud tehisintellekti pakkujad ja volitatud töötlejad, kes asuvad piirkonnas [the United States and the European Union]; võtame mõistlikke meetmeid tagamaks, et nad töötlevad andmeid kooskõlas Austraalia privaatsuspõhimõtetega. Automatiseeritud otsused: alates 10. detsembrist 2026 nimetatakse selles poliitikas arvutiprogrammide tehtavate ja teie õigusi või huve märkimisväärselt mõjutavate otsuste liigid — neid ei ole; hinded ja otsused puudutavad argumente, mitte teid — ning nendes kasutatavad isikuandmed. Kaebuse võib esitada Office of the Australian Information Commissionerile. Uus-Meremaa. Meie privaatsusametnik on [name]. Kui kogume teie kohta isikuandmeid kaudselt — kuna teine kasutaja lisas need küsimusse — on käesolev poliitika ja jaotis 11 teile antav teade. Avaldame andmeid oma esindajatena tegutsevatele registris loetletud tehisintellekti pakkujatele lepingute alusel, mis nõuavad võrreldavaid kaitsemeetmeid. Kaebuse võib esitada Office of the Privacy Commissionerile." }
     ]
   },
   {
-    no: "B.6",
-    title: "Šveits (ainult kui loetletud)",
-    accent: "--con",
+    no: "B.5",
+    title: "Šveits",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Kohaldatakse Šveitsi föderaalset andmekaitseseadust (FADP). Järelevalveasutus on föderaalne andmekaitse- ja teabevolinik (FDPIC), edoeb.admin.ch. Teie andmed edastatakse registris nimetatud riikidesse — ELi riikidesse ja Ameerika Ühendriikidesse. Ameerika Ühendriikide puhul tugineme Šveitsi-USA andmekaitseraamistikule, kui pakkuja on sertifitseeritud, ja muul juhul FDPIC-i tunnustatud lepingutüüptingimustele. Teatame FDPIC-ile võimalikult kiiresti andmetega seotud rikkumisest, mis tõenäoliselt seab teid suure ohu alla. Oleme hinnanud, et meil ei ole vaja Šveitsis esindajat (Art. 14 FADP). Vaatame selle hinnangu igal aastal üle." }
     ]
   },
   {
-    no: "B.7",
-    title: "Moldova (ainult kui loetletud)",
-    accent: "--ink",
+    no: "B.6",
+    title: "Moldova",
+    accent: "--con",
     blocks: [
       { kind: "p", text: "Kohaldatakse Moldova isikuandmete kaitse seadust nr 195/2024. See järgib GDPR-i ja selle poliitika põhiosa kirjeldab teie õigusi selle alusel. Järelevalveasutus on Riiklik Isikuandmete Kaitse Keskus (CNPDCP). Meil ei ole vaja Moldovas esindajat, sest oleme asutatud Euroopa Majanduspiirkonnas (seaduse nr 195/2024 Art. 27(2)(c)). Vaatame selle hinnangu igal aastal üle. Teie andmete edastamine Ameerika Ühendriikidesse põhineb mehhanismil, mis on registris iga pakkuja juures nimetatud. Teatame isikuandmetega seotud rikkumisest CNPDCP-le 72 tunni jooksul, kui seadus seda nõuab." }
     ]
   },
   {
-    no: "B.8",
-    title: "Ukraina (ainult kui loetletud)",
-    accent: "--muted",
+    no: "B.7",
+    title: "Aasia ja Vaikse ookeani piirkond",
+    accent: "--ink",
     blocks: [
-      { kind: "p", text: "Kohaldatakse Ukraina seadust „Isikuandmete kaitse kohta“. Me ei paku Dialectical Engine-d Ukraina aladel, mis ei ole selle valitsuse kontrolli all. Teie andmed edastatakse ELi riikidesse ja Ameerika Ühendriikidesse (vt registrit). Võite esitada kaebuse Ukraina Ülemraada inimõiguste volinikule." }
-    ]
-  },
-  {
-    no: "B.9",
-    title: "Iisrael (ainult kui loetletud)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Kohaldatakse Iisraeli eraelu kaitse seadust. Vastutav töötleja on DebateAIRO S.R.L.; kuidas meiega ühendust võtta, on kirjas jaotises 1. Teil ei ole seadusest tulenevat kohustust meile oma andmeid anda; ilma kontoandmeteta ei saa me teile kontot avada. Kasutame teie andmeid jaotises 4 nimetatud eesmärkidel ja anname need jaotises 5 nimetatud vastuvõtjatele. Võite taotleda nendega tutvumist ja nende parandamist (jaotis 10). Järelevalveasutus on Eraelu Kaitse Amet (Privacy Protection Authority)." }
-    ]
-  },
-  {
-    no: "B.10",
-    title: "Aasia ja Vaikse ookeani piirkond (ainult loetletud piirkondade read)",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Singapur: meie andmekaitsespetsialist on [name, email]; edastamine põhineb lepingulistel kohustustel, mis tagavad PDPA-ga võrreldava kaitse; teavitame PDPC-d teatamiskohustuslikest rikkumistest 3 päeva jooksul. Jaapan: kasutame teie isikuandmeid jaotises 4 sätestatud eesmärkidel ja mitte muudel eesmärkidel. Anname need registris nimetatud tehisintellekti pakkujatele ja majutusteenuse pakkujatele, kes asuvad Ameerika Ühendriikides ja ELi riikides, lepingute alusel, mis kohustavad neid kaitsma andmeid Jaapani isikuandmete kaitse seaduse tasemel; teie taotlusel teatame, mida nad andmete kaitsmiseks teevad, ning nende riigi privaatsussüsteemist. Teie veendumused, sealhulgas usulised ja poliitilised veendumused, ning teie tervis on erilist hoolt nõudvad isikuandmed; kogume neid ainult teie eelneval nõusolekul (jaotis 3). Meie nimi ja aadress on DebateAIRO S.R.L., [address], Rumeenia, ning meie esindaja on juhatuse liige [name]; taotluse esitamise viis on jaotises 10, meie turvameetmed jaotises 9 ning kaebused saatke aadressil privacy@dezbatere.ro. Teatame rikkumistest Isikuandmete Kaitse Komisjonile (Personal Information Protection Commission) seaduse nõuete kohaselt. Lõuna-Korea: meie privaatsusametnik on juhatuse liige [name], privacy@dezbatere.ro. Edastame isikuandmeid välismaale, sest teie väitluste läbiviimine meie teiega sõlmitud lepingu alusel seda nõuab: iga kord, kui väitlus toimub, saadame teie küsimuse ja väitluse avaldused ning kasutajatoe vestluses teie sõnumid krüpteeritud ühenduse kaudu registris nimetatud tehisintellekti pakkujatele ja majutusteenuse pakkujatele; registris on nimetatud iga vastuvõtja, selle riik, kontaktandmed, eesmärk ja andmete säilitamise aeg. Edastamisest saate keelduda, kui te ei alusta väitlusi või kustutate oma konto; siis ei saa me teile väitlusi läbi viia. Poliitilised arvamused, veendumused ja tervis on tundlik teave; töötleme neid ainult teie eraldi nõusolekul (jaotis 3). Me ei tee teie kohta täielikult automatiseeritud otsuseid (jaotis 8). Vastame taotlustele [10] päeva jooksul ning teatame rikkumistest Isikuandmete Kaitse Komisjonile ja teile isikuandmete kaitse seaduse nõuete kohaselt. Taiwan: kohaldatakse Taiwani isikuandmete kaitse seadust. Säilitame teie andmeid jaotises 7 nimetatud tähtaegade jooksul; neid kasutatakse Rumeenias, teistes ELi riikides ja Ameerika Ühendriikides (vt registrit); vastuvõtjad on nimetatud jaotises 5; meie süsteemid ja tehisintellekti mudelid töötlevad neid teie väitluste läbiviimiseks automaatselt. Võite küsida, milliseid andmeid me teie kohta hoiame, nendega tutvuda, saada neist koopia, neid parandada, lasta meil nende kasutamine lõpetada ja need kustutada (jaotis 10). Kontoandmete andmine on teie valik, kuid ilma nendeta ei saa me teile kontot avada. Vastame taotlusele oma andmetega tutvuda või saada neist koopia 15 päeva jooksul; kui vajame rohkem aega, võime seda tähtaega ühe korra pikendada kuni 15 päeva võrra ja teatame teile põhjuse kirjalikult. Filipiinid: meie andmekaitsespetsialist on [name]; kaebuse võib esitada National Privacy Commissionile; jaotis 8 kirjeldab automatiseeritud töötlust. Tai: meie esindaja on [name] [if appointed]." }
-    ]
-  },
-  {
-    no: "B.11",
-    title: "Reserveeritud",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Türgi, Brasiilia ja Indoneesia nõuavad igaüks kohalikus keeles teadet, esindajat või registreerimist ning dokumentide esitamist ja neid ei ole siin käsitletud. Hiinat, Vietnami ega Venemaad ei teenindata." }
+      { kind: "p", text: "Singapur: meie andmekaitsespetsialist on [name, email]; edastamine põhineb lepingulistel kohustustel, mis tagavad PDPA-ga võrreldava kaitse; teavitame PDPC-d teatamiskohustuslikest rikkumistest 3 päeva jooksul. Jaapan: kasutame teie isikuandmeid jaotises 4 sätestatud eesmärkidel ja mitte muudel eesmärkidel. Anname need registris nimetatud tehisintellekti pakkujatele ja majutusteenuse pakkujatele, kes asuvad Ameerika Ühendriikides ja ELi riikides, lepingute alusel, mis kohustavad neid kaitsma andmeid Jaapani isikuandmete kaitse seaduse tasemel; teie taotlusel teatame, mida nad andmete kaitsmiseks teevad, ning nende riigi privaatsussüsteemist. Teie veendumused, sealhulgas usulised ja poliitilised veendumused, ning teie tervis on erilist hoolt nõudvad isikuandmed; kogume neid ainult teie eelneval nõusolekul (jaotis 3). Meie nimi ja aadress on DebateAIRO S.R.L., [address], Rumeenia, ning meie esindaja on juhatuse liige [name]; taotluse esitamise viis on jaotises 10, meie turvameetmed jaotises 9 ning kaebused saatke aadressil privacy@dezbatere.ro. Teatame rikkumistest Isikuandmete Kaitse Komisjonile (Personal Information Protection Commission) seaduse nõuete kohaselt. Lõuna-Korea: meie privaatsusametnik on juhatuse liige [name], privacy@dezbatere.ro. Edastame isikuandmeid välismaale, sest teie väitluste läbiviimine meie teiega sõlmitud lepingu alusel seda nõuab: iga kord, kui väitlus toimub, saadame teie küsimuse ja väitluse avaldused ning kasutajatoe vestluses teie sõnumid krüpteeritud ühenduse kaudu registris nimetatud tehisintellekti pakkujatele ja majutusteenuse pakkujatele; registris on nimetatud iga vastuvõtja, selle riik, kontaktandmed, eesmärk ja andmete säilitamise aeg. Edastamisest saate keelduda, kui te ei alusta väitlusi või kustutate oma konto; siis ei saa me teile väitlusi läbi viia. Poliitilised arvamused, veendumused ja tervis on tundlik teave; töötleme neid ainult teie eraldi nõusolekul (jaotis 3). Me ei tee teie kohta täielikult automatiseeritud otsuseid (jaotis 8). Vastame taotlustele 10 päeva jooksul ning teatame rikkumistest Isikuandmete Kaitse Komisjonile ja teile isikuandmete kaitse seaduse nõuete kohaselt. Taiwan: kohaldatakse Taiwani isikuandmete kaitse seadust. Säilitame teie andmeid jaotises 7 nimetatud tähtaegade jooksul; neid kasutatakse Rumeenias, teistes ELi riikides ja Ameerika Ühendriikides (vt registrit); vastuvõtjad on nimetatud jaotises 5; meie süsteemid ja tehisintellekti mudelid töötlevad neid teie väitluste läbiviimiseks automaatselt. Võite küsida, milliseid andmeid me teie kohta hoiame, nendega tutvuda, saada neist koopia, neid parandada, lasta meil nende kasutamine lõpetada ja need kustutada (jaotis 10). Kontoandmete andmine on teie valik, kuid ilma nendeta ei saa me teile kontot avada. Vastame taotlusele oma andmetega tutvuda või saada neist koopia 15 päeva jooksul; kui vajame rohkem aega, võime seda tähtaega ühe korra pikendada kuni 15 päeva võrra ja teatame teile põhjuse kirjalikult." }
     ]
   }
 ];
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.2",
-  sha256: "b3c1f6155ca3ae815c7191ce392add4e2a43bb692b76573c473def2206153ceb",
-  eyebrow: "PRIVAATSUSPOLIITIKA · v3.2 · KEHTIB ALATES [DATE]",
+  version: "3.3",
+  sha256: "784f8d9ff9868eba9a22f391bf3d8f6abf2ee12355a9a752284f29671bffaf85",
+  eyebrow: "PRIVAATSUSPOLIITIKA · v3.3 · KEHTIB ALATES [DATE]",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",
-  endMarker: "POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.2",
+  endMarker: "POLIITIKA LÕPP · GDPR (EU) 2016/679 · v3.3",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Privaatsuspoliitika tekst",
   sectionIdPrefix: "policy-section-",

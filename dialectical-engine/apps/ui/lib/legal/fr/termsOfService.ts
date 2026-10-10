@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Pays dans lesquels nous proposons DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Nous proposons DebateAI aux personnes qui résident dans [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons." }
+      { kind: "p", text: "Nous proposons DebateAI aux personnes qui résident dans l’Union européenne (27 pays) et l’Espace économique européen (Norvège, Islande et Liechtenstein), en Suisse, en Moldavie, aux États-Unis (Tennessee excepté), au Canada, en Australie, en Nouvelle-Zélande, à Singapour, au Japon, en Corée du Sud et à Taïwan. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Acceptation des présentes Conditions",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Vous acceptez les présentes Conditions en cochant la case intitulée « J’ai lu et j’accepte les Conditions d’utilisation » et en cliquant sur Créer un compte. Cela crée un contrat entre vous et DebateAIRO S.R.L. Les Conditions comprennent les règles d’utilisation acceptable de la section 7, les règles de publication de la section 9, les dispositions relatives à la responsabilité de la section 15, les dispositions relatives au droit applicable et aux litiges de la section 18 et, si vous résidez aux États-Unis, la convention d’arbitrage figurant à l’annexe A.3. Nous conservons la version que vous avez acceptée et la date de votre acceptation, comme l’explique notre Politique de confidentialité." },
+      { kind: "p", text: "Vous acceptez les présentes Conditions en cochant la case intitulée « J’ai lu et j’accepte les Conditions d’utilisation » et en cliquant sur Créer un compte. Cela crée un contrat entre vous et DebateAIRO S.R.L. Les Conditions comprennent les règles d’utilisation acceptable de la section 7, les règles de publication de la section 9, les dispositions relatives à la responsabilité de la section 15, les dispositions relatives au droit applicable et aux litiges de la section 18 et, si vous résidez aux États-Unis, la convention d’arbitrage figurant à l’annexe A.2. Nous conservons la version que vous avez acceptée et la date de votre acceptation, comme l’explique notre Politique de confidentialité." },
       { kind: "p", text: "Notre Politique de confidentialité, disponible à l’adresse [dezbatere.ro/privacy], explique comment nous traitons les données à caractère personnel. Il s’agit d’informations que nous sommes tenus de vous fournir, et non d’un contrat auquel vous consentez, et rien dans les présentes Conditions ne les transforme en consentement au traitement. Notre Politique relative aux cookies, disponible à l’adresse [dezbatere.ro/cookies], et notre Registre des fournisseurs d’IA, disponible à l’adresse [dezbatere.ro/providers], sont intégrés aux présentes Conditions par référence." },
       { kind: "p", text: "Avant que vous ne concluiez électroniquement un contrat avec nous, l’interface vous présente les étapes à suivre, vous permet de vérifier et de corriger les informations saisies avant de les soumettre et vous indique les langues dans lesquelles le contrat peut être conclu. Les présentes Conditions sont mises à votre disposition sous une forme que vous pouvez enregistrer et imprimer. Lorsque vous achetez une formule payante, nous vous envoyons par e-mail la version que vous avez acceptée. Vous pouvez en demander une copie à tout moment. Rien dans les présentes Conditions ne limite les droits dont vous bénéficiez en vertu du droit roumain ou du droit de l’Union européenne relatif à la protection des consommateurs, ou du droit du pays dans lequel vous résidez, lorsque ces droits ne peuvent être limités par contrat." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Votre droit de rétractation",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Si vous résidez dans l’Union européenne, l’EEE ou le Royaume-Uni, vous pouvez vous rétracter d’un abonnement payant dans un délai de 14 jours à compter de la souscription, sans avoir à motiver votre décision. Utilisez la page Se rétracter du contrat à l’adresse [dezbatere.ro/withdraw], le formulaire type joint à l’e-mail de confirmation ou écrivez à [support@dezbatere.ro] ; nous en accusons réception sur un support durable." },
+      { kind: "p", text: "Si vous résidez dans l’Union européenne ou l’EEE, vous pouvez vous rétracter d’un abonnement payant dans un délai de 14 jours à compter de la souscription, sans avoir à motiver votre décision. Utilisez la page Se rétracter du contrat à l’adresse [dezbatere.ro/withdraw], le formulaire type joint à l’e-mail de confirmation ou écrivez à [support@dezbatere.ro] ; nous en accusons réception sur un support durable." },
       { kind: "p", text: "Si vous nous avez demandé de commencer immédiatement à fournir le service — en cochant la case correspondante lors du paiement — puis exercez votre droit de rétractation, vous payez la partie du service fournie jusqu’au jour de votre rétractation, calculée au prorata du prix de la période de facturation, et nous remboursons le solde. Vous ne perdez pas votre droit de rétractation en utilisant le service pendant les 14 jours." },
       { kind: "p", text: "Si vous résidez ailleurs, l’annexe A précise le droit de rétractation ou le délai de réflexion applicable dans votre région, le cas échéant, et à défaut notre politique de remboursement. Les droits légaux de votre pays prévalent toujours." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Droit applicable. Les présentes Conditions ainsi que tout litige ou toute réclamation découlant de celles-ci ou de leur objet, y compris les réclamations non contractuelles, sont régis par le droit roumain." },
-      { kind: "p", text: "Vos protections locales ne sont pas affectées. Si vous êtes un consommateur, le choix du droit roumain ne vous prive pas de la protection des règles impératives de protection des consommateurs du pays dans lequel vous avez votre résidence habituelle — par exemple les règles relatives aux clauses abusives, aux droits de rétractation et de résiliation ou aux garanties — lorsque ces règles s’appliquent indépendamment de ce choix, notamment en vertu de l’article 6, paragraphe 2, du règlement (CE) no 593/2008 si vous résidez dans l’Union européenne, ou des règles équivalentes du Royaume-Uni. Vous pouvez invoquer ces règles en plus du droit roumain." },
-      { kind: "p", text: "Juridictions compétentes si vous résidez dans l’Union européenne, l’EEE ou le Royaume-Uni. Vous pouvez engager une procédure contre nous soit devant les juridictions roumaines, soit devant celles du pays dans lequel vous résidez. Nous ne pouvons engager une procédure contre vous que devant les juridictions du pays dans lequel vous résidez." },
-      { kind: "p", text: "Consommateurs résidant ailleurs. Si vous résidez en dehors de l’Union européenne, de l’EEE et du Royaume-Uni, rien dans les présentes Conditions ne limite les droits que le droit de votre pays vous confère pour saisir ses juridictions, ni tout droit prévu par ce droit auquel il ne peut être renoncé — notamment, si vous résidez en Australie ou en Nouvelle-Zélande, vos droits au titre des garanties offertes aux consommateurs ; si vous résidez au Brésil, le Código de Defesa do Consumidor ; et si vous résidez aux États-Unis, les lois de votre État relatives à la protection des consommateurs." },
-      { kind: "p", text: "Résidents des États-Unis. L’annexe A.3 contient une convention d’arbitrage et une renonciation aux actions collectives régies par le Federal Arbitration Act. Elles ne s’appliquent qu’aux résidents des États-Unis et uniquement lorsqu’elles sont opposables. Elles ne s’appliquent pas aux consommateurs de l’Union européenne, de l’EEE ou du Royaume-Uni." },
+      { kind: "p", text: "Vos protections locales ne sont pas affectées. Si vous êtes un consommateur, le choix du droit roumain ne vous prive pas de la protection des règles impératives de protection des consommateurs du pays dans lequel vous avez votre résidence habituelle — par exemple les règles relatives aux clauses abusives, aux droits de rétractation et de résiliation ou aux garanties — lorsque ces règles s’appliquent indépendamment de ce choix, notamment en vertu de l’article 6, paragraphe 2, du règlement (CE) no 593/2008 si vous résidez dans l’Union européenne. Vous pouvez invoquer ces règles en plus du droit roumain." },
+      { kind: "p", text: "Juridictions compétentes si vous résidez dans l’Union européenne ou l’EEE. Vous pouvez engager une procédure contre nous soit devant les juridictions roumaines, soit devant celles du pays dans lequel vous résidez. Nous ne pouvons engager une procédure contre vous que devant les juridictions du pays dans lequel vous résidez." },
+      { kind: "p", text: "Consommateurs résidant ailleurs. Si vous résidez en dehors de l’Union européenne et de l’EEE, rien dans les présentes Conditions ne limite les droits que le droit de votre pays vous confère pour saisir ses juridictions, ni tout droit prévu par ce droit auquel il ne peut être renoncé — notamment, si vous résidez en Australie ou en Nouvelle-Zélande, vos droits au titre des garanties offertes aux consommateurs ; si vous résidez au Brésil, le Código de Defesa do Consumidor ; et si vous résidez aux États-Unis, les lois de votre État relatives à la protection des consommateurs." },
+      { kind: "p", text: "Résidents des États-Unis. L’annexe A.2 contient une convention d’arbitrage et une renonciation aux actions collectives régies par le Federal Arbitration Act. Elles ne s’appliquent qu’aux résidents des États-Unis et uniquement lorsqu’elles sont opposables. Elles ne s’appliquent pas aux consommateurs de l’Union européenne ou de l’EEE." },
       { kind: "p", text: "Avant de saisir une juridiction. Contactez-nous à l’adresse [legal@dezbatere.ro] ; la plupart des problèmes peuvent être résolus et nous nous efforçons de répondre dans un délai de [5] jours ouvrables. Si vous êtes un consommateur en Roumanie ou dans l’Union européenne, vous pouvez recourir au règlement extrajudiciaire des litiges auprès de [the ANPC – named SAL entity, website] ; quant à notre participation à cette procédure, le choix est le suivant : [do / do not]. Les réclamations relatives aux décisions de modération relèvent de la section 10, qui constitue une voie distincte." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Annexe A — Conditions régionales",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Chaque entrée ne s’applique que si sa région figure à la section 2 et n’indique que les différences par rapport au corps du texte. En cas de conflit entre une entrée et le corps du texte, l’entrée s’applique aux personnes de la région concernée." }
+      { kind: "p", text: "Chaque entrée s’applique aux personnes qui résident dans sa région et n’indique que les différences par rapport au corps du texte. En cas de conflit entre une entrée et le corps du texte, l’entrée s’applique aux personnes de la région concernée." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Royaume-Uni (uniquement s’il figure à la section 2)",
+    title: "États-Unis",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Notre représentant au Royaume-Uni au titre de l’article 27 du UK GDPR est [name, address, email]. Le Consumer Rights Act 2015 s’applique à vous et rien dans les présentes Conditions ne limite les droits qu’il vous confère ; lorsque les règles relatives aux abonnements du Digital Markets, Competition and Consumers Act 2024 entreront en vigueur (prévu en 2027), elles s’appliqueront aux formules payantes, notamment un délai de réflexion après les renouvellements et les essais gratuits. Comment nous protégeons les utilisateurs contre les contenus illicites : [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Technologie proactive que nous utilisons : [describe, or \"none\"]. Vérification de l’âge : [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. La procédure de réclamation de la section 10 accueille les réclamations relatives aux contenus illicites, à la suppression injustifiée de votre contenu, aux restrictions imposées à votre compte, à l’utilisation d’outils automatisés affectant votre contenu et à toute évaluation de l’âge qui vous bloque à tort. Elle est ouverte aux personnes affectées par un contenu qui ne sont pas utilisatrices. L’annexe B.2 de notre Politique de confidentialité couvre vos données." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "États-Unis (uniquement s’ils figurent à la section 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. Nous ne proposons pas DebateAI aux personnes qui résident au Tennessee." },
       { kind: "p", text: "Convention d’arbitrage et renonciation aux actions collectives. Si vous résidez aux États-Unis, vous et DebateAIRO convenez de régler tout litige découlant des présentes Conditions ou du service par un arbitrage individuel contraignant administré par [the American Arbitration Association / JAMS] conformément à son règlement relatif aux consommateurs, plutôt que devant une juridiction, étant entendu que chacun de nous peut introduire une demande individuelle devant une juridiction de proximité. Vous pouvez refuser cette convention en envoyant un e-mail à [address] dans les 30 jours suivant votre première acceptation des présentes Conditions. Cette convention est régie par le Federal Arbitration Act. Nous acquittons les frais de dépôt de l’arbitrage. Les actions collectives, conjointes et représentatives font l’objet d’une renonciation dans la mesure permise par la loi. La présente section ne s’applique que pour l’avenir et ne s’applique pas aux réclamations nées avant votre acceptation." },
       { kind: "p", text: "Notifications et retraits. Les images intimes non consenties peuvent être signalées à l’adresse [URL] sans compte et sont retirées dans les 48 heures suivant une demande valide. Les plaintes relatives au droit d’auteur sont adressées à notre agent désigné, mentionné à la section 16." },
-      { kind: "p", text: "Dispositions propres aux États. Californie : les conditions de renouvellement automatique de la section 12 s’appliquent ; vous pouvez résilier en ligne à tout moment ; nous conservons votre consentement aux conditions de renouvellement pendant au moins trois ans. New York : vous pouvez résilier dans les 14 jours suivant toute facturation à un prix augmenté et obtenir un remboursement au prorata. Texas et Nebraska : nous ne vendons pas de données à caractère personnel sensibles. Washington : notre Consumer Health Data Privacy Notice disponible à l’adresse [URL] s’applique aux informations liées à la santé. Colorado : le service ne prend aucune décision produisant des effets significatifs à votre égard. L’annexe B.3 de notre Politique de confidentialité couvre vos données et les droits en matière de vie privée que vous confère la loi de votre État." }
+      { kind: "p", text: "Dispositions propres aux États. Californie : les conditions de renouvellement automatique de la section 12 s’appliquent ; vous pouvez résilier en ligne à tout moment ; nous conservons votre consentement aux conditions de renouvellement pendant au moins trois ans. New York : vous pouvez résilier dans les 14 jours suivant toute facturation à un prix augmenté et obtenir un remboursement au prorata. Texas et Nebraska : nous ne vendons pas de données à caractère personnel sensibles. Washington : notre Consumer Health Data Privacy Notice disponible à l’adresse [URL] s’applique aux informations liées à la santé. Colorado : le service ne prend aucune décision produisant des effets significatifs à votre égard. L’annexe B.2 de notre Politique de confidentialité couvre vos données et les droits en matière de vie privée que vous confère la loi de votre État." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Canada et Québec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Notre responsable de la protection de la vie privée, qui est aussi, au Québec, la personne responsable de la protection des renseignements personnels, est [name], privacy@dezbatere.ro. L’annexe B.3 de notre Politique de confidentialité couvre vos données. Québec : les présentes Conditions sont disponibles en français ; choisissez le français dans le sélecteur de langue ; les paramètres qui gardent vos débats privés sont activés par défaut ; vous pouvez demander la désindexation des renseignements personnels vous concernant ; aucune convention d’arbitrage ni renonciation aux actions collectives ne vous est applicable." }
     ]
   },
   {
     no: "A.4",
-    title: "Canada et Québec (uniquement s’ils figurent dans la liste)",
+    title: "Australie et Nouvelle-Zélande",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Notre responsable de la protection de la vie privée, qui est aussi, au Québec, la personne responsable de la protection des renseignements personnels, est [name], privacy@dezbatere.ro. L’annexe B.4 de notre Politique de confidentialité couvre vos données. Québec : les présentes Conditions sont disponibles en français ; choisissez le français dans le sélecteur de langue ; les paramètres qui gardent vos débats privés sont activés par défaut ; vous pouvez demander la désindexation des renseignements personnels vous concernant ; aucune convention d’arbitrage ni renonciation aux actions collectives ne vous est applicable." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Australie et Nouvelle-Zélande (uniquement si elles figurent dans la liste)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Nos services sont assortis de garanties qui ne peuvent être exclues en vertu de l’Australian Consumer Law. En cas de défaillance majeure du service, vous avez droit à sa résiliation et au remboursement de la partie inutilisée, ou à une indemnisation pour sa perte de valeur ; vous avez également droit à une indemnisation pour toute autre perte ou tout autre dommage raisonnablement prévisible. Si la défaillance n’est pas majeure, vous avez droit à ce qu’il soit remédié aux problèmes du service dans un délai raisonnable et, à défaut, à résilier et obtenir un remboursement. Dans la mesure permise par la section 64A, notre responsabilité en cas de violation d’une garantie est limitée à une nouvelle fourniture du service ou au paiement du coût de cette nouvelle fourniture. Aucun droit de rétractation ne s’applique à la formule payante au-delà de ce que vous accorde la section 12 ; notre politique de remboursement est […]. Nouvelle-Zélande : le Consumer Guarantees Act 1993 s’applique et rien dans les présentes Conditions ne l’exclut ; les communications numériques préjudiciables peuvent nous être signalées conformément à la section 10 ou être signalées à Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "Suisse",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "La loi fédérale suisse sur la protection des données s’applique à vos données (Politique de confidentialité, annexe B.5). Vous pouvez agir devant les tribunaux du lieu de votre domicile en Suisse. Aucun droit légal de rétractation ne s’applique à la formule payante ; notre politique de remboursement est […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Suisse (uniquement si elle figure dans la liste)",
+    title: "Moldavie",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "La loi fédérale suisse sur la protection des données s’applique à vos données (Politique de confidentialité, annexe B.6). Vous pouvez agir devant les tribunaux du lieu de votre domicile en Suisse. Aucun droit légal de rétractation ne s’applique à la formule payante ; notre politique de remboursement est […]." }
+      { kind: "p", text: "Vous bénéficiez, au titre des présentes Conditions, des mêmes droits qu’un consommateur de l’Union européenne, y compris du droit de rétractation de 14 jours prévu à la section 13. Vous pouvez agir devant les tribunaux de Moldavie. La loi moldave n° 195/2024 sur la protection des données à caractère personnel s’applique à vos données (Politique de confidentialité, annexe B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldavie (uniquement si elle figure dans la liste)",
+    title: "Asie-Pacifique",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Vous bénéficiez, au titre des présentes Conditions, des mêmes droits qu’un consommateur de l’Union européenne, y compris du droit de rétractation de 14 jours prévu à la section 13. Vous pouvez agir devant les tribunaux de Moldavie. La loi moldave n° 195/2024 sur la protection des données à caractère personnel s’applique à vos données (Politique de confidentialité, annexe B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukraine (uniquement si elle figure dans la liste)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Nous proposons DebateAI en Ukraine, à l’exception des zones qui ne sont pas contrôlées par le gouvernement ukrainien. Le produit et les présentes Conditions sont disponibles en ukrainien. La loi ukrainienne « sur la protection des données à caractère personnel » s’applique à vos données (Politique de confidentialité, annexe B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israël (uniquement s’il figure dans la liste)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Vous pouvez résilier une formule payante dans les conditions prévues par la loi sur la protection du consommateur 5741-1981 [state the cancellation terms]. Les présentes Conditions et notre Politique de confidentialité sont disponibles en hébreu. La loi israélienne sur la protection de la vie privée s’applique à vos données (Politique de confidentialité, annexe B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Asie-Pacifique (uniquement les lignes relatives aux régions figurant dans la liste)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapour : notre délégué à la protection des données est [name, email] ; les transferts reposent sur des protections contractuelles comparables à celles de la PDPA ; aucun délai légal de réflexion ne s’applique à la formule payante et notre politique de remboursement est […]. Japon : l’information légale au titre du Specified Commercial Transactions Act est disponible à l’adresse [URL] ; aucun droit général de rétractation ne s’applique aux abonnements en ligne et notre politique de remboursement est […] ; nous envoyons votre contenu à des fournisseurs d’IA situés aux États-Unis et dans l’Union européenne, chacun en vertu d’un contrat exigeant une protection équivalente à celle de l’Act on the Protection of Personal Information japonais, et, sur demande, nous vous indiquons quelles sont ces mesures. Corée du Sud : les consentements aux traitements facultatifs et à la prospection sont recueillis séparément des éléments nécessaires à l’exploitation du service ; notre responsable de la protection de la vie privée est [name], privacy@dezbatere.ro ; vous pouvez vous rétracter d’une formule payante dans un délai de 7 jours suivant la souscription, sous réserve de l’E-Commerce Act ; nous obtenons à nouveau votre consentement avant toute hausse récurrente de prix ou conversion d’une formule gratuite en formule payante ; le service utilise l’IA générative, nous vous en informons avant que vous ne l’utilisiez et apposons une mention sur les résultats générés par l’IA. Taïwan : vous pouvez vous rétracter d’une formule payante dans un délai de 7 jours suivant la souscription, en vertu du Consumer Protection Act ; le Personal Data Protection Act de Taïwan s’applique à vos données (Politique de confidentialité, annexe B.10). Thaïlande : notre représentant en Thaïlande est [name] [if appointed]. Philippines : notre identification commerciale et notre mécanisme de recours au titre de l’Internet Transactions Act sont disponibles à l’adresse [URL] ; les réclamations peuvent être déposées auprès de la National Privacy Commission." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Réservé",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "La Turquie, le Brésil et l’Indonésie exigent chacun une annexe en langue locale, un représentant ou un enregistrement, ainsi que des formalités déclaratives. Ces pays ne sont pas traités ici et demeurent hors du champ de la section 2 tant qu’ils n’y sont pas expressément inclus. La Chine, le Viêt Nam et la Russie ne sont pas desservis." }
+      { kind: "p", text: "Singapour : notre délégué à la protection des données est [name, email] ; les transferts reposent sur des protections contractuelles comparables à celles de la PDPA ; aucun délai légal de réflexion ne s’applique à la formule payante et notre politique de remboursement est […]. Japon : l’information légale au titre du Specified Commercial Transactions Act est disponible à l’adresse [URL] ; aucun droit général de rétractation ne s’applique aux abonnements en ligne et notre politique de remboursement est […] ; nous envoyons votre contenu à des fournisseurs d’IA situés aux États-Unis et dans l’Union européenne, chacun en vertu d’un contrat exigeant une protection équivalente à celle de l’Act on the Protection of Personal Information japonais, et, sur demande, nous vous indiquons quelles sont ces mesures. Corée du Sud : les consentements aux traitements facultatifs et à la prospection sont recueillis séparément des éléments nécessaires à l’exploitation du service ; notre responsable de la protection de la vie privée est [name], privacy@dezbatere.ro ; vous pouvez vous rétracter d’une formule payante dans un délai de 7 jours suivant la souscription, sous réserve de l’E-Commerce Act ; nous obtenons à nouveau votre consentement avant toute hausse récurrente de prix ou conversion d’une formule gratuite en formule payante ; le service utilise l’IA générative, nous vous en informons avant que vous ne l’utilisiez et apposons une mention sur les résultats générés par l’IA. Taïwan : vous pouvez vous rétracter d’une formule payante dans un délai de 7 jours suivant la souscription, en vertu du Consumer Protection Act ; le Personal Data Protection Act de Taïwan s’applique à vos données (Politique de confidentialité, annexe B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "86f8b92104090fe478f7375c3a9d95f571fbac2d562c82d32cba5e0e5d002a41",
-  eyebrow: "CONDITIONS D’UTILISATION · v2.1 · PRISE D’EFFET [DATE]",
+  version: "2.2",
+  sha256: "c3610890e6acf01598a1aabb49f4004ddd8f6746881e404889709d8fcdcf35c7",
+  eyebrow: "CONDITIONS D’UTILISATION · v2.2 · PRISE D’EFFET [DATE]",
   title: "Ce que vous acceptez",
   lede: "Le contrat entre vous et DebateAIRO S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.",
-  endMarker: "FIN DES CONDITIONS · v2.1",
+  endMarker: "FIN DES CONDITIONS · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Texte des Conditions d’utilisation",
   sectionIdPrefix: "terms-section-",

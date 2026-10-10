@@ -12,6 +12,7 @@
 //   release-artifacts.mjs verify --source <source manifest> [--ui-build <ui build manifest>]
 //   release-artifacts.mjs operator-digest --source <source manifest>
 //   release-artifacts.mjs launch-plan --service api|ui|runner --from <existing plan> --root <release root>
+//       (--service runner may name the API plan as --from: the runner's identity then comes from its OS account)
 //       --source-manifest <file> [--ui-build <file>] --native-attestation <file> [--publication <publish output>] --out <file>
 //   release-artifacts.mjs native-plan --operation apply-and-plan|plan|publish|verify --from <existing native plan>
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
@@ -32,6 +33,7 @@ import { validateNativeAttestation } from '../../preview-auth-dev/v1/native-atte
 import { validatePublication } from '../../preview-auth-dev/v1/runtime-receipt.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from '../../preview-auth-dev/v1/turnstile-custody.mjs';
 import { PREVIEW_FREE_MODEL_IDS_JSON } from '../../preview-auth-dev/v1/environment.mjs';
+import { runBounded } from '../../preview-lifecycle/v1/common.mjs';
 
 /** The fixed server folders the reviewed launchers already require (launch-plan.mjs:6,17,37). */
 export const LAYOUT = Object.freeze({
@@ -248,6 +250,37 @@ async function operatorDigestCommand(options, { layout }) {
   return { operatorManifestSha256: operatorManifestSha256(source.value), operatorFileCount: operatorFiles(source.value).length, role: source.value.role, sourceRevision: source.value.sourceRevision, source: { path: source.path, sha256: source.sha256 } };
 }
 
+/** The runner's OS account; its passwd entry is the only source of the runner plan's UID/GID. */
+export const RUNNER_OS_ACCOUNT = 'debateai-preview-runner';
+const ENV_ROOT = '/etc/debateai-v3-preview/auth-dev-v1';
+const NO_LOGIN_SHELLS = ['/usr/sbin/nologin', '/sbin/nologin', '/bin/false', '/usr/bin/false'];
+const accountId = value => (/^[0-9]{1,10}$/.test(value ?? '') ? Number(value) : NaN);
+/**
+ * `getent passwd` and `getent group` lines for the runner account (getpwnam/getgrnam through NSS):
+ * exactly that name, a real uid and primary gid that are neither root's (0) nor nobody's (65534),
+ * a group of the same name with that same gid, and a shell nobody can log in with.
+ */
+export function parseRunnerAccount(passwdText, groupText) {
+  const one = text => { const lines = String(text).split('\n').filter(Boolean); return lines.length === 1 ? lines[0].split(':') : []; };
+  const [name, , uidText, gidText, , , shell, ...restPasswd] = one(passwdText);
+  const [groupName, , groupGidText, , ...restGroup] = one(groupText);
+  const uid = accountId(uidText), gid = accountId(gidText);
+  if (name !== RUNNER_OS_ACCOUNT || restPasswd.length || shell === undefined || groupName !== RUNNER_OS_ACCOUNT || restGroup.length
+    || !(uid >= 1 && uid < 4294967295) || !(gid >= 1 && gid < 4294967295) || uid === 65534 || gid === 65534
+    || accountId(groupGidText) !== gid || !NO_LOGIN_SHELLS.includes(shell)) refuse('RUNNER_ACCOUNT_REFUSED');
+  return { uid, gid };
+}
+export async function lookupRunnerAccount({ run = runBounded, getent = '/usr/bin/getent' } = {}) {
+  const ask = async database => {
+    const result = await run([getent, database, RUNNER_OS_ACCOUNT], { env: {}, timeoutMs: 5000, maxOutputBytes: 4096 });
+    if (result.timedOut || result.overflow || result.error || result.stderr?.length) refuse('RUNNER_ACCOUNT_REFUSED');
+    if (result.code === 2) refuse('RUNNER_ACCOUNT_MISSING');
+    if (result.code !== 0) refuse('RUNNER_ACCOUNT_REFUSED');
+    return result.stdout.toString('utf8');
+  };
+  return parseRunnerAccount(await ask('passwd'), await ask('group'));
+}
+
 async function launchPlanCommand(options, { layout, deps }) {
   const service = options['--service'], root = options['--root'];
   const validatePlan = deps.validateLaunchPlan ?? validateLaunchPlan;
@@ -256,7 +289,9 @@ async function launchPlanCommand(options, { layout, deps }) {
   await assertOutputFree(options['--out'], { layout, name: `${service}-launch.json` });
   const from = await readJson(options['--from'], { layout, flag: '--from', maxBytes: MAX_PLAN_BYTES, artifact: false });
   try { validatePlan(from.value); } catch { refuse('FROM_PLAN_INVALID'); }
-  if (from.value.service !== service) refuse('FROM_PLAN_INVALID');
+  // The first runner plan has no runner plan to copy: it is derived from the API plan (below).
+  const derivedRunner = service === 'runner' && from.value.service === 'api';
+  if (from.value.service !== service && !derivedRunner) refuse('FROM_PLAN_INVALID');
   const source = await readSource(options['--source-manifest'], { layout, flag: '--source-manifest' });
   if (source.value.role !== service || source.value.sourceRoot !== root) refuse('SOURCE_MANIFEST_MISMATCH');
   let uiBuild = null, build = null;
@@ -275,11 +310,16 @@ async function launchPlanCommand(options, { layout, deps }) {
   try {
     validateNativeAttestation(native.value, { sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree, nativeSourceSha256: source.value.nativeSha256, publication }, Date.parse(native.value?.verifiedAt));
   } catch { refuse('NATIVE_ATTESTATION_MISMATCH'); }
+  let { serviceUid, serviceGid, environment } = from.value;
+  if (derivedRunner) {
+    ({ uid: serviceUid, gid: serviceGid } = await (deps.lookupRunnerAccount ?? lookupRunnerAccount)());
+    environment = { path: `${ENV_ROOT}/runner.env`, root: ENV_ROOT, uid: 0, gid: serviceGid, mode: 0o640, parentUid: 0 };
+  }
   const plan = {
     schema: from.value.schema, service, artifact: kind, sourceRoot: root, sourceRevision: source.value.sourceRevision, sourceTree: source.value.sourceTree,
-    serviceUid: from.value.serviceUid, serviceGid: from.value.serviceGid,
+    serviceUid, serviceGid,
     sourceManifest: { path: source.path, sha256: source.sha256 }, nativeAttestation: { path: native.path, sha256: native.sha256 }, uiBuild,
-    publication, operatorManifestSha256: operatorManifestSha256(source.value), environment: from.value.environment,
+    publication, operatorManifestSha256: operatorManifestSha256(source.value), environment,
     apiPort: from.value.apiPort, uiPort: from.value.uiPort, mailExecutable: join(root, 'dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs'), mailFrom: from.value.mailFrom
   };
   try { validatePlan(plan); } catch { refuse('LAUNCH_PLAN_INVALID'); }

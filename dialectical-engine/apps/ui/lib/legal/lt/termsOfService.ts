@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur siūlome DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "DebateAI siūlome žmonėms, gyvenantiems [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
+      { kind: "p", text: "DebateAI siūlome žmonėms, gyvenantiems Europos Sąjungoje (27 valstybės) ir Europos ekonominėje erdvėje (Norvegijoje, Islandijoje ir Lichtenšteine), Šveicarijoje, Moldovoje, Jungtinėse Amerikos Valstijose (išskyrus Tenesį), Kanadoje, Australijoje, Naujojoje Zelandijoje, Singapūre, Japonijoje, Pietų Korėjoje ir Taivane. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Sutikimas su šiomis Sąlygomis",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Su šiomis Sąlygomis sutinkate pažymėdami langelį „Perskaičiau ir sutinku su Paslaugų teikimo sąlygomis“ ir spustelėdami Sukurti paskyrą. Taip tarp jūsų ir DebateAIRO S.R.L. sudaroma sutartis. Sąlygos apima 7 skyriuje nustatytas priimtino naudojimo taisykles, 9 skyriuje nustatytas paskelbimo taisykles, 15 skyriaus nuostatas dėl atsakomybės, 18 skyriaus nuostatas dėl taikytinos teisės ir ginčų, o jei gyvenate Jungtinėse Amerikos Valstijose — A priedo A.3 skirsnyje pateiktą arbitražinį susitarimą. Kaip paaiškinta mūsų Privatumo politikoje, registruojame, su kuria versija ir kada sutikote." },
+      { kind: "p", text: "Su šiomis Sąlygomis sutinkate pažymėdami langelį „Perskaičiau ir sutinku su Paslaugų teikimo sąlygomis“ ir spustelėdami Sukurti paskyrą. Taip tarp jūsų ir DebateAIRO S.R.L. sudaroma sutartis. Sąlygos apima 7 skyriuje nustatytas priimtino naudojimo taisykles, 9 skyriuje nustatytas paskelbimo taisykles, 15 skyriaus nuostatas dėl atsakomybės, 18 skyriaus nuostatas dėl taikytinos teisės ir ginčų, o jei gyvenate Jungtinėse Amerikos Valstijose — A priedo A.2 skirsnyje pateiktą arbitražinį susitarimą. Kaip paaiškinta mūsų Privatumo politikoje, registruojame, su kuria versija ir kada sutikote." },
       { kind: "p", text: "Mūsų Privatumo politikoje adresu [dezbatere.ro/privacy] paaiškinta, kaip tvarkome asmens duomenis. Tai informacija, kurią privalome jums pateikti, o ne sutartis, su kuria sutinkate, ir jokia šių Sąlygų nuostata nepaverčia jos sutikimu tvarkyti duomenis. Mūsų Slapukų politika adresu [dezbatere.ro/cookies] ir DI paslaugų teikėjų registras adresu [dezbatere.ro/providers] nuorodos būdu yra šių Sąlygų dalis." },
       { kind: "p", text: "Prieš jums elektroniniu būdu sudarant sutartį su mumis, sąsajoje parodomi atliekami veiksmai, prieš pateikiant informaciją leidžiama ją peržiūrėti ir ištaisyti bei nurodomos kalbos, kuriomis galima sudaryti sutartį. Šios Sąlygos pateikiamos forma, kurią galite išsaugoti ir atsispausdinti, kai įsigyjate mokamą planą, el. paštu atsiunčiame versiją, su kuria sutikote, o jos kopijos galite paprašyti bet kada. Jokia šių Sąlygų nuostata neapriboja pagal Rumunijos ar ES vartotojų teisę arba jūsų gyvenamosios šalies teisę turimų teisių, kurių negalima apriboti sutartimi." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Jūsų teisė atsisakyti sutarties",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Jei gyvenate ES, EEE arba Jungtinėje Karalystėje, galite per 14 dienų nuo mokamos prenumeratos užsakymo nenurodydami priežasties atsisakyti sutarties. Naudokite puslapį Atsisakyti sutarties adresu [dezbatere.ro/withdraw], patvirtinimo el. laiške pateiktą pavyzdinę formą arba rašykite adresu [support@dezbatere.ro]; patvariojoje laikmenoje patvirtinsime, kad prašymą gavome." },
+      { kind: "p", text: "Jei gyvenate ES arba EEE, galite per 14 dienų nuo mokamos prenumeratos užsakymo nenurodydami priežasties atsisakyti sutarties. Naudokite puslapį Atsisakyti sutarties adresu [dezbatere.ro/withdraw], patvirtinimo el. laiške pateiktą pavyzdinę formą arba rašykite adresu [support@dezbatere.ro]; patvariojoje laikmenoje patvirtinsime, kad prašymą gavome." },
       { kind: "p", text: "Jei pažymėdami langelį atsiskaitymo metu paprašėte mūsų pradėti teikti paslaugą iš karto, o vėliau sutarties atsisakote, turite sumokėti už iki sutarties atsisakymo dienos suteiktą paslaugos dalį, apskaičiuotą proporcingai pagal atsiskaitymo laikotarpio kainą, o likusią sumą grąžinsime. Naudodamiesi paslauga per 14 dienų laikotarpį neprarandate teisės atsisakyti sutarties." },
       { kind: "p", text: "Jei gyvenate kitur, A priede nurodyta jūsų regione taikoma teisė atsisakyti sutarties ar apsigalvojimo laikotarpis, jei toks yra, o kitais atvejais — mūsų pinigų grąžinimo politika. Jūsų šalyje įstatymų nustatytoms teisėms visada teikiama pirmenybė." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Taikytina teisė. Šioms Sąlygoms ir visiems iš jų ar jų dalyko kylantiems ginčams ar reikalavimams, įskaitant nesutartinius reikalavimus, taikomi Rumunijos įstatymai." },
-      { kind: "p", text: "Tai neturi įtakos jūsų vietos apsaugai. Jei esate vartotojas, Rumunijos teisės pasirinkimas neatima apsaugos pagal jokias privalomas vartotojų apsaugos taisykles šalyje, kurioje yra jūsų įprastinė gyvenamoji vieta — pavyzdžiui, taisykles dėl nesąžiningų sąlygų, sutarties atsisakymo ir atšaukimo teisių ar garantijų — kai šios taisyklės taikomos nepaisant šio pasirinkimo, įskaitant Reglamento (EB) Nr. 593/2008 6 straipsnio 2 dalį, jei gyvenate ES, arba lygiavertes Jungtinės Karalystės taisykles. Šiomis taisyklėmis galite remtis kartu su Rumunijos teise." },
-      { kind: "p", text: "Teismai, jei gyvenate ES, EEE arba Jungtinėje Karalystėje. Bylą prieš mus galite iškelti Rumunijos arba šalies, kurioje gyvenate, teismuose. Bylą prieš jus galime iškelti tik šalies, kurioje gyvenate, teismuose." },
-      { kind: "p", text: "Kitur gyvenantys vartotojai. Jei gyvenate ne ES, EEE ar Jungtinėje Karalystėje, jokia šių Sąlygų nuostata neriboja pagal jūsų šalies teisę turimos teisės pareikšti ieškinį jos teismuose ar teisės, kurios pagal tos šalies teisę negalima atsisakyti — įskaitant Australijoje ar Naujojoje Zelandijoje gyvenančių asmenų teises pagal vartotojų garantijas, Brazilijoje gyvenančių asmenų teises pagal Código de Defesa do Consumidor ir Jungtinėse Amerikos Valstijose gyvenančių asmenų teises pagal jų valstijos vartotojų apsaugos įstatymus." },
-      { kind: "p", text: "Jungtinių Amerikos Valstijų gyventojai. A priedo A.3 skirsnyje pateiktas arbitražinis susitarimas ir grupės ieškinio atsisakymas, kuriems taikomas Federalinis arbitražo įstatymas. Jie taikomi tik Jungtinių Amerikos Valstijų gyventojams ir tik tiek, kiek gali būti vykdomi. Jie netaikomi vartotojams ES, EEE ar Jungtinėje Karalystėje." },
+      { kind: "p", text: "Tai neturi įtakos jūsų vietos apsaugai. Jei esate vartotojas, Rumunijos teisės pasirinkimas neatima apsaugos pagal jokias privalomas vartotojų apsaugos taisykles šalyje, kurioje yra jūsų įprastinė gyvenamoji vieta — pavyzdžiui, taisykles dėl nesąžiningų sąlygų, sutarties atsisakymo ir atšaukimo teisių ar garantijų — kai šios taisyklės taikomos nepaisant šio pasirinkimo, įskaitant Reglamento (EB) Nr. 593/2008 6 straipsnio 2 dalį, jei gyvenate ES. Šiomis taisyklėmis galite remtis kartu su Rumunijos teise." },
+      { kind: "p", text: "Teismai, jei gyvenate ES arba EEE. Bylą prieš mus galite iškelti Rumunijos arba šalies, kurioje gyvenate, teismuose. Bylą prieš jus galime iškelti tik šalies, kurioje gyvenate, teismuose." },
+      { kind: "p", text: "Kitur gyvenantys vartotojai. Jei gyvenate ne ES ar EEE, jokia šių Sąlygų nuostata neriboja pagal jūsų šalies teisę turimos teisės pareikšti ieškinį jos teismuose ar teisės, kurios pagal tos šalies teisę negalima atsisakyti — įskaitant Australijoje ar Naujojoje Zelandijoje gyvenančių asmenų teises pagal vartotojų garantijas, Brazilijoje gyvenančių asmenų teises pagal Código de Defesa do Consumidor ir Jungtinėse Amerikos Valstijose gyvenančių asmenų teises pagal jų valstijos vartotojų apsaugos įstatymus." },
+      { kind: "p", text: "Jungtinių Amerikos Valstijų gyventojai. A priedo A.2 skirsnyje pateiktas arbitražinis susitarimas ir grupės ieškinio atsisakymas, kuriems taikomas Federalinis arbitražo įstatymas. Jie taikomi tik Jungtinių Amerikos Valstijų gyventojams ir tik tiek, kiek gali būti vykdomi. Jie netaikomi vartotojams ES ar EEE." },
       { kind: "p", text: "Prieš kreipiantis į teismą. Susisiekite su mumis adresu [legal@dezbatere.ro]; daugumą dalykų galima išspręsti ir siekiame atsakyti per [5] darbo dienas. Jei esate vartotojas Rumunijoje arba ES, galite naudotis alternatyviu ginčų sprendimu per [the ANPC – named SAL entity, website]; mes [do / do not] įsipareigojame dalyvauti šioje procedūroje. Skundams dėl moderavimo sprendimų taikoma 10 skyriuje nustatyta atskira tvarka." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "A priedas — Regioninės sąlygos",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Kiekvienas įrašas taikomas tik tuo atveju, jei jo regionas nurodytas 2 skyriuje, ir jame nurodoma tik tai, kas skiriasi nuo pagrindinės dalies. Jei įrašas prieštarauja pagrindinei daliai, to regiono gyventojams taikomas įrašas." }
+      { kind: "p", text: "Kiekvienas įrašas taikomas žmonėms, gyvenantiems jo regione, ir jame nurodoma tik tai, kas skiriasi nuo pagrindinės dalies. Jei įrašas prieštarauja pagrindinei daliai, to regiono gyventojams taikomas įrašas." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Jungtinė Karalystė (tik jei nurodyta 2 skyriuje)",
+    title: "Jungtinės Amerikos Valstijos",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Mūsų atstovas Jungtinėje Karalystėje pagal JK GDPR 27 straipsnį yra [name, address, email]. Jums taikomas 2015 m. Vartotojų teisių įstatymas, ir jokia šių Sąlygų nuostata neriboja pagal jį turimų teisių; kai įsigalios 2024 m. Skaitmeninių rinkų, konkurencijos ir vartotojų įstatymo prenumeratos taisyklės (tikimasi, kad 2027 m.), jos bus taikomos mokamiems planams, įskaitant apsigalvojimo laikotarpį po atnaujinimo ir nemokamo bandomojo laikotarpio. Kaip saugome naudotojus nuo neteisėto turinio: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Mūsų naudojama aktyvi technologija: [describe, or \"none\"]. Amžiaus patikra: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Pagal 10 skyriuje nustatytą skundų teikimo tvarką priimami skundai dėl neteisėto turinio, neteisingo jūsų turinio pašalinimo, paskyros apribojimų, jūsų turiniui poveikį darančių automatizuotų priemonių naudojimo ir neteisingai jus užblokuojančio amžiaus nustatymo. Ja gali naudotis ir ne naudotojai, kuriems turinys padarė poveikį. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.2 skirsnis." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Jungtinės Amerikos Valstijos (tik jei nurodytos 2 skyriuje)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tenesis. DebateAI nesiūlome žmonėms, gyvenantiems Tenesyje." },
       { kind: "p", text: "Arbitražinis susitarimas ir grupės ieškinio atsisakymas. Jei gyvenate Jungtinėse Amerikos Valstijose, jūs ir DebateAIRO sutinkate visus iš šių Sąlygų ar paslaugos kylančius ginčus spręsti ne teisme, o privalomu individualiu arbitražu, kurį pagal vartotojų taisykles administruoja [the American Arbitration Association / JAMS], išskyrus tai, kad kiekviena šalis gali pareikšti individualų ieškinį nedidelių sumų teisme. Galite atsisakyti arbitražo per 30 dienų nuo pirmojo sutikimo su šiomis Sąlygomis išsiųsdami el. laišką adresu [address]. Šiam susitarimui taikomas Federalinis arbitražo įstatymas. Mes sumokame arbitražo inicijavimo mokesčius. Grupinių, kolektyvinių ir atstovaujamųjų ieškinių atsisakoma tiek, kiek leidžia teisės aktai. Šis skyrius taikomas tik ateityje ir netaikomas reikalavimams, atsiradusiems prieš jums su juo sutinkant." },
       { kind: "p", text: "Pranešimai ir turinio pašalinimas. Apie be sutikimo bendrinamus intymius atvaizdus galima pranešti adresu [URL] neturint paskyros; gavus pagrįstą prašymą jie pašalinami per 48 valandas. Skundai dėl autorių teisių siunčiami 16 skyriuje nurodytam mūsų paskirtam atstovui." },
-      { kind: "p", text: "Konkrečios valstijos. Kalifornija: taikomos 12 skyriuje nustatytos automatinio atnaujinimo sąlygos; bet kada galite atšaukti internetu; jūsų sutikimą su atnaujinimo sąlygomis saugome bent trejus metus. Niujorkas: galite per 14 dienų nuo bet kokio nurašymo padidinta kaina atšaukti ir gauti proporcingą pinigų grąžinimą. Teksasas ir Nebraska: neparduodame neskelbtinų asmens duomenų. Vašingtonas: mūsų Vartotojų sveikatos duomenų privatumo pranešimas adresu [URL] taikomas su sveikata susijusiai informacijai. Koloradas: paslauga nepriima jums reikšmingų sprendimų. Jūsų duomenims ir jūsų valstijos privatumo teisėms taikomas mūsų Privatumo politikos B priedo B.3 skirsnis." }
+      { kind: "p", text: "Konkrečios valstijos. Kalifornija: taikomos 12 skyriuje nustatytos automatinio atnaujinimo sąlygos; bet kada galite atšaukti internetu; jūsų sutikimą su atnaujinimo sąlygomis saugome bent trejus metus. Niujorkas: galite per 14 dienų nuo bet kokio nurašymo padidinta kaina atšaukti ir gauti proporcingą pinigų grąžinimą. Teksasas ir Nebraska: neparduodame neskelbtinų asmens duomenų. Vašingtonas: mūsų Vartotojų sveikatos duomenų privatumo pranešimas adresu [URL] taikomas su sveikata susijusiai informacijai. Koloradas: paslauga nepriima jums reikšmingų sprendimų. Jūsų duomenims ir jūsų valstijos privatumo teisėms taikomas mūsų Privatumo politikos B priedo B.2 skirsnis." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Kanada ir Kvebekas",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra [name], privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. Kvebekas: šios Sąlygos pateikiamos prancūzų kalba; prancūzų kalbą pasirinkite kalbos perjungikliu; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų; jums netaikomas joks arbitražinis susitarimas ar grupės ieškinio atsisakymas." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanada ir Kvebekas (tik jei nurodyti)",
+    title: "Australija ir Naujoji Zelandija",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra [name], privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.4 skirsnis. Kvebekas: šios Sąlygos pateikiamos prancūzų kalba; prancūzų kalbą pasirinkite kalbos perjungikliu; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų; jums netaikomas joks arbitražinis susitarimas ar grupės ieškinio atsisakymas." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Australija ir Naujoji Zelandija (tik jei nurodytos)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Mūsų paslaugoms taikomos garantijos, kurių negalima atmesti pagal Australijos vartotojų teisę. Esant dideliems paslaugos trūkumams turite teisę ją atšaukti ir susigrąžinti pinigus už nepanaudotą dalį arba gauti kompensaciją už sumažėjusią vertę; taip pat turite teisę gauti kompensaciją už bet kokius kitus pagrįstai numatomus nuostolius ar žalą. Jei trūkumas nėra didelis, turite teisę reikalauti per pagrįstą laiką pašalinti paslaugos problemas, o to nepadarius — atšaukti paslaugą ir susigrąžinti pinigus. Tiek, kiek leidžiama pagal 64A skyrių, mūsų atsakomybė už garantijos pažeidimą ribojama pakartotiniu paslaugos suteikimu arba jo išlaidų apmokėjimu. Mokamam planui netaikoma jokia papildoma apsigalvojimo teisė, išskyrus jums 12 skyriuje suteiktas teises; mūsų pinigų grąžinimo politika yra […]. Naujoji Zelandija: taikomas 1993 m. Vartotojų garantijų įstatymas, ir jokia šių Sąlygų nuostata jo neatmeta; apie žalingą skaitmeninį bendravimą galite pranešti mums pagal 10 skyrių arba „Netsafe“." }
     ]
   },
   {
+    no: "A.5",
+    title: "Šveicarija",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "Jūsų duomenims taikomas Šveicarijos federalinis duomenų apsaugos įstatymas (Privatumo politikos B priedo B.5 skirsnis). Galite iškelti bylą tos Šveicarijos vietovės, kurioje gyvenate, teismuose. Mokamam planui netaikoma įstatymų nustatyta teisė atsisakyti sutarties; mūsų pinigų grąžinimo politika yra […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Šveicarija (tik jei nurodyta)",
+    title: "Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Jūsų duomenims taikomas Šveicarijos federalinis duomenų apsaugos įstatymas (Privatumo politikos B priedo B.6 skirsnis). Galite iškelti bylą tos Šveicarijos vietovės, kurioje gyvenate, teismuose. Mokamam planui netaikoma įstatymų nustatyta teisė atsisakyti sutarties; mūsų pinigų grąžinimo politika yra […]." }
+      { kind: "p", text: "Pagal šias Sąlygas turite tokias pačias teises kaip vartotojas Europos Sąjungoje, įskaitant 13 skyriuje nustatytą 14 dienų teisę atsisakyti sutarties. Galite iškelti bylą Moldovos teismuose. Jūsų duomenims taikomas Moldovos įstatymas Nr. 195/2024 dėl asmens duomenų apsaugos (Privatumo politikos B priedo B.6 skirsnis)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldova (tik jei nurodyta)",
+    title: "Azijos ir Ramiojo vandenyno regionas",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Pagal šias Sąlygas turite tokias pačias teises kaip vartotojas Europos Sąjungoje, įskaitant 13 skyriuje nustatytą 14 dienų teisę atsisakyti sutarties. Galite iškelti bylą Moldovos teismuose. Jūsų duomenims taikomas Moldovos įstatymas Nr. 195/2024 dėl asmens duomenų apsaugos (Privatumo politikos B priedo B.7 skirsnis)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukraina (tik jei nurodyta)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "DebateAI siūlome Ukrainoje, išskyrus Ukrainos vyriausybės nekontroliuojamas teritorijas. Produktas ir šios Sąlygos pateikiami ukrainiečių kalba. Jūsų duomenims taikomas Ukrainos įstatymas „Dėl asmens duomenų apsaugos“ (Privatumo politikos B priedo B.8 skirsnis)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Izraelis (tik jei nurodyta)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Mokamą planą galite atšaukti taip, kaip leidžia Vartotojų apsaugos įstatymas, 5741-1981 [state the cancellation terms]. Šios Sąlygos ir mūsų Privatumo politika pateikiamos hebrajų kalba. Jūsų duomenims taikomas Izraelio privatumo apsaugos įstatymas (Privatumo politikos B priedo B.9 skirsnis)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Azijos ir Ramiojo vandenyno regionas (tik nurodytiems regionams skirtos eilutės)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapūras: mūsų duomenų apsaugos pareigūnas yra [name, email]; perdavimai grindžiami sutartinėmis apsaugos priemonėmis, panašiomis į PDPA; mokamam planui netaikomas įstatymų nustatytas apsigalvojimo laikotarpis, o mūsų pinigų grąžinimo politika yra […]. Japonija: įstatymų nustatytas atskleidimas pagal Specialiųjų komercinių sandorių įstatymą pateiktas adresu [URL]; internetinėms prenumeratoms netaikomas bendrasis apsigalvojimo laikotarpis, o mūsų pinigų grąžinimo politika yra […]; jūsų turinį siunčiame DI paslaugų teikėjams Jungtinėse Amerikos Valstijose ir Europos Sąjungoje, kiekvienam pagal sutartį, kuria reikalaujama apsaugos, lygiavertės Japonijos Asmeninės informacijos apsaugos įstatymo reikalavimams, o paprašius informuojame, kokios tai priemonės. Pietų Korėja: sutikimai dėl neprivalomo duomenų tvarkymo ir rinkodaros gaunami atskirai nuo paslaugai teikti būtinų dalykų; mūsų privatumo pareigūnas yra [name], privacy@dezbatere.ro; pagal Elektroninės prekybos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; prieš kiekvieną pasikartojantį kainos padidinimą ar nemokamo plano pakeitimą mokamu iš naujo gauname jūsų sutikimą; paslauga naudoja generatyvųjį DI, apie tai informuojame prieš jums pradedant ja naudotis, o DI sugeneruotą turinį pažymime. Taivanas: pagal Vartotojų apsaugos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; jūsų duomenims taikomas Taivano asmens duomenų apsaugos įstatymas (Privatumo politikos B priedo B.10 skirsnis). Tailandas: mūsų atstovas Tailande yra [name] [if appointed]. Filipinai: mūsų verslo identifikavimo duomenys ir teisių gynimo mechanizmas pagal Internetinių sandorių įstatymą pateikti adresu [URL]; skundus galima pateikti Nacionalinei privatumo komisijai." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Rezervuota",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Turkijai, Brazilijai ir Indonezijai reikia priedo vietos kalba, atstovo arba registracijos ir dokumentų pateikimo. Šie priedai čia neparengti, o šalys nepatenka į 2 skyriaus taikymo sritį, kol nebus sąmoningai įtrauktos. Kinijoje, Vietname ir Rusijoje paslauga nesiūloma." }
+      { kind: "p", text: "Singapūras: mūsų duomenų apsaugos pareigūnas yra [name, email]; perdavimai grindžiami sutartinėmis apsaugos priemonėmis, panašiomis į PDPA; mokamam planui netaikomas įstatymų nustatytas apsigalvojimo laikotarpis, o mūsų pinigų grąžinimo politika yra […]. Japonija: įstatymų nustatytas atskleidimas pagal Specialiųjų komercinių sandorių įstatymą pateiktas adresu [URL]; internetinėms prenumeratoms netaikomas bendrasis apsigalvojimo laikotarpis, o mūsų pinigų grąžinimo politika yra […]; jūsų turinį siunčiame DI paslaugų teikėjams Jungtinėse Amerikos Valstijose ir Europos Sąjungoje, kiekvienam pagal sutartį, kuria reikalaujama apsaugos, lygiavertės Japonijos Asmeninės informacijos apsaugos įstatymo reikalavimams, o paprašius informuojame, kokios tai priemonės. Pietų Korėja: sutikimai dėl neprivalomo duomenų tvarkymo ir rinkodaros gaunami atskirai nuo paslaugai teikti būtinų dalykų; mūsų privatumo pareigūnas yra [name], privacy@dezbatere.ro; pagal Elektroninės prekybos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; prieš kiekvieną pasikartojantį kainos padidinimą ar nemokamo plano pakeitimą mokamu iš naujo gauname jūsų sutikimą; paslauga naudoja generatyvųjį DI, apie tai informuojame prieš jums pradedant ja naudotis, o DI sugeneruotą turinį pažymime. Taivanas: pagal Vartotojų apsaugos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; jūsų duomenims taikomas Taivano asmens duomenų apsaugos įstatymas (Privatumo politikos B priedo B.7 skirsnis)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "6a1d1f0e15348a701834dbf14b8f6c1b9daef2b15930d9b8db99e6e3443ae958",
-  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.1 · ĮSIGALIOJA [DATE]",
+  version: "2.2",
+  sha256: "4ddb393bf7d63ba1fb69e2f7de56d2bed6466375bc502c8093b5246c3a04a3b1",
+  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.2 · ĮSIGALIOJA [DATE]",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DebateAIRO S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",
-  endMarker: "SĄLYGŲ PABAIGA · v2.1",
+  endMarker: "SĄLYGŲ PABAIGA · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Paslaugų teikimo sąlygų tekstas",
   sectionIdPrefix: "terms-section-",

@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Fejn noffru DebateAI",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Noffru DebateAI lil persuni li jgħixu fi [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu." }
+      { kind: "p", text: "Noffru DebateAI lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja, l-Iżlanda u l-Liechtenstein), fl-Iżvizzera, fil-Moldova, fl-Istati Uniti (ħlief Tennessee), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun, fil-Korea t’Isfel u fit-Tajwan. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Aċċettazzjoni ta’ dawn it-Termini",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Int taċċetta dawn it-Termini billi timmarka l-kaxxa “Qrajt u aċċettajt it-Termini tas-Servizz” u tikklikkja Oħloq kont. B’hekk jinħoloq kuntratt bejnek u DebateAIRO S.R.L. It-Termini jinkludu r-regoli dwar l-użu aċċettabbli fit-taqsima 7, ir-regoli dwar il-pubblikazzjoni fit-taqsima 9, id-dispożizzjonijiet dwar ir-responsabbiltà fit-taqsima 15, id-dispożizzjonijiet dwar il-liġi applikabbli u t-tilwim fit-taqsima 18 u, jekk tgħix fl-Istati Uniti, il-ftehim ta’ arbitraġġ fl-Anness A.3. Inżommu rekord tal-verżjoni li aċċettajt u ta’ meta aċċettajtha, kif tispjega l-Politika dwar il-Privatezza tagħna." },
+      { kind: "p", text: "Int taċċetta dawn it-Termini billi timmarka l-kaxxa “Qrajt u aċċettajt it-Termini tas-Servizz” u tikklikkja Oħloq kont. B’hekk jinħoloq kuntratt bejnek u DebateAIRO S.R.L. It-Termini jinkludu r-regoli dwar l-użu aċċettabbli fit-taqsima 7, ir-regoli dwar il-pubblikazzjoni fit-taqsima 9, id-dispożizzjonijiet dwar ir-responsabbiltà fit-taqsima 15, id-dispożizzjonijiet dwar il-liġi applikabbli u t-tilwim fit-taqsima 18 u, jekk tgħix fl-Istati Uniti, il-ftehim ta’ arbitraġġ fl-Anness A.2. Inżommu rekord tal-verżjoni li aċċettajt u ta’ meta aċċettajtha, kif tispjega l-Politika dwar il-Privatezza tagħna." },
       { kind: "p", text: "Il-Politika dwar il-Privatezza tagħna fuq [dezbatere.ro/privacy] tispjega kif nittrattaw id-data personali. Din hija informazzjoni li għandna nagħtuk, mhux kuntratt li taċċetta, u xejn f’dawn it-Termini ma jibdilha f’kunsens għall-ipproċessar. Il-Politika dwar il-Cookies tagħna fuq [dezbatere.ro/cookies] u r-Reġistru tal-Fornituri tal-IA tagħna fuq [dezbatere.ro/providers] jagħmlu parti minn dawn it-Termini b’referenza." },
       { kind: "p", text: "Qabel ma tikkonkludi kwalunkwe kuntratt magħna b’mod elettroniku, l-interfaċċa turik il-passi involuti, tħallik tirrieżamina u tikkoreġi dak li tkun daħħalt qabel tissottomettih, u tgħidlek il-lingwi li bihom jista’ jiġi konkluż il-kuntratt. Dawn it-Termini huma disponibbli f’forma li tippermettilek taħżinhom u tipprintjahom, meta tixtri pjan bi ħlas, nibagħtulek bil-posta elettronika l-verżjoni li aċċettajt, u tista’ titlob kopja fi kwalunkwe ħin. Xejn f’dawn it-Termini ma jillimita drittijiet li għandek skont il-liġi Rumena jew tal-UE dwar il-konsumatur, jew skont il-liġi tal-pajjiż fejn tgħix, li ma jistgħux jiġu limitati b’kuntratt." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Id-dritt tiegħek għall-irtirar",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Jekk tgħix fl-UE, fiż-ŻEE jew fir-Renju Unit, tista’ tirtira minn abbonament bi ħlas fi żmien 14-il jum minn meta tabbona, mingħajr ma tagħti raġuni. Uża l-paġna Irtira mill-kuntratt fuq [dezbatere.ro/withdraw], il-formola mudell fil-messaġġ elettroniku ta’ konferma, jew ikteb lil [support@dezbatere.ro]; nikkonfermaw li rċevejna l-irtirar tiegħek fuq mezz durabbli." },
+      { kind: "p", text: "Jekk tgħix fl-UE jew fiż-ŻEE, tista’ tirtira minn abbonament bi ħlas fi żmien 14-il jum minn meta tabbona, mingħajr ma tagħti raġuni. Uża l-paġna Irtira mill-kuntratt fuq [dezbatere.ro/withdraw], il-formola mudell fil-messaġġ elettroniku ta’ konferma, jew ikteb lil [support@dezbatere.ro]; nikkonfermaw li rċevejna l-irtirar tiegħek fuq mezz durabbli." },
       { kind: "p", text: "Jekk tlabtna nibdew is-servizz immedjatament — billi mmarkajt il-kaxxa waqt il-ħlas — u mbagħad tirtira, tħallas għall-parti tas-servizz ipprovduta sal-jum meta tirtira, ikkalkulata pro rata fuq il-prezz għall-perjodu ta’ fatturazzjoni, u nagħtuk lura l-bqija. Ma titlifx id-dritt tal-irtirar billi tuża s-servizz matul l-14-il jum." },
       { kind: "p", text: "Jekk tgħix band’oħra, l-Anness A jiddikjara d-dritt ta’ rtirar jew il-perjodu ta’ riflessjoni li japplika fir-reġjun tiegħek, jekk ikun hemm, u inkella l-politika tagħna dwar il-ħlasijiet lura. Id-drittijiet statutorji f’pajjiżek dejjem jiġu l-ewwel." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Liġi applikabbli. Dawn it-Termini, u kwalunkwe tilwima jew pretensjoni li tirriżulta minnhom jew mis-suġġett tagħhom, inklużi pretensjonijiet mhux kuntrattwali, huma rregolati mil-liġijiet tar-Rumanija." },
-      { kind: "p", text: "Il-protezzjonijiet lokali tiegħek mhumiex affettwati. Jekk int konsumatur, l-għażla tal-liġi Rumena ma tneħħilekx il-protezzjoni ta’ kwalunkwe regola obbligatorja dwar il-protezzjoni tal-konsumatur tal-pajjiż fejn abitwalment tirrisjedi — pereżempju regoli dwar termini inġusti, drittijiet tal-irtirar u tal-kanċellazzjoni, jew garanziji — fejn dawk ir-regoli japplikaw irrispettivament minn din l-għażla, inkluż skont l-Artikolu 6(2) tar-Regolament (KE) Nru 593/2008 jekk tgħix fl-UE, jew ir-regoli ekwivalenti tar-Renju Unit. Tista’ tibbaża ruħek fuq dawk ir-regoli flimkien mal-liġi Rumena." },
-      { kind: "p", text: "Qrati, jekk tgħix fl-UE, fiż-ŻEE jew fir-Renju Unit. Tista’ tibda proċedimenti kontra tagħna jew fil-qrati tar-Rumanija jew fil-qrati tal-pajjiż fejn tgħix. Aħna nistgħu nibdew proċedimenti kontrik biss fil-qrati tal-pajjiż fejn tgħix." },
-      { kind: "p", text: "Konsumaturi band’oħra. Jekk tgħix barra l-UE, iż-ŻEE u r-Renju Unit, xejn f’dawn it-Termini ma jillimita xi dritt li għandek skont il-liġi ta’ pajjiżek li tressaq pretensjoni fil-qrati tiegħu, jew xi dritt skont dik il-liġi li ma jistax jiġi rrinunzjat — inkluż, jekk tgħix fl-Awstralja jew fiż-Żelanda l-Ġdida, id-drittijiet tiegħek għall-garanziji tal-konsumatur; jekk tgħix fil-Brażil, il-Código de Defesa do Consumidor; u jekk tgħix fl-Istati Uniti, il-liġijiet tal-istat tiegħek dwar il-protezzjoni tal-konsumatur." },
-      { kind: "p", text: "Residenti tal-Istati Uniti. L-Anness A.3 fih ftehim ta’ arbitraġġ u rinunzja għal azzjoni kollettiva rregolati mill-Federal Arbitration Act. Japplika biss għar-residenti tal-Istati Uniti u biss fejn ikun infurzabbli. Ma japplikax għall-konsumaturi fl-UE, fiż-ŻEE jew fir-Renju Unit." },
+      { kind: "p", text: "Il-protezzjonijiet lokali tiegħek mhumiex affettwati. Jekk int konsumatur, l-għażla tal-liġi Rumena ma tneħħilekx il-protezzjoni ta’ kwalunkwe regola obbligatorja dwar il-protezzjoni tal-konsumatur tal-pajjiż fejn abitwalment tirrisjedi — pereżempju regoli dwar termini inġusti, drittijiet tal-irtirar u tal-kanċellazzjoni, jew garanziji — fejn dawk ir-regoli japplikaw irrispettivament minn din l-għażla, inkluż skont l-Artikolu 6(2) tar-Regolament (KE) Nru 593/2008 jekk tgħix fl-UE. Tista’ tibbaża ruħek fuq dawk ir-regoli flimkien mal-liġi Rumena." },
+      { kind: "p", text: "Qrati, jekk tgħix fl-UE jew fiż-ŻEE. Tista’ tibda proċedimenti kontra tagħna jew fil-qrati tar-Rumanija jew fil-qrati tal-pajjiż fejn tgħix. Aħna nistgħu nibdew proċedimenti kontrik biss fil-qrati tal-pajjiż fejn tgħix." },
+      { kind: "p", text: "Konsumaturi band’oħra. Jekk tgħix barra l-UE u ż-ŻEE, xejn f’dawn it-Termini ma jillimita xi dritt li għandek skont il-liġi ta’ pajjiżek li tressaq pretensjoni fil-qrati tiegħu, jew xi dritt skont dik il-liġi li ma jistax jiġi rrinunzjat — inkluż, jekk tgħix fl-Awstralja jew fiż-Żelanda l-Ġdida, id-drittijiet tiegħek għall-garanziji tal-konsumatur; jekk tgħix fil-Brażil, il-Código de Defesa do Consumidor; u jekk tgħix fl-Istati Uniti, il-liġijiet tal-istat tiegħek dwar il-protezzjoni tal-konsumatur." },
+      { kind: "p", text: "Residenti tal-Istati Uniti. L-Anness A.2 fih ftehim ta’ arbitraġġ u rinunzja għal azzjoni kollettiva rregolati mill-Federal Arbitration Act. Japplika biss għar-residenti tal-Istati Uniti u biss fejn ikun infurzabbli. Ma japplikax għall-konsumaturi fl-UE jew fiż-ŻEE." },
       { kind: "p", text: "Qabel tmur il-qorti. Ikkuntattjana fuq [legal@dezbatere.ro]; il-biċċa l-kbira tal-affarijiet jistgħu jiġu solvuti, u nimmiraw li nwieġbu fi żmien [5] ijiem tax-xogħol. Jekk int konsumatur fir-Rumanija jew fl-UE, tista’ tuża s-soluzzjoni alternattiva għat-tilwim permezz ta’ [the ANPC – named SAL entity, website]; aħna [do / do not] nintrabtu li nipparteċipaw f’dik il-proċedura. Ilmenti dwar deċiżjonijiet ta’ moderazzjoni jsegwu t-taqsima 10, li hija rotta separata." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Anness A — Termini reġjonali",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Kull entrata tapplika biss jekk ir-reġjun tagħha jkun elenkat fit-taqsima 2, u tiddikjara biss dak li huwa differenti mill-parti ewlenija. Fejn entrata u l-parti ewlenija jkunu f’kunflitt, l-entrata tapplika għall-persuni f’dak ir-reġjun." }
+      { kind: "p", text: "Kull entrata tapplika għall-persuni li jgħixu fir-reġjun tagħha, u tiddikjara biss dak li huwa differenti mill-parti ewlenija. Fejn entrata u l-parti ewlenija jkunu f’kunflitt, l-entrata tapplika għall-persuni f’dak ir-reġjun." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Ir-Renju Unit (biss jekk elenkat fit-taqsima 2)",
+    title: "L-Istati Uniti",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Ir-rappreżentant tagħna fir-Renju Unit skont l-Artikolu 27 tal-UK GDPR huwa [name, address, email]. Il-Consumer Rights Act 2015 japplika għalik u xejn f’dawn it-Termini ma jillimita d-drittijiet tiegħek taħtu; meta r-regoli dwar l-abbonamenti tad-Digital Markets, Competition and Consumers Act 2024 jidħlu fis-seħħ (mistenni fl-2027), dawn japplikaw għall-pjanijiet bi ħlas, inkluż perjodu ta’ riflessjoni wara t-tiġdid u wara l-perjodi ta’ prova bla ħlas. Kif nipproteġu lill-utenti minn kontenut illegali: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Teknoloġija proattiva li nużaw: [describe, or \"none\"]. Assigurazzjoni tal-età: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Il-proċedura tal-ilmenti fit-taqsima 10 taċċetta lmenti dwar kontenut illegali, tneħħija żbaljata tal-kontenut tiegħek, restrizzjonijiet fuq il-kont tiegħek, l-użu ta’ għodod awtomatizzati li jaffettwaw il-kontenut tiegħek, u kwalunkwe valutazzjoni tal-età li timblukkak bi żball. Hija miftuħa għal persuni li mhumiex utenti u li huma affettwati minn kontenut. Il-Politika dwar il-Privatezza tagħna, Anness B.2, tkopri d-data tiegħek." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "L-Istati Uniti (biss jekk elenkati fit-taqsima 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. Ma noffrux DebateAI lil persuni li jgħixu fi Tennessee." },
       { kind: "p", text: "Ftehim ta’ arbitraġġ u rinunzja għal azzjoni kollettiva. Jekk tgħix fl-Istati Uniti, int u DebateAIRO taqblu li ssolvu kwalunkwe tilwima li tirriżulta minn dawn it-Termini jew mis-servizz permezz ta’ arbitraġġ individwali vinkolanti amministrat minn [the American Arbitration Association / JAMS] skont ir-regoli tagħha għall-konsumaturi, minflok fil-qorti, ħlief li kull wieħed minna jista’ jressaq pretensjoni individwali f’qorti għal talbiet żgħar. Tista’ tagħżel li ma tipparteċipax billi tibgħat messaġġ elettroniku lil [address] fi żmien 30 jum mill-ewwel aċċettazzjoni tiegħek ta’ dawn it-Termini. Dan il-ftehim huwa rregolat mill-Federal Arbitration Act. Aħna nħallsu t-tariffi għall-preżentazzjoni tal-arbitraġġ. Azzjonijiet kollettivi, konġunti u rappreżentattivi huma rrinunzjati safejn tippermetti l-liġi. Din it-taqsima tapplika biss għall-futur u ma tapplikax għal pretensjonijiet li qamu qabel ma aċċettajtha." },
       { kind: "p", text: "Avviżi u tneħħijiet. Stampi intimi mhux kunsenswali jistgħu jiġu rrappurtati fuq [URL] mingħajr kont u jitneħħew fi żmien 48 siegħa minn talba valida. Ilmenti dwar id-drittijiet tal-awtur jintbagħtu lill-aġent maħtur tagħna msemmi fit-taqsima 16." },
-      { kind: "p", text: "Speċifiku għall-istat. California: japplikaw it-termini tat-tiġdid awtomatiku fit-taqsima 12; tista’ tikkanċella fuq l-internet fi kwalunkwe ħin; inżommu l-kunsens tiegħek għat-termini tat-tiġdid għal mill-inqas tliet snin. New York: tista’ tikkanċella fi żmien 14-il jum minn kwalunkwe ħlas bi prezz miżjud u tirċievi ħlas lura pro rata. Texas u Nebraska: ma nbigħux data personali sensittiva. Washington: l-Avviż tagħna dwar il-Privatezza tad-Data tas-Saħħa tal-Konsumatur fuq [URL] japplika għal informazzjoni relatata mas-saħħa. Colorado: xejn fis-servizz ma jieħu deċiżjonijiet konsegwenzjali dwarek. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek u d-drittijiet tal-privatezza tal-istat tiegħek." }
+      { kind: "p", text: "Speċifiku għall-istat. California: japplikaw it-termini tat-tiġdid awtomatiku fit-taqsima 12; tista’ tikkanċella fuq l-internet fi kwalunkwe ħin; inżommu l-kunsens tiegħek għat-termini tat-tiġdid għal mill-inqas tliet snin. New York: tista’ tikkanċella fi żmien 14-il jum minn kwalunkwe ħlas bi prezz miżjud u tirċievi ħlas lura pro rata. Texas u Nebraska: ma nbigħux data personali sensittiva. Washington: l-Avviż tagħna dwar il-Privatezza tad-Data tas-Saħħa tal-Konsumatur fuq [URL] japplika għal informazzjoni relatata mas-saħħa. Colorado: xejn fis-servizz ma jieħu deċiżjonijiet konsegwenzjali dwarek. Il-Politika dwar il-Privatezza tagħna, Anness B.2, tkopri d-data tiegħek u d-drittijiet tal-privatezza tal-istat tiegħek." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Il-Kanada u Quebec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa [name], privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. Quebec: dawn it-Termini huma disponibbli bil-Franċiż; agħżel il-Franċiż bis-selettur tal-lingwa; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek; ebda ftehim ta’ arbitraġġ jew rinunzja għal azzjoni kollettiva ma japplika għalik." }
     ]
   },
   {
     no: "A.4",
-    title: "Il-Kanada u Quebec (biss jekk elenkati)",
+    title: "L-Awstralja u ż-Żelanda l-Ġdida",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa [name], privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.4, tkopri d-data tiegħek. Quebec: dawn it-Termini huma disponibbli bil-Franċiż; agħżel il-Franċiż bis-selettur tal-lingwa; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek; ebda ftehim ta’ arbitraġġ jew rinunzja għal azzjoni kollettiva ma japplika għalik." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "L-Awstralja u ż-Żelanda l-Ġdida (biss jekk elenkati)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Is-servizzi tagħna jingħataw b’garanziji li ma jistgħux jiġu esklużi skont l-Australian Consumer Law. Għal nuqqasijiet kbar fis-servizz għandek id-dritt li tikkanċella u tirċievi ħlas lura għall-parti mhux użata, jew kumpens għat-tnaqqis fil-valur tiegħu; għandek ukoll id-dritt għal kumpens għal kull telf jew ħsara oħra raġonevolment prevedibbli. Jekk in-nuqqas ma jammontax għal nuqqas kbir, għandek id-dritt li l-problemi fis-servizz jiġu rranġati fi żmien raġonevoli u, jekk dan ma jsirx, li tikkanċella u tikseb ħlas lura. Safejn tippermetti t-taqsima 64A, ir-responsabbiltà tagħna għal ksur ta’ garanzija hija limitata għall-provvista mill-ġdid tas-servizz jew għall-ħlas tal-ispiża biex dan isir. Ebda dritt għal perjodu ta’ riflessjoni ma japplika għall-pjan bi ħlas lil hinn minn dak li tagħtik it-taqsima 12; il-politika tagħna dwar il-ħlasijiet lura hija […]. Iż-Żelanda l-Ġdida: il-Consumer Guarantees Act 1993 japplika u xejn f’dawn it-Termini ma jeskludih; komunikazzjonijiet diġitali ta’ ħsara jistgħu jiġu rrappurtati lilna skont it-taqsima 10 jew lil Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "L-Iżvizzera",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "L-Att Federali Żvizzeru dwar il-Protezzjoni tad-Data japplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.5). Tista’ tibda proċedimenti fil-qrati tal-post fl-Iżvizzera fejn tgħix. Ebda dritt statutorju ta’ rtirar ma japplika għall-pjan bi ħlas; il-politika tagħna dwar il-ħlasijiet lura hija […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "L-Iżvizzera (biss jekk elenkata)",
+    title: "Il-Moldova",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "L-Att Federali Żvizzeru dwar il-Protezzjoni tad-Data japplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.6). Tista’ tibda proċedimenti fil-qrati tal-post fl-Iżvizzera fejn tgħix. Ebda dritt statutorju ta’ rtirar ma japplika għall-pjan bi ħlas; il-politika tagħna dwar il-ħlasijiet lura hija […]." }
+      { kind: "p", text: "Għandek l-istess drittijiet taħt dawn it-Termini bħal konsumatur fl-Unjoni Ewropea, inkluż id-dritt ta’ rtirar ta’ 14-il jum fit-taqsima 13. Tista’ tibda proċedimenti fil-qrati tal-Moldova. Il-Liġi tal-Moldova Nru 195/2024 dwar il-protezzjoni tad-data personali tapplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Il-Moldova (biss jekk elenkata)",
+    title: "L-Asja-Paċifiku",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Għandek l-istess drittijiet taħt dawn it-Termini bħal konsumatur fl-Unjoni Ewropea, inkluż id-dritt ta’ rtirar ta’ 14-il jum fit-taqsima 13. Tista’ tibda proċedimenti fil-qrati tal-Moldova. Il-Liġi tal-Moldova Nru 195/2024 dwar il-protezzjoni tad-data personali tapplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "L-Ukrajna (biss jekk elenkata)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Noffru DebateAI fl-Ukrajna ħlief fiż-żoni li mhumiex ikkontrollati mill-gvern Ukren. Il-prodott u dawn it-Termini huma disponibbli bl-Ukren. Il-Liġi tal-Ukrajna “Dwar il-Protezzjoni tad-Data Personali” tapplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "L-Iżrael (biss jekk elenkat)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Tista’ tikkanċella pjan bi ħlas kif tippermetti l-Liġi dwar il-Protezzjoni tal-Konsumatur, 5741-1981 [state the cancellation terms]. Dawn it-Termini u l-Politika dwar il-Privatezza tagħna huma disponibbli bl-Ebrajk. Il-Liġi dwar il-Protezzjoni tal-Privatezza tal-Iżrael tapplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "L-Asja-Paċifiku (il-linji għar-reġjuni elenkati biss)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapor: l-Uffiċjal tal-Protezzjoni tad-Data tagħna huwa [name, email]; it-trasferimenti huma bbażati fuq protezzjonijiet kuntrattwali komparabbli mal-PDPA; ebda perjodu statutorju ta’ riflessjoni ma japplika għall-pjan bi ħlas u l-politika tagħna dwar il-ħlasijiet lura hija […]. Il-Ġappun: l-iżvelar statutorju skont l-Specified Commercial Transactions Act jinsab fuq [URL]; ebda perjodu ġenerali ta’ riflessjoni ma japplika għall-abbonamenti fuq l-internet, u l-politika tagħna dwar il-ħlasijiet lura hija […]; nibagħtu l-kontenut tiegħek lil fornituri tal-IA fl-Istati Uniti u fl-Unjoni Ewropea, kull wieħed taħt kuntratt li jirrikjedi protezzjoni ekwivalenti għal dik tal-Act on the Protection of Personal Information tal-Ġappun, u fuq talba ngħidulek x’inhuma dawk il-miżuri. Il-Korea t’Isfel: il-kunsensi għall-ipproċessar fakultattiv u għall-kummerċjalizzazzjoni jinġabru separatament mill-elementi meħtieġa biex jitħaddem is-servizz; l-uffiċjal tal-privatezza tagħna huwa [name], privacy@dezbatere.ro; tista’ tirtira minn pjan bi ħlas fi żmien 7 ijiem minn meta tabbona, suġġett għall-E-Commerce Act; niksbu kunsens ġdid mingħandek qabel kwalunkwe żieda rikorrenti fil-prezz jew konverżjoni minn bla ħlas għal bi ħlas; is-servizz juża l-IA ġenerattiva, ngħidulek dan qabel ma tużah, u nimmarkaw ir-riżultati ġenerati mill-IA. It-Tajwan: tista’ tirtira minn pjan bi ħlas fi żmien 7 ijiem minn meta tabbona, skont il-Consumer Protection Act; il-Personal Data Protection Act tat-Tajwan japplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.10). It-Tajlandja: ir-rappreżentant tagħna fit-Tajlandja huwa [name] [if appointed]. Il-Filippini: l-identifikazzjoni tan-negozju u l-mekkaniżmu ta’ rimedju tagħna skont l-Internet Transactions Act jinsabu fuq [URL]; l-ilmenti jistgħu jitressqu quddiem il-Kummissjoni Nazzjonali tal-Privatezza." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Riżervata",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "It-Turkija, il-Brażil u l-Indoneżja kollha jeħtieġu anness fil-lingwa lokali, rappreżentant jew reġistrazzjoni, u preżentazzjonijiet uffiċjali. Dawn mhumiex abbozzati hawn u huma barra t-taqsima 2 sakemm jiddaħħlu deliberatament. Iċ-Ċina, il-Vjetnam u r-Russja mhumiex offruti." }
+      { kind: "p", text: "Singapor: l-Uffiċjal tal-Protezzjoni tad-Data tagħna huwa [name, email]; it-trasferimenti huma bbażati fuq protezzjonijiet kuntrattwali komparabbli mal-PDPA; ebda perjodu statutorju ta’ riflessjoni ma japplika għall-pjan bi ħlas u l-politika tagħna dwar il-ħlasijiet lura hija […]. Il-Ġappun: l-iżvelar statutorju skont l-Specified Commercial Transactions Act jinsab fuq [URL]; ebda perjodu ġenerali ta’ riflessjoni ma japplika għall-abbonamenti fuq l-internet, u l-politika tagħna dwar il-ħlasijiet lura hija […]; nibagħtu l-kontenut tiegħek lil fornituri tal-IA fl-Istati Uniti u fl-Unjoni Ewropea, kull wieħed taħt kuntratt li jirrikjedi protezzjoni ekwivalenti għal dik tal-Act on the Protection of Personal Information tal-Ġappun, u fuq talba ngħidulek x’inhuma dawk il-miżuri. Il-Korea t’Isfel: il-kunsensi għall-ipproċessar fakultattiv u għall-kummerċjalizzazzjoni jinġabru separatament mill-elementi meħtieġa biex jitħaddem is-servizz; l-uffiċjal tal-privatezza tagħna huwa [name], privacy@dezbatere.ro; tista’ tirtira minn pjan bi ħlas fi żmien 7 ijiem minn meta tabbona, suġġett għall-E-Commerce Act; niksbu kunsens ġdid mingħandek qabel kwalunkwe żieda rikorrenti fil-prezz jew konverżjoni minn bla ħlas għal bi ħlas; is-servizz juża l-IA ġenerattiva, ngħidulek dan qabel ma tużah, u nimmarkaw ir-riżultati ġenerati mill-IA. It-Tajwan: tista’ tirtira minn pjan bi ħlas fi żmien 7 ijiem minn meta tabbona, skont il-Consumer Protection Act; il-Personal Data Protection Act tat-Tajwan japplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "b2e29d4a9b234bb1a42eecff7b1c63252fe28feb8091e316fd1e46520415b7f9",
-  eyebrow: "TERMINI TAS-SERVIZZ · v2.1 · EFFETTIVI [DATE]",
+  version: "2.2",
+  sha256: "c0ac9bdb05c6a35eaf707faccb50666cf9c6052a89579f915901cdf60cf04f14",
+  eyebrow: "TERMINI TAS-SERVIZZ · v2.2 · EFFETTIVI [DATE]",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DebateAIRO S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",
-  endMarker: "TMIEM IT-TERMINI · v2.1",
+  endMarker: "TMIEM IT-TERMINI · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Test tat-Termini tas-Servizz",
   sectionIdPrefix: "terms-section-",

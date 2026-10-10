@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kde službu DebateAI ponúkame",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Službu DebateAI ponúkame osobám, ktoré žijú v [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
+      { kind: "p", text: "Službu DebateAI ponúkame osobám, ktoré žijú v týchto krajinách a regiónoch: Európska únia (27 krajín) a Európsky hospodársky priestor (Nórsko, Island a Lichtenštajnsko), Švajčiarsko, Moldavsko, Spojené štáty (okrem Tennessee), Kanada, Austrália, Nový Zéland, Singapur, Japonsko, Južná Kórea a Taiwan. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Prijatie týchto Podmienok",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Tieto Podmienky prijímate začiarknutím políčka „Prečítal(-a) som si a súhlasím s Podmienkami poskytovania služby.“ a kliknutím na Vytvoriť účet. Tým medzi vami a DebateAIRO S.R.L. vzniká zmluva. Podmienky zahŕňajú pravidlá prijateľného používania v časti 7, pravidlá zverejňovania v časti 9, ustanovenia o zodpovednosti v časti 15, ustanovenia o rozhodnom práve a riešení sporov v časti 18 a, ak žijete v Spojených štátoch, rozhodcovskú zmluvu v prílohe A.3. V súlade s našimi Zásadami ochrany osobných údajov uchovávame záznam o tom, ktorú verziu ste prijali a kedy." },
+      { kind: "p", text: "Tieto Podmienky prijímate začiarknutím políčka „Prečítal(-a) som si a súhlasím s Podmienkami poskytovania služby.“ a kliknutím na Vytvoriť účet. Tým medzi vami a DebateAIRO S.R.L. vzniká zmluva. Podmienky zahŕňajú pravidlá prijateľného používania v časti 7, pravidlá zverejňovania v časti 9, ustanovenia o zodpovednosti v časti 15, ustanovenia o rozhodnom práve a riešení sporov v časti 18 a, ak žijete v Spojených štátoch, rozhodcovskú zmluvu v prílohe A.2. V súlade s našimi Zásadami ochrany osobných údajov uchovávame záznam o tom, ktorú verziu ste prijali a kedy." },
       { kind: "p", text: "Naše Zásady ochrany osobných údajov na adrese [dezbatere.ro/privacy] vysvetľujú, ako nakladáme s osobnými údajmi. Ide o informácie, ktoré sme povinní vám poskytnúť, nie o zmluvu, s ktorou súhlasíte, a nič v týchto Podmienkach z nich nerobí súhlas so spracúvaním. Naše Zásady používania súborov cookie na adrese [dezbatere.ro/cookies] a náš Register poskytovateľov umelej inteligencie na adrese [dezbatere.ro/providers] sú do týchto Podmienok začlenené odkazom." },
       { kind: "p", text: "Predtým, ako s nami elektronicky uzavriete zmluvu, vám rozhranie zobrazí jednotlivé kroky, umožní vám pred odoslaním skontrolovať a opraviť zadané údaje a oznámi vám jazyky, v ktorých možno zmluvu uzavrieť. Tieto Podmienky sú dostupné vo forme, ktorú môžete uložiť a vytlačiť. Pri kúpe plateného programu vám prijatú verziu zašleme e-mailom. O jej kópiu môžete požiadať kedykoľvek. Nič v týchto Podmienkach neobmedzuje práva, ktoré máte podľa rumunského spotrebiteľského práva či spotrebiteľského práva Európskej únie alebo práva krajiny, v ktorej žijete, ak ich nemožno zmluvne obmedziť." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Vaše právo na odstúpenie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Ak žijete v EÚ, EHP alebo Spojenom kráľovstve, môžete od plateného predplatného odstúpiť do 14 dní od jeho uzavretia bez uvedenia dôvodu. Použite stránku Odstúpiť od zmluvy na adrese [dezbatere.ro/withdraw], vzorový formulár v potvrdzovacom e-maile alebo napíšte na [support@dezbatere.ro]; prijatie potvrdíme na trvanlivom médiu." },
+      { kind: "p", text: "Ak žijete v EÚ alebo EHP, môžete od plateného predplatného odstúpiť do 14 dní od jeho uzavretia bez uvedenia dôvodu. Použite stránku Odstúpiť od zmluvy na adrese [dezbatere.ro/withdraw], vzorový formulár v potvrdzovacom e-maile alebo napíšte na [support@dezbatere.ro]; prijatie potvrdíme na trvanlivom médiu." },
       { kind: "p", text: "Ak ste nás začiarknutím políčka pri nákupe požiadali, aby sme službu začali poskytovať ihneď, a následne odstúpite, zaplatíte časť služby poskytnutú do dňa odstúpenia, vypočítanú pomerne z ceny za fakturačné obdobie, a zvyšnú sumu vám vrátime. Používaním služby počas 14 dní právo na odstúpenie nestrácate." },
       { kind: "p", text: "Ak žijete inde, príloha A uvádza právo na odstúpenie alebo lehotu na rozmyslenie, ktoré sa prípadne uplatnia vo vašom regióne, a v ostatných prípadoch naše pravidlá vrátenia peňazí. Zákonné práva vo vašej krajine majú vždy prednosť." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Rozhodné právo. Tieto Podmienky a všetky spory alebo nároky vyplývajúce z nich alebo z ich predmetu vrátane mimozmluvných nárokov sa riadia rumunským právom." },
-      { kind: "p", text: "Vaša miestna ochrana nie je dotknutá. Ak ste spotrebiteľom, voľba rumunského práva vás nezbavuje ochrany podľa kogentných pravidiel ochrany spotrebiteľa krajiny vášho obvyklého pobytu — napríklad pravidiel týkajúcich sa nekalých podmienok, práva na odstúpenie a zrušenie alebo záruk — ak sa tieto pravidlá uplatňujú bez ohľadu na túto voľbu, a to vrátane článku 6 ods. 2 nariadenia (ES) č. 593/2008, ak žijete v EÚ, alebo rovnocenných pravidiel Spojeného kráľovstva. Popri rumunskom práve sa môžete dovolávať aj týchto pravidiel." },
-      { kind: "p", text: "Súdy, ak žijete v EÚ, EHP alebo Spojenom kráľovstve. Konanie proti nám môžete začať buď na súdoch v Rumunsku, alebo na súdoch krajiny, v ktorej žijete. My môžeme začať konanie proti vám iba na súdoch krajiny, v ktorej žijete." },
-      { kind: "p", text: "Spotrebitelia inde. Ak žijete mimo EÚ, EHP a Spojeného kráľovstva, nič v týchto Podmienkach neobmedzuje vaše právo podľa práva vašej krajiny podať žalobu na jej súdoch ani žiadne právo podľa tohto práva, ktorého sa nemožno vzdať — vrátane práv zo spotrebiteľských záruk, ak žijete v Austrálii alebo na Novom Zélande; práv podľa Código de Defesa do Consumidor, ak žijete v Brazílii; a práv podľa zákonov vášho štátu na ochranu spotrebiteľa, ak žijete v Spojených štátoch." },
-      { kind: "p", text: "Obyvatelia Spojených štátov. Príloha A.3 obsahuje rozhodcovskú zmluvu a vzdanie sa práva na hromadnú žalobu, ktoré sa riadia Federal Arbitration Act. Vzťahuje sa iba na obyvateľov Spojených štátov a iba v rozsahu, v akom je vymáhateľná. Nevzťahuje sa na spotrebiteľov v EÚ, EHP ani Spojenom kráľovstve." },
+      { kind: "p", text: "Vaša miestna ochrana nie je dotknutá. Ak ste spotrebiteľom, voľba rumunského práva vás nezbavuje ochrany podľa kogentných pravidiel ochrany spotrebiteľa krajiny vášho obvyklého pobytu — napríklad pravidiel týkajúcich sa nekalých podmienok, práva na odstúpenie a zrušenie alebo záruk — ak sa tieto pravidlá uplatňujú bez ohľadu na túto voľbu, a to vrátane článku 6 ods. 2 nariadenia (ES) č. 593/2008, ak žijete v EÚ. Popri rumunskom práve sa môžete dovolávať aj týchto pravidiel." },
+      { kind: "p", text: "Súdy, ak žijete v EÚ alebo EHP. Konanie proti nám môžete začať buď na súdoch v Rumunsku, alebo na súdoch krajiny, v ktorej žijete. My môžeme začať konanie proti vám iba na súdoch krajiny, v ktorej žijete." },
+      { kind: "p", text: "Spotrebitelia inde. Ak žijete mimo EÚ a EHP, nič v týchto Podmienkach neobmedzuje vaše právo podľa práva vašej krajiny podať žalobu na jej súdoch ani žiadne právo podľa tohto práva, ktorého sa nemožno vzdať — vrátane práv zo spotrebiteľských záruk, ak žijete v Austrálii alebo na Novom Zélande; práv podľa Código de Defesa do Consumidor, ak žijete v Brazílii; a práv podľa zákonov vášho štátu na ochranu spotrebiteľa, ak žijete v Spojených štátoch." },
+      { kind: "p", text: "Obyvatelia Spojených štátov. Príloha A.2 obsahuje rozhodcovskú zmluvu a vzdanie sa práva na hromadnú žalobu, ktoré sa riadia Federal Arbitration Act. Vzťahuje sa iba na obyvateľov Spojených štátov a iba v rozsahu, v akom je vymáhateľná. Nevzťahuje sa na spotrebiteľov v EÚ ani EHP." },
       { kind: "p", text: "Pred podaním žaloby. Kontaktujte nás na [legal@dezbatere.ro]; väčšinu vecí možno napraviť a snažíme sa odpovedať do [5] pracovných dní. Ak ste spotrebiteľom v Rumunsku alebo EÚ, môžete využiť alternatívne riešenie sporov prostredníctvom [the ANPC – named SAL entity, website]; k účasti na tomto postupe sa [do / do not] zaväzujeme. Sťažnosti na moderátorské rozhodnutia sa riadia časťou 10, čo je samostatný postup." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Príloha A — Regionálne podmienky",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Každá položka sa uplatní iba vtedy, ak je jej región uvedený v časti 2, a stanovuje iba odchýlky od hlavnej časti. Ak je položka v rozpore s hlavnou časťou, na osoby v danom regióne sa uplatní táto položka." }
+      { kind: "p", text: "Každá položka sa uplatňuje na osoby, ktoré žijú v jej regióne, a stanovuje iba odchýlky od hlavnej časti. Ak je položka v rozpore s hlavnou časťou, na osoby v danom regióne sa uplatní táto položka." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Spojené kráľovstvo (iba ak je uvedené v časti 2)",
+    title: "Spojené štáty",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Naším zástupcom v Spojenom kráľovstve podľa článku 27 UK GDPR je [name, address, email]. Vzťahuje sa na vás Consumer Rights Act 2015 a nič v týchto Podmienkach neobmedzuje vaše práva podľa neho; keď nadobudnú účinnosť pravidlá predplatného podľa Digital Markets, Competition and Consumers Act 2024 (očakáva sa to v roku 2027), uplatnia sa na platené programy vrátane lehoty na rozmyslenie po obnovení a po bezplatných skúšobných obdobiach. Ako chránime používateľov pred nezákonným obsahom: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proaktívna technológia, ktorú používame: [describe, or \"none\"]. Overenie veku: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Postup vybavovania sťažností podľa časti 10 prijíma sťažnosti na nezákonný obsah, neoprávnené odstránenie vášho obsahu, obmedzenia vášho účtu, použitie automatizovaných nástrojov ovplyvňujúcich váš obsah a akékoľvek posúdenie veku, ktoré vás nesprávne zablokuje. Je dostupný aj osobám dotknutým obsahom, ktoré nie sú používateľmi. Vaše údaje upravuje príloha B.2 našich Zásady ochrany osobných údajov." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Spojené štáty (iba ak sú uvedené v časti 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. DebateAI neponúkame osobám, ktoré žijú v Tennessee." },
       { kind: "p", text: "Rozhodcovská zmluva a vzdanie sa práva na hromadnú žalobu. Ak žijete v Spojených štátoch, vy a DebateAIRO súhlasíte s riešením všetkých sporov vyplývajúcich z týchto Podmienok alebo služby záväzným individuálnym rozhodcovským konaním vedeným [the American Arbitration Association / JAMS] podľa jej spotrebiteľských pravidiel namiesto súdu; každý z nás však môže uplatniť individuálny nárok na súde pre drobné nároky. Rozhodcovskú zmluvu môžete odmietnuť zaslaním e-mailu na [address] do 30 dní od prvého prijatia týchto Podmienok. Táto dohoda sa riadi Federal Arbitration Act. Hradíme poplatky za začatie rozhodcovského konania. Vy aj DebateAIRO sa v rozsahu povolenom zákonom vzdávate práva na hromadné, kolektívne a zastupiteľské žaloby. Táto časť sa uplatňuje iba do budúcnosti a nevzťahuje sa na nároky, ktoré vznikli pred jej prijatím." },
       { kind: "p", text: "Oznámenia a odstraňovanie. Intímne snímky zdieľané bez súhlasu možno bez účtu nahlásiť na adrese [URL] a budú odstránené do 48 hodín od platnej žiadosti. Sťažnosti týkajúce sa autorských práv sa zasielajú nášmu určenému zástupcovi uvedenému v časti 16." },
-      { kind: "p", text: "Ustanovenia pre jednotlivé štáty. Kalifornia: uplatnia sa podmienky automatického obnovovania podľa časti 12; predplatné môžete kedykoľvek zrušiť online; váš súhlas s podmienkami obnovovania uchovávame najmenej tri roky. New York: do 14 dní od akejkoľvek platby so zvýšenou cenou môžete predplatné zrušiť a získať pomerné vrátenie peňazí. Texas a Nebraska: citlivé osobné údaje nepredávame. Washington: na informácie súvisiace so zdravím sa vzťahuje naše Oznámenie o ochrane údajov o zdraví spotrebiteľov na adrese [URL]. Colorado: nič v službe o vás neprijíma rozhodnutia so závažnými dôsledkami. Vaše údaje a vaše práva na ochranu súkromia podľa práva vášho štátu upravuje príloha B.3 našich Zásady ochrany osobných údajov." }
+      { kind: "p", text: "Ustanovenia pre jednotlivé štáty. Kalifornia: uplatnia sa podmienky automatického obnovovania podľa časti 12; predplatné môžete kedykoľvek zrušiť online; váš súhlas s podmienkami obnovovania uchovávame najmenej tri roky. New York: do 14 dní od akejkoľvek platby so zvýšenou cenou môžete predplatné zrušiť a získať pomerné vrátenie peňazí. Texas a Nebraska: citlivé osobné údaje nepredávame. Washington: na informácie súvisiace so zdravím sa vzťahuje naše Oznámenie o ochrane údajov o zdraví spotrebiteľov na adrese [URL]. Colorado: nič v službe o vás neprijíma rozhodnutia so závažnými dôsledkami. Vaše údaje a vaše práva na ochranu súkromia podľa práva vášho štátu upravuje príloha B.2 našich Zásady ochrany osobných údajov." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Kanada a Quebec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je [name], privacy@dezbatere.ro. Vaše údaje upravuje príloha B.3 našich Zásady ochrany osobných údajov. Quebec: tieto Podmienky sú dostupné vo francúzštine; francúzštinu si zvolíte v prepínači jazykov; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania; nevzťahuje sa na vás žiadna rozhodcovská zmluva ani vzdanie sa práva na hromadnú žalobu." }
     ]
   },
   {
     no: "A.4",
-    title: "Kanada a Quebec (iba ak sú uvedené)",
+    title: "Austrália a Nový Zéland",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je [name], privacy@dezbatere.ro. Vaše údaje upravuje príloha B.4 našich Zásady ochrany osobných údajov. Quebec: tieto Podmienky sú dostupné vo francúzštine; francúzštinu si zvolíte v prepínači jazykov; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania; nevzťahuje sa na vás žiadna rozhodcovská zmluva ani vzdanie sa práva na hromadnú žalobu." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Austrália a Nový Zéland (iba ak sú uvedené)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Na naše služby sa vzťahujú záruky, ktoré nemožno podľa Australian Consumer Law vylúčiť. Pri závažných nedostatkoch služby máte právo zmluvu zrušiť a získať vrátenie peňazí za nevyužitú časť alebo náhradu za zníženú hodnotu služby; máte tiež právo na náhradu akejkoľvek inej primerane predvídateľnej straty alebo škody. Ak nedostatok nie je závažný, máte právo na odstránenie problémov so službou v primeranom čase, a ak sa tak nestane, na zrušenie zmluvy a vrátenie peňazí. V rozsahu, v akom to umožňuje § 64A Australian Consumer Law, je naša zodpovednosť za porušenie záruky obmedzená na opätovné poskytnutie služby alebo úhradu nákladov na jej opätovné poskytnutie. Na platený program sa nad rámec časti 12 nevzťahuje žiadna lehota na rozmyslenie; naše pravidlá vrátenia peňazí sú […]. Nový Zéland: uplatňuje sa Consumer Guarantees Act 1993 a nič v týchto Podmienkach ho nevylučuje; škodlivú digitálnu komunikáciu môžete nahlásiť nám podľa časti 10 alebo organizácii Netsafe." }
     ]
   },
   {
+    no: "A.5",
+    title: "Švajčiarsko",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "Na vaše údaje sa vzťahuje švajčiarsky spolkový zákon o ochrane údajov (Zásady ochrany osobných údajov, príloha B.5). Žalobu môžete podať na súde v mieste vo Švajčiarsku, kde žijete. Na platený program sa nevzťahuje žiadne zákonné právo na odstúpenie; naše pravidlá vrátenia peňazí sú […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Švajčiarsko (iba ak je uvedené)",
+    title: "Moldavsko",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Na vaše údaje sa vzťahuje švajčiarsky spolkový zákon o ochrane údajov (Zásady ochrany osobných údajov, príloha B.6). Žalobu môžete podať na súde v mieste vo Švajčiarsku, kde žijete. Na platený program sa nevzťahuje žiadne zákonné právo na odstúpenie; naše pravidlá vrátenia peňazí sú […]." }
+      { kind: "p", text: "Podľa týchto Podmienok máte rovnaké práva ako spotrebiteľ v Európskej únii vrátane 14-dňového práva na odstúpenie podľa časti 13. Žalobu môžete podať na súdoch Moldavska. Na vaše údaje sa vzťahuje moldavský zákon č. 195/2024 o ochrane osobných údajov (Zásady ochrany osobných údajov, príloha B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldavsko (iba ak je uvedené)",
+    title: "Ázia a Tichomorie",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Podľa týchto Podmienok máte rovnaké práva ako spotrebiteľ v Európskej únii vrátane 14-dňového práva na odstúpenie podľa časti 13. Žalobu môžete podať na súdoch Moldavska. Na vaše údaje sa vzťahuje moldavský zákon č. 195/2024 o ochrane osobných údajov (Zásady ochrany osobných údajov, príloha B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Ukrajina (iba ak je uvedená)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "DebateAI ponúkame na Ukrajine okrem oblastí, ktoré nekontroluje ukrajinská vláda. Produkt a tieto Podmienky sú dostupné v ukrajinčine. Na vaše údaje sa vzťahuje zákon Ukrajiny „O ochrane osobných údajov“ (Zásady ochrany osobných údajov, príloha B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Izrael (iba ak je uvedený)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "Platený program môžete zrušiť v rozsahu, ktorý umožňuje zákon o ochrane spotrebiteľa 5741-1981 [state the cancellation terms]. Tieto Podmienky a naše Zásady ochrany osobných údajov sú dostupné v hebrejčine. Na vaše údaje sa vzťahuje izraelský zákon o ochrane súkromia (Zásady ochrany osobných údajov, príloha B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Ázia a Tichomorie (iba riadky pre uvedené regióny)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapur: našou zodpovednou osobou pre ochranu osobných údajov je [name, email]; prenosy sa opierajú o zmluvnú ochranu porovnateľnú s PDPA; na platený program sa nevzťahuje zákonná lehota na rozmyslenie a naše pravidlá vrátenia peňazí sú […]. Japonsko: zákonné informácie podľa Specified Commercial Transactions Act sú na adrese [URL]; na online predplatné sa nevzťahuje všeobecná lehota na rozmyslenie a naše pravidlá vrátenia peňazí sú […]; váš obsah posielame poskytovateľom umelej inteligencie v Spojených štátoch a Európskej únii, každému na základe zmluvy, ktorá vyžaduje ochranu rovnocennú japonskému Act on the Protection of Personal Information, a na požiadanie vám povieme, aké sú tieto opatrenia. Južná Kórea: súhlasy s voliteľným spracúvaním a marketingom sa získavajú oddelene od položiek potrebných na prevádzku služby; našou zodpovednou osobou pre ochranu osobných údajov je [name], privacy@dezbatere.ro; od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia v súlade s E-Commerce Act; pred každým zvýšením ceny opakujúcej sa platby alebo prechodom z bezplatnej na platenú službu získame váš nový súhlas; služba využíva generatívnu umelú inteligenciu, upozorníme vás na to skôr, ako ju začnete používať, a výstupy vytvorené umelou inteligenciou označujeme. Taiwan: od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia podľa Consumer Protection Act; na vaše údaje sa vzťahuje taiwanský Personal Data Protection Act (Zásady ochrany osobných údajov, príloha B.10). Thajsko: naším zástupcom v Thajsku je [name] [if appointed]. Filipíny: naše identifikačné údaje podniku a mechanizmus nápravy podľa Internet Transactions Act sú na adrese [URL]; sťažnosti možno podať Národnej komisii pre ochranu súkromia." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Vyhradené",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Turecko, Brazília a Indonézia vyžadujú prílohu v miestnom jazyku, zástupcu alebo registráciu a podania. Nie sú tu vypracované a nespadajú do časti 2, kým nebudú výslovne doplnené. V Číne, Vietname a Rusku službu neponúkame." }
+      { kind: "p", text: "Singapur: našou zodpovednou osobou pre ochranu osobných údajov je [name, email]; prenosy sa opierajú o zmluvnú ochranu porovnateľnú s PDPA; na platený program sa nevzťahuje zákonná lehota na rozmyslenie a naše pravidlá vrátenia peňazí sú […]. Japonsko: zákonné informácie podľa Specified Commercial Transactions Act sú na adrese [URL]; na online predplatné sa nevzťahuje všeobecná lehota na rozmyslenie a naše pravidlá vrátenia peňazí sú […]; váš obsah posielame poskytovateľom umelej inteligencie v Spojených štátoch a Európskej únii, každému na základe zmluvy, ktorá vyžaduje ochranu rovnocennú japonskému Act on the Protection of Personal Information, a na požiadanie vám povieme, aké sú tieto opatrenia. Južná Kórea: súhlasy s voliteľným spracúvaním a marketingom sa získavajú oddelene od položiek potrebných na prevádzku služby; našou zodpovednou osobou pre ochranu osobných údajov je [name], privacy@dezbatere.ro; od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia v súlade s E-Commerce Act; pred každým zvýšením ceny opakujúcej sa platby alebo prechodom z bezplatnej na platenú službu získame váš nový súhlas; služba využíva generatívnu umelú inteligenciu, upozorníme vás na to skôr, ako ju začnete používať, a výstupy vytvorené umelou inteligenciou označujeme. Taiwan: od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia podľa Consumer Protection Act; na vaše údaje sa vzťahuje taiwanský Personal Data Protection Act (Zásady ochrany osobných údajov, príloha B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "4e41f7e03b91216decbbb185801a8cd1fddbf9ce7bf31964cde501f932dd243d",
-  eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.1 · ÚČINNÉ OD [DATE]",
+  version: "2.2",
+  sha256: "a2f8bd2c86a306e93e6e007e50235bc136ebac7862ea3f9d45450f9595c39775",
+  eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.2 · ÚČINNÉ OD [DATE]",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DebateAIRO S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",
-  endMarker: "KONIEC PODMIENOK · v2.1",
+  endMarker: "KONIEC PODMIENOK · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Text Podmienok poskytovania služby",
   sectionIdPrefix: "terms-section-",

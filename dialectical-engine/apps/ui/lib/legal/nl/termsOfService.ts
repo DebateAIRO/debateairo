@@ -61,7 +61,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Waar wij DebateAI aanbieden",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wij bieden DebateAI aan personen die wonen in [the European Union and the European Economic Area] [and: the United States (except Tennessee) / Canada / Australia and New Zealand / Switzerland / Moldova / Ukraine / Israel / Singapore / Japan / South Korea / Taiwan]. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
+      { kind: "p", text: "Wij bieden DebateAI aan personen die wonen in de Europese Unie (27 landen) en de Europese Economische Ruimte (Noorwegen, IJsland en Liechtenstein), Zwitserland, Moldavië, de Verenigde Staten (behalve Tennessee), Canada, Australië, Nieuw-Zeeland, Singapore, Japan, Zuid-Korea en Taiwan. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
     ]
   },
   {
@@ -69,7 +69,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Aanvaarding van deze Voorwaarden",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "U aanvaardt deze Voorwaarden door het vakje \"Ik heb kennisgenomen van en ga akkoord met de Servicevoorwaarden.\" aan te vinken en op Account aanmaken te klikken. Daardoor ontstaat een overeenkomst tussen u en DebateAIRO S.R.L. De Voorwaarden omvatten de regels voor toegestaan gebruik in hoofdstuk 7, de publicatieregels in hoofdstuk 9, de aansprakelijkheidsbepalingen in hoofdstuk 15, de bepalingen over toepasselijk recht en geschillen in hoofdstuk 18 en, als u in de Verenigde Staten woont, de arbitrageovereenkomst in Bijlage A.3. Zoals in ons Privacybeleid wordt uitgelegd, leggen wij vast welke versie u hebt aanvaard en wanneer." },
+      { kind: "p", text: "U aanvaardt deze Voorwaarden door het vakje \"Ik heb kennisgenomen van en ga akkoord met de Servicevoorwaarden.\" aan te vinken en op Account aanmaken te klikken. Daardoor ontstaat een overeenkomst tussen u en DebateAIRO S.R.L. De Voorwaarden omvatten de regels voor toegestaan gebruik in hoofdstuk 7, de publicatieregels in hoofdstuk 9, de aansprakelijkheidsbepalingen in hoofdstuk 15, de bepalingen over toepasselijk recht en geschillen in hoofdstuk 18 en, als u in de Verenigde Staten woont, de arbitrageovereenkomst in Bijlage A.2. Zoals in ons Privacybeleid wordt uitgelegd, leggen wij vast welke versie u hebt aanvaard en wanneer." },
       { kind: "p", text: "Ons Privacybeleid op [dezbatere.ro/privacy] legt uit hoe wij persoonsgegevens verwerken. Het is informatie die wij u verschuldigd zijn, geen overeenkomst waarmee u instemt, en niets in deze Voorwaarden maakt daarvan toestemming voor verwerking. Ons Cookiebeleid op [dezbatere.ro/cookies] en ons Register van AI-aanbieders op [dezbatere.ro/providers] maken door verwijzing deel uit van deze Voorwaarden." },
       { kind: "p", text: "Voordat u elektronisch een overeenkomst met ons sluit, toont de interface u welke stappen daarbij horen, kunt u de door u ingevoerde gegevens controleren en corrigeren voordat u ze indient, en wordt vermeld in welke talen de overeenkomst kan worden gesloten. Deze Voorwaarden zijn beschikbaar in een vorm die u kunt opslaan en afdrukken, wanneer u een betaald abonnement koopt, sturen wij u de door u aanvaarde versie per e-mail en u kunt te allen tijde een kopie opvragen. Niets in deze Voorwaarden beperkt rechten die u krachtens het Roemeense of EU-consumentenrecht, of het recht van het land waar u woont, hebt en die niet bij overeenkomst kunnen worden beperkt." }
     ]
@@ -210,7 +210,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Uw herroepingsrecht",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Als u in de EU, de EER of het VK woont, kunt u binnen 14 dagen na het afsluiten van een betaald abonnement zonder opgave van redenen de overeenkomst herroepen. Gebruik de pagina Overeenkomst herroepen op [dezbatere.ro/withdraw], het modelformulier in de bevestigingsmail of schrijf naar [support@dezbatere.ro]; wij bevestigen de ontvangst op een duurzame gegevensdrager." },
+      { kind: "p", text: "Als u in de EU of de EER woont, kunt u binnen 14 dagen na het afsluiten van een betaald abonnement zonder opgave van redenen de overeenkomst herroepen. Gebruik de pagina Overeenkomst herroepen op [dezbatere.ro/withdraw], het modelformulier in de bevestigingsmail of schrijf naar [support@dezbatere.ro]; wij bevestigen de ontvangst op een duurzame gegevensdrager." },
       { kind: "p", text: "Als u ons — door het vakje bij het afrekenen aan te vinken — hebt verzocht de dienst onmiddellijk te laten ingaan en de overeenkomst vervolgens herroept, betaalt u voor het deel van de dienst dat tot de dag van herroeping is geleverd, berekend naar rato van de prijs voor de factureringsperiode, en betalen wij de rest terug. U verliest het herroepingsrecht niet door de dienst gedurende de 14 dagen te gebruiken." },
       { kind: "p", text: "Als u elders woont, vermeldt Bijlage A welk herroepingsrecht of welke bedenktijd eventueel in uw regio van toepassing is, en anders ons terugbetalingsbeleid. Wettelijke rechten in uw land gaan altijd voor." }
     ]
@@ -261,10 +261,10 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ok-dot",
     blocks: [
       { kind: "p", text: "Toepasselijk recht. Op deze Voorwaarden en alle geschillen of vorderingen die daaruit of uit het onderwerp ervan voortvloeien, met inbegrip van niet-contractuele vorderingen, is het recht van Roemenië van toepassing." },
-      { kind: "p", text: "Uw lokale bescherming blijft onaangetast. Als u consument bent, ontneemt de keuze voor Roemeens recht u niet de bescherming van dwingende consumentenbeschermingsregels van het land waar u gewoonlijk verblijft — bijvoorbeeld regels inzake oneerlijke bedingen, herroepings- en opzeggingsrechten of garanties — wanneer die regels ongeacht deze keuze van toepassing zijn, waaronder krachtens artikel 6, lid 2, van Verordening (EG) nr. 593/2008 als u in de EU woont, of de overeenkomstige regels van het Verenigd Koninkrijk. Naast het Roemeense recht kunt u zich op die regels beroepen." },
-      { kind: "p", text: "Bevoegde rechter, als u in de EU, de EER of het VK woont. U kunt een procedure tegen ons aanhangig maken bij de Roemeense rechter of bij de rechter van het land waar u woont. Wij kunnen alleen bij de rechter van het land waar u woont een procedure tegen u aanhangig maken." },
-      { kind: "p", text: "Consumenten elders. Als u buiten de EU, de EER en het VK woont, beperkt niets in deze Voorwaarden enig recht dat u krachtens het recht van uw land hebt om bij de rechter van dat land een vordering in te stellen, of enig recht krachtens dat recht waarvan geen afstand kan worden gedaan — waaronder, als u in Australië of Nieuw-Zeeland woont, uw rechten inzake consumentengaranties; als u in Brazilië woont, de Código de Defesa do Consumidor; en als u in de Verenigde Staten woont, de consumentenbeschermingswetgeving van uw staat." },
-      { kind: "p", text: "Inwoners van de Verenigde Staten. Bijlage A.3 bevat een arbitrageovereenkomst en een afstand van het recht op collectieve vorderingen waarop de Federal Arbitration Act van toepassing is. Zij geldt uitsluitend voor inwoners van de Verenigde Staten en uitsluitend voor zover zij afdwingbaar is. Zij geldt niet voor consumenten in de EU, de EER of het VK." },
+      { kind: "p", text: "Uw lokale bescherming blijft onaangetast. Als u consument bent, ontneemt de keuze voor Roemeens recht u niet de bescherming van dwingende consumentenbeschermingsregels van het land waar u gewoonlijk verblijft — bijvoorbeeld regels inzake oneerlijke bedingen, herroepings- en opzeggingsrechten of garanties — wanneer die regels ongeacht deze keuze van toepassing zijn, waaronder krachtens artikel 6, lid 2, van Verordening (EG) nr. 593/2008 als u in de EU woont. Naast het Roemeense recht kunt u zich op die regels beroepen." },
+      { kind: "p", text: "Bevoegde rechter, als u in de EU of de EER woont. U kunt een procedure tegen ons aanhangig maken bij de Roemeense rechter of bij de rechter van het land waar u woont. Wij kunnen alleen bij de rechter van het land waar u woont een procedure tegen u aanhangig maken." },
+      { kind: "p", text: "Consumenten elders. Als u buiten de EU en de EER woont, beperkt niets in deze Voorwaarden enig recht dat u krachtens het recht van uw land hebt om bij de rechter van dat land een vordering in te stellen, of enig recht krachtens dat recht waarvan geen afstand kan worden gedaan — waaronder, als u in Australië of Nieuw-Zeeland woont, uw rechten inzake consumentengaranties; als u in Brazilië woont, de Código de Defesa do Consumidor; en als u in de Verenigde Staten woont, de consumentenbeschermingswetgeving van uw staat." },
+      { kind: "p", text: "Inwoners van de Verenigde Staten. Bijlage A.2 bevat een arbitrageovereenkomst en een afstand van het recht op collectieve vorderingen waarop de Federal Arbitration Act van toepassing is. Zij geldt uitsluitend voor inwoners van de Verenigde Staten en uitsluitend voor zover zij afdwingbaar is. Zij geldt niet voor consumenten in de EU of de EER." },
       { kind: "p", text: "Voordat u naar de rechter gaat. Neem contact met ons op via [legal@dezbatere.ro]; de meeste zaken kunnen worden opgelost en wij streven ernaar binnen [5] werkdagen te antwoorden. Als u consument in Roemenië of de EU bent, kunt u alternatieve geschillenbeslechting gebruiken via [the ANPC – named SAL entity, website]; wij verbinden ons er [do / do not] toe aan die procedure deel te nemen. Klachten over moderatiebeslissingen volgen hoofdstuk 10, dat een afzonderlijke procedure is." }
     ]
   },
@@ -286,7 +286,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Bijlage A — Regionale voorwaarden",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Elke vermelding is uitsluitend van toepassing als de betreffende regio in hoofdstuk 2 is genoemd en vermeldt alleen wat van de hoofdtekst afwijkt. Wanneer een vermelding en de hoofdtekst met elkaar in strijd zijn, geldt de vermelding voor personen in die regio." }
+      { kind: "p", text: "Elke vermelding is van toepassing op personen die in de betreffende regio wonen en vermeldt alleen wat van de hoofdtekst afwijkt. Wanneer een vermelding en de hoofdtekst met elkaar in strijd zijn, geldt de vermelding voor personen in die regio." }
     ]
   },
   {
@@ -299,97 +299,65 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.2",
-    title: "Verenigd Koninkrijk (uitsluitend indien vermeld in hoofdstuk 2)",
+    title: "Verenigde Staten",
     accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Onze Britse vertegenwoordiger krachtens artikel 27 UK GDPR is [name, address, email]. De Consumer Rights Act 2015 is op u van toepassing en niets in deze Voorwaarden beperkt uw rechten daaronder; wanneer de abonnementsregels van de Digital Markets, Competition and Consumers Act 2024 in werking treden (verwacht in 2027), zijn zij van toepassing op betaalde abonnementen, waaronder een bedenktijd na verlengingen en na gratis proefperioden. Hoe wij gebruikers tegen illegale inhoud beschermen: [terrorism content — …; child sexual exploitation and abuse content — …; other priority illegal content — …; intimate image content — removed within 48 hours of a valid report]. Proactieve technologie die wij gebruiken: [describe, or \"none\"]. Leeftijdscontrole: [describe what is used; if only self-declaration, state that the service is treated as accessible to children for the purposes of the Online Safety Act 2023]. Via de klachtenprocedure in hoofdstuk 10 kunnen klachten worden ingediend over illegale inhoud, onterechte verwijdering van uw inhoud, beperkingen van uw account, het gebruik van geautomatiseerde hulpmiddelen die uw inhoud raken en een leeftijdsbeoordeling die u ten onrechte blokkeert. Zij staat open voor personen die door inhoud worden getroffen en geen gebruiker zijn. Bijlage B.2 van ons Privacybeleid heeft betrekking op uw gegevens." }
-    ]
-  },
-  {
-    no: "A.3",
-    title: "Verenigde Staten (uitsluitend indien vermeld in hoofdstuk 2)",
-    accent: "--muted",
     blocks: [
       { kind: "p", text: "Tennessee. Aan personen die in Tennessee wonen, bieden wij DebateAI niet aan." },
       { kind: "p", text: "Arbitrageovereenkomst en afstand van het recht op collectieve vorderingen. Als u in de Verenigde Staten woont, komen u en DebateAIRO overeen elk geschil dat uit deze Voorwaarden of de dienst voortvloeit, op te lossen door bindende individuele arbitrage beheerd door [the American Arbitration Association / JAMS] overeenkomstig haar consumentenregels, in plaats van voor de rechter, behalve dat ieder van ons een individuele vordering bij een rechter voor geringe vorderingen kan instellen. U kunt hiervan afzien door binnen 30 dagen nadat u deze Voorwaarden voor het eerst hebt aanvaard een e-mail naar [address] te sturen. Op deze overeenkomst is de Federal Arbitration Act van toepassing. Wij betalen de kosten voor het aanhangig maken van de arbitrage. Van collectieve, gezamenlijke en representatieve vorderingen wordt afstand gedaan voor zover de wet dit toestaat. Deze arbitrageovereenkomst geldt uitsluitend voor de toekomst en niet voor vorderingen die ontstonden voordat u deze aanvaardde." },
       { kind: "p", text: "Kennisgevingen en verwijderingen. Intieme beelden zonder toestemming kunnen zonder account worden gemeld op [URL] en worden binnen 48 uur na een geldig verzoek verwijderd. Auteursrechtklachten gaan naar onze in hoofdstuk 16 genoemde aangewezen vertegenwoordiger." },
-      { kind: "p", text: "Per staat. Californië: de voorwaarden voor automatische verlenging in hoofdstuk 12 zijn van toepassing; u kunt te allen tijde online opzeggen; wij bewaren uw instemming met verlengingsvoorwaarden ten minste drie jaar. New York: u kunt binnen 14 dagen na elke afschrijving tegen een verhoogde prijs opzeggen en een terugbetaling naar rato ontvangen. Texas en Nebraska: wij verkopen geen gevoelige persoonsgegevens. Washington: onze Consumer Health Data Privacy Notice op [URL] is van toepassing op gezondheidsgerelateerde informatie. Colorado: niets in de dienst neemt beslissingen over u die aanzienlijke gevolgen hebben. Bijlage B.3 van ons Privacybeleid heeft betrekking op uw gegevens en uw privacyrechten in uw staat." }
+      { kind: "p", text: "Per staat. Californië: de voorwaarden voor automatische verlenging in hoofdstuk 12 zijn van toepassing; u kunt te allen tijde online opzeggen; wij bewaren uw instemming met verlengingsvoorwaarden ten minste drie jaar. New York: u kunt binnen 14 dagen na elke afschrijving tegen een verhoogde prijs opzeggen en een terugbetaling naar rato ontvangen. Texas en Nebraska: wij verkopen geen gevoelige persoonsgegevens. Washington: onze Consumer Health Data Privacy Notice op [URL] is van toepassing op gezondheidsgerelateerde informatie. Colorado: niets in de dienst neemt beslissingen over u die aanzienlijke gevolgen hebben. Bijlage B.2 van ons Privacybeleid heeft betrekking op uw gegevens en uw privacyrechten in uw staat." }
+    ]
+  },
+  {
+    no: "A.3",
+    title: "Canada en Quebec",
+    accent: "--muted",
+    blocks: [
+      { kind: "p", text: "Onze privacyfunctionaris, en in Quebec de persoon die verantwoordelijk is voor de bescherming van persoonsgegevens, is [name], privacy@dezbatere.ro. Bijlage B.3 van ons Privacybeleid heeft betrekking op uw gegevens. Quebec: deze Voorwaarden zijn in het Frans beschikbaar; kies Frans met de taalkeuzeschakelaar; de instellingen die uw debatten privé houden, zijn standaard ingeschakeld; u kunt verzoeken om persoonsgegevens over u uit zoekresultaten te verwijderen; er geldt voor u geen arbitrageovereenkomst of afstand van groepsacties." }
     ]
   },
   {
     no: "A.4",
-    title: "Canada en Quebec (uitsluitend indien vermeld)",
+    title: "Australië en Nieuw-Zeeland",
     accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Onze privacyfunctionaris, en in Quebec de persoon die verantwoordelijk is voor de bescherming van persoonsgegevens, is [name], privacy@dezbatere.ro. Bijlage B.4 van ons Privacybeleid heeft betrekking op uw gegevens. Quebec: deze Voorwaarden zijn in het Frans beschikbaar; kies Frans met de taalkeuzeschakelaar; de instellingen die uw debatten privé houden, zijn standaard ingeschakeld; u kunt verzoeken om persoonsgegevens over u uit zoekresultaten te verwijderen; er geldt voor u geen arbitrageovereenkomst of afstand van groepsacties." }
-    ]
-  },
-  {
-    no: "A.5",
-    title: "Australië en Nieuw-Zeeland (uitsluitend indien vermeld)",
-    accent: "--gold",
     blocks: [
       { kind: "p", text: "Op onze diensten zijn garanties van toepassing die krachtens de Australian Consumer Law niet kunnen worden uitgesloten. Bij ernstige tekortkomingen in de dienst hebt u het recht om de overeenkomst op te zeggen en het ongebruikte deel terugbetaald te krijgen, of om een vergoeding voor de waardevermindering te ontvangen; ook hebt u recht op vergoeding van elk ander redelijkerwijs voorzienbaar verlies of elke redelijkerwijs voorzienbare schade. Als de tekortkoming niet ernstig is, hebt u er recht op dat problemen met de dienst binnen een redelijke termijn worden verholpen; gebeurt dat niet, dan hebt u het recht om de overeenkomst op te zeggen en een terugbetaling te ontvangen. Voor zover artikel 64A dit toestaat, is onze aansprakelijkheid voor schending van een garantie beperkt tot het opnieuw leveren van de dienst of het betalen van de kosten daarvan. Voor het betaalde abonnement geldt geen andere bedenktijd dan die van hoofdstuk 12; ons terugbetalingsbeleid is […]. Nieuw-Zeeland: de Consumer Guarantees Act 1993 is van toepassing en niets in deze Voorwaarden sluit deze uit; schadelijke digitale communicatie kan bij ons krachtens hoofdstuk 10 of bij Netsafe worden gemeld." }
     ]
   },
   {
+    no: "A.5",
+    title: "Zwitserland",
+    accent: "--gold",
+    blocks: [
+      { kind: "p", text: "De Zwitserse federale wet inzake gegevensbescherming is van toepassing op uw gegevens (Privacybeleid, Bijlage B.5). U kunt een procedure aanhangig maken bij de rechter van de plaats in Zwitserland waar u woont. Voor het betaalde abonnement geldt geen wettelijk herroepingsrecht; ons terugbetalingsbeleid is […]." }
+    ]
+  },
+  {
     no: "A.6",
-    title: "Zwitserland (uitsluitend indien vermeld)",
+    title: "Moldavië",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "De Zwitserse federale wet inzake gegevensbescherming is van toepassing op uw gegevens (Privacybeleid, Bijlage B.6). U kunt een procedure aanhangig maken bij de rechter van de plaats in Zwitserland waar u woont. Voor het betaalde abonnement geldt geen wettelijk herroepingsrecht; ons terugbetalingsbeleid is […]." }
+      { kind: "p", text: "U hebt op grond van deze Voorwaarden dezelfde rechten als een consument in de Europese Unie, waaronder het herroepingsrecht van 14 dagen in hoofdstuk 13. U kunt een procedure aanhangig maken bij de Moldavische rechter. De Moldavische wet nr. 195/2024 inzake de bescherming van persoonsgegevens is van toepassing op uw gegevens (Privacybeleid, Bijlage B.6)." }
     ]
   },
   {
     no: "A.7",
-    title: "Moldavië (uitsluitend indien vermeld)",
+    title: "Azië-Pacific",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "U hebt op grond van deze Voorwaarden dezelfde rechten als een consument in de Europese Unie, waaronder het herroepingsrecht van 14 dagen in hoofdstuk 13. U kunt een procedure aanhangig maken bij de Moldavische rechter. De Moldavische wet nr. 195/2024 inzake de bescherming van persoonsgegevens is van toepassing op uw gegevens (Privacybeleid, Bijlage B.7)." }
-    ]
-  },
-  {
-    no: "A.8",
-    title: "Oekraïne (uitsluitend indien vermeld)",
-    accent: "--ink",
-    blocks: [
-      { kind: "p", text: "Wij bieden DebateAI aan in Oekraïne, behalve in de gebieden die niet onder controle van de Oekraïense regering staan. Het product en deze Voorwaarden zijn beschikbaar in het Oekraïens. De Oekraïense wet „Inzake de bescherming van persoonsgegevens” is van toepassing op uw gegevens (Privacybeleid, Bijlage B.8)." }
-    ]
-  },
-  {
-    no: "A.9",
-    title: "Israël (uitsluitend indien vermeld)",
-    accent: "--muted",
-    blocks: [
-      { kind: "p", text: "U kunt een betaald abonnement opzeggen zoals de Consumer Protection Law, 5741-1981, toestaat [state the cancellation terms]. Deze Voorwaarden en ons Privacybeleid zijn beschikbaar in het Hebreeuws. De Israëlische Protection of Privacy Law is van toepassing op uw gegevens (Privacybeleid, Bijlage B.9)." }
-    ]
-  },
-  {
-    no: "A.10",
-    title: "Azië-Pacific (uitsluitend de regels voor de vermelde regio's)",
-    accent: "--ok-dot",
-    blocks: [
-      { kind: "p", text: "Singapore: onze functionaris voor gegevensbescherming is [name, email]; doorgiften berusten op contractuele bescherming die vergelijkbaar is met de PDPA; voor het betaalde abonnement geldt geen wettelijke bedenktijd en ons terugbetalingsbeleid is […]. Japan: de wettelijk verplichte openbaarmaking krachtens de Specified Commercial Transactions Act staat op [URL]; voor onlineabonnementen geldt geen algemene bedenktijd en ons terugbetalingsbeleid is […]; wij sturen uw inhoud naar AI-aanbieders in de Verenigde Staten en de Europese Unie, elk op grond van een contract dat bescherming vereist die gelijkwaardig is aan de Japanse Act on the Protection of Personal Information, en op verzoek vertellen wij u welke maatregelen dat zijn. Zuid-Korea: toestemming voor optionele verwerking en marketing wordt afzonderlijk verkregen, los van de toestemming voor wat nodig is om de dienst te laten functioneren; onze privacyfunctionaris is [name], privacy@dezbatere.ro; u kunt een betaald abonnement binnen 7 dagen na afsluiting herroepen overeenkomstig de E-Commerce Act; wij verkrijgen opnieuw uw toestemming vóór elke terugkerende prijsverhoging of omzetting van gratis naar betaald; de dienst maakt gebruik van generatieve AI, wij vertellen u dat voordat u de dienst gebruikt en wij labelen door AI gegenereerde uitvoer. Taiwan: u kunt een betaald abonnement binnen 7 dagen na afsluiting herroepen, op grond van de Consumer Protection Act; de Taiwanese Personal Data Protection Act is van toepassing op uw gegevens (Privacybeleid, Bijlage B.10). Thailand: onze vertegenwoordiger in Thailand is [name] [if appointed]. Filipijnen: onze bedrijfsidentificatie en ons verhaalmechanisme krachtens de Internet Transactions Act staan op [URL]; klachten kunnen bij de National Privacy Commission worden ingediend." }
-    ]
-  },
-  {
-    no: "A.11",
-    title: "Gereserveerd",
-    accent: "--gold",
-    blocks: [
-      { kind: "p", text: "Turkije, Brazilië en Indonesië vereisen elk een bijlage in de lokale taal, een vertegenwoordiger of registratie en indieningen. Deze zijn hier niet opgesteld en vallen buiten hoofdstuk 2 totdat zij bewust worden opgenomen. China, Vietnam en Rusland worden niet bediend." }
+      { kind: "p", text: "Singapore: onze functionaris voor gegevensbescherming is [name, email]; doorgiften berusten op contractuele bescherming die vergelijkbaar is met de PDPA; voor het betaalde abonnement geldt geen wettelijke bedenktijd en ons terugbetalingsbeleid is […]. Japan: de wettelijk verplichte openbaarmaking krachtens de Specified Commercial Transactions Act staat op [URL]; voor onlineabonnementen geldt geen algemene bedenktijd en ons terugbetalingsbeleid is […]; wij sturen uw inhoud naar AI-aanbieders in de Verenigde Staten en de Europese Unie, elk op grond van een contract dat bescherming vereist die gelijkwaardig is aan de Japanse Act on the Protection of Personal Information, en op verzoek vertellen wij u welke maatregelen dat zijn. Zuid-Korea: toestemming voor optionele verwerking en marketing wordt afzonderlijk verkregen, los van de toestemming voor wat nodig is om de dienst te laten functioneren; onze privacyfunctionaris is [name], privacy@dezbatere.ro; u kunt een betaald abonnement binnen 7 dagen na afsluiting herroepen overeenkomstig de E-Commerce Act; wij verkrijgen opnieuw uw toestemming vóór elke terugkerende prijsverhoging of omzetting van gratis naar betaald; de dienst maakt gebruik van generatieve AI, wij vertellen u dat voordat u de dienst gebruikt en wij labelen door AI gegenereerde uitvoer. Taiwan: u kunt een betaald abonnement binnen 7 dagen na afsluiting herroepen, op grond van de Consumer Protection Act; de Taiwanese Personal Data Protection Act is van toepassing op uw gegevens (Privacybeleid, Bijlage B.7)." }
     ]
   }
 ];
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.1",
-  sha256: "e244de10c12fb004d9846f731875f0cda251ac4e9b037d4782af172a35be60fa",
-  eyebrow: "SERVICEVOORWAARDEN · v2.1 · VAN KRACHT OP [DATE]",
+  version: "2.2",
+  sha256: "28b6f67b36a4a219ede34647668e5722ce0cec29150816194e8711bda4b1d434",
+  eyebrow: "SERVICEVOORWAARDEN · v2.2 · VAN KRACHT OP [DATE]",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DebateAIRO S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",
-  endMarker: "EINDE VAN DE VOORWAARDEN · v2.1",
+  endMarker: "EINDE VAN DE VOORWAARDEN · v2.2",
   contact: "[legal@dezbatere.ro]",
   bodyLabel: "Tekst van de Servicevoorwaarden",
   sectionIdPrefix: "terms-section-",
