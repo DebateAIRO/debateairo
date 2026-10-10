@@ -131,6 +131,49 @@ class GateUnitTests(unittest.TestCase):
             gate_watch.main(['--private', PRIVATE, '--state', '/nonexistent/x', '--notice', 'gate-addresses'], run=run)
 
 
+# Every gate's private folder and GO. Each Google unit that runs a process must hide every OTHER
+# gate's pair (named, or under a hidden parent folder), with the "-" prefix (absent on this server
+# is fine). The socket unit runs no process (systemd itself binds it), so it has nothing to hide.
+GATE_PAIRS = {'deepinfra': ('/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json'),
+              'anthropic': ('/var/lib/debateai-v3-preview/provider-anthropic-authority-v1', '/etc/debateai-v3-preview/provider-anthropic-go-v1.json'),
+              'google': (PRIVATE, GO),
+              'team-v2': ('/var/lib/debateai-v3-preview/provider-team-authority-v2', '/etc/debateai-v3-preview/provider-team-go-v2.json')}
+PROCESS_UNITS = {UNIT: 'google', HALT_UNIT: 'google', FORWARDER: None,
+                 SYSTEMD / 'debateai-preview-google-addresses.service': None}
+
+
+def hides(path, unit):
+    """Whether unit hides path: an InaccessiblePaths entry (always with "-") equal to it or a parent."""
+    entries = ' '.join(entries_of(unit, 'InaccessiblePaths')).split()
+    if not all(entry.startswith('-/') for entry in entries):
+        return False
+    return any(path == entry[1:] or path.startswith(entry[1:].rstrip('/') + '/') for entry in entries)
+
+
+def entries_of(path, name):
+    return entries(path, name)
+
+
+class OtherGatesHiddenTests(unittest.TestCase):
+    def test_every_google_process_unit_hides_every_other_gates_folder_and_go(self):
+        for unit, own in PROCESS_UNITS.items():
+            for gate, pair in GATE_PAIRS.items():
+                if gate == own:
+                    continue
+                for path in pair:
+                    with self.subTest(unit=unit.name, path=path):
+                        self.assertTrue(hides(path, unit))
+
+    def test_the_gate_keeps_its_own_folder_and_the_watcher_never_sees_the_key(self):
+        self.assertFalse(hides(PRIVATE, UNIT))
+        self.assertFalse(hides(GO, UNIT))
+        self.assertFalse(hides(PRIVATE, HALT_UNIT))
+        self.assertTrue(hides(PRIVATE + '/api-key.txt', HALT_UNIT))
+        self.assertTrue(hides(PRIVATE + '/api-key.txt', FORWARDER))
+        self.assertEqual(entries(SOCKET, 'InaccessiblePaths'), [])
+        self.assertEqual(entries(SOCKET, 'ExecStartPre') + entries(SOCKET, 'ExecStart'), [])
+
+
 class ReadmeTests(unittest.TestCase):
     def test_the_readme_covers_every_server_step_in_plain_words(self):
         text = README.read_text()

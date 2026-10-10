@@ -38,7 +38,10 @@ RemoveIPC=yes
 # status never reads the key: hide it, and every other gate's state.
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-google-authority-v1/api-key.txt
 InaccessiblePaths=-/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/etc/debateai-v3-preview/api.env -/root -/var/lib/postgresql -/etc/postfix
-InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/var/lib/debateai-v3-preview/provider-team-authority-v2
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json
+# Every other gate's private folder and GO: this watcher reads only the Google gate's status.
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-anthropic-authority-v1 -/etc/debateai-v3-preview/provider-anthropic-go-v1.json
 InaccessiblePaths=-/etc/debateai-v3-preview/auth-dev-v1 -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/api -/etc/debateai-v3-preview/lifecycle
 RestrictAddressFamilies=AF_UNIX
 IPAddressDeny=any

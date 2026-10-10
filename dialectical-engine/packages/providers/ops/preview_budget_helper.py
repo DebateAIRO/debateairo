@@ -503,6 +503,9 @@ class GoogleProfile:
     # frame adds 40 bytes for this model id. A smaller limit could refuse a call mid-debate.
     max_request_bytes = 256 * 1024 + 64
     redaction_patterns = (r'AIza[0-9A-Za-z_-]{35}',)
+    # The shape a Google API key has. A key-reading core that knows this hook refuses a key file of
+    # any other shape (for example another provider's key put here by mistake).
+    key_pattern = r'^AIza[0-9A-Za-z_-]{35}$'
     rows = {row.model: row for row in (
         # The row's own prices are the ceiling (the last dated step); calls use google_careful_prices.
         ModelRow('gemini-3.8-flash', 'Google', Decimal('1.50'), Decimal('7.50'), 16384, 'high', False),)}

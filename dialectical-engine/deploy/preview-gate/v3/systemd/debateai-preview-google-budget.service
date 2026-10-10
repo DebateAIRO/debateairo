@@ -59,7 +59,7 @@ InaccessiblePaths=-/etc/debateai-v3-preview/auth-dev-v1 -/var/lib/debateai-v3-pr
 # The other gates' state, keys and GOs: the Google gate never needs them.
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
-InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-anthropic-authority-v1
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-anthropic-authority-v1 -/etc/debateai-v3-preview/provider-anthropic-go-v1.json
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 # No internet here: only the local resolver stub. The egress drop-in adds what Gemini needs.
 IPAddressDeny=any

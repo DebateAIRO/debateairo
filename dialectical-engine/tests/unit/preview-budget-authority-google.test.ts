@@ -24,7 +24,7 @@ describe('the preview spending gate, Google profile and files (PR C)', () => {
   it('checks the Google gate units, forwarder, halt watcher and README offline', () => {
     const result = runPython('tests/unit/preview_gate_google_unit_test.py', 10000);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 9 tests');
+    expect(result.stderr).toContain('Ran 11 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the Google address list, the forwarder check and the 24-hour measurement offline', () => {

@@ -292,8 +292,11 @@ and runner env steps).**
   list must still name at least two makers.
 - In the declared provider targets, add the reviewed Gemini target `preview:gemini-3-8-flash`
   after the four existing ones (the app refuses any other shape).
-- Publish a new register version that includes the Gemini provider (never edit the sealed one),
-  and rebuild the UI with the new model list flag.
+- Publish a new register version that includes the Gemini provider (never edit the sealed one).
+- The UI's model list: this release ships only the `glm-only` and `multi-model` lists
+  (`PREVIEW_MODEL_ROSTER_FLAGS` in deploy/preview-auth-dev/v1/environment.mjs, chosen at build time
+  with `--models`); neither names Gemini. A list with Gemini is a later reviewed flag value, added
+  in its own change after the probe passes; then rebuild the UI with it.
 - Restart the API and the runner.
 
 ## Egress: how the gate reaches Google
