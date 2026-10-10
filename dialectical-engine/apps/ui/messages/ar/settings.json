@@ -72,6 +72,7 @@
   "settings.export.download.starting": "بدأ تنزيل ملفك. إذا لم يبدأ، فاستخدم الزر.",
   "settings.export.download.button": "تنزيل ملف ZIP",
   "settings.export.download.invalid": "انتهت صلاحية رابط التنزيل هذا أو استُبدل. اطلب تصديرًا جديدًا من الإعدادات.",
+  "settings.export.download.reopenFromEmail": "افتح رابط التنزيل من بريدك الإلكتروني مرة أخرى. سيظل صالحًا حتى تنتهي صلاحيته.",
   "settings.export.download.wrongAccount": "رابط التنزيل هذا يخص حسابًا آخر. سجّل الخروج ثم ادخل إلى الحساب الذي طلب التصدير.",
   "settings.export.download.backToSettings": "العودة إلى الإعدادات",
   "settings.sessions.operationFailed": "فشلت عملية الجلسة",

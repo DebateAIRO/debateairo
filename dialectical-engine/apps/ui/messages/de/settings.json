@@ -72,6 +72,7 @@
   "settings.export.download.starting": "Ihr Download beginnt. Falls er nicht startet, verwenden Sie die Schaltfläche.",
   "settings.export.download.button": "ZIP herunterladen",
   "settings.export.download.invalid": "Dieser Downloadlink ist abgelaufen oder wurde ersetzt. Fordern Sie unter Einstellungen einen neuen Export an.",
+  "settings.export.download.reopenFromEmail": "Öffnen Sie den Downloadlink aus Ihrer E-Mail erneut. Er funktioniert bis zum Ablaufdatum.",
   "settings.export.download.wrongAccount": "Dieser Downloadlink gehört zu einem anderen Konto. Melden Sie sich ab und bei dem Konto an, das den Export angefordert hat.",
   "settings.export.download.backToSettings": "Zurück zu den Einstellungen",
   "settings.sessions.operationFailed": "Sitzungsaktion fehlgeschlagen",

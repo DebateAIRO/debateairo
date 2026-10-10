@@ -6,7 +6,7 @@ import { clearPendingExport, readPendingExport, stashPendingExport } from "@/lib
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 type Download = { bytes: ArrayBuffer; filename: string };
-type View = "checking" | "starting" | "invalid" | "wrongAccount" | "held" | "unavailable";
+type View = "checking" | "starting" | "reopenFromEmail" | "invalid" | "wrongAccount" | "held" | "unavailable";
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 
 function startDownload(file: Download): void {
@@ -24,45 +24,56 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
 
   useEffect(() => {
     let active = true;
-    const fragment = window.location.hash.slice(1);
-    if (fragment) {
-      window.history.replaceState(null, "", "/export");
-      if (TOKEN.test(fragment)) stashPendingExport(fragment);
-      else clearPendingExport();
-    }
-    const token = TOKEN.test(fragment) ? fragment : fragment ? null : readPendingExport();
-    if (!token || !TOKEN.test(token)) {
-      clearPendingExport();
-      setView("invalid");
-      return () => { active = false; };
-    }
-    void client.downloadDataExport(token).then((download) => {
-      if (!active) return;
-      const ready = { bytes: download.bytes, filename: download.filename };
-      setFile(ready);
-      setView("starting");
-      startDownload(ready);
-      clearPendingExport();
-    }, (failure: unknown) => {
-      if (!active) return;
-      if (failure instanceof ContractHttpError && (failure.code === "SESSION_REQUIRED" || failure.serverCode === "COOKIE_SESSION_REQUIRED" || failure.serverCode === "SESSION_REQUIRED")) {
-        window.location.assign("/login?next=/export");
+    let requestId = 0;
+    const open = (fromHashChange: boolean) => {
+      const fragment = window.location.hash.slice(1);
+      if (fromHashChange && !fragment) return;
+      const currentRequest = ++requestId;
+      setFile(null);
+      setView("checking");
+      if (fragment) {
+        window.history.replaceState(null, "", "/export");
+        if (TOKEN.test(fragment)) stashPendingExport(fragment);
+        else clearPendingExport();
+      }
+      const token = TOKEN.test(fragment) ? fragment : fragment ? null : readPendingExport();
+      if (!token || !TOKEN.test(token)) {
+        clearPendingExport();
+        setView(fragment ? "invalid" : "reopenFromEmail");
         return;
       }
-      if (failure instanceof ContractHttpError && failure.serverCode === "EXPORT_WRONG_ACCOUNT") {
-        clearPendingExport(); setView("wrongAccount");
-      } else if (failure instanceof ContractHttpError && failure.serverCode === "EXPORT_LINK_INVALID") {
-        clearPendingExport(); setView("invalid");
-      } else if (failure instanceof ContractHttpError && failure.serverCode === "EXPORT_ACCOUNT_HELD") {
-        setView("held");
-      } else {
-        setView("unavailable");
-      }
-    });
-    return () => { active = false; };
+      void client.downloadDataExport(token).then((download) => {
+        if (!active || currentRequest !== requestId) return;
+        const ready = { bytes: download.bytes, filename: download.filename };
+        setFile(ready);
+        setView("starting");
+        startDownload(ready);
+        clearPendingExport();
+      }, (failure: unknown) => {
+        if (!active || currentRequest !== requestId) return;
+        if (failure instanceof ContractHttpError && (failure.code === "SESSION_REQUIRED" || failure.serverCode === "COOKIE_SESSION_REQUIRED" || failure.serverCode === "SESSION_REQUIRED")) {
+          window.location.assign("/login?next=/export");
+          return;
+        }
+        if (failure instanceof ContractHttpError && failure.serverCode === "EXPORT_WRONG_ACCOUNT") {
+          clearPendingExport(); setView("wrongAccount");
+        } else if (failure instanceof ContractHttpError && failure.serverCode === "EXPORT_LINK_INVALID") {
+          clearPendingExport(); setView("invalid");
+        } else if (failure instanceof ContractHttpError && failure.serverCode === "EXPORT_ACCOUNT_HELD") {
+          setView("held");
+        } else {
+          setView("unavailable");
+        }
+      });
+    };
+    const onHashChange = () => open(true);
+    window.addEventListener("hashchange", onHashChange);
+    open(false);
+    return () => { active = false; window.removeEventListener("hashchange", onHashChange); };
   }, [client]);
 
   const message = view === "starting" ? t(catalog, "settings.export.download.starting")
+    : view === "reopenFromEmail" ? t(catalog, "settings.export.download.reopenFromEmail")
     : view === "invalid" ? t(catalog, "settings.export.download.invalid")
     : view === "wrongAccount" ? t(catalog, "settings.export.download.wrongAccount")
     : view === "held" ? t(catalog, "settings.export.held")
@@ -72,7 +83,7 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
     <section className="setCard">
       {message ? <p className="setCardHint exportMessage" role="status">{message}</p> : null}
       {view === "starting" && file ? <div className="setCardRow"><button type="button" className="setBtn setBtnPrimary" onClick={() => startDownload(file)}>{t(catalog, "settings.export.download.button")}</button></div> : null}
-      {(view === "invalid" || view === "held" || view === "unavailable") ? <div className="setCardRow"><a className="setBtn" href="/settings">{t(catalog, "settings.export.download.backToSettings")}</a></div> : null}
+      {(view === "reopenFromEmail" || view === "invalid" || view === "held" || view === "unavailable") ? <div className="setCardRow"><a className="setBtn" href="/settings">{t(catalog, "settings.export.download.backToSettings")}</a></div> : null}
     </section>
   </div></main>;
 }

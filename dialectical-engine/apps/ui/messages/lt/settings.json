@@ -72,6 +72,7 @@
   "settings.export.download.starting": "Atsisiuntimas pradedamas. Jei jis neprasideda, naudokite mygtuką.",
   "settings.export.download.button": "Atsisiųsti ZIP",
   "settings.export.download.invalid": "Ši atsisiuntimo nuoroda nebegalioja arba buvo pakeista. Nustatymuose paprašykite naujo eksporto.",
+  "settings.export.download.reopenFromEmail": "Dar kartą atidarykite atsisiuntimo nuorodą savo el. laiške. Ji veiks iki galiojimo pabaigos.",
   "settings.export.download.wrongAccount": "Ši atsisiuntimo nuoroda priklauso kitai paskyrai. Atsijunkite ir prisijunkite prie paskyros, kuri paprašė eksporto.",
   "settings.export.download.backToSettings": "Grįžti į nustatymus",
   "settings.sessions.operationFailed": "Seanso veiksmas nepavyko",

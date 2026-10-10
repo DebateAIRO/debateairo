@@ -72,6 +72,7 @@
   "settings.export.download.starting": "Your download is starting. If it does not, use the button.",
   "settings.export.download.button": "Download ZIP",
   "settings.export.download.invalid": "This download link has expired or was replaced. Request a new export from Settings.",
+  "settings.export.download.reopenFromEmail": "Open the download link from your email again. It still works until it expires.",
   "settings.export.download.wrongAccount": "This download link belongs to a different account. Sign out and sign in to the account that requested it.",
   "settings.export.download.backToSettings": "Back to Settings",
   "settings.sessions.operationFailed": "Session operation failed",

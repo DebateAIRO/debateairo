@@ -72,6 +72,7 @@
   "settings.export.download.starting": "Η λήψη σας ξεκινά. Αν δεν ξεκινήσει, χρησιμοποιήστε το κουμπί.",
   "settings.export.download.button": "Λήψη ZIP",
   "settings.export.download.invalid": "Αυτός ο σύνδεσμος λήψης έληξε ή αντικαταστάθηκε. Ζητήστε νέα εξαγωγή από τις Ρυθμίσεις.",
+  "settings.export.download.reopenFromEmail": "Ανοίξτε ξανά τον σύνδεσμο λήψης από το email σας. Λειτουργεί μέχρι να λήξει.",
   "settings.export.download.wrongAccount": "Αυτός ο σύνδεσμος λήψης ανήκει σε διαφορετικό λογαριασμό. Αποσυνδεθείτε και συνδεθείτε στον λογαριασμό που ζήτησε την εξαγωγή.",
   "settings.export.download.backToSettings": "Επιστροφή στις Ρυθμίσεις",
   "settings.sessions.operationFailed": "Η ενέργεια συνεδρίας απέτυχε",

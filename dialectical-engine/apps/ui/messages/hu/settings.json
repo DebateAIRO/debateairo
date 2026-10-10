@@ -72,6 +72,7 @@
   "settings.export.download.starting": "A letöltés indul. Ha nem kezdődik el, használja a gombot.",
   "settings.export.download.button": "ZIP letöltése",
   "settings.export.download.invalid": "A letöltési hivatkozás lejárt vagy lecserélték. Kérjen új exportot a Beállításokban.",
+  "settings.export.download.reopenFromEmail": "Nyissa meg újra az e-mailben kapott letöltési hivatkozást. A lejáratáig működni fog.",
   "settings.export.download.wrongAccount": "Ez a letöltési hivatkozás egy másik fiókhoz tartozik. Jelentkezzen ki, majd be az exportot kérő fiókba.",
   "settings.export.download.backToSettings": "Vissza a Beállításokhoz",
   "settings.sessions.operationFailed": "A munkamenet-művelet sikertelen",
