@@ -306,7 +306,9 @@ class UnitFileTests(unittest.TestCase):
         self.assertNotIn('--helper', start)
         options = dict(zip(start[4::2], start[5::2]))
         self.assertEqual(set(options), {'--private', '--go', '--socket'})
-        self.assertTrue(gate.socket_path_allowed(options['--socket']))
+        # The v2 code on the server serves this name; the gate in this tree is v3, which retires it.
+        self.assertTrue(gate.SOCKET_PATTERN.fullmatch(options['--socket']))
+        self.assertIn(Path(options['--socket']).name, gate.RETIRED_SOCKET_NAMES)
         self.assertEqual(options['--socket'], '/run/debateai-v3-preview/team-budget-v2.sock')
         self.assertEqual(values(UNIT, 'ReadWritePaths'), [options['--private'] + ' /run/debateai-v3-preview'])
         check = values(UNIT, 'ExecStartPre')[0].split()

@@ -11,7 +11,17 @@
 // The source is closed by an exact, reviewed key list (not a row count): adding a key to the
 // preview register means adding it here in the same reviewed change.
 // Every v1 rule stays: canonical rows, base snapshot hash, billing off, no support or scorecard
-// row, credential-free provider set with the two preview refs, base-owned policies parsed.
+// row, credential-free provider set, base-owned policies parsed.
+// Multi-model (2026-10-10): the source provider set is the reviewed DeepInfra rows (preview-models.ts):
+// preview:fixture-a and preview:fixture-b stay GLM (Z.AI) so runs pinned to the sealed two-GLM version
+// keep resolving, plus one ref per new model with its own maker. requiredDistinctMakers stays 1 (a missing
+// second maker serves with marks, never blocks). The answer writer stays fixture-a (GLM). By default the
+// checker stays fixture-b (GLM), as in the sealed two-GLM version: a version with four refs can then be
+// published while the gate has only GLM switched on. Moving the checker (and the story checker that
+// follows it, story-policy.ts) to the DeepSeek ref is a separate, explicit choice, `checker: 'deepseek'`,
+// which refuses unless the operator also states `deepseekEnabledOnGate: true` (the gate's GO switches
+// DeepSeek on; the app refuses an ask whose role model the gate has not switched on). The base may be the
+// sealed two-GLM pair (or its historical shapes) or a version this kit already published.
 // The delta now carries the old and new canonical values, so the owner reviews values, not hashes;
 // deltaSha256 binds that exact document and the approval binds deltaSha256.
 import { createHash } from 'node:crypto';
@@ -24,7 +34,8 @@ import {
 } from '@debateai/register';
 import { buildDevelopmentDeploymentRegisterPublicationRows } from '../../../apps/runner/src/dev-deployment-register.js';
 import { parseProviderDiscoveryTargets } from '@debateai/providers';
-import { PREVIEW_GLM_TARGET, PREVIEW_GLM_PROVIDER_REFS, assertPreviewProviderTargets } from '../../../packages/providers/src/preview-test.js';
+import { PREVIEW_GLM_PROVIDER_REFS, assertPreviewProviderTargets } from '../../../packages/providers/src/preview-test.js';
+import { PREVIEW_MODEL_ROWS, PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef, previewTargetJsonRow } from '../../../packages/providers/src/preview-models.js';
 import { staffAccessPolicyFromValue } from '../../../packages/register/src/staff-access-policy.js';
 import { internalAllowancePolicyFromValue } from '../../../packages/register/src/internal-allowance-policy.js';
 import { publishPreviewRegister, type RuntimeObservation, type PreviewSnapshot } from './publish-register.js';
@@ -59,23 +70,49 @@ export const PREVIEW_SOURCE_ROW_KEYS_V2 = Object.freeze([
   'verdictHighCut','verdictLowCut','verdictMarginGamma','verificationPolicy','vllmImageDigest','wayOfKnowingCeiling'
 ] as const);
 
+/** The answer writer: GLM (fixture-a), always. Story roles follow the writer and checker (story-policy.ts). */
+export const PREVIEW_SYNTHESIZER_ROLE_REF = 'preview:fixture-a' as const;
+/** The default checker: GLM's second ref (fixture-b), the value the sealed two-GLM version holds. */
+export const PREVIEW_EVALUATOR_ROLE_REF = 'preview:fixture-b' as const;
+/** The checker after the explicit `checker: 'deepseek'` choice: DeepSeek, a different maker from the writer. */
+export const PREVIEW_DEEPSEEK_CHECKER_ROLE_REF = 'preview:deepseek-v4-1-flash' as const;
+/**
+ * Which model checks the answer. Omitted means `{checker:'glm'}`. `{checker:'deepseek'}` must also say
+ * `deepseekEnabledOnGate: true` (exactly): the operator's statement that the gate's GO switches DeepSeek on.
+ */
+export type PreviewCheckerChoice = Readonly<{checker:'glm'}> | Readonly<{checker:'deepseek';deepseekEnabledOnGate:true}>;
+/** The checker's provider ref for a choice; anything but the two reviewed shapes refuses by its own rule. */
+export function previewCheckerRoleRef(choice:unknown={checker:'glm'}):string {
+  if(choice===null||typeof choice!=='object'||Object.getPrototypeOf(choice)!==Object.prototype)fail('checker-choice');
+  const value=choice as Record<string,unknown>,keys=Object.keys(value).sort().join(',');
+  if(value.checker==='glm'&&keys==='checker')return PREVIEW_EVALUATOR_ROLE_REF;
+  if(value.checker!=='deepseek'||!['checker','checker,deepseekEnabledOnGate'].includes(keys))fail('checker-choice');
+  if(value.deepseekEnabledOnGate!==true)fail('checker-deepseek-not-enabled-on-gate');
+  return PREVIEW_DEEPSEEK_CHECKER_ROLE_REF;
+}
+
 const sameKeys = (actual:readonly string[], expected:readonly string[]) =>
   actual.length===expected.length && [...actual].sort().join('\0')===[...expected].sort().join('\0');
 
-/** v1's source build (same runtime gate, same provider panel), closed by the reviewed key list instead of a count. */
-export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation):Promise<readonly RegisterPublicationRow[]> {
+/**
+ * v1's source build (same runtime gate, same provider panel), closed by the reviewed key list instead of a count.
+ * `checker` is the reviewed checker choice (default GLM); it is checked before anything else is built.
+ */
+export async function buildPreviewSourceRowsV2(bootstrap:BootstrapRegister, runtime:RuntimeObservation, checker:PreviewCheckerChoice={checker:'glm'}):Promise<readonly RegisterPublicationRow[]> {
+  const evaluatorRoleRef=previewCheckerRoleRef(checker);
   if(runtime.nodeVersion!=='v26.8.2'||runtime.pnpmVersion!=='11.20.0'||!/^([0-9a-f]{40})$/.test(runtime.sourceRevision)
     ||!/^([0-9a-f]{40})$/.test(runtime.sourceTree)||!/^([0-9a-f]{64})$/.test(runtime.operatorSha256)
     ||!Number.isFinite(Date.parse(runtime.observedAt))||bootstrap.values.pnpmVersion!==runtime.pnpmVersion||bootstrap.values.postgresMajorVersion!=='18')fail();
-  const configuredProviders=PREVIEW_GLM_PROVIDER_REFS.map(providerRef=>({providerRef,adapterKind:'openai-compatible-http' as const,maker:'Z.AI'}));
-  const targetsJson=JSON.stringify(PREVIEW_GLM_PROVIDER_REFS.map(provider_ref=>({...PREVIEW_GLM_TARGET,provider_ref})));
+  const configuredProviders=PREVIEW_REVIEWED_PROVIDER_REFS.map(providerRef=>({providerRef,adapterKind:'openai-compatible-http' as const,maker:previewModelRowForRef(providerRef)!.maker}));
+  const targetsJson=JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow));
   const targets=parseProviderDiscoveryTargets(targetsJson,configuredProviders);
   // Validation only; composition never contacts an authority or declares health.
-  assertPreviewProviderTargets({deployment:'v3-preview',free_model_ids:[PREVIEW_GLM_TARGET.model],requested_thinking_level:'high',budget_socket:'/run/debateai-v3-preview/composition.sock',scope_id:'composition-only'},targets);
+  const models=PREVIEW_MODEL_ROWS.map(row=>row.model);
+  assertPreviewProviderTargets({free_model_ids:models,premium_model_ids:models},targets);
   const panel={configuredProviders,requiredDistinctMakers:1,healthyProviderRefs:[],targets,targetsJson};
   const projected:BootstrapRegister={...bootstrap,values:{...bootstrap.values,nodeRuntimeVersion:runtime.nodeVersion},resolution:{...bootstrap.resolution,
     nodeRuntimeVersion:`preview-auth-dev-v1 actual Node ${runtime.nodeVersion}; measured ${runtime.observedAt}; source ${runtime.sourceRevision}/${runtime.sourceTree}; operator sha256:${runtime.operatorSha256}`}};
-  const rows=[...await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_GLM_PROVIDER_REFS[0],evaluatorRoleRef:PREVIEW_GLM_PROVIDER_REFS[1]},'local'),
+  const rows=[...await buildDevelopmentDeploymentRegisterPublicationRows(projected,panel,{synthesizerRoleRef:PREVIEW_SYNTHESIZER_ROLE_REF,evaluatorRoleRef},'local'),
     ...[PASSWORD_RESET_POLICY_REGISTER_ROW,BACKUP_EMAIL_POLICY_REGISTER_ROW,MFA_RECOVERY_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
   if(!sameKeys(rows.map(row=>row.rowKey),PREVIEW_SOURCE_ROW_KEYS_V2))fail('source-key-list');
   return Object.freeze(rows.map(row=>Object.freeze(row)));
@@ -96,16 +133,23 @@ function credentialFree(value:unknown):boolean {
   if(value!==null&&typeof value==='object')return Object.entries(value).every(([key,item])=>!/(authorization|credential|api.?key|secret|password)/i.test(key)&&credentialFree(item));
   return true;
 }
-/** v1's provider-set rules: the source shape is the preview Z.AI pair; a base row may be the sealed or the vetted historical schema. */
+const sameRefs = (providers:readonly any[], refs:readonly string[]) =>
+  providers.length===refs.length && providers.every((p:any,i:number)=>p?.providerRef===refs[i]);
+/**
+ * Provider-set rules. Source: exactly the reviewed refs in order, each with its row's maker, one
+ * maker required. Base: the sealed two-GLM pair (sealed or vetted historical schema), or the
+ * reviewed set this kit publishes.
+ */
 function assertProviderRows(rows:ReadonlyMap<string,RegisterPublicationRow>, side:'source'|'base') {
   if(JSON.parse(rows.get('billingPolicy')?.valueJsonText??'null')?.enabled!==false)fail();
   const providers=JSON.parse(rows.get('configuredProviderSet')?.valueJsonText??'null');
-  if(!credentialFree(providers)||providers?.providers?.length!==2
-    ||providers.providers.some((p:any,i:number)=>p.providerRef!==PREVIEW_GLM_PROVIDER_REFS[i]))fail();
+  if(!credentialFree(providers)||!Array.isArray(providers?.providers))fail();
   if(side==='source'){
-    if(providers.requiredDistinctMakers!==1||providers.providers.some((p:any)=>Object.keys(p).sort().join(',')!=='adapterKind,maker,providerRef'||p.adapterKind!=='openai-compatible-http'||p.maker!=='Z.AI'))fail();
+    if(!sameRefs(providers.providers,PREVIEW_REVIEWED_PROVIDER_REFS)||providers.requiredDistinctMakers!==1
+      ||providers.providers.some((p:any)=>Object.keys(p).sort().join(',')!=='adapterKind,maker,providerRef'||p.adapterKind!=='openai-compatible-http'||p.maker!==previewModelRowForRef(p.providerRef)?.maker))fail();
     return;
   }
+  if(!sameRefs(providers.providers,PREVIEW_GLM_PROVIDER_REFS)&&!sameRefs(providers.providers,PREVIEW_REVIEWED_PROVIDER_REFS))fail();
   const vetted=providers.setVersion===2;
   if(providers.kind!=='CONFIGURED_PROVIDER_SET'||Object.keys(providers).sort().join(',')!==(vetted?'kind,providers,requiredDistinctMakers,setVersion':'kind,providers,requiredDistinctMakers')
     ||providers.providers.some((p:any)=>Object.keys(p).sort().join(',')!==(vetted?'adapterKind,maker,providerRef,vetting':'adapterKind,maker,providerRef')

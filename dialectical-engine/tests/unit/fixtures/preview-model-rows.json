@@ -1,0 +1,61 @@
+{
+  "schema": "preview-model-rows-v1",
+  "about": "The reviewed DeepInfra model rows of the preview spending gate (contract A section 1). The gate (packages/providers/ops/preview_budget_helper.py) and the app (packages/providers/src) must both equal this file; a price change is a reviewed change to both sides and to this file. Prices are list prices in USD per million tokens. effort null means the request carries no reasoning_effort field.",
+  "provider": "deepinfra",
+  "reservation": {
+    "formula": "((request utf-8 bytes + overhead_bytes) * input price + output_bound * output price) / 1000000",
+    "overhead_bytes": 2048,
+    "worst_case_request_bytes": 262144,
+    "per_call_cap_usd": "0.25"
+  },
+  "rows": [
+    {
+      "model": "zai-org/GLM-5.3-Flash",
+      "maker": "Z.AI",
+      "input_usd_per_m": "0.15",
+      "output_usd_per_m": "0.50",
+      "input_nano_usd_per_token": 150,
+      "output_nano_usd_per_token": 500,
+      "output_bound": 163840,
+      "effort": "high",
+      "json_object": true,
+      "worst_case_reservation_usd": "0.121548800"
+    },
+    {
+      "model": "deepseek-ai/DeepSeek-V4.1-Flash",
+      "maker": "DeepSeek",
+      "input_usd_per_m": "0.20",
+      "output_usd_per_m": "0.60",
+      "input_nano_usd_per_token": 200,
+      "output_nano_usd_per_token": 600,
+      "output_bound": 131072,
+      "effort": "high",
+      "json_object": false,
+      "worst_case_reservation_usd": "0.131481600"
+    },
+    {
+      "model": "XiaomiMiMo/MiMo-V2.6-Pro",
+      "maker": "Xiaomi",
+      "input_usd_per_m": "0.43",
+      "output_usd_per_m": "0.87",
+      "input_nano_usd_per_token": 430,
+      "output_nano_usd_per_token": 870,
+      "output_bound": 131072,
+      "effort": null,
+      "json_object": false,
+      "worst_case_reservation_usd": "0.227635200"
+    },
+    {
+      "model": "Qwen/Qwen3.8-Flash",
+      "maker": "Alibaba",
+      "input_usd_per_m": "0.113",
+      "output_usd_per_m": "0.382",
+      "input_nano_usd_per_token": 113,
+      "output_nano_usd_per_token": 382,
+      "output_bound": 131072,
+      "effort": null,
+      "json_object": false,
+      "worst_case_reservation_usd": "0.079923200"
+    }
+  ]
+}

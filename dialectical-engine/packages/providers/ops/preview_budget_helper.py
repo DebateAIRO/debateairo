@@ -1,9 +1,18 @@
-"""Custody, accounting and transport primitives for the private preview spending gate.
+"""Custody, accounting and transport primitives, and the provider profiles, for the private
+preview spending gate.
 
 Adapted from the reviewed DeepInfra benchmark helper; it keeps only what the gate needs.
 The gate runs this file from its own directory, only after checking that root owns it and no one
 else can write it, and that its hash is the one the GO binds. It is never imported on its own.
 No retries, external packages, environment proxies, redirects, or credential artifacts.
+
+A provider profile is everything the gate knows about one vendor: its host and path, its auth
+header, the exact request shape it forwards (and the bytes it sends), how a reply's usage is
+priced, where a reply names its model, extra key shapes to blank, and its reviewed model rows
+(prices, output bound, effort, JSON mode). The GO names one profile (`provider`) and the rows it
+enables; the GO binds this file's hash, so it binds every profile and every row too. A price
+change is a reviewed code change here (plus the app's parity fixture), never a GO edit. Adding a
+vendor means adding one profile class to PROFILES; the gate's core does not change.
 """
 import fcntl
 import http.client
@@ -14,11 +23,10 @@ import ssl
 import stat
 import threading
 import time
+from collections import namedtuple
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 
-INPUT_PRICE = Decimal('0.15')
-OUTPUT_PRICE = Decimal('0.50')
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_TIMEOUT_SECONDS = 600
 CONNECT_TIMEOUT_SECONDS = 15  # TCP connect + TLS handshake; a black-holed address fails (unsent) fast.
@@ -163,7 +171,30 @@ def integer(value):
     return type(value) is int and value >= 0
 
 
-def account_response(response):
+def billed_output_tokens(prompt, completion, total, reasoning):
+    """Output tokens to charge, on the careful side, or None when the counts contradict each other.
+
+    Reasoning (thinking) tokens are charged as output. They count inside completion_tokens only
+    when the reply proves it: total_tokens equal to prompt + completion, with reasoning no larger
+    than completion. Otherwise (reasoning larger than completion, total equal to prompt +
+    completion + reasoning, or no total at all) they are charged on top: completion + reasoning.
+    Any other total does not add up, and the usage is not valid.
+    """
+    if reasoning is None or reasoning == 0:
+        return completion if total is None or total == prompt + completion else None
+    if total is None:
+        return completion + reasoning  # Inclusion cannot be shown: charge both.
+    if total == prompt + completion:
+        return completion if reasoning <= completion else completion + reasoning
+    if total == prompt + completion + reasoning:
+        return completion + reasoning  # The total says reasoning was counted outside completion.
+    return None
+
+
+def account_response(response, input_price, output_price):
+    """OpenAI-shape usage priced at one row's list prices (USD per million tokens). Reasoning
+    tokens (in completion_tokens_details or at the top level of usage) are charged as
+    billed_output_tokens says."""
     usage = response.get('usage')
     usage = usage if isinstance(usage, dict) else {}
     prompt, completion, total = usage.get('prompt_tokens'), usage.get('completion_tokens'), usage.get('total_tokens')
@@ -171,38 +202,224 @@ def account_response(response):
     completion_details = usage.get('completion_tokens_details') or {}
     details_valid = isinstance(prompt_details, dict) and isinstance(completion_details, dict)
     cached = prompt_details.get('cached_tokens', usage.get('cached_tokens')) if isinstance(prompt_details, dict) else None
-    reasoning = completion_details.get('reasoning_tokens') if isinstance(completion_details, dict) else None
+    # Reasoning may be reported in the details, at the top level, or both: the larger one counts.
+    reported = [value for value in (completion_details.get('reasoning_tokens') if isinstance(completion_details, dict) else None,
+                                    usage.get('reasoning_tokens')) if value is not None]
+    reasoning = max(reported) if reported and all(integer(value) for value in reported) else None
     valid = integer(prompt) and integer(completion) and details_valid
-    valid = valid and (total is None or integer(total) and total == prompt + completion)
+    valid = valid and all(integer(value) for value in reported)
+    valid = valid and (total is None or integer(total))
     valid = valid and (cached is None or integer(cached) and cached <= prompt)
-    valid = valid and (reasoning is None or integer(reasoning) and reasoning <= completion)
-    configured = ((Decimal(prompt) * INPUT_PRICE + Decimal(completion) * OUTPUT_PRICE) / Decimal(1000000)) if valid else None
+    output = billed_output_tokens(prompt, completion, total, reasoning) if valid else None
+    valid = valid and output is not None
+    configured = ((Decimal(prompt) * input_price + Decimal(output) * output_price) / Decimal(1000000)) if valid else None
     provider = decimal_amount(usage.get('estimated_cost', response.get('estimated_cost')))
     reliable = [value for value in (configured, provider) if value is not None]
-    return {'prompt_tokens': prompt if integer(prompt) else None, 'completion_tokens': completion if integer(completion) else None,
+    return {'input_usd_per_m': str(input_price), 'output_usd_per_m': str(output_price),  # The settlement prices.
+            'prompt_tokens': prompt if integer(prompt) else None, 'completion_tokens': completion if integer(completion) else None,
             'total_tokens': total if integer(total) else None, 'cached_tokens': cached if integer(cached) else None,
-            'reasoning_tokens': reasoning if integer(reasoning) else None, 'usage_valid': valid,
+            'reasoning_tokens': reasoning, 'billed_output_tokens': output if valid else None, 'usage_valid': valid,
             'configured_price_cost_usd': str(configured) if configured is not None else None,
             'provider_estimated_cost_usd': str(provider) if provider is not None else None,
             'guard_charge_usd': str(max(reliable)) if reliable else None,
             'cost_basis': 'max(configured uncached list-price usage, provider estimated cost)' if reliable else 'unknown; full reservation retained'}
 
 
-def redact(value, key):
-    sensitive = {'authorization', 'proxy-authorization', 'api_key', 'api-key', 'apikey', 'headers', 'request_headers', 'access_token', 'refresh_token', 'secret'}
+def redact(value, key, patterns=()):
+    """The key itself, any Bearer token and the profile's own key shapes are blanked everywhere."""
+    sensitive = {'authorization', 'proxy-authorization', 'api_key', 'api-key', 'apikey', 'x-api-key', 'x-goog-api-key',
+                 'headers', 'request_headers', 'access_token', 'refresh_token', 'secret'}
     if isinstance(value, dict):
-        return {redact(str(k), key): redact(v, key) for k, v in value.items() if str(k).lower() not in sensitive}
+        return {redact(str(k), key, patterns): redact(v, key, patterns) for k, v in value.items() if str(k).lower() not in sensitive}
     if isinstance(value, list):
-        return [redact(v, key) for v in value]
+        return [redact(v, key, patterns) for v in value]
     if isinstance(value, str):
-        return re.sub(r'(?i)bearer\s+[^\s"<>]+', 'Bearer [REDACTED]', value.replace(key, '[REDACTED]'))
+        text = re.sub(r'(?i)bearer\s+[^\s"<>]+', 'Bearer [REDACTED]', value.replace(key, '[REDACTED]'))
+        for pattern in patterns:
+            text = re.sub(pattern, '[REDACTED]', text)
+        return text
     return value
+
+
+# Any of these keys anywhere in a reply means it may have been billed (ruling 5 refuses to call it unsent).
+BILLED_KEYS = ('usage', 'choices', 'estimated_cost', 'cost', 'inference_status')
+
+
+def names_any_key_prefixed(value, prefix):
+    """Whether any object at any depth of a parsed JSON value has a key starting with prefix."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            if any(isinstance(key, str) and key.startswith(prefix) for key in item):
+                return True
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
+    return False
+
+
+def names_any_key(value, names):
+    """Whether any object at any depth of a parsed JSON value has one of these keys."""
+    stack = [value]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, dict):
+            if any(name in item for name in names):
+                return True
+            stack.extend(item.values())
+        elif isinstance(item, list):
+            stack.extend(item)
+    return False
+
+
+# One reviewed model of a profile. Prices are the vendor's LIST prices in USD per million tokens
+# (the careful side while a vendor runs a promotion); the gate reserves and settles with them.
+# output_bound is both the max_tokens ceiling and what a call reserves for output. effort is
+# 'high' (the request must carry the profile's effort field with exactly that value) or None (the
+# request must not carry it at all). json_object says whether JSON mode may be asked for.
+ModelRow = namedtuple('ModelRow', 'model maker input_usd_per_m output_usd_per_m output_bound effort json_object')
+
+
+PATH_PATTERN = re.compile(r'/[A-Za-z0-9._~:/-]{0,511}')
+
+
+def path_valid(path):
+    """A fixed request path: no query (so never a key in a URL), no fragment, no '..'."""
+    return isinstance(path, str) and bool(PATH_PATTERN.fullmatch(path)) and '..' not in path
+
+
+class DeepInfraProfile:
+    """api.deepinfra.com, OpenAI chat-completions shape, Bearer key. Rows reviewed 2026-10-10
+    (contract A section 1); whether each model takes reasoning_effort and echoes its exact id is
+    measured by the gate's root-only probe before a row is enabled.
+
+    The profile API (every profile implements all of it; the gate's core calls nothing else):
+      name, host                         the GO's `provider` value; the HTTPS host (port 443)
+      per_call_cap_usd (Decimal)         no row may reserve more than this for one full-size request
+      max_request_bytes (int)            the largest request body accepted (and priced)
+      redaction_patterns (tuple of str)  regexes for the vendor's key shapes, blanked in replies
+      rows {model: ModelRow}             the reviewed models
+      path_for(row) -> str               the POST path (checked: no '?', starts with '/')
+      auth_headers(key) -> dict          the header(s) carrying the key
+      requested_model(body) -> str|None  where the request names its model
+      body_valid(body, row) -> bool      the exact request shape this row accepts
+      request_bytes(body) -> bytes       the bytes sent (never longer than the bytes priced)
+      reservation_prices(row, moment) -> (in, out)  USD per million used to reserve at moment
+      ceiling_prices(row) -> (in, out)   the highest prices the row can ever reserve at (worst cases)
+      account(response, row, moment) -> dict  usage and guard charge (see account_response's keys)
+      reply_model(response) -> str|None  where the reply names the model that answered
+      unbilled_refusal(status, response) -> bool  a refusal that provably billed nothing (the gate
+                                         keeps a $0 'released_unbilled' entry, capped per day)
+      probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024)
+      reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
+    """
+    name = 'deepinfra'
+    host = 'api.deepinfra.com'
+    path = '/v1/openai/chat/completions'
+    per_call_cap_usd = Decimal('0.25')
+    max_request_bytes = 256 * 1024
+    redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
+    rows = {row.model: row for row in (
+        ModelRow('zai-org/GLM-5.3-Flash', 'Z.AI', Decimal('0.15'), Decimal('0.50'), 163840, 'high', True),
+        ModelRow('deepseek-ai/DeepSeek-V4.1-Flash', 'DeepSeek', Decimal('0.20'), Decimal('0.60'), 131072, 'high', False),
+        ModelRow('XiaomiMiMo/MiMo-V2.6-Pro', 'Xiaomi', Decimal('0.43'), Decimal('0.87'), 131072, None, False),
+        # Owner swap 2026-10-10 (Qwen in place of Gemini): flat list price over the whole 1M window,
+        # no promotion, no tiers; reasoning_effort is not listed, so none is sent.
+        ModelRow('Qwen/Qwen3.8-Flash', 'Alibaba', Decimal('0.113'), Decimal('0.382'), 131072, None, False))}
+
+    def path_for(self, row):
+        return self.path
+
+    def auth_headers(self, key):
+        return {'Authorization': 'Bearer ' + key}
+
+    def reservation_prices(self, row, moment):
+        """DeepInfra's list prices do not change with the date or the prompt size."""
+        return row.input_usd_per_m, row.output_usd_per_m
+
+    def ceiling_prices(self, row):
+        return row.input_usd_per_m, row.output_usd_per_m
+
+    def requested_model(self, body):
+        """Where the request names its model (looked up before anything else is checked)."""
+        return body.get('model') if isinstance(body, dict) else None
+
+    def body_valid(self, body, row):
+        """Exactly model, max_tokens and messages; reasoning_effort "high" iff the row says so; an
+        optional response_format {"type": "json_object"} only for a row that allows it."""
+        if not isinstance(body, dict) or body.get('model') != row.model:
+            return False
+        fields = {'model', 'max_tokens', 'messages'} | ({'reasoning_effort'} if row.effort else set())
+        extra = set(body) - fields
+        if not fields <= set(body) or extra - {'response_format'}:
+            return False
+        if extra:
+            mode = body['response_format']
+            if not row.json_object or not (isinstance(mode, dict) and set(mode) == {'type'} and mode['type'] == 'json_object'):
+                return False
+        if row.effort and body['reasoning_effort'] != row.effort:
+            return False
+        return (type(body['max_tokens']) is int and 1 <= body['max_tokens'] <= row.output_bound
+                and isinstance(body['messages'], list) and bool(body['messages'])
+                and all(isinstance(m, dict) and set(m) == {'role', 'content'} and m['role'] in ('system', 'user', 'assistant')
+                        and isinstance(m['content'], str) for m in body['messages']))
+
+    def request_bytes(self, body):
+        """The exact bytes sent upstream for a body that passed body_valid."""
+        return canonical(body)
+
+    def account(self, response, row, moment):
+        return account_response(response, row.input_usd_per_m, row.output_usd_per_m)
+
+    def reply_model(self, response):
+        """Where the reply names the model that answered."""
+        return response.get('model')
+
+    def unbilled_refusal(self, status, response):
+        """True only for a refusal that provably billed nothing (owner ruling 5, 2026-10-10): HTTP
+        429, a JSON object with an error field, and no usage, choices, cost, estimated_cost,
+        inference_status (DeepInfra's native cost block) or tokens_* key at any depth. The gate then
+        releases the hold, keeps the entry at $0 as 'released_unbilled' (so it stays on the record),
+        counts it toward the unsent streak and toward the daily ceiling UNBILLED_RELEASES_PER_DAY.
+        Anything else is accounted (and halts) as before."""
+        return (status == 429 and isinstance(response, dict) and bool(response.get('error'))
+                and not names_any_key(response, BILLED_KEYS)
+                and not names_any_key_prefixed(response, 'tokens_'))
+
+    def probe_body(self, row):
+        body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
+                'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
+        if row.effort:
+            body['reasoning_effort'] = row.effort
+        return body
+
+    def reply_text(self, response):
+        """The answer's text, or a provider error's message (for the probe's short excerpt only)."""
+        choices = response.get('choices')
+        if isinstance(choices, list) and choices and isinstance(choices[0], dict):
+            message = choices[0].get('message')
+            return message.get('content') if isinstance(message, dict) else None
+        error = response.get('error')
+        if isinstance(error, dict):
+            return error.get('message')
+        return error if isinstance(error, str) else None
+
+
+# The providers this gate can serve. Anthropic and Google are reserved names: a GO naming them is
+# refused until their reviewed profile is added here.
+PROFILES = {profile.name: profile for profile in (DeepInfraProfile(),)}
 
 
 class HttpsTransport:
     """Direct verified HTTPS only. http.client follows no redirects or env proxies."""
 
-    def __init__(self, timeout, max_response_bytes=MAX_RESPONSE_BYTES):
+    def __init__(self, timeout, profile, path, max_response_bytes=MAX_RESPONSE_BYTES):
+        # Host and auth header come from the GO's profile, the path from its path_for(row); the
+        # path carries no query (no key in a URL).
+        if not path_valid(path):
+            raise SafetyError('profile_path_invalid')  # noqa: F821 - provided by the gate
+        self.profile, self.path = profile, path
         self.max_response_bytes = min(max_response_bytes, MAX_RESPONSE_BYTES)
         self.timeout = min(timeout, MAX_TIMEOUT_SECONDS)
 
@@ -212,7 +429,7 @@ class HttpsTransport:
             raise SafetyError('request_bytes_required')
         deadline = time.monotonic() + self.timeout
         # The connect gets its own short timeout; remaining() then gives the socket the rest.
-        connection = http.client.HTTPSConnection('api.deepinfra.com', timeout=min(CONNECT_TIMEOUT_SECONDS, self.timeout),
+        connection = http.client.HTTPSConnection(self.profile.host, timeout=min(CONNECT_TIMEOUT_SECONDS, self.timeout),
                                                  context=ssl.create_default_context())
 
         def remaining():
@@ -229,8 +446,9 @@ class HttpsTransport:
                 remaining()
             except Exception:  # noqa: BLE001 - every failure before the request is the same fact
                 raise RequestNotSent('request_not_sent') from None
-            connection.request('POST', '/v1/openai/chat/completions', body=payload,
-                               headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Accept': 'application/json'})
+            connection.request('POST', self.path, body=payload,
+                               headers={**self.profile.auth_headers(key), 'Content-Type': 'application/json',
+                                        'Accept': 'application/json'})
             remaining()
             response = connection.getresponse()
             chunks, size = [], 0

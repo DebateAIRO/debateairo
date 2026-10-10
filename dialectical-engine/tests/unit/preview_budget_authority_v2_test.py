@@ -1,7 +1,10 @@
-"""Team daily pot (v2) tests for the preview spending gate.
+"""Team daily pot tests for the preview spending gate: every v2 behaviour, run on the v3 gate.
 
 Offline only: temporary directories, fake dispatch functions, local socket pairs.
-No private files, real keys, real ledgers, or upstream calls.
+No private files, real keys, real ledgers, or upstream calls. The v3 model table has its own
+file (preview_budget_authority_v3_test.py). v3 changes seen here: the GO names a provider and
+its enabled models; activate refuses max_concurrent_calls x the largest enabled worst case
+(GLM: $0.1215488) above the pot, so the small-pot tests run with one slot.
 """
 import contextlib
 import hashlib
@@ -32,7 +35,12 @@ from preview_budget_authority_fixture import (  # noqa: E402
 
 bridge = load_bridge()
 SafetyError = bridge.helper.SafetyError
-REAL_TRANSPORT = bridge.helper.HttpsTransport
+DEEPINFRA = bridge.helper.PROFILES['deepinfra']
+_HTTPS = bridge.helper.HttpsTransport  # Kept before setUp swaps in no_network.
+
+
+def REAL_TRANSPORT(timeout):  # noqa: N802 - the real transport class, bound to the DeepInfra profile
+    return _HTTPS(timeout=timeout, profile=DEEPINFRA, path=DEEPINFRA.path)
 
 
 def file_sha_text(text):
@@ -191,9 +199,9 @@ class GoValidationTests(GateTest):
         return gate, gate.write_go(name='candidate.json', **changes)
 
     def test_valid_go_is_accepted_with_bounds_inclusive(self):
-        for changes in ({}, {'daily_budget_usd': '0.01'}, {'daily_budget_usd': '50.00'},
+        for changes in ({}, {'daily_budget_usd': '0.01'}, {'daily_budget_usd': '5.00'},
                         {'max_paid_posts_per_day': 1}, {'max_paid_posts_per_day': 5000},
-                        {'max_concurrent_calls': 1}, {'max_concurrent_calls': 8},
+                        {'max_concurrent_calls': 1}, {'max_concurrent_calls': 10},
                         {'open_days': 1}, {'open_days': 31}, {'scope_id': 'a'}, {'scope_id': 'a' + 'b' * 95},
                         {'allowed_peer_uids': [0, 992, 994]}, {'predecessor_ledger_sha256': 'ab' * 32}):
             with self.subTest(changes=changes):
@@ -208,15 +216,16 @@ class GoValidationTests(GateTest):
             {'scope_id': 'a' * 97}, {'scope_id': 7}, {'target_host': ''}, {'target_host': 'bad host'},
             {'target_host': 'h' * 129}, {'allowed_peer_uids': []}, {'allowed_peer_uids': [-1]},
             {'allowed_peer_uids': [True]}, {'allowed_peer_uids': ['994']}, {'allowed_peer_uids': 994},
-            {'daily_budget_usd': '0.00'}, {'daily_budget_usd': '50.01'}, {'daily_budget_usd': '5'},
+            {'daily_budget_usd': '0.00'}, {'daily_budget_usd': '5.01'}, {'daily_budget_usd': '50.00'},
+            {'daily_budget_usd': '6.00'}, {'daily_budget_usd': '5'},
             {'daily_budget_usd': '5.001'}, {'daily_budget_usd': 5.0}, {'daily_budget_usd': '-1.00'},
             {'daily_budget_usd': 'NaN'}, {'daily_budget_usd': '1e1'}, {'max_paid_posts_per_day': 0},
             {'max_paid_posts_per_day': 5001}, {'max_paid_posts_per_day': True}, {'max_paid_posts_per_day': 2.0},
-            {'max_concurrent_calls': 0}, {'max_concurrent_calls': 9}, {'max_concurrent_calls': True},
+            {'max_concurrent_calls': 0}, {'max_concurrent_calls': 11}, {'max_concurrent_calls': True},
             {'open_days': 0}, {'open_days': 32}, {'open_days': '7'}, {'predecessor_ledger_sha256': 'abc'},
             {'predecessor_ledger_sha256': 'AB' * 32}, {'predecessor_ledger_sha256': None},
             {'total_budget_usd': '1.00'}, {'unknown': True}]
-        for field in ('schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'model', 'requested_effort',
+        for field in ('schema', 'allow_paid_calls', 'bridge_sha256', 'helper_sha256', 'provider', 'enabled_models',
                       'scope_id', 'target_host', 'allowed_peer_uids', 'daily_budget_usd',
                       'max_paid_posts_per_day', 'max_concurrent_calls', 'open_days'):
             invalid.append({field: REMOVE})
@@ -280,13 +289,13 @@ class PhaseTests(GateTest):
 
     def test_changed_go_is_refused_until_stop_and_reactivation_binds_it(self):
         gate = self.gate().ready()
-        gate.go_path = gate.write_go(name='raised.json', daily_budget_usd='6.00')
+        gate.go_path = gate.write_go(name='lowered.json', daily_budget_usd='4.00')
         with self.refused('AUTHORITY_STOPPED'):
             gate.call('op-before')
         bridge.stop_authority(gate.private, now=gate.clock)
         gate.activate()
         self.assertEqual(gate.call('op-after')['status'], 200)
-        self.assertEqual(gate.status()['daily_budget_usd'], '6.00')
+        self.assertEqual(gate.status()['daily_budget_usd'], '4.00')
 
     def test_stop_halts_with_operator_stop_and_later_calls_refuse(self):
         gate = self.gate().ready()
@@ -314,9 +323,12 @@ class PhaseTests(GateTest):
             self.assertEqual(flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC), 0, name)
         self.assertEqual(result, {
             'state': 'active', 'reason': None, 'halted_at': None, 'unsent_streak': 0,
+            'provider': 'deepinfra', 'enabled_models': [MODEL],
+            'today_by_model': {MODEL: {'spend_usd': '0.05', 'posts': 1}},
             'open_until_utc': '2026-10-15T09:00:00+00:00', 'window_open': True,
             'today': '2026-10-08', 'daily_budget_usd': '5.00', 'today_spend_usd': '0.05',
             'remaining_today_usd': '4.95', 'today_posts': 1, 'max_paid_posts_per_day': 500, 'in_flight': 0,
+            'today_unbilled_releases': 0, 'unbilled_releases_per_day': 20,
             'today_uncertain': 0, 'halts': [], 'halts_dropped': 0})
 
     def test_status_of_uninitialized_directory_refuses_without_creating_files(self):
@@ -374,13 +386,13 @@ class PhaseTests(GateTest):
 
 class DailyPotTests(GateTest):
     def test_exactly_at_the_daily_cap_is_allowed(self):
-        gate = self.gate(daily_budget_usd='0.16').ready()
+        gate = self.gate(daily_budget_usd='0.16', max_concurrent_calls=1).ready()
         gate.call('op-1', charge=str(Decimal('0.16') - RESERVED))
         self.assertEqual(gate.call('op-2')['status'], 200)
         self.assertEqual(gate.day('2026-10-08')['entries']['preview-test:' + SCOPE + ':op-2']['state'], 'settled')
 
     def test_one_cent_over_the_daily_cap_is_refused_with_team_budget_code(self):
-        gate = self.gate(daily_budget_usd='0.15').ready()
+        gate = self.gate(daily_budget_usd='0.15', max_concurrent_calls=1).ready()
         gate.call('op-1', charge=str(Decimal('0.16') - RESERVED))
         dispatched = []
         with self.refused('TEAM_DAILY_BUDGET_REACHED'):
@@ -400,7 +412,7 @@ class DailyPotTests(GateTest):
         self.assertEqual(gate.call('op-3')['status'], 200)
 
     def test_day_rolls_over_at_bucharest_midnight_not_utc_midnight(self):
-        gate = self.gate(daily_budget_usd='0.10').ready()
+        gate = self.gate(daily_budget_usd='0.13', max_concurrent_calls=1).ready()
         gate.clock.set('2026-10-08T20:59:59+00:00')  # 23:59:59 local
         gate.call('op-1', charge=str(RESERVED))
         with self.refused('TEAM_DAILY_BUDGET_REACHED'):
@@ -420,7 +432,7 @@ class DailyPotTests(GateTest):
                 self.assertEqual(bridge.bucharest_day(datetime.fromisoformat(moment)), day)
 
     def test_spring_forward_day_has_twenty_three_hours_of_team_budget(self):
-        gate = self.gate(daily_budget_usd='0.10')
+        gate = self.gate(daily_budget_usd='0.13', max_concurrent_calls=1)
         gate.clock.set('2026-03-28T22:00:00+00:00')  # 00:00 on 2026-03-29, UTC+2
         gate.ready()
         gate.clock.set('2026-03-29T20:59:59+00:00')  # 23:59:59 on 2026-03-29, UTC+3
@@ -520,8 +532,9 @@ class DailyPotTests(GateTest):
         seen = []
 
         class Recorder:
-            def __init__(self, timeout):
+            def __init__(self, timeout, profile, path):
                 seen.append(timeout)
+                self.profile = profile
 
             def __call__(self, _body, _key):
                 return 200, provider_response('0.01')
@@ -537,7 +550,7 @@ class DailyPotTests(GateTest):
         seen, clock = [], [1000.0]
 
         class Recorder:
-            def __init__(self, timeout):
+            def __init__(self, timeout, profile, path):
                 seen.append(timeout)
 
             def __call__(self, _body, _key):
@@ -647,7 +660,7 @@ class RequestBytesTests(GateTest):
         self.assertEqual(typescript, '0.082248350')
         request = {'scope_id': SCOPE, 'operationId': 'op-1', 'requestBody': raw,
                    'requestSha256': file_sha_text(raw), 'reservedUsd': typescript}
-        _, reserved = bridge.validate_request(request, bridge.read_go(self.gate().go_path))
+        _, reserved, _row, _prices = bridge.validate_request(request, bridge.read_go(self.gate().go_path))
         self.assertEqual(reserved, Decimal('0.08224835'))
 
 
@@ -708,7 +721,7 @@ class HaltTests(GateTest):
     def test_unexpected_failure_after_a_paid_reply_holds_full_reservation_and_halts(self):
         gate = self.gate().ready()
 
-        def broken_accounting(_response):
+        def broken_accounting(*_args):
             raise RuntimeError('synthetic accounting failure')
         with patch.object(bridge.helper, 'account_response', broken_accounting), self.refused('NEW_CHARGE_UNCERTAIN'):
             gate.call('op-1')
@@ -765,7 +778,7 @@ class HaltTests(GateTest):
         self.assertEqual(status['halts'][0]['at'], '2026-10-08T09:00:00+00:00')
 
     def test_reactivation_after_halt_keeps_history_and_uncertain_amount_counts_on_its_own_day(self):
-        gate = self.gate(daily_budget_usd='0.10').ready()
+        gate = self.gate(daily_budget_usd='0.13', max_concurrent_calls=1).ready()
 
         def broken(_body, _key):
             raise TimeoutError('deadline')
@@ -782,8 +795,8 @@ class HaltTests(GateTest):
         gate = self.gate().ready()
         go = bridge.read_go(gate.go_path)
         request = envelope(body(), 'op-1')
-        _, reserved = bridge.validate_request(request, go)
-        bridge.reserve_call(gate.private, go, file_sha(gate.go_path), request, reserved, HOST, PEER, gate.clock)
+        _, reserved, row, _prices = bridge.validate_request(request, go)
+        bridge.reserve_call(gate.private, go, file_sha(gate.go_path), request, reserved, row, HOST, PEER, gate.clock)
         self.assertEqual(gate.status()['in_flight'], 1)
         self.assertEqual(bridge.recover_interrupted(gate.private, now=gate.clock), {'interrupted': 1, 'unrecorded_uncertain': 0})
         self.assert_halted(gate, 'interrupted_call_uncertain', 'uncertain')
@@ -824,7 +837,7 @@ class HaltTests(GateTest):
         self.assertEqual((code, json.loads(out.getvalue())),
                          (2, {'status': 'refused', 'error_class': 'SafetyError', 'error': 'ROOT_SOCKET_REQUIRED'}))
         self.assertNotIn("default=Path('/run", SOURCE.read_text())
-        self.assertEqual(bridge.RETIRED_SOCKET_NAMES, frozenset({'provider-budget.sock'}))
+        self.assertEqual(bridge.RETIRED_SOCKET_NAMES, frozenset({'provider-budget.sock', 'team-budget-v2.sock'}))
 
     def test_only_one_server_may_hold_the_authority(self):
         gate = self.gate().ready()
@@ -890,8 +903,9 @@ class CrashRecoveryTests(GateTest):
                 gate = self.gate().ready()
                 go = bridge.read_go(gate.go_path)
                 request = envelope(body(), 'op-1')
-                _, reserved = bridge.validate_request(request, go)
-                bridge.reserve_call(gate.private, go, file_sha(gate.go_path), request, reserved, HOST, PEER, gate.clock)
+                _, reserved, row, _prices = bridge.validate_request(request, go)
+                bridge.reserve_call(gate.private, go, file_sha(gate.go_path), request, reserved, row, HOST, PEER,
+                                    gate.clock)
                 ledger_path = gate.private / 'team-ledger-2026-10-08.json'
                 ledger = json.loads(ledger_path.read_text())
                 entry = ledger['entries'][self.ENTRY]
@@ -1003,7 +1017,11 @@ class ConcurrencyTests(GateTest):
         for fits, budget in ((1, '0.10'), (2, '0.17')):
             with self.subTest(fits=fits):
                 self.assertTrue(fits * RESERVED <= Decimal(budget) < (fits + 1) * RESERVED)
-                gate = self.gate(daily_budget_usd=budget, max_concurrent_calls=8).ready()
+                gate = self.gate(daily_budget_usd=budget, max_concurrent_calls=8)
+                # This test races eight slots over a pot that fits one or two holds, which activate
+                # now refuses (8 x the GLM worst case > pot); only the race itself is tested here.
+                with patch.object(bridge, 'largest_reservation', lambda *_args: Decimal(0)):
+                    gate.ready()
                 start, release, results = threading.Barrier(8), threading.Event(), {}
 
                 def held(_body, _key):
@@ -1126,14 +1144,16 @@ class IpcTests(GateTest):
         self.assertEqual(json.loads(payload)['status'], 200)
 
     def test_budget_and_limit_refusals_reach_the_409_body_with_their_own_code(self):
-        gate = self.gate(daily_budget_usd='0.01').ready()
+        gate = self.gate(daily_budget_usd='0.13', max_concurrent_calls=1).ready()
+        gate.call('op-0', charge='0.06')  # 0.06 + one more hold (about 0.082) is over 0.13.
         line, payload = self.exchange(gate, self.ok)
         self.assertIn(b' 409 ', line)
         self.assertEqual(json.loads(payload), {'error': 'TEAM_DAILY_BUDGET_REACHED'})
         self.assertEqual(gate.status()['state'], 'active')
 
-    def test_refusal_body_maps_only_the_three_team_codes(self):
-        for code in ('TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED'):
+    def test_refusal_body_maps_only_the_public_codes(self):
+        for code in ('TEAM_DAILY_BUDGET_REACHED', 'DAILY_CALL_LIMIT_REACHED', 'CONCURRENCY_LIMIT_REACHED',
+                     'PROVIDER_NOT_REACHED', 'PROVIDER_REFUSED_UNBILLED'):
             self.assertEqual(json.loads(bridge.refusal_body(SafetyError(code))), {'error': code})
         for error in (SafetyError('AUTHORITY_STOPPED'), SafetyError('NEW_CHARGE_UNCERTAIN'),
                       ValueError('TEAM_DAILY_BUDGET_REACHED'), KeyboardInterrupt()):
@@ -1402,7 +1422,8 @@ class UnsentCallTests(GateTest):
     def test_ipc_does_not_halt_for_an_unsent_call(self):
         gate = self.gate().ready()
         line, payload = IpcTests.exchange(self, gate, lambda _client: self.unsent)
-        self.assertEqual((line, json.loads(payload)), (b'HTTP/1.0 409 Conflict', {'error': 'PREVIEW_TEST_AUTHORITY_STOPPED'}))
+        # Nothing billed and the hold released: the one code the app may retry on (ruling of 2026-10-10).
+        self.assertEqual((line, json.loads(payload)), (b'HTTP/1.0 409 Conflict', {'error': 'PROVIDER_NOT_REACHED'}))
         self.assertEqual((gate.status()['state'], gate.status()['unsent_streak']), ('active', 1))
 
 

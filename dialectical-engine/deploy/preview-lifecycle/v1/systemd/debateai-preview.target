@@ -8,7 +8,7 @@ After=network-online.target
 Wants=debateai-preview-postgresql.service debateai-preview-hatchet.service debateai-preview-hatchet-gateway.service
 Wants=debateai-preview-capture.service debateai-preview-provider-budget.service debateai-preview-turnstile.service
 Wants=debateai-preview-api.service debateai-preview-ui.service
-# The spending gate's two watchers (deploy/preview-gate/v2): one email per halt, one per address change.
+# The spending gate's two watchers (deploy/preview-gate/v3; v2 before it): one email per halt, one per address change.
 Wants=debateai-preview-gate-halt-watch.timer debateai-preview-gate-addresses.timer
 
 [Install]

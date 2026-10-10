@@ -103,6 +103,7 @@ import {
   AskRoomResponseSchema
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
+import { assertPreviewBudgetAdmits, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
 import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
@@ -1790,8 +1791,13 @@ export function askRefusalPublicMessage(code: string, message: string): string {
   return code === "DAILY_COST_ENVELOPE_REACHED" ? code : message;
 }
 
-/** The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. */
-export function askRefusalRetryAfter(code: string, now: Date): string | null {
+/**
+ * The HTTP-date for the next UTC midnight, or `null` when retrying cannot help. A refusal that
+ * names its own retry instant uses that one, whatever its status: the preview gate's day ends at
+ * Bucharest midnight, and a preview gate that cannot be used right now asks for about a minute.
+ */
+export function askRefusalRetryAfter(code: string, now: Date, retryAt?: Date): string | null {
+  if (retryAt !== undefined && Number.isFinite(retryAt.getTime()) && retryAt.getTime() > now.getTime()) return retryAt.toUTCString();
   if (askRefusalStatus(code) !== 429) return null;
   const midnight = new Date(Date.UTC(
     now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1
@@ -1801,11 +1807,15 @@ export function askRefusalRetryAfter(code: string, now: Date): string | null {
 
 export class AskRefusal extends Error {
   readonly code: string;
+  /** The refusal's own reset instant, when it names one (the preview's Bucharest day). */
+  readonly retryAt?: Date;
 
   constructor(refusal: TypedDomainError) {
     super(refusal.message);
     this.name = "AskRefusal";
     this.code = refusal.code;
+    const retryAt = (refusal as TypedDomainError & Readonly<{ retryAt?: unknown }>).retryAt;
+    if (retryAt instanceof Date) this.retryAt = retryAt;
   }
 }
 
@@ -2493,7 +2503,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     }
     // R1: `Retry-After` names the instant the daily envelope resets, so a client
     // library that honours the header waits exactly as long as it must.
-    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date()) : null;
+    const retryAfter = askRefusal ? askRefusalRetryAfter(knownError.code, new Date(), knownError.retryAt) : null;
     if (retryAfter !== null) reply.header("retry-after", retryAfter);
     // I6: the spend figures the refusal carries are the OPERATOR's, so they are
     // logged here and withheld from the body below.
@@ -3831,6 +3841,12 @@ export class HatchetDispatcher implements Dispatcher {
 
 export interface RunCreationSettings {
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
+  /**
+   * Contract A §5: the preview's start-of-debate estimate asks the gate what is left today.
+   * Read only with `previewProviderTestConfig`; absent there, every preview ask is refused
+   * (fail closed). Off the preview it is never asked.
+   */
+  readonly previewBudgetGate?: PreviewBudgetGateSettings;
   /** Step 1: the preview's team; `submit` refuses everyone else (the route refuses them first). */
   readonly previewTeamUserIds?: readonly string[];
   readonly strangerSampleRate: number;
@@ -4251,6 +4267,19 @@ export async function evaluateAskAdmission(
     });
   } catch (error) {
     markAskRefusal(error);
+  }
+  // Owner's rule (never stop a debate half-way): on the preview, the debate's estimated calls and
+  // money must fit what the gate has left today, BEFORE any run exists. The panel is known and the
+  // basis resolved; the only model calls so far are discovery's. A refusal is the daily code (429).
+  if (previewConfig !== undefined) {
+    try {
+      await assertPreviewBudgetAdmits(settings.previewBudgetGate, {
+        basis: envelopeBasis,
+        panel: filteredPanel
+      });
+    } catch (error) {
+      markAskRefusal(error);
+    }
   }
   return {
     risk,
