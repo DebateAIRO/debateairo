@@ -202,6 +202,6 @@
   "public.publication.contentCheck.groundIllegal": "Tekst võib olla ka ebaseaduslik.",
   "public.publication.contentCheck.automated": "Selle otsuse tegi automaatne tööriist. Ükski inimene ei ole seda veel läbi vaadanud.",
   "public.publication.contentCheck.stillPrivate": "Teie arutelu jääb privaatseks ja muutmata. Ainult teie saate seda näha.",
-  "public.publication.contentCheck.appeal": "Kui soovite, et inimene selle otsuse läbi vaataks, kirjutage kuue kuu jooksul aadressile [appeals@dezbatere.ro].",
+  "public.publication.contentCheck.appeal": "Kui soovite, et inimene selle otsuse läbi vaataks, kirjutage kuue kuu jooksul aadressile office@dezbatere.ro.",
   "public.publication.contentCheck.unavailable": "Sisu kontrollimine ei ole praegu saadaval, seega midagi ei avaldatud. Teie arutelu jääb privaatseks. Proovige mõne minuti pärast uuesti."
 }

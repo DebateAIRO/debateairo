@@ -203,6 +203,6 @@
   "public.publication.contentCheck.groundIllegal": "Le texte pourrait également être illégal.",
   "public.publication.contentCheck.automated": "Cette décision a été prise par un outil automatique. Aucune personne ne l’a encore examinée.",
   "public.publication.contentCheck.stillPrivate": "Votre débat reste privé et inchangé. Vous seul pouvez le voir.",
-  "public.publication.contentCheck.appeal": "Pour demander à une personne de réexaminer cette décision, écrivez à [appeals@dezbatere.ro] dans un délai de six mois.",
+  "public.publication.contentCheck.appeal": "Pour demander à une personne de réexaminer cette décision, écrivez à office@dezbatere.ro dans un délai de six mois.",
   "public.publication.contentCheck.unavailable": "La vérification du contenu est momentanément indisponible. Rien n’a donc été publié. Votre débat reste privé. Réessayez dans quelques minutes."
 }

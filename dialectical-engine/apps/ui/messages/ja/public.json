@@ -201,6 +201,6 @@
   "public.publication.contentCheck.groundIllegal": "この文章は違法である可能性もあります。",
   "public.publication.contentCheck.automated": "この判断は自動ツールによるものです。まだ人による確認は行われていません。",
   "public.publication.contentCheck.stillPrivate": "議論は非公開のまま変更されません。閲覧できるのはあなただけです。",
-  "public.publication.contentCheck.appeal": "この判断について人による再確認を希望する場合は、6か月以内に [appeals@dezbatere.ro] までご連絡ください。",
+  "public.publication.contentCheck.appeal": "この判断について人による再確認を希望する場合は、6か月以内に office@dezbatere.ro までご連絡ください。",
   "public.publication.contentCheck.unavailable": "現在、コンテンツチェックを利用できないため、何も公開されませんでした。議論は非公開のままです。数分後にもう一度お試しください。"
 }

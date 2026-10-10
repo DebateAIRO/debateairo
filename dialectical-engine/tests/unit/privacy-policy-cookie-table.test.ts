@@ -163,7 +163,7 @@ describe("Privacy Policy §13 — the eighteen actual stored items in every loca
         continue;
       }
       if (!(found[3]?.text ?? "").includes("Do Not Track")) misses.push(`${locale}: block 3 lacks the literal Do Not Track`);
-      if (!(found[0]?.text ?? "").includes("\\[dezbatere.ro/cookies\\]")) misses.push(`${locale}: block 0 lacks \\[dezbatere.ro/cookies\\]`);
+      if (!(found[0]?.text ?? "").includes("dezbatere.ro/cookies")) misses.push(`${locale}: block 0 lacks dezbatere.ro/cookies`);
       found.forEach((block, index) => {
         if (block.kind === "p" && block.text.trim() === english[index]?.text.trim()) misses.push(`${locale}: paragraph ${index} equals en`);
       });

@@ -204,6 +204,6 @@
   "public.publication.contentCheck.groundIllegal": "Tekst może być również niezgodny z prawem.",
   "public.publication.contentCheck.automated": "Decyzję podjęło narzędzie automatyczne. Nie została jeszcze sprawdzona przez człowieka.",
   "public.publication.contentCheck.stillPrivate": "Twoja debata pozostaje prywatna i niezmieniona. Tylko Ty możesz ją zobaczyć.",
-  "public.publication.contentCheck.appeal": "Aby poprosić człowieka o ponowne rozpatrzenie tej decyzji, napisz na [appeals@dezbatere.ro] w ciągu sześciu miesięcy.",
+  "public.publication.contentCheck.appeal": "Aby poprosić człowieka o ponowne rozpatrzenie tej decyzji, napisz na office@dezbatere.ro w ciągu sześciu miesięcy.",
   "public.publication.contentCheck.unavailable": "Kontrola treści jest teraz niedostępna, więc niczego nie opublikowano. Twoja debata pozostaje prywatna. Spróbuj ponownie za kilka minut."
 }

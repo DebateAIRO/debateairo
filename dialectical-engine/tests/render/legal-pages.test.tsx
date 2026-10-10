@@ -180,18 +180,21 @@ describe("the legal notice states the company and seller details from one consta
     }
   });
 
-  it("renders unverified facts bracketed, and never links a bracketed address", () => {
+  it("renders the owner's facts as written, and never links a bracketed address", () => {
     const view = renderNotice("en");
-    expect(COMPANY.tradeRegisterNo).toBe("[J40/…/…]");
-    expect(factCell(view, "legal.notice.company.register")?.textContent).toBe("[J40/…/…]");
-    // Paid plans (P21, R3-4): the owner confirmed on 29 September 2026 that the company is VAT-registered; the number
-    // itself stays bracketed (R4) until the owner fills it.
-    expect(COMPANY.vat).toEqual({ kind: "registered", number: "[RO…]" });
-    expect(factCell(view, "legal.notice.company.vat")?.textContent).toBe("[RO…]");
-    expect(factCell(view, "legal.notice.company.vat")?.textContent).toMatch(/^\[.+\]$/);
+    // The owner filled the company facts on 9 October 2026 (Date-de-completat-Termeni-Confidentialitate.docx; ANAF record).
+    expect(COMPANY.legalName).toBe("DMS Merchandise Shop S.R.L.");
+    expect(COMPANY.tradeRegisterNo).toBe("J2022000426271");
+    expect(factCell(view, "legal.notice.company.register")?.textContent).toBe("J2022000426271");
+    // Paid plans (P21, R3-4): VAT-registered; the RO VAT code is RO + the CUI.
+    expect(COMPANY.vat).toEqual({ kind: "registered", number: "RO45935221" });
+    expect(factCell(view, "legal.notice.company.vat")?.textContent).toBe("RO45935221");
+    for (const fact of [COMPANY.registeredOffice, COMPANY.cui, COMPANY.shareCapital, COMPANY.representative, COMPANY.phone]) {
+      expect(isUnverified(fact), fact).toBe(false);
+    }
     const mailto = [...view.querySelectorAll("a[href^='mailto:']")].map((link) => link.getAttribute("href"));
-    expect(mailto).toEqual(
-      Object.values(COMPANY.emails).filter((address) => !isUnverified(address)).map((address) => `mailto:${address}`)
+    expect([...mailto].sort()).toEqual(
+      Object.values(COMPANY.emails).filter((address) => !isUnverified(address)).map((address) => `mailto:${address}`).sort()
     );
     expect(mailto).toContain("mailto:privacy@dezbatere.ro");
     expect(view.querySelector("a[href^='mailto:[']")).toBeNull();

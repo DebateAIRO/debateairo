@@ -204,6 +204,6 @@
   "public.publication.contentCheck.groundIllegal": "Text může být také nezákonný.",
   "public.publication.contentCheck.automated": "Toto rozhodnutí učinil automatický nástroj. Žádný člověk jej zatím nepřezkoumal.",
   "public.publication.contentCheck.stillPrivate": "Vaše debata zůstává soukromá a beze změn. Vidíte ji pouze vy.",
-  "public.publication.contentCheck.appeal": "Pokud chcete požádat o přezkoumání tohoto rozhodnutí člověkem, napište do šesti měsíců na [appeals@dezbatere.ro].",
+  "public.publication.contentCheck.appeal": "Pokud chcete požádat o přezkoumání tohoto rozhodnutí člověkem, napište do šesti měsíců na office@dezbatere.ro.",
   "public.publication.contentCheck.unavailable": "Kontrola obsahu nyní není dostupná, proto nebylo nic zveřejněno. Vaše debata zůstává soukromá. Zkuste to znovu za několik minut."
 }
