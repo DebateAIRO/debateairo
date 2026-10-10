@@ -399,9 +399,17 @@ function providerTargetAdapterKind(
   configuredAdapterKind: string | undefined,
   thinking: Readonly<{ thinkingParameter: ThinkingParameter }> | undefined
 ): string | undefined {
+  // No silent fallback: a configured kind this package does not implement is
+  // refused here rather than spoken as the OpenAI-compatible wire.
+  if (configuredAdapterKind !== undefined
+    && !BUILT_IN_PROVIDER_ADAPTERS.some((adapter) => adapter.adapterKind === configuredAdapterKind)) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_ADAPTER_UNSUPPORTED");
+  }
   const geminiUrl = baseUrl === GOOGLE_GEMINI_BASE_URL;
   const geminiKind = configuredAdapterKind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND;
-  if (configuredAdapterKind !== undefined && geminiUrl !== geminiKind) {
+  // Google's API host speaks only the native wire, and only at the one base.
+  const googleHost = new URL(baseUrl).hostname.toLowerCase().replace(/\.$/u, "") === GOOGLE_GEMINI_API_HOST;
+  if ((googleHost && !geminiUrl) || (configuredAdapterKind !== undefined && geminiUrl !== geminiKind)) {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_ADAPTER_MISMATCH");
   }
   if (!geminiUrl) return undefined;
@@ -1027,6 +1035,8 @@ export interface ProviderAdapterRegistration {
 export const OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND = "openai-compatible-http" as const;
 /** PR C: the native Google Gemini `generateContent` wire (./gemini-generate.ts). */
 export const GOOGLE_GEMINI_HTTP_ADAPTER_KIND = "google-gemini-http" as const;
+/** PR C: Google's Gemini API host; any base on it other than the one below is refused. */
+const GOOGLE_GEMINI_API_HOST = "generativelanguage.googleapis.com";
 /** PR C: the one base URL a `google-gemini-http` target may name. */
 export const GOOGLE_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta" as const;
 /** What a raw artifact and a call result record as the wire that carried the call. */

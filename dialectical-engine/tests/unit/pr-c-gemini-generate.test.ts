@@ -26,7 +26,7 @@ import {
   type ProviderLedgerInput,
   type RawArtifactInput
 } from "@debateai/providers";
-import { chargeableUsage } from "@debateai/budget";
+import { chargeMicrosForUsage, chargeableUsage, projectedCallCeilingMicros } from "@debateai/budget";
 import { buildConfiguredProviderSetSealedRow } from "@debateai/register";
 import { framedFixturePacket } from "../support/framed-packet.js";
 
@@ -368,6 +368,123 @@ describe("PR C — Gemini usage: input = prompt, output = candidates + thoughts"
     expect(chargeableUsage(missingPrompt.charge, { requestBytes: 2_000, completionTokenCeiling: 64 })!.promptTokens)
       .toBeGreaterThan(0);
     expect(readGeminiUsage("nonsense").problem).toBe("MALFORMED");
+  });
+});
+
+describe("PR C — review round (lead, 2026-10-10)", () => {
+  const PRICE = Object.freeze({ inputMicrosPerMillionTokens: 1_500_000, outputMicrosPerMillionTokens: 7_500_000 });
+
+  it("charges a billed SAFETY block with no usageMetadata the projected maximum, then refuses it", async () => {
+    const admitted: { requestBytes: number; completionTokenCeiling: number }[] = [];
+    const charged: number[] = [];
+    const seam: ProviderCostEnvelopeSeam = {
+      assertCallAllowed: (projection) => { admitted.push(projection); },
+      recordCall: (observed) => {
+        const usage = chargeableUsage(observed.usage, observed.projection);
+        expect(usage).not.toBeNull();
+        expect(usage!.completionTokens).toBe(64);
+        charged.push(chargeMicrosForUsage(PRICE, usage!));
+      },
+      assertUsageReported: () => undefined
+    };
+    const { gateway, captured, ledger } = harness([() => reply({
+      candidates: [{ finishReason: "SAFETY", index: 0 }], modelVersion: MODEL
+    })]);
+    const error = await failure(gateway.call(callRequest({ costEnvelope: seam })));
+    expect(((error as ProviderCallFailedError).cause as TypedDomainError).code).toBe(PROVIDER_CONTENT_REFUSED);
+    const requestBytes = Buffer.byteLength(String(captured[0]!.init.body), "utf8");
+    expect(admitted).toEqual([{ requestBytes, completionTokenCeiling: 64 }]);
+    const projected = projectedCallCeilingMicros(PRICE, { requestBytes, completionTokenCeiling: 64 });
+    expect(projected).toBeGreaterThan(0);
+    expect(charged).toEqual([projected]);
+    expect(ledger.map((entry) => entry.outcome)).toEqual(["FAILED"]);
+  });
+
+  it("charges an empty usage block on a 200 the projected maximum too, and an error status nothing", async () => {
+    const { seam, charges } = recordingSeam();
+    const { gateway } = harness([() => reply(geminiAnswer([{ text: "{}" }], { usageMetadata: {} }))]);
+    await gateway.call(callRequest({ costEnvelope: seam }));
+    expect(charges).toEqual([{ prompt_tokens: "MALFORMED", completion_tokens: "MALFORMED", total_tokens: "MALFORMED" }]);
+  });
+
+  it("caps the length retry at the model's 65,536-token output limit and never resends at the cap", async () => {
+    const { gateway, captured } = harness([() => reply(geminiAnswer([{ text: "{" }], {}, "MAX_TOKENS"))]);
+    const error = await failure(gateway.call(callRequest({
+      classifyContent: jsonClassifier, bound: { maxAttempts: 3, tokenCeiling: 40_000, deadlineMs: 5_000 }
+    })));
+    expect((error as ProviderContentUnacceptedError).lastParseStatus).toBe(PROVIDER_CONTENT_LENGTH_EXCEEDED);
+    expect(captured.map((call) => (JSON.parse(String(call.init.body)) as {
+      generationConfig: { maxOutputTokens: number };
+    }).generationConfig.maxOutputTokens)).toEqual([40_000, 65_536]);
+    const above = harness([() => reply(geminiAnswer([{ text: "{" }], {}, "MAX_TOKENS"))]);
+    await failure(above.gateway.call(callRequest({
+      classifyContent: jsonClassifier, bound: { maxAttempts: 3, tokenCeiling: 70_000, deadlineMs: 5_000 }
+    })));
+    expect(above.captured.map((call) => JSON.parse(String(call.init.body)).generationConfig.maxOutputTokens)).toEqual([65_536]);
+    expect(() => geminiGenerateContentBody({ messages: [{ role: "user", content: "a" }], maxOutputTokens: 65_537 }))
+      .toThrow(TypedDomainError);
+  });
+
+  it("treats an over-long prompt as a plain provider error, never as a truncation", async () => {
+    const { gateway } = harness([() => reply({
+      error: { code: 400, status: "INVALID_ARGUMENT", message: "The input token count exceeds the maximum" }
+    }, 400)]);
+    const error = await failure(gateway.call(callRequest({ classifyContent: jsonClassifier })));
+    expect(error).toBeInstanceOf(ProviderCallFailedError);
+    expect(error).not.toBeInstanceOf(ProviderContentUnacceptedError);
+    expect(((error as ProviderCallFailedError).cause as Error).message).toBe("PROVIDER_HTTP_STATUS_400");
+    const declared = harness([() => reply(geminiAnswer([{ text: "{}" }]))], { contextWindowTokens: 10 });
+    await expect(declared.gateway.call(callRequest())).rejects.toMatchObject({ code: "PROVIDER_CONTEXT_WINDOW_EXCEEDED" });
+    expect(declared.captured).toHaveLength(0);
+  });
+
+  it("never lets the key reach an error, an artifact or a ledger row", async () => {
+    const key = "fixture-key-DO-NOT-LEAK-7f3a";
+    const outcomes: unknown[] = [];
+    for (const body of [
+      () => reply(geminiAnswer([{ text: "{\"ok\":true}" }])),
+      () => reply({ error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "quota" } }, 429),
+      () => reply(geminiAnswer([], {}, "SAFETY")),
+      () => reply(geminiAnswer([{ text: "{}" }], { modelVersion: "gemini-other" }))
+    ]) {
+      const { gateway, artifacts, ledger, captured } = harness([body], { authorizationHeader: key });
+      try {
+        outcomes.push(await gateway.call(callRequest()));
+      } catch (error) {
+        const cause = (error as { cause?: unknown }).cause;
+        outcomes.push(String(error), (error as Error).stack, String(cause), (cause as Error | undefined)?.stack);
+      }
+      outcomes.push(artifacts, ledger);
+      expect(captured[0]!.url).not.toContain(key);
+      expect(String(captured[0]!.init.body)).not.toContain(key);
+    }
+    expect(JSON.stringify(outcomes)).not.toContain(key);
+    for (const bad of ["", "key with space", "key\nnewline", "key\u00e9"]) {
+      expect(() => new GeminiGenerateProviderGateway({
+        endpoint: GOOGLE_GEMINI_BASE_URL, model: MODEL, maker: "Google", authorizationHeader: bad,
+        persistRawArtifact: async () => "a", appendLedgerEntry: async () => "l", assertNoOpenWriteTransaction: () => undefined
+      })).toThrow("PROVIDER_GEMINI_CREDENTIAL_FORM_INVALID");
+    }
+  });
+
+  it("refuses an unknown configured adapter kind and the OpenAI wire on Google's host", () => {
+    const parse = (row: Readonly<Record<string, unknown>>, adapterKind?: string) => parseProviderDiscoveryTargets(
+      JSON.stringify([row]),
+      [{ providerRef: "google:gemini", maker: "Google", ...(adapterKind === undefined ? {} : { adapterKind }) }]
+    );
+    expect(() => parse({ ...GEMINI_ROW, base_url: "https://api.deepinfra.com/v1/openai" }, "provider-plugin"))
+      .toThrow("PROVIDER_DISCOVERY_TARGET_ADAPTER_UNSUPPORTED");
+    for (const baseUrl of ["https://generativelanguage.googleapis.com/v1", "https://generativelanguage.googleapis.com/v1beta/openai/v1"]) {
+      expect(() => parse({ ...GEMINI_ROW, base_url: baseUrl }, "openai-compatible-http")).toThrow("PROVIDER_DISCOVERY_TARGET_ADAPTER_MISMATCH");
+      expect(() => parse({ ...GEMINI_ROW, base_url: baseUrl })).toThrow("PROVIDER_DISCOVERY_TARGET_ADAPTER_MISMATCH");
+      expect(() => parse({ ...GEMINI_ROW, base_url: baseUrl }, GOOGLE_GEMINI_HTTP_ADAPTER_KIND)).toThrow("PROVIDER_DISCOVERY_TARGET_ADAPTER_MISMATCH");
+    }
+    expect(() => parse(GEMINI_ROW, "vllm-openai-compatible-http")).toThrow("PROVIDER_DISCOVERY_TARGET_ADAPTER_MISMATCH");
+    const options = {
+      endpoint: GOOGLE_GEMINI_BASE_URL, model: MODEL, maker: "Google",
+      persistRawArtifact: async () => "a", appendLedgerEntry: async () => "l", assertNoOpenWriteTransaction: () => undefined
+    };
+    expect(() => createProviderGatewayForAdapter("provider-plugin", options)).toThrow("PROVIDER_ADAPTER_KIND_UNSUPPORTED");
   });
 });
 

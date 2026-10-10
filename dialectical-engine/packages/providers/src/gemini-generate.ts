@@ -74,6 +74,22 @@ export const GEMINI_MODEL_ID_PATTERN = /^[a-z0-9.-]{1,64}$/u;
  */
 export const PROVIDER_CONTENT_REFUSED = "PROVIDER_CONTENT_REFUSED" as const;
 
+/**
+ * The Gemini model's own output limit (gemini-3.8-flash: 65,536 tokens, per
+ * Google's model page). No attempt ever asks for more: the length retry's
+ * raised bound is capped here, and a retry that could not raise it is not sent.
+ */
+const GEMINI_MAX_OUTPUT_TOKENS = 65_536;
+
+/**
+ * What a BILLED reply (a 2xx) that reported no usage is charged: both sides
+ * unreadable, so the money seam charges this attempt's projected maximum —
+ * never zero (the budget's `chargeableUsage` fallback).
+ */
+const GEMINI_UNREPORTED_USAGE_CHARGE = Object.freeze({
+  prompt_tokens: "MALFORMED", completion_tokens: "MALFORMED", total_tokens: "MALFORMED"
+});
+
 /** Gemini's own name for "cut off at maxOutputTokens" — the OpenAI wire's `length`. */
 export const GEMINI_FINISH_REASON_MAX_TOKENS = "MAX_TOKENS" as const;
 export const GEMINI_FINISH_REASON_STOP = "STOP" as const;
@@ -116,8 +132,11 @@ export function geminiGenerateContentBody(input: Readonly<{
   thinkingLevel?: string;
 }>): string {
   if (!Number.isSafeInteger(input.maxOutputTokens) || input.maxOutputTokens < 1
-    || input.maxOutputTokens > MAX_USAGE_COUNTER) {
-    throw new TypedDomainError("PROVIDER_GEMINI_REQUEST_INVALID", "maxOutputTokens must be a positive whole number");
+    || input.maxOutputTokens > GEMINI_MAX_OUTPUT_TOKENS) {
+    throw new TypedDomainError(
+      "PROVIDER_GEMINI_REQUEST_INVALID",
+      "maxOutputTokens must be a positive whole number within the model's output limit"
+    );
   }
   const system: string[] = [];
   const contents: { role: "user" | "model"; parts: { text: string }[] }[] = [];
@@ -167,7 +186,7 @@ export function geminiRequestHeaders(credential: string | undefined): Record<str
  * the other wire cannot be sent to Google as a malformed header.
  */
 function assertGeminiCredentialForm(credential: unknown): void {
-  if (typeof credential !== "string" || !/^[\x21-\x7e]{1,512}$/u.test(credential)) {
+  if (typeof credential !== "string" || !/^[\x21-\x7e]+$/u.test(credential)) {
     throw new TypeError("PROVIDER_GEMINI_CREDENTIAL_FORM_INVALID");
   }
 }
@@ -486,7 +505,10 @@ export class GeminiGenerateProviderGateway implements ProviderGateway {
         || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
 
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
-      const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
+      // Capped at the model's output limit: a retry never asks for more.
+      const attemptTokenCeiling = Math.min(
+        lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures), GEMINI_MAX_OUTPUT_TOKENS
+      );
       if (attempt > 1 && !fitsContextWindow(attemptPacket, attemptTokenCeiling)) break;
       if (attempt > 1) await sleep(providerBackoffMs(attempt));
       await request.assertAttemptAllowed?.();
@@ -602,9 +624,13 @@ export class GeminiGenerateProviderGateway implements ProviderGateway {
           thinkingTokens: usage.thoughtsTokens
         });
         // V-28 / I4 — the charge, before any decision about the body.
+        // A 2xx was billed. If it reported nothing billable (no usageMetadata,
+        // or an empty one), it is charged the projected maximum, never zero.
+        // An error status is not billed and keeps the OpenAI gateway's rule.
+        const billedWithoutUsage = response.ok && usage.reported === null && usage.problem === null;
         await request.costEnvelope?.recordCall({
           providerRef: request.providerRef,
-          usage: usage.charge,
+          usage: billedWithoutUsage ? GEMINI_UNREPORTED_USAGE_CHARGE : usage.charge,
           ...(costAdmission === undefined ? {} : { admission: costAdmission }),
           projection: {
             requestBytes: Buffer.byteLength(body, "utf8"),
@@ -685,6 +711,10 @@ export class GeminiGenerateProviderGateway implements ProviderGateway {
           if (contentRejection.parseStatus === PROVIDER_CONTENT_LENGTH_EXCEEDED) {
             lengthFailures += 1;
             attemptPacket = request.packet;
+            // At the output limit already: the retry would be the same request
+            // under the same bound, so it is not sent.
+            if (Math.min(lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures), GEMINI_MAX_OUTPUT_TOKENS)
+              <= attemptTokenCeiling) break;
           } else if (attempt < request.bound.maxAttempts && request.buildRepairPacket !== undefined) {
             const repair = request.buildRepairPacket({
               rawText: content ?? rawText,
