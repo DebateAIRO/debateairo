@@ -180,6 +180,13 @@ export function assertAnthropicCredentialShape(credential: string | undefined): 
  *  · this wire on anything but exactly `ANTHROPIC_MESSAGES_BASE_URL`;
  *  · any other wire on the Anthropic API host.
  */
+/** Drops every trailing "/" in one backward pass (CodeQL js/polynomial-redos: `/\/+$/` is quadratic on many "/"). */
+function trimTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url.charCodeAt(end - 1) === 47) end -= 1;
+  return url.slice(0, end);
+}
+
 export function isAnthropicHostPairing(native: boolean, baseUrl: string): boolean {
   let host: string;
   try {
@@ -189,7 +196,7 @@ export function isAnthropicHostPairing(native: boolean, baseUrl: string): boolea
     return !native;
   }
   return native
-    ? baseUrl.replace(/\/+$/u, "") === ANTHROPIC_MESSAGES_BASE_URL
+    ? trimTrailingSlashes(baseUrl) === ANTHROPIC_MESSAGES_BASE_URL
     : host !== ANTHROPIC_API_HOST;
 }
 
