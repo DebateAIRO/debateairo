@@ -285,14 +285,51 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * Serving company for the selected private-preview GLM endpoint; terms reviewed 5 October 2026.
- * Listed only by the preview's GLM build (`providerRegister`).
+ * The models the private preview offers, by the id its build flag names them with. DeepInfra
+ * serves the first four (each made by another company, named in brackets); Anthropic and Google
+ * serve their own. Gemini is kept for later: the owner swapped it for Qwen on 10 October 2026, so
+ * no reviewed preview flag offers it, and nothing about it shows unless one does. Facts checked against the vendors' published terms: see
+ * `docs/legal/2026-10-10-preview-provider-facts.md`.
+ */
+const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: string]> = Object.freeze([
+  ["zai-org/GLM-5.3-Flash", "GLM-5.3-Flash (Z.AI)"],
+  ["deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek-V4.1-Flash (DeepSeek)"],
+  ["XiaomiMiMo/MiMo-V2.6-Pro", "MiMo-V2.6-Pro (Xiaomi)"],
+  ["Qwen/Qwen3.8-Flash", "Qwen3.8-Flash (Alibaba)"]
+] as const);
+const PREVIEW_DEEPINFRA_QWEN = "Qwen/Qwen3.8-Flash";
+const PREVIEW_ANTHROPIC_MODEL = "claude-haiku-5-5";
+const PREVIEW_GOOGLE_MODEL = "gemini-3.8-flash";
+/** Every preview model id and its maker, as the new-debate form's roster reader knows them. */
+const PREVIEW_MODEL_MAKERS: ReadonlyMap<string, string> = new Map([
+  ["zai-org/GLM-5.3-Flash", "Z.AI"],
+  ["deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek"],
+  ["XiaomiMiMo/MiMo-V2.6-Pro", "Xiaomi"],
+  [PREVIEW_DEEPINFRA_QWEN, "Alibaba"],
+  [PREVIEW_ANTHROPIC_MODEL, "Anthropic"],
+  [PREVIEW_GOOGLE_MODEL, "Google"]
+]);
+const LEGACY_PREVIEW_MODEL = "zai-org/GLM-5.3-Flash";
+/**
+ * The multi-model preview register (feat/2026-10-10-preview-mm-a-app, publish-register-v2.ts) gives
+ * the fixed roles to DeepInfra models whatever the panel: GLM writes the answer and the verdict
+ * story, DeepSeek checks both. So a per-plan build always sends text to DeepInfra for these two,
+ * even when its plans list only Anthropic and Google. (The first preview's build runs GLM alone.)
+ */
+const PREVIEW_ROLE_MODELS: ReadonlySet<string> = new Set(["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"]);
+
+/**
+ * Serving company for the private preview's open-weight models; terms reviewed 5 October 2026 and
+ * rechecked 10 October 2026. Listed only by a preview build (`providerRegister`), which names in
+ * `models` the DeepInfra models that build uses. Its jobs are confirmed: every panel member writes
+ * and judges arguments, GLM writes the answer and the verdict story, DeepSeek checks both (the
+ * first preview's GLM alone does all three).
  */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
   key: "deepinfra",
   provider: "DeepInfra",
-  models: "GLM-5.3-Flash (Z.AI)",
+  models: PREVIEW_DEEPINFRA_MODELS.map(([, label]) => label).join(", "),
   entity: "Deep Infra Inc.",
   purposesConfirmed: true,
   // Published terms exclude model training. Endpoint-specific retention and transfer facts
@@ -304,17 +341,126 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * The whole Register, in the order `/providers` shows it. DeepInfra serves GLM only on the private
- * preview, so only the preview's GLM build lists it: the build that sets the public flag the
- * new-debate form reads (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON, `previewPlanRoster`). Every other
- * build, the real site included, sets none. The flag's value is checked where it picks the roster,
- * which refuses a malformed one loudly; here any value counts, so the page discloses rather than
- * hides, and this module (the root layout imports it) never throws.
+ * Anthropic's API as the private preview uses it (Claude Haiku 5.5), checked 10 October 2026: a
+ * customer in the EEA contracts with Anthropic Ireland, Limited (Commercial Terms); API inputs and
+ * outputs are deleted within 30 days unless flagged for misuse or the law requires more (privacy
+ * center); zero data retention needs Anthropic's approval, which the preview does not have; no
+ * training on customer content (Commercial Terms B); transfers under standard contractual clauses
+ * (Data Processing Addendum). On a preview build that offers it, it replaces the hosted-site
+ * placeholder row for Claude, so the page never shows Anthropic twice.
+ */
+export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  ...UNCHECKED_CLOUD,
+  key: "claude",
+  provider: "Anthropic",
+  models: "Claude Haiku 5.5",
+  entity: "Anthropic Ireland, Limited",
+  homeCountryKey: "legal.providers.ireland",
+  locationKey: "legal.providers.locationAnthropic",
+  retentionKey: "legal.providers.retentionAnthropic",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.sccBasis",
+  contact: "privacy@anthropic.com",
+  checkedOn: "2026-10-10"
+});
+
+/**
+ * Google's Gemini API, paid tier only, as the private preview uses it (Gemini 3.8 Flash), checked
+ * 10 October 2026: for a billing address in Romania the contracting entity is Google Cloud EMEA
+ * Limited (Google Contracting Entity page, "Gemini API Paid Services"); paid prompts and responses
+ * are not used to improve Google's products and are logged 55 days for abuse monitoring, in any
+ * country where Google or its agents have facilities (Gemini API terms and usage policies); zero
+ * data retention is guaranteed only on Vertex AI, not on this API. Google's EU–US Data Privacy
+ * Framework listing could not be read, so the transfer basis stays bracketed. On a preview build
+ * that offers it, it replaces the hosted-site placeholder row for Gemini.
+ */
+export const GOOGLE_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  ...UNCHECKED_CLOUD,
+  key: "gemini",
+  provider: "Google",
+  models: "Gemini 3.8 Flash",
+  entity: "Google Cloud EMEA Limited",
+  homeCountryKey: "legal.providers.ireland",
+  locationKey: "legal.providers.locationGoogle",
+  retentionKey: "legal.providers.retentionGoogle",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.usBasis",
+  contact: "legal-notices@google.com",
+  checkedOn: "2026-10-10"
+});
+
+/** A non-empty list of known preview ids with no repeats, or undefined. */
+function previewRoster(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  if (!value.every((id) => typeof id === "string" && PREVIEW_MODEL_MAKERS.has(id))) return undefined;
+  if (new Set(value).size !== value.length) return undefined;
+  return value as string[];
+}
+
+const makersOf = (roster: readonly string[]): Set<string> => new Set(roster.map((id) => PREVIEW_MODEL_MAKERS.get(id) ?? id));
+
+/**
+ * The model ids a preview build offers, read from its public flag exactly as strictly as the
+ * new-debate form's roster reader (`parsePreviewRosterFlag`): the first preview's list
+ * `["zai-org/GLM-5.3-Flash"]`, or a plain object with exactly the keys "free" and "premium", each a
+ * non-empty list of known ids with no repeats, and, when the two lists together name two or more
+ * makers, each naming at least two makers. Anything else, which the form refuses loudly, returns
+ * null: "list every preview provider". A legal page discloses rather than hides, and never throws
+ * (the root layout imports this module).
+ */
+function previewModelIds(flag: string): ReadonlySet<string> | null {
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(flag);
+  } catch {
+    return null;
+  }
+  if (Array.isArray(decoded)) {
+    return decoded.length === 1 && decoded[0] === LEGACY_PREVIEW_MODEL ? new Set([LEGACY_PREVIEW_MODEL]) : null;
+  }
+  if (decoded === null || typeof decoded !== "object" || Object.getPrototypeOf(decoded) !== Object.prototype) return null;
+  const keys = Object.keys(decoded).sort();
+  if (keys.length !== 2 || keys[0] !== "free" || keys[1] !== "premium") return null;
+  const record = decoded as Record<string, unknown>;
+  const free = previewRoster(record.free);
+  const premium = previewRoster(record.premium);
+  if (free === undefined || premium === undefined) return null;
+  if (makersOf([...free, ...premium]).size >= 2 && (makersOf(free).size < 2 || makersOf(premium).size < 2)) return null;
+  return new Set([...free, ...premium]);
+}
+
+/**
+ * The whole Register, in the order `/providers` shows it. Only the private preview's build sets
+ * the public flag the new-debate form reads (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON,
+ * `previewPlanRoster`); every other build, the real site included, sets none and gets the
+ * hosted-site rows unchanged. A preview build lists DeepInfra just before the support chat's
+ * model, naming the DeepInfra models its plans offer plus, on a per-plan build, the two role models
+ * (GLM writes, DeepSeek checks); it swaps the Claude and Gemini hosted rows for the checked preview
+ * rows when it offers Claude Haiku 5.5 or Gemini 3.8 Flash, and drops the hosted "own servers" Qwen
+ * row when it sends Qwen3.8-Flash to DeepInfra, so no maker is shown twice or where it does not run.
+ * A flag the new-debate form would refuse lists every DeepInfra model and the Anthropic preview row
+ * (never Gemini, which only a flag naming it shows). Never throws.
  */
 export function providerRegister(previewFreeModelIdsJson: string | undefined): readonly ProviderRegisterEntry[] {
+  if (previewFreeModelIdsJson === undefined) return Object.freeze([...MODEL_PROVIDERS, SUPPORT_PROVIDER]);
+  const ids = previewModelIds(previewFreeModelIdsJson);
+  const offers = (id: string): boolean => ids === null || ids.has(id);
+  // A per-plan build always uses the role models; the first preview's build (GLM alone) has no others.
+  const roleModels = ids !== null && ids.size === 1 && ids.has(LEGACY_PREVIEW_MODEL) ? new Set<string>() : PREVIEW_ROLE_MODELS;
+  const deepInfraModels = PREVIEW_DEEPINFRA_MODELS.filter(([id]) => offers(id) || roleModels.has(id)).map(([, label]) => label);
+  const rows = MODEL_PROVIDERS.flatMap((row) => {
+    if (row.key === "claude" && offers(PREVIEW_ANTHROPIC_MODEL)) return [ANTHROPIC_PREVIEW_PROVIDER];
+    // Gemini only when the flag names it: a bad flag must not invent a Google model the preview never offers.
+    if (row.key === "gemini" && ids?.has(PREVIEW_GOOGLE_MODEL) === true) return [GOOGLE_PREVIEW_PROVIDER];
+    // The hosted row says Qwen runs on our own servers; a build that sends Qwen to DeepInfra names it there instead.
+    if (row.key === "qwen" && offers(PREVIEW_DEEPINFRA_QWEN)) return [];
+    return [row];
+  });
   return Object.freeze([
-    ...MODEL_PROVIDERS,
-    ...(previewFreeModelIdsJson === undefined ? [] : [DEEPINFRA_PROVIDER]),
+    ...rows,
+    ...(deepInfraModels.length === 0 ? [] : [Object.freeze({ ...DEEPINFRA_PROVIDER, models: deepInfraModels.join(", ") })]),
     SUPPORT_PROVIDER
   ]);
 }
