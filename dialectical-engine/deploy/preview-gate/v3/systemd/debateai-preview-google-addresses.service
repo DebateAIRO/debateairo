@@ -1,0 +1,44 @@
+# Install as /etc/systemd/system/debateai-preview-google-addresses.service (root:root 0644).
+# ONLY in measured-list mode of the Google spending gate (the gate unit allows a fixed list of
+# Google's IPv4 addresses from 50-google-addresses.conf). In proxy mode do NOT install it, nor
+# its timer: there is no list to keep in step.
+# The DeepInfra address watcher (debateai-preview-gate-addresses.service) with Google's names and
+# paths. Started hourly by debateai-preview-google-addresses.timer. A mismatch not announced
+# before fails this unit (exit 3) and its OnFailure= notice emails the owner the one command that
+# updates the list: at most one email per change. It reads only DNS (through the local resolver
+# stub) and the drop-in; no key, no gate state. Unprivileged.
+[Unit]
+Description=DebateAI preview: check the Google spending gate's allow-list against DNS
+OnFailure=debateai-preview-notice@google-addresses-mismatch.service
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/google-budget-v1/google_addresses.py watch --dropin /etc/systemd/system/debateai-preview-google-budget.service.d/50-google-addresses.conf --state /var/lib/debateai-preview-google-addresses/announced
+# Only this unit's own state: the fingerprint of the last announced mismatch.
+StateDirectory=debateai-preview-google-addresses
+StateDirectoryMode=0700
+TimeoutStartSec=60
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+InaccessiblePaths=-/etc/debateai-v3-preview -/var/lib/debateai-v3-preview -/var/lib/postgresql -/etc/postfix
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=127.0.0.53/32

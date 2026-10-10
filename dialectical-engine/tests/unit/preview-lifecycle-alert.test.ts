@@ -577,4 +577,28 @@ describe('spending-gate notices', () => {
     await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'gate-halted-uncertain_charge']), layout, deps: h.deps });
     expect(h.sent.map(mail => mail.match(/^Subject: (.*)$/m)![1])).toEqual(['Preview: spending gate stopped: provider_unreachable', 'Preview: spending gate stopped: uncertain_charge']);
   });
+
+  it('the Google gate has its own two notices, each with the Google gate\'s own command (PR C)', async () => {
+    const googleHalted = 'debateai-preview-notice@google-halted-charge_overrun.service';
+    expect(alert.parseAlertArgs(['--notice', 'google-halted-charge_overrun'])).toEqual({ unit: googleHalted, test: false, notice: { kind: 'google-halted', code: 'charge_overrun', unit: googleHalted } });
+    expect(alert.parseAlertArgs(['--notice', 'google-addresses-mismatch'])).toMatchObject({ notice: { kind: 'google-addresses', code: 'mismatch' } });
+    expect(alert.parseAlertArgs(['--notice', 'anthropic-halted-x'])).toBeNull();
+    const layout = server();
+    const h = harness(layout, { ...notMe, readJournal: async () => { throw new Error('a halt notice reads no journal'); } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'google-halted-charge_overrun']), layout, deps: h.deps });
+    const mail = h.sent[0]!;
+    expect(mail).toContain('Subject: Preview: Google spending gate stopped: charge_overrun');
+    expect(mail).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/google-budget-v1/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-google-authority-v1 --go /etc/debateai-v3-preview/provider-google-go-v1.json');
+    expect(mail).toContain('systemctl status debateai-preview-google-budget.service');
+    expect(mail).not.toMatch(/\$|usd/i);
+    const asked: string[] = [];
+    const second = server();
+    const g = harness(second, { ...notMe, readJournal: async (name: string) => { asked.push(name); return ['{"status": "refused", "error": "GOOGLE_ADDRESSES_CHANGED", "new": ["142.250.1.1"]}']; } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'google-addresses-mismatch']), layout: second, deps: g.deps });
+    expect(asked).toEqual(['debateai-preview-google-addresses.service']);
+    const update = g.sent[0]!;
+    expect(update).toContain('Subject: Preview: Google gate address list needs an update (mismatch)');
+    expect(update).not.toContain('142.250.1.1');
+    expect(update).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/google-budget-v1/google_addresses.py update --dropin /etc/systemd/system/debateai-preview-google-budget.service.d/50-google-addresses.conf && systemctl restart debateai-preview-google-budget');
+  });
 });

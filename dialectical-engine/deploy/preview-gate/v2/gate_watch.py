@@ -4,7 +4,7 @@
 It asks the gate itself for `status` (read-only: a shared lock, nothing written; the key file is
 hidden from this unit). If the gate is halted and this halt (its halted_at and reason) has not
 been announced yet, it records the halt first and then queues one notice,
-debateai-preview-notice@gate-halted-<reason>.service, without waiting for it
+debateai-preview-notice@<kind>-<reason>.service, without waiting for it
 (`systemctl start --no-block`). So the halt itself is never blocked or slowed by mail, and each
 halt is announced at most once: a failed notice is not retried. A halt that is re-opened within
 the same minute may go unannounced; status still lists every halt.
@@ -25,6 +25,9 @@ PYTHON = '/usr/bin/python3'
 SYSTEMCTL = '/usr/bin/systemctl'
 REASON = re.compile(r'[a-z0-9_]{1,64}')
 STATE_BYTES = 4096
+# The notice kind names which gate halted, so the email carries that gate's own re-open command:
+# gate-halted (DeepInfra, the default) or google-halted (the Google gate, v3 README "Google").
+NOTICE_KINDS = ('gate-halted', 'google-halted')
 
 
 class WatchError(Exception):
@@ -83,8 +86,10 @@ def write_announced(path, value):
             pass
 
 
-def queue_notice(code, run=subprocess.run):
-    unit = 'debateai-preview-notice@gate-halted-%s.service' % code
+def queue_notice(code, run=subprocess.run, kind='gate-halted'):
+    if kind not in NOTICE_KINDS:
+        raise WatchError('NOTICE_KIND_INVALID')
+    unit = 'debateai-preview-notice@%s-%s.service' % (kind, code)
     try:
         result = run([SYSTEMCTL, 'start', '--no-block', unit], env={}, stdin=subprocess.DEVNULL, capture_output=True,
                      timeout=30)
@@ -95,7 +100,7 @@ def queue_notice(code, run=subprocess.run):
     return unit
 
 
-def watch(private, state_path, run=subprocess.run):
+def watch(private, state_path, run=subprocess.run, kind='gate-halted'):
     status = read_status(private, run)
     if status['state'] != 'halted':
         return {'status': 'ok', 'state': status['state']}
@@ -106,16 +111,17 @@ def watch(private, state_path, run=subprocess.run):
     if read_announced(state_path) == halt:
         return {'status': 'halted', 'reason': code, 'announced': 'before'}
     write_announced(state_path, halt)  # Recorded first: at most one notice per halt.
-    return {'status': 'halted', 'reason': code, 'announced': 'now', 'notice': queue_notice(code, run)}
+    return {'status': 'halted', 'reason': code, 'announced': 'now', 'notice': queue_notice(code, run, kind)}
 
 
 def main(argv=None, run=subprocess.run):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--private', type=Path, required=True)
     parser.add_argument('--state', type=Path, required=True)
+    parser.add_argument('--notice', choices=NOTICE_KINDS, default='gate-halted')
     args = parser.parse_args(argv)
     try:
-        print(json.dumps(watch(args.private, args.state, run)))
+        print(json.dumps(watch(args.private, args.state, run, args.notice)))
         return 0
     except (WatchError, OSError) as error:
         print(json.dumps({'status': 'refused', 'error': str(error) if isinstance(error, WatchError) else 'STATE_UNWRITABLE'}))

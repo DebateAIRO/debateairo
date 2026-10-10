@@ -24,8 +24,9 @@ import stat
 import threading
 import time
 from collections import namedtuple
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from zoneinfo import ZoneInfo
 
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_TIMEOUT_SECONDS = 600
@@ -373,9 +374,231 @@ class DeepInfraProfile:
         return error if isinstance(error, str) else None
 
 
-# The providers this gate can serve. Anthropic and Google are reserved names: a GO naming them is
-# refused until their reviewed profile is added here.
+# The providers this gate can serve. A provider name without a reviewed profile here (Anthropic,
+# until its profile is added) is refused.
 PROFILES = {profile.name: profile for profile in (DeepInfraProfile(),)}
+
+
+def _is_text_part_list(parts):
+    """Exactly one part, and that part is exactly {"text": <string>}."""
+    return (isinstance(parts, list) and len(parts) == 1 and isinstance(parts[0], dict)
+            and set(parts[0]) == {'text'} and isinstance(parts[0]['text'], str))
+
+
+def _whole(value):
+    return type(value) is int and 0 <= value <= 2 ** 31 - 1
+
+
+GOOGLE_PRICE_ZONE = 'Europe/Bucharest'
+# Gemini 3.8 Flash list prices, USD per million tokens, by the vendor's dated table
+# (ai.google.dev/gemini-api/docs/pricing, read 2026-10-10): thinking is billed as output. Each step
+# is (first day it applies, input, output); the last step's prices are the ceiling.
+GOOGLE_PRICE_STEPS = (('0001-01-01', Decimal('0.75'), Decimal('3.75')),
+                      ('2027-01-01', Decimal('1.50'), Decimal('7.50')))
+# Google's own day boundary is not stated, so a price is taken as in force from the start of the
+# Bucharest day BEFORE the vendor's date (Bucharest is behind every zone from UTC+3 to UTC+14, and a
+# day earlier covers the zones behind it): the gate never prices a call below the vendor's price.
+
+
+def google_prices_on(day):
+    """The dated (input, output) list prices for one ISO day (YYYY-MM-DD)."""
+    prices = None
+    for first_day, input_price, output_price in GOOGLE_PRICE_STEPS:
+        if day >= first_day:
+            prices = (input_price, output_price)
+    return prices
+
+
+def google_careful_prices(moment):
+    """The higher of the prices for moment's Bucharest day and for the next Bucharest day.
+
+    Used for both the reservation (at the moment the gate checks the request) and the settlement
+    (at the moment the reply is accounted). The app computes the very same figure for its
+    reservation (preview-google.ts, parity fixture). Prices only ever rise in the table, so
+    'higher' is element-wise and the next day's prices win at a step."""
+    if not isinstance(moment, datetime) or moment.tzinfo is None:
+        raise SafetyError('CLOCK_INVALID')  # noqa: F821 - provided by the gate
+    today = moment.astimezone(ZoneInfo(GOOGLE_PRICE_ZONE)).date()
+    first, second = google_prices_on(today.isoformat()), google_prices_on((today + timedelta(days=1)).isoformat())
+    return max(first[0], second[0]), max(first[1], second[1])
+
+
+# The usage fields a Gemini generateContent reply may carry. Counts left out mean 0 (proto3 JSON
+# drops zero values); the detail lists are per-modality splits of the counts above them.
+GOOGLE_USAGE_COUNTS = ('promptTokenCount', 'candidatesTokenCount', 'thoughtsTokenCount', 'totalTokenCount',
+                       'cachedContentTokenCount', 'toolUsePromptTokenCount')
+GOOGLE_USAGE_DETAILS = {'promptTokensDetails': 'promptTokenCount', 'candidatesTokensDetails': 'candidatesTokenCount',
+                        'cacheTokensDetails': 'cachedContentTokenCount',
+                        'toolUsePromptTokensDetails': 'toolUsePromptTokenCount'}
+# Any of these anywhere in a refusal means it may have produced (and billed) an answer.
+GOOGLE_BILLED_KEYS = ('candidates', 'usageMetadata', 'modelVersion', 'responseId', 'promptFeedback')
+GOOGLE_UNBILLED_STATUSES = {429: 'RESOURCE_EXHAUSTED', 503: 'UNAVAILABLE'}
+
+
+def _details_valid(details, ceiling):
+    """A per-modality split: a list of {"modality": str, "tokenCount": int} whose counts sum to no
+    more than the count it splits."""
+    if not isinstance(details, list) or not all(
+            isinstance(item, dict) and set(item) <= {'modality', 'tokenCount'} and isinstance(item.get('modality'), str)
+            and _whole(item.get('tokenCount', 0)) for item in details):
+        return False
+    return sum(item.get('tokenCount', 0) for item in details) <= ceiling
+
+
+def account_gemini_usage(response, input_price, output_price):
+    """Gemini usageMetadata priced at one (input, output) pair: input = promptTokenCount, output =
+    candidatesTokenCount + thoughtsTokenCount (thinking is billed as output). Valid only if every
+    field is a known one, the total adds up exactly (tool-use prompt tokens must be absent or 0,
+    as no tools are ever sent), no cached tokens are reported (no cache is ever asked for) and
+    the prompt and total are present. Anything else is invalid usage: the call stays uncertain
+    and the gate halts."""
+    usage = response.get('usageMetadata') if isinstance(response, dict) else None
+    known = isinstance(usage, dict) and set(usage) <= set(GOOGLE_USAGE_COUNTS) | set(GOOGLE_USAGE_DETAILS)
+    usage = usage if isinstance(usage, dict) else {}
+    counts = {name: usage.get(name, 0) for name in GOOGLE_USAGE_COUNTS}
+    whole = all(_whole(value) for value in counts.values())
+    prompt, candidates, thoughts = counts['promptTokenCount'], counts['candidatesTokenCount'], counts['thoughtsTokenCount']
+    total, cached, tool = counts['totalTokenCount'], counts['cachedContentTokenCount'], counts['toolUsePromptTokenCount']
+    valid = (known and whole and 'promptTokenCount' in usage and 'totalTokenCount' in usage
+             and cached == 0 and tool == 0 and total == prompt + candidates + thoughts + tool
+             and all(_details_valid(usage[name], counts[count]) for name, count in GOOGLE_USAGE_DETAILS.items()
+                     if name in usage))
+    completion = candidates + thoughts if whole else None
+    configured = ((Decimal(prompt) * input_price + Decimal(completion) * output_price) / Decimal(1000000)) if valid else None
+
+    def reported(name):
+        value = usage.get(name)
+        return value if _whole(value) else None
+    return {'input_usd_per_m': str(input_price), 'output_usd_per_m': str(output_price),  # The settlement prices.
+            'prompt_tokens': reported('promptTokenCount'), 'completion_tokens': completion if valid else None,
+            'candidates_tokens': reported('candidatesTokenCount'), 'reasoning_tokens': reported('thoughtsTokenCount'),
+            'total_tokens': reported('totalTokenCount'), 'cached_tokens': reported('cachedContentTokenCount'),
+            'tool_use_prompt_tokens': reported('toolUsePromptTokenCount'), 'usage_valid': valid,
+            'configured_price_cost_usd': str(configured) if configured is not None else None,
+            'provider_estimated_cost_usd': None,
+            'guard_charge_usd': str(configured) if configured is not None else None,
+            'cost_basis': ('dated list price x (prompt; candidates + thoughts)' if configured is not None
+                           else 'unknown; full reservation retained')}
+
+
+class GoogleProfile:
+    """generativelanguage.googleapis.com, native Gemini generateContent, key in x-goog-api-key.
+    One row reviewed 2026-10-10 (gemini-3.8-flash). The profile API is DeepInfraProfile's.
+
+    The app frames each request as {"model": <id>, "request": <native body>} (exactly those two
+    keys): the model is read from the frame, the path is built from the row (never from the
+    request, and never with a query, so the key can never travel in a URL), and the bytes sent are
+    the canonical inner native body, which is always shorter than the framed bytes the reservation
+    priced. Prices are dated (GOOGLE_PRICE_STEPS): a call reserves and settles at the higher of the
+    prices of its Bucharest day and the next one; the worst cases use the ceiling (the last step).
+
+    Unmeasured until the root-only probe's paid call: the exact modelVersion the reply echoes (the
+    gate accepts exactly the row's id and halts on anything else), and whether thought tokens stay
+    within maxOutputTokens for generateContent (if they do not, a charge can pass its reservation
+    and the gate halts on charge_overrun; the probe prints completion_within_max_tokens)."""
+    name = 'google'
+    host = 'generativelanguage.googleapis.com'
+    per_call_cap_usd = Decimal('0.55')
+    # The engine never sends a native body over 256 KiB (MAX_PROVIDER_REQUEST_PACKET_BYTES); the
+    # frame adds 40 bytes for this model id. A smaller limit could refuse a call mid-debate.
+    max_request_bytes = 256 * 1024 + 64
+    redaction_patterns = (r'AIza[0-9A-Za-z_-]{35}',)
+    rows = {row.model: row for row in (
+        # The row's own prices are the ceiling (the last dated step); calls use google_careful_prices.
+        ModelRow('gemini-3.8-flash', 'Google', Decimal('1.50'), Decimal('7.50'), 16384, 'high', False),)}
+
+    def path_for(self, row):
+        return '/v1beta/models/' + row.model + ':generateContent'
+
+    def auth_headers(self, key):
+        return {'x-goog-api-key': key}
+
+    def reservation_prices(self, row, moment):
+        return google_careful_prices(moment)
+
+    def ceiling_prices(self, row):
+        return GOOGLE_PRICE_STEPS[-1][1], GOOGLE_PRICE_STEPS[-1][2]
+
+    def requested_model(self, body):
+        return body.get('model') if isinstance(body, dict) else None
+
+    def body_valid(self, body, row):
+        """The frame, then the native body exactly as the wire contract fixes it: contents (user
+        and model turns, one text part each, the user first), an optional systemInstruction with
+        one text part, and generationConfig with exactly maxOutputTokens (1..the row's bound) and,
+        iff the row's effort is "high", thinkingConfig {"thinkingLevel": "high"}. No tools, cache,
+        safety settings, labels, stop sequences, sampling or JSON mode (no row allows it)."""
+        if not isinstance(body, dict) or set(body) != {'model', 'request'} or body['model'] != row.model:
+            return False
+        native = body['request']
+        if not isinstance(native, dict) or not {'contents', 'generationConfig'} <= set(native) \
+                or not set(native) <= {'contents', 'generationConfig', 'systemInstruction'}:
+            return False
+        contents = native['contents']
+        if not (isinstance(contents, list) and contents and all(
+                isinstance(turn, dict) and set(turn) == {'role', 'parts'} and turn['role'] in ('user', 'model')
+                and _is_text_part_list(turn['parts']) for turn in contents) and contents[0]['role'] == 'user'):
+            return False
+        if 'systemInstruction' in native:
+            system = native['systemInstruction']
+            if not (isinstance(system, dict) and set(system) == {'parts'} and _is_text_part_list(system['parts'])):
+                return False
+        config = native['generationConfig']
+        expected = {'maxOutputTokens'} | ({'thinkingConfig'} if row.effort else set())
+        if not isinstance(config, dict) or set(config) != expected:
+            return False
+        if row.effort and config['thinkingConfig'] != {'thinkingLevel': row.effort}:
+            return False
+        return type(config['maxOutputTokens']) is int and 1 <= config['maxOutputTokens'] <= row.output_bound
+
+    def request_bytes(self, body):
+        """The canonical inner native body: never longer than the framed bytes that were priced."""
+        return canonical(body['request'])
+
+    def account(self, response, row, moment):
+        return account_gemini_usage(response, *google_careful_prices(moment))
+
+    def reply_model(self, response):
+        return response.get('modelVersion')
+
+    def unbilled_refusal(self, status, response):
+        """True only for a 429 RESOURCE_EXHAUSTED or a 503 UNAVAILABLE whose body is exactly
+        {"error": {"code", "status", "message", "details"?}} with the code equal to the HTTP status,
+        and with no candidates, usageMetadata, modelVersion, responseId, promptFeedback (or any
+        other billed key) at any depth. Judged on the raw reply."""
+        expected = GOOGLE_UNBILLED_STATUSES.get(status) if type(status) is int else None
+        if expected is None or not isinstance(response, dict) or set(response) != {'error'}:
+            return False
+        error = response['error']
+        return bool(isinstance(error, dict) and {'code', 'status', 'message'} <= set(error)
+                    and set(error) <= {'code', 'status', 'message', 'details'}
+                    and type(error['code']) is int and error['code'] == status and error['status'] == expected
+                    and isinstance(error['message'], str) and isinstance(error.get('details', []), list)
+                    and not names_any_key(response, GOOGLE_BILLED_KEYS + BILLED_KEYS)
+                    and not names_any_key_prefixed(response, 'tokens_'))
+
+    def probe_body(self, row):
+        config = {'maxOutputTokens': min(1024, row.output_bound)}
+        if row.effort:
+            config['thinkingConfig'] = {'thinkingLevel': row.effort}
+        return {'model': row.model, 'request': {'contents': [{'role': 'user', 'parts': [{'text': 'Reply exactly: OK'}]}],
+                                                'generationConfig': config}}
+
+    def reply_text(self, response):
+        """The answer's text parts (thought parts left out), or a provider error's message."""
+        candidates = response.get('candidates')
+        if isinstance(candidates, list) and candidates and isinstance(candidates[0], dict):
+            content = candidates[0].get('content')
+            parts = content.get('parts') if isinstance(content, dict) else None
+            if not isinstance(parts, list):
+                return None
+            return ''.join(part['text'] for part in parts
+                           if isinstance(part, dict) and isinstance(part.get('text'), str) and part.get('thought') is not True)
+        error = response.get('error')
+        return error.get('message') if isinstance(error, dict) and isinstance(error.get('message'), str) else None
+
+
+PROFILES[GoogleProfile.name] = GoogleProfile()
 
 
 class HttpsTransport:

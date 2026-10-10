@@ -1,0 +1,5 @@
+# Install as /opt/debateai-v3-preview/operator/google-budget-v1/gate-hosts (root:root 0644), ONLY
+# in forwarder mode. It becomes the Google gate's /etc/hosts inside its private network namespace
+# (40-google-egress-forwarder.conf): the one name the gate calls points at the local forwarder.
+127.0.0.1 localhost
+127.0.0.1 generativelanguage.googleapis.com

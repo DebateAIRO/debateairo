@@ -981,7 +981,7 @@ class ProfileTests(GateTest):
                 gate.call('op-2', value=body())  # A DeepInfra row is not this profile's row.
 
     def test_reserved_provider_names_have_no_profile_yet(self):
-        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra'})
+        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'google'})
 
 
 if __name__ == '__main__':

@@ -1,0 +1,13 @@
+# Install as /etc/systemd/system/debateai-preview-google-forwarder.socket (root:root 0644), ONLY in
+# forwarder mode (README-google.md, "Egress", mode B). PROPOSED FOR THE OWNER'S REVIEW.
+# systemd creates this listening socket INSIDE the Google gate's private network namespace
+# (PrivateNetwork + JoinsNamespaceOf), so 127.0.0.1:443 exists only for the gate. A connection
+# starts debateai-preview-google-forwarder.service, which runs in the normal network namespace.
+[Unit]
+Description=DebateAI preview: the Google gate's only way out (listening inside the gate's namespace)
+JoinsNamespaceOf=debateai-preview-google-budget.service
+
+[Socket]
+ListenStream=127.0.0.1:443
+PrivateNetwork=yes
+Accept=no

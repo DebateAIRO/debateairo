@@ -1,0 +1,47 @@
+# Install as /etc/systemd/system/debateai-preview-google-forwarder.service (root:root 0644), ONLY
+# in forwarder mode (README-google.md, "Egress", mode B). PROPOSED FOR THE OWNER'S REVIEW.
+# systemd's own byte forwarder: every connection the gate opens to 127.0.0.1:443 is joined to
+# generativelanguage.googleapis.com:443, resolved again for each connection. It is fixed to that
+# one name and port on this command line: no request can ask it for another host. It holds no
+# key and cannot read one (it runs as a throw-away user, sees no state folder, and the bytes it
+# carries are TLS that ends at the gate). It refuses non-public addresses through the kernel
+# filter below (a DNS answer pointing at a local or private address cannot be reached). Its
+# remaining risk: this unit itself may reach any public address; only this command line limits
+# it to Google's name.
+[Unit]
+Description=DebateAI preview: forward the Google gate's TLS bytes to generativelanguage.googleapis.com:443
+Requires=debateai-preview-google-forwarder.socket
+After=debateai-preview-google-forwarder.socket network-online.target nss-lookup.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --connections-max=16 generativelanguage.googleapis.com:443
+DynamicUser=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+InaccessiblePaths=-/etc/debateai-v3-preview -/var/lib/debateai-v3-preview -/opt/debateai-v3-preview -/var/lib/postgresql -/etc/postfix -/root
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# The local resolver stub only, of all local addresses; then no loopback, private, shared,
+# link-local, multicast or reserved address, IPv4 or IPv6 (an allow entry wins over a deny).
+IPAddressAllow=127.0.0.53/32
+IPAddressDeny=0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.0.0.0/24 192.0.2.0/24 192.168.0.0/16 198.18.0.0/15 198.51.100.0/24 203.0.113.0/24 224.0.0.0/3
+IPAddressDeny=::/127 ::ffff:0:0/96 64:ff9b::/96 100::/64 2001:db8::/32 fc00::/7 fe80::/10 ff00::/8
