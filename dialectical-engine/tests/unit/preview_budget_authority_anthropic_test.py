@@ -29,8 +29,11 @@ HAIKU = 'claude-haiku-5-5'
 KEY = 'sk-' + 'ant-' + 'api03-' + 'synthetic' + '-0123456789'  # A made-up test value.
 OTHER_SHAPE = 'sk-' + 'ant-' + 'api03-LEAKED_value-42'  # Any other string of the same shape.
 # The reviewed row and Anthropic's two list-price steps, written out independently of the gate:
-# input reserve 0.625 (the upper step's 5-minute cache write), output 2.50, bound 32768.
-PRICE_IN, PRICE_OUT, BOUND = Decimal('0.625'), Decimal('2.50'), 32768
+# the row holds the lower step's prices (0.10 / 0.50), bound 32768; a request whose bytes + 2048 are
+# above 100,000 reserves at the upper step's (0.50 / 2.50), the ceiling (owner ruling 2026-10-10, evening).
+PRICE_IN, PRICE_OUT, BOUND = Decimal('0.10'), Decimal('0.50'), 32768
+CEIL_IN, CEIL_OUT = Decimal('0.50'), Decimal('2.50')
+STEP_TOKENS = 100000
 LOWER = {'input': Decimal('0.10'), 'write_5m': Decimal('0.125'), 'write_1h': Decimal('0.20'), 'read': Decimal('0.01'),
          'output': Decimal('0.50')}
 UPPER = {'input': Decimal('0.50'), 'write_5m': Decimal('0.625'), 'write_1h': Decimal('1.00'), 'read': Decimal('0.05'),
@@ -55,7 +58,9 @@ def without(name, value=None):
 
 
 def reservation_of(raw):
-    return (Decimal(len(raw.encode()) + 2048) * PRICE_IN + Decimal(BOUND) * PRICE_OUT) / Decimal(1000000)
+    tokens = len(raw.encode()) + 2048
+    price_in, price_out = (PRICE_IN, PRICE_OUT) if tokens <= STEP_TOKENS else (CEIL_IN, CEIL_OUT)
+    return (Decimal(tokens) * price_in + Decimal(BOUND) * price_out) / Decimal(1000000)
 
 
 def envelope(value, operation_id='op-1'):
@@ -170,28 +175,53 @@ class ParityAndReservationTests(AnthropicTest):
                           lower.cache_read_usd_per_m, lower.output_usd_per_m), tuple(LOWER.values()))
         self.assertEqual((upper.input_usd_per_m, upper.cache_write_5m_usd_per_m, upper.cache_write_1h_usd_per_m,
                           upper.cache_read_usd_per_m, upper.output_usd_per_m), tuple(UPPER.values()))
-        # The reservation prices are the dearest the request can meet: never below a settlement price
-        # of either step (except the 1-hour write, which no accepted request can ask for).
-        self.assertEqual(ANTHROPIC.reservation_prices(ANTHROPIC.rows[HAIKU], bridge.helper.utc_now()), (PRICE_IN, PRICE_OUT))
-        self.assertEqual(ANTHROPIC.ceiling_prices(row), (PRICE_IN, PRICE_OUT))
-        for step in (lower, upper):
-            self.assertLessEqual(max(step.input_usd_per_m, step.cache_write_5m_usd_per_m, step.cache_read_usd_per_m), PRICE_IN)
-            self.assertLessEqual(step.output_usd_per_m, PRICE_OUT)
+        # The row is the lower step; the ceiling is the upper step's plain input and output prices
+        # (no accepted request can ask for a cache write, so its prices are never reserved at).
+        self.assertEqual((PRICE_IN, PRICE_OUT), (lower.input_usd_per_m, lower.output_usd_per_m))
+        self.assertEqual(ANTHROPIC.ceiling_prices(row), (CEIL_IN, CEIL_OUT))
+        self.assertEqual((CEIL_IN, CEIL_OUT), (upper.input_usd_per_m, upper.output_usd_per_m))
+        self.assertEqual(ANTHROPIC.RESERVATION_OVERHEAD_BYTES, bridge.RESERVATION_OVERHEAD_BYTES)
+        self.assertEqual((parity['reservation']['step_tokens'], Decimal(parity['reservation']['ceiling_input_usd_per_m']),
+                          Decimal(parity['reservation']['ceiling_output_usd_per_m'])),
+                         (lower.prompt_tokens_up_to, CEIL_IN, CEIL_OUT))
+
+    def test_the_reservation_step_follows_the_request_size(self):
+        # bytes + 2048 up to 100,000: the prompt cannot reach the upper step, so the lower prices;
+        # one byte more, or an unknown size: the upper step's.
+        row, now = ANTHROPIC.rows[HAIKU], bridge.helper.utc_now()
+        edge = STEP_TOKENS - 2048
+        self.assertEqual(ANTHROPIC.reservation_prices(row, now, edge), (PRICE_IN, PRICE_OUT))
+        self.assertEqual(ANTHROPIC.reservation_prices(row, now, 0), (PRICE_IN, PRICE_OUT))
+        for size in (edge + 1, 256 * 1024, None, -1, True, 1.0):
+            with self.subTest(size=size):
+                self.assertEqual(ANTHROPIC.reservation_prices(row, now, size), (CEIL_IN, CEIL_OUT))
+        go = bridge.read_go(self.gate().go_path)
+        for size, prices in ((edge, (PRICE_IN, PRICE_OUT)), (edge + 1, (CEIL_IN, CEIL_OUT))):
+            with self.subTest(body_bytes=size):
+                _, reserved, _, used = bridge.validate_request(envelope(sized(size)), go)
+                self.assertEqual(used, prices)
+                self.assertEqual(reserved, (Decimal(size + 2048) * prices[0] + Decimal(BOUND) * prices[1]) / Decimal(1000000))
+        # At the edge: (100,000 x 0.10 + 32,768 x 0.50) / 1e6 = $0.026384; one byte more:
+        # (100,001 x 0.50 + 32,768 x 2.50) / 1e6 = $0.1319205.
+        self.assertEqual(reservation_of(json.dumps(sized(edge))), Decimal('0.026384'))
+        self.assertEqual(reservation_of(json.dumps(sized(edge + 1))), Decimal('0.1319205'))
 
     def test_worst_case_is_pinned_under_the_per_call_cap(self):
         row = ANTHROPIC.rows[HAIKU]
         self.assertEqual((ANTHROPIC.per_call_cap_usd, ANTHROPIC.max_request_bytes), (Decimal('0.25'), 256 * 1024))
-        self.assertEqual(bridge.worst_case_reservation(ANTHROPIC, row), Decimal('0.24704'))
-        self.assertEqual((Decimal(264192) * PRICE_IN + Decimal(32768) * PRICE_OUT) / Decimal(1000000), Decimal('0.24704'))
+        self.assertEqual(bridge.worst_case_reservation(ANTHROPIC, row), Decimal('0.214016'))
+        self.assertEqual((Decimal(264192) * CEIL_IN + Decimal(32768) * CEIL_OUT) / Decimal(1000000), Decimal('0.214016'))
         self.assertTrue(bridge.row_reviewed(ANTHROPIC, HAIKU, row))
         self.assertIs(bridge.profile_of('anthropic'), ANTHROPIC)
         go = bridge.read_go(self.gate().go_path)
         _, reserved, _, prices = bridge.validate_request(envelope(sized(ANTHROPIC.max_request_bytes)), go)
-        self.assertEqual((reserved, prices), (Decimal('0.24704'), (PRICE_IN, PRICE_OUT)))
+        self.assertEqual((reserved, prices), (Decimal('0.214016'), (CEIL_IN, CEIL_OUT)))
         with self.refused('REQUEST_SCOPE_INVALID'):
             bridge.validate_request(envelope(sized(ANTHROPIC.max_request_bytes + 1)), go)
-        # A row whose full-size request would pass the cap (33,953 x 2.50 tips it over) is not reviewed, and its GO is refused.
-        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=33953)}):
+        # A row whose full-size request would pass the cap (47,162 x 2.50 tips it over) is not reviewed, and its GO is refused.
+        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=47161)}):
+            self.assertIs(bridge.profile_of('anthropic'), ANTHROPIC)
+        with patch.object(ANTHROPIC, 'rows', {HAIKU: row._replace(output_bound=47162)}):
             self.assertIsNone(bridge.profile_of('anthropic'))
 
     def test_a_small_request_reserves_exactly_and_the_app_nano_usd_form_is_accepted(self):
@@ -199,10 +229,10 @@ class ParityAndReservationTests(AnthropicTest):
         value = request()
         raw = json.dumps(value, separators=(',', ':'))
         self.assertEqual(len(raw.encode()), 185)
-        expected = Decimal('0.083315625')  # ((185 + 2048) x 0.625 + 32768 x 2.50) / 1e6
-        total = (len(raw.encode()) + 2048) * 625 + BOUND * 2500  # The app's nano-USD sum.
+        expected = Decimal('0.0166073')  # ((185 + 2048) x 0.10 + 32768 x 0.50) / 1e6: the lower step
+        total = (len(raw.encode()) + 2048) * 100 + BOUND * 500  # The app's nano-USD sum.
         typescript = '%d.%09d' % (total // 10 ** 9, total % 10 ** 9)
-        self.assertEqual(typescript, '0.083315625')
+        self.assertEqual(typescript, '0.016607300')
         sent = {'scope_id': SCOPE, 'operationId': 'op-1', 'requestBody': raw,
                 'requestSha256': hashlib.sha256(raw.encode()).hexdigest(), 'reservedUsd': typescript}
         outgoing, reserved, row, prices = bridge.validate_request(sent, go)
@@ -210,7 +240,7 @@ class ParityAndReservationTests(AnthropicTest):
         # Sorted keys, no spaces: the same length as the compact bytes priced, never longer.
         self.assertEqual((outgoing, len(outgoing)), (bridge.helper.canonical(value), len(raw.encode())))
         with self.refused('RESERVATION_MISMATCH'):
-            bridge.validate_request({**sent, 'reservedUsd': '0.083315624'}, go)
+            bridge.validate_request({**sent, 'reservedUsd': '0.016607299'}, go)
 
 
 class GoAndActivateTests(AnthropicTest):
@@ -250,9 +280,9 @@ class GoAndActivateTests(AnthropicTest):
                                                                  **changes}))
 
     def test_activate_checks_the_calls_in_flight_times_the_worst_case_against_the_pot(self):
-        # The proposed GO: 2 x 0.24704 = 0.49408 fits $1.00. 4 x 0.24704 = 0.98816.
-        for budget, calls, ok in (('1.00', 2, True), ('0.50', 2, True), ('0.49', 2, False),
-                                  ('0.98', 4, False), ('0.99', 4, True), ('1.00', 4, True), ('0.24', 1, False)):
+        # The proposed GO: 2 x 0.214016 = 0.428032 fits $2.00. 4 x 0.214016 = 0.856064.
+        for budget, calls, ok in (('2.00', 2, True), ('0.43', 2, True), ('0.42', 2, False),
+                                  ('0.85', 4, False), ('0.86', 4, True), ('0.21', 1, False), ('0.22', 1, True)):
             with self.subTest(budget=budget, calls=calls):
                 gate = self.gate(daily_budget_usd=budget, max_concurrent_calls=calls)
                 gate.init()
@@ -266,8 +296,13 @@ class GoAndActivateTests(AnthropicTest):
 
 class SettlementTests(AnthropicTest):
     def settle(self, reply, operation_id='op-1', gate=None):
+        # A reply whose prompt total is near or above the step needs a request that large: its bytes
+        # + 2048 above 100,000 reserve at the upper step (a small request could never bring one back).
+        usage = reply.get('usage') if isinstance(reply.get('usage'), dict) else {}
+        prompt = sum(value for value in (usage.get('input_tokens'), usage.get('cache_creation_input_tokens'),
+                                         usage.get('cache_read_input_tokens')) if type(value) is int)
         gate = gate or self.ready()
-        result = self.call(gate, operation_id, reply=reply)
+        result = self.call(gate, operation_id, reply=reply, value=sized(120000) if prompt > 50000 else None)
         self.assertEqual(result['status'], 200)
         return gate, entry_of(gate, operation_id)
 
@@ -297,7 +332,9 @@ class SettlementTests(AnthropicTest):
                                                         'reserve_output_usd_per_m', 'output_bound', 'requested_effort',
                                                         'reply_model')},
                                  {'provider': 'anthropic', 'model': HAIKU, 'maker': 'Anthropic',
-                                  'reserve_input_usd_per_m': '0.625', 'reserve_output_usd_per_m': '2.50',
+                                  # The reservation follows the REQUEST's size: a reply this large needed a large request.
+                                  'reserve_input_usd_per_m': '0.10' if name == 'small' else '0.50',
+                                  'reserve_output_usd_per_m': '0.50' if name == 'small' else '2.50',
                                   'output_bound': 32768, 'requested_effort': 'high', 'reply_model': HAIKU})
                 self.assertEqual((Decimal(entry['settle_input_usd_per_m']), Decimal(entry['settle_output_usd_per_m'])),
                                  (prices['input'], prices['output']))
@@ -450,9 +487,9 @@ class SettlementTests(AnthropicTest):
         self.assertEqual((entry_of(gate)['state'], gate.status()['reason']), ('settled', 'provider_error_or_model_identity'))
 
     def test_a_1h_cache_write_above_the_hold_is_charged_and_halts_with_charge_overrun(self):
-        # 0.625 is not the dearest input price: a 1-hour cache write over 100,000 tokens is 1.00.
-        # The request cannot ask for caching, but if Anthropic reports such a write anyway, the call
-        # is charged in full (no cap at the hold) and the gate halts with charge_overrun.
+        # The ceiling (0.50 input) is not the dearest input price: a 1-hour cache write over 100,000
+        # tokens is 1.00. The request cannot ask for caching, but if Anthropic reports such a write
+        # anyway, the call is charged in full (no cap at the hold) and the gate halts with charge_overrun.
         hour = {'ephemeral_5m_input_tokens': 0, 'ephemeral_1h_input_tokens': 200000}
         reply = message(1000, 100, cache_creation_input_tokens=200000, cache_creation=hour)
         expected = cost(UPPER, 1000, write_1h=200000, output=100)
@@ -795,7 +832,7 @@ class RemainingAndProbeTests(AnthropicTest):
                          {'state': 'active', 'window_open': True, 'remaining_calls': 399, 'max_concurrent_calls': 2,
                           'enabled_models': [HAIKU]})
         self.assertEqual((Decimal(report['remaining_usd']), Decimal(report['largest_reservation_usd'])),
-                         (Decimal('1.99965'), Decimal('0.24704')))
+                         (Decimal('1.99965'), Decimal('0.214016')))
 
     def test_probe_sends_the_tiny_request_and_reports_what_it_measured(self):
         gate = self.ready()

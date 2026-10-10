@@ -200,8 +200,8 @@ class GateUnitTests(unittest.TestCase):
 
     def test_readme_names_the_same_paths_the_proposed_go_and_the_key_command(self):
         readme = README.read_text()
-        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"anthropic"', '"1.00"', '400', '$4.00', 'systemctl show -p InaccessiblePaths', '3a.',
-                     'claude-haiku-5-5', '0.24704', '0.98816', '160.79.104.0/23', 'getent ahostsv4 api.anthropic.com',
+        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"anthropic"', '"2.00"', '400', '$10.00', 'systemctl show -p InaccessiblePaths', '3a.',
+                     'claude-haiku-5-5', '0.214016', '0.428032', '160.79.104.0/23', 'getent ahostsv4 api.anthropic.com',
                      'preview_key.py install anthropic', 'probe', '--model claude-haiku-5-5', 'model_echoed_exactly',
                      'completion_within_max_tokens', 'anthropic_budget_socket', '429', '529', UNIT.name, HALT_TIMER.name,
                      CHECK_TIMER.name, TARGET_DROPIN.name):
@@ -210,15 +210,17 @@ class GateUnitTests(unittest.TestCase):
 
 
     def test_the_pot_is_the_owners_ruling_everywhere(self):
-        # Owner's ruling 2026-10-10: Anthropic $1.00, 400 calls, 2 at once; with DeepInfra's $4.00, $5.00.
+        # Owner's ruling 2026-10-10 (evening): Anthropic $2.00, 400 calls, 2 at once; with DeepInfra's $10.00, $12.00.
         readme, deepinfra = README.read_text(), (V3 / 'README.md').read_text()
         go = re.search(r"jq -n [^\n]*provider:\"anthropic\"[^\n]*", readme).group(0)
-        for field in ('daily_budget_usd:"1.00"', 'max_paid_posts_per_day:400', 'max_concurrent_calls:2'):
+        for field in ('daily_budget_usd:"2.00"', 'max_paid_posts_per_day:400', 'max_concurrent_calls:2'):
             self.assertIn(field, go)
-        for stale in ('1.50', '$3.50', '$50 a month'):
+        for stale in ('1.50', '"1.00"', '$3.50', '$4.00', '$5 team', '$5.00', '0.24704', '0.625 per million'):
             self.assertNotIn(stale, readme)
-        self.assertIn('DeepInfra $4.00 and Anthropic $1.00, $5.00 together', deepinfra)
-        self.assertNotIn('Anthropic $1.50', deepinfra)
+        self.assertIn('DeepInfra $10.00 and Anthropic $2.00, $12.00 together', deepinfra)
+        for stale in ('Anthropic $1.50', 'Anthropic $1.00', 'Anthropic (Claude Haiku) | $1.00'):
+            self.assertNotIn(stale, deepinfra)
+        self.assertIn('| Anthropic (Claude Haiku) | $2.00 | 400 | 2 |', deepinfra)
         self.assertIn('TEAM_TOTAL_BUDGET_EXCEEDED', readme)
 
     def test_install_order_reinstalls_the_deepinfra_units_before_the_key_and_checks_them_live(self):

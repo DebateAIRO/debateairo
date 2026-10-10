@@ -308,7 +308,9 @@ class DeepInfraProfile:
       requested_model(body) -> str|None  where the request names its model
       body_valid(body, row) -> bool      the exact request shape this row accepts
       request_bytes(body) -> bytes       the bytes sent (never longer than the bytes priced)
-      reservation_prices(row, moment) -> (in, out)  USD per million used to reserve at moment
+      reservation_prices(row, moment, request_bytes=None) -> (in, out)  USD per million used to
+                                         reserve at moment for a request of that many bytes (None:
+                                         any size, so the dearest prices the size could need)
       ceiling_prices(row) -> (in, out)   the highest prices the row can ever reserve at (worst cases)
       account(response, row, moment) -> dict  usage and guard charge (see account_response's keys)
       reply_model(response) -> str|None  where the reply names the model that answered
@@ -347,7 +349,7 @@ class DeepInfraProfile:
     def auth_headers(self, key):
         return {'Authorization': 'Bearer ' + key}
 
-    def reservation_prices(self, row, moment):
+    def reservation_prices(self, row, moment, request_bytes=None):
         """DeepInfra's list prices do not change with the date or the prompt size."""
         return row.input_usd_per_m, row.output_usd_per_m
 
@@ -455,12 +457,13 @@ class AnthropicProfile:
     """api.anthropic.com, Messages API (POST /v1/messages), x-api-key plus anthropic-version.
     One reviewed row (Claude Haiku 5.5), 2026-10-10. The profile API is DeepInfraProfile's.
 
-    Reservation: every request byte (+2048) at the upper step's 5-minute cache-write price (0.625)
-    and the output bound at its output price (2.50), so a full 256 KiB request reserves
-    (264,192 x 0.625 + 32,768 x 2.50) / 1e6 = $0.24704, under the $0.25 cap. 0.625 is NOT the
-    dearest input price (a 1-hour cache write over 100,000 tokens is 1.00); it is enough because a
-    request cannot ask for caching (body_valid refuses cache_control) and bytes + 2048 over-count
-    tokens. A reply that still costs more than its hold is charged in full and halts
+    Reservation (owner ruling 2026-10-10, evening): every request byte (+2048) counts as an input
+    token. When that count is above the lower step's 100,000 tokens the call reserves at the UPPER
+    step's prices (input 0.50, output 2.50); otherwise the prompt cannot reach the upper step, and
+    it reserves at the lower step's (0.10, 0.50), the row's own prices. A full 256 KiB request
+    reserves (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016, under the $0.25 cap. A request
+    cannot ask for caching (body_valid refuses cache_control), so no cache write is priced; a reply
+    that still costs more than its hold (for example a cache write) is charged in full and halts
     (charge_overrun). Settlement: the real step (prompt total <= 100,000 tokens: the lower one), each
     kind of input token at its own price. Anthropic reports no cost, so the guard charge is that
     list-price charge. Any usage field this profile does not know, any server-tool use, another
@@ -481,7 +484,8 @@ class AnthropicProfile:
     # and Authentication pages, read 2026-10-10).
     key_pattern = r'sk-ant-api[0-9]{2}-[A-Za-z0-9_-]+'
     rows = {row.model: row for row in (
-        ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.625'), Decimal('2.50'), 32768, 'high', False),)}
+        # The row holds the lower step's prices (the estimate's and a small call's); see reservation_prices.
+        ModelRow('claude-haiku-5-5', 'Anthropic', Decimal('0.10'), Decimal('0.50'), 32768, 'high', False),)}
     settlement_steps = (
         PriceStep('up_to_100k', 100000, Decimal('0.10'), Decimal('0.125'), Decimal('0.20'), Decimal('0.01'), Decimal('0.50')),
         PriceStep('over_100k', None, Decimal('0.50'), Decimal('0.625'), Decimal('1.00'), Decimal('0.05'), Decimal('2.50')))
@@ -494,14 +498,24 @@ class AnthropicProfile:
     def auth_headers(self, key):
         return {'x-api-key': key, 'anthropic-version': self.api_version}
 
-    def reservation_prices(self, row, moment):
-        """Anthropic's list prices do not change with the date; the row holds the upper step's
-        5-minute cache-write price (0.625, above any plain input price) and its output price; see
-        the class docstring for why that covers a request that cannot ask for caching."""
-        return row.input_usd_per_m, row.output_usd_per_m
+    # Bytes the core adds to every request on the input side (preview_budget_authority's
+    # RESERVATION_OVERHEAD_BYTES; the app adds the same).
+    RESERVATION_OVERHEAD_BYTES = 2048
+
+    def reservation_prices(self, row, moment, request_bytes=None):
+        """Anthropic's list prices do not change with the date. (request bytes + 2048) above the
+        lower step's 100,000 tokens, or an unknown size: the upper step's input and output prices;
+        otherwise the row's own (the lower step's). See the class docstring."""
+        lower = self.settlement_steps[0]
+        if (type(request_bytes) is int and request_bytes >= 0
+                and request_bytes + self.RESERVATION_OVERHEAD_BYTES <= lower.prompt_tokens_up_to):
+            return row.input_usd_per_m, row.output_usd_per_m
+        return self.ceiling_prices(row)
 
     def ceiling_prices(self, row):
-        return row.input_usd_per_m, row.output_usd_per_m
+        """The upper step's input and output prices: the dearest any accepted request reserves at."""
+        upper = self.settlement_steps[1]
+        return upper.input_usd_per_m, upper.output_usd_per_m
 
     def requested_model(self, body):
         return body.get('model') if isinstance(body, dict) else None

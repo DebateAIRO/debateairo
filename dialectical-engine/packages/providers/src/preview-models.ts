@@ -32,12 +32,20 @@ export type PreviewModelRow = Readonly<{
   maker: string;
   /**
    * Vendor list price in USD per million tokens, as the decimal string the gate reads: the price
-   * every call reserves at and the estimate uses. For a vendor with price steps (Anthropic) it is
-   * the upper step's 5-minute cache-write price (above any plain input price; a request cannot ask
-   * for caching); the gate settles at the real step and halts on any overrun.
+   * the estimate uses and every call reserves at (unless `upperStep` applies). For a vendor with
+   * price steps (Anthropic) it is the lower step's; the gate settles at the real step and halts on
+   * any overrun.
    */
   inputUsdPerM: string;
   outputUsdPerM: string;
+  /**
+   * A vendor's upper price step, if it has one (Anthropic: a prompt above 100,000 tokens). A call
+   * whose charged input tokens (body bytes + 2048) are above `aboveChargedInputTokens` reserves at
+   * these prices; at or below, its prompt cannot reach the upper step and it reserves at the row's
+   * own (owner ruling 2026-10-10, evening). The gate applies the same rule (reservation_prices).
+   */
+  upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string;
+    inputNanoUsdPerToken: bigint; outputNanoUsdPerToken: bigint }>;
   /** The same prices as whole nano-USD per token (USD per million x 1000), for BigInt arithmetic. */
   inputNanoUsdPerToken: bigint;
   outputNanoUsdPerToken: bigint;
@@ -82,6 +90,7 @@ const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 type RowInput = Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;
   outputBound: number; effort: "high" | null; jsonObject: boolean; contextWindowTokens?: number;
+  upperStep?: Readonly<{ aboveChargedInputTokens: number; inputUsdPerM: string; outputUsdPerM: string }>;
 }>;
 const PROVIDER_CONNECTIONS = Object.freeze({
   deepinfra: Object.freeze({ provider: "deepinfra", baseUrl: PREVIEW_DEEPINFRA_BASE_URL,
@@ -98,9 +107,12 @@ function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
   };
   const inputNanoUsdPerToken = nano(input.inputUsdPerM);
   const outputNanoUsdPerToken = nano(input.outputUsdPerM);
+  const { upperStep, ...plain } = input;
   return Object.freeze({
     ...PROVIDER_CONNECTIONS[provider],
-    ...input,
+    ...plain,
+    ...(upperStep === undefined ? {} : { upperStep: Object.freeze({ ...upperStep,
+      inputNanoUsdPerToken: nano(upperStep.inputUsdPerM), outputNanoUsdPerToken: nano(upperStep.outputUsdPerM) }) }),
     contextWindowTokens: input.contextWindowTokens ?? PROVIDER_CONNECTIONS[provider].contextWindowTokens,
     inputNanoUsdPerToken,
     outputNanoUsdPerToken,
@@ -125,13 +137,14 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
     row("deepinfra", { model: "Qwen/Qwen3.8-Flash", maker: "Alibaba", inputUsdPerM: "0.113", outputUsdPerM: "0.382",
       outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: null, jsonObject: false, contextWindowTokens: 1_000_000 })
   ]),
-  // PR B (lead, 2026-10-10). Reserve and estimate at the upper step's 5-minute cache-write price
-  // ($0.625, above any plain input price; a request cannot ask for caching, so the dearer 1-hour
-  // write $1.00 should never occur) and the upper output price ($2.50): a 256 KiB call holds at
-  // most $0.24704. The gate settles at the real step and halts on an overrun (charge_overrun).
+  // PR B, owner ruling 2026-10-10 (evening). Estimate and reserve at the lower step ($0.10 / $0.50);
+  // a call whose bytes + 2048 are above 100,000 reserves at the upper step ($0.50 / $2.50), so a
+  // 256 KiB call holds at most (264,192 x 0.50 + 32,768 x 2.50) / 1e6 = $0.214016. A request cannot
+  // ask for caching; the gate settles at the real step and halts on an overrun (charge_overrun).
   anthropic: Object.freeze([
-    row("anthropic", { model: "claude-haiku-5-5", maker: "Anthropic", inputUsdPerM: "0.625", outputUsdPerM: "2.50",
-      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false })
+    row("anthropic", { model: "claude-haiku-5-5", maker: "Anthropic", inputUsdPerM: "0.10", outputUsdPerM: "0.50",
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, effort: "high", jsonObject: false,
+      upperStep: { aboveChargedInputTokens: 100_000, inputUsdPerM: "0.50", outputUsdPerM: "2.50" } })
   ])
 });
 /** Every reviewed row, providers in the order above. */
@@ -212,10 +225,15 @@ export function previewChargedInputTokens(bodyBytes: number): bigint {
   return BigInt(bodyBytes + PREVIEW_RESERVATION_TEMPLATE_BYTES);
 }
 
-/** Contract A §3: ((body bytes + 2048) x input + output_bound x output), in nano-USD. */
+/**
+ * Contract A §3: ((body bytes + 2048) x input + output_bound x output), in nano-USD, at the row's
+ * prices, or at its upper step's when the charged input tokens are above that step's threshold.
+ */
 export function previewReservationNanoUsd(reviewed: PreviewModelRow, bodyBytes: number): bigint {
-  return previewChargedInputTokens(bodyBytes) * reviewed.inputNanoUsdPerToken
-    + BigInt(reviewed.outputBound) * reviewed.outputNanoUsdPerToken;
+  const tokens = previewChargedInputTokens(bodyBytes);
+  const step = reviewed.upperStep !== undefined && tokens > BigInt(reviewed.upperStep.aboveChargedInputTokens)
+    ? reviewed.upperStep : reviewed;
+  return tokens * step.inputNanoUsdPerToken + BigInt(reviewed.outputBound) * step.outputNanoUsdPerToken;
 }
 
 /** The reviewed row for a target's own base URL and model name, if any (any provider). */
