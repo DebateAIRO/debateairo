@@ -155,7 +155,7 @@ When a claimed run has a rotation pin (read with `readRunRoleRotation(pool, runI
 - **Answer roles.** The run uses the pin's writer and checker refs wherever it uses the sealed `synthesizerRoleRef` / `evaluatorRoleRef` today: the per-claim role policy is the boot policy with those two refs replaced (loop bound and call bounds unchanged). Everything downstream is today's code: the legacy seat book (no `assigned` flag, so the judge, review and 80-20 paths are untouched), `resolveSynthesisRoleMaker`, the planned refs in `synthesisRoleControls`, the disclosure's planned-versus-served record. Because the planned refs are the pinned ones, a rotated debate's disclosure records no false fallback.
 - **Absent at claim.** A pinned role whose member is not claim-eligible refuses the run exactly as a sealed role does today (J24, terminal, `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM`, same event). The pinned refs are panel members, so they are never probed twice.
 - **The pre-claim check** (`index.ts:4300-4314`) keeps checking the sealed refs: they remain the fallback for one-maker debates and must stay configured.
-- **Story roles.** The story's `roleMakers` come from the pin's storyteller and story checker refs, looked up among the claim-eligible members (the place `index.ts:8128-8135` sets them today for scorecard runs). No change in `packages/story`'s role logic. A pinned story role that is not available when the story runs gives today's `STORY_ROLE_UNAVAILABLE`.
+- **Story roles.** The story's `roleMakers` come from the pin's storyteller and story checker refs, looked up among the claim-eligible members (the place `index.ts:8128-8135` sets them today for scorecard runs). No change in `packages/story`'s role logic. A pinned story member that is not claim-eligible is handed over as null, and the story package then uses the register's story ref, exactly as it does today for a scorecard FALLBACK seat (`packages/story/src/writer.ts:457-459`); if that ref is unavailable too, today's `STORY_ROLE_UNAVAILABLE`. The served lineage names whoever actually wrote and checked.
 - **Cheaper-model fallback (money).** Unchanged. Within a rotated debate the eligible members have one maker each, so the existing "avoid the writer's ref" ordering is the same as "avoid the writer's maker" (see Question 2).
 - **No pin:** byte-for-byte today's path.
 
@@ -176,7 +176,7 @@ When a claimed run has a rotation pin (read with `readRunRoleRotation(pool, runI
 | Pin insert fails in `submit` | `RUN_SETUP_FAILED:ROLE_ROTATION`, nothing queued (the setup-step rule). |
 | Pin present but unreadable at claim | Terminal `RUN_ROLE_ROTATION_INVALID`, like `RUN_ROLE_ASSIGNMENT_INVALID`. |
 | Pinned answer role absent at claim | Today's J24 terminal refusal. |
-| Pinned story role unavailable | Today's `STORY_ROLE_UNAVAILABLE`. |
+| Pinned story role not claim-eligible | The register's story ref takes it (today's FALLBACK-seat rule); if that is unavailable too, today's `STORY_ROLE_UNAVAILABLE`. |
 | Estimate does not fit | Today's refusal and waiting line, unchanged. |
 
 ## Testing
