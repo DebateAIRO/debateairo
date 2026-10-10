@@ -51,6 +51,8 @@ type Counters = { submitted: number; probes: number; quota: number; country: num
 function application(counters: Counters): AskApplication {
   const settings: RunCreationSettings = {
     previewProviderTestConfig: PREVIEW,
+    // The preview's start-of-debate estimate: an ample pot (tests/unit/preview-budget-estimate.test.ts covers refusals).
+    previewBudgetGate: {remaining:{deepinfra:async()=>({state:"active",windowOpen:true,remainingNanoUsd:3_000_000_000n,remainingCalls:1200,maxConcurrentCalls:4,largestReservationNanoUsd:131_481_600n,enabledModels:[MODEL]})},roleModelIds:[],storyCalls:0},
     strangerSampleRate: 0, registerVersion: 5, batteryVersion: "fixture", settlementWatchHandle: "fixture",
     resolveDiscoveredPanel: async () => {
       counters.probes += 1;

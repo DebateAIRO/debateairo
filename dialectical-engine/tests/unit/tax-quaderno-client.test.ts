@@ -21,7 +21,7 @@ const quote = (country: string, extra: Partial<TaxLocation> = {}, taxId: string 
   date: new Date("2026-10-02T10:00:00Z")
 });
 const sale = (transactionId: string): SaleRecord => ({
-  chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId, issuedOn: new Date("2026-10-02T10:00:00Z"),
+  chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId, issuedOn: new Date("2026-10-02T10:00:00Z"), currency: "USD",
   customer: { name: "Test Person", email: "person@example.test", country: "DE", region: null, postalCode: "10115",
     city: "Berlin", street: null, taxId: null, locale: "de" },
   lines: [{ description: "DebateAI Plus, October 2026", netMicros: 20_000_000, taxMicros: 3_800_000, taxRateBasisPoints: 1900 }],
@@ -139,7 +139,7 @@ describe("P4 — Quaderno client against the fake", () => {
 
   it("records a refund once against the sale's processor id, with the caller's line text", async () => {
     const refund = {
-      chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId: "7001", issuedOn: new Date("2026-10-05T10:00:00Z"),
+      chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId: "7001", issuedOn: new Date("2026-10-05T10:00:00Z"), currency: "USD" as const,
       refundTotalMicros: 11_900_000, original: { documentId: "1", number: "Q-1" },
       description: "Rückerstattung zu Rechnung Q-1", processor: "netopia" as const
     };
@@ -165,7 +165,7 @@ describe("P4 — Quaderno client against the fake", () => {
     expect(bodies).toHaveLength(1);
     expect(bodies[0]).toMatchObject({ processor: "netopia", payment: { processor: "netopia", processor_id: "ntp-7301" } });
     await engine.recordRefund({
-      chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId: "ntp-7301", issuedOn: new Date("2026-10-05T10:00:00Z"),
+      chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId: "ntp-7301", issuedOn: new Date("2026-10-05T10:00:00Z"), currency: "USD",
       refundTotalMicros: 11_900_000, original: { documentId: first.documentId, number: first.number },
       description: "Credit", processor: "netopia"
     });
@@ -183,7 +183,7 @@ describe("P4 — a lookup that does not answer a list never leads to a second do
     const local = new QuadernoTaxEngine({ baseUrl: "https://quaderno.test/api", apiKey: "fake", fetch: stub });
     await expect(local.recordSale(sale("7401"))).rejects.toMatchObject({ code: "TAX_SERVICE_REFUSED", message: "QUADERNO_RESPONSE_INVALID" });
     await expect(local.recordRefund({
-      chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId: "7401", issuedOn: new Date("2026-10-05T10:00:00Z"),
+      chargeId: "c0ffee00c0ffee00c0ffee00c0ffee00", transactionId: "7401", issuedOn: new Date("2026-10-05T10:00:00Z"), currency: "USD",
       refundTotalMicros: 1_000_000, original: { documentId: "1", number: "Q-1" }, description: "Gutschrift",
       processor: "netopia"
     })).rejects.toMatchObject({ code: "TAX_SERVICE_REFUSED", message: "QUADERNO_RESPONSE_INVALID" });
@@ -194,7 +194,7 @@ describe("P4 — a lookup that does not answer a list never leads to a second do
 describe("P4 — R-24's charge-id half: the same processor id is not enough to adopt a document", () => {
   const CHARGE = "c0ffee00c0ffee00c0ffee00c0ffee00";
   const refund = {
-    chargeId: CHARGE, transactionId: "7501", issuedOn: new Date("2026-10-05T10:00:00Z"),
+    chargeId: CHARGE, transactionId: "7501", issuedOn: new Date("2026-10-05T10:00:00Z"), currency: "USD" as const,
     refundTotalMicros: 1_000_000, original: { documentId: "1", number: "Q-1" }, description: "Gutschrift",
     processor: "netopia" as const
   };

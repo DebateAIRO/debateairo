@@ -39,7 +39,7 @@ import { readDeploymentMakerCapability } from "@debateai/critique";
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, previewRunnerPolicy, withPreviewProviderCallPolicy, PREVIEW_GLM_GENERATION_TOKEN_FLOOR, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
+import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, previewRunnerPolicy, withPreviewProviderCallPolicy, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, assertDeploymentProviderTargets, assertPricedProviderTargets, observeProviderTarget, parseProviderDiscoveryTargets, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -339,7 +339,7 @@ const providerTopology = createRunnerProviderTopology(providerTargets, (target) 
       })
     })
   });
-  return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig);
+  return previewConfig === undefined ? gateway : withPreviewProviderCallPolicy(gateway, previewConfig, target);
 });
 const runRepository = new RunRepository(pool);
 // V-20: taken on the DECLARED targets, because the three optional keys describe
@@ -427,7 +427,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     const observation = await observeProviderTarget({
       target,
       timeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-      ...(previewConfig === undefined ? {} : { thinkingLevel: "high", tokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR }),
+      ...(previewConfig === undefined ? {} : previewProbeControls(target)),
       fetchImplementation: previewFetch,
       clock: () => new Date()
     });
@@ -473,7 +473,7 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
     // persists this observation separately from the selected debate panel.
     const observation = await observeProviderTarget({
       target, timeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-      ...(previewConfig === undefined ? {} : { thinkingLevel: "high", tokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR }),
+      ...(previewConfig === undefined ? {} : previewProbeControls(target)),
       fetchImplementation: previewFetch, clock: () => new Date()
     });
     return { state: observation.state, modelId: observation.modelId, failureCode: observation.failureCode };

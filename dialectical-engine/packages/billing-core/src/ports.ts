@@ -3,6 +3,8 @@
 // (the credit line in the customer's language), and the three
 // OPTIONAL InvoiceIssuer members lookup (A17b), creditPartial (A17c) and pdf (A26b). R-24: an issuer
 // offers each only when its API confirms it (X1); P10b defines what happens when one is absent.
+import type { PriceCurrency } from "./payments.js";
+
 export type TaxLocation = Readonly<{
   country: string; region: string | null; postalCode: string | null; city: string | null; street: string | null; ip: string | null;
 }>;
@@ -15,6 +17,8 @@ export type TaxIdCheck = Readonly<{ valid: boolean; name: string | null; checked
 export type SaleLine = Readonly<{ description: string; netMicros: number; taxMicros: number; taxRateBasisPoints: number }>;
 export type SaleRecord = Readonly<{
   chargeId: string; transactionId: string; issuedOn: Date;
+  /** Spec 2026-10-05 §2.16.4: the charge's currency, which is its subscription's; every line is in it. */
+  currency: PriceCurrency;
   customer: Readonly<{
     name: string | null; email: string; country: string; region: string | null; postalCode: string | null;
     city: string | null; street: string | null; taxId: string | null; locale: string;
@@ -26,7 +30,10 @@ export type SaleRecord = Readonly<{
   processor: "netopia";
 }>;
 export type RefundRecord = Readonly<{
-  chargeId: string; transactionId: string; issuedOn: Date; refundTotalMicros: number;
+  chargeId: string; transactionId: string; issuedOn: Date;
+  /** The refunded charge's currency (spec 2026-10-05 §2.16.4). */
+  currency: PriceCurrency;
+  refundTotalMicros: number;
   original: Readonly<{ documentId: string; number: string }>;
   /**
    * The credit line's text in the customer's locale (P10a takes it from the catalogue, as it does a sale line's
@@ -41,7 +48,7 @@ export type InvoiceErrorCode = "INVOICE_SERVICE_UNAVAILABLE" | "INVOICE_SERVICE_
 
 export interface TaxEngine {
   quote(i: Readonly<{
-    netMicros: number; currency: "USD"; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
+    netMicros: number; currency: PriceCurrency; location: TaxLocation; taxId: string | null; taxCode: "saas" | "eservice"; date: Date;
   }>): Promise<TaxQuote>;
   validateTaxId(country: string, taxId: string): Promise<TaxIdCheck>;
   recordSale(i: SaleRecord): Promise<{ documentId: string; number: string; url: string | null }>;

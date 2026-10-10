@@ -82,14 +82,15 @@ const SITE: AskMoneyPolicy = Object.freeze({ perRunCeilingMicros: 250_000, serve
 function plan(planId: "FREE" | "PLUS" | "PRO" | "MAX", monthlyCreditMicros: number) {
   const free = planId === "FREE";
   return Object.freeze({
-    planId, tier: free ? "free" as const : "premium" as const, netPriceMicros: 0, monthlyCreditMicros,
+    planId, tier: free ? "free" as const : "premium" as const, netPrices: Object.freeze({ USD: 0, EUR: 0, RON: 0 }), monthlyCreditMicros,
     dayBasisPoints: free ? null : 2000, weekBasisPoints: free ? null : 5000, finishBasisPoints: 11000,
     // R-11: Free's fixed risk tier is "standard" (what /new sends today).
     fixedGauges: free ? Object.freeze({ riskTier: "standard" as const, compositionBudgetTier: "low" as const, depth: 2 }) : null
   });
 }
 const PLANS: BillingPlans = Object.freeze({
-  currency: "USD",
+  creditCurrency: "USD",
+  currencyByCountry: Object.freeze({ defaultCurrency: "USD", countries: Object.freeze({}) }),
   plans: Object.freeze([plan("FREE", 200_000), plan("PLUS", 5_000_000), plan("PRO", 20_000_000), plan("MAX", 150_000_000)]),
   sourceRef: "test:s2-plans"
 });
