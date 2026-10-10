@@ -1,0 +1,144 @@
+{
+  "schema": "preview-google-row-v1",
+  "about": "The reviewed Google row of the preview spending gate (PR C). The gate (packages/providers/ops/preview_budget_helper.py, GoogleProfile) and the app (packages/providers/src/preview-google.ts) must both equal this file. Prices are dated list prices in USD per million tokens (ai.google.dev/gemini-api/docs/pricing, read 2026-10-10): the gate reserves and settles a call at the higher of the prices of its Europe/Bucharest day and of the next day (settling at the prices of the moment the call was priced). The app reserves with a lookahead: the highest prices of that day and the next two (the gate accepts a hold at or above its own figure, up to the request at the ceiling prices). The worst case uses the last step (the ceiling).",
+  "provider": "google",
+  "price_zone": "Europe/Bucharest",
+  "row": {
+    "model": "gemini-3.8-flash",
+    "maker": "Google",
+    "output_bound": 16384,
+    "effort": "high",
+    "json_object": false,
+    "ceiling_input_usd_per_m": "1.50",
+    "ceiling_output_usd_per_m": "7.50"
+  },
+  "price_steps": [
+    {
+      "first_day": "0001-01-01",
+      "input_usd_per_m": "0.75",
+      "output_usd_per_m": "3.75"
+    },
+    {
+      "first_day": "2027-01-01",
+      "input_usd_per_m": "1.50",
+      "output_usd_per_m": "7.50"
+    }
+  ],
+  "reservation": {
+    "formula": "((framed request utf-8 bytes + overhead_bytes) * input price + output_bound * output price) / 1000000",
+    "overhead_bytes": 2048,
+    "max_request_bytes": 262208,
+    "per_call_cap_usd": "0.55",
+    "worst_case_reservation_usd": "0.519264000"
+  },
+  "moments": [
+    {
+      "moment": "2026-10-10T09:00:00+00:00",
+      "request_bytes": 1000,
+      "input_usd_per_m": "0.75",
+      "output_usd_per_m": "3.75",
+      "input_nano_usd_per_token": 750,
+      "output_nano_usd_per_token": 3750,
+      "reserved_usd": "0.063726000",
+      "lookahead_input_usd_per_m": "0.75",
+      "lookahead_output_usd_per_m": "3.75",
+      "lookahead_reserved_usd": "0.063726000"
+    },
+    {
+      "moment": "2026-10-10T09:00:00+00:00",
+      "request_bytes": 262208,
+      "input_usd_per_m": "0.75",
+      "output_usd_per_m": "3.75",
+      "input_nano_usd_per_token": 750,
+      "output_nano_usd_per_token": 3750,
+      "reserved_usd": "0.259632000",
+      "lookahead_input_usd_per_m": "0.75",
+      "lookahead_output_usd_per_m": "3.75",
+      "lookahead_reserved_usd": "0.259632000"
+    },
+    {
+      "moment": "2026-12-29T21:59:59.999+00:00",
+      "request_bytes": 5000,
+      "input_usd_per_m": "0.75",
+      "output_usd_per_m": "3.75",
+      "input_nano_usd_per_token": 750,
+      "output_nano_usd_per_token": 3750,
+      "reserved_usd": "0.066726000",
+      "lookahead_input_usd_per_m": "0.75",
+      "lookahead_output_usd_per_m": "3.75",
+      "lookahead_reserved_usd": "0.066726000"
+    },
+    {
+      "moment": "2026-12-29T22:00:00+00:00",
+      "request_bytes": 5000,
+      "input_usd_per_m": "0.75",
+      "output_usd_per_m": "3.75",
+      "input_nano_usd_per_token": 750,
+      "output_nano_usd_per_token": 3750,
+      "reserved_usd": "0.066726000",
+      "lookahead_input_usd_per_m": "1.50",
+      "lookahead_output_usd_per_m": "7.50",
+      "lookahead_reserved_usd": "0.133452000"
+    },
+    {
+      "moment": "2026-12-30T21:59:59.999+00:00",
+      "request_bytes": 5000,
+      "input_usd_per_m": "0.75",
+      "output_usd_per_m": "3.75",
+      "input_nano_usd_per_token": 750,
+      "output_nano_usd_per_token": 3750,
+      "reserved_usd": "0.066726000",
+      "lookahead_input_usd_per_m": "1.50",
+      "lookahead_output_usd_per_m": "7.50",
+      "lookahead_reserved_usd": "0.133452000"
+    },
+    {
+      "moment": "2026-12-30T22:00:00+00:00",
+      "request_bytes": 5000,
+      "input_usd_per_m": "1.50",
+      "output_usd_per_m": "7.50",
+      "input_nano_usd_per_token": 1500,
+      "output_nano_usd_per_token": 7500,
+      "reserved_usd": "0.133452000",
+      "lookahead_input_usd_per_m": "1.50",
+      "lookahead_output_usd_per_m": "7.50",
+      "lookahead_reserved_usd": "0.133452000"
+    },
+    {
+      "moment": "2026-12-31T22:00:00+00:00",
+      "request_bytes": 5000,
+      "input_usd_per_m": "1.50",
+      "output_usd_per_m": "7.50",
+      "input_nano_usd_per_token": 1500,
+      "output_nano_usd_per_token": 7500,
+      "reserved_usd": "0.133452000",
+      "lookahead_input_usd_per_m": "1.50",
+      "lookahead_output_usd_per_m": "7.50",
+      "lookahead_reserved_usd": "0.133452000"
+    },
+    {
+      "moment": "2027-03-29T00:30:00+00:00",
+      "request_bytes": 777,
+      "input_usd_per_m": "1.50",
+      "output_usd_per_m": "7.50",
+      "input_nano_usd_per_token": 1500,
+      "output_nano_usd_per_token": 7500,
+      "reserved_usd": "0.127117500",
+      "lookahead_input_usd_per_m": "1.50",
+      "lookahead_output_usd_per_m": "7.50",
+      "lookahead_reserved_usd": "0.127117500"
+    },
+    {
+      "moment": "2026-03-29T00:30:00+00:00",
+      "request_bytes": 777,
+      "input_usd_per_m": "0.75",
+      "output_usd_per_m": "3.75",
+      "input_nano_usd_per_token": 750,
+      "output_nano_usd_per_token": 3750,
+      "reserved_usd": "0.063558750",
+      "lookahead_input_usd_per_m": "0.75",
+      "lookahead_output_usd_per_m": "3.75",
+      "lookahead_reserved_usd": "0.063558750"
+    }
+  ]
+}

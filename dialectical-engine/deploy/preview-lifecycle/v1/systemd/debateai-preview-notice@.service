@@ -1,5 +1,5 @@
 # Install as /etc/systemd/system/debateai-preview-notice@.service
-# Started by the spending gate's watchers (deploy/preview-gate/v2): one plain email to the owner
+# Started by the spending gate's watchers (deploy/preview-gate/v3; v2 before it): one plain email to the owner
 # for a fixed gate event, through the same owner-only mail path as debateai-preview-alert@:
 #   debateai-preview-notice@gate-halted-<reason>.service  (gate-halt-watch, once per halt)
 #   debateai-preview-notice@gate-addresses-mismatch.service  (gate-addresses, once per change)

@@ -1,0 +1,9 @@
+# Install as /etc/systemd/system/debateai-preview-google-halt-watch.timer (root:root 0644).
+# Started by debateai-preview.target through debateai-preview.target.d/60-google-gate.conf.
+[Unit]
+Description=DebateAI preview: check every minute whether the Google spending gate halted
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=5s

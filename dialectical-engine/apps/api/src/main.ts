@@ -1,5 +1,6 @@
-import { assertPreviewProviderTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPort, PREVIEW_GLM_GENERATION_TOKEN_FLOOR, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
+import { assertPreviewProviderTargets, assertPreviewRoleTargets, createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS } from "@debateai/providers";
 import { readModelScorecard, readEngineVersion } from "@debateai/register";
+import { readPreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
 import { BackupEmailService, MfaRecoveryService } from "./email-mfa-recovery.js";
@@ -489,7 +490,14 @@ if (previewConfig !== undefined) {
     }
   });
 }
-const previewFetch = previewConfig === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPort(previewConfig));
+const previewFetch = previewConfig === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewConfig));
+// Contract A §5: the preview's start-of-debate estimate asks the gate what is left today (read-only).
+const previewBudgetGate = previewConfig === undefined ? undefined : await boot.run("preview-budget-gate", async () => {
+  const settings = await readPreviewBudgetGateSettings(pool, environment.REGISTER_VERSION, previewConfig);
+  // Every role the register names must be a declared target, or its debates would fail at claim.
+  assertPreviewRoleTargets(previewConfig, declaredProviderTargets, settings.roleProviderRefs);
+  return settings;
+});
 const providerDiscoveryTargets = boot.runSync("provider-credentials", () =>
   resolveProviderTargetCredentials(declaredProviderTargets, readCustodyAuthorizationHeader));
 const resolveProviderPanel = createProviderDiscoveryResolver({
@@ -498,7 +506,7 @@ const resolveProviderPanel = createProviderDiscoveryResolver({
   probes,
   probeFreshnessMs: discoveryPolicy.probeFreshnessMs,
   probeTimeoutMs: previewConfig === undefined ? environment.PROVIDER_PROBE_TIMEOUT_MS : PREVIEW_GLM_DEADLINE_MS,
-  ...(previewConfig === undefined ? {} : { thinkingLevel: "high", probeTokenCeiling: PREVIEW_GLM_GENERATION_TOKEN_FLOOR, fetchImplementation: previewFetch! })
+  ...(previewConfig === undefined ? {} : { probeControlsFor: previewProbeControls, fetchImplementation: previewFetch! })
 });
 /**
  * Budget spec 2026-09-28 §2.4–§2.7 and the paid-plans spec §2.4 (B6b): THE ROOM.
@@ -928,6 +936,7 @@ const legacyRunClaim=new PostgresLegacyRunClaimApplication(
 );
 const application = new PostgresAskApplication(pool, dispatcher, {
   ...(previewConfig === undefined ? {} : { previewProviderTestConfig: previewConfig, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
+  ...(previewBudgetGate === undefined ? {} : { previewBudgetGate }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   registerVersion: environment.REGISTER_VERSION,
   batteryVersion: environment.BATTERY_VERSION,

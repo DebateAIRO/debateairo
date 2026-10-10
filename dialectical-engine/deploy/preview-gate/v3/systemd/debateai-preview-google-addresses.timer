@@ -1,0 +1,12 @@
+# Install as /etc/systemd/system/debateai-preview-google-addresses.timer (root:root 0644).
+# ONLY in measured-list mode of the Google spending gate; in proxy mode do NOT install it.
+# Runs debateai-preview-google-addresses.service once an hour, at a random minute in the first
+# five. No [Install] section, like every preview unit: in measured-list mode it is pulled in by a
+# Wants= line (README), and started the first time by hand with `systemctl start`.
+[Unit]
+Description=DebateAI preview: hourly check of the Google spending gate's allow-list
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=5min
+Persistent=yes

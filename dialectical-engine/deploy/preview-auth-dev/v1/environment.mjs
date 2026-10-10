@@ -2,8 +2,45 @@ import { refuse, withPrivateBytes } from './custody.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY, PREVIEW_SOCKET } from './turnstile-custody.mjs';
 const STAFF=['STAFF_ACCESS_POLICY_VERSION','STAFF_WEBAUTHN_ORIGIN','STAFF_WEBAUTHN_RP_ID','STAFF_INDEPENDENT_ALERT_CONFIG_PATH','STAFF_ALERT_OPERATOR_MODULE_PATH','STAFF_ALERT_OPERATOR_MODULE_SHA256',
  'INTERNAL_ALLOWANCE_POLICY_VERSION','INTERNAL_ALLOWANCE_CURRENCY','INTERNAL_ALLOWANCE_MAXIMUM_GRANT_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_DAY_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_WEEK_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_LIFETIME_MS','INTERNAL_ALLOWANCE_FINISH_ALLOWANCE_BP','INTERNAL_ALLOWANCE_POLICY_SOURCE_REF'];
-/** The only public model list the preview UI may be built and run with. */
-export const PREVIEW_FREE_MODEL_IDS_JSON='["zai-org/GLM-5.3-Flash"]';
+/**
+ * The only public model lists the preview UI may be built and run with, one per stage of the switch-on
+ * order (deploy/preview-gate/v3/README.md, "Switching on the new models, in order"):
+ * - `glm-only`: the legacy array, GLM for Free and Premium (until the gate and the API offer more);
+ * - `multi-model`: Free gets two makers (Z.AI, DeepSeek), Premium three (plus Xiaomi).
+ * The value is baked into the website when it is built (release-artifacts.mjs `ui-build --models`),
+ * ui-build.mjs records it next to the build, and narrowEnvironment demands that ui.env says the same.
+ */
+export const PREVIEW_MODEL_ROSTER_FLAGS=Object.freeze({
+ 'glm-only':'["zai-org/GLM-5.3-Flash"]',
+ 'multi-model':'{"free":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash"],"premium":["zai-org/GLM-5.3-Flash","deepseek-ai/DeepSeek-V4.1-Flash","XiaomiMiMo/MiMo-V2.6-Pro"]}'
+});
+/** The default build value (the stage before the API offers more than GLM): the legacy array. */
+export const PREVIEW_FREE_MODEL_IDS_JSON=PREVIEW_MODEL_ROSTER_FLAGS['glm-only'];
+const REVIEWED_ROSTER_FLAGS=Object.values(PREVIEW_MODEL_ROSTER_FLAGS);
+export const isReviewedModelRosterFlag=value=>typeof value==='string'&&REVIEWED_ROSTER_FLAGS.includes(value);
+const LEGACY_CONFIG_KEYS='budget_socket,deployment,free_model_ids,requested_thinking_level,scope_id';
+const ROSTER_CONFIG_KEYS='budget_socket,deployment,free_model_ids,premium_model_ids,requested_thinking_level,scope_id';
+// PR B and C: the roster form may also name the Anthropic and the Google gate's sockets (the API's
+// parser checks their values).
+const OPTIONAL_SOCKET_KEYS=Object.freeze(['anthropic_budget_socket','google_budget_socket']);
+/**
+ * Whether the UI's public model list (NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON) offers exactly what the
+ * API's preview configuration (PREVIEW_PROVIDER_TEST_CONFIG_JSON) allows: the legacy array only with the
+ * legacy five-key config holding that one list; the two-list object only with the six-key config holding
+ * the same free and premium lists, in the same order. A UI that offers a model the API refuses, or the
+ * reverse, is a mismatch. The API config's own parser (packages/providers preview-test.ts) checks the rest.
+ */
+export function uiRosterMatchesApiConfig(uiFlag,apiConfigJson) {
+ try{
+  if(!isReviewedModelRosterFlag(uiFlag)||typeof apiConfigJson!=='string')return false;
+  const ui=JSON.parse(uiFlag),api=JSON.parse(apiConfigJson);
+  if(!api||typeof api!=='object'||Array.isArray(api))return false;
+  const keys=Object.keys(api).sort().join(','),same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  if(Array.isArray(ui))return keys===LEGACY_CONFIG_KEYS&&same(api.free_model_ids,ui);
+  const rosterKeys=Object.keys(api).filter(key=>!OPTIONAL_SOCKET_KEYS.includes(key)).sort().join(',');
+  return rosterKeys===ROSTER_CONFIG_KEYS&&same(api.free_model_ids,ui.free)&&same(api.premium_model_ids,ui.premium);
+ }catch{return false;}
+}
 const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY'];
 export function parseEnvironmentText(text) {
  try{
@@ -13,6 +50,7 @@ export function parseEnvironmentText(text) {
   return out;
  }catch{refuse('PREVIEW_ENVIRONMENT_REFUSED');}
 }
+/** For service ui, `runtime` is `{builtModelRosterFlag}`: the model list the website was built with (ui-build.mjs builtModelRosterFlag). */
 export function narrowEnvironment(service,configured,runtime,publication,approved) {
  try{
   if(!configured||Object.getPrototypeOf(configured)!==Object.prototype)refuse();
@@ -24,7 +62,7 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
   if(service==='ui'){
    if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.PORT!==approved.uiPort||configured.DIALECTICAL_UI_HOST!=='127.0.0.1'
     ||configured.DIALECTICAL_API_BASE!==`http://127.0.0.1:${approved.apiPort}`
-    ||configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON!==PREVIEW_FREE_MODEL_IDS_JSON
+    ||!isReviewedModelRosterFlag(configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON)||configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON!==runtime?.builtModelRosterFlag
     ||(configured.TURNSTILE_SITE_KEY!==undefined&&configured.TURNSTILE_SITE_KEY!==PREVIEW_SITE_KEY))refuse();
    return {environment:Object.freeze(environment),selectedRegisterVersion:null,deploymentMode:'local'};
   }

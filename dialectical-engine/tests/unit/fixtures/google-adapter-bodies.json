@@ -1,0 +1,72 @@
+{
+  "schema": "google-adapter-bodies-v1",
+  "about": "Native generateContent bodies of the app's Gemini adapter (packages/providers/src/gemini-generate.ts geminiGenerateContentBody). `sent` is the adapter's own output, byte for byte, for the cases in tests/unit/preview-google-gate.test.ts (that test rebuilds every one); `refused` are bodies the adapter never sends and the wire contract forbids (an empty text part included). The gate's GoogleProfile.body_valid (on the {model, request} frame) and the app's guarded fetch must accept every `sent` body and refuse every `refused` one. Read by tests/unit/preview-google-gate.test.ts and tests/unit/preview_budget_authority_google_test.py.",
+  "sent": [
+    {
+      "name": "system and one user turn",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}}}"
+    },
+    {
+      "name": "two system messages joined, a full exchange",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"First.\"}]},{\"role\":\"model\",\"parts\":[{\"text\":\"Answer.\"}]},{\"role\":\"user\",\"parts\":[{\"text\":\"Second.\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"Frame A.\\n\\nFrame B.\"}]},\"generationConfig\":{\"maxOutputTokens\":16384,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}}}"
+    },
+    {
+      "name": "one user turn, the smallest bound",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Reply exactly: OK\"}]}],\"generationConfig\":{\"maxOutputTokens\":1,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}}}"
+    },
+    {
+      "name": "non-ASCII text, quotes and a new line",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Ce regulă proporțională? 日本語 «citat» \\\"quoted\\\"\\nnew line\"}]}],\"generationConfig\":{\"maxOutputTokens\":4096,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}}}"
+    }
+  ],
+  "refused": [
+    {
+      "name": "an empty text part in contents",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}}}"
+    },
+    {
+      "name": "an empty system text",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}}}"
+    },
+    {
+      "name": "tools",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}},\"tools\":[{\"googleSearch\":{}}]}"
+    },
+    {
+      "name": "safety settings",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}},\"safetySettings\":[]}"
+    },
+    {
+      "name": "cached content",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}},\"cachedContent\":\"cachedContents/x\"}"
+    },
+    {
+      "name": "JSON mode",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"},\"responseMimeType\":\"application/json\"}}"
+    },
+    {
+      "name": "a thinking budget",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\",\"thinkingBudget\":0}}}"
+    },
+    {
+      "name": "a temperature",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"},\"temperature\":0}}"
+    },
+    {
+      "name": "maxOutputTokens above the bound",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":16385,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}}}"
+    },
+    {
+      "name": "the model speaks first",
+      "body": "{\"contents\":[{\"role\":\"model\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}}}"
+    },
+    {
+      "name": "two parts in one turn",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\"},{\"text\":\"b\"}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}}}"
+    },
+    {
+      "name": "a thought part",
+      "body": "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"Is the synthetic claim supported?\",\"thought\":true}]}],\"systemInstruction\":{\"parts\":[{\"text\":\"You are the synthetic judge.\"}]},\"generationConfig\":{\"maxOutputTokens\":8192,\"thinkingConfig\":{\"thinkingLevel\":\"high\"}}}"
+    }
+  ]
+}

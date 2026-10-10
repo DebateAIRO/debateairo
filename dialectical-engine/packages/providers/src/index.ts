@@ -4,6 +4,21 @@ import { z } from "zod";
 import { THINKING_LEVEL_DEFAULT_ONLY, TypedDomainError, isDebateRole, type DebateRole, type ProviderCallAdmission } from "@debateai/kernel";
 import { assertFramedPrompt } from "./prompt-frame.js";
 import { scanPromptTripwires } from "./prompt-tripwire.js";
+import { GEMINI_MODEL_ID_PATTERN, GeminiGenerateProviderGateway } from "./gemini-generate.js";
+import {
+  ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  ANTHROPIC_MESSAGES_PATH,
+  PROVIDER_CONTENT_REFUSED,
+  PROVIDER_PACKET_UNSUPPORTED,
+  PROVIDER_REPLY_UNSUPPORTED,
+  anthropicMessagesRequestBody,
+  anthropicMessagesRequestHeaders,
+  assertAnthropicCredentialShape,
+  isAnthropicHostPairing,
+  isAnthropicThinkingControl,
+  readAnthropicMessagesReply
+} from "./anthropic-messages.js";
+import { previewModelRowForEndpoint } from "./preview-models.js";
 
 // T9 (goal 232-235): SYNTHESIZER and EVALUATOR are NAMED PROVIDER ROLES,
 // not organ aliases. A debater's model may hold either role; the CALL is
@@ -187,11 +202,17 @@ export class ProviderContentUnacceptedError extends TypedDomainError {
   }
 }
 
+/**
+ * Multi-model preview, PR B and C: the wire a call went out on. Recorded on the
+ * call result and the raw artifact (`raw_artifact.provider` is free text).
+ */
+export type ProviderWireKind = "openai-compatible-http" | typeof ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND | "google-gemini-http";
+
 export interface ProviderCallResult {
   readonly rawArtifactRef: string;
   readonly ledgerEntryRef: string;
   readonly content: string;
-  readonly provider: "openai-compatible-http";
+  readonly provider: ProviderWireKind;
   readonly model: string;
   readonly maker: string;
   readonly modelVersion: string;
@@ -248,6 +269,14 @@ export type ProviderDiscoveryTarget = Readonly<{
    * GLM relay declares 1 000 000). Absent = no pre-send window check.
    */
   contextWindowTokens?: number;
+  /**
+   * The NATIVE wire this target speaks, when it is not the OpenAI-compatible
+   * one. PR B: `anthropic-messages-http`, taken from its configuredProviderSet
+   * register row. PR C: `google-gemini-http`, set from the base URL (the Gemini
+   * base has exactly one wire) and checked against the register row's kind.
+   * Absent = the OpenAI-compatible wire, which is every target before these.
+   */
+  adapterKind?: string;
 }>;
 
 /**
@@ -278,10 +307,17 @@ export type ProviderTargetGatewayControls = Readonly<{
   thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
   contextWindowTokens?: number;
   supportsJsonObjectResponse?: boolean;
+  /** PR B/C: the target's native wire, for `createProviderGatewayForAdapter`; absent = OpenAI-compatible. */
+  adapterKind?: string;
 }>;
 
+/** The reviewed preview row behind an endpoint and model, if any (contract A §1; PR B and C add theirs). */
+function reviewedPreviewRow(endpoint:string,model:string) {
+  return previewModelRowForEndpoint(endpoint,model);
+}
+/** Row-driven: only a reviewed row whose json_object is true (a DeepInfra row) may send response_format. */
 function isJsonObjectResponseTarget(endpoint:string,model:string):boolean {
-  return endpoint === "https://api.deepinfra.com/v1/openai" && model === "zai-org/GLM-5.3-Flash";
+  return reviewedPreviewRow(endpoint,model)?.jsonObject === true;
 }
 export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): ProviderTargetGatewayControls {
   return Object.freeze({
@@ -289,7 +325,8 @@ export function providerTargetGatewayControls(target: ProviderDiscoveryTarget): 
       thinking: Object.freeze({ parameter: target.thinkingParameter, levels: target.thinkingLevels })
     }),
     ...(target.contextWindowTokens === undefined ? {} : { contextWindowTokens: target.contextWindowTokens }),
-    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{})
+    ...(isJsonObjectResponseTarget(target.baseUrl,target.model)?{supportsJsonObjectResponse:true}:{}),
+    ...(target.adapterKind === undefined ? {} : { adapterKind: target.adapterKind })
   });
 }
 
@@ -325,7 +362,7 @@ function providerTargetThinkingLevels(value: unknown): readonly string[] {
  * usage-counter bound. One rule for the target parser and the gateway
  * constructor (task review fix round 1, finding 4).
  */
-function isContextWindowTokens(value: unknown): value is number {
+export function isContextWindowTokens(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 1 && value <= MAX_USAGE_COUNTER;
 }
 
@@ -362,15 +399,60 @@ function normalizedProviderBaseUrl(value: unknown): string {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
   }
   parsed.pathname = parsed.pathname.replace(/\/+$/u, "");
-  if (!parsed.pathname.endsWith("/v1") && parsed.toString() !== "https://api.deepinfra.com/v1/openai") {
+  // PR C: the Gemini API base is admitted as this ONE exact string (no other
+  // path, scheme, port or host), like DeepInfra's; it selects the native wire.
+  if (!parsed.pathname.endsWith("/v1") && parsed.toString() !== "https://api.deepinfra.com/v1/openai"
+    && parsed.toString() !== GOOGLE_GEMINI_BASE_URL) {
     throw new TypeError("PROVIDER_DISCOVERY_TARGET_BASE_URL_INVALID");
   }
   return parsed.toString().replace(/\/$/u, "");
 }
 
+/**
+ * PR C — WHICH WIRE A TARGET SPEAKS, decided by its base URL and cross-checked
+ * with the configured provider's adapter kind. The Gemini base URL means the
+ * native Gemini wire and nothing else; the Gemini adapter kind needs that base
+ * URL. A mismatch either way is an operator's half-finished edit and is
+ * refused, never guessed. A Gemini target that declares a thinking capability
+ * uses the vendor spelling (`reasoning_effort`): it is an API vendor, which
+ * never echoes a level, and the gateway carries the level as
+ * `generationConfig.thinkingConfig.thinkingLevel`. Every other target is left
+ * exactly as it was (no `adapterKind` member).
+ */
+function providerTargetAdapterKind(
+  baseUrl: string,
+  configuredAdapterKind: string | undefined,
+  thinking: Readonly<{ thinkingParameter: ThinkingParameter }> | undefined
+): string | undefined {
+  // No silent fallback: a configured kind this package does not implement is
+  // refused here rather than spoken as the OpenAI-compatible wire.
+  if (configuredAdapterKind !== undefined
+    && !BUILT_IN_PROVIDER_ADAPTERS.some((adapter) => adapter.adapterKind === configuredAdapterKind)) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_ADAPTER_UNSUPPORTED");
+  }
+  const geminiUrl = baseUrl === GOOGLE_GEMINI_BASE_URL;
+  const geminiKind = configuredAdapterKind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND;
+  // Google's API host speaks only the native wire, and only at the one base.
+  const googleHost = new URL(baseUrl).hostname.toLowerCase().replace(/\.$/u, "") === GOOGLE_GEMINI_API_HOST;
+  if ((googleHost && !geminiUrl) || (configuredAdapterKind !== undefined && geminiUrl !== geminiKind)) {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_ADAPTER_MISMATCH");
+  }
+  if (!geminiUrl) return undefined;
+  if (thinking !== undefined && thinking.thinkingParameter !== "reasoning_effort") {
+    throw new TypeError("PROVIDER_DISCOVERY_TARGET_THINKING_INVALID");
+  }
+  return GOOGLE_GEMINI_HTTP_ADAPTER_KIND;
+}
+
 export function parseProviderDiscoveryTargets(
   source: string,
-  configuredProviders: readonly Readonly<{ providerRef: string; maker: string }>[]
+  /**
+   * `adapterKind` is the register row's. `anthropic-messages-http` marks the
+   * target native; an OpenAI-compatible kind (or none) keeps the OpenAI wire,
+   * exactly as before PR B; any other kind is refused rather than silently sent
+   * over the OpenAI wire (review fix, 2026-10-10).
+   */
+  configuredProviders: readonly Readonly<{ providerRef: string; maker: string; adapterKind?: string }>[]
 ): readonly ProviderDiscoveryTarget[] {
   if (Buffer.byteLength(source, "utf8") > MAX_PROVIDER_TARGET_CONFIG_BYTES) {
     throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
@@ -385,6 +467,8 @@ export function parseProviderDiscoveryTargets(
     throw new TypeError("PROVIDER_DISCOVERY_TARGETS_INVALID");
   }
   const configuredByRef = new Map<string, string>();
+  const configuredAdapterByRef = new Map<string, string>();
+  const nativeRefs = new Set<string>();
   for (const configured of configuredProviders) {
     const providerRef = requiredProviderTargetText(
       configured.providerRef,
@@ -393,6 +477,12 @@ export function parseProviderDiscoveryTargets(
     const maker = requiredProviderTargetText(configured.maker, "CONFIGURED_PROVIDER_INVALID");
     if (configuredByRef.has(providerRef)) throw new TypeError("CONFIGURED_PROVIDER_DUPLICATE");
     configuredByRef.set(providerRef, maker);
+    if (configured.adapterKind !== undefined
+      && !BUILT_IN_PROVIDER_ADAPTERS.some((adapter) => adapter.adapterKind === configured.adapterKind)) {
+      throw new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN");
+    }
+    if (configured.adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) nativeRefs.add(providerRef);
+    if (typeof configured.adapterKind === "string") configuredAdapterByRef.set(providerRef, configured.adapterKind);
   }
   const targetsByRef = new Map<string, ProviderDiscoveryTarget>();
   for (const candidate of decoded) {
@@ -451,6 +541,21 @@ export function parseProviderDiscoveryTargets(
     }
     const maker = configuredByRef.get(providerRef);
     if (maker === undefined) throw new TypeError("PROVIDER_DISCOVERY_TARGET_SET_MISMATCH");
+    const native = nativeRefs.has(providerRef);
+    const baseUrl = normalizedProviderBaseUrl(row.base_url);
+    // Review fix: the wire and the host are tied both ways, so a vendor key is
+    // never sent over the wrong wire and this wire's body never to another host.
+    if (!isAnthropicHostPairing(native, baseUrl)) {
+      throw new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH");
+    }
+    // PR B: the Anthropic wire carries a level as `output_config.effort`, and
+    // only the levels its contract lists; anything else is an operator's
+    // declaration the vendor (or the preview gate) would refuse on every call.
+    if (native && thinking !== undefined && !isAnthropicThinkingControl({
+      parameter: thinking.thinkingParameter, levels: thinking.thinkingLevels
+    })) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_THINKING_INVALID");
+    }
     const authorizationHeader = row.authorization_header === undefined
       ? undefined
       : requiredProviderTargetText(
@@ -474,16 +579,23 @@ export function parseProviderDiscoveryTargets(
     if (authorizationFile !== undefined && !authorizationFile.startsWith("/")) {
       throw new TypeError("PROVIDER_DISCOVERY_AUTHORIZATION_FILE_INVALID");
     }
+    const adapterKind = providerTargetAdapterKind(baseUrl, configuredAdapterByRef.get(providerRef), thinking);
+    const model = requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID");
+    // PR C: a Gemini model id is placed in the request PATH, so it is one plain token.
+    if (adapterKind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND && !GEMINI_MODEL_ID_PATTERN.test(model)) {
+      throw new TypeError("PROVIDER_DISCOVERY_TARGET_MODEL_INVALID");
+    }
     targetsByRef.set(providerRef, Object.freeze({
       providerRef,
       maker,
-      baseUrl: normalizedProviderBaseUrl(row.base_url),
-      model: requiredProviderTargetText(row.model, "PROVIDER_DISCOVERY_TARGET_MODEL_INVALID"),
+      baseUrl,
+      model,
       ...(authorizationHeader === undefined ? {} : { authorizationHeader }),
       ...(authorizationFile === undefined ? {} : { authorizationFile }),
       ...(price === undefined ? {} : price),
       ...(thinking === undefined ? {} : thinking),
-      ...(contextWindow === undefined ? {} : contextWindow)
+      ...(contextWindow === undefined ? {} : contextWindow),
+      ...(native ? { adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND } : adapterKind === undefined ? {} : { adapterKind })
     }));
   }
   if (targetsByRef.size !== configuredByRef.size) {
@@ -813,6 +925,14 @@ export function assertHostedProviderTargets(
     if (target.authorizationHeader !== undefined) {
       throw new TypeError(`PROVIDER_INLINE_CREDENTIAL_REFUSED:${target.providerRef}`);
     }
+    // PR C: the native Gemini wire is not yet wired through the hosted
+    // preview's guarded fetch and gate (and the hosted register file admits
+    // only the OpenAI-compatible adapter), so a hosted boot refuses it by name
+    // until that step lands, rather than sending native bytes where a gate
+    // expects another shape.
+    if (target.adapterKind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND) {
+      throw new TypeError(`PROVIDER_ADAPTER_NOT_HOSTED:${target.providerRef}`);
+    }
   }
 }
 
@@ -964,9 +1084,18 @@ export interface ProviderAdapterRegistration {
 }
 
 export const OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND = "openai-compatible-http" as const;
+/** PR C: the native Google Gemini `generateContent` wire (./gemini-generate.ts). */
+export const GOOGLE_GEMINI_HTTP_ADAPTER_KIND = "google-gemini-http" as const;
+/** PR C: Google's Gemini API host; any base on it other than the one below is refused. */
+const GOOGLE_GEMINI_API_HOST = "generativelanguage.googleapis.com";
+/** PR C: the one base URL a `google-gemini-http` target may name. */
+export const GOOGLE_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta" as const;
 export const BUILT_IN_PROVIDER_ADAPTERS = Object.freeze([
   Object.freeze({ adapterKind: OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND, implementation: "OpenAICompatibleProviderGateway" }),
-  Object.freeze({ adapterKind: "vllm-openai-compatible-http", implementation: "VllmOpenAICompatibleProviderGateway" })
+  Object.freeze({ adapterKind: "vllm-openai-compatible-http", implementation: "VllmOpenAICompatibleProviderGateway" }),
+  Object.freeze({ adapterKind: GOOGLE_GEMINI_HTTP_ADAPTER_KIND, implementation: "GeminiGenerateProviderGateway" }),
+  // Multi-model preview, PR B: the native Messages wire (./anthropic-messages.ts).
+  Object.freeze({ adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND, implementation: "AnthropicMessagesProviderGateway" })
 ] as const);
 
 export function selectProviderAdapter(
@@ -986,7 +1115,7 @@ export interface RawArtifactInput {
   readonly attemptId: string;
   readonly runId: string | null;
   readonly providerRef: string;
-  readonly provider: "openai-compatible-http";
+  readonly provider: ProviderWireKind;
   readonly model: string;
   readonly maker: string;
   readonly modelVersion: string | null;
@@ -1102,6 +1231,18 @@ export interface ProviderCostEnvelopeSeam {
 
 export interface OpenAICompatibleGatewayOptions {
   readonly supportsJsonObjectResponse?: boolean;
+  /**
+   * Multi-model preview, PR B: the wire this gateway speaks. Absent = the
+   * OpenAI-compatible `/chat/completions` wire, byte for byte as before. With
+   * `anthropic-messages-http` the SAME attempt loop posts the Messages body to
+   * `/messages` and reads the reply through ./anthropic-messages.ts; nothing
+   * else about the loop changes. `providerTargetGatewayControls` sets it from
+   * the target, so a composition root needs no change of its own. Typed as a
+   * string because the same controls carry PR C's `google-gemini-http` (served
+   * by GeminiGenerateProviderGateway); this gateway refuses any kind but its own
+   * two at construction.
+   */
+  readonly adapterKind?: string;
   readonly endpoint: string;
   readonly model: string;
   readonly maker: string;
@@ -1120,6 +1261,12 @@ export interface OpenAICompatibleGatewayOptions {
   readonly thinking?: Readonly<{ parameter: ThinkingParameter; levels: readonly string[] }>;
   /** Model scorecard §2.10: from the target's `context_window_tokens`. Absent = no window check. */
   readonly contextWindowTokens?: number;
+  /**
+   * Contract A §2 (preview multi-model, 2026-10-10): the target's largest `max_tokens`. Every
+   * attempt's bound, a length retry's raised one included, is clamped to it before the body is
+   * built, so the guarded fetch never sees a bound its row refuses. Absent = no clamp.
+   */
+  readonly maxOutputTokens?: number;
   /**
    * Model scorecard §2.3: records each attempt's prompt just before it is sent.
    * Optional: the unit doubles and a gateway with no debate run record none.
@@ -1161,12 +1308,12 @@ const MAX_PROVIDER_RESPONSE_BYTES = 4 * 1024 * 1024;
  * attempts, not tokens, so an unbounded packet turns one ask into unbounded model spend. An
  * oversized packet is a refused attempt — recorded, never sent, never retried.
  */
-const MAX_PROVIDER_REQUEST_PACKET_BYTES = 256 * 1024;
+export const MAX_PROVIDER_REQUEST_PACKET_BYTES = 256 * 1024;
 /** L4-F8: bounded exponential backoff between HTTP attempts — 250 ms x 2^n, capped at 4 s. */
 const PROVIDER_BACKOFF_BASE_MS = 250;
 const PROVIDER_BACKOFF_CAP_MS = 4_000;
 const MAX_PROVIDER_MODEL_CHARS = 256;
-const MAX_USAGE_COUNTER = 2 ** 31 - 1;
+export const MAX_USAGE_COUNTER = 2 ** 31 - 1;
 
 /**
  * Model scorecard §2.10 — THE ONE LOCAL PROMPT-SIZE ESTIMATE: characters / 4,
@@ -1234,7 +1381,7 @@ type ResolvedThinkingLevel = Readonly<{
 }>;
 
 /** Model scorecard §2.2: the one body member a requested level becomes, or the refusal. */
-function resolveThinkingLevel(
+export function resolveThinkingLevel(
   requested: string | undefined,
   control: OpenAICompatibleGatewayOptions["thinking"],
   providerRef: string
@@ -1283,7 +1430,7 @@ const CANDIDATE_ID_TOKEN = /^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,127}$/u;
  * sent. The ledger's CHECKs would otherwise refuse the row only after a paid
  * call, and an unrecorded paid call is the one thing this ledger must not have.
  */
-function assertProviderCallRecord(request: ProviderCallRequest): void {
+export function assertProviderCallRecord(request: ProviderCallRequest): void {
   const role = request.modelRole;
   const candidate = request.candidateId;
   const version = request.scorecardVersion;
@@ -1296,11 +1443,11 @@ function assertProviderCallRecord(request: ProviderCallRequest): void {
 }
 
 /** Delay before `attempt` (only attempts after the first back off). */
-function providerBackoffMs(attempt: number): number {
+export function providerBackoffMs(attempt: number): number {
   return Math.min(PROVIDER_BACKOFF_BASE_MS * 2 ** (attempt - 2), PROVIDER_BACKOFF_CAP_MS);
 }
 
-function realSleep(milliseconds: number): Promise<void> {
+export function realSleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => { setTimeout(resolve, milliseconds); });
 }
 
@@ -1332,6 +1479,11 @@ const usageSchema = z.object({
 });
 
 const modelIdSchema = z.string().min(1).max(MAX_PROVIDER_MODEL_CHARS);
+
+/** L4-F3: the one bound on a model id a vendor asserts (shared with ./gemini-generate.ts). */
+export function isBoundedProviderModelId(value: string): boolean {
+  return modelIdSchema.safeParse(value).success;
+}
 
 const responseSchema = z.object({
   id: z.string().min(1),
@@ -1403,7 +1555,7 @@ function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function contentParseStatus(content: string): "PARSED" | "UNPARSED" {
+export function contentParseStatus(content: string): "PARSED" | "UNPARSED" {
   try {
     JSON.parse(content);
     return "PARSED";
@@ -1413,7 +1565,7 @@ function contentParseStatus(content: string): "PARSED" | "UNPARSED" {
 }
 
 /** Reads the body through its stream and cancels it the moment the cap is crossed (L4-F3). */
-async function readBoundedResponseText(response: Response): Promise<string> {
+export async function readBoundedResponseText(response: Response): Promise<string> {
   if (response.body === null) return "";
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -1463,8 +1615,34 @@ function assertJsonObjectResponseCapability(options:OpenAICompatibleGatewayOptio
   throw new TypedDomainError("PROVIDER_RESPONSE_FORMAT_CAPABILITY_INVALID","Invalid JSON object response capability");
 }
 
+/**
+ * PR B: the Anthropic wire's construction rules, checked once. A level outside
+ * the wire's list, a JSON-object capability, or a credential that is not a bare
+ * key would each fail at the vendor on every call, so each is refused here.
+ */
+function assertGatewayWire(options: OpenAICompatibleGatewayOptions): boolean {
+  if (options.adapterKind !== undefined && options.adapterKind !== ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) {
+    throw new TypeError("PROVIDER_ADAPTER_KIND_UNKNOWN");
+  }
+  const native = options.adapterKind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND;
+  if (!isAnthropicHostPairing(native, options.endpoint)) {
+    throw new TypeError("PROVIDER_ADAPTER_HOST_MISMATCH");
+  }
+  if (!native) return false;
+  if (!isAnthropicThinkingControl(options.thinking)) {
+    throw new TypeError("PROVIDER_GATEWAY_THINKING_INVALID");
+  }
+  if (options.supportsJsonObjectResponse === true) {
+    throw new TypedDomainError("PROVIDER_RESPONSE_FORMAT_CAPABILITY_INVALID", "Invalid JSON object response capability");
+  }
+  assertAnthropicCredentialShape(options.authorizationHeader);
+  return true;
+}
+
 export class OpenAICompatibleProviderGateway implements ProviderGateway {
   readonly #options: OpenAICompatibleGatewayOptions;
+  /** PR B: true when this gateway speaks the Anthropic Messages wire. */
+  readonly #anthropic: boolean;
 
   constructor(options: OpenAICompatibleGatewayOptions) {
     /**
@@ -1477,7 +1655,12 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     if (options.contextWindowTokens !== undefined && !isContextWindowTokens(options.contextWindowTokens)) {
       throw new TypeError("PROVIDER_GATEWAY_CONTEXT_WINDOW_INVALID");
     }
+    if (options.maxOutputTokens !== undefined
+      && (!Number.isSafeInteger(options.maxOutputTokens) || options.maxOutputTokens < 1)) {
+      throw new TypeError("PROVIDER_GATEWAY_MAX_OUTPUT_TOKENS_INVALID");
+    }
     assertJsonObjectResponseCapability(options);
+    this.#anthropic = assertGatewayWire(options);
     this.#options = options;
   }
 
@@ -1519,6 +1702,15 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
     let lastOutcome: "TIMED_OUT" | "FAILED" = "FAILED";
     let lastLedgerEntryRef = "PROVIDER_LEDGER_ENTRY_UNRESOLVED";
     let attemptPacket = request.packet;
+    /**
+     * PR B review: a packet the Anthropic wire cannot say (no user turn first, a final assistant
+     * turn, an empty message) is refused HERE, before the loop: nothing is sent, so nothing is
+     * ledgered, exactly as the frame refusal above. A later attempt's packet (a repair) that the
+     * wire cannot say ends the loop below as exhaustion does, never as an escape mid-attempt.
+     */
+    if (this.#anthropic) {
+      anthropicMessagesRequestBody({ model: this.#options.model, maxTokens: 1, thinkingLevel: thinking.sent, messages: attemptPacket.messages });
+    }
     /** W10/2: how many attempts of THIS call were cut off at the bound. */
     let lengthFailures = 0;
     let lastContentRejection: {
@@ -1541,7 +1733,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         || estimateWindowTokens(packet.messages) + tokenCeiling <= contextWindowTokens;
 
     for (let attempt = 1; attempt <= request.bound.maxAttempts; attempt += 1) {
-      const attemptTokenCeiling = lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures);
+      const attemptTokenCeiling = Math.min(
+        lengthRetryTokenCeiling(request.bound.tokenCeiling, lengthFailures),
+        this.#options.maxOutputTokens ?? Number.MAX_SAFE_INTEGER
+      );
       /**
        * Task review fix round 1, finding 3. PROVIDER_CONTEXT_WINDOW_EXCEEDED
        * means "this prompt is over this candidate's window", and the picker
@@ -1562,7 +1757,26 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // per-attempt bound a length retry raised (W10/2).
       // Model scorecard §2.2: with no level asked this is today's three-member
       // body byte for byte; with one, the target's own member carries it.
-      const body = JSON.stringify({
+      // PR B: the Anthropic wire builds its own contract body; a packet it
+      // cannot say is refused here, before anything is sent or recorded.
+      let anthropicBody: string | undefined;
+      if (this.#anthropic) {
+        try {
+          anthropicBody = anthropicMessagesRequestBody({
+            model: this.#options.model,
+            maxTokens: attemptTokenCeiling,
+            thinkingLevel: thinking.sent,
+            messages: attemptPacket.messages
+          });
+        } catch (error) {
+          // Only a later attempt can get here (the first packet was checked before the loop).
+          if (attempt > 1 && error instanceof TypedDomainError && error.code === PROVIDER_PACKET_UNSUPPORTED) break;
+          throw error;
+        }
+      }
+      const body = anthropicBody !== undefined
+        ? anthropicBody
+        : JSON.stringify({
         model: this.#options.model,
         max_tokens: attemptTokenCeiling,
         ...thinking.wire,
@@ -1597,8 +1811,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
       // catch below lets that failure leave unsent, unledgered and unretried.
       let promptRecordFailed = false;
       try {
-        const headers: Record<string, string> = { "content-type": "application/json" };
-        if (this.#options.authorizationHeader !== undefined) {
+        const headers: Record<string, string> = this.#anthropic
+          ? anthropicMessagesRequestHeaders(this.#options.authorizationHeader)
+          : { "content-type": "application/json" };
+        if (!this.#anthropic && this.#options.authorizationHeader !== undefined) {
           headers.authorization = this.#options.authorizationHeader;
         }
         if (Buffer.byteLength(body, "utf8") > MAX_PROVIDER_REQUEST_PACKET_BYTES) {
@@ -1639,7 +1855,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
             throw promptError;
           }
         }
-        const response = await fetcher(`${this.#options.endpoint}/chat/completions`, {
+        const response = await fetcher(`${this.#options.endpoint}${this.#anthropic ? ANTHROPIC_MESSAGES_PATH : "/chat/completions"}`, {
           method: "POST",
           headers,
           signal: AbortSignal.timeout(request.bound.deadlineMs),
@@ -1652,6 +1868,10 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         } catch {
           decoded = null;
         }
+        // PR B: the Anthropic reply is read into the shape every line below
+        // already reads; `rawText` (the artifact) keeps the vendor's own bytes.
+        const nativeReply = this.#anthropic ? readAnthropicMessagesReply(decoded) : null;
+        if (nativeReply !== null) decoded = nativeReply.normalized;
         const candidate = z.object({ id: z.string(), model: modelIdSchema }).passthrough().safeParse(decoded);
         const observedUsage = z.object({ usage: usageSchema.nullable().optional() })
           .passthrough().safeParse(decoded);
@@ -1726,7 +1946,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           attemptId,
           runId: request.runId,
           providerRef: request.providerRef,
-          provider: "openai-compatible-http",
+          provider: this.#anthropic ? ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND : "openai-compatible-http",
           model: candidate.success ? candidate.data.model : this.#options.model,
           maker: this.#options.maker,
           modelVersion: candidate.success ? candidate.data.model : null,
@@ -1866,6 +2086,14 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           providerRef: request.providerRef,
           usage: reportedUsage
         });
+        /**
+         * PR B: a refusal or an unusable reply (a tool call), raised only now —
+         * after the artifact, the charge, the bounded-response check and the
+         * hosted usage requirement — so its usage is always recorded and judged
+         * first, exactly as a usable reply's is (review fix, 2026-10-10). The
+         * model-identity check stays below, after these as before.
+         */
+        if (nativeReply?.failure) throw nativeReply.failure;
         // W10/1: a refusal that arrived with `finish_reason: "length"` is a
         // TRUNCATION, and it is named as one. The classifier's own verdict
         // (PARSE_FAILED on a half-written object) describes the symptom; the
@@ -1983,7 +2211,7 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
           rawArtifactRef,
           ledgerEntryRef,
           content: responseJson.choices[0]!.message.content,
-          provider: "openai-compatible-http",
+          provider: this.#anthropic ? ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND : "openai-compatible-http",
           model: responseJson.model,
           maker: this.#options.maker,
           modelVersion: responseJson.model,
@@ -2070,6 +2298,16 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
          * and switches to the runner-up at once (A16a).
          */
         if (error instanceof TypedDomainError && error.code === PROVIDER_USAGE_CAP) break;
+        /**
+         * PR B: a vendor refusal and a reply this engine cannot use (a tool
+         * call it never offered) were both billed, and asking again is most
+         * likely a second bill for the same answer. Stopped like the usage
+         * cap: after the FAILED row, wrapped as PROVIDER_CALL_FAILED with the
+         * reason as its `cause`, so every caller handles it as it handles any
+         * failed member today.
+         */
+        if (error instanceof TypedDomainError
+          && (error.code === PROVIDER_CONTENT_REFUSED || error.code === PROVIDER_REPLY_UNSUPPORTED)) break;
       }
       // L4-F2: an oversized packet is deterministic — resending it would burn the ceiling for
       // an identical refusal, so the loop stops on the attempt that refused it.
@@ -2104,6 +2342,47 @@ export class VllmOpenAICompatibleProviderGateway implements ProviderGateway {
     return this.#delegate.call(request);
   }
 }
+
+/**
+ * Multi-model preview, PR B: the native Anthropic Messages adapter. The wire is
+ * ./anthropic-messages.ts; the attempt loop is the shared one above.
+ */
+export class AnthropicMessagesProviderGateway implements ProviderGateway {
+  readonly #delegate: OpenAICompatibleProviderGateway;
+
+  constructor(options: Omit<OpenAICompatibleGatewayOptions, "adapterKind">) {
+    this.#delegate = new OpenAICompatibleProviderGateway({
+      ...options,
+      adapterKind: ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND
+    });
+  }
+
+  call(request: ProviderCallRequest): Promise<ProviderCallResult> {
+    return this.#delegate.call(request);
+  }
+}
+
+/**
+ * PR C — THE ONE ADAPTER DISPATCH. One plain test per configured adapter
+ * kind (an if-chain: the source-purity law refuses a switch without an
+ * exhaustive fall-through, and a kind is an open string) (absent = OpenAI-compatible, so every existing composition is
+ * unchanged); a further native wire joins it as one more case. An unknown
+ * kind is refused by name rather than sent down another wire.
+ */
+export function createProviderGatewayForAdapter(
+  adapterKind: string | undefined,
+  options: OpenAICompatibleGatewayOptions
+): ProviderGateway {
+  const kind = adapterKind ?? OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND;
+  if (kind === OPENAI_COMPATIBLE_HTTP_ADAPTER_KIND) return new OpenAICompatibleProviderGateway(options);
+  if (kind === "vllm-openai-compatible-http") return new VllmOpenAICompatibleProviderGateway(options);
+  if (kind === GOOGLE_GEMINI_HTTP_ADAPTER_KIND) return new GeminiGenerateProviderGateway(options);
+  if (kind === ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND) return new AnthropicMessagesProviderGateway(options);
+  throw new TypeError("PROVIDER_ADAPTER_KIND_UNSUPPORTED");
+}
+
+// PR C: the native Gemini adapter. See ./gemini-generate.ts.
+export * from "./gemini-generate.js";
 
 // V-11 addendum layers 1-3: THE one frame every hand-off is built with, and the
 // door that refuses a packet built any other way. See ./prompt-frame.ts.
@@ -2144,3 +2423,22 @@ export {
 } from "./provider-probe.js";
 
 export * from "./preview-test.js";
+
+// Multi-model preview, PR B: the native Anthropic Messages wire.
+export {
+  ANTHROPIC_API_VERSION,
+  ANTHROPIC_EFFORT_LEVELS,
+  ANTHROPIC_MESSAGES_BASE_URL,
+  ANTHROPIC_MESSAGES_HTTP_ADAPTER_KIND,
+  ANTHROPIC_MESSAGES_PATH,
+  PROVIDER_CONTENT_REFUSED,
+  PROVIDER_PACKET_UNSUPPORTED,
+  PROVIDER_REPLY_UNSUPPORTED,
+  anthropicMessagesRequestBody,
+  anthropicUsageAsEngineUsage,
+  readAnthropicMessagesReply,
+  type AnthropicMessagesReply
+} from "./anthropic-messages.js";
+export * from "./preview-models.js";
+export * from "./preview-remaining.js";
+export * from "./preview-google.js";

@@ -149,7 +149,9 @@ describe("DL4-F3 — the runner's gateway factory supplies the per-attempt hook"
 
     // The anchors: this really is the factory, and it really is the delegating
     // call whose retry loop the hook has to reach.
-    expect(body).toContain("new OpenAICompatibleProviderGateway({");
+    // PR C: the factory builds the wire's gateway through the one adapter
+    // dispatch; the OpenAI-compatible gateway is its default case.
+    expect(body).toContain("createProviderGatewayForAdapter(adapterKind, {");
     expect(body).toContain("http.call({");
     // The hook itself — and closing over the LEASED run id, not a re-read of
     // `request.runId`, so it names the same run the content lease holds.

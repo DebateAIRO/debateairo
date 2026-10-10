@@ -1,0 +1,66 @@
+# Install as /etc/systemd/system/debateai-preview-google-budget.service (root:root 0644).
+# The Google spending gate (PR C): the same reviewed gate code as the DeepInfra gate, run with the
+# Google GO (provider "google"), its own state folder, key, socket and halt watcher. A halt or a
+# fault here stops Gemini only. Started through debateai-preview.target (drop-in
+# debateai-preview.target.d/60-google-gate.conf); no [Install] section of its own.
+# FAIL CLOSED BY DEFAULT: this file alone gives the gate no internet address at all. Exactly one
+# egress drop-in turns calls on (README-google.md, "Egress"):
+#   40-google-egress-list.conf       measured-list mode (+ 50-google-addresses.conf, rendered), or
+#   40-google-egress-forwarder.conf  forwarder mode (private network + the local forwarder).
+# Start check: Google offers no model listing that works without a key, so there is no keyless
+# model check (unlike DeepInfra); the egress drop-in's own check runs before every start, and the
+# key is never sent by any start check.
+[Unit]
+Description=DebateAI preview: Google spending gate v1 (gemini-3.8-flash, one daily pot, Europe/Bucharest)
+Documentation=file:///opt/debateai-v3-preview/operator/google-budget-v1/README-google.md
+Wants=network-online.target
+After=network-online.target nss-lookup.target
+Before=debateai-preview-api.service debateai-preview-runner.service
+StartLimitIntervalSec=900
+StartLimitBurst=4
+OnFailure=debateai-preview-alert@%n.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/bin/python3 -I /opt/debateai-v3-preview/operator/google-budget-v1/preview_budget_authority.py serve --private /var/lib/debateai-v3-preview/provider-google-authority-v1 --go /etc/debateai-v3-preview/provider-google-go-v1.json --socket /run/debateai-v3-preview/google-budget-v1.sock
+# Restart after a crash: safe for the same reasons as the DeepInfra gate (pot, ledger and halts
+# live on disk; serve start halts on any interrupted call; only root's activate re-opens).
+Restart=on-failure
+RestartMode=direct
+RestartSec=30
+KillSignal=SIGTERM
+TimeoutStopSec=700
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+LimitCORE=0
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RemoveIPC=yes
+ReadWritePaths=/var/lib/debateai-v3-preview/provider-google-authority-v1 /run/debateai-v3-preview
+InaccessiblePaths=-/etc/debateai-v3-preview/api -/etc/debateai-v3-preview/runner -/etc/debateai-v3-preview/api.env -/root -/var/lib/postgresql -/etc/postfix
+InaccessiblePaths=-/etc/debateai-v3-preview/auth-dev-v1 -/var/lib/debateai-v3-preview/provider-test-authority -/var/lib/debateai-v3-preview/api -/etc/debateai-v3-preview/lifecycle
+# The other gates' state, keys and GOs: the Google gate never needs them.
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc/debateai-v3-preview/provider-team-go-v2.json
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-anthropic-authority-v1 -/etc/debateai-v3-preview/provider-anthropic-go-v1.json
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# No internet here: only the local resolver stub. The egress drop-in adds what Gemini needs.
+IPAddressDeny=any
+IPAddressAllow=127.0.0.53/32
