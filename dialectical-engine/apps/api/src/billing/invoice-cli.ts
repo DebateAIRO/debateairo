@@ -35,7 +35,7 @@ import {
   BillingJobQueries, BillingRepository, type ChargeEventRow, type ChargeRow, type InvoiceRow,
   type OutboxJob
 } from "@debateai/db";
-import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
+import { decimalToMicros, microsToDecimal, type PriceCurrency } from "@debateai/billing-core";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import { netopiaEnvironmentOf } from "@debateai/payments-netopia";
 import { loadBillingInvoiceEnvironment } from "@debateai/register";
@@ -54,6 +54,8 @@ export type InvoiceArguments =
 export type InvoiceResult =
   | Readonly<{
     kind: "RECORDED"; document: "INVOICE" | "CREDIT_NOTE"; issuer: "QUADERNO" | "SMARTBILL";
+    /** The recorded charge's currency, the one `--amount` is in (spec 2026-10-05 §2.16.5). */
+    currency: PriceCurrency;
     /** A dead credit-note job of the charge that waits for this invoice (INVOICE_ORIGINAL_MISSING): re-queue it next. */
     creditNoteWaiting: boolean;
   }>
@@ -77,7 +79,7 @@ export type InvoiceCommandDeps = Readonly<{
 const CHARGE_REF = /^[A-Za-z0-9]{1,64}$/u;
 const QUADERNO_ID = /^[A-Za-z0-9_-]{1,64}$/u;
 const PRINTABLE_CODE = /^[A-Z][A-Z0-9_]{2,95}$/u;
-/** Dollars and cents, as `pnpm billing:withdraw` takes an amount (the charges are in USD). */
+/** Units and cents (or bani), as `pnpm billing:withdraw` takes an amount, in the charge's own currency. */
 const AMOUNT = /^(0|[1-9][0-9]*)\.[0-9]{2}$/u;
 const refuse = (code: string, message: string): never => { throw new TypedDomainError(code, message); };
 
@@ -241,7 +243,7 @@ async function record(deps: InvoiceCommandDeps, input: Readonly<{
   if (quote === null || customer === null) return refuse("BILLING_INVOICE_DATA_MISSING", "a paid charge without its quote or customer");
   const recorded: RecordedCharge = Object.freeze({
     chargeId: charge.chargeId, customerId: customer.customerId, planId: quote.planId,
-    chargeTotalMicros: charge.totalMicros, paidAt: input.paid.at
+    chargeTotalMicros: charge.totalMicros, paidAt: input.paid.at, currency: charge.currency
   });
   // A17a: the intent first (it already exists after the job's own attempt; 0086's foreign key needs it).
   await deps.repository.withTransaction((client) => deps.repository.insertInvoiceIntent(client, {
@@ -266,7 +268,8 @@ async function record(deps: InvoiceCommandDeps, input: Readonly<{
   }
   const waiting = document === "INVOICE" ? (await deps.jobs.documentJobsOfCharge(charge.chargeId, "CREDIT_NOTE")).dead : null;
   return Object.freeze({
-    kind: "RECORDED" as const, document, issuer, creditNoteWaiting: waiting?.code === "INVOICE_ORIGINAL_MISSING"
+    kind: "RECORDED" as const, document, issuer, currency: recorded.currency,
+    creditNoteWaiting: waiting?.code === "INVOICE_ORIGINAL_MISSING"
   });
 }
 
@@ -309,7 +312,7 @@ export function renderInvoiceResult(input: InvoiceArguments, result: InvoiceResu
           ? " It joins the e-Factura list until you record ANAF's answer with the billing:efactura-status command below." : "")
         + " It leaves the owner summary's list."
         + (input.mode === "RECORD" && input.amountMicros !== undefined
-          ? ` The quarter's tax summary now subtracts this refund at ${microsToDecimal(input.amountMicros)} USD.` : "")
+          ? ` The quarter's tax summary now subtracts this refund at ${microsToDecimal(input.amountMicros)} ${result.currency}.` : "")
         + (result.creditNoteWaiting
           ? " A credit note of this charge was waiting for this invoice: re-queue it with the billing:invoice command below"
             + `${result.issuer === "SMARTBILL" ? " (once you have checked SmartBill)" : ""}.`

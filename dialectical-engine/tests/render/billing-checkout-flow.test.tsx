@@ -20,7 +20,7 @@ const STARTED = Object.freeze({ redirect_url: PAGE, charge_ref: "0123456789abcde
 function quote(overrides: Record<string, unknown> = {}) {
   return {
     quote_ref: "11111111-1111-4111-8111-111111111111", plan_id: "PLUS", net: "20.00", tax: "3.80", total: "23.80",
-    tax_name: "MwSt.", tax_rate_bp: 1900, tax_country: "DE", tax_region: null, tax_status: "TAXABLE",
+    currency: "USD", tax_name: "MwSt.", tax_rate_bp: 1900, tax_country: "DE", tax_region: null, tax_status: "TAXABLE",
     country: "DE", ip_country: "DE", country_confirm_needed: false, address_required: false,
     renews_on: "2026-10-29T10:00:00.000Z", withdrawal_days: 14, expires_at: "2026-09-29T10:30:00.000Z", ...overrides
   };

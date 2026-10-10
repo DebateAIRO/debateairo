@@ -4,7 +4,7 @@ import {
   allowanceText,
   countryName,
   formatLongDate,
-  formatUsd,
+  formatMoney,
   planName,
   renewDayLabel,
   taxLabel
@@ -12,10 +12,10 @@ import {
 import { isBillingPlanId, isPaidPlanId } from "../../apps/ui/lib/billing/plans.js";
 
 describe("P18 billing formatting helpers", () => {
-  it("shows a decimal price as US dollars in the reader's locale and leaves anything else untouched", () => {
-    expect(formatUsd("en", "20.00")).toBe("$20.00");
-    expect(formatUsd("de", "20.00")).toMatch(/^20,00\s\$$/u);
-    expect(formatUsd("en", "20")).toBe("20");
+  it("shows a decimal price in its currency in the reader's locale and leaves anything else untouched", () => {
+    expect(formatMoney("en", "20.00", "USD")).toBe("$20.00");
+    expect(formatMoney("de", "20.00", "USD")).toMatch(/^20,00\s\$$/u);
+    expect(formatMoney("en", "20", "USD")).toBe("20");
   });
 
   it("names plans from the catalogue and words the allowance as a multiple, never as credit", () => {
@@ -27,16 +27,16 @@ describe("P18 billing formatting helpers", () => {
   });
 
   it("builds the tax label from its parts, the amount first as spec §1.3 shows it, and handles the untaxed cases", () => {
-    expect(taxLabel(billingEnglish, "en", { status: "TAXABLE", taxAmount: "4.20", taxName: "VAT", rateBasisPoints: 2100, country: "RO" }))
+    expect(taxLabel(billingEnglish, "en", { status: "TAXABLE", taxAmount: "4.20", currency: "USD", taxName: "VAT", rateBasisPoints: 2100, country: "RO" }))
       .toBe("$4.20 VAT (21%, Romania)");
-    expect(taxLabel(billingEnglish, "en", { status: "TAXABLE", taxAmount: "1.77", taxName: "Sales tax", rateBasisPoints: 887, country: "US" }))
+    expect(taxLabel(billingEnglish, "en", { status: "TAXABLE", taxAmount: "1.77", currency: "USD", taxName: "Sales tax", rateBasisPoints: 887, country: "US" }))
       .toBe("$1.77 Sales tax (8.87%, United States)");
     // P8b's tax_rate_bp may be fractional: New York's 8.875 % is 887.5 basis points.
-    expect(taxLabel(billingEnglish, "en", { status: "TAXABLE", taxAmount: "1.78", taxName: "Sales tax", rateBasisPoints: 887.5, country: "US" }))
+    expect(taxLabel(billingEnglish, "en", { status: "TAXABLE", taxAmount: "1.78", currency: "USD", taxName: "Sales tax", rateBasisPoints: 887.5, country: "US" }))
       .toBe("$1.78 Sales tax (8.875%, United States)");
-    expect(taxLabel(billingEnglish, "en", { status: "REVERSE_CHARGE", taxAmount: "0.00", taxName: "VAT", rateBasisPoints: 0, country: "DE" }))
+    expect(taxLabel(billingEnglish, "en", { status: "REVERSE_CHARGE", taxAmount: "0.00", currency: "USD", taxName: "VAT", rateBasisPoints: 0, country: "DE" }))
       .toBe("VAT reverse charge");
-    expect(taxLabel(billingEnglish, "en", { status: "NOT_REGISTERED", taxAmount: "0.00", taxName: "", rateBasisPoints: 0, country: "AU" }))
+    expect(taxLabel(billingEnglish, "en", { status: "NOT_REGISTERED", taxAmount: "0.00", currency: "USD", taxName: "", rateBasisPoints: 0, country: "AU" }))
       .toBe("no tax");
   });
 

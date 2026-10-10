@@ -1,4 +1,4 @@
-import { computeWindows, type RefundRecord, type SaleRecord } from "@debateai/billing-core";
+import { computeWindows, type PriceCurrency, type RefundRecord, type SaleRecord } from "@debateai/billing-core";
 import type {
   BillingRepository, ChargeEventRow, ChargeRow, InvoiceRow, OutboxJob, QuoteRow
 } from "@debateai/db";
@@ -115,12 +115,14 @@ export async function loadPaidCharge(
  */
 export type RecordedCharge = Readonly<{
   chargeId: string; customerId: string; planId: PlanId; chargeTotalMicros: number; paidAt: Date;
+  /** The charge's currency, the one M2 shows its total in (spec 2026-10-05 §2.16.5). */
+  currency: PriceCurrency;
 }>;
 
 export function recordedChargeOf(paid: PaidCharge): RecordedCharge {
   return Object.freeze({
     chargeId: paid.charge.chargeId, customerId: paid.customerId, planId: paid.quote.planId,
-    chargeTotalMicros: paid.charge.totalMicros, paidAt: paid.paid.at
+    chargeTotalMicros: paid.charge.totalMicros, paidAt: paid.paid.at, currency: paid.charge.currency
   });
 }
 

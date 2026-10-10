@@ -24,7 +24,7 @@ function row(overrides: Partial<TaxSummaryRow>): TaxSummaryRow {
   return Object.freeze({
     type: "SALE", chargeId: "c".repeat(32), at, taxCountry: "RO", taxRegion: null, taxStatus: "TAXABLE",
     chargeNetMicros: 20_000_000, chargeTaxMicros: 4_200_000, chargeTotalMicros: 24_200_000, amountMicros: 24_200_000,
-    amountKnown: true, saleRecorded: true, locationVerdict: "AGREED", ...overrides
+    amountKnown: true, saleRecorded: true, locationVerdict: "AGREED", currency: "USD", ...overrides
   }) as TaxSummaryRow;
 }
 
@@ -108,8 +108,8 @@ describe("P16b the summary", () => {
     expect(summary.conflicting).toEqual([{ chargeId: "d".repeat(32), taxCountry: "DE", at }]);
     expect(summary.notRegistered).toEqual([{ chargeId: "f".repeat(32), taxCountry: "US", taxRegion: "CA", at }]);
     expect(summary.chargebacks).toEqual([{
-      chargeId: "9".repeat(32), taxCountry: "DE", amountMicros: 59_500_000, at: new Date("2026-12-01T08:00:00.000Z"),
-      saleRecorded: true
+      chargeId: "9".repeat(32), taxCountry: "DE", amountMicros: 59_500_000, currency: "USD",
+      at: new Date("2026-12-01T08:00:00.000Z"), saleRecorded: true
     }]);
   });
 
@@ -220,7 +220,8 @@ describe("P16b the summary", () => {
     const ro = alone.lines.find((line) => line.taxCountry === "RO")!;
     expect(ro).toMatchObject({ netMicros: 20_000_000, taxMicros: 4_200_000, sales: 1, refunds: 0, unknownRefunds: 1 });
     expect(alone.unknownRefunds).toEqual([{
-      chargeId: "a".repeat(32), taxCountry: "RO", taxRegion: null, upToMicros: 24_200_000, at: new Date("2026-11-20T09:00:00.000Z")
+      chargeId: "a".repeat(32), taxCountry: "RO", taxRegion: null, upToMicros: 24_200_000, currency: "USD",
+      at: new Date("2026-11-20T09:00:00.000Z")
     }]);
     const text = renderTaxSummary(alone);
     expect(text).toContain("Net sales 20.00 USD, tax collected 4.20 USD, from 1 sale and 0 refunds.");
@@ -273,7 +274,8 @@ describe("P16b the summary", () => {
       invoiceUnknown: [{ chargeId: charge, jobKind: "DASHBOARD_REFUND", code: "CREDIT_NOTE_MANUAL", since }]
     });
     expect(dashboard.unknownRefunds).toEqual([{
-      chargeId: charge, taxCountry: "RO", taxRegion: null, upToMicros: 24_200_000, at: new Date("2026-11-20T09:00:00.000Z")
+      chargeId: charge, taxCountry: "RO", taxRegion: null, upToMicros: 24_200_000, currency: "USD",
+      at: new Date("2026-11-20T09:00:00.000Z")
     }]);
     expect(dashboard.lines.find((line) => line.taxCountry === "RO")).toMatchObject({ unknownRefunds: 1 });
     const dashboardText = renderTaxSummary(dashboard);

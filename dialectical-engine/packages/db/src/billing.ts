@@ -101,6 +101,8 @@ export type InvoiceRow = Readonly<{
   invoiceId: string; chargeId: string; issuer: InvoiceIssuerName; kind: InvoiceKind; externalRef: string;
   series: string | null; number: string; url: string | null; totalMicros: number; at: Date;
 }>;
+/** An invoice as Settings lists it: the row and its charge's currency (spec 2026-10-05 §2.16.5). */
+export type OwnerInvoiceRow = InvoiceRow & Readonly<{ currency: PriceCurrency }>;
 export type OutboxJob = Readonly<{
   jobId: string; kind: OutboxKind; ref: string; payload: OutboxPayload; createdAt: Date; notBefore: Date;
   attempts: number; claimedBy: string | null; claimedAt: Date | null;
@@ -130,6 +132,8 @@ export type TaxSummaryRow = Readonly<{
   amountKnown: boolean;
   saleRecorded: boolean;
   locationVerdict: LocationVerdict | null;
+  /** The charge's currency (spec 2026-10-05 §2.16.5): figures are summed per currency, never across. */
+  currency: PriceCurrency;
 }>;
 /** Where the previous page of due renewals ended: the order is (currentPeriodEnd, subscriptionId). */
 export type DueRenewalCursor = Readonly<{ periodEnd: Date; subscriptionId: string }>;
@@ -955,16 +959,16 @@ export class BillingRepository {
     `, [i.invoiceId, i.at, i.efacturaStatus]);
   }
 
-  async invoicesForOwner(ownerRef: string): Promise<InvoiceRow[]> {
-    return (await this.pool.query<InvoiceRaw>(`
+  async invoicesForOwner(ownerRef: string): Promise<OwnerInvoiceRow[]> {
+    return (await this.pool.query<InvoiceRaw & { currency: PriceCurrency }>(`
       SELECT invoice.invoice_id, invoice.charge_id, invoice.issuer, invoice.kind, invoice.external_ref,
-        invoice.series, invoice.number, invoice.url, invoice.total_micros, invoice.at
+        invoice.series, invoice.number, invoice.url, invoice.total_micros, invoice.at, charge.currency
       FROM billing.invoice AS invoice JOIN billing.charge AS charge ON charge.charge_id = invoice.charge_id
       WHERE charge.owner_ref = $1 ORDER BY invoice.at DESC, invoice.invoice_id
     `, [ownerRef])).rows.map((row) => Object.freeze({
       invoiceId: row.invoice_id, chargeId: row.charge_id, issuer: row.issuer, kind: row.kind,
       externalRef: row.external_ref, series: row.series, number: row.number, url: row.url,
-      totalMicros: micros(row.total_micros), at: row.at
+      totalMicros: micros(row.total_micros), at: row.at, currency: row.currency
     }));
   }
 
@@ -1122,7 +1126,7 @@ export class BillingRepository {
     const rows = (await this.pool.query<{
       type: "SALE" | "REFUND" | "CHARGEBACK"; charge_id: string; at: Date; tax_country: string; tax_region: string | null;
       tax_status: TaxStatus; net_micros: string; tax_micros: string; total_micros: string; amount_micros: string;
-      amount_known: boolean; sale_recorded: boolean; verdict: LocationVerdict | null;
+      currency: PriceCurrency; amount_known: boolean; sale_recorded: boolean; verdict: LocationVerdict | null;
     }>(`
       WITH dated AS (
         -- When the processor says the money moved; a row recorded without it falls back to when we recorded it.
@@ -1131,7 +1135,7 @@ export class BillingRepository {
       )
       SELECT CASE dated.kind WHEN 'SUCCEEDED' THEN 'SALE' WHEN 'REFUNDED' THEN 'REFUND' ELSE 'CHARGEBACK' END AS type,
         charge.charge_id, dated.money_at AS at, quote.tax_country, quote.tax_region, quote.tax_status,
-        charge.net_micros, charge.tax_micros, charge.total_micros,
+        charge.net_micros, charge.tax_micros, charge.total_micros, charge.currency,
         CASE dated.kind WHEN 'SUCCEEDED' THEN charge.total_micros
           WHEN 'REFUNDED' THEN COALESCE(dashboard_note.total_micros, dated.amount_micros)
           ELSE COALESCE(dated.amount_micros, charge.total_micros) END AS amount_micros,
@@ -1183,7 +1187,8 @@ export class BillingRepository {
       type: row.type, chargeId: row.charge_id, at: row.at, taxCountry: row.tax_country, taxRegion: row.tax_region,
       taxStatus: row.tax_status, chargeNetMicros: micros(row.net_micros), chargeTaxMicros: micros(row.tax_micros),
       chargeTotalMicros: micros(row.total_micros), amountMicros: micros(row.amount_micros),
-      amountKnown: row.amount_known, saleRecorded: row.sale_recorded, locationVerdict: row.verdict
+      amountKnown: row.amount_known, saleRecorded: row.sale_recorded, locationVerdict: row.verdict,
+      currency: row.currency
     }));
   }
 

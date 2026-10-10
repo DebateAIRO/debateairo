@@ -13,7 +13,7 @@ const DETAILS = Object.freeze({
   country: "RO", region: "Cluj", first_name: "Ana", last_name: "Pop", phone: "+40712345678", street: "Strada Memorandumului 1",
   city: "Cluj-Napoca", postal_code: "400001"
 });
-const SUBSCRIBED = Object.freeze({ subscription: { renewal_total: "24.20" } });
+const SUBSCRIBED = Object.freeze({ subscription: { renewal_total: "24.20", currency: "USD" } });
 const PAGE = "https://secure-sandbox.netopia-payments.com/ui/card?p=fedcba987654";
 const continueButton = (container: HTMLElement) =>
   [...container.querySelectorAll("button")].find((candidate) => candidate.textContent === EN["billing.card.checkCard"]);
@@ -94,9 +94,9 @@ describe("P20 the card change page (A11, A12)", () => {
   it("names why no check is offered when the read has no total, never a button that cannot enable", async () => {
     for (const [subscription, sentence] of [
       // A pending cancel: the plan is charged no more, so there is no agreement to give.
-      [{ renewal_total: null, cancel_requested: true }, EN["billing.subscription.wontRenew"]],
+      [{ renewal_total: null, currency: "USD", cancel_requested: true }, EN["billing.subscription.wontRenew"]],
       // Any other read without a total: a plain error, not a silent page.
-      [{ renewal_total: null, cancel_requested: false }, EN["billing.checkout.genericError"]]
+      [{ renewal_total: null, currency: "USD", cancel_requested: false }, EN["billing.checkout.genericError"]]
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);
@@ -117,7 +117,7 @@ describe("P20 the card change page (A11, A12)", () => {
     }
   });
 
-  it("says a check that saved no card asks for a card instead of a wallet (N13's CARD_NOT_SAVED)", async () => {
+  it("says a check that saved no card asks to try again, then another card, and names no wallet (N13's CARD_NOT_SAVED, PR-63)", async () => {
     const client = {
       getBillingCardDetails: vi.fn(), getBillingSubscription: vi.fn(), startCardChange: vi.fn(),
       getBillingCharge: vi.fn(async () => ({ state: "FAILED" as const, reason_code: "CARD_NOT_SAVED", kind: "CARD_CHECK" as const }))
@@ -128,6 +128,8 @@ describe("P20 the card change page (A11, A12)", () => {
     });
     await settle();
     expect(container.textContent).toContain(EN["billing.card.notSaved"]);
+    expect(EN["billing.card.notSaved"]).toBe("Your card was checked, but it couldn't be saved for your monthly payments."
+      + " Please try again; if it happens again, use another card.");
     expect(client.startCardChange).not.toHaveBeenCalled();
   });
 

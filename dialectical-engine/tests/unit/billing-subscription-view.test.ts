@@ -34,7 +34,7 @@ describe("P12b the subscription as the person sees it", () => {
     expect(view()).toEqual({
       plan_id: "PLUS", status: "ACTIVE", cancel_requested: false,
       current_period_end: "2026-11-01T09:00:00.000Z", renews_on: "2026-11-01T09:00:00.000Z",
-      renewal_total: "24.20", scheduled_downgrade_plan_id: null,
+      renewal_total: "24.20", currency: "USD", scheduled_downgrade_plan_id: null,
       // Romania: the 14 days run 2–15 October, Bucharest time; the window closes at the next local midnight.
       withdrawal_open_until: "2026-10-15T21:00:00.000Z", withdrawal_last_day: "2026-10-15",
       can_upgrade: true, can_change_card: true, can_revoke_cancel: false

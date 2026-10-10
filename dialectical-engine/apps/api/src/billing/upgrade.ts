@@ -135,7 +135,7 @@ export async function quoteUpgrade(deps: SubscriptionRouteDeps, input: Readonly<
   return Object.freeze({
     quote_ref: quoteId, plan_id: input.planId,
     net: microsToDecimal(prorated.netMicros), tax: microsToDecimal(prorated.taxMicros),
-    total: microsToDecimal(prorated.totalMicros), tax_name: prorated.taxName,
+    total: microsToDecimal(prorated.totalMicros), currency: row.currency, tax_name: prorated.taxName,
     tax_rate_basis_points: prorated.taxRateBasisPoints, tax_country: prorated.taxCountry,
     recurring_total: microsToDecimal(recurring.totalMicros),
     renews_on: state.currentPeriodEnd.toISOString(), expires_at: expiresAt.toISOString()

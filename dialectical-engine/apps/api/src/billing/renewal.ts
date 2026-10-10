@@ -760,7 +760,8 @@ export class RenewalService {
       template: "M3", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
       dedupeRef: `${fresh.subscriptionId}:${fresh.currentPeriodEnd.toISOString()}:${priced.tax.totalMicros}`,
       params: {
-        plan: priced.planId, totalAmount: microsToDecimal(priced.tax.totalMicros), chargeDate: chargeDate.toISOString(),
+        plan: priced.planId, totalAmount: microsToDecimal(priced.tax.totalMicros), currency: fresh.currency,
+        chargeDate: chargeDate.toISOString(),
         // A25: M3 links to the /cancel page, never to a token.
         cancelPageUrl: new URL("/cancel", this.deps.publicAppUrl).toString()
       },

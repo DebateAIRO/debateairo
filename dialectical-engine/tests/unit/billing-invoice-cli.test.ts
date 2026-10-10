@@ -79,7 +79,7 @@ describe("W12 pnpm billing:invoice's grammar (P2-I17)", () => {
     expect(await runBillingInvoiceCli(
       ["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--record", "DBAI-0042", "--amount", "12.10"], recorded.output,
       async () => ({
-        run: async () => ({ kind: "RECORDED" as const, document: "CREDIT_NOTE" as const, issuer: "SMARTBILL" as const, creditNoteWaiting: false }),
+        run: async () => ({ kind: "RECORDED" as const, document: "CREDIT_NOTE" as const, issuer: "SMARTBILL" as const, currency: "USD" as const, creditNoteWaiting: false }),
         close: async () => undefined
       })
     )).toBe(0);
@@ -89,7 +89,7 @@ describe("W12 pnpm billing:invoice's grammar (P2-I17)", () => {
     const plain = sink();
     expect(await runBillingInvoiceCli(["--charge", CHARGE, "--kind", "CREDIT_NOTE", "--record", "DBAI-0042"], plain.output,
       async () => ({
-        run: async () => ({ kind: "RECORDED" as const, document: "CREDIT_NOTE" as const, issuer: "SMARTBILL" as const, creditNoteWaiting: false }),
+        run: async () => ({ kind: "RECORDED" as const, document: "CREDIT_NOTE" as const, issuer: "SMARTBILL" as const, currency: "USD" as const, creditNoteWaiting: false }),
         close: async () => undefined
       }))).toBe(0);
     expect(plain.lines.out).not.toContain("USD");
@@ -102,7 +102,7 @@ describe("the commands the invoice command prints next", () => {
   it("names billing:efactura-status and the waiting credit note's re-queue as the runbook runs them, each on its own line", () => {
     const runbook = runbookBillingCommands();
     const record = parseInvoiceArguments(["--charge", CHARGE, "--kind", "INVOICE", "--record", "DBAI-0900"]);
-    const smartbill = renderInvoiceResult(record, { kind: "RECORDED", document: "INVOICE", issuer: "SMARTBILL", creditNoteWaiting: true });
+    const smartbill = renderInvoiceResult(record, { kind: "RECORDED", document: "INVOICE", issuer: "SMARTBILL", currency: "USD", creditNoteWaiting: true });
     expect(smartbill).not.toMatch(BARE_BILLING_COMMAND);
     expect(smartbill).toContain(" It joins the e-Factura list until you record ANAF's answer with the billing:efactura-status"
       + " command below. It leaves the owner summary's list.");
@@ -117,13 +117,13 @@ describe("the commands the invoice command prints next", () => {
     ]));
     const requeueValues = [[`--charge ${CHARGE}`, '--charge "$CHARGE_REF"'], ["--kind CREDIT_NOTE", '--kind "$KIND"']] as const;
     expect(runbook).toContain(asRunbookLine(`${requeue} --confirm-not-issued`, requeueValues));
-    const quaderno = renderInvoiceResult(record, { kind: "RECORDED", document: "INVOICE", issuer: "QUADERNO", creditNoteWaiting: true });
+    const quaderno = renderInvoiceResult(record, { kind: "RECORDED", document: "INVOICE", issuer: "QUADERNO", currency: "USD", creditNoteWaiting: true });
     expect(quaderno).not.toMatch(BARE_BILLING_COMMAND);
     expect(quaderno).toContain("re-queue it with the billing:invoice command below. Run the command as root on the server.\n");
     expect(printedHostCommands(quaderno)).toEqual([requeue]);
     expect(runbook).toContain(asRunbookLine(requeue, requeueValues));
     // Nothing to run next: no command, and no root step.
-    const done = renderInvoiceResult(record, { kind: "RECORDED", document: "INVOICE", issuer: "QUADERNO", creditNoteWaiting: false });
+    const done = renderInvoiceResult(record, { kind: "RECORDED", document: "INVOICE", issuer: "QUADERNO", currency: "USD", creditNoteWaiting: false });
     expect(printedHostCommands(done)).toEqual([]);
     expect(done).toBe(`Recorded: Quaderno invoice DBAI-0900 for charge ${CHARGE}. The receipt (M2) is queued for the customer.`
       + " It leaves the owner summary's list.\n");
