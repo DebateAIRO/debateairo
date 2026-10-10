@@ -2314,7 +2314,8 @@ buyer pays, by the country of the billing address: RON for Romania, EUR for the 
 Iceland, Liechtenstein, Switzerland and the United Kingdom, USD for everyone else. Set your prices in `net_prices`
 (micro-units: 100 lei is `100000000`; whole bani or cents only), keep `credit_currency` at `USD`, dry-run, publish, pin,
 restart. A subscription keeps its currency and its price for good; a new price list or a changed country reaches only
-new subscriptions. `pnpm billing:check` shows a cross while the published plans are the engine's own row.
+new subscriptions. `pnpm billing:check` shows a cross while the published plans are the engine's own row or still carry
+its placeholder EUR and RON prices, as a copy of the kit's example does.
 
 Then, inside a migrator window (§4 steps 2 and 5), check and publish:
 
