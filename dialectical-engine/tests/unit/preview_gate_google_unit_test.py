@@ -181,7 +181,8 @@ class ReadmeTests(unittest.TestCase):
                        'debateai-preview-google-budget.service', PRIVATE, GO, GATE_SOCKET, OPERATOR, 'probe',
                        'completion_within_max_tokens', 'model_echoed_exactly', 'Re-open after a halt', 'Egress',
                        'Threat model', 'google_budget_socket', '"daily_budget_usd": "1.00"', '"max_paid_posts_per_day": 400',
-                       '"max_concurrent_calls": 1', 'x-goog-api-key'):
+                       '"max_concurrent_calls": 1', 'x-goog-api-key', '--max-tokens 32', '"completion_within_max_tokens": true',
+                       'about $1.50 in 2026', 'about $3.00 from', 'queue', '60 seconds', 'cachedContentTokenCount'):
             self.assertIn(needle, text)
 
     def test_no_file_holds_a_one_computer_path_or_a_key_shape(self):
@@ -191,6 +192,9 @@ class ReadmeTests(unittest.TestCase):
                 self.assertNotIn('/Users/', text)
                 self.assertNotIn('/home/', text)
                 self.assertIsNone(re.search(r'AIza[0-9A-Za-z_-]{35}', text))
+                # No machine-specific values: the server's host name and user ids come from its own GO.
+                self.assertNotIn('vps-', text)
+                self.assertIsNone(re.search(r'\b99[0-9]\b', text))
 
 
 if __name__ == '__main__':

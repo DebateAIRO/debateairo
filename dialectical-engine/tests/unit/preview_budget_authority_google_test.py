@@ -448,6 +448,28 @@ class RequestShapeTests(GoogleTest):
         # The engine's own cap on a native body (256 KiB) always fits once framed.
         self.assertGreaterEqual(MAX_BYTES, 256 * 1024 + len(framed({})) - 2)
 
+    def test_every_body_the_app_adapter_sends_passes_and_what_it_refuses_fails(self):
+        # tests/unit/fixtures/google-adapter-bodies.json: `sent` holds the adapter's own output byte for
+        # byte (its TS test rebuilds each one); `refused` holds bodies it never sends (an empty text too).
+        fixture = json.loads((Path(__file__).resolve().parent / 'fixtures/google-adapter-bodies.json').read_text())
+        self.assertEqual(fixture['schema'], 'google-adapter-bodies-v1')
+        self.assertGreaterEqual(len(fixture['sent']), 4)
+        row = GOOGLE.rows[GEMINI]
+        for case in fixture['sent']:
+            with self.subTest(sent=case['name']):
+                raw = '{"model":"gemini-3.8-flash","request":' + case['body'] + '}'
+                self.assertTrue(GOOGLE.body_valid(json.loads(raw), row))
+                outgoing, _, _, _ = self.validate(raw)
+                self.assertEqual(json.loads(outgoing), json.loads(case['body']))
+                self.assertLess(len(outgoing), len(raw.encode()))
+        self.assertIn('an empty text part in contents', [case['name'] for case in fixture['refused']])
+        for case in fixture['refused']:
+            with self.subTest(refused=case['name']):
+                raw = '{"model":"gemini-3.8-flash","request":' + case['body'] + '}'
+                self.assertFalse(GOOGLE.body_valid(json.loads(raw), row))
+                with self.refused('REQUEST_PARAMETERS_INVALID'):
+                    self.validate(raw)
+
     def test_the_probe_body_is_a_contract_body(self):
         raw = json.dumps(GOOGLE.probe_body(GOOGLE.rows[GEMINI]), ensure_ascii=False, separators=(',', ':'))
         outgoing, _, _, _ = self.validate(raw, probe=True)
@@ -486,7 +508,9 @@ class SettlementTests(GoogleTest):
                  'total_short': reply(total=1499), 'total_long': reply(total=1501),
                  'no_total': reply(total=None) | {'usageMetadata': {'promptTokenCount': 1000, 'candidatesTokenCount': 200}},
                  'no_prompt': dict(reply(), usageMetadata={'candidatesTokenCount': 200, 'totalTokenCount': 200}),
-                 'cached': reply(cachedContentTokenCount=10, total=1510),
+                 'cached_over_prompt': reply(cachedContentTokenCount=1001),
+                 'cached_negative': reply(cachedContentTokenCount=-1),
+                 'cached_counted_twice': reply(cachedContentTokenCount=10, total=1510),
                  'tool_use': reply(toolUsePromptTokenCount=10, total=1510),
                  'unknown_field': reply(trafficType='ON_DEMAND'),
                  'negative': reply(prompt=-1, total=499), 'bool': reply(thoughts=True, total=1201),
@@ -502,6 +526,18 @@ class SettlementTests(GoogleTest):
                 entry = gate.entry('op-1')
                 self.assertEqual((entry['state'], entry['held_usd']), ('uncertain', entry['reserved_usd']))
                 self.assertEqual((gate.status()['state'], gate.status()['reason']), ('halted', 'uncertain_charge'))
+
+    def test_implicitly_cached_prompt_tokens_settle_at_the_full_input_price(self):
+        # Gemini caches long repeated prefixes on its own and counts them INSIDE promptTokenCount.
+        gate = self.gate().ready()
+        for operation_id, cached in (('op-1', 600), ('op-2', 1000), ('op-3', 0)):
+            with self.subTest(cached=cached):
+                gate.gcall(operation_id, response=reply(prompt=1000, candidates=200, thoughts=300, cachedContentTokenCount=cached,
+                                                        cacheTokensDetails=[{'modality': 'TEXT', 'tokenCount': cached}]))
+                entry = gate.entry(operation_id)
+                self.assertEqual((entry['state'], entry['accounting']['cached_tokens']), ('settled', cached))
+                self.assertEqual(Decimal(entry['held_usd']), (1000 * Decimal('0.75') + 500 * Decimal('3.75')) / Decimal(1000000))
+        self.assertEqual(gate.status()['state'], 'active')
 
     def test_another_model_version_halts(self):
         for named in ('gemini-3.8-flash-001', 'models/gemini-3.8-flash', 'gemini-3.8-pro', None):
@@ -581,7 +617,52 @@ class UnsentTests(GoogleTest):
         self.assertEqual((gate.status()['state'], gate.status()['today_posts']), ('active', 0))
 
 
+class OverrunAgainstTheGatesOwnFigureTests(GoogleTest):
+    def test_a_charge_above_the_gates_own_reservation_halts_even_inside_the_callers_larger_hold(self):
+        # 23:00 on 30 December in Bucharest: the gate's own figure (30 and 31 Dec) is still at the 2026 price, while
+        # the app's lookahead hold is at the 2027 price. The hold kept is the app's; an overrun is
+        # judged against the gate's own figure.
+        gate = self.gate()
+        gate.clock.set('2026-12-30T21:00:00+00:00')
+        gate.ready()
+        raw = framed(native())
+        moment = gate.clock()
+        own = reservation(raw, moment)
+        held = bridge.reservation_for(len(raw.encode()), GOOGLE.rows[GEMINI], lookahead(moment))
+        self.assertEqual(lookahead(moment), (Decimal('1.50'), Decimal('7.50')))
+        thoughts = BOUND + 2000  # Charged at $0.75/$3.75: above `own`, below `held`.
+        charge = (100 * Decimal('0.75') + (100 + thoughts) * Decimal('3.75')) / Decimal(1000000)
+        self.assertTrue(own < charge < held)
+
+        def send(sent_bytes, _key):
+            return 200, reply(prompt=100, candidates=100, thoughts=thoughts)
+        request = envelope(raw, moment, 'op-1', reserved='%.9f' % held)
+        with self.refused('AUTHORITY_HALTED'):
+            bridge.execute_request(gate.private, gate.go_path, request, peer_uid=PEER, slots=gate.slots, dispatch=send,
+                                   key_loader=lambda _p: FAKE_KEY, host=HOST, platform='linux', now=gate.clock, slot_wait=0.2)
+        entry = gate.day('2026-12-30')['entries']['preview-test:' + SCOPE + ':op-1']
+        self.assertEqual((entry['reserved_usd'], entry['state'], Decimal(entry['held_usd'])), ('%.9f' % held, 'settled', charge))
+        self.assertEqual(Decimal(entry['overrun_usd']), charge - own)
+        self.assertEqual(gate.status()['reason'], 'charge_overrun')
+        # Within the gate's own figure, the same lookahead hold settles quietly.
+        gate2 = self.gate()
+        gate2.clock.set('2026-12-30T21:00:00+00:00')
+        gate2.ready()
+        quiet = envelope(raw, moment, 'op-2', reserved='%.9f' % held)
+        bridge.execute_request(gate2.private, gate2.go_path, quiet, peer_uid=PEER, slots=gate2.slots,
+                               dispatch=lambda _s, _k: (200, reply()), key_loader=lambda _p: FAKE_KEY, host=HOST,
+                               platform='linux', now=gate2.clock, slot_wait=0.2)
+        self.assertEqual(gate2.status()['state'], 'active')
+
+
 class KeyTests(GoogleTest):
+    def test_a_key_of_another_shape_is_refused_before_anything_is_reserved_or_sent(self):
+        gate = self.gate().ready()
+        for wrong in ('sk-ant-' + 'x' * 40, FAKE_KEY[:-1], 'synthetic-key-0123456789'):
+            with self.subTest(shape=wrong[:6]), self.refused('KEY_SHAPE_INVALID'):
+                gate.gcall('op-1', dispatch=no_network, key_loader=lambda _p, wrong=wrong: wrong)
+        self.assertEqual((gate.status()['today_posts'], gate.status()['state']), (0, 'active'))
+
     def test_the_key_goes_only_in_x_goog_api_key_and_never_in_the_url(self):
         seen = []
 
@@ -665,13 +746,53 @@ class ProbeAndRemainingTests(GoogleTest):
                           summary['halt_reason']),
                          (False, False, 'gemini-3.8-flash-preview-10-2026', 'provider_error_or_model_identity'))
 
-    def test_remaining_reports_the_ceiling_worst_case(self):
+    def test_remaining_reports_the_largest_hold_at_the_prices_in_force_and_activate_keeps_the_ceiling(self):
+        """Core change (PR C review): /remaining's largest_reservation_usd is the full-size hold at the
+        reservation prices now and one day later (the app's three-day lookahead), never the ceiling
+        before the vendor's step; activate and the per-call cap keep the ceiling."""
+        full = lambda price_in, price_out: (Decimal(MAX_BYTES + 2048) * Decimal(price_in) + BOUND * Decimal(price_out)) / Decimal(1000000)
         gate = self.gate().ready()
+        for moment, expected in (('2026-10-10T09:00:00+00:00', full('0.75', '3.75')),
+                                 ('2026-12-29T21:59:59+00:00', full('0.75', '3.75')),
+                                 ('2026-12-29T22:00:00+00:00', full('1.50', '7.50')),  # 30 Dec in Bucharest: the lookahead reaches 1 Jan.
+                                 ('2027-03-01T09:00:00+00:00', full('1.50', '7.50'))):
+            with self.subTest(moment=moment):
+                gate.clock.set(moment)  # The figure does not depend on the window being open.
+                report = bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, now=gate.clock)
+                self.assertEqual(Decimal(report['largest_reservation_usd']), expected)
+        self.assertEqual(Decimal('0.259632'), full('0.75', '3.75'))
+        self.assertEqual(bridge.largest_reservation(GOOGLE, [GEMINI]), full('1.50', '7.50'))  # activate's figure.
+        self.assertEqual((report['enabled_models'], report['max_concurrent_calls']), ([GEMINI], CONCURRENCY))
+
+    def test_a_flat_price_profile_reports_the_same_largest_hold_as_before(self):
+        from preview_budget_authority_fixture import Gate as DeepInfraGate
+        gate = DeepInfraGate(bridge)
+        self.gates.append(gate)
+        gate.ready()
         report = bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, now=gate.clock)
-        self.assertEqual(Decimal(report['largest_reservation_usd']),
-                         (Decimal(MAX_BYTES + 2048) * Decimal('1.50') + BOUND * Decimal('7.50')) / Decimal(1000000))
-        self.assertEqual((report['enabled_models'], report['max_concurrent_calls'], report['remaining_usd']),
-                         ([GEMINI], CONCURRENCY, '1.00'))
+        deepinfra = helper.PROFILES['deepinfra']
+        self.assertEqual(Decimal(report['largest_reservation_usd']), bridge.largest_reservation(deepinfra, gate.go['enabled_models']))
+
+    def test_the_probe_takes_a_smaller_bound_to_measure_thinking_within_it(self):
+        gate = self.gate().ready()
+        sent = []
+
+        def dispatch(outgoing, key):
+            sent.append(json.loads(outgoing))
+            return 200, reply(prompt=8, candidates=1, thoughts=40)
+        summary = bridge.probe(gate.private, gate.go_path, GEMINI, dispatch=dispatch, key_loader=lambda _p: FAKE_KEY,
+                               host=HOST, platform='linux', uid=0, now=gate.clock, max_tokens=32)
+        self.assertEqual(sent[0]['generationConfig']['maxOutputTokens'], 32)
+        self.assertEqual((summary['sent']['max_tokens'], summary['completion_within_max_tokens']), (32, False))
+        for bad in (15, 1025, 0, True, '32'):
+            with self.subTest(bad=bad), self.refused('PROBE_MAX_TOKENS_INVALID'):
+                bridge.probe(gate.private, gate.go_path, GEMINI, dispatch=no_network, key_loader=no_network,
+                             host=HOST, platform='linux', uid=0, now=gate.clock, max_tokens=bad)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):  # This test runs as the developer, not root: refused before any call.
+            code = bridge.main(['probe', '--private', str(gate.private), '--go', str(gate.go_path), '--model', GEMINI,
+                                '--max-tokens', '32'])
+        self.assertEqual((code, json.loads(out.getvalue().splitlines()[-1])['error']), (2, 'ROOT_PROBE_REFUSED'))
 
 
 if __name__ == '__main__':

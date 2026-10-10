@@ -29,6 +29,7 @@ import {
   previewModelRow,
   previewModelRowForRef,
   previewProviderSocket,
+  previewRowPricesAt,
   type PreviewGateRemaining,
   type PreviewModelRow,
   type PreviewProviderName,
@@ -136,10 +137,14 @@ export function previewGateKeyOf(model: string): PreviewGateKey | undefined {
   return previewModelRow(model)?.provider;
 }
 
-/** One average call at a row's list price, in nano-USD. */
-export function previewAverageCallNanoUsd(row: PreviewModelRow): bigint {
-  return PREVIEW_ESTIMATE_INPUT_TOKENS_PER_CALL * row.inputNanoUsdPerToken
-    + PREVIEW_ESTIMATE_OUTPUT_TOKENS_PER_CALL * row.outputNanoUsdPerToken;
+/**
+ * One average call at a row's price at `now`, in nano-USD: its list price, or for a row with dated
+ * prices (Google) the price its calls are reserved at now (previewRowPricesAt).
+ */
+export function previewAverageCallNanoUsd(row: PreviewModelRow, now: Date = new Date()): bigint {
+  const prices = previewRowPricesAt(row, now);
+  return PREVIEW_ESTIMATE_INPUT_TOKENS_PER_CALL * prices.inputNanoUsdPerToken
+    + PREVIEW_ESTIMATE_OUTPUT_TOKENS_PER_CALL * prices.outputNanoUsdPerToken;
 }
 
 const withMargin = (value: bigint): bigint =>
@@ -198,13 +203,13 @@ export type PreviewGateNeed = Readonly<{
   callsNanoUsd: bigint;
 }>;
 
-function gateNeeds(models: ReadonlyMap<PreviewGateKey, readonly PreviewModelRow[]>, expectedCalls: number): readonly PreviewGateNeed[] {
+function gateNeeds(models: ReadonlyMap<PreviewGateKey, readonly PreviewModelRow[]>, expectedCalls: number, now: Date): readonly PreviewGateNeed[] {
   const calls = BigInt(expectedCalls);
   return Object.freeze([...models].map(([gate, rows]) => {
-    const dearest = rows.reduce((best, row) => previewAverageCallNanoUsd(row) > previewAverageCallNanoUsd(best) ? row : best);
+    const dearest = rows.reduce((best, row) => previewAverageCallNanoUsd(row, now) > previewAverageCallNanoUsd(best, now) ? row : best);
     return Object.freeze({
       gate, modelIds: Object.freeze([...new Set(rows.map((row) => row.model))]), dearestModelId: dearest.model,
-      expectedCalls, callsWithMargin: Number(withMargin(calls)), callsNanoUsd: withMargin(calls * previewAverageCallNanoUsd(dearest))
+      expectedCalls, callsWithMargin: Number(withMargin(calls)), callsNanoUsd: withMargin(calls * previewAverageCallNanoUsd(dearest, now))
     });
   }));
 }
@@ -217,6 +222,8 @@ export function estimatePreviewGateNeeds(input: Readonly<{
   roleProviderRefs: readonly string[];
   storyCalls: number;
   maxCooldownHoldsPerRun: number;
+  /** The moment prices are taken at (dated prices); default now. */
+  now?: Date;
 }>): readonly PreviewGateNeed[] {
   if (input.panel.length === 0) throw new TypeError("PREVIEW_PANEL_EMPTY");
   const expected = previewExpectedCalls(input);
@@ -227,7 +234,7 @@ export function estimatePreviewGateNeeds(input: Readonly<{
     if (row === undefined || gate === undefined) throw new TypeError("PREVIEW_MODEL_UNREVIEWED");
     byGate.set(gate, [...(byGate.get(gate) ?? []), row]);
   }
-  return gateNeeds(byGate, expected.total);
+  return gateNeeds(byGate, expected.total, input.now ?? new Date());
 }
 
 /**
@@ -237,7 +244,7 @@ export function estimatePreviewGateNeeds(input: Readonly<{
  * gate existed) is priced at the dearest DeepInfra row, on the DeepInfra gate.
  */
 export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: Pick<PreviewBudgetGateSettings,
-  "roleModelIds" | "roleProviderRefs" | "storyCalls" | "maxCooldownHoldsPerRun">): readonly PreviewGateNeed[] {
+  "roleModelIds" | "roleProviderRefs" | "storyCalls" | "maxCooldownHoldsPerRun">, now: Date = new Date()): readonly PreviewGateNeed[] {
   const expected = previewExpectedCalls({ ...settings, basis: run.basis, panel: run.panel });
   // A model off the reviewed rows predates the per-provider gates, so it ran on the DeepInfra gate:
   // price it at that gate's dearest row (never move its hold onto another provider's gate).
@@ -249,7 +256,7 @@ export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: 
     const gate = previewGateKeyOf(row.model) ?? "deepinfra";
     byGate.set(gate, [...(byGate.get(gate) ?? []), row]);
   }
-  return gateNeeds(byGate, expected.total);
+  return gateNeeds(byGate, expected.total, now);
 }
 
 /** The money one gate must still have: the debate's calls plus what it may hold at once for calls in flight. */
@@ -319,13 +326,14 @@ export async function assertPreviewBudgetAdmits(
   let needs: readonly PreviewGateNeed[];
   let held: Map<PreviewGateKey, PreviewGateHeld>;
   try {
+    const now = clock();
     needs = estimatePreviewGateNeeds({ ...input, roleModelIds: gate!.roleModelIds, roleProviderRefs: gate!.roleProviderRefs,
-      storyCalls: gate!.storyCalls, maxCooldownHoldsPerRun: gate!.maxCooldownHoldsPerRun });
+      storyCalls: gate!.storyCalls, maxCooldownHoldsPerRun: gate!.maxCooldownHoldsPerRun, now });
     const unfinished = await gate!.readUnfinishedRuns();
     if (unfinished.length > PREVIEW_UNFINISHED_RUNS_MAX) throw new TypeError("PREVIEW_UNFINISHED_RUNS_TOO_MANY");
     held = new Map();
     for (const run of unfinished) {
-      for (const hold of estimateUnfinishedRunHolds(run, gate!)) {
+      for (const hold of estimateUnfinishedRunHolds(run, gate!, now)) {
         const sum = held.get(hold.gate) ?? { calls: 0, nanoUsd: 0n };
         held.set(hold.gate, { calls: sum.calls + hold.callsWithMargin, nanoUsd: sum.nanoUsd + hold.callsNanoUsd });
       }

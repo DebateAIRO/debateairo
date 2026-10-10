@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import {
   GOOGLE_GEMINI_BASE_URL, GeminiGenerateProviderGateway, PREVIEW_GOOGLE_BASE_URL, PREVIEW_GOOGLE_GENERATE_URL,
   PREVIEW_GOOGLE_MODEL_ROW, PREVIEW_GOOGLE_PRICE_STEPS, PREVIEW_GOOGLE_PROVIDER_REF, PREVIEW_GOOGLE_REQUEST_BODY_MAX_BYTES,
-  PREVIEW_MODEL_ROWS, PREVIEW_MODEL_ROWS_BY_PROVIDER, PREVIEW_RESERVATION_TEMPLATE_BYTES, PREVIEW_REVIEWED_PROVIDER_REFS,
+  PREVIEW_MODEL_ROWS, PREVIEW_MODEL_ROWS_BY_PROVIDER, PREVIEW_REVIEWED_PROVIDER_REFS,
   assertPreviewProviderTargets, createPreviewBudgetRpcPorts, createPreviewGuardedFetch, geminiGenerateContentBody,
   geminiGenerateContentUrl, geminiPreviewRequestBody, observeProviderTarget, parsePreviewProviderTestConfig,
   parseProviderDiscoveryTargets, previewGoogleBucharestDay, previewGoogleCarefulPrices, previewGoogleLookaheadPrices,
@@ -113,7 +113,9 @@ describe("the reviewed Google row equals the gate's parity file", () => {
       expect(step.inputNanoUsdPerToken).toBe(BigInt(Math.round(Number(step.inputUsdPerM) * 1000)));
       expect(step.outputNanoUsdPerToken).toBe(BigInt(Math.round(Number(step.outputUsdPerM) * 1000)));
     }
-    expect(PREVIEW_RESERVATION_TEMPLATE_BYTES).toBe(fixture.reservation.overhead_bytes);
+    // The template allowance: a zero-byte request still reserves overhead_bytes of input.
+    const unit = Object.freeze({ inputUsdPerM: "x", outputUsdPerM: "x", inputNanoUsdPerToken: 1n, outputNanoUsdPerToken: 0n });
+    expect(previewGoogleReservationNanoUsd(0, unit)).toBe(BigInt(fixture.reservation.overhead_bytes));
     expect(PREVIEW_GOOGLE_REQUEST_BODY_MAX_BYTES).toBe(fixture.reservation.max_request_bytes);
   });
   it("the worst case (largest frame, ceiling prices) equals the file and stays under the per-call cap", () => {
@@ -404,14 +406,42 @@ describe("the start-of-debate estimate asks the Google gate", () => {
     expect(Object.keys(previewRemainingPorts(parse(WITH_GOOGLE)!)).sort()).toEqual(["deepinfra", "google"]);
     expect(Object.keys(previewRemainingPorts(parse({ ...BASE, free_model_ids: [GLM] })!))).toEqual(["deepinfra"]);
   });
-  it("prices every Google call at the row's ceiling", () => {
-    const needs = estimatePreviewGateNeeds({ basis: basis(2), panel: panelOf([GLM, GEMINI]), ...ROLES([GLM]) });
-    const google = needs.find(need => need.gate === "google")!;
-    expect(google).toMatchObject({ modelIds: [GEMINI], dearestModelId: GEMINI });
-    // Every call at (4,000 x 1,500 + 1,200 x 7,500) nano-USD, x 115 / 100, rounded up.
-    const raw = BigInt(google.expectedCalls) * (4_000n * 1_500n + 1_200n * 7_500n) * 115n;
-    expect(google.callsNanoUsd).toBe((raw + 99n) / 100n);
-    expect(google.expectedCalls).toBeGreaterThan(0);
+  it("prices every Google call at the dated price in force (the three-day lookahead), never at a later year's", () => {
+    const at = (iso: string) => estimatePreviewGateNeeds({ basis: basis(2), panel: panelOf([GLM, GEMINI]), ...ROLES([GLM]),
+      now: new Date(iso) }).find(need => need.gate === "google")!;
+    const raw = (calls: number, input: bigint, output: bigint) => (BigInt(calls) * (4_000n * input + 1_200n * output) * 115n + 99n) / 100n;
+    const today = at("2026-10-10T09:00:00Z");
+    expect(today).toMatchObject({ modelIds: [GEMINI], dearestModelId: GEMINI });
+    expect(today.expectedCalls).toBeGreaterThan(0);
+    expect(today.callsNanoUsd).toBe(raw(today.expectedCalls, 750n, 3_750n));
+    // 22:00 UTC on 29 December is 00:00 on 30 December in Bucharest: the lookahead reaches 1 January.
+    expect(at("2026-12-29T21:59:59Z").callsNanoUsd).toBe(raw(today.expectedCalls, 750n, 3_750n));
+    expect(at("2026-12-29T22:00:00Z").callsNanoUsd).toBe(raw(today.expectedCalls, 1_500n, 7_500n));
+    expect(at("2027-06-01T00:00:00Z").callsNanoUsd).toBe(raw(today.expectedCalls, 1_500n, 7_500n));
+  });
+  it("dated prices halve what a Gemini debate needs before 2027: about $1.42 in 2026, about $2.85 from 2027", async () => {
+    // A's realistic basis (tests/unit/preview-budget-estimate.test.ts): 120 attempts, 2 holds, a 3-round story.
+    const realBasis = Object.freeze({ ...basis(3), max_model_attempts: 120, hold_cap: 2 });
+    const roles = { ...ROLES([GLM, GLM]), storyCalls: 6, maxCooldownHoldsPerRun: 2 };
+    const panel = panelOf([GLM, DEEPSEEK, GEMINI]);
+    const largestAt = (now: string) => previewGoogleReservationNanoUsd(PREVIEW_GOOGLE_REQUEST_BODY_MAX_BYTES, previewGoogleLookaheadPrices(new Date(now)));
+    const need = (now: string) => estimatePreviewGateNeeds({ basis: realBasis, panel, ...roles, now: new Date(now) })
+      .find(entry => entry.gate === "google")!.callsNanoUsd + largestAt(now);
+    expect(largestAt("2026-10-10T09:00:00Z")).toBe(259_632_000n);
+    expect(largestAt("2027-01-02T09:00:00Z")).toBe(519_264_000n);
+    expect(need("2026-10-10T09:00:00Z")).toBe(1_424_007_000n);
+    expect(need("2027-01-02T09:00:00Z")).toBe(2_848_014_000n);
+    const pot = async (now: string, remainingNanoUsd: bigint) => {
+      const gate: PreviewBudgetGateSettings = Object.freeze({ remaining: {
+        deepinfra: async () => openGate([GLM, DEEPSEEK], 3_000_000_000n),
+        google: async () => ({ ...openGate([GEMINI], remainingNanoUsd), largestReservationNanoUsd: largestAt(now) }) },
+        ...roles, readUnfinishedRuns: async () => [] });
+      return assertPreviewBudgetAdmits(gate, { basis: realBasis, panel }, () => new Date(now));
+    };
+    await expect(pot("2026-10-10T09:00:00Z", 1_000_000_000n)).rejects.toBeInstanceOf(PreviewDailyLimitRefusal);
+    await expect(pot("2026-10-10T09:00:00Z", 1_500_000_000n)).resolves.toBeUndefined();
+    await expect(pot("2027-01-02T09:00:00Z", 1_500_000_000n)).rejects.toBeInstanceOf(PreviewDailyLimitRefusal);
+    await expect(pot("2027-01-02T09:00:00Z", 3_000_000_000n)).resolves.toBeUndefined();
   });
   const counted = () => {
     const calls = { deepinfra: 0, google: 0 };
@@ -550,3 +580,40 @@ describe("the UI build flag knows the Google row", () => {
       JSON.stringify({ free: [GLM, GEMINI], premium: [GLM, DEEPSEEK, GEMINI] }))).toBeGreaterThan(0);
   });
 });
+
+const adapterBodies = JSON.parse(readFileSync(new URL("./fixtures/google-adapter-bodies.json", import.meta.url), "utf8")) as {
+  schema: string; sent: Array<{ name: string; body: string }>; refused: Array<{ name: string; body: string }> };
+const ADAPTER_CASES = [
+  { name: "system and one user turn", maxOutputTokens: 8192, messages: [
+    { role: "system", content: "You are the synthetic judge." }, { role: "user", content: "Is the synthetic claim supported?" }] },
+  { name: "two system messages joined, a full exchange", maxOutputTokens: 16384, messages: [
+    { role: "system", content: "Frame A." }, { role: "system", content: "Frame B." }, { role: "user", content: "First." },
+    { role: "assistant", content: "Answer." }, { role: "user", content: "Second." }] },
+  { name: "one user turn, the smallest bound", maxOutputTokens: 1, messages: [{ role: "user", content: "Reply exactly: OK" }] },
+  { name: "non-ASCII text, quotes and a new line", maxOutputTokens: 4096, messages: [
+    { role: "user", content: "Ce regulă proporțională? 日本語 «citat» \"quoted\"\nnew line" }] }
+] as const;
+
+describe("the gate's shape mirrors the adapter's (the Python gate reads the same file)", () => {
+  it("the fixture's sent bodies are the adapter's own output, byte for byte", () => {
+    expect(adapterBodies.schema).toBe("google-adapter-bodies-v1");
+    expect(adapterBodies.sent.map(entry => entry.name)).toEqual(ADAPTER_CASES.map(entry => entry.name));
+    ADAPTER_CASES.forEach((entry, index) => {
+      expect(geminiGenerateContentBody({ maxOutputTokens: entry.maxOutputTokens, thinkingLevel: "high",
+        messages: entry.messages as unknown as Parameters<typeof geminiGenerateContentBody>[0]["messages"] })).toBe(adapterBodies.sent[index]!.body);
+    });
+  });
+  it("the guarded fetch frames every body the adapter sends and refuses every body it never sends (an empty text part too)", async () => {
+    const { google, ports } = recordingPorts();
+    const fetcher = createPreviewGuardedFetch(ports, { clock: () => NOW });
+    for (const entry of adapterBodies.sent) await post(fetcher, PREVIEW_GOOGLE_GENERATE_URL, entry.body);
+    expect(google.map(execution => execution.requestBody)).toEqual(adapterBodies.sent.map(entry => geminiPreviewRequestBody(GEMINI, entry.body)));
+    expect(adapterBodies.refused.map(entry => entry.name)).toContain("an empty text part in contents");
+    for (const entry of adapterBodies.refused) {
+      expect(previewGoogleNativeBodyValid(JSON.parse(entry.body)), entry.name).toBe(false);
+      await expect(post(fetcher, PREVIEW_GOOGLE_GENERATE_URL, entry.body), entry.name).rejects.toThrow("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
+    }
+    expect(google).toHaveLength(adapterBodies.sent.length);
+  });
+});
+

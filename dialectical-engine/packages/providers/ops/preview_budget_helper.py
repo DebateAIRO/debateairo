@@ -287,7 +287,7 @@ class DeepInfraProfile:
       account(response, row, moment) -> dict  usage and guard charge (see account_response's keys)
       reply_model(response) -> str|None  where the reply names the model that answered
       unbilled_refusal(status, response) -> bool  a refusal that provably billed nothing
-      probe_body(row) -> dict            the probe's tiny request (max_tokens <= 1024)
+      probe_body(row, max_tokens=1024) -> dict  the probe's tiny request (its token bound, at most 1024)
       reply_text(response) -> str|None   answer or error text, for the probe's short excerpt
     """
     name = 'deepinfra'
@@ -360,8 +360,8 @@ class DeepInfraProfile:
                 and not names_any_key(response, BILLED_KEYS)
                 and not names_any_key_prefixed(response, 'tokens_'))
 
-    def probe_body(self, row):
-        body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
+    def probe_body(self, row, max_tokens=1024):
+        body = {'model': row.model, 'max_tokens': min(max_tokens, row.output_bound),
                 'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
         if row.effort:
             body['reasoning_effort'] = row.effort
@@ -579,8 +579,8 @@ class AnthropicProfile:
                 and not names_any_key_prefixed(response, 'tokens_')
                 and not names_any_key_suffixed(response, '_tokens'))
 
-    def probe_body(self, row):
-        body = {'model': row.model, 'max_tokens': min(1024, row.output_bound),
+    def probe_body(self, row, max_tokens=1024):
+        body = {'model': row.model, 'max_tokens': min(max_tokens, row.output_bound),
                 'messages': [{'role': 'user', 'content': 'Reply exactly: OK'}]}
         if row.effort:
             body['output_config'] = {'effort': row.effort}
@@ -603,9 +603,10 @@ PROFILES = {profile.name: profile for profile in (DeepInfraProfile(), AnthropicP
 
 
 def _is_text_part_list(parts):
-    """Exactly one part, and that part is exactly {"text": <string>}."""
+    """Exactly one part, and that part is exactly {"text": <non-empty string>} (Google refuses an
+    empty text part; refusing it here keeps such a call from being reserved and then failing)."""
     return (isinstance(parts, list) and len(parts) == 1 and isinstance(parts[0], dict)
-            and set(parts[0]) == {'text'} and isinstance(parts[0]['text'], str))
+            and set(parts[0]) == {'text'} and isinstance(parts[0]['text'], str) and parts[0]['text'] != '')
 
 
 def _whole(value):
@@ -635,10 +636,11 @@ def google_prices_on(day):
 def google_careful_prices(moment):
     """The higher of the prices for moment's Bucharest day and for the next Bucharest day.
 
-    Used for both the reservation (at the moment the gate checks the request) and the settlement
-    (at the moment the reply is accounted). The app computes the very same figure for its
-    reservation (preview-google.ts, parity fixture). Prices only ever rise in the table, so
-    'higher' is element-wise and the next day's prices win at a step."""
+    The gate's own figure, used for both the reservation and the settlement of a call, at the one
+    moment the call is priced (the core passes the same moment to both). The app reserves with a
+    three-day lookahead (this rule at the moment and one day later, preview-google.ts), at or above
+    this figure; the gate holds the app's figure, settles at this one, and halts on a charge above
+    this one. Prices only ever rise in the table, so 'higher' is element-wise."""
     if not isinstance(moment, datetime) or moment.tzinfo is None:
         raise SafetyError('CLOCK_INVALID')  # noqa: F821 - provided by the gate
     today = moment.astimezone(ZoneInfo(GOOGLE_PRICE_ZONE)).date()
@@ -672,9 +674,11 @@ def account_gemini_usage(response, input_price, output_price):
     """Gemini usageMetadata priced at one (input, output) pair: input = promptTokenCount, output =
     candidatesTokenCount + thoughtsTokenCount (thinking is billed as output). Valid only if every
     field is a known one, the total adds up exactly (tool-use prompt tokens must be absent or 0,
-    as no tools are ever sent), no cached tokens are reported (no cache is ever asked for) and
-    the prompt and total are present. Anything else is invalid usage: the call stays uncertain
-    and the gate halts."""
+    as no tools are ever sent) and the prompt and total are present. Gemini caches long repeated
+    prefixes on its own (implicit caching) and reports those tokens as cachedContentTokenCount
+    INSIDE promptTokenCount: it may be anything from 0 to the prompt count, and every prompt token
+    is still charged at the full input price (no cache discount: the careful side). Anything else
+    is invalid usage: the call stays uncertain and the gate halts."""
     usage = response.get('usageMetadata') if isinstance(response, dict) else None
     known = isinstance(usage, dict) and set(usage) <= set(GOOGLE_USAGE_COUNTS) | set(GOOGLE_USAGE_DETAILS)
     usage = usage if isinstance(usage, dict) else {}
@@ -683,7 +687,7 @@ def account_gemini_usage(response, input_price, output_price):
     prompt, candidates, thoughts = counts['promptTokenCount'], counts['candidatesTokenCount'], counts['thoughtsTokenCount']
     total, cached, tool = counts['totalTokenCount'], counts['cachedContentTokenCount'], counts['toolUsePromptTokenCount']
     valid = (known and whole and 'promptTokenCount' in usage and 'totalTokenCount' in usage
-             and cached == 0 and tool == 0 and total == prompt + candidates + thoughts + tool
+             and cached <= prompt and tool == 0 and total == prompt + candidates + thoughts + tool
              and all(_details_valid(usage[name], counts[count]) for name, count in GOOGLE_USAGE_DETAILS.items()
                      if name in usage))
     completion = candidates + thoughts if whole else None
@@ -700,7 +704,7 @@ def account_gemini_usage(response, input_price, output_price):
             'configured_price_cost_usd': str(configured) if configured is not None else None,
             'provider_estimated_cost_usd': None,
             'guard_charge_usd': str(configured) if configured is not None else None,
-            'cost_basis': ('dated list price x (prompt; candidates + thoughts)' if configured is not None
+            'cost_basis': ('dated list price x (prompt incl. cached; candidates + thoughts)' if configured is not None
                            else 'unknown; full reservation retained')}
 
 
@@ -803,8 +807,8 @@ class GoogleProfile:
                     and not names_any_key(response, GOOGLE_BILLED_KEYS + BILLED_KEYS)
                     and not names_any_key_prefixed(response, 'tokens_'))
 
-    def probe_body(self, row):
-        config = {'maxOutputTokens': min(1024, row.output_bound)}
+    def probe_body(self, row, max_tokens=1024):
+        config = {'maxOutputTokens': min(max_tokens, row.output_bound)}
         if row.effort:
             config['thinkingConfig'] = {'thinkingLevel': row.effort}
         return {'model': row.model, 'request': {'contents': [{'role': 'user', 'parts': [{'text': 'Reply exactly: OK'}]}],

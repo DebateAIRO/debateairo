@@ -46,15 +46,36 @@ at the price change. On every other day the two figures are the same.
 
 **Why one call at a time.** The worst case of one call is a full-size request (256 KiB + 64 bytes
 of framing) plus 16,384 output tokens, at the 2027 prices: **$0.519264**. Two at once would need
-$1.04, more than the $1.00 pot, and `activate` refuses that. A smaller request limit would allow
+$1.04, more than the $1.00 pot, and `activate` refuses that (activate always uses the 2027
+prices, so a GO that passes today still passes in 2027). A smaller request limit would allow
 more calls at once (128 KiB would allow 3), but we measured what the engine really sends and it
 does not fit: the review step of a debate can send about 95 KB normally and about 144 KB with a
 long question, and the verdict story's checker about 170 to 266 KB at the high tier. Nothing
 below the engine's own 256 KiB refusal keeps a Gemini request smaller. A limit the engine can pass
 would stop a debate half-way, which the owner's rule forbids. So the limit stays at 256 KiB, and
-the price is one call at a time: Gemini calls of the same debate wait for each other (a call
-that waits more than 60 seconds is retried by the engine later, never charged). If you want more
-calls at once, raise the Google pot instead (for example $2.00 allows 3).
+the price is one call at a time.
+
+What one call at a time means in practice: Gemini calls queue. While one Gemini call runs, a
+second one waits at the gate for up to 60 seconds; if the first has not finished by then, the
+second gets a "busy, try again" answer (nothing is set aside or charged) and the engine retries it
+after a short pause. Debates with Gemini are therefore slower, never charged twice. If you want
+more calls at once, raise the Google pot (for example $2.00 allows 3).
+
+**Does a Gemini debate fit the pot? The arithmetic.** Before a debate starts, the app estimates
+it for each gate it uses: every call of the debate counted on that gate (careful: as if Gemini made
+them all), each at an average of 4,000 input and 1,200 output tokens, plus 15%, plus one full-size
+call in flight. Prices are the ones in force (the same three-day lookahead as above).
+- **2026:** one average call = 4,000 x $0.75/M + 1,200 x $3.75/M = $0.0075; plus 15% = $0.0086.
+  A three-maker debate of about 138 calls (the shape the tests use) = about $1.16-1.19, plus one call
+  in flight ($0.259632 at 2026 prices) = **about $1.42-1.45**.
+- **From 1 January 2027 (from 30 December 2026, with the lookahead):** prices double: about
+  $2.33-2.38 for the calls plus $0.519264 in flight = **about $2.85-2.90**.
+
+So, in plain words: with the proposed **$1.00** Google pot, the app refuses a Gemini debate
+before it starts (the person sees "today's limit is used up"), even in 2026. To let Gemini
+debates start, raise the Google pot in its GO: **about $1.50 in 2026**, and **about $3.00 from
+1 January 2027**; otherwise from 2027 every Gemini debate is refused before it starts. A pot
+change is a GO edit plus `activate` (step 7). The other gates are not affected.
 
 ## Decisions you should know about
 
@@ -66,10 +87,15 @@ calls at once, raise the Google pot instead (for example $2.00 allows 3).
   money set aside is released, the gate stays open, and the engine retries later. Five of those
   in a row halt the gate (`provider_unreachable`). Any other refusal halts, as for DeepInfra.
 - **Usage.** Input = `promptTokenCount`; output = `candidatesTokenCount + thoughtsTokenCount`.
-  `totalTokenCount` must equal their sum exactly. Cached tokens and tool-use tokens must be absent
-  or 0 (the gate never asks for a cache or tools). A field the gate does not know halts it (fail
-  closed): if the probe shows `"usage_valid": false`, tell the developers; the fix is a reviewed
-  code change.
+  `totalTokenCount` must equal their sum exactly. Tool-use tokens must be absent or 0 (the gate
+  never sends tools). Google caches long repeated beginnings of prompts on its own and reports
+  them as `cachedContentTokenCount`, counted INSIDE the prompt: anything from 0 to the prompt's
+  count is accepted, and every prompt token is still charged at the full input price (the gate
+  never counts the cache discount: the careful side). A field the gate does not know halts it
+  (fail closed): if the probe shows `"usage_valid": false`, tell the developers; the fix is a
+  reviewed code change.
+- **Empty text.** A request with an empty text (Google refuses those) is refused by the app and
+  by the gate before anything is set aside.
 - **Not yet measured (the probe measures both, see step 9):**
   - whether Google's reply names the model exactly `gemini-3.8-flash` (`modelVersion`). Until it
     does, any other spelling halts the gate (`model_echoed_exactly` in the probe).
@@ -199,8 +225,8 @@ install -o root -g root -m 0644 $S/debateai-preview-google-forwarder.socket $S/d
 | `provider` | `google` | This gate's provider. |
 | `enabled_models` | `["gemini-3.8-flash"]` | The one reviewed Google row. Until the probe (step 9) passes, the app's lists do not name it, so no debate uses it. |
 | `scope_id` | `preview-google-v1-20261010` | Its own pot (use the install date). The app's configuration has no separate Google scope: see step 10. |
-| `target_host` | `vps-a156d797` | The server's host name, as for DeepInfra. |
-| `allowed_peer_uids` | `[994, 992]` | The API and the runner. |
+| `target_host` | the same as in your DeepInfra GO | The server's host name. The command below copies it from the DeepInfra GO. |
+| `allowed_peer_uids` | the same as in your DeepInfra GO | The API's and the runner's user ids. The command below copies them from the DeepInfra GO. |
 | `daily_budget_usd` | `"1.00"` | Google's share of the $5 team total. |
 | `max_paid_posts_per_day` | `400` | Second fuse. |
 | `max_concurrent_calls` | `1` | `activate` refuses 2 with a $1.00 pot (see "Why one call at a time"). |
@@ -216,9 +242,10 @@ your DeepInfra GO uses.
 ```sh
 G=/opt/debateai-v3-preview/operator/google-budget-v1
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
-SC=$(jq -r .scope_id /etc/debateai-v3-preview/provider-deepinfra-go-v3.json)
+DI=/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
+SC=$(jq -er .scope_id $DI); TH=$(jq -er .target_host $DI); UI=$(jq -ec .allowed_peer_uids $DI)
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" --arg s "$SC" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"google",enabled_models:["gemini-3.8-flash"],scope_id:$s,target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"1.00",max_paid_posts_per_day:400,max_concurrent_calls:1,open_days:31}' > /root/preview-archive/provider-google-go-v1.json
+jq -n --arg b "$BR" --arg h "$HE" --arg s "$SC" --arg t "$TH" --argjson u "$UI" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"google",enabled_models:["gemini-3.8-flash"],scope_id:$s,target_host:$t,allowed_peer_uids:$u,daily_budget_usd:"1.00",max_paid_posts_per_day:400,max_concurrent_calls:1,open_days:31}' > /root/preview-archive/provider-google-go-v1.json
 install -o root -g root -m 0600 /root/preview-archive/provider-google-go-v1.json /etc/debateai-v3-preview/provider-google-go-v1.json
 jq -c . /etc/debateai-v3-preview/provider-google-go-v1.json
 ```
@@ -253,7 +280,7 @@ stat -c '%a %U:%G %F' /run/debateai-v3-preview/google-budget-v1.sock
 
 What to expect: `active`; the journal shows the egress check's `"status": "ok"` and then
 `"status": "serving"` with `"provider": "google"`; the socket is `666 root:root socket` (the gate
-answers only uids 994 and 992). In mode A, also start the address timer:
+answers only the user ids listed in the GO). In mode A, also start the address timer:
 `systemctl start debateai-preview-google-addresses.timer`.
 
 Refresh the installed alert script (it now knows the two Google notices), as in the DeepInfra
@@ -283,7 +310,20 @@ Switch Gemini on in the app (step 10) only if ALL of these hold in the printout:
 - `"reply_excerpt"` is `OK` (thinking may leave it empty if the 1,024 tokens ran out; then run the
   probe again later, it is not a failure of the gate).
 
-If the probe halted the gate, read "Re-open after a halt" first.
+Then the REQUIRED second probe, with a tiny answer bound (32 tokens; the option takes 16 to
+1,024). With thinking "high" the model wants to think far longer than 32 tokens, so this shows
+whether Google keeps the thinking inside `maxOutputTokens`:
+
+```sh
+/usr/bin/python3 -I /opt/debateai-v3-preview/operator/google-budget-v1/preview_budget_authority.py probe --private /var/lib/debateai-v3-preview/provider-google-authority-v1 --go /etc/debateai-v3-preview/provider-google-go-v1.json --model gemini-3.8-flash --max-tokens 32
+```
+
+It must print `"sent": {"max_tokens": 32, ...}` and `"completion_within_max_tokens": true` (the
+reply may well be empty or cut off; that is expected here). If it prints `false`, Google bills
+thinking beyond the limit: do NOT switch Gemini on, and tell the developers (in real use a call
+could then cost more than was set aside, and the gate would halt).
+
+If a probe halted the gate, read "Re-open after a halt" first.
 
 **10. Switch Gemini on in the app (a configuration edit and a restart; part of the runbook's API
 and runner env steps).**

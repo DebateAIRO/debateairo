@@ -150,6 +150,7 @@ CALL_ENTRY_PREFIX = 'preview-test:'
 PROBE_ENTRY_PREFIX = 'preview-probe:'
 PROBE_LOCK_NAME = 'team-probe.lock'  # Held by a running probe; serve start and reservations check it.
 PROBE_EXCERPT_CHARS = 80
+PROBE_MIN_TOKENS, PROBE_MAX_TOKENS = 16, 1024  # probe --max-tokens bounds (default: the largest).
 ENTRY_STATES = ('pending', 'settled', 'uncertain')
 
 
@@ -324,6 +325,23 @@ def enabled_models_valid(models, profile):
 
 def largest_reservation(profile, models):
     return max(worst_case_reservation(profile, profile.rows[model]) for model in models)
+
+
+def current_largest_reservation(profile, models, moment):
+    """The largest full-size hold an enabled model can be reserved at now, for /remaining: the
+    higher of the profile's reservation prices at moment and one day later (the same three-day
+    lookahead the app reserves dated prices with), never above the ceiling worst case. For flat
+    prices it equals largest_reservation. activate and the per-call cap keep the ceiling."""
+    later = moment + timedelta(days=1)
+    holds = []
+    for model in models:
+        row = profile.rows[model]
+        first, second = profile.reservation_prices(row, moment), profile.reservation_prices(row, later)
+        if not (prices_ok(first) and prices_ok(second)):
+            raise SafetyError('REMAINING_UNAVAILABLE')
+        prices = (max(first[0], second[0]), max(first[1], second[1]))
+        holds.append(min(reservation_for(profile.max_request_bytes, row, prices), worst_case_reservation(profile, row)))
+    return max(holds)
 
 
 def valid_go(go):
@@ -829,6 +847,9 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
     # so a call that runs past a dated price step settles at the prices it was reserved at.
     priced_at = current(now)
     outgoing, reserved, row, prices = validate_request(input, go, probe=probe, moment=priced_at)
+    # The gate's own figure for this request: a charge above it overruns, even when the caller
+    # chose to hold more (a dated-price lookahead), so a hidden overrun cannot hide in the margin.
+    own_reserved = reservation_for(len(input['requestBody'].encode()), row, prices)
     host, platform = host or socket.gethostname(), platform or sys.platform
     if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int \
             or not (peer_uid in go['allowed_peer_uids'] or probe and peer_uid == 0):
@@ -889,7 +910,7 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
         elapsed = round(time.monotonic() - started, 6)
         try:
             changes, halt_reason, charge, reply = assess_reply(status, response, reserved, elapsed, profile, row,
-                                                               priced_at)
+                                                               priced_at, overrun_limit=own_reserved)
         except BaseException:
             # Paid but unaccountable: keep the full hold and stop, as for a transport failure.
             changes, halt_reason, charge, reply = ({'state': 'uncertain', 'held_usd': str(reserved),
@@ -914,11 +935,13 @@ def bounded_model_name(value):
     return value if isinstance(value, str) and len(value) <= 128 else None
 
 
-def assess_reply(status, response, reserved, elapsed, profile, row, moment):
+def assess_reply(status, response, reserved, elapsed, profile, row, moment, overrun_limit=None):
     """Ledger changes, halt reason, guard charge and caller reply for one redacted provider reply.
     Settled at the profile's prices for this row at moment, the moment the call was priced (its
     reservation's), recorded in the entry; the reply
-    must name this call's own model, not just any reviewed or enabled one."""
+    must name this call's own model, not just any reviewed or enabled one. A charge above
+    overrun_limit (the gate's own reservation for the request; default the amount held) halts."""
+    overrun_limit = reserved if overrun_limit is None else overrun_limit
     accounting = bounded_accounting(profile.account(response, row, moment))
     charge = accounting.get('guard_charge_usd')
     named = profile.reply_model(response)
@@ -932,8 +955,8 @@ def assess_reply(status, response, reserved, elapsed, profile, row, moment):
         changes.update(state='uncertain', held_usd=str(reserved), reason='usage_or_cost_unreported')
         return changes, 'uncertain_charge', None, None
     amount = Decimal(charge)
-    changes.update(state='settled', held_usd=str(amount), overrun_usd=str(max(Decimal(0), amount - reserved)))
-    if amount > reserved:
+    changes.update(state='settled', held_usd=str(amount), overrun_usd=str(max(Decimal(0), amount - overrun_limit)))
+    if amount > overrun_limit:
         halt_reason = 'charge_overrun'
     elif status != 200 or named != row.model:
         halt_reason = 'provider_error_or_model_identity'
@@ -993,7 +1016,8 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
             'remaining_usd': nano_text(max(Decimal(0), budget - spend), ROUND_FLOOR),
             'remaining_calls': max(0, limits['max_paid_posts_per_day'] - len(ledger['entries'])),
             'max_concurrent_calls': limits['max_concurrent_calls'],
-            'largest_reservation_usd': nano_text(largest_reservation(profile, control['enabled_models']), ROUND_CEILING),
+            'largest_reservation_usd': nano_text(current_largest_reservation(profile, control['enabled_models'], moment),
+                                                 ROUND_CEILING),
             'enabled_models': list(control['enabled_models'])}
 
 
@@ -1041,13 +1065,13 @@ class RemainingAnswers:
         return remaining_answer(snapshot, input, uid)
 
 
-def probe_summary(observed, profile):
+def probe_summary(observed, profile, max_tokens=PROBE_MAX_TOKENS):
     """The probe's printout: no key (the reply was redacted with it) and no reply text beyond a
     short, single-line excerpt."""
     response, row, accounting = observed['response'], observed['row'], observed['changes'].get('accounting') or {}
     text = profile.reply_text(response)
     excerpt = re.sub(r'\s+', ' ', text)[:PROBE_EXCERPT_CHARS] if isinstance(text, str) else None
-    max_tokens, completion = min(1024, row.output_bound), accounting.get('completion_tokens')
+    max_tokens, completion = min(max_tokens, row.output_bound), accounting.get('completion_tokens')
     return {'status': 'probed', 'provider': profile.name, 'model': row.model, 'maker': row.maker,
             'sent': {'max_tokens': max_tokens, 'effort': row.effort or 'none'},
             # A model that bills past max_tokens would overrun its reservation in real use: do not enable it.
@@ -1063,7 +1087,8 @@ def probe_summary(observed, profile):
             'authority': observed.get('authority'), 'reply_excerpt': excerpt}
 
 
-def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None, platform=None, uid=None, now=None):
+def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None, platform=None, uid=None, now=None,
+          max_tokens=None):
     """Root only: one tiny paid call ("Reply exactly: OK") to a reviewed model of the GO's provider,
     even one the GO does not enable yet, through the normal reserve/settle/halt path. It counts in
     today's pot and call count, and a non-200 reply or another model in the reply halts the gate
@@ -1077,7 +1102,13 @@ def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None,
     row = profile.rows.get(model) if isinstance(model, str) else None
     if row is None:
         raise SafetyError('MODEL_NOT_REVIEWED')
-    raw = json.dumps(profile.probe_body(row), ensure_ascii=False, separators=(',', ':'))
+    # --max-tokens: a smaller answer bound (16..1024), so the owner can see whether a model's hidden
+    # thinking stays within it (completion_within_max_tokens) before switching the model on.
+    if max_tokens is not None and not _int_in(max_tokens, PROBE_MIN_TOKENS, PROBE_MAX_TOKENS):
+        raise SafetyError('PROBE_MAX_TOKENS_INVALID')
+    limit = PROBE_MAX_TOKENS if max_tokens is None else max_tokens
+    raw = json.dumps(profile.probe_body(row) if max_tokens is None else profile.probe_body(row, max_tokens),
+                     ensure_ascii=False, separators=(',', ':'))
     prices = profile.reservation_prices(row, current(now or helper.utc_now))
     request = {'scope_id': go['scope_id'], 'operationId': 'probe-%x' % time.time_ns(), 'requestBody': raw,
                'requestSha256': hashlib.sha256(raw.encode()).hexdigest(),
@@ -1096,7 +1127,7 @@ def probe(private, go_path, model, *, dispatch=None, key_loader=None, host=None,
             raise  # Refused, not sent, or uncertain: the refusal code says which.
     finally:
         os.close(lock_fd)
-    return probe_summary(observed, profile)
+    return probe_summary(observed, profile, limit)
 
 
 def hold_probe_lock(private):
@@ -1461,6 +1492,7 @@ def main(argv=None):
     parser.add_argument('--go', type=Path)
     parser.add_argument('--socket', type=Path)  # serve only, and required there: no built-in name.
     parser.add_argument('--model')  # probe only, and required there.
+    parser.add_argument('--max-tokens', type=int)  # probe only, optional: 16..1024.
     args = parser.parse_args(argv)
     try:
         uses_go = args.phase in ('init', 'activate', 'serve', 'probe')
@@ -1479,7 +1511,7 @@ def main(argv=None):
         elif args.phase == 'probe':
             if args.model is None:
                 raise SafetyError('MODEL_REQUIRED')
-            result = probe(args.private, args.go, args.model)
+            result = probe(args.private, args.go, args.model, max_tokens=args.max_tokens)
         else:
             if args.socket is None:
                 raise SafetyError('ROOT_SOCKET_REQUIRED')

@@ -76,7 +76,7 @@ export const PREVIEW_GOOGLE_CONTEXT_WINDOW_TOKENS = 1_048_576 as const;
 /** Request bodies above this are refused before any reservation (contract A §2). */
 export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
 /** Template allowance added to the body's bytes on the input side of a reservation (contract A §3). */
-export const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
+const PREVIEW_RESERVATION_TEMPLATE_BYTES = 2048;
 
 type RowInput = Readonly<{
   model: string; maker: string; inputUsdPerM: string; outputUsdPerM: string;

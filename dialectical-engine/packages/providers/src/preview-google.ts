@@ -15,7 +15,7 @@
  * tests/unit/fixtures/preview-google-row.json so the two copies cannot drift.
  */
 import {
-  PREVIEW_MODEL_ROWS_BY_PROVIDER, PREVIEW_RESERVATION_TEMPLATE_BYTES, type PreviewModelRow
+  PREVIEW_MODEL_ROWS_BY_PROVIDER, previewReservationNanoUsd, type PreviewModelRow
 } from "./preview-models.js";
 
 /** The reviewed Google row (prices = the ceiling, $1.50 / $7.50 per million). */
@@ -114,9 +114,9 @@ export function previewGoogleLookaheadPrices(moment: Date): PreviewGooglePrices 
  * output price, at the prices given (the caller picks the moment and the rule).
  */
 export function previewGoogleReservationNanoUsd(framedBytes: number, prices: PreviewGooglePrices): bigint {
-  if (!Number.isSafeInteger(framedBytes) || framedBytes < 0) throw new TypeError("PREVIEW_BODY_BYTES_INVALID");
-  return BigInt(framedBytes + PREVIEW_RESERVATION_TEMPLATE_BYTES) * prices.inputNanoUsdPerToken
-    + BigInt(PREVIEW_GOOGLE_MODEL_ROW.outputBound) * prices.outputNanoUsdPerToken;
+  // The one reservation formula (contract A §3), at these prices instead of the row's static ones.
+  return previewReservationNanoUsd(Object.freeze({ ...PREVIEW_GOOGLE_MODEL_ROW,
+    inputNanoUsdPerToken: prices.inputNanoUsdPerToken, outputNanoUsdPerToken: prices.outputNanoUsdPerToken }), framedBytes);
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -130,10 +130,13 @@ function hasExactlyKeys(value: Readonly<Record<string, unknown>>, keys: readonly
 function isSendableText(value: unknown): value is string {
   return typeof value === "string" && !/\p{Cs}/u.test(value);
 }
-/** Exactly one part, and that part is exactly {"text": <string>}. */
+/**
+ * Exactly one part, and that part is exactly {"text": <non-empty string>}. Google refuses an empty
+ * text part, so such a call is refused here, before anything is reserved (the gate does the same).
+ */
 function isOneTextPart(parts: unknown): boolean {
   return Array.isArray(parts) && parts.length === 1 && isRecord(parts[0]) && hasExactlyKeys(parts[0], ["text"])
-    && isSendableText(parts[0].text);
+    && isSendableText(parts[0].text) && parts[0].text.length > 0;
 }
 
 /**
@@ -164,4 +167,16 @@ export function previewGoogleNativeBodyValid(native: unknown): boolean {
   }
   const max = config.maxOutputTokens;
   return typeof max === "number" && Number.isSafeInteger(max) && max >= 1 && max <= row.outputBound;
+}
+
+/**
+ * The per-token prices (nano-USD) a row's calls are reserved at, at `moment`: the Google row's
+ * three-day lookahead (what the guarded fetch reserves and the gate's /remaining reports), every
+ * other row its own static list price. The start-of-debate estimate prices its average call here,
+ * so a Gemini debate is estimated at the price in force, never at a later year's.
+ */
+export function previewRowPricesAt(row: PreviewModelRow, moment: Date): Readonly<{ inputNanoUsdPerToken: bigint; outputNanoUsdPerToken: bigint }> {
+  if (row.provider !== "google") return Object.freeze({ inputNanoUsdPerToken: row.inputNanoUsdPerToken, outputNanoUsdPerToken: row.outputNanoUsdPerToken });
+  const prices = previewGoogleLookaheadPrices(moment);
+  return Object.freeze({ inputNanoUsdPerToken: prices.inputNanoUsdPerToken, outputNanoUsdPerToken: prices.outputNanoUsdPerToken });
 }

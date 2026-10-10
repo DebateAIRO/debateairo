@@ -18,7 +18,7 @@ describe('the preview spending gate, Google profile and files (PR C)', () => {
     const result = runPython('tests/unit/preview_budget_authority_google_test.py', 30000);
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
-    expect(result.stderr).toContain('Ran 28 tests');
+    expect(result.stderr).toContain('Ran 34 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the Google gate units, forwarder, halt watcher and README offline', () => {
