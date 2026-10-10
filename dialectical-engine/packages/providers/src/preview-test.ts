@@ -45,7 +45,7 @@ export interface PreviewProviderTestConfig {
   readonly scope_id: string;
 }
 /** What the target check needs; the legacy five-key literal (v1 publish kit) still fits it. */
-export type PreviewTargetRosters = Readonly<{ free_model_ids: readonly string[]; premium_model_ids?: readonly string[] }>;
+export type PreviewTargetRosters = Readonly<Partial<PreviewProviderTestConfig> & { free_model_ids: readonly string[] }>;
 function refused(): never { throw new TypeError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID"); }
 const LEGACY_CONFIG_KEYS = ["budget_socket", "deployment", "free_model_ids", "requested_thinking_level", "scope_id"];
 const CONFIG_KEYS = [...LEGACY_CONFIG_KEYS, "premium_model_ids"].sort();

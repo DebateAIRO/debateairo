@@ -103,6 +103,7 @@ import {
   AskRoomResponseSchema
 } from "@debateai/contract";
 import type { Pool, PoolClient, QueryResultRow, QueryResult } from "pg";
+import { assertPreviewBudgetAdmits, type PreviewBudgetGateSettings } from "./preview-budget-estimate.js";
 import { createInitialBatteryRows, SplitLifecycleProjection, WorkItemRepository } from "@debateai/battery";
 import type { SpendScope, WaitsFor } from "@debateai/budget";
 import {
@@ -3831,6 +3832,12 @@ export class HatchetDispatcher implements Dispatcher {
 
 export interface RunCreationSettings {
   readonly previewProviderTestConfig?: PreviewProviderTestConfig;
+  /**
+   * Contract A §5: the preview's start-of-debate estimate asks the gate what is left today.
+   * Read only with `previewProviderTestConfig`; absent there, every preview ask is refused
+   * (fail closed). Off the preview it is never asked.
+   */
+  readonly previewBudgetGate?: PreviewBudgetGateSettings;
   /** Step 1: the preview's team; `submit` refuses everyone else (the route refuses them first). */
   readonly previewTeamUserIds?: readonly string[];
   readonly strangerSampleRate: number;
@@ -4251,6 +4258,19 @@ export async function evaluateAskAdmission(
     });
   } catch (error) {
     markAskRefusal(error);
+  }
+  // Owner's rule (never stop a debate half-way): on the preview, the debate's estimated calls and
+  // money must fit what the gate has left today, BEFORE any run exists. The panel is known and the
+  // basis resolved; the only model calls so far are discovery's. A refusal is the daily code (429).
+  if (previewConfig !== undefined) {
+    try {
+      await assertPreviewBudgetAdmits(settings.previewBudgetGate, {
+        basis: envelopeBasis,
+        panelModelIds: filteredPanel.map((member) => member.model_id)
+      });
+    } catch (error) {
+      markAskRefusal(error);
+    }
   }
   return {
     risk,

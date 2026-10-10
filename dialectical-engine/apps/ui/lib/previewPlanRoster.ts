@@ -20,7 +20,7 @@ function reviewedRoster(value: unknown): readonly string[] | undefined {
 }
 
 function makers(roster: readonly string[]): Set<string> {
-  return new Set(roster.map((id) => PREVIEW_MODEL_MAKERS[id]));
+  return new Set(roster.map((id) => PREVIEW_MODEL_MAKERS[id] ?? id));
 }
 
 /**

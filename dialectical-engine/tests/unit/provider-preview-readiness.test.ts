@@ -17,7 +17,7 @@ function feature(name:string){expect(name in providers,`missing provider integra
 function nativeGateway(fetchImplementation:typeof fetch){const target=providers.parseProviderDiscoveryTargets(JSON.stringify([row]),configured)[0]!;return new providers.OpenAICompatibleProviderGateway({endpoint:target.baseUrl,model:target.model,maker:target.maker,...providers.providerTargetGatewayControls(target),fetchImplementation,persistRawArtifact:async a=>a.artifactId,appendLedgerEntry:async e=>e.attemptId,assertNoOpenWriteTransaction:()=>undefined,sleepImplementation:async()=>undefined});}
 const request={runId:"run:synthetic",subjectItemId:"node:test",callSiteKey:"fixture:judge",role:"JUDGE" as const,lane:"served" as const,bound:{maxAttempts:3,tokenCeiling:2048,deadlineMs:5000},contractHash:"contract:test",providerRef:REF,packet:framedFixturePacket("Synthetic school phone policy; no personal data.")};
 const ask={question:"Ce regulă proporțională ar trebui aplicată telefoanelor în școli?",plan_tier:"free",risk_tier:"standard",tier_source:"ASKER",tier_provenance_ref:"synthetic:test",depth_params:{depth:1},composition_budget_tier:"low",decision_scope:"synthetic school policy",as_of:"2026-10-04T00:00:00Z",steering_presets:[],steering_annotations:[]} as unknown as AskRequest;
-function settings(extra:Partial<RunCreationSettings>={}):RunCreationSettings{return {strangerSampleRate:0,registerVersion:5,batteryVersion:"fixture",settlementWatchHandle:"fixture",resolveDiscoveredPanel:async()=>[{provider_ref:REF,maker:"Z.AI",model_id:MODEL,probe_evidence_ref:"fixture:probe",probed_at:"2026-10-04T00:00:00Z"}],resolveEnvelopeBasis:async input=>({panel_size:input.panelSize,max_model_attempts:8}),resolveRisk:(effectiveRiskTier,tierSource,tierProvenanceRef)=>({effectiveRiskTier,tierSource,tierProvenanceRef}),...extra};}
+function settings(extra:Partial<RunCreationSettings>={}):RunCreationSettings{return {strangerSampleRate:0,registerVersion:5,batteryVersion:"fixture",settlementWatchHandle:"fixture",previewBudgetGate:{remaining:{deepinfra:async()=>({state:"active",windowOpen:true,remainingNanoUsd:3_000_000_000n,remainingCalls:1200,maxConcurrentCalls:4,largestReservationNanoUsd:131_481_600n,enabledModels:[MODEL]})},roleModelIds:[],storyCalls:0},resolveDiscoveredPanel:async()=>[{provider_ref:REF,maker:"Z.AI",model_id:MODEL,probe_evidence_ref:"fixture:probe",probed_at:"2026-10-04T00:00:00Z"}],resolveEnvelopeBasis:async input=>({panel_size:input.panelSize,max_model_attempts:8}),resolveRisk:(effectiveRiskTier,tierSource,tierProvenanceRef)=>({effectiveRiskTier,tierSource,tierProvenanceRef}),...extra};}
 
 describe("preview provider readiness uses native seams",()=>{
  it("admits exact real GLM in a preview Free roster and honestly marks one maker",async()=>{const config=feature("parsePreviewProviderTestConfig")(JSON.stringify(CONFIG));const rosters=feature("previewPlanTierRosters")(config,PLAN_TIER_ROSTERS);const result=await evaluateAskAdmission(settings({previewProviderTestConfig:config}),ask);expect(result.discoveredPanel.map(x=>x.model_id)).toEqual([MODEL]);expect(result.criticUnavailableCap.conditionMarks).toEqual(["SINGLE-LINEAGE","CRITIQUE-UNAVAILABLE"]);expect(result.criticUnavailableCap.confidenceBandCapRequired).toBe(true);expect(PLAN_TIER_ROSTERS.free).toEqual(["gpt-5.6-luna","claude-sonnet-5"]);expect(rosters.premium).toEqual([MODEL]);});
@@ -150,5 +150,25 @@ describe("Step 1: the Premium coarse fit estimates the roster the preview really
   expect(await coarseFitFor(premiumAsk,"owner-fixture",billing(offPreview) as never,new Date("2026-10-08T10:00:00Z"))).toBe("AS_ASKED");
   expect(onPreview).toEqual([{planTier:"premium",compositionBudgetTier:"medium",makerCount:1,depth:2}]);
   expect(offPreview).toEqual([{planTier:"premium",compositionBudgetTier:"medium",makerCount:3,depth:2}]);
+ });
+});
+
+describe("multi-model (contract A §6): a two-maker preview roster is a real two-maker debate",()=>{
+ const DEEPSEEK="deepseek-ai/DeepSeek-V4.1-Flash";const MIMO="XiaomiMiMo/MiMo-V2.6-Pro";
+ const MULTI={...CONFIG,free_model_ids:[MODEL,DEEPSEEK],premium_model_ids:[MODEL,DEEPSEEK,MIMO]};
+ const member=(provider_ref:string,maker:string,model_id:string)=>({provider_ref,maker,model_id,probe_evidence_ref:`fixture:${provider_ref}`,probed_at:"2026-10-10T00:00:00Z"});
+ const discovered=[member("preview:fixture-a","Z.AI",MODEL),member("preview:fixture-b","Z.AI",MODEL),member("preview:deepseek-v4-1-flash","DeepSeek",DEEPSEEK),member("preview:mimo-v2-6-pro","Xiaomi",MIMO)];
+ const gate={remaining:{deepinfra:async()=>({state:"active" as const,windowOpen:true,remainingNanoUsd:3_000_000_000n,remainingCalls:1200,maxConcurrentCalls:4,largestReservationNanoUsd:227_635_200n,enabledModels:[MODEL,DEEPSEEK,MIMO]})},roleModelIds:[MODEL,DEEPSEEK],storyCalls:0};
+ it.each([["free",[MODEL,DEEPSEEK]],["premium",[MODEL,DEEPSEEK,MIMO]]] as const)("the %s roster maps to a panel of distinct makers: CAPABLE, no SINGLE-LINEAGE or CRITIQUE-UNAVAILABLE",async(tier,models)=>{
+  const config=feature("parsePreviewProviderTestConfig")(JSON.stringify(MULTI));
+  const result=await evaluateAskAdmission(settings({previewProviderTestConfig:config,previewBudgetGate:gate,resolveDiscoveredPanel:async()=>discovered}),{...ask,plan_tier:tier} as unknown as AskRequest);
+  expect(result.discoveredPanel.map(x=>x.model_id)).toEqual(models);
+  expect(new Set(result.discoveredPanel.map(x=>x.maker)).size).toBe(models.length);
+  expect(result.discoveredPanel[0]!.provider_ref).toBe("preview:fixture-a");
+  expect(result.criticUnavailableCap).toEqual({serves:true,conditionMarks:[],confidenceBandCapRequired:false,liftCondition:null});
+ });
+ it("a roster model that was not discovered refuses at start, never mid-way",async()=>{
+  const config=feature("parsePreviewProviderTestConfig")(JSON.stringify(MULTI));
+  await expect(evaluateAskAdmission(settings({previewProviderTestConfig:config,previewBudgetGate:gate,resolveDiscoveredPanel:async()=>discovered.slice(0,2)}),ask)).rejects.toMatchObject({code:"ASK_PLAN_TIER_MODEL_UNAVAILABLE"});
  });
 });
