@@ -30,6 +30,13 @@ import { developmentRunnerClaimMs } from "../../apps/runner/src/dev-runner-proce
  * and its proof is a database-backed race between two runners on one item.
  * Both are recorded in the RUN1 report; this file exists so the finding can
  * never quietly regrade itself back to "plausible".
+ *
+ * REPAIRED 2026-10-11 (owner ruling, options 1 + 3): the heartbeat is
+ * apps/runner/src/run-keep-alive.ts, fenced on the deadline last seen
+ * (`WorkItemRepository.renewClaim`), and the race is in
+ * tests/integration/database.test.ts ("L4-F9 / ADR-0017 §3(c)"). The arithmetic
+ * below still holds — the window still covers one call — which is why the
+ * window has to be renewed rather than lengthened.
  */
 
 const MEASURED_CALLS_IN_ONE_FULL_RUN = 114;

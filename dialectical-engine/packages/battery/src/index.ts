@@ -253,6 +253,16 @@ export interface DispatchableWorkItem {
   readonly workItemId: string;
 }
 
+/**
+ * What one claim renewal found (L4-F9 repair, ADR-0017 §3(c)'s permitted
+ * heartbeat): the claim extended, the item settled (DONE or FAILED, so no copy
+ * can claim it again), or the claim no longer the one this copy last saw.
+ */
+export type ClaimRenewal =
+  | { readonly kind: "RENEWED"; readonly claimDeadline: Date }
+  | { readonly kind: "FINISHED" }
+  | { readonly kind: "LOST" };
+
 export class WorkItemRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -421,6 +431,46 @@ export class WorkItemRepository {
         claimDeadline: row.claim_deadline,
         runId: row.run_id
       };
+    });
+  }
+
+  /**
+   * L4-F9 repair — extends a running copy's claim by `claimSeconds` from now, in
+   * its own short transaction (ADR-0017 §3(c): "extend the claim in a short
+   * separate transaction"; ADR-0009 clause 7(a) forbids only an open one across a
+   * call). The FENCE is the deadline this copy last saw: a copy that claimed the
+   * item after this one's claim lapsed wrote its own deadline, under the same
+   * worker id when it is a Hatchet retry in the same process, so the worker id
+   * alone cannot tell the two apart. The ±1 ms covers the driver reading the
+   * microsecond column as a millisecond Date; two claims of one item are always
+   * at least a claim length apart.
+   */
+  async renewClaim(input: {
+    readonly workItemId: string;
+    readonly workerId: string;
+    readonly claimSeconds: number;
+    readonly heldUntil: Date;
+  }): Promise<ClaimRenewal> {
+    if (!Number.isFinite(input.claimSeconds) || input.claimSeconds <= 0) {
+      throw new TypeError("claimSeconds must be a positive register value");
+    }
+    return withWriteTransaction(this.pool, async (client) => {
+      const result = await client.query<{ claim_deadline: Date | null; state: string | null }>(
+        `WITH renewed AS (
+          UPDATE core.work_item
+          SET claim_deadline = clock_timestamp() + make_interval(secs => $3)
+          WHERE work_item_id = $1 AND state = 'CLAIMED' AND claimed_by = $2
+            AND claim_deadline BETWEEN $4::timestamptz - interval '1 millisecond'
+                                   AND $4::timestamptz + interval '1 millisecond'
+          RETURNING claim_deadline
+        )
+        SELECT (SELECT claim_deadline FROM renewed) AS claim_deadline,
+               (SELECT state FROM core.work_item WHERE work_item_id = $1) AS state`,
+        [input.workItemId, input.workerId, input.claimSeconds, input.heldUntil]
+      );
+      const row = result.rows[0];
+      if (row?.claim_deadline != null) return { kind: "RENEWED", claimDeadline: row.claim_deadline };
+      return row?.state === "DONE" || row?.state === "FAILED" ? { kind: "FINISHED" } : { kind: "LOST" };
     });
   }
 
